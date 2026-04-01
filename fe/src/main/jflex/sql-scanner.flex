@@ -222,6 +222,7 @@ import org.apache.impala.thrift.TReservedWordsVersion;
     keywordMap.put("partition", SqlParserSymbols.KW_PARTITION);
     keywordMap.put("partitioned", SqlParserSymbols.KW_PARTITIONED);
     keywordMap.put("partitions", SqlParserSymbols.KW_PARTITIONS);
+    keywordMap.put("pivot", SqlParserSymbols.KW_PIVOT);
     keywordMap.put("preceding", SqlParserSymbols.KW_PRECEDING);
     keywordMap.put("prepare_fn", SqlParserSymbols.KW_PREPARE_FN);
     keywordMap.put("primary", SqlParserSymbols.KW_PRIMARY);

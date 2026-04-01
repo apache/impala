@@ -1210,7 +1210,7 @@ public class BuiltinsDb extends Db {
 
       db.addBuiltin(AggregateFunction.createBuiltin(db, "aggif",
           Lists.newArrayList(ScalarType.BOOLEAN, t), t, t,
-          initNull,
+          t.isStringType() ? initNullString : initNull,
           prefix + AGGIF_UPDATE_SYMBOL.get(t),
           prefix + AGGIF_MERGE_SYMBOL.get(t),
           null,

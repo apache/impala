@@ -217,6 +217,13 @@ public class PlannerTest extends PlannerTestBase {
   }
 
   @Test
+  public void testPivotClause() {
+    TQueryOptions options = defaultQueryOptions();
+    runPlannerTestFile("pivot-clause", options,
+        ImmutableSet.of(PlannerTestOption.VALIDATE_CARDINALITY));
+  }
+
+  @Test
   public void testAnalyticFns() {
     runPlannerTestFile("analytic-fns",
         ImmutableSet.of(PlannerTestOption.VALIDATE_CARDINALITY));

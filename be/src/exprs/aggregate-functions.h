@@ -396,7 +396,7 @@ class AggregateFunctions {
 
   /// The AGGIF(predicate, expr) function returns 'expr' if 'predicate' is true.
   /// It is expected that 'predicate' only returns true for a single row per group.
-  /// The predicate must not evaluate to NULL.
+  /// It skips the current row if 'predicate' is null.
   template <typename T>
   static void AggIfUpdate(FunctionContext*, const BooleanVal& cond, const T& src, T* dst);
   template <typename T>

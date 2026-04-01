@@ -29,7 +29,6 @@ import java.util.Map;
 import java.util.Set;
 
 import org.apache.impala.authorization.AuthorizationChecker;
-import org.apache.impala.authorization.AuthorizationContext;
 import org.apache.impala.authorization.Privilege;
 import org.apache.impala.authorization.TableMask;
 import org.apache.impala.catalog.Column;
@@ -882,11 +881,16 @@ public class TableRef extends StmtNode {
     return selectedDataFilesWithoutDeletesForOptimize_;
   }
 
+  // This method is called after the slot descriptor of this TableRef is registered in
+  // Analyzer.registerSlotRef(). It is designed to be overridden by the subclasses.
   void notifySlotRefRegistered(Analyzer analyzer, SlotDescriptor slot)
       throws AnalysisException {
     // Do nothing
   }
 
+  // This method is called after the slot descriptor of the TableRef is set to
+  // materialized in Analyzer.materializeSlots(). It is designed to be overridden by the
+  // subclasses.
   void notifySlotsMaterialized(Analyzer analyzer, Expr expr) {
     // Do nothing
   }

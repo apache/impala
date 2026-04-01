@@ -626,6 +626,14 @@ public class AnalysisContext {
           new StmtRewriter.ZippingUnnestRewriter().rewrite(stmt_);
           shouldReAnalyze = true;
         }
+        if (stmt_ instanceof SelectStmt) {
+          StmtRewriter.PivotClauseRewriter pivotClauseRewriter =
+              new StmtRewriter.PivotClauseRewriter();
+          pivotClauseRewriter.rewrite(stmt_);
+          if (pivotClauseRewriter.changed()) {
+            shouldReAnalyze = true;
+          }
+        }
         if (!shouldReAnalyze) {
           return new AnalysisResult(parsedStmt_, analyzer_);
         }

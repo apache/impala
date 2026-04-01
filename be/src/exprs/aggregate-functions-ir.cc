@@ -3284,26 +3284,24 @@ BigIntVal AggregateFunctions::SampledNdvFinalize(FunctionContext* ctx,
 template <typename T>
 void AggregateFunctions::AggIfUpdate(
     FunctionContext* ctx, const BooleanVal& cond, const T& src, T* dst) {
-  DCHECK(!cond.is_null);
-  if (cond.val) *dst = src;
+  if (!cond.is_null && cond.val) *dst = src;
 }
 
 template <>
 void AggregateFunctions::AggIfUpdate(
     FunctionContext* ctx, const BooleanVal& cond, const StringVal& src, StringVal* dst) {
-  DCHECK(!cond.is_null);
-  if (cond.val) CopyStringVal(ctx, src, dst);
+  if (!cond.is_null && cond.val) CopyStringVal(ctx, src, dst);
 }
 
 template <typename T>
 void AggregateFunctions::AggIfMerge(FunctionContext*, const T& src, T* dst) {
-  *dst = src;
+  if (!src.is_null) *dst = src;
 }
 
 template <>
 void AggregateFunctions::AggIfMerge(
     FunctionContext* ctx, const StringVal& src, StringVal* dst) {
-  CopyStringVal(ctx, src, dst);
+  if (!src.is_null) CopyStringVal(ctx, src, dst);
 }
 
 template <typename T>

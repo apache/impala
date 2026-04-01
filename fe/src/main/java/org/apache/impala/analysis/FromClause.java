@@ -193,8 +193,9 @@ public class FromClause extends StmtNode implements Iterable<TableRef> {
   public void reset() {
     for (int i = 0; i < size(); ++i) {
       TableRef origTblRef = get(i);
-      if (origTblRef instanceof UnpivotTableRef) {
-        // UnpivotTableRef.clone() creates an unanalyzed clone and can be used for reset.
+      if (origTblRef instanceof UnpivotTableRef || origTblRef instanceof PivotTableRef) {
+        // For UnpivotTableRef and PivotTableRef, clone() creates an unanalyzed clone and
+        // can be used for reset.
         set(i, origTblRef.clone());
         continue;
       }

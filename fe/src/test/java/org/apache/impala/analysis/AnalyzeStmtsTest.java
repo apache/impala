@@ -450,6 +450,73 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
     );
   }
 
+  public void TestPivotClause() {
+    AnalysisError(
+        "select month from functional_parquet.alltypestiny pivot (" +
+        "    count(month) for month in (1 as v1)) as t;",
+        "Could not resolve column/field reference: 'month'"
+    );
+    AnalysisError(
+        "select year, v1 from functional_parquet.alltypestiny pivot (" +
+        "    sleep(1) for month in (1 as v1, 2 as v2)) as t;",
+        "The function called in the PIVOT clause should be an aggregate"
+    );
+    AnalysisError(
+        "select year, v1 from functional_parquet.alltypestiny pivot (" +
+        "    min(month) for month in (1 as v1, 2 as v1)) as t;",
+        "Duplicate alias for header values in the PIVOT clause: v1"
+    );
+    AnalysisError(
+        "select year, v1 from functional_parquet.alltypestiny pivot (" +
+        "    min(month) for month in (1 as v1, 1 as v2)) as t;",
+        "Duplicate value in the PIVOT clause: 1"
+    );
+    AnalysisError(
+        "select year from functional_parquet.alltypestiny pivot (" +
+        "    min(month) for month in (1 as year)) as t;",
+        "Duplicate column name: year"
+    );
+    AnalysisError(
+        "with t1 (a, b) as (select 1, 'a')" +
+        "select * from t1 pivot (count(*) for b in ('a')) as t;",
+        "Duplicate column name: a"
+    );
+    AnalysisError(
+        "select year from functional_parquet.alltypestiny pivot (" +
+        "    min(month) for month in (1, 2 as `1`)) as t;",
+        "Duplicate alias in the PIVOT clause: 1"
+    );
+    AnalysisError(
+        "select alltypes from functional_parquet.complextypes_structs pivot (" +
+        "    count(*) for id in (1)) as t;",
+        "Referencing complex columns in the source table of the PIVOT clause " +
+        "is not supported"
+    );
+    AnalysisError(
+        "select year, v1 from functional_parquet.alltypestiny pivot (" +
+        "    min(month), max(month) for month in (1 as v1, 2 as v2)) as t;",
+        "Aliases are required when multiple aggregate expressions are specified " +
+        "in the PIVOT clause"
+    );
+    AnalysisError(
+        "SELECT v1, v2 FROM functional.alltypes PIVOT ( " +
+        "    count(id) for month in (int_col AS v1, 2 AS v2) ) AS t;",
+        "Only literals are suppoted in the header value list of the PIVOT clause"
+    );
+    AnalysisError(
+        "with t1 (v2_min, b) as (select 1, 2) " +
+        "select * from t1 pivot (" +
+        "    min(b) as min, max(b) as max for b in (2 as v2, 4 as v4)) as t;",
+        "Duplicate column name: v2_min"
+    );
+    AnalysisError(
+        "with t1 (a, b) as (select 1, 2) " +
+        "select * from t1 pivot (" +
+        "    min(b) as min, max(b) as min for b in (2 as v2, 4 as v4)) as t;",
+        "Duplicate alias for aggregations in the PIVOT clause: min"
+    );
+  }
+
   /**
    * Helper function that returns a list of integers used to improve readability
    * in the path-related tests below.

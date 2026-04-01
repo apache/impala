@@ -98,6 +98,9 @@ public class StmtRewriter {
   protected void rewriteSelectStatement(SelectStmt stmt, Analyzer analyzer)
       throws AnalysisException {
     for (TableRef tblRef : stmt.fromClause_) {
+      if (tblRef instanceof PivotTableRef) {
+        tblRef = ((PivotTableRef)tblRef).getSourceTableRef();
+      }
       if (!(tblRef instanceof InlineViewRef)) continue;
       InlineViewRef inlineViewRef = (InlineViewRef) tblRef;
       rewriteQueryStatement(inlineViewRef.getViewStmt(), inlineViewRef.getAnalyzer());
@@ -1879,5 +1882,23 @@ public class StmtRewriter {
       Preconditions.checkState(stmt.getResultExprs().size() >= unnestTableRefs.size());
       for (TableRef tblRef : unnestTableRefs) stmt.fromClause_.add(tblRef);
     }
+  }
+
+  static class PivotClauseRewriter extends StmtRewriter {
+    private boolean changed_ = false;
+
+    @Override
+    protected void rewriteSelectStmtHook(SelectStmt stmt, Analyzer analyzer)
+        throws AnalysisException {
+      for (int i = 0; i < stmt.fromClause_.getTableRefs().size(); ++i) {
+        if (stmt.fromClause_.get(i) instanceof PivotTableRef) {
+          PivotTableRef pivotTableRef = (PivotTableRef)stmt.fromClause_.get(i);
+          stmt.fromClause_.set(i, pivotTableRef.toInlineViewRef(null));
+          changed_ = true;
+        }
+      }
+    }
+
+    boolean changed() { return changed_; }
   }
 }

@@ -1,0 +1,434 @@
+====
+---- QUERY
+# Each result column of PIVOT contains the minimum id in the month.
+select year, v1, v2, v3, v4
+from functional_parquet.alltypestiny pivot (
+    min(id) for month in (1 as v1, 2 as v2, 3 as v3, 4 as v4)) as t;
+---- TYPES
+INT,INT,INT,INT,INT
+---- RESULTS
+2009,0,2,4,6
+====
+---- QUERY
+# The child node of the AGGREGATE node is a SCAN node.
+# min(month) is used to easily check if the value of `month` for the result
+# column matches the value in the PIVOT clause.
+select year, v1, v2, v3, v4
+from functional_parquet.alltypestiny pivot (
+    min(month) for month in (1 as v1, 2 as v2, 3 as v3, 4 as v4)) as t;
+---- TYPES
+INT,INT,INT,INT,INT
+---- RESULTS
+2009,1,2,3,4
+====
+---- QUERY
+# Uses DISTINCT aggregation in the PIVOT clause.
+select year, v1, v2, v3, v4
+from functional_parquet.alltypestiny pivot (
+    count(distinct month) for month in (1 as v1, 2 as v2, 3 as v3, 4 as v4)) as t;
+---- TYPES
+INT,BIGINT,BIGINT,BIGINT,BIGINT
+---- RESULTS
+2009,1,1,1,1
+====
+---- QUERY
+select year, v1
+from functional_parquet.alltypestiny pivot (
+    count(*) for month in (1 as v1, 2 as v2)) as t;
+---- TYPES
+INT,BIGINT
+---- RESULTS
+2009,2
+====
+---- QUERY
+select year, v1
+from functional_parquet.alltypestiny pivot (
+    count(1) for month in (1 as v1, 2 as v2)) as t;
+---- TYPES
+INT,BIGINT
+---- RESULTS
+2009,2
+====
+---- QUERY
+# The parent node of the AGGREGATE node is a SORT node.
+select v1, v2, v3, v4
+from functional_parquet.alltypestiny pivot (
+    min(month) for month in (1 as v1, 2 as v2, 3 as v3, 4 as v4)
+) as t
+order by year;
+---- TYPES
+INT,INT,INT,INT
+---- RESULTS
+1,2,3,4
+====
+---- QUERY
+# The child node of the AGGRTEGATE node is a UNION node.
+with t1 (a, b) as (
+    values (1, 2), (3, 4)
+)
+select a from t1 pivot (
+    min(b) for b in (2 as v2, 4 as v4)
+) as t;
+---- TYPES
+TINYINT
+---- RESULTS
+3
+1
+====
+---- QUERY
+with t1 (a, b) as (
+    values (1, 2), (3, 4)
+)
+select a, v2, v4 from t1 pivot (
+    min(b) for b in (2 as v2, 4 as v4)
+) as t;
+---- TYPES
+TINYINT,TINYINT,TINYINT
+---- RESULTS
+3,NULL,4
+1,2,NULL
+====
+---- QUERY
+# The type of the pivot values is different from the type of the pivot column.
+with t1 (a, b) as (
+    values (1, CAST(NULL AS INT))
+)
+select a, v2, v4 from t1 pivot (
+    min(b) for b in (2 as v2, 4 as v4)
+) as t;
+---- TYPES
+TINYINT,INT,INT
+---- RESULTS
+1,NULL,NULL
+====
+---- QUERY
+# The pivot column only contains NULLs.
+with t1 (a, b) as (
+    values (1, CAST(NULL AS STRING))
+)
+select a, v2, v4, v2 IS NULL, v4 IS NULL from t1 pivot (
+    min(b) for b in ('2' as v2, '4' as v4)
+) as t;
+---- TYPES
+TINYINT,STRING,STRING,BOOLEAN,BOOLEAN
+---- RESULTS
+1,'NULL','NULL',true,true
+====
+---- QUERY
+# The child node of the AGGREGATE node is an inner JOIN node.
+with t1 (a, b) as (
+    values (1, 2), (3, 4)
+), t2 as (
+    select t11.a as a1, t11.b as b1, t12.a as a2, t12.b as b2
+    from t1 as t11 join t1 as t12
+)
+select a1, v2, v4 from t2 pivot (
+    count(b2) for b2 in (2 as v2, 4 as v4)
+) as t;
+---- TYPES
+TINYINT,BIGINT,BIGINT
+---- RESULTS
+1,1,1
+3,1,1
+====
+---- QUERY
+# The child node of the AGGREGATE node is an outer JOIN node.
+with t1 (a, b) as (
+    values (1, 2), (3, 4)
+), t2 (a, b) as (
+    values (5, 6), (7, 8)
+), t3 as (
+    select t1.a as a1, t1.b as b1, t2.a as a2, t2.b as b2
+    from t1 left outer join t2 on t1.a = t2.a
+)
+select a1, v2, v4 from t3 pivot (
+    count(b2) for b2 in (2 as v2, 4 as v4)
+) as t;
+---- TYPES
+TINYINT,BIGINT,BIGINT
+---- RESULTS
+1,NULL,NULL
+3,NULL,NULL
+====
+---- QUERY
+# The PIVOT clause is in an inline view.
+with t1 (a, b) as (
+    values (1, 2), (3, 4)
+), t2 as (
+    select a, v2, v4 from t1 pivot (
+        min(b) for b in (2 as v2, 4 as v4)
+    ) as t
+)
+select * from t2;
+---- TYPES
+TINYINT,TINYINT,TINYINT
+---- RESULTS
+3,NULL,4
+1,2,NULL
+====
+---- QUERY
+# PIVOT on a local view.
+select year, m5, m6 from functional.alltypes_view pivot (
+    count(*) for month in (5 as m5, 6 as m6)
+) as t;
+---- TYPES
+INT,BIGINT,BIGINT
+---- RESULTS
+2009,310,300
+2010,310,300
+====
+---- QUERY
+# Selects * from the PIVOT table
+select * from functional_parquet.alltypestiny pivot (
+    min(month) for month in (1 as v1, 2 as v2, 3 as v3, 4 as v4)) as t
+order by id;
+---- TYPES
+INT,INT,BOOLEAN,TINYINT,SMALLINT,INT,BIGINT,FLOAT,DOUBLE,STRING,STRING,TIMESTAMP,INT,INT,INT,INT
+---- RESULTS
+2009,0,true,0,0,0,0,0.0,0.0,'01/01/09','0',2009-01-01 00:00:00,1,NULL,NULL,NULL
+2009,1,false,1,1,1,10,1.100000023841858,10.1,'01/01/09','1',2009-01-01 00:01:00,1,NULL,NULL,NULL
+2009,2,true,0,0,0,0,0.0,0.0,'02/01/09','0',2009-02-01 00:00:00,NULL,2,NULL,NULL
+2009,3,false,1,1,1,10,1.100000023841858,10.1,'02/01/09','1',2009-02-01 00:01:00,NULL,2,NULL,NULL
+2009,4,true,0,0,0,0,0.0,0.0,'03/01/09','0',2009-03-01 00:00:00,NULL,NULL,3,NULL
+2009,5,false,1,1,1,10,1.100000023841858,10.1,'03/01/09','1',2009-03-01 00:01:00,NULL,NULL,3,NULL
+2009,6,true,0,0,0,0,0.0,0.0,'04/01/09','0',2009-04-01 00:00:00,NULL,NULL,NULL,4
+2009,7,false,1,1,1,10,1.100000023841858,10.1,'04/01/09','1',2009-04-01 00:01:00,NULL,NULL,NULL,4
+====
+---- QUERY
+# Evaluates a predicate in the AGGREGATE node.
+with t1 (a, b) as (
+    values (1, 2), (3, 4)
+)
+select v2, v4 from t1 pivot (
+    min(b) for b in (2 as v2, 4 as v4)
+) as t
+where a = 1;
+---- TYPES
+TINYINT,TINYINT
+---- RESULTS
+2,NULL
+====
+---- QUERY
+# The predicate should be pushed down to the SCAN node.
+select v1, v2, v3, v4 from functional_parquet.alltypestiny pivot (
+    min(month) for month in (1 as v1, 2 as v2, 3 as v3, 4 as v4)) as t
+where id = 1;
+---- TYPES
+INT,INT,INT,INT
+---- RESULTS
+1,NULL,NULL,NULL
+====
+---- QUERY
+# The child of the AGGREGATE node is an ANALYTIC node.
+with t1 as (
+    select id, row_number() over (order by id) as b
+    from functional_parquet.alltypestiny
+)
+select * from t1 pivot (
+    min(b) for b in (
+        1 as v1, 2 as v2, 3 as v3, 4 as v4, 5 as v5, 6 as v6, 7 as v7, 8 as v8)
+) as t
+order by id;
+---- TYPES
+INT,BIGINT,BIGINT,BIGINT,BIGINT,BIGINT,BIGINT,BIGINT,BIGINT
+---- RESULTS
+0,1,NULL,NULL,NULL,NULL,NULL,NULL,NULL
+1,NULL,2,NULL,NULL,NULL,NULL,NULL,NULL
+2,NULL,NULL,3,NULL,NULL,NULL,NULL,NULL
+3,NULL,NULL,NULL,4,NULL,NULL,NULL,NULL
+4,NULL,NULL,NULL,NULL,5,NULL,NULL,NULL
+5,NULL,NULL,NULL,NULL,NULL,6,NULL,NULL
+6,NULL,NULL,NULL,NULL,NULL,NULL,7,NULL
+7,NULL,NULL,NULL,NULL,NULL,NULL,NULL,8
+====
+---- QUERY
+# The AGGREGATE node reads from an TOP-N node.
+with t1 as (
+    select month
+    from functional_parquet.alltypestiny
+    order by year limit 8
+)
+select v1, v2, v3, v4 from t1 pivot (
+    count(month) for month in (1 as v1, 2 as v2, 3 as v3, 4 as v4)) as t;
+---- TYPES
+BIGINT,BIGINT,BIGINT,BIGINT
+---- RESULTS
+2,2,2,2
+====
+---- QUERY
+# The output of the AGGREGATE node is consumed by a JOIN node.
+with t1 as (
+    select year, v1, v2
+    from functional_parquet.alltypestiny pivot (
+        min(month) for month in (1 as v1, 2 as v2)) as t
+)
+select t1.year, v1, v2
+from t1 join functional_parquet.alltypestiny as t2 on t1.year = t2.year;
+---- TYPES
+INT,INT,INT
+---- RESULTS
+2009,1,2
+2009,1,2
+2009,1,2
+2009,1,2
+2009,1,2
+2009,1,2
+2009,1,2
+2009,1,2
+====
+---- QUERY
+# The output of the AGGREGATE node is consumed by a JOIN node on a column
+# created from the split.
+with t1 as (
+    select year, v1, v2
+    from functional_parquet.alltypestiny pivot (
+        min(month) for month in (1 as v1, 2 as v2)) as t
+)
+select t1.year, v1, v2
+from t1 join functional_parquet.alltypestiny as t2 on t1.v2 = t2.month;
+---- TYPES
+INT,INT,INT
+---- RESULTS
+2009,1,2
+2009,1,2
+====
+---- QUERY
+# The child of the AGGREGATE NODE is a UNION node for a constant SELECT.
+# Aliases in the PIVOT clause should be optional.
+with t1 (a, b) as (
+    select 1, 2
+), t2 (a, b, c) as (
+    select * from t1 pivot (min(b) for b in (1, 2)) as t
+)
+select * from t2;
+---- LABELS
+a,b,c
+---- TYPES
+TINYINT,TINYINT,TINYINT
+---- RESULTS
+1,NULL,2
+====
+---- QUERY
+# The source table is a collection column.
+select * from functional_parquet.complextypestbl.int_map pivot (
+    min(value) for key in ('k1', 'k2', 'k3')
+) as t;
+---- TYPES
+INT,INT,INT,INT
+---- RESULTS
+1,1,NULL,NULL
+-1,-1,NULL,NULL
+NULL,NULL,NULL,NULL
+2,2,NULL,NULL
+100,NULL,100,NULL
+====
+---- QUERY
+# The PIVOT clause contains multiple aggregate function calls.
+with t1 (a, b) as (
+    values (1, 2), (3, 4)
+)
+select * from t1 pivot (
+    min(b) as min, max(b) as max for b in (2 as v2, 4 as v4)
+) as t;
+---- LABELS
+a,v2_min,v2_max,v4_min,v4_max
+---- TYPES
+TINYINT,TINYINT,TINYINT,TINYINT,TINYINT
+---- RESULTS
+3,NULL,NULL,4,4
+1,2,2,NULL,NULL
+====
+---- QUERY
+# Aggregates with multiple DISTINCTs in the PIVOT clause.
+with t1 (a, b, c) as (
+    values (1, 2, 3), (1, 2, 3), (1, 2, 4)
+)
+select v2_count_a, v2_count_c from t1 pivot (
+    count(distinct a) as count_a, count(distinct c) as count_c for b in (2 as v2)
+) as t;
+---- TYPES
+BIGINT,BIGINT
+---- RESULTS
+1,2
+====
+---- QUERY
+# The aggregate function has multiple parameters.
+with t1 (a, b) as (
+    values (1, 'a'), (1, 'b')
+)
+select v1 from t1 pivot (
+    group_concat(b, ',') for a in (1 as v1)
+) as t;
+---- TYPES
+STRING
+---- RESULTS
+'a,b'
+====
+---- QUERY
+# The query contains a HAVING clause.
+select year, m5, m6
+from functional.alltypes pivot(
+    max(id) for month in (5 as m5, 6 as m6)
+) as t
+having m5 > 2000;
+---- TYPES
+INT,INT,INT
+---- RESULTS
+2010,5159,5459
+====
+---- QUERY
+# Nested PIVOT operation.
+with t1 as (
+    select year, v1, v2
+    from functional_parquet.alltypestiny pivot (
+        min(id) for month in (1 as v1, 2 as v2)) as t
+)
+select * from t1 pivot (
+    min(v1) for year in (2009 as y2009)) as t2;
+---- LABELS
+v1,v2,y2009
+---- TYPES
+INT,INT,INT
+---- RESULTS
+0,2,0
+====
+---- QUERY
+# The PIVOT clause is in a Set Operation statement.
+with t as (
+    select year, v1, v2
+    from functional_parquet.alltypestiny pivot (
+        min(month) for month in (1 as v1, 2 as v2)) as t
+    intersect
+    select year, v1, v2
+    from functional_parquet.alltypestiny pivot (
+        min(month) for month in (1 as v1, 2 as v2)) as t2
+)
+select * from t;
+---- LABELS
+year,v1,v2
+---- TYPES
+INT,INT,INT
+---- RESULTS
+2009,1,2
+====
+---- QUERY
+# The PIVOT clause is in a CREATE TABLE AS statement.
+create table test_pivot_ctas as
+    select year, v1, v2, v3, v4
+    from functional_parquet.alltypestiny pivot (
+        min(month) for month in (1 as v1, 2 as v2, 3 as v3, 4 as v4)) as t;
+---- CATCH
+NotImplementedException: Planning not implemented for table ref class: class org.apache.impala.analysis.PivotTableRef
+====
+---- QUERY
+create table test_pivot_insert (
+    v1 int,
+    v2 int
+) stored as parquet;
+insert into test_pivot_insert
+    select v1, v2
+    from functional_parquet.alltypestiny pivot (
+        min(month) for month in (1 as v1, 2 as v2)) as t;
+---- CATCH
+NotImplementedException: Planning not implemented for table ref class: class org.apache.impala.analysis.PivotTableRef
+====

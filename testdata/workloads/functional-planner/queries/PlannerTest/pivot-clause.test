@@ -1,0 +1,230 @@
+# The child node of the AGGREGATE node is a SCAN node.
+# The predicate should be pushed down to the SCAN node.
+select year, v1, v2
+from functional_parquet.alltypestiny pivot (
+    min(month) as result for month in (1 as v1, 2 as v2)) as t
+where year = 2009;
+---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
+07:EXCHANGE [UNPARTITIONED]
+|
+06:AGGREGATE [FINALIZE]
+|  output: aggif:merge(`month` = 1, result), aggif:merge(`month` = 2, result)
+|  group by: `year`
+|  row-size=12B cardinality=1
+|
+05:EXCHANGE [HASH(`year`)]
+|
+02:AGGREGATE [STREAMING]
+|  output: aggif(`month` = 1, min(`month`)), aggif(`month` = 2, min(`month`))
+|  group by: `year`
+|  row-size=12B cardinality=3
+|
+04:AGGREGATE [FINALIZE]
+|  output: min:merge(`month`)
+|  group by: `month`, `year`
+|  row-size=12B cardinality=4
+|
+03:EXCHANGE [HASH(`month`,`year`)]
+|
+01:AGGREGATE [STREAMING]
+|  output: min(`month`)
+|  group by: `month`, `year`
+|  row-size=12B cardinality=4
+|
+00:SCAN HDFS [functional_parquet.alltypestiny]
+   partition predicates: functional_parquet.alltypestiny.year = 2009
+   HDFS partitions=4/4 files=4 size=11.92KB
+   partition key scan
+   row-size=8B cardinality=4
+====
+# The child node of the AGGREGATE node is a SCAN node.
+# The predicate should be evaluated in the AGGREGATE node.
+select year, v1, v2
+from functional_parquet.alltypestiny pivot (
+    min(month) as result for month in (1 as v1, 2 as v2)) as t
+where v1 = 1;
+---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
+07:EXCHANGE [UNPARTITIONED]
+|
+06:AGGREGATE [FINALIZE]
+|  output: aggif:merge(`month` = 1, result), aggif:merge(`month` = 2, result)
+|  group by: `year`
+|  having: aggif(`month` = 1, result) = 1
+|  row-size=12B cardinality=1
+|
+05:EXCHANGE [HASH(`year`)]
+|
+02:AGGREGATE [STREAMING]
+|  output: aggif(`month` = 1, min(`month`)), aggif(`month` = 2, min(`month`))
+|  group by: `year`
+|  row-size=12B cardinality=3
+|
+04:AGGREGATE [FINALIZE]
+|  output: min:merge(`month`)
+|  group by: `month`, `year`
+|  row-size=12B cardinality=4
+|
+03:EXCHANGE [HASH(`month`,`year`)]
+|
+01:AGGREGATE [STREAMING]
+|  output: min(`month`)
+|  group by: `month`, `year`
+|  row-size=12B cardinality=4
+|
+00:SCAN HDFS [functional_parquet.alltypestiny]
+   HDFS partitions=4/4 files=4 size=11.92KB
+   partition key scan
+   row-size=8B cardinality=4
+====
+# The output of the AGGREGATE node is consumed by a JOIN node.
+with t1 as (
+    select year, v1, v2
+    from functional_parquet.alltypestiny pivot (
+        min(month) as result for month in (1 as v1, 2 as v2)) as t
+)
+select t1.year, v1, v2 from t1
+join functional_parquet.alltypestiny as t2 on t1.year = t2.year;
+---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
+10:EXCHANGE [UNPARTITIONED]
+|
+04:HASH JOIN [INNER JOIN, BROADCAST]
+|  hash predicates: t2.`year` = `year`
+|  runtime filters: RF000 <- `year`, RF001 <- `year`
+|  row-size=16B cardinality=758
+|
+|--09:EXCHANGE [BROADCAST]
+|  |
+|  08:AGGREGATE [FINALIZE]
+|  |  output: aggif:merge(`month` = 1, result), aggif:merge(`month` = 2, result)
+|  |  group by: `year`
+|  |  row-size=12B cardinality=1
+|  |
+|  07:EXCHANGE [HASH(`year`)]
+|  |
+|  02:AGGREGATE [STREAMING]
+|  |  output: aggif(`month` = 1, min(`month`)), aggif(`month` = 2, min(`month`))
+|  |  group by: `year`
+|  |  row-size=12B cardinality=3
+|  |
+|  06:AGGREGATE [FINALIZE]
+|  |  output: min:merge(`month`)
+|  |  group by: `month`, `year`
+|  |  row-size=12B cardinality=4
+|  |
+|  05:EXCHANGE [HASH(`month`,`year`)]
+|  |
+|  01:AGGREGATE [STREAMING]
+|  |  output: min(`month`)
+|  |  group by: `month`, `year`
+|  |  row-size=12B cardinality=4
+|  |
+|  00:SCAN HDFS [functional_parquet.alltypestiny]
+|     HDFS partitions=4/4 files=4 size=11.92KB
+|     partition key scan
+|     row-size=8B cardinality=4
+|
+03:SCAN HDFS [functional_parquet.alltypestiny t2]
+   HDFS partitions=4/4 files=4 size=11.92KB
+   runtime filters: RF001 -> t2.`year`, RF000 -> t2.`year`
+   row-size=4B cardinality=758
+====
+# The output of the AGGREGATE node is consumed by a JOIN node on a column
+# created from the split.
+with t1 as (
+    select year, v1, v2
+    from functional_parquet.alltypestiny pivot (
+        min(month) as result for month in (1 as v1, 2 as v2)) as t
+)
+select t1.year, v1, v2 from t1
+join functional_parquet.alltypestiny as t2 on t1.v2 = t2.month;
+---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
+10:EXCHANGE [UNPARTITIONED]
+|
+04:HASH JOIN [INNER JOIN, BROADCAST]
+|  hash predicates: t2.`month` = aggif(`month` = 2, result)
+|  runtime filters: RF000 <- aggif(`month` = 2, result), RF001 <- aggif(`month` = 2, result)
+|  row-size=16B cardinality=758
+|
+|--09:EXCHANGE [BROADCAST]
+|  |
+|  08:AGGREGATE [FINALIZE]
+|  |  output: aggif:merge(`month` = 1, result), aggif:merge(`month` = 2, result)
+|  |  group by: `year`
+|  |  row-size=12B cardinality=1
+|  |
+|  07:EXCHANGE [HASH(`year`)]
+|  |
+|  02:AGGREGATE [STREAMING]
+|  |  output: aggif(`month` = 1, min(`month`)), aggif(`month` = 2, min(`month`))
+|  |  group by: `year`
+|  |  row-size=12B cardinality=3
+|  |
+|  06:AGGREGATE [FINALIZE]
+|  |  output: min:merge(`month`)
+|  |  group by: `month`, `year`
+|  |  row-size=12B cardinality=4
+|  |
+|  05:EXCHANGE [HASH(`month`,`year`)]
+|  |
+|  01:AGGREGATE [STREAMING]
+|  |  output: min(`month`)
+|  |  group by: `month`, `year`
+|  |  row-size=12B cardinality=4
+|  |
+|  00:SCAN HDFS [functional_parquet.alltypestiny]
+|     HDFS partitions=4/4 files=4 size=11.92KB
+|     partition key scan
+|     row-size=8B cardinality=4
+|
+03:SCAN HDFS [functional_parquet.alltypestiny t2]
+   HDFS partitions=4/4 files=4 size=11.92KB
+   runtime filters: RF001 -> t2.`month`, RF000 -> t2.`month`
+   row-size=4B cardinality=758
+====
+# Aggregates with multiple DISTINCTs in the PIVOT clause.
+with t1 (a, b, c) as (
+    values (1, 2, 3), (1, 2, 3), (1, 2, 4)
+)
+select v2_count_a, v2_count_c from t1 pivot (
+    count(distinct a) as count_a, count(distinct c) as count_c for b in (2 as v2)
+) as t;
+---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
+04:AGGREGATE [FINALIZE]
+|  output: aggif(CASE valid_tid(3,5) WHEN 3 THEN b WHEN 5 THEN b END = 2, aggif(valid_tid(3,5) = 3, count(a))), aggif(CASE valid_tid(3,5) WHEN 3 THEN b WHEN 5 THEN b END = 2, aggif(valid_tid(3,5) = 5, count(c)))
+|  row-size=16B cardinality=1
+|
+03:AGGREGATE [FINALIZE]
+|  output: aggif(valid_tid(3,5) = 3, count(a)), aggif(valid_tid(3,5) = 5, count(c))
+|  group by: CASE valid_tid(3,5) WHEN 3 THEN b WHEN 5 THEN b END
+|  row-size=17B cardinality=3
+|
+02:AGGREGATE [FINALIZE]
+|  Class 0
+|    output: count(a)
+|    group by: b
+|  Class 1
+|    output: count(c)
+|    group by: b
+|  row-size=18B cardinality=6
+|
+01:AGGREGATE
+|  Class 0
+|    group by: 2, 1
+|  Class 1
+|    group by: 2, 3
+|  row-size=4B cardinality=6
+|
+00:UNION
+   constant-operands=3
+   row-size=3B cardinality=3
+====
