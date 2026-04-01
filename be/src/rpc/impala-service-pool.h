@@ -37,6 +37,9 @@ class Thread;
 /// Also includes a queue that calls get pushed onto for handling by the pool.
 class ImpalaServicePool : public kudu::rpc::RpcService {
  public:
+  /// 'incoming_queue_time' is a histogram to track the time it takes for a
+  /// reactor thread to dispatch to a service thread
+  ///
   /// 'service_queue_length' is the maximum number of requests that may be queued for
   /// this service before clients begin to see rejection errors.
   ///
@@ -47,6 +50,7 @@ class ImpalaServicePool : public kudu::rpc::RpcService {
   ///
   /// 'address' is the ip address and port that 'service' runs on.
   ImpalaServicePool(const scoped_refptr<kudu::MetricEntity>& entity,
+      scoped_refptr<kudu::Histogram> incoming_queue_time,
       int service_queue_length, kudu::rpc::GeneratedServiceIf* service,
       MemTracker* service_mem_tracker, const NetworkAddressPB& address,
       MetricGroup* rpc_metrics);

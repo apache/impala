@@ -120,6 +120,9 @@ class RpcMgr {
 
   /// Register a new service.
   ///
+  /// 'incoming_queue_time' is a histogram to track the time it takes for a
+  /// reactor thread to dispatch to a service thread
+  ///
   /// 'num_service_threads' is the number of threads that should be started to execute RPC
   /// handlers for the new service.
   ///
@@ -135,6 +138,7 @@ class RpcMgr {
   ///
   /// It is an error to call this after StartServices() has been called.
   Status RegisterService(int32_t num_service_threads, int32_t service_queue_depth,
+      scoped_refptr<kudu::Histogram> incoming_queue_time,
       kudu::rpc::GeneratedServiceIf* service_ptr, MemTracker* service_mem_tracker,
       MetricGroup* rpc_metrics) WARN_UNUSED_RESULT;
 

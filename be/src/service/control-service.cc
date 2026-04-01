@@ -59,6 +59,11 @@ DEFINE_int32(control_service_num_svc_threads, 0, "Number of threads for processi
     "CPU cores. Set it to a positive value to change from the default.");
 DECLARE_string(debug_actions);
 
+METRIC_DEFINE_histogram(server, control_service_incoming_queue_time,
+    "Control Service RPC Queue Time", kudu::MetricUnit::kMicroseconds,
+    "Number of microseconds incoming RPC requests spend in the worker queue",
+    kudu::MetricLevel::kInfo, 60000000LU, 3);
+
 namespace impala {
 
 ControlService::ControlService(MetricGroup* metric_group)
@@ -81,11 +86,13 @@ ControlService::ControlService(MetricGroup* metric_group)
 Status ControlService::Init() {
   int num_svc_threads = FLAGS_control_service_num_svc_threads > 0 ?
       FLAGS_control_service_num_svc_threads : CpuInfo::num_cores();
+  RpcMgr* rpc_mgr = ExecEnv::GetInstance()->rpc_mgr();
   // The maximum queue length is set to maximum 32-bit value. Its actual capacity is
   // bound by memory consumption against 'mem_tracker_'.
-  RETURN_IF_ERROR(ExecEnv::GetInstance()->rpc_mgr()->RegisterService(num_svc_threads,
-      std::numeric_limits<int32_t>::max(), this, mem_tracker_.get(),
-      ExecEnv::GetInstance()->rpc_metrics()));
+  RETURN_IF_ERROR(rpc_mgr->RegisterService(num_svc_threads,
+      std::numeric_limits<int32_t>::max(),
+      METRIC_control_service_incoming_queue_time.Instantiate(rpc_mgr->metric_entity()),
+      this, mem_tracker_.get(), ExecEnv::GetInstance()->rpc_metrics()));
   return Status::OK();
 }
 

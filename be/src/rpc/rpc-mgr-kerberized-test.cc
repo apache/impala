@@ -99,11 +99,13 @@ TEST_P(RpcMgrKerberizedTest, AuthorizationFail) {
       TakeOverService(make_unique<ScanMemServiceImpl>(&rpc_mgr_));
   const int num_service_threads = 10;
   const int queue_size = 10;
-  ASSERT_OK(rpc_mgr_.RegisterService(num_service_threads, queue_size, ping_impl,
-      static_cast<PingServiceImpl*>(ping_impl)->mem_tracker(),
+  ASSERT_OK(rpc_mgr_.RegisterService(num_service_threads, queue_size,
+      METRIC_rpc_mgr_test_incoming_queue_time.Instantiate(rpc_mgr_.metric_entity()),
+      ping_impl, static_cast<PingServiceImpl*>(ping_impl)->mem_tracker(),
       ExecEnv::GetInstance()->rpc_metrics()));
-  ASSERT_OK(rpc_mgr_.RegisterService(num_service_threads, queue_size, scan_mem_impl,
-      static_cast<ScanMemServiceImpl*>(scan_mem_impl)->mem_tracker(),
+  ASSERT_OK(rpc_mgr_.RegisterService(num_service_threads, queue_size,
+      METRIC_rpc_mgr_test_incoming_queue_time.Instantiate(rpc_mgr_.metric_entity()),
+      scan_mem_impl, static_cast<ScanMemServiceImpl*>(scan_mem_impl)->mem_tracker(),
       ExecEnv::GetInstance()->rpc_metrics()));
   FLAGS_num_acceptor_threads = 2;
   FLAGS_num_reactor_threads = 10;
@@ -255,8 +257,9 @@ TEST_P(RpcMgrKerberizedTest, InternalAuthorizationSkip) {
       TakeOverService(make_unique<PingServiceImpl>(&rpc_mgr_));
   const int num_service_threads = 10;
   const int queue_size = 10;
-  ASSERT_OK(rpc_mgr_.RegisterService(num_service_threads, queue_size, ping_impl,
-      static_cast<PingServiceImpl*>(ping_impl)->mem_tracker(),
+  ASSERT_OK(rpc_mgr_.RegisterService(num_service_threads, queue_size,
+      METRIC_rpc_mgr_test_incoming_queue_time.Instantiate(rpc_mgr_.metric_entity()),
+      ping_impl, static_cast<PingServiceImpl*>(ping_impl)->mem_tracker(),
       ExecEnv::GetInstance()->rpc_metrics()));
   FLAGS_num_acceptor_threads = 2;
   FLAGS_num_reactor_threads = 10;

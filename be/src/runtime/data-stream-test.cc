@@ -90,6 +90,11 @@ static const int TOTAL_DATA_SIZE = 8 * 1024;
 static const int NUM_BATCHES = TOTAL_DATA_SIZE / BATCH_CAPACITY / PER_ROW_DATA;
 static const int SHORT_SERVICE_QUEUE_MEM_LIMIT = 16;
 
+METRIC_DEFINE_histogram(server, data_stream_test_incoming_queue_time,
+    "Data Stream Test RPC Queue Time", kudu::MetricUnit::kMicroseconds,
+    "Number of microseconds incoming RPC requests spend in the worker queue",
+    kudu::MetricLevel::kInfo, 60000000LU, 3);
+
 namespace impala {
 
 // This class acts as a service interface for all KRPC related communication within
@@ -114,8 +119,10 @@ class ImpalaKRPCTestBackend : public DataStreamServiceIf {
     int num_svc_threads = FLAGS_datastream_service_num_svc_threads > 0 ?
         FLAGS_datastream_service_num_svc_threads : CpuInfo::num_cores();
     LOG(INFO) << "Num svc thread=" << num_svc_threads;
-    return rpc_mgr_->RegisterService(num_svc_threads, 1024, this, mem_tracker(),
-        ExecEnv::GetInstance()->rpc_metrics());
+    return rpc_mgr_->RegisterService(num_svc_threads, 1024,
+        METRIC_data_stream_test_incoming_queue_time.Instantiate(
+            rpc_mgr_->metric_entity()),
+        this, mem_tracker(), ExecEnv::GetInstance()->rpc_metrics());
   }
 
   virtual bool Authorize(const google::protobuf::Message* req,

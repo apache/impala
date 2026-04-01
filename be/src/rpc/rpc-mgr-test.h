@@ -69,6 +69,11 @@ DECLARE_string(tls_ciphersuites);
 // library as the 'application name'.
 static string CURRENT_EXECUTABLE_PATH;
 
+METRIC_DEFINE_histogram(server, rpc_mgr_test_incoming_queue_time,
+    "RPC Manager Test RPC Queue Time", kudu::MetricUnit::kMicroseconds,
+    "Number of microseconds incoming RPC requests spend in the worker queue",
+    kudu::MetricLevel::kInfo, 60000000LU, 3);
+
 namespace impala {
 
 const static string IMPALA_HOME(getenv("IMPALA_HOME"));
@@ -304,8 +309,9 @@ Status RpcMgrTest::RunMultipleServicesTest(
   // Test that a service can be started, and will respond to requests.
   GeneratedServiceIf* ping_impl = TakeOverService(
       make_unique<PingServiceImpl>(rpc_mgr));
-  RETURN_IF_ERROR(rpc_mgr->RegisterService(10, 10, ping_impl,
-      static_cast<PingServiceImpl*>(ping_impl)->mem_tracker(),
+  RETURN_IF_ERROR(rpc_mgr->RegisterService(10, 10,
+      METRIC_rpc_mgr_test_incoming_queue_time.Instantiate(rpc_mgr->metric_entity()),
+      ping_impl, static_cast<PingServiceImpl*>(ping_impl)->mem_tracker(),
       ExecEnv::GetInstance()->rpc_metrics()));
 
   // Test that a second service, that verifies the RPC payload is not corrupted,
@@ -313,8 +319,9 @@ Status RpcMgrTest::RunMultipleServicesTest(
   GeneratedServiceIf* scan_mem_impl =
       TakeOverService(make_unique<ScanMemServiceImpl>(rpc_mgr));
 
-  RETURN_IF_ERROR(rpc_mgr->RegisterService(10, 10, scan_mem_impl,
-      static_cast<ScanMemServiceImpl*>(scan_mem_impl)->mem_tracker(),
+  RETURN_IF_ERROR(rpc_mgr->RegisterService(10, 10,
+      METRIC_rpc_mgr_test_incoming_queue_time.Instantiate(rpc_mgr->metric_entity()),
+      scan_mem_impl, static_cast<ScanMemServiceImpl*>(scan_mem_impl)->mem_tracker(),
       ExecEnv::GetInstance()->rpc_metrics()));
 
   FLAGS_num_acceptor_threads = 2;

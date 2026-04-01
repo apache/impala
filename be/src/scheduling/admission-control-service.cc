@@ -64,6 +64,11 @@ DEFINE_int32(admission_status_wait_time_ms, 100,
     "(Advanced) The number of milliseconds the GetQueryStatus() rpc in the admission "
     "control service will wait for admission to complete before returning.");
 
+METRIC_DEFINE_histogram(server, admission_control_service_incoming_queue_time,
+    "Admission Control Service RPC Queue Time", kudu::MetricUnit::kMicroseconds,
+    "Number of microseconds incoming RPC requests spend in the worker queue",
+    kudu::MetricLevel::kInfo, 60000000LU, 3);
+
 namespace impala {
 
 #define RESPOND_IF_ERROR(stmt)                          \
@@ -102,10 +107,14 @@ Status AdmissionControlService::Init() {
   int num_svc_threads = FLAGS_admission_control_service_num_svc_threads > 0 ?
       FLAGS_admission_control_service_num_svc_threads :
       CpuInfo::num_cores();
+  RpcMgr* rpc_mgr = AdmissiondEnv::GetInstance()->rpc_mgr();
   // The maximum queue length is set to maximum 32-bit value. Its actual capacity is
   // bound by memory consumption against 'mem_tracker_'.
-  RETURN_IF_ERROR(AdmissiondEnv::GetInstance()->rpc_mgr()->RegisterService(
-      num_svc_threads, std::numeric_limits<int32_t>::max(), this, mem_tracker_.get(),
+  RETURN_IF_ERROR(rpc_mgr->RegisterService(
+      num_svc_threads, std::numeric_limits<int32_t>::max(),
+      METRIC_admission_control_service_incoming_queue_time.Instantiate(
+          rpc_mgr->metric_entity()),
+      this, mem_tracker_.get(),
       AdmissiondEnv::GetInstance()->rpc_metrics()));
 
   admission_thread_pool_.reset(
