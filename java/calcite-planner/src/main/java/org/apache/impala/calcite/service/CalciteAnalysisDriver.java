@@ -23,11 +23,14 @@ import org.apache.calcite.prepare.CalciteCatalogReader;
 import org.apache.calcite.rel.type.RelDataTypeFactory;
 import org.apache.calcite.runtime.CalciteContextException;
 import org.apache.calcite.sql.SqlNode;
+import org.apache.calcite.sql.SqlOperatorTable;
+import org.apache.calcite.sql.util.SqlOperatorTables;
 import org.apache.calcite.sql.validate.SqlValidator;
 import org.apache.impala.analysis.AnalysisContext;
 import org.apache.impala.analysis.AnalysisContext.AnalysisResult;
 import org.apache.impala.analysis.AnalysisDriver;
 import org.apache.impala.analysis.Analyzer;
+import org.apache.impala.analysis.FunctionName;
 import org.apache.impala.analysis.ParsedStatement;
 import org.apache.impala.analysis.StmtMetadataLoader.StmtTableCache;
 import org.apache.impala.analysis.TableName;
@@ -45,12 +48,14 @@ import org.apache.impala.catalog.FeCatalog;
 import org.apache.impala.catalog.FeDb;
 import org.apache.impala.catalog.FeTable;
 import org.apache.impala.catalog.FeView;
+import org.apache.impala.catalog.Function;
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.common.ImpalaException;
 import org.apache.impala.common.UnsupportedFeatureException;
 import org.apache.impala.thrift.TQueryCtx;
 
 import com.google.common.base.Preconditions;
+import com.google.common.collect.ImmutableList;
 
 /**
  * The CalciteAnalysisDriver is the implementation of AnalysisDriver which validates
@@ -114,10 +119,15 @@ public class CalciteAnalysisDriver implements AnalysisDriver {
       // given query but not the underlying tables referenced by a regular view.
       CalciteMetadataHandler.populateCalciteSchema(reader_, ctx_.getCatalog(),
           stmtTableCache_, parsedStmt_.tableNameMap_, analyzer_);
+      FeDb db = ctx_.getCatalog().getDb(queryCtx_.session.database);
+      ImpalaOperatorTable dbOperatorTable =
+          ImpalaOperatorTable.create(ctx_.getCatalog(), db, true);
+      SqlOperatorTable chainedOpTables = SqlOperatorTables.chain(
+          ImmutableList.of(ImpalaOperatorTable.getInstance(), dbOperatorTable));
 
       typeFactory_ = ImpalaTypeFactoryImpl.INSTANCE;
       sqlValidator_ = new ImpalaSqlValidatorImpl(
-          ImpalaOperatorTable.getInstance(),
+          chainedOpTables,
           reader_, typeFactory_,
           SqlValidator.Config.DEFAULT
               // Impala requires identifier expansion (tpcds test queries fail
@@ -144,6 +154,14 @@ public class CalciteAnalysisDriver implements AnalysisDriver {
       // referenced by views assuming that those tables and columns referenced by views
       // could be successfully resolved.
       validatedNode_ = sqlValidator_.validate(parsedStmt_.getParsedSqlNode());
+      for (Function function : dbOperatorTable.getUsedFunctions()) {
+        FunctionName fnName = function.getFunctionName();
+
+        analyzer_.registerPrivReq(builder -> builder.allOf(Privilege.SELECT)
+            .onFunction(fnName.getDb(), fnName.getFunction()).build());
+        analyzer_.registerPrivReq(builder -> builder.allOf(Privilege.VIEW_METADATA)
+            .onDb(ctx_.getCatalog().getDb(fnName.getDb())).build());
+      }
       return new CalciteAnalysisResult(this);
     } catch (ImpalaException e) {
       try {

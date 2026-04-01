@@ -22,12 +22,15 @@ import org.apache.calcite.rel.type.RelDataType;
 import org.apache.calcite.rel.type.RelDataTypeFactory;
 import org.apache.calcite.rex.RexBuilder;
 import org.apache.calcite.sql.SqlOperandCountRange;
+import org.apache.calcite.sql.SqlOperator;
 import org.apache.calcite.sql.SqlOperatorBinding;
 import org.apache.calcite.sql.type.SqlOperandCountRanges;
 import org.apache.calcite.sql.type.SqlTypeName;
 import org.apache.impala.calcite.functions.FunctionResolver;
 import org.apache.impala.calcite.type.ImpalaTypeConverter;
 import org.apache.impala.calcite.type.ImpalaTypeFactoryImpl;
+import org.apache.impala.catalog.BuiltinsDb;
+import org.apache.impala.catalog.FeDb;
 import org.apache.impala.catalog.Function;
 import org.apache.impala.catalog.Type;
 
@@ -45,23 +48,23 @@ public class CommonOperatorFunctions {
   public static SqlOperandCountRange ANY_COUNT_RANGE = SqlOperandCountRanges.any();
 
   public static RelDataType inferReturnType(SqlOperatorBinding opBinding,
-      String name) {
+      SqlOperator op) {
     final List<RelDataType> operandTypes = getOperandTypes(opBinding);
 
     RexBuilder rexBuilder = new RexBuilder(ImpalaTypeFactoryImpl.INSTANCE);
     RelDataTypeFactory factory = rexBuilder.getTypeFactory();
 
     // Resolve Impala function through Impala method.
-    Function fn = getSupertypeFunction(name, operandTypes);
+    Function fn = getSupertypeFunction(op, operandTypes);
 
     if (fn == null) {
       throw new IllegalArgumentException("Cannot infer return type for "
-          + name + "; operand types: " + operandTypes);
+          + op.getName() + "; operand types: " + operandTypes);
     }
 
     // IF's first operand is the condition, not a possible return value. Keep it
     // in function resolution above, but exclude it from DECIMAL type inference.
-    List<RelDataType> returnOperandTypes = name.equalsIgnoreCase("if")
+    List<RelDataType> returnOperandTypes = op.getName().equalsIgnoreCase("if")
         ? operandTypes.subList(1, 3) : operandTypes;
     RelDataType returnType = fn.getReturnType().equals(Type.DECIMAL)
         ? ImpalaTypeConverter.getCompatibleType(returnOperandTypes, factory)
@@ -124,9 +127,9 @@ public class CommonOperatorFunctions {
     return operandTypes.stream().anyMatch(rdt -> rdt.isNullable());
   }
 
-  private static Function getSupertypeFunction(String name,
+  private static Function getSupertypeFunction(SqlOperator op,
       List<RelDataType> operandTypes) {
-    Function fn = FunctionResolver.getSupertypeFunction(name, operandTypes);
+    Function fn = FunctionResolver.getSupertypeFunction(op, operandTypes);
     if (fn != null) {
       return fn;
     }
@@ -147,6 +150,10 @@ public class CommonOperatorFunctions {
         adjustedTypes.add(opType);
       }
     }
-    return hasChar ? FunctionResolver.getSupertypeFunction(name, adjustedTypes) : null;
+    return hasChar ? FunctionResolver.getSupertypeFunction(op, adjustedTypes) : null;
+  }
+
+  public static String getInternalName(FeDb db, String funcName) {
+    return db == BuiltinsDb.getInstance() ? funcName : db.getName() + "." + funcName;
   }
 }

@@ -65,7 +65,7 @@ public class TestReduceExprShuttle extends PlannerTestBase {
   @BeforeClass
   public static void setUpClass() throws Exception {
     RuntimeEnv.INSTANCE.setTestEnv(true);
-    ImpalaOperatorTable.create(BuiltinsDb.getInstance());
+    ImpalaOperatorTable.create(null, BuiltinsDb.getInstance(), false);
     RelMetadataQuery.THREAD_PROVIDERS.set(
         JaninoRelMetadataProvider.of(DefaultRelMetadataProvider.INSTANCE));
   }

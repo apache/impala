@@ -1541,3 +1541,10 @@ OFFSET must be a constant expression
 ---- RUNTIME_PROFILE
 row_regex: PlannerType: CalcitePlanner
 ====
+---- QUERY
+select xyz.length('hello');
+---- CATCH
+No match found
+---- RUNTIME_PROFILE
+row_regex: PlannerType: CalcitePlanner
+====

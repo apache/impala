@@ -70,7 +70,7 @@ public class ImpalaAdjustScaleFunction extends SqlFunction {
                 && (SqlTypeFamily.CHARACTER.contains(opBinding.getOperandType(1))
                     || opBinding.getOperandType(1).getSqlTypeName()
                         == SqlTypeName.NULL)))) {
-      return CommonOperatorFunctions.inferReturnType(opBinding, getName());
+      return CommonOperatorFunctions.inferReturnType(opBinding, this);
     }
 
     if (opBinding.getOperandType(0).getSqlTypeName().equals(SqlTypeName.DOUBLE) ||

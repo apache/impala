@@ -50,6 +50,7 @@ import org.apache.impala.calcite.rel.util.CreateExprVisitor;
 import org.apache.impala.calcite.rel.util.ExprConjunctsConverter;
 import org.apache.impala.calcite.rel.util.RexInputRefCollector;
 import org.apache.impala.calcite.type.ImpalaTypeConverter;
+import org.apache.impala.catalog.BuiltinsDb;
 import org.apache.impala.catalog.Function;
 import org.apache.impala.catalog.Type;
 import org.apache.impala.common.AnalysisException;
@@ -265,8 +266,8 @@ public class ImpalaJoinRel extends Join
     tmpArgs.add(nullLiteral);
     tmpArgs.add(expr);
     List<Type> typeNames = ImmutableList.of(Type.BOOLEAN, expr.getType(), expr.getType());
-    Function conditionalFunc = FunctionResolver.getExactFunction("if",
-        ImpalaTypeConverter.getRelDataTypesForArgs(typeNames));
+    Function conditionalFunc = FunctionResolver.getExactFunction(BuiltinsDb.getInstance(),
+        "if", ImpalaTypeConverter.getRelDataTypesForArgs(typeNames));
     Preconditions.checkNotNull(conditionalFunc,
         "Could not create IF function for arg types %s and return type %s",
         typeNames, expr.getType());

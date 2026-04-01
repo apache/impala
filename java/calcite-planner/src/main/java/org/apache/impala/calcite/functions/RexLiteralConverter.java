@@ -36,6 +36,7 @@ import org.apache.impala.analysis.NumericLiteral;
 import org.apache.impala.analysis.StringLiteral;
 import org.apache.impala.calcite.functions.AnalyzedCastExpr;
 import org.apache.impala.calcite.type.ImpalaTypeConverter;
+import org.apache.impala.catalog.BuiltinsDb;
 import org.apache.impala.catalog.Function;
 import org.apache.impala.catalog.Type;
 import org.apache.impala.common.AnalysisException;
@@ -154,7 +155,8 @@ public class RexLiteralConverter {
         Lists.newArrayList(new StringLiteral(nanOrInf, Type.STRING, false));
     Preconditions.checkState(t.equals(Type.DOUBLE) || t.equals(Type.FLOAT));
     String fnName = t.equals(Type.DOUBLE) ? "casttodouble" : "casttofloat";
-    Function castFunc = FunctionResolver.getExactFunction(fnName, typeNames);
+    Function castFunc =
+        FunctionResolver.getExactFunction(BuiltinsDb.getInstance(), fnName, typeNames);
     return new AnalyzedFunctionCallExpr(castFunc, argList, t);
   }
 }

@@ -28,12 +28,12 @@ Per-Host Resource Estimates: Memory=146.23GB
 ImpalaAggRel(group=[{}], EXPR$0=[COUNT()])
   ImpalaFilterRel(condition=[AND(>($3, 0), =($4, 0))])
     ImpalaAggRel(group=[{0, 1, 2}], agg#0=[COUNT($3)], agg#1=[COUNT($4)])
-      ImpalaProjectRel(C_LAST_NAME=[$0], C_FIRST_NAME=[$1], D_DATE=[$2], $f3=[IF(=($3, 0), 1:TINYINT, null:TINYINT)], $f4=[IF(=($3, 1), 1:TINYINT, null:TINYINT)])
+      ImpalaProjectRel(C_LAST_NAME=[$0], C_FIRST_NAME=[$1], D_DATE=[$2], $f3=[if(=($3, 0), 1:TINYINT, null:TINYINT)], $f4=[if(=($3, 1), 1:TINYINT, null:TINYINT)])
         ImpalaUnionRel(all=[true])
           ImpalaProjectRel(C_LAST_NAME=[$0], C_FIRST_NAME=[$1], D_DATE=[$2], $f3=[0:TINYINT])
             ImpalaFilterRel(condition=[AND(>($3, 0), =($4, 0))])
               ImpalaAggRel(group=[{0, 1, 2}], agg#0=[COUNT($3)], agg#1=[COUNT($4)])
-                ImpalaProjectRel(C_LAST_NAME=[$0], C_FIRST_NAME=[$1], D_DATE=[$2], $f3=[IF(=($3, 0), 1:TINYINT, null:TINYINT)], $f4=[IF(=($3, 1), 1:TINYINT, null:TINYINT)])
+                ImpalaProjectRel(C_LAST_NAME=[$0], C_FIRST_NAME=[$1], D_DATE=[$2], $f3=[if(=($3, 0), 1:TINYINT, null:TINYINT)], $f4=[if(=($3, 1), 1:TINYINT, null:TINYINT)])
                   ImpalaUnionRel(all=[true])
                     ImpalaProjectRel(C_LAST_NAME=[$0], C_FIRST_NAME=[$1], D_DATE=[$2], $f3=[0:TINYINT])
                       ImpalaAggRel(group=[{0, 1, 2}])
@@ -299,7 +299,7 @@ PLAN-ROOT SINK
      table: rows=8.64G size=389.90GB
      partitions: 1823/1823 rows=8.25G
      columns: all
-   extrapolated-rows=disabled max-scan-range-rows=12.31M
+   extrapolated-rows=disabled max-scan-range-rows=12.22M
    parquet dictionary predicates: tpcds_partitioned_parquet_snap.store_sales.ss_customer_sk IS NOT NULL
    mem-estimate=16.00MB mem-reservation=512.00KB thread-reservation=0
    tuple-ids=0 row-size=8B cardinality=7.57G(filtered from 7.88G) cost=1182183990
@@ -310,12 +310,12 @@ Per-Host Resource Estimates: Memory=103.68GB
 ImpalaAggRel(group=[{}], EXPR$0=[COUNT()])
   ImpalaFilterRel(condition=[AND(>($3, 0), =($4, 0))])
     ImpalaAggRel(group=[{0, 1, 2}], agg#0=[COUNT($3)], agg#1=[COUNT($4)])
-      ImpalaProjectRel(C_LAST_NAME=[$0], C_FIRST_NAME=[$1], D_DATE=[$2], $f3=[IF(=($3, 0), 1:TINYINT, null:TINYINT)], $f4=[IF(=($3, 1), 1:TINYINT, null:TINYINT)])
+      ImpalaProjectRel(C_LAST_NAME=[$0], C_FIRST_NAME=[$1], D_DATE=[$2], $f3=[if(=($3, 0), 1:TINYINT, null:TINYINT)], $f4=[if(=($3, 1), 1:TINYINT, null:TINYINT)])
         ImpalaUnionRel(all=[true])
           ImpalaProjectRel(C_LAST_NAME=[$0], C_FIRST_NAME=[$1], D_DATE=[$2], $f3=[0:TINYINT])
             ImpalaFilterRel(condition=[AND(>($3, 0), =($4, 0))])
               ImpalaAggRel(group=[{0, 1, 2}], agg#0=[COUNT($3)], agg#1=[COUNT($4)])
-                ImpalaProjectRel(C_LAST_NAME=[$0], C_FIRST_NAME=[$1], D_DATE=[$2], $f3=[IF(=($3, 0), 1:TINYINT, null:TINYINT)], $f4=[IF(=($3, 1), 1:TINYINT, null:TINYINT)])
+                ImpalaProjectRel(C_LAST_NAME=[$0], C_FIRST_NAME=[$1], D_DATE=[$2], $f3=[if(=($3, 0), 1:TINYINT, null:TINYINT)], $f4=[if(=($3, 1), 1:TINYINT, null:TINYINT)])
                   ImpalaUnionRel(all=[true])
                     ImpalaProjectRel(C_LAST_NAME=[$0], C_FIRST_NAME=[$1], D_DATE=[$2], $f3=[0:TINYINT])
                       ImpalaAggRel(group=[{0, 1, 2}])
@@ -772,7 +772,7 @@ max-parallelism=1823 segment-costs=[50289478027, 22341022045] cpu-comparison-res
      table: rows=8.64G size=389.90GB
      partitions: 1823/1823 rows=8.25G
      columns: all
-   extrapolated-rows=disabled max-scan-range-rows=12.31M
+   extrapolated-rows=disabled max-scan-range-rows=12.22M
    parquet dictionary predicates: tpcds_partitioned_parquet_snap.store_sales.ss_customer_sk IS NOT NULL
    mem-estimate=16.00MB mem-reservation=512.00KB thread-reservation=0
    tuple-ids=0 row-size=8B cardinality=7.57G(filtered from 7.88G) cost=1182183990
@@ -783,12 +783,12 @@ Per-Host Resource Estimates: Memory=102.52GB
 ImpalaAggRel(group=[{}], EXPR$0=[COUNT()])
   ImpalaFilterRel(condition=[AND(>($3, 0), =($4, 0))])
     ImpalaAggRel(group=[{0, 1, 2}], agg#0=[COUNT($3)], agg#1=[COUNT($4)])
-      ImpalaProjectRel(C_LAST_NAME=[$0], C_FIRST_NAME=[$1], D_DATE=[$2], $f3=[IF(=($3, 0), 1:TINYINT, null:TINYINT)], $f4=[IF(=($3, 1), 1:TINYINT, null:TINYINT)])
+      ImpalaProjectRel(C_LAST_NAME=[$0], C_FIRST_NAME=[$1], D_DATE=[$2], $f3=[if(=($3, 0), 1:TINYINT, null:TINYINT)], $f4=[if(=($3, 1), 1:TINYINT, null:TINYINT)])
         ImpalaUnionRel(all=[true])
           ImpalaProjectRel(C_LAST_NAME=[$0], C_FIRST_NAME=[$1], D_DATE=[$2], $f3=[0:TINYINT])
             ImpalaFilterRel(condition=[AND(>($3, 0), =($4, 0))])
               ImpalaAggRel(group=[{0, 1, 2}], agg#0=[COUNT($3)], agg#1=[COUNT($4)])
-                ImpalaProjectRel(C_LAST_NAME=[$0], C_FIRST_NAME=[$1], D_DATE=[$2], $f3=[IF(=($3, 0), 1:TINYINT, null:TINYINT)], $f4=[IF(=($3, 1), 1:TINYINT, null:TINYINT)])
+                ImpalaProjectRel(C_LAST_NAME=[$0], C_FIRST_NAME=[$1], D_DATE=[$2], $f3=[if(=($3, 0), 1:TINYINT, null:TINYINT)], $f4=[if(=($3, 1), 1:TINYINT, null:TINYINT)])
                   ImpalaUnionRel(all=[true])
                     ImpalaProjectRel(C_LAST_NAME=[$0], C_FIRST_NAME=[$1], D_DATE=[$2], $f3=[0:TINYINT])
                       ImpalaAggRel(group=[{0, 1, 2}])
@@ -1253,7 +1253,7 @@ max-parallelism=1823 segment-costs=[50289478027, 22341022045] cpu-comparison-res
      table: rows=8.64G size=389.90GB
      partitions: 1823/1823 rows=8.25G
      columns: all
-   extrapolated-rows=disabled max-scan-range-rows=12.31M
+   extrapolated-rows=disabled max-scan-range-rows=12.22M
    parquet dictionary predicates: tpcds_partitioned_parquet_snap.store_sales.ss_customer_sk IS NOT NULL
    mem-estimate=16.00MB mem-reservation=512.00KB thread-reservation=0
    tuple-ids=0 row-size=8B cardinality=7.57G(filtered from 7.88G) cost=1182183990

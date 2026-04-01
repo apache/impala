@@ -175,8 +175,7 @@ public class RexCallConverter {
 
   private static Function getFunction(RexCall call) {
     List<RelDataType> argTypes = Lists.transform(call.getOperands(), RexNode::getType);
-    String name = call.getOperator().getName();
-    return FunctionResolver.getExactFunction(name, call.getKind(), argTypes);
+    return FunctionResolver.getExactFunction(call.getOperator(), argTypes);
   }
 
   /**

@@ -17,14 +17,20 @@
 
 package org.apache.impala.calcite.operators;
 
+import com.google.common.collect.ImmutableList;
+
 import org.apache.calcite.rel.type.RelDataType;
 import org.apache.calcite.sql.SqlAggFunction;
 import org.apache.calcite.sql.SqlCallBinding;
 import org.apache.calcite.sql.SqlFunctionCategory;
+import org.apache.calcite.sql.SqlIdentifier;
 import org.apache.calcite.sql.SqlKind;
 import org.apache.calcite.sql.SqlOperandCountRange;
 import org.apache.calcite.sql.SqlOperatorBinding;
 import org.apache.calcite.sql.SqlSyntax;
+import org.apache.calcite.sql.parser.SqlParserPos;
+import org.apache.impala.catalog.BuiltinsDb;
+import org.apache.impala.catalog.FeDb;
 
 /**
  * ImpalaAggOperator is a custom Calcite operator that handles all generic functions
@@ -34,14 +40,27 @@ import org.apache.calcite.sql.SqlSyntax;
  */
 public class ImpalaAggOperator extends SqlAggFunction {
 
+  private final FeDb db_;
+
+  private final SqlIdentifier id_;
+
   public ImpalaAggOperator(String name) {
-    super(name.toUpperCase(), SqlKind.OTHER, null, null, null,
-        SqlFunctionCategory.USER_DEFINED_FUNCTION);
+    this(BuiltinsDb.getInstance(), name);
+  }
+
+  public ImpalaAggOperator(FeDb db,String name) {
+    super(CommonOperatorFunctions.getInternalName(db, name), SqlKind.OTHER, null, null,
+        null, SqlFunctionCategory.USER_DEFINED_FUNCTION);
+    db_ = db;
+    ImmutableList<String> idNameList = (db_ == BuiltinsDb.getInstance())
+        ? ImmutableList.of(name)
+        : ImmutableList.of(db.getName(), name);
+    id_ = new SqlIdentifier(idNameList, SqlParserPos.ZERO);
   }
 
   @Override
   public RelDataType inferReturnType(SqlOperatorBinding opBinding) {
-    return CommonOperatorFunctions.inferReturnType(opBinding, getName());
+    return CommonOperatorFunctions.inferReturnType(opBinding, this);
   }
 
   @Override
@@ -72,5 +91,14 @@ public class ImpalaAggOperator extends SqlAggFunction {
   @Override
   public boolean allowsNullTreatment() {
     return getName().equals("LAST_VALUE") || getName().equals("FIRST_VALUE");
+  }
+
+  @Override
+  public SqlIdentifier getNameAsId() {
+    return id_;
+  }
+
+  public FeDb getDb() {
+    return db_;
   }
 }

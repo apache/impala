@@ -26,7 +26,6 @@ import org.apache.impala.analysis.ParsedStatement;
 import org.apache.impala.analysis.StmtMetadataLoader.StmtTableCache;
 import org.apache.impala.authorization.AuthorizationContext;
 import org.apache.impala.calcite.operators.ImpalaOperatorTable;
-import org.apache.impala.catalog.BuiltinsDb;
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.common.ImpalaException;
 import org.apache.impala.common.UnsupportedFeatureException;
@@ -48,7 +47,7 @@ public class CalciteCompilerFactory implements CompilerFactory {
   private static final String PLANNER = "CalcitePlanner";
 
   static {
-    ImpalaOperatorTable.create(BuiltinsDb.getInstance());
+    ImpalaOperatorTable.create();
   }
 
   public ParsedStatement createParsedStatement(TQueryCtx queryCtx)

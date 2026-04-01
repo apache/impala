@@ -363,8 +363,7 @@ public class ImpalaAggRel extends Aggregate
       RelDataType relDataType = input.getRowType().getFieldList().get(i).getType();
       operandTypes.add(relDataType);
     }
-    Function fn = FunctionResolver.getExactFunction(aggFunction.getName(),
-         aggFunction.getKind(), operandTypes);
+    Function fn = FunctionResolver.getExactFunction(aggFunction, operandTypes);
     // special case for ndv which needs a little extra resolving
     return aggFunction.getName().toLowerCase().equals("ndv")
         ? getNdvFunction(fn, aggCall, inputExprs)

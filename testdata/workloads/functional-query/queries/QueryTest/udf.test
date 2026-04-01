@@ -582,3 +582,35 @@ DOUBLE, DOUBLE
 ---- RESULTS
 9,9
 ====
+---- QUERY
+# Test identity functions
+select nonexisting_db.identity(true);
+---- CATCH: ANY_OF
+Database does not exist
+No match found
+====
+---- QUERY
+# Test creating a function with an existing builtin function name.
+create function if not exists abs(int) returns int
+location '$FILESYSTEM_PREFIX/test-warehouse/libTestUdfs.so'
+symbol='Identity';
+====
+---- QUERY
+# When the database is explicit in the SQL, the udf is used.
+select $DATABASE.abs(-10);
+---- TYPES
+int
+---- RESULTS
+-10
+====
+---- QUERY
+# When the database is not explicit, the builtin function is used.
+select abs(-10);
+---- TYPES
+smallint
+---- RESULTS
+10
+====
+---- QUERY
+drop function abs(int);
+====

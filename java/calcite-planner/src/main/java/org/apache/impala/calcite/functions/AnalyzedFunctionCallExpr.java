@@ -24,6 +24,7 @@ import org.apache.impala.analysis.FunctionCallExpr;
 import org.apache.impala.analysis.FunctionParams;
 import org.apache.impala.calcite.type.ImpalaTypeConverter;
 import org.apache.impala.catalog.AggregateFunction;
+import org.apache.impala.catalog.BuiltinsDb;
 import org.apache.impala.catalog.Function;
 import org.apache.impala.catalog.Type;
 import org.apache.impala.common.AnalysisException;
@@ -130,7 +131,8 @@ public class AnalyzedFunctionCallExpr extends FunctionCallExpr {
             operandTypes.set(2, operandTypes.get(0));
             uncheckedCastChild(operandTypes.get(0), 2);
           }
-          fn_ = FunctionResolver.getExactFunction(getFnName().getFunction(),
+          fn_ = FunctionResolver.getExactFunction(BuiltinsDb.getInstance(),
+              getFnName().getFunction(),
               ImpalaTypeConverter.createRelDataTypes(operandTypes));
           this.savedFunction_ = fn_;
           break;
