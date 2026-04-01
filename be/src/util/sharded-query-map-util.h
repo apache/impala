@@ -44,14 +44,16 @@ template <typename K, typename V>
 class GenericShardedQueryMap {
  public:
 
+  GenericShardedQueryMap();
+
   // This function takes a lambda which should take a parameter of object 'T' and
   // runs the lambda for all the entries in the map. The lambda should have a return
   // type of 'void'..
   // TODO: If necessary, refactor the lambda signature to allow returning Status objects.
   void DoFuncForAllEntries(const std::function<void(const V&)>& call) {
-    for (int i = 0; i < NUM_QUERY_BUCKETS; ++i) {
-      std::lock_guard<SpinLock> l(shards_[i].map_lock_);
-      for (const auto& map_value_ref: shards_[i].map_) {
+    for (auto& shard: shards_) {
+      std::lock_guard<SpinLock> l(shard.map_lock_);
+      for (const auto& map_value_ref: shard.map_) {
         call(map_value_ref.second);
       }
     }
@@ -60,9 +62,9 @@ class GenericShardedQueryMap {
   // Return number of elements in the sharded query map.
   size_t Count() {
     size_t count = 0;
-    for (int i = 0; i < NUM_QUERY_BUCKETS; ++i) {
-      std::lock_guard<SpinLock> l(shards_[i].map_lock_);
-      count += shards_[i].map_.size();
+    for (auto& shard: shards_) {
+      std::lock_guard<SpinLock> l(shard.map_lock_);
+      count += shard.map_.size();
     }
     return count;
   }
@@ -86,9 +88,6 @@ class GenericShardedQueryMap {
   template <typename K2, typename V2>
   friend class GenericScopedShardedMapRef;
 
-  // Number of buckets to split the containers of query IDs into.
-  static constexpr uint32_t NUM_QUERY_BUCKETS = 4;
-
   // We group the map and its corresponding lock together to avoid false sharing. Since
   // we will always access a map and its corresponding lock together, it's better if
   // they can be allocated on the same cache line.
@@ -96,7 +95,7 @@ class GenericShardedQueryMap {
     std::unordered_map<K, V> map_;
     SpinLock map_lock_;
   };
-  struct MapShard shards_[NUM_QUERY_BUCKETS];
+  std::vector<MapShard> shards_;
 
   // Metric for tracking the map size.
   AtomicHighWaterMarkGauge* size_metric_ = nullptr;
@@ -128,7 +127,7 @@ class GenericScopedShardedMapRef {
   GenericScopedShardedMapRef(
       const K& query_id, class GenericShardedQueryMap<K, V>* sharded_map) {
     DCHECK(sharded_map != nullptr);
-    int qs_map_bucket = QueryIdToBucket(query_id);
+    int qs_map_bucket = QueryIdToBucket(query_id, sharded_map->shards_.size());
     shard_ = &sharded_map->shards_[qs_map_bucket];
 
     // Lock the corresponding shard.
@@ -155,15 +154,15 @@ class GenericScopedShardedMapRef {
  private:
 
   // Return the correct bucket that a query ID would belong to.
-  inline int QueryIdToBucket(const TUniqueId& query_id) {
-    int bucket = static_cast<int>(query_id.hi) % ShardedQueryMap<V>::NUM_QUERY_BUCKETS;
-    DCHECK(bucket < ShardedQueryMap<V>::NUM_QUERY_BUCKETS && bucket >= 0);
+  inline int QueryIdToBucket(const TUniqueId& query_id, size_t num_buckets) {
+    int bucket = query_id.hi % num_buckets;
+    DCHECK(bucket < num_buckets && bucket >= 0);
     return bucket;
   }
 
-  inline int QueryIdToBucket(const UniqueIdPB& query_id) {
-    int bucket = static_cast<int>(query_id.hi()) % ShardedQueryMap<V>::NUM_QUERY_BUCKETS;
-    DCHECK(bucket < ShardedQueryMap<V>::NUM_QUERY_BUCKETS && bucket >= 0);
+  inline int QueryIdToBucket(const UniqueIdPB& query_id, size_t num_buckets) {
+    int bucket = query_id.hi() % num_buckets;
+    DCHECK(bucket < num_buckets && bucket >= 0);
     return bucket;
   }
 
@@ -175,13 +174,6 @@ template <typename T>
 class ScopedShardedMapRef : public GenericScopedShardedMapRef<TUniqueId, T> {
  public:
   ScopedShardedMapRef(const TUniqueId& query_id, class ShardedQueryMap<T>* sharded_map)
-    : GenericScopedShardedMapRef<TUniqueId, T>(query_id, sharded_map) {}
-};
-
-template <typename T>
-class ScopedShardedMapPBRef : public GenericScopedShardedMapRef<UniqueIdPB, T> {
- public:
-  ScopedShardedMapPBRef(const TUniqueId& query_id, class ShardedQueryMap<T>* sharded_map)
     : GenericScopedShardedMapRef<TUniqueId, T>(query_id, sharded_map) {}
 };
 

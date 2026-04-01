@@ -17,12 +17,24 @@
 
 #include "util/sharded-query-map-util.h"
 
+#include <gflags/gflags.h>
+
 #include "runtime/query-driver.h"
+#include "runtime/query-state.h"
 #include "scheduling/admission-control-service.h"
 #include "util/debug-util.h"
+#include "util/gflag-validator-util.h"
 #include "util/metrics.h"
 
+DEFINE_uint32(num_query_map_shards, 4,
+              "number of shards for active query map (default=4)");
+DEFINE_validator(num_query_map_shards, gt_zero);
+
 namespace impala {
+
+template <typename K, typename V>
+GenericShardedQueryMap<K, V>::GenericShardedQueryMap()
+    : shards_(FLAGS_num_query_map_shards) {}
 
 template <typename K, typename V>
 Status GenericShardedQueryMap<K, V>::Add(const K& query_id, const V& obj) {
@@ -71,7 +83,12 @@ Status GenericShardedQueryMap<K, V>::Delete(const K& query_id) {
   return Status::OK();
 }
 
+// Needed by QueryExecMgr
+template GenericShardedQueryMap<TUniqueId, QueryState*>::GenericShardedQueryMap();
+
 // Needed by ImpalaServer
+template GenericShardedQueryMap<TUniqueId,
+    std::shared_ptr<QueryDriver>>::GenericShardedQueryMap();
 template Status GenericShardedQueryMap<TUniqueId, std::shared_ptr<QueryDriver>>::Add(
     TUniqueId const&, const std::shared_ptr<QueryDriver>&);
 template Status GenericShardedQueryMap<TUniqueId, std::shared_ptr<QueryDriver>>::Get(
@@ -80,6 +97,8 @@ template Status GenericShardedQueryMap<TUniqueId, std::shared_ptr<QueryDriver>>:
     TUniqueId const&);
 
 // Needed by AdmissionControlService
+template GenericShardedQueryMap<UniqueIdPB,
+    std::shared_ptr<AdmissionControlService::AdmissionState>>::GenericShardedQueryMap();
 template Status GenericShardedQueryMap<UniqueIdPB,
     std::shared_ptr<AdmissionControlService::AdmissionState>>::Add(UniqueIdPB const&,
     const std::shared_ptr<AdmissionControlService::AdmissionState>&);
