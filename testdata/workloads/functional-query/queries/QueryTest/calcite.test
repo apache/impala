@@ -1664,6 +1664,13 @@ select -cast(1.0 as float), -cast(1 as int), -cast(1 as tinyint),
 -1,-1,-1,-1,-1,-1
 ---- TYPES
 DOUBLE,BIGINT,SMALLINT,INT,BIGINT,DOUBLE
+====
+---- QUERY
+select 7 DIV 0
+---- TYPES
+TINYINT
+---- RESULTS
+NULL
 ---- RUNTIME_PROFILE
 row_regex: PlannerType: CalcitePlanner
 ====
@@ -1684,4 +1691,20 @@ select -1, -1.5, cast('2024-01-02' as timestamp) + interval -1 days
 -1,-1.5,2024-01-01 00:00:00
 ---- TYPES
 TINYINT,DECIMAL,TIMESTAMP
+====
+---- QUERY
+select tinyint_col div 2 from functional.alltypestiny;
+---- TYPES
+TINYINT
+---- RESULTS
+0
+0
+0
+0
+0
+0
+0
+0
+---- RUNTIME_PROFILE
+row_regex: PlannerType: CalcitePlanner
 ====

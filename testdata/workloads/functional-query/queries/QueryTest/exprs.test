@@ -3491,3 +3491,10 @@ dround(9.78, 1), dround(cast(9.78 as double), 1)
 ---- TYPES
 DECIMAL,DOUBLE,DECIMAL,DOUBLE,DECIMAL,DOUBLE,DECIMAL,DOUBLE
 ====
+---- QUERY
+select trim(leading from '  x  ');
+---- RESULTS
+'x  '
+---- TYPES
+STRING
+====

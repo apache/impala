@@ -130,6 +130,7 @@ import org.apache.impala.calcite.util.JavaCCParserUtils;
 import org.apache.impala.calcite.validate.ImpalaSnapshotSqlNode;
 import org.apache.impala.calcite.operators.ImpalaCustomOperatorTable;
 import org.apache.impala.calcite.operators.ImpalaConcatOrOperator;
+import org.apache.impala.calcite.operators.ImpalaOperator;
 import org.apache.impala.calcite.operators.ImpalaSqlNumericLiteral;
 import org.apache.impala.catalog.ScalarType;
 import org.apache.impala.common.AnalysisException;
@@ -4355,7 +4356,90 @@ SqlCall PercentileFunctionCall() :
    )
 }
 
+SqlCall FirstLastValueFunctionCall() :
+{
+   final Span s;
+   SqlOperator op;
+   final SqlNode e;
+   final List<SqlNode> args = new ArrayList<SqlNode>();
+   final Pair<SqlParserPos, SqlOperator> nullTreatment;
+}
+{
+   (
+       <FIRST_VALUE> { op = SqlStdOperatorTable.FIRST_VALUE; }
+   |   <LAST_VALUE> { op = SqlStdOperatorTable.LAST_VALUE; }
+   )
+   { s = span(); }
+   <LPAREN>
+   AddArg(args, ExprContext.ACCEPT_SUB_QUERY)
+   (
+       (
+           nullTreatment = NullTreatment()
+       |   { nullTreatment = null; }
+       )
+       <RPAREN>
+       {
+           SqlCall call = op.createCall(s.end(this), args);
+           if (nullTreatment != null) {
+               // Wrap in RESPECT_NULLS or IGNORE_NULLS.
+               call = nullTreatment.right.createCall(nullTreatment.left, call);
+           }
+           return call;
+       }
+   )
+}
 
+SqlCall TrimFunctionCall() :
+{
+   final Span s;
+   SqlOperator op;
+   final List<SqlNode> args = new ArrayList<SqlNode>();
+   String function = "btrim";
+   String prefix = "";
+}
+{
+   (
+       <TRIM> {
+         op = SqlStdOperatorTable.TRIM;
+       }
+       |
+       <UTF8_TRIM> {
+         op = SqlStdOperatorTable.TRIM;
+         prefix = "utf8_";
+         function = prefix + function;
+       }
+   )
+   { s = span(); }
+   <LPAREN>
+   (
+     (
+       <LEADING> { function = prefix + "ltrim"; }
+       |
+       <TRAILING> { function = prefix + "rtrim"; }
+       |
+       <BOTH> { function = prefix + "btrim"; }
+     )?
+     (AddArg(args, ExprContext.ACCEPT_SUB_QUERY))?
+     (
+     <FROM>
+     AddArg(args, ExprContext.ACCEPT_SUB_QUERY)
+     )?
+   )
+   <RPAREN>
+   {
+     if (args.size() == 0) {
+       throw new ParseException(function + " cannot be run with no arguments.");
+     }
+     SqlOperator operator = new ImpalaOperator(function);
+     List<SqlNode> finalArgs = new ArrayList<SqlNode>();
+     if (args.size() > 1) {
+       finalArgs.add(args.get(1));
+     }
+     finalArgs.add(args.get(0));
+
+     return operator.createCall(s.end(this), finalArgs);
+   }
+}
 /**
  * Parses an atomic row expression.
  */
@@ -6458,6 +6542,7 @@ SqlNode BuiltinFunctionCall() :
     final SqlNode node;
     final SqlLiteral style; // mssql convert 'style' operand
     final SqlFunction f;
+    String p;
 }
 {
     //~ FUNCTIONS WITH SPECIAL SYNTAX ---------------------------------------
@@ -6471,6 +6556,9 @@ SqlNode BuiltinFunctionCall() :
         <AS>
         (
             dt = DataType() { args.add(dt); }
+            (
+            <FORMAT> p = SimpleStringLiteral() { args.add(SqlLiteral.createCharString(p, s.end(this))); }
+            )?
         |
             <INTERVAL> e = IntervalQualifier() { args.add(e); }
         )
@@ -7557,6 +7645,12 @@ SqlNode NamedFunctionCall() :
         LOOKAHEAD(1)
         call = PercentileFunctionCall()
     |
+        LOOKAHEAD(1)
+        call = FirstLastValueFunctionCall()
+    |
+        LOOKAHEAD(1)
+        call = TrimFunctionCall()
+    |
         call = NamedCall()
     )
     [
@@ -7616,6 +7710,11 @@ SqlCall NamedCall() :
     }
     (
         LOOKAHEAD(2) <LPAREN> <STAR> {
+            args = ImmutableList.of(SqlIdentifier.star(getPos()));
+        }
+        <RPAREN>
+    |
+        LOOKAHEAD(3) <LPAREN> <ALL> <STAR> {
             args = ImmutableList.of(SqlIdentifier.star(getPos()));
         }
         <RPAREN>
@@ -7770,8 +7869,8 @@ SqlIdentifier ReservedFunctionName() :
     |   <STDDEV_SAMP>
     |   <SUM>
     |   <UPPER>
-    |   <TRUNCATE>
     |   <USER>
+    |   <TRUNCATE>
     |   <VAR_POP>
     |   <VAR_SAMP>
     |   <YEAR>
@@ -8028,14 +8127,17 @@ SqlBinaryOperator BinaryRowOperator() :
 |   <MINUS> { return ImpalaCustomOperatorTable.MINUS; }
 |   <STAR> { return ImpalaCustomOperatorTable.MULTIPLY; }
 |   <SLASH> { return ImpalaCustomOperatorTable.DIVIDE; }
+|   <DIV> { return ImpalaCustomOperatorTable.INT_DIVIDE; }
 |   <PERCENT_REMAINDER> {
         if (!this.conformance.isPercentRemainderAllowed()) {
             throw SqlUtil.newContextException(getPos(), RESOURCE.percentRemainderNotAllowed());
         }
-        return SqlStdOperatorTable.PERCENT_REMAINDER;
+        return ImpalaCustomOperatorTable.PERCENT_REMAINDER;
     }
 |   <CONCAT> { return ImpalaCustomOperatorTable.CONCAT_OR; }
 |   <AND> { return SqlStdOperatorTable.AND; }
+|   <AMPERSAND_AND> { return SqlStdOperatorTable.AND; }
+|   <BITAND_OPERATOR> { return SqlStdOperatorTable.BITAND_OPERATOR; }
 |   <OR> { return SqlStdOperatorTable.OR; }
 |   LOOKAHEAD(2) <IS> <DISTINCT> <FROM> { return SqlStdOperatorTable.IS_DISTINCT_FROM; }
 |   <IS> <NOT> <DISTINCT> <FROM> { return SqlStdOperatorTable.IS_NOT_DISTINCT_FROM; }
@@ -8103,6 +8205,10 @@ SqlPostfixOperator PostfixRowOperator() :
         |   LOOKAHEAD(2) <JSON> <SCALAR> { return SqlStdOperatorTable.IS_JSON_SCALAR; }
         |   <JSON> { return SqlStdOperatorTable.IS_JSON_VALUE; }
         )
+    )
+    |
+    (
+      <BANG_NOT> { return ImpalaCustomOperatorTable.FACTORIAL; }
     )
 |
     <FORMAT>
@@ -8805,6 +8911,7 @@ SqlPostfixOperator PostfixRowOperator() :
 |   < USER_DEFINED_TYPE_SCHEMA: "USER_DEFINED_TYPE_SCHEMA" >
 |   < USING: "USING" >
 |   < UTF8: "UTF8" >
+|   < UTF8_TRIM: "UTF8_TRIM" >
 |   < UTF16: "UTF16" >
 |   < UTF32: "UTF32" >
 |   < VALUE: "VALUE" >

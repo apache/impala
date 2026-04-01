@@ -26,6 +26,7 @@ import org.apache.impala.analysis.ArithmeticExpr;
 import org.apache.impala.analysis.TypesUtil;
 import org.apache.impala.catalog.ScalarType;
 import org.apache.impala.catalog.Type;
+import org.apache.impala.catalog.TypeCompatibility;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -216,7 +217,9 @@ public class ImpalaTypeSystemImpl extends RelDataTypeSystemImpl {
         return type2;
       }
 
-      Type retType = TypesUtil.getArithmeticResultType(t1, t2, op, true);
+      Type retType = op == ArithmeticExpr.Operator.INT_DIVIDE
+          ? Type.getAssignmentCompatibleType(t1, t2, TypeCompatibility.DEFAULT)
+          : TypesUtil.getArithmeticResultType(t1, t2, op, true);
       SqlTypeName sqlTypeName =
           ImpalaTypeConverter.getRelDataType(retType).getSqlTypeName();
       RelDataType preNullableType =
@@ -224,7 +227,11 @@ public class ImpalaTypeSystemImpl extends RelDataTypeSystemImpl {
               ? typeFactory.createSqlType(sqlTypeName,
                   retType.getPrecision(), retType.getDecimalDigits())
               : typeFactory.createSqlType(sqlTypeName);
-      boolean nullable = type1.isNullable() && type2.isNullable();
+      // The return type is nullable if one of the args is nullable. In addition,
+      // we also return null when we use the INT_DIVIDE operator where 0 is the
+      // second operand, so INT_DIVIDE is also nullable.
+      boolean nullable = type1.isNullable() || type2.isNullable() ||
+          op == ArithmeticExpr.Operator.INT_DIVIDE;
       return typeFactory.createTypeWithNullability(preNullableType, nullable);
     } catch (Exception e) {
       throw new RuntimeException(e);

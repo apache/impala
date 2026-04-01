@@ -99,6 +99,7 @@ public class ImpalaOperatorTable extends ReflectiveSqlOperatorTable {
       .add("abs")
       .add("first_value")
       .add("last_value")
+      .add("typeof")
       .build();
 
   private static ImpalaOperatorTable INSTANCE;

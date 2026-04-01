@@ -68,37 +68,34 @@ row_regex: PlannerType: OriginalPlanner
 ---- QUERY
 set planner=CALCITE;
 set fallback_planner=CALCITE;
-# query does not compile in Calcite, Calcite currently expects ignore nulls to be
-# outside the parens.
-select id, tinyint_col,
-  last_value(tinyint_col ignore nulls) over
-    (order by id rows between unbounded preceding and 1 preceding),
-from functional.alltypesagg where id < 21
----- CATCH
-ParseException
-====
----- QUERY
-set planner=CALCITE;
-set fallback_planner=NONE;
-# query does not compile in Calcite, Calcite currently expects ignore nulls to be
-# outside the parens.
-select id, tinyint_col,
-  last_value(tinyint_col ignore nulls) over
-    (order by id rows between unbounded preceding and 1 preceding),
-from functional.alltypesagg where id < 21
----- CATCH
-ParseException
-====
----- QUERY
-set planner=CALCITE;
-set fallback_planner=ORIGINAL;
-# query does not compile in Calcite, Fallback planner kicks in
 select id, tinyint_col,
   last_value(tinyint_col ignore nulls) over
     (order by id rows between unbounded preceding and 1 preceding)
 from functional.alltypesagg where id < 21
 ---- RUNTIME_PROFILE
-row_regex: PlannerType: OriginalPlanner
+row_regex: PlannerType: CalcitePlanner
+====
+---- QUERY
+set planner=CALCITE;
+set fallback_planner=NONE;
+# Test for ignore nulls within parens syntax
+select id, tinyint_col,
+  last_value(tinyint_col ignore nulls) over
+    (order by id rows between unbounded preceding and 1 preceding)
+from functional.alltypesagg where id < 21
+---- RUNTIME_PROFILE
+row_regex: PlannerType: CalcitePlanner
+====
+---- QUERY
+set planner=CALCITE;
+set fallback_planner=ORIGINAL;
+# Test for ignore nulls within parens syntax
+select id, tinyint_col,
+  last_value(tinyint_col ignore nulls) over
+    (order by id rows between unbounded preceding and 1 preceding)
+from functional.alltypesagg where id < 21
+---- RUNTIME_PROFILE
+row_regex: PlannerType: CalcitePlanner
 ====
 ---- QUERY
 set planner=ORIGINAL;

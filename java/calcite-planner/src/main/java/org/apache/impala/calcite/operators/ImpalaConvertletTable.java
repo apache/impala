@@ -33,12 +33,14 @@ import org.apache.calcite.sql2rel.SqlRexContext;
 import org.apache.calcite.sql2rel.SqlRexConvertlet;
 import org.apache.calcite.sql2rel.StandardConvertletTable;
 import org.apache.calcite.sql.type.SqlTypeName;
+import org.apache.calcite.sql.type.SqlTypeUtil;
 import org.apache.impala.calcite.operators.ImpalaCustomOperatorTable;
 import org.checkerframework.checker.initialization.qual.UnknownInitialization;
 
 import java.util.List;
 import java.util.Set;
 
+import com.google.common.base.Preconditions;
 /**
  * ImpalaConvertletTable adds the ability to override any converlets in the
  * StandardConvertlet table provided by Calcite. The convertlets are executed in
@@ -136,11 +138,23 @@ public class ImpalaConvertletTable extends ReflectiveConvertletTable {
 
   protected RexNode convertExplicitCast(
       SqlRexContext cx, SqlCall call) {
-    final SqlNode expr = call.operand(0);
     final RexBuilder rexBuilder = cx.getRexBuilder();
     RelDataType returnType =
         cx.getValidator().getValidatedNodeTypeIfKnown(call);
-    List<RexNode> operands = Lists.newArrayList(cx.convertExpression(expr));
+    List<RexNode> operands = null;
+    final SqlNode expr = call.operand(0);
+    if (call.operandCount() == 3) {
+      Preconditions.checkState(SqlTypeUtil.isDatetime(returnType) ||
+          SqlTypeUtil.inCharFamily(returnType));
+      SqlNode formatExpr = call.operand(2);
+      operands = Lists.newArrayList(cx.convertExpression(expr),
+          cx.convertExpression(formatExpr));
+    } else if (call.operandCount() == 2) {
+      operands = Lists.newArrayList(cx.convertExpression(expr));
+    } else {
+      Preconditions.checkState(false, "Invalid number of operands");
+    }
+
     return rexBuilder.makeCall(returnType, ImpalaCastFunction.INSTANCE, operands);
   }
 
