@@ -43,6 +43,8 @@ class TestAutomaticCatalogInvalidation(CustomClusterTestSuite):
   timeout = 20 if ImpalaTestClusterProperties.get_instance().runs_slowly() or\
                (not IS_HDFS and not IS_LOCAL) else 10
   timeout_flag = "--invalidate_tables_timeout_s=" + str(timeout)
+  metrics_test_ttl_s = 1
+  metrics_test_timeout_flag = ("--invalidate_tables_timeout_s=" + str(metrics_test_ttl_s))
 
   def _get_catalog_object(self):
     """ Return the catalog object of functional.alltypes serialized to string. """
@@ -211,3 +213,202 @@ class TestAutomaticCatalogInvalidation(CustomClusterTestSuite):
     # Verify that the table metadata was actually invalidated
     assert self.metadata_cache_string not in self._get_catalog_object(), \
         "Table metadata should be invalidated after timeout"
+
+  @SkipIfFS.hive
+  @pytest.mark.execute_serially
+  @CustomClusterTestSuite.with_args(
+      catalogd_args=metrics_test_timeout_flag,
+      impalad_args=metrics_test_timeout_flag)
+  def test_invalidation_metrics(self):
+    """Test catalog invalidation metrics track TTL and memory pressure
+       based invalidations correctly."""
+
+    ttl_metric = "catalog.num-ttl-invalidated-tables"
+    memory_metric = "catalog.num-memory-pressure-invalidated-tables"
+    ttl_10s = "catalog.ttl-invalidations-10s"
+    ttl_1m = "catalog.ttl-invalidations-01m"
+    ttl_5m = "catalog.ttl-invalidations-05m"
+    ttl_30m = "catalog.ttl-invalidations-30m"
+    loaded_tables_metric = "catalog.num-loaded-tables"
+    last_ttl_ms = "catalog.last-ttl-invalidation-ms"
+    last_ttl_tables = "catalog.last-ttl-invalidated-tables"
+    last_mem_ms = "catalog.last-memory-pressure-invalidation-ms"
+    last_mem_tables = "catalog.last-memory-pressure-invalidated-tables"
+    catalogd = self.cluster.catalogd.service
+
+    # Clear any loaded tables from previous tests to start with a clean slate
+    self.execute_query("INVALIDATE METADATA")
+    catalogd.wait_for_metric_value(loaded_tables_metric, 0, timeout=5)
+
+    # Capture baseline counters - these are cumulative across test runs
+    baseline_ttl_count = catalogd.get_metric_value(ttl_metric)
+    baseline_memory_count = catalogd.get_metric_value(memory_metric)
+    assert baseline_ttl_count == 0, "TTL metric should be 0"
+    assert baseline_memory_count == 0, "Memory pressure metric should be 0"
+
+    # Total max wait = 15s (report delay) + TTL + 2s (buffer)
+    max_wait_time = 15 + self.metrics_test_ttl_s + 2
+
+    # Test 1: Load a single table and verify it gets invalidated
+    self.execute_query(self.query)
+    catalogd.wait_for_metric_value(loaded_tables_metric, 1, timeout=5)
+
+    # Wait for table to be unloaded
+    catalogd.wait_for_metric_value(loaded_tables_metric, 0, timeout=max_wait_time,
+        interval=2)
+
+    catalogd.wait_for_metric_value(ttl_metric, 1, timeout=5, allow_greater=True)
+    ttl_count_after_first = catalogd.get_metric_value(ttl_metric)
+    assert ttl_count_after_first == 1, ("TTL invalidation metric should be 1 (got %d)"
+        % ttl_count_after_first)
+
+    last_ttl_ms_1 = catalogd.get_metric_value(last_ttl_ms)
+    last_ttl_tables_1 = catalogd.get_metric_value(last_ttl_tables)
+    assert last_ttl_tables_1 == 1, (
+        "last-ttl-invalidated-tables should be 1 after first batch (got %d)"
+        % last_ttl_tables_1)
+    assert last_ttl_ms_1 > 0, (
+        "last-ttl-invalidation-ms should be set after first batch (got %d)"
+        % last_ttl_ms_1)
+    assert catalogd.get_metric_value(last_mem_ms) == 0, (
+        "last-memory-pressure-invalidation-ms should stay 0 (no memory-pressure batch)")
+    assert catalogd.get_metric_value(last_mem_tables) == 0, (
+        "last-memory-pressure-invalidated-tables should stay 0")
+
+    # Test 2: Verify memory pressure metric remained unchanged
+    memory_count_after_first = catalogd.get_metric_value(memory_metric)
+    assert memory_count_after_first == baseline_memory_count, (
+        "Memory pressure invalidation metric should remain %d (got %d)"
+        % (baseline_memory_count, memory_count_after_first))
+
+    # Test 3: Load multiple tables in one query
+    join_query = (
+        "SELECT 1 FROM functional.alltypessmall s "
+        "INNER JOIN functional.alltypesagg a ON s.id = a.id "
+        "INNER JOIN functional.alltypes t ON t.id = s.id LIMIT 1")
+    self.execute_query(join_query)
+    catalogd.wait_for_metric_value(loaded_tables_metric, 3, timeout=5)
+
+    # Wait for all join tables to be unloaded
+    catalogd.wait_for_metric_value(loaded_tables_metric, 0, timeout=max_wait_time,
+        interval=2)
+
+    # Wait for TTL metric to reach 4 (1 from first test + 3 from join)
+    expected_final_ttl = 4
+    catalogd.wait_for_metric_value(ttl_metric, expected_final_ttl,
+        timeout=5, allow_greater=True)
+    final_ttl_count = catalogd.get_metric_value(ttl_metric)
+    assert final_ttl_count == expected_final_ttl, ("TTL invalidation metric should be "
+        "%d (got %d)" % (expected_final_ttl, final_ttl_count))
+
+    last_ttl_ms_2 = catalogd.get_metric_value(last_ttl_ms)
+    last_ttl_tables_2 = catalogd.get_metric_value(last_ttl_tables)
+    # last-ttl-invalidated-tables is the size of the most recent batch only. With a
+    # short TTL, tables may expire across multiple daemon cycles (e.g. on multi-node
+    # clusters where last-used times are refreshed at slightly different times).
+    assert 1 <= last_ttl_tables_2 <= 3, (
+        "last-ttl-invalidated-tables after join round should be 1-3 (got %d)"
+        % last_ttl_tables_2)
+    assert last_ttl_ms_2 >= last_ttl_ms_1, (
+        "last-ttl-invalidation-ms should not go backwards (%d -> %d)"
+        % (last_ttl_ms_1, last_ttl_ms_2))
+    assert catalogd.get_metric_value(last_mem_ms) == 0, (
+        "last-memory-pressure-invalidation-ms should still be 0")
+    assert catalogd.get_metric_value(last_mem_tables) == 0, (
+        "last-memory-pressure-invalidated-tables should still be 0")
+
+    # Test 4: Verify memory pressure metric still unchanged
+    final_memory_count = catalogd.get_metric_value(memory_metric)
+    assert final_memory_count == baseline_memory_count, (
+        "Memory pressure invalidation metric should remain %d (got %d)"
+        % (baseline_memory_count, final_memory_count))
+
+    # Test 5: Verify all sliding window counts are accessible and non-negative
+    ttl_count_10s = catalogd.get_metric_value(ttl_10s)
+    ttl_count_1m = catalogd.get_metric_value(ttl_1m)
+    ttl_count_5m = catalogd.get_metric_value(ttl_5m)
+    ttl_count_30m = catalogd.get_metric_value(ttl_30m)
+
+    assert ttl_count_10s >= 0, (
+        "TTL 10-sec count should be non-negative (got %d)" % ttl_count_10s)
+
+    # Test 6: Verify window counts make sense (longer windows should contain at least
+    # as many invalidations as shorter windows)
+    assert ttl_count_1m >= ttl_count_10s, (
+        "1-min count (%d) should be >= 10-sec count (%d)"
+        % (ttl_count_1m, ttl_count_10s))
+    assert ttl_count_5m >= ttl_count_1m, (
+        "5-min count (%d) should be >= 1-min count (%d)" % (ttl_count_5m, ttl_count_1m))
+    assert ttl_count_30m >= ttl_count_5m, (
+        "30-min count (%d) should be >= 5-min count (%d)" % (ttl_count_30m, ttl_count_5m))
+
+    # Test 7: Window counts should reflect the 4 invalidations we triggered
+    assert ttl_count_30m == 4, (
+        "30-min window should contain exactly the 4 invalidations we triggered (got %d)"
+        % ttl_count_30m)
+
+  @SkipIfFS.hive
+  @pytest.mark.execute_serially
+  @CustomClusterTestSuite.with_args(
+    catalogd_args="--invalidate_tables_on_memory_pressure "
+                  "--invalidate_tables_gc_old_gen_full_threshold=0 "
+                  "--invalidate_tables_fraction_on_memory_pressure=1 "
+                  "--invalidate_tables_timeout_s=0",
+    impalad_args="--invalidate_tables_on_memory_pressure "
+                  "--invalidate_tables_timeout_s=0")
+  def test_memory_pressure_metrics(self):
+    """Test memory pressure invalidation metrics work correctly."""
+
+    ttl_metric = "catalog.num-ttl-invalidated-tables"
+    memory_metric = "catalog.num-memory-pressure-invalidated-tables"
+    memory_1m = "catalog.memory-pressure-invalidations-01m"
+    memory_5m = "catalog.memory-pressure-invalidations-05m"
+    memory_30m = "catalog.memory-pressure-invalidations-30m"
+    loaded_tables_metric = "catalog.num-loaded-tables"
+    last_mem_ms = "catalog.last-memory-pressure-invalidation-ms"
+    last_mem_tables = "catalog.last-memory-pressure-invalidated-tables"
+    catalogd = self.cluster.catalogd.service
+
+    # Clear state and get baseline
+    self.execute_query("INVALIDATE METADATA")
+    catalogd.wait_for_metric_value(loaded_tables_metric, 0, timeout=5)
+
+    baseline_ttl_count = catalogd.get_metric_value(ttl_metric)
+
+    self.execute_query(self.query)
+    catalogd.wait_for_metric_value(loaded_tables_metric, 1, timeout=5)
+
+    # Trigger memory pressure invalidation using GC
+    call(["jmap", "-histo:live", str(self.cluster.catalogd.get_pid())])
+
+    catalogd.wait_for_metric_value(loaded_tables_metric, 0, timeout=15, interval=2)
+
+    # Verify memory pressure metric increased
+    catalogd.wait_for_metric_value(memory_metric, 1, timeout=5, allow_greater=True)
+
+    assert catalogd.get_metric_value(last_mem_ms) > 0, (
+        "last-memory-pressure-invalidation-ms should be set after eviction (got %d)"
+        % catalogd.get_metric_value(last_mem_ms))
+    assert catalogd.get_metric_value(last_mem_tables) >= 1, (
+        "last-memory-pressure-invalidated-tables should be at least 1 (got %d)"
+        % catalogd.get_metric_value(last_mem_tables))
+
+    # Verify TTL metric unchanged
+    final_ttl_count = catalogd.get_metric_value(ttl_metric)
+    assert final_ttl_count == baseline_ttl_count, (
+        "TTL metric should remain %d (got %d)"
+        % (baseline_ttl_count, final_ttl_count))
+
+    # Sliding windows for the single memory-pressure batch we triggered
+    memory_count_1m = catalogd.get_metric_value(memory_1m)
+    memory_count_5m = catalogd.get_metric_value(memory_5m)
+    memory_count_30m = catalogd.get_metric_value(memory_30m)
+    assert memory_count_1m == 1, (
+        "1-min memory pressure window should show 1 invalidation (got %d)"
+        % memory_count_1m)
+    assert memory_count_5m == 1, (
+        "5-min memory pressure window should show 1 invalidation (got %d)"
+        % memory_count_5m)
+    assert memory_count_30m == 1, (
+        "30-min memory pressure window should show 1 invalidation (got %d)"
+        % memory_count_30m)

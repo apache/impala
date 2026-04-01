@@ -26,6 +26,7 @@ import java.util.List;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 
@@ -131,9 +132,16 @@ public abstract class Catalog implements AutoCloseable {
 
   // Number of loaded tables (i.e. not IncompleteTable) in the catalog cache.
   // This is updated in real-time when tables are loaded or invalidated.
-  // IMPALA-13863: Track loaded tables to help monitor catalog memory pressure.
+  // Track loaded tables to help monitor catalog memory pressure.
   // This is static because it tracks loaded tables across all catalog instances.
   protected static final AtomicInteger numLoadedTables_ = new AtomicInteger(0);
+
+  // Number of tables invalidated due to TTL (Time-To-Live).
+  protected static final AtomicLong numTtlInvalidatedTables_ = new AtomicLong(0);
+
+  // Number of tables invalidated due to memory pressure.
+  protected static final AtomicLong numMemoryPressureInvalidatedTables_ =
+      new AtomicLong(0);
 
   // Update function for tracking table additions/replacements in the loaded tables
   // counter. This is passed to Db#addTable() to centralize the counter update logic.
@@ -363,6 +371,36 @@ public abstract class Catalog implements AutoCloseable {
    */
   public int getNumLoadedTables() {
     return numLoadedTables_.get();
+  }
+
+  /**
+   * Returns the total number of tables invalidated due to TTL.
+   */
+  public long getNumTtlInvalidatedTables() {
+    return numTtlInvalidatedTables_.get();
+  }
+
+  /**
+   * Returns the total number of tables invalidated due to memory pressure.
+   */
+  public long getNumMemoryPressureInvalidatedTables() {
+    return numMemoryPressureInvalidatedTables_.get();
+  }
+
+  /**
+   * Increments the counter for TTL-based invalidations by {@code n}.
+   */
+  public static void incrementTtlInvalidatedTables(int n) {
+    Preconditions.checkArgument(n >= 0, "n must be non-negative");
+    numTtlInvalidatedTables_.addAndGet(n);
+  }
+
+  /**
+   * Increments the counter for memory pressure-based invalidations by {@code n}.
+   */
+  public static void incrementMemoryPressureInvalidatedTables(int n) {
+    Preconditions.checkArgument(n >= 0, "n must be non-negative");
+    numMemoryPressureInvalidatedTables_.addAndGet(n);
   }
 
   /**

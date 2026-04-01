@@ -34,9 +34,11 @@ import javax.management.Notification;
 import javax.management.NotificationEmitter;
 import javax.management.NotificationListener;
 import java.lang.management.MemoryUsage;
+import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
+import java.util.Iterator;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
@@ -53,6 +55,10 @@ import java.util.concurrent.atomic.AtomicLong;
 public class CatalogdTableInvalidator {
   public static final Logger LOG =
       LoggerFactory.getLogger(CatalogdTableInvalidator.class);
+
+  // Maximum retention time for invalidation batch history (30 minutes)
+  private static final long MAX_TIMESTAMP_RETENTION_MS = TimeUnit.MINUTES.toMillis(30);
+
   /**
    * Plugable time source for tests. Defined as static to avoid passing
    * CatalogdTableInvalidator everywhere the clock is used.
@@ -96,6 +102,18 @@ public class CatalogdTableInvalidator {
    * Last time an time-based invalidation is executed in nanoseconds.
    */
   private long lastInvalidationTime_;
+
+  /**
+   * One entry per invalidation batch: wall-clock timestamp in millis and table count.
+   */
+  private record InvalidationBatch(long timestampMillis, int count) {}
+
+  private final ArrayDeque<InvalidationBatch> ttlInvalidationBatches_ =
+      new ArrayDeque<>();
+  private final ArrayDeque<InvalidationBatch> memoryPressureInvalidationBatches_ =
+      new ArrayDeque<>();
+  private InvalidationBatch lastTtlInvalidationBatch_;
+  private InvalidationBatch lastMemoryPressureInvalidationBatch_;
 
   CatalogdTableInvalidator(CatalogServiceCatalog catalog, final long unusedTableTtlSec,
       boolean invalidateTableOnMemoryPressure, double oldGenFullThreshold,
@@ -214,6 +232,7 @@ public class CatalogdTableInvalidator {
         return Long.compare(o1.getLastUsedTime(), o2.getLastUsedTime());
       }
     });
+    int numInvalidated = 0;
     for (int i = 0; i < tables.size() * invalidationFraction; ++i) {
       TTableName tTableName = tables.get(i).getTableName().toThrift();
       Reference<Boolean> tblWasRemoved = new Reference<>();
@@ -222,11 +241,17 @@ public class CatalogdTableInvalidator {
           NoOpEventSequence.INSTANCE);
       LOG.info("Table " + tables.get(i).getFullName() + " invalidated due to memory " +
           "pressure.");
+      numInvalidated++;
+    }
+    // Track memory pressure invalidations
+    if (numInvalidated > 0) {
+      recordMemoryPressureInvalidationBatch(numInvalidated);
     }
   }
 
   private void invalidateOlderThan(long retireAgeNano) {
     long now = TIME_SOURCE.read();
+    int numInvalidated = 0;
     for (Db db : catalog_.getAllDbs()) {
       for (Table table : catalog_.getAllTables(db)) {
         if (table instanceof IncompleteTable) continue;
@@ -240,7 +265,12 @@ public class CatalogdTableInvalidator {
         LOG.info(
             "Invalidated " + table.getFullName() + " due to inactivity for " +
                 TimeUnit.NANOSECONDS.toSeconds(inactivityTime) + " seconds.");
+        numInvalidated++;
       }
+    }
+    // Track TTL invalidations
+    if (numInvalidated > 0) {
+      recordTtlInvalidationBatch(numInvalidated);
     }
   }
 
@@ -259,6 +289,148 @@ public class CatalogdTableInvalidator {
   @VisibleForTesting
   synchronized void wakeUpForTests() {
     notify();
+  }
+
+  private InvalidationBatch appendBatch(
+      ArrayDeque<InvalidationBatch> batches, int count) {
+    long now = System.currentTimeMillis();
+    InvalidationBatch batch = new InvalidationBatch(now, count);
+    batches.addLast(batch);
+    long cutoffTime = now - MAX_TIMESTAMP_RETENTION_MS;
+    while (!batches.isEmpty() && batches.peekFirst().timestampMillis() < cutoffTime) {
+      batches.removeFirst();
+    }
+    return batch;
+  }
+
+  private void recordTtlInvalidationBatch(int count) {
+    synchronized (ttlInvalidationBatches_) {
+      lastTtlInvalidationBatch_ = appendBatch(ttlInvalidationBatches_, count);
+    }
+    Catalog.incrementTtlInvalidatedTables(count);
+  }
+
+  private void recordMemoryPressureInvalidationBatch(int count) {
+    synchronized (memoryPressureInvalidationBatches_) {
+      lastMemoryPressureInvalidationBatch_ =
+          appendBatch(memoryPressureInvalidationBatches_, count);
+    }
+    Catalog.incrementMemoryPressureInvalidatedTables(count);
+  }
+
+  /**
+   * Sliding-window invalidation counts for 10s / 1m / 5m / 30m.
+   */
+  private record SlidingWindowCounts(
+      long invalidations10Sec,
+      long invalidations1Min,
+      long invalidations5Min,
+      long invalidations30Min) {}
+
+  /**
+   * Counts invalidations in all sliding windows with a single pass.
+   * Caller must hold the lock on {@code batches}.
+   */
+  private SlidingWindowCounts countInvalidationsInSlidingWindows(
+      ArrayDeque<InvalidationBatch> batches) {
+    long now = System.currentTimeMillis();
+    long cutoff10Sec = now - TimeUnit.SECONDS.toMillis(10);
+    long cutoff1Min = now - TimeUnit.MINUTES.toMillis(1);
+    long cutoff5Min = now - TimeUnit.MINUTES.toMillis(5);
+    long cutoff30Min = now - TimeUnit.MINUTES.toMillis(30);
+
+    long invalidations10Sec = 0;
+    long invalidations1Min = 0;
+    long invalidations5Min = 0;
+    long invalidations30Min = 0;
+    Iterator<InvalidationBatch> it = batches.descendingIterator();
+    while (it.hasNext()) {
+      InvalidationBatch batch = it.next();
+      long timestamp = batch.timestampMillis();
+      if (timestamp < cutoff30Min) break;
+      int count = batch.count();
+      invalidations30Min += count;
+      if (timestamp >= cutoff5Min) invalidations5Min += count;
+      if (timestamp >= cutoff1Min) invalidations1Min += count;
+      if (timestamp >= cutoff10Sec) invalidations10Sec += count;
+    }
+    return new SlidingWindowCounts(
+        invalidations10Sec, invalidations1Min, invalidations5Min, invalidations30Min);
+  }
+
+  /**
+   * Snapshot of invalidation metrics from {@link CatalogdTableInvalidator}.
+   */
+  public record InvalidationMetrics(
+      long ttlInvalidations10Sec,
+      long ttlInvalidations1Min,
+      long ttlInvalidations5Min,
+      long ttlInvalidations30Min,
+      long memoryPressureInvalidations10Sec,
+      long memoryPressureInvalidations1Min,
+      long memoryPressureInvalidations5Min,
+      long memoryPressureInvalidations30Min,
+      long lastTtlInvalidationMillis,
+      long lastTtlInvalidatedTables,
+      long lastMemoryPressureInvalidationMillis,
+      long lastMemoryPressureInvalidatedTables) {}
+
+  /**
+   * Returns a consistent snapshot of all invalidation metrics. TTL and memory-pressure
+   * fields are read under separate locks since they are independent.
+   */
+  public InvalidationMetrics getMetrics() {
+    long ttlInvalidations10Sec;
+    long ttlInvalidations1Min;
+    long ttlInvalidations5Min;
+    long ttlInvalidations30Min;
+    long lastTtlInvalidationMillis;
+    long lastTtlInvalidatedTables;
+    synchronized (ttlInvalidationBatches_) {
+      SlidingWindowCounts ttlCounts =
+          countInvalidationsInSlidingWindows(ttlInvalidationBatches_);
+      ttlInvalidations10Sec = ttlCounts.invalidations10Sec();
+      ttlInvalidations1Min = ttlCounts.invalidations1Min();
+      ttlInvalidations5Min = ttlCounts.invalidations5Min();
+      ttlInvalidations30Min = ttlCounts.invalidations30Min();
+      InvalidationBatch lastTtl = lastTtlInvalidationBatch_;
+      lastTtlInvalidationMillis = lastTtl != null ? lastTtl.timestampMillis() : 0;
+      lastTtlInvalidatedTables = lastTtl != null ? lastTtl.count() : 0;
+    }
+
+    long memoryPressureInvalidations10Sec;
+    long memoryPressureInvalidations1Min;
+    long memoryPressureInvalidations5Min;
+    long memoryPressureInvalidations30Min;
+    long lastMemoryPressureInvalidationMillis;
+    long lastMemoryPressureInvalidatedTables;
+    synchronized (memoryPressureInvalidationBatches_) {
+      SlidingWindowCounts memoryCounts =
+          countInvalidationsInSlidingWindows(memoryPressureInvalidationBatches_);
+      memoryPressureInvalidations10Sec = memoryCounts.invalidations10Sec();
+      memoryPressureInvalidations1Min = memoryCounts.invalidations1Min();
+      memoryPressureInvalidations5Min = memoryCounts.invalidations5Min();
+      memoryPressureInvalidations30Min = memoryCounts.invalidations30Min();
+      InvalidationBatch lastMemory = lastMemoryPressureInvalidationBatch_;
+      lastMemoryPressureInvalidationMillis =
+          lastMemory != null ? lastMemory.timestampMillis() : 0;
+      lastMemoryPressureInvalidatedTables =
+          lastMemory != null ? lastMemory.count() : 0;
+    }
+
+    return new InvalidationMetrics(
+        ttlInvalidations10Sec,
+        ttlInvalidations1Min,
+        ttlInvalidations5Min,
+        ttlInvalidations30Min,
+        memoryPressureInvalidations10Sec,
+        memoryPressureInvalidations1Min,
+        memoryPressureInvalidations5Min,
+        memoryPressureInvalidations30Min,
+        lastTtlInvalidationMillis,
+        lastTtlInvalidatedTables,
+        lastMemoryPressureInvalidationMillis,
+        lastMemoryPressureInvalidatedTables);
   }
 
   private class DaemonThread implements Runnable {

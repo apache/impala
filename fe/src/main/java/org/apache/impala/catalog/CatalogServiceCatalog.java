@@ -4919,7 +4919,7 @@ public class CatalogServiceCatalog extends Catalog {
     }
   }
 
-  CatalogdTableInvalidator getCatalogdTableInvalidator() {
+  public CatalogdTableInvalidator getCatalogdTableInvalidator() {
     return catalogdTableInvalidator_;
   }
 

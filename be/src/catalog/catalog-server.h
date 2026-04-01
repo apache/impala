@@ -213,6 +213,31 @@ class CatalogServer {
   IntGauge* num_hms_clients_idle_metric_;
   IntGauge* num_hms_clients_in_use_metric_;
 
+  /// Metrics that track table invalidations
+  /// Total number of tables invalidated due to TTL
+  IntGauge* num_ttl_invalidated_tables_metric_;
+  /// Total number of tables invalidated due to memory pressure
+  IntGauge* num_memory_pressure_invalidated_tables_metric_;
+
+  /// Sliding window counts for invalidations (10s/1m/5m/30m)
+  IntGauge* ttl_invalidations_10s_metric_;
+  IntGauge* ttl_invalidations_1m_metric_;
+  IntGauge* ttl_invalidations_5m_metric_;
+  IntGauge* ttl_invalidations_30m_metric_;
+  IntGauge* memory_pressure_invalidations_10s_metric_;
+  IntGauge* memory_pressure_invalidations_1m_metric_;
+  IntGauge* memory_pressure_invalidations_5m_metric_;
+  IntGauge* memory_pressure_invalidations_30m_metric_;
+
+  /// Metrics that track the last TTL invalidation and the number of tables invalidated.
+  IntGauge* last_ttl_invalidation_ms_metric_;
+  IntGauge* last_ttl_invalidated_tables_metric_;
+
+  /// Metrics that track the last memory pressure invalidation and
+  /// the number of tables invalidated.
+  IntGauge* last_memory_pressure_invalidation_ms_metric_;
+  IntGauge* last_memory_pressure_invalidated_tables_metric_;
+
   /// Thread that polls and execute first reset metadata operation.
   std::unique_ptr<Thread> catalog_first_reset_metadata_thread_;
 

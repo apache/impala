@@ -1125,6 +1125,30 @@ struct TGetCatalogServerMetricsResponse {
 
   // Number of loaded tables (i.e. not IncompleteTable)
   15: optional i32 catalog_num_loaded_tables
+
+  // Table invalidation metrics
+  // Total number of tables invalidated due to TTL
+  16: optional i64 catalog_num_ttl_invalidated_tables
+  // Total number of tables invalidated due to memory pressure
+  17: optional i64 catalog_num_memory_pressure_invalidated_tables
+
+  // Sliding window counts for TTL-based invalidations (10s/1m/5m/30m)
+  18: optional i64 catalog_ttl_invalidations_10s
+  19: optional i64 catalog_ttl_invalidations_1m
+  20: optional i64 catalog_ttl_invalidations_5m
+  21: optional i64 catalog_ttl_invalidations_30m
+
+  // Sliding window counts for memory pressure-based invalidations (10s/1m/5m/30m)
+  22: optional i64 catalog_memory_pressure_invalidations_10s
+  23: optional i64 catalog_memory_pressure_invalidations_1m
+  24: optional i64 catalog_memory_pressure_invalidations_5m
+  25: optional i64 catalog_memory_pressure_invalidations_30m
+
+  // Last invalidation batch details
+  26: optional i64 catalog_last_ttl_invalidation_ms
+  27: optional i64 catalog_last_ttl_invalidated_tables
+  28: optional i64 catalog_last_memory_pressure_invalidation_ms
+  29: optional i64 catalog_last_memory_pressure_invalidated_tables
 }
 
 // Request to copy the generated testcase from a given input path.

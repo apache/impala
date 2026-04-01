@@ -39,6 +39,7 @@ import org.apache.impala.authorization.AuthorizationManager;
 import org.apache.impala.catalog.Catalog;
 import org.apache.impala.catalog.CatalogException;
 import org.apache.impala.catalog.CatalogServiceCatalog;
+import org.apache.impala.catalog.CatalogdTableInvalidator;
 import org.apache.impala.catalog.monitor.CatalogOperationTracker;
 import org.apache.impala.catalog.Db;
 import org.apache.impala.catalog.FeDb;
@@ -650,6 +651,37 @@ public class JniCatalog {
           response.setCatalog_num_hms_clients_in_use(catalog_.getNumHmsClientsInUse());
           response.setCatalog_num_loaded_tables(catalog_.getNumLoadedTables());
           response.setEvent_metrics(catalog_.getEventProcessorMetrics());
+          response.setCatalog_num_ttl_invalidated_tables(
+              catalog_.getNumTtlInvalidatedTables());
+          response.setCatalog_num_memory_pressure_invalidated_tables(
+              catalog_.getNumMemoryPressureInvalidatedTables());
+
+          CatalogdTableInvalidator invalidator = catalog_.getCatalogdTableInvalidator();
+          if (invalidator != null) {
+            CatalogdTableInvalidator.InvalidationMetrics metrics =
+                invalidator.getMetrics();
+            response.setCatalog_ttl_invalidations_10s(metrics.ttlInvalidations10Sec());
+            response.setCatalog_ttl_invalidations_1m(metrics.ttlInvalidations1Min());
+            response.setCatalog_ttl_invalidations_5m(metrics.ttlInvalidations5Min());
+            response.setCatalog_ttl_invalidations_30m(metrics.ttlInvalidations30Min());
+            response.setCatalog_memory_pressure_invalidations_10s(
+                metrics.memoryPressureInvalidations10Sec());
+            response.setCatalog_memory_pressure_invalidations_1m(
+                metrics.memoryPressureInvalidations1Min());
+            response.setCatalog_memory_pressure_invalidations_5m(
+                metrics.memoryPressureInvalidations5Min());
+            response.setCatalog_memory_pressure_invalidations_30m(
+                metrics.memoryPressureInvalidations30Min());
+            response.setCatalog_last_ttl_invalidation_ms(
+                metrics.lastTtlInvalidationMillis());
+            response.setCatalog_last_ttl_invalidated_tables(
+                metrics.lastTtlInvalidatedTables());
+            response.setCatalog_last_memory_pressure_invalidation_ms(
+                metrics.lastMemoryPressureInvalidationMillis());
+            response.setCatalog_last_memory_pressure_invalidated_tables(
+                metrics.lastMemoryPressureInvalidatedTables());
+          }
+
           return response;
         });
   }

@@ -379,6 +379,36 @@ const string CATALOG_NUM_LOADED_TABLES = "catalog.num-loaded-tables";
 const string CATALOG_NUM_HMS_CLIENTS_IDLE = "catalog.hms-client-pool.num-idle";
 const string CATALOG_NUM_HMS_CLIENTS_IN_USE = "catalog.hms-client-pool.num-in-use";
 
+// Table invalidation metrics
+const string CATALOG_NUM_TTL_INVALIDATED_TABLES =
+    "catalog.num-ttl-invalidated-tables";
+const string CATALOG_NUM_MEMORY_PRESSURE_INVALIDATED_TABLES =
+    "catalog.num-memory-pressure-invalidated-tables";
+const string CATALOG_TTL_INVALIDATIONS_10S =
+    "catalog.ttl-invalidations-10s";
+const string CATALOG_TTL_INVALIDATIONS_1M =
+    "catalog.ttl-invalidations-01m";
+const string CATALOG_TTL_INVALIDATIONS_5M =
+    "catalog.ttl-invalidations-05m";
+const string CATALOG_TTL_INVALIDATIONS_30M =
+    "catalog.ttl-invalidations-30m";
+const string CATALOG_LAST_TTL_INVALIDATION_MS =
+    "catalog.last-ttl-invalidation-ms";
+const string CATALOG_LAST_TTL_INVALIDATED_TABLES =
+    "catalog.last-ttl-invalidated-tables";
+const string CATALOG_MEMORY_PRESSURE_INVALIDATIONS_10S =
+    "catalog.memory-pressure-invalidations-10s";
+const string CATALOG_MEMORY_PRESSURE_INVALIDATIONS_1M =
+    "catalog.memory-pressure-invalidations-01m";
+const string CATALOG_MEMORY_PRESSURE_INVALIDATIONS_5M =
+    "catalog.memory-pressure-invalidations-05m";
+const string CATALOG_MEMORY_PRESSURE_INVALIDATIONS_30M =
+    "catalog.memory-pressure-invalidations-30m";
+const string CATALOG_LAST_MEMORY_PRESSURE_INVALIDATION_MS =
+    "catalog.last-memory-pressure-invalidation-ms";
+const string CATALOG_LAST_MEMORY_PRESSURE_INVALIDATED_TABLES =
+    "catalog.last-memory-pressure-invalidated-tables";
+
 const string CATALOG_WEB_PAGE = "/catalog";
 const string CATALOG_TEMPLATE = "catalog.tmpl";
 const string CATALOG_OBJECT_WEB_PAGE = "/catalog_object";
@@ -660,6 +690,36 @@ CatalogServer::CatalogServer(MetricGroup* metrics)
   num_loaded_tables_metric_ = metrics->AddGauge(CATALOG_NUM_LOADED_TABLES, 0);
   num_hms_clients_idle_metric_ = metrics->AddGauge(CATALOG_NUM_HMS_CLIENTS_IDLE, 0);
   num_hms_clients_in_use_metric_ = metrics->AddGauge(CATALOG_NUM_HMS_CLIENTS_IN_USE, 0);
+
+  num_ttl_invalidated_tables_metric_ =
+      metrics->AddGauge(CATALOG_NUM_TTL_INVALIDATED_TABLES, 0);
+  num_memory_pressure_invalidated_tables_metric_ =
+      metrics->AddGauge(CATALOG_NUM_MEMORY_PRESSURE_INVALIDATED_TABLES, 0);
+
+  ttl_invalidations_10s_metric_ =
+      metrics->AddGauge(CATALOG_TTL_INVALIDATIONS_10S, 0);
+  ttl_invalidations_1m_metric_ =
+      metrics->AddGauge(CATALOG_TTL_INVALIDATIONS_1M, 0);
+  ttl_invalidations_5m_metric_ =
+      metrics->AddGauge(CATALOG_TTL_INVALIDATIONS_5M, 0);
+  ttl_invalidations_30m_metric_ =
+      metrics->AddGauge(CATALOG_TTL_INVALIDATIONS_30M, 0);
+  last_ttl_invalidation_ms_metric_ =
+      metrics->AddGauge(CATALOG_LAST_TTL_INVALIDATION_MS, 0);
+  last_ttl_invalidated_tables_metric_ =
+      metrics->AddGauge(CATALOG_LAST_TTL_INVALIDATED_TABLES, 0);
+  memory_pressure_invalidations_10s_metric_ =
+      metrics->AddGauge(CATALOG_MEMORY_PRESSURE_INVALIDATIONS_10S, 0);
+  memory_pressure_invalidations_1m_metric_ =
+      metrics->AddGauge(CATALOG_MEMORY_PRESSURE_INVALIDATIONS_1M, 0);
+  memory_pressure_invalidations_5m_metric_ =
+      metrics->AddGauge(CATALOG_MEMORY_PRESSURE_INVALIDATIONS_5M, 0);
+  memory_pressure_invalidations_30m_metric_ =
+      metrics->AddGauge(CATALOG_MEMORY_PRESSURE_INVALIDATIONS_30M, 0);
+  last_memory_pressure_invalidation_ms_metric_ =
+      metrics->AddGauge(CATALOG_LAST_MEMORY_PRESSURE_INVALIDATION_MS, 0);
+  last_memory_pressure_invalidated_tables_metric_ =
+      metrics->AddGauge(CATALOG_LAST_MEMORY_PRESSURE_INVALIDATED_TABLES, 0);
 
   active_status_metric_ =
       metrics->AddProperty(CATALOG_ACTIVE_STATUS, !FLAGS_enable_catalogd_ha);
@@ -1142,6 +1202,31 @@ void CatalogServer::MarkPendingMetadataReset(const unique_lock<std::mutex>& lock
     num_loaded_tables_metric_->SetValue(response.catalog_num_loaded_tables);
     num_hms_clients_idle_metric_->SetValue(response.catalog_num_hms_clients_idle);
     num_hms_clients_in_use_metric_->SetValue(response.catalog_num_hms_clients_in_use);
+
+    num_ttl_invalidated_tables_metric_->SetValue(
+        response.catalog_num_ttl_invalidated_tables);
+    num_memory_pressure_invalidated_tables_metric_->SetValue(
+        response.catalog_num_memory_pressure_invalidated_tables);
+    ttl_invalidations_10s_metric_->SetValue(response.catalog_ttl_invalidations_10s);
+    ttl_invalidations_1m_metric_->SetValue(response.catalog_ttl_invalidations_1m);
+    ttl_invalidations_5m_metric_->SetValue(response.catalog_ttl_invalidations_5m);
+    ttl_invalidations_30m_metric_->SetValue(response.catalog_ttl_invalidations_30m);
+    last_ttl_invalidation_ms_metric_->SetValue(response.catalog_last_ttl_invalidation_ms);
+    last_ttl_invalidated_tables_metric_->SetValue(
+        response.catalog_last_ttl_invalidated_tables);
+    memory_pressure_invalidations_10s_metric_->SetValue(
+        response.catalog_memory_pressure_invalidations_10s);
+    memory_pressure_invalidations_1m_metric_->SetValue(
+        response.catalog_memory_pressure_invalidations_1m);
+    memory_pressure_invalidations_5m_metric_->SetValue(
+        response.catalog_memory_pressure_invalidations_5m);
+    memory_pressure_invalidations_30m_metric_->SetValue(
+        response.catalog_memory_pressure_invalidations_30m);
+    last_memory_pressure_invalidation_ms_metric_->SetValue(
+        response.catalog_last_memory_pressure_invalidation_ms);
+    last_memory_pressure_invalidated_tables_metric_->SetValue(
+        response.catalog_last_memory_pressure_invalidated_tables);
+
     TEventProcessorMetrics eventProcessorMetrics = response.event_metrics;
     MetastoreEventMetrics::refresh(&eventProcessorMetrics);
   }

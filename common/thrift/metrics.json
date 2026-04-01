@@ -602,6 +602,146 @@
     "key": "catalog.hms-client-pool.num-in-use"
   },
   {
+    "description": "Total number of tables invalidated due to TTL (Time-To-Live).",
+    "contexts": [
+      "CATALOGSERVER"
+    ],
+    "label": "TTL Invalidated Tables",
+    "units": "NONE",
+    "kind": "GAUGE",
+    "key": "catalog.num-ttl-invalidated-tables"
+  },
+  {
+    "description": "Total number of tables invalidated due to memory pressure.",
+    "contexts": [
+      "CATALOGSERVER"
+    ],
+    "label": "Memory Pressure Invalidated Tables",
+    "units": "NONE",
+    "kind": "GAUGE",
+    "key": "catalog.num-memory-pressure-invalidated-tables"
+  },
+  {
+    "description": "Number of tables invalidated due to TTL in the last 10 seconds.",
+    "contexts": [
+      "CATALOGSERVER"
+    ],
+    "label": "TTL Invalidations (10s)",
+    "units": "NONE",
+    "kind": "GAUGE",
+    "key": "catalog.ttl-invalidations-10s"
+  },
+  {
+    "description": "Number of tables invalidated due to TTL in the last 1 minute.",
+    "contexts": [
+      "CATALOGSERVER"
+    ],
+    "label": "TTL Invalidations (1m)",
+    "units": "NONE",
+    "kind": "GAUGE",
+    "key": "catalog.ttl-invalidations-01m"
+  },
+  {
+    "description": "Number of tables invalidated due to TTL in the last 5 minutes.",
+    "contexts": [
+      "CATALOGSERVER"
+    ],
+    "label": "TTL Invalidations (5m)",
+    "units": "NONE",
+    "kind": "GAUGE",
+    "key": "catalog.ttl-invalidations-05m"
+  },
+  {
+    "description": "Number of tables invalidated due to TTL in the last 30 minutes.",
+    "contexts": [
+      "CATALOGSERVER"
+    ],
+    "label": "TTL Invalidations (30m)",
+    "units": "NONE",
+    "kind": "GAUGE",
+    "key": "catalog.ttl-invalidations-30m"
+  },
+  {
+    "description": "Unix timestamp in milliseconds when the last TTL invalidation batch ran.",
+    "contexts": [
+      "CATALOGSERVER"
+    ],
+    "label": "Last TTL invalidation (ms)",
+    "units": "NONE",
+    "kind": "GAUGE",
+    "key": "catalog.last-ttl-invalidation-ms"
+  },
+  {
+    "description": "Number of tables invalidated in the last TTL invalidation batch.",
+    "contexts": [
+      "CATALOGSERVER"
+    ],
+    "label": "Last TTL invalidated tables",
+    "units": "NONE",
+    "kind": "GAUGE",
+    "key": "catalog.last-ttl-invalidated-tables"
+  },
+  {
+    "description": "Number of tables invalidated due to memory pressure in the last 10 seconds.",
+    "contexts": [
+      "CATALOGSERVER"
+    ],
+    "label": "Memory Pressure Invalidations (10s)",
+    "units": "NONE",
+    "kind": "GAUGE",
+    "key": "catalog.memory-pressure-invalidations-10s"
+  },
+  {
+    "description": "Number of tables invalidated due to memory pressure in the last 1 minute.",
+    "contexts": [
+      "CATALOGSERVER"
+    ],
+    "label": "Memory Pressure Invalidations (1m)",
+    "units": "NONE",
+    "kind": "GAUGE",
+    "key": "catalog.memory-pressure-invalidations-01m"
+  },
+  {
+    "description": "Number of tables invalidated due to memory pressure in the last 5 minutes.",
+    "contexts": [
+      "CATALOGSERVER"
+    ],
+    "label": "Memory Pressure Invalidations (5m)",
+    "units": "NONE",
+    "kind": "GAUGE",
+    "key": "catalog.memory-pressure-invalidations-05m"
+  },
+  {
+    "description": "Number of tables invalidated due to memory pressure in the last 30 minutes.",
+    "contexts": [
+      "CATALOGSERVER"
+    ],
+    "label": "Memory Pressure Invalidations (30m)",
+    "units": "NONE",
+    "kind": "GAUGE",
+    "key": "catalog.memory-pressure-invalidations-30m"
+  },
+  {
+    "description": "Unix timestamp in milliseconds when the last memory-pressure invalidation batch ran.",
+    "contexts": [
+      "CATALOGSERVER"
+    ],
+    "label": "Last memory-pressure invalidation (ms)",
+    "units": "NONE",
+    "kind": "GAUGE",
+    "key": "catalog.last-memory-pressure-invalidation-ms"
+  },
+  {
+    "description": "Number of tables invalidated in the last memory-pressure invalidation batch.",
+    "contexts": [
+      "CATALOGSERVER"
+    ],
+    "label": "Last memory-pressure invalidated tables",
+    "units": "NONE",
+    "kind": "GAUGE",
+    "key": "catalog.last-memory-pressure-invalidated-tables"
+  },
+  {
     "description": "Catalog topic update version.",
     "contexts": [
       "IMPALAD"
