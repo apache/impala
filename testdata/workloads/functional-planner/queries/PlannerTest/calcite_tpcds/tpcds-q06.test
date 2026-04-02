@@ -36,7 +36,7 @@ ImpalaSortRel(sort0=[$1], sort1=[$0], dir0=[ASC], dir1=[ASC], fetch=[100:TINYINT
               ImpalaProjectRel(ss_item_sk=[$1], ss_customer_sk=[$2], ss_sold_date_sk=[$22])
                 ImpalaFilterRel(condition=[AND(IS NOT NULL($2), IS NOT NULL($22), IS NOT NULL($1))])
                   ImpalaHdfsScanRel(table=[[tpcds_partitioned_parquet_snap, store_sales]])
-              ImpalaJoinRel(condition=[AND(=($2, $3), >(CAST($1):DECIMAL(14, 7), *(1.2:DECIMAL(2, 1), $4)))], joinType=[inner])
+              ImpalaJoinRel(condition=[AND(=($2, $3), >($1, *(1.2:DECIMAL(2, 1), $4)))], joinType=[inner])
                 ImpalaProjectRel(i_item_sk=[$0], i_current_price=[$5], i_category=[$12])
                   ImpalaFilterRel(condition=[AND(IS NOT NULL($0), IS NOT NULL($12), IS NOT NULL($5))])
                     ImpalaHdfsScanRel(table=[[tpcds_partitioned_parquet_snap, item]])
@@ -189,7 +189,7 @@ PLAN-ROOT SINK
 |--04:HASH JOIN [INNER JOIN]
 |  |  hash predicates: tpcds_partitioned_parquet_snap.item.i_category = tpcds_partitioned_parquet_snap.item_0.i_category
 |  |  fk/pk conjuncts: none
-|  |  other join predicates: CAST(tpcds_partitioned_parquet_snap.item.i_current_price AS DECIMAL(14,7)) > multiply(CAST(1.2 AS DECIMAL(2,1)), avg(tpcds_partitioned_parquet_snap.item_0.i_current_price))
+|  |  other join predicates: tpcds_partitioned_parquet_snap.item.i_current_price > multiply(CAST(1.2 AS DECIMAL(2,1)), avg(tpcds_partitioned_parquet_snap.item_0.i_current_price))
 |  |  runtime filters: RF006[bloom] <- tpcds_partitioned_parquet_snap.item_0.i_category, RF007[min_max] <- tpcds_partitioned_parquet_snap.item_0.i_category
 |  |  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
 |  |  tuple-ids=2,7 row-size=52B cardinality=360.00K cost=157240
@@ -254,7 +254,7 @@ ImpalaSortRel(sort0=[$1], sort1=[$0], dir0=[ASC], dir1=[ASC], fetch=[100:TINYINT
               ImpalaProjectRel(ss_item_sk=[$1], ss_customer_sk=[$2], ss_sold_date_sk=[$22])
                 ImpalaFilterRel(condition=[AND(IS NOT NULL($2), IS NOT NULL($22), IS NOT NULL($1))])
                   ImpalaHdfsScanRel(table=[[tpcds_partitioned_parquet_snap, store_sales]])
-              ImpalaJoinRel(condition=[AND(=($2, $3), >(CAST($1):DECIMAL(14, 7), *(1.2:DECIMAL(2, 1), $4)))], joinType=[inner])
+              ImpalaJoinRel(condition=[AND(=($2, $3), >($1, *(1.2:DECIMAL(2, 1), $4)))], joinType=[inner])
                 ImpalaProjectRel(i_item_sk=[$0], i_current_price=[$5], i_category=[$12])
                   ImpalaFilterRel(condition=[AND(IS NOT NULL($0), IS NOT NULL($12), IS NOT NULL($5))])
                     ImpalaHdfsScanRel(table=[[tpcds_partitioned_parquet_snap, item]])
@@ -554,7 +554,7 @@ max-parallelism=1050 segment-costs=[10421290131, 11823] cpu-comparison-result=12
 |  |  hash-table-id=05
 |  |  hash predicates: tpcds_partitioned_parquet_snap.item.i_category = tpcds_partitioned_parquet_snap.item_0.i_category
 |  |  fk/pk conjuncts: none
-|  |  other join predicates: CAST(tpcds_partitioned_parquet_snap.item.i_current_price AS DECIMAL(14,7)) > multiply(CAST(1.2 AS DECIMAL(2,1)), avg(tpcds_partitioned_parquet_snap.item_0.i_current_price))
+|  |  other join predicates: tpcds_partitioned_parquet_snap.item.i_current_price > multiply(CAST(1.2 AS DECIMAL(2,1)), avg(tpcds_partitioned_parquet_snap.item_0.i_current_price))
 |  |  mem-estimate=0B mem-reservation=0B spill-buffer=64.00KB thread-reservation=0
 |  |  tuple-ids=2,7 row-size=52B cardinality=360.00K cost=157230
 |  |  in pipelines: 01(GETNEXT), 19(OPEN)
@@ -650,7 +650,7 @@ ImpalaSortRel(sort0=[$1], sort1=[$0], dir0=[ASC], dir1=[ASC], fetch=[100:TINYINT
               ImpalaProjectRel(ss_item_sk=[$1], ss_customer_sk=[$2], ss_sold_date_sk=[$22])
                 ImpalaFilterRel(condition=[AND(IS NOT NULL($2), IS NOT NULL($22), IS NOT NULL($1))])
                   ImpalaHdfsScanRel(table=[[tpcds_partitioned_parquet_snap, store_sales]])
-              ImpalaJoinRel(condition=[AND(=($2, $3), >(CAST($1):DECIMAL(14, 7), *(1.2:DECIMAL(2, 1), $4)))], joinType=[inner])
+              ImpalaJoinRel(condition=[AND(=($2, $3), >($1, *(1.2:DECIMAL(2, 1), $4)))], joinType=[inner])
                 ImpalaProjectRel(i_item_sk=[$0], i_current_price=[$5], i_category=[$12])
                   ImpalaFilterRel(condition=[AND(IS NOT NULL($0), IS NOT NULL($12), IS NOT NULL($5))])
                     ImpalaHdfsScanRel(table=[[tpcds_partitioned_parquet_snap, item]])
@@ -950,7 +950,7 @@ max-parallelism=1050 segment-costs=[10421290131, 11823] cpu-comparison-result=12
 |  |  hash-table-id=05
 |  |  hash predicates: tpcds_partitioned_parquet_snap.item.i_category = tpcds_partitioned_parquet_snap.item_0.i_category
 |  |  fk/pk conjuncts: none
-|  |  other join predicates: CAST(tpcds_partitioned_parquet_snap.item.i_current_price AS DECIMAL(14,7)) > multiply(CAST(1.2 AS DECIMAL(2,1)), avg(tpcds_partitioned_parquet_snap.item_0.i_current_price))
+|  |  other join predicates: tpcds_partitioned_parquet_snap.item.i_current_price > multiply(CAST(1.2 AS DECIMAL(2,1)), avg(tpcds_partitioned_parquet_snap.item_0.i_current_price))
 |  |  mem-estimate=0B mem-reservation=0B spill-buffer=64.00KB thread-reservation=0
 |  |  tuple-ids=2,7 row-size=52B cardinality=360.00K cost=157230
 |  |  in pipelines: 01(GETNEXT), 19(OPEN)

@@ -74,7 +74,7 @@ Max Per-Host Resource Reservation: Memory=259.38MB Threads=1
 Per-Host Resource Estimates: Memory=34.98GB
 ImpalaSortRel(sort0=[$8], sort1=[$9], dir0=[ASC], dir1=[ASC], fetch=[100:TINYINT])
   ImpalaProjectRel(PREV_YEAR=[$7], YEAR=[$0], I_BRAND_ID=[$1], I_CLASS_ID=[$2], I_CATEGORY_ID=[$3], I_MANUFACT_ID=[$4], PREV_YR_CNT=[$12], CURR_YR_CNT=[$5], SALES_CNT_DIFF=[-($5, $12)], SALES_AMT_DIFF=[-($6, $13)])
-    ImpalaJoinRel(condition=[AND(=($1, $8), =($2, $9), =($3, $10), =($4, $11), <(/(EXPLICIT_CAST($5), EXPLICIT_CAST($12)), 0.90000000000000000000))], joinType=[inner])
+    ImpalaJoinRel(condition=[AND(=($1, $8), =($2, $9), =($3, $10), =($4, $11), <(/(EXPLICIT_CAST($5), EXPLICIT_CAST($12)), 0.9:DECIMAL(2, 1)))], joinType=[inner])
       ImpalaProjectRel(D_YEAR=[CAST(2001):INTEGER], I_BRAND_ID=[$0], I_CLASS_ID=[$1], I_CATEGORY_ID=[$2], I_MANUFACT_ID=[$3], SALES_CNT=[$4], SALES_AMT=[$5])
         ImpalaAggRel(group=[{0, 1, 2, 3}], SALES_CNT=[SUM($4)], SALES_AMT=[SUM($5)])
           ImpalaAggRel(group=[{0, 1, 2, 3, 4, 5}])
@@ -193,7 +193,7 @@ PLAN-ROOT SINK
 52:HASH JOIN [INNER JOIN]
 |  hash predicates: I_BRAND_ID = I_BRAND_ID, I_CATEGORY_ID = I_CATEGORY_ID, I_CLASS_ID = I_CLASS_ID, I_MANUFACT_ID = I_MANUFACT_ID
 |  fk/pk conjuncts: assumed fk/pk
-|  other join predicates: divide(CAST(sum(SALES_CNT) AS DECIMAL(17,2)), CAST(sum(SALES_CNT) AS DECIMAL(17,2))) < CAST(0.90000000000000000000 AS DECIMAL(37,20))
+|  other join predicates: divide(CAST(sum(SALES_CNT) AS DECIMAL(17,2)), CAST(sum(SALES_CNT) AS DECIMAL(17,2))) < CAST(0.9 AS DECIMAL(2,1))
 |  runtime filters: RF004[min_max] <- I_BRAND_ID, RF005[min_max] <- I_CATEGORY_ID, RF006[min_max] <- I_CLASS_ID, RF007[min_max] <- I_MANUFACT_ID
 |  mem-estimate=17.12GB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
 |  tuple-ids=28,57 row-size=80B cardinality=46.58T cost=8441568666281
@@ -722,7 +722,7 @@ Max Per-Host Resource Reservation: Memory=8.53GB Threads=319
 Per-Host Resource Estimates: Memory=28.74GB
 ImpalaSortRel(sort0=[$8], sort1=[$9], dir0=[ASC], dir1=[ASC], fetch=[100:TINYINT])
   ImpalaProjectRel(PREV_YEAR=[$7], YEAR=[$0], I_BRAND_ID=[$1], I_CLASS_ID=[$2], I_CATEGORY_ID=[$3], I_MANUFACT_ID=[$4], PREV_YR_CNT=[$12], CURR_YR_CNT=[$5], SALES_CNT_DIFF=[-($5, $12)], SALES_AMT_DIFF=[-($6, $13)])
-    ImpalaJoinRel(condition=[AND(=($1, $8), =($2, $9), =($3, $10), =($4, $11), <(/(EXPLICIT_CAST($5), EXPLICIT_CAST($12)), 0.90000000000000000000))], joinType=[inner])
+    ImpalaJoinRel(condition=[AND(=($1, $8), =($2, $9), =($3, $10), =($4, $11), <(/(EXPLICIT_CAST($5), EXPLICIT_CAST($12)), 0.9:DECIMAL(2, 1)))], joinType=[inner])
       ImpalaProjectRel(D_YEAR=[CAST(2001):INTEGER], I_BRAND_ID=[$0], I_CLASS_ID=[$1], I_CATEGORY_ID=[$2], I_MANUFACT_ID=[$3], SALES_CNT=[$4], SALES_AMT=[$5])
         ImpalaAggRel(group=[{0, 1, 2, 3}], SALES_CNT=[SUM($4)], SALES_AMT=[SUM($5)])
           ImpalaAggRel(group=[{0, 1, 2, 3, 4, 5}])
@@ -852,7 +852,7 @@ max-parallelism=120098350 segment-costs=[1871552430, 1200983414847757, 199] cpu-
 |  hash-table-id=00
 |  hash predicates: I_BRAND_ID = I_BRAND_ID, I_CATEGORY_ID = I_CATEGORY_ID, I_CLASS_ID = I_CLASS_ID, I_MANUFACT_ID = I_MANUFACT_ID
 |  fk/pk conjuncts: assumed fk/pk
-|  other join predicates: divide(CAST(sum(SALES_CNT) AS DECIMAL(17,2)), CAST(sum(SALES_CNT) AS DECIMAL(17,2))) < CAST(0.90000000000000000000 AS DECIMAL(37,20))
+|  other join predicates: divide(CAST(sum(SALES_CNT) AS DECIMAL(17,2)), CAST(sum(SALES_CNT) AS DECIMAL(17,2))) < CAST(0.9 AS DECIMAL(2,1))
 |  mem-estimate=0B mem-reservation=0B spill-buffer=2.00MB thread-reservation=0
 |  tuple-ids=28,57 row-size=80B cardinality=46.58T cost=8441270063535
 |  in pipelines: 71(GETNEXT), 89(OPEN)
@@ -1837,7 +1837,7 @@ Max Per-Host Resource Reservation: Memory=8.53GB Threads=319
 Per-Host Resource Estimates: Memory=28.74GB
 ImpalaSortRel(sort0=[$8], sort1=[$9], dir0=[ASC], dir1=[ASC], fetch=[100:TINYINT])
   ImpalaProjectRel(PREV_YEAR=[$7], YEAR=[$0], I_BRAND_ID=[$1], I_CLASS_ID=[$2], I_CATEGORY_ID=[$3], I_MANUFACT_ID=[$4], PREV_YR_CNT=[$12], CURR_YR_CNT=[$5], SALES_CNT_DIFF=[-($5, $12)], SALES_AMT_DIFF=[-($6, $13)])
-    ImpalaJoinRel(condition=[AND(=($1, $8), =($2, $9), =($3, $10), =($4, $11), <(/(EXPLICIT_CAST($5), EXPLICIT_CAST($12)), 0.90000000000000000000))], joinType=[inner])
+    ImpalaJoinRel(condition=[AND(=($1, $8), =($2, $9), =($3, $10), =($4, $11), <(/(EXPLICIT_CAST($5), EXPLICIT_CAST($12)), 0.9:DECIMAL(2, 1)))], joinType=[inner])
       ImpalaProjectRel(D_YEAR=[CAST(2001):INTEGER], I_BRAND_ID=[$0], I_CLASS_ID=[$1], I_CATEGORY_ID=[$2], I_MANUFACT_ID=[$3], SALES_CNT=[$4], SALES_AMT=[$5])
         ImpalaAggRel(group=[{0, 1, 2, 3}], SALES_CNT=[SUM($4)], SALES_AMT=[SUM($5)])
           ImpalaAggRel(group=[{0, 1, 2, 3, 4, 5}])
@@ -1967,7 +1967,7 @@ max-parallelism=120098350 segment-costs=[1871552430, 1200983414847757, 199] cpu-
 |  hash-table-id=00
 |  hash predicates: I_BRAND_ID = I_BRAND_ID, I_CATEGORY_ID = I_CATEGORY_ID, I_CLASS_ID = I_CLASS_ID, I_MANUFACT_ID = I_MANUFACT_ID
 |  fk/pk conjuncts: assumed fk/pk
-|  other join predicates: divide(CAST(sum(SALES_CNT) AS DECIMAL(17,2)), CAST(sum(SALES_CNT) AS DECIMAL(17,2))) < CAST(0.90000000000000000000 AS DECIMAL(37,20))
+|  other join predicates: divide(CAST(sum(SALES_CNT) AS DECIMAL(17,2)), CAST(sum(SALES_CNT) AS DECIMAL(17,2))) < CAST(0.9 AS DECIMAL(2,1))
 |  mem-estimate=0B mem-reservation=0B spill-buffer=2.00MB thread-reservation=0
 |  tuple-ids=28,57 row-size=80B cardinality=46.58T cost=8441270063535
 |  in pipelines: 71(GETNEXT), 89(OPEN)

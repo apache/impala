@@ -46,7 +46,7 @@ ImpalaSortRel(sort0=[$0], dir0=[ASC], fetch=[100:TINYINT])
             ImpalaHdfsScanRel(table=[[tpcds_partitioned_parquet_snap, item]])
         ImpalaFilterRel(condition=[AND(<($1, 11), IS NOT NULL($0))])
           ImpalaAnalyticRel(ITEM_SK=[$0], RNK=[RANK() OVER (ORDER BY $1)])
-            ImpalaJoinRel(condition=[>(CAST($1):DECIMAL(14, 7) NOT NULL, *(0.9:DECIMAL(2, 1), $2))], joinType=[inner])
+            ImpalaJoinRel(condition=[>($1, *(0.9:DECIMAL(2, 1), $2))], joinType=[inner])
               ImpalaAggRel(group=[{0}], RANK_COL=[AVG($1)])
                 ImpalaProjectRel(ITEM_SK=[$1], ss_net_profit=[$21])
                   ImpalaFilterRel(condition=[=($6, 457)])
@@ -62,7 +62,7 @@ ImpalaSortRel(sort0=[$0], dir0=[ASC], fetch=[100:TINYINT])
             ImpalaHdfsScanRel(table=[[tpcds_partitioned_parquet_snap, item]])
         ImpalaFilterRel(condition=[AND(<($1, 11), IS NOT NULL($0))])
           ImpalaAnalyticRel(ITEM_SK=[$0], RNK=[RANK() OVER (ORDER BY $1 DESC)])
-            ImpalaJoinRel(condition=[>(CAST($1):DECIMAL(14, 7) NOT NULL, *(0.9:DECIMAL(2, 1), $2))], joinType=[inner])
+            ImpalaJoinRel(condition=[>($1, *(0.9:DECIMAL(2, 1), $2))], joinType=[inner])
               ImpalaAggRel(group=[{0}], RANK_COL=[AVG($1)])
                 ImpalaProjectRel(ITEM_SK=[$1], ss_net_profit=[$21])
                   ImpalaFilterRel(condition=[=($6, 457)])
@@ -123,7 +123,7 @@ PLAN-ROOT SINK
 |  |  |  in pipelines: 16(GETNEXT), 12(OPEN)
 |  |  |
 |  |  15:NESTED LOOP JOIN [INNER JOIN]
-|  |  |  predicates: CAST(avg(tpcds_partitioned_parquet_snap.store_sales_1.ss_net_profit) AS DECIMAL(14,7)) > multiply(CAST(0.9 AS DECIMAL(2,1)), avg(tpcds_partitioned_parquet_snap.store_sales_2.ss_net_profit))
+|  |  |  predicates: avg(tpcds_partitioned_parquet_snap.store_sales_1.ss_net_profit) > multiply(CAST(0.9 AS DECIMAL(2,1)), avg(tpcds_partitioned_parquet_snap.store_sales_2.ss_net_profit))
 |  |  |  mem-estimate=12B mem-reservation=0B thread-reservation=0
 |  |  |  tuple-ids=21,25 row-size=24B cardinality=360.18K cost=73800
 |  |  |  in pipelines: 12(GETNEXT), 14(OPEN)
@@ -214,7 +214,7 @@ PLAN-ROOT SINK
 |  |  in pipelines: 06(GETNEXT), 02(OPEN)
 |  |
 |  05:NESTED LOOP JOIN [INNER JOIN]
-|  |  predicates: CAST(avg(tpcds_partitioned_parquet_snap.store_sales.ss_net_profit) AS DECIMAL(14,7)) > multiply(CAST(0.9 AS DECIMAL(2,1)), avg(tpcds_partitioned_parquet_snap.store_sales_0.ss_net_profit))
+|  |  predicates: avg(tpcds_partitioned_parquet_snap.store_sales.ss_net_profit) > multiply(CAST(0.9 AS DECIMAL(2,1)), avg(tpcds_partitioned_parquet_snap.store_sales_0.ss_net_profit))
 |  |  mem-estimate=12B mem-reservation=0B thread-reservation=0
 |  |  tuple-ids=5,9 row-size=24B cardinality=360.18K cost=73800
 |  |  in pipelines: 02(GETNEXT), 04(OPEN)
@@ -285,7 +285,7 @@ ImpalaSortRel(sort0=[$0], dir0=[ASC], fetch=[100:TINYINT])
             ImpalaHdfsScanRel(table=[[tpcds_partitioned_parquet_snap, item]])
         ImpalaFilterRel(condition=[AND(<($1, 11), IS NOT NULL($0))])
           ImpalaAnalyticRel(ITEM_SK=[$0], RNK=[RANK() OVER (ORDER BY $1)])
-            ImpalaJoinRel(condition=[>(CAST($1):DECIMAL(14, 7) NOT NULL, *(0.9:DECIMAL(2, 1), $2))], joinType=[inner])
+            ImpalaJoinRel(condition=[>($1, *(0.9:DECIMAL(2, 1), $2))], joinType=[inner])
               ImpalaAggRel(group=[{0}], RANK_COL=[AVG($1)])
                 ImpalaProjectRel(ITEM_SK=[$1], ss_net_profit=[$21])
                   ImpalaFilterRel(condition=[=($6, 457)])
@@ -301,7 +301,7 @@ ImpalaSortRel(sort0=[$0], dir0=[ASC], fetch=[100:TINYINT])
             ImpalaHdfsScanRel(table=[[tpcds_partitioned_parquet_snap, item]])
         ImpalaFilterRel(condition=[AND(<($1, 11), IS NOT NULL($0))])
           ImpalaAnalyticRel(ITEM_SK=[$0], RNK=[RANK() OVER (ORDER BY $1 DESC)])
-            ImpalaJoinRel(condition=[>(CAST($1):DECIMAL(14, 7) NOT NULL, *(0.9:DECIMAL(2, 1), $2))], joinType=[inner])
+            ImpalaJoinRel(condition=[>($1, *(0.9:DECIMAL(2, 1), $2))], joinType=[inner])
               ImpalaAggRel(group=[{0}], RANK_COL=[AVG($1)])
                 ImpalaProjectRel(ITEM_SK=[$1], ss_net_profit=[$21])
                   ImpalaFilterRel(condition=[=($6, 457)])
@@ -423,7 +423,7 @@ max-parallelism=4 segment-costs=[0, 2] cpu-comparison-result=480 [max(8 (self) v
 |  |  |
 |  |  15:NESTED LOOP JOIN [INNER JOIN, BROADCAST]
 |  |  |  join table id: 02
-|  |  |  predicates: CAST(avg(tpcds_partitioned_parquet_snap.store_sales_1.ss_net_profit) AS DECIMAL(14,7)) > multiply(CAST(0.9 AS DECIMAL(2,1)), avg(tpcds_partitioned_parquet_snap.store_sales_2.ss_net_profit))
+|  |  |  predicates: avg(tpcds_partitioned_parquet_snap.store_sales_1.ss_net_profit) > multiply(CAST(0.9 AS DECIMAL(2,1)), avg(tpcds_partitioned_parquet_snap.store_sales_2.ss_net_profit))
 |  |  |  mem-estimate=0B mem-reservation=0B thread-reservation=0
 |  |  |  tuple-ids=21,25 row-size=24B cardinality=360.18K cost=73800
 |  |  |  in pipelines: 31(GETNEXT), 33(OPEN)
@@ -601,7 +601,7 @@ max-parallelism=4 segment-costs=[241660]
 |  |
 |  05:NESTED LOOP JOIN [INNER JOIN, BROADCAST]
 |  |  join table id: 04
-|  |  predicates: CAST(avg(tpcds_partitioned_parquet_snap.store_sales.ss_net_profit) AS DECIMAL(14,7)) > multiply(CAST(0.9 AS DECIMAL(2,1)), avg(tpcds_partitioned_parquet_snap.store_sales_0.ss_net_profit))
+|  |  predicates: avg(tpcds_partitioned_parquet_snap.store_sales.ss_net_profit) > multiply(CAST(0.9 AS DECIMAL(2,1)), avg(tpcds_partitioned_parquet_snap.store_sales_0.ss_net_profit))
 |  |  mem-estimate=0B mem-reservation=0B thread-reservation=0
 |  |  tuple-ids=5,9 row-size=24B cardinality=360.18K cost=73800
 |  |  in pipelines: 23(GETNEXT), 25(OPEN)
@@ -717,7 +717,7 @@ ImpalaSortRel(sort0=[$0], dir0=[ASC], fetch=[100:TINYINT])
             ImpalaHdfsScanRel(table=[[tpcds_partitioned_parquet_snap, item]])
         ImpalaFilterRel(condition=[AND(<($1, 11), IS NOT NULL($0))])
           ImpalaAnalyticRel(ITEM_SK=[$0], RNK=[RANK() OVER (ORDER BY $1)])
-            ImpalaJoinRel(condition=[>(CAST($1):DECIMAL(14, 7) NOT NULL, *(0.9:DECIMAL(2, 1), $2))], joinType=[inner])
+            ImpalaJoinRel(condition=[>($1, *(0.9:DECIMAL(2, 1), $2))], joinType=[inner])
               ImpalaAggRel(group=[{0}], RANK_COL=[AVG($1)])
                 ImpalaProjectRel(ITEM_SK=[$1], ss_net_profit=[$21])
                   ImpalaFilterRel(condition=[=($6, 457)])
@@ -733,7 +733,7 @@ ImpalaSortRel(sort0=[$0], dir0=[ASC], fetch=[100:TINYINT])
             ImpalaHdfsScanRel(table=[[tpcds_partitioned_parquet_snap, item]])
         ImpalaFilterRel(condition=[AND(<($1, 11), IS NOT NULL($0))])
           ImpalaAnalyticRel(ITEM_SK=[$0], RNK=[RANK() OVER (ORDER BY $1 DESC)])
-            ImpalaJoinRel(condition=[>(CAST($1):DECIMAL(14, 7) NOT NULL, *(0.9:DECIMAL(2, 1), $2))], joinType=[inner])
+            ImpalaJoinRel(condition=[>($1, *(0.9:DECIMAL(2, 1), $2))], joinType=[inner])
               ImpalaAggRel(group=[{0}], RANK_COL=[AVG($1)])
                 ImpalaProjectRel(ITEM_SK=[$1], ss_net_profit=[$21])
                   ImpalaFilterRel(condition=[=($6, 457)])
@@ -855,7 +855,7 @@ max-parallelism=4 segment-costs=[0, 2] cpu-comparison-result=480 [max(8 (self) v
 |  |  |
 |  |  15:NESTED LOOP JOIN [INNER JOIN, BROADCAST]
 |  |  |  join table id: 02
-|  |  |  predicates: CAST(avg(tpcds_partitioned_parquet_snap.store_sales_1.ss_net_profit) AS DECIMAL(14,7)) > multiply(CAST(0.9 AS DECIMAL(2,1)), avg(tpcds_partitioned_parquet_snap.store_sales_2.ss_net_profit))
+|  |  |  predicates: avg(tpcds_partitioned_parquet_snap.store_sales_1.ss_net_profit) > multiply(CAST(0.9 AS DECIMAL(2,1)), avg(tpcds_partitioned_parquet_snap.store_sales_2.ss_net_profit))
 |  |  |  mem-estimate=0B mem-reservation=0B thread-reservation=0
 |  |  |  tuple-ids=21,25 row-size=24B cardinality=360.18K cost=73800
 |  |  |  in pipelines: 31(GETNEXT), 33(OPEN)
@@ -1033,7 +1033,7 @@ max-parallelism=4 segment-costs=[241660]
 |  |
 |  05:NESTED LOOP JOIN [INNER JOIN, BROADCAST]
 |  |  join table id: 04
-|  |  predicates: CAST(avg(tpcds_partitioned_parquet_snap.store_sales.ss_net_profit) AS DECIMAL(14,7)) > multiply(CAST(0.9 AS DECIMAL(2,1)), avg(tpcds_partitioned_parquet_snap.store_sales_0.ss_net_profit))
+|  |  predicates: avg(tpcds_partitioned_parquet_snap.store_sales.ss_net_profit) > multiply(CAST(0.9 AS DECIMAL(2,1)), avg(tpcds_partitioned_parquet_snap.store_sales_0.ss_net_profit))
 |  |  mem-estimate=0B mem-reservation=0B thread-reservation=0
 |  |  tuple-ids=5,9 row-size=24B cardinality=360.18K cost=73800
 |  |  in pipelines: 23(GETNEXT), 25(OPEN)

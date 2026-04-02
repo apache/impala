@@ -31,6 +31,7 @@ import org.apache.calcite.rex.RexOver;
 import org.apache.calcite.rex.RexShuttle;
 import org.apache.calcite.rex.RexUtil;
 import org.apache.calcite.sql.SqlKind;
+import org.apache.calcite.sql.SqlOperator;
 import org.apache.calcite.sql.fun.SqlDatetimePlusOperator;
 import org.apache.calcite.sql.fun.SqlDatetimeSubtractionOperator;
 import org.apache.calcite.sql.type.SqlTypeName;
@@ -141,7 +142,7 @@ public class CoerceOperandShuttle extends RexShuttle {
         SqlTypeUtil.isDecimal(castedOperandsCall.getType()));
 
     List<RexNode> newOperands = getCastedArgTypes(fn, castedOperandsCall.getOperands(),
-        retType, factory, rexBuilder);
+        retType, factory, rexBuilder, castedOperandsCall.getOperator());
 
     // keep the original call if nothing changed, else build a new RexCall.
     return retType.equals(castedOperandsCall.getType())
@@ -165,8 +166,8 @@ public class CoerceOperandShuttle extends RexShuttle {
 
     RelDataType retType = castedOver.getType();
 
-    List<RexNode> newOperands =
-        getCastedArgTypes(fn, castedOver.getOperands(), retType, factory, rexBuilder);
+    List<RexNode> newOperands = getCastedArgTypes(fn, castedOver.getOperands(), retType,
+        factory, rexBuilder, castedOver.getAggOperator());
 
     return retType.equals(castedOver.getType()) &&
            newOperands.equals(castedOver.getOperands())
@@ -262,7 +263,8 @@ public class CoerceOperandShuttle extends RexShuttle {
    * Return a list of the operands, casting whenever needed.
    */
   private static List<RexNode> getCastedArgTypes(Function fn, List<RexNode> operands,
-      RelDataType retType, RelDataTypeFactory factory, RexBuilder rexBuilder) {
+      RelDataType retType, RelDataTypeFactory factory, RexBuilder rexBuilder,
+      SqlOperator op) {
     List<RelDataType> argTypes = Util.transform(operands, RexNode::getType);
     List<RexNode> newOperands = new ArrayList<>();
     // The "Case" operator is special because the operands alternate between
@@ -270,6 +272,9 @@ public class CoerceOperandShuttle extends RexShuttle {
     // boolean, so they don't need casting.
     boolean isCaseFunction = isCaseFunction(fn);
     boolean castedOperand = false;
+    Type commonDecOperandType =
+        getCommonDecimalTypeToUse(op.getKind(), argTypes, retType, factory);
+
     Preconditions.checkState(argTypes.size() == 0 || fn.getNumArgs() > 0);
     for (int i = 0; i < argTypes.size(); ++i) {
       if (isCaseFunction &&
@@ -281,8 +286,16 @@ public class CoerceOperandShuttle extends RexShuttle {
 
       // in the case of varargs, take the last argument in the signature.
       int indexToUse = Math.min(i, fn.getNumArgs() - 1);
-      Type toImpalaType = fn.getArgs()[indexToUse];
-      RelDataType toType = useReturnTypeForCastingArg(fn, argTypes.get(indexToUse))
+
+      // Use the common decimal type if it's a wildcard decimal and the common
+      // type is defined. If the common type is not defined, leave it as is, and
+      // the "getCastedToType()" will resolve the toType from however the fromType
+      // is defined.
+      Type tmpType = fn.getArgs()[indexToUse];
+      Type toImpalaType = tmpType.isWildcardDecimal() && commonDecOperandType != null
+          ? commonDecOperandType
+          : tmpType;
+      RelDataType toType = isCaseFunction(fn)
           ? retType
           : getCastedToType(argTypes.get(i), toImpalaType, factory,
               isNullable(operands.get(i)));
@@ -297,6 +310,52 @@ public class CoerceOperandShuttle extends RexShuttle {
     }
 
     return castedOperand ? newOperands : operands;
+  }
+
+  /**
+   * Method to get a common decimal type of all the argument types and the return type.
+   * For certain sql functions (e.g. width_bucket), the decimal types need to be the
+   * same across all parameters and return type in order for the value to make sense.
+   * This is used for when the type is defined as a wildcard because a specific decimal
+   * type is needed by the backend.
+   */
+  public static Type getCommonDecimalTypeToUse(SqlKind kind, List<RelDataType> argTypes,
+      RelDataType retType, RelDataTypeFactory factory) {
+
+    // For arithmetic and comparison operations, the operands will not be cast, so there
+    // is no need to find a common decimal type.
+    if (kind.belongsTo(SqlKind.BINARY_ARITHMETIC) ||
+        kind.belongsTo(SqlKind.BINARY_COMPARISON)) {
+      return null;
+    }
+
+    // If the return type is a decimal, then this is the common type. It has already been
+    // determined in the validation stage in inferReturnType.
+    if (SqlTypeUtil.isDecimal(retType)) {
+      return ImpalaTypeConverter.createImpalaType(retType);
+    }
+
+    // The return type is something other than a decimal. If there are no decimal
+    // operands, return null. If there are multiple decimal operands (e.g. width_bucket),
+    // find a common type if it exists. If it doesn't exist, throw an exception.
+    List<RelDataType> decimalOperands = new ArrayList<>();
+    for (RelDataType argType : argTypes) {
+      if (argType.getSqlTypeName().equals(SqlTypeName.DECIMAL)) {
+        decimalOperands.add(argType);
+      }
+    }
+    if (decimalOperands.size() == 0) {
+      return null;
+    }
+
+    try {
+      RelDataType dType = ImpalaTypeConverter.getCompatibleType(decimalOperands, factory);
+      Preconditions.checkNotNull(dType);
+      return ImpalaTypeConverter.createImpalaType(dType);
+    } catch (Exception e) {
+      throw new RuntimeException("Cannot resolve DECIMAL types. You need to wrap the " +
+          "arguments in a CAST.");
+    }
   }
 
   /**
@@ -319,18 +378,6 @@ public class CoerceOperandShuttle extends RexShuttle {
       default:
         return true;
     }
-  }
-
-  private static boolean useReturnTypeForCastingArg(Function fn, RelDataType argType) {
-    // case functions use the precalculated return type from the function resolver.
-    if (isCaseFunction(fn)) {
-      return true;
-    }
-
-    // For functions that have decimal varargs and return a decimal
-    // (e.g. greatest, least), the type has been calculated at validation time.
-    return SqlTypeUtil.isDecimal(argType) &&
-        fn.getReturnType().isDecimal() && fn.hasVarArgs();
   }
 
   private static boolean isCaseFunction(Function fn) {
@@ -357,6 +404,10 @@ public class CoerceOperandShuttle extends RexShuttle {
 
     if (!toImpalaType.isDecimal() || SqlTypeUtil.isNull(fromType)) {
       return ImpalaTypeConverter.getRelDataType(toImpalaType, isNullable);
+    }
+
+    if (!toImpalaType.isWildcardDecimal()) {
+      return ImpalaTypeConverter.createRelDataType(factory, toImpalaType);
     }
 
     // Integer based type needs special conversion to Decimal types based on the

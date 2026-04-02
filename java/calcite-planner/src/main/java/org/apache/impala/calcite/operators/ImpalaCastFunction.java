@@ -16,12 +16,11 @@
  */
 package org.apache.impala.calcite.operators;
 
-import org.apache.calcite.jdbc.JavaTypeFactoryImpl;
 import org.apache.calcite.rel.type.RelDataType;
 import org.apache.calcite.rel.type.RelDataTypeFactory;
 import org.apache.calcite.rex.RexBuilder;
 import org.apache.calcite.sql.SqlOperatorBinding;
-import org.apache.impala.calcite.type.ImpalaTypeSystemImpl;
+import org.apache.impala.calcite.type.ImpalaTypeFactoryImpl;
 
 import java.util.List;
 
@@ -45,8 +44,7 @@ public class ImpalaCastFunction extends ImpalaOperator {
         CommonOperatorFunctions.getOperandTypes(opBinding);
 
     String castFunctionName = "castto" + getCastToName(operandTypes.get(1));
-    RexBuilder rexBuilder =
-        new RexBuilder(new JavaTypeFactoryImpl(new ImpalaTypeSystemImpl()));
+    RexBuilder rexBuilder = new RexBuilder(ImpalaTypeFactoryImpl.INSTANCE);
     RelDataTypeFactory factory = rexBuilder.getTypeFactory();
 
     List<RelDataType> castFromList = operandTypes.subList(0, 1);

@@ -57,7 +57,7 @@ ImpalaSortRel(fetch=[100:TINYINT])
     ImpalaUnionRel(all=[true])
       ImpalaProjectRel(SALES=[*(CAST($5):DECIMAL(10, 0), $6)])
         ImpalaJoinRel(condition=[=($3, $0)], joinType=[inner])
-          ImpalaJoinRel(condition=[>($1, CAST(*(0.950000:DECIMAL(10, 6), $2)):DECIMAL(38, 2))], joinType=[inner])
+          ImpalaJoinRel(condition=[>($1, *(0.950000:DECIMAL(10, 6), $2))], joinType=[inner])
             ImpalaFilterRel(condition=[IS NOT NULL($1)])
               ImpalaAggRel(group=[{0}], SSALES=[SUM($1)])
                 ImpalaProjectRel(C_CUSTOMER_SK=[$3], $f1=[*(CAST($1):DECIMAL(10, 0), $2)])
@@ -110,7 +110,7 @@ ImpalaSortRel(fetch=[100:TINYINT])
                             ImpalaHdfsScanRel(table=[[tpcds_partitioned_parquet_snap, item]])
       ImpalaProjectRel(SALES=[*(CAST($5):DECIMAL(10, 0), $6)])
         ImpalaJoinRel(condition=[=($4, $0)], joinType=[inner])
-          ImpalaJoinRel(condition=[>($1, CAST(*(0.950000:DECIMAL(10, 6), $2)):DECIMAL(38, 2))], joinType=[inner])
+          ImpalaJoinRel(condition=[>($1, *(0.950000:DECIMAL(10, 6), $2))], joinType=[inner])
             ImpalaFilterRel(condition=[IS NOT NULL($1)])
               ImpalaAggRel(group=[{0}], SSALES=[SUM($1)])
                 ImpalaProjectRel(C_CUSTOMER_SK=[$3], $f1=[*(CAST($1):DECIMAL(10, 0), $2)])
@@ -189,7 +189,7 @@ PLAN-ROOT SINK
 |  |  in pipelines: 37(GETNEXT), 28(OPEN)
 |  |
 |  |--36:NESTED LOOP JOIN [INNER JOIN]
-|  |  |  predicates: sum(multiply(tpcds_partitioned_parquet_snap.store_sales_2.ss_quantity, tpcds_partitioned_parquet_snap.store_sales_2.ss_sales_price)) > CAST(multiply(CAST(0.950000 AS DECIMAL(10,6)), max(sum(multiply(tpcds_partitioned_parquet_snap.store_sales_3.ss_quantity, tpcds_partitioned_parquet_snap.store_sales_3.ss_sales_price)))) AS DECIMAL(38,2))
+|  |  |  predicates: sum(multiply(tpcds_partitioned_parquet_snap.store_sales_2.ss_quantity, tpcds_partitioned_parquet_snap.store_sales_2.ss_sales_price)) > multiply(CAST(0.950000 AS DECIMAL(10,6)), max(sum(multiply(tpcds_partitioned_parquet_snap.store_sales_3.ss_quantity, tpcds_partitioned_parquet_snap.store_sales_3.ss_sales_price))))
 |  |  |  mem-estimate=16B mem-reservation=0B thread-reservation=0
 |  |  |  tuple-ids=29,37 row-size=36B cardinality=3.00M cost=614700
 |  |  |  in pipelines: 28(GETNEXT), 35(OPEN)
@@ -429,7 +429,7 @@ PLAN-ROOT SINK
 |  in pipelines: 13(GETNEXT), 04(OPEN)
 |
 |--12:NESTED LOOP JOIN [INNER JOIN]
-|  |  predicates: sum(multiply(tpcds_partitioned_parquet_snap.store_sales.ss_quantity, tpcds_partitioned_parquet_snap.store_sales.ss_sales_price)) > CAST(multiply(CAST(0.950000 AS DECIMAL(10,6)), max(sum(multiply(tpcds_partitioned_parquet_snap.store_sales_0.ss_quantity, tpcds_partitioned_parquet_snap.store_sales_0.ss_sales_price)))) AS DECIMAL(38,2))
+|  |  predicates: sum(multiply(tpcds_partitioned_parquet_snap.store_sales.ss_quantity, tpcds_partitioned_parquet_snap.store_sales.ss_sales_price)) > multiply(CAST(0.950000 AS DECIMAL(10,6)), max(sum(multiply(tpcds_partitioned_parquet_snap.store_sales_0.ss_quantity, tpcds_partitioned_parquet_snap.store_sales_0.ss_sales_price))))
 |  |  mem-estimate=16B mem-reservation=0B thread-reservation=0
 |  |  tuple-ids=4,12 row-size=36B cardinality=3.00M cost=614700
 |  |  in pipelines: 04(GETNEXT), 11(OPEN)
@@ -667,7 +667,7 @@ ImpalaSortRel(fetch=[100:TINYINT])
     ImpalaUnionRel(all=[true])
       ImpalaProjectRel(SALES=[*(CAST($5):DECIMAL(10, 0), $6)])
         ImpalaJoinRel(condition=[=($3, $0)], joinType=[inner])
-          ImpalaJoinRel(condition=[>($1, CAST(*(0.950000:DECIMAL(10, 6), $2)):DECIMAL(38, 2))], joinType=[inner])
+          ImpalaJoinRel(condition=[>($1, *(0.950000:DECIMAL(10, 6), $2))], joinType=[inner])
             ImpalaFilterRel(condition=[IS NOT NULL($1)])
               ImpalaAggRel(group=[{0}], SSALES=[SUM($1)])
                 ImpalaProjectRel(C_CUSTOMER_SK=[$3], $f1=[*(CAST($1):DECIMAL(10, 0), $2)])
@@ -720,7 +720,7 @@ ImpalaSortRel(fetch=[100:TINYINT])
                             ImpalaHdfsScanRel(table=[[tpcds_partitioned_parquet_snap, item]])
       ImpalaProjectRel(SALES=[*(CAST($5):DECIMAL(10, 0), $6)])
         ImpalaJoinRel(condition=[=($4, $0)], joinType=[inner])
-          ImpalaJoinRel(condition=[>($1, CAST(*(0.950000:DECIMAL(10, 6), $2)):DECIMAL(38, 2))], joinType=[inner])
+          ImpalaJoinRel(condition=[>($1, *(0.950000:DECIMAL(10, 6), $2))], joinType=[inner])
             ImpalaFilterRel(condition=[IS NOT NULL($1)])
               ImpalaAggRel(group=[{0}], SSALES=[SUM($1)])
                 ImpalaProjectRel(C_CUSTOMER_SK=[$3], $f1=[*(CAST($1):DECIMAL(10, 0), $2)])
@@ -832,7 +832,7 @@ max-parallelism=70 segment-costs=[676272669, 185] cpu-comparison-result=742 [max
 |  |  max-parallelism=170 segment-costs=[1644760041, 1035900] cpu-comparison-result=240 [max(40 (self) vs 240 (sum children))]
 |  |  36:NESTED LOOP JOIN [INNER JOIN, BROADCAST]
 |  |  |  join table id: 10
-|  |  |  predicates: sum(multiply(tpcds_partitioned_parquet_snap.store_sales_2.ss_quantity, tpcds_partitioned_parquet_snap.store_sales_2.ss_sales_price)) > CAST(multiply(CAST(0.950000 AS DECIMAL(10,6)), max(sum(multiply(tpcds_partitioned_parquet_snap.store_sales_3.ss_quantity, tpcds_partitioned_parquet_snap.store_sales_3.ss_sales_price)))) AS DECIMAL(38,2))
+|  |  |  predicates: sum(multiply(tpcds_partitioned_parquet_snap.store_sales_2.ss_quantity, tpcds_partitioned_parquet_snap.store_sales_2.ss_sales_price)) > multiply(CAST(0.950000 AS DECIMAL(10,6)), max(sum(multiply(tpcds_partitioned_parquet_snap.store_sales_3.ss_quantity, tpcds_partitioned_parquet_snap.store_sales_3.ss_sales_price))))
 |  |  |  mem-estimate=0B mem-reservation=0B thread-reservation=0
 |  |  |  tuple-ids=29,37 row-size=36B cardinality=3.00M cost=614700
 |  |  |  in pipelines: 79(GETNEXT), 85(OPEN)
@@ -1300,7 +1300,7 @@ max-parallelism=70 segment-costs=[676272669, 185] cpu-comparison-result=742 [max
 |  max-parallelism=170 segment-costs=[1644760041, 1035900] cpu-comparison-result=240 [max(40 (self) vs 240 (sum children))]
 |  12:NESTED LOOP JOIN [INNER JOIN, BROADCAST]
 |  |  join table id: 01
-|  |  predicates: sum(multiply(tpcds_partitioned_parquet_snap.store_sales.ss_quantity, tpcds_partitioned_parquet_snap.store_sales.ss_sales_price)) > CAST(multiply(CAST(0.950000 AS DECIMAL(10,6)), max(sum(multiply(tpcds_partitioned_parquet_snap.store_sales_0.ss_quantity, tpcds_partitioned_parquet_snap.store_sales_0.ss_sales_price)))) AS DECIMAL(38,2))
+|  |  predicates: sum(multiply(tpcds_partitioned_parquet_snap.store_sales.ss_quantity, tpcds_partitioned_parquet_snap.store_sales.ss_sales_price)) > multiply(CAST(0.950000 AS DECIMAL(10,6)), max(sum(multiply(tpcds_partitioned_parquet_snap.store_sales_0.ss_quantity, tpcds_partitioned_parquet_snap.store_sales_0.ss_sales_price))))
 |  |  mem-estimate=0B mem-reservation=0B thread-reservation=0
 |  |  tuple-ids=4,12 row-size=36B cardinality=3.00M cost=614700
 |  |  in pipelines: 60(GETNEXT), 66(OPEN)
@@ -1748,7 +1748,7 @@ ImpalaSortRel(fetch=[100:TINYINT])
     ImpalaUnionRel(all=[true])
       ImpalaProjectRel(SALES=[*(CAST($5):DECIMAL(10, 0), $6)])
         ImpalaJoinRel(condition=[=($3, $0)], joinType=[inner])
-          ImpalaJoinRel(condition=[>($1, CAST(*(0.950000:DECIMAL(10, 6), $2)):DECIMAL(38, 2))], joinType=[inner])
+          ImpalaJoinRel(condition=[>($1, *(0.950000:DECIMAL(10, 6), $2))], joinType=[inner])
             ImpalaFilterRel(condition=[IS NOT NULL($1)])
               ImpalaAggRel(group=[{0}], SSALES=[SUM($1)])
                 ImpalaProjectRel(C_CUSTOMER_SK=[$3], $f1=[*(CAST($1):DECIMAL(10, 0), $2)])
@@ -1801,7 +1801,7 @@ ImpalaSortRel(fetch=[100:TINYINT])
                             ImpalaHdfsScanRel(table=[[tpcds_partitioned_parquet_snap, item]])
       ImpalaProjectRel(SALES=[*(CAST($5):DECIMAL(10, 0), $6)])
         ImpalaJoinRel(condition=[=($4, $0)], joinType=[inner])
-          ImpalaJoinRel(condition=[>($1, CAST(*(0.950000:DECIMAL(10, 6), $2)):DECIMAL(38, 2))], joinType=[inner])
+          ImpalaJoinRel(condition=[>($1, *(0.950000:DECIMAL(10, 6), $2))], joinType=[inner])
             ImpalaFilterRel(condition=[IS NOT NULL($1)])
               ImpalaAggRel(group=[{0}], SSALES=[SUM($1)])
                 ImpalaProjectRel(C_CUSTOMER_SK=[$3], $f1=[*(CAST($1):DECIMAL(10, 0), $2)])
@@ -1913,7 +1913,7 @@ max-parallelism=70 segment-costs=[676272669, 185] cpu-comparison-result=742 [max
 |  |  max-parallelism=170 segment-costs=[1644760041, 1035900] cpu-comparison-result=240 [max(40 (self) vs 240 (sum children))]
 |  |  36:NESTED LOOP JOIN [INNER JOIN, BROADCAST]
 |  |  |  join table id: 10
-|  |  |  predicates: sum(multiply(tpcds_partitioned_parquet_snap.store_sales_2.ss_quantity, tpcds_partitioned_parquet_snap.store_sales_2.ss_sales_price)) > CAST(multiply(CAST(0.950000 AS DECIMAL(10,6)), max(sum(multiply(tpcds_partitioned_parquet_snap.store_sales_3.ss_quantity, tpcds_partitioned_parquet_snap.store_sales_3.ss_sales_price)))) AS DECIMAL(38,2))
+|  |  |  predicates: sum(multiply(tpcds_partitioned_parquet_snap.store_sales_2.ss_quantity, tpcds_partitioned_parquet_snap.store_sales_2.ss_sales_price)) > multiply(CAST(0.950000 AS DECIMAL(10,6)), max(sum(multiply(tpcds_partitioned_parquet_snap.store_sales_3.ss_quantity, tpcds_partitioned_parquet_snap.store_sales_3.ss_sales_price))))
 |  |  |  mem-estimate=0B mem-reservation=0B thread-reservation=0
 |  |  |  tuple-ids=29,37 row-size=36B cardinality=3.00M cost=614700
 |  |  |  in pipelines: 79(GETNEXT), 85(OPEN)
@@ -2381,7 +2381,7 @@ max-parallelism=70 segment-costs=[676272669, 185] cpu-comparison-result=742 [max
 |  max-parallelism=170 segment-costs=[1644760041, 1035900] cpu-comparison-result=240 [max(40 (self) vs 240 (sum children))]
 |  12:NESTED LOOP JOIN [INNER JOIN, BROADCAST]
 |  |  join table id: 01
-|  |  predicates: sum(multiply(tpcds_partitioned_parquet_snap.store_sales.ss_quantity, tpcds_partitioned_parquet_snap.store_sales.ss_sales_price)) > CAST(multiply(CAST(0.950000 AS DECIMAL(10,6)), max(sum(multiply(tpcds_partitioned_parquet_snap.store_sales_0.ss_quantity, tpcds_partitioned_parquet_snap.store_sales_0.ss_sales_price)))) AS DECIMAL(38,2))
+|  |  predicates: sum(multiply(tpcds_partitioned_parquet_snap.store_sales.ss_quantity, tpcds_partitioned_parquet_snap.store_sales.ss_sales_price)) > multiply(CAST(0.950000 AS DECIMAL(10,6)), max(sum(multiply(tpcds_partitioned_parquet_snap.store_sales_0.ss_quantity, tpcds_partitioned_parquet_snap.store_sales_0.ss_sales_price))))
 |  |  mem-estimate=0B mem-reservation=0B thread-reservation=0
 |  |  tuple-ids=4,12 row-size=36B cardinality=3.00M cost=614700
 |  |  in pipelines: 60(GETNEXT), 66(OPEN)

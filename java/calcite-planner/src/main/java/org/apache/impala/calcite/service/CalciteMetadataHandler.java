@@ -22,7 +22,6 @@ import org.apache.calcite.config.CalciteConnectionConfig;
 import org.apache.calcite.config.CalciteConnectionConfigImpl;
 import org.apache.calcite.config.CalciteConnectionProperty;
 import org.apache.calcite.jdbc.CalciteSchema;
-import org.apache.calcite.jdbc.JavaTypeFactoryImpl;
 import org.apache.calcite.prepare.CalciteCatalogReader;
 import org.apache.calcite.rel.type.RelDataTypeFactory;
 import org.apache.calcite.sql.SqlBasicCall;
@@ -40,7 +39,7 @@ import org.apache.impala.analysis.StmtMetadataLoader;
 import org.apache.impala.analysis.TableName;
 import org.apache.impala.calcite.schema.CalciteDb;
 import org.apache.impala.calcite.schema.ImpalaCalciteCatalogReader;
-import org.apache.impala.calcite.type.ImpalaTypeSystemImpl;
+import org.apache.impala.calcite.type.ImpalaTypeFactoryImpl;
 import org.apache.impala.catalog.FeCatalog;
 import org.apache.impala.catalog.FeDb;
 import org.apache.impala.catalog.FeTable;
@@ -78,7 +77,7 @@ public class CalciteMetadataHandler {
   public static CalciteCatalogReader createCalciteCatalogReader(
       StmtMetadataLoader.StmtTableCache stmtTableCache, TQueryCtx queryCtx,
       String database) {
-    RelDataTypeFactory typeFactory = new JavaTypeFactoryImpl(new ImpalaTypeSystemImpl());
+    RelDataTypeFactory typeFactory = ImpalaTypeFactoryImpl.INSTANCE;
     Properties props = new Properties();
     props.setProperty(CalciteConnectionProperty.CASE_SENSITIVE.camelName(), "false");
     CalciteConnectionConfig config = new CalciteConnectionConfigImpl(props);

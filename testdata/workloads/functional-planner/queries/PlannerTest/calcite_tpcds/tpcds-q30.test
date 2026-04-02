@@ -43,7 +43,7 @@ ImpalaSortRel(sort0=[$0], sort1=[$1], sort2=[$2], sort3=[$3], sort4=[$4], sort5=
         ImpalaProjectRel(ca_address_sk=[$0])
           ImpalaFilterRel(condition=[AND(=($8, _UTF-8'GA'), IS NOT NULL($0))])
             ImpalaHdfsScanRel(table=[[tpcds_partitioned_parquet_snap, customer_address]])
-      ImpalaJoinRel(condition=[AND(=($1, $3), >($2, CAST(*($4, 1.2:DECIMAL(2, 1))):DECIMAL(38, 2)))], joinType=[inner])
+      ImpalaJoinRel(condition=[AND(=($1, $3), >($2, *($4, 1.2:DECIMAL(2, 1))))], joinType=[inner])
         ImpalaFilterRel(condition=[IS NOT NULL($2)])
           ImpalaAggRel(group=[{0, 1}], CTR_TOTAL_RETURN=[SUM($2)])
             ImpalaProjectRel(CTR_CUSTOMER_SK=[$2], CTR_STATE=[$1], wr_return_amt=[$4])
@@ -131,7 +131,7 @@ PLAN-ROOT SINK
 16:HASH JOIN [INNER JOIN]
 |  hash predicates: tpcds_partitioned_parquet_snap.customer_address_0.ca_state = tpcds_partitioned_parquet_snap.customer_address_1.ca_state
 |  fk/pk conjuncts: none
-|  other join predicates: sum(tpcds_partitioned_parquet_snap.web_returns.wr_return_amt) > CAST(multiply(avg(sum(tpcds_partitioned_parquet_snap.web_returns_0.wr_return_amt)), CAST(1.2 AS DECIMAL(2,1))) AS DECIMAL(38,2))
+|  other join predicates: sum(tpcds_partitioned_parquet_snap.web_returns.wr_return_amt) > multiply(avg(sum(tpcds_partitioned_parquet_snap.web_returns_0.wr_return_amt)), CAST(1.2 AS DECIMAL(2,1)))
 |  runtime filters: RF002[bloom] <- tpcds_partitioned_parquet_snap.customer_address_1.ca_state, RF003[min_max] <- tpcds_partitioned_parquet_snap.customer_address_1.ca_state
 |  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
 |  tuple-ids=10,19 row-size=64B cardinality=15.00M cost=3590661
@@ -284,7 +284,7 @@ ImpalaSortRel(sort0=[$0], sort1=[$1], sort2=[$2], sort3=[$3], sort4=[$4], sort5=
         ImpalaProjectRel(ca_address_sk=[$0])
           ImpalaFilterRel(condition=[AND(=($8, _UTF-8'GA'), IS NOT NULL($0))])
             ImpalaHdfsScanRel(table=[[tpcds_partitioned_parquet_snap, customer_address]])
-      ImpalaJoinRel(condition=[AND(=($1, $3), >($2, CAST(*($4, 1.2:DECIMAL(2, 1))):DECIMAL(38, 2)))], joinType=[inner])
+      ImpalaJoinRel(condition=[AND(=($1, $3), >($2, *($4, 1.2:DECIMAL(2, 1))))], joinType=[inner])
         ImpalaFilterRel(condition=[IS NOT NULL($2)])
           ImpalaAggRel(group=[{0, 1}], CTR_TOTAL_RETURN=[SUM($2)])
             ImpalaProjectRel(CTR_CUSTOMER_SK=[$2], CTR_STATE=[$1], wr_return_amt=[$4])
@@ -426,7 +426,7 @@ max-parallelism=30 segment-costs=[209906128, 80870610] cpu-comparison-result=102
 |  hash-table-id=02
 |  hash predicates: tpcds_partitioned_parquet_snap.customer_address_0.ca_state = tpcds_partitioned_parquet_snap.customer_address_1.ca_state
 |  fk/pk conjuncts: none
-|  other join predicates: sum(tpcds_partitioned_parquet_snap.web_returns.wr_return_amt) > CAST(multiply(avg(sum(tpcds_partitioned_parquet_snap.web_returns_0.wr_return_amt)), CAST(1.2 AS DECIMAL(2,1))) AS DECIMAL(38,2))
+|  other join predicates: sum(tpcds_partitioned_parquet_snap.web_returns.wr_return_amt) > multiply(avg(sum(tpcds_partitioned_parquet_snap.web_returns_0.wr_return_amt)), CAST(1.2 AS DECIMAL(2,1)))
 |  mem-estimate=0B mem-reservation=0B spill-buffer=64.00KB thread-reservation=0
 |  tuple-ids=10,19 row-size=64B cardinality=15.00M cost=3590610
 |  in pipelines: 23(GETNEXT), 30(OPEN)
@@ -727,7 +727,7 @@ ImpalaSortRel(sort0=[$0], sort1=[$1], sort2=[$2], sort3=[$3], sort4=[$4], sort5=
         ImpalaProjectRel(ca_address_sk=[$0])
           ImpalaFilterRel(condition=[AND(=($8, _UTF-8'GA'), IS NOT NULL($0))])
             ImpalaHdfsScanRel(table=[[tpcds_partitioned_parquet_snap, customer_address]])
-      ImpalaJoinRel(condition=[AND(=($1, $3), >($2, CAST(*($4, 1.2:DECIMAL(2, 1))):DECIMAL(38, 2)))], joinType=[inner])
+      ImpalaJoinRel(condition=[AND(=($1, $3), >($2, *($4, 1.2:DECIMAL(2, 1))))], joinType=[inner])
         ImpalaFilterRel(condition=[IS NOT NULL($2)])
           ImpalaAggRel(group=[{0, 1}], CTR_TOTAL_RETURN=[SUM($2)])
             ImpalaProjectRel(CTR_CUSTOMER_SK=[$2], CTR_STATE=[$1], wr_return_amt=[$4])
@@ -869,7 +869,7 @@ max-parallelism=30 segment-costs=[209906128, 80870610] cpu-comparison-result=102
 |  hash-table-id=02
 |  hash predicates: tpcds_partitioned_parquet_snap.customer_address_0.ca_state = tpcds_partitioned_parquet_snap.customer_address_1.ca_state
 |  fk/pk conjuncts: none
-|  other join predicates: sum(tpcds_partitioned_parquet_snap.web_returns.wr_return_amt) > CAST(multiply(avg(sum(tpcds_partitioned_parquet_snap.web_returns_0.wr_return_amt)), CAST(1.2 AS DECIMAL(2,1))) AS DECIMAL(38,2))
+|  other join predicates: sum(tpcds_partitioned_parquet_snap.web_returns.wr_return_amt) > multiply(avg(sum(tpcds_partitioned_parquet_snap.web_returns_0.wr_return_amt)), CAST(1.2 AS DECIMAL(2,1)))
 |  mem-estimate=0B mem-reservation=0B spill-buffer=64.00KB thread-reservation=0
 |  tuple-ids=10,19 row-size=64B cardinality=15.00M cost=3590610
 |  in pipelines: 23(GETNEXT), 30(OPEN)

@@ -237,7 +237,8 @@ public class CoerceNodes{
       }
 
       // if here, need to transform
-      List<RelDataType> newOperandTypes = getCastedOperandTypes(aggCall, operandTypes);
+      List<RelDataType> newOperandTypes = getCastedOperandTypes(aggCall,
+          rexBuilder.getTypeFactory(), operandTypes);
 
       // last parameter is the starting point for new project fields added
       // (see method comment for details).
@@ -351,8 +352,7 @@ public class CoerceNodes{
        return dt1;
      }
 
-    return ImpalaTypeConverter.getCompatibleType(
-        ImmutableList.of(dt1, dt2), rexBuilder.getTypeFactory());
+    return ImpalaTypeConverter.getCompatibleType(dt1, dt2, rexBuilder.getTypeFactory());
   }
 
   /**
@@ -448,16 +448,8 @@ public class CoerceNodes{
     }
 
     // Look for a function match.  If found, no need to coerce
-    Function fn = FunctionResolver.getExactFunction(aggCall.getAggregation().getName(),
+    return null != FunctionResolver.getExactFunction(aggCall.getAggregation().getName(),
         operandTypes);
-
-    if (fn == null) {
-      return false;
-    }
-
-    // One last check to make sure the return types match.
-    RelDataType retType = ImpalaTypeConverter.getRelDataType(fn.getReturnType());
-    return retType.getSqlTypeName().equals(aggCall.getType().getSqlTypeName());
   }
 
   /**
@@ -479,27 +471,28 @@ public class CoerceNodes{
    * in a matching Impala function signature.
    */
   private static List<RelDataType> getCastedOperandTypes(AggregateCall aggCall,
-      List<RelDataType> operandTypes) {
+      RelDataTypeFactory factory, List<RelDataType> operandTypes) {
     // Get the Impala function. Getting the "supertype" function will retrieve
     // the closest function where operands may be cast.
     Function fn = FunctionResolver.getSupertypeFunction(
         aggCall.getAggregation().getName(), operandTypes);
     Preconditions.checkNotNull(fn, "Could not find matching functions for " +
         aggCall.getAggregation().getName());
-    RelDataType retType = ImpalaTypeConverter.getRelDataType(fn.getReturnType());
-
-    // Not changing return type, they should be the same. The code will get more
-    // complicated if this has to change.
-    Preconditions.checkState(
-        retType.getSqlTypeName().equals(aggCall.getType().getSqlTypeName()) ||
-        aggCall.getType().getSqlTypeName().equals(SqlTypeName.NULL));
 
     List<RelDataType> newOperandTypes = new ArrayList<>();
     for (int i = 0; i < operandTypes.size(); ++i) {
       Type t = (i < fn.getArgs().length)
           ? fn.getArgs()[i]
           : fn.getArgs()[fn.getArgs().length - 1];
-      newOperandTypes.add(ImpalaTypeConverter.getRelDataType(t));
+      // For built in functions, the function should contain a wildcard type so
+      // the operand can be retrieved from the existing call. For UDFs, the
+      // decimal will be defined, so the function itself defines the datatype
+      // which will potentially be cast.
+      if (t.isWildcardDecimal()) {
+        newOperandTypes.add(operandTypes.get(i));
+      } else {
+        newOperandTypes.add(ImpalaTypeConverter.createRelDataType(factory, t));
+      }
     }
     return newOperandTypes;
   }
@@ -530,7 +523,8 @@ public class CoerceNodes{
       // type, we use the previous operand type which will be the same
       // index number in the underlying Project. If a new one is needed,
       // the underlying Project will be the next available index.
-      boolean typesEqual = areSqlTypesEqual(operandTypes.get(i), newOperandTypes.get(i));
+      boolean typesEqual =
+          ImpalaTypeConverter.areTypesEqual(operandTypes.get(i), newOperandTypes.get(i));
       int newArg = typesEqual
           ? aggCall.getArgList().get(i)
           : numProjects++;
@@ -551,7 +545,8 @@ public class CoerceNodes{
       List<RelDataType> newOperandTypes) {
     List<RexNode> newProjects = new ArrayList<>();
     for (int i = 0; i < operandTypes.size(); ++i) {
-      if (!areSqlTypesEqual(operandTypes.get(i), newOperandTypes.get(i))) {
+      if (!ImpalaTypeConverter.areTypesEqual(operandTypes.get(i),
+          newOperandTypes.get(i))) {
         RexInputRef inputRef = rexBuilder.makeInputRef(
             operandTypes.get(i), aggCall.getArgList().get(i));
         RexNode newProject = rexBuilder.makeCast(newOperandTypes.get(i), inputRef);
@@ -570,25 +565,14 @@ public class CoerceNodes{
       List<RelDataType> newOperandTypes) {
     List<String> newNames = new ArrayList<>();
     for (int i = 0; i < operandTypes.size(); ++i) {
-      if (!areSqlTypesEqual(operandTypes.get(i), newOperandTypes.get(i))) {
+      if (!ImpalaTypeConverter.areTypesEqual(operandTypes.get(i),
+          newOperandTypes.get(i))) {
         String precastFieldName =
             input.getRowType().getFieldNames().get(aggCall.getArgList().get(i));
         newNames.add("cast_" + precastFieldName);
       }
     }
     return newNames;
-  }
-
-  private static boolean areSqlTypesEqual(RelDataType r1, RelDataType r2) {
-    if (r1.getSqlTypeName().equals(SqlTypeName.VARCHAR) &&
-        r2.getSqlTypeName().equals(SqlTypeName.VARCHAR)) {
-      // if both precisions are Integer.MAX_VALUE, they are both strings
-      // if both precisions are not INteger.MAX_VALUE, they are both varchars
-      int maxVal = Integer.MAX_VALUE;
-      return (r1.getPrecision() == maxVal && r2.getPrecision() == maxVal) ||
-          (r1.getPrecision() != maxVal && r2.getPrecision() != maxVal);
-    }
-    return r1.getSqlTypeName().equals(r2.getSqlTypeName());
   }
 
   /**

@@ -58,7 +58,7 @@ Max Per-Host Resource Reservation: Memory=269.94MB Threads=1
 Per-Host Resource Estimates: Memory=68.14GB
 ImpalaSortRel(sort0=[$0], sort1=[$1], sort2=[$2], dir0=[ASC], dir1=[ASC], dir2=[ASC])
   ImpalaProjectRel(C_LAST_NAME=[$0], C_FIRST_NAME=[$1], S_STORE_NAME=[$2], PAID=[$3])
-    ImpalaJoinRel(condition=[>($3, CAST($4):DECIMAL(38, 2))], joinType=[inner])
+    ImpalaJoinRel(condition=[>($3, $4)], joinType=[inner])
       ImpalaFilterRel(condition=[IS NOT NULL($3)])
         ImpalaAggRel(group=[{0, 1, 2}], PAID=[SUM($3)])
           ImpalaProjectRel(C_LAST_NAME=[$0], C_FIRST_NAME=[$1], S_STORE_NAME=[$2], NETPAID=[$9])
@@ -130,7 +130,7 @@ PLAN-ROOT SINK
 |  in pipelines: 27(GETNEXT), 12(OPEN)
 |
 26:NESTED LOOP JOIN [INNER JOIN]
-|  predicates: sum(sum(tpcds_partitioned_parquet_snap.store_sales.ss_net_paid)) > CAST(multiply(CAST(0.05 AS DECIMAL(3,2)), avg(sum(tpcds_partitioned_parquet_snap.store_sales_0.ss_net_paid))) AS DECIMAL(38,2))
+|  predicates: sum(sum(tpcds_partitioned_parquet_snap.store_sales.ss_net_paid)) > multiply(CAST(0.05 AS DECIMAL(3,2)), avg(sum(tpcds_partitioned_parquet_snap.store_sales_0.ss_net_paid)))
 |  mem-estimate=16B mem-reservation=0B thread-reservation=0
 |  tuple-ids=13,28 row-size=84B cardinality=11.46K cost=2349
 |  in pipelines: 12(GETNEXT), 25(OPEN)
@@ -409,7 +409,7 @@ Max Per-Host Resource Reservation: Memory=548.95MB Threads=75
 Per-Host Resource Estimates: Memory=8.37GB
 ImpalaSortRel(sort0=[$0], sort1=[$1], sort2=[$2], dir0=[ASC], dir1=[ASC], dir2=[ASC])
   ImpalaProjectRel(C_LAST_NAME=[$0], C_FIRST_NAME=[$1], S_STORE_NAME=[$2], PAID=[$3])
-    ImpalaJoinRel(condition=[>($3, CAST($4):DECIMAL(38, 2))], joinType=[inner])
+    ImpalaJoinRel(condition=[>($3, $4)], joinType=[inner])
       ImpalaFilterRel(condition=[IS NOT NULL($3)])
         ImpalaAggRel(group=[{0, 1, 2}], PAID=[SUM($3)])
           ImpalaProjectRel(C_LAST_NAME=[$0], C_FIRST_NAME=[$1], S_STORE_NAME=[$2], NETPAID=[$9])
@@ -491,7 +491,7 @@ max-parallelism=10 segment-costs=[725295, 40883, 24001] cpu-comparison-result=32
 |
 26:NESTED LOOP JOIN [INNER JOIN, BROADCAST]
 |  join table id: 00
-|  predicates: sum(sum(tpcds_partitioned_parquet_snap.store_sales.ss_net_paid)) > CAST(multiply(CAST(0.05 AS DECIMAL(3,2)), avg(sum(tpcds_partitioned_parquet_snap.store_sales_0.ss_net_paid))) AS DECIMAL(38,2))
+|  predicates: sum(sum(tpcds_partitioned_parquet_snap.store_sales.ss_net_paid)) > multiply(CAST(0.05 AS DECIMAL(3,2)), avg(sum(tpcds_partitioned_parquet_snap.store_sales_0.ss_net_paid)))
 |  mem-estimate=0B mem-reservation=0B thread-reservation=0
 |  tuple-ids=13,28 row-size=84B cardinality=11.46K cost=2349
 |  in pipelines: 38(GETNEXT), 48(OPEN)
@@ -1045,7 +1045,7 @@ Max Per-Host Resource Reservation: Memory=548.95MB Threads=75
 Per-Host Resource Estimates: Memory=8.37GB
 ImpalaSortRel(sort0=[$0], sort1=[$1], sort2=[$2], dir0=[ASC], dir1=[ASC], dir2=[ASC])
   ImpalaProjectRel(C_LAST_NAME=[$0], C_FIRST_NAME=[$1], S_STORE_NAME=[$2], PAID=[$3])
-    ImpalaJoinRel(condition=[>($3, CAST($4):DECIMAL(38, 2))], joinType=[inner])
+    ImpalaJoinRel(condition=[>($3, $4)], joinType=[inner])
       ImpalaFilterRel(condition=[IS NOT NULL($3)])
         ImpalaAggRel(group=[{0, 1, 2}], PAID=[SUM($3)])
           ImpalaProjectRel(C_LAST_NAME=[$0], C_FIRST_NAME=[$1], S_STORE_NAME=[$2], NETPAID=[$9])
@@ -1127,7 +1127,7 @@ max-parallelism=10 segment-costs=[725295, 40883, 24001] cpu-comparison-result=32
 |
 26:NESTED LOOP JOIN [INNER JOIN, BROADCAST]
 |  join table id: 00
-|  predicates: sum(sum(tpcds_partitioned_parquet_snap.store_sales.ss_net_paid)) > CAST(multiply(CAST(0.05 AS DECIMAL(3,2)), avg(sum(tpcds_partitioned_parquet_snap.store_sales_0.ss_net_paid))) AS DECIMAL(38,2))
+|  predicates: sum(sum(tpcds_partitioned_parquet_snap.store_sales.ss_net_paid)) > multiply(CAST(0.05 AS DECIMAL(3,2)), avg(sum(tpcds_partitioned_parquet_snap.store_sales_0.ss_net_paid)))
 |  mem-estimate=0B mem-reservation=0B thread-reservation=0
 |  tuple-ids=13,28 row-size=84B cardinality=11.46K cost=2349
 |  in pipelines: 38(GETNEXT), 48(OPEN)

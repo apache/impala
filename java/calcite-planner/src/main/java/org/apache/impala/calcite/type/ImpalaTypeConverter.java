@@ -20,7 +20,6 @@ package org.apache.impala.calcite.type;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
-import org.apache.calcite.jdbc.JavaTypeFactoryImpl;
 import org.apache.calcite.rel.type.RelDataType;
 import org.apache.calcite.rel.type.RelDataTypeFactory;
 import org.apache.calcite.rex.RexBuilder;
@@ -67,8 +66,7 @@ public class ImpalaTypeConverter {
   private static Map<Type, RelDataType> nonNullImpalaToCalciteMap;
 
   static {
-    RexBuilder rexBuilder =
-        new RexBuilder(new JavaTypeFactoryImpl(new ImpalaTypeSystemImpl()));
+    RexBuilder rexBuilder = new RexBuilder(ImpalaTypeFactoryImpl.INSTANCE);
     RelDataTypeFactory factory = rexBuilder.getTypeFactory();
     Map<Type, RelDataType> map = new HashMap<>();
     map.put(Type.BOOLEAN, factory.createSqlType(SqlTypeName.BOOLEAN));
@@ -103,6 +101,13 @@ public class ImpalaTypeConverter {
    */
   public static RelDataType createRelDataType(RelDataTypeFactory factory,
       Type impalaType) {
+    return createRelDataType(factory, impalaType, true);
+  }
+  /**
+   * Create a new RelDataType given the Impala type.
+   */
+  public static RelDataType createRelDataType(RelDataTypeFactory factory,
+      Type impalaType, boolean isNullable) {
     if (impalaType == null) {
       return null;
     }
@@ -112,15 +117,15 @@ public class ImpalaTypeConverter {
       case DECIMAL:
         RelDataType decimalDefinedRetType = factory.createSqlType(SqlTypeName.DECIMAL,
             scalarType.decimalPrecision(), scalarType.decimalScale());
-        return factory.createTypeWithNullability(decimalDefinedRetType, true);
+        return factory.createTypeWithNullability(decimalDefinedRetType, isNullable);
       case VARCHAR:
         RelDataType varcharType = factory.createSqlType(SqlTypeName.VARCHAR,
             scalarType.getLength());
-        return factory.createTypeWithNullability(varcharType, true);
+        return factory.createTypeWithNullability(varcharType, isNullable);
       case CHAR:
         RelDataType charType = factory.createSqlType(SqlTypeName.CHAR,
             scalarType.getLength());
-        return factory.createTypeWithNullability(charType, true);
+        return factory.createTypeWithNullability(charType, isNullable);
       default:
         Type normalizedImpalaType = getImpalaType(primitiveType);
         return impalaToCalciteMap.get(normalizedImpalaType);
@@ -193,6 +198,12 @@ public class ImpalaTypeConverter {
         throw new RuntimeException("Unknown type " + argType);
     }
   }
+
+  // helper function to handle translation of lists.
+  public static List<Type> createImpalaTypes(List<RelDataType> relDataTypes) {
+    return Lists.transform(relDataTypes, ImpalaTypeConverter::createImpalaType);
+  }
+
 
   /**
    * Create a new impala type given a relDataType
@@ -345,8 +356,7 @@ public class ImpalaTypeConverter {
     TPrimitiveType primitiveType = impalaType.getPrimitiveType().toThrift();
     if (primitiveType == TPrimitiveType.DECIMAL) {
       ScalarType scalarType = (ScalarType) impalaType;
-      RexBuilder rexBuilder =
-          new RexBuilder(new JavaTypeFactoryImpl(new ImpalaTypeSystemImpl()));
+      RexBuilder rexBuilder = new RexBuilder(ImpalaTypeFactoryImpl.INSTANCE);
       RelDataTypeFactory factory = rexBuilder.getTypeFactory();
       RelDataType decimalDefinedRetType = factory.createSqlType(SqlTypeName.DECIMAL,
           scalarType.decimalPrecision(), scalarType.decimalScale());
@@ -366,8 +376,7 @@ public class ImpalaTypeConverter {
   // Converts Calcite Integer literal type into an appropriate exact type for Impala,
   // e.g. TINYINT, SMALLINT, INT, or BIGINT
   public static RelDataType getLiteralDataType(BigDecimal bd, RelDataType rdt) {
-    RexBuilder rexBuilder =
-        new RexBuilder(new JavaTypeFactoryImpl(new ImpalaTypeSystemImpl()));
+    RexBuilder rexBuilder = new RexBuilder(ImpalaTypeFactoryImpl.INSTANCE);
     RelDataTypeFactory factory = rexBuilder.getTypeFactory();
 
     // If value is null, just use smallest value
@@ -434,11 +443,43 @@ public class ImpalaTypeConverter {
     Type impalaType2 = createImpalaType(type2);
 
     Type retType = ScalarType.getAssignmentCompatibleType(impalaType1, impalaType2,
-        TypeCompatibility.DEFAULT);
+        TypeCompatibility.STRICT_DECIMAL);
 
     RelDataType compatibleType = createRelDataType(factory, retType);
     return (!type1.isNullable() && !type2.isNullable())
         ? factory.createTypeWithNullability(compatibleType, false)
         : compatibleType;
+  }
+
+  public static boolean areTypesEqual(RelDataType r1, RelDataType r2) {
+    if (!r1.getSqlTypeName().equals(r2.getSqlTypeName())) {
+      return false;
+    }
+
+    if (r1.getSqlTypeName().equals(SqlTypeName.VARCHAR) &&
+        r2.getSqlTypeName().equals(SqlTypeName.VARCHAR)) {
+      // if both precisions are Integer.MAX_VALUE, they are both strings
+      // if both precisions are not Integer.MAX_VALUE, they are both varchars
+      int maxVal = Integer.MAX_VALUE;
+      return (r1.getPrecision() == maxVal && r2.getPrecision() == maxVal) ||
+          (r1.getPrecision() != maxVal && r2.getPrecision() != maxVal);
+    }
+
+    if (r1.getSqlTypeName().equals(SqlTypeName.CHAR) &&
+        r2.getSqlTypeName().equals(SqlTypeName.CHAR)) {
+      return r1.getPrecision() == r2.getPrecision();
+    }
+
+    // A wildcard for either parameter counts as a match.
+    if (r1.getSqlTypeName().equals(SqlTypeName.DECIMAL) &&
+        r2.getSqlTypeName().equals(SqlTypeName.DECIMAL)) {
+      if ((r1.getPrecision() == -1 && r1.getScale() == 0) ||
+          (r2.getPrecision() == -1 && r2.getScale() == 0)) {
+        return true;
+      }
+      return r1.getPrecision() == r2.getPrecision() && r1.getScale() == r2.getScale();
+    }
+
+    return true;
   }
 }

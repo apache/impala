@@ -93,8 +93,8 @@ ImpalaProjectRel(I_CATEGORY=[$0], I_BRAND=[$1], CC_NAME=[$2], D_YEAR=[$3], D_MOY
                     ImpalaProjectRel(i_item_sk=[$0], i_brand=[$8], i_category=[$12])
                       ImpalaFilterRel(condition=[IS NOT NULL($0)])
                         ImpalaHdfsScanRel(table=[[tpcds_partitioned_parquet_snap, item]])
-          ImpalaFilterRel(condition=[AND(=($3, 2001), >($6, 0.000000), >(CASE(>($6, 0.000000), /(ABS(-($5, $6)), $6), null:DECIMAL(38, 6)), 0.100000), IS NOT NULL($0), IS NOT NULL($1), IS NOT NULL($2))])
-            ImpalaAnalyticRel(I_CATEGORY=[$0], I_BRAND=[$1], CC_NAME=[$2], D_YEAR=[$3], D_MOY=[$4], SUM_SALES=[$5], AVG_MONTHLY_SALES=[AVG($5) OVER (PARTITION BY $0, $1, $2, $3)], RN=[RANK() OVER (PARTITION BY $0, $1, $2 ORDER BY $3, $4)])
+          ImpalaFilterRel(condition=[AND(=($3, 2001), >($6, 0.000000), >(CASE(>($6, 0.000000), /(ABS(-($5, $6)), $6), null:DECIMAL(38, 6)), 0.1:DECIMAL(2, 1)), IS NOT NULL($0), IS NOT NULL($1), IS NOT NULL($2))])
+            ImpalaAnalyticRel(I_CATEGORY=[$0], I_BRAND=[$1], CC_NAME=[$2], D_YEAR=[$3], D_MOY=[$4], SUM_SALES=[$5], AVG_MONTHLY_SALES=[AVG(CAST($5):DECIMAL(38, 6)) OVER (PARTITION BY $0, $1, $2, $3)], RN=[RANK() OVER (PARTITION BY $0, $1, $2 ORDER BY $3, $4)])
               ImpalaAggRel(group=[{0, 1, 2, 3, 4}], SUM_SALES=[SUM($5)])
                 ImpalaProjectRel(I_CATEGORY=[$11], I_BRAND=[$10], CC_NAME=[$5], D_YEAR=[$7], D_MOY=[$8], cs_sales_price=[$2])
                   ImpalaJoinRel(condition=[=($1, $9)], joinType=[inner])
@@ -244,7 +244,7 @@ PLAN-ROOT SINK
 |  in pipelines: 19(GETNEXT), 32(OPEN)
 |
 |--34:SELECT
-|  |  predicates: tpcds_partitioned_parquet_snap.date_dim_1.d_year = CAST(2001 AS INT), CASE WHEN avg(sum(tpcds_partitioned_parquet_snap.catalog_sales_1.cs_sales_price)) > CAST(0 AS DECIMAL(38,6)) THEN divide(abs(subtract(sum(tpcds_partitioned_parquet_snap.catalog_sales_1.cs_sales_price), avg(sum(tpcds_partitioned_parquet_snap.catalog_sales_1.cs_sales_price)))), avg(sum(tpcds_partitioned_parquet_snap.catalog_sales_1.cs_sales_price))) ELSE NULL END > CAST(0.100000 AS DECIMAL(38,6)), avg(sum(tpcds_partitioned_parquet_snap.catalog_sales_1.cs_sales_price)) > CAST(0 AS DECIMAL(38,6)), tpcds_partitioned_parquet_snap.call_center_1.cc_name IS NOT NULL, tpcds_partitioned_parquet_snap.item_1.i_brand IS NOT NULL, tpcds_partitioned_parquet_snap.item_1.i_category IS NOT NULL
+|  |  predicates: tpcds_partitioned_parquet_snap.date_dim_1.d_year = CAST(2001 AS INT), CASE WHEN avg(sum(tpcds_partitioned_parquet_snap.catalog_sales_1.cs_sales_price)) > CAST(0 AS DECIMAL(38,6)) THEN divide(abs(subtract(sum(tpcds_partitioned_parquet_snap.catalog_sales_1.cs_sales_price), avg(sum(tpcds_partitioned_parquet_snap.catalog_sales_1.cs_sales_price)))), avg(sum(tpcds_partitioned_parquet_snap.catalog_sales_1.cs_sales_price))) ELSE NULL END > CAST(0.1 AS DECIMAL(2,1)), avg(sum(tpcds_partitioned_parquet_snap.catalog_sales_1.cs_sales_price)) > CAST(0 AS DECIMAL(38,6)), tpcds_partitioned_parquet_snap.call_center_1.cc_name IS NOT NULL, tpcds_partitioned_parquet_snap.item_1.i_brand IS NOT NULL, tpcds_partitioned_parquet_snap.item_1.i_category IS NOT NULL
 |  |  mem-estimate=0B mem-reservation=0B thread-reservation=0
 |  |  tuple-ids=47,42 row-size=120B cardinality=9.23K cost=34328880
 |  |  in pipelines: 32(GETNEXT)
@@ -510,8 +510,8 @@ ImpalaProjectRel(I_CATEGORY=[$0], I_BRAND=[$1], CC_NAME=[$2], D_YEAR=[$3], D_MOY
                     ImpalaProjectRel(i_item_sk=[$0], i_brand=[$8], i_category=[$12])
                       ImpalaFilterRel(condition=[IS NOT NULL($0)])
                         ImpalaHdfsScanRel(table=[[tpcds_partitioned_parquet_snap, item]])
-          ImpalaFilterRel(condition=[AND(=($3, 2001), >($6, 0.000000), >(CASE(>($6, 0.000000), /(ABS(-($5, $6)), $6), null:DECIMAL(38, 6)), 0.100000), IS NOT NULL($0), IS NOT NULL($1), IS NOT NULL($2))])
-            ImpalaAnalyticRel(I_CATEGORY=[$0], I_BRAND=[$1], CC_NAME=[$2], D_YEAR=[$3], D_MOY=[$4], SUM_SALES=[$5], AVG_MONTHLY_SALES=[AVG($5) OVER (PARTITION BY $0, $1, $2, $3)], RN=[RANK() OVER (PARTITION BY $0, $1, $2 ORDER BY $3, $4)])
+          ImpalaFilterRel(condition=[AND(=($3, 2001), >($6, 0.000000), >(CASE(>($6, 0.000000), /(ABS(-($5, $6)), $6), null:DECIMAL(38, 6)), 0.1:DECIMAL(2, 1)), IS NOT NULL($0), IS NOT NULL($1), IS NOT NULL($2))])
+            ImpalaAnalyticRel(I_CATEGORY=[$0], I_BRAND=[$1], CC_NAME=[$2], D_YEAR=[$3], D_MOY=[$4], SUM_SALES=[$5], AVG_MONTHLY_SALES=[AVG(CAST($5):DECIMAL(38, 6)) OVER (PARTITION BY $0, $1, $2, $3)], RN=[RANK() OVER (PARTITION BY $0, $1, $2 ORDER BY $3, $4)])
               ImpalaAggRel(group=[{0, 1, 2, 3, 4}], SUM_SALES=[SUM($5)])
                 ImpalaProjectRel(I_CATEGORY=[$11], I_BRAND=[$10], CC_NAME=[$5], D_YEAR=[$7], D_MOY=[$8], cs_sales_price=[$2])
                   ImpalaJoinRel(condition=[=($1, $9)], joinType=[inner])
@@ -780,7 +780,7 @@ max-parallelism=11740 segment-costs=[29333266, 117347093271, 408] cpu-comparison
 |  Per-Instance Resources: mem-estimate=116.93MB mem-reservation=32.00MB thread-reservation=1
 |  max-parallelism=10 segment-costs=[29333266, 33888447, 40053744] cpu-comparison-result=99 [max(10 (self) vs 99 (sum children))]
 |  34:SELECT
-|  |  predicates: tpcds_partitioned_parquet_snap.date_dim_1.d_year = CAST(2001 AS INT), CASE WHEN avg(sum(tpcds_partitioned_parquet_snap.catalog_sales_1.cs_sales_price)) > CAST(0 AS DECIMAL(38,6)) THEN divide(abs(subtract(sum(tpcds_partitioned_parquet_snap.catalog_sales_1.cs_sales_price), avg(sum(tpcds_partitioned_parquet_snap.catalog_sales_1.cs_sales_price)))), avg(sum(tpcds_partitioned_parquet_snap.catalog_sales_1.cs_sales_price))) ELSE NULL END > CAST(0.100000 AS DECIMAL(38,6)), avg(sum(tpcds_partitioned_parquet_snap.catalog_sales_1.cs_sales_price)) > CAST(0 AS DECIMAL(38,6)), tpcds_partitioned_parquet_snap.call_center_1.cc_name IS NOT NULL, tpcds_partitioned_parquet_snap.item_1.i_brand IS NOT NULL, tpcds_partitioned_parquet_snap.item_1.i_category IS NOT NULL
+|  |  predicates: tpcds_partitioned_parquet_snap.date_dim_1.d_year = CAST(2001 AS INT), CASE WHEN avg(sum(tpcds_partitioned_parquet_snap.catalog_sales_1.cs_sales_price)) > CAST(0 AS DECIMAL(38,6)) THEN divide(abs(subtract(sum(tpcds_partitioned_parquet_snap.catalog_sales_1.cs_sales_price), avg(sum(tpcds_partitioned_parquet_snap.catalog_sales_1.cs_sales_price)))), avg(sum(tpcds_partitioned_parquet_snap.catalog_sales_1.cs_sales_price))) ELSE NULL END > CAST(0.1 AS DECIMAL(2,1)), avg(sum(tpcds_partitioned_parquet_snap.catalog_sales_1.cs_sales_price)) > CAST(0 AS DECIMAL(38,6)), tpcds_partitioned_parquet_snap.call_center_1.cc_name IS NOT NULL, tpcds_partitioned_parquet_snap.item_1.i_brand IS NOT NULL, tpcds_partitioned_parquet_snap.item_1.i_category IS NOT NULL
 |  |  mem-estimate=0B mem-reservation=0B thread-reservation=0
 |  |  tuple-ids=47,42 row-size=120B cardinality=9.23K cost=34328880
 |  |  in pipelines: 32(GETNEXT)
@@ -1196,8 +1196,8 @@ ImpalaProjectRel(I_CATEGORY=[$0], I_BRAND=[$1], CC_NAME=[$2], D_YEAR=[$3], D_MOY
                     ImpalaProjectRel(i_item_sk=[$0], i_brand=[$8], i_category=[$12])
                       ImpalaFilterRel(condition=[IS NOT NULL($0)])
                         ImpalaHdfsScanRel(table=[[tpcds_partitioned_parquet_snap, item]])
-          ImpalaFilterRel(condition=[AND(=($3, 2001), >($6, 0.000000), >(CASE(>($6, 0.000000), /(ABS(-($5, $6)), $6), null:DECIMAL(38, 6)), 0.100000), IS NOT NULL($0), IS NOT NULL($1), IS NOT NULL($2))])
-            ImpalaAnalyticRel(I_CATEGORY=[$0], I_BRAND=[$1], CC_NAME=[$2], D_YEAR=[$3], D_MOY=[$4], SUM_SALES=[$5], AVG_MONTHLY_SALES=[AVG($5) OVER (PARTITION BY $0, $1, $2, $3)], RN=[RANK() OVER (PARTITION BY $0, $1, $2 ORDER BY $3, $4)])
+          ImpalaFilterRel(condition=[AND(=($3, 2001), >($6, 0.000000), >(CASE(>($6, 0.000000), /(ABS(-($5, $6)), $6), null:DECIMAL(38, 6)), 0.1:DECIMAL(2, 1)), IS NOT NULL($0), IS NOT NULL($1), IS NOT NULL($2))])
+            ImpalaAnalyticRel(I_CATEGORY=[$0], I_BRAND=[$1], CC_NAME=[$2], D_YEAR=[$3], D_MOY=[$4], SUM_SALES=[$5], AVG_MONTHLY_SALES=[AVG(CAST($5):DECIMAL(38, 6)) OVER (PARTITION BY $0, $1, $2, $3)], RN=[RANK() OVER (PARTITION BY $0, $1, $2 ORDER BY $3, $4)])
               ImpalaAggRel(group=[{0, 1, 2, 3, 4}], SUM_SALES=[SUM($5)])
                 ImpalaProjectRel(I_CATEGORY=[$11], I_BRAND=[$10], CC_NAME=[$5], D_YEAR=[$7], D_MOY=[$8], cs_sales_price=[$2])
                   ImpalaJoinRel(condition=[=($1, $9)], joinType=[inner])
@@ -1474,7 +1474,7 @@ max-parallelism=20 segment-costs=[29333266, 150244774] cpu-comparison-result=198
 |  Per-Instance Resources: mem-estimate=116.93MB mem-reservation=32.00MB thread-reservation=1
 |  max-parallelism=10 segment-costs=[29333266, 33888447, 40053744] cpu-comparison-result=99 [max(10 (self) vs 99 (sum children))]
 |  34:SELECT
-|  |  predicates: tpcds_partitioned_parquet_snap.date_dim_1.d_year = CAST(2001 AS INT), CASE WHEN avg(sum(tpcds_partitioned_parquet_snap.catalog_sales_1.cs_sales_price)) > CAST(0 AS DECIMAL(38,6)) THEN divide(abs(subtract(sum(tpcds_partitioned_parquet_snap.catalog_sales_1.cs_sales_price), avg(sum(tpcds_partitioned_parquet_snap.catalog_sales_1.cs_sales_price)))), avg(sum(tpcds_partitioned_parquet_snap.catalog_sales_1.cs_sales_price))) ELSE NULL END > CAST(0.100000 AS DECIMAL(38,6)), avg(sum(tpcds_partitioned_parquet_snap.catalog_sales_1.cs_sales_price)) > CAST(0 AS DECIMAL(38,6)), tpcds_partitioned_parquet_snap.call_center_1.cc_name IS NOT NULL, tpcds_partitioned_parquet_snap.item_1.i_brand IS NOT NULL, tpcds_partitioned_parquet_snap.item_1.i_category IS NOT NULL
+|  |  predicates: tpcds_partitioned_parquet_snap.date_dim_1.d_year = CAST(2001 AS INT), CASE WHEN avg(sum(tpcds_partitioned_parquet_snap.catalog_sales_1.cs_sales_price)) > CAST(0 AS DECIMAL(38,6)) THEN divide(abs(subtract(sum(tpcds_partitioned_parquet_snap.catalog_sales_1.cs_sales_price), avg(sum(tpcds_partitioned_parquet_snap.catalog_sales_1.cs_sales_price)))), avg(sum(tpcds_partitioned_parquet_snap.catalog_sales_1.cs_sales_price))) ELSE NULL END > CAST(0.1 AS DECIMAL(2,1)), avg(sum(tpcds_partitioned_parquet_snap.catalog_sales_1.cs_sales_price)) > CAST(0 AS DECIMAL(38,6)), tpcds_partitioned_parquet_snap.call_center_1.cc_name IS NOT NULL, tpcds_partitioned_parquet_snap.item_1.i_brand IS NOT NULL, tpcds_partitioned_parquet_snap.item_1.i_category IS NOT NULL
 |  |  mem-estimate=0B mem-reservation=0B thread-reservation=0
 |  |  tuple-ids=47,42 row-size=120B cardinality=9.23K cost=34328880
 |  |  in pipelines: 32(GETNEXT)

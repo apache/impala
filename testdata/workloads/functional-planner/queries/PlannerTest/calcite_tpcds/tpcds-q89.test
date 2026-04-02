@@ -33,8 +33,8 @@ Per-Host Resource Estimates: Memory=979MB
 ImpalaProjectRel(I_CATEGORY=[$0], I_CLASS=[$1], I_BRAND=[$2], S_STORE_NAME=[$3], S_COMPANY_NAME=[$4], D_MOY=[$5], SUM_SALES=[$6], AVG_MONTHLY_SALES=[$7])
   ImpalaSortRel(sort0=[$8], sort1=[$3], dir0=[ASC], dir1=[ASC], fetch=[100:TINYINT])
     ImpalaProjectRel(I_CATEGORY=[$0], I_CLASS=[$1], I_BRAND=[$2], S_STORE_NAME=[$3], S_COMPANY_NAME=[$4], D_MOY=[$5], SUM_SALES=[$6], AVG_MONTHLY_SALES=[$7], EXPR$8=[-($6, $7)])
-      ImpalaFilterRel(condition=[>(CASE(<>($7, 0.000000), /(ABS(-($6, $7)), $7), null:DECIMAL(38, 6)), 0.100000)])
-        ImpalaAnalyticRel(I_CATEGORY=[$0], I_CLASS=[$1], I_BRAND=[$2], S_STORE_NAME=[$3], S_COMPANY_NAME=[$4], D_MOY=[$5], SUM_SALES=[$6], AVG_MONTHLY_SALES=[AVG($6) OVER (PARTITION BY $0, $2, $3, $4)])
+      ImpalaFilterRel(condition=[>(CASE(<>($7, 0.000000), /(ABS(-($6, $7)), $7), null:DECIMAL(38, 6)), 0.1:DECIMAL(2, 1))])
+        ImpalaAnalyticRel(I_CATEGORY=[$0], I_CLASS=[$1], I_BRAND=[$2], S_STORE_NAME=[$3], S_COMPANY_NAME=[$4], D_MOY=[$5], SUM_SALES=[$6], AVG_MONTHLY_SALES=[AVG(CAST($6):DECIMAL(38, 6)) OVER (PARTITION BY $0, $2, $3, $4)])
           ImpalaAggRel(group=[{0, 1, 2, 3, 4, 5}], SUM_SALES=[SUM($6)])
             ImpalaProjectRel(I_CATEGORY=[$12], I_CLASS=[$11], I_BRAND=[$10], S_STORE_NAME=[$7], S_COMPANY_NAME=[$8], D_MOY=[$5], ss_sales_price=[$2])
               ImpalaJoinRel(condition=[=($0, $9)], joinType=[inner])
@@ -66,7 +66,7 @@ PLAN-ROOT SINK
 |  in pipelines: 11(GETNEXT), 08(OPEN)
 |
 10:SELECT
-|  predicates: CASE WHEN avg(sum(tpcds_partitioned_parquet_snap.store_sales.ss_sales_price)) != CAST(0 AS DECIMAL(38,6)) THEN divide(abs(subtract(sum(tpcds_partitioned_parquet_snap.store_sales.ss_sales_price), avg(sum(tpcds_partitioned_parquet_snap.store_sales.ss_sales_price)))), avg(sum(tpcds_partitioned_parquet_snap.store_sales.ss_sales_price))) ELSE NULL END > CAST(0.100000 AS DECIMAL(38,6))
+|  predicates: CASE WHEN avg(sum(tpcds_partitioned_parquet_snap.store_sales.ss_sales_price)) != CAST(0 AS DECIMAL(38,6)) THEN divide(abs(subtract(sum(tpcds_partitioned_parquet_snap.store_sales.ss_sales_price), avg(sum(tpcds_partitioned_parquet_snap.store_sales.ss_sales_price)))), avg(sum(tpcds_partitioned_parquet_snap.store_sales.ss_sales_price))) ELSE NULL END > CAST(0.1 AS DECIMAL(2,1))
 |  mem-estimate=0B mem-reservation=0B thread-reservation=0
 |  tuple-ids=13,12 row-size=137B cardinality=298.51K cost=2985120
 |  in pipelines: 08(GETNEXT)
@@ -174,8 +174,8 @@ Per-Host Resource Estimates: Memory=1.24GB
 ImpalaProjectRel(I_CATEGORY=[$0], I_CLASS=[$1], I_BRAND=[$2], S_STORE_NAME=[$3], S_COMPANY_NAME=[$4], D_MOY=[$5], SUM_SALES=[$6], AVG_MONTHLY_SALES=[$7])
   ImpalaSortRel(sort0=[$8], sort1=[$3], dir0=[ASC], dir1=[ASC], fetch=[100:TINYINT])
     ImpalaProjectRel(I_CATEGORY=[$0], I_CLASS=[$1], I_BRAND=[$2], S_STORE_NAME=[$3], S_COMPANY_NAME=[$4], D_MOY=[$5], SUM_SALES=[$6], AVG_MONTHLY_SALES=[$7], EXPR$8=[-($6, $7)])
-      ImpalaFilterRel(condition=[>(CASE(<>($7, 0.000000), /(ABS(-($6, $7)), $7), null:DECIMAL(38, 6)), 0.100000)])
-        ImpalaAnalyticRel(I_CATEGORY=[$0], I_CLASS=[$1], I_BRAND=[$2], S_STORE_NAME=[$3], S_COMPANY_NAME=[$4], D_MOY=[$5], SUM_SALES=[$6], AVG_MONTHLY_SALES=[AVG($6) OVER (PARTITION BY $0, $2, $3, $4)])
+      ImpalaFilterRel(condition=[>(CASE(<>($7, 0.000000), /(ABS(-($6, $7)), $7), null:DECIMAL(38, 6)), 0.1:DECIMAL(2, 1))])
+        ImpalaAnalyticRel(I_CATEGORY=[$0], I_CLASS=[$1], I_BRAND=[$2], S_STORE_NAME=[$3], S_COMPANY_NAME=[$4], D_MOY=[$5], SUM_SALES=[$6], AVG_MONTHLY_SALES=[AVG(CAST($6):DECIMAL(38, 6)) OVER (PARTITION BY $0, $2, $3, $4)])
           ImpalaAggRel(group=[{0, 1, 2, 3, 4, 5}], SUM_SALES=[SUM($6)])
             ImpalaProjectRel(I_CATEGORY=[$12], I_CLASS=[$11], I_BRAND=[$10], S_STORE_NAME=[$7], S_COMPANY_NAME=[$8], D_MOY=[$5], ss_sales_price=[$2])
               ImpalaJoinRel(condition=[=($0, $9)], joinType=[inner])
@@ -217,7 +217,7 @@ max-parallelism=10 segment-costs=[18890602, 9031203, 389] cpu-comparison-result=
 |  in pipelines: 11(GETNEXT), 08(OPEN)
 |
 10:SELECT
-|  predicates: CASE WHEN avg(sum(tpcds_partitioned_parquet_snap.store_sales.ss_sales_price)) != CAST(0 AS DECIMAL(38,6)) THEN divide(abs(subtract(sum(tpcds_partitioned_parquet_snap.store_sales.ss_sales_price), avg(sum(tpcds_partitioned_parquet_snap.store_sales.ss_sales_price)))), avg(sum(tpcds_partitioned_parquet_snap.store_sales.ss_sales_price))) ELSE NULL END > CAST(0.100000 AS DECIMAL(38,6))
+|  predicates: CASE WHEN avg(sum(tpcds_partitioned_parquet_snap.store_sales.ss_sales_price)) != CAST(0 AS DECIMAL(38,6)) THEN divide(abs(subtract(sum(tpcds_partitioned_parquet_snap.store_sales.ss_sales_price), avg(sum(tpcds_partitioned_parquet_snap.store_sales.ss_sales_price)))), avg(sum(tpcds_partitioned_parquet_snap.store_sales.ss_sales_price))) ELSE NULL END > CAST(0.1 AS DECIMAL(2,1))
 |  mem-estimate=0B mem-reservation=0B thread-reservation=0
 |  tuple-ids=13,12 row-size=137B cardinality=298.51K cost=2985120
 |  in pipelines: 08(GETNEXT)
@@ -400,8 +400,8 @@ Per-Host Resource Estimates: Memory=1.24GB
 ImpalaProjectRel(I_CATEGORY=[$0], I_CLASS=[$1], I_BRAND=[$2], S_STORE_NAME=[$3], S_COMPANY_NAME=[$4], D_MOY=[$5], SUM_SALES=[$6], AVG_MONTHLY_SALES=[$7])
   ImpalaSortRel(sort0=[$8], sort1=[$3], dir0=[ASC], dir1=[ASC], fetch=[100:TINYINT])
     ImpalaProjectRel(I_CATEGORY=[$0], I_CLASS=[$1], I_BRAND=[$2], S_STORE_NAME=[$3], S_COMPANY_NAME=[$4], D_MOY=[$5], SUM_SALES=[$6], AVG_MONTHLY_SALES=[$7], EXPR$8=[-($6, $7)])
-      ImpalaFilterRel(condition=[>(CASE(<>($7, 0.000000), /(ABS(-($6, $7)), $7), null:DECIMAL(38, 6)), 0.100000)])
-        ImpalaAnalyticRel(I_CATEGORY=[$0], I_CLASS=[$1], I_BRAND=[$2], S_STORE_NAME=[$3], S_COMPANY_NAME=[$4], D_MOY=[$5], SUM_SALES=[$6], AVG_MONTHLY_SALES=[AVG($6) OVER (PARTITION BY $0, $2, $3, $4)])
+      ImpalaFilterRel(condition=[>(CASE(<>($7, 0.000000), /(ABS(-($6, $7)), $7), null:DECIMAL(38, 6)), 0.1:DECIMAL(2, 1))])
+        ImpalaAnalyticRel(I_CATEGORY=[$0], I_CLASS=[$1], I_BRAND=[$2], S_STORE_NAME=[$3], S_COMPANY_NAME=[$4], D_MOY=[$5], SUM_SALES=[$6], AVG_MONTHLY_SALES=[AVG(CAST($6):DECIMAL(38, 6)) OVER (PARTITION BY $0, $2, $3, $4)])
           ImpalaAggRel(group=[{0, 1, 2, 3, 4, 5}], SUM_SALES=[SUM($6)])
             ImpalaProjectRel(I_CATEGORY=[$12], I_CLASS=[$11], I_BRAND=[$10], S_STORE_NAME=[$7], S_COMPANY_NAME=[$8], D_MOY=[$5], ss_sales_price=[$2])
               ImpalaJoinRel(condition=[=($0, $9)], joinType=[inner])
@@ -443,7 +443,7 @@ max-parallelism=10 segment-costs=[18890602, 9031203, 389] cpu-comparison-result=
 |  in pipelines: 11(GETNEXT), 08(OPEN)
 |
 10:SELECT
-|  predicates: CASE WHEN avg(sum(tpcds_partitioned_parquet_snap.store_sales.ss_sales_price)) != CAST(0 AS DECIMAL(38,6)) THEN divide(abs(subtract(sum(tpcds_partitioned_parquet_snap.store_sales.ss_sales_price), avg(sum(tpcds_partitioned_parquet_snap.store_sales.ss_sales_price)))), avg(sum(tpcds_partitioned_parquet_snap.store_sales.ss_sales_price))) ELSE NULL END > CAST(0.100000 AS DECIMAL(38,6))
+|  predicates: CASE WHEN avg(sum(tpcds_partitioned_parquet_snap.store_sales.ss_sales_price)) != CAST(0 AS DECIMAL(38,6)) THEN divide(abs(subtract(sum(tpcds_partitioned_parquet_snap.store_sales.ss_sales_price), avg(sum(tpcds_partitioned_parquet_snap.store_sales.ss_sales_price)))), avg(sum(tpcds_partitioned_parquet_snap.store_sales.ss_sales_price))) ELSE NULL END > CAST(0.1 AS DECIMAL(2,1))
 |  mem-estimate=0B mem-reservation=0B thread-reservation=0
 |  tuple-ids=13,12 row-size=137B cardinality=298.51K cost=2985120
 |  in pipelines: 08(GETNEXT)

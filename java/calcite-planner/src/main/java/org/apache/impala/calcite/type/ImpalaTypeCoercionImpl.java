@@ -101,6 +101,20 @@ public class ImpalaTypeCoercionImpl extends TypeCoercionImpl {
     return coerced;
   }
 
+  // The binaryComparison method has been overridden for handling Impala
+  // specific rules for decimals with different precisions and/or scales.
+  @Override
+  public boolean binaryComparisonCoercion(SqlCallBinding binding) {
+    // For binary comparisons, no coercion is needed if both operands are
+    // of type decimal, even if they are of different precisions.
+    if (binding.getOperandCount() == 2 &&
+        SqlTypeUtil.isDecimal(binding.getOperandType(0)) &&
+        SqlTypeUtil.isDecimal(binding.getOperandType(1))) {
+      return false;
+    }
+    return super.binaryComparisonCoercion(binding);
+  }
+
   private boolean coerceInOperand(SqlValidatorScope scope, SqlCall call,
       int index, RelDataType fromType, RelDataType toType) {
     if (!needsCasting(fromType, toType)) {

@@ -380,6 +380,7 @@ parser: {
     "VIEW"
     "WEEK"
     "WEEKS"
+    "WIDTH_BUCKET"
     "WORK"
     "WRAPPER"
     "WRITE"

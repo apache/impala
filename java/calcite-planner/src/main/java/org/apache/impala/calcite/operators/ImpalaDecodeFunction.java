@@ -17,7 +17,6 @@
 
 package org.apache.impala.calcite.operators;
 
-import org.apache.calcite.jdbc.JavaTypeFactoryImpl;
 import org.apache.calcite.rel.type.RelDataType;
 import org.apache.calcite.rel.type.RelDataTypeFactory;
 import org.apache.calcite.rex.RexBuilder;
@@ -25,7 +24,7 @@ import org.apache.calcite.sql.SqlOperandCountRange;
 import org.apache.calcite.sql.SqlOperatorBinding;
 import org.apache.calcite.sql.type.SqlOperandCountRanges;
 import org.apache.impala.calcite.type.ImpalaTypeConverter;
-import org.apache.impala.calcite.type.ImpalaTypeSystemImpl;
+import org.apache.impala.calcite.type.ImpalaTypeFactoryImpl;
 
 import java.util.List;
 
@@ -62,8 +61,7 @@ public class ImpalaDecodeFunction extends ImpalaOperator {
   public RelDataType inferReturnType(SqlOperatorBinding opBinding) {
     List<RelDataType> operandTypes = CommonOperatorFunctions.getOperandTypes(opBinding);
 
-    RexBuilder rexBuilder =
-        new RexBuilder(new JavaTypeFactoryImpl(new ImpalaTypeSystemImpl()));
+    RexBuilder rexBuilder = new RexBuilder(ImpalaTypeFactoryImpl.INSTANCE);
     RelDataTypeFactory factory = rexBuilder.getTypeFactory();
 
     // No need to capture the return value, but an exception will be thrown

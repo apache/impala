@@ -37,7 +37,7 @@ ImpalaSortRel(sort0=[$0], sort1=[$1], dir0=[ASC], dir1=[ASC], fetch=[100:TINYINT
       ImpalaProjectRel(i_item_sk=[$0], i_item_desc=[$4], i_current_price=[$5], i_wholesale_cost=[$6], i_brand=[$8])
         ImpalaFilterRel(condition=[IS NOT NULL($0)])
           ImpalaHdfsScanRel(table=[[tpcds_partitioned_parquet_snap, item]])
-      ImpalaJoinRel(condition=[AND(<=($2, CAST(*(0.1:DECIMAL(2, 1), $6)):DECIMAL(38, 2) NOT NULL), =($5, $0))], joinType=[inner])
+      ImpalaJoinRel(condition=[AND(<=($2, *(0.1:DECIMAL(2, 1), $6)), =($5, $0))], joinType=[inner])
         ImpalaFilterRel(condition=[IS NOT NULL($2)])
           ImpalaAggRel(group=[{0, 1}], REVENUE=[SUM($2)])
             ImpalaProjectRel(SS_STORE_SK=[$1], SS_ITEM_SK=[$0], ss_sales_price=[$2])
@@ -99,7 +99,7 @@ PLAN-ROOT SINK
 12:HASH JOIN [INNER JOIN]
 |  hash predicates: tpcds_partitioned_parquet_snap.store_sales.ss_store_sk = tpcds_partitioned_parquet_snap.store_sales_0.ss_store_sk
 |  fk/pk conjuncts: none
-|  other join predicates: sum(tpcds_partitioned_parquet_snap.store_sales.ss_sales_price) <= CAST(multiply(CAST(0.1 AS DECIMAL(2,1)), avg(sum(tpcds_partitioned_parquet_snap.store_sales_0.ss_sales_price))) AS DECIMAL(38,2))
+|  other join predicates: sum(tpcds_partitioned_parquet_snap.store_sales.ss_sales_price) <= multiply(CAST(0.1 AS DECIMAL(2,1)), avg(sum(tpcds_partitioned_parquet_snap.store_sales_0.ss_sales_price)))
 |  runtime filters: RF002[bloom] <- tpcds_partitioned_parquet_snap.store_sales_0.ss_store_sk, RF003[min_max] <- tpcds_partitioned_parquet_snap.store_sales_0.ss_store_sk
 |  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
 |  tuple-ids=6,7,15 row-size=64B cardinality=8.84G cost=1607552148
@@ -228,7 +228,7 @@ ImpalaSortRel(sort0=[$0], sort1=[$1], dir0=[ASC], dir1=[ASC], fetch=[100:TINYINT
       ImpalaProjectRel(i_item_sk=[$0], i_item_desc=[$4], i_current_price=[$5], i_wholesale_cost=[$6], i_brand=[$8])
         ImpalaFilterRel(condition=[IS NOT NULL($0)])
           ImpalaHdfsScanRel(table=[[tpcds_partitioned_parquet_snap, item]])
-      ImpalaJoinRel(condition=[AND(<=($2, CAST(*(0.1:DECIMAL(2, 1), $6)):DECIMAL(38, 2) NOT NULL), =($5, $0))], joinType=[inner])
+      ImpalaJoinRel(condition=[AND(<=($2, *(0.1:DECIMAL(2, 1), $6)), =($5, $0))], joinType=[inner])
         ImpalaFilterRel(condition=[IS NOT NULL($2)])
           ImpalaAggRel(group=[{0, 1}], REVENUE=[SUM($2)])
             ImpalaProjectRel(SS_STORE_SK=[$1], SS_ITEM_SK=[$0], ss_sales_price=[$2])
@@ -318,7 +318,7 @@ max-parallelism=17010 segment-costs=[12033974180, 170036470682, 504] cpu-compari
 |  hash-table-id=01
 |  hash predicates: tpcds_partitioned_parquet_snap.store_sales.ss_store_sk = tpcds_partitioned_parquet_snap.store_sales_0.ss_store_sk
 |  fk/pk conjuncts: none
-|  other join predicates: sum(tpcds_partitioned_parquet_snap.store_sales.ss_sales_price) <= CAST(multiply(CAST(0.1 AS DECIMAL(2,1)), avg(sum(tpcds_partitioned_parquet_snap.store_sales_0.ss_sales_price))) AS DECIMAL(38,2))
+|  other join predicates: sum(tpcds_partitioned_parquet_snap.store_sales.ss_sales_price) <= multiply(CAST(0.1 AS DECIMAL(2,1)), avg(sum(tpcds_partitioned_parquet_snap.store_sales_0.ss_sales_price)))
 |  mem-estimate=0B mem-reservation=0B spill-buffer=64.00KB thread-reservation=0
 |  tuple-ids=6,15,7 row-size=64B cardinality=8.84G cost=1607551480
 |  in pipelines: 17(GETNEXT), 22(OPEN)
@@ -560,7 +560,7 @@ ImpalaSortRel(sort0=[$0], sort1=[$1], dir0=[ASC], dir1=[ASC], fetch=[100:TINYINT
       ImpalaProjectRel(i_item_sk=[$0], i_item_desc=[$4], i_current_price=[$5], i_wholesale_cost=[$6], i_brand=[$8])
         ImpalaFilterRel(condition=[IS NOT NULL($0)])
           ImpalaHdfsScanRel(table=[[tpcds_partitioned_parquet_snap, item]])
-      ImpalaJoinRel(condition=[AND(<=($2, CAST(*(0.1:DECIMAL(2, 1), $6)):DECIMAL(38, 2) NOT NULL), =($5, $0))], joinType=[inner])
+      ImpalaJoinRel(condition=[AND(<=($2, *(0.1:DECIMAL(2, 1), $6)), =($5, $0))], joinType=[inner])
         ImpalaFilterRel(condition=[IS NOT NULL($2)])
           ImpalaAggRel(group=[{0, 1}], REVENUE=[SUM($2)])
             ImpalaProjectRel(SS_STORE_SK=[$1], SS_ITEM_SK=[$0], ss_sales_price=[$2])
@@ -650,7 +650,7 @@ max-parallelism=17010 segment-costs=[12033974180, 170036470682, 504] cpu-compari
 |  hash-table-id=01
 |  hash predicates: tpcds_partitioned_parquet_snap.store_sales.ss_store_sk = tpcds_partitioned_parquet_snap.store_sales_0.ss_store_sk
 |  fk/pk conjuncts: none
-|  other join predicates: sum(tpcds_partitioned_parquet_snap.store_sales.ss_sales_price) <= CAST(multiply(CAST(0.1 AS DECIMAL(2,1)), avg(sum(tpcds_partitioned_parquet_snap.store_sales_0.ss_sales_price))) AS DECIMAL(38,2))
+|  other join predicates: sum(tpcds_partitioned_parquet_snap.store_sales.ss_sales_price) <= multiply(CAST(0.1 AS DECIMAL(2,1)), avg(sum(tpcds_partitioned_parquet_snap.store_sales_0.ss_sales_price)))
 |  mem-estimate=0B mem-reservation=0B spill-buffer=64.00KB thread-reservation=0
 |  tuple-ids=6,15,7 row-size=64B cardinality=8.84G cost=1607551480
 |  in pipelines: 17(GETNEXT), 22(OPEN)

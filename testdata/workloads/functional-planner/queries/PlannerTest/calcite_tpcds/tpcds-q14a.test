@@ -109,7 +109,7 @@ ImpalaSortRel(sort0=[$0], sort1=[$1], sort2=[$2], sort3=[$3], dir0=[ASC], dir1=[
     ImpalaUnionRel(all=[true])
       ImpalaUnionRel(all=[true])
         ImpalaProjectRel(CHANNEL=[_UTF-8'store':VARCHAR(2147483647) CHARACTER SET "UTF-8"], I_BRAND_ID=[$0], I_CLASS_ID=[$1], I_CATEGORY_ID=[$2], SALES=[$3], NUMBER_SALES=[$4])
-          ImpalaJoinRel(condition=[>($3, CAST($5):DECIMAL(38, 2))], joinType=[inner])
+          ImpalaJoinRel(condition=[>($3, $5)], joinType=[inner])
             ImpalaFilterRel(condition=[IS NOT NULL($3)])
               ImpalaAggRel(group=[{0, 1, 2}], SALES=[SUM($3)], NUMBER_SALES=[COUNT()])
                 ImpalaProjectRel(I_BRAND_ID=[$3], I_CLASS_ID=[$4], I_CATEGORY_ID=[$5], $f3=[*(CAST($1):DECIMAL(10, 0), $2)])
@@ -208,7 +208,7 @@ ImpalaSortRel(sort0=[$0], sort1=[$1], sort2=[$2], sort3=[$3], dir0=[ASC], dir1=[
                           ImpalaFilterRel(condition=[AND(SEARCH($6, Sarg[[1998..2000]]), IS NOT NULL($0))])
                             ImpalaHdfsScanRel(table=[[tpcds_partitioned_parquet_snap, date_dim]])
         ImpalaProjectRel(CHANNEL=[_UTF-8'catalog':VARCHAR(2147483647) CHARACTER SET "UTF-8"], I_BRAND_ID=[$0], I_CLASS_ID=[$1], I_CATEGORY_ID=[$2], SALES=[$3], NUMBER_SALES=[$4])
-          ImpalaJoinRel(condition=[>($3, CAST($5):DECIMAL(38, 2))], joinType=[inner])
+          ImpalaJoinRel(condition=[>($3, $5)], joinType=[inner])
             ImpalaFilterRel(condition=[IS NOT NULL($3)])
               ImpalaAggRel(group=[{0, 1, 2}], SALES=[SUM($3)], NUMBER_SALES=[COUNT()])
                 ImpalaProjectRel(I_BRAND_ID=[$3], I_CLASS_ID=[$4], I_CATEGORY_ID=[$5], $f3=[*(CAST($1):DECIMAL(10, 0), $2)])
@@ -307,7 +307,7 @@ ImpalaSortRel(sort0=[$0], sort1=[$1], sort2=[$2], sort3=[$3], dir0=[ASC], dir1=[
                           ImpalaFilterRel(condition=[AND(SEARCH($6, Sarg[[1998..2000]]), IS NOT NULL($0))])
                             ImpalaHdfsScanRel(table=[[tpcds_partitioned_parquet_snap, date_dim]])
       ImpalaProjectRel(CHANNEL=[_UTF-8'web':VARCHAR(2147483647) CHARACTER SET "UTF-8"], I_BRAND_ID=[$0], I_CLASS_ID=[$1], I_CATEGORY_ID=[$2], SALES=[$3], NUMBER_SALES=[$4])
-        ImpalaJoinRel(condition=[>($3, CAST($5):DECIMAL(38, 2))], joinType=[inner])
+        ImpalaJoinRel(condition=[>($3, $5)], joinType=[inner])
           ImpalaFilterRel(condition=[IS NOT NULL($3)])
             ImpalaAggRel(group=[{0, 1, 2}], SALES=[SUM($3)], NUMBER_SALES=[COUNT()])
               ImpalaProjectRel(I_BRAND_ID=[$3], I_CLASS_ID=[$4], I_CATEGORY_ID=[$5], $f3=[*(CAST($1):DECIMAL(10, 0), $2)])
@@ -452,7 +452,7 @@ PLAN-ROOT SINK
 |  in pipelines: 32(GETNEXT), 76(GETNEXT), 120(GETNEXT)
 |
 |--133:NESTED LOOP JOIN [INNER JOIN]
-|  |  predicates: sum(multiply(tpcds_partitioned_parquet_snap.web_sales_3.ws_quantity, tpcds_partitioned_parquet_snap.web_sales_3.ws_list_price)) > CAST(avg(multiply(QUANTITY, LIST_PRICE)) AS DECIMAL(38,2))
+|  |  predicates: sum(multiply(tpcds_partitioned_parquet_snap.web_sales_3.ws_quantity, tpcds_partitioned_parquet_snap.web_sales_3.ws_list_price)) > avg(multiply(QUANTITY, LIST_PRICE))
 |  |  mem-estimate=16B mem-reservation=0B thread-reservation=0
 |  |  tuple-ids=134,150 row-size=52B cardinality=14.91K cost=3055
 |  |  in pipelines: 120(GETNEXT), 132(OPEN)
@@ -883,7 +883,7 @@ PLAN-ROOT SINK
 |  in pipelines: 32(GETNEXT), 76(GETNEXT)
 |
 |--89:NESTED LOOP JOIN [INNER JOIN]
-|  |  predicates: sum(multiply(tpcds_partitioned_parquet_snap.catalog_sales_1.cs_quantity, tpcds_partitioned_parquet_snap.catalog_sales_1.cs_list_price)) > CAST(avg(multiply(QUANTITY, LIST_PRICE)) AS DECIMAL(38,2))
+|  |  predicates: sum(multiply(tpcds_partitioned_parquet_snap.catalog_sales_1.cs_quantity, tpcds_partitioned_parquet_snap.catalog_sales_1.cs_list_price)) > avg(multiply(QUANTITY, LIST_PRICE))
 |  |  mem-estimate=16B mem-reservation=0B thread-reservation=0
 |  |  tuple-ids=83,99 row-size=52B cardinality=14.91K cost=3055
 |  |  in pipelines: 76(GETNEXT), 88(OPEN)
@@ -1309,7 +1309,7 @@ PLAN-ROOT SINK
 |     in pipelines: 46(GETNEXT)
 |
 45:NESTED LOOP JOIN [INNER JOIN]
-|  predicates: sum(multiply(tpcds_partitioned_parquet_snap.store_sales.ss_quantity, tpcds_partitioned_parquet_snap.store_sales.ss_list_price)) > CAST(avg(multiply(QUANTITY, LIST_PRICE)) AS DECIMAL(38,2))
+|  predicates: sum(multiply(tpcds_partitioned_parquet_snap.store_sales.ss_quantity, tpcds_partitioned_parquet_snap.store_sales.ss_list_price)) > avg(multiply(QUANTITY, LIST_PRICE))
 |  mem-estimate=16B mem-reservation=0B thread-reservation=0
 |  tuple-ids=33,49 row-size=52B cardinality=14.91K cost=3055
 |  in pipelines: 32(GETNEXT), 44(OPEN)
@@ -1741,7 +1741,7 @@ ImpalaSortRel(sort0=[$0], sort1=[$1], sort2=[$2], sort3=[$3], dir0=[ASC], dir1=[
     ImpalaUnionRel(all=[true])
       ImpalaUnionRel(all=[true])
         ImpalaProjectRel(CHANNEL=[_UTF-8'store':VARCHAR(2147483647) CHARACTER SET "UTF-8"], I_BRAND_ID=[$0], I_CLASS_ID=[$1], I_CATEGORY_ID=[$2], SALES=[$3], NUMBER_SALES=[$4])
-          ImpalaJoinRel(condition=[>($3, CAST($5):DECIMAL(38, 2))], joinType=[inner])
+          ImpalaJoinRel(condition=[>($3, $5)], joinType=[inner])
             ImpalaFilterRel(condition=[IS NOT NULL($3)])
               ImpalaAggRel(group=[{0, 1, 2}], SALES=[SUM($3)], NUMBER_SALES=[COUNT()])
                 ImpalaProjectRel(I_BRAND_ID=[$3], I_CLASS_ID=[$4], I_CATEGORY_ID=[$5], $f3=[*(CAST($1):DECIMAL(10, 0), $2)])
@@ -1840,7 +1840,7 @@ ImpalaSortRel(sort0=[$0], sort1=[$1], sort2=[$2], sort3=[$3], dir0=[ASC], dir1=[
                           ImpalaFilterRel(condition=[AND(SEARCH($6, Sarg[[1998..2000]]), IS NOT NULL($0))])
                             ImpalaHdfsScanRel(table=[[tpcds_partitioned_parquet_snap, date_dim]])
         ImpalaProjectRel(CHANNEL=[_UTF-8'catalog':VARCHAR(2147483647) CHARACTER SET "UTF-8"], I_BRAND_ID=[$0], I_CLASS_ID=[$1], I_CATEGORY_ID=[$2], SALES=[$3], NUMBER_SALES=[$4])
-          ImpalaJoinRel(condition=[>($3, CAST($5):DECIMAL(38, 2))], joinType=[inner])
+          ImpalaJoinRel(condition=[>($3, $5)], joinType=[inner])
             ImpalaFilterRel(condition=[IS NOT NULL($3)])
               ImpalaAggRel(group=[{0, 1, 2}], SALES=[SUM($3)], NUMBER_SALES=[COUNT()])
                 ImpalaProjectRel(I_BRAND_ID=[$3], I_CLASS_ID=[$4], I_CATEGORY_ID=[$5], $f3=[*(CAST($1):DECIMAL(10, 0), $2)])
@@ -1939,7 +1939,7 @@ ImpalaSortRel(sort0=[$0], sort1=[$1], sort2=[$2], sort3=[$3], dir0=[ASC], dir1=[
                           ImpalaFilterRel(condition=[AND(SEARCH($6, Sarg[[1998..2000]]), IS NOT NULL($0))])
                             ImpalaHdfsScanRel(table=[[tpcds_partitioned_parquet_snap, date_dim]])
       ImpalaProjectRel(CHANNEL=[_UTF-8'web':VARCHAR(2147483647) CHARACTER SET "UTF-8"], I_BRAND_ID=[$0], I_CLASS_ID=[$1], I_CATEGORY_ID=[$2], SALES=[$3], NUMBER_SALES=[$4])
-        ImpalaJoinRel(condition=[>($3, CAST($5):DECIMAL(38, 2))], joinType=[inner])
+        ImpalaJoinRel(condition=[>($3, $5)], joinType=[inner])
           ImpalaFilterRel(condition=[IS NOT NULL($3)])
             ImpalaAggRel(group=[{0, 1, 2}], SALES=[SUM($3)], NUMBER_SALES=[COUNT()])
               ImpalaProjectRel(I_BRAND_ID=[$3], I_CLASS_ID=[$4], I_CATEGORY_ID=[$5], $f3=[*(CAST($1):DECIMAL(10, 0), $2)])
@@ -2123,7 +2123,7 @@ max-parallelism=70 segment-costs=[31467972, 31467972, 31443606, 943657, 2403160]
 |
 |--133:NESTED LOOP JOIN [INNER JOIN, BROADCAST]
 |  |  join table id: 08
-|  |  predicates: sum(multiply(tpcds_partitioned_parquet_snap.web_sales_3.ws_quantity, tpcds_partitioned_parquet_snap.web_sales_3.ws_list_price)) > CAST(avg(multiply(QUANTITY, LIST_PRICE)) AS DECIMAL(38,2))
+|  |  predicates: sum(multiply(tpcds_partitioned_parquet_snap.web_sales_3.ws_quantity, tpcds_partitioned_parquet_snap.web_sales_3.ws_list_price)) > avg(multiply(QUANTITY, LIST_PRICE))
 |  |  mem-estimate=0B mem-reservation=0B thread-reservation=0
 |  |  tuple-ids=134,150 row-size=52B cardinality=14.91K cost=3055
 |  |  in pipelines: 217(GETNEXT), 222(OPEN)
@@ -2903,7 +2903,7 @@ max-parallelism=70 segment-costs=[31467972, 31467972, 31443606, 943657, 2403160]
 |
 |--89:NESTED LOOP JOIN [INNER JOIN, BROADCAST]
 |  |  join table id: 04
-|  |  predicates: sum(multiply(tpcds_partitioned_parquet_snap.catalog_sales_1.cs_quantity, tpcds_partitioned_parquet_snap.catalog_sales_1.cs_list_price)) > CAST(avg(multiply(QUANTITY, LIST_PRICE)) AS DECIMAL(38,2))
+|  |  predicates: sum(multiply(tpcds_partitioned_parquet_snap.catalog_sales_1.cs_quantity, tpcds_partitioned_parquet_snap.catalog_sales_1.cs_list_price)) > avg(multiply(QUANTITY, LIST_PRICE))
 |  |  mem-estimate=0B mem-reservation=0B thread-reservation=0
 |  |  tuple-ids=83,99 row-size=52B cardinality=14.91K cost=3055
 |  |  in pipelines: 188(GETNEXT), 193(OPEN)
@@ -3678,7 +3678,7 @@ max-parallelism=70 segment-costs=[31467972, 31467972, 31443606, 943657, 2403160]
 |
 45:NESTED LOOP JOIN [INNER JOIN, BROADCAST]
 |  join table id: 00
-|  predicates: sum(multiply(tpcds_partitioned_parquet_snap.store_sales.ss_quantity, tpcds_partitioned_parquet_snap.store_sales.ss_list_price)) > CAST(avg(multiply(QUANTITY, LIST_PRICE)) AS DECIMAL(38,2))
+|  predicates: sum(multiply(tpcds_partitioned_parquet_snap.store_sales.ss_quantity, tpcds_partitioned_parquet_snap.store_sales.ss_list_price)) > avg(multiply(QUANTITY, LIST_PRICE))
 |  mem-estimate=0B mem-reservation=0B thread-reservation=0
 |  tuple-ids=33,49 row-size=52B cardinality=14.91K cost=3055
 |  in pipelines: 159(GETNEXT), 164(OPEN)
@@ -4459,7 +4459,7 @@ ImpalaSortRel(sort0=[$0], sort1=[$1], sort2=[$2], sort3=[$3], dir0=[ASC], dir1=[
     ImpalaUnionRel(all=[true])
       ImpalaUnionRel(all=[true])
         ImpalaProjectRel(CHANNEL=[_UTF-8'store':VARCHAR(2147483647) CHARACTER SET "UTF-8"], I_BRAND_ID=[$0], I_CLASS_ID=[$1], I_CATEGORY_ID=[$2], SALES=[$3], NUMBER_SALES=[$4])
-          ImpalaJoinRel(condition=[>($3, CAST($5):DECIMAL(38, 2))], joinType=[inner])
+          ImpalaJoinRel(condition=[>($3, $5)], joinType=[inner])
             ImpalaFilterRel(condition=[IS NOT NULL($3)])
               ImpalaAggRel(group=[{0, 1, 2}], SALES=[SUM($3)], NUMBER_SALES=[COUNT()])
                 ImpalaProjectRel(I_BRAND_ID=[$3], I_CLASS_ID=[$4], I_CATEGORY_ID=[$5], $f3=[*(CAST($1):DECIMAL(10, 0), $2)])
@@ -4558,7 +4558,7 @@ ImpalaSortRel(sort0=[$0], sort1=[$1], sort2=[$2], sort3=[$3], dir0=[ASC], dir1=[
                           ImpalaFilterRel(condition=[AND(SEARCH($6, Sarg[[1998..2000]]), IS NOT NULL($0))])
                             ImpalaHdfsScanRel(table=[[tpcds_partitioned_parquet_snap, date_dim]])
         ImpalaProjectRel(CHANNEL=[_UTF-8'catalog':VARCHAR(2147483647) CHARACTER SET "UTF-8"], I_BRAND_ID=[$0], I_CLASS_ID=[$1], I_CATEGORY_ID=[$2], SALES=[$3], NUMBER_SALES=[$4])
-          ImpalaJoinRel(condition=[>($3, CAST($5):DECIMAL(38, 2))], joinType=[inner])
+          ImpalaJoinRel(condition=[>($3, $5)], joinType=[inner])
             ImpalaFilterRel(condition=[IS NOT NULL($3)])
               ImpalaAggRel(group=[{0, 1, 2}], SALES=[SUM($3)], NUMBER_SALES=[COUNT()])
                 ImpalaProjectRel(I_BRAND_ID=[$3], I_CLASS_ID=[$4], I_CATEGORY_ID=[$5], $f3=[*(CAST($1):DECIMAL(10, 0), $2)])
@@ -4657,7 +4657,7 @@ ImpalaSortRel(sort0=[$0], sort1=[$1], sort2=[$2], sort3=[$3], dir0=[ASC], dir1=[
                           ImpalaFilterRel(condition=[AND(SEARCH($6, Sarg[[1998..2000]]), IS NOT NULL($0))])
                             ImpalaHdfsScanRel(table=[[tpcds_partitioned_parquet_snap, date_dim]])
       ImpalaProjectRel(CHANNEL=[_UTF-8'web':VARCHAR(2147483647) CHARACTER SET "UTF-8"], I_BRAND_ID=[$0], I_CLASS_ID=[$1], I_CATEGORY_ID=[$2], SALES=[$3], NUMBER_SALES=[$4])
-        ImpalaJoinRel(condition=[>($3, CAST($5):DECIMAL(38, 2))], joinType=[inner])
+        ImpalaJoinRel(condition=[>($3, $5)], joinType=[inner])
           ImpalaFilterRel(condition=[IS NOT NULL($3)])
             ImpalaAggRel(group=[{0, 1, 2}], SALES=[SUM($3)], NUMBER_SALES=[COUNT()])
               ImpalaProjectRel(I_BRAND_ID=[$3], I_CLASS_ID=[$4], I_CATEGORY_ID=[$5], $f3=[*(CAST($1):DECIMAL(10, 0), $2)])
@@ -4841,7 +4841,7 @@ max-parallelism=70 segment-costs=[31467972, 31467972, 31443606, 943657, 2403160]
 |
 |--133:NESTED LOOP JOIN [INNER JOIN, BROADCAST]
 |  |  join table id: 08
-|  |  predicates: sum(multiply(tpcds_partitioned_parquet_snap.web_sales_3.ws_quantity, tpcds_partitioned_parquet_snap.web_sales_3.ws_list_price)) > CAST(avg(multiply(QUANTITY, LIST_PRICE)) AS DECIMAL(38,2))
+|  |  predicates: sum(multiply(tpcds_partitioned_parquet_snap.web_sales_3.ws_quantity, tpcds_partitioned_parquet_snap.web_sales_3.ws_list_price)) > avg(multiply(QUANTITY, LIST_PRICE))
 |  |  mem-estimate=0B mem-reservation=0B thread-reservation=0
 |  |  tuple-ids=134,150 row-size=52B cardinality=14.91K cost=3055
 |  |  in pipelines: 217(GETNEXT), 222(OPEN)
@@ -5621,7 +5621,7 @@ max-parallelism=70 segment-costs=[31467972, 31467972, 31443606, 943657, 2403160]
 |
 |--89:NESTED LOOP JOIN [INNER JOIN, BROADCAST]
 |  |  join table id: 04
-|  |  predicates: sum(multiply(tpcds_partitioned_parquet_snap.catalog_sales_1.cs_quantity, tpcds_partitioned_parquet_snap.catalog_sales_1.cs_list_price)) > CAST(avg(multiply(QUANTITY, LIST_PRICE)) AS DECIMAL(38,2))
+|  |  predicates: sum(multiply(tpcds_partitioned_parquet_snap.catalog_sales_1.cs_quantity, tpcds_partitioned_parquet_snap.catalog_sales_1.cs_list_price)) > avg(multiply(QUANTITY, LIST_PRICE))
 |  |  mem-estimate=0B mem-reservation=0B thread-reservation=0
 |  |  tuple-ids=83,99 row-size=52B cardinality=14.91K cost=3055
 |  |  in pipelines: 188(GETNEXT), 193(OPEN)
@@ -6396,7 +6396,7 @@ max-parallelism=70 segment-costs=[31467972, 31467972, 31443606, 943657, 2403160]
 |
 45:NESTED LOOP JOIN [INNER JOIN, BROADCAST]
 |  join table id: 00
-|  predicates: sum(multiply(tpcds_partitioned_parquet_snap.store_sales.ss_quantity, tpcds_partitioned_parquet_snap.store_sales.ss_list_price)) > CAST(avg(multiply(QUANTITY, LIST_PRICE)) AS DECIMAL(38,2))
+|  predicates: sum(multiply(tpcds_partitioned_parquet_snap.store_sales.ss_quantity, tpcds_partitioned_parquet_snap.store_sales.ss_list_price)) > avg(multiply(QUANTITY, LIST_PRICE))
 |  mem-estimate=0B mem-reservation=0B thread-reservation=0
 |  tuple-ids=33,49 row-size=52B cardinality=14.91K cost=3055
 |  in pipelines: 159(GETNEXT), 164(OPEN)

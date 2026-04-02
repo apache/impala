@@ -29,7 +29,7 @@ Max Per-Host Resource Reservation: Memory=111.91MB Threads=1
 Per-Host Resource Estimates: Memory=6.18GB
 ImpalaSortRel(sort0=[$0], dir0=[ASC], fetch=[100:TINYINT])
   ImpalaProjectRel(C_CUSTOMER_ID=[$1])
-    ImpalaJoinRel(condition=[AND(=($3, $6), >($4, CAST(*($7, 1.2:DECIMAL(2, 1))):DECIMAL(38, 2)))], joinType=[inner])
+    ImpalaJoinRel(condition=[AND(=($3, $6), >($4, *($7, 1.2:DECIMAL(2, 1))))], joinType=[inner])
       ImpalaJoinRel(condition=[=($2, $0)], joinType=[inner])
         ImpalaProjectRel(c_customer_sk=[$0], c_customer_id=[$1])
           ImpalaFilterRel(condition=[IS NOT NULL($0)])
@@ -75,7 +75,7 @@ PLAN-ROOT SINK
 13:HASH JOIN [INNER JOIN]
 |  hash predicates: tpcds_partitioned_parquet_snap.store_returns.sr_store_sk = tpcds_partitioned_parquet_snap.store_returns_0.sr_store_sk
 |  fk/pk conjuncts: none
-|  other join predicates: sum(tpcds_partitioned_parquet_snap.store_returns.sr_fee) > CAST(multiply(avg(sum(tpcds_partitioned_parquet_snap.store_returns_0.sr_fee)), CAST(1.2 AS DECIMAL(2,1))) AS DECIMAL(38,2))
+|  other join predicates: sum(tpcds_partitioned_parquet_snap.store_returns.sr_fee) > multiply(avg(sum(tpcds_partitioned_parquet_snap.store_returns_0.sr_fee)), CAST(1.2 AS DECIMAL(2,1)))
 |  runtime filters: RF000[bloom] <- tpcds_partitioned_parquet_snap.store_returns_0.sr_store_sk, RF001[min_max] <- tpcds_partitioned_parquet_snap.store_returns_0.sr_store_sk
 |  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
 |  tuple-ids=0,6,7,15 row-size=94B cardinality=661.28M cost=120084585
@@ -222,7 +222,7 @@ Max Per-Host Resource Reservation: Memory=1.46GB Threads=51
 Per-Host Resource Estimates: Memory=2.84GB
 ImpalaSortRel(sort0=[$0], dir0=[ASC], fetch=[100:TINYINT])
   ImpalaProjectRel(C_CUSTOMER_ID=[$1])
-    ImpalaJoinRel(condition=[AND(=($3, $6), >($4, CAST(*($7, 1.2:DECIMAL(2, 1))):DECIMAL(38, 2)))], joinType=[inner])
+    ImpalaJoinRel(condition=[AND(=($3, $6), >($4, *($7, 1.2:DECIMAL(2, 1))))], joinType=[inner])
       ImpalaJoinRel(condition=[=($2, $0)], joinType=[inner])
         ImpalaProjectRel(c_customer_sk=[$0], c_customer_id=[$1])
           ImpalaFilterRel(condition=[IS NOT NULL($0)])
@@ -280,7 +280,7 @@ max-parallelism=10 segment-costs=[11054198439, 104] cpu-comparison-result=211 [m
 |  hash-table-id=00
 |  hash predicates: tpcds_partitioned_parquet_snap.store_returns.sr_store_sk = tpcds_partitioned_parquet_snap.store_returns_0.sr_store_sk
 |  fk/pk conjuncts: none
-|  other join predicates: sum(tpcds_partitioned_parquet_snap.store_returns.sr_fee) > CAST(multiply(avg(sum(tpcds_partitioned_parquet_snap.store_returns_0.sr_fee)), CAST(1.2 AS DECIMAL(2,1))) AS DECIMAL(38,2))
+|  other join predicates: sum(tpcds_partitioned_parquet_snap.store_returns.sr_fee) > multiply(avg(sum(tpcds_partitioned_parquet_snap.store_returns_0.sr_fee)), CAST(1.2 AS DECIMAL(2,1)))
 |  mem-estimate=0B mem-reservation=0B spill-buffer=64.00KB thread-reservation=0
 |  tuple-ids=0,6,7,15 row-size=94B cardinality=661.28M cost=120083932
 |  in pipelines: 00(GETNEXT), 24(OPEN)
@@ -559,7 +559,7 @@ Max Per-Host Resource Reservation: Memory=1.46GB Threads=51
 Per-Host Resource Estimates: Memory=2.84GB
 ImpalaSortRel(sort0=[$0], dir0=[ASC], fetch=[100:TINYINT])
   ImpalaProjectRel(C_CUSTOMER_ID=[$1])
-    ImpalaJoinRel(condition=[AND(=($3, $6), >($4, CAST(*($7, 1.2:DECIMAL(2, 1))):DECIMAL(38, 2)))], joinType=[inner])
+    ImpalaJoinRel(condition=[AND(=($3, $6), >($4, *($7, 1.2:DECIMAL(2, 1))))], joinType=[inner])
       ImpalaJoinRel(condition=[=($2, $0)], joinType=[inner])
         ImpalaProjectRel(c_customer_sk=[$0], c_customer_id=[$1])
           ImpalaFilterRel(condition=[IS NOT NULL($0)])
@@ -617,7 +617,7 @@ max-parallelism=10 segment-costs=[11054198439, 104] cpu-comparison-result=211 [m
 |  hash-table-id=00
 |  hash predicates: tpcds_partitioned_parquet_snap.store_returns.sr_store_sk = tpcds_partitioned_parquet_snap.store_returns_0.sr_store_sk
 |  fk/pk conjuncts: none
-|  other join predicates: sum(tpcds_partitioned_parquet_snap.store_returns.sr_fee) > CAST(multiply(avg(sum(tpcds_partitioned_parquet_snap.store_returns_0.sr_fee)), CAST(1.2 AS DECIMAL(2,1))) AS DECIMAL(38,2))
+|  other join predicates: sum(tpcds_partitioned_parquet_snap.store_returns.sr_fee) > multiply(avg(sum(tpcds_partitioned_parquet_snap.store_returns_0.sr_fee)), CAST(1.2 AS DECIMAL(2,1)))
 |  mem-estimate=0B mem-reservation=0B spill-buffer=64.00KB thread-reservation=0
 |  tuple-ids=0,6,7,15 row-size=94B cardinality=661.28M cost=120083932
 |  in pipelines: 00(GETNEXT), 24(OPEN)
