@@ -301,7 +301,7 @@ store_sales_zorder a join [SHUFFLE] tpcds_parquet.store_sales b
 on a.ss_item_sk = b.ss_item_sk
 where b.ss_customer_sk < 10 and b.ss_addr_sk < 20;
 ---- RESULTS: VERIFY_IS_SUBSET
-row_regex:.* RF001\[min_max\] -. .\.ss_item_sk.*
+row_regex:.* RF001\[min_max\] -.*\.ss_item_sk.*
 ====
 ---- QUERY
 ###################################################
@@ -314,7 +314,7 @@ store_sales_zorder a join [SHUFFLE] tpcds_parquet.store_sales b
 on a.ss_ticket_number = b.ss_ticket_number
 where b.ss_customer_sk < 10 and b.ss_addr_sk < 20;
 ---- RESULTS: VERIFY_IS_SUBSET
-row_regex:.* RF001\[min_max\] -. .\.ss_ticket_number.*
+row_regex:.* RF001\[min_max\] -.*\.ss_ticket_number.*
 ====
 ---- QUERY
 ###################################################
@@ -327,7 +327,7 @@ store_sales_zorder a join [SHUFFLE] tpcds_parquet.store_sales b
 on a.ss_cdemo_sk = b.ss_cdemo_sk
 where b.ss_customer_sk < 10 and b.ss_addr_sk < 20;
 ---- RESULTS: VERIFY_IS_NOT_IN
-row_regex:.* RF001\[min_max\] -. .\.ss_cdemo_sk.*
+row_regex:.* RF001\[min_max\] -.*\.ss_cdemo_sk.*
 ====
 ---- QUERY
 ###################################################

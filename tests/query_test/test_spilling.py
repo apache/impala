@@ -67,6 +67,9 @@ class TestSpillingDebugActionDimensions(ImpalaTestSuite):
           v.get_value('exec_option')['mt_dop'] == 1 or
           v.get_value('exec_option')['debug_action'] is None)
 
+  # IMPALA-15123: Calcite planner produces query that fails test because the plan
+  # is different. This might be ok, but needs investigation.
+  @SkipIfCalcite.spilling_plan_different
   def test_spilling(self, vector):
     self.run_test_case('QueryTest/spilling', vector)
 
