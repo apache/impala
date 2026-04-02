@@ -64,6 +64,16 @@ public abstract class LiteralExpr extends Expr implements Comparable<LiteralExpr
    */
   public static LiteralExpr createFromUnescapedStr(String value, Type type)
       throws AnalysisException {
+    return createFromStr(value, type, false);
+  }
+
+  /**
+   * Creates an analyzed literal of 'type'.  The boolean 'needsUnescaping' should be
+   * set to true if there are escape backslashes within the string.
+   * Returns null for types that do not have a LiteralExpr subclass, e.g. TIMESTAMP.
+   */
+  public static LiteralExpr createFromStr(String value, Type type,
+      boolean needsUnescaping) throws AnalysisException {
     if (!type.isValid()) {
       throw new UnsupportedFeatureException("Invalid literal type: " + type.toSql());
     }
@@ -87,6 +97,8 @@ public abstract class LiteralExpr extends Expr implements Comparable<LiteralExpr
       case STRING:
       case VARCHAR:
       case CHAR:
+        e = new StringLiteral(value, type, needsUnescaping);
+        break;
       case BINARY:
         e = new StringLiteral(value, type, false);
         break;

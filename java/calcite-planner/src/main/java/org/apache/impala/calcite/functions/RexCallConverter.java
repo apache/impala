@@ -41,6 +41,7 @@ import org.apache.impala.analysis.IsNullPredicate;
 import org.apache.impala.analysis.LikePredicate;
 import org.apache.impala.analysis.LiteralExpr;
 import org.apache.impala.analysis.NumericLiteral;
+import org.apache.impala.analysis.StringLiteral;
 import org.apache.impala.analysis.TimestampArithmeticExpr;
 import org.apache.impala.calcite.operators.ImpalaInOperator;
 import org.apache.impala.calcite.rules.ImpalaRexExecutor;
@@ -54,6 +55,7 @@ import org.slf4j.LoggerFactory;
 
 import java.math.BigDecimal;
 import java.util.ArrayList;
+import java.util.HexFormat;
 import java.util.List;
 import java.util.Map;
 
@@ -131,6 +133,10 @@ public class RexCallConverter {
       return createCompoundExpr(rexCall, params);
     }
 
+    if (fn.functionName().equals("unhex")) {
+      return createUnhexExpr(fn, rexCall, params);
+    }
+
     Type impalaRetType = ImpalaTypeConverter.createImpalaType(fn.getReturnType(),
         rexCall.getType().getPrecision(), rexCall.getType().getScale());
 
@@ -194,6 +200,25 @@ public class RexCallConverter {
     String funcName = rexCall.getOperator().getName().toUpperCase();
     LikePredicate.Operator likeOp = LikePredicate.Operator.valueOf(funcName);
     return new LikePredicate(likeOp, params.get(0), params.get(1));
+  }
+
+  private static Expr createUnhexExpr(Function fn, RexCall rexCall, List<Expr> params) {
+    // Constant folding fails for the unhex function when the bytes are non-UTF-8
+    // ("unhex('AA')" produces a non-UTF byte string. Constant folding for
+    // this function is done here.
+    if (params.get(0) instanceof StringLiteral) {
+      try {
+        HexFormat hex = HexFormat.of();
+        String s = ((StringLiteral)params.get(0)).getStringValue();
+        return new StringLiteral(hex.parseHex(s), Type.STRING);
+      } catch (Exception e) {
+        // If the string isn't a hex value, a blank string is created.
+        return new StringLiteral("", Type.STRING, false);
+      }
+    }
+    // When the parameter is not a literal, it will still be an operand
+    // (potentially a function) of type string.
+    return new AnalyzedFunctionCallExpr(fn, params, Type.STRING);
   }
 
   /**

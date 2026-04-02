@@ -126,7 +126,6 @@ import org.apache.impala.calcite.type.ImpalaSqlIntervalQualifier;
 import org.apache.impala.calcite.operators.ImpalaCustomOperatorTable;
 import org.apache.impala.calcite.operators.ImpalaConcatOrOperator;
 import org.apache.impala.calcite.operators.ImpalaSqlNumericLiteral;
-import org.apache.impala.calcite.util.ParserUtil;
 import org.apache.impala.catalog.ScalarType;
 
 import com.google.common.collect.ImmutableList;
@@ -4623,33 +4622,25 @@ SqlNode StringLiteral() :
 |
     <BIG_QUERY_DOUBLE_QUOTED_STRING>
     {
-        p = SqlParserUtil.stripQuotes(getToken(0).image, DQ, DQ, "\\\"",
+       p = SqlParserUtil.stripQuotes(getToken(0).image, DQ, DQ, "\"",
             Casing.UNCHANGED);
         try {
-            p = ParserUtil.replaceEscapedChars(p);
             return SqlLiteral.createCharString(p, charSet, getPos());
         } catch (java.nio.charset.UnsupportedCharsetException e) {
             throw SqlUtil.newContextException(getPos(),
                 RESOURCE.unknownCharacterSet(charSet));
-        } catch (ParserUtil.MalformedUnicodeEscape e) {
-            throw SqlUtil.newContextException(getPos(),
-                RESOURCE.unicodeEscapeMalformed(e.i));
         }
     }
 |
     <BIG_QUERY_QUOTED_STRING>
     {
-        p = SqlParserUtil.stripQuotes(getToken(0).image, "'", "'", "\\'",
+        p = SqlParserUtil.stripQuotes(getToken(0).image, "'", "'", "'",
             Casing.UNCHANGED);
         try {
-            p = ParserUtil.replaceEscapedChars(p);
             return SqlLiteral.createCharString(p, charSet, getPos());
         } catch (java.nio.charset.UnsupportedCharsetException e) {
             throw SqlUtil.newContextException(getPos(),
                 RESOURCE.unknownCharacterSet(charSet));
-        } catch (ParserUtil.MalformedUnicodeEscape e) {
-            throw SqlUtil.newContextException(getPos(),
-                RESOURCE.unicodeEscapeMalformed(e.i));
         }
     }
 }
@@ -4667,7 +4658,11 @@ String SimpleStringLiteral() :
     }
 |
     <BIG_QUERY_QUOTED_STRING> {
-        return SqlParserUtil.stripQuotes(token.image, "'", "'", "\\'", Casing.UNCHANGED);
+      return SqlParserUtil.stripQuotes(token.image, "'", "'", "'", Casing.UNCHANGED);
+    }
+|
+    <BIG_QUERY_DOUBLE_QUOTED_STRING> {
+      return SqlParserUtil.stripQuotes(token.image, "\"", "\"", "\"", Casing.UNCHANGED);
     }
 }
 

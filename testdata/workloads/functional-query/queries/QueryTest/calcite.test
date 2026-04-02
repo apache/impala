@@ -1337,3 +1337,43 @@ bigint
 ---- RUNTIME_PROFILE
 row_regex: PlannerType: CalcitePlanner
 ====
+---- QUERY
+# IMPALA-14912: select date with quotes
+select DATE '1999-01-01';
+---- RESULTS
+1999-01-01
+---- TYPES
+date
+---- RUNTIME_PROFILE
+row_regex: PlannerType: CalcitePlanner
+====
+---- QUERY
+# IMPALA-14912: select date with double quotes
+select DATE "1999-01-01";
+---- RESULTS
+1999-01-01
+---- TYPES
+date
+---- RUNTIME_PROFILE
+row_regex: PlannerType: CalcitePlanner
+====
+---- QUERY
+select id, hex(cast(binary_col as string)) from functional.binary_tbl
+where binary_col = cast(unhex("FF4433221100") as binary)
+---- TYPES
+INT, STRING
+---- RESULTS
+8,'FF4433221100'
+---- RUNTIME_PROFILE
+row_regex: PlannerType: CalcitePlanner
+====
+---- QUERY
+# a non hex value produces a blank string.
+select unhex("FG");
+---- TYPES
+STRING
+---- RESULTS
+''
+---- RUNTIME_PROFILE
+row_regex: PlannerType: CalcitePlanner
+====
