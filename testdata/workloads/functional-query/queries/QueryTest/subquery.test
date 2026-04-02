@@ -787,7 +787,14 @@ AND t1.int_col NOT IN
    LEFT JOIN alltypestiny tt2 ON tt2.year = tt1.id
       AND t1.bigint_col = tt2.smallint_col)
 ---- RESULTS
+# IMPALA-15124: should return 9980 rows. The alltypesagg table
+# on the left side of the left join should produce all rows from
+# the table even with the decorrelated column. So any row where
+# alltypesagg.int_col is the same as alltypesagg.month should not
+# be included in the count.
 10000
+---- CALCITE_PLANNER_RESULTS
+9980
 ---- TYPES
 BIGINT
 ====

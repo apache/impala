@@ -57,7 +57,8 @@ public class IntervalExpr extends Expr {
   private final String timeUnit_;
 
   public IntervalExpr(RexCall intervalExpr, Expr literalExpr) {
-    Preconditions.checkState(intervalExpr.getOperator().getKind().equals(SqlKind.TIMES));
+    Preconditions.checkState(intervalExpr.getOperator().getKind().equals(SqlKind.TIMES) ||
+        intervalExpr.getOperator().getKind().equals(SqlKind.CHECKED_TIMES));
     Preconditions.checkState(SqlTypeName.INTERVAL_TYPES.contains(
         intervalExpr.getOperands().get(1).getType().getSqlTypeName()));
     intervalExpr_ = intervalExpr;

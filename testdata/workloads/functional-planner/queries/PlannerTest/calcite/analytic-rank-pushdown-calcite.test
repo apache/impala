@@ -775,6 +775,9 @@ PLAN-ROOT SINK
 # Different from original planner: The Calcite planner has
 # a different plan which allows the top-n optimization even
 # though there's a union.
+# IMPALA-15125 has been filed for the Select/Union PlanNode
+# combination which should be folded into just a Union. This
+# has a very minimal performance impact.
 select * from (
   select id, int_col,
       row_number() over (order by string_col desc) as rownum
@@ -784,8 +787,15 @@ where rownum <= 20
 PLAN-ROOT SINK
 |
 00:UNION
-|  constant-operands=1
 |  row-size=16B cardinality=21
+|
+|--06:SELECT
+|  |  predicates: EXPR$2 <= 20
+|  |  row-size=3B cardinality=1
+|  |
+|  05:UNION
+|     constant-operands=1
+|     row-size=3B cardinality=1
 |
 04:SELECT
 |  predicates: row_number() <= 20

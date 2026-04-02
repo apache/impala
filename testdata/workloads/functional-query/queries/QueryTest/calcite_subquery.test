@@ -117,22 +117,17 @@ select id from functional.alltypestiny where
 row_regex: PlannerType: CalcitePlanner
 ====
 ---- QUERY
-select id from functional.alltypessmall a where 1
-    IN (select int_col from functional.alltypestiny b where b.id = a.id limit 5)
-# Will be supported in Calcite 1.42
----- CATCH
-Unknown RelNode
----- RUNTIME_PROFILE
-row_regex: PlannerType: CalcitePlanner
-====
----- QUERY
+# Supported in Calcite 1.42
 select id from functional.alltypessmall a where 1 IN
     (select int_col from functional.alltypestiny b where b.id = a.id
     order by int_col limit 5)
----- CATCH
-Unknown RelNode
----- RUNTIME_PROFILE
-row_regex: PlannerType: CalcitePlanner
+---- TYPES
+INT
+---- RESULTS
+1
+3
+5
+7
 ====
 ---- QUERY
 # nested subqueries

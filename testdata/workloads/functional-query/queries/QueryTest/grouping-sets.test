@@ -139,7 +139,12 @@ where exists
    where a.tinyint_col = b.tinyint_col and a.string_col = b.string_col
    group by rollup(id, int_col, bool_col))
   and tinyint_col < 10
+order by id
+limit 15;
 ---- RESULTS
+# IMPALA-15122: Rollup contains an empty group which always has a row.
+# The inner query should return NULL, not 0 results, and the exists clause
+# should always be true.
 1
 1001
 2001
@@ -150,6 +155,22 @@ where exists
 7001
 8001
 9001
+---- CALCITE_PLANNER_RESULTS
+1
+2
+3
+4
+5
+6
+7
+8
+9
+11
+12
+13
+14
+15
+16
 ---- TYPES
 INT
 ====

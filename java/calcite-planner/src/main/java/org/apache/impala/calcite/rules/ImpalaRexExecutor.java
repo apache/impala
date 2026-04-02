@@ -161,7 +161,8 @@ public class ImpalaRexExecutor implements RexExecutor {
       return false;
     }
     RexCall call = (RexCall) operand;
-    if (!call.getKind().equals(SqlKind.TIMES)) {
+    if (!(call.getKind().equals(SqlKind.TIMES)
+        || call.getKind().equals(SqlKind.CHECKED_TIMES))) {
       return false;
     }
     if (!SqlTypeUtil.isInterval(call.getType())) {

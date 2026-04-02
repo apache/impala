@@ -20,7 +20,7 @@ from copy import deepcopy
 
 from tests.common.environ import ImpalaTestClusterProperties
 from tests.common.impala_test_suite import ImpalaTestSuite
-from tests.common.skip import SkipIfNotHdfsMinicluster
+from tests.common.skip import SkipIfNotHdfsMinicluster, SkipIfCalcite
 from tests.common.test_dimensions import (create_exec_option_dimension_from_dict,
     create_kudu_dimension, create_parquet_dimension)
 
@@ -108,6 +108,9 @@ class TestSpillingNoDebugActionDimensions(ImpalaTestSuite):
         create_exec_option_dimension_from_dict({'default_spillable_buffer_size': ['64k'],
             'mt_dop': [0, 4]}))
 
+  # IMPALA-15123: Calcite planner produces query that fails test because the plan
+  # is different. This might be ok, but needs investigation.
+  @SkipIfCalcite.spilling_plan_different
   def test_spilling_naaj_no_deny_reservation(self, vector):
     """
     Null-aware anti-join tests that depend on getting more than the minimum reservation

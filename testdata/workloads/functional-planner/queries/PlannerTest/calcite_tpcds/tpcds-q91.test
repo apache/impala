@@ -65,7 +65,7 @@ ImpalaSortRel(sort0=[$3], dir0=[DESC])
                     ImpalaHdfsScanRel(table=[[tpcds_partitioned_parquet_snap, customer]])
                 ImpalaProjectRel(hd_demo_sk=[$0])
                   ImpalaProjectRel(hd_demo_sk=[$0], hd_buy_potential=[$2])
-                    ImpalaFilterRel(condition=[AND(LIKE($2, _UTF-8'5001-10000%'), IS NOT NULL($0))])
+                    ImpalaFilterRel(condition=[AND(LIKE($2, _UTF-8'5001-10000%':VARCHAR(2147483647) CHARACTER SET "UTF-8"), IS NOT NULL($0))])
                       ImpalaHdfsScanRel(table=[[tpcds_partitioned_parquet_snap, household_demographics]])
 F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Instance Resources: mem-estimate=419.97MB mem-reservation=100.38MB thread-reservation=1 runtime-filters-memory=8.00MB
@@ -260,7 +260,7 @@ ImpalaSortRel(sort0=[$3], dir0=[DESC])
                     ImpalaHdfsScanRel(table=[[tpcds_partitioned_parquet_snap, customer]])
                 ImpalaProjectRel(hd_demo_sk=[$0])
                   ImpalaProjectRel(hd_demo_sk=[$0], hd_buy_potential=[$2])
-                    ImpalaFilterRel(condition=[AND(LIKE($2, _UTF-8'5001-10000%'), IS NOT NULL($0))])
+                    ImpalaFilterRel(condition=[AND(LIKE($2, _UTF-8'5001-10000%':VARCHAR(2147483647) CHARACTER SET "UTF-8"), IS NOT NULL($0))])
                       ImpalaHdfsScanRel(table=[[tpcds_partitioned_parquet_snap, household_demographics]])
 F10:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Instance Resources: mem-estimate=4.18MB mem-reservation=4.00MB thread-reservation=1
@@ -599,7 +599,7 @@ ImpalaSortRel(sort0=[$3], dir0=[DESC])
                     ImpalaHdfsScanRel(table=[[tpcds_partitioned_parquet_snap, customer]])
                 ImpalaProjectRel(hd_demo_sk=[$0])
                   ImpalaProjectRel(hd_demo_sk=[$0], hd_buy_potential=[$2])
-                    ImpalaFilterRel(condition=[AND(LIKE($2, _UTF-8'5001-10000%'), IS NOT NULL($0))])
+                    ImpalaFilterRel(condition=[AND(LIKE($2, _UTF-8'5001-10000%':VARCHAR(2147483647) CHARACTER SET "UTF-8"), IS NOT NULL($0))])
                       ImpalaHdfsScanRel(table=[[tpcds_partitioned_parquet_snap, household_demographics]])
 F10:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Instance Resources: mem-estimate=4.18MB mem-reservation=4.00MB thread-reservation=1
