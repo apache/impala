@@ -165,14 +165,23 @@ public class CalciteAnalysisDriver implements AnalysisDriver {
       return new CalciteAnalysisResult(this);
     } catch (ImpalaException e) {
       try {
-        UnsupportedChecker.throwUnsupportedIfKnownException(e, stmtTableCache_);
+        ComplexTableDetector.checkForComplexTables(parsedStmt_.getParsedSqlNode(),
+            queryCtx_, ctx_);
+        UnsupportedChecker.throwUnsupportedIfKnownException(e, stmtTableCache_,
+            queryCtx_);
       } catch (ImpalaException u) {
         e = u;
       }
       return new CalciteAnalysisResult(this, e);
     } catch (CalciteContextException e) {
+      if (e.getCause() instanceof UnsupportedFeatureException) {
+        return new CalciteAnalysisResult(this, (UnsupportedFeatureException)e.getCause());
+      }
       try {
-        UnsupportedChecker.throwUnsupportedIfKnownException(e, stmtTableCache_);
+        ComplexTableDetector.checkForComplexTables(parsedStmt_.getParsedSqlNode(),
+            queryCtx_, ctx_);
+        UnsupportedChecker.throwUnsupportedIfKnownException(e, stmtTableCache_,
+            queryCtx_);
       } catch (ImpalaException u) {
         return new CalciteAnalysisResult(this, u);
       }
@@ -226,9 +235,8 @@ public class CalciteAnalysisDriver implements AnalysisDriver {
         String sql = ((FeView) feTable).getQueryStmt().toSql();
         CalciteQueryParser queryParser = new CalciteQueryParser(sql);
         SqlNode parsedSqlNode = queryParser.parse();
-        CalciteMetadataHandler.TableVisitor tableVisitor =
-            new CalciteMetadataHandler.TableVisitor(/* currentDb */ "default");
-        parsedSqlNode.accept(tableVisitor);
+        Set<TableName> tableNames = CalciteMetadataHandler.TableVisitor.getTableNames(
+            parsedSqlNode, "default");
 
         boolean childViewCreatedBySuperuser =
             !PrivilegeRequestBuilder.isViewCreatedByNonSuperuser(feTable);
@@ -260,7 +268,7 @@ public class CalciteAnalysisDriver implements AnalysisDriver {
 
         // Recurse if 'feTable' is also a view. Note that the privilege requests for the
         // tables referenced by 'feTable' will be registered within the recursive call.
-        registerPrivReqsInTables(tableVisitor.getTableNames(),
+        registerPrivReqsInTables(tableNames,
             shouldMaskPrivChecks || childViewCreatedBySuperuser, catalog, validator);
 
         // Set 'maskPrivChecks_' back to false in this case because we do not know if

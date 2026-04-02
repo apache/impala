@@ -2,8 +2,9 @@
 ---- QUERY
 # Blacklisted tables are not resolvable.
 select count(*) from ice.airports_parquet;
----- CATCH
+---- CATCH: ANY_OF
 AnalysisException: Could not resolve table reference: 'ice.airports_parquet'
+Object 'ICE' not found
 ====
 ---- QUERY
 # Blacklisted tables cannot be shown.

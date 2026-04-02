@@ -108,9 +108,10 @@ public class CalciteTable extends RelOptAbstractTable
 
     // skip clustering columns, save them for the end
     for (Column column : table.getStarColumns()) {
-      if (column.getType().isComplexType()) {
+      if (column.getType().isComplexOrVariantType() ||
+          column.getType().isUuid()) {
         throw new UnsupportedFeatureException(
-            "Calcite does not support complex types yet.");
+            "Calcite does not support complex or variant types yet.");
       }
       RelDataType type =
           ImpalaTypeConverter.createRelDataType(typeFactory, column.getType());

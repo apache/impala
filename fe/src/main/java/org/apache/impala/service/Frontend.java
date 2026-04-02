@@ -2550,6 +2550,9 @@ public class Frontend {
         return request;
       } catch (Throwable e) {
         // If there is any kind of exception from the first planner, we hit this code.
+        // This exception could be any kind of exception, like an NPE or perhaps
+        // a planned "UnsupportedFeatureException" from something that isn't currently
+        // supported by the Calcite planner.
         error = e;
         attemptedPlanner = compilerFactory.getPlannerString();
         LOG.info(attemptedPlanner + " planner failed: {}", e.getClass());
@@ -2583,9 +2586,10 @@ public class Frontend {
           !(Parser.parse(queryCtx.client_request.stmt,
               queryCtx.client_request.query_options) instanceof QueryStmt);
     } catch (Exception f) {
-      // If an exception was thrown, it failed to parse in the original planner, so there
-      // is no reason to compile it there.
-      return false;
+      // If Parser.parse() also throws, still treat the query as Calcite-unsupported
+      // so fallback runs; the original planner will produce the expected parse
+      // error for tests.
+      return true;
     }
   }
 

@@ -42,7 +42,6 @@ public class CalciteParsedStatement implements ParsedStatement {
   private final SqlNode parsedNode_;
   private final boolean isExplain_;
   private final String sql_;
-  private final Set<TableName> tableNames_;
 
   public final Map<TableName, List<TimeTravelSpec>> tableNameMap_;
 
@@ -56,19 +55,13 @@ public class CalciteParsedStatement implements ParsedStatement {
     }
     parsedNode_ = parsedSqlNode;
 
-    CalciteMetadataHandler.TableVisitor tableVisitor =
-        new CalciteMetadataHandler.TableVisitor(queryCtx.session.database);
-
-    parsedNode_.accept(tableVisitor);
-
-    tableNames_ = tableVisitor.getTableNames();
-
-    tableNameMap_ = tableVisitor.getTableNameMap();
+    tableNameMap_ = CalciteMetadataHandler.TableVisitor.getTableNameMap(
+        parsedNode_, queryCtx.session.database);
   }
 
   @Override
   public Set<TableName> getTablesInQuery(StmtMetadataLoader loader) {
-    return tableNames_;
+    return tableNameMap_.keySet();
   }
 
   @Override

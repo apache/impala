@@ -38,14 +38,17 @@ import org.apache.calcite.sql.SqlOperatorTable;
 import org.apache.calcite.sql.SqlBasicCall;
 import org.apache.calcite.sql.SqlCall;
 import org.apache.calcite.sql.SqlCharStringLiteral;
+import org.apache.calcite.sql.SqlDataTypeSpec;
 import org.apache.calcite.sql.SqlFunction;
 import org.apache.calcite.sql.SqlIdentifier;
 import org.apache.calcite.sql.SqlJoin;
 import org.apache.calcite.sql.SqlKind;
 import org.apache.calcite.sql.SqlNode;
+import org.apache.calcite.sql.SqlNodeList;
 import org.apache.calcite.sql.SqlNumericLiteral;
 import org.apache.calcite.sql.SqlOperator;
 import org.apache.calcite.sql.SqlSelect;
+import org.apache.calcite.sql.SqlWithItem;
 import org.apache.impala.analysis.Analyzer;
 import org.apache.impala.authorization.Privilege;
 import org.apache.impala.calcite.schema.CalciteTable;
@@ -99,6 +102,15 @@ public class ImpalaSqlValidatorImpl extends SqlValidatorImpl {
   public RelDataType deriveType(
       SqlValidatorScope scope,
       SqlNode operand) {
+    if (operand instanceof SqlDataTypeSpec) {
+      SqlDataTypeSpec spec = (SqlDataTypeSpec) operand;
+      // Impala allows the type uuid, e.g.
+      // "SELECT CAST('12345678-1234-5678-1234-567812345678' AS UUID)"
+      if (spec.getTypeName().names.get(0).toLowerCase().equals("uuid")) {
+        throw new CalciteContextException("", new UnsupportedFeatureException(
+            "Uuid type not supported yet."));
+      }
+    }
     // This code is needed because Calcite treats all integer literals (except
     // BIGINT) as Integers, but Impala needs the finer granularity of smaller
     // integers (e.g. tinyint)
@@ -164,6 +176,27 @@ public class ImpalaSqlValidatorImpl extends SqlValidatorImpl {
         );
       }
     }
+  }
+
+  @Override public void validateWithItem(SqlWithItem withItem) {
+    // Impala supports the case (for better or for worse) where the number of
+    // columns in the with clause definition do not match the number of columns
+    // being selected out (e.g. "with t(c1) as (select c1, c2 from ...)")
+    // Calcite will throw its own exception, but we need to throw an
+    // UnsupportedFeatureException so this can be run by the original planner.
+    SqlNodeList columnList = withItem.columnList;
+    if (columnList != null) {
+      final RelDataType rowType = getValidatedNodeType(withItem.query);
+      final int fieldCount = rowType.getFieldCount();
+      if (columnList.size() != fieldCount) {
+        throw new CalciteContextException("", new UnsupportedFeatureException(
+            "Number of columns in with clause must match number of query columns"));
+      }
+    }
+    // After the above check, the Impala "with" validation is in sync with the
+    // Calcite "with" validation, so we can just call the Calcite version of
+    // validateWithItem().
+    super.validateWithItem(withItem);
   }
 
   @Override public void validateCall(
