@@ -115,6 +115,34 @@ public class ImpalaTypeCoercionImpl extends TypeCoercionImpl {
     return super.binaryComparisonCoercion(binding);
   }
 
+  @Override
+  protected boolean booleanEquality(SqlCallBinding binding,
+      RelDataType left, RelDataType right) {
+    // IMPALA-14911: Override the Calcite method which does special
+    // coercion for SqlKind.BINARY_EQUALITY operators with boolean.
+    // The commonTypeForBinaryComparision method is also called and
+    // this is where the Impala custom logic for coercion is done.
+    return false;
+  }
+
+  @Override
+  public RelDataType commonTypeForBinaryComparison(
+      RelDataType type1, RelDataType type2) {
+    // IMPALA-14911: Use Impala custom logic for coercion when
+    // one of the types in the comparison is a boolean.
+    if (SqlTypeUtil.isBoolean(type1) && SqlTypeUtil.isNumeric(type2)) {
+      return SqlTypeUtil.isDecimal(type2)
+          ? ImpalaTypeConverter.getRelDataType(Type.FLOAT)
+          : type2;
+    }
+    if (SqlTypeUtil.isBoolean(type2) && SqlTypeUtil.isNumeric(type1)) {
+      return SqlTypeUtil.isDecimal(type1)
+          ? ImpalaTypeConverter.getRelDataType(Type.FLOAT)
+          : type1;
+    }
+    return super.commonTypeForBinaryComparison(type1, type2);
+  }
+
   private boolean coerceInOperand(SqlValidatorScope scope, SqlCall call,
       int index, RelDataType fromType, RelDataType toType) {
     if (!needsCasting(fromType, toType)) {

@@ -1,0 +1,334 @@
+====
+---- QUERY
+create table test_bool_binary_eq (
+   tinyint_col TINYINT,
+   smallint_col SMALLINT,
+   int_col INT,
+   bigint_col BIGINT,
+   float_col FLOAT,
+   double_col DOUBLE,
+   string_col STRING,
+   date_col DATE,
+   timestamp_col TIMESTAMP,
+   decimal_col decimal(2,1),
+   binary_col binary,
+   bool_col boolean
+);
+insert into test_bool_binary_eq values(1,1,1,1,1,1,'1',
+cast('1980-01-05' as date),
+cast('1980-01-05' as timestamp),
+1.0, cast('0x1' as binary),
+true);
+insert into test_bool_binary_eq values(2,2,2,2,2,2,'2',
+cast('1980-02-05' as date),
+cast('1980-02-05' as timestamp),
+2.0, cast('0x1' as binary),
+true);
+insert into test_bool_binary_eq values(0,0,0,0,0,0,'0',
+cast('1980-02-05' as date),
+cast('1980-02-05' as timestamp),
+0.0, cast('0x0' as binary),
+true);
+insert into test_bool_binary_eq values(NULL,NULL,NULL,NULL,NULL,NULL,NULL,
+NULL, NULL,NULL, NULL,
+true);
+====
+---- QUERY
+select tinyint_col = bool_col as a from test_bool_binary_eq order by a;
+---- RESULTS
+false
+false
+true
+NULL
+---- TYPES
+boolean
+====
+---- QUERY
+set explain_level=2;
+explain select tinyint_col = bool_col as a from test_bool_binary_eq order by a;
+---- TYPES
+STRING
+---- RESULTS: VERIFY_IS_SUBSET
+row_regex:.*tinyint_col = CAST\(bool_col AS TINYINT\).*
+====
+---- QUERY
+select smallint_col = bool_col as a from test_bool_binary_eq order by a;
+---- RESULTS
+false
+false
+true
+NULL
+---- TYPES
+boolean
+====
+---- QUERY
+set explain_level=2;
+explain select smallint_col = bool_col as a from test_bool_binary_eq order by a;
+---- TYPES
+STRING
+---- RESULTS: VERIFY_IS_SUBSET
+row_regex:.*smallint_col = CAST\(bool_col AS SMALLINT\).*
+====
+---- QUERY
+select int_col = bool_col as a from test_bool_binary_eq order by a;
+---- RESULTS
+false
+false
+true
+NULL
+---- TYPES
+boolean
+====
+---- QUERY
+set explain_level=2;
+explain select int_col = bool_col as a from test_bool_binary_eq order by a;
+---- TYPES
+STRING
+---- RESULTS: VERIFY_IS_SUBSET
+row_regex:.*int_col = CAST\(bool_col AS INT\).*
+====
+---- QUERY
+select bigint_col = bool_col as a from test_bool_binary_eq order by a;
+---- RESULTS
+false
+false
+true
+NULL
+---- TYPES
+boolean
+====
+---- QUERY
+set explain_level=2;
+explain select bigint_col = bool_col as a from test_bool_binary_eq order by a;
+---- TYPES
+STRING
+---- RESULTS: VERIFY_IS_SUBSET
+row_regex:.*bigint_col = CAST\(bool_col AS BIGINT\).*
+====
+---- QUERY
+select float_col = bool_col as a from test_bool_binary_eq order by a;
+---- RESULTS
+false
+false
+true
+NULL
+---- TYPES
+boolean
+====
+---- QUERY
+set explain_level=2;
+explain select float_col = bool_col as a from test_bool_binary_eq order by a;
+---- TYPES
+STRING
+---- RESULTS: VERIFY_IS_SUBSET
+row_regex:.*float_col = CAST\(bool_col AS FLOAT\).*
+====
+---- QUERY
+select double_col = bool_col as a from test_bool_binary_eq order by a;
+---- RESULTS
+false
+false
+true
+NULL
+---- TYPES
+boolean
+====
+---- QUERY
+set explain_level=2;
+explain select double_col = bool_col as a from test_bool_binary_eq order by a;
+---- TYPES
+STRING
+---- RESULTS: VERIFY_IS_SUBSET
+row_regex:.*double_col = CAST\(bool_col AS DOUBLE\).*
+====
+---- QUERY
+select string_col = bool_col as a from test_bool_binary_eq order by a;
+---- CATCH
+AnalysisException: operands of type STRING and BOOLEAN are not comparable
+====
+---- QUERY
+select date_col = bool_col as a from test_bool_binary_eq order by a;
+---- CATCH
+AnalysisException: operands of type DATE and BOOLEAN are not comparable
+====
+---- QUERY
+select timestamp_col = bool_col as a from test_bool_binary_eq order by a;
+---- CATCH
+AnalysisException: operands of type TIMESTAMP and BOOLEAN are not comparable
+====
+---- QUERY
+select decimal_col = bool_col as a from test_bool_binary_eq order by a;
+---- RESULTS
+false
+false
+true
+NULL
+---- TYPES
+boolean
+====
+---- QUERY
+set explain_level=2;
+explain select decimal_col = bool_col as a from test_bool_binary_eq order by a;
+---- TYPES
+STRING
+---- RESULTS: VERIFY_IS_SUBSET
+row_regex:.*CAST\(decimal_col AS FLOAT\) = CAST\(bool_col AS FLOAT\).*
+====
+---- QUERY
+select binary_col = bool_col as a from test_bool_binary_eq order by a;
+---- CATCH
+AnalysisException: operands of type BINARY and BOOLEAN are not comparable
+====
+---- QUERY
+select tinyint_col > bool_col as a from test_bool_binary_eq order by a;
+---- RESULTS
+false
+false
+true
+NULL
+---- TYPES
+boolean
+====
+---- QUERY
+set explain_level=2;
+explain select tinyint_col > bool_col as a from test_bool_binary_eq order by a;
+---- TYPES
+STRING
+---- RESULTS: VERIFY_IS_SUBSET
+row_regex:.*tinyint_col > CAST\(bool_col AS TINYINT\).*
+====
+---- QUERY
+select smallint_col > bool_col as a from test_bool_binary_eq order by a;
+---- RESULTS
+false
+false
+true
+NULL
+---- TYPES
+boolean
+====
+---- QUERY
+set explain_level=2;
+explain select smallint_col > bool_col as a from test_bool_binary_eq order by a;
+---- TYPES
+STRING
+---- RESULTS: VERIFY_IS_SUBSET
+row_regex:.*smallint_col > CAST\(bool_col AS SMALLINT\).*
+====
+---- QUERY
+select int_col > bool_col as a from test_bool_binary_eq order by a;
+---- RESULTS
+false
+false
+true
+NULL
+---- TYPES
+boolean
+====
+---- QUERY
+set explain_level=2;
+explain select int_col > bool_col as a from test_bool_binary_eq order by a;
+---- TYPES
+STRING
+---- RESULTS: VERIFY_IS_SUBSET
+row_regex:.*int_col > CAST\(bool_col AS INT\).*
+====
+---- QUERY
+select bigint_col > bool_col as a from test_bool_binary_eq order by a;
+---- RESULTS
+false
+false
+true
+NULL
+---- TYPES
+boolean
+====
+---- QUERY
+set explain_level=2;
+explain select bigint_col > bool_col as a from test_bool_binary_eq order by a;
+---- TYPES
+STRING
+---- RESULTS: VERIFY_IS_SUBSET
+row_regex:.*bigint_col > CAST\(bool_col AS BIGINT\).*
+====
+---- QUERY
+select float_col > bool_col as a from test_bool_binary_eq order by a;
+---- RESULTS
+false
+false
+true
+NULL
+---- TYPES
+boolean
+====
+---- QUERY
+set explain_level=2;
+explain select float_col > bool_col as a from test_bool_binary_eq order by a;
+---- TYPES
+STRING
+---- RESULTS: VERIFY_IS_SUBSET
+row_regex:.*float_col > CAST\(bool_col AS FLOAT\).*
+====
+---- QUERY
+select double_col > bool_col as a from test_bool_binary_eq order by a;
+---- RESULTS
+false
+false
+true
+NULL
+---- TYPES
+boolean
+====
+---- QUERY
+set explain_level=2;
+explain select double_col > bool_col as a from test_bool_binary_eq order by a;
+---- TYPES
+STRING
+---- RESULTS: VERIFY_IS_SUBSET
+row_regex:.*double_col > CAST\(bool_col AS DOUBLE\).*
+====
+---- QUERY
+select string_col > bool_col as a from test_bool_binary_eq order by a;
+---- CATCH
+AnalysisException: operands of type STRING and BOOLEAN are not comparable
+====
+---- QUERY
+select date_col > bool_col as a from test_bool_binary_eq order by a;
+---- CATCH
+AnalysisException: operands of type DATE and BOOLEAN are not comparable
+====
+---- QUERY
+select timestamp_col > bool_col as a from test_bool_binary_eq order by a;
+---- CATCH
+AnalysisException: operands of type TIMESTAMP and BOOLEAN are not comparable
+====
+---- QUERY
+select decimal_col > bool_col as a from test_bool_binary_eq order by a;
+---- RESULTS
+false
+false
+true
+NULL
+---- TYPES
+boolean
+====
+---- QUERY
+set explain_level=2;
+explain select decimal_col > bool_col as a from test_bool_binary_eq order by a;
+---- TYPES
+STRING
+---- RESULTS: VERIFY_IS_SUBSET
+row_regex:.*CAST\(decimal_col AS FLOAT\) > CAST\(bool_col AS FLOAT\).*
+====
+---- QUERY
+select binary_col > bool_col as a from test_bool_binary_eq order by a;
+---- CATCH
+AnalysisException: operands of type BINARY and BOOLEAN are not comparable
+====
+---- QUERY
+select 2 = true;
+---- RESULTS
+false
+---- TYPES
+boolean
+====

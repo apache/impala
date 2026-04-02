@@ -388,3 +388,20 @@ class TestNonConstPatternILike(ImpalaTestSuite):
     iregexp_result = self.execute_query_expect_success(client,
         "SELECT count(*) FROM {0} WHERE 'ABC' IREGEXP pattern_str".format(tbl_name))
     assert int(iregexp_result.get_data()) == 1
+
+
+class TestBinaryExprsWithBoolean(ImpalaTestSuite):
+  @classmethod
+  def setup_class(cls):
+    super(TestBinaryExprsWithBoolean, cls).setup_class()
+
+  @classmethod
+  def add_test_dimensions(cls):
+    super(TestBinaryExprsWithBoolean, cls).add_test_dimensions()
+    cls.ImpalaTestMatrix.add_constraint(lambda v:
+        v.get_value('table_format').file_format == 'parquet'
+        and v.get_value('table_format').compression_codec == 'none')
+
+  def test_binary_exprs_with_boolean(self, vector, unique_database):
+    self.run_test_case('QueryTest/binary_exprs_with_boolean', vector,
+        use_db=unique_database)
