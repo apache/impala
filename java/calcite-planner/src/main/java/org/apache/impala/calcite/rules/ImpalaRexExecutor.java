@@ -62,17 +62,31 @@ public class ImpalaRexExecutor implements RexExecutor {
   // Reducer class used for testing purposes for injection.
   private final Reducer reducer_;
 
+  // shouldCast_ is false if the type of the variable pre-reduction does not need
+  // to match the variable post-reduction. Note: A change in the nullability of
+  // the datatype is also avoided if this variable is false.
+  private final boolean shouldCast_;
+
   public ImpalaRexExecutor(CalciteAnalysisResult analysisResult, Reducer reducer) {
-    analyzer_ = analysisResult.getAnalyzer();
-    queryCtx_ = analyzer_.getQueryCtx();
-    reducer_ = reducer;
+    this(analysisResult.getAnalyzer(), analysisResult.getAnalyzer().getQueryCtx(),
+        reducer);
   }
 
   public ImpalaRexExecutor(Analyzer analyzer, TQueryCtx queryCtx,
       Reducer reducer) {
+    this(analyzer, queryCtx, reducer, true);
+  }
+
+  public ImpalaRexExecutor(ImpalaRexExecutor executor, boolean shouldCast) {
+    this(executor.analyzer_, executor.queryCtx_, executor.reducer_, shouldCast);
+  }
+
+  public ImpalaRexExecutor(Analyzer analyzer, TQueryCtx queryCtx, Reducer reducer,
+      boolean shouldCast) {
     analyzer_ = analyzer;
     queryCtx_ = queryCtx;
     reducer_ = reducer;
+    shouldCast_ = shouldCast;
   }
 
   /**
@@ -88,7 +102,7 @@ public class ImpalaRexExecutor implements RexExecutor {
         new ReduceRexNodeShuttle(analyzer_, queryCtx_, rexBuilder, reducer_);
     for (RexNode rexNode : constExps) {
       RexNode newProject = rexNode.accept(shuttle);
-      if (rexNode.getType() != newProject.getType()) {
+      if (rexNode.getType() != newProject.getType() && shouldCast_) {
         newProject = rexBuilder.makeCast(rexNode.getType(), newProject,
             rexNode.getType().isNullable());
       }

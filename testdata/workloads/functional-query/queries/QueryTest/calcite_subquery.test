@@ -120,7 +120,7 @@ row_regex: PlannerType: CalcitePlanner
 # Supported in Calcite 1.42
 select id from functional.alltypessmall a where 1 IN
     (select int_col from functional.alltypestiny b where b.id = a.id
-    order by int_col limit 5)
+    order by int_col limit 5) order by id;
 ---- TYPES
 INT
 ---- RESULTS

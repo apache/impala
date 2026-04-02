@@ -60,6 +60,7 @@ import org.apache.impala.calcite.rules.IcebergCountStarOptimizer;
 import org.apache.impala.calcite.rules.ImpalaCoreRules;
 import org.apache.impala.calcite.rules.ImpalaFilterSimplifyRule;
 import org.apache.impala.calcite.rules.ImpalaProjectSimplifyRule;
+import org.apache.impala.calcite.rules.ImpalaSortSimplifyRule;
 import org.apache.impala.calcite.rules.ImpalaMQContext;
 import org.apache.impala.calcite.rules.ImpalaRexExecutor;
 import org.apache.impala.calcite.rules.RemoveInfrequentCTERule;
@@ -170,9 +171,14 @@ public class CalciteOptimizer implements CompilerStep {
     timeline_.markEvent("Coerced plan");
     LogUtil.logDebug(coercedNodesPlan, "Plan after it has been coerced.");
 
+    RelNode preOptimizedPlan = runPreOptimizeNodesProgram(coercedNodesPlan, simplifier);
+    timeline_.markEvent("Created pre-optimized plan pre join");
+    LogUtil.logDebug(preOptimizedPlan, "Pre-Optimized plan before optimize rules " +
+        "have been applied.");
+
     // Run rules that swap RelNodes and optimize the expressions within a RelNode
     RelNode preJoinOptimizedPlan = runOptimizeNodesProgram(relBuilder, rexBuilder,
-        coercedNodesPlan, simplifier, false);
+        preOptimizedPlan, simplifier, false);
     timeline_.markEvent("Created optimized plan pre join");
     LogUtil.logDebug(preJoinOptimizedPlan, "Optimized plan before join rules " +
         "have been applied.");
@@ -222,6 +228,22 @@ public class CalciteOptimizer implements CompilerStep {
 
     builder.addMatchOrder(HepMatchOrder.BOTTOM_UP);
 
+    return runProgram(plan, builder.build(), simplifier);
+  }
+
+  /**
+   * Special rule that has to be applied post coercenodes and pre-optimization.
+   * The SortSimplify takes a limit expression like "limit 1 + 1" and simplifies it
+   * to "limit 2".  This has to be done post coercion so that the constant folding
+   * can find the right function to simplify. This has to be done pre-optimization
+   * because some of the rules have issues with a non-RexLiteral for a limit RexNode.
+   * This only needs to be run one time so that the limit expression can be folded.
+   */
+  private RelNode runPreOptimizeNodesProgram(RelNode plan,
+      ImpalaRexSimplify simplifier) throws ImpalaException {
+    HepProgramBuilder builder = new HepProgramBuilder();
+    builder.addMatchOrder(HepMatchOrder.TOP_DOWN);
+    builder.addRuleInstance(new ImpalaSortSimplifyRule(simplifier));
     return runProgram(plan, builder.build(), simplifier);
   }
 

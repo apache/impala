@@ -26,16 +26,19 @@ import org.apache.calcite.rel.logical.LogicalAggregate;
 import org.apache.calcite.rel.logical.LogicalFilter;
 import org.apache.calcite.rel.logical.LogicalJoin;
 import org.apache.calcite.rel.logical.LogicalProject;
+import org.apache.calcite.rel.logical.LogicalSort;
 import org.apache.calcite.rel.logical.LogicalUnion;
 import org.apache.calcite.rel.type.RelDataType;
 import org.apache.calcite.rel.type.RelDataTypeField;
 import org.apache.calcite.rel.type.RelDataTypeFactory;
 import org.apache.calcite.rex.RexBuilder;
+import org.apache.calcite.rex.RexCall;
 import org.apache.calcite.rex.RexInputRef;
 import org.apache.calcite.rex.RexLiteral;
 import org.apache.calcite.rex.RexNode;
 import org.apache.calcite.rex.RexUtil;
 import org.apache.calcite.sql.type.SqlTypeName;
+import org.apache.calcite.sql.type.SqlTypeUtil;
 import org.apache.calcite.util.Util;
 import org.apache.impala.calcite.functions.FunctionResolver;
 import org.apache.impala.calcite.rel.node.ImpalaPlanRel;
@@ -106,8 +109,9 @@ public class CoerceNodes{
         return processProjectNode(relNode, newInputs, rexBuilder, isInputChanged);
       case CTEPRODUCER:
       case SEQUENCE:
-      case SORT:
         return processSimpleNode(relNode, newInputs, rexBuilder, isInputChanged);
+      case SORT:
+        return processSortNode(relNode, newInputs, rexBuilder, isInputChanged);
       case UNION:
         return processUnionNode(relNode, newInputs, rexBuilder, isInputChanged);
       case CTECONSUMER:
@@ -203,6 +207,41 @@ public class CoerceNodes{
   private static RelNode processSimpleNode(RelNode relNode, List<RelNode> inputs,
       RexBuilder rexBuilder, boolean isInputChanged) {
     return isInputChanged ? relNode.copy(relNode.getTraitSet(), inputs) : relNode;
+  }
+
+  /**
+   * processSimpleNode: recreates sort node if an input was changed. Impala SQL
+   * syntax allows expressions in the limit clause, so the expressions within
+   * the "fetch" and "offset" need to have their operands coerced, if necessary.
+   */
+  private static RelNode processSortNode(RelNode relNode, List<RelNode> inputs,
+      RexBuilder rexBuilder, boolean isInputChanged) {
+    final LogicalSort sort = (LogicalSort) relNode;
+    RexNode newFetch = sort.fetch;
+    RexNode newOffset = sort.offset;
+    if (sort.fetch instanceof RexCall) {
+      isInputChanged = true;
+      List<RexNode> changedList =
+          processRexNodes(sort, inputs, ImmutableList.of(sort.fetch));
+      Preconditions.checkNotNull(changedList);
+      newFetch = changedList.get(0);
+    }
+    if (newFetch != null && !SqlTypeUtil.isIntType(newFetch.getType())) {
+      throw new RuntimeException("LIMIT expression must be an integer type.");
+    }
+    if (sort.offset instanceof RexCall) {
+      isInputChanged = true;
+      List<RexNode> changedList =
+          processRexNodes(sort, inputs, ImmutableList.of(sort.offset));
+      Preconditions.checkNotNull(changedList);
+      newOffset = changedList.get(0);
+    }
+    if (newOffset != null && !SqlTypeUtil.isIntType(newOffset.getType())) {
+      throw new RuntimeException("OFFSET expression must be an integer type.");
+    }
+    return isInputChanged
+        ? LogicalSort.create(inputs.get(0), sort.getCollation(), newOffset, newFetch)
+        : relNode;
   }
 
   /**

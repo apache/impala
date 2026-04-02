@@ -1374,6 +1374,42 @@ select unhex("FG");
 STRING
 ---- RESULTS
 ''
+====
+---- QUERY
+# IMPALA-14910: limit expression
+select id from functional.alltypes order by id limit 1 + 1
+---- RESULTS
+0
+1
+---- TYPES
+int
+---- RUNTIME_PROFILE
+row_regex: PlannerType: CalcitePlanner
+====
+---- QUERY
+select id from functional.alltypestiny order by id offset 2 + 3
+---- RESULTS
+5
+6
+7
+---- TYPES
+int
+---- RUNTIME_PROFILE
+row_regex: PlannerType: CalcitePlanner
+====
+---- QUERY
+# IMPALA-14910: limit expression
+select id from functional.alltypes order by id limit 1 + .5
+---- CATCH
+LIMIT expression must be an integer type
+---- RUNTIME_PROFILE
+row_regex: PlannerType: CalcitePlanner
+====
+---- QUERY
+# IMPALA-14910: limit expression
+select id from functional.alltypes order by id limit 2 - 3
+---- CATCH
+LIMIT must be a non-negative integer
 ---- RUNTIME_PROFILE
 row_regex: PlannerType: CalcitePlanner
 ====
@@ -1429,6 +1465,11 @@ select count(*) from functional.alltypestiny
 where smallint_col > sleep(100);
 ---- RESULTS
 0
+====
+---- QUERY
+select * from functional.alltypessmall limit -1;
+---- CATCH
+LIMIT must be a non-negative integer
 ---- RUNTIME_PROFILE
 row_regex: PlannerType: CalcitePlanner
 ====
@@ -1443,6 +1484,11 @@ values (timestamp '2024-01-01 00:02:03.456'),
 1970-01-01 00:00:01.234567891
 ---- TYPES
 timestamp
+====
+---- QUERY
+select * from functional.alltypessmall offset -1;
+---- CATCH
+OFFSET must be a non-negative integer
 ---- RUNTIME_PROFILE
 row_regex: PlannerType: CalcitePlanner
 ====
@@ -1478,6 +1524,20 @@ select null in (select null);
 NULL
 ---- TYPES
 BOOLEAN
+---- RUNTIME_PROFILE
+row_regex: PlannerType: CalcitePlanner
+====
+---- QUERY
+select * from functional.alltypessmall limit cast(null as int);
+---- CATCH
+LIMIT must be a constant expression
+---- RUNTIME_PROFILE
+row_regex: PlannerType: CalcitePlanner
+====
+---- QUERY
+select * from functional.alltypessmall offset cast(null as int);
+---- CATCH
+OFFSET must be a constant expression
 ---- RUNTIME_PROFILE
 row_regex: PlannerType: CalcitePlanner
 ====
