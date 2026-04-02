@@ -131,9 +131,8 @@ ImpalaSortRel(sort0=[$0], sort1=[$1], sort2=[$2], sort3=[$3], dir0=[ASC], dir1=[
                     ImpalaFilterRel(condition=[AND(IS NOT NULL($2), IS NOT NULL($33))])
                       ImpalaHdfsScanRel(table=[[tpcds_partitioned_parquet_snap, catalog_sales]])
                   ImpalaProjectRel(d_date_sk=[$0])
-                    ImpalaProjectRel(d_date_sk=[$0], d_year=[$6])
-                      ImpalaFilterRel(condition=[AND(=($6, 1999), IS NOT NULL($0))])
-                        ImpalaHdfsScanRel(table=[[tpcds_partitioned_parquet_snap, date_dim]])
+                    ImpalaFilterRel(condition=[AND(=($6, 1999), IS NOT NULL($0))])
+                      ImpalaHdfsScanRel(table=[[tpcds_partitioned_parquet_snap, date_dim]])
                 ImpalaProjectRel(c_customer_sk=[$0], c_customer_id=[$1], c_first_name=[$8], c_last_name=[$9], c_preferred_cust_flag=[$10], c_birth_country=[$14], c_login=[$15], c_email_address=[$16])
                   ImpalaFilterRel(condition=[AND(IS NOT NULL($0), IS NOT NULL($1))])
                     ImpalaHdfsScanRel(table=[[tpcds_partitioned_parquet_snap, customer]])
@@ -148,9 +147,8 @@ ImpalaSortRel(sort0=[$0], sort1=[$1], sort2=[$2], sort3=[$3], dir0=[ASC], dir1=[
                       ImpalaFilterRel(condition=[AND(IS NOT NULL($2), IS NOT NULL($22))])
                         ImpalaHdfsScanRel(table=[[tpcds_partitioned_parquet_snap, store_sales]])
                     ImpalaProjectRel(d_date_sk=[$0])
-                      ImpalaProjectRel(d_date_sk=[$0], d_year=[$6])
-                        ImpalaFilterRel(condition=[AND(=($6, 2000), IS NOT NULL($0))])
-                          ImpalaHdfsScanRel(table=[[tpcds_partitioned_parquet_snap, date_dim]])
+                      ImpalaFilterRel(condition=[AND(=($6, 2000), IS NOT NULL($0))])
+                        ImpalaHdfsScanRel(table=[[tpcds_partitioned_parquet_snap, date_dim]])
                   ImpalaProjectRel(c_customer_sk=[$0], c_customer_id=[$1], c_first_name=[$8], c_last_name=[$9], c_preferred_cust_flag=[$10], c_birth_country=[$14], c_login=[$15], c_email_address=[$16])
                     ImpalaFilterRel(condition=[AND(IS NOT NULL($0), IS NOT NULL($1))])
                       ImpalaHdfsScanRel(table=[[tpcds_partitioned_parquet_snap, customer]])
@@ -168,9 +166,8 @@ ImpalaSortRel(sort0=[$0], sort1=[$1], sort2=[$2], sort3=[$3], dir0=[ASC], dir1=[
                         ImpalaFilterRel(condition=[AND(IS NOT NULL($3), IS NOT NULL($33))])
                           ImpalaHdfsScanRel(table=[[tpcds_partitioned_parquet_snap, web_sales]])
                       ImpalaProjectRel(d_date_sk=[$0])
-                        ImpalaProjectRel(d_date_sk=[$0], d_year=[$6])
-                          ImpalaFilterRel(condition=[AND(=($6, 1999), IS NOT NULL($0))])
-                            ImpalaHdfsScanRel(table=[[tpcds_partitioned_parquet_snap, date_dim]])
+                        ImpalaFilterRel(condition=[AND(=($6, 1999), IS NOT NULL($0))])
+                          ImpalaHdfsScanRel(table=[[tpcds_partitioned_parquet_snap, date_dim]])
           ImpalaJoinRel(condition=[=($4, $0)], joinType=[inner])
             ImpalaProjectRel(CUSTOMER_ID=[$0], YEAR_TOTAL=[$7])
               ImpalaFilterRel(condition=[IS NOT NULL($7)])
@@ -185,9 +182,8 @@ ImpalaSortRel(sort0=[$0], sort1=[$1], sort2=[$2], sort3=[$3], dir0=[ASC], dir1=[
                           ImpalaFilterRel(condition=[AND(IS NOT NULL($3), IS NOT NULL($33))])
                             ImpalaHdfsScanRel(table=[[tpcds_partitioned_parquet_snap, web_sales]])
                         ImpalaProjectRel(d_date_sk=[$0])
-                          ImpalaProjectRel(d_date_sk=[$0], d_year=[$6])
-                            ImpalaFilterRel(condition=[AND(=($6, 2000), IS NOT NULL($0))])
-                              ImpalaHdfsScanRel(table=[[tpcds_partitioned_parquet_snap, date_dim]])
+                          ImpalaFilterRel(condition=[AND(=($6, 2000), IS NOT NULL($0))])
+                            ImpalaHdfsScanRel(table=[[tpcds_partitioned_parquet_snap, date_dim]])
             ImpalaJoinRel(condition=[=($2, $0)], joinType=[inner])
               ImpalaProjectRel(CUSTOMER_ID=[$0], YEAR_TOTAL=[$7])
                 ImpalaFilterRel(condition=[IS NOT NULL($7)])
@@ -199,9 +195,8 @@ ImpalaSortRel(sort0=[$0], sort1=[$1], sort2=[$2], sort3=[$3], dir0=[ASC], dir1=[
                             ImpalaFilterRel(condition=[AND(IS NOT NULL($2), IS NOT NULL($33))])
                               ImpalaHdfsScanRel(table=[[tpcds_partitioned_parquet_snap, catalog_sales]])
                           ImpalaProjectRel(d_date_sk=[$0])
-                            ImpalaProjectRel(d_date_sk=[$0], d_year=[$6])
-                              ImpalaFilterRel(condition=[AND(=($6, 2000), IS NOT NULL($0))])
-                                ImpalaHdfsScanRel(table=[[tpcds_partitioned_parquet_snap, date_dim]])
+                            ImpalaFilterRel(condition=[AND(=($6, 2000), IS NOT NULL($0))])
+                              ImpalaHdfsScanRel(table=[[tpcds_partitioned_parquet_snap, date_dim]])
                         ImpalaProjectRel(c_customer_sk=[$0], c_customer_id=[$1], c_first_name=[$8], c_last_name=[$9], c_preferred_cust_flag=[$10], c_birth_country=[$14], c_login=[$15], c_email_address=[$16])
                           ImpalaFilterRel(condition=[AND(IS NOT NULL($0), IS NOT NULL($1))])
                             ImpalaHdfsScanRel(table=[[tpcds_partitioned_parquet_snap, customer]])
@@ -215,9 +210,8 @@ ImpalaSortRel(sort0=[$0], sort1=[$1], sort2=[$2], sort3=[$3], dir0=[ASC], dir1=[
                             ImpalaFilterRel(condition=[AND(IS NOT NULL($2), IS NOT NULL($22))])
                               ImpalaHdfsScanRel(table=[[tpcds_partitioned_parquet_snap, store_sales]])
                           ImpalaProjectRel(d_date_sk=[$0])
-                            ImpalaProjectRel(d_date_sk=[$0], d_year=[$6])
-                              ImpalaFilterRel(condition=[AND(=($6, 1999), IS NOT NULL($0))])
-                                ImpalaHdfsScanRel(table=[[tpcds_partitioned_parquet_snap, date_dim]])
+                            ImpalaFilterRel(condition=[AND(=($6, 1999), IS NOT NULL($0))])
+                              ImpalaHdfsScanRel(table=[[tpcds_partitioned_parquet_snap, date_dim]])
                         ImpalaProjectRel(c_customer_sk=[$0], c_customer_id=[$1], c_first_name=[$8], c_last_name=[$9], c_preferred_cust_flag=[$10], c_birth_country=[$14], c_login=[$15], c_email_address=[$16])
                           ImpalaFilterRel(condition=[AND(IS NOT NULL($0), IS NOT NULL($1))])
                             ImpalaHdfsScanRel(table=[[tpcds_partitioned_parquet_snap, customer]])
@@ -374,7 +368,7 @@ PLAN-ROOT SINK
 |       table: rows=8.64G size=389.90GB
 |       partitions: 1823/1823 rows=8.25G
 |       columns: all
-|     extrapolated-rows=disabled max-scan-range-rows=12.22M est-scan-range=373(filtered from 1823)
+|     extrapolated-rows=disabled max-scan-range-rows=12.31M est-scan-range=373(filtered from 1823)
 |     parquet dictionary predicates: tpcds_partitioned_parquet_snap.store_sales.ss_customer_sk IS NOT NULL
 |     mem-estimate=16.00MB mem-reservation=512.00KB thread-reservation=0
 |     tuple-ids=7 row-size=24B cardinality=1.61G(filtered from 7.88G) cost=630443220
@@ -658,7 +652,7 @@ PLAN-ROOT SINK
      table: rows=8.64G size=389.90GB
      partitions: 1823/1823 rows=8.25G
      columns: all
-   extrapolated-rows=disabled max-scan-range-rows=12.22M est-scan-range=373(filtered from 1823)
+   extrapolated-rows=disabled max-scan-range-rows=12.31M est-scan-range=373(filtered from 1823)
    parquet dictionary predicates: tpcds_partitioned_parquet_snap.store_sales_0.ss_customer_sk IS NOT NULL
    mem-estimate=16.00MB mem-reservation=512.00KB thread-reservation=0
    tuple-ids=35 row-size=24B cardinality=1.61G(filtered from 7.88G) cost=630443220
@@ -679,9 +673,8 @@ ImpalaSortRel(sort0=[$0], sort1=[$1], sort2=[$2], sort3=[$3], dir0=[ASC], dir1=[
                     ImpalaFilterRel(condition=[AND(IS NOT NULL($2), IS NOT NULL($33))])
                       ImpalaHdfsScanRel(table=[[tpcds_partitioned_parquet_snap, catalog_sales]])
                   ImpalaProjectRel(d_date_sk=[$0])
-                    ImpalaProjectRel(d_date_sk=[$0], d_year=[$6])
-                      ImpalaFilterRel(condition=[AND(=($6, 1999), IS NOT NULL($0))])
-                        ImpalaHdfsScanRel(table=[[tpcds_partitioned_parquet_snap, date_dim]])
+                    ImpalaFilterRel(condition=[AND(=($6, 1999), IS NOT NULL($0))])
+                      ImpalaHdfsScanRel(table=[[tpcds_partitioned_parquet_snap, date_dim]])
                 ImpalaProjectRel(c_customer_sk=[$0], c_customer_id=[$1], c_first_name=[$8], c_last_name=[$9], c_preferred_cust_flag=[$10], c_birth_country=[$14], c_login=[$15], c_email_address=[$16])
                   ImpalaFilterRel(condition=[AND(IS NOT NULL($0), IS NOT NULL($1))])
                     ImpalaHdfsScanRel(table=[[tpcds_partitioned_parquet_snap, customer]])
@@ -696,9 +689,8 @@ ImpalaSortRel(sort0=[$0], sort1=[$1], sort2=[$2], sort3=[$3], dir0=[ASC], dir1=[
                       ImpalaFilterRel(condition=[AND(IS NOT NULL($2), IS NOT NULL($22))])
                         ImpalaHdfsScanRel(table=[[tpcds_partitioned_parquet_snap, store_sales]])
                     ImpalaProjectRel(d_date_sk=[$0])
-                      ImpalaProjectRel(d_date_sk=[$0], d_year=[$6])
-                        ImpalaFilterRel(condition=[AND(=($6, 2000), IS NOT NULL($0))])
-                          ImpalaHdfsScanRel(table=[[tpcds_partitioned_parquet_snap, date_dim]])
+                      ImpalaFilterRel(condition=[AND(=($6, 2000), IS NOT NULL($0))])
+                        ImpalaHdfsScanRel(table=[[tpcds_partitioned_parquet_snap, date_dim]])
                   ImpalaProjectRel(c_customer_sk=[$0], c_customer_id=[$1], c_first_name=[$8], c_last_name=[$9], c_preferred_cust_flag=[$10], c_birth_country=[$14], c_login=[$15], c_email_address=[$16])
                     ImpalaFilterRel(condition=[AND(IS NOT NULL($0), IS NOT NULL($1))])
                       ImpalaHdfsScanRel(table=[[tpcds_partitioned_parquet_snap, customer]])
@@ -716,9 +708,8 @@ ImpalaSortRel(sort0=[$0], sort1=[$1], sort2=[$2], sort3=[$3], dir0=[ASC], dir1=[
                         ImpalaFilterRel(condition=[AND(IS NOT NULL($3), IS NOT NULL($33))])
                           ImpalaHdfsScanRel(table=[[tpcds_partitioned_parquet_snap, web_sales]])
                       ImpalaProjectRel(d_date_sk=[$0])
-                        ImpalaProjectRel(d_date_sk=[$0], d_year=[$6])
-                          ImpalaFilterRel(condition=[AND(=($6, 1999), IS NOT NULL($0))])
-                            ImpalaHdfsScanRel(table=[[tpcds_partitioned_parquet_snap, date_dim]])
+                        ImpalaFilterRel(condition=[AND(=($6, 1999), IS NOT NULL($0))])
+                          ImpalaHdfsScanRel(table=[[tpcds_partitioned_parquet_snap, date_dim]])
           ImpalaJoinRel(condition=[=($4, $0)], joinType=[inner])
             ImpalaProjectRel(CUSTOMER_ID=[$0], YEAR_TOTAL=[$7])
               ImpalaFilterRel(condition=[IS NOT NULL($7)])
@@ -733,9 +724,8 @@ ImpalaSortRel(sort0=[$0], sort1=[$1], sort2=[$2], sort3=[$3], dir0=[ASC], dir1=[
                           ImpalaFilterRel(condition=[AND(IS NOT NULL($3), IS NOT NULL($33))])
                             ImpalaHdfsScanRel(table=[[tpcds_partitioned_parquet_snap, web_sales]])
                         ImpalaProjectRel(d_date_sk=[$0])
-                          ImpalaProjectRel(d_date_sk=[$0], d_year=[$6])
-                            ImpalaFilterRel(condition=[AND(=($6, 2000), IS NOT NULL($0))])
-                              ImpalaHdfsScanRel(table=[[tpcds_partitioned_parquet_snap, date_dim]])
+                          ImpalaFilterRel(condition=[AND(=($6, 2000), IS NOT NULL($0))])
+                            ImpalaHdfsScanRel(table=[[tpcds_partitioned_parquet_snap, date_dim]])
             ImpalaJoinRel(condition=[=($2, $0)], joinType=[inner])
               ImpalaProjectRel(CUSTOMER_ID=[$0], YEAR_TOTAL=[$7])
                 ImpalaFilterRel(condition=[IS NOT NULL($7)])
@@ -747,9 +737,8 @@ ImpalaSortRel(sort0=[$0], sort1=[$1], sort2=[$2], sort3=[$3], dir0=[ASC], dir1=[
                             ImpalaFilterRel(condition=[AND(IS NOT NULL($2), IS NOT NULL($33))])
                               ImpalaHdfsScanRel(table=[[tpcds_partitioned_parquet_snap, catalog_sales]])
                           ImpalaProjectRel(d_date_sk=[$0])
-                            ImpalaProjectRel(d_date_sk=[$0], d_year=[$6])
-                              ImpalaFilterRel(condition=[AND(=($6, 2000), IS NOT NULL($0))])
-                                ImpalaHdfsScanRel(table=[[tpcds_partitioned_parquet_snap, date_dim]])
+                            ImpalaFilterRel(condition=[AND(=($6, 2000), IS NOT NULL($0))])
+                              ImpalaHdfsScanRel(table=[[tpcds_partitioned_parquet_snap, date_dim]])
                         ImpalaProjectRel(c_customer_sk=[$0], c_customer_id=[$1], c_first_name=[$8], c_last_name=[$9], c_preferred_cust_flag=[$10], c_birth_country=[$14], c_login=[$15], c_email_address=[$16])
                           ImpalaFilterRel(condition=[AND(IS NOT NULL($0), IS NOT NULL($1))])
                             ImpalaHdfsScanRel(table=[[tpcds_partitioned_parquet_snap, customer]])
@@ -763,9 +752,8 @@ ImpalaSortRel(sort0=[$0], sort1=[$1], sort2=[$2], sort3=[$3], dir0=[ASC], dir1=[
                             ImpalaFilterRel(condition=[AND(IS NOT NULL($2), IS NOT NULL($22))])
                               ImpalaHdfsScanRel(table=[[tpcds_partitioned_parquet_snap, store_sales]])
                           ImpalaProjectRel(d_date_sk=[$0])
-                            ImpalaProjectRel(d_date_sk=[$0], d_year=[$6])
-                              ImpalaFilterRel(condition=[AND(=($6, 1999), IS NOT NULL($0))])
-                                ImpalaHdfsScanRel(table=[[tpcds_partitioned_parquet_snap, date_dim]])
+                            ImpalaFilterRel(condition=[AND(=($6, 1999), IS NOT NULL($0))])
+                              ImpalaHdfsScanRel(table=[[tpcds_partitioned_parquet_snap, date_dim]])
                         ImpalaProjectRel(c_customer_sk=[$0], c_customer_id=[$1], c_first_name=[$8], c_last_name=[$9], c_preferred_cust_flag=[$10], c_birth_country=[$14], c_login=[$15], c_email_address=[$16])
                           ImpalaFilterRel(condition=[AND(IS NOT NULL($0), IS NOT NULL($1))])
                             ImpalaHdfsScanRel(table=[[tpcds_partitioned_parquet_snap, customer]])
@@ -1083,7 +1071,7 @@ max-parallelism=160 segment-costs=[1503467851, 253] cpu-comparison-result=1440 [
 |       table: rows=8.64G size=389.90GB
 |       partitions: 1823/1823 rows=8.25G
 |       columns: all
-|     extrapolated-rows=disabled max-scan-range-rows=12.22M est-scan-range=373(filtered from 1823)
+|     extrapolated-rows=disabled max-scan-range-rows=12.31M est-scan-range=373(filtered from 1823)
 |     parquet dictionary predicates: tpcds_partitioned_parquet_snap.store_sales.ss_customer_sk IS NOT NULL
 |     mem-estimate=16.00MB mem-reservation=512.00KB thread-reservation=0
 |     tuple-ids=7 row-size=24B cardinality=1.61G(filtered from 7.88G) cost=630443220
@@ -1662,7 +1650,7 @@ max-parallelism=373 segment-costs=[6315884965]
      table: rows=8.64G size=389.90GB
      partitions: 1823/1823 rows=8.25G
      columns: all
-   extrapolated-rows=disabled max-scan-range-rows=12.22M est-scan-range=373(filtered from 1823)
+   extrapolated-rows=disabled max-scan-range-rows=12.31M est-scan-range=373(filtered from 1823)
    parquet dictionary predicates: tpcds_partitioned_parquet_snap.store_sales_0.ss_customer_sk IS NOT NULL
    mem-estimate=16.00MB mem-reservation=512.00KB thread-reservation=0
    tuple-ids=35 row-size=24B cardinality=1.61G(filtered from 7.88G) cost=630443220
@@ -1683,9 +1671,8 @@ ImpalaSortRel(sort0=[$0], sort1=[$1], sort2=[$2], sort3=[$3], dir0=[ASC], dir1=[
                     ImpalaFilterRel(condition=[AND(IS NOT NULL($2), IS NOT NULL($33))])
                       ImpalaHdfsScanRel(table=[[tpcds_partitioned_parquet_snap, catalog_sales]])
                   ImpalaProjectRel(d_date_sk=[$0])
-                    ImpalaProjectRel(d_date_sk=[$0], d_year=[$6])
-                      ImpalaFilterRel(condition=[AND(=($6, 1999), IS NOT NULL($0))])
-                        ImpalaHdfsScanRel(table=[[tpcds_partitioned_parquet_snap, date_dim]])
+                    ImpalaFilterRel(condition=[AND(=($6, 1999), IS NOT NULL($0))])
+                      ImpalaHdfsScanRel(table=[[tpcds_partitioned_parquet_snap, date_dim]])
                 ImpalaProjectRel(c_customer_sk=[$0], c_customer_id=[$1], c_first_name=[$8], c_last_name=[$9], c_preferred_cust_flag=[$10], c_birth_country=[$14], c_login=[$15], c_email_address=[$16])
                   ImpalaFilterRel(condition=[AND(IS NOT NULL($0), IS NOT NULL($1))])
                     ImpalaHdfsScanRel(table=[[tpcds_partitioned_parquet_snap, customer]])
@@ -1700,9 +1687,8 @@ ImpalaSortRel(sort0=[$0], sort1=[$1], sort2=[$2], sort3=[$3], dir0=[ASC], dir1=[
                       ImpalaFilterRel(condition=[AND(IS NOT NULL($2), IS NOT NULL($22))])
                         ImpalaHdfsScanRel(table=[[tpcds_partitioned_parquet_snap, store_sales]])
                     ImpalaProjectRel(d_date_sk=[$0])
-                      ImpalaProjectRel(d_date_sk=[$0], d_year=[$6])
-                        ImpalaFilterRel(condition=[AND(=($6, 2000), IS NOT NULL($0))])
-                          ImpalaHdfsScanRel(table=[[tpcds_partitioned_parquet_snap, date_dim]])
+                      ImpalaFilterRel(condition=[AND(=($6, 2000), IS NOT NULL($0))])
+                        ImpalaHdfsScanRel(table=[[tpcds_partitioned_parquet_snap, date_dim]])
                   ImpalaProjectRel(c_customer_sk=[$0], c_customer_id=[$1], c_first_name=[$8], c_last_name=[$9], c_preferred_cust_flag=[$10], c_birth_country=[$14], c_login=[$15], c_email_address=[$16])
                     ImpalaFilterRel(condition=[AND(IS NOT NULL($0), IS NOT NULL($1))])
                       ImpalaHdfsScanRel(table=[[tpcds_partitioned_parquet_snap, customer]])
@@ -1720,9 +1706,8 @@ ImpalaSortRel(sort0=[$0], sort1=[$1], sort2=[$2], sort3=[$3], dir0=[ASC], dir1=[
                         ImpalaFilterRel(condition=[AND(IS NOT NULL($3), IS NOT NULL($33))])
                           ImpalaHdfsScanRel(table=[[tpcds_partitioned_parquet_snap, web_sales]])
                       ImpalaProjectRel(d_date_sk=[$0])
-                        ImpalaProjectRel(d_date_sk=[$0], d_year=[$6])
-                          ImpalaFilterRel(condition=[AND(=($6, 1999), IS NOT NULL($0))])
-                            ImpalaHdfsScanRel(table=[[tpcds_partitioned_parquet_snap, date_dim]])
+                        ImpalaFilterRel(condition=[AND(=($6, 1999), IS NOT NULL($0))])
+                          ImpalaHdfsScanRel(table=[[tpcds_partitioned_parquet_snap, date_dim]])
           ImpalaJoinRel(condition=[=($4, $0)], joinType=[inner])
             ImpalaProjectRel(CUSTOMER_ID=[$0], YEAR_TOTAL=[$7])
               ImpalaFilterRel(condition=[IS NOT NULL($7)])
@@ -1737,9 +1722,8 @@ ImpalaSortRel(sort0=[$0], sort1=[$1], sort2=[$2], sort3=[$3], dir0=[ASC], dir1=[
                           ImpalaFilterRel(condition=[AND(IS NOT NULL($3), IS NOT NULL($33))])
                             ImpalaHdfsScanRel(table=[[tpcds_partitioned_parquet_snap, web_sales]])
                         ImpalaProjectRel(d_date_sk=[$0])
-                          ImpalaProjectRel(d_date_sk=[$0], d_year=[$6])
-                            ImpalaFilterRel(condition=[AND(=($6, 2000), IS NOT NULL($0))])
-                              ImpalaHdfsScanRel(table=[[tpcds_partitioned_parquet_snap, date_dim]])
+                          ImpalaFilterRel(condition=[AND(=($6, 2000), IS NOT NULL($0))])
+                            ImpalaHdfsScanRel(table=[[tpcds_partitioned_parquet_snap, date_dim]])
             ImpalaJoinRel(condition=[=($2, $0)], joinType=[inner])
               ImpalaProjectRel(CUSTOMER_ID=[$0], YEAR_TOTAL=[$7])
                 ImpalaFilterRel(condition=[IS NOT NULL($7)])
@@ -1751,9 +1735,8 @@ ImpalaSortRel(sort0=[$0], sort1=[$1], sort2=[$2], sort3=[$3], dir0=[ASC], dir1=[
                             ImpalaFilterRel(condition=[AND(IS NOT NULL($2), IS NOT NULL($33))])
                               ImpalaHdfsScanRel(table=[[tpcds_partitioned_parquet_snap, catalog_sales]])
                           ImpalaProjectRel(d_date_sk=[$0])
-                            ImpalaProjectRel(d_date_sk=[$0], d_year=[$6])
-                              ImpalaFilterRel(condition=[AND(=($6, 2000), IS NOT NULL($0))])
-                                ImpalaHdfsScanRel(table=[[tpcds_partitioned_parquet_snap, date_dim]])
+                            ImpalaFilterRel(condition=[AND(=($6, 2000), IS NOT NULL($0))])
+                              ImpalaHdfsScanRel(table=[[tpcds_partitioned_parquet_snap, date_dim]])
                         ImpalaProjectRel(c_customer_sk=[$0], c_customer_id=[$1], c_first_name=[$8], c_last_name=[$9], c_preferred_cust_flag=[$10], c_birth_country=[$14], c_login=[$15], c_email_address=[$16])
                           ImpalaFilterRel(condition=[AND(IS NOT NULL($0), IS NOT NULL($1))])
                             ImpalaHdfsScanRel(table=[[tpcds_partitioned_parquet_snap, customer]])
@@ -1767,9 +1750,8 @@ ImpalaSortRel(sort0=[$0], sort1=[$1], sort2=[$2], sort3=[$3], dir0=[ASC], dir1=[
                             ImpalaFilterRel(condition=[AND(IS NOT NULL($2), IS NOT NULL($22))])
                               ImpalaHdfsScanRel(table=[[tpcds_partitioned_parquet_snap, store_sales]])
                           ImpalaProjectRel(d_date_sk=[$0])
-                            ImpalaProjectRel(d_date_sk=[$0], d_year=[$6])
-                              ImpalaFilterRel(condition=[AND(=($6, 1999), IS NOT NULL($0))])
-                                ImpalaHdfsScanRel(table=[[tpcds_partitioned_parquet_snap, date_dim]])
+                            ImpalaFilterRel(condition=[AND(=($6, 1999), IS NOT NULL($0))])
+                              ImpalaHdfsScanRel(table=[[tpcds_partitioned_parquet_snap, date_dim]])
                         ImpalaProjectRel(c_customer_sk=[$0], c_customer_id=[$1], c_first_name=[$8], c_last_name=[$9], c_preferred_cust_flag=[$10], c_birth_country=[$14], c_login=[$15], c_email_address=[$16])
                           ImpalaFilterRel(condition=[AND(IS NOT NULL($0), IS NOT NULL($1))])
                             ImpalaHdfsScanRel(table=[[tpcds_partitioned_parquet_snap, customer]])
@@ -2087,7 +2069,7 @@ max-parallelism=160 segment-costs=[1503467851, 253] cpu-comparison-result=1440 [
 |       table: rows=8.64G size=389.90GB
 |       partitions: 1823/1823 rows=8.25G
 |       columns: all
-|     extrapolated-rows=disabled max-scan-range-rows=12.22M est-scan-range=373(filtered from 1823)
+|     extrapolated-rows=disabled max-scan-range-rows=12.31M est-scan-range=373(filtered from 1823)
 |     parquet dictionary predicates: tpcds_partitioned_parquet_snap.store_sales.ss_customer_sk IS NOT NULL
 |     mem-estimate=16.00MB mem-reservation=512.00KB thread-reservation=0
 |     tuple-ids=7 row-size=24B cardinality=1.61G(filtered from 7.88G) cost=630443220
@@ -2666,7 +2648,7 @@ max-parallelism=373 segment-costs=[6315884965]
      table: rows=8.64G size=389.90GB
      partitions: 1823/1823 rows=8.25G
      columns: all
-   extrapolated-rows=disabled max-scan-range-rows=12.22M est-scan-range=373(filtered from 1823)
+   extrapolated-rows=disabled max-scan-range-rows=12.31M est-scan-range=373(filtered from 1823)
    parquet dictionary predicates: tpcds_partitioned_parquet_snap.store_sales_0.ss_customer_sk IS NOT NULL
    mem-estimate=16.00MB mem-reservation=512.00KB thread-reservation=0
    tuple-ids=35 row-size=24B cardinality=1.61G(filtered from 7.88G) cost=630443220

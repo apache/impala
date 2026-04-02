@@ -37,6 +37,7 @@ import org.apache.calcite.sql2rel.RelFieldTrimmer;
 import org.apache.calcite.tools.RelBuilder;
 import org.apache.impala.analysis.Analyzer;
 import org.apache.impala.calcite.coercenodes.CoerceNodes;
+import org.apache.impala.calcite.operators.ImpalaRexBuilder;
 import org.apache.impala.calcite.operators.ImpalaRexSimplify;
 import org.apache.impala.calcite.rel.node.ConvertToImpalaRelRules;
 import org.apache.impala.calcite.rel.node.ImpalaPlanRel;
@@ -89,7 +90,7 @@ public class CalciteOptimizer implements CompilerStep {
     RelBuilder relBuilder = ImpalaCoreRules.LOGICAL_BUILDER_NO_SIMPLIFY.create(
         logPlan.getCluster(), reader_);
 
-    RexBuilder rexBuilder = logPlan.getCluster().getRexBuilder();
+    ImpalaRexBuilder rexBuilder = (ImpalaRexBuilder) logPlan.getCluster().getRexBuilder();
 
     ImpalaRexExecutor rexExecutor = new ImpalaRexExecutor(analyzer_, queryCtx_,
         new ImpalaRexExecutor.ReducerImpl());
@@ -101,6 +102,8 @@ public class CalciteOptimizer implements CompilerStep {
     RelNode expandedNodesPlan = runExpandNodesProgram(logPlan, simplifier);
     timeline_.markEvent("Expanded plan");
     LogUtil.logDebug(expandedNodesPlan, "Plan after expanded plan phase.");
+
+    rexBuilder.setPostAnalysis();
 
     // The initial parse and validate steps have some issues finding the correct
     // Impala datatypes for various functions and expressions. For instance,
@@ -191,6 +194,7 @@ public class CalciteOptimizer implements CompilerStep {
         ImpalaCoreRules.UNION_REMOVE,
         ImpalaCoreRules.PROJECT_TO_SEMI_JOIN,
         ImpalaCoreRules.FILTER_VALUES_MERGE,
+        ImpalaCoreRules.PROJECT_VALUES_MERGE,
         ImpalaCoreRules.FILTER_MERGE,
         ImpalaCoreRules.PROJECT_MERGE,
         ImpalaCoreRules.JOIN_PUSH_EXPRESSIONS,
@@ -268,6 +272,7 @@ public class CalciteOptimizer implements CompilerStep {
     builder.addMatchOrder(HepMatchOrder.BOTTOM_UP);
     builder.addRuleCollection(ImmutableList.of(
         ImpalaCoreRules.REWRITE_REX_OVER,
+        ImpalaCoreRules.PROJECT_MERGE,
         ImpalaCoreRules.FILTER_PROJECT_TRANSPOSE
         ));
 

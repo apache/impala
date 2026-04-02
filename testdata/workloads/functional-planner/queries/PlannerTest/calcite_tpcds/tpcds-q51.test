@@ -58,10 +58,9 @@ ImpalaSortRel(sort0=[$0], sort1=[$1], dir0=[ASC], dir1=[ASC], fetch=[100:TINYINT
                 ImpalaProjectRel(ss_item_sk=[$1], ss_sales_price=[$12], ss_sold_date_sk=[$22])
                   ImpalaFilterRel(condition=[AND(IS NOT NULL($1), IS NOT NULL($22))])
                     ImpalaHdfsScanRel(table=[[tpcds_partitioned_parquet_snap, store_sales]])
-                ImpalaProjectRel(d_date_sk=[$0], d_date=[$1])
-                  ImpalaProjectRel(d_date_sk=[$0], d_date=[$2], d_month_seq=[$3])
-                    ImpalaFilterRel(condition=[AND(SEARCH($3, Sarg[[1176..1187]]), IS NOT NULL($0))])
-                      ImpalaHdfsScanRel(table=[[tpcds_partitioned_parquet_snap, date_dim]])
+                ImpalaProjectRel(d_date_sk=[$0], d_date=[$2])
+                  ImpalaFilterRel(condition=[AND(SEARCH($3, Sarg[[1176..1187]]), IS NOT NULL($0))])
+                    ImpalaHdfsScanRel(table=[[tpcds_partitioned_parquet_snap, date_dim]])
         ImpalaAnalyticRel(ITEM_SK=[$0], D_DATE=[$1], CUME_SALES=[CASE(>(COUNT($2) OVER (PARTITION BY $0 ORDER BY $1 ROWS UNBOUNDED PRECEDING), 0), CAST(SUM($2) OVER (PARTITION BY $0 ORDER BY $1 ROWS UNBOUNDED PRECEDING)):DECIMAL(38, 2), null:DECIMAL(38, 2))])
           ImpalaAggRel(group=[{0, 1}], agg#0=[SUM($2)])
             ImpalaProjectRel(ITEM_SK=[$0], D_DATE=[$4], ws_sales_price=[$1])
@@ -69,10 +68,9 @@ ImpalaSortRel(sort0=[$0], sort1=[$1], dir0=[ASC], dir1=[ASC], fetch=[100:TINYINT
                 ImpalaProjectRel(ws_item_sk=[$2], ws_sales_price=[$20], ws_sold_date_sk=[$33])
                   ImpalaFilterRel(condition=[AND(IS NOT NULL($2), IS NOT NULL($33))])
                     ImpalaHdfsScanRel(table=[[tpcds_partitioned_parquet_snap, web_sales]])
-                ImpalaProjectRel(d_date_sk=[$0], d_date=[$1])
-                  ImpalaProjectRel(d_date_sk=[$0], d_date=[$2], d_month_seq=[$3])
-                    ImpalaFilterRel(condition=[AND(SEARCH($3, Sarg[[1176..1187]]), IS NOT NULL($0))])
-                      ImpalaHdfsScanRel(table=[[tpcds_partitioned_parquet_snap, date_dim]])
+                ImpalaProjectRel(d_date_sk=[$0], d_date=[$2])
+                  ImpalaFilterRel(condition=[AND(SEARCH($3, Sarg[[1176..1187]]), IS NOT NULL($0))])
+                    ImpalaHdfsScanRel(table=[[tpcds_partitioned_parquet_snap, date_dim]])
 F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Instance Resources: mem-estimate=198.28GB mem-reservation=94.00MB thread-reservation=1 runtime-filters-memory=2.00MB
 |  max-parallelism=1 segment-costs=[53963054123, 11971159917, 14125096569, 3133506007, 235728514246980, 266041741238206, 600]
@@ -224,7 +222,7 @@ PLAN-ROOT SINK
      table: rows=8.64G size=389.90GB
      partitions: 1823/1823 rows=8.25G
      columns: all
-   extrapolated-rows=disabled max-scan-range-rows=12.22M
+   extrapolated-rows=disabled max-scan-range-rows=12.31M
    parquet dictionary predicates: tpcds_partitioned_parquet_snap.store_sales.ss_item_sk IS NOT NULL
    mem-estimate=16.00MB mem-reservation=512.00KB thread-reservation=0
    tuple-ids=0 row-size=12B cardinality=8.25G cost=1657367506
@@ -243,10 +241,9 @@ ImpalaSortRel(sort0=[$0], sort1=[$1], dir0=[ASC], dir1=[ASC], fetch=[100:TINYINT
                 ImpalaProjectRel(ss_item_sk=[$1], ss_sales_price=[$12], ss_sold_date_sk=[$22])
                   ImpalaFilterRel(condition=[AND(IS NOT NULL($1), IS NOT NULL($22))])
                     ImpalaHdfsScanRel(table=[[tpcds_partitioned_parquet_snap, store_sales]])
-                ImpalaProjectRel(d_date_sk=[$0], d_date=[$1])
-                  ImpalaProjectRel(d_date_sk=[$0], d_date=[$2], d_month_seq=[$3])
-                    ImpalaFilterRel(condition=[AND(SEARCH($3, Sarg[[1176..1187]]), IS NOT NULL($0))])
-                      ImpalaHdfsScanRel(table=[[tpcds_partitioned_parquet_snap, date_dim]])
+                ImpalaProjectRel(d_date_sk=[$0], d_date=[$2])
+                  ImpalaFilterRel(condition=[AND(SEARCH($3, Sarg[[1176..1187]]), IS NOT NULL($0))])
+                    ImpalaHdfsScanRel(table=[[tpcds_partitioned_parquet_snap, date_dim]])
         ImpalaAnalyticRel(ITEM_SK=[$0], D_DATE=[$1], CUME_SALES=[CASE(>(COUNT($2) OVER (PARTITION BY $0 ORDER BY $1 ROWS UNBOUNDED PRECEDING), 0), CAST(SUM($2) OVER (PARTITION BY $0 ORDER BY $1 ROWS UNBOUNDED PRECEDING)):DECIMAL(38, 2), null:DECIMAL(38, 2))])
           ImpalaAggRel(group=[{0, 1}], agg#0=[SUM($2)])
             ImpalaProjectRel(ITEM_SK=[$0], D_DATE=[$4], ws_sales_price=[$1])
@@ -254,10 +251,9 @@ ImpalaSortRel(sort0=[$0], sort1=[$1], dir0=[ASC], dir1=[ASC], fetch=[100:TINYINT
                 ImpalaProjectRel(ws_item_sk=[$2], ws_sales_price=[$20], ws_sold_date_sk=[$33])
                   ImpalaFilterRel(condition=[AND(IS NOT NULL($2), IS NOT NULL($33))])
                     ImpalaHdfsScanRel(table=[[tpcds_partitioned_parquet_snap, web_sales]])
-                ImpalaProjectRel(d_date_sk=[$0], d_date=[$1])
-                  ImpalaProjectRel(d_date_sk=[$0], d_date=[$2], d_month_seq=[$3])
-                    ImpalaFilterRel(condition=[AND(SEARCH($3, Sarg[[1176..1187]]), IS NOT NULL($0))])
-                      ImpalaHdfsScanRel(table=[[tpcds_partitioned_parquet_snap, date_dim]])
+                ImpalaProjectRel(d_date_sk=[$0], d_date=[$2])
+                  ImpalaFilterRel(condition=[AND(SEARCH($3, Sarg[[1176..1187]]), IS NOT NULL($0))])
+                    ImpalaHdfsScanRel(table=[[tpcds_partitioned_parquet_snap, date_dim]])
 F10:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Instance Resources: mem-estimate=4.86MB mem-reservation=4.00MB thread-reservation=1
 |  max-parallelism=1 segment-costs=[644] cpu-comparison-result=240 [max(1 (self) vs 240 (sum children))]
@@ -534,7 +530,7 @@ max-parallelism=1823 segment-costs=[53963028038, 17001010240] cpu-comparison-res
      table: rows=8.64G size=389.90GB
      partitions: 1823/1823 rows=8.25G
      columns: all
-   extrapolated-rows=disabled max-scan-range-rows=12.22M
+   extrapolated-rows=disabled max-scan-range-rows=12.31M
    parquet dictionary predicates: tpcds_partitioned_parquet_snap.store_sales.ss_item_sk IS NOT NULL
    mem-estimate=16.00MB mem-reservation=512.00KB thread-reservation=0
    tuple-ids=0 row-size=12B cardinality=8.25G cost=1657367506
@@ -553,10 +549,9 @@ ImpalaSortRel(sort0=[$0], sort1=[$1], dir0=[ASC], dir1=[ASC], fetch=[100:TINYINT
                 ImpalaProjectRel(ss_item_sk=[$1], ss_sales_price=[$12], ss_sold_date_sk=[$22])
                   ImpalaFilterRel(condition=[AND(IS NOT NULL($1), IS NOT NULL($22))])
                     ImpalaHdfsScanRel(table=[[tpcds_partitioned_parquet_snap, store_sales]])
-                ImpalaProjectRel(d_date_sk=[$0], d_date=[$1])
-                  ImpalaProjectRel(d_date_sk=[$0], d_date=[$2], d_month_seq=[$3])
-                    ImpalaFilterRel(condition=[AND(SEARCH($3, Sarg[[1176..1187]]), IS NOT NULL($0))])
-                      ImpalaHdfsScanRel(table=[[tpcds_partitioned_parquet_snap, date_dim]])
+                ImpalaProjectRel(d_date_sk=[$0], d_date=[$2])
+                  ImpalaFilterRel(condition=[AND(SEARCH($3, Sarg[[1176..1187]]), IS NOT NULL($0))])
+                    ImpalaHdfsScanRel(table=[[tpcds_partitioned_parquet_snap, date_dim]])
         ImpalaAnalyticRel(ITEM_SK=[$0], D_DATE=[$1], CUME_SALES=[CASE(>(COUNT($2) OVER (PARTITION BY $0 ORDER BY $1 ROWS UNBOUNDED PRECEDING), 0), CAST(SUM($2) OVER (PARTITION BY $0 ORDER BY $1 ROWS UNBOUNDED PRECEDING)):DECIMAL(38, 2), null:DECIMAL(38, 2))])
           ImpalaAggRel(group=[{0, 1}], agg#0=[SUM($2)])
             ImpalaProjectRel(ITEM_SK=[$0], D_DATE=[$4], ws_sales_price=[$1])
@@ -564,10 +559,9 @@ ImpalaSortRel(sort0=[$0], sort1=[$1], dir0=[ASC], dir1=[ASC], fetch=[100:TINYINT
                 ImpalaProjectRel(ws_item_sk=[$2], ws_sales_price=[$20], ws_sold_date_sk=[$33])
                   ImpalaFilterRel(condition=[AND(IS NOT NULL($2), IS NOT NULL($33))])
                     ImpalaHdfsScanRel(table=[[tpcds_partitioned_parquet_snap, web_sales]])
-                ImpalaProjectRel(d_date_sk=[$0], d_date=[$1])
-                  ImpalaProjectRel(d_date_sk=[$0], d_date=[$2], d_month_seq=[$3])
-                    ImpalaFilterRel(condition=[AND(SEARCH($3, Sarg[[1176..1187]]), IS NOT NULL($0))])
-                      ImpalaHdfsScanRel(table=[[tpcds_partitioned_parquet_snap, date_dim]])
+                ImpalaProjectRel(d_date_sk=[$0], d_date=[$2])
+                  ImpalaFilterRel(condition=[AND(SEARCH($3, Sarg[[1176..1187]]), IS NOT NULL($0))])
+                    ImpalaHdfsScanRel(table=[[tpcds_partitioned_parquet_snap, date_dim]])
 F10:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Instance Resources: mem-estimate=4.86MB mem-reservation=4.00MB thread-reservation=1
 |  max-parallelism=1 segment-costs=[644] cpu-comparison-result=240 [max(1 (self) vs 240 (sum children))]
@@ -844,7 +838,7 @@ max-parallelism=1823 segment-costs=[53963028038, 17001010240] cpu-comparison-res
      table: rows=8.64G size=389.90GB
      partitions: 1823/1823 rows=8.25G
      columns: all
-   extrapolated-rows=disabled max-scan-range-rows=12.22M
+   extrapolated-rows=disabled max-scan-range-rows=12.31M
    parquet dictionary predicates: tpcds_partitioned_parquet_snap.store_sales.ss_item_sk IS NOT NULL
    mem-estimate=16.00MB mem-reservation=512.00KB thread-reservation=0
    tuple-ids=0 row-size=12B cardinality=8.25G cost=1657367506

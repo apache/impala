@@ -79,17 +79,7 @@ public class ImpalaProjectRel extends Project
       return createUnionPlanNode(context, getProjects(), getRowType());
     }
 
-    // see comment in isCoercedProjectForValues method
-    boolean isCoercedProjectForValues = isCoercedProjectForValues(context);
-
-    NodeWithExprs inputWithExprs = getChildPlanNode(context, isCoercedProjectForValues);
-
-    // If this Project is a coercedProjectForValues, then this Project has been taken
-    // care of in the underlying Values RelNode so the output of that node is passed
-    // directly up to the parent.
-    if (isCoercedProjectForValues) {
-      return inputWithExprs;
-    }
+    NodeWithExprs inputWithExprs = getChildPlanNode(context);
 
     // get the output exprs for this node that are needed by the parent node.
     List<Expr> outputExprs =
@@ -123,26 +113,17 @@ public class ImpalaProjectRel extends Project
     return builder.build();
   }
 
-  private NodeWithExprs getChildPlanNode(ParentPlanRelContext context,
-      boolean isCoercedProjectForValues) throws ImpalaException {
+  private NodeWithExprs getChildPlanNode(ParentPlanRelContext context)
+      throws ImpalaException {
     // The filter condition should have been pushed through the Project via a
     // Calcite rule. The only exception to this is when a bogus "coerced project"
     // (see comment in isCoercedProjectForValues method) is created after the
     // rule has been applied.
-    Preconditions.checkState(context.filterCondition_ == null ||
-        isCoercedProjectForValues,
+    Preconditions.checkState(context.filterCondition_ == null,
         "Failure, Filter RelNode needs to be passed through the Project Rel Node.");
     ImpalaPlanRel relInput = (ImpalaPlanRel) getInput(0);
     ParentPlanRelContext.Builder builder =
         new ParentPlanRelContext.Builder(context, this);
-    // see "isCoercedProjectForValues" method
-    if (isCoercedProjectForValues) {
-      // RelNode type of parent of project is set for the child
-      builder.setParentType(context.parentType_);
-      // For a coerced project, the rowtype of the project is passed in. This is because
-      // a "cast(inputref)" may change the row type for the underlying Values RelNode.
-      builder.setParentRowType(getRowType());
-    }
     builder.setInputRefs(RelOptUtil.InputFinder.bits(getProjects(), null));
     return relInput.getPlanNode(builder.build());
   }

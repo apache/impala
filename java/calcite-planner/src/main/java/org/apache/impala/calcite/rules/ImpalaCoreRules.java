@@ -170,6 +170,11 @@ public class ImpalaCoreRules {
           .withRelBuilderFactory(LOGICAL_BUILDER_NO_SIMPLIFY)
            .as(ValuesReduceRule.Config.class).toRule();
 
+  public static ValuesReduceRule PROJECT_VALUES_MERGE =
+      ValuesReduceRule.Config.PROJECT
+          .withRelBuilderFactory(LOGICAL_BUILDER_NO_SIMPLIFY)
+           .as(ValuesReduceRule.Config.class).toRule();
+
   public static FilterMergeRule FILTER_MERGE =
       FilterMergeRule.Config.DEFAULT
           .withRelBuilderFactory(LOGICAL_BUILDER_NO_SIMPLIFY)

@@ -44,13 +44,11 @@ ImpalaProjectRel(GROSS_MARGIN=[$0], I_CATEGORY=[$1], I_CLASS=[$2], LOCHIERARCHY=
                   ImpalaFilterRel(condition=[AND(IS NOT NULL($22), IS NOT NULL($1), IS NOT NULL($6))])
                     ImpalaHdfsScanRel(table=[[tpcds_partitioned_parquet_snap, store_sales]])
                 ImpalaProjectRel(d_date_sk=[$0])
-                  ImpalaProjectRel(d_date_sk=[$0], d_year=[$6])
-                    ImpalaFilterRel(condition=[AND(=($6, 1998), IS NOT NULL($0))])
-                      ImpalaHdfsScanRel(table=[[tpcds_partitioned_parquet_snap, date_dim]])
+                  ImpalaFilterRel(condition=[AND(=($6, 1998), IS NOT NULL($0))])
+                    ImpalaHdfsScanRel(table=[[tpcds_partitioned_parquet_snap, date_dim]])
               ImpalaProjectRel(s_store_sk=[$0])
-                ImpalaProjectRel(s_store_sk=[$0], s_state=[$24])
-                  ImpalaFilterRel(condition=[AND(SEARCH($24, Sarg[_UTF-8'MI':VARCHAR(2147483647) CHARACTER SET "UTF-8", _UTF-8'MN':VARCHAR(2147483647) CHARACTER SET "UTF-8", _UTF-8'MO':VARCHAR(2147483647) CHARACTER SET "UTF-8", _UTF-8'NM':VARCHAR(2147483647) CHARACTER SET "UTF-8", _UTF-8'OH':VARCHAR(2147483647) CHARACTER SET "UTF-8", _UTF-8'PA':VARCHAR(2147483647) CHARACTER SET "UTF-8", _UTF-8'TN':VARCHAR(2147483647) CHARACTER SET "UTF-8", _UTF-8'WV':VARCHAR(2147483647) CHARACTER SET "UTF-8"]:VARCHAR(2147483647) CHARACTER SET "UTF-8"), IS NOT NULL($0))])
-                    ImpalaHdfsScanRel(table=[[tpcds_partitioned_parquet_snap, store]])
+                ImpalaFilterRel(condition=[AND(SEARCH($24, Sarg[_UTF-8'MI':VARCHAR(2147483647) CHARACTER SET "UTF-8", _UTF-8'MN':VARCHAR(2147483647) CHARACTER SET "UTF-8", _UTF-8'MO':VARCHAR(2147483647) CHARACTER SET "UTF-8", _UTF-8'NM':VARCHAR(2147483647) CHARACTER SET "UTF-8", _UTF-8'OH':VARCHAR(2147483647) CHARACTER SET "UTF-8", _UTF-8'PA':VARCHAR(2147483647) CHARACTER SET "UTF-8", _UTF-8'TN':VARCHAR(2147483647) CHARACTER SET "UTF-8", _UTF-8'WV':VARCHAR(2147483647) CHARACTER SET "UTF-8"]:VARCHAR(2147483647) CHARACTER SET "UTF-8"), IS NOT NULL($0))])
+                  ImpalaHdfsScanRel(table=[[tpcds_partitioned_parquet_snap, store]])
             ImpalaProjectRel(i_item_sk=[$0], i_class=[$10], i_category=[$12])
               ImpalaFilterRel(condition=[IS NOT NULL($0)])
                 ImpalaHdfsScanRel(table=[[tpcds_partitioned_parquet_snap, item]])
@@ -174,7 +172,7 @@ PLAN-ROOT SINK
      table: rows=8.64G size=389.90GB
      partitions: 1823/1823 rows=8.25G
      columns: all
-   extrapolated-rows=disabled max-scan-range-rows=12.22M est-scan-range=373(filtered from 1823)
+   extrapolated-rows=disabled max-scan-range-rows=12.31M est-scan-range=373(filtered from 1823)
    parquet dictionary predicates: tpcds_partitioned_parquet_snap.store_sales.ss_store_sk IS NOT NULL, tpcds_partitioned_parquet_snap.store_sales.ss_item_sk IS NOT NULL
    mem-estimate=16.00MB mem-reservation=512.00KB thread-reservation=0
    tuple-ids=0 row-size=20B cardinality=1.61G(filtered from 7.88G) cost=580675827
@@ -194,13 +192,11 @@ ImpalaProjectRel(GROSS_MARGIN=[$0], I_CATEGORY=[$1], I_CLASS=[$2], LOCHIERARCHY=
                   ImpalaFilterRel(condition=[AND(IS NOT NULL($22), IS NOT NULL($1), IS NOT NULL($6))])
                     ImpalaHdfsScanRel(table=[[tpcds_partitioned_parquet_snap, store_sales]])
                 ImpalaProjectRel(d_date_sk=[$0])
-                  ImpalaProjectRel(d_date_sk=[$0], d_year=[$6])
-                    ImpalaFilterRel(condition=[AND(=($6, 1998), IS NOT NULL($0))])
-                      ImpalaHdfsScanRel(table=[[tpcds_partitioned_parquet_snap, date_dim]])
+                  ImpalaFilterRel(condition=[AND(=($6, 1998), IS NOT NULL($0))])
+                    ImpalaHdfsScanRel(table=[[tpcds_partitioned_parquet_snap, date_dim]])
               ImpalaProjectRel(s_store_sk=[$0])
-                ImpalaProjectRel(s_store_sk=[$0], s_state=[$24])
-                  ImpalaFilterRel(condition=[AND(SEARCH($24, Sarg[_UTF-8'MI':VARCHAR(2147483647) CHARACTER SET "UTF-8", _UTF-8'MN':VARCHAR(2147483647) CHARACTER SET "UTF-8", _UTF-8'MO':VARCHAR(2147483647) CHARACTER SET "UTF-8", _UTF-8'NM':VARCHAR(2147483647) CHARACTER SET "UTF-8", _UTF-8'OH':VARCHAR(2147483647) CHARACTER SET "UTF-8", _UTF-8'PA':VARCHAR(2147483647) CHARACTER SET "UTF-8", _UTF-8'TN':VARCHAR(2147483647) CHARACTER SET "UTF-8", _UTF-8'WV':VARCHAR(2147483647) CHARACTER SET "UTF-8"]:VARCHAR(2147483647) CHARACTER SET "UTF-8"), IS NOT NULL($0))])
-                    ImpalaHdfsScanRel(table=[[tpcds_partitioned_parquet_snap, store]])
+                ImpalaFilterRel(condition=[AND(SEARCH($24, Sarg[_UTF-8'MI':VARCHAR(2147483647) CHARACTER SET "UTF-8", _UTF-8'MN':VARCHAR(2147483647) CHARACTER SET "UTF-8", _UTF-8'MO':VARCHAR(2147483647) CHARACTER SET "UTF-8", _UTF-8'NM':VARCHAR(2147483647) CHARACTER SET "UTF-8", _UTF-8'OH':VARCHAR(2147483647) CHARACTER SET "UTF-8", _UTF-8'PA':VARCHAR(2147483647) CHARACTER SET "UTF-8", _UTF-8'TN':VARCHAR(2147483647) CHARACTER SET "UTF-8", _UTF-8'WV':VARCHAR(2147483647) CHARACTER SET "UTF-8"]:VARCHAR(2147483647) CHARACTER SET "UTF-8"), IS NOT NULL($0))])
+                  ImpalaHdfsScanRel(table=[[tpcds_partitioned_parquet_snap, store]])
             ImpalaProjectRel(i_item_sk=[$0], i_class=[$10], i_category=[$12])
               ImpalaFilterRel(condition=[IS NOT NULL($0)])
                 ImpalaHdfsScanRel(table=[[tpcds_partitioned_parquet_snap, item]])
@@ -416,7 +412,7 @@ max-parallelism=373 segment-costs=[6137610458, 1636865] cpu-comparison-result=12
      table: rows=8.64G size=389.90GB
      partitions: 1823/1823 rows=8.25G
      columns: all
-   extrapolated-rows=disabled max-scan-range-rows=12.22M est-scan-range=373(filtered from 1823)
+   extrapolated-rows=disabled max-scan-range-rows=12.31M est-scan-range=373(filtered from 1823)
    parquet dictionary predicates: tpcds_partitioned_parquet_snap.store_sales.ss_store_sk IS NOT NULL, tpcds_partitioned_parquet_snap.store_sales.ss_item_sk IS NOT NULL
    mem-estimate=16.00MB mem-reservation=512.00KB thread-reservation=0
    tuple-ids=0 row-size=20B cardinality=1.61G(filtered from 7.88G) cost=580675827
@@ -436,13 +432,11 @@ ImpalaProjectRel(GROSS_MARGIN=[$0], I_CATEGORY=[$1], I_CLASS=[$2], LOCHIERARCHY=
                   ImpalaFilterRel(condition=[AND(IS NOT NULL($22), IS NOT NULL($1), IS NOT NULL($6))])
                     ImpalaHdfsScanRel(table=[[tpcds_partitioned_parquet_snap, store_sales]])
                 ImpalaProjectRel(d_date_sk=[$0])
-                  ImpalaProjectRel(d_date_sk=[$0], d_year=[$6])
-                    ImpalaFilterRel(condition=[AND(=($6, 1998), IS NOT NULL($0))])
-                      ImpalaHdfsScanRel(table=[[tpcds_partitioned_parquet_snap, date_dim]])
+                  ImpalaFilterRel(condition=[AND(=($6, 1998), IS NOT NULL($0))])
+                    ImpalaHdfsScanRel(table=[[tpcds_partitioned_parquet_snap, date_dim]])
               ImpalaProjectRel(s_store_sk=[$0])
-                ImpalaProjectRel(s_store_sk=[$0], s_state=[$24])
-                  ImpalaFilterRel(condition=[AND(SEARCH($24, Sarg[_UTF-8'MI':VARCHAR(2147483647) CHARACTER SET "UTF-8", _UTF-8'MN':VARCHAR(2147483647) CHARACTER SET "UTF-8", _UTF-8'MO':VARCHAR(2147483647) CHARACTER SET "UTF-8", _UTF-8'NM':VARCHAR(2147483647) CHARACTER SET "UTF-8", _UTF-8'OH':VARCHAR(2147483647) CHARACTER SET "UTF-8", _UTF-8'PA':VARCHAR(2147483647) CHARACTER SET "UTF-8", _UTF-8'TN':VARCHAR(2147483647) CHARACTER SET "UTF-8", _UTF-8'WV':VARCHAR(2147483647) CHARACTER SET "UTF-8"]:VARCHAR(2147483647) CHARACTER SET "UTF-8"), IS NOT NULL($0))])
-                    ImpalaHdfsScanRel(table=[[tpcds_partitioned_parquet_snap, store]])
+                ImpalaFilterRel(condition=[AND(SEARCH($24, Sarg[_UTF-8'MI':VARCHAR(2147483647) CHARACTER SET "UTF-8", _UTF-8'MN':VARCHAR(2147483647) CHARACTER SET "UTF-8", _UTF-8'MO':VARCHAR(2147483647) CHARACTER SET "UTF-8", _UTF-8'NM':VARCHAR(2147483647) CHARACTER SET "UTF-8", _UTF-8'OH':VARCHAR(2147483647) CHARACTER SET "UTF-8", _UTF-8'PA':VARCHAR(2147483647) CHARACTER SET "UTF-8", _UTF-8'TN':VARCHAR(2147483647) CHARACTER SET "UTF-8", _UTF-8'WV':VARCHAR(2147483647) CHARACTER SET "UTF-8"]:VARCHAR(2147483647) CHARACTER SET "UTF-8"), IS NOT NULL($0))])
+                  ImpalaHdfsScanRel(table=[[tpcds_partitioned_parquet_snap, store]])
             ImpalaProjectRel(i_item_sk=[$0], i_class=[$10], i_category=[$12])
               ImpalaFilterRel(condition=[IS NOT NULL($0)])
                 ImpalaHdfsScanRel(table=[[tpcds_partitioned_parquet_snap, item]])
@@ -658,7 +652,7 @@ max-parallelism=373 segment-costs=[6137610458, 1636865] cpu-comparison-result=12
      table: rows=8.64G size=389.90GB
      partitions: 1823/1823 rows=8.25G
      columns: all
-   extrapolated-rows=disabled max-scan-range-rows=12.22M est-scan-range=373(filtered from 1823)
+   extrapolated-rows=disabled max-scan-range-rows=12.31M est-scan-range=373(filtered from 1823)
    parquet dictionary predicates: tpcds_partitioned_parquet_snap.store_sales.ss_store_sk IS NOT NULL, tpcds_partitioned_parquet_snap.store_sales.ss_item_sk IS NOT NULL
    mem-estimate=16.00MB mem-reservation=512.00KB thread-reservation=0
    tuple-ids=0 row-size=20B cardinality=1.61G(filtered from 7.88G) cost=580675827

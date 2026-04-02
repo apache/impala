@@ -65,14 +65,7 @@ public class ImpalaValuesRel extends Values
   public NodeWithExprs getPlanNode(ParentPlanRelContext context) throws ImpalaException {
 
 
-    RelDataType rowType =
-        context.parentRowType_ != null ? context.parentRowType_ : getRowType();
-
-    // Value RelNode will generate a Union PlanNode to hold the values. There is
-    // no need to create another Union node if the parent is already a Union node.
-    if (context.parentType_ == RelNodeType.UNION && (getTuples().size() == 1)) {
-      return getValuesExprs(rowType, context.ctx_.getRootAnalyzer(), getTuples().get(0));
-    }
+    RelDataType rowType = getRowType();
 
     List<NodeWithExprs> nodeWithExprsList =
         getValuesExprs(rowType, context.ctx_.getRootAnalyzer());

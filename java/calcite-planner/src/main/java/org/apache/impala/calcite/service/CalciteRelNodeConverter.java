@@ -53,7 +53,6 @@ import org.apache.impala.calcite.operators.ImpalaConvertletTable;
 import org.apache.impala.calcite.operators.ImpalaRexBuilder;
 import org.apache.impala.calcite.rules.ImpalaCoreRules;
 import org.apache.impala.calcite.rules.ImpalaMQContext;
-import org.apache.impala.calcite.rules.RemoveUnraggedCharCastRexExecutor;
 import org.apache.impala.calcite.schema.ImpalaCost;
 import org.apache.impala.calcite.schema.ImpalaRelMetadataProvider;
 import org.apache.impala.calcite.util.LogUtil;
@@ -91,7 +90,6 @@ public class CalciteRelNodeConverter implements CompilerStep {
     this.sqlValidator_ = analysisResult.getSqlValidator();
     this.planner_ = new VolcanoPlanner(ImpalaCost.FACTORY, new ImpalaMQContext(this));
     planner_.addRelTraitDef(ConventionTraitDef.INSTANCE);
-    planner_.setExecutor(new RemoveUnraggedCharCastRexExecutor());
     this.rexBuilder_ = new ImpalaRexBuilder(typeFactory_);
     cluster_ =
         RelOptCluster.create(planner_, this.rexBuilder_);
@@ -148,17 +146,13 @@ public class CalciteRelNodeConverter implements CompilerStep {
 
     LogUtil.logDebug(decorrelatedPlan, "Plan after subquery decorrelation phase");
 
-    rexBuilder_.setPostAnalysis();
     return decorrelatedPlan;
   }
 
   public RelRoot convertQuery(SqlNode validatedNode) {
-    // Use the NO_SIMPLIFY RelBuilderFactory. Starting around Calcite 1.40, there
-    // are cases where Calcite finds a common type for literal strings that do not
-    // have the same length to the higher CHAR type. Impala treats literal strings
-    // as STRING type. The simplify() method removes some vital information needed
-    // to convert the CHAR to a STRING type later in coerce nodes, so we avoid the
-    // simplify step until after coerce nodes is complete.
+    // Use the NO_SIMPLIFY RelBuilderFactory since the Calcite given simplifier
+    // does some simplifications that are not compatible with Impala
+    // (see ImpalaRexSimplify).
     SqlToRelConverter relConverter = new SqlToRelConverter(
         viewExpander_,
         sqlValidator_,

@@ -46,17 +46,14 @@ ImpalaSortRel(sort0=[$5], sort1=[$0], dir0=[DESC], dir1=[ASC])
                     ImpalaFilterRel(condition=[AND(IS NOT NULL($22), IS NOT NULL($6), IS NOT NULL($4), IS NOT NULL($2))])
                       ImpalaHdfsScanRel(table=[[tpcds_partitioned_parquet_snap, store_sales]])
                   ImpalaProjectRel(d_date_sk=[$0])
-                    ImpalaProjectRel(d_date_sk=[$0], d_year=[$6], d_dom=[$9])
-                      ImpalaFilterRel(condition=[AND(SEARCH($9, Sarg[[1..2]]), SEARCH($6, Sarg[1999, 2000, 2001]), IS NOT NULL($0))])
-                        ImpalaHdfsScanRel(table=[[tpcds_partitioned_parquet_snap, date_dim]])
+                    ImpalaFilterRel(condition=[AND(SEARCH($9, Sarg[[1..2]]), SEARCH($6, Sarg[1999, 2000, 2001]), IS NOT NULL($0))])
+                      ImpalaHdfsScanRel(table=[[tpcds_partitioned_parquet_snap, date_dim]])
                 ImpalaProjectRel(hd_demo_sk=[$0])
-                  ImpalaProjectRel(hd_demo_sk=[$0], hd_buy_potential=[$2], hd_dep_count=[$3], hd_vehicle_count=[$4])
-                    ImpalaFilterRel(condition=[AND(OR(=($2, _UTF-8'501-1000'), =($2, _UTF-8'Unknown')), >($4, 0), >(CASE(>($4, 0), /(CAST($3):DOUBLE, CAST($4):DOUBLE), null:DOUBLE), 1.0E0), IS NOT NULL($0))])
-                      ImpalaHdfsScanRel(table=[[tpcds_partitioned_parquet_snap, household_demographics]])
+                  ImpalaFilterRel(condition=[AND(OR(=($2, _UTF-8'501-1000'), =($2, _UTF-8'Unknown')), >($4, 0), >(CASE(>($4, 0), /(CAST($3):DOUBLE, CAST($4):DOUBLE), null:DOUBLE), 1.0E0), IS NOT NULL($0))])
+                    ImpalaHdfsScanRel(table=[[tpcds_partitioned_parquet_snap, household_demographics]])
               ImpalaProjectRel(s_store_sk=[$0])
-                ImpalaProjectRel(s_store_sk=[$0], s_county=[$23])
-                  ImpalaFilterRel(condition=[AND(SEARCH($23, Sarg[_UTF-8'Franklin Parish':VARCHAR(2147483647) CHARACTER SET "UTF-8", _UTF-8'Luce County':VARCHAR(2147483647) CHARACTER SET "UTF-8", _UTF-8'Williamson County':VARCHAR(2147483647) CHARACTER SET "UTF-8", _UTF-8'Ziebach County':VARCHAR(2147483647) CHARACTER SET "UTF-8"]:VARCHAR(2147483647) CHARACTER SET "UTF-8"), IS NOT NULL($0))])
-                    ImpalaHdfsScanRel(table=[[tpcds_partitioned_parquet_snap, store]])
+                ImpalaFilterRel(condition=[AND(SEARCH($23, Sarg[_UTF-8'Franklin Parish':VARCHAR(2147483647) CHARACTER SET "UTF-8", _UTF-8'Luce County':VARCHAR(2147483647) CHARACTER SET "UTF-8", _UTF-8'Williamson County':VARCHAR(2147483647) CHARACTER SET "UTF-8", _UTF-8'Ziebach County':VARCHAR(2147483647) CHARACTER SET "UTF-8"]:VARCHAR(2147483647) CHARACTER SET "UTF-8"), IS NOT NULL($0))])
+                  ImpalaHdfsScanRel(table=[[tpcds_partitioned_parquet_snap, store]])
 F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Instance Resources: mem-estimate=494.69MB mem-reservation=73.00MB thread-reservation=1 runtime-filters-memory=4.00MB
 |  max-parallelism=1 segment-costs=[1302644196, 16987437, 8339760]
@@ -158,7 +155,7 @@ PLAN-ROOT SINK
 |       table: rows=8.64G size=389.90GB
 |       partitions: 1823/1823 rows=8.25G
 |       columns: all
-|     extrapolated-rows=disabled max-scan-range-rows=12.22M est-scan-range=354(filtered from 1823)
+|     extrapolated-rows=disabled max-scan-range-rows=12.31M est-scan-range=354(filtered from 1823)
 |     parquet dictionary predicates: tpcds_partitioned_parquet_snap.store_sales.ss_customer_sk IS NOT NULL, tpcds_partitioned_parquet_snap.store_sales.ss_hdemo_sk IS NOT NULL, tpcds_partitioned_parquet_snap.store_sales.ss_store_sk IS NOT NULL
 |     mem-estimate=16.00MB mem-reservation=512.00KB thread-reservation=0
 |     tuple-ids=2 row-size=24B cardinality=445.14M(filtered from 7.58G) cost=688311073
@@ -195,17 +192,14 @@ ImpalaSortRel(sort0=[$5], sort1=[$0], dir0=[DESC], dir1=[ASC])
                     ImpalaFilterRel(condition=[AND(IS NOT NULL($22), IS NOT NULL($6), IS NOT NULL($4), IS NOT NULL($2))])
                       ImpalaHdfsScanRel(table=[[tpcds_partitioned_parquet_snap, store_sales]])
                   ImpalaProjectRel(d_date_sk=[$0])
-                    ImpalaProjectRel(d_date_sk=[$0], d_year=[$6], d_dom=[$9])
-                      ImpalaFilterRel(condition=[AND(SEARCH($9, Sarg[[1..2]]), SEARCH($6, Sarg[1999, 2000, 2001]), IS NOT NULL($0))])
-                        ImpalaHdfsScanRel(table=[[tpcds_partitioned_parquet_snap, date_dim]])
+                    ImpalaFilterRel(condition=[AND(SEARCH($9, Sarg[[1..2]]), SEARCH($6, Sarg[1999, 2000, 2001]), IS NOT NULL($0))])
+                      ImpalaHdfsScanRel(table=[[tpcds_partitioned_parquet_snap, date_dim]])
                 ImpalaProjectRel(hd_demo_sk=[$0])
-                  ImpalaProjectRel(hd_demo_sk=[$0], hd_buy_potential=[$2], hd_dep_count=[$3], hd_vehicle_count=[$4])
-                    ImpalaFilterRel(condition=[AND(OR(=($2, _UTF-8'501-1000'), =($2, _UTF-8'Unknown')), >($4, 0), >(CASE(>($4, 0), /(CAST($3):DOUBLE, CAST($4):DOUBLE), null:DOUBLE), 1.0E0), IS NOT NULL($0))])
-                      ImpalaHdfsScanRel(table=[[tpcds_partitioned_parquet_snap, household_demographics]])
+                  ImpalaFilterRel(condition=[AND(OR(=($2, _UTF-8'501-1000'), =($2, _UTF-8'Unknown')), >($4, 0), >(CASE(>($4, 0), /(CAST($3):DOUBLE, CAST($4):DOUBLE), null:DOUBLE), 1.0E0), IS NOT NULL($0))])
+                    ImpalaHdfsScanRel(table=[[tpcds_partitioned_parquet_snap, household_demographics]])
               ImpalaProjectRel(s_store_sk=[$0])
-                ImpalaProjectRel(s_store_sk=[$0], s_county=[$23])
-                  ImpalaFilterRel(condition=[AND(SEARCH($23, Sarg[_UTF-8'Franklin Parish':VARCHAR(2147483647) CHARACTER SET "UTF-8", _UTF-8'Luce County':VARCHAR(2147483647) CHARACTER SET "UTF-8", _UTF-8'Williamson County':VARCHAR(2147483647) CHARACTER SET "UTF-8", _UTF-8'Ziebach County':VARCHAR(2147483647) CHARACTER SET "UTF-8"]:VARCHAR(2147483647) CHARACTER SET "UTF-8"), IS NOT NULL($0))])
-                    ImpalaHdfsScanRel(table=[[tpcds_partitioned_parquet_snap, store]])
+                ImpalaFilterRel(condition=[AND(SEARCH($23, Sarg[_UTF-8'Franklin Parish':VARCHAR(2147483647) CHARACTER SET "UTF-8", _UTF-8'Luce County':VARCHAR(2147483647) CHARACTER SET "UTF-8", _UTF-8'Williamson County':VARCHAR(2147483647) CHARACTER SET "UTF-8", _UTF-8'Ziebach County':VARCHAR(2147483647) CHARACTER SET "UTF-8"]:VARCHAR(2147483647) CHARACTER SET "UTF-8"), IS NOT NULL($0))])
+                  ImpalaHdfsScanRel(table=[[tpcds_partitioned_parquet_snap, store]])
 F06:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Instance Resources: mem-estimate=111.45MB mem-reservation=4.00MB thread-reservation=1
 |  max-parallelism=1 segment-costs=[8914256] cpu-comparison-result=120 [max(1 (self) vs 120 (sum children))]
@@ -401,7 +395,7 @@ max-parallelism=10 segment-costs=[15597477, 3357850] cpu-comparison-result=120 [
 |       table: rows=8.64G size=389.90GB
 |       partitions: 1823/1823 rows=8.25G
 |       columns: all
-|     extrapolated-rows=disabled max-scan-range-rows=12.22M est-scan-range=354(filtered from 1823)
+|     extrapolated-rows=disabled max-scan-range-rows=12.31M est-scan-range=354(filtered from 1823)
 |     parquet dictionary predicates: tpcds_partitioned_parquet_snap.store_sales.ss_customer_sk IS NOT NULL, tpcds_partitioned_parquet_snap.store_sales.ss_hdemo_sk IS NOT NULL, tpcds_partitioned_parquet_snap.store_sales.ss_store_sk IS NOT NULL
 |     mem-estimate=16.00MB mem-reservation=512.00KB thread-reservation=0
 |     tuple-ids=2 row-size=24B cardinality=445.14M(filtered from 7.58G) cost=688311073
@@ -438,17 +432,14 @@ ImpalaSortRel(sort0=[$5], sort1=[$0], dir0=[DESC], dir1=[ASC])
                     ImpalaFilterRel(condition=[AND(IS NOT NULL($22), IS NOT NULL($6), IS NOT NULL($4), IS NOT NULL($2))])
                       ImpalaHdfsScanRel(table=[[tpcds_partitioned_parquet_snap, store_sales]])
                   ImpalaProjectRel(d_date_sk=[$0])
-                    ImpalaProjectRel(d_date_sk=[$0], d_year=[$6], d_dom=[$9])
-                      ImpalaFilterRel(condition=[AND(SEARCH($9, Sarg[[1..2]]), SEARCH($6, Sarg[1999, 2000, 2001]), IS NOT NULL($0))])
-                        ImpalaHdfsScanRel(table=[[tpcds_partitioned_parquet_snap, date_dim]])
+                    ImpalaFilterRel(condition=[AND(SEARCH($9, Sarg[[1..2]]), SEARCH($6, Sarg[1999, 2000, 2001]), IS NOT NULL($0))])
+                      ImpalaHdfsScanRel(table=[[tpcds_partitioned_parquet_snap, date_dim]])
                 ImpalaProjectRel(hd_demo_sk=[$0])
-                  ImpalaProjectRel(hd_demo_sk=[$0], hd_buy_potential=[$2], hd_dep_count=[$3], hd_vehicle_count=[$4])
-                    ImpalaFilterRel(condition=[AND(OR(=($2, _UTF-8'501-1000'), =($2, _UTF-8'Unknown')), >($4, 0), >(CASE(>($4, 0), /(CAST($3):DOUBLE, CAST($4):DOUBLE), null:DOUBLE), 1.0E0), IS NOT NULL($0))])
-                      ImpalaHdfsScanRel(table=[[tpcds_partitioned_parquet_snap, household_demographics]])
+                  ImpalaFilterRel(condition=[AND(OR(=($2, _UTF-8'501-1000'), =($2, _UTF-8'Unknown')), >($4, 0), >(CASE(>($4, 0), /(CAST($3):DOUBLE, CAST($4):DOUBLE), null:DOUBLE), 1.0E0), IS NOT NULL($0))])
+                    ImpalaHdfsScanRel(table=[[tpcds_partitioned_parquet_snap, household_demographics]])
               ImpalaProjectRel(s_store_sk=[$0])
-                ImpalaProjectRel(s_store_sk=[$0], s_county=[$23])
-                  ImpalaFilterRel(condition=[AND(SEARCH($23, Sarg[_UTF-8'Franklin Parish':VARCHAR(2147483647) CHARACTER SET "UTF-8", _UTF-8'Luce County':VARCHAR(2147483647) CHARACTER SET "UTF-8", _UTF-8'Williamson County':VARCHAR(2147483647) CHARACTER SET "UTF-8", _UTF-8'Ziebach County':VARCHAR(2147483647) CHARACTER SET "UTF-8"]:VARCHAR(2147483647) CHARACTER SET "UTF-8"), IS NOT NULL($0))])
-                    ImpalaHdfsScanRel(table=[[tpcds_partitioned_parquet_snap, store]])
+                ImpalaFilterRel(condition=[AND(SEARCH($23, Sarg[_UTF-8'Franklin Parish':VARCHAR(2147483647) CHARACTER SET "UTF-8", _UTF-8'Luce County':VARCHAR(2147483647) CHARACTER SET "UTF-8", _UTF-8'Williamson County':VARCHAR(2147483647) CHARACTER SET "UTF-8", _UTF-8'Ziebach County':VARCHAR(2147483647) CHARACTER SET "UTF-8"]:VARCHAR(2147483647) CHARACTER SET "UTF-8"), IS NOT NULL($0))])
+                  ImpalaHdfsScanRel(table=[[tpcds_partitioned_parquet_snap, store]])
 F06:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Instance Resources: mem-estimate=111.45MB mem-reservation=4.00MB thread-reservation=1
 |  max-parallelism=1 segment-costs=[8914256] cpu-comparison-result=120 [max(1 (self) vs 120 (sum children))]
@@ -644,7 +635,7 @@ max-parallelism=10 segment-costs=[15597477, 3357850] cpu-comparison-result=120 [
 |       table: rows=8.64G size=389.90GB
 |       partitions: 1823/1823 rows=8.25G
 |       columns: all
-|     extrapolated-rows=disabled max-scan-range-rows=12.22M est-scan-range=354(filtered from 1823)
+|     extrapolated-rows=disabled max-scan-range-rows=12.31M est-scan-range=354(filtered from 1823)
 |     parquet dictionary predicates: tpcds_partitioned_parquet_snap.store_sales.ss_customer_sk IS NOT NULL, tpcds_partitioned_parquet_snap.store_sales.ss_hdemo_sk IS NOT NULL, tpcds_partitioned_parquet_snap.store_sales.ss_store_sk IS NOT NULL
 |     mem-estimate=16.00MB mem-reservation=512.00KB thread-reservation=0
 |     tuple-ids=2 row-size=24B cardinality=445.14M(filtered from 7.58G) cost=688311073

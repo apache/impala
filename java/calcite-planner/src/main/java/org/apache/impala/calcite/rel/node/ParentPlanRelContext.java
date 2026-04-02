@@ -17,7 +17,6 @@
 
 package org.apache.impala.calcite.rel.node;
 
-import org.apache.calcite.rel.type.RelDataType;
 import org.apache.calcite.rex.RexNode;
 import org.apache.calcite.util.ImmutableBitSet;
 import org.apache.impala.planner.PlannerContext;
@@ -38,11 +37,6 @@ public class ParentPlanRelContext {
   // The input refs used by the parent PlanRel Node
   public final ImmutableBitSet inputRefs_;
 
-  // type of parent RelNode
-  public final ImpalaPlanRel.RelNodeType parentType_;
-
-  public final RelDataType parentRowType_;
-
   public ImpalaAggRel parentAggregate_;
 
   /**
@@ -52,8 +46,6 @@ public class ParentPlanRelContext {
     this.ctx_ = plannerContext;
     this.filterCondition_ = null;
     this.inputRefs_ = null;
-    this.parentType_ = null;
-    this.parentRowType_ = null;
     this.parentAggregate_ = null;
   }
 
@@ -61,8 +53,6 @@ public class ParentPlanRelContext {
     this.ctx_ = builder.context_;
     this.filterCondition_ = builder.filterCondition_;
     this.inputRefs_ = builder.inputRefs_;
-    this.parentType_ = builder.parentType_;
-    this.parentRowType_ = builder.parentRowType_;
     this.parentAggregate_ = builder.parentAggregate_;
   }
 
@@ -70,8 +60,6 @@ public class ParentPlanRelContext {
     private PlannerContext context_;
     private RexNode filterCondition_;
     private ImmutableBitSet inputRefs_;
-    private ImpalaPlanRel.RelNodeType parentType_;
-    private RelDataType  parentRowType_;
     private ImpalaAggRel parentAggregate_;
 
     /**
@@ -79,13 +67,11 @@ public class ParentPlanRelContext {
      */
     public Builder(PlannerContext plannerContext) {
       this.context_ = plannerContext;
-      this.parentType_ = null;
     }
 
     public Builder(ParentPlanRelContext planRelContext, ImpalaPlanRel planRel) {
       this.context_ = planRelContext.ctx_;
       this.filterCondition_ = planRelContext.filterCondition_;
-      this.parentType_ = planRel.relNodeType();
       this.parentAggregate_ = ImpalaPlanRel.canPassThroughParentAggregate(planRel)
           ? planRelContext.parentAggregate_
           : null;
@@ -97,14 +83,6 @@ public class ParentPlanRelContext {
 
     public void setInputRefs(ImmutableBitSet inputRefs) {
       this.inputRefs_ = inputRefs;
-    }
-
-    public void setParentRowType(RelDataType parentRowType) {
-      this.parentRowType_ = parentRowType;
-    }
-
-    public void setParentType(ImpalaPlanRel.RelNodeType parentType) {
-      this.parentType_ = parentType;
     }
 
     public void setParentAggregate(ImpalaAggRel parentAggregate) {

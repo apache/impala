@@ -45,9 +45,8 @@ ImpalaSortRel(sort0=[$2], sort1=[$3], sort2=[$0], sort3=[$1], sort4=[$6], dir0=[
               ImpalaFilterRel(condition=[AND(IS NOT NULL($1), IS NOT NULL($22))])
                 ImpalaHdfsScanRel(table=[[tpcds_partitioned_parquet_snap, store_sales]])
             ImpalaProjectRel(d_date_sk=[$0])
-              ImpalaProjectRel(d_date_sk=[$0], d_date=[$2])
-                ImpalaFilterRel(condition=[AND(SEARCH($2, Sarg[[2001-04-12:DATE..2001-05-12:DATE]]:DATE), IS NOT NULL($0))])
-                  ImpalaHdfsScanRel(table=[[tpcds_partitioned_parquet_snap, date_dim]])
+              ImpalaFilterRel(condition=[AND(SEARCH($2, Sarg[[2001-04-12:DATE..2001-05-12:DATE]]:DATE), IS NOT NULL($0))])
+                ImpalaHdfsScanRel(table=[[tpcds_partitioned_parquet_snap, date_dim]])
           ImpalaProjectRel(i_item_sk=[$0], i_item_id=[$1], i_item_desc=[$4], i_current_price=[$5], i_class=[$10], i_category=[$12])
             ImpalaFilterRel(condition=[AND(SEARCH($12, Sarg[_UTF-8'Home':VARCHAR(2147483647) CHARACTER SET "UTF-8", _UTF-8'Jewelry':VARCHAR(2147483647) CHARACTER SET "UTF-8", _UTF-8'Shoes':VARCHAR(2147483647) CHARACTER SET "UTF-8"]:VARCHAR(2147483647) CHARACTER SET "UTF-8"), IS NOT NULL($0))])
               ImpalaHdfsScanRel(table=[[tpcds_partitioned_parquet_snap, item]])
@@ -136,7 +135,7 @@ PLAN-ROOT SINK
      table: rows=8.64G size=389.90GB
      partitions: 1823/1823 rows=8.25G
      columns: all
-   extrapolated-rows=disabled max-scan-range-rows=12.22M
+   extrapolated-rows=disabled max-scan-range-rows=12.31M
    parquet dictionary predicates: tpcds_partitioned_parquet_snap.store_sales.ss_item_sk IS NOT NULL
    mem-estimate=16.00MB mem-reservation=512.00KB thread-reservation=0
    tuple-ids=0 row-size=12B cardinality=2.47G(filtered from 8.25G) cost=1657367506
@@ -154,9 +153,8 @@ ImpalaSortRel(sort0=[$2], sort1=[$3], sort2=[$0], sort3=[$1], sort4=[$6], dir0=[
               ImpalaFilterRel(condition=[AND(IS NOT NULL($1), IS NOT NULL($22))])
                 ImpalaHdfsScanRel(table=[[tpcds_partitioned_parquet_snap, store_sales]])
             ImpalaProjectRel(d_date_sk=[$0])
-              ImpalaProjectRel(d_date_sk=[$0], d_date=[$2])
-                ImpalaFilterRel(condition=[AND(SEARCH($2, Sarg[[2001-04-12:DATE..2001-05-12:DATE]]:DATE), IS NOT NULL($0))])
-                  ImpalaHdfsScanRel(table=[[tpcds_partitioned_parquet_snap, date_dim]])
+              ImpalaFilterRel(condition=[AND(SEARCH($2, Sarg[[2001-04-12:DATE..2001-05-12:DATE]]:DATE), IS NOT NULL($0))])
+                ImpalaHdfsScanRel(table=[[tpcds_partitioned_parquet_snap, date_dim]])
           ImpalaProjectRel(i_item_sk=[$0], i_item_id=[$1], i_item_desc=[$4], i_current_price=[$5], i_class=[$10], i_category=[$12])
             ImpalaFilterRel(condition=[AND(SEARCH($12, Sarg[_UTF-8'Home':VARCHAR(2147483647) CHARACTER SET "UTF-8", _UTF-8'Jewelry':VARCHAR(2147483647) CHARACTER SET "UTF-8", _UTF-8'Shoes':VARCHAR(2147483647) CHARACTER SET "UTF-8"]:VARCHAR(2147483647) CHARACTER SET "UTF-8"), IS NOT NULL($0))])
               ImpalaHdfsScanRel(table=[[tpcds_partitioned_parquet_snap, item]])
@@ -312,7 +310,7 @@ max-parallelism=850 segment-costs=[8464153624, 573922566] cpu-comparison-result=
      table: rows=8.64G size=389.90GB
      partitions: 1823/1823 rows=8.25G
      columns: all
-   extrapolated-rows=disabled max-scan-range-rows=12.22M
+   extrapolated-rows=disabled max-scan-range-rows=12.31M
    parquet dictionary predicates: tpcds_partitioned_parquet_snap.store_sales.ss_item_sk IS NOT NULL
    mem-estimate=16.00MB mem-reservation=512.00KB thread-reservation=0
    tuple-ids=0 row-size=12B cardinality=2.47G(filtered from 8.25G) cost=1657367506
@@ -330,9 +328,8 @@ ImpalaSortRel(sort0=[$2], sort1=[$3], sort2=[$0], sort3=[$1], sort4=[$6], dir0=[
               ImpalaFilterRel(condition=[AND(IS NOT NULL($1), IS NOT NULL($22))])
                 ImpalaHdfsScanRel(table=[[tpcds_partitioned_parquet_snap, store_sales]])
             ImpalaProjectRel(d_date_sk=[$0])
-              ImpalaProjectRel(d_date_sk=[$0], d_date=[$2])
-                ImpalaFilterRel(condition=[AND(SEARCH($2, Sarg[[2001-04-12:DATE..2001-05-12:DATE]]:DATE), IS NOT NULL($0))])
-                  ImpalaHdfsScanRel(table=[[tpcds_partitioned_parquet_snap, date_dim]])
+              ImpalaFilterRel(condition=[AND(SEARCH($2, Sarg[[2001-04-12:DATE..2001-05-12:DATE]]:DATE), IS NOT NULL($0))])
+                ImpalaHdfsScanRel(table=[[tpcds_partitioned_parquet_snap, date_dim]])
           ImpalaProjectRel(i_item_sk=[$0], i_item_id=[$1], i_item_desc=[$4], i_current_price=[$5], i_class=[$10], i_category=[$12])
             ImpalaFilterRel(condition=[AND(SEARCH($12, Sarg[_UTF-8'Home':VARCHAR(2147483647) CHARACTER SET "UTF-8", _UTF-8'Jewelry':VARCHAR(2147483647) CHARACTER SET "UTF-8", _UTF-8'Shoes':VARCHAR(2147483647) CHARACTER SET "UTF-8"]:VARCHAR(2147483647) CHARACTER SET "UTF-8"), IS NOT NULL($0))])
               ImpalaHdfsScanRel(table=[[tpcds_partitioned_parquet_snap, item]])
@@ -488,7 +485,7 @@ max-parallelism=850 segment-costs=[8464153624, 573922566] cpu-comparison-result=
      table: rows=8.64G size=389.90GB
      partitions: 1823/1823 rows=8.25G
      columns: all
-   extrapolated-rows=disabled max-scan-range-rows=12.22M
+   extrapolated-rows=disabled max-scan-range-rows=12.31M
    parquet dictionary predicates: tpcds_partitioned_parquet_snap.store_sales.ss_item_sk IS NOT NULL
    mem-estimate=16.00MB mem-reservation=512.00KB thread-reservation=0
    tuple-ids=0 row-size=12B cardinality=2.47G(filtered from 8.25G) cost=1657367506

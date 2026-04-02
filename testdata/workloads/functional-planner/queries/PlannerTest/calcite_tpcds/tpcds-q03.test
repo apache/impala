@@ -32,14 +32,12 @@ ImpalaSortRel(sort0=[$0], sort1=[$3], sort2=[$1], dir0=[ASC], dir1=[DESC], dir2=
             ImpalaProjectRel(ss_item_sk=[$1], ss_sales_price=[$12], ss_sold_date_sk=[$22])
               ImpalaFilterRel(condition=[AND(IS NOT NULL($22), IS NOT NULL($1))])
                 ImpalaHdfsScanRel(table=[[tpcds_partitioned_parquet_snap, store_sales]])
-            ImpalaProjectRel(d_date_sk=[$0], d_year=[$1])
-              ImpalaProjectRel(d_date_sk=[$0], d_year=[$6], d_moy=[$8])
-                ImpalaFilterRel(condition=[AND(=($8, 11), IS NOT NULL($0))])
-                  ImpalaHdfsScanRel(table=[[tpcds_partitioned_parquet_snap, date_dim]])
-          ImpalaProjectRel(i_item_sk=[$0], i_brand_id=[$1], i_brand=[$2])
-            ImpalaProjectRel(i_item_sk=[$0], i_brand_id=[$7], i_brand=[$8], i_manufact_id=[$13])
-              ImpalaFilterRel(condition=[AND(=($13, 816), IS NOT NULL($0))])
-                ImpalaHdfsScanRel(table=[[tpcds_partitioned_parquet_snap, item]])
+            ImpalaProjectRel(d_date_sk=[$0], d_year=[$6])
+              ImpalaFilterRel(condition=[AND(=($8, 11), IS NOT NULL($0))])
+                ImpalaHdfsScanRel(table=[[tpcds_partitioned_parquet_snap, date_dim]])
+          ImpalaProjectRel(i_item_sk=[$0], i_brand_id=[$7], i_brand=[$8])
+            ImpalaFilterRel(condition=[AND(=($13, 816), IS NOT NULL($0))])
+              ImpalaHdfsScanRel(table=[[tpcds_partitioned_parquet_snap, item]])
 F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Instance Resources: mem-estimate=537.26MB mem-reservation=40.38MB thread-reservation=1 runtime-filters-memory=2.00MB
 |  max-parallelism=1 segment-costs=[3209066006, 111544107, 400]
@@ -111,7 +109,7 @@ PLAN-ROOT SINK
      table: rows=8.64G size=389.90GB
      partitions: 1823/1823 rows=8.25G
      columns: all
-   extrapolated-rows=disabled max-scan-range-rows=12.22M
+   extrapolated-rows=disabled max-scan-range-rows=12.31M
    parquet dictionary predicates: tpcds_partitioned_parquet_snap.store_sales.ss_item_sk IS NOT NULL
    mem-estimate=16.00MB mem-reservation=512.00KB thread-reservation=0
    tuple-ids=0 row-size=12B cardinality=8.59M(filtered from 8.25G) cost=1657367506
@@ -128,14 +126,12 @@ ImpalaSortRel(sort0=[$0], sort1=[$3], sort2=[$1], dir0=[ASC], dir1=[DESC], dir2=
             ImpalaProjectRel(ss_item_sk=[$1], ss_sales_price=[$12], ss_sold_date_sk=[$22])
               ImpalaFilterRel(condition=[AND(IS NOT NULL($22), IS NOT NULL($1))])
                 ImpalaHdfsScanRel(table=[[tpcds_partitioned_parquet_snap, store_sales]])
-            ImpalaProjectRel(d_date_sk=[$0], d_year=[$1])
-              ImpalaProjectRel(d_date_sk=[$0], d_year=[$6], d_moy=[$8])
-                ImpalaFilterRel(condition=[AND(=($8, 11), IS NOT NULL($0))])
-                  ImpalaHdfsScanRel(table=[[tpcds_partitioned_parquet_snap, date_dim]])
-          ImpalaProjectRel(i_item_sk=[$0], i_brand_id=[$1], i_brand=[$2])
-            ImpalaProjectRel(i_item_sk=[$0], i_brand_id=[$7], i_brand=[$8], i_manufact_id=[$13])
-              ImpalaFilterRel(condition=[AND(=($13, 816), IS NOT NULL($0))])
-                ImpalaHdfsScanRel(table=[[tpcds_partitioned_parquet_snap, item]])
+            ImpalaProjectRel(d_date_sk=[$0], d_year=[$6])
+              ImpalaFilterRel(condition=[AND(=($8, 11), IS NOT NULL($0))])
+                ImpalaHdfsScanRel(table=[[tpcds_partitioned_parquet_snap, date_dim]])
+          ImpalaProjectRel(i_item_sk=[$0], i_brand_id=[$7], i_brand=[$8])
+            ImpalaFilterRel(condition=[AND(=($13, 816), IS NOT NULL($0))])
+              ImpalaHdfsScanRel(table=[[tpcds_partitioned_parquet_snap, item]])
 F04:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Instance Resources: mem-estimate=4.11MB mem-reservation=4.00MB thread-reservation=1
 |  max-parallelism=1 segment-costs=[435] cpu-comparison-result=120 [max(1 (self) vs 120 (sum children))]
@@ -267,7 +263,7 @@ max-parallelism=330 segment-costs=[3208876607, 33276559] cpu-comparison-result=1
      table: rows=8.64G size=389.90GB
      partitions: 1823/1823 rows=8.25G
      columns: all
-   extrapolated-rows=disabled max-scan-range-rows=12.22M
+   extrapolated-rows=disabled max-scan-range-rows=12.31M
    parquet dictionary predicates: tpcds_partitioned_parquet_snap.store_sales.ss_item_sk IS NOT NULL
    mem-estimate=16.00MB mem-reservation=512.00KB thread-reservation=0
    tuple-ids=0 row-size=12B cardinality=8.59M(filtered from 8.25G) cost=1657367506
@@ -284,14 +280,12 @@ ImpalaSortRel(sort0=[$0], sort1=[$3], sort2=[$1], dir0=[ASC], dir1=[DESC], dir2=
             ImpalaProjectRel(ss_item_sk=[$1], ss_sales_price=[$12], ss_sold_date_sk=[$22])
               ImpalaFilterRel(condition=[AND(IS NOT NULL($22), IS NOT NULL($1))])
                 ImpalaHdfsScanRel(table=[[tpcds_partitioned_parquet_snap, store_sales]])
-            ImpalaProjectRel(d_date_sk=[$0], d_year=[$1])
-              ImpalaProjectRel(d_date_sk=[$0], d_year=[$6], d_moy=[$8])
-                ImpalaFilterRel(condition=[AND(=($8, 11), IS NOT NULL($0))])
-                  ImpalaHdfsScanRel(table=[[tpcds_partitioned_parquet_snap, date_dim]])
-          ImpalaProjectRel(i_item_sk=[$0], i_brand_id=[$1], i_brand=[$2])
-            ImpalaProjectRel(i_item_sk=[$0], i_brand_id=[$7], i_brand=[$8], i_manufact_id=[$13])
-              ImpalaFilterRel(condition=[AND(=($13, 816), IS NOT NULL($0))])
-                ImpalaHdfsScanRel(table=[[tpcds_partitioned_parquet_snap, item]])
+            ImpalaProjectRel(d_date_sk=[$0], d_year=[$6])
+              ImpalaFilterRel(condition=[AND(=($8, 11), IS NOT NULL($0))])
+                ImpalaHdfsScanRel(table=[[tpcds_partitioned_parquet_snap, date_dim]])
+          ImpalaProjectRel(i_item_sk=[$0], i_brand_id=[$7], i_brand=[$8])
+            ImpalaFilterRel(condition=[AND(=($13, 816), IS NOT NULL($0))])
+              ImpalaHdfsScanRel(table=[[tpcds_partitioned_parquet_snap, item]])
 F04:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Instance Resources: mem-estimate=4.11MB mem-reservation=4.00MB thread-reservation=1
 |  max-parallelism=1 segment-costs=[435] cpu-comparison-result=120 [max(1 (self) vs 120 (sum children))]
@@ -423,7 +417,7 @@ max-parallelism=330 segment-costs=[3208876607, 33276559] cpu-comparison-result=1
      table: rows=8.64G size=389.90GB
      partitions: 1823/1823 rows=8.25G
      columns: all
-   extrapolated-rows=disabled max-scan-range-rows=12.22M
+   extrapolated-rows=disabled max-scan-range-rows=12.31M
    parquet dictionary predicates: tpcds_partitioned_parquet_snap.store_sales.ss_item_sk IS NOT NULL
    mem-estimate=16.00MB mem-reservation=512.00KB thread-reservation=0
    tuple-ids=0 row-size=12B cardinality=8.59M(filtered from 8.25G) cost=1657367506

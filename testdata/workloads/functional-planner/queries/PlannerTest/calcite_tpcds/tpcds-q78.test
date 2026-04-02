@@ -77,9 +77,8 @@ ImpalaSortRel(sort0=[$1], sort1=[$2], sort2=[$4], sort3=[$5], sort4=[$6], sort5=
                       ImpalaProjectRel(sr_item_sk=[$1], sr_ticket_number=[$8])
                         ImpalaHdfsScanRel(table=[[tpcds_partitioned_parquet_snap, store_returns]])
                   ImpalaProjectRel(d_date_sk=[$0])
-                    ImpalaProjectRel(d_date_sk=[$0], d_year=[$6])
-                      ImpalaFilterRel(condition=[AND(=($6, 2002), IS NOT NULL($0))])
-                        ImpalaHdfsScanRel(table=[[tpcds_partitioned_parquet_snap, date_dim]])
+                    ImpalaFilterRel(condition=[AND(=($6, 2002), IS NOT NULL($0))])
+                      ImpalaHdfsScanRel(table=[[tpcds_partitioned_parquet_snap, date_dim]])
           ImpalaProjectRel(WS_SOLD_YEAR=[CAST(2002):INTEGER], WS_ITEM_SK=[$0], WS_CUSTOMER_SK=[$1], WS_QTY=[$2], WS_WC=[$3], WS_SP=[$4])
             ImpalaAggRel(group=[{0, 1}], WS_QTY=[SUM($4)], WS_WC=[SUM($2)], WS_SP=[SUM($3)])
               ImpalaProjectRel(WS_ITEM_SK=[$0], WS_CUSTOMER_SK=[$1], ws_wholesale_cost=[$4], ws_sales_price=[$5], cast_ws_quantity=[CAST($3):BIGINT])
@@ -92,9 +91,8 @@ ImpalaSortRel(sort0=[$1], sort1=[$2], sort2=[$4], sort3=[$5], sort4=[$6], sort5=
                       ImpalaProjectRel(wr_item_sk=[$1], wr_order_number=[$12])
                         ImpalaHdfsScanRel(table=[[tpcds_partitioned_parquet_snap, web_returns]])
                   ImpalaProjectRel(d_date_sk=[$0])
-                    ImpalaProjectRel(d_date_sk=[$0], d_year=[$6])
-                      ImpalaFilterRel(condition=[AND(=($6, 2002), IS NOT NULL($0))])
-                        ImpalaHdfsScanRel(table=[[tpcds_partitioned_parquet_snap, date_dim]])
+                    ImpalaFilterRel(condition=[AND(=($6, 2002), IS NOT NULL($0))])
+                      ImpalaHdfsScanRel(table=[[tpcds_partitioned_parquet_snap, date_dim]])
         ImpalaProjectRel(CS_SOLD_YEAR=[CAST(2002):INTEGER], CS_ITEM_SK=[$0], CS_CUSTOMER_SK=[$1], CS_QTY=[$2], CS_WC=[$3], CS_SP=[$4])
           ImpalaAggRel(group=[{0, 1}], CS_QTY=[SUM($4)], CS_WC=[SUM($2)], CS_SP=[SUM($3)])
             ImpalaProjectRel(CS_ITEM_SK=[$1], CS_CUSTOMER_SK=[$0], cs_wholesale_cost=[$4], cs_sales_price=[$5], cast_cs_quantity=[CAST($3):BIGINT])
@@ -107,9 +105,8 @@ ImpalaSortRel(sort0=[$1], sort1=[$2], sort2=[$4], sort3=[$5], sort4=[$6], sort5=
                     ImpalaProjectRel(cr_item_sk=[$1], cr_order_number=[$15])
                       ImpalaHdfsScanRel(table=[[tpcds_partitioned_parquet_snap, catalog_returns]])
                 ImpalaProjectRel(d_date_sk=[$0])
-                  ImpalaProjectRel(d_date_sk=[$0], d_year=[$6])
-                    ImpalaFilterRel(condition=[AND(=($6, 2002), IS NOT NULL($0))])
-                      ImpalaHdfsScanRel(table=[[tpcds_partitioned_parquet_snap, date_dim]])
+                  ImpalaFilterRel(condition=[AND(=($6, 2002), IS NOT NULL($0))])
+                    ImpalaHdfsScanRel(table=[[tpcds_partitioned_parquet_snap, date_dim]])
 F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Instance Resources: mem-estimate=202.09GB mem-reservation=213.69MB thread-reservation=1 runtime-filters-memory=3.00MB
 |  max-parallelism=1 segment-costs=[14650716146, 3822997494, 7588348737, 31948515754, 1000]
@@ -313,7 +310,7 @@ PLAN-ROOT SINK
      table: rows=8.64G size=389.90GB
      partitions: 1823/1823 rows=8.25G
      columns: all
-   extrapolated-rows=disabled max-scan-range-rows=12.22M est-scan-range=373(filtered from 1823)
+   extrapolated-rows=disabled max-scan-range-rows=12.31M est-scan-range=373(filtered from 1823)
    mem-estimate=16.00MB mem-reservation=512.00KB thread-reservation=0
    tuple-ids=0 row-size=32B cardinality=1.69G(filtered from 8.25G) cost=777383559
    in pipelines: 00(GETNEXT)
@@ -337,9 +334,8 @@ ImpalaSortRel(sort0=[$1], sort1=[$2], sort2=[$4], sort3=[$5], sort4=[$6], sort5=
                       ImpalaProjectRel(sr_item_sk=[$1], sr_ticket_number=[$8])
                         ImpalaHdfsScanRel(table=[[tpcds_partitioned_parquet_snap, store_returns]])
                   ImpalaProjectRel(d_date_sk=[$0])
-                    ImpalaProjectRel(d_date_sk=[$0], d_year=[$6])
-                      ImpalaFilterRel(condition=[AND(=($6, 2002), IS NOT NULL($0))])
-                        ImpalaHdfsScanRel(table=[[tpcds_partitioned_parquet_snap, date_dim]])
+                    ImpalaFilterRel(condition=[AND(=($6, 2002), IS NOT NULL($0))])
+                      ImpalaHdfsScanRel(table=[[tpcds_partitioned_parquet_snap, date_dim]])
           ImpalaProjectRel(WS_SOLD_YEAR=[CAST(2002):INTEGER], WS_ITEM_SK=[$0], WS_CUSTOMER_SK=[$1], WS_QTY=[$2], WS_WC=[$3], WS_SP=[$4])
             ImpalaAggRel(group=[{0, 1}], WS_QTY=[SUM($4)], WS_WC=[SUM($2)], WS_SP=[SUM($3)])
               ImpalaProjectRel(WS_ITEM_SK=[$0], WS_CUSTOMER_SK=[$1], ws_wholesale_cost=[$4], ws_sales_price=[$5], cast_ws_quantity=[CAST($3):BIGINT])
@@ -352,9 +348,8 @@ ImpalaSortRel(sort0=[$1], sort1=[$2], sort2=[$4], sort3=[$5], sort4=[$6], sort5=
                       ImpalaProjectRel(wr_item_sk=[$1], wr_order_number=[$12])
                         ImpalaHdfsScanRel(table=[[tpcds_partitioned_parquet_snap, web_returns]])
                   ImpalaProjectRel(d_date_sk=[$0])
-                    ImpalaProjectRel(d_date_sk=[$0], d_year=[$6])
-                      ImpalaFilterRel(condition=[AND(=($6, 2002), IS NOT NULL($0))])
-                        ImpalaHdfsScanRel(table=[[tpcds_partitioned_parquet_snap, date_dim]])
+                    ImpalaFilterRel(condition=[AND(=($6, 2002), IS NOT NULL($0))])
+                      ImpalaHdfsScanRel(table=[[tpcds_partitioned_parquet_snap, date_dim]])
         ImpalaProjectRel(CS_SOLD_YEAR=[CAST(2002):INTEGER], CS_ITEM_SK=[$0], CS_CUSTOMER_SK=[$1], CS_QTY=[$2], CS_WC=[$3], CS_SP=[$4])
           ImpalaAggRel(group=[{0, 1}], CS_QTY=[SUM($4)], CS_WC=[SUM($2)], CS_SP=[SUM($3)])
             ImpalaProjectRel(CS_ITEM_SK=[$1], CS_CUSTOMER_SK=[$0], cs_wholesale_cost=[$4], cs_sales_price=[$5], cast_cs_quantity=[CAST($3):BIGINT])
@@ -367,9 +362,8 @@ ImpalaSortRel(sort0=[$1], sort1=[$2], sort2=[$4], sort3=[$5], sort4=[$6], sort5=
                     ImpalaProjectRel(cr_item_sk=[$1], cr_order_number=[$15])
                       ImpalaHdfsScanRel(table=[[tpcds_partitioned_parquet_snap, catalog_returns]])
                 ImpalaProjectRel(d_date_sk=[$0])
-                  ImpalaProjectRel(d_date_sk=[$0], d_year=[$6])
-                    ImpalaFilterRel(condition=[AND(=($6, 2002), IS NOT NULL($0))])
-                      ImpalaHdfsScanRel(table=[[tpcds_partitioned_parquet_snap, date_dim]])
+                  ImpalaFilterRel(condition=[AND(=($6, 2002), IS NOT NULL($0))])
+                    ImpalaHdfsScanRel(table=[[tpcds_partitioned_parquet_snap, date_dim]])
 F13:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Instance Resources: mem-estimate=5.51MB mem-reservation=4.00MB thread-reservation=1
 |  max-parallelism=1 segment-costs=[1050] cpu-comparison-result=360 [max(1 (self) vs 360 (sum children))]
@@ -775,7 +769,7 @@ max-parallelism=373 segment-costs=[13637417386, 6084106052] cpu-comparison-resul
      table: rows=8.64G size=389.90GB
      partitions: 1823/1823 rows=8.25G
      columns: all
-   extrapolated-rows=disabled max-scan-range-rows=12.22M est-scan-range=373(filtered from 1823)
+   extrapolated-rows=disabled max-scan-range-rows=12.31M est-scan-range=373(filtered from 1823)
    mem-estimate=16.00MB mem-reservation=512.00KB thread-reservation=0
    tuple-ids=0 row-size=32B cardinality=1.69G(filtered from 8.25G) cost=777383559
    in pipelines: 00(GETNEXT)
@@ -799,9 +793,8 @@ ImpalaSortRel(sort0=[$1], sort1=[$2], sort2=[$4], sort3=[$5], sort4=[$6], sort5=
                       ImpalaProjectRel(sr_item_sk=[$1], sr_ticket_number=[$8])
                         ImpalaHdfsScanRel(table=[[tpcds_partitioned_parquet_snap, store_returns]])
                   ImpalaProjectRel(d_date_sk=[$0])
-                    ImpalaProjectRel(d_date_sk=[$0], d_year=[$6])
-                      ImpalaFilterRel(condition=[AND(=($6, 2002), IS NOT NULL($0))])
-                        ImpalaHdfsScanRel(table=[[tpcds_partitioned_parquet_snap, date_dim]])
+                    ImpalaFilterRel(condition=[AND(=($6, 2002), IS NOT NULL($0))])
+                      ImpalaHdfsScanRel(table=[[tpcds_partitioned_parquet_snap, date_dim]])
           ImpalaProjectRel(WS_SOLD_YEAR=[CAST(2002):INTEGER], WS_ITEM_SK=[$0], WS_CUSTOMER_SK=[$1], WS_QTY=[$2], WS_WC=[$3], WS_SP=[$4])
             ImpalaAggRel(group=[{0, 1}], WS_QTY=[SUM($4)], WS_WC=[SUM($2)], WS_SP=[SUM($3)])
               ImpalaProjectRel(WS_ITEM_SK=[$0], WS_CUSTOMER_SK=[$1], ws_wholesale_cost=[$4], ws_sales_price=[$5], cast_ws_quantity=[CAST($3):BIGINT])
@@ -814,9 +807,8 @@ ImpalaSortRel(sort0=[$1], sort1=[$2], sort2=[$4], sort3=[$5], sort4=[$6], sort5=
                       ImpalaProjectRel(wr_item_sk=[$1], wr_order_number=[$12])
                         ImpalaHdfsScanRel(table=[[tpcds_partitioned_parquet_snap, web_returns]])
                   ImpalaProjectRel(d_date_sk=[$0])
-                    ImpalaProjectRel(d_date_sk=[$0], d_year=[$6])
-                      ImpalaFilterRel(condition=[AND(=($6, 2002), IS NOT NULL($0))])
-                        ImpalaHdfsScanRel(table=[[tpcds_partitioned_parquet_snap, date_dim]])
+                    ImpalaFilterRel(condition=[AND(=($6, 2002), IS NOT NULL($0))])
+                      ImpalaHdfsScanRel(table=[[tpcds_partitioned_parquet_snap, date_dim]])
         ImpalaProjectRel(CS_SOLD_YEAR=[CAST(2002):INTEGER], CS_ITEM_SK=[$0], CS_CUSTOMER_SK=[$1], CS_QTY=[$2], CS_WC=[$3], CS_SP=[$4])
           ImpalaAggRel(group=[{0, 1}], CS_QTY=[SUM($4)], CS_WC=[SUM($2)], CS_SP=[SUM($3)])
             ImpalaProjectRel(CS_ITEM_SK=[$1], CS_CUSTOMER_SK=[$0], cs_wholesale_cost=[$4], cs_sales_price=[$5], cast_cs_quantity=[CAST($3):BIGINT])
@@ -829,9 +821,8 @@ ImpalaSortRel(sort0=[$1], sort1=[$2], sort2=[$4], sort3=[$5], sort4=[$6], sort5=
                     ImpalaProjectRel(cr_item_sk=[$1], cr_order_number=[$15])
                       ImpalaHdfsScanRel(table=[[tpcds_partitioned_parquet_snap, catalog_returns]])
                 ImpalaProjectRel(d_date_sk=[$0])
-                  ImpalaProjectRel(d_date_sk=[$0], d_year=[$6])
-                    ImpalaFilterRel(condition=[AND(=($6, 2002), IS NOT NULL($0))])
-                      ImpalaHdfsScanRel(table=[[tpcds_partitioned_parquet_snap, date_dim]])
+                  ImpalaFilterRel(condition=[AND(=($6, 2002), IS NOT NULL($0))])
+                    ImpalaHdfsScanRel(table=[[tpcds_partitioned_parquet_snap, date_dim]])
 F16:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Instance Resources: mem-estimate=5.51MB mem-reservation=4.00MB thread-reservation=1
 |  max-parallelism=1 segment-costs=[1050] cpu-comparison-result=731 [max(1 (self) vs 731 (sum children))]
@@ -1261,7 +1252,7 @@ max-parallelism=373 segment-costs=[5123173596]
      table: rows=8.64G size=389.90GB
      partitions: 1823/1823 rows=8.25G
      columns: all
-   extrapolated-rows=disabled max-scan-range-rows=12.22M est-scan-range=373(filtered from 1823)
+   extrapolated-rows=disabled max-scan-range-rows=12.31M est-scan-range=373(filtered from 1823)
    mem-estimate=16.00MB mem-reservation=512.00KB thread-reservation=0
    tuple-ids=0 row-size=32B cardinality=1.69G(filtered from 8.25G) cost=777383559
    in pipelines: 00(GETNEXT)

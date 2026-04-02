@@ -149,11 +149,15 @@ public class ImpalaRexExecutor implements RexExecutor {
   }
 
   private static boolean isLiteralOrCastOfLiteral(RexNode operand) {
-    while ((operand instanceof RexCall) &&
-        ((RexCall) operand).getKind() == SqlKind.CAST) {
+    while ((operand instanceof RexCall) && isCast((RexCall) operand)) {
       operand = ((RexCall) operand).getOperands().get(0);
     }
     return (operand instanceof RexLiteral);
+  }
+
+  private static boolean isCast(RexCall rexCall) {
+    return rexCall.getKind() == SqlKind.CAST ||
+        rexCall.getOperator().getName().equals("EXPLICIT_CAST");
   }
 
   private static boolean isIntervalConst(RexNode operand) {

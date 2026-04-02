@@ -48,12 +48,7 @@ public class ImpalaTypeCoercionImpl extends TypeCoercionImpl {
   @Override
   public RelDataType getWiderTypeFor(List<RelDataType> typeList,
       boolean stringPromotion) {
-    List<RelDataType> newTypeList = new ArrayList<>();
-    for (RelDataType type : typeList) {
-      newTypeList.add(type);
-    }
-
-    return ImpalaTypeConverter.getCompatibleType(newTypeList, factory);
+    return ImpalaTypeConverter.getCompatibleType(typeList, factory);
   }
 
   // Do type coercion for In Clause. Calcite allows numerics

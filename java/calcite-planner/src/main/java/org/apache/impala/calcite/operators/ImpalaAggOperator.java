@@ -68,4 +68,9 @@ public class ImpalaAggOperator extends SqlAggFunction {
   public SqlSyntax getSyntax() {
     return SqlSyntax.FUNCTION;
   }
+
+  @Override
+  public boolean allowsNullTreatment() {
+    return getName().equals("LAST_VALUE") || getName().equals("FIRST_VALUE");
+  }
 }
