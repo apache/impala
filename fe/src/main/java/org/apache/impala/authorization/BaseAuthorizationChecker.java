@@ -160,11 +160,13 @@ public abstract class BaseAuthorizationChecker implements AuthorizationChecker {
             // CopyTestCaseStmt#analyze().
             Preconditions.checkState(ALLOWED_HIER_AUTHZ_TABLE_PRIVILEGES
                 .contains(privReq.getPrivilege()));
-            requests = tablePrivReqs.computeIfAbsent(tableName, k -> new ArrayList<>());
+            requests = tablePrivReqs.computeIfAbsent(tableName.toLowerCase(),
+                k -> new ArrayList<>());
             requests.add(privReq);
           } else {
             Preconditions.checkState(privReq.getAuthorizable().getType() == Type.COLUMN);
-            requests = columnPrivReqs.computeIfAbsent(tableName, k -> new ArrayList<>());
+            requests = columnPrivReqs.computeIfAbsent(tableName.toLowerCase(),
+                k -> new ArrayList<>());
             requests.add(privReq);
           }
         }
@@ -177,7 +179,8 @@ public abstract class BaseAuthorizationChecker implements AuthorizationChecker {
       // authorizeTableAccess() below.
       for (Map.Entry<String, List<PrivilegeRequest>> entry : columnPrivReqs.entrySet()) {
         List<PrivilegeRequest> privReqs = tablePrivReqs.get(entry.getKey());
-        Preconditions.checkState(privReqs != null);
+        Preconditions.checkState(privReqs != null, "There is no corresponding " +
+            "table-level privilege request for the table: %s", entry.getKey());
         privReqs.addAll(entry.getValue());
       }
 

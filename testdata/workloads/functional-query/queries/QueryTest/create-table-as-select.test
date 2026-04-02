@@ -210,3 +210,25 @@ describe formatted zsortbytest;
 ---- TYPES
 STRING,STRING,STRING
 ====
+---- QUERY
+# Regression test for IMPALA-14875.
+# Make sure that in the local catalog mode, the CTAS query could pass the Preconditions
+# check that requires each column-level privilege request has at least one corresponding
+# table-level privilege request even if we have capital letters in the target table.
+create table Alltypes_A as select int_col from functional.alltypes;
+---- RESULTS
+'Inserted 7300 row(s)'
+---- TYPES
+STRING
+====
+---- QUERY
+# Regression test for IMPALA-14875.
+# Make sure that in the local catalog mode, the CTAS query could pass the Preconditions
+# check that requires each column-level privilege request has at least one corresponding
+# table-level privilege request even if we have capital letters in the target table.
+create table Alltypes_B as select * from functional.alltypes;
+---- RESULTS
+'Inserted 7300 row(s)'
+---- TYPES
+STRING
+====
