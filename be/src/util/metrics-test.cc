@@ -274,6 +274,23 @@ TEST_F(MetricsTest, MemMetric) {
   IntGauge* pageheap_unmapped_bytes =
       metrics.FindMetricForTesting<IntGauge>("tcmalloc.pageheap-unmapped-bytes");
   EXPECT_TRUE(pageheap_unmapped_bytes != NULL);
+
+  IntGauge* current_total_thread_cache_bytes =
+      metrics.FindMetricForTesting<IntGauge>("tcmalloc.current-total-thread-cache-bytes");
+  ASSERT_TRUE(current_total_thread_cache_bytes != NULL);
+  EXPECT_GE(current_total_thread_cache_bytes->GetValue(), 0);
+
+  IntGauge* central_cache_free_bytes =
+      metrics.FindMetricForTesting<IntGauge>("tcmalloc.central-cache-free-bytes");
+  ASSERT_TRUE(central_cache_free_bytes != NULL);
+
+  IntGauge* transfer_cache_free_bytes =
+      metrics.FindMetricForTesting<IntGauge>("tcmalloc.transfer-cache-free-bytes");
+  ASSERT_TRUE(transfer_cache_free_bytes != NULL);
+
+  IntGauge* thread_cache_free_bytes =
+      metrics.FindMetricForTesting<IntGauge>("tcmalloc.thread-cache-free-bytes");
+  ASSERT_TRUE(thread_cache_free_bytes != NULL);
 #endif
 }
 

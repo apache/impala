@@ -56,6 +56,10 @@ TcmallocMetric* TcmallocMetric::BYTES_IN_USE = nullptr;
 TcmallocMetric* TcmallocMetric::PAGEHEAP_FREE_BYTES = nullptr;
 TcmallocMetric* TcmallocMetric::TOTAL_BYTES_RESERVED = nullptr;
 TcmallocMetric* TcmallocMetric::PAGEHEAP_UNMAPPED_BYTES = nullptr;
+TcmallocMetric* TcmallocMetric::CURRENT_TOTAL_THREAD_CACHE_BYTES = nullptr;
+TcmallocMetric* TcmallocMetric::CENTRAL_CACHE_FREE_BYTES = nullptr;
+TcmallocMetric* TcmallocMetric::TRANSFER_CACHE_FREE_BYTES = nullptr;
+TcmallocMetric* TcmallocMetric::THREAD_CACHE_FREE_BYTES = nullptr;
 TcmallocMetric::PhysicalBytesMetric* TcmallocMetric::PHYSICAL_BYTES_RESERVED = nullptr;
 
 SanitizerMallocMetric* SanitizerMallocMetric::BYTES_ALLOCATED = nullptr;
@@ -129,6 +133,22 @@ Status impala::RegisterMemoryMetrics(MetricGroup* metrics, bool register_jvm_met
   TcmallocMetric::PAGEHEAP_UNMAPPED_BYTES =
       TcmallocMetric::CreateAndRegister(tcmalloc_metrics,
           "tcmalloc.pageheap-unmapped-bytes", "tcmalloc.pageheap_unmapped_bytes");
+
+  TcmallocMetric::CURRENT_TOTAL_THREAD_CACHE_BYTES = TcmallocMetric::CreateAndRegister(
+      tcmalloc_metrics, "tcmalloc.current-total-thread-cache-bytes",
+      "tcmalloc.current_total_thread_cache_bytes");
+
+  TcmallocMetric::CENTRAL_CACHE_FREE_BYTES = TcmallocMetric::CreateAndRegister(
+      tcmalloc_metrics, "tcmalloc.central-cache-free-bytes",
+      "tcmalloc.central_cache_free_bytes");
+
+  TcmallocMetric::TRANSFER_CACHE_FREE_BYTES = TcmallocMetric::CreateAndRegister(
+      tcmalloc_metrics, "tcmalloc.transfer-cache-free-bytes",
+      "tcmalloc.transfer_cache_free_bytes");
+
+  TcmallocMetric::THREAD_CACHE_FREE_BYTES = TcmallocMetric::CreateAndRegister(
+      tcmalloc_metrics, "tcmalloc.thread-cache-free-bytes",
+      "tcmalloc.thread_cache_free_bytes");
 
   TcmallocMetric::PHYSICAL_BYTES_RESERVED =
       tcmalloc_metrics->RegisterMetric(new TcmallocMetric::PhysicalBytesMetric(

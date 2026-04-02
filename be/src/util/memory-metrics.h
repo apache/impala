@@ -109,6 +109,18 @@ class TcmallocMetric : public IntGauge {
   /// address space used, but not to the physical memory usage.
   static TcmallocMetric* PAGEHEAP_UNMAPPED_BYTES;
 
+  /// Number of bytes used across all thread caches.
+  static TcmallocMetric* CURRENT_TOTAL_THREAD_CACHE_BYTES;
+
+  /// Number of free bytes in the central cache assigned to size classes.
+  static TcmallocMetric* CENTRAL_CACHE_FREE_BYTES;
+
+  /// Number of free bytes waiting to be transferred between central and thread caches.
+  static TcmallocMetric* TRANSFER_CACHE_FREE_BYTES;
+
+  /// Number of free bytes in thread caches.
+  static TcmallocMetric* THREAD_CACHE_FREE_BYTES;
+
   /// Derived metric computing the amount of physical memory (in bytes) used by the
   /// process, including that actually in use and free bytes reserved by tcmalloc. Does not
   /// include the tcmalloc metadata.

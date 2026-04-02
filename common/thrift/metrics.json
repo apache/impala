@@ -2609,6 +2609,54 @@
     "key": "tcmalloc.total-bytes-reserved"
   },
   {
+    "description": "Number of bytes used across all thread caches.",
+    "contexts": [
+      "STATESTORE",
+      "CATALOGSERVER",
+      "IMPALAD"
+    ],
+    "label": "TCMalloc Current Total Thread Cache Bytes",
+    "units": "BYTES",
+    "kind": "GAUGE",
+    "key": "tcmalloc.current-total-thread-cache-bytes"
+  },
+  {
+    "description": "Number of free bytes in the central cache that have been assigned to size classes. They always count towards virtual memory usage, and unless the underlying memory is swapped out by the OS, they also count towards physical memory usage.",
+    "contexts": [
+      "STATESTORE",
+      "CATALOGSERVER",
+      "IMPALAD"
+    ],
+    "label": "TCMalloc Central Cache Free Bytes",
+    "units": "BYTES",
+    "kind": "GAUGE",
+    "key": "tcmalloc.central-cache-free-bytes"
+  },
+  {
+    "description": "Number of free bytes that are waiting to be transferred between the central cache and a thread cache. They always count towards virtual memory usage, and unless the underlying memory is swapped out by the OS, they also count towards physical memory usage.",
+    "contexts": [
+      "STATESTORE",
+      "CATALOGSERVER",
+      "IMPALAD"
+    ],
+    "label": "TCMalloc Transfer Cache Free Bytes",
+    "units": "BYTES",
+    "kind": "GAUGE",
+    "key": "tcmalloc.transfer-cache-free-bytes"
+  },
+  {
+    "description": "Number of free bytes in thread caches. They always count towards virtual memory usage, and unless the underlying memory is swapped out by the OS, they also count towards physical memory usage.",
+    "contexts": [
+      "STATESTORE",
+      "CATALOGSERVER",
+      "IMPALAD"
+    ],
+    "label": "TCMalloc Thread Cache Free Bytes",
+    "units": "BYTES",
+    "kind": "GAUGE",
+    "key": "tcmalloc.thread-cache-free-bytes"
+  },
+  {
     "description": "Bytes allocated from the sanitizer malloc (Sanitizer debug builds only)",
     "contexts": [
       "STATESTORE",
