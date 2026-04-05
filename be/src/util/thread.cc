@@ -334,8 +334,8 @@ Status Thread::StartThread(const std::string& category, const std::string& name,
   Promise<int64_t> thread_started;
   try {
     t->thread_.reset(
-        new boost::thread(&Thread::SuperviseThread, t->name_, t->category_, functor,
-            GetThreadDebugInfo(), &thread_started));
+        new boost::thread(&Thread::SuperviseThread, t->name_.c_str(), t->category_,
+            functor, GetThreadDebugInfo(), &thread_started));
   } catch (boost::thread_resource_error& e) {
     return Status(TErrorCode::THREAD_CREATION_FAILED, name, category, e.what());
   }
@@ -350,7 +350,15 @@ Status Thread::StartThread(const std::string& category, const std::string& name,
   return Status::OK();
 }
 
-void Thread::SuperviseThread(const string& name, const string& category,
+// Disable optimization for this function so the compiler won't elide uses of parameters,
+// e.g., showing "<optimized out>" in gdb/pstack. We want the thread name to be printed
+// in backtraces.
+#if defined(__clang__)
+[[clang::optnone]]
+#elif defined(__GNUC__)
+__attribute__((optimize("O0")))
+#endif
+void Thread::SuperviseThread(const char* name, const string& category,
     const Thread::ThreadFunctor& functor, const ThreadDebugInfo* parent_thread_info,
     Promise<int64_t>* thread_started) {
   int64_t system_tid = syscall(SYS_gettid);
@@ -358,17 +366,26 @@ void Thread::SuperviseThread(const string& name, const string& category,
     string error_msg = GetStrErrMsg();
     LOG_EVERY_N(INFO, 100) << "Could not determine thread ID: " << error_msg;
   }
+  // Store the final thread name in thread-local storage so the name pointer remains
+  // valid for pstack/gdb throughout the thread's lifetime, even if the Thread object
+  // that originally held the name gets destroyed (e.g., after Join() or Detach()).
+  thread_local string tls_name;
+  tls_name = (name == nullptr || name[0] == '\0')
+      ? Substitute("thread-$0", system_tid)
+      : string(name);
+  // Keep const char* parameter pointing at thread-local storage for pstack visibility.
+  name = tls_name.c_str();
+
   // Make a copy, since we want to refer to these variables after the unsafe point below.
-  string category_copy = category.empty() ? "no-category" : category;;
+  string category_copy = category.empty() ? "no-category" : category;
   shared_ptr<ThreadMgr> thread_mgr_ref = thread_manager;
-  string name_copy = name.empty() ? Substitute("thread-$0", system_tid) : name;
 
   // Use boost's get_id rather than the system thread ID as the unique key for this thread
   // since the latter is more prone to being recycled.
-  thread_mgr_ref->AddThread(this_thread::get_id(), name_copy, category_copy, system_tid);
+  thread_mgr_ref->AddThread(this_thread::get_id(), tls_name, category_copy, system_tid);
 
   ThreadDebugInfo thread_debug_info;
-  thread_debug_info.SetThreadName(name_copy);
+  thread_debug_info.SetThreadName(tls_name);
   thread_debug_info.SetParentInfo(parent_thread_info);
 
   thread_started->Set(system_tid);

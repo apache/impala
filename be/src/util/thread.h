@@ -183,12 +183,18 @@ class Thread {
   /// it is used after the notification completes.h The tid parameter is written to
   /// exactly once before SuperviseThread() notifies the caller.
   ///
+  /// The 'name' parameter is passed as const char* (from the caller's string, e.g.
+  /// name_.c_str()) rather than std::string so that debuggers (gdb, pstack) are more
+  /// likely to show the actual thread name in backtraces. It will be copied into a
+  /// thread-local string and updated to point at that string so the pointer is always
+  /// valid throughout the thread's lifetime.
+  ///
   /// parent_thread_info points to the parent thread's ThreadDebugInfo object if the
   /// parent has one, otherwise it's a nullptr. As part of the initialisation
   /// SuperviseThread() copies the useful information from the parent's ThreadDebugInfo
   /// info object to its own TDI object. This way the TDI objects can preserve the thread
   /// creation graph.
-  static void SuperviseThread(const std::string& name, const std::string& category,
+  static void SuperviseThread(const char* name, const std::string& category,
       const ThreadFunctor& functor, const ThreadDebugInfo* parent_thread_info,
       Promise<int64_t>* thread_started);
 };
