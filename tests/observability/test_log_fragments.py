@@ -58,3 +58,15 @@ class TestLogFragments(ImpalaTestSuite):
       raise Exception("query-id still attached to thread after query finished")
     except AssertionError:
       pass
+
+  @SkipIfDockerizedCluster.daemon_logs_not_exposed
+  def test_slow_rpc_stack_trace(self):
+    """Test that the stack trace of a slow RPC is included in the profile."""
+    query = """select tinyint_col, count(*) from functional.alltypes
+        group by tinyint_col order by tinyint_col limit 5"""
+    self.execute_query(query, {"debug_action": "IMPALA_MISS_EXEC_COMPLETE_CB:SLEEP@300"})
+    self.assert_impalad_log_contains("WARNING",
+        "kernel_stack_watchdog.cc:.* Thread .* stuck", expected_count=-1)
+    self.assert_impalad_log_contains("WARNING", "impala::SleepForMs()", expected_count=-1)
+    self.assert_impalad_log_contains("WARNING",
+        "unable to take thread stack: signal handler unavailable", expected_count=0)
