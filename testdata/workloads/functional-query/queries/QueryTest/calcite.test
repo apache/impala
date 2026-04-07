@@ -1548,3 +1548,12 @@ No match found
 ---- RUNTIME_PROFILE
 row_regex: PlannerType: CalcitePlanner
 ====
+---- QUERY
+values((1+2), 4);
+---- TYPES
+SMALLINT, TINYINT
+---- RESULTS
+3,4
+---- RUNTIME_PROFILE
+row_regex: PlannerType: CalcitePlanner
+====

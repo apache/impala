@@ -1,0 +1,273 @@
+====
+---- QUERY
+set planner=calcite;
+values(1);
+---- RUNTIME_PROFILE
+row_regex: PlannerType: CalcitePlanner
+====
+---- QUERY
+set planner=calcite;
+set fallback_planner=none;
+values ((1+2),4);
+---- RESULTS
+3,4
+---- TYPES
+SMALLINT, TINYINT
+====
+---- QUERY
+set planner=calcite;
+set fallback_planner=none;
+values((1 x), (2), (3));
+---- RESULTS
+1
+2
+3
+---- TYPES
+TINYINT
+====
+---- QUERY
+set planner=calcite;
+set fallback_planner=none;
+values((1 "x"), (2), (3));
+---- RESULTS
+1
+2
+3
+---- TYPES
+TINYINT
+====
+---- QUERY
+set planner=calcite;
+set fallback_planner=none;
+values((1 'x'), (2), (3));
+---- RESULTS
+1
+2
+3
+---- TYPES
+TINYINT
+====
+---- QUERY
+set planner=calcite;
+set fallback_planner=none;
+values(('hello' 'x'), ('world'));
+---- RESULTS
+'hello'
+'world'
+---- TYPES
+STRING
+====
+---- QUERY
+# IMPALA-14943: Because of known Calcite issue, an unsupported
+# exception should be thrown and this should fallback.
+set planner=calcite;
+set fallback_planner=original;
+select tmp.val from (values
+(0 as val),
+(34304461)) as tmp;
+---- RUNTIME_PROFILE
+row_regex: PlannerType: OriginalPlanner
+====
+---- QUERY
+# With 2 columns in the values clause, this
+# should not fallback.
+set planner=calcite;
+select tmp.val from (values
+(0 as val, 1 as val2),
+(34304461, 2)) as tmp;
+---- RUNTIME_PROFILE
+row_regex: PlannerType: CalcitePlanner
+====
+---- QUERY
+# No alias for column should not fallback
+set planner=calcite;
+select * from (values
+(0),
+(34304461)) tmp;
+---- RUNTIME_PROFILE
+row_regex: PlannerType: CalcitePlanner
+====
+---- QUERY
+# Standard aliasing syntax should not fallback
+set planner=calcite;
+select tmp.val1 from (values
+(0),
+(34304461)) tmp(val1);
+---- RUNTIME_PROFILE
+row_regex: PlannerType: CalcitePlanner
+====
+---- QUERY
+# IMPALA-14943: alias on the left should cause fallback
+set planner=calcite;
+select a.val from
+(values(1 as val)) a
+cross join
+(values(2, 3)) b;
+---- RUNTIME_PROFILE
+row_regex: PlannerType: OriginalPlanner
+====
+---- QUERY
+# IMPALA-14943: alias on the right should cause fallback
+set planner=calcite;
+select a.val from
+(values(2, 3)) b
+cross join
+(values(1 as val)) a;
+---- RUNTIME_PROFILE
+row_regex: PlannerType: OriginalPlanner
+====
+---- QUERY
+# 2 columns with alias on left should not fallback
+set planner=calcite;
+select a.val from
+(values(1 as val, 2 as val2)) a
+cross join
+(values(2, 3)) b;
+---- RUNTIME_PROFILE
+row_regex: PlannerType: CalcitePlanner
+====
+---- QUERY
+# IMPALA-14943: query not supported on CalcitePlanner, will fallback
+set planner=calcite;
+select a.val from (values(1 as val)) a cross join (values(2,3)) b cross join (values(4,5)) c
+---- RUNTIME_PROFILE
+row_regex: PlannerType: OriginalPlanner
+====
+---- QUERY
+set planner=calcite;
+set fallback_planner=none;
+values ((1+2), (3 + 4));
+---- RESULTS
+3,7
+---- TYPES
+SMALLINT, SMALLINT
+---- RUNTIME_PROFILE
+row_regex: PlannerType: CalcitePlanner
+====
+---- QUERY
+set planner=calcite;
+set fallback_planner=none;
+values ((1 + 3, 2 + 4), (2, 3));
+---- RESULTS
+4,6
+2,3
+---- TYPES
+SMALLINT, SMALLINT
+====
+---- QUERY
+set planner=calcite;
+set fallback_planner=none;
+values ((1+2)*3, (3 + 4));
+---- RESULTS
+9,7
+---- TYPES
+INT, SMALLINT
+---- RUNTIME_PROFILE
+row_regex: PlannerType: CalcitePlanner
+====
+---- QUERY
+set planner=calcite;
+set fallback_planner=none;
+values ((abs(1)), (2));
+---- RESULTS
+1,2
+---- TYPES
+SMALLINT, TINYINT
+---- RUNTIME_PROFILE
+row_regex: PlannerType: CalcitePlanner
+====
+---- QUERY
+# Non-identifier aliases on a one-column row in the double paren form.
+set planner=calcite;
+set fallback_planner=none;
+values((1 year), (2), (3));
+---- RESULTS
+1
+2
+3
+---- TYPES
+TINYINT
+====
+---- QUERY
+# Non-identifier aliases on a one-column row in the double paren form.
+set planner=calcite;
+set fallback_planner=none;
+values((1 a), (2), (3));
+---- RESULTS
+1
+2
+3
+---- TYPES
+TINYINT
+====
+---- QUERY
+# Non-identifier aliases on a one-column row in the double paren form.
+set planner=calcite;
+set fallback_planner=none;
+values((1 as x), (2), (3));
+---- RESULTS
+1
+2
+3
+---- TYPES
+TINYINT
+====
+---- QUERY
+# Non-identifier aliases on a one-column row in the double paren form.
+set planner=calcite;
+set fallback_planner=none;
+values((1 as year), (2), (3));
+---- RESULTS
+1
+2
+3
+---- TYPES
+TINYINT
+====
+---- QUERY
+# Non-identifier aliases on a one-column row in the double paren form.
+set planner=calcite;
+set fallback_planner=none;
+values((1 `x`), (2), (3));
+---- RESULTS
+1
+2
+3
+---- TYPES
+TINYINT
+====
+---- QUERY
+# Non-identifier aliases on a one-column row in the double paren form.
+set planner=calcite;
+set fallback_planner=none;
+values((1 as `year`), (2), (3));
+---- RESULTS
+1
+2
+3
+---- TYPES
+TINYINT
+====
+---- QUERY
+# A word ending an expression is not an alias: this is one row of two columns.
+set planner=calcite;
+set fallback_planner=none;
+values((case when true then 1 else 2 end), (3));
+---- RESULTS
+1,3
+---- TYPES
+TINYINT, TINYINT
+====
+---- QUERY
+# IMPALA-15681: Fix this test by creating a UDF function
+# It should return a single row of two values. We know that
+# it parses correctly because the second value "2" does not
+# have any parens around it, but we get past the parsing stage
+# and get an analysis error that the function doesn't exist.
+set planner=calcite;
+set fallback_planner=none;
+values ((1+my_udf(1)), 2);
+---- CATCH: ANY_OF
+my_udf() unknown
+No match found for function signature MY_UDF
+====

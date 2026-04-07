@@ -101,6 +101,38 @@ public class CalciteValuesLiteralTest extends FrontendTestBase {
     assertEquals("[DATE '1970-01-01']", constantRow("values (date '1970-01-01')"));
   }
 
+  /** Parenthesized expression as the first column, e.g. values ((1+2), 4). */
+  @Test
+  public void parenthesizedExpressionAsFirstValuesColumnPlans() throws ImpalaException {
+    assertEquals("[3, 4]", constantRow("values ((1+2),4)"));
+  }
+
+  /** Per-row aliases in Impala multi-row form, e.g. values((1 x), (2), (3)). */
+  @Test
+  public void aliasedRowsInImpalaDoubleParenValuesPlans() throws ImpalaException {
+    assertEquals("[1, 2, 3]", sorted(constantRow("values((1 x), (2), (3))")));
+  }
+
+  /** Keyword, quoted and AS aliases on a one-column row are rows, not one wide row. */
+  @Test
+  public void nonIdentifierAliasesInImpalaDoubleParenValuesPlan()
+      throws ImpalaException {
+    String[] aliases = {"year", "a", "as x", "as a", "as year", "`x`",
+        "as `x`", "as `year`"};
+    for (String alias : aliases) {
+      assertEquals("alias: " + alias, "[1, 2, 3]",
+          sorted(constantRow("values((1 " + alias + "), (2), (3))")));
+    }
+  }
+
+  /** Words that end an expression without being an alias keep a single row. */
+  @Test
+  public void expressionsEndingInAWordAreNotTreatedAsAliases()
+      throws ImpalaException {
+    assertEquals("[1, 3]",
+        sorted(constantRow("values((case when true then 1 else 2 end), (3))")));
+  }
+
   /** The literals the physical plan holds for a single-row VALUES, as SQL. */
   private String constantRow(String sql) throws ImpalaException {
     return sqlOf(constantExprs(planNodeFor(sql)));

@@ -84,3 +84,7 @@ class TestFallbackPlanner(ImpalaTestSuite):
 
   def test_fallback_planner(self, vector, unique_database):
     self.run_test_case('QueryTest/fallback_planner', vector, use_db=unique_database)
+
+  def test_values_bug(self, vector, unique_database):
+    self.run_test_case('QueryTest/values_calcite_planner_bug',
+        vector, use_db=unique_database)

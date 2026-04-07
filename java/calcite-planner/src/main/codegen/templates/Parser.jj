@@ -283,6 +283,178 @@ public class ${parser.class} extends SqlAbstractParserImpl
                 RESOURCE.nonStandardFeatureUsed(token)));
         return timeUnit;
     }
+
+    /**
+     * isSingleParenRowForValues returns true if the values statement uses
+     * single parentheses to separate the rows.
+     * The simple example is "values (3), (4)";
+     * The simple counter-example is "values ((3,4), (5,6))";
+     * The reason for this method is because there are some ambiguous cases.
+     * For example: "values((3),(4))" could be interpreted either way, but
+     * the original planner interprets this as a single row with 2 values (3,4).
+     * The general rule is that if there is a comma within the second level
+     * of parentheses, the inner parens represent a single row.
+     * One special exception:
+     * While "values((3),(4))" is a single row of (3,4), if an alias is added,
+     * it becomes 2 separate rows, e.g. "values ((3 as x), (4))" becomes two
+     * separate rows of one column each.
+     * An alias is recognized in the following ways:
+     * - the "AS" keyword at the second level of parentheses
+     * - an identifier (quoted or not) directly before the closing paren
+     * - any other word (e.g. the keyword YEAR) that directly follows a complete
+     *   operand, e.g. "(1 year)". See isOperandEnd().
+     */
+    private boolean isSingleParenRowForValues() {
+        int depth = 0;
+        boolean hasTokenAtDepth2 = false;
+        boolean possibleAliasTokenFound = false;
+        // Kinds of the previous 3 tokens (prev1 is the most recent).
+        int prev1 = -1;
+        int prev2 = -1;
+        int prev3 = -1;
+        // True if the paren open at depth 2 groups a row, as opposed to being the
+        // argument list of a function such as "cast(1 as int)".
+        boolean depth2IsGroup = false;
+        for (int i = 1;; i++) {
+            final Token t = getToken(i);
+            // A word directly after a complete operand and directly before the
+            // closing paren is an alias, even if it is a keyword, e.g. "(1 year)".
+            // INTERVAL and CASE expressions end with a word that is not an alias,
+            // e.g. "(interval 1 year)" or "(case when a then 1 else 2 end)".
+            if (depth == 2 && depth2IsGroup && t.kind == RPAREN &&
+                isOperandEnd(prev2) && isAliasWord(prev1) && prev3 != INTERVAL) {
+              return false;
+            }
+            // If the last token is an identifier and we are at the second depth
+            // level and see a paren closing the second depth level, then it
+            // should be treated as a double paren row.
+            // Note: if it is an alias by itself, this will also return false,
+            // but this is an invalid query anyway, so it doesn't matter that
+            // we treat this as a double paren row.
+            if (depth == 2 && possibleAliasTokenFound && t.kind == RPAREN) {
+              return false;
+            }
+            // reset the possibleAliasTokenFound, since it is not an alias that
+            // we care about.
+            possibleAliasTokenFound = false;
+            prev3 = prev2;
+            prev2 = prev1;
+            prev1 = t.kind;
+            switch (t.kind) {
+              // If EOF is hit, it's most likely a syntax error which
+              // will be handle outside this method.
+              case EOF:
+                return false;
+              case LPAREN:
+                depth++;
+                if (depth == 2) {
+                  // prev2 is the token before this paren.
+                  depth2IsGroup = prev2 == LPAREN || prev2 == COMMA;
+                }
+                break;
+              case AS:
+                // AS directly in a group at the second level can only introduce an
+                // alias, e.g. "((1 as year), (2))", so the inner parens are a row.
+                if (depth == 2 && depth2IsGroup) {
+                  return false;
+                }
+                break;
+              case COMMA:
+                // A comma inside a second paren will treat this as a double
+                // paren row.
+                if (depth == 2) {
+                   return false;
+                }
+                // A comma inside a single paren will treat this as a single
+                // paren row.
+                if (depth == 1) {
+                  return true;
+                }
+                break;
+              case RPAREN:
+                // If we hit a right paren before any comma or identifier, then
+                // it is a single paren row.
+                if (depth <= 2) {
+                  return true;
+                }
+                depth--;
+                break;
+              case IDENTIFIER:
+              case BACK_QUOTED_IDENTIFIER:
+              case BIG_QUERY_BACK_QUOTED_IDENTIFIER:
+                // If we spot an identifier at depth 2, it is either an alias or
+                // a function name. If it's an alias, we want to treat this as
+                // a double paren values. This would mean the next token has to
+                // be a right paren. If it's anything else, we treat it as a
+                // single paren values statement.
+                if (depth == 2) {
+                  possibleAliasTokenFound = true;
+                }
+                break;
+              case BIG_QUERY_DOUBLE_QUOTED_STRING:
+              case BIG_QUERY_QUOTED_STRING:
+                // If we see a string at depth 2, we have to be a little careful.
+                // The SQL "values(('hello'),('world'))" is treated as a single row.
+                // But the SQL "values (('hello' 'colname'), ('world')) is treated
+                // as a double paren row because it has an identifier.
+                // If we see any token at depth 2, we know the quoted string has to be
+                // a column name and we return false because it is a double paren row.
+                if (depth == 2 && hasTokenAtDepth2) {
+                  return false;
+                }
+                break;
+            }
+            if (depth == 2 && t.kind != LPAREN) {
+              hasTokenAtDepth2 = true;
+            }
+        }
+    }
+
+    /**
+     * Returns true if a token of this kind can be the last token of a complete
+     * operand, i.e. a word that follows it directly must be an alias.
+     */
+    private static boolean isOperandEnd(int kind) {
+        switch (kind) {
+          case RPAREN:
+          case IDENTIFIER:
+          case BACK_QUOTED_IDENTIFIER:
+          case BIG_QUERY_BACK_QUOTED_IDENTIFIER:
+          case UNSIGNED_INTEGER_LITERAL:
+          case DECIMAL_NUMERIC_LITERAL:
+          case APPROX_NUMERIC_LITERAL:
+          case QUOTED_STRING:
+          case BIG_QUERY_QUOTED_STRING:
+          case BIG_QUERY_DOUBLE_QUOTED_STRING:
+          case TRUE:
+          case FALSE:
+          case NULL:
+            return true;
+          default:
+            return false;
+        }
+    }
+
+    /**
+     * Returns true if a token of this kind may be used as an alias: an identifier
+     * or a keyword (recognized by its image being a plain upper-case word), but not
+     * punctuation, operators, literals, or END, which closes a CASE expression.
+     */
+    private boolean isAliasWord(int kind) {
+        switch (kind) {
+          case IDENTIFIER:
+          case BACK_QUOTED_IDENTIFIER:
+          case BIG_QUERY_BACK_QUOTED_IDENTIFIER:
+            return true;
+          case END:
+          case TRUE:
+          case FALSE:
+          case NULL:
+            return false;
+          default:
+            return kind > 0 && tokenImage[kind].matches("\"[A-Z_0-9]+\"");
+        }
+    }
 }
 
 PARSER_END(${parser.class})
@@ -2414,37 +2586,79 @@ SqlNode ExplicitTable(SqlParserPos pos) :
 SqlNode TableConstructor() :
 {
     final List<SqlNode> list = new ArrayList<SqlNode>();
-    final Span s;
+    final List<SqlNode> outerList = new ArrayList<SqlNode>();
+    Span s = null;
 }
 {
     (
         <VALUES> { s = span(); }
-    |
-        <VALUE>
-        {
-            s = span();
-            if (!this.conformance.isValueAllowed()) {
-                throw SqlUtil.newContextException(getPos(), RESOURCE.valueNotAllowed());
-            }
-        }
     )
-    AddRowConstructor(list)
     (
-        LOOKAHEAD(2)
-        <COMMA> AddRowConstructor(list)
-    )*
+        LOOKAHEAD({isSingleParenRowForValues()})
+        <LPAREN>
+        AddValuesRow(list, outerList, s)
+        <RPAREN>
+        AddValuesMoreRows(list, outerList, s)
+    |
+        LOOKAHEAD(2) <LPAREN> <LPAREN>
+        AddValuesRow(list, outerList, s)
+        <RPAREN>
+        AddValuesMoreRows(list, outerList, s)
+        [ <RPAREN> ]
+    )
     {
-        return SqlStdOperatorTable.VALUES.createCall(s.end(this), list);
+        return SqlStdOperatorTable.VALUES.createCall(s.end(this), outerList);
     }
 }
 
-/** Parses a row constructor and adds it to a list. */
-void AddRowConstructor(List<SqlNode> list) :
+/** Parses additional parenthesized rows in a VALUES expression. */
+void AddValuesMoreRows(List<SqlNode> list, List<SqlNode> outerList, Span s) :
+{}
 {
-    SqlNode e;
+    (
+      <COMMA>
+      <LPAREN>
+      AddValuesRow(list, outerList, s)
+      <RPAREN>
+    )*
+}
+
+/** Parses one row of a VALUES expression and adds it to a list. */
+void AddValuesRow(List<SqlNode> list, List<SqlNode> outerList, Span s) :
+{
+    SqlNode last;
+    SqlNode row;
 }
 {
-    e = RowConstructor() { list.add(e); }
+    AddValuesItem(list)
+    ( <COMMA> AddValuesItem(list) )*
+    {
+        last = list.get(list.size() - 1);
+        row = SqlStdOperatorTable.ROW.createCall(s.end(last), list);
+        outerList.add(row);
+        list.clear();
+    }
+}
+
+/**
+ * Parses one item in a VALUES row.
+ */
+void AddValuesItem(List<SqlNode> list) :
+{
+    final SqlNode e;
+    final SqlIdentifier id;
+}
+{
+    e = Expression(ExprContext.ACCEPT_CURSOR)
+    (
+        [ <AS> ]
+        (
+            // Added Impala code to handle when there are quotes and no quotes
+            id = SimpleIdentifierFromAllQuotesOrNonQuotes()
+        )
+        { list.add(SqlStdOperatorTable.AS.createCall(span().end(e), e, id)); }
+    |   { list.add(e); }
+    )
 }
 
 /**
