@@ -89,17 +89,20 @@ public class CalciteRelNodeConverter implements CompilerStep {
     this.typeFactory_ = analysisResult.getTypeFactory();
     this.reader_ = analysisResult.getCatalogReader();
     this.sqlValidator_ = analysisResult.getSqlValidator();
-    this.planner_ = new VolcanoPlanner(ImpalaCost.FACTORY, new ImpalaMQContext());
+    this.planner_ = new VolcanoPlanner(ImpalaCost.FACTORY, new ImpalaMQContext(this));
     planner_.addRelTraitDef(ConventionTraitDef.INSTANCE);
     planner_.setExecutor(new RemoveUnraggedCharCastRexExecutor());
     this.rexBuilder_ = new ImpalaRexBuilder(typeFactory_);
-    cluster_ = RelOptCluster.create(planner_, this.rexBuilder_);
+    cluster_ =
+        RelOptCluster.create(planner_, this.rexBuilder_);
     viewExpander_ = createViewExpander(
-        analysisResult.getSqlValidator().getCatalogReader().getRootSchema().plus());
+        analysisResult.getSqlValidator().getCatalogReader().getRootSchema().plus(),
+        this);
     cluster_.setMetadataProvider(ImpalaRelMetadataProvider.DEFAULT);
   }
 
-  private static RelOptTable.ViewExpander createViewExpander(SchemaPlus schemaPlus) {
+  private static RelOptTable.ViewExpander createViewExpander(SchemaPlus schemaPlus,
+      CalciteRelNodeConverter relNodeConverter) {
     SqlParser.Config parserConfig =
         SqlParser.configBuilder().setCaseSensitive(false).build()
             // This makes SqlParser expect identifiers that require quoting to be
@@ -117,28 +120,13 @@ public class CalciteRelNodeConverter implements CompilerStep {
         .traitDefs(ConventionTraitDef.INSTANCE)
         .costFactory(ImpalaCost.FACTORY)
         .build();
-    return new PlannerImpl(config);
+    return new ImpalaViewExpander(config, relNodeConverter);
   }
 
   public RelNode convert(SqlNode validatedNode) {
-    // Use the NO_SIMPLIFY RelBuilderFactory. Starting around Calcite 1.40, there
-    // are cases where Calcite finds a common type for literal strings that do not
-    // have the same length to the higher CHAR type. Impala treats literal strings
-    // as STRING type. The simplify() method removes some vital information needed
-    // to convert the CHAR to a STRING type later in coerce nodes, so we avoid the
-    // simplify step until after coerce nodes is complete.
-    SqlToRelConverter relConverter = new SqlToRelConverter(
-        viewExpander_,
-        sqlValidator_,
-        reader_,
-        cluster_,
-        ImpalaConvertletTable.INSTANCE,
-        SqlToRelConverter.config().withCreateValuesRel(false)
-            .withRelBuilderFactory(ImpalaCoreRules.LOGICAL_BUILDER_NO_SIMPLIFY)
-            .withHintStrategyTable(ImpalaCoreRules.HINT_STRATEGIES));
 
     // Convert the valid AST into a logical plan
-    RelRoot root = relConverter.convertQuery(validatedNode, false, true);
+    RelRoot root = convertQuery(validatedNode);
     RelNode relNode = root.project();
     LogUtil.logDebug(relNode, "Plan after conversion from Abstract Syntax Tree");
 
@@ -162,6 +150,26 @@ public class CalciteRelNodeConverter implements CompilerStep {
 
     rexBuilder_.setPostAnalysis();
     return decorrelatedPlan;
+  }
+
+  public RelRoot convertQuery(SqlNode validatedNode) {
+    // Use the NO_SIMPLIFY RelBuilderFactory. Starting around Calcite 1.40, there
+    // are cases where Calcite finds a common type for literal strings that do not
+    // have the same length to the higher CHAR type. Impala treats literal strings
+    // as STRING type. The simplify() method removes some vital information needed
+    // to convert the CHAR to a STRING type later in coerce nodes, so we avoid the
+    // simplify step until after coerce nodes is complete.
+    SqlToRelConverter relConverter = new SqlToRelConverter(
+        viewExpander_,
+        sqlValidator_,
+        reader_,
+        cluster_,
+        ImpalaConvertletTable.INSTANCE,
+        SqlToRelConverter.config().withCreateValuesRel(false)
+            .withRelBuilderFactory(ImpalaCoreRules.LOGICAL_BUILDER_NO_SIMPLIFY)
+            .withHintStrategyTable(ImpalaCoreRules.HINT_STRATEGIES));
+    // Convert the valid AST into a logical plan
+    return relConverter.convertQuery(validatedNode, false, true);
   }
 
   /**
@@ -241,5 +249,20 @@ public class CalciteRelNodeConverter implements CompilerStep {
             false, null, ImpalaCost.FACTORY);
     planner.setRoot(currentNode);
     return planner.findBestExp();
+  }
+
+  public static class ImpalaViewExpander extends PlannerImpl {
+
+    private final CalciteRelNodeConverter relNodeConverter_;
+
+    private ImpalaViewExpander(FrameworkConfig config,
+        CalciteRelNodeConverter relNodeConverter) {
+      super(config);
+      this.relNodeConverter_ = relNodeConverter;
+    }
+
+    public RelRoot expandView(SqlNode validatedNode) {
+      return relNodeConverter_.convertQuery(validatedNode);
+    }
   }
 }

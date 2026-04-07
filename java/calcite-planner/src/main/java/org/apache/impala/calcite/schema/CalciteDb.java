@@ -20,7 +20,6 @@ package org.apache.impala.calcite.schema;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 
-import org.apache.calcite.adapter.java.JavaTypeFactory;
 import org.apache.calcite.prepare.CalciteCatalogReader;
 import org.apache.calcite.rel.type.RelDataType;
 import org.apache.calcite.rel.type.RelDataTypeImpl;
@@ -28,7 +27,6 @@ import org.apache.calcite.schema.Table;
 import org.apache.calcite.schema.impl.AbstractSchema;
 import org.apache.calcite.schema.impl.ViewTable;
 import org.apache.impala.analysis.Analyzer;
-import org.apache.impala.calcite.type.ImpalaTypeSystemImpl;
 import org.apache.impala.catalog.FeIcebergTable;
 import org.apache.impala.catalog.FeTable;
 import org.apache.impala.catalog.FeView;
@@ -37,7 +35,6 @@ import org.apache.impala.catalog.local.LocalFsTable;
 import org.apache.impala.common.ImpalaException;
 import org.apache.impala.common.UnsupportedFeatureException;
 
-import java.lang.reflect.Type;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -92,10 +89,8 @@ public class CalciteDb extends AbstractSchema {
 
     private static ViewTable createViewTable(FeTable feTable) throws ImpalaException {
       RelDataType rowType = CalciteTable.buildColumnsForRelDataType(feTable);
-      JavaTypeFactory typeFactory = (JavaTypeFactory) ImpalaTypeSystemImpl.TYPE_FACTORY;
-      Type elementType = typeFactory.getJavaClass(rowType);
-      return new ImpalaViewTable(elementType,
-          RelDataTypeImpl.proto(rowType), ((FeView) feTable).getQueryStmt().toSql(),
+      return new ImpalaViewTable(rowType.getClass(),
+          RelDataTypeImpl.proto(rowType),
           /* schemaPath */ ImmutableList.of(),
           /* viewPath */ ImmutableList.of(feTable.getDb().getName().toLowerCase(),
           feTable.getName().toLowerCase()), (FeView) feTable);

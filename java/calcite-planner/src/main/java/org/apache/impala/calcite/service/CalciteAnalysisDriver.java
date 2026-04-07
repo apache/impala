@@ -37,6 +37,7 @@ import org.apache.impala.authorization.AuthorizationFactory;
 import org.apache.impala.authorization.Privilege;
 import org.apache.impala.authorization.PrivilegeRequestBuilder;
 import org.apache.impala.calcite.operators.ImpalaOperatorTable;
+import org.apache.impala.calcite.schema.ImpalaViewTable;
 import org.apache.impala.calcite.type.ImpalaTypeCoercionFactory;
 import org.apache.impala.calcite.type.ImpalaTypeSystemImpl;
 import org.apache.impala.calcite.util.SimplifiedAnalyzer;
@@ -47,9 +48,10 @@ import org.apache.impala.catalog.FeTable;
 import org.apache.impala.catalog.FeView;
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.common.ImpalaException;
-import org.apache.impala.common.ParseException;
 import org.apache.impala.common.UnsupportedFeatureException;
 import org.apache.impala.thrift.TQueryCtx;
+
+import com.google.common.base.Preconditions;
 
 /**
  * The CalciteAnalysisDriver is the implementation of AnalysisDriver which validates
@@ -198,7 +200,7 @@ public class CalciteAnalysisDriver implements AnalysisDriver {
    */
   private void registerPrivReqsInTables(Set<TableName> tableNamesInQuery,
       boolean shouldMaskPrivChecks, FeCatalog catalog, ImpalaSqlValidatorImpl validator)
-      throws ParseException {
+      throws ImpalaException {
 
     for (TableName tableName : tableNamesInQuery) {
       FeTable feTable = registerTablePrivReq(tableName, catalog);
@@ -230,7 +232,14 @@ public class CalciteAnalysisDriver implements AnalysisDriver {
           analyzer_.setMaskPrivChecks(null);
         }
         // Register privilege requests for columns referenced by the child view.
-        validator.validate(parsedSqlNode);
+        parsedSqlNode = validateView(validator, parsedSqlNode, queryParser);
+
+        ImpalaViewTable calciteView =
+            reader_.getTable(tableName.toPath()).unwrap(ImpalaViewTable.class);
+        Preconditions.checkNotNull(calciteView);
+        // Set the validated node into the view so it won't have to be re-validated
+        // when the SqlNode AST gets turned into a RelNode tree for the view.
+        calciteView.setValidatedNode(parsedSqlNode);
 
         // Recurse if 'feTable' is also a view. Note that the privilege requests for the
         // tables referenced by 'feTable' will be registered within the recursive call.
@@ -243,6 +252,34 @@ public class CalciteAnalysisDriver implements AnalysisDriver {
           analyzer_.unsetMaskPrivChecks();
         }
       }
+    }
+  }
+
+  /**
+   * validateView() takes a parsed SqlNode for view SQL and returns the validated SqlNode.
+   *
+   * The logic here is mostly straightforward, but there is an oddity for views. If the
+   * view contains an "alias issue" (see the ViewAliasCorrector class for details), an
+   * exception will be thrown. The code here checks to see if that issue exists and
+   * retries validating the view with the validator in an alias correction mode.
+   */
+  private SqlNode validateView(ImpalaSqlValidatorImpl validator, SqlNode parsedSqlNode,
+      CalciteQueryParser queryParser) throws ImpalaException {
+    try {
+      validator.startValidatingView();
+      parsedSqlNode = validator.validate(parsedSqlNode);
+      return parsedSqlNode;
+    } catch (Exception e) {
+      validator.restartValidationInAliasCorrectionMode();
+      if (validator.foundAliasIssueInView()) {
+        parsedSqlNode = queryParser.parse();
+        parsedSqlNode = validator.validate(parsedSqlNode);
+        return parsedSqlNode;
+      } else {
+        throw e;
+      }
+    } finally {
+      validator.endValidatingView();
     }
   }
 
