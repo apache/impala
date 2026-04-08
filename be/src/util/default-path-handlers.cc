@@ -222,14 +222,14 @@ void StacksHandler(const Webserver::WebRequest& req, Document* document) {
       }
 
       // Print thread IDs and names
+      string thread_name;
+      kudu::faststring buf;
       for (auto& info : group) {
         // Try to get the thread name from Impala's ThreadMgr first for consistency
         // with the /thread-group page. If not found (e.g., JVM threads or library
         // threads), fall back to reading from /proc.
-        string thread_name;
         if (!GetThreadNameByTid(info.tid, &thread_name)) {
           // Thread not managed by Impala - read from /proc/self/task/[tid]/comm
-          kudu::faststring buf;
           kudu::Status s = kudu::ReadFileToString(kudu::Env::Default(),
               strings::Substitute("/proc/self/task/$0/comm", info.tid), &buf);
           if (!s.ok()) {
