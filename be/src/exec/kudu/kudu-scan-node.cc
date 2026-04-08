@@ -171,6 +171,8 @@ void KuduScanNode::ThreadAvailableCb(ThreadResourcePool* pool) {
     // Reserve the first token so no other thread picks it up.
     const string* token = GetNextScanToken();
     auto fn = [this, first_thread, token, name]() {
+      RuntimeState* state = this->runtime_state();
+      GetThreadDebugInfo()->SetInstanceId(state->fragment_instance_id());
       this->RunScannerThread(first_thread, name, token);
     };
     std::unique_ptr<Thread> t;

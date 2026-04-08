@@ -338,6 +338,8 @@ void HdfsScanNode::ThreadTokenAvailableCb(ThreadResourcePool* pool) {
         PrintId(runtime_state_->fragment_instance_id()), id(),
         thread_state_.GetNumStarted());
     auto fn = [this, first_thread, scanner_thread_reservation]() {
+      RuntimeState* state = this->runtime_state();
+      GetThreadDebugInfo()->SetInstanceId(state->fragment_instance_id());
       this->ScannerThread(first_thread, scanner_thread_reservation);
     };
     std::unique_ptr<Thread> t;
