@@ -77,9 +77,31 @@ from iceberg_v3_row_lineage for system_version as of 2872597867664652808;
 INT,BIGINT,BIGINT
 ====
 ---- QUERY
+# Use syntactic sugars '_row_id' and '_last_updated_sequence_number' in time-travel query.
+# They should provide the same results as the expressions in the previous query.
+select i, _row_id, _last_updated_sequence_number
+from iceberg_v3_row_lineage for system_version as of 2872597867664652808;
+---- RESULTS
+1,0,1
+2,1,2
+3,2,3
+---- TYPES
+INT,BIGINT,BIGINT
+====
+---- QUERY
 # Calculate 'row_id' and 'last_updated_sequence_number'
 select i, coalesce(_file_row_id, ICEBERG__FIRST__ROW__ID + FILE__POSITION),
           coalesce(_file_last_updated_sequence_number, ICEBERG__DATA__SEQUENCE__NUMBER)
+from iceberg_v3_row_lineage;
+---- RESULTS
+1,0,1
+2,1,2
+3,2,3
+---- TYPES
+INT,BIGINT,BIGINT
+====
+---- QUERY
+select i, _row_id, _last_updated_sequence_number
 from iceberg_v3_row_lineage;
 ---- RESULTS
 1,0,1
@@ -422,9 +444,30 @@ from iceberg_v3_row_lineage_orc for system_version as of 7033898671372067760;
 INT,BIGINT,BIGINT
 ====
 ---- QUERY
+# Use syntactic sugars '_row_id' and '_last_updated_sequence_number' in time-travel query.
+select i, _row_id, _last_updated_sequence_number
+from iceberg_v3_row_lineage_orc for system_version as of 7033898671372067760;
+---- RESULTS
+1,0,1
+2,1,2
+3,2,3
+---- TYPES
+INT,BIGINT,BIGINT
+====
+---- QUERY
 # Calculate 'row_id' and 'last_updated_sequence_number'
 select i, coalesce(_file_row_id, ICEBERG__FIRST__ROW__ID + FILE__POSITION),
           coalesce(_file_last_updated_sequence_number, ICEBERG__DATA__SEQUENCE__NUMBER)
+from iceberg_v3_row_lineage_orc;
+---- RESULTS
+1,0,1
+2,1,2
+3,2,3
+---- TYPES
+INT,BIGINT,BIGINT
+====
+---- QUERY
+select i, _row_id, _last_updated_sequence_number
 from iceberg_v3_row_lineage_orc;
 ---- RESULTS
 1,0,1
@@ -499,4 +542,197 @@ cannot be dropped.
 alter table iceberg_v3_row_lineage_orc drop column _file_last_updated_sequence_number;
 ---- CATCH
 cannot be dropped.
+====
+---- QUERY
+# Query syntactic sugar columns of row lineage fields.
+select i, _row_id, _last_updated_sequence_number from iceberg_v3_row_lineage;
+---- RESULTS
+1,0,1
+2,1,2
+3,2,3
+---- TYPES
+INT,BIGINT,BIGINT
+---- LABELS
+i,_row_id,_last_updated_sequence_number
+====
+---- QUERY
+# Syntactic sugar column results match the explicit COALESCE expressions.
+select i,
+    _row_id = coalesce(_file_row_id, ICEBERG__FIRST__ROW__ID + FILE__POSITION),
+    _last_updated_sequence_number
+        = coalesce(_file_last_updated_sequence_number, ICEBERG__DATA__SEQUENCE__NUMBER)
+from iceberg_v3_row_lineage;
+---- RESULTS
+1,true,true
+2,true,true
+3,true,true
+---- TYPES
+INT,BOOLEAN,BOOLEAN
+====
+---- QUERY
+# WHERE clause: filter using _row_id.
+select i from iceberg_v3_row_lineage where _row_id = 1;
+---- RESULTS
+2
+---- TYPES
+INT
+====
+---- QUERY
+# WHERE clause: filter using _last_updated_sequence_number.
+select i from iceberg_v3_row_lineage where _last_updated_sequence_number > 1;
+---- RESULTS
+2
+3
+---- TYPES
+INT
+====
+---- QUERY
+# ORDER BY using _row_id (descending).
+select i, _row_id from iceberg_v3_row_lineage order by _row_id desc;
+---- RESULTS
+3,2
+2,1
+1,0
+---- TYPES
+INT,BIGINT
+---- LABELS
+i,_row_id
+====
+---- QUERY
+# ORDER BY using _last_updated_sequence_number.
+select i, _last_updated_sequence_number
+from iceberg_v3_row_lineage order by _last_updated_sequence_number desc;
+---- RESULTS
+3,3
+2,2
+1,1
+---- TYPES
+INT,BIGINT
+---- LABELS
+i,_last_updated_sequence_number
+====
+---- QUERY
+# GROUP BY using _row_id.
+select _row_id, count(*) from iceberg_v3_row_lineage group by _row_id order by _row_id;
+---- RESULTS
+0,1
+1,1
+2,1
+---- TYPES
+BIGINT,BIGINT
+====
+---- QUERY
+# GROUP BY using _last_updated_sequence_number.
+select _last_updated_sequence_number, count(*)
+from iceberg_v3_row_lineage
+group by _last_updated_sequence_number
+order by _last_updated_sequence_number;
+---- RESULTS
+1,1
+2,1
+3,1
+---- TYPES
+BIGINT,BIGINT
+====
+---- QUERY
+# HAVING clause using _row_id, grouped by i.
+select i, max(_row_id) row_id from iceberg_v3_row_lineage
+group by i
+having max(_row_id) >= 1
+order by i;
+---- RESULTS
+2,1
+3,2
+---- TYPES
+INT,BIGINT
+====
+---- QUERY
+# Subquery: _row_id used in inner SELECT, referenced by outer WHERE.
+select i from (
+    select i, _row_id from iceberg_v3_row_lineage
+) sub
+where _row_id < 2
+order by i;
+---- RESULTS
+1
+2
+---- TYPES
+INT
+====
+---- QUERY
+# CTE using _row_id and _last_updated_sequence_number.
+with ids as (
+    select i, _row_id, _last_updated_sequence_number
+    from iceberg_v3_row_lineage
+)
+select i, _row_id, _last_updated_sequence_number
+from ids
+order by i;
+---- RESULTS
+1,0,1
+2,1,2
+3,2,3
+---- TYPES
+INT,BIGINT,BIGINT
+====
+---- QUERY
+create table ice_v3_a (x int) stored as iceberg
+tblproperties ('format-version'='3');
+create table ice_v3_b (y int) stored as iceberg
+tblproperties ('format-version'='3');
+insert into ice_v3_a values (10);
+insert into ice_v3_a values (20);
+insert into ice_v3_b values (20);
+insert into ice_v3_b values (10);
+====
+---- QUERY
+# Qualified _row_id and _last_updated_sequence_number across two V3 tables in one query.
+select a.x, a._row_id, a._last_updated_sequence_number,
+       b.y, b._row_id, b._last_updated_sequence_number
+from ice_v3_a a, ice_v3_b b
+where a.x = b.y;
+---- RESULTS
+10,0,1,10,1,2
+20,1,2,20,0,1
+---- TYPES
+INT,BIGINT,BIGINT,INT,BIGINT,BIGINT
+====
+---- QUERY
+# Join: _row_id from both tables in WHERE predicate.
+select a.x, b.y
+from ice_v3_a a cross join ice_v3_b b
+where a._row_id = b._row_id;
+---- RESULTS
+10,20
+20,10
+---- TYPES
+INT,INT
+====
+---- QUERY
+# _row_id on V2 table should fail, column does not exist on non-V3 tables.
+create table ice_v2_no_sugar (i int) stored as iceberg
+tblproperties ('format-version'='2');
+insert into ice_v2_no_sugar values (1);
+select _row_id from ice_v2_no_sugar;
+---- CATCH
+Could not resolve column/field reference: '_row_id'
+====
+---- QUERY
+# _last_updated_sequence_number on V2 table should fail.
+select _last_updated_sequence_number from ice_v2_no_sugar;
+---- CATCH
+Could not resolve column/field reference: '_last_updated_sequence_number'
+====
+---- QUERY
+# Unqualified _row_id is ambiguous when multiple V3 tables are in scope.
+select _row_id from ice_v3_a a, ice_v3_b b;
+---- CATCH
+Column/field reference is ambiguous: '_row_id'
+====
+---- QUERY
+# Unqualified _last_updated_sequence_number is ambiguous when multiple V3 tables
+# are in scope.
+select _last_updated_sequence_number from ice_v3_a a cross join ice_v3_b b;
+---- CATCH
+Column/field reference is ambiguous: '_last_updated_sequence_number'
 ====

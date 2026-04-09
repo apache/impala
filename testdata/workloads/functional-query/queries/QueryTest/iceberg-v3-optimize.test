@@ -89,34 +89,38 @@ INSERT INTO optimize_part VALUES (1,'aa'),(2,'ab');
 INSERT INTO optimize_part VALUES (3,'ac'),(4,'ad');
 INSERT INTO optimize_part VALUES (5,'ba'),(6,'bb');
 
-SELECT _file_row_id, ICEBERG__FIRST__ROW__ID, _file_last_updated_sequence_number, ICEBERG__DATA__SEQUENCE__NUMBER, *
+SELECT _file_row_id, ICEBERG__FIRST__ROW__ID, _row_id, '|',
+       _file_last_updated_sequence_number, ICEBERG__DATA__SEQUENCE__NUMBER, _last_updated_sequence_number, '|',
+       *
 FROM optimize_part;
 ---- RESULTS
-NULL,0,NULL,1,1,'aa'
-NULL,0,NULL,1,2,'ab'
-NULL,2,NULL,2,3,'ac'
-NULL,2,NULL,2,4,'ad'
-NULL,4,NULL,3,5,'ba'
-NULL,4,NULL,3,6,'bb'
+NULL,0,0,'|',NULL,1,1,'|',1,'aa'
+NULL,0,1,'|',NULL,1,1,'|',2,'ab'
+NULL,2,2,'|',NULL,2,2,'|',3,'ac'
+NULL,2,3,'|',NULL,2,2,'|',4,'ad'
+NULL,4,4,'|',NULL,3,3,'|',5,'ba'
+NULL,4,5,'|',NULL,3,3,'|',6,'bb'
 ---- TYPES
-BIGINT,BIGINT,BIGINT,BIGINT,INT,STRING
+BIGINT,BIGINT,BIGINT,STRING,BIGINT,BIGINT,BIGINT,STRING,INT,STRING
 ====
 ---- QUERY
 # With FILE_SIZE_THRESHOLD_MB specified, OPTIMIZE only compact partitions with at least
 # two data files.
 OPTIMIZE TABLE optimize_part (FILE_SIZE_THRESHOLD_MB=10);
 
-SELECT _file_row_id, _file_last_updated_sequence_number, *
+SELECT _file_row_id, _row_id, '|',
+       _file_last_updated_sequence_number, _last_updated_sequence_number, '|',
+       *
 FROM optimize_part;
 ---- RESULTS
-0,1,1,'aa'
-1,1,2,'ab'
-2,2,3,'ac'
-3,2,4,'ad'
-NULL,NULL,5,'ba'
-NULL,NULL,6,'bb'
+0,0,'|',1,1,'|',1,'aa'
+1,1,'|',1,1,'|',2,'ab'
+2,2,'|',2,2,'|',3,'ac'
+3,3,'|',2,2,'|',4,'ad'
+NULL,4,'|',NULL,3,'|',5,'ba'
+NULL,5,'|',NULL,3,'|',6,'bb'
 ---- TYPES
-BIGINT,BIGINT,INT,STRING
+BIGINT,BIGINT,STRING,BIGINT,BIGINT,STRING,INT,STRING
 ====
 ---- QUERY
 # Let's do a full compaction on the partially compacted table.
@@ -205,4 +209,16 @@ FROM optimize_upgraded;
 2,8,3,6,3
 ---- TYPES
 BIGINT,BIGINT,BIGINT,BIGINT,INT
+====
+---- QUERY
+SELECT _file_row_id, ICEBERG__FIRST__ROW__ID, _row_id, '|',
+       _file_last_updated_sequence_number, ICEBERG__DATA__SEQUENCE__NUMBER, _last_updated_sequence_number, '|',
+       *
+FROM optimize_upgraded;
+---- RESULTS
+0,6,0,'|',1,6,1,'|',1
+1,7,1,'|',2,6,2,'|',2
+2,8,2,'|',3,6,3,'|',3
+---- TYPES
+BIGINT,BIGINT,BIGINT,STRING,BIGINT,BIGINT,BIGINT,STRING,INT
 ====

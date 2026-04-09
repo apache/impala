@@ -1,0 +1,27 @@
+====
+---- QUERY
+# _row_id, _file_row_id, _last_updated_sequence_number, _file_last_updated_sequence_number
+# have column masking rules that multiplies their values by -1.
+# _row_id returns _file_row_id if the latter is present, but it doesn't mean we multiply
+# the final result by -1 twice. I.e., the final results are always the original results
+# plus the column masking rule applied on top of it.
+select _row_id, _file_row_id, _last_updated_sequence_number,
+    _file_last_updated_sequence_number, i
+from $UNIQUE_DB.ice_v3 where i < 10 order by _row_id;
+---- RESULTS
+-6001202,-6001202,-3,-3,6
+-6001201,-6001201,-3,-3,5
+-6001200,-6001200,-3,-3,4
+regex:-\d+,NULL,-2,NULL,7
+regex:-\d+,NULL,-2,NULL,7
+regex:-\d+,NULL,-2,NULL,7
+regex:-\d+,NULL,-2,NULL,7
+regex:-\d+,NULL,-2,NULL,7
+regex:-\d+,NULL,-2,NULL,7
+regex:-\d+,NULL,-2,NULL,7
+-2,-2,-1,-1,3
+-1,-1,-1,-1,2
+0,0,-1,-1,1
+---- TYPES
+BIGINT,BIGINT,BIGINT,BIGINT,INT
+====

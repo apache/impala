@@ -96,7 +96,9 @@ enum TVirtualColumnType {
   ICEBERG_DATA_SEQUENCE_NUMBER,
   PARTITION_VALUE_SERIALIZED,
   BUCKET_ID,
-  ICEBERG_FIRST_ROW_ID
+  ICEBERG_FIRST_ROW_ID,
+  ICEBERG_ROW_ID,
+  ICEBERG_LAST_UPDATED_SEQUENCE_NUMBER
 }
 
 // TODO: Since compression is also enabled for Kudu columns, we should

@@ -104,6 +104,7 @@ import org.apache.impala.rewrite.ExprRewriter;
 import org.apache.impala.rewrite.ExtractCommonConjunctRule;
 import org.apache.impala.rewrite.ExtractCompoundVerticalBarExprRule;
 import org.apache.impala.rewrite.FoldConstantsRule;
+import org.apache.impala.rewrite.IcebergVirtualColumnRewriteRule;
 import org.apache.impala.rewrite.NormalizeBinaryPredicatesRule;
 import org.apache.impala.rewrite.NormalizeCountStarRule;
 import org.apache.impala.rewrite.NormalizeExprsRule;
@@ -679,6 +680,8 @@ public class Analyzer {
       // expr rewrites can be disabled via a query option. When rewrites are enabled
       // BetweenPredicates should be rewritten first to help trigger other rules.
       rules.add(BetweenToCompoundRule.INSTANCE);
+      // Iceberg V3 syntactic-sugar virtual columns must be rewritten before planning.
+      rules.add(IcebergVirtualColumnRewriteRule.INSTANCE);
       // Binary predicates must be rewritten to a canonical form for both Kudu predicate
       // pushdown and Parquet row group pruning based on min/max statistics.
       rules.add(NormalizeBinaryPredicatesRule.INSTANCE);

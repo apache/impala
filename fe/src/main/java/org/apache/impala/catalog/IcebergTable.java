@@ -746,6 +746,10 @@ public class IcebergTable extends Table implements FeIcebergTable {
     addVirtualColumn(VirtualColumn.ICEBERG_PARTITION_SERIALIZED);
     addVirtualColumn(VirtualColumn.ICEBERG_DATA_SEQUENCE_NUMBER);
     addVirtualColumn(VirtualColumn.ICEBERG_FIRST_ROW_ID);
+    if (getFormatVersion() >= 3) {
+      addVirtualColumn(VirtualColumn.ICEBERG_ROW_ID);
+      addVirtualColumn(VirtualColumn.ICEBERG_LAST_UPDATED_SEQUENCE_NUMBER);
+    }
   }
 
   private void addHiddenColumns() {

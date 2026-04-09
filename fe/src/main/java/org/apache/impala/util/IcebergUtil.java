@@ -83,6 +83,7 @@ import org.apache.impala.analysis.IcebergPartitionField;
 import org.apache.impala.analysis.IcebergPartitionSpec;
 import org.apache.impala.analysis.IcebergPartitionTransform;
 import org.apache.impala.analysis.NumericLiteral;
+import org.apache.impala.analysis.Path;
 import org.apache.impala.analysis.SlotRef;
 import org.apache.impala.analysis.StatementBase;
 import org.apache.impala.analysis.StringLiteral;
@@ -1592,32 +1593,66 @@ public class IcebergUtil {
       List<Expr> resultExprs) throws AnalysisException {
     FeIcebergTable table = (FeIcebergTable) tableRef.getTable();
     if (table.getFormatVersion() < 3) return;
-    resultExprs.add(IcebergUtil.getRowIdExpr(analyzer, tableRef));
-    resultExprs.add(IcebergUtil.getLastUpdatedSeqNoExpr(analyzer, tableRef));
+    resultExprs.add(getAnalyzedRowIdExpr(analyzer, tableRef));
+    resultExprs.add(getAnalyzedLastUpdatedSeqNoExpr(analyzer, tableRef));
     Preconditions.checkState(resultExprs.size() == table.getColumns().size());
+  }
+
+  /**
+   * Builds an unanalyzed expression equivalent to:
+   *   COALESCE(_file_row_id, ICEBERG__FIRST__ROW__ID + FILE__POSITION)
+   */
+  public static Expr buildRowIdExpr(String tableAlias) {
+    SlotRef fileRowId = new SlotRef(
+        Path.createRawPath(tableAlias, "_file_row_id"));
+    SlotRef firstRowId = new SlotRef(
+        Path.createRawPath(tableAlias, "ICEBERG__FIRST__ROW__ID"));
+    SlotRef filePosition = new SlotRef(
+        Path.createRawPath(tableAlias, "FILE__POSITION"));
+    Expr addExpr = new ArithmeticExpr(
+        ArithmeticExpr.Operator.ADD, firstRowId, filePosition);
+    FunctionCallExpr fnCall = new FunctionCallExpr(
+        "coalesce", Arrays.asList(fileRowId, addExpr));
+    fnCall.setIsInternalFnCall(true);
+    return fnCall;
+  }
+
+  /**
+   * Builds an unanalyzed expression equivalent to:
+   *   COALESCE(_file_last_updated_sequence_number, ICEBERG__DATA__SEQUENCE__NUMBER)
+   */
+  public static Expr buildLastUpdatedSeqNoExpr(String tableAlias) {
+    SlotRef fileLastUpdatedSeqNo = new SlotRef(
+        Path.createRawPath(tableAlias, "_file_last_updated_sequence_number"));
+    SlotRef dataSeqNo = new SlotRef(
+        Path.createRawPath(tableAlias, "ICEBERG__DATA__SEQUENCE__NUMBER"));
+    FunctionCallExpr fnCall = new FunctionCallExpr(
+        "coalesce", Arrays.asList(fileLastUpdatedSeqNo, dataSeqNo));
+    fnCall.setIsInternalFnCall(true);
+    return fnCall;
   }
 
   /**
    * Returns COALESCE(_file_row_id, ICEBERG__FIRST__ROW__ID + FILE__POSITION).
    */
-  public static Expr getRowIdExpr(Analyzer analyzer, TableRef tableRef)
+  public static Expr getAnalyzedRowIdExpr(Analyzer analyzer, TableRef tableRef)
       throws AnalysisException {
-    Expr addExpr = new ArithmeticExpr(ArithmeticExpr.Operator.ADD,
-        createSlotRef(analyzer, tableRef, "ICEBERG__FIRST__ROW__ID"),
-        createSlotRef(analyzer, tableRef, "FILE__POSITION"));
-    return createCoalesceFn(analyzer,
-        createSlotRef(analyzer, tableRef, "_file_row_id"), addExpr);
+    Expr expr = buildRowIdExpr(tableRef.getUniqueAlias());
+    expr.analyze(analyzer);
+    analyzer.materializeSlots(expr);
+    return expr;
   }
 
   /**
    * Returns
    * COALESCE(_file_last_updated_sequence_number, ICEBERG__DATA__SEQUENCE__NUMBER).
    */
-  public static Expr getLastUpdatedSeqNoExpr(Analyzer analyzer, TableRef tableRef)
+  public static Expr getAnalyzedLastUpdatedSeqNoExpr(Analyzer analyzer, TableRef tableRef)
       throws AnalysisException {
-    return createCoalesceFn(analyzer,
-        createSlotRef(analyzer, tableRef, "_file_last_updated_sequence_number"),
-        createSlotRef(analyzer, tableRef, "ICEBERG__DATA__SEQUENCE__NUMBER"));
+    Expr expr = buildLastUpdatedSeqNoExpr(tableRef.getUniqueAlias());
+    expr.analyze(analyzer);
+    analyzer.materializeSlots(expr);
+    return expr;
   }
 
   /**
@@ -1639,8 +1674,7 @@ public class IcebergUtil {
 
   public static SlotRef createSlotRef(Analyzer analyzer, TableRef tableRef,
       String colName) throws AnalysisException {
-    List<String> path = org.apache.impala.analysis.Path
-        .createRawPath(tableRef.getUniqueAlias(), colName);
+    List<String> path = Path.createRawPath(tableRef.getUniqueAlias(), colName);
     SlotRef ref = new SlotRef(path);
     ref.analyze(analyzer);
     return ref;

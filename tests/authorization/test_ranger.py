@@ -3555,6 +3555,52 @@ class TestRangerLocalCatalog(TestRanger):
       admin_client.execute("drop database if exists {0} cascade".format(unique_database))
 
   @pytest.mark.execute_serially
+  def test_iceberg_v3_column_masking(self, vector, unique_name):
+    """Test column masking on Iceberg V3 virtual columns (_row_id, _file_row_id,
+    _last_updated_sequence_number, _file_last_updated_sequence_number)."""
+    user = getuser()
+    admin_client = self.create_impala_client(user=ADMIN)
+    unique_database = unique_name + "_db"
+    short_table_name = "ice_v3"
+    tbl_name = unique_database + "." + short_table_name
+
+    policy_cnt = 0
+    try:
+      admin_client.execute("drop database if exists {0} cascade"
+                           .format(unique_database))
+      admin_client.execute("create database {0}".format(unique_database))
+      admin_client.execute(
+          "create table {0} (i int) stored by iceberg "
+          "tblproperties ('format-version'='3')".format(tbl_name))
+      admin_client.execute("insert into {0} values (1), (2), (3)".format(tbl_name))
+      admin_client.execute(
+          "insert into {0} select cast(l_orderkey as INT) "
+          "from tpch.lineitem where l_orderkey > 6".format(tbl_name))
+      admin_client.execute("insert into {0} values (4), (5), (6)".format(tbl_name))
+      admin_client.execute(
+          "optimize table {0} (file_size_threshold_mb=1)".format(tbl_name))
+      admin_client.execute("grant select on database {0} to user {1} "
+                           .format(unique_database, user))
+
+      # Add column masking policies that produce the negative values of virtual columns.
+      for col in ["_row_id", "_file_row_id", "_last_updated_sequence_number",
+                  "_file_last_updated_sequence_number"]:
+        TestRanger._add_column_masking_policy(
+            unique_name + str(policy_cnt), user, unique_database, short_table_name,
+            col, "CUSTOM", "-{col}")
+        policy_cnt += 1
+      self.execute_query_expect_success(admin_client, "refresh authorization")
+      self.run_test_case("QueryTest/ranger_iceberg_v3_column_masking", vector,
+                         test_file_vars={'$UNIQUE_DB': unique_database})
+    finally:
+      admin_client.execute("revoke select on database {0} from user {1}"
+                            .format(unique_database, user))
+      admin_client.execute("drop database if exists {0} cascade"
+                           .format(unique_database))
+      for i in range(policy_cnt):
+        TestRanger._remove_policy(unique_name + str(i))
+
+  @pytest.mark.execute_serially
   def test_convert_table_to_iceberg(self, unique_name):
     """Test that autorization is taken into account when performing a table migration to
     Iceberg."""

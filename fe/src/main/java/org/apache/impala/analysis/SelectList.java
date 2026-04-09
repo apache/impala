@@ -95,10 +95,24 @@ public class SelectList {
   public void rewriteExprs(ExprRewriter rewriter, Analyzer analyzer)
       throws AnalysisException {
     List<Subquery> subqueryExprs = new ArrayList<>();
-    for (SelectListItem item: items_) {
+    for (int i = 0; i < items_.size(); ++i) {
+      SelectListItem item = items_.get(i);
       if (item.isStar()) continue;
       if (item.isSkipExprRewrite()) continue;
-      item.setExpr(rewriter.rewrite(item.getExpr(), analyzer));
+      Expr origExpr = item.getExpr();
+      Expr newExpr = rewriter.rewrite(origExpr, analyzer);
+      if (newExpr != origExpr && item.getAlias() == null
+          && origExpr instanceof SlotRef) {
+        // The expression was rewritten (e.g., an Iceberg virtual-column SlotRef
+        // replaced by its definition). Preserve the original column label as an
+        // explicit alias so that re-analysis does not change the output column
+        // name, which would break outer-query references (e.g., in CTEs).
+        String colLabel = item.toColumnLabel(i, false);
+        items_.set(i, new SelectListItem(newExpr, colLabel));
+        item = items_.get(i);
+      } else {
+        item.setExpr(newExpr);
+      }
       item.getExpr().collect(Subquery.class, subqueryExprs);
     }
     for (Subquery s : subqueryExprs) {
