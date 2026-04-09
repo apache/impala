@@ -280,7 +280,7 @@ public class LocalCatalogTest {
     LocalIcebergTable t = (LocalIcebergTable)catalog_.getTable(
         "functional_parquet", "iceberg_partitioned");
     IcebergContentFileStore fileStore = t.getContentFileStore();
-    TPartialTableInfo tblInfo = provider_.loadIcebergTable(t.ref_);
+    TPartialTableInfo tblInfo = provider_.loadIcebergTableWithPagination(t.ref_);
     ListMap<TNetworkAddress> catalogdHostIndexes = new ListMap<>();
     catalogdHostIndexes.populate(tblInfo.getNetwork_addresses());
     IcebergContentFileStore catalogFileStore = IcebergContentFileStore.fromThrift(

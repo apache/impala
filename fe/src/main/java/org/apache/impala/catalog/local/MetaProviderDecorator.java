@@ -155,6 +155,11 @@ public abstract class MetaProviderDecorator implements MetaProvider {
     return this.decoratedObj_.loadIcebergApiTable(table, param, msTable);
   }
 
+  public MetaProvider.CachedIcebergFiles
+      loadIcebergContentFileStore(final TableMetaRef table) throws TException {
+    return this.decoratedObj_.loadIcebergContentFileStore(table);
+  }
+
   public TValidWriteIdList getValidWriteIdList(TableMetaRef ref) {
     return this.decoratedObj_.getValidWriteIdList(ref);
   }

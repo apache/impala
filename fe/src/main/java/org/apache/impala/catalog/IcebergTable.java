@@ -549,7 +549,7 @@ public class IcebergTable extends Table implements FeIcebergTable {
       catalogTimeline.markEvent("Loaded Iceberg file descriptors");
       fileStore_ = new IcebergContentFileStore(icebergApiTable_,
           loader.getLoadedIcebergFds(), icebergFiles, loader.getIcebergPartitions());
-      partitionStats_ = Utils.loadPartitionStats(this, icebergFiles);
+      partitionStats_ = Utils.loadPartitionStats(this.getIcebergApiTable(), icebergFiles);
 
       setAvroSchema(msClient, msTable_, fileStore_, catalogTimeline);
       updateMetrics(loader.getFileMetadataStats());
@@ -887,6 +887,13 @@ public class IcebergTable extends Table implements FeIcebergTable {
     }
 
     if (req.table_info_selector.want_iceberg_table) {
+      resp.table_info.setIceberg_table(Utils.getTIcebergTable(this,
+          ThriftObjectType.DESCRIPTOR_ONLY));
+      resp.table_info.iceberg_table.setCatalog_snapshot_id(catalogSnapshotId_);
+    }
+
+    if (req.table_info_selector.want_iceberg_table
+        && req.table_info_selector.want_partition_files) {
       // Only apply pagination if the coordinator explicitly opted in by setting
       // iceberg_file_offset. This ensures callers that don't support pagination
       // always receive the full file set.
@@ -903,10 +910,9 @@ public class IcebergTable extends Table implements FeIcebergTable {
           getContentFileStore().toThriftPartial(fileOffset, fileLimit);
 
       // Count files actually returned
-      long filesReturned = IcebergContentFileStore.countContentFiles(partialContentFiles);
+      long filesReturned =
+          IcebergContentFileStore.countContentFiles(partialContentFiles);
 
-      resp.table_info.setIceberg_table(Utils.getTIcebergTable(this,
-          ThriftObjectType.DESCRIPTOR_ONLY));
       resp.table_info.iceberg_table.setContent_files(partialContentFiles);
 
       // On the first request, include total file count so the coordinator knows
@@ -923,8 +929,8 @@ public class IcebergTable extends Table implements FeIcebergTable {
       if (!resp.table_info.isSetNetwork_addresses()) {
         resp.table_info.setNetwork_addresses(getHostIndex().getList());
       }
-      resp.table_info.iceberg_table.setCatalog_snapshot_id(catalogSnapshotId_);
     }
+
     return resp;
   }
 

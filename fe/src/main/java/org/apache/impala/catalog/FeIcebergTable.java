@@ -630,18 +630,19 @@ public interface FeIcebergTable extends FeFsTable {
       Map<String, TIcebergPartitionStats> nameToStats = new HashMap<>();
       // Use IcebergUtil.planFiles to retrieve only matching files.
       // This uses Iceberg's metadata (manifest files) to skip files that don't match.
+      Table apiTable = table.getIcebergApiTable();
       try (CloseableIterable<FileScanTask> tasks = IcebergUtil.planFiles(table,
           Collections.singletonList(filterExpr), null, null)) {
         // Iceberg has already done the filtering at the metadata level.
         for (FileScanTask task : tasks) {
           ContentFile<?> contentFile = task.file();
-          String partitionKey = getPartitionKey(table, contentFile);
+          String partitionKey = getPartitionKey(apiTable, contentFile);
           nameToStats.put(partitionKey,
               mergePartitionStats(nameToStats, contentFile, partitionKey));
 
           // Also include delete files for completeness
           for (DeleteFile deleteFile : task.deletes()) {
-            String deletePartitionKey = getPartitionKey(table, deleteFile);
+            String deletePartitionKey = getPartitionKey(apiTable, deleteFile);
             nameToStats.put(deletePartitionKey,
                 mergePartitionStats(nameToStats, deleteFile, deletePartitionKey));
           }
@@ -1012,10 +1013,10 @@ public interface FeIcebergTable extends FeFsTable {
      * TODO(IMPALA-11516): Return better partition stats for V2 tables.
      */
     public static Map<String, TIcebergPartitionStats> loadPartitionStats(
-        IcebergTable table, GroupedContentFiles icebergFiles) {
+        Table apiTable, GroupedContentFiles icebergFiles) {
       Map<String, TIcebergPartitionStats> nameToStats = new HashMap<>();
       for (ContentFile<?> contentFile : icebergFiles.getAllContentFiles()) {
-        String name = getPartitionKey(table, contentFile);
+        String name = getPartitionKey(apiTable, contentFile);
         nameToStats.put(name, mergePartitionStats(nameToStats, contentFile, name));
       }
       return nameToStats;
@@ -1050,9 +1051,9 @@ public interface FeIcebergTable extends FeFsTable {
     /**
      * Get iceberg partition from a dataFile and wrapper to a json string
      */
-    public static String getPartitionKey(FeIcebergTable table,
+    public static String getPartitionKey(Table apiTable,
         ContentFile<?> contentFile) {
-      PartitionSpec spec = table.getIcebergApiTable().specs().get(contentFile.specId());
+      PartitionSpec spec = apiTable.specs().get(contentFile.specId());
       Map<String, String> fieldNameToPartitionValue = new LinkedHashMap<>();
       for (int i = 0; i < spec.fields().size(); ++i) {
         Object partValue = contentFile.partition().get(i, Object.class);

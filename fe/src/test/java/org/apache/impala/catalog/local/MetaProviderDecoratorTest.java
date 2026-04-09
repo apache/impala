@@ -63,7 +63,7 @@ public class MetaProviderDecoratorTest {
 
   // Expected number of public methods in MetaProvider interface
   // Update this constant when adding new methods to MetaProvider
-  private static final int EXPECTED_METHOD_COUNT = 23;
+  private static final int EXPECTED_METHOD_COUNT = 24;
 
   @Test
   public void testMetaProviderMethodCount() {

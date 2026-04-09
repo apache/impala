@@ -197,6 +197,9 @@ public class IcebergContentFileStore {
     }
   }
 
+  /////////////////////////////////////////
+  // BEGIN: immutable members
+
   // Separate map-list containers for the different content files.
   private MapListContainer dataFilesWithoutDeletes_ = new MapListContainer();
   private MapListContainer dataFilesWithDeletes_ = new MapListContainer();
@@ -208,6 +211,17 @@ public class IcebergContentFileStore {
   // from the IcebergFileDescriptors.
   private Map<TIcebergPartition, Integer> partitions_;
 
+  // Flags to indicate file formats used in the table.
+  private boolean hasAvro_ = false;
+  private boolean hasOrc_ = false;
+  private boolean hasParquet_ = false;
+
+  // END: immutable members
+  /////////////////////////////////////////
+
+  /////////////////////////////////////////
+  // BEGIN: mutable members
+
   // Caches file descriptors loaded during time-travel queries.
   private final ConcurrentMap<Hash128, EncodedFileDescriptor> oldFileDescMap_ =
       new ConcurrentHashMap<>();
@@ -215,10 +229,8 @@ public class IcebergContentFileStore {
   private final ConcurrentMap<TIcebergPartition, Integer> oldPartitionMap_ =
       new ConcurrentHashMap<>();
 
-  // Flags to indicate file formats used in the table.
-  private boolean hasAvro_ = false;
-  private boolean hasOrc_ = false;
-  private boolean hasParquet_ = false;
+  // END: mutable members
+  /////////////////////////////////////////
 
   public IcebergContentFileStore() {}
 
@@ -253,6 +265,24 @@ public class IcebergContentFileStore {
       storeFile(deleteFile, fileDescMap, equalityDeleteFiles_);
     }
     dataFileToDV_ = icebergFiles.dataFileToDV;
+  }
+
+  // Creates a new instance with shared immutable members but
+  // new empty mutable ones.
+  public IcebergContentFileStore cloneWithoutMutables() {
+    IcebergContentFileStore ret = new IcebergContentFileStore();
+    // Separate map-list containers for the different content files.
+    ret.dataFilesWithoutDeletes_ = dataFilesWithoutDeletes_;
+    ret.dataFilesWithDeletes_ = dataFilesWithDeletes_;
+    ret.positionDeleteFiles_ = positionDeleteFiles_;
+    ret.equalityDeleteFiles_ = equalityDeleteFiles_;
+    ret.dataFileToDV_ = dataFileToDV_;
+    ret.missingFiles_ = missingFiles_;
+    ret.partitions_ = partitions_;
+    ret.hasAvro_ = hasAvro_;
+    ret.hasOrc_ = hasOrc_;
+    ret.hasParquet_ = hasParquet_;
+    return ret;
   }
 
   private void storeFile(ContentFile<?> contentFile,

@@ -600,4 +600,11 @@ class DirectMetaProvider implements MetaProvider {
     throw new NotImplementedException(
         "loadIcebergApiTable() is not implemented for DirectMetaProvider");
   }
+
+  @Override
+  public MetaProvider.CachedIcebergFiles
+      loadIcebergContentFileStore(final TableMetaRef table) throws TException {
+    throw new NotImplementedException(
+        "loadIcebergContentFileStore() is not implemented for DirectMetaProvider");
+  }
 }

@@ -52,6 +52,7 @@ import org.apache.impala.authorization.AuthorizationChecker;
 import org.apache.impala.authorization.AuthorizationPolicy;
 import org.apache.impala.catalog.CatalogException;
 import org.apache.impala.catalog.DataSource;
+import org.apache.impala.catalog.FeIcebergTable;
 import org.apache.impala.catalog.FileDescriptor;
 import org.apache.impala.catalog.Function;
 import org.apache.impala.catalog.HdfsCachePool;
@@ -73,6 +74,7 @@ import org.apache.impala.common.Pair;
 import org.apache.impala.compat.MetastoreShim;
 import org.apache.impala.thrift.TBriefTableMeta;
 import org.apache.impala.thrift.TIcebergContentFileStore;
+import org.apache.impala.thrift.TIcebergPartitionStats;
 import org.apache.impala.thrift.TIcebergTable;
 import org.apache.impala.thrift.TNetworkAddress;
 import org.apache.impala.thrift.TPartialTableInfo;
@@ -563,11 +565,7 @@ public class IcebergMetaProvider implements MetaProvider {
       iceTable.setCatalog_snapshot_id(apiTable.currentSnapshot().snapshotId());
     }
     iceTable.setDefault_partition_spec_id(apiTable.spec().specId());
-    ListMap<TNetworkAddress> hostIndex = new ListMap<>();
-    iceTable.setContent_files(getTContentFileStore(table, apiTable, hostIndex));
-    iceTable.setPartition_stats(Collections.emptyMap());
     ret.setIceberg_table(iceTable);
-    ret.setNetwork_addresses(hostIndex.getList());
     return ret;
   }
 
@@ -577,25 +575,36 @@ public class IcebergMetaProvider implements MetaProvider {
     return ((TableMetaRefImpl)table).iceApiTbl_;
   }
 
-  public String getLocation(final TableMetaRef table) {
-    return ((TableMetaRefImpl)table).msTable_.getSd().getLocation();
+  @Override
+  public MetaProvider.CachedIcebergFiles
+      loadIcebergContentFileStore(final TableMetaRef table) throws TException {
+    // TODO: integrate with CatalogdMetadataProvider's cache somehow
+    TableMetaRefImpl tableRef = (TableMetaRefImpl) table;
+    ListMap<TNetworkAddress> hostIndex = new ListMap<>();
+    return getContentFileStore(tableRef.iceApiTbl_, hostIndex, true);
   }
 
-  private TIcebergContentFileStore getTContentFileStore(final TableMetaRef table,
-      org.apache.iceberg.Table apiTable, ListMap<TNetworkAddress> hostIndex) {
+  private static MetaProvider.CachedIcebergFiles getContentFileStore(
+      org.apache.iceberg.Table apiTable,
+      ListMap<TNetworkAddress> hostIndex, boolean loadPartStats) {
     try {
       TableScan scan = apiTable.newScan();
       GroupedContentFiles groupedFiles = new GroupedContentFiles(scan.planFiles());
       IcebergFileMetadataLoader iceFml = new IcebergFileMetadataLoader(
           apiTable, Collections.emptyList(), hostIndex, groupedFiles,
-          new ArrayList<>(), false);
+          Collections.emptyList(), false);
       iceFml.load();
       IcebergContentFileStore contentFileStore = new IcebergContentFileStore(apiTable,
           iceFml.getLoadedIcebergFds(), groupedFiles, iceFml.getIcebergPartitions());
-      return contentFileStore.toThrift();
+      Map<String, TIcebergPartitionStats> partStats = null;
+      if (loadPartStats) {
+        partStats = FeIcebergTable.Utils.loadPartitionStats(apiTable, groupedFiles);
+      }
+      return new MetaProvider.CachedIcebergFiles(contentFileStore, hostIndex, partStats);
     } catch (Exception e) {
       throw new IllegalStateException(
           "Exception occurred during loading Iceberg file metadata", e);
     }
   }
+
 }

@@ -214,6 +214,14 @@ public class MultiMetaProvider implements MetaProvider {
         unchecked(provider -> provider.loadIcebergApiTable(table, param, msTable)));
   }
 
+  // TODO: this interface doesn't really make sense, see IMPALA-14892
+  @Override
+  public MetaProvider.CachedIcebergFiles
+      loadIcebergContentFileStore(final TableMetaRef table) throws TException {
+    return tryAllProviders(
+        unchecked(provider -> provider.loadIcebergContentFileStore(table)));
+  }
+
   @Override
   public TValidWriteIdList getValidWriteIdList(TableMetaRef ref) {
     try {

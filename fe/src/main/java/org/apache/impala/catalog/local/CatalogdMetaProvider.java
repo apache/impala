@@ -1227,19 +1227,66 @@ public class CatalogdMetaProvider implements MetaProvider {
         new Callable<TPartialTableInfo>() {
           @Override
           public TPartialTableInfo call() throws Exception {
-            return loadIcebergTableWithPagination(table);
+            // Load Iceberg table without file list.
+            TGetPartialCatalogObjectRequest req = newReqForTable(table);
+            req.table_info_selector.want_iceberg_table = true;
+            req.table_info_selector.want_partition_files = false;
+            TGetPartialCatalogObjectResponse resp = sendRequest(req);
+            checkResponse(resp.table_info != null &&
+                resp.table_info.iceberg_table != null, req,
+                "missing Iceberg table metadata");
+            return resp.getTable_info();
           }
     });
+  }
+
+  @Override
+  public CachedIcebergFiles
+      loadIcebergContentFileStore(final TableMetaRef table) throws TException {
+    Preconditions.checkArgument(table instanceof TableMetaRefImpl);
+    TableMetaRefImpl tableRef = (TableMetaRefImpl)table;
+
+    String itemStr = "content file store for " + tableRef.dbName_ + "."
+        + tableRef.tableName_;
+    // TODO: use snapshot id for key to make usable for REST catalog
+    IcebergContentFileStoreCacheKey cacheKey =
+        new IcebergContentFileStoreCacheKey(tableRef);
+    MetaProvider.CachedIcebergFiles result =
+        loadWithCaching(itemStr, TABLE_METADATA_CACHE_CATEGORY, cacheKey,
+          new Callable<CachedIcebergFiles>() {
+            @Override
+            public CachedIcebergFiles call() throws Exception {
+              TPartialTableInfo tableInfo = loadIcebergTableWithPagination(table);
+              ListMap<TNetworkAddress> hostIndex = new ListMap<>();
+              IcebergContentFileStore contentFiles = IcebergContentFileStore.fromThrift(
+                  tableInfo.getIceberg_table().getContent_files(),
+                  tableInfo.getNetwork_addresses(),
+                  hostIndex);
+              return new CachedIcebergFiles(
+                  contentFiles, hostIndex,
+                  tableInfo.getIceberg_table().getPartition_stats());
+            }
+          });
+
+    // The result is cloned to share immutable members but keep mutable ones private.
+    // Mutable concurrent hash maps are used to cache files from time-travel queries,
+    // which is thread-safe, but would increase the size of the cached object without
+    // updating weight.
+    // TODO: come up with a way to cache files in time-travel queries
+    return new MetaProvider.CachedIcebergFiles(result.fileStore.cloneWithoutMutables(),
+        result.hostIndex, result.partitionStats);
   }
 
   /**
    * Load Iceberg table metadata, handling partial file responses with pagination.
    * Similar to loadPartitionsFromCatalogd but for Iceberg file pagination.
    */
-  private TPartialTableInfo loadIcebergTableWithPagination(TableMetaRef table)
+  @VisibleForTesting
+  TPartialTableInfo loadIcebergTableWithPagination(TableMetaRef table)
       throws TException {
     TGetPartialCatalogObjectRequest req = newReqForTable(table);
     req.table_info_selector.want_iceberg_table = true;
+    req.table_info_selector.want_partition_files = true;
     req.table_info_selector.setIceberg_file_offset(0);
 
     TGetPartialCatalogObjectResponse resp = sendRequest(req);
@@ -1266,6 +1313,7 @@ public class CatalogdMetaProvider implements MetaProvider {
 
       TGetPartialCatalogObjectRequest nextReq = newReqForTable(table);
       nextReq.table_info_selector.want_iceberg_table = true;
+      nextReq.table_info_selector.want_partition_files = true;
       nextReq.table_info_selector.setIceberg_file_offset(fileOffset);
 
       TGetPartialCatalogObjectResponse nextResp = sendRequest(nextReq);
@@ -2344,6 +2392,18 @@ public class CatalogdMetaProvider implements MetaProvider {
   private static class IcebergApiTableCacheKey extends VersionedTableCacheKey {
 
     public IcebergApiTableCacheKey(TableMetaRefImpl table) {
+      super(table);
+    }
+  }
+
+  /**
+   * Cache key for an entry storing Iceberg files
+   *
+   * Values for these keys are 'MetaProvider.CachedIcebergFiles' objects.
+   */
+  private static class IcebergContentFileStoreCacheKey extends VersionedTableCacheKey {
+
+    public IcebergContentFileStoreCacheKey(TableMetaRefImpl table) {
       super(table);
     }
   }

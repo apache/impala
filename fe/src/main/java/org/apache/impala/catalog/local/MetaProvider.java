@@ -34,11 +34,13 @@ import org.apache.impala.catalog.Function;
 import org.apache.impala.catalog.HdfsCachePool;
 import org.apache.impala.catalog.HdfsPartitionLocationCompressor;
 import org.apache.impala.catalog.HdfsStorageDescriptor;
+import org.apache.impala.catalog.IcebergContentFileStore;
 import org.apache.impala.catalog.SqlConstraints;
 import org.apache.impala.catalog.VirtualColumn;
 import org.apache.impala.catalog.local.LocalIcebergTable.TableParams;
 import org.apache.impala.common.Pair;
 import org.apache.impala.thrift.TBriefTableMeta;
+import org.apache.impala.thrift.TIcebergPartitionStats;
 import org.apache.impala.thrift.TNetworkAddress;
 import org.apache.impala.thrift.TPartialTableInfo;
 import org.apache.impala.thrift.TValidWriteIdList;
@@ -163,6 +165,23 @@ public interface MetaProvider {
    */
   public org.apache.iceberg.Table loadIcebergApiTable(
       final TableMetaRef table, TableParams param, Table msTable) throws TException;
+
+  public class CachedIcebergFiles {
+    public IcebergContentFileStore fileStore;
+    public ListMap<TNetworkAddress> hostIndex;
+    public Map<String, TIcebergPartitionStats> partitionStats;
+
+    public CachedIcebergFiles(IcebergContentFileStore fileStore,
+        ListMap<TNetworkAddress> hostIndex,
+        Map<String, TIcebergPartitionStats> partitionStats) {
+      this.fileStore = fileStore;
+      this.hostIndex = hostIndex;
+      this.partitionStats = partitionStats;
+    }
+  }
+
+  public CachedIcebergFiles
+      loadIcebergContentFileStore(final TableMetaRef table) throws TException;
 
   /**
    * Reference to a table as returned by loadTable(). This reference must be passed

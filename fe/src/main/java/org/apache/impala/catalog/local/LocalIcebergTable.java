@@ -94,6 +94,9 @@ public class LocalIcebergTable extends LocalTable implements FeIcebergTable {
       TableParams tableParams = new TableParams(msTable);
       TPartialTableInfo tableInfo = db.getCatalog().getMetaProvider()
           .loadIcebergTable(ref);
+      MetaProvider.CachedIcebergFiles cachedFiles =
+          db.getCatalog().getMetaProvider().loadIcebergContentFileStore(ref);
+
       LocalFsTable fsTable = LocalFsTable.load(db, msTable, ref);
       warmupMetaProviderCache(db, msTable, ref, fsTable);
       org.apache.iceberg.Table icebergApiTable = db.getCatalog().getMetaProvider()
@@ -110,7 +113,7 @@ public class LocalIcebergTable extends LocalTable implements FeIcebergTable {
           db.getName() + "." + msTable.getTableName(),
           /*isFullAcidSchema=*/false);
       return new LocalIcebergTable(db, msTable, ref, fsTable, colMap, tableInfo,
-          tableParams, icebergApiTable);
+          tableParams, icebergApiTable, cachedFiles);
     } catch (InconsistentMetadataFetchException e) {
       // Just rethrow this so the query can be retried by the Frontend.
       throw e;
@@ -146,17 +149,17 @@ public class LocalIcebergTable extends LocalTable implements FeIcebergTable {
 
   private LocalIcebergTable(LocalDb db, Table msTable, MetaProvider.TableMetaRef ref,
       LocalFsTable fsTable, ColumnMap cmap, TPartialTableInfo tableInfo,
-      TableParams tableParams, org.apache.iceberg.Table icebergApiTable)
+      TableParams tableParams, org.apache.iceberg.Table icebergApiTable,
+      MetaProvider.CachedIcebergFiles cachedFiles)
       throws ImpalaRuntimeException {
     super(db, msTable, ref, cmap);
 
     Preconditions.checkNotNull(tableInfo);
     localFsTable_ = fsTable;
     tableParams_ = tableParams;
-    fileStore_ = IcebergContentFileStore.fromThrift(
-        tableInfo.getIceberg_table().getContent_files(),
-        tableInfo.getNetwork_addresses(),
-        getHostIndex());
+    fileStore_ = cachedFiles.fileStore;
+    getHostIndex().populate(cachedFiles.hostIndex.getList());
+    partitionStats_ = cachedFiles.partitionStats;
     if (fileStore_.hasAvro()) localFsTable_.setAvroSchema(msTable);
     icebergApiTable_ = icebergApiTable;
     catalogSnapshotId_ = tableInfo.getIceberg_table().getCatalog_snapshot_id();
@@ -167,7 +170,6 @@ public class LocalIcebergTable extends LocalTable implements FeIcebergTable {
     icebergParquetRowGroupSize_ = Utils.getIcebergParquetRowGroupSize(msTable);
     icebergParquetPlainPageSize_ = Utils.getIcebergParquetPlainPageSize(msTable);
     icebergParquetDictPageSize_ = Utils.getIcebergParquetDictPageSize(msTable);
-    partitionStats_ = tableInfo.getIceberg_table().getPartition_stats();
     setIcebergTableStats();
     addVirtualColumns(ref.getVirtualColumns());
   }
