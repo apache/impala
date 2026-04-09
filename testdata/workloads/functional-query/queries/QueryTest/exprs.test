@@ -2426,6 +2426,16 @@ select dayofyear(trunc('2014-11-11', string_col)) from functional.alltypestiny l
 Invalid Truncate Unit: 0
 ====
 ---- QUERY
+select trunc(2.1, int_col) from functional.alltypestiny limit 1;
+---- CATCH
+trunc() must be called with a constant second argument.
+====
+---- QUERY
+select trunc(2.1, null) from functional.alltypestiny limit 1;
+---- CATCH
+trunc() cannot be called with a NULL second argument.
+====
+---- QUERY
 select regexp_match_count(tmp.str, tmp.`pattern`) from (values
 ('aaa' as str, 'a' as `pattern`),
 ('aaa', 'aa'),
