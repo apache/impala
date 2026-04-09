@@ -238,6 +238,22 @@ class AtomicMetric : public ScalarMetric<int64_t, metric_kind_t> {
   AtomicInt64 value_;
 };
 
+// An implementation of 'gauge' metric that defers to a function. Must be destroyed before
+// the function context it defers to is destroyed.
+template<TMetricKind::type metric_kind_t>
+class FunctionMetric : public ScalarMetric<int64_t, metric_kind_t> {
+ public:
+  FunctionMetric(const TMetricDef& metric_def, std::function<int64_t()> function)
+    : ScalarMetric<int64_t, metric_kind_t>(metric_def), function_(std::move(function)) {
+    DCHECK(metric_kind_t == TMetricKind::GAUGE);
+  }
+
+  virtual int64_t GetValue() override { return function_(); }
+
+ private:
+  std::function<int64_t()> function_;
+};
+
 /// An AtomicMetric that keeps track of the highest value seen and the current value.
 ///
 /// Implementation notes:
@@ -391,6 +407,12 @@ class MetricGroup {
     return RegisterMetric(new DoubleGauge(MetricDefs::Get(key, metric_def_arg), value));
   }
 
+  FunctionGauge* AddFunctionGauge(const std::string& key,
+      std::function<int64_t()> function, const std::string& metric_def_arg = "") {
+    return RegisterMetric(
+        new FunctionGauge(MetricDefs::Get(key, metric_def_arg), std::move(function)));
+  }
+
   template<typename T>
   LockedMetric<T, TMetricKind::PROPERTY>* AddProperty(const std::string& key,
       const T& value, const std::string& metric_def_arg = "") {
@@ -519,4 +541,5 @@ extern template class LockedMetric<std::string, TMetricKind::PROPERTY>;
 extern template class LockedMetric<double, TMetricKind::GAUGE>;
 extern template class AtomicMetric<TMetricKind::GAUGE>;
 extern template class AtomicMetric<TMetricKind::COUNTER>;
-}
+extern template class FunctionMetric<TMetricKind::GAUGE>;
+} // namespace impala

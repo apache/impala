@@ -35,6 +35,7 @@
 #include "service/data-stream-service.h"
 #include "util/container-util.h"
 #include "util/debug-util.h"
+#include "util/histogram-metric.h"
 #include "util/metrics.h"
 #include "util/periodic-counter-updater.h"
 #include "util/pretty-printer.h"
@@ -79,6 +80,13 @@ KrpcDataStreamMgr::KrpcDataStreamMgr(MetricGroup* metrics)
       dsm_metrics->AddCounter("total-senders-blocked-on-recvr-creation", 0L);
   num_senders_timedout_ = dsm_metrics->AddCounter(
       "total-senders-timedout-waiting-for-recvr-creation", 0L);
+  deserialization_queue_size_ =
+      dsm_metrics->AddFunctionGauge("deserialization-queue-size",
+          [this]() { return deserialize_pool_.GetQueueSize(); });
+  constexpr int64_t ONE_HOUR_IN_NS = 60L * 60L * 1000L * 1000L * 1000L;
+  deserialize_queue_wait_time_ns_histogram_ = dsm_metrics->RegisterMetric(
+      new HistogramMetric(MetricDefs::Get("deserialization-queue-wait-time"),
+          ONE_HOUR_IN_NS, 3));
 }
 
 Status KrpcDataStreamMgr::Init(MemTracker* service_mem_tracker) {
@@ -251,12 +259,16 @@ void KrpcDataStreamMgr::AddData(const TransmitDataRequestPB* request,
 void KrpcDataStreamMgr::EnqueueDeserializeTask(const TUniqueId& finst_id,
     PlanNodeId dest_node_id, int sender_id, int num_requests) {
   for (int i = 0; i < num_requests; ++i) {
-    DeserializeTask payload = {finst_id, dest_node_id, sender_id};
+    DeserializeTask payload = {finst_id, dest_node_id, sender_id, MonotonicNanos()};
     deserialize_pool_.Offer(move(payload));
   }
 }
 
 void KrpcDataStreamMgr::DeserializeThreadFn(int thread_id, const DeserializeTask& task) {
+  int64_t queue_wait_time_ns = MonotonicNanos() - task.enqueue_time_ns;
+  if (LIKELY(queue_wait_time_ns > 0)) {
+    deserialize_queue_wait_time_ns_histogram_->Update(queue_wait_time_ns);
+  }
   shared_ptr<KrpcDataStreamRecvr> recvr;
   {
     bool already_unregistered;
@@ -445,6 +457,7 @@ void KrpcDataStreamMgr::Maintenance() {
                    << PrettyPrinter::Print(MonotonicMillis() - now, TUnit::TIME_MS);
       }
     }
+
     bool timed_out = false;
     shutdown_promise_.Get(sleep_time_ms, &timed_out);
     if (!timed_out) return;

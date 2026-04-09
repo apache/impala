@@ -53,6 +53,8 @@ template<typename T, TMetricKind::type metric_kind_t>
 class LockedMetric;
 template<TMetricKind::type metric_kind_t>
 class AtomicMetric;
+template<TMetricKind::type metric_kind_t>
+class FunctionMetric;
 template <typename T>
 class SetMetric;
 template <typename T, int StatsSelection=StatsType::ALL>
@@ -65,5 +67,7 @@ typedef class LockedMetric<double, TMetricKind::GAUGE> DoubleGauge;
 /// We write 'Int' as a placeholder for all integer types.
 typedef class AtomicMetric<TMetricKind::GAUGE> IntGauge;
 typedef class AtomicMetric<TMetricKind::COUNTER> IntCounter;
+
+typedef class FunctionMetric<TMetricKind::GAUGE> FunctionGauge;
 
 }

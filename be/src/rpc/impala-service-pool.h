@@ -103,6 +103,9 @@ class ImpalaServicePool : public kudu::rpc::RpcService {
   /// Histogram to track time spent by requests in the krpc incoming requests queue.
   scoped_refptr<kudu::Histogram> incoming_queue_time_;
 
+  /// Counter tracking timed out RPCs in the queue.
+  scoped_refptr<kudu::Counter> rpcs_timed_out_in_queue_;
+
   /// Histogram for incoming request payload size for each method of this service.
   std::unordered_map<std::string, std::unique_ptr<HistogramMetric>>
       payload_size_histograms_;

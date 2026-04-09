@@ -49,6 +49,8 @@ METRIC_DEFINE_histogram(server, impala_incoming_queue_time, "RPC Queue Time",
     "Number of microseconds incoming RPC requests spend in the worker queue",
     kudu::MetricLevel::kInfo, 60000000LU, 3);
 
+METRIC_DECLARE_counter(rpcs_timed_out_in_queue);
+
 using namespace rapidjson;
 
 DECLARE_string(debug_actions);
@@ -65,6 +67,7 @@ ImpalaServicePool::ImpalaServicePool(const scoped_refptr<kudu::MetricEntity>& en
     service_(service),
     service_queue_(service_queue_length),
     incoming_queue_time_(METRIC_impala_incoming_queue_time.Instantiate(entity)),
+    rpcs_timed_out_in_queue_(METRIC_rpcs_timed_out_in_queue.Instantiate(entity)),
     hostname_(address.hostname()),
     port_(SimpleItoa(address.port())) {
   DCHECK(service_mem_tracker_ != nullptr);
@@ -326,6 +329,8 @@ void ImpalaServicePool::ToJson(rapidjson::Value* value, rapidjson::Document* doc
   value->AddMember("idle_threads", service_queue_.estimated_idle_worker_count(),
       document->GetAllocator());
   value->AddMember("rpcs_queue_overflow", rpcs_queue_overflow_->GetValue(),
+      document->GetAllocator());
+  value->AddMember("rpcs_timed_out_in_queue", rpcs_timed_out_in_queue_->value(),
       document->GetAllocator());
 
   Value mem_usage(PrettyPrinter::Print(service_mem_tracker_->consumption(),

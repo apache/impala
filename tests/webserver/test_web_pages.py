@@ -854,22 +854,26 @@ class TestWebPage(ImpalaTestSuite):
   def test_rpc_read_write_metrics(self):
     """Test that read/write metrics are exposed in /rpcz"""
     rpcz = self._get_debug_page(self.RPCZ_URL)
-    hist_time_regex = "[0-9][0-9numsh.]*"
-    rpc_histogram_regex = (
-      "Count: [0-9]+, sum: " + hist_time_regex
-      + ", min / max: " + hist_time_regex + " / " + hist_time_regex
-      + ", 25th %-ile: " + hist_time_regex
-      + ", 50th %-ile: " + hist_time_regex
-      + ", 75th %-ile: " + hist_time_regex
-      + ", 90th %-ile: " + hist_time_regex
-      + ", 95th %-ile: " + hist_time_regex
-      + ", 99.9th %-ile: " + hist_time_regex)
+
+    def create_histogram_regex(value_regex):
+      return ("Count: [0-9]+, sum: " + value_regex
+        + ", min / max: " + value_regex + " / " + value_regex
+        + ", 25th %-ile: " + value_regex
+        + ", 50th %-ile: " + value_regex
+        + ", 75th %-ile: " + value_regex
+        + ", 90th %-ile: " + value_regex
+        + ", 95th %-ile: " + value_regex
+        + ", 99.9th %-ile: " + value_regex)
+    rpc_hist_time_regex = create_histogram_regex("[0-9][0-9numsh.]*")
+    rpc_hist_unit_regex = create_histogram_regex("[0-9][0-9KM.]*")
     assert len(rpcz['servers']) > 0
     for s in rpcz['servers']:
       for m in s['methods']:
-        assert re.search(rpc_histogram_regex, m["summary"])
-        assert re.search(rpc_histogram_regex, m["read"])
-        assert re.search(rpc_histogram_regex, m["write"])
+        assert re.search(rpc_hist_time_regex, m["summary"])
+        assert re.search(rpc_hist_time_regex, m["read"])
+        assert re.search(rpc_hist_time_regex, m["write"])
+    assert re.search(rpc_hist_time_regex, rpcz['reactor_active_latency'])
+    assert re.search(rpc_hist_unit_regex, rpcz['reactor_load_percent'])
 
   def test_krpc_rpcz(self):
     """Test that KRPC metrics are exposed in /rpcz and that they are updated when
@@ -897,6 +901,7 @@ class TestWebPage(ImpalaTestSuite):
       assert len(rpcz['services']) > 0
       for s in rpcz['services']:
         if s['service_name'] == svc_name:
+          assert s['rpcs_timed_out_in_queue'] == 0
           assert len(s['rpc_method_metrics']) > 0, '%s metrics are empty' % svc_name
           return sorted(s['rpc_method_metrics'], key=lambda m: m['method_name'])
       assert False, 'Could not find metrics for %s' % svc_name

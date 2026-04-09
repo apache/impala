@@ -105,6 +105,9 @@ DEFINE_string(uds_address_unique_id, "ip_address",
     "Specify unique Id for UDS address. It could be \"ip_address\", \"backend_id\", or "
     "\"none\"");
 
+METRIC_DECLARE_histogram(reactor_load_percent);
+METRIC_DECLARE_histogram(reactor_active_latency_us);
+
 namespace impala {
 
 RpcMgr::RpcMgr(bool use_tls) : use_tls_(use_tls) {
@@ -290,6 +293,12 @@ bool RpcMgr::IsServerTooBusy(const RpcController& rpc_controller) {
       && err->code() == kudu::rpc::ErrorStatusPB::ERROR_SERVER_TOO_BUSY;
 }
 
+static string ToString(kudu::HistogramPrototype& metric,
+    const scoped_refptr<kudu::MetricEntity>& metric_entity, TUnit::type unit) {
+  kudu::HdrHistogram snapshot(*metric.Instantiate(metric_entity)->histogram());
+  return HistogramMetric::HistogramToHumanReadable(&snapshot, unit);
+}
+
 void RpcMgr::ToJson(Document* document) {
   if (messenger_.get() == nullptr) return;
   // Add rpc_use_unix_domain_socket.
@@ -301,6 +310,12 @@ void RpcMgr::ToJson(Document* document) {
     num_accepted = acceptor_pool_->num_rpc_connections_accepted();
   }
   document->AddMember("rpc_connections_accepted", num_accepted, document->GetAllocator());
+
+  document->AddMember("reactor_active_latency", ToString(
+      METRIC_reactor_active_latency_us, messenger_->metric_entity(), TUnit::TIME_US),
+      document->GetAllocator());
+  document->AddMember("reactor_load_percent", ToString(METRIC_reactor_load_percent,
+      messenger_->metric_entity(), TUnit::UNIT), document->GetAllocator());
 
   // Add messenger metrics.
   DumpConnectionsResponsePB response;

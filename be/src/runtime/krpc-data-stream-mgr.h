@@ -315,6 +315,9 @@ class KrpcDataStreamMgr : public CacheLineAligned {
 
     /// Sender id used for identifying the sender queue for merging exchange.
     int sender_id;
+
+    /// Monotonic timestamp when this task was enqueued, in nanoseconds.
+    int64_t enqueue_time_ns;
   };
 
   /// Set of threads which deserialize buffered row batches, and deliver them to their
@@ -337,6 +340,13 @@ class KrpcDataStreamMgr : public CacheLineAligned {
 
   /// Total number of senders that timed-out waiting for a receiver to register
   IntCounter* num_senders_timedout_;
+
+  /// Current number of tasks queued in the deserialization thread pool. Sampled
+  /// periodically by the maintenance thread.
+  FunctionGauge* deserialization_queue_size_;
+
+  /// Distribution of time spent waiting in the deserialization queue, in ns.
+  HistogramMetric* deserialize_queue_wait_time_ns_histogram_;
 
   /// protects all fields below
   std::mutex lock_;

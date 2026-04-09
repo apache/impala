@@ -3322,6 +3322,26 @@
     "key": "total-senders-timedout-waiting-for-recvr-creation"
   },
   {
+    "description": "Current number of deserialization tasks queued in the datastream deserialization thread pool. Sampled periodically. A value persistently near datastream_service_deserialization_queue_size indicates the thread pool is undersized and datastream_service_num_deserialization_threads should be increased.",
+    "contexts": [
+      "IMPALAD"
+    ],
+    "label": "Datastream Deserialization Queue Size",
+    "units": "NONE",
+    "kind": "GAUGE",
+    "key": "deserialization-queue-size"
+  },
+  {
+    "description": "Histogram of per-task wait time in the datastream deserialization queue before a worker thread starts processing.",
+    "contexts": [
+      "IMPALAD"
+    ],
+    "label": "Datastream Deserialization Queue Wait Time",
+    "units": "TIME_NS",
+    "kind": "HISTOGRAM",
+    "key": "deserialization-queue-wait-time"
+  },
+  {
     "description": "A version string identifying the Kudu client",
     "contexts": [
       "IMPALAD",

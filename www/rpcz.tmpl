@@ -31,6 +31,11 @@ under the License.
 
 {{?services}}
 <h2>KRPC Services</h2>
+<h3><samp>Reactors</samp></h3>
+<p><b>Active Latency:</b>
+ <span id="reactor_active_latency">{{reactor_active_latency}}</span></p>
+<p><b>Load Percent:</b>
+ <span id="reactor_load_percent">{{reactor_load_percent}}</span></p>
 {{/services}}
 {{#services}}
 <h3><samp>{{service_name}}</samp></h3>
@@ -286,6 +291,12 @@ function update_impala_services(json) {
 // Update all krpc metrics from the "services" member of "json".
 function update_krpc_services(json) {
   if (!json["services"]) return;
+  // Update reactor metrics
+  const reactor_latency = document.getElementById("reactor_active_latency")
+  if (reactor_latency) reactor_latency.innerHTML = json["reactor_active_latency"]
+  const reactor_load = document.getElementById("reactor_load_percent")
+  if (reactor_load) reactor_load.innerHTML = json["reactor_load_percent"]
+
   // Update each service
   for (let i = 0; i < json["services"].length; ++i) {
     const svc_json = json["services"][i];

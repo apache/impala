@@ -416,4 +416,5 @@ template class LockedMetric<std::string, TMetricKind::PROPERTY>;
 template class LockedMetric<double, TMetricKind::GAUGE>;
 template class AtomicMetric<TMetricKind::GAUGE>;
 template class AtomicMetric<TMetricKind::COUNTER>;
+template class FunctionMetric<TMetricKind::GAUGE>;
 } // namespace impala
