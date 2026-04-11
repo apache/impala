@@ -153,7 +153,6 @@ class ExecEnv {
     return frontend_.get();
   }
   RequestPoolService* request_pool_service() { return request_pool_service_.get(); }
-  CallableThreadPool* rpc_pool() { return async_rpc_pool_.get(); }
   QueryExecMgr* query_exec_mgr() { return query_exec_mgr_.get(); }
   RpcMgr* rpc_mgr() const { return rpc_mgr_.get(); }
   PoolMemTrackerRegistry* pool_mem_trackers() { return pool_mem_trackers_.get(); }
@@ -261,7 +260,6 @@ class ExecEnv {
   boost::scoped_ptr<RequestPoolService> request_pool_service_;
   boost::scoped_ptr<Frontend> frontend_;
 
-  boost::scoped_ptr<CallableThreadPool> async_rpc_pool_;
   boost::scoped_ptr<QueryExecMgr> query_exec_mgr_;
   boost::scoped_ptr<RpcMgr> rpc_mgr_;
   boost::scoped_ptr<ControlService> control_svc_;

@@ -252,7 +252,6 @@ ExecEnv::ExecEnv(int krpc_port, int subscriber_port, int webserver_port,
     thread_mgr_(new ThreadResourceMgr),
     tmp_file_mgr_(new TmpFileMgr),
     frontend_(external_fe ? nullptr : new Frontend()),
-    async_rpc_pool_(new CallableThreadPool("rpc-pool", "async-rpc-sender", 8, 10000)),
     query_exec_mgr_(new QueryExecMgr()),
     tuple_cache_mgr_(new TupleCacheMgr(metrics_.get())),
     rpc_metrics_(metrics_->GetOrCreateChildGroup("rpc")),
@@ -356,7 +355,6 @@ Status ExecEnv::Init() {
   if (FLAGS_is_coordinator) {
     RETURN_IF_ERROR(hdfs_op_thread_pool_->Init());
   }
-  RETURN_IF_ERROR(async_rpc_pool_->Init());
 
   int64_t bytes_limit;
   RETURN_IF_ERROR(ChooseProcessMemLimit(&bytes_limit));
