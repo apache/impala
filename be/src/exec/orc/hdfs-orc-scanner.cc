@@ -607,7 +607,7 @@ Status HdfsOrcScanner::ResolveColumns(const TupleDescriptor& tuple_desc,
   SlotDescriptor* pos_slot_desc = nullptr;
   for (SlotDescriptor* slot_desc : tuple_desc.slots()) {
     // Skip columns not (necessarily) stored in the data files.
-    if (!file_metadata_utils_.NeedDataInFile(slot_desc)) {
+    if (file_metadata_utils_.ShouldSkipReadFromFile(slot_desc)) {
       if (slot_desc->virtual_column_type() == TVirtualColumnType::FILE_POSITION) {
         DCHECK(pos_slot_desc == nullptr)
             << "There should only be one position slot per tuple";
@@ -641,7 +641,8 @@ Status HdfsOrcScanner::ResolveColumns(const TupleDescriptor& tuple_desc,
       }
       if (acid_original_file_ && schema_resolver_->IsAcidColumn(slot_desc->col_path())) {
         SetSyntheticAcidFieldForOriginalFile(slot_desc, *template_tuple);
-      } else {
+      } else if (file_metadata_utils_.NeedDataInFile(slot_desc)) {
+        // Set NULL if the field is missing and we need data from the file.
         (*template_tuple)->SetNull(slot_desc->null_indicator_offset());
       }
       missing_field_slots_.insert(slot_desc);

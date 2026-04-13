@@ -2332,6 +2332,7 @@ class TestIcebergV3Table(IcebergTestSuite):
   def test_v3_negative(self, vector, unique_database):
     self.load_table(unique_database, "iceberg_v3_deletion_vectors")
     self.load_table(unique_database, "iceberg_v3_default_value")
+    self.load_table(unique_database, "test_complex_default")
     self.run_test_case('QueryTest/iceberg-v3-negative', vector, unique_database)
 
   def test_v3_row_lineage(self, vector, unique_database):
@@ -2370,6 +2371,15 @@ class TestIcebergV3Table(IcebergTestSuite):
 
   def test_v3_optimize(self, vector, unique_database):
     self.run_test_case('QueryTest/iceberg-v3-optimize', vector, unique_database)
+
+  def test_v3_default_values(self, vector, unique_database):
+    """Test Iceberg V3 initial-default and write-default values."""
+    self.load_table(unique_database, "iceberg_v3_default_value")
+    self.load_table(unique_database, "iceberg_v3_default_value_orc", format="orc")
+    self.load_table(unique_database, "iceberg_v3_default_value_avro", format="avro")
+    self.load_table(unique_database, "test_default_part")
+    self.load_table(unique_database, "test_complex_default")
+    self.run_test_case('QueryTest/iceberg-v3-default-values', vector, unique_database)
 
 
 # Tests to exercise the DIRECTED distribution mode for V2 Iceberg tables. Note, that most

@@ -2915,7 +2915,7 @@ Status HdfsParquetScanner::CreateColumnReaders(const TupleDescriptor& tuple_desc
 
   for (SlotDescriptor* slot_desc: tuple_desc.slots()) {
     // Skip partition columns
-    if (!file_metadata_utils_.NeedDataInFile(slot_desc)) {
+    if (file_metadata_utils_.ShouldSkipReadFromFile(slot_desc)) {
       if (UNLIKELY(slot_desc->virtual_column_type() ==
           TVirtualColumnType::FILE_POSITION)) {
         DCHECK(file_pos_slot_desc == nullptr)
@@ -2939,7 +2939,10 @@ Status HdfsParquetScanner::CreateColumnReaders(const TupleDescriptor& tuple_desc
         *template_tuple =
             Tuple::Create(tuple_desc.byte_size(), template_tuple_pool_.get());
       }
-      (*template_tuple)->SetNull(slot_desc->null_indicator_offset());
+      // Set NULL if the field is missing and we need data from the file.
+      if (file_metadata_utils_.NeedDataInFile(slot_desc)) {
+        (*template_tuple)->SetNull(slot_desc->null_indicator_offset());
+      }
       continue;
     }
 

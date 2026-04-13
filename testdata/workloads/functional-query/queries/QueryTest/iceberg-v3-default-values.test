@@ -1,0 +1,280 @@
+====
+---- QUERY
+# Test Iceberg V3 default values across multiple file formats
+#
+# This test covers:
+# - Parquet: Full read (initial-default)
+# - ORC: Read (initial-default) support only
+# - Avro: Read (initial-default) support only
+#
+# Note: Impala only supports writing to Parquet format Iceberg tables.
+# ORC and Avro formats are read-only for Iceberg in Impala.
+
+# Test initial-default values for Parquet format
+# Column 'j' has initial-default = -1 and write-default = -999
+# First row: i=1, j is missing (should use initial-default -1)
+# Second row: i=2, j=2 (explicit value)
+SELECT * FROM iceberg_v3_default_value ORDER BY i;
+---- RESULTS
+1,-1
+2,2
+---- TYPES
+INT,INT
+====
+---- QUERY
+# Test initial-default values for ORC format
+SELECT * FROM iceberg_v3_default_value_orc ORDER BY i;
+---- RESULTS
+1,-1
+2,2
+---- TYPES
+INT,INT
+====
+---- QUERY
+# Test initial-default values for Avro format
+SELECT * FROM iceberg_v3_default_value_avro ORDER BY i;
+---- RESULTS
+1,-1
+2,2
+---- TYPES
+INT,INT
+====
+---- QUERY
+# Parquet: Filter exactly on the initial-default value
+SELECT i, j FROM iceberg_v3_default_value WHERE j = -1 ORDER BY i;
+---- RESULTS
+1,-1
+---- TYPES
+INT,INT
+====
+---- QUERY
+# ORC: Filter exactly on the initial-default value
+SELECT i, j FROM iceberg_v3_default_value_orc WHERE j = -1 ORDER BY i;
+---- RESULTS
+1,-1
+---- TYPES
+INT,INT
+====
+---- QUERY
+# Avro: Filter exactly on the initial-default value
+SELECT i, j FROM iceberg_v3_default_value_avro WHERE j = -1 ORDER BY i;
+---- RESULTS
+1,-1
+---- TYPES
+INT,INT
+====
+---- QUERY
+# Parquet: Filter exactly on explicit value
+SELECT i, j FROM iceberg_v3_default_value WHERE j > 0 ORDER BY i;
+---- RESULTS
+2,2
+---- TYPES
+INT,INT
+====
+---- QUERY
+# ORC: Filter exactly on explicit value
+SELECT i, j FROM iceberg_v3_default_value_orc WHERE j > 0 ORDER BY i;
+---- RESULTS
+2,2
+---- TYPES
+INT,INT
+====
+---- QUERY
+# Avro: Filter exactly on explicit value
+SELECT i, j FROM iceberg_v3_default_value_avro WHERE j > 0 ORDER BY i;
+---- RESULTS
+2,2
+---- TYPES
+INT,INT
+====
+---- QUERY
+# Parquet: initial-default is a real INT, not SQL NULL — no rows match j IS NULL
+SELECT i, j FROM iceberg_v3_default_value WHERE j IS NULL ORDER BY i;
+---- RESULTS
+---- TYPES
+INT,INT
+====
+---- QUERY
+# ORC: no NULL j after default fill
+SELECT i, j FROM iceberg_v3_default_value_orc WHERE j IS NULL ORDER BY i;
+---- RESULTS
+---- TYPES
+INT,INT
+====
+---- QUERY
+# Avro: no NULL j after default fill
+SELECT i, j FROM iceberg_v3_default_value_avro WHERE j IS NULL ORDER BY i;
+---- RESULTS
+---- TYPES
+INT,INT
+====
+---- QUERY
+# Parquet: verify all materialized defaults and explicitly stored values evaluate to NOT NULL
+SELECT i, j FROM iceberg_v3_default_value WHERE j IS NOT NULL ORDER BY i;
+---- RESULTS
+1,-1
+2,2
+---- TYPES
+INT,INT
+====
+---- QUERY
+# ORC: verify NOT NULL evaluation
+SELECT i, j FROM iceberg_v3_default_value_orc WHERE j IS NOT NULL ORDER BY i;
+---- RESULTS
+1,-1
+2,2
+---- TYPES
+INT,INT
+====
+---- QUERY
+# Avro: verify NOT NULL evaluation
+SELECT i, j FROM iceberg_v3_default_value_avro WHERE j IS NOT NULL ORDER BY i;
+---- RESULTS
+1,-1
+2,2
+---- TYPES
+INT,INT
+====
+---- QUERY
+# Parquet: Compound predicate pushdown testing
+SELECT i, j FROM iceberg_v3_default_value WHERE i = 1 AND j = -1;
+---- RESULTS
+1,-1
+---- TYPES
+INT,INT
+====
+---- QUERY
+# ORC: Compound predicate pushdown testing
+SELECT i, j FROM iceberg_v3_default_value_orc WHERE i = 1 AND j = -1;
+---- RESULTS
+1,-1
+---- TYPES
+INT,INT
+====
+---- QUERY
+# Avro: Compound predicate pushdown testing
+SELECT i, j FROM iceberg_v3_default_value_avro WHERE i = 1 AND j = -1;
+---- RESULTS
+1,-1
+---- TYPES
+INT,INT
+====
+---- QUERY
+# Time travel — first snapshot: schema had only i
+SELECT * FROM iceberg_v3_default_value FOR SYSTEM_VERSION AS OF 7752776210164022855;
+---- RESULTS
+1
+---- TYPES
+INT
+====
+---- QUERY
+# Time travel — ORC first snapshot (schema without j)
+SELECT * FROM iceberg_v3_default_value_orc FOR SYSTEM_VERSION AS OF 1536392834658079256;
+---- RESULTS
+1
+---- TYPES
+INT
+====
+---- QUERY
+# Time travel — Avro first snapshot (schema without j)
+SELECT * FROM iceberg_v3_default_value_avro FOR SYSTEM_VERSION AS OF 2819462914350205316;
+---- RESULTS
+1
+---- TYPES
+INT
+====
+---- QUERY
+# Tests Iceberg V3 `initial-default` read projection against partition evolution.
+# Validates that the scanner correctly projects the read default value for older unpartitioned files,
+# while successfully overriding it with partition key values (or explicit NULLs) for newly partitioned data files.
+
+# Table was created initially with column 'i' and records (1), (2) were inserted.
+# It was then partitioned on the newly added column 'j'. Has initial-default = -1 and write-default = -999
+# Three new records (3,5), (4,10) & (5,NULL) were inserted.
+# For row: i=1 & i=2, j is missing (should use initial-default -1)
+# For others, it must use the partition key value, explicit NULL
+SELECT * FROM test_default_part ORDER BY i;
+---- RESULTS
+1,-1
+2,-1
+3,5
+4,10
+5,NULL
+---- TYPES
+INT,INT
+====
+---- QUERY
+# Test Case 2: Filter on the Default Value
+# This validates that partition pruning doesn't accidentally skip old files
+# that lack partition metadata for j.
+SELECT i FROM test_default_part WHERE j = -1 ORDER BY i;
+---- RESULTS
+1
+2
+---- TYPES
+INT
+====
+---- QUERY
+# Test Case 3: Filter on the Partition Key
+# This tests that expression evaluation works correctly on the newly partitioned
+# data and doesn't get confused by the initial default.
+SELECT i FROM test_default_part WHERE j = 5;
+---- RESULTS
+3
+---- TYPES
+INT
+====
+---- QUERY
+# Test Case 4: Aggregation and Grouping
+SELECT j, COUNT(i) as row_count
+FROM test_default_part
+GROUP BY j
+ORDER BY j;
+---- RESULTS
+-1,2
+5,1
+10,1
+NULL,1
+---- TYPES
+INT,BIGINT
+====
+---- QUERY
+# Table test_complex_default has two columns: i (int), j STRUCT<f1: INT, f2: STRING>
+# Nested field j.f1 with an int initial-default in metadata.
+# Selecting only column i should succeed because j is not materialized.
+SELECT i FROM test_complex_default ORDER BY i;
+---- RESULTS
+1
+2
+---- TYPES
+INT
+====
+---- QUERY
+# SELECT * does not materialize complex columns like struct j unless they
+# are explicitly referenced. Since j is not materialized in this query, the nested default
+# on j.f1 is not checked and the scan succeeds.
+SELECT * FROM test_complex_default;
+---- RESULTS
+1
+2
+---- TYPES
+INT
+====
+---- QUERY
+# Nested field j.f2 does not have any initial-default in metadata.
+# Selecting the nested field j.f2 specifically should succeed.
+SELECT j.f2 FROM test_complex_default;
+---- RESULTS
+'hello'
+'NULL'
+---- TYPES
+STRING
+====
+---- QUERY
+SELECT f2 FROM (SELECT j.f1 as f1, j.f2 as f2 FROM test_complex_default) v;
+---- RESULTS
+'hello'
+'NULL'
+---- TYPES
+STRING
+====

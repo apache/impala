@@ -999,6 +999,15 @@ public class InsertStmt extends DmlStatementBase {
           } else {
             // Unmentioned non-clustering columns get NULL literals with the appropriate
             // target type because Parquet cannot handle NULL_TYPE (IMPALA-617).
+            // TODO: Add write-default support for Iceberg tables
+            if (isIcebergTarget()) {
+              IcebergColumn iceCol = (IcebergColumn) tblColumn;
+              if (iceCol.getWriteDefault() != null) {
+                throw new AnalysisException("Write-default values are not yet " +
+                    "supported. Column '" + iceCol.getName() + "' has a write-default " +
+                    "value defined.");
+              }
+            }
             NullLiteral nullExpr = NullLiteral.create(tblColumn.getType());
             resultExprs_.add(nullExpr);
             // In the case of INSERT INTO iceberg_tbl (col_a, col_b, ...), if the

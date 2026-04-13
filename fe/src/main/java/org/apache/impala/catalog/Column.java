@@ -115,10 +115,14 @@ public class Column {
     if (columnDesc.isIs_iceberg_column()) {
       Preconditions.checkState(columnDesc.isSetIceberg_field_id());
       boolean isHidden = columnDesc.isSetIs_hidden() && columnDesc.isIs_hidden();
+      String initialDefault = columnDesc.isSetIceberg_initial_default() ?
+          columnDesc.getIceberg_initial_default() : null;
+      String writeDefault = columnDesc.isSetIceberg_write_default() ?
+          columnDesc.getIceberg_write_default() : null;
       col = new IcebergColumn(columnDesc.getColumnName(), type, comment, position,
           columnDesc.getIceberg_field_id(), columnDesc.getIceberg_field_map_key_id(),
           columnDesc.getIceberg_field_map_value_id(), columnDesc.isIs_nullable(),
-          isHidden);
+          isHidden, initialDefault, writeDefault);
     } else if (columnDesc.isIs_paimon_column()) {
       Preconditions.checkState(columnDesc.isSetIceberg_field_id());
       col = new PaimonColumn(columnDesc.getColumnName(), type, comment, position,

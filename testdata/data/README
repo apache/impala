@@ -1219,6 +1219,32 @@ Since Spark still doesn't support default values, the metadata.json file was edi
 manually to set the default value for column 'j':
 {"id":2,"name":"j","required":false,"type":"int","initial-default":-1,"write-default":-1}
 
+testdata/data/iceberg_test/iceberg_v3/iceberg_v3_default_value_orc
+Same as iceberg_v3_default_value, but with ORC data files (tblproperty write.format.default=orc).
+
+testdata/data/iceberg_test/iceberg_v3/iceberg_v3_default_value_avro
+Same as iceberg_v3_default_value, but with Avro data files (tblproperty write.format.default=avro).
+
+testdata/data/iceberg_test/iceberg_v3/test_default_part
+Iceberg V3 table with an identity-partitioned column that uses initial-default
+in metadata (for partition-default behavior in tests). Created with
+Spark/Iceberg similarly to iceberg_v3_deletion_vectors, then modified:
+  1. Initial table: column i (int), inserted (1), (2)
+  2. Added column j (int), added partition by spec (j)
+  3. Inserted (3, 5), (4, 10), (5, NULL)
+  4. Manually set initial-default=-1 for column j in metadata JSON files
+The table exercises initial-default on partition columns where older files (from before
+the schema evolution) lack values for j, which should read as -1.
+
+testdata/data/iceberg_test/iceberg_v3/test_complex_default
+Iceberg V3 table for negative tests: struct column with an initial-default on a nested
+primitive field. Created with Spark/Iceberg, then copied from HDFS:
+  1. Initial table: column i (int), inserted (1)
+  2. ALTER TABLE ADD COLUMN j STRUCT<f1: INT, f2: STRING>
+  3. Inserted (2, named_struct('f1', 100, 'f2', 'hello'))
+  4. Manually added initial-default=-1 to nested field j.f1 (field id 3) in metadata
+Impala should reject scans that materialize any nested field with a default.
+
 testdata/data/iceberg_test/iceberg_v3/iceberg_v3_row_lineage(_orc):
 Iceberg V3 table created by Spark 4.0.2, see above (iceberg_v3_deletion_vectors).
 sql("create table iceberg_v3_row_lineage (i int) using iceberg options('format-version'='3')").collect()

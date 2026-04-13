@@ -145,8 +145,13 @@ public class IcebergSchemaConverter {
         keyId = mapType.keyId();
         valueId = mapType.valueId();
       }
+      String initialDefault = column.initialDefaultLiteral() != null ?
+          column.initialDefaultLiteral().toString() : null;
+      String writeDefault = column.writeDefaultLiteral() != null ?
+          column.writeDefaultLiteral().toString() : null;
       ret.add(new IcebergColumn(column.name(), colType, column.doc(), pos++,
-          column.fieldId(), keyId, valueId, column.isOptional()));
+          column.fieldId(), keyId, valueId, column.isOptional(), false,
+          initialDefault, writeDefault));
     }
     return ret;
   }

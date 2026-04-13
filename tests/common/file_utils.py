@@ -39,8 +39,8 @@ def create_iceberg_table_from_directory(impala_client, unique_database, table_na
   if not warehouse_prefix and unique_database:
     warehouse_prefix = os.getenv("DEFAULT_FS", WAREHOUSE_PREFIX)
 
-  # Only orc and parquet tested/supported
-  assert file_format == "orc" or file_format == "parquet"
+  # Only orc, parquet, and avro tested/supported
+  assert file_format in ["orc", "parquet", "avro"]
 
   table_location = os.path.expandvars(table_location)
   local_dir = os.path.join(table_location, table_name)

@@ -18,6 +18,7 @@
 #pragma once
 
 #include "common/global-types.h"
+#include "exec/text-converter.h"
 
 #include <cstdint>
 #include <map>
@@ -64,6 +65,23 @@ public:
   /// partition columns, virtual columns.
   bool NeedDataInFile(const SlotDescriptor* slot_desc);
 
+  /// Returns true if the column has an Iceberg initial-default value.
+  /// This is used by scanners to determine if a missing column should use the default
+  /// value instead of being set to NULL.
+  bool HasIcebergDefaultValue(const SlotDescriptor* slot_desc);
+
+  /// Returns true if we should skip reading this column from the file.
+  /// This returns true for partition columns, but false for columns with default values
+  /// when we have both defaults and data in files - in such cases we want the column
+  /// reader to be created and read data from file.
+  bool ShouldSkipReadFromFile(const SlotDescriptor* slot_desc);
+
+  /// Populates Iceberg initial-default values into the given template tuple.
+  /// The tuple must already exist (typically copied from the partition template tuple
+  /// built in HdfsScanPlanNode::InitTemplateTuple). This applies initial-default values
+  /// to top-level columns for Iceberg tables. Complex type defaults are not supported.
+  void PopulateIcebergDefaults(Tuple* template_tuple, MemPool* pool);
+
   /// Adjusts the file-level fieldID for data files residing in migrated partitioned
   /// Iceberg tables. It is OK to have none of the partition columns in the data
   /// file, or to have all of the partition columns, in any other case this method
@@ -87,6 +105,10 @@ private:
   /// Returns a pointer to the container of partition transforms. Only valid to call
   /// for Iceberg tables.
   auto IcebergPartitionTransforms() const;
+
+  /// Creates a TextConverter with the standard parameters used for parsing partition
+  /// values and default values.
+  TextConverter CreateTextConverter() const;
 
   HdfsScanNodeBase* const scan_node_;
 

@@ -17,9 +17,11 @@
 
 package org.apache.impala.planner;
 
+import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 import java.io.IOException;
+import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -48,6 +50,7 @@ import org.apache.iceberg.io.CloseableIterable;
 import org.apache.iceberg.metrics.InMemoryMetricsReporter;
 import org.apache.iceberg.metrics.ScanMetricsResult;
 import org.apache.iceberg.metrics.ScanReport;
+import org.apache.iceberg.Schema;
 import org.apache.iceberg.types.Types.NestedField;
 import org.apache.impala.analysis.Analyzer;
 import org.apache.impala.analysis.BinaryPredicate;
@@ -57,6 +60,7 @@ import org.apache.impala.analysis.IcebergExpressionCollector;
 import org.apache.impala.analysis.IcebergPartitionSpec;
 import org.apache.impala.analysis.JoinOperator;
 import org.apache.impala.analysis.MultiAggregateInfo;
+import org.apache.impala.analysis.Path;
 import org.apache.impala.analysis.SlotDescriptor;
 import org.apache.impala.analysis.SlotId;
 import org.apache.impala.analysis.SlotRef;
@@ -93,6 +97,7 @@ import org.apache.impala.thrift.TIcebergPartitionTransformType;
 import org.apache.impala.thrift.TQueryOptions;
 import org.apache.impala.thrift.TVirtualColumnType;
 import org.apache.impala.util.Hash128;
+import org.apache.impala.util.IcebergSchemaConverter;
 import org.apache.impala.util.IcebergUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -250,26 +255,10 @@ public class IcebergScanPlanner {
         dataFileToDV_.isEmpty();
   }
 
-  private void validateSlotRefs() throws ImpalaException {
-    if (getIceTable().getFormatVersion() < 3) return;
-    for (SlotDescriptor slotDesc : tblRef_.getDesc().getSlots()) {
-      if (!slotDesc.isMaterialized()) continue;
-      Column column = slotDesc.getColumn();
-      if (column == null) continue;
-      int fieldId = ((IcebergColumn) column).getFieldId();
-      NestedField field = getIceTable().getIcebergApiTable().schema().findField(fieldId);
-      if (field != null && field.initialDefaultLiteral() != null) {
-        throw new ImpalaRuntimeException(String.format(
-            "Iceberg columns with default values not supported yet. " +
-            "Table: %s Column: %s Default value: %s",
-            getIceTable().getFullName(), column.getName(),
-            field.initialDefaultLiteral().toString()));
-      }
-    }
-  }
-
   private PlanNode createIcebergScanPlanImpl() throws ImpalaException {
-    validateSlotRefs();
+    // Check for nested fields as they are not supported for Iceberg default values
+    checkForNestedDefaultValues();
+
     boolean isPartitionKeyScan = IsPartitionKeyScan();
     if (noDeleteFiles()) {
       Preconditions.checkState(!tblRef_.optimizeCountStarForIcebergV2());
@@ -1069,6 +1058,109 @@ public class IcebergScanPlanner {
       Map<SlotId, SlotDescriptor> idToSlotDesc) {
     return hasPartitionTransformType(cols, idToSlotDesc,
         transformType -> transformType == TIcebergPartitionTransformType.IDENTITY);
+  }
+
+  /**
+   * Rejects scans when a default value appears on a nested field or on a top-level
+   * complex column, but only for Iceberg fields that are part of this scan (including
+   * all nested field ids under a materialized struct, array, or map).
+   *
+   * The catalog only attaches defaults to top-level columns, so this walks the
+   * Iceberg schema tree. Slots that are not referenced by the query are skipped.
+   */
+  private void checkForNestedDefaultValues() throws AnalysisException {
+    Set<Integer> materializedFieldIds = computeMaterializedIcebergFieldIds();
+    for (NestedField field : getIceTable().getIcebergSchema().columns()) {
+      visitIcebergFieldForUnsupportedDefaults(field,
+          Collections.singletonList(field.name()), materializedFieldIds);
+    }
+  }
+
+  /**
+   * Resolves materialized scan slots to Iceberg field ids, then adds every descendant
+   * field id so that selecting a struct column still covers inner fields for this check.
+   */
+  private Set<Integer> computeMaterializedIcebergFieldIds() {
+    Schema schema = getIceTable().getIcebergSchema();
+    Set<Integer> seedIds = new HashSet<>();
+    for (SlotDescriptor slot : tblRef_.getDesc().getSlots()) {
+      if (!slot.isMaterialized() || !slot.isScanSlot()) continue;
+      Path path = slot.getPath();
+      if (path == null || path.getRawPath().isEmpty()) continue;
+      String qualified = Joiner.on(".").join(path.getRawPath());
+      NestedField nf = schema.findField(qualified);
+      if (nf == null) nf = schema.caseInsensitiveFindField(qualified);
+      if (nf != null) seedIds.add(nf.fieldId());
+    }
+    return expandMaterializedFieldIds(seedIds, schema);
+  }
+
+  private static Set<Integer> expandMaterializedFieldIds(
+      Set<Integer> seedIds, Schema schema) {
+    Set<Integer> expanded = new HashSet<>(seedIds);
+    ArrayDeque<Integer> queue = new ArrayDeque<>(seedIds);
+    while (!queue.isEmpty()) {
+      int id = queue.remove();
+      NestedField nf = schema.findField(id);
+      if (nf == null) continue;
+      for (NestedField child : getIcebergChildFieldsToVisit(nf.type())) {
+        if (expanded.add(child.fieldId())) queue.add(child.fieldId());
+      }
+    }
+    return expanded;
+  }
+
+  /**
+   * If this field has a default, checks that Impala would allow it for fields that
+   * appear in this scan. Then recurses into struct, list, or map children.
+   */
+  private void visitIcebergFieldForUnsupportedDefaults(NestedField field,
+      List<String> pathFromRoot, Set<Integer> materializedFieldIds)
+      throws AnalysisException {
+    boolean hasDefault =
+        field.initialDefault() != null || field.writeDefault() != null;
+    if (hasDefault && materializedFieldIds.contains(field.fieldId())) {
+      boolean isNested = pathFromRoot.size() > 1;
+      Type impalaType;
+      try {
+        impalaType = IcebergSchemaConverter.toImpalaType(field.type());
+      } catch (ImpalaRuntimeException e) {
+        throw new AnalysisException(e.getMessage(), e);
+      }
+      if (isNested) {
+        throw new AnalysisException(String.format(
+            "Default values are not supported for nested fields. " +
+            "Nested field '%s' in column '%s' cannot have default values.",
+            String.join(".", pathFromRoot.subList(1, pathFromRoot.size())),
+            pathFromRoot.get(0)));
+      }
+      if (impalaType.isComplexType()) {
+        throw new AnalysisException(String.format(
+            "Default values are not supported for complex types. " +
+            "Column '%s' has type %s which cannot have default values.",
+            field.name(), impalaType.toSql()));
+      }
+    }
+
+    for (NestedField child : getIcebergChildFieldsToVisit(field.type())) {
+      List<String> childPath = new ArrayList<>(pathFromRoot);
+      childPath.add(child.name());
+      visitIcebergFieldForUnsupportedDefaults(child, childPath, materializedFieldIds);
+    }
+  }
+
+  private static List<NestedField> getIcebergChildFieldsToVisit(
+      org.apache.iceberg.types.Type type) {
+    switch (type.typeId()) {
+      case STRUCT:
+        return type.asStructType().fields();
+      case LIST:
+        return type.asListType().fields();
+      case MAP:
+        return type.asMapType().fields();
+      default:
+        return Collections.emptyList();
+    }
   }
 
   private boolean hasPartitionTransformType(List<IcebergColumn> cols,

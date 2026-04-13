@@ -177,6 +177,9 @@ ColumnDescriptor::ColumnDescriptor(const TColumnDescriptor& tdesc)
     // Get key and value field_id for Iceberg table column with Map type.
     field_map_key_id_ = tdesc.icebergFieldMapKeyId;
     field_map_value_id_ = tdesc.icebergFieldMapValueId;
+    if (tdesc.__isset.icebergInitialDefault) {
+      initial_default_ = tdesc.icebergInitialDefault;
+    }
   }
 }
 

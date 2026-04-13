@@ -251,7 +251,12 @@ Status HdfsAvroScanner::ResolveSchemas(const AvroSchemaElement& table_root,
           avro_schema_record_field_get_index(file_record->schema, field_name);
 
       if (file_field_idx < 0) {
-        // This field doesn't exist in the file schema. Check if there is a default value.
+        // This field doesn't exist in the file schema.
+        // Skip if we don't need data from file (partition/virtual/default columns).
+        if (!file_metadata_utils_.NeedDataInFile(slot_desc)) {
+          continue;
+        }
+        // Check if there is a default value in the Avro schema.
         avro_datum_t default_value =
             avro_schema_record_field_default(table_record->schema, table_field_idx);
         if (default_value == nullptr) {

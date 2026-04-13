@@ -74,6 +74,8 @@ struct TColumnDescriptor {
   // Key and value field id for Iceberg column with Map type.
   4: optional i32 icebergFieldMapKeyId
   5: optional i32 icebergFieldMapValueId
+  // Iceberg V3 default value fields
+  6: optional string icebergInitialDefault
 }
 
 // "Union" of all table types.

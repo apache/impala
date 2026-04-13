@@ -342,6 +342,9 @@ struct TColumn {
   // will reuse the iceberg_field_id, is_key, is_nullable
   // for Paimon table.
   26: optional bool is_paimon_column
+  // Iceberg V3 default value fields
+  27: optional string iceberg_initial_default
+  28: optional string iceberg_write_default
 
 }
 

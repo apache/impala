@@ -44,58 +44,22 @@ FROM iceberg_v3_deletion_vectors FOR SYSTEM_VERSION AS OF 2700858159721908397;
 INT
 ====
 ---- QUERY
-SELECT * FROM iceberg_v3_default_value;
+# Default values on nested struct fields are rejected when materialized.
+# Table test_complex_default: nested field j.f1 has an int initial-default in metadata.
+# Selecting j materializes the struct and its nested fields, so the scan should fail.
+SELECT j FROM test_complex_default;
 ---- CATCH
-Iceberg columns with default values not supported yet.
+Default values are not supported for nested fields
 ====
 ---- QUERY
-# Column 'i' does not have a default value.
-SELECT i FROM iceberg_v3_default_value;
----- RESULTS
-1
-2
----- TYPES
-INT
+# Selecting j.f1 materializes the nested field, so the scan should fail.
+SELECT j.f1 FROM test_complex_default;
+---- CATCH
+Default values are not supported for nested fields
 ====
 ---- QUERY
-# The first snapshot only has column 'i' which does not have a default value.
-SELECT * FROM iceberg_v3_default_value FOR SYSTEM_VERSION AS OF 7752776210164022855;
----- RESULTS
-1
----- TYPES
-INT
-====
----- QUERY
-# 'j' is not materialized.
-select i from (select * from iceberg_v3_default_value) v;
----- RESULTS
-1
-2
----- TYPES
-INT
-====
----- QUERY
-# 'j' is not materialized.
-select i from (select i, j from iceberg_v3_default_value) v;
----- RESULTS
-1
-2
----- TYPES
-INT
-====
----- QUERY
-select i, file__position, input__file__name from iceberg_v3_default_value;
----- RESULTS
-1,0,regex:'.*00000-0-4bcf51b3-40de-43df-a74a-3eb29c0a9634-0-00001.parquet'
-2,0,regex:'.*00000-1-18a720eb-5773-431a-b440-5e9caa4ac641-0-00001.parquet'
----- TYPES
-INT,BIGINT,STRING
-====
----- QUERY
-# 'j' is not materialized.
-select count(*) from (select j from iceberg_v3_default_value) v;
----- RESULTS
-2
----- TYPES
-BIGINT
+# Negative test: INSERT omitting a column that has a write-default should fail until supported
+INSERT INTO iceberg_v3_default_value (i) VALUES (100);
+---- CATCH
+Write-default values are not yet supported
 ====

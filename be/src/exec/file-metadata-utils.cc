@@ -50,8 +50,53 @@ Tuple* FileMetadataUtils::CreateTemplateTuple(int64_t partition_id, MemPool* mem
   }
   if (scan_node_->hdfs_table()->IsIcebergTable()) {
     AddIcebergColumns(mem_pool, &template_tuple, slot_descs_written);
+
+    PopulateIcebergDefaults(template_tuple, mem_pool);
   }
   return template_tuple;
+}
+
+TextConverter FileMetadataUtils::CreateTextConverter() const {
+  return TextConverter(/* escape_char */ '\\',
+      scan_node_->hdfs_table()->null_partition_key_value(),
+      /* check_null */ true, /* strict_mode */ true);
+}
+
+void FileMetadataUtils::PopulateIcebergDefaults(Tuple* template_tuple, MemPool* pool) {
+  DCHECK(scan_node_->hdfs_table()->IsIcebergTable());
+  if (template_tuple == nullptr) return;
+
+  TextConverter text_converter = CreateTextConverter();
+
+  for (int i = 0; i < scan_node_->tuple_desc()->slots().size(); ++i) {
+    const SlotDescriptor* slot_desc = scan_node_->tuple_desc()->slots()[i];
+
+    // Skip if not a top-level column (complex types not supported for defaults)
+    if (slot_desc->col_path().size() != 1) continue;
+
+    int col_idx = slot_desc->col_path()[0];
+    DCHECK_LT(col_idx, scan_node_->hdfs_table()->col_descs().size());
+    const ColumnDescriptor& col_desc = scan_node_->hdfs_table()->col_descs()[col_idx];
+
+    if (col_desc.initial_default().empty()) continue;
+
+    // Don't overwrite partition columns
+    if (IsValuePartitionCol(slot_desc)) continue;
+
+    if (!text_converter.WriteSlot(slot_desc, template_tuple,
+                                  col_desc.initial_default().c_str(),
+                                  col_desc.initial_default().size(),
+                                  /* copy_string = */ true, /* need_escape = */ false,
+                                  pool)) {
+      ErrorMsg error_msg(TErrorCode::GENERAL,
+          Substitute("Could not parse Iceberg initial-default value for "
+              "column '$0' in file '$1'. Default string is '$2'",
+              col_desc.name(), file_desc_->filename, col_desc.initial_default()));
+      state_->LogError(error_msg);
+      continue;
+    }
+    template_tuple->SetNotNull(slot_desc->null_indicator_offset());
+  }
 }
 
 void FileMetadataUtils::AddFileLevelVirtualColumns(MemPool* mem_pool,
@@ -113,12 +158,22 @@ auto FileMetadataUtils::IcebergPartitionTransforms() const {
   return ice_metadata->partition_keys();
 }
 
+bool FileMetadataUtils::HasIcebergDefaultValue(const SlotDescriptor* slot_desc) {
+  if (!scan_node_->hdfs_table()->IsIcebergTable()) return false;
+
+  const SchemaPath& path = slot_desc->col_path();
+  if (path.size() != 1) return false;
+
+  DCHECK_LT(path.front(), scan_node_->hdfs_table()->col_descs().size());
+  const ColumnDescriptor& col_desc =
+      scan_node_->hdfs_table()->col_descs()[path.front()];
+  return !col_desc.initial_default().empty();
+}
+
 void FileMetadataUtils::AddIcebergColumns(MemPool* mem_pool, Tuple** template_tuple,
     std::map<const SlotId, const SlotDescriptor*>* slot_descs_written) {
   using namespace org::apache::impala::fb;
-  TextConverter text_converter(/* escape_char = */ '\\',
-      scan_node_->hdfs_table()->null_partition_key_value(),
-      /* check_null = */ true, /* strict_mode = */ true);
+  TextConverter text_converter = CreateTextConverter();
   const FbFileMetadata* file_metadata = file_desc_->file_metadata;
   const FbIcebergMetadata* ice_metadata = file_metadata->iceberg_metadata();
   auto transforms = ice_metadata->partition_keys();
@@ -302,7 +357,18 @@ Status FileMetadataUtils::AdjustFieldIdForMigratedPartitionedTables(int *fieldID
 bool FileMetadataUtils::NeedDataInFile(const SlotDescriptor* slot_desc) {
   if (IsValuePartitionCol(slot_desc)) return false;
   if (slot_desc->IsVirtual()) return false;
+  if (HasIcebergDefaultValue(slot_desc)) return false;
   return true;
+}
+
+bool FileMetadataUtils::ShouldSkipReadFromFile(const SlotDescriptor* slot_desc) {
+  // Skip partition columns as they're populated from partition values
+  if (IsValuePartitionCol(slot_desc)) return true;
+  // Skip virtual columns
+  if (slot_desc->IsVirtual()) return true;
+  // For default values: don't skip - we want to read data if it exists in the file
+  // The default is only used when data is missing from the file
+  return false;
 }
 
 } // namespace impala
