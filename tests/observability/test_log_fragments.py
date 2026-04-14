@@ -64,7 +64,7 @@ class TestLogFragments(ImpalaTestSuite):
     """Test that the stack trace of a slow RPC is included in the profile."""
     query = """select tinyint_col, count(*) from functional.alltypes
         group by tinyint_col order by tinyint_col limit 5"""
-    self.execute_query(query, {"debug_action": "IMPALA_MISS_EXEC_COMPLETE_CB:SLEEP@300"})
+    self.execute_query(query, {"debug_action": "IMPALA_MISS_EXEC_COMPLETE_CB:SLEEP@1000"})
     self.assert_impalad_log_contains("WARNING",
         "kernel_stack_watchdog.cc:.* Thread .* stuck", expected_count=-1)
     self.assert_impalad_log_contains("WARNING", "impala::SleepForMs()", expected_count=-1)
