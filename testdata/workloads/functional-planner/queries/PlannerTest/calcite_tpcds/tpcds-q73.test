@@ -30,6 +30,33 @@ select c_last_name
 ---- PLAN
 Max Per-Host Resource Reservation: Memory=73.00MB Threads=1
 Per-Host Resource Estimates: Memory=495MB
+ImpalaSortRel(sort0=[$5], sort1=[$0], dir0=[DESC], dir1=[ASC])
+  ImpalaProjectRel(C_LAST_NAME=[$3], C_FIRST_NAME=[$2], C_SALUTATION=[$1], C_PREFERRED_CUST_FLAG=[$4], SS_TICKET_NUMBER=[$5], CNT=[$7])
+    ImpalaJoinRel(condition=[=($6, $0)], joinType=[inner])
+      ImpalaProjectRel(c_customer_sk=[$0], c_salutation=[$7], c_first_name=[$8], c_last_name=[$9], c_preferred_cust_flag=[$10])
+        ImpalaFilterRel(condition=[IS NOT NULL($0)])
+          ImpalaHdfsScanRel(table=[[tpcds_partitioned_parquet_snap, customer]])
+      ImpalaFilterRel(condition=[SEARCH($2, Sarg[[1L:BIGINT..5L:BIGINT]]:BIGINT)])
+        ImpalaAggRel(group=[{0, 1}], CNT=[COUNT()])
+          ImpalaProjectRel(SS_TICKET_NUMBER=[$3], SS_CUSTOMER_SK=[$0])
+            ImpalaJoinRel(condition=[=($2, $7)], joinType=[inner])
+              ImpalaJoinRel(condition=[=($1, $6)], joinType=[inner])
+                ImpalaJoinRel(condition=[=($4, $5)], joinType=[inner])
+                  ImpalaProjectRel(ss_customer_sk=[$2], ss_hdemo_sk=[$4], ss_store_sk=[$6], ss_ticket_number=[$8], ss_sold_date_sk=[$22])
+                    ImpalaFilterRel(condition=[AND(IS NOT NULL($22), IS NOT NULL($6), IS NOT NULL($4), IS NOT NULL($2))])
+                      ImpalaHdfsScanRel(table=[[tpcds_partitioned_parquet_snap, store_sales]])
+                  ImpalaProjectRel(d_date_sk=[$0])
+                    ImpalaProjectRel(d_date_sk=[$0], d_year=[$6], d_dom=[$9])
+                      ImpalaFilterRel(condition=[AND(SEARCH($9, Sarg[[1..2]]), SEARCH($6, Sarg[1999, 2000, 2001]), IS NOT NULL($0))])
+                        ImpalaHdfsScanRel(table=[[tpcds_partitioned_parquet_snap, date_dim]])
+                ImpalaProjectRel(hd_demo_sk=[$0])
+                  ImpalaProjectRel(hd_demo_sk=[$0], hd_buy_potential=[$2], hd_dep_count=[$3], hd_vehicle_count=[$4])
+                    ImpalaFilterRel(condition=[AND(OR(=($2, _UTF-8'501-1000'), =($2, _UTF-8'Unknown')), >($4, 0), >(CASE(>($4, 0), /(CAST($3):DOUBLE, CAST($4):DOUBLE), null:DOUBLE), 1.0E0), IS NOT NULL($0))])
+                      ImpalaHdfsScanRel(table=[[tpcds_partitioned_parquet_snap, household_demographics]])
+              ImpalaProjectRel(s_store_sk=[$0])
+                ImpalaProjectRel(s_store_sk=[$0], s_county=[$23])
+                  ImpalaFilterRel(condition=[AND(SEARCH($23, Sarg[_UTF-8'Franklin Parish':VARCHAR(2147483647) CHARACTER SET "UTF-8", _UTF-8'Luce County':VARCHAR(2147483647) CHARACTER SET "UTF-8", _UTF-8'Williamson County':VARCHAR(2147483647) CHARACTER SET "UTF-8", _UTF-8'Ziebach County':VARCHAR(2147483647) CHARACTER SET "UTF-8"]:VARCHAR(2147483647) CHARACTER SET "UTF-8"), IS NOT NULL($0))])
+                    ImpalaHdfsScanRel(table=[[tpcds_partitioned_parquet_snap, store]])
 F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Instance Resources: mem-estimate=494.69MB mem-reservation=73.00MB thread-reservation=1 runtime-filters-memory=4.00MB
 |  max-parallelism=1 segment-costs=[1302644196, 16987437, 8339760]
@@ -152,6 +179,33 @@ PLAN-ROOT SINK
 ---- DISTRIBUTEDPLAN
 Max Per-Host Resource Reservation: Memory=229.33MB Threads=22
 Per-Host Resource Estimates: Memory=705MB
+ImpalaSortRel(sort0=[$5], sort1=[$0], dir0=[DESC], dir1=[ASC])
+  ImpalaProjectRel(C_LAST_NAME=[$3], C_FIRST_NAME=[$2], C_SALUTATION=[$1], C_PREFERRED_CUST_FLAG=[$4], SS_TICKET_NUMBER=[$5], CNT=[$7])
+    ImpalaJoinRel(condition=[=($6, $0)], joinType=[inner])
+      ImpalaProjectRel(c_customer_sk=[$0], c_salutation=[$7], c_first_name=[$8], c_last_name=[$9], c_preferred_cust_flag=[$10])
+        ImpalaFilterRel(condition=[IS NOT NULL($0)])
+          ImpalaHdfsScanRel(table=[[tpcds_partitioned_parquet_snap, customer]])
+      ImpalaFilterRel(condition=[SEARCH($2, Sarg[[1L:BIGINT..5L:BIGINT]]:BIGINT)])
+        ImpalaAggRel(group=[{0, 1}], CNT=[COUNT()])
+          ImpalaProjectRel(SS_TICKET_NUMBER=[$3], SS_CUSTOMER_SK=[$0])
+            ImpalaJoinRel(condition=[=($2, $7)], joinType=[inner])
+              ImpalaJoinRel(condition=[=($1, $6)], joinType=[inner])
+                ImpalaJoinRel(condition=[=($4, $5)], joinType=[inner])
+                  ImpalaProjectRel(ss_customer_sk=[$2], ss_hdemo_sk=[$4], ss_store_sk=[$6], ss_ticket_number=[$8], ss_sold_date_sk=[$22])
+                    ImpalaFilterRel(condition=[AND(IS NOT NULL($22), IS NOT NULL($6), IS NOT NULL($4), IS NOT NULL($2))])
+                      ImpalaHdfsScanRel(table=[[tpcds_partitioned_parquet_snap, store_sales]])
+                  ImpalaProjectRel(d_date_sk=[$0])
+                    ImpalaProjectRel(d_date_sk=[$0], d_year=[$6], d_dom=[$9])
+                      ImpalaFilterRel(condition=[AND(SEARCH($9, Sarg[[1..2]]), SEARCH($6, Sarg[1999, 2000, 2001]), IS NOT NULL($0))])
+                        ImpalaHdfsScanRel(table=[[tpcds_partitioned_parquet_snap, date_dim]])
+                ImpalaProjectRel(hd_demo_sk=[$0])
+                  ImpalaProjectRel(hd_demo_sk=[$0], hd_buy_potential=[$2], hd_dep_count=[$3], hd_vehicle_count=[$4])
+                    ImpalaFilterRel(condition=[AND(OR(=($2, _UTF-8'501-1000'), =($2, _UTF-8'Unknown')), >($4, 0), >(CASE(>($4, 0), /(CAST($3):DOUBLE, CAST($4):DOUBLE), null:DOUBLE), 1.0E0), IS NOT NULL($0))])
+                      ImpalaHdfsScanRel(table=[[tpcds_partitioned_parquet_snap, household_demographics]])
+              ImpalaProjectRel(s_store_sk=[$0])
+                ImpalaProjectRel(s_store_sk=[$0], s_county=[$23])
+                  ImpalaFilterRel(condition=[AND(SEARCH($23, Sarg[_UTF-8'Franklin Parish':VARCHAR(2147483647) CHARACTER SET "UTF-8", _UTF-8'Luce County':VARCHAR(2147483647) CHARACTER SET "UTF-8", _UTF-8'Williamson County':VARCHAR(2147483647) CHARACTER SET "UTF-8", _UTF-8'Ziebach County':VARCHAR(2147483647) CHARACTER SET "UTF-8"]:VARCHAR(2147483647) CHARACTER SET "UTF-8"), IS NOT NULL($0))])
+                    ImpalaHdfsScanRel(table=[[tpcds_partitioned_parquet_snap, store]])
 F06:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Instance Resources: mem-estimate=111.45MB mem-reservation=4.00MB thread-reservation=1
 |  max-parallelism=1 segment-costs=[8914256] cpu-comparison-result=120 [max(1 (self) vs 120 (sum children))]
@@ -368,6 +422,33 @@ max-parallelism=10 segment-costs=[15597477, 3357850] cpu-comparison-result=120 [
 ---- PARALLELPLANS
 Max Per-Host Resource Reservation: Memory=229.33MB Threads=22
 Per-Host Resource Estimates: Memory=705MB
+ImpalaSortRel(sort0=[$5], sort1=[$0], dir0=[DESC], dir1=[ASC])
+  ImpalaProjectRel(C_LAST_NAME=[$3], C_FIRST_NAME=[$2], C_SALUTATION=[$1], C_PREFERRED_CUST_FLAG=[$4], SS_TICKET_NUMBER=[$5], CNT=[$7])
+    ImpalaJoinRel(condition=[=($6, $0)], joinType=[inner])
+      ImpalaProjectRel(c_customer_sk=[$0], c_salutation=[$7], c_first_name=[$8], c_last_name=[$9], c_preferred_cust_flag=[$10])
+        ImpalaFilterRel(condition=[IS NOT NULL($0)])
+          ImpalaHdfsScanRel(table=[[tpcds_partitioned_parquet_snap, customer]])
+      ImpalaFilterRel(condition=[SEARCH($2, Sarg[[1L:BIGINT..5L:BIGINT]]:BIGINT)])
+        ImpalaAggRel(group=[{0, 1}], CNT=[COUNT()])
+          ImpalaProjectRel(SS_TICKET_NUMBER=[$3], SS_CUSTOMER_SK=[$0])
+            ImpalaJoinRel(condition=[=($2, $7)], joinType=[inner])
+              ImpalaJoinRel(condition=[=($1, $6)], joinType=[inner])
+                ImpalaJoinRel(condition=[=($4, $5)], joinType=[inner])
+                  ImpalaProjectRel(ss_customer_sk=[$2], ss_hdemo_sk=[$4], ss_store_sk=[$6], ss_ticket_number=[$8], ss_sold_date_sk=[$22])
+                    ImpalaFilterRel(condition=[AND(IS NOT NULL($22), IS NOT NULL($6), IS NOT NULL($4), IS NOT NULL($2))])
+                      ImpalaHdfsScanRel(table=[[tpcds_partitioned_parquet_snap, store_sales]])
+                  ImpalaProjectRel(d_date_sk=[$0])
+                    ImpalaProjectRel(d_date_sk=[$0], d_year=[$6], d_dom=[$9])
+                      ImpalaFilterRel(condition=[AND(SEARCH($9, Sarg[[1..2]]), SEARCH($6, Sarg[1999, 2000, 2001]), IS NOT NULL($0))])
+                        ImpalaHdfsScanRel(table=[[tpcds_partitioned_parquet_snap, date_dim]])
+                ImpalaProjectRel(hd_demo_sk=[$0])
+                  ImpalaProjectRel(hd_demo_sk=[$0], hd_buy_potential=[$2], hd_dep_count=[$3], hd_vehicle_count=[$4])
+                    ImpalaFilterRel(condition=[AND(OR(=($2, _UTF-8'501-1000'), =($2, _UTF-8'Unknown')), >($4, 0), >(CASE(>($4, 0), /(CAST($3):DOUBLE, CAST($4):DOUBLE), null:DOUBLE), 1.0E0), IS NOT NULL($0))])
+                      ImpalaHdfsScanRel(table=[[tpcds_partitioned_parquet_snap, household_demographics]])
+              ImpalaProjectRel(s_store_sk=[$0])
+                ImpalaProjectRel(s_store_sk=[$0], s_county=[$23])
+                  ImpalaFilterRel(condition=[AND(SEARCH($23, Sarg[_UTF-8'Franklin Parish':VARCHAR(2147483647) CHARACTER SET "UTF-8", _UTF-8'Luce County':VARCHAR(2147483647) CHARACTER SET "UTF-8", _UTF-8'Williamson County':VARCHAR(2147483647) CHARACTER SET "UTF-8", _UTF-8'Ziebach County':VARCHAR(2147483647) CHARACTER SET "UTF-8"]:VARCHAR(2147483647) CHARACTER SET "UTF-8"), IS NOT NULL($0))])
+                    ImpalaHdfsScanRel(table=[[tpcds_partitioned_parquet_snap, store]])
 F06:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Instance Resources: mem-estimate=111.45MB mem-reservation=4.00MB thread-reservation=1
 |  max-parallelism=1 segment-costs=[8914256] cpu-comparison-result=120 [max(1 (self) vs 120 (sum children))]

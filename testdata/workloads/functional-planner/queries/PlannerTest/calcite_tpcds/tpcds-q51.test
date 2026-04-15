@@ -47,6 +47,32 @@ limit 100
 ---- PLAN
 Max Per-Host Resource Reservation: Memory=94.00MB Threads=1
 Per-Host Resource Estimates: Memory=198.28GB
+ImpalaSortRel(sort0=[$0], sort1=[$1], dir0=[ASC], dir1=[ASC], fetch=[100:TINYINT])
+  ImpalaFilterRel(condition=[>($4, $5)])
+    ImpalaAnalyticRel(ITEM_SK=[CASE(IS NOT NULL($3), $3, $0)], D_DATE=[CASE(IS NOT NULL($4), $4, $1)], WEB_SALES=[$5], STORE_SALES=[$2], WEB_CUMULATIVE=[MAX($5) OVER (PARTITION BY CASE(IS NOT NULL($3), $3, $0) ORDER BY CASE(IS NOT NULL($4), $4, $1) ROWS UNBOUNDED PRECEDING)], STORE_CUMULATIVE=[MAX($2) OVER (PARTITION BY CASE(IS NOT NULL($3), $3, $0) ORDER BY CASE(IS NOT NULL($4), $4, $1) ROWS UNBOUNDED PRECEDING)])
+      ImpalaJoinRel(condition=[AND(=($3, $0), =($4, $1))], joinType=[full])
+        ImpalaAnalyticRel(ITEM_SK=[$0], D_DATE=[$1], CUME_SALES=[CASE(>(COUNT($2) OVER (PARTITION BY $0 ORDER BY $1 ROWS UNBOUNDED PRECEDING), 0), CAST(SUM($2) OVER (PARTITION BY $0 ORDER BY $1 ROWS UNBOUNDED PRECEDING)):DECIMAL(38, 2), null:DECIMAL(38, 2))])
+          ImpalaAggRel(group=[{0, 1}], agg#0=[SUM($2)])
+            ImpalaProjectRel(ITEM_SK=[$0], D_DATE=[$4], ss_sales_price=[$1])
+              ImpalaJoinRel(condition=[=($2, $3)], joinType=[inner])
+                ImpalaProjectRel(ss_item_sk=[$1], ss_sales_price=[$12], ss_sold_date_sk=[$22])
+                  ImpalaFilterRel(condition=[AND(IS NOT NULL($1), IS NOT NULL($22))])
+                    ImpalaHdfsScanRel(table=[[tpcds_partitioned_parquet_snap, store_sales]])
+                ImpalaProjectRel(d_date_sk=[$0], d_date=[$1])
+                  ImpalaProjectRel(d_date_sk=[$0], d_date=[$2], d_month_seq=[$3])
+                    ImpalaFilterRel(condition=[AND(SEARCH($3, Sarg[[1176..1187]]), IS NOT NULL($0))])
+                      ImpalaHdfsScanRel(table=[[tpcds_partitioned_parquet_snap, date_dim]])
+        ImpalaAnalyticRel(ITEM_SK=[$0], D_DATE=[$1], CUME_SALES=[CASE(>(COUNT($2) OVER (PARTITION BY $0 ORDER BY $1 ROWS UNBOUNDED PRECEDING), 0), CAST(SUM($2) OVER (PARTITION BY $0 ORDER BY $1 ROWS UNBOUNDED PRECEDING)):DECIMAL(38, 2), null:DECIMAL(38, 2))])
+          ImpalaAggRel(group=[{0, 1}], agg#0=[SUM($2)])
+            ImpalaProjectRel(ITEM_SK=[$0], D_DATE=[$4], ws_sales_price=[$1])
+              ImpalaJoinRel(condition=[=($2, $3)], joinType=[inner])
+                ImpalaProjectRel(ws_item_sk=[$2], ws_sales_price=[$20], ws_sold_date_sk=[$33])
+                  ImpalaFilterRel(condition=[AND(IS NOT NULL($2), IS NOT NULL($33))])
+                    ImpalaHdfsScanRel(table=[[tpcds_partitioned_parquet_snap, web_sales]])
+                ImpalaProjectRel(d_date_sk=[$0], d_date=[$1])
+                  ImpalaProjectRel(d_date_sk=[$0], d_date=[$2], d_month_seq=[$3])
+                    ImpalaFilterRel(condition=[AND(SEARCH($3, Sarg[[1176..1187]]), IS NOT NULL($0))])
+                      ImpalaHdfsScanRel(table=[[tpcds_partitioned_parquet_snap, date_dim]])
 F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Instance Resources: mem-estimate=198.28GB mem-reservation=94.00MB thread-reservation=1 runtime-filters-memory=2.00MB
 |  max-parallelism=1 segment-costs=[53963054123, 11971159917, 14125096569, 3133506007, 235728514246980, 266041741238206, 600]
@@ -206,6 +232,32 @@ PLAN-ROOT SINK
 ---- DISTRIBUTEDPLAN
 Max Per-Host Resource Reservation: Memory=2.38GB Threads=110
 Per-Host Resource Estimates: Memory=132.85GB
+ImpalaSortRel(sort0=[$0], sort1=[$1], dir0=[ASC], dir1=[ASC], fetch=[100:TINYINT])
+  ImpalaFilterRel(condition=[>($4, $5)])
+    ImpalaAnalyticRel(ITEM_SK=[CASE(IS NOT NULL($3), $3, $0)], D_DATE=[CASE(IS NOT NULL($4), $4, $1)], WEB_SALES=[$5], STORE_SALES=[$2], WEB_CUMULATIVE=[MAX($5) OVER (PARTITION BY CASE(IS NOT NULL($3), $3, $0) ORDER BY CASE(IS NOT NULL($4), $4, $1) ROWS UNBOUNDED PRECEDING)], STORE_CUMULATIVE=[MAX($2) OVER (PARTITION BY CASE(IS NOT NULL($3), $3, $0) ORDER BY CASE(IS NOT NULL($4), $4, $1) ROWS UNBOUNDED PRECEDING)])
+      ImpalaJoinRel(condition=[AND(=($3, $0), =($4, $1))], joinType=[full])
+        ImpalaAnalyticRel(ITEM_SK=[$0], D_DATE=[$1], CUME_SALES=[CASE(>(COUNT($2) OVER (PARTITION BY $0 ORDER BY $1 ROWS UNBOUNDED PRECEDING), 0), CAST(SUM($2) OVER (PARTITION BY $0 ORDER BY $1 ROWS UNBOUNDED PRECEDING)):DECIMAL(38, 2), null:DECIMAL(38, 2))])
+          ImpalaAggRel(group=[{0, 1}], agg#0=[SUM($2)])
+            ImpalaProjectRel(ITEM_SK=[$0], D_DATE=[$4], ss_sales_price=[$1])
+              ImpalaJoinRel(condition=[=($2, $3)], joinType=[inner])
+                ImpalaProjectRel(ss_item_sk=[$1], ss_sales_price=[$12], ss_sold_date_sk=[$22])
+                  ImpalaFilterRel(condition=[AND(IS NOT NULL($1), IS NOT NULL($22))])
+                    ImpalaHdfsScanRel(table=[[tpcds_partitioned_parquet_snap, store_sales]])
+                ImpalaProjectRel(d_date_sk=[$0], d_date=[$1])
+                  ImpalaProjectRel(d_date_sk=[$0], d_date=[$2], d_month_seq=[$3])
+                    ImpalaFilterRel(condition=[AND(SEARCH($3, Sarg[[1176..1187]]), IS NOT NULL($0))])
+                      ImpalaHdfsScanRel(table=[[tpcds_partitioned_parquet_snap, date_dim]])
+        ImpalaAnalyticRel(ITEM_SK=[$0], D_DATE=[$1], CUME_SALES=[CASE(>(COUNT($2) OVER (PARTITION BY $0 ORDER BY $1 ROWS UNBOUNDED PRECEDING), 0), CAST(SUM($2) OVER (PARTITION BY $0 ORDER BY $1 ROWS UNBOUNDED PRECEDING)):DECIMAL(38, 2), null:DECIMAL(38, 2))])
+          ImpalaAggRel(group=[{0, 1}], agg#0=[SUM($2)])
+            ImpalaProjectRel(ITEM_SK=[$0], D_DATE=[$4], ws_sales_price=[$1])
+              ImpalaJoinRel(condition=[=($2, $3)], joinType=[inner])
+                ImpalaProjectRel(ws_item_sk=[$2], ws_sales_price=[$20], ws_sold_date_sk=[$33])
+                  ImpalaFilterRel(condition=[AND(IS NOT NULL($2), IS NOT NULL($33))])
+                    ImpalaHdfsScanRel(table=[[tpcds_partitioned_parquet_snap, web_sales]])
+                ImpalaProjectRel(d_date_sk=[$0], d_date=[$1])
+                  ImpalaProjectRel(d_date_sk=[$0], d_date=[$2], d_month_seq=[$3])
+                    ImpalaFilterRel(condition=[AND(SEARCH($3, Sarg[[1176..1187]]), IS NOT NULL($0))])
+                      ImpalaHdfsScanRel(table=[[tpcds_partitioned_parquet_snap, date_dim]])
 F10:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Instance Resources: mem-estimate=4.86MB mem-reservation=4.00MB thread-reservation=1
 |  max-parallelism=1 segment-costs=[644] cpu-comparison-result=240 [max(1 (self) vs 240 (sum children))]
@@ -490,6 +542,32 @@ max-parallelism=1823 segment-costs=[53963028038, 17001010240] cpu-comparison-res
 ---- PARALLELPLANS
 Max Per-Host Resource Reservation: Memory=2.38GB Threads=110
 Per-Host Resource Estimates: Memory=132.85GB
+ImpalaSortRel(sort0=[$0], sort1=[$1], dir0=[ASC], dir1=[ASC], fetch=[100:TINYINT])
+  ImpalaFilterRel(condition=[>($4, $5)])
+    ImpalaAnalyticRel(ITEM_SK=[CASE(IS NOT NULL($3), $3, $0)], D_DATE=[CASE(IS NOT NULL($4), $4, $1)], WEB_SALES=[$5], STORE_SALES=[$2], WEB_CUMULATIVE=[MAX($5) OVER (PARTITION BY CASE(IS NOT NULL($3), $3, $0) ORDER BY CASE(IS NOT NULL($4), $4, $1) ROWS UNBOUNDED PRECEDING)], STORE_CUMULATIVE=[MAX($2) OVER (PARTITION BY CASE(IS NOT NULL($3), $3, $0) ORDER BY CASE(IS NOT NULL($4), $4, $1) ROWS UNBOUNDED PRECEDING)])
+      ImpalaJoinRel(condition=[AND(=($3, $0), =($4, $1))], joinType=[full])
+        ImpalaAnalyticRel(ITEM_SK=[$0], D_DATE=[$1], CUME_SALES=[CASE(>(COUNT($2) OVER (PARTITION BY $0 ORDER BY $1 ROWS UNBOUNDED PRECEDING), 0), CAST(SUM($2) OVER (PARTITION BY $0 ORDER BY $1 ROWS UNBOUNDED PRECEDING)):DECIMAL(38, 2), null:DECIMAL(38, 2))])
+          ImpalaAggRel(group=[{0, 1}], agg#0=[SUM($2)])
+            ImpalaProjectRel(ITEM_SK=[$0], D_DATE=[$4], ss_sales_price=[$1])
+              ImpalaJoinRel(condition=[=($2, $3)], joinType=[inner])
+                ImpalaProjectRel(ss_item_sk=[$1], ss_sales_price=[$12], ss_sold_date_sk=[$22])
+                  ImpalaFilterRel(condition=[AND(IS NOT NULL($1), IS NOT NULL($22))])
+                    ImpalaHdfsScanRel(table=[[tpcds_partitioned_parquet_snap, store_sales]])
+                ImpalaProjectRel(d_date_sk=[$0], d_date=[$1])
+                  ImpalaProjectRel(d_date_sk=[$0], d_date=[$2], d_month_seq=[$3])
+                    ImpalaFilterRel(condition=[AND(SEARCH($3, Sarg[[1176..1187]]), IS NOT NULL($0))])
+                      ImpalaHdfsScanRel(table=[[tpcds_partitioned_parquet_snap, date_dim]])
+        ImpalaAnalyticRel(ITEM_SK=[$0], D_DATE=[$1], CUME_SALES=[CASE(>(COUNT($2) OVER (PARTITION BY $0 ORDER BY $1 ROWS UNBOUNDED PRECEDING), 0), CAST(SUM($2) OVER (PARTITION BY $0 ORDER BY $1 ROWS UNBOUNDED PRECEDING)):DECIMAL(38, 2), null:DECIMAL(38, 2))])
+          ImpalaAggRel(group=[{0, 1}], agg#0=[SUM($2)])
+            ImpalaProjectRel(ITEM_SK=[$0], D_DATE=[$4], ws_sales_price=[$1])
+              ImpalaJoinRel(condition=[=($2, $3)], joinType=[inner])
+                ImpalaProjectRel(ws_item_sk=[$2], ws_sales_price=[$20], ws_sold_date_sk=[$33])
+                  ImpalaFilterRel(condition=[AND(IS NOT NULL($2), IS NOT NULL($33))])
+                    ImpalaHdfsScanRel(table=[[tpcds_partitioned_parquet_snap, web_sales]])
+                ImpalaProjectRel(d_date_sk=[$0], d_date=[$1])
+                  ImpalaProjectRel(d_date_sk=[$0], d_date=[$2], d_month_seq=[$3])
+                    ImpalaFilterRel(condition=[AND(SEARCH($3, Sarg[[1176..1187]]), IS NOT NULL($0))])
+                      ImpalaHdfsScanRel(table=[[tpcds_partitioned_parquet_snap, date_dim]])
 F10:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Instance Resources: mem-estimate=4.86MB mem-reservation=4.00MB thread-reservation=1
 |  max-parallelism=1 segment-costs=[644] cpu-comparison-result=240 [max(1 (self) vs 240 (sum children))]

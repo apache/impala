@@ -17,6 +17,7 @@
 
 package org.apache.impala.calcite.service;
 
+import org.apache.calcite.plan.RelOptUtil;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.core.Aggregate;
 import org.apache.calcite.rel.core.Project;
@@ -56,6 +57,7 @@ public class CalciteSingleNodePlanner implements SingleNodePlannerIntf {
   private NodeWithExprs rootNode_;
   private List<String> fieldNames_;
   private boolean returnsMoreThanOneRow_;
+  private RelNode finalPlan_;
 
   public CalciteSingleNodePlanner(PlannerContext ctx) {
     ctx_ = ctx;
@@ -73,6 +75,7 @@ public class CalciteSingleNodePlanner implements SingleNodePlannerIntf {
     CalciteOptimizer optimizer =
         new CalciteOptimizer(analysisResult_, ctx_.getTimeline());
     ImpalaPlanRel optimizedPlan = optimizer.optimize(logicalPlan);
+    this.finalPlan_ = optimizedPlan;
 
     returnsMoreThanOneRow_ = returnsMoreThanOneRow(optimizedPlan);
 
@@ -83,6 +86,11 @@ public class CalciteSingleNodePlanner implements SingleNodePlannerIntf {
 
     analysisResult_.getAnalyzer().computeValueTransferGraph();
     return rootNode_.planNode_;
+  }
+
+  @Override
+  public String calcitePlan() {
+    return finalPlan_ == null ? "" : RelOptUtil.toString(finalPlan_);
   }
 
   /**

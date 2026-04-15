@@ -588,6 +588,7 @@ under the License.
           <version>3.0.0</version>
           <configuration>
             <redirectTestOutputToFile>true</redirectTestOutputToFile>
+            <argLine>-Dfile.encoding=UTF-8</argLine>
           </configuration>
         </plugin>
 

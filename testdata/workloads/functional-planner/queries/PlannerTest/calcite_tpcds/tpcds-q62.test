@@ -37,6 +37,29 @@ limit 100
 ---- PLAN
 Max Per-Host Resource Reservation: Memory=13.81MB Threads=1
 Per-Host Resource Estimates: Memory=92MB
+ImpalaSortRel(sort0=[$0], sort1=[$1], sort2=[$2], dir0=[ASC], dir1=[ASC], dir2=[ASC], fetch=[100:TINYINT])
+  ImpalaAggRel(group=[{0, 1, 2}], 30 days=[SUM($3)], 31-60 days=[SUM($4)], 61-90 days=[SUM($5)], 91-120 days=[SUM($6)], >120 days=[SUM($7)])
+    ImpalaProjectRel(EXPR$0=[SUBSTR($9, 1:BIGINT, 20:BIGINT)], SM_TYPE=[$11], WEB_NAME=[$7], cast_$f3=[CAST(CASE(<=(-(CAST($0):BIGINT, CAST($4):BIGINT), 30), 1:TINYINT, 0:TINYINT)):BIGINT], cast_$f4=[CAST(CASE(SEARCH(-(CAST($0):BIGINT, CAST($4):BIGINT), Sarg[(30L:BIGINT..60L:BIGINT]]:BIGINT), 1:TINYINT, 0:TINYINT)):BIGINT], cast_$f5=[CAST(CASE(SEARCH(-(CAST($0):BIGINT, CAST($4):BIGINT), Sarg[(60L:BIGINT..90L:BIGINT]]:BIGINT), 1:TINYINT, 0:TINYINT)):BIGINT], cast_$f6=[CAST(CASE(SEARCH(-(CAST($0):BIGINT, CAST($4):BIGINT), Sarg[(90L:BIGINT..120L:BIGINT]]:BIGINT), 1:TINYINT, 0:TINYINT)):BIGINT], cast_$f7=[CAST(CASE(>(-(CAST($0):BIGINT, CAST($4):BIGINT), 120), 1:TINYINT, 0:TINYINT)):BIGINT])
+      ImpalaJoinRel(condition=[=($2, $10)], joinType=[inner])
+        ImpalaJoinRel(condition=[=($3, $8)], joinType=[inner])
+          ImpalaJoinRel(condition=[=($1, $6)], joinType=[inner])
+            ImpalaJoinRel(condition=[=($0, $5)], joinType=[inner])
+              ImpalaProjectRel(ws_ship_date_sk=[$1], ws_web_site_sk=[$12], ws_ship_mode_sk=[$13], ws_warehouse_sk=[$14], ws_sold_date_sk=[$33])
+                ImpalaFilterRel(condition=[AND(IS NOT NULL($14), IS NOT NULL($13), IS NOT NULL($12), IS NOT NULL($1))])
+                  ImpalaHdfsScanRel(table=[[tpcds_partitioned_parquet_snap, web_sales]])
+              ImpalaProjectRel(d_date_sk=[$0])
+                ImpalaProjectRel(d_date_sk=[$0], d_month_seq=[$3])
+                  ImpalaFilterRel(condition=[AND(SEARCH($3, Sarg[[1194..1205]]), IS NOT NULL($0))])
+                    ImpalaHdfsScanRel(table=[[tpcds_partitioned_parquet_snap, date_dim]])
+            ImpalaProjectRel(web_site_sk=[$0], web_name=[$4])
+              ImpalaFilterRel(condition=[IS NOT NULL($0)])
+                ImpalaHdfsScanRel(table=[[tpcds_partitioned_parquet_snap, web_site]])
+          ImpalaProjectRel(w_warehouse_sk=[$0], w_warehouse_name=[$2])
+            ImpalaFilterRel(condition=[IS NOT NULL($0)])
+              ImpalaHdfsScanRel(table=[[tpcds_partitioned_parquet_snap, warehouse]])
+        ImpalaProjectRel(sm_ship_mode_sk=[$0], sm_type=[$2])
+          ImpalaFilterRel(condition=[IS NOT NULL($0)])
+            ImpalaHdfsScanRel(table=[[tpcds_partitioned_parquet_snap, ship_mode]])
 F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Instance Resources: mem-estimate=91.75MB mem-reservation=13.81MB thread-reservation=1 runtime-filters-memory=4.00MB
 |  max-parallelism=1 segment-costs=[8112218033, 8155, 800]
@@ -154,6 +177,29 @@ PLAN-ROOT SINK
 ---- DISTRIBUTEDPLAN
 Max Per-Host Resource Reservation: Memory=132.98MB Threads=22
 Per-Host Resource Estimates: Memory=548MB
+ImpalaSortRel(sort0=[$0], sort1=[$1], sort2=[$2], dir0=[ASC], dir1=[ASC], dir2=[ASC], fetch=[100:TINYINT])
+  ImpalaAggRel(group=[{0, 1, 2}], 30 days=[SUM($3)], 31-60 days=[SUM($4)], 61-90 days=[SUM($5)], 91-120 days=[SUM($6)], >120 days=[SUM($7)])
+    ImpalaProjectRel(EXPR$0=[SUBSTR($9, 1:BIGINT, 20:BIGINT)], SM_TYPE=[$11], WEB_NAME=[$7], cast_$f3=[CAST(CASE(<=(-(CAST($0):BIGINT, CAST($4):BIGINT), 30), 1:TINYINT, 0:TINYINT)):BIGINT], cast_$f4=[CAST(CASE(SEARCH(-(CAST($0):BIGINT, CAST($4):BIGINT), Sarg[(30L:BIGINT..60L:BIGINT]]:BIGINT), 1:TINYINT, 0:TINYINT)):BIGINT], cast_$f5=[CAST(CASE(SEARCH(-(CAST($0):BIGINT, CAST($4):BIGINT), Sarg[(60L:BIGINT..90L:BIGINT]]:BIGINT), 1:TINYINT, 0:TINYINT)):BIGINT], cast_$f6=[CAST(CASE(SEARCH(-(CAST($0):BIGINT, CAST($4):BIGINT), Sarg[(90L:BIGINT..120L:BIGINT]]:BIGINT), 1:TINYINT, 0:TINYINT)):BIGINT], cast_$f7=[CAST(CASE(>(-(CAST($0):BIGINT, CAST($4):BIGINT), 120), 1:TINYINT, 0:TINYINT)):BIGINT])
+      ImpalaJoinRel(condition=[=($2, $10)], joinType=[inner])
+        ImpalaJoinRel(condition=[=($3, $8)], joinType=[inner])
+          ImpalaJoinRel(condition=[=($1, $6)], joinType=[inner])
+            ImpalaJoinRel(condition=[=($0, $5)], joinType=[inner])
+              ImpalaProjectRel(ws_ship_date_sk=[$1], ws_web_site_sk=[$12], ws_ship_mode_sk=[$13], ws_warehouse_sk=[$14], ws_sold_date_sk=[$33])
+                ImpalaFilterRel(condition=[AND(IS NOT NULL($14), IS NOT NULL($13), IS NOT NULL($12), IS NOT NULL($1))])
+                  ImpalaHdfsScanRel(table=[[tpcds_partitioned_parquet_snap, web_sales]])
+              ImpalaProjectRel(d_date_sk=[$0])
+                ImpalaProjectRel(d_date_sk=[$0], d_month_seq=[$3])
+                  ImpalaFilterRel(condition=[AND(SEARCH($3, Sarg[[1194..1205]]), IS NOT NULL($0))])
+                    ImpalaHdfsScanRel(table=[[tpcds_partitioned_parquet_snap, date_dim]])
+            ImpalaProjectRel(web_site_sk=[$0], web_name=[$4])
+              ImpalaFilterRel(condition=[IS NOT NULL($0)])
+                ImpalaHdfsScanRel(table=[[tpcds_partitioned_parquet_snap, web_site]])
+          ImpalaProjectRel(w_warehouse_sk=[$0], w_warehouse_name=[$2])
+            ImpalaFilterRel(condition=[IS NOT NULL($0)])
+              ImpalaHdfsScanRel(table=[[tpcds_partitioned_parquet_snap, warehouse]])
+        ImpalaProjectRel(sm_ship_mode_sk=[$0], sm_type=[$2])
+          ImpalaFilterRel(condition=[IS NOT NULL($0)])
+            ImpalaHdfsScanRel(table=[[tpcds_partitioned_parquet_snap, ship_mode]])
 F06:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Instance Resources: mem-estimate=4.09MB mem-reservation=4.00MB thread-reservation=1
 |  max-parallelism=1 segment-costs=[843] cpu-comparison-result=120 [max(1 (self) vs 120 (sum children))]
@@ -365,6 +411,29 @@ max-parallelism=820 segment-costs=[8112942931, 1045327] cpu-comparison-result=12
 ---- PARALLELPLANS
 Max Per-Host Resource Reservation: Memory=132.98MB Threads=22
 Per-Host Resource Estimates: Memory=548MB
+ImpalaSortRel(sort0=[$0], sort1=[$1], sort2=[$2], dir0=[ASC], dir1=[ASC], dir2=[ASC], fetch=[100:TINYINT])
+  ImpalaAggRel(group=[{0, 1, 2}], 30 days=[SUM($3)], 31-60 days=[SUM($4)], 61-90 days=[SUM($5)], 91-120 days=[SUM($6)], >120 days=[SUM($7)])
+    ImpalaProjectRel(EXPR$0=[SUBSTR($9, 1:BIGINT, 20:BIGINT)], SM_TYPE=[$11], WEB_NAME=[$7], cast_$f3=[CAST(CASE(<=(-(CAST($0):BIGINT, CAST($4):BIGINT), 30), 1:TINYINT, 0:TINYINT)):BIGINT], cast_$f4=[CAST(CASE(SEARCH(-(CAST($0):BIGINT, CAST($4):BIGINT), Sarg[(30L:BIGINT..60L:BIGINT]]:BIGINT), 1:TINYINT, 0:TINYINT)):BIGINT], cast_$f5=[CAST(CASE(SEARCH(-(CAST($0):BIGINT, CAST($4):BIGINT), Sarg[(60L:BIGINT..90L:BIGINT]]:BIGINT), 1:TINYINT, 0:TINYINT)):BIGINT], cast_$f6=[CAST(CASE(SEARCH(-(CAST($0):BIGINT, CAST($4):BIGINT), Sarg[(90L:BIGINT..120L:BIGINT]]:BIGINT), 1:TINYINT, 0:TINYINT)):BIGINT], cast_$f7=[CAST(CASE(>(-(CAST($0):BIGINT, CAST($4):BIGINT), 120), 1:TINYINT, 0:TINYINT)):BIGINT])
+      ImpalaJoinRel(condition=[=($2, $10)], joinType=[inner])
+        ImpalaJoinRel(condition=[=($3, $8)], joinType=[inner])
+          ImpalaJoinRel(condition=[=($1, $6)], joinType=[inner])
+            ImpalaJoinRel(condition=[=($0, $5)], joinType=[inner])
+              ImpalaProjectRel(ws_ship_date_sk=[$1], ws_web_site_sk=[$12], ws_ship_mode_sk=[$13], ws_warehouse_sk=[$14], ws_sold_date_sk=[$33])
+                ImpalaFilterRel(condition=[AND(IS NOT NULL($14), IS NOT NULL($13), IS NOT NULL($12), IS NOT NULL($1))])
+                  ImpalaHdfsScanRel(table=[[tpcds_partitioned_parquet_snap, web_sales]])
+              ImpalaProjectRel(d_date_sk=[$0])
+                ImpalaProjectRel(d_date_sk=[$0], d_month_seq=[$3])
+                  ImpalaFilterRel(condition=[AND(SEARCH($3, Sarg[[1194..1205]]), IS NOT NULL($0))])
+                    ImpalaHdfsScanRel(table=[[tpcds_partitioned_parquet_snap, date_dim]])
+            ImpalaProjectRel(web_site_sk=[$0], web_name=[$4])
+              ImpalaFilterRel(condition=[IS NOT NULL($0)])
+                ImpalaHdfsScanRel(table=[[tpcds_partitioned_parquet_snap, web_site]])
+          ImpalaProjectRel(w_warehouse_sk=[$0], w_warehouse_name=[$2])
+            ImpalaFilterRel(condition=[IS NOT NULL($0)])
+              ImpalaHdfsScanRel(table=[[tpcds_partitioned_parquet_snap, warehouse]])
+        ImpalaProjectRel(sm_ship_mode_sk=[$0], sm_type=[$2])
+          ImpalaFilterRel(condition=[IS NOT NULL($0)])
+            ImpalaHdfsScanRel(table=[[tpcds_partitioned_parquet_snap, ship_mode]])
 F06:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Instance Resources: mem-estimate=4.09MB mem-reservation=4.00MB thread-reservation=1
 |  max-parallelism=1 segment-costs=[843] cpu-comparison-result=120 [max(1 (self) vs 120 (sum children))]

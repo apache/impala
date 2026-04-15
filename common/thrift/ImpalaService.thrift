@@ -1088,6 +1088,11 @@ enum TImpalaQueryOptions {
   // NONE             : No fallback planner to be used.
   // default is ORIGINAL
   FALLBACK_PLANNER = 200
+
+  // Enables the display of the CALCITE plan in the EXPLAIN output.
+  // The flag has no effect when CALCITE is not in use.
+  // default is false
+  ENABLE_EXPLAIN_CALCITE = 201
 }
 
 // The summary of a DML statement.

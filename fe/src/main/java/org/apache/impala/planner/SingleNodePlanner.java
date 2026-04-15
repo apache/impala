@@ -189,6 +189,11 @@ public class SingleNodePlanner implements SingleNodePlannerIntf {
     return singleNodePlan;
   }
 
+  @Override
+  public String calcitePlan() {
+    return "";
+  }
+
   /**
    * Checks that the given single-node plan is executable:
    * - It may not contain right or full outer joins with no equi-join conjuncts that

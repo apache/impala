@@ -30,6 +30,29 @@ limit 100
 ---- PLAN
 Max Per-Host Resource Reservation: Memory=53.00MB Threads=1
 Per-Host Resource Estimates: Memory=979MB
+ImpalaProjectRel(I_CATEGORY=[$0], I_CLASS=[$1], I_BRAND=[$2], S_STORE_NAME=[$3], S_COMPANY_NAME=[$4], D_MOY=[$5], SUM_SALES=[$6], AVG_MONTHLY_SALES=[$7])
+  ImpalaSortRel(sort0=[$8], sort1=[$3], dir0=[ASC], dir1=[ASC], fetch=[100:TINYINT])
+    ImpalaProjectRel(I_CATEGORY=[$0], I_CLASS=[$1], I_BRAND=[$2], S_STORE_NAME=[$3], S_COMPANY_NAME=[$4], D_MOY=[$5], SUM_SALES=[$6], AVG_MONTHLY_SALES=[$7], EXPR$8=[-($6, $7)])
+      ImpalaFilterRel(condition=[>(CASE(<>($7, 0.000000), /(ABS(-($6, $7)), $7), null:DECIMAL(38, 6)), 0.100000)])
+        ImpalaAnalyticRel(I_CATEGORY=[$0], I_CLASS=[$1], I_BRAND=[$2], S_STORE_NAME=[$3], S_COMPANY_NAME=[$4], D_MOY=[$5], SUM_SALES=[$6], AVG_MONTHLY_SALES=[AVG($6) OVER (PARTITION BY $0, $2, $3, $4)])
+          ImpalaAggRel(group=[{0, 1, 2, 3, 4, 5}], SUM_SALES=[SUM($6)])
+            ImpalaProjectRel(I_CATEGORY=[$12], I_CLASS=[$11], I_BRAND=[$10], S_STORE_NAME=[$7], S_COMPANY_NAME=[$8], D_MOY=[$5], ss_sales_price=[$2])
+              ImpalaJoinRel(condition=[=($0, $9)], joinType=[inner])
+                ImpalaJoinRel(condition=[=($1, $6)], joinType=[inner])
+                  ImpalaJoinRel(condition=[=($3, $4)], joinType=[inner])
+                    ImpalaProjectRel(ss_item_sk=[$1], ss_store_sk=[$6], ss_sales_price=[$12], ss_sold_date_sk=[$22])
+                      ImpalaFilterRel(condition=[AND(IS NOT NULL($1), IS NOT NULL($22), IS NOT NULL($6))])
+                        ImpalaHdfsScanRel(table=[[tpcds_partitioned_parquet_snap, store_sales]])
+                    ImpalaProjectRel(d_date_sk=[$0], d_moy=[$2])
+                      ImpalaProjectRel(d_date_sk=[$0], d_year=[$6], d_moy=[$8])
+                        ImpalaFilterRel(condition=[AND(=($6, 2001), IS NOT NULL($0))])
+                          ImpalaHdfsScanRel(table=[[tpcds_partitioned_parquet_snap, date_dim]])
+                  ImpalaProjectRel(s_store_sk=[$0], s_store_name=[$5], s_company_name=[$17])
+                    ImpalaFilterRel(condition=[IS NOT NULL($0)])
+                      ImpalaHdfsScanRel(table=[[tpcds_partitioned_parquet_snap, store]])
+                ImpalaProjectRel(i_item_sk=[$0], i_brand=[$8], i_class=[$10], i_category=[$12])
+                  ImpalaFilterRel(condition=[AND(SEARCH($12, Sarg[_UTF-8'Books':VARCHAR(2147483647) CHARACTER SET "UTF-8", _UTF-8'Children':VARCHAR(2147483647) CHARACTER SET "UTF-8", _UTF-8'Home':VARCHAR(2147483647) CHARACTER SET "UTF-8", _UTF-8'Men':VARCHAR(2147483647) CHARACTER SET "UTF-8", _UTF-8'Music':VARCHAR(2147483647) CHARACTER SET "UTF-8", _UTF-8'Women':VARCHAR(2147483647) CHARACTER SET "UTF-8"]:VARCHAR(2147483647) CHARACTER SET "UTF-8"), OR(SEARCH($12, Sarg[_UTF-8'Home':VARCHAR(2147483647) CHARACTER SET "UTF-8", _UTF-8'Music':VARCHAR(2147483647) CHARACTER SET "UTF-8", _UTF-8'Women':VARCHAR(2147483647) CHARACTER SET "UTF-8"]:VARCHAR(2147483647) CHARACTER SET "UTF-8"), SEARCH($10, Sarg[_UTF-8'home repair':VARCHAR(2147483647) CHARACTER SET "UTF-8", _UTF-8'infants':VARCHAR(2147483647) CHARACTER SET "UTF-8", _UTF-8'sports-apparel':VARCHAR(2147483647) CHARACTER SET "UTF-8"]:VARCHAR(2147483647) CHARACTER SET "UTF-8")), OR(SEARCH($10, Sarg[_UTF-8'bedding':VARCHAR(2147483647) CHARACTER SET "UTF-8", _UTF-8'fragrances':VARCHAR(2147483647) CHARACTER SET "UTF-8", _UTF-8'pop':VARCHAR(2147483647) CHARACTER SET "UTF-8"]:VARCHAR(2147483647) CHARACTER SET "UTF-8"), SEARCH($12, Sarg[_UTF-8'Books':VARCHAR(2147483647) CHARACTER SET "UTF-8", _UTF-8'Children':VARCHAR(2147483647) CHARACTER SET "UTF-8", _UTF-8'Men':VARCHAR(2147483647) CHARACTER SET "UTF-8"]:VARCHAR(2147483647) CHARACTER SET "UTF-8")), SEARCH($10, Sarg[_UTF-8'bedding':VARCHAR(2147483647) CHARACTER SET "UTF-8", _UTF-8'fragrances':VARCHAR(2147483647) CHARACTER SET "UTF-8", _UTF-8'home repair':VARCHAR(2147483647) CHARACTER SET "UTF-8", _UTF-8'infants':VARCHAR(2147483647) CHARACTER SET "UTF-8", _UTF-8'pop':VARCHAR(2147483647) CHARACTER SET "UTF-8", _UTF-8'sports-apparel':VARCHAR(2147483647) CHARACTER SET "UTF-8"]:VARCHAR(2147483647) CHARACTER SET "UTF-8"), IS NOT NULL($0))])
+                    ImpalaHdfsScanRel(table=[[tpcds_partitioned_parquet_snap, item]])
 F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Instance Resources: mem-estimate=978.81MB mem-reservation=53.00MB thread-reservation=1 runtime-filters-memory=3.00MB
 |  max-parallelism=1 segment-costs=[1264354009, 16900305, 9031203, 800]
@@ -149,6 +172,29 @@ PLAN-ROOT SINK
 ---- DISTRIBUTEDPLAN
 Max Per-Host Resource Reservation: Memory=544.77MB Threads=21
 Per-Host Resource Estimates: Memory=1.24GB
+ImpalaProjectRel(I_CATEGORY=[$0], I_CLASS=[$1], I_BRAND=[$2], S_STORE_NAME=[$3], S_COMPANY_NAME=[$4], D_MOY=[$5], SUM_SALES=[$6], AVG_MONTHLY_SALES=[$7])
+  ImpalaSortRel(sort0=[$8], sort1=[$3], dir0=[ASC], dir1=[ASC], fetch=[100:TINYINT])
+    ImpalaProjectRel(I_CATEGORY=[$0], I_CLASS=[$1], I_BRAND=[$2], S_STORE_NAME=[$3], S_COMPANY_NAME=[$4], D_MOY=[$5], SUM_SALES=[$6], AVG_MONTHLY_SALES=[$7], EXPR$8=[-($6, $7)])
+      ImpalaFilterRel(condition=[>(CASE(<>($7, 0.000000), /(ABS(-($6, $7)), $7), null:DECIMAL(38, 6)), 0.100000)])
+        ImpalaAnalyticRel(I_CATEGORY=[$0], I_CLASS=[$1], I_BRAND=[$2], S_STORE_NAME=[$3], S_COMPANY_NAME=[$4], D_MOY=[$5], SUM_SALES=[$6], AVG_MONTHLY_SALES=[AVG($6) OVER (PARTITION BY $0, $2, $3, $4)])
+          ImpalaAggRel(group=[{0, 1, 2, 3, 4, 5}], SUM_SALES=[SUM($6)])
+            ImpalaProjectRel(I_CATEGORY=[$12], I_CLASS=[$11], I_BRAND=[$10], S_STORE_NAME=[$7], S_COMPANY_NAME=[$8], D_MOY=[$5], ss_sales_price=[$2])
+              ImpalaJoinRel(condition=[=($0, $9)], joinType=[inner])
+                ImpalaJoinRel(condition=[=($1, $6)], joinType=[inner])
+                  ImpalaJoinRel(condition=[=($3, $4)], joinType=[inner])
+                    ImpalaProjectRel(ss_item_sk=[$1], ss_store_sk=[$6], ss_sales_price=[$12], ss_sold_date_sk=[$22])
+                      ImpalaFilterRel(condition=[AND(IS NOT NULL($1), IS NOT NULL($22), IS NOT NULL($6))])
+                        ImpalaHdfsScanRel(table=[[tpcds_partitioned_parquet_snap, store_sales]])
+                    ImpalaProjectRel(d_date_sk=[$0], d_moy=[$2])
+                      ImpalaProjectRel(d_date_sk=[$0], d_year=[$6], d_moy=[$8])
+                        ImpalaFilterRel(condition=[AND(=($6, 2001), IS NOT NULL($0))])
+                          ImpalaHdfsScanRel(table=[[tpcds_partitioned_parquet_snap, date_dim]])
+                  ImpalaProjectRel(s_store_sk=[$0], s_store_name=[$5], s_company_name=[$17])
+                    ImpalaFilterRel(condition=[IS NOT NULL($0)])
+                      ImpalaHdfsScanRel(table=[[tpcds_partitioned_parquet_snap, store]])
+                ImpalaProjectRel(i_item_sk=[$0], i_brand=[$8], i_class=[$10], i_category=[$12])
+                  ImpalaFilterRel(condition=[AND(SEARCH($12, Sarg[_UTF-8'Books':VARCHAR(2147483647) CHARACTER SET "UTF-8", _UTF-8'Children':VARCHAR(2147483647) CHARACTER SET "UTF-8", _UTF-8'Home':VARCHAR(2147483647) CHARACTER SET "UTF-8", _UTF-8'Men':VARCHAR(2147483647) CHARACTER SET "UTF-8", _UTF-8'Music':VARCHAR(2147483647) CHARACTER SET "UTF-8", _UTF-8'Women':VARCHAR(2147483647) CHARACTER SET "UTF-8"]:VARCHAR(2147483647) CHARACTER SET "UTF-8"), OR(SEARCH($12, Sarg[_UTF-8'Home':VARCHAR(2147483647) CHARACTER SET "UTF-8", _UTF-8'Music':VARCHAR(2147483647) CHARACTER SET "UTF-8", _UTF-8'Women':VARCHAR(2147483647) CHARACTER SET "UTF-8"]:VARCHAR(2147483647) CHARACTER SET "UTF-8"), SEARCH($10, Sarg[_UTF-8'home repair':VARCHAR(2147483647) CHARACTER SET "UTF-8", _UTF-8'infants':VARCHAR(2147483647) CHARACTER SET "UTF-8", _UTF-8'sports-apparel':VARCHAR(2147483647) CHARACTER SET "UTF-8"]:VARCHAR(2147483647) CHARACTER SET "UTF-8")), OR(SEARCH($10, Sarg[_UTF-8'bedding':VARCHAR(2147483647) CHARACTER SET "UTF-8", _UTF-8'fragrances':VARCHAR(2147483647) CHARACTER SET "UTF-8", _UTF-8'pop':VARCHAR(2147483647) CHARACTER SET "UTF-8"]:VARCHAR(2147483647) CHARACTER SET "UTF-8"), SEARCH($12, Sarg[_UTF-8'Books':VARCHAR(2147483647) CHARACTER SET "UTF-8", _UTF-8'Children':VARCHAR(2147483647) CHARACTER SET "UTF-8", _UTF-8'Men':VARCHAR(2147483647) CHARACTER SET "UTF-8"]:VARCHAR(2147483647) CHARACTER SET "UTF-8")), SEARCH($10, Sarg[_UTF-8'bedding':VARCHAR(2147483647) CHARACTER SET "UTF-8", _UTF-8'fragrances':VARCHAR(2147483647) CHARACTER SET "UTF-8", _UTF-8'home repair':VARCHAR(2147483647) CHARACTER SET "UTF-8", _UTF-8'infants':VARCHAR(2147483647) CHARACTER SET "UTF-8", _UTF-8'pop':VARCHAR(2147483647) CHARACTER SET "UTF-8", _UTF-8'sports-apparel':VARCHAR(2147483647) CHARACTER SET "UTF-8"]:VARCHAR(2147483647) CHARACTER SET "UTF-8"), IS NOT NULL($0))])
+                    ImpalaHdfsScanRel(table=[[tpcds_partitioned_parquet_snap, item]])
 F06:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Instance Resources: mem-estimate=4.14MB mem-reservation=4.00MB thread-reservation=1
 |  max-parallelism=1 segment-costs=[852] cpu-comparison-result=120 [max(1 (self) vs 120 (sum children))]
@@ -353,6 +399,29 @@ max-parallelism=140 segment-costs=[1394743679, 264035694] cpu-comparison-result=
 ---- PARALLELPLANS
 Max Per-Host Resource Reservation: Memory=544.77MB Threads=21
 Per-Host Resource Estimates: Memory=1.24GB
+ImpalaProjectRel(I_CATEGORY=[$0], I_CLASS=[$1], I_BRAND=[$2], S_STORE_NAME=[$3], S_COMPANY_NAME=[$4], D_MOY=[$5], SUM_SALES=[$6], AVG_MONTHLY_SALES=[$7])
+  ImpalaSortRel(sort0=[$8], sort1=[$3], dir0=[ASC], dir1=[ASC], fetch=[100:TINYINT])
+    ImpalaProjectRel(I_CATEGORY=[$0], I_CLASS=[$1], I_BRAND=[$2], S_STORE_NAME=[$3], S_COMPANY_NAME=[$4], D_MOY=[$5], SUM_SALES=[$6], AVG_MONTHLY_SALES=[$7], EXPR$8=[-($6, $7)])
+      ImpalaFilterRel(condition=[>(CASE(<>($7, 0.000000), /(ABS(-($6, $7)), $7), null:DECIMAL(38, 6)), 0.100000)])
+        ImpalaAnalyticRel(I_CATEGORY=[$0], I_CLASS=[$1], I_BRAND=[$2], S_STORE_NAME=[$3], S_COMPANY_NAME=[$4], D_MOY=[$5], SUM_SALES=[$6], AVG_MONTHLY_SALES=[AVG($6) OVER (PARTITION BY $0, $2, $3, $4)])
+          ImpalaAggRel(group=[{0, 1, 2, 3, 4, 5}], SUM_SALES=[SUM($6)])
+            ImpalaProjectRel(I_CATEGORY=[$12], I_CLASS=[$11], I_BRAND=[$10], S_STORE_NAME=[$7], S_COMPANY_NAME=[$8], D_MOY=[$5], ss_sales_price=[$2])
+              ImpalaJoinRel(condition=[=($0, $9)], joinType=[inner])
+                ImpalaJoinRel(condition=[=($1, $6)], joinType=[inner])
+                  ImpalaJoinRel(condition=[=($3, $4)], joinType=[inner])
+                    ImpalaProjectRel(ss_item_sk=[$1], ss_store_sk=[$6], ss_sales_price=[$12], ss_sold_date_sk=[$22])
+                      ImpalaFilterRel(condition=[AND(IS NOT NULL($1), IS NOT NULL($22), IS NOT NULL($6))])
+                        ImpalaHdfsScanRel(table=[[tpcds_partitioned_parquet_snap, store_sales]])
+                    ImpalaProjectRel(d_date_sk=[$0], d_moy=[$2])
+                      ImpalaProjectRel(d_date_sk=[$0], d_year=[$6], d_moy=[$8])
+                        ImpalaFilterRel(condition=[AND(=($6, 2001), IS NOT NULL($0))])
+                          ImpalaHdfsScanRel(table=[[tpcds_partitioned_parquet_snap, date_dim]])
+                  ImpalaProjectRel(s_store_sk=[$0], s_store_name=[$5], s_company_name=[$17])
+                    ImpalaFilterRel(condition=[IS NOT NULL($0)])
+                      ImpalaHdfsScanRel(table=[[tpcds_partitioned_parquet_snap, store]])
+                ImpalaProjectRel(i_item_sk=[$0], i_brand=[$8], i_class=[$10], i_category=[$12])
+                  ImpalaFilterRel(condition=[AND(SEARCH($12, Sarg[_UTF-8'Books':VARCHAR(2147483647) CHARACTER SET "UTF-8", _UTF-8'Children':VARCHAR(2147483647) CHARACTER SET "UTF-8", _UTF-8'Home':VARCHAR(2147483647) CHARACTER SET "UTF-8", _UTF-8'Men':VARCHAR(2147483647) CHARACTER SET "UTF-8", _UTF-8'Music':VARCHAR(2147483647) CHARACTER SET "UTF-8", _UTF-8'Women':VARCHAR(2147483647) CHARACTER SET "UTF-8"]:VARCHAR(2147483647) CHARACTER SET "UTF-8"), OR(SEARCH($12, Sarg[_UTF-8'Home':VARCHAR(2147483647) CHARACTER SET "UTF-8", _UTF-8'Music':VARCHAR(2147483647) CHARACTER SET "UTF-8", _UTF-8'Women':VARCHAR(2147483647) CHARACTER SET "UTF-8"]:VARCHAR(2147483647) CHARACTER SET "UTF-8"), SEARCH($10, Sarg[_UTF-8'home repair':VARCHAR(2147483647) CHARACTER SET "UTF-8", _UTF-8'infants':VARCHAR(2147483647) CHARACTER SET "UTF-8", _UTF-8'sports-apparel':VARCHAR(2147483647) CHARACTER SET "UTF-8"]:VARCHAR(2147483647) CHARACTER SET "UTF-8")), OR(SEARCH($10, Sarg[_UTF-8'bedding':VARCHAR(2147483647) CHARACTER SET "UTF-8", _UTF-8'fragrances':VARCHAR(2147483647) CHARACTER SET "UTF-8", _UTF-8'pop':VARCHAR(2147483647) CHARACTER SET "UTF-8"]:VARCHAR(2147483647) CHARACTER SET "UTF-8"), SEARCH($12, Sarg[_UTF-8'Books':VARCHAR(2147483647) CHARACTER SET "UTF-8", _UTF-8'Children':VARCHAR(2147483647) CHARACTER SET "UTF-8", _UTF-8'Men':VARCHAR(2147483647) CHARACTER SET "UTF-8"]:VARCHAR(2147483647) CHARACTER SET "UTF-8")), SEARCH($10, Sarg[_UTF-8'bedding':VARCHAR(2147483647) CHARACTER SET "UTF-8", _UTF-8'fragrances':VARCHAR(2147483647) CHARACTER SET "UTF-8", _UTF-8'home repair':VARCHAR(2147483647) CHARACTER SET "UTF-8", _UTF-8'infants':VARCHAR(2147483647) CHARACTER SET "UTF-8", _UTF-8'pop':VARCHAR(2147483647) CHARACTER SET "UTF-8", _UTF-8'sports-apparel':VARCHAR(2147483647) CHARACTER SET "UTF-8"]:VARCHAR(2147483647) CHARACTER SET "UTF-8"), IS NOT NULL($0))])
+                    ImpalaHdfsScanRel(table=[[tpcds_partitioned_parquet_snap, item]])
 F06:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Instance Resources: mem-estimate=4.14MB mem-reservation=4.00MB thread-reservation=1
 |  max-parallelism=1 segment-costs=[852] cpu-comparison-result=120 [max(1 (self) vs 120 (sum children))]

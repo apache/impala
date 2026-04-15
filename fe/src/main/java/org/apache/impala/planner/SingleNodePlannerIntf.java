@@ -46,4 +46,12 @@ public interface SingleNodePlannerIntf {
   // Create the TResultSetMetadata which contains the output expressions
   public TResultSetMetadata getTResultSetMetadata(ParsedStatement stmt);
 
+  /**
+   * Returns a string representation of the Calcite plan. If the underlying planner
+   * does not use Calcite the method returns an empty string (never {@code null}).
+   *
+   * @return a string representation of the Calcite plan or empty string if the
+   * planner does not use Calcite.
+   */
+  String calcitePlan();
 }

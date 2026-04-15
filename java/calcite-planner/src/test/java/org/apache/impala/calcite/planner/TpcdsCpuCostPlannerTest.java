@@ -74,7 +74,8 @@ public class TpcdsCpuCostPlannerTest extends PlannerTestBase {
           // numRows property or not.
           .setDisable_hdfs_num_rows_estimate(true)
           .setPlanner(TPlannerType.CALCITE)
-          .setFallback_planner(TPlannerType.CALCITE);
+          .setFallback_planner(TPlannerType.CALCITE)
+          .setEnable_explain_calcite(true);
 
   // Database name to run this test.
   private static String testDb = "tpcds_partitioned_parquet_snap";

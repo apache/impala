@@ -21,6 +21,22 @@ select  s_store_name, s_store_id,
 ---- PLAN
 Max Per-Host Resource Reservation: Memory=9.25MB Threads=1
 Per-Host Resource Estimates: Memory=54MB
+ImpalaSortRel(sort0=[$0], sort1=[$1], sort2=[$2], sort3=[$3], sort4=[$4], sort5=[$5], sort6=[$6], sort7=[$7], sort8=[$8], dir0=[ASC], dir1=[ASC], dir2=[ASC], dir3=[ASC], dir4=[ASC], dir5=[ASC], dir6=[ASC], dir7=[ASC], dir8=[ASC], fetch=[100:TINYINT])
+  ImpalaAggRel(group=[{0, 1}], SUN_SALES=[SUM($2)], MON_SALES=[SUM($3)], TUE_SALES=[SUM($4)], WED_SALES=[SUM($5)], THU_SALES=[SUM($6)], FRI_SALES=[SUM($7)], SAT_SALES=[SUM($8)])
+    ImpalaProjectRel(S_STORE_NAME=[$7], S_STORE_ID=[$6], $f2=[CASE(=($4, _UTF-8'Sunday'), $1, null:DECIMAL(7, 2))], $f3=[CASE(=($4, _UTF-8'Monday'), $1, null:DECIMAL(7, 2))], $f4=[CASE(=($4, _UTF-8'Tuesday'), $1, null:DECIMAL(7, 2))], $f5=[CASE(=($4, _UTF-8'Wednesday'), $1, null:DECIMAL(7, 2))], $f6=[CASE(=($4, _UTF-8'Thursday'), $1, null:DECIMAL(7, 2))], $f7=[CASE(=($4, _UTF-8'Friday'), $1, null:DECIMAL(7, 2))], $f8=[CASE(=($4, _UTF-8'Saturday'), $1, null:DECIMAL(7, 2))])
+      ImpalaJoinRel(condition=[=($5, $0)], joinType=[inner])
+        ImpalaJoinRel(condition=[=($3, $2)], joinType=[inner])
+          ImpalaProjectRel(ss_store_sk=[$6], ss_sales_price=[$12], ss_sold_date_sk=[$22])
+            ImpalaFilterRel(condition=[AND(IS NOT NULL($22), IS NOT NULL($6))])
+              ImpalaHdfsScanRel(table=[[tpcds_partitioned_parquet_snap, store_sales]])
+          ImpalaProjectRel(d_date_sk=[$0], d_day_name=[$2])
+            ImpalaProjectRel(d_date_sk=[$0], d_year=[$6], d_day_name=[$14])
+              ImpalaFilterRel(condition=[AND(=($6, 1999), IS NOT NULL($0))])
+                ImpalaHdfsScanRel(table=[[tpcds_partitioned_parquet_snap, date_dim]])
+        ImpalaProjectRel(s_store_sk=[$0], s_store_id=[$1], s_store_name=[$2])
+          ImpalaProjectRel(s_store_sk=[$0], s_store_id=[$1], s_store_name=[$5], s_gmt_offset=[$27])
+            ImpalaFilterRel(condition=[AND(=($27, -6.00), IS NOT NULL($0))])
+              ImpalaHdfsScanRel(table=[[tpcds_partitioned_parquet_snap, store]])
 F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Instance Resources: mem-estimate=53.88MB mem-reservation=9.25MB thread-reservation=1 runtime-filters-memory=2.00MB
 |  max-parallelism=1 segment-costs=[3057317017, 7914, 900]
@@ -100,6 +116,22 @@ PLAN-ROOT SINK
 ---- DISTRIBUTEDPLAN
 Max Per-Host Resource Reservation: Memory=98.97MB Threads=18
 Per-Host Resource Estimates: Memory=505MB
+ImpalaSortRel(sort0=[$0], sort1=[$1], sort2=[$2], sort3=[$3], sort4=[$4], sort5=[$5], sort6=[$6], sort7=[$7], sort8=[$8], dir0=[ASC], dir1=[ASC], dir2=[ASC], dir3=[ASC], dir4=[ASC], dir5=[ASC], dir6=[ASC], dir7=[ASC], dir8=[ASC], fetch=[100:TINYINT])
+  ImpalaAggRel(group=[{0, 1}], SUN_SALES=[SUM($2)], MON_SALES=[SUM($3)], TUE_SALES=[SUM($4)], WED_SALES=[SUM($5)], THU_SALES=[SUM($6)], FRI_SALES=[SUM($7)], SAT_SALES=[SUM($8)])
+    ImpalaProjectRel(S_STORE_NAME=[$7], S_STORE_ID=[$6], $f2=[CASE(=($4, _UTF-8'Sunday'), $1, null:DECIMAL(7, 2))], $f3=[CASE(=($4, _UTF-8'Monday'), $1, null:DECIMAL(7, 2))], $f4=[CASE(=($4, _UTF-8'Tuesday'), $1, null:DECIMAL(7, 2))], $f5=[CASE(=($4, _UTF-8'Wednesday'), $1, null:DECIMAL(7, 2))], $f6=[CASE(=($4, _UTF-8'Thursday'), $1, null:DECIMAL(7, 2))], $f7=[CASE(=($4, _UTF-8'Friday'), $1, null:DECIMAL(7, 2))], $f8=[CASE(=($4, _UTF-8'Saturday'), $1, null:DECIMAL(7, 2))])
+      ImpalaJoinRel(condition=[=($5, $0)], joinType=[inner])
+        ImpalaJoinRel(condition=[=($3, $2)], joinType=[inner])
+          ImpalaProjectRel(ss_store_sk=[$6], ss_sales_price=[$12], ss_sold_date_sk=[$22])
+            ImpalaFilterRel(condition=[AND(IS NOT NULL($22), IS NOT NULL($6))])
+              ImpalaHdfsScanRel(table=[[tpcds_partitioned_parquet_snap, store_sales]])
+          ImpalaProjectRel(d_date_sk=[$0], d_day_name=[$2])
+            ImpalaProjectRel(d_date_sk=[$0], d_year=[$6], d_day_name=[$14])
+              ImpalaFilterRel(condition=[AND(=($6, 1999), IS NOT NULL($0))])
+                ImpalaHdfsScanRel(table=[[tpcds_partitioned_parquet_snap, date_dim]])
+        ImpalaProjectRel(s_store_sk=[$0], s_store_id=[$1], s_store_name=[$2])
+          ImpalaProjectRel(s_store_sk=[$0], s_store_id=[$1], s_store_name=[$5], s_gmt_offset=[$27])
+            ImpalaFilterRel(condition=[AND(=($27, -6.00), IS NOT NULL($0))])
+              ImpalaHdfsScanRel(table=[[tpcds_partitioned_parquet_snap, store]])
 F04:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Instance Resources: mem-estimate=4.15MB mem-reservation=4.00MB thread-reservation=1
 |  max-parallelism=1 segment-costs=[956] cpu-comparison-result=120 [max(1 (self) vs 120 (sum children))]
@@ -239,6 +271,22 @@ max-parallelism=310 segment-costs=[3058023158, 1710341] cpu-comparison-result=12
 ---- PARALLELPLANS
 Max Per-Host Resource Reservation: Memory=98.97MB Threads=18
 Per-Host Resource Estimates: Memory=505MB
+ImpalaSortRel(sort0=[$0], sort1=[$1], sort2=[$2], sort3=[$3], sort4=[$4], sort5=[$5], sort6=[$6], sort7=[$7], sort8=[$8], dir0=[ASC], dir1=[ASC], dir2=[ASC], dir3=[ASC], dir4=[ASC], dir5=[ASC], dir6=[ASC], dir7=[ASC], dir8=[ASC], fetch=[100:TINYINT])
+  ImpalaAggRel(group=[{0, 1}], SUN_SALES=[SUM($2)], MON_SALES=[SUM($3)], TUE_SALES=[SUM($4)], WED_SALES=[SUM($5)], THU_SALES=[SUM($6)], FRI_SALES=[SUM($7)], SAT_SALES=[SUM($8)])
+    ImpalaProjectRel(S_STORE_NAME=[$7], S_STORE_ID=[$6], $f2=[CASE(=($4, _UTF-8'Sunday'), $1, null:DECIMAL(7, 2))], $f3=[CASE(=($4, _UTF-8'Monday'), $1, null:DECIMAL(7, 2))], $f4=[CASE(=($4, _UTF-8'Tuesday'), $1, null:DECIMAL(7, 2))], $f5=[CASE(=($4, _UTF-8'Wednesday'), $1, null:DECIMAL(7, 2))], $f6=[CASE(=($4, _UTF-8'Thursday'), $1, null:DECIMAL(7, 2))], $f7=[CASE(=($4, _UTF-8'Friday'), $1, null:DECIMAL(7, 2))], $f8=[CASE(=($4, _UTF-8'Saturday'), $1, null:DECIMAL(7, 2))])
+      ImpalaJoinRel(condition=[=($5, $0)], joinType=[inner])
+        ImpalaJoinRel(condition=[=($3, $2)], joinType=[inner])
+          ImpalaProjectRel(ss_store_sk=[$6], ss_sales_price=[$12], ss_sold_date_sk=[$22])
+            ImpalaFilterRel(condition=[AND(IS NOT NULL($22), IS NOT NULL($6))])
+              ImpalaHdfsScanRel(table=[[tpcds_partitioned_parquet_snap, store_sales]])
+          ImpalaProjectRel(d_date_sk=[$0], d_day_name=[$2])
+            ImpalaProjectRel(d_date_sk=[$0], d_year=[$6], d_day_name=[$14])
+              ImpalaFilterRel(condition=[AND(=($6, 1999), IS NOT NULL($0))])
+                ImpalaHdfsScanRel(table=[[tpcds_partitioned_parquet_snap, date_dim]])
+        ImpalaProjectRel(s_store_sk=[$0], s_store_id=[$1], s_store_name=[$2])
+          ImpalaProjectRel(s_store_sk=[$0], s_store_id=[$1], s_store_name=[$5], s_gmt_offset=[$27])
+            ImpalaFilterRel(condition=[AND(=($27, -6.00), IS NOT NULL($0))])
+              ImpalaHdfsScanRel(table=[[tpcds_partitioned_parquet_snap, store]])
 F04:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Instance Resources: mem-estimate=4.15MB mem-reservation=4.00MB thread-reservation=1
 |  max-parallelism=1 segment-costs=[956] cpu-comparison-result=120 [max(1 (self) vs 120 (sum children))]

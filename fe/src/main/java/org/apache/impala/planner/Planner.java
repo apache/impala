@@ -387,9 +387,8 @@ public class Planner {
    * explicit explain level.
    * Includes the estimated resource requirements from the request if set.
    */
-  public static String getExplainString(List<PlanFragment> fragments,
-      TQueryExecRequest request, TExplainLevel explainLevel,
-      TQueryOptions options, QueryStmt queryStmt) {
+  public String getExplainString(List<PlanFragment> fragments, TQueryExecRequest request,
+      TExplainLevel explainLevel, TQueryOptions options, QueryStmt queryStmt) {
     StringBuilder str = new StringBuilder();
     boolean hasHeader = false;
 
@@ -485,6 +484,11 @@ public class Planner {
 
     // Add the blank line that indicates the end of the header
     if (hasHeader) str.append("\n");
+    if (options.isEnable_explain_calcite()) {
+      // If we are not using the CALCITE planner then plan will be just
+      // an empty string and basically append is almost noop
+      str.append(this.singleNodePlannerIntf_.calcitePlan());
+    }
 
     if (explainLevel.ordinal() < TExplainLevel.VERBOSE.ordinal()) {
       // Print the non-fragmented parallel plan.
