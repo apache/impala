@@ -521,6 +521,13 @@ Status ClientRequestState::ExecLocalCatalogOp(
       SetResultSet(result.role_names);
       return Status::OK();
     }
+    case TCatalogOpType::SHOW_CURRENT_GROUPS: {
+      const TShowCurrentGroupsParams& params = catalog_op.show_current_groups_params;
+      TShowCurrentGroupsResult result;
+      RETURN_IF_ERROR(frontend_->ShowCurrentGroups(params, &result));
+      SetResultSet(result.group_names);
+      return Status::OK();
+    }
     case TCatalogOpType::SHOW_GRANT_PRINCIPAL: {
       const TShowGrantPrincipalParams& params = catalog_op.show_grant_principal_params;
       TResultSet response;

@@ -344,6 +344,16 @@ struct TShowRolesResult {
   1: required list<string> role_names
 }
 
+struct TShowCurrentGroupsParams {
+  // The user running the statement
+  1: required string requesting_user
+}
+
+struct TShowCurrentGroupsResult {
+  // A list of groups the user belongs to
+  1: required list<string> group_names
+}
+
 // Represents one row in the DESCRIBE HISTORY command's result.
 struct TGetTableHistoryResultItem {
   // Timestamp in millis
@@ -487,6 +497,7 @@ enum TCatalogOpType {
   DESCRIBE_HISTORY = 15
   SHOW_VIEWS = 16
   SHOW_METADATA_TABLES = 17
+  SHOW_CURRENT_GROUPS = 18
 }
 
 // TODO: Combine SHOW requests with a single struct that contains a field
@@ -556,6 +567,9 @@ struct TCatalogOpRequest {
 
   // Partition limit for SHOW CREATE TABLE WITH STATS
   21: optional i32 show_create_table_partition_limit
+
+  // Parameters for SHOW CURRENT GROUPS
+  22: optional TShowCurrentGroupsParams show_current_groups_params
 }
 
 // Query options type

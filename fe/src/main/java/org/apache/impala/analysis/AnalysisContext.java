@@ -167,6 +167,9 @@ public class AnalysisContext {
     public boolean isResetMetadataStmt() { return stmt_ instanceof ResetMetadataStmt; }
     public boolean isExplainStmt() { return parsedStmt_.isExplain(); }
     public boolean isShowRolesStmt() { return stmt_ instanceof ShowRolesStmt; }
+    public boolean isShowCurrentGroupsStmt() {
+      return stmt_ instanceof ShowCurrentGroupsStmt;
+    }
     public boolean isShowGrantPrincipalStmt() {
       return stmt_ instanceof ShowGrantPrincipalStmt;
     }
@@ -208,7 +211,8 @@ public class AnalysisContext {
           isShowViewsStmt() || isShowDbsStmt() || isShowFunctionsStmt() ||
           isShowRolesStmt() || isShowGrantPrincipalStmt() || isShowCreateTableStmt() ||
           isShowDataSrcsStmt() || isShowStatsStmt() || isDescribeTableStmt() ||
-          isDescribeDbStmt() || isShowCreateFunctionStmt() || isDescribeHistoryStmt();
+          isDescribeDbStmt() || isShowCreateFunctionStmt() || isDescribeHistoryStmt() ||
+          isShowCurrentGroupsStmt();
     }
 
     private boolean isGrantRevokeStmt() {

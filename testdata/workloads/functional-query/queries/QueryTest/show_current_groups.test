@@ -1,0 +1,25 @@
+====
+---- USER
+admin
+---- QUERY
+# This verifies that the user 'admin' is associated with the group 'admin'.
+# Note that the test cases in this file were run with the startup flag
+# "--use_customized_user_groups_mapper_for_ranger" and thus a user belongs to a group of
+# the same name.
+# Refer to RangerUtil#getGroups() for more details.
+show current groups
+---- RESULTS
+'admin'
+---- TYPES
+STRING
+====
+---- USER
+non_owner
+---- QUERY
+# This verifies that the user 'non_owner' is associated with the group 'non_owner'.
+show current groups
+---- RESULTS
+'non_owner'
+---- TYPES
+STRING
+====

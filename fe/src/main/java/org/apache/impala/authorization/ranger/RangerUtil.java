@@ -92,19 +92,19 @@ public class RangerUtil {
   }
 
   /**
-   * This method returns the groups that 'user' belongs to. By starting impalad and
-   * catalogd with the argument of "use_customized_user_groups_mapper_for_ranger",
+   * This method returns the groups that 'userShortName' belongs to. By starting impalad
+   * and catalogd with the argument of "use_customized_user_groups_mapper_for_ranger",
    * the customized user-to-groups mapper would be provided, which is useful in the
    * testing environment.
    */
-  public static Set<String> getGroups(String user) {
+  public static Set<String> getGroups(String userShortName) {
     UserGroupInformation ugi;
     if (RuntimeEnv.INSTANCE.isTestEnv() ||
         BackendConfig.INSTANCE.useCustomizedUserGroupsMapperForRanger()) {
-      ugi = UserGroupInformation.createUserForTesting(user,
-          new String[]{user});
+      ugi = UserGroupInformation.createUserForTesting(userShortName,
+          new String[]{userShortName});
     } else {
-      ugi = UserGroupInformation.createRemoteUser(user);
+      ugi = UserGroupInformation.createRemoteUser(userShortName);
     }
     return Sets.newHashSet(ugi.getGroupNames());
   }

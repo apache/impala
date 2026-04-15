@@ -4325,6 +4325,15 @@ public class ParserTest extends FrontendTestBase {
   }
 
   @Test
+  public void TestShowCurrentGroups() {
+    ParsesOk("SHOW CURRENT GROUPS");
+    ParserError("SHOW CURRENT GROUPS blah");
+    ParserError("SHOW CURRENT");
+    ParserError("SHOW CURRENT GROUP");
+    ParserError("SHOW GROUPS");
+  }
+
+  @Test
   public void TestShowGrantPrincipal() {
     for (String type: new String[]{"ROLE", "USER", "GROUP"}) {
       // Show all grants on a particular principal type.

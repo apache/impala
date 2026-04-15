@@ -566,15 +566,7 @@ public class RangerAuthorizationChecker extends BaseAuthorizationChecker {
   @Override
   public Set<String> getUserGroups(User user) throws InternalException {
     Preconditions.checkNotNull(user);
-    UserGroupInformation ugi;
-    if (RuntimeEnv.INSTANCE.isTestEnv() ||
-        BackendConfig.INSTANCE.useCustomizedUserGroupsMapperForRanger()) {
-      ugi = UserGroupInformation.createUserForTesting(user.getShortName(),
-          new String[]{user.getShortName()});
-    } else {
-      ugi = UserGroupInformation.createRemoteUser(user.getShortName());
-    }
-    return new HashSet<>(ugi.getGroups());
+    return RangerUtil.getGroups(user.getShortName());
   }
 
   private boolean authorizeAny(RangerAuthorizationContext authzCtx,

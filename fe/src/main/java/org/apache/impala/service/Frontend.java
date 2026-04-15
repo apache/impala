@@ -99,6 +99,7 @@ import org.apache.impala.analysis.ParsedStatement;
 import org.apache.impala.analysis.Parser;
 import org.apache.impala.analysis.QueryStmt;
 import org.apache.impala.analysis.ResetMetadataStmt;
+import org.apache.impala.analysis.ShowCurrentGroupsStmt;
 import org.apache.impala.analysis.ShowDbsStmt;
 import org.apache.impala.analysis.ShowFunctionsStmt;
 import org.apache.impala.analysis.ShowGrantPrincipalStmt;
@@ -885,6 +886,12 @@ public class Frontend {
       ddl.setShow_roles_params(showRolesStmt.toThrift());
       metadata.setColumns(Arrays.asList(
           new TColumn("role_name", Type.STRING.toThrift())));
+    } else if (analysis.isShowCurrentGroupsStmt()) {
+      ddl.op_type = TCatalogOpType.SHOW_CURRENT_GROUPS;
+      ShowCurrentGroupsStmt stmt = (ShowCurrentGroupsStmt) analysis.getStmt();
+      ddl.setShow_current_groups_params(stmt.toThrift());
+      metadata.setColumns(
+          Arrays.asList(new TColumn("group_name", Type.STRING.toThrift())));
     } else if (analysis.isShowGrantPrincipalStmt()) {
       ddl.op_type = TCatalogOpType.SHOW_GRANT_PRINCIPAL;
       ShowGrantPrincipalStmt showGrantPrincipalStmt =

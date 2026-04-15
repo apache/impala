@@ -332,7 +332,7 @@ terminal
   KW_EXISTS, KW_EXPLAIN, KW_EXTENDED, KW_EXTERNAL, KW_FALSE, KW_FIELDS, KW_FILEFORMAT,
   KW_FILES, KW_FILE_SIZE_THRESHOLD_MB, KW_FINALIZE_FN, KW_FIRST, KW_FLOAT, KW_FOLLOWING, KW_FOR,
   KW_FOREIGN, KW_FORMAT, KW_FORMATTED, KW_FROM, KW_FULL, KW_FUNCTION, KW_FUNCTIONS, KW_GRANT,
-  KW_GROUP, KW_GROUPING, KW_HASH, KW_HUDIPARQUET, KW_IGNORE, KW_HAVING, KW_ICEBERG, KW_IF,
+  KW_GROUP, KW_GROUPING, KW_GROUPS, KW_HASH, KW_HUDIPARQUET, KW_IGNORE, KW_HAVING, KW_ICEBERG, KW_IF,
   KW_ILIKE, KW_IN, KW_INCREMENTAL, KW_INIT_FN, KW_INNER, KW_INPATH, KW_INSERT, KW_INT,
   KW_INTERMEDIATE, KW_INTERSECT, KW_INTERVAL, KW_INTO, KW_INVALIDATE, KW_IREGEXP, KW_IS,
   KW_JDBC, KW_JOIN, KW_JSONFILE, KW_KILL, KW_KUDU, KW_LAST, KW_LEADING, KW_LEFT, KW_LEXICAL,
@@ -608,6 +608,7 @@ nonterminal Boolean enable_spec, validate_spec, rely_spec;
 
 // For GRANT/REVOKE/AUTH DDL statements
 nonterminal ShowRolesStmt show_roles_stmt;
+nonterminal ShowCurrentGroupsStmt show_current_groups_stmt;
 nonterminal ShowGrantPrincipalStmt show_grant_principal_stmt;
 nonterminal TPrincipalType principal_type;
 nonterminal CreateDropRoleStmt create_drop_role_stmt;
@@ -797,6 +798,8 @@ stmt ::=
   {: RESULT = unset; :}
   | show_roles_stmt:show_roles
   {: RESULT = show_roles; :}
+  | show_current_groups_stmt:stmt
+  {: RESULT = stmt; :}
   | show_grant_principal_stmt:show_grant_principal
   {: RESULT = show_grant_principal; :}
   | create_drop_role_stmt:create_drop_role
@@ -1181,6 +1184,11 @@ show_roles_stmt ::=
   :}
   | KW_SHOW KW_CURRENT KW_ROLES
   {: RESULT = new ShowRolesStmt(true, null, null); :}
+  ;
+
+show_current_groups_stmt ::=
+  KW_SHOW KW_CURRENT KW_GROUPS
+  {: RESULT = new ShowCurrentGroupsStmt(); :}
   ;
 
 show_grant_principal_stmt ::=
@@ -4632,6 +4640,8 @@ word ::=
   | KW_GROUP:r
   {: RESULT = r.toString(); :}
   | KW_GROUPING:r
+  {: RESULT = r.toString(); :}
+  | KW_GROUPS:r
   {: RESULT = r.toString(); :}
   | KW_HAVING:r
   {: RESULT = r.toString(); :}

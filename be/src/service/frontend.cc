@@ -138,6 +138,7 @@ Frontend::Frontend() {
     {"getCatalogTable", "([B)Lorg/apache/impala/catalog/FeTable;",
         &get_catalog_table_id_},
     {"getRoles", "([B)[B", &show_roles_id_},
+    {"getCurrentGroups", "([B)[B", &show_current_groups_id_},
     {"getPrincipalPrivileges", "([B)[B", &get_principal_privileges_id_},
     {"execHiveServer2MetadataOp", "([B)[B", &exec_hs2_metadata_op_id_},
     {"setCatalogIsReady", "()V", &set_catalog_is_ready_id_},
@@ -319,6 +320,11 @@ Status Frontend::GetFunctions(TFunctionCategory::type fn_category, const string&
 
 Status Frontend::ShowRoles(const TShowRolesParams& params, TShowRolesResult* result) {
   return JniUtil::CallJniMethod(fe_, show_roles_id_, params, result);
+}
+
+Status Frontend::ShowCurrentGroups(const TShowCurrentGroupsParams& params,
+  TShowCurrentGroupsResult* result) {
+  return JniUtil::CallJniMethod(fe_, show_current_groups_id_, params, result);
 }
 
 Status Frontend::GetCatalogObject(const TCatalogObject& req,

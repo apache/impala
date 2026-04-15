@@ -39,6 +39,7 @@ import org.apache.impala.analysis.SqlScanner;
 import org.apache.impala.authentication.saml.WrappedWebContext;
 import org.apache.impala.authorization.AuthorizationFactory;
 import org.apache.impala.authorization.ImpalaInternalAdminUser;
+import org.apache.impala.authorization.ranger.RangerUtil;
 import org.apache.impala.authorization.User;
 import org.apache.impala.catalog.FeDataSource;
 import org.apache.impala.catalog.FeTable;
@@ -88,6 +89,8 @@ import org.apache.impala.thrift.TSessionState;
 import org.apache.impala.thrift.TShowFilesParams;
 import org.apache.impala.thrift.TShowGrantPrincipalParams;
 import org.apache.impala.thrift.TCatalogOpRequest;
+import org.apache.impala.thrift.TShowCurrentGroupsParams;
+import org.apache.impala.thrift.TShowCurrentGroupsResult;
 import org.apache.impala.thrift.TShowRolesParams;
 import org.apache.impala.thrift.TShowStatsOp;
 import org.apache.impala.thrift.TShowStatsParams;
@@ -116,7 +119,9 @@ import java.io.File;
 import java.io.IOException;
 import java.lang.IllegalArgumentException;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
 import java.util.Calendar;
+import java.util.Collections;
 import java.util.GregorianCalendar;
 import java.util.Enumeration;
 import java.util.List;
@@ -655,6 +660,28 @@ public class JniFrontend {
     try {
       TSerializer serializer = new TSerializer(protocolFactory_);
       return serializer.serialize(frontend_.getAuthzManager().getRoles(params));
+    } catch (TException e) {
+      throw new InternalException(e.getMessage());
+    }
+  }
+
+  /**
+   * This is only used by the SHOW CURRENT GROUPS statement.
+   */
+  public byte[] getCurrentGroups(byte[] showCurrentGroupsParams) throws ImpalaException {
+    TShowCurrentGroupsParams params = new TShowCurrentGroupsParams();
+    JniUtil.deserializeThrift(protocolFactory_, params, showCurrentGroupsParams);
+    // Re-use existing Ranger logic for group lookup.
+    // 'params.getRequesting_user()' is already the Kerberos short name that was set in
+    // ShowCurrentGroupsStmt#toThrift().
+    Set<String> groups = RangerUtil.getGroups(params.getRequesting_user());
+    TShowCurrentGroupsResult result = new TShowCurrentGroupsResult();
+    List<String> groupsList = new ArrayList<>(groups);
+    Collections.sort(groupsList);
+    result.setGroup_names(groupsList);
+    try {
+      TSerializer serializer = new TSerializer(protocolFactory_);
+      return serializer.serialize(result);
     } catch (TException e) {
       throw new InternalException(e.getMessage());
     }

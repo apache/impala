@@ -2335,6 +2335,14 @@ class TestRangerIndependent(TestRanger):
       TestRanger._test_grant_revoke_with_role(self, 'USER', vector, admin_client)
 
   @CustomClusterTestSuite.with_args(
+    impalad_args="{0} {1}".format(IMPALAD_ARGS,
+                                  "--use_customized_user_groups_mapper_for_ranger"),
+    catalogd_args="{0} {1}".format(CATALOGD_ARGS,
+                                   "--use_customized_user_groups_mapper_for_ranger"))
+  def test_show_current_groups(self, vector):
+    self.run_test_case('QueryTest/show_current_groups', vector)
+
+  @CustomClusterTestSuite.with_args(
     impalad_args=IMPALAD_ARGS, catalogd_args=CATALOGD_ARGS)
   def test_show_roles(self):
     """Test SHOW ROLE GRANT GROUP/USER and SHOW CURRENT ROLES."""

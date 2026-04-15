@@ -155,6 +155,7 @@ import org.apache.impala.thrift.TReservedWordsVersion;
     keywordMap.put("grant", SqlParserSymbols.KW_GRANT);
     keywordMap.put("group", SqlParserSymbols.KW_GROUP);
     keywordMap.put("grouping", Integer.valueOf(SqlParserSymbols.KW_GROUPING));
+    keywordMap.put("groups", SqlParserSymbols.KW_GROUPS);
     keywordMap.put("hash", SqlParserSymbols.KW_HASH);
     keywordMap.put("having", SqlParserSymbols.KW_HAVING);
     keywordMap.put("hudiparquet", SqlParserSymbols.KW_HUDIPARQUET);
