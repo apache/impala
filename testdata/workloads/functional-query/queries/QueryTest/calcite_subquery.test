@@ -1,0 +1,276 @@
+====
+---- QUERY
+# Multiple subqueries.
+select id from functional.alltypes t where
+  t.id in (select id from functional.alltypesagg where id < 5) or
+  t.id in (select id from functional.alltypesagg where id > 7295) order by id;
+---- RESULTS
+0
+1
+2
+3
+4
+7296
+7297
+7298
+7299
+---- RUNTIME_PROFILE
+row_regex: PlannerType: CalcitePlanner
+====
+---- QUERY
+# Disjunctions with correlated predicates
+select id from functional.alltypes t where id IN
+    (select id from functional.alltypesagg a where
+     a.int_col = t.int_col or a.bool_col = false
+    ) and id > 15 order by id limit 5;
+---- RESULTS
+17
+19
+21
+23
+25
+---- RUNTIME_PROFILE
+row_regex: PlannerType: CalcitePlanner
+====
+---- QUERY
+# Correlated subquery with grouping (min) and addition
+select id from functional.alltypes t where t.id IN
+    (select min(a.id) + 10 from functional.alltypesagg a where
+    t.int_col = a.int_col) order by id
+---- RESULTS
+11
+12
+13
+14
+15
+16
+17
+18
+19
+---- RUNTIME_PROFILE
+row_regex: PlannerType: CalcitePlanner
+====
+---- QUERY
+# Correlated subquery with distinct
+select id from functional.alltypes t where t.id IN
+    (select distinct a.id from functional.alltypesagg a where
+    a.bigint_col = t.bigint_col) order by id limit 10
+---- RESULTS
+1
+2
+3
+4
+5
+6
+7
+8
+9
+1001
+---- RUNTIME_PROFILE
+row_regex: PlannerType: CalcitePlanner
+====
+---- QUERY
+# Correlated subquery with a LIMIT clause
+select id from functional.alltypes t where id IN
+    (select s.id from functional.alltypesagg s where s.int_col = t.int_col
+   and s.id > 1000 order by id limit 1) order by id
+---- RESULTS
+1001
+1002
+1003
+1004
+1005
+1006
+1007
+1008
+1009
+---- RUNTIME_PROFILE
+row_regex: PlannerType: CalcitePlanner
+====
+---- QUERY
+# Correlated subquery with analytic function
+select id, int_col, bool_col from
+    functional.alltypestiny t1
+    where int_col IN (select min(bigint_col) over (partition by bool_col)
+    from functional.alltypessmall t2 where t1.id < t2.id) order by id
+---- RESULTS
+0,0,true
+2,0,true
+4,0,true
+6,0,true
+---- TYPES
+int,int,boolean
+---- RUNTIME_PROFILE
+row_regex: PlannerType: CalcitePlanner
+====
+---- QUERY
+# IN subquery predicates
+select id from functional.alltypestiny where
+    (tinyint_col in (1,2)) = (bool_col in (select bool_col from
+    functional.alltypes)) order by id;
+---- RESULTS
+1
+3
+5
+7
+---- RUNTIME_PROFILE
+row_regex: PlannerType: CalcitePlanner
+====
+---- QUERY
+select id from functional.alltypessmall a where 1
+    IN (select int_col from functional.alltypestiny b where b.id = a.id limit 5)
+# Will be supported in Calcite 1.42
+---- CATCH
+Unknown RelNode
+---- RUNTIME_PROFILE
+row_regex: PlannerType: CalcitePlanner
+====
+---- QUERY
+select id from functional.alltypessmall a where 1 IN
+    (select int_col from functional.alltypestiny b where b.id = a.id
+    order by int_col limit 5)
+---- CATCH
+Unknown RelNode
+---- RUNTIME_PROFILE
+row_regex: PlannerType: CalcitePlanner
+====
+---- QUERY
+# nested subqueries
+select count(*) from (select 1 from functional.alltypes t where 1 NOT IN
+     (select int_col from functional.alltypesagg g where g.id = t.id))
+---- RESULTS
+7284
+---- RUNTIME_PROFILE
+row_regex: PlannerType: CalcitePlanner
+---- QUERY
+# NOT IN predicate with subquery
+select id, count(*) from functional.alltypes t
+    where 1 NOT IN (select id from functional.alltypesagg g where t.int_col =
+    g.int_col) group by id order by id limit 10;
+---- RESULTS
+0,1
+2,1
+3,1
+4,1
+5,1
+6,1
+7,1
+8,1
+9,1
+10,1
+---- TYPES
+INT, BIGINT
+---- RUNTIME_PROFILE
+row_regex: PlannerType: CalcitePlanner
+====
+---- QUERY
+# subquery in 'if' clause
+select count(*) from functional.alltypestiny where
+    if(exists(select * from functional.alltypesagg), 1, 0) = 1
+---- RESULTS
+8
+---- RUNTIME_PROFILE
+row_regex: PlannerType: CalcitePlanner
+====
+---- QUERY
+# subquery in 'case' statement
+select count(*) from functional.alltypestiny t
+    where case when id % 2 = 0 then exists(select id from functional.alltypesagg)
+    end
+---- RESULTS
+4
+---- RUNTIME_PROFILE
+row_regex: PlannerType: CalcitePlanner
+====
+---- QUERY
+# runtime scalar check, throws runtime error
+select * from functional.alltypes t where t.id =
+    (select id from functional.alltypesagg g where t.int_col = g.int_col)
+    or t.id = 10
+---- CATCH
+Subquery must not return more than one row: CARDINALITY CHECK
+---- RUNTIME_PROFILE
+row_regex: PlannerType: CalcitePlanner
+====
+---- QUERY
+# subquery within cast function
+select id from functional.alltypestiny t
+    where cast((t.id IN (select id from functional.alltypesagg)
+    or t.bool_col = false) as string) is not null order by id
+---- RESULTS
+0
+1
+2
+3
+4
+5
+6
+7
+---- RUNTIME_PROFILE
+row_regex: PlannerType: CalcitePlanner
+====
+---- QUERY
+# subquery within 'in' clause
+select id from functional.alltypestiny t1
+    where id in (1, (select min(id) from functional.alltypesagg t2
+    where t1.int_col = t2.int_col)) or t1.bool_col = true order by id;
+---- RESULTS
+0
+1
+2
+4
+6
+---- RUNTIME_PROFILE
+row_regex: PlannerType: CalcitePlanner
+====
+---- QUERY
+# 2 subqueries in an '=' clause
+select id from functional.alltypestiny t where
+    (select count(*) from functional.alltypessmall) =
+    (select count(*) from functional.alltypesagg)
+---- RESULTS
+---- RUNTIME_PROFILE
+row_regex: PlannerType: CalcitePlanner
+====
+---- QUERY
+# correlated subquery in a having clause
+select id, count(*) from functional.alltypestiny t group by id
+    having count(*) < (select count(*) from functional.alltypesagg where id = t.id)
+---- TYPES
+int,bigint
+---- RESULTS
+0,1
+---- RUNTIME_PROFILE
+row_regex: PlannerType: CalcitePlanner
+====
+---- QUERY
+# union inside a subquery
+select id from functional.alltypestiny where exists
+    (select id from functional.alltypestiny union
+    select id from functional.alltypesagg) order by id
+---- RESULTS
+0
+1
+2
+3
+4
+5
+6
+7
+---- RUNTIME_PROFILE
+row_regex: PlannerType: CalcitePlanner
+====
+---- QUERY
+# values subquery clause
+select id from functional.alltypestiny where exists (values(1))
+---- RESULTS
+0
+1
+2
+3
+4
+5
+6
+7
+---- RUNTIME_PROFILE
+row_regex: PlannerType: CalcitePlanner

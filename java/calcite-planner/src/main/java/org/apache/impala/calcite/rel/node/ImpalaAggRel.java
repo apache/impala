@@ -400,8 +400,7 @@ public class ImpalaAggRel extends Aggregate
 
     int inputRef = getAggCallList().get(0).getArgList().get(0);
     // output expressions do not change from the input
-    List<Expr> outputExprs =
-        ImmutableList.of(inputNodeWithExprs.outputExprs_.get(inputRef));
+    List<Expr> outputExprs = inputNodeWithExprs.outputExprs_;
 
     CardinalityCheckNode cardinalityCheckNode = new CardinalityCheckNode(
         ctx.getNextNodeId(), inputNodeWithExprs.planNode_, "CARDINALITY CHECK");

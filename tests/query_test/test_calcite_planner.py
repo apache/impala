@@ -42,6 +42,9 @@ class TestCalcitePlanner(ImpalaTestSuite):
   def test_calcite_frontend(self, vector, unique_database):
     self.run_test_case('QueryTest/calcite', vector, use_db=unique_database)
 
+  def test_calcite_subquery(self, vector, unique_database):
+    self.run_test_case('QueryTest/calcite_subquery', vector, use_db=unique_database)
+
   def test_semicolon(self, cursor):
     cursor.execute("select 4;")
 

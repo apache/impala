@@ -1301,3 +1301,18 @@ select string_col from functional.alltypestiny where string_col like '1%';
 ---- RUNTIME_PROFILE
 row_regex: PlannerType: CalcitePlanner
 ====
+---- QUERY
+# this query fails in the original planner, see IMPALA-5098
+select distinct year, month,
+sum(int_col) over (partition by year, month)
+from functional.alltypessmall
+where id % 4 = 0 and month != 1;
+---- RESULTS
+2009,4,26
+2009,3,22
+2009,2,28
+---- TYPES
+int,int,bigint
+---- RUNTIME_PROFILE
+row_regex: PlannerType: CalcitePlanner
+====
