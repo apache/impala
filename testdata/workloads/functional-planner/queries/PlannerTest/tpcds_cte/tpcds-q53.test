@@ -1,0 +1,152 @@
+# TPCDS-Q53
+select
+  *
+from
+  (select
+    i_manufact_id,
+    sum(ss_sales_price) sum_sales
+  from
+    item,
+    store_sales,
+    date_dim,
+    store
+  where
+    ss_item_sk = i_item_sk
+    and ss_sold_date_sk = d_date_sk
+    and ss_store_sk = s_store_sk
+    and d_month_seq in (1212, 1212 + 1, 1212 + 2, 1212 + 3, 1212 + 4, 1212 + 5, 1212 + 6, 1212 + 7, 1212 + 8, 1212 + 9, 1212 + 10, 1212 + 11)
+    and ((i_category in ('Books', 'Children', 'Electronics')
+      and i_class in ('personal', 'portable', 'reference', 'self-help')
+      and i_brand in ('scholaramalgamalg #14', 'scholaramalgamalg #7', 'exportiunivamalg #9', 'scholaramalgamalg #9'))
+    or (i_category in ('Women', 'Music', 'Men')
+      and i_class in ('accessories', 'classical', 'fragrances', 'pants')
+      and i_brand in ('amalgimporto #1', 'edu packscholar #1', 'exportiimporto #1', 'importoamalg #1')))
+  group by
+    i_manufact_id,
+    d_qoy
+  ) tmp1
+order by
+  sum_sales,
+  i_manufact_id
+limit 100
+---- PLAN
+Max Per-Host Resource Reservation: Memory=11.25MB Threads=1
+Per-Host Resource Estimates: Memory=73MB
+ImpalaSortRel(sort0=[$1], sort1=[$0], dir0=[ASC], dir1=[ASC], fetch=[100:TINYINT])
+  ImpalaProjectRel(I_MANUFACT_ID=[$0], SUM_SALES=[$2])
+    ImpalaAggRel(group=[{0, 1}], SUM_SALES=[SUM($2)])
+      ImpalaProjectRel(I_MANUFACT_ID=[$5], d_qoy=[$7], ss_sales_price=[$2])
+        ImpalaJoinRel(condition=[=($1, $8)], joinType=[inner])
+          ImpalaJoinRel(condition=[=($3, $6)], joinType=[inner])
+            ImpalaJoinRel(condition=[=($0, $4)], joinType=[inner])
+              ImpalaFilterRel(condition=[AND(IS NOT NULL($0), IS NOT NULL($3), IS NOT NULL($1))])
+                ImpalaProjectRel(ss_item_sk=[$1], ss_store_sk=[$6], ss_sales_price=[$12], ss_sold_date_sk=[$22])
+                  ImpalaHdfsScanRel(table=[[tpcds_partitioned_parquet_snap, store_sales]])
+              ImpalaProjectRel(i_item_sk=[$0], i_manufact_id=[$4])
+                ImpalaFilterRel(condition=[AND(SEARCH($3, Sarg[_UTF-8'Books':VARCHAR(2147483647) CHARACTER SET "UTF-8", _UTF-8'Children':VARCHAR(2147483647) CHARACTER SET "UTF-8", _UTF-8'Electronics':VARCHAR(2147483647) CHARACTER SET "UTF-8", _UTF-8'Men':VARCHAR(2147483647) CHARACTER SET "UTF-8", _UTF-8'Music':VARCHAR(2147483647) CHARACTER SET "UTF-8", _UTF-8'Women':VARCHAR(2147483647) CHARACTER SET "UTF-8"]:VARCHAR(2147483647) CHARACTER SET "UTF-8"), OR(SEARCH($3, Sarg[_UTF-8'Books':VARCHAR(2147483647) CHARACTER SET "UTF-8", _UTF-8'Children':VARCHAR(2147483647) CHARACTER SET "UTF-8", _UTF-8'Electronics':VARCHAR(2147483647) CHARACTER SET "UTF-8"]:VARCHAR(2147483647) CHARACTER SET "UTF-8"), SEARCH($2, Sarg[_UTF-8'accessories':VARCHAR(2147483647) CHARACTER SET "UTF-8", _UTF-8'classical':VARCHAR(2147483647) CHARACTER SET "UTF-8", _UTF-8'fragrances':VARCHAR(2147483647) CHARACTER SET "UTF-8", _UTF-8'pants':VARCHAR(2147483647) CHARACTER SET "UTF-8"]:VARCHAR(2147483647) CHARACTER SET "UTF-8")), OR(SEARCH($3, Sarg[_UTF-8'Books':VARCHAR(2147483647) CHARACTER SET "UTF-8", _UTF-8'Children':VARCHAR(2147483647) CHARACTER SET "UTF-8", _UTF-8'Electronics':VARCHAR(2147483647) CHARACTER SET "UTF-8"]:VARCHAR(2147483647) CHARACTER SET "UTF-8"), SEARCH($1, Sarg[_UTF-8'amalgimporto #1':VARCHAR(2147483647) CHARACTER SET "UTF-8", _UTF-8'edu packscholar #1':VARCHAR(2147483647) CHARACTER SET "UTF-8", _UTF-8'exportiimporto #1':VARCHAR(2147483647) CHARACTER SET "UTF-8", _UTF-8'importoamalg #1':VARCHAR(2147483647) CHARACTER SET "UTF-8"]:VARCHAR(2147483647) CHARACTER SET "UTF-8")), OR(SEARCH($2, Sarg[_UTF-8'personal':VARCHAR(2147483647) CHARACTER SET "UTF-8", _UTF-8'portable':VARCHAR(2147483647) CHARACTER SET "UTF-8", _UTF-8'reference':VARCHAR(2147483647) CHARACTER SET "UTF-8", _UTF-8'self-help':VARCHAR(2147483647) CHARACTER SET "UTF-8"]:VARCHAR(2147483647) CHARACTER SET "UTF-8"), SEARCH($3, Sarg[_UTF-8'Men':VARCHAR(2147483647) CHARACTER SET "UTF-8", _UTF-8'Music':VARCHAR(2147483647) CHARACTER SET "UTF-8", _UTF-8'Women':VARCHAR(2147483647) CHARACTER SET "UTF-8"]:VARCHAR(2147483647) CHARACTER SET "UTF-8")), SEARCH($2, Sarg[_UTF-8'accessories':VARCHAR(2147483647) CHARACTER SET "UTF-8", _UTF-8'classical':VARCHAR(2147483647) CHARACTER SET "UTF-8", _UTF-8'fragrances':VARCHAR(2147483647) CHARACTER SET "UTF-8", _UTF-8'pants':VARCHAR(2147483647) CHARACTER SET "UTF-8", _UTF-8'personal':VARCHAR(2147483647) CHARACTER SET "UTF-8", _UTF-8'portable':VARCHAR(2147483647) CHARACTER SET "UTF-8", _UTF-8'reference':VARCHAR(2147483647) CHARACTER SET "UTF-8", _UTF-8'self-help':VARCHAR(2147483647) CHARACTER SET "UTF-8"]:VARCHAR(2147483647) CHARACTER SET "UTF-8"), OR(SEARCH($2, Sarg[_UTF-8'personal':VARCHAR(2147483647) CHARACTER SET "UTF-8", _UTF-8'portable':VARCHAR(2147483647) CHARACTER SET "UTF-8", _UTF-8'reference':VARCHAR(2147483647) CHARACTER SET "UTF-8", _UTF-8'self-help':VARCHAR(2147483647) CHARACTER SET "UTF-8"]:VARCHAR(2147483647) CHARACTER SET "UTF-8"), SEARCH($1, Sarg[_UTF-8'amalgimporto #1':VARCHAR(2147483647) CHARACTER SET "UTF-8", _UTF-8'edu packscholar #1':VARCHAR(2147483647) CHARACTER SET "UTF-8", _UTF-8'exportiimporto #1':VARCHAR(2147483647) CHARACTER SET "UTF-8", _UTF-8'importoamalg #1':VARCHAR(2147483647) CHARACTER SET "UTF-8"]:VARCHAR(2147483647) CHARACTER SET "UTF-8")), OR(SEARCH($1, Sarg[_UTF-8'exportiunivamalg #9':VARCHAR(2147483647) CHARACTER SET "UTF-8", _UTF-8'scholaramalgamalg #14':VARCHAR(2147483647) CHARACTER SET "UTF-8", _UTF-8'scholaramalgamalg #7':VARCHAR(2147483647) CHARACTER SET "UTF-8", _UTF-8'scholaramalgamalg #9':VARCHAR(2147483647) CHARACTER SET "UTF-8"]:VARCHAR(2147483647) CHARACTER SET "UTF-8"), SEARCH($3, Sarg[_UTF-8'Men':VARCHAR(2147483647) CHARACTER SET "UTF-8", _UTF-8'Music':VARCHAR(2147483647) CHARACTER SET "UTF-8", _UTF-8'Women':VARCHAR(2147483647) CHARACTER SET "UTF-8"]:VARCHAR(2147483647) CHARACTER SET "UTF-8")), OR(SEARCH($1, Sarg[_UTF-8'exportiunivamalg #9':VARCHAR(2147483647) CHARACTER SET "UTF-8", _UTF-8'scholaramalgamalg #14':VARCHAR(2147483647) CHARACTER SET "UTF-8", _UTF-8'scholaramalgamalg #7':VARCHAR(2147483647) CHARACTER SET "UTF-8", _UTF-8'scholaramalgamalg #9':VARCHAR(2147483647) CHARACTER SET "UTF-8"]:VARCHAR(2147483647) CHARACTER SET "UTF-8"), SEARCH($2, Sarg[_UTF-8'accessories':VARCHAR(2147483647) CHARACTER SET "UTF-8", _UTF-8'classical':VARCHAR(2147483647) CHARACTER SET "UTF-8", _UTF-8'fragrances':VARCHAR(2147483647) CHARACTER SET "UTF-8", _UTF-8'pants':VARCHAR(2147483647) CHARACTER SET "UTF-8"]:VARCHAR(2147483647) CHARACTER SET "UTF-8")), SEARCH($1, Sarg[_UTF-8'amalgimporto #1':VARCHAR(2147483647) CHARACTER SET "UTF-8", _UTF-8'edu packscholar #1':VARCHAR(2147483647) CHARACTER SET "UTF-8", _UTF-8'exportiimporto #1':VARCHAR(2147483647) CHARACTER SET "UTF-8", _UTF-8'exportiunivamalg #9':VARCHAR(2147483647) CHARACTER SET "UTF-8", _UTF-8'importoamalg #1':VARCHAR(2147483647) CHARACTER SET "UTF-8", _UTF-8'scholaramalgamalg #14':VARCHAR(2147483647) CHARACTER SET "UTF-8", _UTF-8'scholaramalgamalg #7':VARCHAR(2147483647) CHARACTER SET "UTF-8", _UTF-8'scholaramalgamalg #9':VARCHAR(2147483647) CHARACTER SET "UTF-8"]:VARCHAR(2147483647) CHARACTER SET "UTF-8"), IS NOT NULL($0))])
+                  ImpalaProjectRel(i_item_sk=[$0], i_brand=[$8], i_class=[$10], i_category=[$12], i_manufact_id=[$13])
+                    ImpalaHdfsScanRel(table=[[tpcds_partitioned_parquet_snap, item]])
+            ImpalaProjectRel(d_date_sk=[$0], d_qoy=[$2])
+              ImpalaFilterRel(condition=[AND(SEARCH($1, Sarg[1212, 1213, 1214, 1215, 1216, 1217, 1218, 1219, 1220, 1221, 1222, 1223]), IS NOT NULL($0))])
+                ImpalaProjectRel(d_date_sk=[$0], d_month_seq=[$3], d_qoy=[$10])
+                  ImpalaHdfsScanRel(table=[[tpcds_partitioned_parquet_snap, date_dim]])
+          ImpalaFilterRel(condition=[IS NOT NULL($0)])
+            ImpalaProjectRel(s_store_sk=[$0])
+              ImpalaHdfsScanRel(table=[[tpcds_partitioned_parquet_snap, store]])
+F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
+|  Per-Instance Resources: mem-estimate=72.81MB mem-reservation=11.25MB thread-reservation=1 runtime-filters-memory=3.00MB
+|  max-parallelism=1 segment-costs=[470728393, 25688, 200]
+PLAN-ROOT SINK
+|  output exprs: tpcds_partitioned_parquet_snap.item.i_manufact_id, sum(tpcds_partitioned_parquet_snap.store_sales.ss_sales_price)
+|  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0 cost=200
+|
+08:TOP-N [LIMIT=100]
+|  order by: sum(tpcds_partitioned_parquet_snap.store_sales.ss_sales_price) ASC NULLS LAST, tpcds_partitioned_parquet_snap.item.i_manufact_id ASC NULLS LAST
+|  mem-estimate=1.95KB mem-reservation=0B thread-reservation=0
+|  tuple-ids=9 row-size=20B cardinality=100 cost=25688
+|  in pipelines: 08(GETNEXT), 07(OPEN)
+|
+07:AGGREGATE [FINALIZE]
+|  output: sum(tpcds_partitioned_parquet_snap.store_sales.ss_sales_price)
+|  group by: tpcds_partitioned_parquet_snap.item.i_manufact_id, tpcds_partitioned_parquet_snap.date_dim.d_qoy
+|  mem-estimate=10.00MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
+|  tuple-ids=8 row-size=24B cardinality=3.83K cost=476658
+|  in pipelines: 07(GETNEXT), 00(OPEN)
+|
+06:HASH JOIN [INNER JOIN]
+|  hash predicates: tpcds_partitioned_parquet_snap.store_sales.ss_store_sk = tpcds_partitioned_parquet_snap.store.s_store_sk
+|  fk/pk conjuncts: tpcds_partitioned_parquet_snap.store_sales.ss_store_sk = tpcds_partitioned_parquet_snap.store.s_store_sk
+|  runtime filters: RF000[bloom] <- tpcds_partitioned_parquet_snap.store.s_store_sk, RF001[min_max] <- tpcds_partitioned_parquet_snap.store.s_store_sk
+|  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
+|  tuple-ids=0,2,4,6 row-size=106B cardinality=334.27K cost=147660
+|  in pipelines: 00(GETNEXT), 05(OPEN)
+|
+|--05:SCAN HDFS [tpcds_partitioned_parquet_snap.store]
+|     HDFS partitions=1/1 files=1 size=119.76KB
+|     predicates: tpcds_partitioned_parquet_snap.store.s_store_sk IS NOT NULL
+|     stored statistics:
+|       table: rows=1.35K size=119.76KB
+|       columns: all
+|     extrapolated-rows=disabled max-scan-range-rows=1.35K
+|     parquet dictionary predicates: tpcds_partitioned_parquet_snap.store.s_store_sk IS NOT NULL
+|     mem-estimate=16.00MB mem-reservation=16.00KB thread-reservation=0
+|     tuple-ids=6 row-size=4B cardinality=1.35K cost=115
+|     in pipelines: 05(GETNEXT)
+|
+04:HASH JOIN [INNER JOIN]
+|  hash predicates: tpcds_partitioned_parquet_snap.store_sales.ss_sold_date_sk = tpcds_partitioned_parquet_snap.date_dim.d_date_sk
+|  fk/pk conjuncts: tpcds_partitioned_parquet_snap.store_sales.ss_sold_date_sk = tpcds_partitioned_parquet_snap.date_dim.d_date_sk
+|  runtime filters: RF002[bloom] <- tpcds_partitioned_parquet_snap.date_dim.d_date_sk
+|  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
+|  tuple-ids=0,2,4 row-size=102B cardinality=334.27K cost=150712
+|  in pipelines: 00(GETNEXT), 03(OPEN)
+|
+|--03:SCAN HDFS [tpcds_partitioned_parquet_snap.date_dim]
+|     HDFS partitions=1/1 files=1 size=2.17MB
+|     predicates: tpcds_partitioned_parquet_snap.date_dim.d_month_seq IN (CAST(1212 AS INT), CAST(1213 AS INT), CAST(1214 AS INT), CAST(1215 AS INT), CAST(1216 AS INT), CAST(1217 AS INT), CAST(1218 AS INT), CAST(1219 AS INT), CAST(1220 AS INT), CAST(1221 AS INT), CAST(1222 AS INT), CAST(1223 AS INT)), tpcds_partitioned_parquet_snap.date_dim.d_date_sk IS NOT NULL
+|     stored statistics:
+|       table: rows=73.05K size=2.17MB
+|       columns: all
+|     extrapolated-rows=disabled max-scan-range-rows=73.05K
+|     parquet statistics predicates: tpcds_partitioned_parquet_snap.date_dim.d_month_seq IN (CAST(1212 AS INT), CAST(1213 AS INT), CAST(1214 AS INT), CAST(1215 AS INT), CAST(1216 AS INT), CAST(1217 AS INT), CAST(1218 AS INT), CAST(1219 AS INT), CAST(1220 AS INT), CAST(1221 AS INT), CAST(1222 AS INT), CAST(1223 AS INT))
+|     parquet dictionary predicates: tpcds_partitioned_parquet_snap.date_dim.d_month_seq IN (CAST(1212 AS INT), CAST(1213 AS INT), CAST(1214 AS INT), CAST(1215 AS INT), CAST(1216 AS INT), CAST(1217 AS INT), CAST(1218 AS INT), CAST(1219 AS INT), CAST(1220 AS INT), CAST(1221 AS INT), CAST(1222 AS INT), CAST(1223 AS INT)), tpcds_partitioned_parquet_snap.date_dim.d_date_sk IS NOT NULL
+|     mem-estimate=16.00MB mem-reservation=512.00KB thread-reservation=0
+|     tuple-ids=4 row-size=12B cardinality=362 cost=16728
+|     in pipelines: 03(GETNEXT)
+|
+02:HASH JOIN [INNER JOIN]
+|  hash predicates: tpcds_partitioned_parquet_snap.store_sales.ss_item_sk = tpcds_partitioned_parquet_snap.item.i_item_sk
+|  fk/pk conjuncts: tpcds_partitioned_parquet_snap.store_sales.ss_item_sk = tpcds_partitioned_parquet_snap.item.i_item_sk
+|  runtime filters: RF004[bloom] <- tpcds_partitioned_parquet_snap.item.i_item_sk, RF005[min_max] <- tpcds_partitioned_parquet_snap.item.i_item_sk
+|  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
+|  tuple-ids=0,2 row-size=90B cardinality=350.02K(filtered from 1.68M) cost=395050
+|  in pipelines: 00(GETNEXT), 01(OPEN)
+|
+|--01:SCAN HDFS [tpcds_partitioned_parquet_snap.item]
+|     HDFS partitions=1/1 files=1 size=33.54MB
+|     predicates: tpcds_partitioned_parquet_snap.item.i_brand IN ('amalgimporto #1', 'edu packscholar #1', 'exportiimporto #1', 'exportiunivamalg #9', 'importoamalg #1', 'scholaramalgamalg #14', 'scholaramalgamalg #7', 'scholaramalgamalg #9'), tpcds_partitioned_parquet_snap.item.i_class IN ('accessories', 'classical', 'fragrances', 'pants', 'personal', 'portable', 'reference', 'self-help'), tpcds_partitioned_parquet_snap.item.i_brand IN ('exportiunivamalg #9', 'scholaramalgamalg #14', 'scholaramalgamalg #7', 'scholaramalgamalg #9') OR tpcds_partitioned_parquet_snap.item.i_class IN ('accessories', 'classical', 'fragrances', 'pants'), tpcds_partitioned_parquet_snap.item.i_class IN ('personal', 'portable', 'reference', 'self-help') OR tpcds_partitioned_parquet_snap.item.i_brand IN ('amalgimporto #1', 'edu packscholar #1', 'exportiimporto #1', 'importoamalg #1'), tpcds_partitioned_parquet_snap.item.i_brand IN ('exportiunivamalg #9', 'scholaramalgamalg #14', 'scholaramalgamalg #7', 'scholaramalgamalg #9') OR tpcds_partitioned_parquet_snap.item.i_category IN ('Men', 'Music', 'Women'), tpcds_partitioned_parquet_snap.item.i_category IN ('Books', 'Children', 'Electronics') OR tpcds_partitioned_parquet_snap.item.i_brand IN ('amalgimporto #1', 'edu packscholar #1', 'exportiimporto #1', 'importoamalg #1'), tpcds_partitioned_parquet_snap.item.i_category IN ('Books', 'Children', 'Electronics') OR tpcds_partitioned_parquet_snap.item.i_class IN ('accessories', 'classical', 'fragrances', 'pants'), tpcds_partitioned_parquet_snap.item.i_class IN ('personal', 'portable', 'reference', 'self-help') OR tpcds_partitioned_parquet_snap.item.i_category IN ('Men', 'Music', 'Women'), tpcds_partitioned_parquet_snap.item.i_category IN ('Books', 'Children', 'Electronics', 'Men', 'Music', 'Women'), tpcds_partitioned_parquet_snap.item.i_item_sk IS NOT NULL
+|     stored statistics:
+|       table: rows=360.00K size=33.54MB
+|       columns: all
+|     extrapolated-rows=disabled max-scan-range-rows=101.54K
+|     parquet statistics predicates: tpcds_partitioned_parquet_snap.item.i_brand IN ('amalgimporto #1', 'edu packscholar #1', 'exportiimporto #1', 'exportiunivamalg #9', 'importoamalg #1', 'scholaramalgamalg #14', 'scholaramalgamalg #7', 'scholaramalgamalg #9'), tpcds_partitioned_parquet_snap.item.i_class IN ('accessories', 'classical', 'fragrances', 'pants', 'personal', 'portable', 'reference', 'self-help'), tpcds_partitioned_parquet_snap.item.i_category IN ('Books', 'Children', 'Electronics', 'Men', 'Music', 'Women')
+|     parquet dictionary predicates: tpcds_partitioned_parquet_snap.item.i_brand IN ('amalgimporto #1', 'edu packscholar #1', 'exportiimporto #1', 'exportiunivamalg #9', 'importoamalg #1', 'scholaramalgamalg #14', 'scholaramalgamalg #7', 'scholaramalgamalg #9'), tpcds_partitioned_parquet_snap.item.i_class IN ('accessories', 'classical', 'fragrances', 'pants', 'personal', 'portable', 'reference', 'self-help'), tpcds_partitioned_parquet_snap.item.i_category IN ('Books', 'Children', 'Electronics', 'Men', 'Music', 'Women'), tpcds_partitioned_parquet_snap.item.i_item_sk IS NOT NULL
+|     mem-estimate=16.00MB mem-reservation=512.00KB thread-reservation=0
+|     tuple-ids=2 row-size=74B cardinality=77 cost=297386
+|     in pipelines: 01(GETNEXT)
+|
+00:SCAN HDFS [tpcds_partitioned_parquet_snap.store_sales]
+   partition predicates: tpcds_partitioned_parquet_snap.store_sales.ss_sold_date_sk IS NOT NULL
+   HDFS partitions=1823/1824 files=1823 size=389.69GB
+   predicates: tpcds_partitioned_parquet_snap.store_sales.ss_store_sk IS NOT NULL, tpcds_partitioned_parquet_snap.store_sales.ss_item_sk IS NOT NULL
+   runtime filters: RF001[min_max] -> tpcds_partitioned_parquet_snap.store_sales.ss_store_sk, RF005[min_max] -> tpcds_partitioned_parquet_snap.store_sales.ss_item_sk, RF000[bloom] -> tpcds_partitioned_parquet_snap.store_sales.ss_store_sk, RF002[bloom] -> tpcds_partitioned_parquet_snap.store_sales.ss_sold_date_sk, RF004[bloom] -> tpcds_partitioned_parquet_snap.store_sales.ss_item_sk
+   stored statistics:
+     table: rows=8.64G size=389.90GB
+     partitions: 1823/1823 rows=8.25G
+     columns: all
+   extrapolated-rows=disabled max-scan-range-rows=12.40M est-scan-range=362(filtered from 1823)
+   parquet dictionary predicates: tpcds_partitioned_parquet_snap.store_sales.ss_store_sk IS NOT NULL, tpcds_partitioned_parquet_snap.store_sales.ss_item_sk IS NOT NULL
+   mem-estimate=16.00MB mem-reservation=512.00KB thread-reservation=0
+   tuple-ids=0 row-size=16B cardinality=350.02K(filtered from 7.88G) cost=469244084
+   in pipelines: 00(GETNEXT)
+====

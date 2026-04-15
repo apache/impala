@@ -1,0 +1,423 @@
+# TPCDS-Q11
+WITH year_total AS
+  (SELECT c_customer_id customer_id,
+          c_first_name customer_first_name,
+          c_last_name customer_last_name,
+          c_preferred_cust_flag customer_preferred_cust_flag,
+          c_birth_country customer_birth_country,
+          c_login customer_login,
+          c_email_address customer_email_address,
+          d_year dyear,
+          sum(ss_ext_list_price-ss_ext_discount_amt) year_total,
+          's' sale_type
+   FROM customer,
+        store_sales,
+        date_dim
+   WHERE c_customer_sk = ss_customer_sk
+     AND ss_sold_date_sk = d_date_sk
+   GROUP BY c_customer_id,
+            c_first_name,
+            c_last_name,
+            c_preferred_cust_flag,
+            c_birth_country,
+            c_login,
+            c_email_address,
+            d_year
+   UNION ALL SELECT c_customer_id customer_id,
+                    c_first_name customer_first_name,
+                    c_last_name customer_last_name,
+                    c_preferred_cust_flag customer_preferred_cust_flag,
+                    c_birth_country customer_birth_country,
+                    c_login customer_login,
+                    c_email_address customer_email_address,
+                    d_year dyear,
+                    sum(ws_ext_list_price-ws_ext_discount_amt) year_total,
+                    'w' sale_type
+   FROM customer,
+        web_sales,
+        date_dim
+   WHERE c_customer_sk = ws_bill_customer_sk
+     AND ws_sold_date_sk = d_date_sk
+   GROUP BY c_customer_id,
+            c_first_name,
+            c_last_name,
+            c_preferred_cust_flag,
+            c_birth_country,
+            c_login,
+            c_email_address,
+            d_year)
+SELECT t_s_secyear.customer_id,
+       t_s_secyear.customer_first_name,
+       t_s_secyear.customer_last_name,
+       t_s_secyear.customer_preferred_cust_flag
+FROM year_total t_s_firstyear,
+     year_total t_s_secyear,
+     year_total t_w_firstyear,
+     year_total t_w_secyear
+WHERE t_s_secyear.customer_id = t_s_firstyear.customer_id
+  AND t_s_firstyear.customer_id = t_w_secyear.customer_id
+  AND t_s_firstyear.customer_id = t_w_firstyear.customer_id
+  AND t_s_firstyear.sale_type = 's'
+  AND t_w_firstyear.sale_type = 'w'
+  AND t_s_secyear.sale_type = 's'
+  AND t_w_secyear.sale_type = 'w'
+  AND t_s_firstyear.dyear = 2001
+  AND t_s_secyear.dyear = 2001+1
+  AND t_w_firstyear.dyear = 2001
+  AND t_w_secyear.dyear = 2001+1
+  AND t_s_firstyear.year_total > 0
+  AND t_w_firstyear.year_total > 0
+  AND CASE
+          WHEN t_w_firstyear.year_total > 0 THEN (t_w_secyear.year_total*1.0000) / t_w_firstyear.year_total
+          ELSE 0.0
+      END > CASE
+                WHEN t_s_firstyear.year_total > 0 THEN (t_s_secyear.year_total*1.0000) / t_s_firstyear.year_total
+                ELSE 0.0
+            END
+ORDER BY t_s_secyear.customer_id,
+         t_s_secyear.customer_first_name,
+         t_s_secyear.customer_last_name,
+         t_s_secyear.customer_preferred_cust_flag
+LIMIT 100;
+---- PLAN
+Max Per-Host Resource Reservation: Memory=466.38MB Threads=1
+Per-Host Resource Estimates: Memory=247.96GB
+ImpalaSequence
+  ImpalaSortRel(sort0=[$0], sort1=[$1], sort2=[$2], sort3=[$3], dir0=[ASC], dir1=[ASC], dir2=[ASC], dir3=[ASC], fetch=[100:TINYINT])
+    ImpalaProjectRel(CUSTOMER_ID=[$0], CUSTOMER_FIRST_NAME=[$1], CUSTOMER_LAST_NAME=[$2], CUSTOMER_PREFERRED_CUST_FLAG=[$3])
+      ImpalaJoinRel(condition=[AND(>(CASE(>($10, 0.00), /(CAST($6):DECIMAL(38, 6), $10), 0.000000:DECIMAL(38, 6)), CASE(>($8, 0.00), /(CAST($4):DECIMAL(38, 6), $8), 0.000000:DECIMAL(38, 6))), =($7, $9))], joinType=[inner])
+        ImpalaJoinRel(condition=[=($0, $7)], joinType=[inner])
+          ImpalaProjectRel(CUSTOMER_ID=[$0], CUSTOMER_FIRST_NAME=[$1], CUSTOMER_LAST_NAME=[$2], CUSTOMER_PREFERRED_CUST_FLAG=[$3], YEAR_TOTAL=[$7])
+            ImpalaAggRel(group=[{0, 1, 2, 3, 4, 5, 6}], YEAR_TOTAL=[SUM($7)])
+              ImpalaProjectRel(CUSTOMER_ID=[$6], CUSTOMER_FIRST_NAME=[$7], CUSTOMER_LAST_NAME=[$8], CUSTOMER_PREFERRED_CUST_FLAG=[$9], CUSTOMER_BIRTH_COUNTRY=[$10], CUSTOMER_LOGIN=[$11], CUSTOMER_EMAIL_ADDRESS=[$12], $f8=[-($2, $1)])
+                ImpalaJoinRel(condition=[=($5, $0)], joinType=[inner])
+                  ImpalaJoinRel(condition=[=($3, $4)], joinType=[inner])
+                    ImpalaCTEConsumer(cteName=[cte_suggestion_1])
+                    ImpalaCTEConsumer(cteName=[cte_suggestion_4])
+                  ImpalaCTEConsumer(cteName=[cte_suggestion_0])
+          ImpalaJoinRel(condition=[=($2, $0)], joinType=[inner])
+            ImpalaProjectRel(CUSTOMER_ID=[$0], YEAR_TOTAL=[$7])
+              ImpalaAggRel(group=[{0, 1, 2, 3, 4, 5, 6}], YEAR_TOTAL=[SUM($7)])
+                ImpalaProjectRel(CUSTOMER_ID=[$6], CUSTOMER_FIRST_NAME=[$7], CUSTOMER_LAST_NAME=[$8], CUSTOMER_PREFERRED_CUST_FLAG=[$9], CUSTOMER_BIRTH_COUNTRY=[$10], CUSTOMER_LOGIN=[$11], CUSTOMER_EMAIL_ADDRESS=[$12], $f8=[-($2, $1)])
+                  ImpalaJoinRel(condition=[=($5, $0)], joinType=[inner])
+                    ImpalaJoinRel(condition=[=($3, $4)], joinType=[inner])
+                      ImpalaCTEConsumer(cteName=[cte_suggestion_2])
+                      ImpalaCTEConsumer(cteName=[cte_suggestion_4])
+                    ImpalaCTEConsumer(cteName=[cte_suggestion_0])
+            ImpalaProjectRel(CUSTOMER_ID=[$0], YEAR_TOTAL=[$7])
+              ImpalaFilterRel(condition=[>($7, 0.00)])
+                ImpalaAggRel(group=[{0, 1, 2, 3, 4, 5, 6}], YEAR_TOTAL=[SUM($7)])
+                  ImpalaProjectRel(CUSTOMER_ID=[$6], CUSTOMER_FIRST_NAME=[$7], CUSTOMER_LAST_NAME=[$8], CUSTOMER_PREFERRED_CUST_FLAG=[$9], CUSTOMER_BIRTH_COUNTRY=[$10], CUSTOMER_LOGIN=[$11], CUSTOMER_EMAIL_ADDRESS=[$12], $f8=[-($2, $1)])
+                    ImpalaJoinRel(condition=[=($5, $0)], joinType=[inner])
+                      ImpalaJoinRel(condition=[=($3, $4)], joinType=[inner])
+                        ImpalaCTEConsumer(cteName=[cte_suggestion_1])
+                        ImpalaCTEConsumer(cteName=[cte_suggestion_3])
+                      ImpalaCTEConsumer(cteName=[cte_suggestion_0])
+        ImpalaProjectRel(CUSTOMER_ID=[$0], YEAR_TOTAL=[$7])
+          ImpalaFilterRel(condition=[>($7, 0.00)])
+            ImpalaAggRel(group=[{0, 1, 2, 3, 4, 5, 6}], YEAR_TOTAL=[SUM($7)])
+              ImpalaProjectRel(CUSTOMER_ID=[$6], CUSTOMER_FIRST_NAME=[$7], CUSTOMER_LAST_NAME=[$8], CUSTOMER_PREFERRED_CUST_FLAG=[$9], CUSTOMER_BIRTH_COUNTRY=[$10], CUSTOMER_LOGIN=[$11], CUSTOMER_EMAIL_ADDRESS=[$12], $f8=[-($2, $1)])
+                ImpalaJoinRel(condition=[=($5, $0)], joinType=[inner])
+                  ImpalaJoinRel(condition=[=($3, $4)], joinType=[inner])
+                    ImpalaCTEConsumer(cteName=[cte_suggestion_2])
+                    ImpalaCTEConsumer(cteName=[cte_suggestion_3])
+                  ImpalaCTEConsumer(cteName=[cte_suggestion_0])
+  ImpalaCTEProducer(readType=[EAGER], writeType=[EAGER], cteName=[cte_suggestion_4])
+    ImpalaProjectRel(d_date_sk=[$0])
+      ImpalaFilterRel(condition=[AND(=($1, 2002), IS NOT NULL($0))])
+        ImpalaProjectRel(d_date_sk=[$0], d_year=[$6])
+          ImpalaHdfsScanRel(table=[[tpcds_partitioned_parquet_snap, date_dim]])
+  ImpalaCTEProducer(readType=[EAGER], writeType=[EAGER], cteName=[cte_suggestion_2])
+    ImpalaFilterRel(condition=[AND(IS NOT NULL($0), IS NOT NULL($3))])
+      ImpalaProjectRel(ws_bill_customer_sk=[$3], ws_ext_discount_amt=[$21], ws_ext_list_price=[$24], ws_sold_date_sk=[$33])
+        ImpalaHdfsScanRel(table=[[tpcds_partitioned_parquet_snap, web_sales]])
+  ImpalaCTEProducer(readType=[EAGER], writeType=[EAGER], cteName=[cte_suggestion_3])
+    ImpalaProjectRel(d_date_sk=[$0])
+      ImpalaFilterRel(condition=[AND(=($1, 2001), IS NOT NULL($0))])
+        ImpalaProjectRel(d_date_sk=[$0], d_year=[$6])
+          ImpalaHdfsScanRel(table=[[tpcds_partitioned_parquet_snap, date_dim]])
+  ImpalaCTEProducer(readType=[EAGER], writeType=[EAGER], cteName=[cte_suggestion_0])
+    ImpalaFilterRel(condition=[AND(IS NOT NULL($0), IS NOT NULL($1))])
+      ImpalaProjectRel(c_customer_sk=[$0], c_customer_id=[$1], c_first_name=[$8], c_last_name=[$9], c_preferred_cust_flag=[$10], c_birth_country=[$14], c_login=[$15], c_email_address=[$16])
+        ImpalaHdfsScanRel(table=[[tpcds_partitioned_parquet_snap, customer]])
+  ImpalaCTEProducer(readType=[EAGER], writeType=[EAGER], cteName=[cte_suggestion_1])
+    ImpalaFilterRel(condition=[AND(IS NOT NULL($0), IS NOT NULL($3))])
+      ImpalaProjectRel(ss_customer_sk=[$2], ss_ext_discount_amt=[$13], ss_ext_list_price=[$16], ss_sold_date_sk=[$22])
+        ImpalaHdfsScanRel(table=[[tpcds_partitioned_parquet_snap, store_sales]])
+F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
+|  Per-Instance Resources: mem-estimate=247.96GB mem-reservation=466.38MB thread-reservation=1
+|  max-parallelism=1 segment-costs=[1544705478, 11753665434, 5192077540, 3248632317, 678032830, 2722338716]
+PLAN-ROOT SINK
+|  output exprs: c_customer_id, c_first_name, c_last_name, c_preferred_cust_flag
+|  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0 cost=400
+|
+00:SEQUENCE
+|  mem-estimate=0B mem-reservation=0B thread-reservation=0
+|  tuple-ids=26 row-size=77B cardinality=100 cost=0
+|  in pipelines: 38(GETNEXT), 02(OPEN), 04(OPEN), 06(OPEN), 08(OPEN), 10(OPEN)
+|
+|--09:CTE PRODUCER [cte_suggestion_1]
+|  |  mem-estimate=117.40GB mem-reservation=6.00MB spill-buffer=2.00MB thread-reservation=0
+|  |  tuple-ids=8 row-size=16B cardinality=7.88G cost=0
+|  |  in pipelines: 10(GETNEXT)
+|  |
+|  10:SCAN HDFS [tpcds_partitioned_parquet_snap.store_sales]
+|     partition predicates: tpcds_partitioned_parquet_snap.store_sales.ss_sold_date_sk IS NOT NULL
+|     HDFS partitions=1823/1824 files=1823 size=389.69GB
+|     predicates: tpcds_partitioned_parquet_snap.store_sales.ss_customer_sk IS NOT NULL
+|     stored statistics:
+|       table: rows=8.64G size=389.90GB
+|       partitions: 1823/1823 rows=8.25G
+|       columns: all
+|     extrapolated-rows=disabled max-scan-range-rows=12.40M
+|     parquet dictionary predicates: tpcds_partitioned_parquet_snap.store_sales.ss_customer_sk IS NOT NULL
+|     mem-estimate=16.00MB mem-reservation=512.00KB thread-reservation=0
+|     tuple-ids=8 row-size=16B cardinality=7.88G cost=2132551022
+|     in pipelines: 10(GETNEXT)
+|
+|--07:CTE PRODUCER [cte_suggestion_0]
+|  |  mem-estimate=4.28GB mem-reservation=6.00MB spill-buffer=2.00MB thread-reservation=0
+|  |  tuple-ids=6 row-size=153B cardinality=30.00M cost=0
+|  |  in pipelines: 08(GETNEXT)
+|  |
+|  08:SCAN HDFS [tpcds_partitioned_parquet_snap.customer]
+|     HDFS partitions=1/1 files=1 size=1.55GB
+|     predicates: tpcds_partitioned_parquet_snap.customer.c_customer_id IS NOT NULL, tpcds_partitioned_parquet_snap.customer.c_customer_sk IS NOT NULL
+|     stored statistics:
+|       table: rows=30.00M size=1.55GB
+|       columns: all
+|     extrapolated-rows=disabled max-scan-range-rows=3.10M
+|     parquet dictionary predicates: tpcds_partitioned_parquet_snap.customer.c_customer_id IS NOT NULL, tpcds_partitioned_parquet_snap.customer.c_customer_sk IS NOT NULL
+|     mem-estimate=16.00MB mem-reservation=1.00MB thread-reservation=0
+|     tuple-ids=6 row-size=153B cardinality=30.00M cost=31557228
+|     in pipelines: 08(GETNEXT)
+|
+|--05:CTE PRODUCER [cte_suggestion_3]
+|  |  mem-estimate=6.00MB mem-reservation=6.00MB spill-buffer=2.00MB thread-reservation=0
+|  |  tuple-ids=4 row-size=8B cardinality=373 cost=0
+|  |  in pipelines: 06(GETNEXT)
+|  |
+|  06:SCAN HDFS [tpcds_partitioned_parquet_snap.date_dim]
+|     HDFS partitions=1/1 files=1 size=2.17MB
+|     predicates: tpcds_partitioned_parquet_snap.date_dim_0.d_year = CAST(2001 AS INT), tpcds_partitioned_parquet_snap.date_dim_0.d_date_sk IS NOT NULL
+|     stored statistics:
+|       table: rows=73.05K size=2.17MB
+|       columns: all
+|     extrapolated-rows=disabled max-scan-range-rows=73.05K
+|     parquet statistics predicates: tpcds_partitioned_parquet_snap.date_dim_0.d_year = CAST(2001 AS INT)
+|     parquet dictionary predicates: tpcds_partitioned_parquet_snap.date_dim_0.d_year = CAST(2001 AS INT), tpcds_partitioned_parquet_snap.date_dim_0.d_date_sk IS NOT NULL
+|     mem-estimate=16.00MB mem-reservation=512.00KB thread-reservation=0
+|     tuple-ids=4 row-size=8B cardinality=373 cost=12520
+|     in pipelines: 06(GETNEXT)
+|
+|--03:CTE PRODUCER [cte_suggestion_2]
+|  |  mem-estimate=32.17GB mem-reservation=6.00MB spill-buffer=2.00MB thread-reservation=0
+|  |  tuple-ids=2 row-size=16B cardinality=2.16G cost=0
+|  |  in pipelines: 04(GETNEXT)
+|  |
+|  04:SCAN HDFS [tpcds_partitioned_parquet_snap.web_sales]
+|     partition predicates: tpcds_partitioned_parquet_snap.web_sales.ws_sold_date_sk IS NOT NULL
+|     HDFS partitions=1823/1824 files=1823 size=145.67GB
+|     predicates: tpcds_partitioned_parquet_snap.web_sales.ws_bill_customer_sk IS NOT NULL
+|     stored statistics:
+|       table: rows=2.16G size=145.75GB
+|       partitions: 1823/1823 rows=2.16G
+|       columns: all
+|     extrapolated-rows=disabled max-scan-range-rows=3.37M
+|     parquet dictionary predicates: tpcds_partitioned_parquet_snap.web_sales.ws_bill_customer_sk IS NOT NULL
+|     mem-estimate=16.00MB mem-reservation=128.00KB thread-reservation=0
+|     tuple-ids=2 row-size=16B cardinality=2.16G cost=558205026
+|     in pipelines: 04(GETNEXT)
+|
+|--01:CTE PRODUCER [cte_suggestion_4]
+|  |  mem-estimate=6.00MB mem-reservation=6.00MB spill-buffer=2.00MB thread-reservation=0
+|  |  tuple-ids=0 row-size=8B cardinality=373 cost=0
+|  |  in pipelines: 02(GETNEXT)
+|  |
+|  02:SCAN HDFS [tpcds_partitioned_parquet_snap.date_dim]
+|     HDFS partitions=1/1 files=1 size=2.17MB
+|     predicates: tpcds_partitioned_parquet_snap.date_dim.d_year = CAST(2002 AS INT), tpcds_partitioned_parquet_snap.date_dim.d_date_sk IS NOT NULL
+|     stored statistics:
+|       table: rows=73.05K size=2.17MB
+|       columns: all
+|     extrapolated-rows=disabled max-scan-range-rows=73.05K
+|     parquet statistics predicates: tpcds_partitioned_parquet_snap.date_dim.d_year = CAST(2002 AS INT)
+|     parquet dictionary predicates: tpcds_partitioned_parquet_snap.date_dim.d_year = CAST(2002 AS INT), tpcds_partitioned_parquet_snap.date_dim.d_date_sk IS NOT NULL
+|     mem-estimate=16.00MB mem-reservation=512.00KB thread-reservation=0
+|     tuple-ids=0 row-size=8B cardinality=373 cost=12520
+|     in pipelines: 02(GETNEXT)
+|
+38:TOP-N [LIMIT=100]
+|  order by: c_customer_id ASC NULLS LAST, c_first_name ASC NULLS LAST, c_last_name ASC NULLS LAST, c_preferred_cust_flag ASC NULLS LAST
+|  mem-estimate=7.52KB mem-reservation=0B thread-reservation=0
+|  tuple-ids=26 row-size=77B cardinality=100 cost=420117698
+|  in pipelines: 38(GETNEXT), 16(OPEN)
+|
+37:HASH JOIN [INNER JOIN]
+|  hash predicates: c_customer_id = c_customer_id
+|  fk/pk conjuncts: c_customer_id = c_customer_id
+|  other join predicates: CASE WHEN sum(subtract(ws_ext_list_price, ws_ext_discount_amt)) > CAST(0 AS DECIMAL(38,2)) THEN divide(CAST(sum(subtract(ws_ext_list_price, ws_ext_discount_amt)) AS DECIMAL(38,6)), sum(subtract(ws_ext_list_price, ws_ext_discount_amt))) ELSE CAST(0 AS DECIMAL(38,6)) END > CASE WHEN sum(subtract(ss_ext_list_price, ss_ext_discount_amt)) > CAST(0 AS DECIMAL(38,2)) THEN divide(CAST(sum(subtract(ss_ext_list_price, ss_ext_discount_amt)) AS DECIMAL(38,6)), sum(subtract(ss_ext_list_price, ss_ext_discount_amt))) ELSE CAST(0 AS DECIMAL(38,6)) END
+|  mem-estimate=7.16GB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
+|  tuple-ids=13,17,21,25 row-size=661B cardinality=30.00M cost=53757738
+|  in pipelines: 16(GETNEXT), 36(OPEN)
+|
+|--36:AGGREGATE [FINALIZE]
+|  |  output: sum(subtract(ws_ext_list_price, ws_ext_discount_amt))
+|  |  group by: c_customer_id, c_first_name, c_last_name, c_preferred_cust_flag, c_birth_country, c_login, c_email_address
+|  |  having: sum(subtract(ws_ext_list_price, ws_ext_discount_amt)) > CAST(0 AS DECIMAL(38,2))
+|  |  mem-estimate=5.92GB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
+|  |  tuple-ids=25 row-size=165B cardinality=40.63M cost=2398033848
+|  |  in pipelines: 36(GETNEXT), 31(OPEN)
+|  |
+|  35:HASH JOIN [INNER JOIN]
+|  |  hash predicates: ws_bill_customer_sk = c_customer_sk
+|  |  fk/pk conjuncts: ws_bill_customer_sk = c_customer_sk
+|  |  mem-estimate=5.03GB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
+|  |  tuple-ids=22,23,24 row-size=108B cardinality=406.27M cost=216854633
+|  |  in pipelines: 31(GETNEXT), 34(OPEN)
+|  |
+|  |--34:CTE CONSUMER [cte_suggestion_0]
+|  |     mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
+|  |     tuple-ids=24 row-size=153B cardinality=30.00M cost=0
+|  |     in pipelines: 34(GETNEXT)
+|  |
+|  33:HASH JOIN [INNER JOIN]
+|  |  hash predicates: ws_sold_date_sk = d_date_sk
+|  |  fk/pk conjuncts: ws_sold_date_sk = d_date_sk
+|  |  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
+|  |  tuple-ids=22,23 row-size=20B cardinality=441.48M cost=633743836
+|  |  in pipelines: 31(GETNEXT), 32(OPEN)
+|  |
+|  |--32:CTE CONSUMER [cte_suggestion_3]
+|  |     mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
+|  |     tuple-ids=23 row-size=8B cardinality=373 cost=0
+|  |     in pipelines: 32(GETNEXT)
+|  |
+|  31:CTE CONSUMER [cte_suggestion_2]
+|     mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
+|     tuple-ids=22 row-size=16B cardinality=2.16G cost=0
+|     in pipelines: 31(GETNEXT)
+|
+30:HASH JOIN [INNER JOIN]
+|  hash predicates: c_customer_id = c_customer_id
+|  fk/pk conjuncts: c_customer_id = c_customer_id
+|  mem-estimate=9.98GB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
+|  tuple-ids=13,17,21 row-size=495B cardinality=30.00M cost=43131000
+|  in pipelines: 16(GETNEXT), 22(OPEN)
+|
+|--29:HASH JOIN [INNER JOIN]
+|  |  hash predicates: c_customer_id = c_customer_id
+|  |  fk/pk conjuncts: c_customer_id = c_customer_id
+|  |  mem-estimate=27.50GB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
+|  |  tuple-ids=17,21 row-size=330B cardinality=30.00M cost=161026394
+|  |  in pipelines: 22(GETNEXT), 28(OPEN)
+|  |
+|  |--28:AGGREGATE [FINALIZE]
+|  |  |  output: sum(subtract(ss_ext_list_price, ss_ext_discount_amt))
+|  |  |  group by: c_customer_id, c_first_name, c_last_name, c_preferred_cust_flag, c_birth_country, c_login, c_email_address
+|  |  |  having: sum(subtract(ss_ext_list_price, ss_ext_discount_amt)) > CAST(0 AS DECIMAL(38,2))
+|  |  |  mem-estimate=8.68GB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
+|  |  |  tuple-ids=21 row-size=165B cardinality=147.90M cost=8729673496
+|  |  |  in pipelines: 28(GETNEXT), 23(OPEN)
+|  |  |
+|  |  27:HASH JOIN [INNER JOIN]
+|  |  |  hash predicates: ss_customer_sk = c_customer_sk
+|  |  |  fk/pk conjuncts: ss_customer_sk = c_customer_sk
+|  |  |  mem-estimate=5.03GB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
+|  |  |  tuple-ids=18,19,20 row-size=108B cardinality=1.48G cost=711235853
+|  |  |  in pipelines: 23(GETNEXT), 26(OPEN)
+|  |  |
+|  |  |--26:CTE CONSUMER [cte_suggestion_0]
+|  |  |     mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
+|  |  |     tuple-ids=20 row-size=153B cardinality=30.00M cost=0
+|  |  |     in pipelines: 26(GETNEXT)
+|  |  |
+|  |  25:HASH JOIN [INNER JOIN]
+|  |  |  hash predicates: ss_sold_date_sk = d_date_sk
+|  |  |  fk/pk conjuncts: ss_sold_date_sk = d_date_sk
+|  |  |  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
+|  |  |  tuple-ids=18,19 row-size=20B cardinality=1.61G cost=2312756085
+|  |  |  in pipelines: 23(GETNEXT), 24(OPEN)
+|  |  |
+|  |  |--24:CTE CONSUMER [cte_suggestion_3]
+|  |  |     mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
+|  |  |     tuple-ids=19 row-size=8B cardinality=373 cost=0
+|  |  |     in pipelines: 24(GETNEXT)
+|  |  |
+|  |  23:CTE CONSUMER [cte_suggestion_1]
+|  |     mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
+|  |     tuple-ids=18 row-size=16B cardinality=7.88G cost=0
+|  |     in pipelines: 23(GETNEXT)
+|  |
+|  22:AGGREGATE [FINALIZE]
+|  |  output: sum(subtract(ws_ext_list_price, ws_ext_discount_amt))
+|  |  group by: c_customer_id, c_first_name, c_last_name, c_preferred_cust_flag, c_birth_country, c_login, c_email_address
+|  |  mem-estimate=5.92GB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
+|  |  tuple-ids=17 row-size=165B cardinality=30.00M cost=694107009
+|  |  in pipelines: 22(GETNEXT), 17(OPEN)
+|  |
+|  21:HASH JOIN [INNER JOIN]
+|  |  hash predicates: ws_bill_customer_sk = c_customer_sk
+|  |  fk/pk conjuncts: ws_bill_customer_sk = c_customer_sk
+|  |  mem-estimate=5.03GB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
+|  |  tuple-ids=14,15,16 row-size=108B cardinality=406.27M cost=216854633
+|  |  in pipelines: 17(GETNEXT), 20(OPEN)
+|  |
+|  |--20:CTE CONSUMER [cte_suggestion_0]
+|  |     mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
+|  |     tuple-ids=16 row-size=153B cardinality=30.00M cost=0
+|  |     in pipelines: 20(GETNEXT)
+|  |
+|  19:HASH JOIN [INNER JOIN]
+|  |  hash predicates: ws_sold_date_sk = d_date_sk
+|  |  fk/pk conjuncts: ws_sold_date_sk = d_date_sk
+|  |  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
+|  |  tuple-ids=14,15 row-size=20B cardinality=441.48M cost=633743836
+|  |  in pipelines: 17(GETNEXT), 18(OPEN)
+|  |
+|  |--18:CTE CONSUMER [cte_suggestion_4]
+|  |     mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
+|  |     tuple-ids=15 row-size=8B cardinality=373 cost=0
+|  |     in pipelines: 18(GETNEXT)
+|  |
+|  17:CTE CONSUMER [cte_suggestion_2]
+|     mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
+|     tuple-ids=14 row-size=16B cardinality=2.16G cost=0
+|     in pipelines: 17(GETNEXT)
+|
+16:AGGREGATE [FINALIZE]
+|  output: sum(subtract(ss_ext_list_price, ss_ext_discount_amt))
+|  group by: c_customer_id, c_first_name, c_last_name, c_preferred_cust_flag, c_birth_country, c_login, c_email_address
+|  mem-estimate=8.68GB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
+|  tuple-ids=13 row-size=165B cardinality=30.00M cost=2168085602
+|  in pipelines: 16(GETNEXT), 11(OPEN)
+|
+15:HASH JOIN [INNER JOIN]
+|  hash predicates: ss_customer_sk = c_customer_sk
+|  fk/pk conjuncts: ss_customer_sk = c_customer_sk
+|  mem-estimate=5.03GB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
+|  tuple-ids=10,11,12 row-size=108B cardinality=1.48G cost=711235853
+|  in pipelines: 11(GETNEXT), 14(OPEN)
+|
+|--14:CTE CONSUMER [cte_suggestion_0]
+|     mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
+|     tuple-ids=12 row-size=153B cardinality=30.00M cost=0
+|     in pipelines: 14(GETNEXT)
+|
+13:HASH JOIN [INNER JOIN]
+|  hash predicates: ss_sold_date_sk = d_date_sk
+|  fk/pk conjuncts: ss_sold_date_sk = d_date_sk
+|  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
+|  tuple-ids=10,11 row-size=20B cardinality=1.61G cost=2312756085
+|  in pipelines: 11(GETNEXT), 12(OPEN)
+|
+|--12:CTE CONSUMER [cte_suggestion_4]
+|     mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
+|     tuple-ids=11 row-size=8B cardinality=373 cost=0
+|     in pipelines: 12(GETNEXT)
+|
+11:CTE CONSUMER [cte_suggestion_1]
+   mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
+   tuple-ids=10 row-size=16B cardinality=7.88G cost=0
+   in pipelines: 11(GETNEXT)
+====

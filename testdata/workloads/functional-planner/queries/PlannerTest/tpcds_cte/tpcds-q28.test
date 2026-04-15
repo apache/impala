@@ -1,0 +1,287 @@
+# TPCDS-Q28
+SELECT *
+FROM
+  (SELECT avg(ss_list_price) B1_LP,
+          count(ss_list_price) B1_CNT,
+          count(DISTINCT ss_list_price) B1_CNTD
+   FROM store_sales
+   WHERE ss_quantity BETWEEN 0 AND 5
+     AND (ss_list_price BETWEEN 8 AND 8+10
+          OR ss_coupon_amt BETWEEN 459 AND 459+1000
+          OR ss_wholesale_cost BETWEEN 57 AND 57+20)) B1,
+  (SELECT avg(ss_list_price) B2_LP,
+          count(ss_list_price) B2_CNT,
+          count(DISTINCT ss_list_price) B2_CNTD
+   FROM store_sales
+   WHERE ss_quantity BETWEEN 6 AND 10
+     AND (ss_list_price BETWEEN 90 AND 90+10
+          OR ss_coupon_amt BETWEEN 2323 AND 2323+1000
+          OR ss_wholesale_cost BETWEEN 31 AND 31+20)) B2,
+  (SELECT avg(ss_list_price) B3_LP,
+          count(ss_list_price) B3_CNT,
+          count(DISTINCT ss_list_price) B3_CNTD
+   FROM store_sales
+   WHERE ss_quantity BETWEEN 11 AND 15
+     AND (ss_list_price BETWEEN 142 AND 142+10
+          OR ss_coupon_amt BETWEEN 12214 AND 12214+1000
+          OR ss_wholesale_cost BETWEEN 79 AND 79+20)) B3,
+  (SELECT avg(ss_list_price) B4_LP,
+          count(ss_list_price) B4_CNT,
+          count(DISTINCT ss_list_price) B4_CNTD
+   FROM store_sales
+   WHERE ss_quantity BETWEEN 16 AND 20
+     AND (ss_list_price BETWEEN 135 AND 135+10
+          OR ss_coupon_amt BETWEEN 6071 AND 6071+1000
+          OR ss_wholesale_cost BETWEEN 38 AND 38+20)) B4,
+  (SELECT avg(ss_list_price) B5_LP,
+          count(ss_list_price) B5_CNT,
+          count(DISTINCT ss_list_price) B5_CNTD
+   FROM store_sales
+   WHERE ss_quantity BETWEEN 21 AND 25
+     AND (ss_list_price BETWEEN 122 AND 122+10
+          OR ss_coupon_amt BETWEEN 836 AND 836+1000
+          OR ss_wholesale_cost BETWEEN 17 AND 17+20)) B5,
+  (SELECT avg(ss_list_price) B6_LP,
+          count(ss_list_price) B6_CNT,
+          count(DISTINCT ss_list_price) B6_CNTD
+   FROM store_sales
+   WHERE ss_quantity BETWEEN 26 AND 30
+     AND (ss_list_price BETWEEN 154 AND 154+10
+          OR ss_coupon_amt BETWEEN 7326 AND 7326+1000
+          OR ss_wholesale_cost BETWEEN 7 AND 7+20)) B6
+LIMIT 100;
+---- PLAN
+Max Per-Host Resource Reservation: Memory=59.62MB Threads=1
+Per-Host Resource Estimates: Memory=156MB
+ImpalaSortRel(fetch=[100:TINYINT])
+  ImpalaProjectRel(B1_LP=[$0], B1_CNT=[$1], B1_CNTD=[$2], B2_LP=[$15], B2_CNT=[$16], B2_CNTD=[$17], B3_LP=[$12], B3_CNT=[$13], B3_CNTD=[$14], B4_LP=[$9], B4_CNT=[$10], B4_CNTD=[$11], B5_LP=[$6], B5_CNT=[$7], B5_CNTD=[$8], B6_LP=[$3], B6_CNT=[$4], B6_CNTD=[$5])
+    ImpalaJoinRel(condition=[true], joinType=[inner])
+      ImpalaJoinRel(condition=[true], joinType=[inner])
+        ImpalaJoinRel(condition=[true], joinType=[inner])
+          ImpalaJoinRel(condition=[true], joinType=[inner])
+            ImpalaJoinRel(condition=[true], joinType=[inner])
+              ImpalaAggRel(group=[{}], B1_LP=[AVG($0)], B1_CNT=[COUNT($0)], B1_CNTD=[COUNT(DISTINCT $0)])
+                ImpalaProjectRel(ss_list_price=[$2])
+                  ImpalaFilterRel(condition=[AND(SEARCH($0, Sarg[[0..5]]), OR(>=($2, 8.00), >=(CAST($3):DECIMAL(12, 2), 459.00), >=($1, 57.00)), OR(>=($2, 8.00), >=(CAST($3):DECIMAL(12, 2), 459.00), <=($1, 77.00)), OR(>=($2, 8.00), <=(CAST($3):DECIMAL(12, 2), 1459.00), >=($1, 57.00)), OR(>=($2, 8.00), <=(CAST($3):DECIMAL(12, 2), 1459.00), <=($1, 77.00)), OR(<=($2, 18.00), >=(CAST($3):DECIMAL(12, 2), 459.00), >=($1, 57.00)), OR(<=($2, 18.00), >=(CAST($3):DECIMAL(12, 2), 459.00), <=($1, 77.00)), OR(<=($2, 18.00), <=(CAST($3):DECIMAL(12, 2), 1459.00), >=($1, 57.00)), OR(<=($2, 18.00), <=(CAST($3):DECIMAL(12, 2), 1459.00), <=($1, 77.00)))])
+                    ImpalaProjectRel(ss_quantity=[$9], ss_wholesale_cost=[$10], ss_list_price=[$11], ss_coupon_amt=[$18])
+                      ImpalaHdfsScanRel(table=[[tpcds_partitioned_parquet_snap, store_sales]])
+              ImpalaAggRel(group=[{}], B6_LP=[AVG($0)], B6_CNT=[COUNT($0)], B6_CNTD=[COUNT(DISTINCT $0)])
+                ImpalaProjectRel(ss_list_price=[$2])
+                  ImpalaFilterRel(condition=[AND(SEARCH($0, Sarg[[26..30]]), OR(>=(CAST($2):DECIMAL(12, 2), 154.00), >=(CAST($3):DECIMAL(12, 2), 7326.00), >=($1, 7.00)), OR(>=(CAST($2):DECIMAL(12, 2), 154.00), >=(CAST($3):DECIMAL(12, 2), 7326.00), <=($1, 27.00)), OR(>=(CAST($2):DECIMAL(12, 2), 154.00), <=(CAST($3):DECIMAL(12, 2), 8326.00), >=($1, 7.00)), OR(>=(CAST($2):DECIMAL(12, 2), 154.00), <=(CAST($3):DECIMAL(12, 2), 8326.00), <=($1, 27.00)), OR(<=(CAST($2):DECIMAL(12, 2), 164.00), >=(CAST($3):DECIMAL(12, 2), 7326.00), >=($1, 7.00)), OR(<=(CAST($2):DECIMAL(12, 2), 164.00), >=(CAST($3):DECIMAL(12, 2), 7326.00), <=($1, 27.00)), OR(<=(CAST($2):DECIMAL(12, 2), 164.00), <=(CAST($3):DECIMAL(12, 2), 8326.00), >=($1, 7.00)), OR(<=(CAST($2):DECIMAL(12, 2), 164.00), <=(CAST($3):DECIMAL(12, 2), 8326.00), <=($1, 27.00)))])
+                    ImpalaProjectRel(ss_quantity=[$9], ss_wholesale_cost=[$10], ss_list_price=[$11], ss_coupon_amt=[$18])
+                      ImpalaHdfsScanRel(table=[[tpcds_partitioned_parquet_snap, store_sales]])
+            ImpalaAggRel(group=[{}], B5_LP=[AVG($0)], B5_CNT=[COUNT($0)], B5_CNTD=[COUNT(DISTINCT $0)])
+              ImpalaProjectRel(ss_list_price=[$2])
+                ImpalaFilterRel(condition=[AND(SEARCH($0, Sarg[[21..25]]), OR(>=($2, 122.00), >=(CAST($3):DECIMAL(12, 2), 836.00), >=($1, 17.00)), OR(>=($2, 122.00), >=(CAST($3):DECIMAL(12, 2), 836.00), <=($1, 37.00)), OR(>=($2, 122.00), <=(CAST($3):DECIMAL(12, 2), 1836.00), >=($1, 17.00)), OR(>=($2, 122.00), <=(CAST($3):DECIMAL(12, 2), 1836.00), <=($1, 37.00)), OR(<=($2, 132.00), >=(CAST($3):DECIMAL(12, 2), 836.00), >=($1, 17.00)), OR(<=($2, 132.00), >=(CAST($3):DECIMAL(12, 2), 836.00), <=($1, 37.00)), OR(<=($2, 132.00), <=(CAST($3):DECIMAL(12, 2), 1836.00), >=($1, 17.00)), OR(<=($2, 132.00), <=(CAST($3):DECIMAL(12, 2), 1836.00), <=($1, 37.00)))])
+                  ImpalaProjectRel(ss_quantity=[$9], ss_wholesale_cost=[$10], ss_list_price=[$11], ss_coupon_amt=[$18])
+                    ImpalaHdfsScanRel(table=[[tpcds_partitioned_parquet_snap, store_sales]])
+          ImpalaAggRel(group=[{}], B4_LP=[AVG($0)], B4_CNT=[COUNT($0)], B4_CNTD=[COUNT(DISTINCT $0)])
+            ImpalaProjectRel(ss_list_price=[$2])
+              ImpalaFilterRel(condition=[AND(SEARCH($0, Sarg[[16..20]]), OR(>=(CAST($2):DECIMAL(12, 2), 135.00), >=(CAST($3):DECIMAL(12, 2), 6071.00), >=($1, 38.00)), OR(>=(CAST($2):DECIMAL(12, 2), 135.00), >=(CAST($3):DECIMAL(12, 2), 6071.00), <=($1, 58.00)), OR(>=(CAST($2):DECIMAL(12, 2), 135.00), <=(CAST($3):DECIMAL(12, 2), 7071.00), >=($1, 38.00)), OR(>=(CAST($2):DECIMAL(12, 2), 135.00), <=(CAST($3):DECIMAL(12, 2), 7071.00), <=($1, 58.00)), OR(<=(CAST($2):DECIMAL(12, 2), 145.00), >=(CAST($3):DECIMAL(12, 2), 6071.00), >=($1, 38.00)), OR(<=(CAST($2):DECIMAL(12, 2), 145.00), >=(CAST($3):DECIMAL(12, 2), 6071.00), <=($1, 58.00)), OR(<=(CAST($2):DECIMAL(12, 2), 145.00), <=(CAST($3):DECIMAL(12, 2), 7071.00), >=($1, 38.00)), OR(<=(CAST($2):DECIMAL(12, 2), 145.00), <=(CAST($3):DECIMAL(12, 2), 7071.00), <=($1, 58.00)))])
+                ImpalaProjectRel(ss_quantity=[$9], ss_wholesale_cost=[$10], ss_list_price=[$11], ss_coupon_amt=[$18])
+                  ImpalaHdfsScanRel(table=[[tpcds_partitioned_parquet_snap, store_sales]])
+        ImpalaAggRel(group=[{}], B3_LP=[AVG($0)], B3_CNT=[COUNT($0)], B3_CNTD=[COUNT(DISTINCT $0)])
+          ImpalaProjectRel(ss_list_price=[$2])
+            ImpalaFilterRel(condition=[AND(SEARCH($0, Sarg[[11..15]]), OR(>=(CAST($2):DECIMAL(12, 2), 142.00), >=(CAST($3):DECIMAL(12, 2), 12214.00), >=($1, 79.00)), OR(>=(CAST($2):DECIMAL(12, 2), 142.00), >=(CAST($3):DECIMAL(12, 2), 12214.00), <=($1, 99.00)), OR(>=(CAST($2):DECIMAL(12, 2), 142.00), <=(CAST($3):DECIMAL(12, 2), 13214.00), >=($1, 79.00)), OR(>=(CAST($2):DECIMAL(12, 2), 142.00), <=(CAST($3):DECIMAL(12, 2), 13214.00), <=($1, 99.00)), OR(<=(CAST($2):DECIMAL(12, 2), 152.00), >=(CAST($3):DECIMAL(12, 2), 12214.00), >=($1, 79.00)), OR(<=(CAST($2):DECIMAL(12, 2), 152.00), >=(CAST($3):DECIMAL(12, 2), 12214.00), <=($1, 99.00)), OR(<=(CAST($2):DECIMAL(12, 2), 152.00), <=(CAST($3):DECIMAL(12, 2), 13214.00), >=($1, 79.00)), OR(<=(CAST($2):DECIMAL(12, 2), 152.00), <=(CAST($3):DECIMAL(12, 2), 13214.00), <=($1, 99.00)))])
+              ImpalaProjectRel(ss_quantity=[$9], ss_wholesale_cost=[$10], ss_list_price=[$11], ss_coupon_amt=[$18])
+                ImpalaHdfsScanRel(table=[[tpcds_partitioned_parquet_snap, store_sales]])
+      ImpalaAggRel(group=[{}], B2_LP=[AVG($0)], B2_CNT=[COUNT($0)], B2_CNTD=[COUNT(DISTINCT $0)])
+        ImpalaProjectRel(ss_list_price=[$2])
+          ImpalaFilterRel(condition=[AND(SEARCH($0, Sarg[[6..10]]), OR(>=($2, 90.00), >=(CAST($3):DECIMAL(12, 2), 2323.00), >=($1, 31.00)), OR(>=($2, 90.00), >=(CAST($3):DECIMAL(12, 2), 2323.00), <=($1, 51.00)), OR(>=($2, 90.00), <=(CAST($3):DECIMAL(12, 2), 3323.00), >=($1, 31.00)), OR(>=($2, 90.00), <=(CAST($3):DECIMAL(12, 2), 3323.00), <=($1, 51.00)), OR(<=($2, 100.00), >=(CAST($3):DECIMAL(12, 2), 2323.00), >=($1, 31.00)), OR(<=($2, 100.00), >=(CAST($3):DECIMAL(12, 2), 2323.00), <=($1, 51.00)), OR(<=($2, 100.00), <=(CAST($3):DECIMAL(12, 2), 3323.00), >=($1, 31.00)), OR(<=($2, 100.00), <=(CAST($3):DECIMAL(12, 2), 3323.00), <=($1, 51.00)))])
+            ImpalaProjectRel(ss_quantity=[$9], ss_wholesale_cost=[$10], ss_list_price=[$11], ss_coupon_amt=[$18])
+              ImpalaHdfsScanRel(table=[[tpcds_partitioned_parquet_snap, store_sales]])
+F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
+|  Per-Instance Resources: mem-estimate=156.00MB mem-reservation=59.62MB thread-reservation=1
+|  max-parallelism=1 segment-costs=[4731713303, 4252, 4731713303, 4252, 4731713303, 4252, 4731713303, 4252, 4731713303, 4252, 4731713303, 4252, 18]
+PLAN-ROOT SINK
+|  output exprs: avg(tpcds_partitioned_parquet_snap.store_sales.ss_list_price), count(tpcds_partitioned_parquet_snap.store_sales.ss_list_price), count(tpcds_partitioned_parquet_snap.store_sales.ss_list_price), avg(tpcds_partitioned_parquet_snap.store_sales_4.ss_list_price), count(tpcds_partitioned_parquet_snap.store_sales_4.ss_list_price), count(tpcds_partitioned_parquet_snap.store_sales_4.ss_list_price), avg(tpcds_partitioned_parquet_snap.store_sales_3.ss_list_price), count(tpcds_partitioned_parquet_snap.store_sales_3.ss_list_price), count(tpcds_partitioned_parquet_snap.store_sales_3.ss_list_price), avg(tpcds_partitioned_parquet_snap.store_sales_2.ss_list_price), count(tpcds_partitioned_parquet_snap.store_sales_2.ss_list_price), count(tpcds_partitioned_parquet_snap.store_sales_2.ss_list_price), avg(tpcds_partitioned_parquet_snap.store_sales_1.ss_list_price), count(tpcds_partitioned_parquet_snap.store_sales_1.ss_list_price), count(tpcds_partitioned_parquet_snap.store_sales_1.ss_list_price), avg(tpcds_partitioned_parquet_snap.store_sales_0.ss_list_price), count(tpcds_partitioned_parquet_snap.store_sales_0.ss_list_price), count(tpcds_partitioned_parquet_snap.store_sales_0.ss_list_price)
+|  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0 cost=18
+|
+22:NESTED LOOP JOIN [CROSS JOIN]
+|  limit: 100
+|  mem-estimate=24B mem-reservation=0B thread-reservation=0
+|  tuple-ids=5,11,17,23,29,35 row-size=144B cardinality=1 cost=0
+|  in pipelines: 02(GETNEXT), 21(OPEN)
+|
+|--21:AGGREGATE [FINALIZE]
+|  |  output: count(tpcds_partitioned_parquet_snap.store_sales_4.ss_list_price), avg:merge(tpcds_partitioned_parquet_snap.store_sales_4.ss_list_price), count:merge(tpcds_partitioned_parquet_snap.store_sales_4.ss_list_price)
+|  |  mem-estimate=16.00KB mem-reservation=0B spill-buffer=2.00MB thread-reservation=0
+|  |  tuple-ids=35 row-size=24B cardinality=1 cost=4252
+|  |  in pipelines: 21(GETNEXT), 20(OPEN)
+|  |
+|  20:AGGREGATE
+|  |  output: avg(tpcds_partitioned_parquet_snap.store_sales_4.ss_list_price), count(tpcds_partitioned_parquet_snap.store_sales_4.ss_list_price)
+|  |  group by: tpcds_partitioned_parquet_snap.store_sales_4.ss_list_price
+|  |  mem-estimate=10.00MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
+|  |  tuple-ids=32 row-size=20B cardinality=20.25K cost=313250446
+|  |  in pipelines: 20(GETNEXT), 19(OPEN)
+|  |
+|  19:SCAN HDFS [tpcds_partitioned_parquet_snap.store_sales]
+|     HDFS partitions=1824/1824 files=1824 size=389.90GB
+|     predicates: tpcds_partitioned_parquet_snap.store_sales_4.ss_quantity <= CAST(10 AS INT), tpcds_partitioned_parquet_snap.store_sales_4.ss_quantity >= CAST(6 AS INT), tpcds_partitioned_parquet_snap.store_sales_4.ss_list_price <= CAST(100.00 AS DECIMAL(7,2)) OR CAST(tpcds_partitioned_parquet_snap.store_sales_4.ss_coupon_amt AS DECIMAL(12,2)) <= CAST(3323.00 AS DECIMAL(12,2)) OR tpcds_partitioned_parquet_snap.store_sales_4.ss_wholesale_cost <= CAST(51.00 AS DECIMAL(7,2)), tpcds_partitioned_parquet_snap.store_sales_4.ss_list_price <= CAST(100.00 AS DECIMAL(7,2)) OR CAST(tpcds_partitioned_parquet_snap.store_sales_4.ss_coupon_amt AS DECIMAL(12,2)) <= CAST(3323.00 AS DECIMAL(12,2)) OR tpcds_partitioned_parquet_snap.store_sales_4.ss_wholesale_cost >= CAST(31.00 AS DECIMAL(7,2)), tpcds_partitioned_parquet_snap.store_sales_4.ss_list_price <= CAST(100.00 AS DECIMAL(7,2)) OR CAST(tpcds_partitioned_parquet_snap.store_sales_4.ss_coupon_amt AS DECIMAL(12,2)) >= CAST(2323.00 AS DECIMAL(12,2)) OR tpcds_partitioned_parquet_snap.store_sales_4.ss_wholesale_cost <= CAST(51.00 AS DECIMAL(7,2)), tpcds_partitioned_parquet_snap.store_sales_4.ss_list_price <= CAST(100.00 AS DECIMAL(7,2)) OR CAST(tpcds_partitioned_parquet_snap.store_sales_4.ss_coupon_amt AS DECIMAL(12,2)) >= CAST(2323.00 AS DECIMAL(12,2)) OR tpcds_partitioned_parquet_snap.store_sales_4.ss_wholesale_cost >= CAST(31.00 AS DECIMAL(7,2)), tpcds_partitioned_parquet_snap.store_sales_4.ss_list_price >= CAST(90.00 AS DECIMAL(7,2)) OR CAST(tpcds_partitioned_parquet_snap.store_sales_4.ss_coupon_amt AS DECIMAL(12,2)) <= CAST(3323.00 AS DECIMAL(12,2)) OR tpcds_partitioned_parquet_snap.store_sales_4.ss_wholesale_cost <= CAST(51.00 AS DECIMAL(7,2)), tpcds_partitioned_parquet_snap.store_sales_4.ss_list_price >= CAST(90.00 AS DECIMAL(7,2)) OR CAST(tpcds_partitioned_parquet_snap.store_sales_4.ss_coupon_amt AS DECIMAL(12,2)) <= CAST(3323.00 AS DECIMAL(12,2)) OR tpcds_partitioned_parquet_snap.store_sales_4.ss_wholesale_cost >= CAST(31.00 AS DECIMAL(7,2)), tpcds_partitioned_parquet_snap.store_sales_4.ss_list_price >= CAST(90.00 AS DECIMAL(7,2)) OR CAST(tpcds_partitioned_parquet_snap.store_sales_4.ss_coupon_amt AS DECIMAL(12,2)) >= CAST(2323.00 AS DECIMAL(12,2)) OR tpcds_partitioned_parquet_snap.store_sales_4.ss_wholesale_cost <= CAST(51.00 AS DECIMAL(7,2)), tpcds_partitioned_parquet_snap.store_sales_4.ss_list_price >= CAST(90.00 AS DECIMAL(7,2)) OR CAST(tpcds_partitioned_parquet_snap.store_sales_4.ss_coupon_amt AS DECIMAL(12,2)) >= CAST(2323.00 AS DECIMAL(12,2)) OR tpcds_partitioned_parquet_snap.store_sales_4.ss_wholesale_cost >= CAST(31.00 AS DECIMAL(7,2))
+|     stored statistics:
+|       table: rows=8.64G size=389.90GB
+|       partitions: 1824/1824 rows=8.64G
+|       columns: all
+|     extrapolated-rows=disabled max-scan-range-rows=390.22M
+|     parquet statistics predicates: tpcds_partitioned_parquet_snap.store_sales_4.ss_quantity <= CAST(10 AS INT), tpcds_partitioned_parquet_snap.store_sales_4.ss_quantity >= CAST(6 AS INT)
+|     parquet dictionary predicates: tpcds_partitioned_parquet_snap.store_sales_4.ss_quantity <= CAST(10 AS INT), tpcds_partitioned_parquet_snap.store_sales_4.ss_quantity >= CAST(6 AS INT)
+|     mem-estimate=16.00MB mem-reservation=8.00MB thread-reservation=0
+|     tuple-ids=30 row-size=16B cardinality=863.99M cost=4418462857
+|     in pipelines: 19(GETNEXT)
+|
+18:NESTED LOOP JOIN [CROSS JOIN]
+|  mem-estimate=24B mem-reservation=0B thread-reservation=0
+|  tuple-ids=5,11,17,23,29 row-size=120B cardinality=1 cost=0
+|  in pipelines: 02(GETNEXT), 17(OPEN)
+|
+|--17:AGGREGATE [FINALIZE]
+|  |  output: count(tpcds_partitioned_parquet_snap.store_sales_3.ss_list_price), avg:merge(tpcds_partitioned_parquet_snap.store_sales_3.ss_list_price), count:merge(tpcds_partitioned_parquet_snap.store_sales_3.ss_list_price)
+|  |  mem-estimate=16.00KB mem-reservation=0B spill-buffer=2.00MB thread-reservation=0
+|  |  tuple-ids=29 row-size=24B cardinality=1 cost=4252
+|  |  in pipelines: 17(GETNEXT), 16(OPEN)
+|  |
+|  16:AGGREGATE
+|  |  output: avg(tpcds_partitioned_parquet_snap.store_sales_3.ss_list_price), count(tpcds_partitioned_parquet_snap.store_sales_3.ss_list_price)
+|  |  group by: tpcds_partitioned_parquet_snap.store_sales_3.ss_list_price
+|  |  mem-estimate=10.00MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
+|  |  tuple-ids=26 row-size=20B cardinality=20.25K cost=313250446
+|  |  in pipelines: 16(GETNEXT), 15(OPEN)
+|  |
+|  15:SCAN HDFS [tpcds_partitioned_parquet_snap.store_sales]
+|     HDFS partitions=1824/1824 files=1824 size=389.90GB
+|     predicates: tpcds_partitioned_parquet_snap.store_sales_3.ss_quantity <= CAST(15 AS INT), tpcds_partitioned_parquet_snap.store_sales_3.ss_quantity >= CAST(11 AS INT), CAST(tpcds_partitioned_parquet_snap.store_sales_3.ss_list_price AS DECIMAL(12,2)) <= CAST(152.00 AS DECIMAL(12,2)) OR CAST(tpcds_partitioned_parquet_snap.store_sales_3.ss_coupon_amt AS DECIMAL(12,2)) <= CAST(13214.00 AS DECIMAL(12,2)) OR tpcds_partitioned_parquet_snap.store_sales_3.ss_wholesale_cost <= CAST(99.00 AS DECIMAL(7,2)), CAST(tpcds_partitioned_parquet_snap.store_sales_3.ss_list_price AS DECIMAL(12,2)) <= CAST(152.00 AS DECIMAL(12,2)) OR CAST(tpcds_partitioned_parquet_snap.store_sales_3.ss_coupon_amt AS DECIMAL(12,2)) <= CAST(13214.00 AS DECIMAL(12,2)) OR tpcds_partitioned_parquet_snap.store_sales_3.ss_wholesale_cost >= CAST(79.00 AS DECIMAL(7,2)), CAST(tpcds_partitioned_parquet_snap.store_sales_3.ss_list_price AS DECIMAL(12,2)) <= CAST(152.00 AS DECIMAL(12,2)) OR CAST(tpcds_partitioned_parquet_snap.store_sales_3.ss_coupon_amt AS DECIMAL(12,2)) >= CAST(12214.00 AS DECIMAL(12,2)) OR tpcds_partitioned_parquet_snap.store_sales_3.ss_wholesale_cost <= CAST(99.00 AS DECIMAL(7,2)), CAST(tpcds_partitioned_parquet_snap.store_sales_3.ss_list_price AS DECIMAL(12,2)) <= CAST(152.00 AS DECIMAL(12,2)) OR CAST(tpcds_partitioned_parquet_snap.store_sales_3.ss_coupon_amt AS DECIMAL(12,2)) >= CAST(12214.00 AS DECIMAL(12,2)) OR tpcds_partitioned_parquet_snap.store_sales_3.ss_wholesale_cost >= CAST(79.00 AS DECIMAL(7,2)), CAST(tpcds_partitioned_parquet_snap.store_sales_3.ss_list_price AS DECIMAL(12,2)) >= CAST(142.00 AS DECIMAL(12,2)) OR CAST(tpcds_partitioned_parquet_snap.store_sales_3.ss_coupon_amt AS DECIMAL(12,2)) <= CAST(13214.00 AS DECIMAL(12,2)) OR tpcds_partitioned_parquet_snap.store_sales_3.ss_wholesale_cost <= CAST(99.00 AS DECIMAL(7,2)), CAST(tpcds_partitioned_parquet_snap.store_sales_3.ss_list_price AS DECIMAL(12,2)) >= CAST(142.00 AS DECIMAL(12,2)) OR CAST(tpcds_partitioned_parquet_snap.store_sales_3.ss_coupon_amt AS DECIMAL(12,2)) <= CAST(13214.00 AS DECIMAL(12,2)) OR tpcds_partitioned_parquet_snap.store_sales_3.ss_wholesale_cost >= CAST(79.00 AS DECIMAL(7,2)), CAST(tpcds_partitioned_parquet_snap.store_sales_3.ss_list_price AS DECIMAL(12,2)) >= CAST(142.00 AS DECIMAL(12,2)) OR CAST(tpcds_partitioned_parquet_snap.store_sales_3.ss_coupon_amt AS DECIMAL(12,2)) >= CAST(12214.00 AS DECIMAL(12,2)) OR tpcds_partitioned_parquet_snap.store_sales_3.ss_wholesale_cost <= CAST(99.00 AS DECIMAL(7,2)), CAST(tpcds_partitioned_parquet_snap.store_sales_3.ss_list_price AS DECIMAL(12,2)) >= CAST(142.00 AS DECIMAL(12,2)) OR CAST(tpcds_partitioned_parquet_snap.store_sales_3.ss_coupon_amt AS DECIMAL(12,2)) >= CAST(12214.00 AS DECIMAL(12,2)) OR tpcds_partitioned_parquet_snap.store_sales_3.ss_wholesale_cost >= CAST(79.00 AS DECIMAL(7,2))
+|     stored statistics:
+|       table: rows=8.64G size=389.90GB
+|       partitions: 1824/1824 rows=8.64G
+|       columns: all
+|     extrapolated-rows=disabled max-scan-range-rows=390.22M
+|     parquet statistics predicates: tpcds_partitioned_parquet_snap.store_sales_3.ss_quantity <= CAST(15 AS INT), tpcds_partitioned_parquet_snap.store_sales_3.ss_quantity >= CAST(11 AS INT)
+|     parquet dictionary predicates: tpcds_partitioned_parquet_snap.store_sales_3.ss_quantity <= CAST(15 AS INT), tpcds_partitioned_parquet_snap.store_sales_3.ss_quantity >= CAST(11 AS INT)
+|     mem-estimate=16.00MB mem-reservation=8.00MB thread-reservation=0
+|     tuple-ids=24 row-size=16B cardinality=863.99M cost=4418462857
+|     in pipelines: 15(GETNEXT)
+|
+14:NESTED LOOP JOIN [CROSS JOIN]
+|  mem-estimate=24B mem-reservation=0B thread-reservation=0
+|  tuple-ids=5,11,17,23 row-size=96B cardinality=1 cost=0
+|  in pipelines: 02(GETNEXT), 13(OPEN)
+|
+|--13:AGGREGATE [FINALIZE]
+|  |  output: count(tpcds_partitioned_parquet_snap.store_sales_2.ss_list_price), avg:merge(tpcds_partitioned_parquet_snap.store_sales_2.ss_list_price), count:merge(tpcds_partitioned_parquet_snap.store_sales_2.ss_list_price)
+|  |  mem-estimate=16.00KB mem-reservation=0B spill-buffer=2.00MB thread-reservation=0
+|  |  tuple-ids=23 row-size=24B cardinality=1 cost=4252
+|  |  in pipelines: 13(GETNEXT), 12(OPEN)
+|  |
+|  12:AGGREGATE
+|  |  output: avg(tpcds_partitioned_parquet_snap.store_sales_2.ss_list_price), count(tpcds_partitioned_parquet_snap.store_sales_2.ss_list_price)
+|  |  group by: tpcds_partitioned_parquet_snap.store_sales_2.ss_list_price
+|  |  mem-estimate=10.00MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
+|  |  tuple-ids=20 row-size=20B cardinality=20.25K cost=313250446
+|  |  in pipelines: 12(GETNEXT), 11(OPEN)
+|  |
+|  11:SCAN HDFS [tpcds_partitioned_parquet_snap.store_sales]
+|     HDFS partitions=1824/1824 files=1824 size=389.90GB
+|     predicates: tpcds_partitioned_parquet_snap.store_sales_2.ss_quantity <= CAST(20 AS INT), tpcds_partitioned_parquet_snap.store_sales_2.ss_quantity >= CAST(16 AS INT), CAST(tpcds_partitioned_parquet_snap.store_sales_2.ss_list_price AS DECIMAL(12,2)) <= CAST(145.00 AS DECIMAL(12,2)) OR CAST(tpcds_partitioned_parquet_snap.store_sales_2.ss_coupon_amt AS DECIMAL(12,2)) <= CAST(7071.00 AS DECIMAL(12,2)) OR tpcds_partitioned_parquet_snap.store_sales_2.ss_wholesale_cost <= CAST(58.00 AS DECIMAL(7,2)), CAST(tpcds_partitioned_parquet_snap.store_sales_2.ss_list_price AS DECIMAL(12,2)) <= CAST(145.00 AS DECIMAL(12,2)) OR CAST(tpcds_partitioned_parquet_snap.store_sales_2.ss_coupon_amt AS DECIMAL(12,2)) <= CAST(7071.00 AS DECIMAL(12,2)) OR tpcds_partitioned_parquet_snap.store_sales_2.ss_wholesale_cost >= CAST(38.00 AS DECIMAL(7,2)), CAST(tpcds_partitioned_parquet_snap.store_sales_2.ss_list_price AS DECIMAL(12,2)) <= CAST(145.00 AS DECIMAL(12,2)) OR CAST(tpcds_partitioned_parquet_snap.store_sales_2.ss_coupon_amt AS DECIMAL(12,2)) >= CAST(6071.00 AS DECIMAL(12,2)) OR tpcds_partitioned_parquet_snap.store_sales_2.ss_wholesale_cost <= CAST(58.00 AS DECIMAL(7,2)), CAST(tpcds_partitioned_parquet_snap.store_sales_2.ss_list_price AS DECIMAL(12,2)) <= CAST(145.00 AS DECIMAL(12,2)) OR CAST(tpcds_partitioned_parquet_snap.store_sales_2.ss_coupon_amt AS DECIMAL(12,2)) >= CAST(6071.00 AS DECIMAL(12,2)) OR tpcds_partitioned_parquet_snap.store_sales_2.ss_wholesale_cost >= CAST(38.00 AS DECIMAL(7,2)), CAST(tpcds_partitioned_parquet_snap.store_sales_2.ss_list_price AS DECIMAL(12,2)) >= CAST(135.00 AS DECIMAL(12,2)) OR CAST(tpcds_partitioned_parquet_snap.store_sales_2.ss_coupon_amt AS DECIMAL(12,2)) <= CAST(7071.00 AS DECIMAL(12,2)) OR tpcds_partitioned_parquet_snap.store_sales_2.ss_wholesale_cost <= CAST(58.00 AS DECIMAL(7,2)), CAST(tpcds_partitioned_parquet_snap.store_sales_2.ss_list_price AS DECIMAL(12,2)) >= CAST(135.00 AS DECIMAL(12,2)) OR CAST(tpcds_partitioned_parquet_snap.store_sales_2.ss_coupon_amt AS DECIMAL(12,2)) <= CAST(7071.00 AS DECIMAL(12,2)) OR tpcds_partitioned_parquet_snap.store_sales_2.ss_wholesale_cost >= CAST(38.00 AS DECIMAL(7,2)), CAST(tpcds_partitioned_parquet_snap.store_sales_2.ss_list_price AS DECIMAL(12,2)) >= CAST(135.00 AS DECIMAL(12,2)) OR CAST(tpcds_partitioned_parquet_snap.store_sales_2.ss_coupon_amt AS DECIMAL(12,2)) >= CAST(6071.00 AS DECIMAL(12,2)) OR tpcds_partitioned_parquet_snap.store_sales_2.ss_wholesale_cost <= CAST(58.00 AS DECIMAL(7,2)), CAST(tpcds_partitioned_parquet_snap.store_sales_2.ss_list_price AS DECIMAL(12,2)) >= CAST(135.00 AS DECIMAL(12,2)) OR CAST(tpcds_partitioned_parquet_snap.store_sales_2.ss_coupon_amt AS DECIMAL(12,2)) >= CAST(6071.00 AS DECIMAL(12,2)) OR tpcds_partitioned_parquet_snap.store_sales_2.ss_wholesale_cost >= CAST(38.00 AS DECIMAL(7,2))
+|     stored statistics:
+|       table: rows=8.64G size=389.90GB
+|       partitions: 1824/1824 rows=8.64G
+|       columns: all
+|     extrapolated-rows=disabled max-scan-range-rows=390.22M
+|     parquet statistics predicates: tpcds_partitioned_parquet_snap.store_sales_2.ss_quantity <= CAST(20 AS INT), tpcds_partitioned_parquet_snap.store_sales_2.ss_quantity >= CAST(16 AS INT)
+|     parquet dictionary predicates: tpcds_partitioned_parquet_snap.store_sales_2.ss_quantity <= CAST(20 AS INT), tpcds_partitioned_parquet_snap.store_sales_2.ss_quantity >= CAST(16 AS INT)
+|     mem-estimate=16.00MB mem-reservation=8.00MB thread-reservation=0
+|     tuple-ids=18 row-size=16B cardinality=863.99M cost=4418462857
+|     in pipelines: 11(GETNEXT)
+|
+10:NESTED LOOP JOIN [CROSS JOIN]
+|  mem-estimate=24B mem-reservation=0B thread-reservation=0
+|  tuple-ids=5,11,17 row-size=72B cardinality=1 cost=0
+|  in pipelines: 02(GETNEXT), 09(OPEN)
+|
+|--09:AGGREGATE [FINALIZE]
+|  |  output: count(tpcds_partitioned_parquet_snap.store_sales_1.ss_list_price), avg:merge(tpcds_partitioned_parquet_snap.store_sales_1.ss_list_price), count:merge(tpcds_partitioned_parquet_snap.store_sales_1.ss_list_price)
+|  |  mem-estimate=16.00KB mem-reservation=0B spill-buffer=2.00MB thread-reservation=0
+|  |  tuple-ids=17 row-size=24B cardinality=1 cost=4252
+|  |  in pipelines: 09(GETNEXT), 08(OPEN)
+|  |
+|  08:AGGREGATE
+|  |  output: avg(tpcds_partitioned_parquet_snap.store_sales_1.ss_list_price), count(tpcds_partitioned_parquet_snap.store_sales_1.ss_list_price)
+|  |  group by: tpcds_partitioned_parquet_snap.store_sales_1.ss_list_price
+|  |  mem-estimate=10.00MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
+|  |  tuple-ids=14 row-size=20B cardinality=20.25K cost=313250446
+|  |  in pipelines: 08(GETNEXT), 07(OPEN)
+|  |
+|  07:SCAN HDFS [tpcds_partitioned_parquet_snap.store_sales]
+|     HDFS partitions=1824/1824 files=1824 size=389.90GB
+|     predicates: tpcds_partitioned_parquet_snap.store_sales_1.ss_quantity <= CAST(25 AS INT), tpcds_partitioned_parquet_snap.store_sales_1.ss_quantity >= CAST(21 AS INT), tpcds_partitioned_parquet_snap.store_sales_1.ss_list_price <= CAST(132.00 AS DECIMAL(7,2)) OR CAST(tpcds_partitioned_parquet_snap.store_sales_1.ss_coupon_amt AS DECIMAL(12,2)) <= CAST(1836.00 AS DECIMAL(12,2)) OR tpcds_partitioned_parquet_snap.store_sales_1.ss_wholesale_cost <= CAST(37.00 AS DECIMAL(7,2)), tpcds_partitioned_parquet_snap.store_sales_1.ss_list_price <= CAST(132.00 AS DECIMAL(7,2)) OR CAST(tpcds_partitioned_parquet_snap.store_sales_1.ss_coupon_amt AS DECIMAL(12,2)) <= CAST(1836.00 AS DECIMAL(12,2)) OR tpcds_partitioned_parquet_snap.store_sales_1.ss_wholesale_cost >= CAST(17.00 AS DECIMAL(7,2)), tpcds_partitioned_parquet_snap.store_sales_1.ss_list_price <= CAST(132.00 AS DECIMAL(7,2)) OR CAST(tpcds_partitioned_parquet_snap.store_sales_1.ss_coupon_amt AS DECIMAL(12,2)) >= CAST(836.00 AS DECIMAL(12,2)) OR tpcds_partitioned_parquet_snap.store_sales_1.ss_wholesale_cost <= CAST(37.00 AS DECIMAL(7,2)), tpcds_partitioned_parquet_snap.store_sales_1.ss_list_price <= CAST(132.00 AS DECIMAL(7,2)) OR CAST(tpcds_partitioned_parquet_snap.store_sales_1.ss_coupon_amt AS DECIMAL(12,2)) >= CAST(836.00 AS DECIMAL(12,2)) OR tpcds_partitioned_parquet_snap.store_sales_1.ss_wholesale_cost >= CAST(17.00 AS DECIMAL(7,2)), tpcds_partitioned_parquet_snap.store_sales_1.ss_list_price >= CAST(122.00 AS DECIMAL(7,2)) OR CAST(tpcds_partitioned_parquet_snap.store_sales_1.ss_coupon_amt AS DECIMAL(12,2)) <= CAST(1836.00 AS DECIMAL(12,2)) OR tpcds_partitioned_parquet_snap.store_sales_1.ss_wholesale_cost <= CAST(37.00 AS DECIMAL(7,2)), tpcds_partitioned_parquet_snap.store_sales_1.ss_list_price >= CAST(122.00 AS DECIMAL(7,2)) OR CAST(tpcds_partitioned_parquet_snap.store_sales_1.ss_coupon_amt AS DECIMAL(12,2)) <= CAST(1836.00 AS DECIMAL(12,2)) OR tpcds_partitioned_parquet_snap.store_sales_1.ss_wholesale_cost >= CAST(17.00 AS DECIMAL(7,2)), tpcds_partitioned_parquet_snap.store_sales_1.ss_list_price >= CAST(122.00 AS DECIMAL(7,2)) OR CAST(tpcds_partitioned_parquet_snap.store_sales_1.ss_coupon_amt AS DECIMAL(12,2)) >= CAST(836.00 AS DECIMAL(12,2)) OR tpcds_partitioned_parquet_snap.store_sales_1.ss_wholesale_cost <= CAST(37.00 AS DECIMAL(7,2)), tpcds_partitioned_parquet_snap.store_sales_1.ss_list_price >= CAST(122.00 AS DECIMAL(7,2)) OR CAST(tpcds_partitioned_parquet_snap.store_sales_1.ss_coupon_amt AS DECIMAL(12,2)) >= CAST(836.00 AS DECIMAL(12,2)) OR tpcds_partitioned_parquet_snap.store_sales_1.ss_wholesale_cost >= CAST(17.00 AS DECIMAL(7,2))
+|     stored statistics:
+|       table: rows=8.64G size=389.90GB
+|       partitions: 1824/1824 rows=8.64G
+|       columns: all
+|     extrapolated-rows=disabled max-scan-range-rows=390.22M
+|     parquet statistics predicates: tpcds_partitioned_parquet_snap.store_sales_1.ss_quantity <= CAST(25 AS INT), tpcds_partitioned_parquet_snap.store_sales_1.ss_quantity >= CAST(21 AS INT)
+|     parquet dictionary predicates: tpcds_partitioned_parquet_snap.store_sales_1.ss_quantity <= CAST(25 AS INT), tpcds_partitioned_parquet_snap.store_sales_1.ss_quantity >= CAST(21 AS INT)
+|     mem-estimate=16.00MB mem-reservation=8.00MB thread-reservation=0
+|     tuple-ids=12 row-size=16B cardinality=863.99M cost=4418462857
+|     in pipelines: 07(GETNEXT)
+|
+06:NESTED LOOP JOIN [CROSS JOIN]
+|  mem-estimate=24B mem-reservation=0B thread-reservation=0
+|  tuple-ids=5,11 row-size=48B cardinality=1 cost=0
+|  in pipelines: 02(GETNEXT), 05(OPEN)
+|
+|--05:AGGREGATE [FINALIZE]
+|  |  output: count(tpcds_partitioned_parquet_snap.store_sales_0.ss_list_price), avg:merge(tpcds_partitioned_parquet_snap.store_sales_0.ss_list_price), count:merge(tpcds_partitioned_parquet_snap.store_sales_0.ss_list_price)
+|  |  mem-estimate=16.00KB mem-reservation=0B spill-buffer=2.00MB thread-reservation=0
+|  |  tuple-ids=11 row-size=24B cardinality=1 cost=4252
+|  |  in pipelines: 05(GETNEXT), 04(OPEN)
+|  |
+|  04:AGGREGATE
+|  |  output: avg(tpcds_partitioned_parquet_snap.store_sales_0.ss_list_price), count(tpcds_partitioned_parquet_snap.store_sales_0.ss_list_price)
+|  |  group by: tpcds_partitioned_parquet_snap.store_sales_0.ss_list_price
+|  |  mem-estimate=10.00MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
+|  |  tuple-ids=8 row-size=20B cardinality=20.25K cost=313250446
+|  |  in pipelines: 04(GETNEXT), 03(OPEN)
+|  |
+|  03:SCAN HDFS [tpcds_partitioned_parquet_snap.store_sales]
+|     HDFS partitions=1824/1824 files=1824 size=389.90GB
+|     predicates: tpcds_partitioned_parquet_snap.store_sales_0.ss_quantity <= CAST(30 AS INT), tpcds_partitioned_parquet_snap.store_sales_0.ss_quantity >= CAST(26 AS INT), CAST(tpcds_partitioned_parquet_snap.store_sales_0.ss_list_price AS DECIMAL(12,2)) <= CAST(164.00 AS DECIMAL(12,2)) OR CAST(tpcds_partitioned_parquet_snap.store_sales_0.ss_coupon_amt AS DECIMAL(12,2)) <= CAST(8326.00 AS DECIMAL(12,2)) OR tpcds_partitioned_parquet_snap.store_sales_0.ss_wholesale_cost <= CAST(27.00 AS DECIMAL(7,2)), CAST(tpcds_partitioned_parquet_snap.store_sales_0.ss_list_price AS DECIMAL(12,2)) <= CAST(164.00 AS DECIMAL(12,2)) OR CAST(tpcds_partitioned_parquet_snap.store_sales_0.ss_coupon_amt AS DECIMAL(12,2)) <= CAST(8326.00 AS DECIMAL(12,2)) OR tpcds_partitioned_parquet_snap.store_sales_0.ss_wholesale_cost >= CAST(7.00 AS DECIMAL(7,2)), CAST(tpcds_partitioned_parquet_snap.store_sales_0.ss_list_price AS DECIMAL(12,2)) <= CAST(164.00 AS DECIMAL(12,2)) OR CAST(tpcds_partitioned_parquet_snap.store_sales_0.ss_coupon_amt AS DECIMAL(12,2)) >= CAST(7326.00 AS DECIMAL(12,2)) OR tpcds_partitioned_parquet_snap.store_sales_0.ss_wholesale_cost <= CAST(27.00 AS DECIMAL(7,2)), CAST(tpcds_partitioned_parquet_snap.store_sales_0.ss_list_price AS DECIMAL(12,2)) <= CAST(164.00 AS DECIMAL(12,2)) OR CAST(tpcds_partitioned_parquet_snap.store_sales_0.ss_coupon_amt AS DECIMAL(12,2)) >= CAST(7326.00 AS DECIMAL(12,2)) OR tpcds_partitioned_parquet_snap.store_sales_0.ss_wholesale_cost >= CAST(7.00 AS DECIMAL(7,2)), CAST(tpcds_partitioned_parquet_snap.store_sales_0.ss_list_price AS DECIMAL(12,2)) >= CAST(154.00 AS DECIMAL(12,2)) OR CAST(tpcds_partitioned_parquet_snap.store_sales_0.ss_coupon_amt AS DECIMAL(12,2)) <= CAST(8326.00 AS DECIMAL(12,2)) OR tpcds_partitioned_parquet_snap.store_sales_0.ss_wholesale_cost <= CAST(27.00 AS DECIMAL(7,2)), CAST(tpcds_partitioned_parquet_snap.store_sales_0.ss_list_price AS DECIMAL(12,2)) >= CAST(154.00 AS DECIMAL(12,2)) OR CAST(tpcds_partitioned_parquet_snap.store_sales_0.ss_coupon_amt AS DECIMAL(12,2)) <= CAST(8326.00 AS DECIMAL(12,2)) OR tpcds_partitioned_parquet_snap.store_sales_0.ss_wholesale_cost >= CAST(7.00 AS DECIMAL(7,2)), CAST(tpcds_partitioned_parquet_snap.store_sales_0.ss_list_price AS DECIMAL(12,2)) >= CAST(154.00 AS DECIMAL(12,2)) OR CAST(tpcds_partitioned_parquet_snap.store_sales_0.ss_coupon_amt AS DECIMAL(12,2)) >= CAST(7326.00 AS DECIMAL(12,2)) OR tpcds_partitioned_parquet_snap.store_sales_0.ss_wholesale_cost <= CAST(27.00 AS DECIMAL(7,2)), CAST(tpcds_partitioned_parquet_snap.store_sales_0.ss_list_price AS DECIMAL(12,2)) >= CAST(154.00 AS DECIMAL(12,2)) OR CAST(tpcds_partitioned_parquet_snap.store_sales_0.ss_coupon_amt AS DECIMAL(12,2)) >= CAST(7326.00 AS DECIMAL(12,2)) OR tpcds_partitioned_parquet_snap.store_sales_0.ss_wholesale_cost >= CAST(7.00 AS DECIMAL(7,2))
+|     stored statistics:
+|       table: rows=8.64G size=389.90GB
+|       partitions: 1824/1824 rows=8.64G
+|       columns: all
+|     extrapolated-rows=disabled max-scan-range-rows=390.22M
+|     parquet statistics predicates: tpcds_partitioned_parquet_snap.store_sales_0.ss_quantity <= CAST(30 AS INT), tpcds_partitioned_parquet_snap.store_sales_0.ss_quantity >= CAST(26 AS INT)
+|     parquet dictionary predicates: tpcds_partitioned_parquet_snap.store_sales_0.ss_quantity <= CAST(30 AS INT), tpcds_partitioned_parquet_snap.store_sales_0.ss_quantity >= CAST(26 AS INT)
+|     mem-estimate=16.00MB mem-reservation=8.00MB thread-reservation=0
+|     tuple-ids=6 row-size=16B cardinality=863.99M cost=4418462857
+|     in pipelines: 03(GETNEXT)
+|
+02:AGGREGATE [FINALIZE]
+|  output: count(tpcds_partitioned_parquet_snap.store_sales.ss_list_price), avg:merge(tpcds_partitioned_parquet_snap.store_sales.ss_list_price), count:merge(tpcds_partitioned_parquet_snap.store_sales.ss_list_price)
+|  mem-estimate=16.00KB mem-reservation=0B spill-buffer=2.00MB thread-reservation=0
+|  tuple-ids=5 row-size=24B cardinality=1 cost=4252
+|  in pipelines: 02(GETNEXT), 01(OPEN)
+|
+01:AGGREGATE
+|  output: avg(tpcds_partitioned_parquet_snap.store_sales.ss_list_price), count(tpcds_partitioned_parquet_snap.store_sales.ss_list_price)
+|  group by: tpcds_partitioned_parquet_snap.store_sales.ss_list_price
+|  mem-estimate=10.00MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
+|  tuple-ids=2 row-size=20B cardinality=20.25K cost=313250446
+|  in pipelines: 01(GETNEXT), 00(OPEN)
+|
+00:SCAN HDFS [tpcds_partitioned_parquet_snap.store_sales]
+   HDFS partitions=1824/1824 files=1824 size=389.90GB
+   predicates: tpcds_partitioned_parquet_snap.store_sales.ss_quantity <= CAST(5 AS INT), tpcds_partitioned_parquet_snap.store_sales.ss_quantity >= CAST(0 AS INT), tpcds_partitioned_parquet_snap.store_sales.ss_list_price <= CAST(18.00 AS DECIMAL(7,2)) OR CAST(tpcds_partitioned_parquet_snap.store_sales.ss_coupon_amt AS DECIMAL(12,2)) <= CAST(1459.00 AS DECIMAL(12,2)) OR tpcds_partitioned_parquet_snap.store_sales.ss_wholesale_cost <= CAST(77.00 AS DECIMAL(7,2)), tpcds_partitioned_parquet_snap.store_sales.ss_list_price <= CAST(18.00 AS DECIMAL(7,2)) OR CAST(tpcds_partitioned_parquet_snap.store_sales.ss_coupon_amt AS DECIMAL(12,2)) <= CAST(1459.00 AS DECIMAL(12,2)) OR tpcds_partitioned_parquet_snap.store_sales.ss_wholesale_cost >= CAST(57.00 AS DECIMAL(7,2)), tpcds_partitioned_parquet_snap.store_sales.ss_list_price <= CAST(18.00 AS DECIMAL(7,2)) OR CAST(tpcds_partitioned_parquet_snap.store_sales.ss_coupon_amt AS DECIMAL(12,2)) >= CAST(459.00 AS DECIMAL(12,2)) OR tpcds_partitioned_parquet_snap.store_sales.ss_wholesale_cost <= CAST(77.00 AS DECIMAL(7,2)), tpcds_partitioned_parquet_snap.store_sales.ss_list_price <= CAST(18.00 AS DECIMAL(7,2)) OR CAST(tpcds_partitioned_parquet_snap.store_sales.ss_coupon_amt AS DECIMAL(12,2)) >= CAST(459.00 AS DECIMAL(12,2)) OR tpcds_partitioned_parquet_snap.store_sales.ss_wholesale_cost >= CAST(57.00 AS DECIMAL(7,2)), tpcds_partitioned_parquet_snap.store_sales.ss_list_price >= CAST(8.00 AS DECIMAL(7,2)) OR CAST(tpcds_partitioned_parquet_snap.store_sales.ss_coupon_amt AS DECIMAL(12,2)) <= CAST(1459.00 AS DECIMAL(12,2)) OR tpcds_partitioned_parquet_snap.store_sales.ss_wholesale_cost <= CAST(77.00 AS DECIMAL(7,2)), tpcds_partitioned_parquet_snap.store_sales.ss_list_price >= CAST(8.00 AS DECIMAL(7,2)) OR CAST(tpcds_partitioned_parquet_snap.store_sales.ss_coupon_amt AS DECIMAL(12,2)) <= CAST(1459.00 AS DECIMAL(12,2)) OR tpcds_partitioned_parquet_snap.store_sales.ss_wholesale_cost >= CAST(57.00 AS DECIMAL(7,2)), tpcds_partitioned_parquet_snap.store_sales.ss_list_price >= CAST(8.00 AS DECIMAL(7,2)) OR CAST(tpcds_partitioned_parquet_snap.store_sales.ss_coupon_amt AS DECIMAL(12,2)) >= CAST(459.00 AS DECIMAL(12,2)) OR tpcds_partitioned_parquet_snap.store_sales.ss_wholesale_cost <= CAST(77.00 AS DECIMAL(7,2)), tpcds_partitioned_parquet_snap.store_sales.ss_list_price >= CAST(8.00 AS DECIMAL(7,2)) OR CAST(tpcds_partitioned_parquet_snap.store_sales.ss_coupon_amt AS DECIMAL(12,2)) >= CAST(459.00 AS DECIMAL(12,2)) OR tpcds_partitioned_parquet_snap.store_sales.ss_wholesale_cost >= CAST(57.00 AS DECIMAL(7,2))
+   stored statistics:
+     table: rows=8.64G size=389.90GB
+     partitions: 1824/1824 rows=8.64G
+     columns: all
+   extrapolated-rows=disabled max-scan-range-rows=390.22M
+   parquet statistics predicates: tpcds_partitioned_parquet_snap.store_sales.ss_quantity <= CAST(5 AS INT), tpcds_partitioned_parquet_snap.store_sales.ss_quantity >= CAST(0 AS INT)
+   parquet dictionary predicates: tpcds_partitioned_parquet_snap.store_sales.ss_quantity <= CAST(5 AS INT), tpcds_partitioned_parquet_snap.store_sales.ss_quantity >= CAST(0 AS INT)
+   mem-estimate=16.00MB mem-reservation=8.00MB thread-reservation=0
+   tuple-ids=0 row-size=16B cardinality=863.99M cost=4418462857
+   in pipelines: 00(GETNEXT)
+====

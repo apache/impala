@@ -162,6 +162,9 @@ public class TpcdsCpuCostPlannerTest extends PlannerTestBase {
     RuntimeEnv.INSTANCE.dropSideloadStats();
     RuntimeEnv.INSTANCE.dropTableScanRangeLimit();
     invalidateTables();
+
+    RequestPoolService.getInstance().stop();
+    tempFolder.delete();
   }
 
   /**

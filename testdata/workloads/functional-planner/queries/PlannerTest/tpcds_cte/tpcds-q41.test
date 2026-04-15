@@ -1,0 +1,209 @@
+# TPCDS-Q41
+SELECT distinct(i_product_name)
+FROM item i1
+WHERE i_manufact_id BETWEEN 738 AND 738+40
+  AND
+    (SELECT count(*) AS item_cnt
+     FROM item
+     WHERE (i_manufact = i1.i_manufact
+            AND ((i_category = 'Women'
+                  AND (i_color = 'powder'
+                       OR i_color = 'khaki')
+                  AND (i_units = 'Ounce'
+                       OR i_units = 'Oz')
+                  AND (i_size = 'medium'
+                       OR i_size = 'extra large'))
+                 OR (i_category = 'Women'
+                     AND (i_color = 'brown'
+                          OR i_color = 'honeydew')
+                     AND (i_units = 'Bunch'
+                          OR i_units = 'Ton')
+                     AND (i_size = 'N/A'
+                          OR i_size = 'small'))
+                 OR (i_category = 'Men'
+                     AND (i_color = 'floral'
+                          OR i_color = 'deep')
+                     AND (i_units = 'N/A'
+                          OR i_units = 'Dozen')
+                     AND (i_size = 'petite'
+                          OR i_size = 'petite'))
+                 OR (i_category = 'Men'
+                     AND (i_color = 'light'
+                          OR i_color = 'cornflower')
+                     AND (i_units = 'Box'
+                          OR i_units = 'Pound')
+                     AND (i_size = 'medium'
+                          OR i_size = 'extra large'))))
+       OR (i_manufact = i1.i_manufact
+           AND ((i_category = 'Women'
+                 AND (i_color = 'midnight'
+                      OR i_color = 'snow')
+                 AND (i_units = 'Pallet'
+                      OR i_units = 'Gross')
+                 AND (i_size = 'medium'
+                      OR i_size = 'extra large'))
+                OR (i_category = 'Women'
+                    AND (i_color = 'cyan'
+                         OR i_color = 'papaya')
+                    AND (i_units = 'Cup'
+                         OR i_units = 'Dram')
+                    AND (i_size = 'N/A'
+                         OR i_size = 'small'))
+                OR (i_category = 'Men'
+                    AND (i_color = 'orange'
+                         OR i_color = 'frosted')
+                    AND (i_units = 'Each'
+                         OR i_units = 'Tbl')
+                    AND (i_size = 'petite'
+                         OR i_size = 'petite'))
+                OR (i_category = 'Men'
+                    AND (i_color = 'forest'
+                         OR i_color = 'ghost')
+                    AND (i_units = 'Lb'
+                         OR i_units = 'Bundle')
+                    AND (i_size = 'medium'
+                         OR i_size = 'extra large'))))) > 0
+ORDER BY i_product_name
+LIMIT 100;
+---- PLAN
+Max Per-Host Resource Reservation: Memory=8.31MB Threads=1
+Per-Host Resource Estimates: Memory=87MB
+ImpalaSortRel(sort0=[$0], dir0=[ASC], fetch=[100:TINYINT])
+  ImpalaAggRel(group=[{0}])
+    ImpalaProjectRel(I_PRODUCT_NAME=[$3])
+      ImpalaFilterRel(condition=[>(CASE(IS NULL($1), 0:BIGINT, $1), 0)])
+        ImpalaJoinRel(condition=[AND(OR(IS NULL($2), =($2, $0)), OR(IS NULL($0), =($2, $0)))], joinType=[right])
+          ImpalaProjectRel(i_manufact0=[$2], ITEM_CNT=[CASE(IS NOT NULL($1), $1, 0:BIGINT)])
+            ImpalaJoinRel(condition=[AND(OR(IS NULL($2), =($2, $0)), OR(IS NULL($0), =($2, $0)))], joinType=[right])
+              ImpalaAggRel(group=[{0}], ITEM_CNT=[COUNT()])
+                ImpalaProjectRel(i_manufact0=[$1])
+                  ImpalaJoinRel(condition=[=($0, $1)], joinType=[inner])
+                    ImpalaProjectRel(i_manufact=[$1])
+                      ImpalaFilterRel(condition=[AND(OR(AND(=($0, _UTF-8'Women'), SEARCH($3, Sarg[_UTF-8'khaki':VARCHAR(2147483647) CHARACTER SET "UTF-8", _UTF-8'powder':VARCHAR(2147483647) CHARACTER SET "UTF-8"]:VARCHAR(2147483647) CHARACTER SET "UTF-8"), SEARCH($4, Sarg[_UTF-8'Ounce':VARCHAR(2147483647) CHARACTER SET "UTF-8", _UTF-8'Oz':VARCHAR(2147483647) CHARACTER SET "UTF-8"]:VARCHAR(2147483647) CHARACTER SET "UTF-8"), SEARCH($2, Sarg[_UTF-8'extra large':VARCHAR(2147483647) CHARACTER SET "UTF-8", _UTF-8'medium':VARCHAR(2147483647) CHARACTER SET "UTF-8"]:VARCHAR(2147483647) CHARACTER SET "UTF-8")), AND(=($0, _UTF-8'Women'), SEARCH($3, Sarg[_UTF-8'brown':VARCHAR(2147483647) CHARACTER SET "UTF-8", _UTF-8'honeydew':VARCHAR(2147483647) CHARACTER SET "UTF-8"]:VARCHAR(2147483647) CHARACTER SET "UTF-8"), SEARCH($4, Sarg[_UTF-8'Bunch':VARCHAR(2147483647) CHARACTER SET "UTF-8", _UTF-8'Ton':VARCHAR(2147483647) CHARACTER SET "UTF-8"]:VARCHAR(2147483647) CHARACTER SET "UTF-8"), SEARCH($2, Sarg[_UTF-8'N/A':VARCHAR(2147483647) CHARACTER SET "UTF-8", _UTF-8'small':VARCHAR(2147483647) CHARACTER SET "UTF-8"]:VARCHAR(2147483647) CHARACTER SET "UTF-8")), AND(=($0, _UTF-8'Men'), SEARCH($3, Sarg[_UTF-8'deep':VARCHAR(2147483647) CHARACTER SET "UTF-8", _UTF-8'floral':VARCHAR(2147483647) CHARACTER SET "UTF-8"]:VARCHAR(2147483647) CHARACTER SET "UTF-8"), SEARCH($4, Sarg[_UTF-8'Dozen':VARCHAR(2147483647) CHARACTER SET "UTF-8", _UTF-8'N/A':VARCHAR(2147483647) CHARACTER SET "UTF-8"]:VARCHAR(2147483647) CHARACTER SET "UTF-8"), =($2, _UTF-8'petite')), AND(=($0, _UTF-8'Men'), SEARCH($3, Sarg[_UTF-8'cornflower':VARCHAR(2147483647) CHARACTER SET "UTF-8", _UTF-8'light':VARCHAR(2147483647) CHARACTER SET "UTF-8"]:VARCHAR(2147483647) CHARACTER SET "UTF-8"), SEARCH($4, Sarg[_UTF-8'Box':VARCHAR(2147483647) CHARACTER SET "UTF-8", _UTF-8'Pound':VARCHAR(2147483647) CHARACTER SET "UTF-8"]:VARCHAR(2147483647) CHARACTER SET "UTF-8"), SEARCH($2, Sarg[_UTF-8'extra large':VARCHAR(2147483647) CHARACTER SET "UTF-8", _UTF-8'medium':VARCHAR(2147483647) CHARACTER SET "UTF-8"]:VARCHAR(2147483647) CHARACTER SET "UTF-8")), AND(=($0, _UTF-8'Women'), SEARCH($3, Sarg[_UTF-8'midnight':VARCHAR(2147483647) CHARACTER SET "UTF-8", _UTF-8'snow':VARCHAR(2147483647) CHARACTER SET "UTF-8"]:VARCHAR(2147483647) CHARACTER SET "UTF-8"), SEARCH($4, Sarg[_UTF-8'Gross':VARCHAR(2147483647) CHARACTER SET "UTF-8", _UTF-8'Pallet':VARCHAR(2147483647) CHARACTER SET "UTF-8"]:VARCHAR(2147483647) CHARACTER SET "UTF-8"), SEARCH($2, Sarg[_UTF-8'extra large':VARCHAR(2147483647) CHARACTER SET "UTF-8", _UTF-8'medium':VARCHAR(2147483647) CHARACTER SET "UTF-8"]:VARCHAR(2147483647) CHARACTER SET "UTF-8")), AND(=($0, _UTF-8'Women'), SEARCH($3, Sarg[_UTF-8'cyan':VARCHAR(2147483647) CHARACTER SET "UTF-8", _UTF-8'papaya':VARCHAR(2147483647) CHARACTER SET "UTF-8"]:VARCHAR(2147483647) CHARACTER SET "UTF-8"), SEARCH($4, Sarg[_UTF-8'Cup':VARCHAR(2147483647) CHARACTER SET "UTF-8", _UTF-8'Dram':VARCHAR(2147483647) CHARACTER SET "UTF-8"]:VARCHAR(2147483647) CHARACTER SET "UTF-8"), SEARCH($2, Sarg[_UTF-8'N/A':VARCHAR(2147483647) CHARACTER SET "UTF-8", _UTF-8'small':VARCHAR(2147483647) CHARACTER SET "UTF-8"]:VARCHAR(2147483647) CHARACTER SET "UTF-8")), AND(=($0, _UTF-8'Men'), SEARCH($3, Sarg[_UTF-8'frosted':VARCHAR(2147483647) CHARACTER SET "UTF-8", _UTF-8'orange':VARCHAR(2147483647) CHARACTER SET "UTF-8"]:VARCHAR(2147483647) CHARACTER SET "UTF-8"), SEARCH($4, Sarg[_UTF-8'Each':VARCHAR(2147483647) CHARACTER SET "UTF-8", _UTF-8'Tbl':VARCHAR(2147483647) CHARACTER SET "UTF-8"]:VARCHAR(2147483647) CHARACTER SET "UTF-8"), =($2, _UTF-8'petite')), AND(=($0, _UTF-8'Men'), SEARCH($3, Sarg[_UTF-8'forest':VARCHAR(2147483647) CHARACTER SET "UTF-8", _UTF-8'ghost':VARCHAR(2147483647) CHARACTER SET "UTF-8"]:VARCHAR(2147483647) CHARACTER SET "UTF-8"), SEARCH($4, Sarg[_UTF-8'Bundle':VARCHAR(2147483647) CHARACTER SET "UTF-8", _UTF-8'Lb':VARCHAR(2147483647) CHARACTER SET "UTF-8"]:VARCHAR(2147483647) CHARACTER SET "UTF-8"), SEARCH($2, Sarg[_UTF-8'extra large':VARCHAR(2147483647) CHARACTER SET "UTF-8", _UTF-8'medium':VARCHAR(2147483647) CHARACTER SET "UTF-8"]:VARCHAR(2147483647) CHARACTER SET "UTF-8"))), IS NOT NULL($1))])
+                        ImpalaProjectRel(i_category=[$12], i_manufact=[$14], i_size=[$15], i_color=[$17], i_units=[$18])
+                          ImpalaHdfsScanRel(table=[[tpcds_partitioned_parquet_snap, item]])
+                    ImpalaAggRel(group=[{0}])
+                      ImpalaProjectRel(i_manufact=[$1])
+                        ImpalaFilterRel(condition=[AND(SEARCH($0, Sarg[[738..778]]), IS NOT NULL($1))])
+                          ImpalaProjectRel(i_manufact_id=[$13], i_manufact=[$14])
+                            ImpalaHdfsScanRel(table=[[tpcds_partitioned_parquet_snap, item]])
+              ImpalaAggRel(group=[{0}])
+                ImpalaProjectRel(i_manufact=[$1])
+                  ImpalaFilterRel(condition=[SEARCH($0, Sarg[[738..778]])])
+                    ImpalaProjectRel(i_manufact_id=[$13], i_manufact=[$14])
+                      ImpalaHdfsScanRel(table=[[tpcds_partitioned_parquet_snap, item]])
+          ImpalaProjectRel(i_manufact=[$1], i_product_name=[$2])
+            ImpalaFilterRel(condition=[SEARCH($0, Sarg[[738..778]])])
+              ImpalaProjectRel(i_manufact_id=[$13], i_manufact=[$14], i_product_name=[$21])
+                ImpalaHdfsScanRel(table=[[tpcds_partitioned_parquet_snap, item]])
+F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
+|  Per-Instance Resources: mem-estimate=87.13MB mem-reservation=8.31MB thread-reservation=1 runtime-filters-memory=1.00MB
+|  max-parallelism=1 segment-costs=[122830, 210996, 112727, 6280392, 307206, 100]
+PLAN-ROOT SINK
+|  output exprs: tpcds_partitioned_parquet_snap.item_2.i_product_name
+|  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0 cost=100
+|
+11:TOP-N [LIMIT=100]
+|  order by: tpcds_partitioned_parquet_snap.item_2.i_product_name ASC NULLS LAST
+|  mem-estimate=3.40KB mem-reservation=0B thread-reservation=0
+|  tuple-ids=12 row-size=35B cardinality=100 cost=307206
+|  in pipelines: 11(GETNEXT), 10(OPEN)
+|
+10:AGGREGATE [FINALIZE]
+|  group by: tpcds_partitioned_parquet_snap.item_2.i_product_name
+|  mem-estimate=10.00MB mem-reservation=2.88MB spill-buffer=128.00KB thread-reservation=0
+|  tuple-ids=11 row-size=35B cardinality=36.00K cost=104389
+|  in pipelines: 10(GETNEXT), 04(OPEN)
+|
+09:NESTED LOOP JOIN [RIGHT OUTER JOIN]
+|  join predicates: tpcds_partitioned_parquet_snap.item_1.i_manufact IS NULL OR tpcds_partitioned_parquet_snap.item_2.i_manufact = tpcds_partitioned_parquet_snap.item_1.i_manufact, tpcds_partitioned_parquet_snap.item_2.i_manufact IS NULL OR tpcds_partitioned_parquet_snap.item_2.i_manufact = tpcds_partitioned_parquet_snap.item_1.i_manufact
+|  predicates: CASE WHEN if(TupleIsNull(5,8), NULL, CASE WHEN count() IS NOT NULL THEN count() ELSE CAST(0 AS BIGINT) END) IS NULL THEN CAST(0 AS BIGINT) ELSE if(TupleIsNull(5,8), NULL, CASE WHEN count() IS NOT NULL THEN count() ELSE CAST(0 AS BIGINT) END) END > CAST(0 AS BIGINT)
+|  mem-estimate=2.13MB mem-reservation=0B thread-reservation=0
+|  tuple-ids=5N,8N,9 row-size=117B cardinality=36.00K cost=5791996
+|  in pipelines: 04(GETNEXT), 08(OPEN)
+|
+|--08:SCAN HDFS [tpcds_partitioned_parquet_snap.item]
+|     HDFS partitions=1/1 files=1 size=33.54MB
+|     predicates: tpcds_partitioned_parquet_snap.item_2.i_manufact_id <= CAST(778 AS INT), tpcds_partitioned_parquet_snap.item_2.i_manufact_id >= CAST(738 AS INT)
+|     stored statistics:
+|       table: rows=360.00K size=33.54MB
+|       columns: all
+|     extrapolated-rows=disabled max-scan-range-rows=101.54K
+|     parquet statistics predicates: tpcds_partitioned_parquet_snap.item_2.i_manufact_id <= CAST(778 AS INT), tpcds_partitioned_parquet_snap.item_2.i_manufact_id >= CAST(738 AS INT)
+|     parquet dictionary predicates: tpcds_partitioned_parquet_snap.item_2.i_manufact_id <= CAST(778 AS INT), tpcds_partitioned_parquet_snap.item_2.i_manufact_id >= CAST(738 AS INT)
+|     mem-estimate=16.00MB mem-reservation=512.00KB thread-reservation=0
+|     tuple-ids=9 row-size=62B cardinality=36.00K cost=217970
+|     in pipelines: 08(GETNEXT)
+|
+07:NESTED LOOP JOIN [RIGHT OUTER JOIN]
+|  join predicates: tpcds_partitioned_parquet_snap.item_0.i_manufact IS NULL OR tpcds_partitioned_parquet_snap.item_1.i_manufact = tpcds_partitioned_parquet_snap.item_0.i_manufact, tpcds_partitioned_parquet_snap.item_1.i_manufact IS NULL OR tpcds_partitioned_parquet_snap.item_1.i_manufact = tpcds_partitioned_parquet_snap.item_0.i_manufact
+|  mem-estimate=23.47KB mem-reservation=0B thread-reservation=0
+|  tuple-ids=5N,8 row-size=55B cardinality=1.03K cost=166037
+|  in pipelines: 04(GETNEXT), 06(OPEN)
+|
+|--06:AGGREGATE [FINALIZE]
+|  |  group by: tpcds_partitioned_parquet_snap.item_1.i_manufact
+|  |  mem-estimate=10.00MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
+|  |  tuple-ids=8 row-size=23B cardinality=1.03K cost=13220
+|  |  in pipelines: 06(GETNEXT), 05(OPEN)
+|  |
+|  05:SCAN HDFS [tpcds_partitioned_parquet_snap.item]
+|     HDFS partitions=1/1 files=1 size=33.54MB
+|     predicates: tpcds_partitioned_parquet_snap.item_1.i_manufact_id <= CAST(778 AS INT), tpcds_partitioned_parquet_snap.item_1.i_manufact_id >= CAST(738 AS INT)
+|     stored statistics:
+|       table: rows=360.00K size=33.54MB
+|       columns: all
+|     extrapolated-rows=disabled max-scan-range-rows=101.54K
+|     parquet statistics predicates: tpcds_partitioned_parquet_snap.item_1.i_manufact_id <= CAST(778 AS INT), tpcds_partitioned_parquet_snap.item_1.i_manufact_id >= CAST(738 AS INT)
+|     parquet dictionary predicates: tpcds_partitioned_parquet_snap.item_1.i_manufact_id <= CAST(778 AS INT), tpcds_partitioned_parquet_snap.item_1.i_manufact_id >= CAST(738 AS INT)
+|     mem-estimate=16.00MB mem-reservation=512.00KB thread-reservation=0
+|     tuple-ids=6 row-size=27B cardinality=36.00K cost=99507
+|     in pipelines: 05(GETNEXT)
+|
+04:AGGREGATE [FINALIZE]
+|  output: count()
+|  group by: tpcds_partitioned_parquet_snap.item_0.i_manufact
+|  mem-estimate=10.00MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
+|  tuple-ids=5 row-size=31B cardinality=1.03K cost=18608
+|  in pipelines: 04(GETNEXT), 00(OPEN)
+|
+03:HASH JOIN [INNER JOIN]
+|  hash predicates: tpcds_partitioned_parquet_snap.item.i_manufact = tpcds_partitioned_parquet_snap.item_0.i_manufact
+|  fk/pk conjuncts: none
+|  runtime filters: RF000[bloom] <- tpcds_partitioned_parquet_snap.item_0.i_manufact, RF001[min_max] <- tpcds_partitioned_parquet_snap.item_0.i_manufact
+|  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
+|  tuple-ids=0,4 row-size=114B cardinality=54.42K cost=10932
+|  in pipelines: 00(GETNEXT), 02(OPEN)
+|
+|--02:AGGREGATE [FINALIZE]
+|  |  group by: tpcds_partitioned_parquet_snap.item_0.i_manufact
+|  |  mem-estimate=10.00MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
+|  |  tuple-ids=4 row-size=23B cardinality=1.03K cost=13207
+|  |  in pipelines: 02(GETNEXT), 01(OPEN)
+|  |
+|  01:SCAN HDFS [tpcds_partitioned_parquet_snap.item]
+|     HDFS partitions=1/1 files=1 size=33.54MB
+|     predicates: tpcds_partitioned_parquet_snap.item_0.i_manufact_id <= CAST(778 AS INT), tpcds_partitioned_parquet_snap.item_0.i_manufact_id >= CAST(738 AS INT), tpcds_partitioned_parquet_snap.item_0.i_manufact IS NOT NULL
+|     stored statistics:
+|       table: rows=360.00K size=33.54MB
+|       columns: all
+|     extrapolated-rows=disabled max-scan-range-rows=101.54K
+|     parquet statistics predicates: tpcds_partitioned_parquet_snap.item_0.i_manufact_id <= CAST(778 AS INT), tpcds_partitioned_parquet_snap.item_0.i_manufact_id >= CAST(738 AS INT)
+|     parquet dictionary predicates: tpcds_partitioned_parquet_snap.item_0.i_manufact_id <= CAST(778 AS INT), tpcds_partitioned_parquet_snap.item_0.i_manufact_id >= CAST(738 AS INT), tpcds_partitioned_parquet_snap.item_0.i_manufact IS NOT NULL
+|     mem-estimate=16.00MB mem-reservation=512.00KB thread-reservation=0
+|     tuple-ids=2 row-size=27B cardinality=35.95K cost=109623
+|     in pipelines: 01(GETNEXT)
+|
+00:SCAN HDFS [tpcds_partitioned_parquet_snap.item]
+   HDFS partitions=1/1 files=1 size=33.54MB
+   predicates: tpcds_partitioned_parquet_snap.item.i_category = 'Women' AND tpcds_partitioned_parquet_snap.item.i_color IN ('khaki', 'powder') AND tpcds_partitioned_parquet_snap.item.i_units IN ('Ounce', 'Oz') AND tpcds_partitioned_parquet_snap.item.i_size IN ('extra large', 'medium') OR tpcds_partitioned_parquet_snap.item.i_category = 'Women' AND tpcds_partitioned_parquet_snap.item.i_color IN ('brown', 'honeydew') AND tpcds_partitioned_parquet_snap.item.i_units IN ('Bunch', 'Ton') AND tpcds_partitioned_parquet_snap.item.i_size IN ('N/A', 'small') OR tpcds_partitioned_parquet_snap.item.i_category = 'Men' AND tpcds_partitioned_parquet_snap.item.i_color IN ('deep', 'floral') AND tpcds_partitioned_parquet_snap.item.i_units IN ('Dozen', 'N/A') AND tpcds_partitioned_parquet_snap.item.i_size = 'petite' OR tpcds_partitioned_parquet_snap.item.i_category = 'Men' AND tpcds_partitioned_parquet_snap.item.i_color IN ('cornflower', 'light') AND tpcds_partitioned_parquet_snap.item.i_units IN ('Box', 'Pound') AND tpcds_partitioned_parquet_snap.item.i_size IN ('extra large', 'medium') OR tpcds_partitioned_parquet_snap.item.i_category = 'Women' AND tpcds_partitioned_parquet_snap.item.i_color IN ('midnight', 'snow') AND tpcds_partitioned_parquet_snap.item.i_units IN ('Gross', 'Pallet') AND tpcds_partitioned_parquet_snap.item.i_size IN ('extra large', 'medium') OR tpcds_partitioned_parquet_snap.item.i_category = 'Women' AND tpcds_partitioned_parquet_snap.item.i_color IN ('cyan', 'papaya') AND tpcds_partitioned_parquet_snap.item.i_units IN ('Cup', 'Dram') AND tpcds_partitioned_parquet_snap.item.i_size IN ('N/A', 'small') OR tpcds_partitioned_parquet_snap.item.i_category = 'Men' AND tpcds_partitioned_parquet_snap.item.i_color IN ('frosted', 'orange') AND tpcds_partitioned_parquet_snap.item.i_units IN ('Each', 'Tbl') AND tpcds_partitioned_parquet_snap.item.i_size = 'petite' OR tpcds_partitioned_parquet_snap.item.i_category = 'Men' AND tpcds_partitioned_parquet_snap.item.i_color IN ('forest', 'ghost') AND tpcds_partitioned_parquet_snap.item.i_units IN ('Bundle', 'Lb') AND tpcds_partitioned_parquet_snap.item.i_size IN ('extra large', 'medium'), tpcds_partitioned_parquet_snap.item.i_manufact IS NOT NULL
+   runtime filters: RF001[min_max] -> tpcds_partitioned_parquet_snap.item.i_manufact, RF000[bloom] -> tpcds_partitioned_parquet_snap.item.i_manufact
+   stored statistics:
+     table: rows=360.00K size=33.54MB
+     columns: all
+   extrapolated-rows=disabled max-scan-range-rows=101.54K
+   parquet dictionary predicates: tpcds_partitioned_parquet_snap.item.i_manufact IS NOT NULL
+   mem-estimate=16.00MB mem-reservation=512.00KB thread-reservation=0
+   tuple-ids=0 row-size=91B cardinality=156 cost=181456
+   in pipelines: 00(GETNEXT)
+====

@@ -1,0 +1,279 @@
+# TPCDS-Q70
+select
+    sum(ss_net_profit) as total_sum
+   ,s_state
+   ,s_county
+   ,grouping(s_state)+grouping(s_county) as lochierarchy
+   ,rank() over (
+        partition by grouping(s_state)+grouping(s_county),
+        case when grouping(s_county) = 0 then s_state end
+        order by sum(ss_net_profit) desc) as rank_within_parent
+ from
+    store_sales
+   ,date_dim       d1
+   ,store
+ where
+    d1.d_month_seq between 1212 and 1212+11
+ and d1.d_date_sk = ss_sold_date_sk
+ and s_store_sk  = ss_store_sk
+ and s_state in
+             ( select s_state
+               from  (select s_state as s_state,
+                            rank() over ( partition by s_state order by sum(ss_net_profit) desc) as ranking
+                      from   store_sales, store, date_dim
+                      where  d_month_seq between 1212 and 1212+11
+                            and d_date_sk = ss_sold_date_sk
+                            and s_store_sk  = ss_store_sk
+                      group by s_state
+                     ) tmp1
+               where ranking <= 5
+             )
+ group by rollup(s_state,s_county)
+ order by
+   lochierarchy desc
+  -- Modified from original because Impala does not allow aliases within order by
+  -- expressions, except at the top level.
+  ,case when grouping(s_state)+grouping(s_county) = 0 then s_state end
+  ,rank_within_parent
+ limit 100
+---- PLAN
+Max Per-Host Resource Reservation: Memory=85.41MB Threads=1
+Per-Host Resource Estimates: Memory=88.23GB
+ImpalaSequence
+  ImpalaProjectRel(TOTAL_SUM=[$0], S_STATE=[$1], S_COUNTY=[$2], LOCHIERARCHY=[$3], RANK_WITHIN_PARENT=[$4])
+    ImpalaSortRel(sort0=[$3], sort1=[$5], sort2=[$4], dir0=[DESC], dir1=[ASC], dir2=[ASC], fetch=[100:TINYINT])
+      ImpalaAnalyticRel(TOTAL_SUM=[$2], S_STATE=[$0], S_COUNTY=[$1], LOCHIERARCHY=[+(CAST($3):SMALLINT, CAST($4):SMALLINT)], RANK_WITHIN_PARENT=[RANK() OVER (PARTITION BY +(CAST($3):SMALLINT, CAST($4):SMALLINT), CASE(=($4, 0), $0, null:VARCHAR(2147483647) CHARACTER SET "UTF-8") ORDER BY $2 DESC)], EXPR$5=[CASE(=(+(CAST($3):SMALLINT, CAST($4):SMALLINT), 0), $0, null:VARCHAR(2147483647) CHARACTER SET "UTF-8")])
+        ImpalaAggRel(group=[{0, 1}], groups=[[{0, 1}, {0}, {}]], TOTAL_SUM=[SUM($2)], agg#1=[GROUPING($0)], agg#2=[GROUPING($1)])
+          ImpalaProjectRel(S_STATE=[$5], S_COUNTY=[$4], ss_net_profit=[$1])
+            ImpalaJoinRel(condition=[=($7, $2)], joinType=[inner])
+              ImpalaJoinRel(condition=[=($3, $0)], joinType=[inner])
+                ImpalaCTEConsumer(cteName=[cte_suggestion_0])
+                ImpalaJoinRel(condition=[=($2, $3)], joinType=[inner])
+                  ImpalaFilterRel(condition=[AND(IS NOT NULL($0), IS NOT NULL($2))])
+                    ImpalaProjectRel(s_store_sk=[$0], s_county=[$23], s_state=[$24])
+                      ImpalaHdfsScanRel(table=[[tpcds_partitioned_parquet_snap, store]])
+                  ImpalaProjectRel(S_STATE=[$0])
+                    ImpalaFilterRel(condition=[AND(<=($1, 5), IS NOT NULL($0))])
+                      ImpalaAnalyticRel(S_STATE=[$0], RANKING=[RANK() OVER (PARTITION BY $0 ORDER BY $1 DESC)])
+                        ImpalaAggRel(group=[{0}], agg#0=[SUM($1)])
+                          ImpalaProjectRel(S_STATE=[$5], ss_net_profit=[$1])
+                            ImpalaJoinRel(condition=[=($4, $0)], joinType=[inner])
+                              ImpalaJoinRel(condition=[=($3, $2)], joinType=[inner])
+                                ImpalaCTEConsumer(cteName=[cte_suggestion_0])
+                                ImpalaCTEConsumer(cteName=[cte_suggestion_1])
+                              ImpalaFilterRel(condition=[IS NOT NULL($0)])
+                                ImpalaProjectRel(s_store_sk=[$0], s_state=[$24])
+                                  ImpalaHdfsScanRel(table=[[tpcds_partitioned_parquet_snap, store]])
+              ImpalaCTEConsumer(cteName=[cte_suggestion_1])
+  ImpalaCTEProducer(readType=[EAGER], writeType=[EAGER], cteName=[cte_suggestion_0])
+    ImpalaFilterRel(condition=[AND(IS NOT NULL($2), IS NOT NULL($0))])
+      ImpalaProjectRel(ss_store_sk=[$6], ss_net_profit=[$21], ss_sold_date_sk=[$22])
+        ImpalaHdfsScanRel(table=[[tpcds_partitioned_parquet_snap, store_sales]])
+  ImpalaCTEProducer(readType=[EAGER], writeType=[EAGER], cteName=[cte_suggestion_1])
+    ImpalaProjectRel(d_date_sk=[$0])
+      ImpalaFilterRel(condition=[AND(SEARCH($1, Sarg[[1212..1223]]), IS NOT NULL($0))])
+        ImpalaProjectRel(d_date_sk=[$0], d_month_seq=[$3])
+          ImpalaHdfsScanRel(table=[[tpcds_partitioned_parquet_snap, date_dim]])
+F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
+|  Per-Instance Resources: mem-estimate=88.23GB mem-reservation=85.41MB thread-reservation=1 runtime-filters-memory=1.00MB
+|  max-parallelism=1 segment-costs=[9201337999, 79, 9845400328, 8242, 3284, 9372, 1657382579]
+PLAN-ROOT SINK
+|  output exprs: aggif(valid_tid(19,20,21) IN (19, 20, 21), CASE valid_tid(19,20,21) WHEN 19 THEN sum(ss_net_profit) WHEN 20 THEN sum(ss_net_profit) WHEN 21 THEN sum(ss_net_profit) END), CASE valid_tid(19,20,21) WHEN 19 THEN tpcds_partitioned_parquet_snap.store.s_state WHEN 20 THEN tpcds_partitioned_parquet_snap.store.s_state WHEN 21 THEN NULL END, CASE valid_tid(19,20,21) WHEN 19 THEN tpcds_partitioned_parquet_snap.store.s_county WHEN 20 THEN NULL WHEN 21 THEN NULL END, add(CAST(aggif(valid_tid(19,20,21) IN (19, 20, 21), CASE valid_tid(19,20,21) WHEN 19 THEN 0 WHEN 20 THEN 0 WHEN 21 THEN 1 END) AS SMALLINT), CAST(aggif(valid_tid(19,20,21) IN (19, 20, 21), CASE valid_tid(19,20,21) WHEN 19 THEN 0 WHEN 20 THEN 1 WHEN 21 THEN 1 END) AS SMALLINT)), rank()
+|  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0 cost=500
+|
+00:SEQUENCE
+|  mem-estimate=0B mem-reservation=0B thread-reservation=0
+|  tuple-ids=29 row-size=50B cardinality=100 cost=0
+|  in pipelines: 24(GETNEXT), 02(OPEN), 04(OPEN)
+|
+|--03:CTE PRODUCER [cte_suggestion_1]
+|  |  mem-estimate=6.00MB mem-reservation=6.00MB spill-buffer=2.00MB thread-reservation=0
+|  |  tuple-ids=2 row-size=8B cardinality=7.30K cost=0
+|  |  in pipelines: 04(GETNEXT)
+|  |
+|  04:SCAN HDFS [tpcds_partitioned_parquet_snap.date_dim]
+|     HDFS partitions=1/1 files=1 size=2.17MB
+|     predicates: tpcds_partitioned_parquet_snap.date_dim.d_month_seq <= CAST(1223 AS INT), tpcds_partitioned_parquet_snap.date_dim.d_month_seq >= CAST(1212 AS INT), tpcds_partitioned_parquet_snap.date_dim.d_date_sk IS NOT NULL
+|     stored statistics:
+|       table: rows=73.05K size=2.17MB
+|       columns: all
+|     extrapolated-rows=disabled max-scan-range-rows=73.05K
+|     parquet statistics predicates: tpcds_partitioned_parquet_snap.date_dim.d_month_seq <= CAST(1223 AS INT), tpcds_partitioned_parquet_snap.date_dim.d_month_seq >= CAST(1212 AS INT)
+|     parquet dictionary predicates: tpcds_partitioned_parquet_snap.date_dim.d_month_seq <= CAST(1223 AS INT), tpcds_partitioned_parquet_snap.date_dim.d_month_seq >= CAST(1212 AS INT), tpcds_partitioned_parquet_snap.date_dim.d_date_sk IS NOT NULL
+|     mem-estimate=16.00MB mem-reservation=512.00KB thread-reservation=0
+|     tuple-ids=2 row-size=8B cardinality=7.30K cost=14573
+|     in pipelines: 04(GETNEXT)
+|
+|--01:CTE PRODUCER [cte_suggestion_0]
+|  |  mem-estimate=88.05GB mem-reservation=6.00MB spill-buffer=2.00MB thread-reservation=0
+|  |  tuple-ids=0 row-size=12B cardinality=7.88G cost=0
+|  |  in pipelines: 02(GETNEXT)
+|  |
+|  02:SCAN HDFS [tpcds_partitioned_parquet_snap.store_sales]
+|     partition predicates: tpcds_partitioned_parquet_snap.store_sales.ss_sold_date_sk IS NOT NULL
+|     HDFS partitions=1823/1824 files=1823 size=389.69GB
+|     predicates: tpcds_partitioned_parquet_snap.store_sales.ss_store_sk IS NOT NULL
+|     stored statistics:
+|       table: rows=8.64G size=389.90GB
+|       partitions: 1823/1823 rows=8.25G
+|       columns: all
+|     extrapolated-rows=disabled max-scan-range-rows=12.40M
+|     parquet dictionary predicates: tpcds_partitioned_parquet_snap.store_sales.ss_store_sk IS NOT NULL
+|     mem-estimate=16.00MB mem-reservation=512.00KB thread-reservation=0
+|     tuple-ids=0 row-size=12B cardinality=7.88G cost=1657367506
+|     in pipelines: 02(GETNEXT)
+|
+24:TOP-N [LIMIT=100]
+|  order by: add(aggif(valid_tid(19,20,21) IN (19, 20, 21), CASE valid_tid(19,20,21) WHEN 19 THEN 0 WHEN 20 THEN 0 WHEN 21 THEN 1 END), aggif(valid_tid(19,20,21) IN (19, 20, 21), CASE valid_tid(19,20,21) WHEN 19 THEN 0 WHEN 20 THEN 1 WHEN 21 THEN 1 END)) DESC NULLS FIRST, CASE WHEN add(aggif(valid_tid(19,20,21) IN (19, 20, 21), CASE valid_tid(19,20,21) WHEN 19 THEN 0 WHEN 20 THEN 0 WHEN 21 THEN 1 END), aggif(valid_tid(19,20,21) IN (19, 20, 21), CASE valid_tid(19,20,21) WHEN 19 THEN 0 WHEN 20 THEN 1 WHEN 21 THEN 1 END)) = 0 THEN CASE valid_tid(19,20,21) WHEN 19 THEN tpcds_partitioned_parquet_snap.store.s_state WHEN 20 THEN tpcds_partitioned_parquet_snap.store.s_state WHEN 21 THEN NULL END ELSE NULL END ASC NULLS LAST, rank() ASC NULLS LAST
+|  mem-estimate=4.88KB mem-reservation=0B thread-reservation=0
+|  tuple-ids=29 row-size=50B cardinality=100 cost=8008
+|  in pipelines: 24(GETNEXT), 22(OPEN)
+|
+23:ANALYTIC
+|  functions: rank()
+|  partition by: add(aggif(valid_tid(19,20,21) IN (19, 20, 21), CASE valid_tid(19,20,21) WHEN 19 THEN 0 WHEN 20 THEN 0 WHEN 21 THEN 1 END), aggif(valid_tid(19,20,21) IN (19, 20, 21), CASE valid_tid(19,20,21) WHEN 19 THEN 0 WHEN 20 THEN 1 WHEN 21 THEN 1 END)), CASE WHEN aggif(valid_tid(19,20,21) IN (19, 20, 21), CASE valid_tid(19,20,21) WHEN 19 THEN 0 WHEN 20 THEN 1 WHEN 21 THEN 1 END) = 0 THEN CASE valid_tid(19,20,21) WHEN 19 THEN tpcds_partitioned_parquet_snap.store.s_state WHEN 20 THEN tpcds_partitioned_parquet_snap.store.s_state WHEN 21 THEN NULL END ELSE NULL END
+|  order by: aggif(valid_tid(19,20,21) IN (19, 20, 21), CASE valid_tid(19,20,21) WHEN 19 THEN sum(ss_net_profit) WHEN 20 THEN sum(ss_net_profit) WHEN 21 THEN sum(ss_net_profit) END) DESC
+|  window: RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+|  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
+|  tuple-ids=27,26 row-size=54B cardinality=1.36K cost=1364
+|  in pipelines: 22(GETNEXT)
+|
+22:SORT
+|  order by: add(aggif(valid_tid(19,20,21) IN (19, 20, 21), CASE valid_tid(19,20,21) WHEN 19 THEN 0 WHEN 20 THEN 0 WHEN 21 THEN 1 END), aggif(valid_tid(19,20,21) IN (19, 20, 21), CASE valid_tid(19,20,21) WHEN 19 THEN 0 WHEN 20 THEN 1 WHEN 21 THEN 1 END)) ASC NULLS LAST, CASE WHEN aggif(valid_tid(19,20,21) IN (19, 20, 21), CASE valid_tid(19,20,21) WHEN 19 THEN 0 WHEN 20 THEN 1 WHEN 21 THEN 1 END) = 0 THEN CASE valid_tid(19,20,21) WHEN 19 THEN tpcds_partitioned_parquet_snap.store.s_state WHEN 20 THEN tpcds_partitioned_parquet_snap.store.s_state WHEN 21 THEN NULL END ELSE NULL END ASC NULLS LAST, aggif(valid_tid(19,20,21) IN (19, 20, 21), CASE valid_tid(19,20,21) WHEN 19 THEN sum(ss_net_profit) WHEN 20 THEN sum(ss_net_profit) WHEN 21 THEN sum(ss_net_profit) END) DESC NULLS FIRST
+|  mem-estimate=12.00MB mem-reservation=12.00MB spill-buffer=2.00MB thread-reservation=0
+|  tuple-ids=27 row-size=46B cardinality=1.36K cost=3284
+|  in pipelines: 22(GETNEXT), 21(OPEN)
+|
+21:AGGREGATE [FINALIZE]
+|  output: aggif(valid_tid(19,20,21) IN (CAST(19 AS INT), CAST(20 AS INT), CAST(21 AS INT)), CASE valid_tid(19,20,21) WHEN CAST(19 AS INT) THEN sum(ss_net_profit) WHEN CAST(20 AS INT) THEN sum(ss_net_profit) WHEN CAST(21 AS INT) THEN sum(ss_net_profit) END), aggif(valid_tid(19,20,21) IN (CAST(19 AS INT), CAST(20 AS INT), CAST(21 AS INT)), CASE valid_tid(19,20,21) WHEN CAST(19 AS INT) THEN CAST(0 AS TINYINT) WHEN CAST(20 AS INT) THEN CAST(0 AS TINYINT) WHEN CAST(21 AS INT) THEN CAST(1 AS TINYINT) END), aggif(valid_tid(19,20,21) IN (CAST(19 AS INT), CAST(20 AS INT), CAST(21 AS INT)), CASE valid_tid(19,20,21) WHEN CAST(19 AS INT) THEN CAST(0 AS TINYINT) WHEN CAST(20 AS INT) THEN CAST(1 AS TINYINT) WHEN CAST(21 AS INT) THEN CAST(1 AS TINYINT) END)
+|  group by: CASE valid_tid(19,20,21) WHEN CAST(19 AS INT) THEN tpcds_partitioned_parquet_snap.store.s_state WHEN CAST(20 AS INT) THEN tpcds_partitioned_parquet_snap.store.s_state WHEN CAST(21 AS INT) THEN NULL END, CASE valid_tid(19,20,21) WHEN CAST(19 AS INT) THEN tpcds_partitioned_parquet_snap.store.s_county WHEN CAST(20 AS INT) THEN NULL WHEN CAST(21 AS INT) THEN NULL END, CASE valid_tid(19,20,21) WHEN CAST(19 AS INT) THEN CAST(19 AS INT) WHEN CAST(20 AS INT) THEN CAST(20 AS INT) WHEN CAST(21 AS INT) THEN CAST(21 AS INT) END
+|  mem-estimate=10.00MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
+|  tuple-ids=22 row-size=46B cardinality=1.36K cost=8242
+|  in pipelines: 21(GETNEXT), 20(OPEN)
+|
+20:AGGREGATE [FINALIZE]
+|  Class 0
+|    output: sum(ss_net_profit)
+|    group by: tpcds_partitioned_parquet_snap.store.s_state, tpcds_partitioned_parquet_snap.store.s_county
+|  Class 1
+|    output: sum(ss_net_profit)
+|    group by: tpcds_partitioned_parquet_snap.store.s_state, NULL
+|  Class 2
+|    output: sum(ss_net_profit)
+|    group by: NULL, NULL
+|  mem-estimate=30.00MB mem-reservation=5.81MB thread-reservation=0
+|  tuple-ids=19N,20N,21N row-size=138B cardinality=1.36K cost=6803161436
+|  in pipelines: 20(GETNEXT), 05(OPEN)
+|
+19:HASH JOIN [INNER JOIN]
+|  hash predicates: ss_sold_date_sk = d_date_sk
+|  fk/pk conjuncts: ss_sold_date_sk = d_date_sk
+|  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
+|  tuple-ids=4,5,16,15,18 row-size=98B cardinality=1.65G cost=722356735
+|  in pipelines: 05(GETNEXT), 18(OPEN)
+|
+|--18:CTE CONSUMER [cte_suggestion_1]
+|     mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
+|     tuple-ids=18 row-size=8B cardinality=7.30K cost=0
+|     in pipelines: 18(GETNEXT)
+|
+17:HASH JOIN [INNER JOIN]
+|  hash predicates: ss_store_sk = tpcds_partitioned_parquet_snap.store.s_store_sk
+|  fk/pk conjuncts: ss_store_sk = tpcds_partitioned_parquet_snap.store.s_store_sk
+|  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
+|  tuple-ids=4,5,16,15 row-size=94B cardinality=1.65G cost=2319881543
+|  in pipelines: 05(GETNEXT), 06(OPEN)
+|
+|--16:HASH JOIN [INNER JOIN]
+|  |  hash predicates: tpcds_partitioned_parquet_snap.store.s_state = tpcds_partitioned_parquet_snap.store_0.s_state
+|  |  fk/pk conjuncts: none
+|  |  runtime filters: RF002[bloom] <- tpcds_partitioned_parquet_snap.store_0.s_state, RF003[min_max] <- tpcds_partitioned_parquet_snap.store_0.s_state
+|  |  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
+|  |  tuple-ids=5,16,15 row-size=82B cardinality=140 cost=64
+|  |  in pipelines: 06(GETNEXT), 13(OPEN)
+|  |
+|  |--15:SELECT
+|  |  |  predicates: tpcds_partitioned_parquet_snap.store_0.s_state IS NOT NULL, rank() <= CAST(5 AS BIGINT)
+|  |  |  mem-estimate=0B mem-reservation=0B thread-reservation=0
+|  |  |  tuple-ids=16,15 row-size=38B cardinality=3 cost=58
+|  |  |  in pipelines: 13(GETNEXT)
+|  |  |
+|  |  14:ANALYTIC
+|  |  |  functions: rank()
+|  |  |  partition by: tpcds_partitioned_parquet_snap.store_0.s_state
+|  |  |  order by: sum(ss_net_profit) DESC
+|  |  |  window: RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+|  |  |  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
+|  |  |  tuple-ids=16,15 row-size=38B cardinality=29 cost=29
+|  |  |  in pipelines: 13(GETNEXT)
+|  |  |
+|  |  13:TOP-N
+|  |  |  partition by: tpcds_partitioned_parquet_snap.store_0.s_state
+|  |  |  order by: sum(ss_net_profit) DESC NULLS FIRST
+|  |  |  partition limit: 5 (include ties)
+|  |  |  source expr: rank() <= CAST(5 AS BIGINT)
+|  |  |  mem-estimate=12.00MB mem-reservation=12.00MB spill-buffer=2.00MB thread-reservation=0
+|  |  |  tuple-ids=16 row-size=30B cardinality=29 cost=79
+|  |  |  in pipelines: 13(GETNEXT), 12(OPEN)
+|  |  |
+|  |  12:AGGREGATE [FINALIZE]
+|  |  |  output: sum(ss_net_profit)
+|  |  |  group by: tpcds_partitioned_parquet_snap.store_0.s_state
+|  |  |  mem-estimate=10.00MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
+|  |  |  tuple-ids=11 row-size=30B cardinality=29 cost=2304468580
+|  |  |  in pipelines: 12(GETNEXT), 07(OPEN)
+|  |  |
+|  |  11:HASH JOIN [INNER JOIN]
+|  |  |  hash predicates: ss_store_sk = tpcds_partitioned_parquet_snap.store_0.s_store_sk
+|  |  |  fk/pk conjuncts: ss_store_sk = tpcds_partitioned_parquet_snap.store_0.s_store_sk
+|  |  |  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
+|  |  |  tuple-ids=7,8,9 row-size=34B cardinality=7.88G cost=3448431655
+|  |  |  in pipelines: 07(GETNEXT), 10(OPEN)
+|  |  |
+|  |  |--10:SCAN HDFS [tpcds_partitioned_parquet_snap.store]
+|  |  |     HDFS partitions=1/1 files=1 size=119.76KB
+|  |  |     predicates: tpcds_partitioned_parquet_snap.store_0.s_store_sk IS NOT NULL
+|  |  |     stored statistics:
+|  |  |       table: rows=1.35K size=119.76KB
+|  |  |       columns: all
+|  |  |     extrapolated-rows=disabled max-scan-range-rows=1.35K
+|  |  |     parquet dictionary predicates: tpcds_partitioned_parquet_snap.store_0.s_store_sk IS NOT NULL
+|  |  |     mem-estimate=16.00MB mem-reservation=16.00KB thread-reservation=0
+|  |  |     tuple-ids=9 row-size=18B cardinality=1.35K cost=154
+|  |  |     in pipelines: 10(GETNEXT)
+|  |  |
+|  |  09:HASH JOIN [INNER JOIN]
+|  |  |  hash predicates: ss_sold_date_sk = d_date_sk
+|  |  |  fk/pk conjuncts: ss_sold_date_sk = d_date_sk
+|  |  |  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
+|  |  |  tuple-ids=7,8 row-size=16B cardinality=7.88G cost=3448437610
+|  |  |  in pipelines: 07(GETNEXT), 08(OPEN)
+|  |  |
+|  |  |--08:CTE CONSUMER [cte_suggestion_1]
+|  |  |     mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
+|  |  |     tuple-ids=8 row-size=8B cardinality=7.30K cost=0
+|  |  |     in pipelines: 08(GETNEXT)
+|  |  |
+|  |  07:CTE CONSUMER [cte_suggestion_0]
+|  |     mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
+|  |     tuple-ids=7 row-size=12B cardinality=7.88G cost=0
+|  |     in pipelines: 07(GETNEXT)
+|  |
+|  06:SCAN HDFS [tpcds_partitioned_parquet_snap.store]
+|     HDFS partitions=1/1 files=1 size=119.76KB
+|     predicates: tpcds_partitioned_parquet_snap.store.s_state IS NOT NULL, tpcds_partitioned_parquet_snap.store.s_store_sk IS NOT NULL
+|     runtime filters: RF003[min_max] -> tpcds_partitioned_parquet_snap.store.s_state, RF002[bloom] -> tpcds_partitioned_parquet_snap.store.s_state
+|     stored statistics:
+|       table: rows=1.35K size=119.76KB
+|       columns: all
+|     extrapolated-rows=disabled max-scan-range-rows=1.35K
+|     parquet dictionary predicates: tpcds_partitioned_parquet_snap.store.s_state IS NOT NULL, tpcds_partitioned_parquet_snap.store.s_store_sk IS NOT NULL
+|     mem-estimate=16.00MB mem-reservation=24.00KB thread-reservation=0
+|     tuple-ids=5 row-size=44B cardinality=140(filtered from 1.34K) cost=463
+|     in pipelines: 06(GETNEXT)
+|
+05:CTE CONSUMER [cte_suggestion_0]
+   mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
+   tuple-ids=4 row-size=12B cardinality=7.88G cost=0
+   in pipelines: 05(GETNEXT)
+====

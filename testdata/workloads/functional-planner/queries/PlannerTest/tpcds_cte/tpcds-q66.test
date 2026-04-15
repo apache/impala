@@ -1,0 +1,522 @@
+# TPCDS-Q66
+select
+         w_warehouse_name
+ 	,w_warehouse_sq_ft
+ 	,w_city
+ 	,w_county
+ 	,w_state
+ 	,w_country
+        ,ship_carriers
+        ,year
+ 	,sum(jan_sales) as jan_sales
+ 	,sum(feb_sales) as feb_sales
+ 	,sum(mar_sales) as mar_sales
+ 	,sum(apr_sales) as apr_sales
+ 	,sum(may_sales) as may_sales
+ 	,sum(jun_sales) as jun_sales
+ 	,sum(jul_sales) as jul_sales
+ 	,sum(aug_sales) as aug_sales
+ 	,sum(sep_sales) as sep_sales
+ 	,sum(oct_sales) as oct_sales
+ 	,sum(nov_sales) as nov_sales
+ 	,sum(dec_sales) as dec_sales
+ 	,sum(jan_sales/w_warehouse_sq_ft) as jan_sales_per_sq_foot
+ 	,sum(feb_sales/w_warehouse_sq_ft) as feb_sales_per_sq_foot
+ 	,sum(mar_sales/w_warehouse_sq_ft) as mar_sales_per_sq_foot
+ 	,sum(apr_sales/w_warehouse_sq_ft) as apr_sales_per_sq_foot
+ 	,sum(may_sales/w_warehouse_sq_ft) as may_sales_per_sq_foot
+ 	,sum(jun_sales/w_warehouse_sq_ft) as jun_sales_per_sq_foot
+ 	,sum(jul_sales/w_warehouse_sq_ft) as jul_sales_per_sq_foot
+ 	,sum(aug_sales/w_warehouse_sq_ft) as aug_sales_per_sq_foot
+ 	,sum(sep_sales/w_warehouse_sq_ft) as sep_sales_per_sq_foot
+ 	,sum(oct_sales/w_warehouse_sq_ft) as oct_sales_per_sq_foot
+ 	,sum(nov_sales/w_warehouse_sq_ft) as nov_sales_per_sq_foot
+ 	,sum(dec_sales/w_warehouse_sq_ft) as dec_sales_per_sq_foot
+ 	,sum(jan_net) as jan_net
+ 	,sum(feb_net) as feb_net
+ 	,sum(mar_net) as mar_net
+ 	,sum(apr_net) as apr_net
+ 	,sum(may_net) as may_net
+ 	,sum(jun_net) as jun_net
+ 	,sum(jul_net) as jul_net
+ 	,sum(aug_net) as aug_net
+ 	,sum(sep_net) as sep_net
+ 	,sum(oct_net) as oct_net
+ 	,sum(nov_net) as nov_net
+ 	,sum(dec_net) as dec_net
+ from (
+     select
+ 	w_warehouse_name
+ 	,w_warehouse_sq_ft
+ 	,w_city
+ 	,w_county
+ 	,w_state
+ 	,w_country
+ 	,'HARMSTORF' || ',' || 'USPS' as ship_carriers
+       ,d_year as year
+ 	,sum(case when d_moy = 1
+ 		then ws_sales_price* ws_quantity else 0 end) as jan_sales
+ 	,sum(case when d_moy = 2
+ 		then ws_sales_price* ws_quantity else 0 end) as feb_sales
+ 	,sum(case when d_moy = 3
+ 		then ws_sales_price* ws_quantity else 0 end) as mar_sales
+ 	,sum(case when d_moy = 4
+ 		then ws_sales_price* ws_quantity else 0 end) as apr_sales
+ 	,sum(case when d_moy = 5
+ 		then ws_sales_price* ws_quantity else 0 end) as may_sales
+ 	,sum(case when d_moy = 6
+ 		then ws_sales_price* ws_quantity else 0 end) as jun_sales
+ 	,sum(case when d_moy = 7
+ 		then ws_sales_price* ws_quantity else 0 end) as jul_sales
+ 	,sum(case when d_moy = 8
+ 		then ws_sales_price* ws_quantity else 0 end) as aug_sales
+ 	,sum(case when d_moy = 9
+ 		then ws_sales_price* ws_quantity else 0 end) as sep_sales
+ 	,sum(case when d_moy = 10
+ 		then ws_sales_price* ws_quantity else 0 end) as oct_sales
+ 	,sum(case when d_moy = 11
+ 		then ws_sales_price* ws_quantity else 0 end) as nov_sales
+ 	,sum(case when d_moy = 12
+ 		then ws_sales_price* ws_quantity else 0 end) as dec_sales
+ 	,sum(case when d_moy = 1
+ 		then ws_net_paid_inc_tax * ws_quantity else 0 end) as jan_net
+ 	,sum(case when d_moy = 2
+ 		then ws_net_paid_inc_tax * ws_quantity else 0 end) as feb_net
+ 	,sum(case when d_moy = 3
+ 		then ws_net_paid_inc_tax * ws_quantity else 0 end) as mar_net
+ 	,sum(case when d_moy = 4
+ 		then ws_net_paid_inc_tax * ws_quantity else 0 end) as apr_net
+ 	,sum(case when d_moy = 5
+ 		then ws_net_paid_inc_tax * ws_quantity else 0 end) as may_net
+ 	,sum(case when d_moy = 6
+ 		then ws_net_paid_inc_tax * ws_quantity else 0 end) as jun_net
+ 	,sum(case when d_moy = 7
+ 		then ws_net_paid_inc_tax * ws_quantity else 0 end) as jul_net
+ 	,sum(case when d_moy = 8
+ 		then ws_net_paid_inc_tax * ws_quantity else 0 end) as aug_net
+ 	,sum(case when d_moy = 9
+ 		then ws_net_paid_inc_tax * ws_quantity else 0 end) as sep_net
+ 	,sum(case when d_moy = 10
+ 		then ws_net_paid_inc_tax * ws_quantity else 0 end) as oct_net
+ 	,sum(case when d_moy = 11
+ 		then ws_net_paid_inc_tax * ws_quantity else 0 end) as nov_net
+ 	,sum(case when d_moy = 12
+ 		then ws_net_paid_inc_tax * ws_quantity else 0 end) as dec_net
+     from
+          web_sales
+         ,warehouse
+         ,date_dim
+         ,time_dim
+ 	  ,ship_mode
+     where
+            ws_warehouse_sk =  w_warehouse_sk
+        and ws_sold_date_sk = d_date_sk
+        and ws_sold_time_sk = t_time_sk
+ 	and ws_ship_mode_sk = sm_ship_mode_sk
+        and d_year = 2002
+ 	and t_time between 24285 and 24285+28800
+ 	and sm_carrier in ('HARMSTORF','USPS')
+     group by
+        w_warehouse_name
+ 	,w_warehouse_sq_ft
+ 	,w_city
+ 	,w_county
+ 	,w_state
+ 	,w_country
+       ,d_year
+ union all
+     select
+ 	w_warehouse_name
+ 	,w_warehouse_sq_ft
+ 	,w_city
+ 	,w_county
+ 	,w_state
+ 	,w_country
+ 	,'HARMSTORF' || ',' || 'USPS' as ship_carriers
+       ,d_year as year
+ 	,sum(case when d_moy = 1
+ 		then cs_ext_list_price* cs_quantity else 0 end) as jan_sales
+ 	,sum(case when d_moy = 2
+ 		then cs_ext_list_price* cs_quantity else 0 end) as feb_sales
+ 	,sum(case when d_moy = 3
+ 		then cs_ext_list_price* cs_quantity else 0 end) as mar_sales
+ 	,sum(case when d_moy = 4
+ 		then cs_ext_list_price* cs_quantity else 0 end) as apr_sales
+ 	,sum(case when d_moy = 5
+ 		then cs_ext_list_price* cs_quantity else 0 end) as may_sales
+ 	,sum(case when d_moy = 6
+ 		then cs_ext_list_price* cs_quantity else 0 end) as jun_sales
+ 	,sum(case when d_moy = 7
+ 		then cs_ext_list_price* cs_quantity else 0 end) as jul_sales
+ 	,sum(case when d_moy = 8
+ 		then cs_ext_list_price* cs_quantity else 0 end) as aug_sales
+ 	,sum(case when d_moy = 9
+ 		then cs_ext_list_price* cs_quantity else 0 end) as sep_sales
+ 	,sum(case when d_moy = 10
+ 		then cs_ext_list_price* cs_quantity else 0 end) as oct_sales
+ 	,sum(case when d_moy = 11
+ 		then cs_ext_list_price* cs_quantity else 0 end) as nov_sales
+ 	,sum(case when d_moy = 12
+ 		then cs_ext_list_price* cs_quantity else 0 end) as dec_sales
+ 	,sum(case when d_moy = 1
+ 		then cs_net_paid * cs_quantity else 0 end) as jan_net
+ 	,sum(case when d_moy = 2
+ 		then cs_net_paid * cs_quantity else 0 end) as feb_net
+ 	,sum(case when d_moy = 3
+ 		then cs_net_paid * cs_quantity else 0 end) as mar_net
+ 	,sum(case when d_moy = 4
+ 		then cs_net_paid * cs_quantity else 0 end) as apr_net
+ 	,sum(case when d_moy = 5
+ 		then cs_net_paid * cs_quantity else 0 end) as may_net
+ 	,sum(case when d_moy = 6
+ 		then cs_net_paid * cs_quantity else 0 end) as jun_net
+ 	,sum(case when d_moy = 7
+ 		then cs_net_paid * cs_quantity else 0 end) as jul_net
+ 	,sum(case when d_moy = 8
+ 		then cs_net_paid * cs_quantity else 0 end) as aug_net
+ 	,sum(case when d_moy = 9
+ 		then cs_net_paid * cs_quantity else 0 end) as sep_net
+ 	,sum(case when d_moy = 10
+ 		then cs_net_paid * cs_quantity else 0 end) as oct_net
+ 	,sum(case when d_moy = 11
+ 		then cs_net_paid * cs_quantity else 0 end) as nov_net
+ 	,sum(case when d_moy = 12
+ 		then cs_net_paid * cs_quantity else 0 end) as dec_net
+     from
+          catalog_sales
+         ,warehouse
+         ,date_dim
+         ,time_dim
+ 	 ,ship_mode
+     where
+            cs_warehouse_sk =  w_warehouse_sk
+        and cs_sold_date_sk = d_date_sk
+        and cs_sold_time_sk = t_time_sk
+ 	and cs_ship_mode_sk = sm_ship_mode_sk
+        and d_year = 2002
+ 	and t_time between 24285 AND 24285+28800
+ 	and sm_carrier in ('HARMSTORF','USPS')
+     group by
+        w_warehouse_name
+ 	,w_warehouse_sq_ft
+ 	,w_city
+ 	,w_county
+ 	,w_state
+ 	,w_country
+       ,d_year
+ ) x
+ group by
+        w_warehouse_name
+ 	,w_warehouse_sq_ft
+ 	,w_city
+ 	,w_county
+ 	,w_state
+ 	,w_country
+ 	,ship_carriers
+       ,year
+ order by w_warehouse_name
+ limit 100;
+---- PLAN
+Max Per-Host Resource Reservation: Memory=155.38MB Threads=1
+Per-Host Resource Estimates: Memory=1.15GB
+ImpalaSequence
+  ImpalaSortRel(sort0=[$0], dir0=[ASC], fetch=[100:TINYINT])
+    ImpalaProjectRel(W_WAREHOUSE_NAME=[$0], W_WAREHOUSE_SQ_FT=[$1], W_CITY=[$2], W_COUNTY=[$3], W_STATE=[$4], W_COUNTRY=[$5], SHIP_CARRIERS=[CAST(_UTF-8'HARMSTORF,USPS':VARCHAR(2147483647) CHARACTER SET "UTF-8"):VARCHAR(2147483647) CHARACTER SET "UTF-8"], YEAR=[CAST(2002):INTEGER], JAN_SALES=[$6], FEB_SALES=[$7], MAR_SALES=[$8], APR_SALES=[$9], MAY_SALES=[$10], JUN_SALES=[$11], JUL_SALES=[$12], AUG_SALES=[$13], SEP_SALES=[$14], OCT_SALES=[$15], NOV_SALES=[$16], DEC_SALES=[$17], JAN_SALES_PER_SQ_FOOT=[$18], FEB_SALES_PER_SQ_FOOT=[$19], MAR_SALES_PER_SQ_FOOT=[$20], APR_SALES_PER_SQ_FOOT=[$21], MAY_SALES_PER_SQ_FOOT=[$22], JUN_SALES_PER_SQ_FOOT=[$23], JUL_SALES_PER_SQ_FOOT=[$24], AUG_SALES_PER_SQ_FOOT=[$25], SEP_SALES_PER_SQ_FOOT=[$26], OCT_SALES_PER_SQ_FOOT=[$27], NOV_SALES_PER_SQ_FOOT=[$28], DEC_SALES_PER_SQ_FOOT=[$29], JAN_NET=[$30], FEB_NET=[$31], MAR_NET=[$32], APR_NET=[$33], MAY_NET=[$34], JUN_NET=[$35], JUL_NET=[$36], AUG_NET=[$37], SEP_NET=[$38], OCT_NET=[$39], NOV_NET=[$40], DEC_NET=[$41])
+      ImpalaAggRel(group=[{0, 1, 2, 3, 4, 5}], JAN_SALES=[SUM($6)], FEB_SALES=[SUM($7)], MAR_SALES=[SUM($8)], APR_SALES=[SUM($9)], MAY_SALES=[SUM($10)], JUN_SALES=[SUM($11)], JUL_SALES=[SUM($12)], AUG_SALES=[SUM($13)], SEP_SALES=[SUM($14)], OCT_SALES=[SUM($15)], NOV_SALES=[SUM($16)], DEC_SALES=[SUM($17)], JAN_SALES_PER_SQ_FOOT=[SUM($18)], FEB_SALES_PER_SQ_FOOT=[SUM($19)], MAR_SALES_PER_SQ_FOOT=[SUM($20)], APR_SALES_PER_SQ_FOOT=[SUM($21)], MAY_SALES_PER_SQ_FOOT=[SUM($22)], JUN_SALES_PER_SQ_FOOT=[SUM($23)], JUL_SALES_PER_SQ_FOOT=[SUM($24)], AUG_SALES_PER_SQ_FOOT=[SUM($25)], SEP_SALES_PER_SQ_FOOT=[SUM($26)], OCT_SALES_PER_SQ_FOOT=[SUM($27)], NOV_SALES_PER_SQ_FOOT=[SUM($28)], DEC_SALES_PER_SQ_FOOT=[SUM($29)], JAN_NET=[SUM($30)], FEB_NET=[SUM($31)], MAR_NET=[SUM($32)], APR_NET=[SUM($33)], MAY_NET=[SUM($34)], JUN_NET=[SUM($35)], JUL_NET=[SUM($36)], AUG_NET=[SUM($37)], SEP_NET=[SUM($38)], OCT_NET=[SUM($39)], NOV_NET=[SUM($40)], DEC_NET=[SUM($41)])
+        ImpalaProjectRel(W_WAREHOUSE_NAME=[$0], W_WAREHOUSE_SQ_FT=[$1], W_CITY=[$2], W_COUNTY=[$3], W_STATE=[$4], W_COUNTRY=[$5], JAN_SALES=[$6], FEB_SALES=[$7], MAR_SALES=[$8], APR_SALES=[$9], MAY_SALES=[$10], JUN_SALES=[$11], JUL_SALES=[$12], AUG_SALES=[$13], SEP_SALES=[$14], OCT_SALES=[$15], NOV_SALES=[$16], DEC_SALES=[$17], $f20=[/($6, CAST($1):DECIMAL(10, 0))], $f21=[/($7, CAST($1):DECIMAL(10, 0))], $f22=[/($8, CAST($1):DECIMAL(10, 0))], $f23=[/($9, CAST($1):DECIMAL(10, 0))], $f24=[/($10, CAST($1):DECIMAL(10, 0))], $f25=[/($11, CAST($1):DECIMAL(10, 0))], $f26=[/($12, CAST($1):DECIMAL(10, 0))], $f27=[/($13, CAST($1):DECIMAL(10, 0))], $f28=[/($14, CAST($1):DECIMAL(10, 0))], $f29=[/($15, CAST($1):DECIMAL(10, 0))], $f30=[/($16, CAST($1):DECIMAL(10, 0))], $f31=[/($17, CAST($1):DECIMAL(10, 0))], JAN_NET=[$18], FEB_NET=[$19], MAR_NET=[$20], APR_NET=[$21], MAY_NET=[$22], JUN_NET=[$23], JUL_NET=[$24], AUG_NET=[$25], SEP_NET=[$26], OCT_NET=[$27], NOV_NET=[$28], DEC_NET=[$29])
+          ImpalaUnionRel(all=[true])
+            ImpalaAggRel(group=[{0, 1, 2, 3, 4, 5}], JAN_SALES=[SUM($6)], FEB_SALES=[SUM($7)], MAR_SALES=[SUM($8)], APR_SALES=[SUM($9)], MAY_SALES=[SUM($10)], JUN_SALES=[SUM($11)], JUL_SALES=[SUM($12)], AUG_SALES=[SUM($13)], SEP_SALES=[SUM($14)], OCT_SALES=[SUM($15)], NOV_SALES=[SUM($16)], DEC_SALES=[SUM($17)], JAN_NET=[SUM($18)], FEB_NET=[SUM($19)], MAR_NET=[SUM($20)], APR_NET=[SUM($21)], MAY_NET=[SUM($22)], JUN_NET=[SUM($23)], JUL_NET=[SUM($24)], AUG_NET=[SUM($25)], SEP_NET=[SUM($26)], OCT_NET=[SUM($27)], NOV_NET=[SUM($28)], DEC_NET=[SUM($29)])
+              ImpalaProjectRel(W_WAREHOUSE_NAME=[$12], W_WAREHOUSE_SQ_FT=[$13], W_CITY=[$14], W_COUNTY=[$15], W_STATE=[$16], W_COUNTRY=[$17], $f7=[CASE(=($10, 1), *($4, CAST($3):DECIMAL(10, 0)), 0.00:DECIMAL(18, 2))], $f8=[CASE(=($10, 2), *($4, CAST($3):DECIMAL(10, 0)), 0.00:DECIMAL(18, 2))], $f9=[CASE(=($10, 3), *($4, CAST($3):DECIMAL(10, 0)), 0.00:DECIMAL(18, 2))], $f10=[CASE(=($10, 4), *($4, CAST($3):DECIMAL(10, 0)), 0.00:DECIMAL(18, 2))], $f11=[CASE(=($10, 5), *($4, CAST($3):DECIMAL(10, 0)), 0.00:DECIMAL(18, 2))], $f12=[CASE(=($10, 6), *($4, CAST($3):DECIMAL(10, 0)), 0.00:DECIMAL(18, 2))], $f13=[CASE(=($10, 7), *($4, CAST($3):DECIMAL(10, 0)), 0.00:DECIMAL(18, 2))], $f14=[CASE(=($10, 8), *($4, CAST($3):DECIMAL(10, 0)), 0.00:DECIMAL(18, 2))], $f15=[CASE(=($10, 9), *($4, CAST($3):DECIMAL(10, 0)), 0.00:DECIMAL(18, 2))], $f16=[CASE(=($10, 10), *($4, CAST($3):DECIMAL(10, 0)), 0.00:DECIMAL(18, 2))], $f17=[CASE(=($10, 11), *($4, CAST($3):DECIMAL(10, 0)), 0.00:DECIMAL(18, 2))], $f18=[CASE(=($10, 12), *($4, CAST($3):DECIMAL(10, 0)), 0.00:DECIMAL(18, 2))], $f19=[CASE(=($10, 1), *($5, CAST($3):DECIMAL(10, 0)), 0.00:DECIMAL(18, 2))], $f20=[CASE(=($10, 2), *($5, CAST($3):DECIMAL(10, 0)), 0.00:DECIMAL(18, 2))], $f21=[CASE(=($10, 3), *($5, CAST($3):DECIMAL(10, 0)), 0.00:DECIMAL(18, 2))], $f22=[CASE(=($10, 4), *($5, CAST($3):DECIMAL(10, 0)), 0.00:DECIMAL(18, 2))], $f23=[CASE(=($10, 5), *($5, CAST($3):DECIMAL(10, 0)), 0.00:DECIMAL(18, 2))], $f24=[CASE(=($10, 6), *($5, CAST($3):DECIMAL(10, 0)), 0.00:DECIMAL(18, 2))], $f25=[CASE(=($10, 7), *($5, CAST($3):DECIMAL(10, 0)), 0.00:DECIMAL(18, 2))], $f26=[CASE(=($10, 8), *($5, CAST($3):DECIMAL(10, 0)), 0.00:DECIMAL(18, 2))], $f27=[CASE(=($10, 9), *($5, CAST($3):DECIMAL(10, 0)), 0.00:DECIMAL(18, 2))], $f28=[CASE(=($10, 10), *($5, CAST($3):DECIMAL(10, 0)), 0.00:DECIMAL(18, 2))], $f29=[CASE(=($10, 11), *($5, CAST($3):DECIMAL(10, 0)), 0.00:DECIMAL(18, 2))], $f30=[CASE(=($10, 12), *($5, CAST($3):DECIMAL(10, 0)), 0.00:DECIMAL(18, 2))])
+                ImpalaJoinRel(condition=[=($2, $11)], joinType=[inner])
+                  ImpalaJoinRel(condition=[=($6, $9)], joinType=[inner])
+                    ImpalaJoinRel(condition=[=($1, $8)], joinType=[inner])
+                      ImpalaJoinRel(condition=[=($0, $7)], joinType=[inner])
+                        ImpalaFilterRel(condition=[AND(IS NOT NULL($2), IS NOT NULL($6), IS NOT NULL($0), IS NOT NULL($1))])
+                          ImpalaProjectRel(ws_sold_time_sk=[$0], ws_ship_mode_sk=[$13], ws_warehouse_sk=[$14], ws_quantity=[$17], ws_sales_price=[$20], ws_net_paid_inc_tax=[$29], ws_sold_date_sk=[$33])
+                            ImpalaHdfsScanRel(table=[[tpcds_partitioned_parquet_snap, web_sales]])
+                        ImpalaCTEConsumer(cteName=[cte_suggestion_3])
+                      ImpalaCTEConsumer(cteName=[cte_suggestion_2])
+                    ImpalaCTEConsumer(cteName=[cte_suggestion_1])
+                  ImpalaCTEConsumer(cteName=[cte_suggestion_0])
+            ImpalaAggRel(group=[{0, 1, 2, 3, 4, 5}], JAN_SALES=[SUM($6)], FEB_SALES=[SUM($7)], MAR_SALES=[SUM($8)], APR_SALES=[SUM($9)], MAY_SALES=[SUM($10)], JUN_SALES=[SUM($11)], JUL_SALES=[SUM($12)], AUG_SALES=[SUM($13)], SEP_SALES=[SUM($14)], OCT_SALES=[SUM($15)], NOV_SALES=[SUM($16)], DEC_SALES=[SUM($17)], JAN_NET=[SUM($18)], FEB_NET=[SUM($19)], MAR_NET=[SUM($20)], APR_NET=[SUM($21)], MAY_NET=[SUM($22)], JUN_NET=[SUM($23)], JUL_NET=[SUM($24)], AUG_NET=[SUM($25)], SEP_NET=[SUM($26)], OCT_NET=[SUM($27)], NOV_NET=[SUM($28)], DEC_NET=[SUM($29)])
+              ImpalaProjectRel(W_WAREHOUSE_NAME=[$12], W_WAREHOUSE_SQ_FT=[$13], W_CITY=[$14], W_COUNTY=[$15], W_STATE=[$16], W_COUNTRY=[$17], $f7=[CASE(=($10, 1), *($4, CAST($3):DECIMAL(10, 0)), 0.00:DECIMAL(18, 2))], $f8=[CASE(=($10, 2), *($4, CAST($3):DECIMAL(10, 0)), 0.00:DECIMAL(18, 2))], $f9=[CASE(=($10, 3), *($4, CAST($3):DECIMAL(10, 0)), 0.00:DECIMAL(18, 2))], $f10=[CASE(=($10, 4), *($4, CAST($3):DECIMAL(10, 0)), 0.00:DECIMAL(18, 2))], $f11=[CASE(=($10, 5), *($4, CAST($3):DECIMAL(10, 0)), 0.00:DECIMAL(18, 2))], $f12=[CASE(=($10, 6), *($4, CAST($3):DECIMAL(10, 0)), 0.00:DECIMAL(18, 2))], $f13=[CASE(=($10, 7), *($4, CAST($3):DECIMAL(10, 0)), 0.00:DECIMAL(18, 2))], $f14=[CASE(=($10, 8), *($4, CAST($3):DECIMAL(10, 0)), 0.00:DECIMAL(18, 2))], $f15=[CASE(=($10, 9), *($4, CAST($3):DECIMAL(10, 0)), 0.00:DECIMAL(18, 2))], $f16=[CASE(=($10, 10), *($4, CAST($3):DECIMAL(10, 0)), 0.00:DECIMAL(18, 2))], $f17=[CASE(=($10, 11), *($4, CAST($3):DECIMAL(10, 0)), 0.00:DECIMAL(18, 2))], $f18=[CASE(=($10, 12), *($4, CAST($3):DECIMAL(10, 0)), 0.00:DECIMAL(18, 2))], $f19=[CASE(=($10, 1), *($5, CAST($3):DECIMAL(10, 0)), 0.00:DECIMAL(18, 2))], $f20=[CASE(=($10, 2), *($5, CAST($3):DECIMAL(10, 0)), 0.00:DECIMAL(18, 2))], $f21=[CASE(=($10, 3), *($5, CAST($3):DECIMAL(10, 0)), 0.00:DECIMAL(18, 2))], $f22=[CASE(=($10, 4), *($5, CAST($3):DECIMAL(10, 0)), 0.00:DECIMAL(18, 2))], $f23=[CASE(=($10, 5), *($5, CAST($3):DECIMAL(10, 0)), 0.00:DECIMAL(18, 2))], $f24=[CASE(=($10, 6), *($5, CAST($3):DECIMAL(10, 0)), 0.00:DECIMAL(18, 2))], $f25=[CASE(=($10, 7), *($5, CAST($3):DECIMAL(10, 0)), 0.00:DECIMAL(18, 2))], $f26=[CASE(=($10, 8), *($5, CAST($3):DECIMAL(10, 0)), 0.00:DECIMAL(18, 2))], $f27=[CASE(=($10, 9), *($5, CAST($3):DECIMAL(10, 0)), 0.00:DECIMAL(18, 2))], $f28=[CASE(=($10, 10), *($5, CAST($3):DECIMAL(10, 0)), 0.00:DECIMAL(18, 2))], $f29=[CASE(=($10, 11), *($5, CAST($3):DECIMAL(10, 0)), 0.00:DECIMAL(18, 2))], $f30=[CASE(=($10, 12), *($5, CAST($3):DECIMAL(10, 0)), 0.00:DECIMAL(18, 2))])
+                ImpalaJoinRel(condition=[=($2, $11)], joinType=[inner])
+                  ImpalaJoinRel(condition=[=($6, $9)], joinType=[inner])
+                    ImpalaJoinRel(condition=[=($1, $8)], joinType=[inner])
+                      ImpalaJoinRel(condition=[=($0, $7)], joinType=[inner])
+                        ImpalaFilterRel(condition=[AND(IS NOT NULL($2), IS NOT NULL($6), IS NOT NULL($0), IS NOT NULL($1))])
+                          ImpalaProjectRel(cs_sold_time_sk=[$0], cs_ship_mode_sk=[$12], cs_warehouse_sk=[$13], cs_quantity=[$17], cs_ext_list_price=[$24], cs_net_paid=[$28], cs_sold_date_sk=[$33])
+                            ImpalaHdfsScanRel(table=[[tpcds_partitioned_parquet_snap, catalog_sales]])
+                        ImpalaCTEConsumer(cteName=[cte_suggestion_3])
+                      ImpalaCTEConsumer(cteName=[cte_suggestion_2])
+                    ImpalaCTEConsumer(cteName=[cte_suggestion_1])
+                  ImpalaCTEConsumer(cteName=[cte_suggestion_0])
+  ImpalaCTEProducer(readType=[EAGER], writeType=[EAGER], cteName=[cte_suggestion_2])
+    ImpalaProjectRel(sm_ship_mode_sk=[$0])
+      ImpalaFilterRel(condition=[AND(SEARCH($1, Sarg[_UTF-8'HARMSTORF':VARCHAR(2147483647) CHARACTER SET "UTF-8", _UTF-8'USPS':VARCHAR(2147483647) CHARACTER SET "UTF-8"]:VARCHAR(2147483647) CHARACTER SET "UTF-8"), IS NOT NULL($0))])
+        ImpalaProjectRel(sm_ship_mode_sk=[$0], sm_carrier=[$4])
+          ImpalaHdfsScanRel(table=[[tpcds_partitioned_parquet_snap, ship_mode]])
+  ImpalaCTEProducer(readType=[EAGER], writeType=[EAGER], cteName=[cte_suggestion_3])
+    ImpalaProjectRel(t_time_sk=[$0])
+      ImpalaFilterRel(condition=[AND(SEARCH($1, Sarg[[24285..53085]]), IS NOT NULL($0))])
+        ImpalaProjectRel(t_time_sk=[$0], t_time=[$2])
+          ImpalaHdfsScanRel(table=[[tpcds_partitioned_parquet_snap, time_dim]])
+  ImpalaCTEProducer(readType=[EAGER], writeType=[EAGER], cteName=[cte_suggestion_0])
+    ImpalaFilterRel(condition=[IS NOT NULL($0)])
+      ImpalaProjectRel(w_warehouse_sk=[$0], w_warehouse_name=[$2], w_warehouse_sq_ft=[$3], w_city=[$8], w_county=[$9], w_state=[$10], w_country=[$12])
+        ImpalaHdfsScanRel(table=[[tpcds_partitioned_parquet_snap, warehouse]])
+  ImpalaCTEProducer(readType=[EAGER], writeType=[EAGER], cteName=[cte_suggestion_1])
+    ImpalaProjectRel(d_date_sk=[$0], d_moy=[$2])
+      ImpalaFilterRel(condition=[AND(=($1, 2002), IS NOT NULL($0))])
+        ImpalaProjectRel(d_date_sk=[$0], d_year=[$6], d_moy=[$8])
+          ImpalaHdfsScanRel(table=[[tpcds_partitioned_parquet_snap, date_dim]])
+F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
+|  Per-Instance Resources: mem-estimate=1.15GB mem-reservation=155.38MB thread-reservation=1 runtime-filters-memory=8.00MB
+|  max-parallelism=1 segment-costs=[389980356, 772471083, 367, 135, 35924]
+PLAN-ROOT SINK
+|  output exprs: W_WAREHOUSE_NAME, W_WAREHOUSE_SQ_FT, W_CITY, W_COUNTY, W_STATE, W_COUNTRY, 'HARMSTORF,USPS', CAST(2002 AS INT), sum(JAN_SALES), sum(FEB_SALES), sum(MAR_SALES), sum(APR_SALES), sum(MAY_SALES), sum(JUN_SALES), sum(JUL_SALES), sum(AUG_SALES), sum(SEP_SALES), sum(OCT_SALES), sum(NOV_SALES), sum(DEC_SALES), sum(divide(JAN_SALES, W_WAREHOUSE_SQ_FT)), sum(divide(FEB_SALES, W_WAREHOUSE_SQ_FT)), sum(divide(MAR_SALES, W_WAREHOUSE_SQ_FT)), sum(divide(APR_SALES, W_WAREHOUSE_SQ_FT)), sum(divide(MAY_SALES, W_WAREHOUSE_SQ_FT)), sum(divide(JUN_SALES, W_WAREHOUSE_SQ_FT)), sum(divide(JUL_SALES, W_WAREHOUSE_SQ_FT)), sum(divide(AUG_SALES, W_WAREHOUSE_SQ_FT)), sum(divide(SEP_SALES, W_WAREHOUSE_SQ_FT)), sum(divide(OCT_SALES, W_WAREHOUSE_SQ_FT)), sum(divide(NOV_SALES, W_WAREHOUSE_SQ_FT)), sum(divide(DEC_SALES, W_WAREHOUSE_SQ_FT)), sum(JAN_NET), sum(FEB_NET), sum(MAR_NET), sum(APR_NET), sum(MAY_NET), sum(JUN_NET), sum(JUL_NET), sum(AUG_NET), sum(SEP_NET), sum(OCT_NET), sum(NOV_NET), sum(DEC_NET)
+|  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0 cost=1936
+|
+00:SEQUENCE
+|  mem-estimate=0B mem-reservation=0B thread-reservation=0
+|  tuple-ids=24 row-size=695B cardinality=44 cost=0
+|  in pipelines: 31(GETNEXT), 02(OPEN), 04(OPEN), 06(OPEN), 08(OPEN)
+|
+|--07:CTE PRODUCER [cte_suggestion_1]
+|  |  mem-estimate=6.00MB mem-reservation=6.00MB spill-buffer=2.00MB thread-reservation=0
+|  |  tuple-ids=6 row-size=12B cardinality=373 cost=0
+|  |  in pipelines: 08(GETNEXT)
+|  |
+|  08:SCAN HDFS [tpcds_partitioned_parquet_snap.date_dim]
+|     HDFS partitions=1/1 files=1 size=2.17MB
+|     predicates: tpcds_partitioned_parquet_snap.date_dim.d_year = CAST(2002 AS INT), tpcds_partitioned_parquet_snap.date_dim.d_date_sk IS NOT NULL
+|     stored statistics:
+|       table: rows=73.05K size=2.17MB
+|       columns: all
+|     extrapolated-rows=disabled max-scan-range-rows=73.05K
+|     parquet statistics predicates: tpcds_partitioned_parquet_snap.date_dim.d_year = CAST(2002 AS INT)
+|     parquet dictionary predicates: tpcds_partitioned_parquet_snap.date_dim.d_year = CAST(2002 AS INT), tpcds_partitioned_parquet_snap.date_dim.d_date_sk IS NOT NULL
+|     mem-estimate=16.00MB mem-reservation=512.00KB thread-reservation=0
+|     tuple-ids=6 row-size=12B cardinality=373 cost=16728
+|     in pipelines: 08(GETNEXT)
+|
+|--05:CTE PRODUCER [cte_suggestion_0]
+|  |  mem-estimate=6.00MB mem-reservation=6.00MB spill-buffer=2.00MB thread-reservation=0
+|  |  tuple-ids=4 row-size=123B cardinality=22 cost=0
+|  |  in pipelines: 06(GETNEXT)
+|  |
+|  06:SCAN HDFS [tpcds_partitioned_parquet_snap.warehouse]
+|     HDFS partitions=1/1 files=1 size=5.99KB
+|     predicates: tpcds_partitioned_parquet_snap.warehouse.w_warehouse_sk IS NOT NULL
+|     stored statistics:
+|       table: rows=22 size=5.99KB
+|       columns: all
+|     extrapolated-rows=disabled max-scan-range-rows=22
+|     parquet dictionary predicates: tpcds_partitioned_parquet_snap.warehouse.w_warehouse_sk IS NOT NULL
+|     mem-estimate=16.00MB mem-reservation=56.00KB thread-reservation=0
+|     tuple-ids=4 row-size=123B cardinality=22 cost=20
+|     in pipelines: 06(GETNEXT)
+|
+|--03:CTE PRODUCER [cte_suggestion_3]
+|  |  mem-estimate=6.00MB mem-reservation=6.00MB spill-buffer=2.00MB thread-reservation=0
+|  |  tuple-ids=2 row-size=8B cardinality=8.64K cost=0
+|  |  in pipelines: 04(GETNEXT)
+|  |
+|  04:SCAN HDFS [tpcds_partitioned_parquet_snap.time_dim]
+|     HDFS partitions=1/1 files=1 size=1.31MB
+|     predicates: tpcds_partitioned_parquet_snap.time_dim.t_time <= CAST(53085 AS INT), tpcds_partitioned_parquet_snap.time_dim.t_time >= CAST(24285 AS INT), tpcds_partitioned_parquet_snap.time_dim.t_time_sk IS NOT NULL
+|     stored statistics:
+|       table: rows=86.40K size=1.31MB
+|       columns: all
+|     extrapolated-rows=disabled max-scan-range-rows=86.40K
+|     parquet statistics predicates: tpcds_partitioned_parquet_snap.time_dim.t_time <= CAST(53085 AS INT), tpcds_partitioned_parquet_snap.time_dim.t_time >= CAST(24285 AS INT)
+|     parquet dictionary predicates: tpcds_partitioned_parquet_snap.time_dim.t_time <= CAST(53085 AS INT), tpcds_partitioned_parquet_snap.time_dim.t_time >= CAST(24285 AS INT), tpcds_partitioned_parquet_snap.time_dim.t_time_sk IS NOT NULL
+|     mem-estimate=16.00MB mem-reservation=1.00MB thread-reservation=0
+|     tuple-ids=2 row-size=8B cardinality=8.64K cost=17236
+|     in pipelines: 04(GETNEXT)
+|
+|--01:CTE PRODUCER [cte_suggestion_2]
+|  |  mem-estimate=6.00MB mem-reservation=6.00MB spill-buffer=2.00MB thread-reservation=0
+|  |  tuple-ids=0 row-size=23B cardinality=2 cost=0
+|  |  in pipelines: 02(GETNEXT)
+|  |
+|  02:SCAN HDFS [tpcds_partitioned_parquet_snap.ship_mode]
+|     HDFS partitions=1/1 files=1 size=2.68KB
+|     predicates: tpcds_partitioned_parquet_snap.ship_mode.sm_carrier IN ('HARMSTORF', 'USPS'), tpcds_partitioned_parquet_snap.ship_mode.sm_ship_mode_sk IS NOT NULL
+|     stored statistics:
+|       table: rows=20 size=2.68KB
+|       columns: all
+|     extrapolated-rows=disabled max-scan-range-rows=20
+|     parquet statistics predicates: tpcds_partitioned_parquet_snap.ship_mode.sm_carrier IN ('HARMSTORF', 'USPS')
+|     parquet dictionary predicates: tpcds_partitioned_parquet_snap.ship_mode.sm_carrier IN ('HARMSTORF', 'USPS'), tpcds_partitioned_parquet_snap.ship_mode.sm_ship_mode_sk IS NOT NULL
+|     mem-estimate=16.00MB mem-reservation=16.00KB thread-reservation=0
+|     tuple-ids=0 row-size=23B cardinality=2 cost=4
+|     in pipelines: 02(GETNEXT)
+|
+31:TOP-N [LIMIT=100]
+|  order by: W_WAREHOUSE_NAME ASC NULLS LAST
+|  mem-estimate=29.87KB mem-reservation=0B thread-reservation=0
+|  tuple-ids=24 row-size=695B cardinality=44 cost=135
+|  in pipelines: 31(GETNEXT), 30(OPEN)
+|
+30:AGGREGATE [FINALIZE]
+|  output: sum(JAN_SALES), sum(FEB_SALES), sum(MAR_SALES), sum(APR_SALES), sum(MAY_SALES), sum(JUN_SALES), sum(JUL_SALES), sum(AUG_SALES), sum(SEP_SALES), sum(OCT_SALES), sum(NOV_SALES), sum(DEC_SALES), sum(divide(JAN_SALES, CAST(W_WAREHOUSE_SQ_FT AS DECIMAL(10,0)))), sum(divide(FEB_SALES, CAST(W_WAREHOUSE_SQ_FT AS DECIMAL(10,0)))), sum(divide(MAR_SALES, CAST(W_WAREHOUSE_SQ_FT AS DECIMAL(10,0)))), sum(divide(APR_SALES, CAST(W_WAREHOUSE_SQ_FT AS DECIMAL(10,0)))), sum(divide(MAY_SALES, CAST(W_WAREHOUSE_SQ_FT AS DECIMAL(10,0)))), sum(divide(JUN_SALES, CAST(W_WAREHOUSE_SQ_FT AS DECIMAL(10,0)))), sum(divide(JUL_SALES, CAST(W_WAREHOUSE_SQ_FT AS DECIMAL(10,0)))), sum(divide(AUG_SALES, CAST(W_WAREHOUSE_SQ_FT AS DECIMAL(10,0)))), sum(divide(SEP_SALES, CAST(W_WAREHOUSE_SQ_FT AS DECIMAL(10,0)))), sum(divide(OCT_SALES, CAST(W_WAREHOUSE_SQ_FT AS DECIMAL(10,0)))), sum(divide(NOV_SALES, CAST(W_WAREHOUSE_SQ_FT AS DECIMAL(10,0)))), sum(divide(DEC_SALES, CAST(W_WAREHOUSE_SQ_FT AS DECIMAL(10,0)))), sum(JAN_NET), sum(FEB_NET), sum(MAR_NET), sum(APR_NET), sum(MAY_NET), sum(JUN_NET), sum(JUL_NET), sum(AUG_NET), sum(SEP_NET), sum(OCT_NET), sum(NOV_NET), sum(DEC_NET)
+|  group by: W_WAREHOUSE_NAME, W_WAREHOUSE_SQ_FT, W_CITY, W_COUNTY, W_STATE, W_COUNTRY
+|  mem-estimate=10.00MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
+|  tuple-ids=23 row-size=695B cardinality=44 cost=367
+|  in pipelines: 30(GETNEXT), 19(OPEN), 29(OPEN)
+|
+09:UNION
+|  pass-through-operands: all
+|  mem-estimate=0B mem-reservation=0B thread-reservation=0
+|  tuple-ids=22 row-size=503B cardinality=44 cost=0
+|  in pipelines: 19(GETNEXT), 29(GETNEXT)
+|
+|--29:AGGREGATE [FINALIZE]
+|  |  output: sum(CASE WHEN d_moy = CAST(1 AS INT) THEN multiply(tpcds_partitioned_parquet_snap.catalog_sales.cs_ext_list_price, CAST(tpcds_partitioned_parquet_snap.catalog_sales.cs_quantity AS DECIMAL(10,0))) ELSE CAST(0 AS DECIMAL(18,2)) END), sum(CASE WHEN d_moy = CAST(2 AS INT) THEN multiply(tpcds_partitioned_parquet_snap.catalog_sales.cs_ext_list_price, CAST(tpcds_partitioned_parquet_snap.catalog_sales.cs_quantity AS DECIMAL(10,0))) ELSE CAST(0 AS DECIMAL(18,2)) END), sum(CASE WHEN d_moy = CAST(3 AS INT) THEN multiply(tpcds_partitioned_parquet_snap.catalog_sales.cs_ext_list_price, CAST(tpcds_partitioned_parquet_snap.catalog_sales.cs_quantity AS DECIMAL(10,0))) ELSE CAST(0 AS DECIMAL(18,2)) END), sum(CASE WHEN d_moy = CAST(4 AS INT) THEN multiply(tpcds_partitioned_parquet_snap.catalog_sales.cs_ext_list_price, CAST(tpcds_partitioned_parquet_snap.catalog_sales.cs_quantity AS DECIMAL(10,0))) ELSE CAST(0 AS DECIMAL(18,2)) END), sum(CASE WHEN d_moy = CAST(5 AS INT) THEN multiply(tpcds_partitioned_parquet_snap.catalog_sales.cs_ext_list_price, CAST(tpcds_partitioned_parquet_snap.catalog_sales.cs_quantity AS DECIMAL(10,0))) ELSE CAST(0 AS DECIMAL(18,2)) END), sum(CASE WHEN d_moy = CAST(6 AS INT) THEN multiply(tpcds_partitioned_parquet_snap.catalog_sales.cs_ext_list_price, CAST(tpcds_partitioned_parquet_snap.catalog_sales.cs_quantity AS DECIMAL(10,0))) ELSE CAST(0 AS DECIMAL(18,2)) END), sum(CASE WHEN d_moy = CAST(7 AS INT) THEN multiply(tpcds_partitioned_parquet_snap.catalog_sales.cs_ext_list_price, CAST(tpcds_partitioned_parquet_snap.catalog_sales.cs_quantity AS DECIMAL(10,0))) ELSE CAST(0 AS DECIMAL(18,2)) END), sum(CASE WHEN d_moy = CAST(8 AS INT) THEN multiply(tpcds_partitioned_parquet_snap.catalog_sales.cs_ext_list_price, CAST(tpcds_partitioned_parquet_snap.catalog_sales.cs_quantity AS DECIMAL(10,0))) ELSE CAST(0 AS DECIMAL(18,2)) END), sum(CASE WHEN d_moy = CAST(9 AS INT) THEN multiply(tpcds_partitioned_parquet_snap.catalog_sales.cs_ext_list_price, CAST(tpcds_partitioned_parquet_snap.catalog_sales.cs_quantity AS DECIMAL(10,0))) ELSE CAST(0 AS DECIMAL(18,2)) END), sum(CASE WHEN d_moy = CAST(10 AS INT) THEN multiply(tpcds_partitioned_parquet_snap.catalog_sales.cs_ext_list_price, CAST(tpcds_partitioned_parquet_snap.catalog_sales.cs_quantity AS DECIMAL(10,0))) ELSE CAST(0 AS DECIMAL(18,2)) END), sum(CASE WHEN d_moy = CAST(11 AS INT) THEN multiply(tpcds_partitioned_parquet_snap.catalog_sales.cs_ext_list_price, CAST(tpcds_partitioned_parquet_snap.catalog_sales.cs_quantity AS DECIMAL(10,0))) ELSE CAST(0 AS DECIMAL(18,2)) END), sum(CASE WHEN d_moy = CAST(12 AS INT) THEN multiply(tpcds_partitioned_parquet_snap.catalog_sales.cs_ext_list_price, CAST(tpcds_partitioned_parquet_snap.catalog_sales.cs_quantity AS DECIMAL(10,0))) ELSE CAST(0 AS DECIMAL(18,2)) END), sum(CASE WHEN d_moy = CAST(1 AS INT) THEN multiply(tpcds_partitioned_parquet_snap.catalog_sales.cs_net_paid, CAST(tpcds_partitioned_parquet_snap.catalog_sales.cs_quantity AS DECIMAL(10,0))) ELSE CAST(0 AS DECIMAL(18,2)) END), sum(CASE WHEN d_moy = CAST(2 AS INT) THEN multiply(tpcds_partitioned_parquet_snap.catalog_sales.cs_net_paid, CAST(tpcds_partitioned_parquet_snap.catalog_sales.cs_quantity AS DECIMAL(10,0))) ELSE CAST(0 AS DECIMAL(18,2)) END), sum(CASE WHEN d_moy = CAST(3 AS INT) THEN multiply(tpcds_partitioned_parquet_snap.catalog_sales.cs_net_paid, CAST(tpcds_partitioned_parquet_snap.catalog_sales.cs_quantity AS DECIMAL(10,0))) ELSE CAST(0 AS DECIMAL(18,2)) END), sum(CASE WHEN d_moy = CAST(4 AS INT) THEN multiply(tpcds_partitioned_parquet_snap.catalog_sales.cs_net_paid, CAST(tpcds_partitioned_parquet_snap.catalog_sales.cs_quantity AS DECIMAL(10,0))) ELSE CAST(0 AS DECIMAL(18,2)) END), sum(CASE WHEN d_moy = CAST(5 AS INT) THEN multiply(tpcds_partitioned_parquet_snap.catalog_sales.cs_net_paid, CAST(tpcds_partitioned_parquet_snap.catalog_sales.cs_quantity AS DECIMAL(10,0))) ELSE CAST(0 AS DECIMAL(18,2)) END), sum(CASE WHEN d_moy = CAST(6 AS INT) THEN multiply(tpcds_partitioned_parquet_snap.catalog_sales.cs_net_paid, CAST(tpcds_partitioned_parquet_snap.catalog_sales.cs_quantity AS DECIMAL(10,0))) ELSE CAST(0 AS DECIMAL(18,2)) END), sum(CASE WHEN d_moy = CAST(7 AS INT) THEN multiply(tpcds_partitioned_parquet_snap.catalog_sales.cs_net_paid, CAST(tpcds_partitioned_parquet_snap.catalog_sales.cs_quantity AS DECIMAL(10,0))) ELSE CAST(0 AS DECIMAL(18,2)) END), sum(CASE WHEN d_moy = CAST(8 AS INT) THEN multiply(tpcds_partitioned_parquet_snap.catalog_sales.cs_net_paid, CAST(tpcds_partitioned_parquet_snap.catalog_sales.cs_quantity AS DECIMAL(10,0))) ELSE CAST(0 AS DECIMAL(18,2)) END), sum(CASE WHEN d_moy = CAST(9 AS INT) THEN multiply(tpcds_partitioned_parquet_snap.catalog_sales.cs_net_paid, CAST(tpcds_partitioned_parquet_snap.catalog_sales.cs_quantity AS DECIMAL(10,0))) ELSE CAST(0 AS DECIMAL(18,2)) END), sum(CASE WHEN d_moy = CAST(10 AS INT) THEN multiply(tpcds_partitioned_parquet_snap.catalog_sales.cs_net_paid, CAST(tpcds_partitioned_parquet_snap.catalog_sales.cs_quantity AS DECIMAL(10,0))) ELSE CAST(0 AS DECIMAL(18,2)) END), sum(CASE WHEN d_moy = CAST(11 AS INT) THEN multiply(tpcds_partitioned_parquet_snap.catalog_sales.cs_net_paid, CAST(tpcds_partitioned_parquet_snap.catalog_sales.cs_quantity AS DECIMAL(10,0))) ELSE CAST(0 AS DECIMAL(18,2)) END), sum(CASE WHEN d_moy = CAST(12 AS INT) THEN multiply(tpcds_partitioned_parquet_snap.catalog_sales.cs_net_paid, CAST(tpcds_partitioned_parquet_snap.catalog_sales.cs_quantity AS DECIMAL(10,0))) ELSE CAST(0 AS DECIMAL(18,2)) END)
+|  |  group by: w_warehouse_name, w_warehouse_sq_ft, w_city, w_county, w_state, w_country
+|  |  mem-estimate=495.79MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
+|  |  tuple-ids=21 row-size=503B cardinality=22 cost=25815930
+|  |  in pipelines: 29(GETNEXT), 20(OPEN)
+|  |
+|  28:HASH JOIN [INNER JOIN]
+|  |  hash predicates: tpcds_partitioned_parquet_snap.catalog_sales.cs_warehouse_sk = w_warehouse_sk
+|  |  fk/pk conjuncts: tpcds_partitioned_parquet_snap.catalog_sales.cs_warehouse_sk = w_warehouse_sk
+|  |  runtime filters: RF008[bloom] <- w_warehouse_sk, RF009[min_max] <- w_warehouse_sk
+|  |  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
+|  |  tuple-ids=15,17,18,19,20 row-size=112B cardinality=8.65M cost=3786620
+|  |  in pipelines: 20(GETNEXT), 27(OPEN)
+|  |
+|  |--27:CTE CONSUMER [cte_suggestion_0]
+|  |     mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
+|  |     tuple-ids=20 row-size=123B cardinality=22 cost=0
+|  |     in pipelines: 27(GETNEXT)
+|  |
+|  26:HASH JOIN [INNER JOIN]
+|  |  hash predicates: tpcds_partitioned_parquet_snap.catalog_sales.cs_sold_date_sk = d_date_sk
+|  |  fk/pk conjuncts: tpcds_partitioned_parquet_snap.catalog_sales.cs_sold_date_sk = d_date_sk
+|  |  runtime filters: RF010[bloom] <- d_date_sk
+|  |  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
+|  |  tuple-ids=15,17,18,19 row-size=44B cardinality=8.65M cost=12460758
+|  |  in pipelines: 20(GETNEXT), 25(OPEN)
+|  |
+|  |--25:CTE CONSUMER [cte_suggestion_1]
+|  |     mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
+|  |     tuple-ids=19 row-size=12B cardinality=373 cost=0
+|  |     in pipelines: 25(GETNEXT)
+|  |
+|  24:HASH JOIN [INNER JOIN]
+|  |  hash predicates: tpcds_partitioned_parquet_snap.catalog_sales.cs_ship_mode_sk = sm_ship_mode_sk
+|  |  fk/pk conjuncts: tpcds_partitioned_parquet_snap.catalog_sales.cs_ship_mode_sk = sm_ship_mode_sk
+|  |  runtime filters: RF012[bloom] <- sm_ship_mode_sk, RF013[min_max] <- sm_ship_mode_sk
+|  |  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
+|  |  tuple-ids=15,17,18 row-size=36B cardinality=42.47M cost=116623043
+|  |  in pipelines: 20(GETNEXT), 23(OPEN)
+|  |
+|  |--23:CTE CONSUMER [cte_suggestion_2]
+|  |     mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
+|  |     tuple-ids=18 row-size=23B cardinality=2 cost=0
+|  |     in pipelines: 23(GETNEXT)
+|  |
+|  22:HASH JOIN [INNER JOIN]
+|  |  hash predicates: tpcds_partitioned_parquet_snap.catalog_sales.cs_sold_time_sk = t_time_sk
+|  |  fk/pk conjuncts: tpcds_partitioned_parquet_snap.catalog_sales.cs_sold_time_sk = t_time_sk
+|  |  runtime filters: RF014[bloom] <- t_time_sk, RF015[min_max] <- t_time_sk
+|  |  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
+|  |  tuple-ids=15,17 row-size=32B cardinality=424.67M cost=186892578
+|  |  in pipelines: 20(GETNEXT), 21(OPEN)
+|  |
+|  |--21:CTE CONSUMER [cte_suggestion_3]
+|  |     mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
+|  |     tuple-ids=17 row-size=8B cardinality=8.64K cost=0
+|  |     in pipelines: 21(GETNEXT)
+|  |
+|  20:SCAN HDFS [tpcds_partitioned_parquet_snap.catalog_sales]
+|     partition predicates: tpcds_partitioned_parquet_snap.catalog_sales.cs_sold_date_sk IS NOT NULL
+|     HDFS partitions=1830/1831 files=1830 size=280.81GB
+|     predicates: tpcds_partitioned_parquet_snap.catalog_sales.cs_warehouse_sk IS NOT NULL, tpcds_partitioned_parquet_snap.catalog_sales.cs_sold_time_sk IS NOT NULL, tpcds_partitioned_parquet_snap.catalog_sales.cs_ship_mode_sk IS NOT NULL
+|     runtime filters: RF015[min_max] -> tpcds_partitioned_parquet_snap.catalog_sales.cs_sold_time_sk, RF013[min_max] -> tpcds_partitioned_parquet_snap.catalog_sales.cs_ship_mode_sk, RF009[min_max] -> tpcds_partitioned_parquet_snap.catalog_sales.cs_warehouse_sk, RF014[bloom] -> tpcds_partitioned_parquet_snap.catalog_sales.cs_sold_time_sk, RF012[bloom] -> tpcds_partitioned_parquet_snap.catalog_sales.cs_ship_mode_sk, RF010[bloom] -> tpcds_partitioned_parquet_snap.catalog_sales.cs_sold_date_sk, RF008[bloom] -> tpcds_partitioned_parquet_snap.catalog_sales.cs_warehouse_sk
+|     stored statistics:
+|       table: rows=4.32G size=280.96GB
+|       partitions: 1830/1830 rows=4.30G
+|       columns: all
+|     extrapolated-rows=disabled max-scan-range-rows=5.09M est-scan-range=373(filtered from 1830)
+|     parquet dictionary predicates: tpcds_partitioned_parquet_snap.catalog_sales.cs_warehouse_sk IS NOT NULL, tpcds_partitioned_parquet_snap.catalog_sales.cs_sold_time_sk IS NOT NULL, tpcds_partitioned_parquet_snap.catalog_sales.cs_ship_mode_sk IS NOT NULL
+|     mem-estimate=16.00MB mem-reservation=256.00KB thread-reservation=0
+|     tuple-ids=15 row-size=28B cardinality=428.59M(filtered from 4.26G) cost=426892154
+|     in pipelines: 20(GETNEXT)
+|
+19:AGGREGATE [FINALIZE]
+|  output: sum(CASE WHEN d_moy = CAST(1 AS INT) THEN multiply(tpcds_partitioned_parquet_snap.web_sales.ws_sales_price, CAST(tpcds_partitioned_parquet_snap.web_sales.ws_quantity AS DECIMAL(10,0))) ELSE CAST(0 AS DECIMAL(18,2)) END), sum(CASE WHEN d_moy = CAST(2 AS INT) THEN multiply(tpcds_partitioned_parquet_snap.web_sales.ws_sales_price, CAST(tpcds_partitioned_parquet_snap.web_sales.ws_quantity AS DECIMAL(10,0))) ELSE CAST(0 AS DECIMAL(18,2)) END), sum(CASE WHEN d_moy = CAST(3 AS INT) THEN multiply(tpcds_partitioned_parquet_snap.web_sales.ws_sales_price, CAST(tpcds_partitioned_parquet_snap.web_sales.ws_quantity AS DECIMAL(10,0))) ELSE CAST(0 AS DECIMAL(18,2)) END), sum(CASE WHEN d_moy = CAST(4 AS INT) THEN multiply(tpcds_partitioned_parquet_snap.web_sales.ws_sales_price, CAST(tpcds_partitioned_parquet_snap.web_sales.ws_quantity AS DECIMAL(10,0))) ELSE CAST(0 AS DECIMAL(18,2)) END), sum(CASE WHEN d_moy = CAST(5 AS INT) THEN multiply(tpcds_partitioned_parquet_snap.web_sales.ws_sales_price, CAST(tpcds_partitioned_parquet_snap.web_sales.ws_quantity AS DECIMAL(10,0))) ELSE CAST(0 AS DECIMAL(18,2)) END), sum(CASE WHEN d_moy = CAST(6 AS INT) THEN multiply(tpcds_partitioned_parquet_snap.web_sales.ws_sales_price, CAST(tpcds_partitioned_parquet_snap.web_sales.ws_quantity AS DECIMAL(10,0))) ELSE CAST(0 AS DECIMAL(18,2)) END), sum(CASE WHEN d_moy = CAST(7 AS INT) THEN multiply(tpcds_partitioned_parquet_snap.web_sales.ws_sales_price, CAST(tpcds_partitioned_parquet_snap.web_sales.ws_quantity AS DECIMAL(10,0))) ELSE CAST(0 AS DECIMAL(18,2)) END), sum(CASE WHEN d_moy = CAST(8 AS INT) THEN multiply(tpcds_partitioned_parquet_snap.web_sales.ws_sales_price, CAST(tpcds_partitioned_parquet_snap.web_sales.ws_quantity AS DECIMAL(10,0))) ELSE CAST(0 AS DECIMAL(18,2)) END), sum(CASE WHEN d_moy = CAST(9 AS INT) THEN multiply(tpcds_partitioned_parquet_snap.web_sales.ws_sales_price, CAST(tpcds_partitioned_parquet_snap.web_sales.ws_quantity AS DECIMAL(10,0))) ELSE CAST(0 AS DECIMAL(18,2)) END), sum(CASE WHEN d_moy = CAST(10 AS INT) THEN multiply(tpcds_partitioned_parquet_snap.web_sales.ws_sales_price, CAST(tpcds_partitioned_parquet_snap.web_sales.ws_quantity AS DECIMAL(10,0))) ELSE CAST(0 AS DECIMAL(18,2)) END), sum(CASE WHEN d_moy = CAST(11 AS INT) THEN multiply(tpcds_partitioned_parquet_snap.web_sales.ws_sales_price, CAST(tpcds_partitioned_parquet_snap.web_sales.ws_quantity AS DECIMAL(10,0))) ELSE CAST(0 AS DECIMAL(18,2)) END), sum(CASE WHEN d_moy = CAST(12 AS INT) THEN multiply(tpcds_partitioned_parquet_snap.web_sales.ws_sales_price, CAST(tpcds_partitioned_parquet_snap.web_sales.ws_quantity AS DECIMAL(10,0))) ELSE CAST(0 AS DECIMAL(18,2)) END), sum(CASE WHEN d_moy = CAST(1 AS INT) THEN multiply(tpcds_partitioned_parquet_snap.web_sales.ws_net_paid_inc_tax, CAST(tpcds_partitioned_parquet_snap.web_sales.ws_quantity AS DECIMAL(10,0))) ELSE CAST(0 AS DECIMAL(18,2)) END), sum(CASE WHEN d_moy = CAST(2 AS INT) THEN multiply(tpcds_partitioned_parquet_snap.web_sales.ws_net_paid_inc_tax, CAST(tpcds_partitioned_parquet_snap.web_sales.ws_quantity AS DECIMAL(10,0))) ELSE CAST(0 AS DECIMAL(18,2)) END), sum(CASE WHEN d_moy = CAST(3 AS INT) THEN multiply(tpcds_partitioned_parquet_snap.web_sales.ws_net_paid_inc_tax, CAST(tpcds_partitioned_parquet_snap.web_sales.ws_quantity AS DECIMAL(10,0))) ELSE CAST(0 AS DECIMAL(18,2)) END), sum(CASE WHEN d_moy = CAST(4 AS INT) THEN multiply(tpcds_partitioned_parquet_snap.web_sales.ws_net_paid_inc_tax, CAST(tpcds_partitioned_parquet_snap.web_sales.ws_quantity AS DECIMAL(10,0))) ELSE CAST(0 AS DECIMAL(18,2)) END), sum(CASE WHEN d_moy = CAST(5 AS INT) THEN multiply(tpcds_partitioned_parquet_snap.web_sales.ws_net_paid_inc_tax, CAST(tpcds_partitioned_parquet_snap.web_sales.ws_quantity AS DECIMAL(10,0))) ELSE CAST(0 AS DECIMAL(18,2)) END), sum(CASE WHEN d_moy = CAST(6 AS INT) THEN multiply(tpcds_partitioned_parquet_snap.web_sales.ws_net_paid_inc_tax, CAST(tpcds_partitioned_parquet_snap.web_sales.ws_quantity AS DECIMAL(10,0))) ELSE CAST(0 AS DECIMAL(18,2)) END), sum(CASE WHEN d_moy = CAST(7 AS INT) THEN multiply(tpcds_partitioned_parquet_snap.web_sales.ws_net_paid_inc_tax, CAST(tpcds_partitioned_parquet_snap.web_sales.ws_quantity AS DECIMAL(10,0))) ELSE CAST(0 AS DECIMAL(18,2)) END), sum(CASE WHEN d_moy = CAST(8 AS INT) THEN multiply(tpcds_partitioned_parquet_snap.web_sales.ws_net_paid_inc_tax, CAST(tpcds_partitioned_parquet_snap.web_sales.ws_quantity AS DECIMAL(10,0))) ELSE CAST(0 AS DECIMAL(18,2)) END), sum(CASE WHEN d_moy = CAST(9 AS INT) THEN multiply(tpcds_partitioned_parquet_snap.web_sales.ws_net_paid_inc_tax, CAST(tpcds_partitioned_parquet_snap.web_sales.ws_quantity AS DECIMAL(10,0))) ELSE CAST(0 AS DECIMAL(18,2)) END), sum(CASE WHEN d_moy = CAST(10 AS INT) THEN multiply(tpcds_partitioned_parquet_snap.web_sales.ws_net_paid_inc_tax, CAST(tpcds_partitioned_parquet_snap.web_sales.ws_quantity AS DECIMAL(10,0))) ELSE CAST(0 AS DECIMAL(18,2)) END), sum(CASE WHEN d_moy = CAST(11 AS INT) THEN multiply(tpcds_partitioned_parquet_snap.web_sales.ws_net_paid_inc_tax, CAST(tpcds_partitioned_parquet_snap.web_sales.ws_quantity AS DECIMAL(10,0))) ELSE CAST(0 AS DECIMAL(18,2)) END), sum(CASE WHEN d_moy = CAST(12 AS INT) THEN multiply(tpcds_partitioned_parquet_snap.web_sales.ws_net_paid_inc_tax, CAST(tpcds_partitioned_parquet_snap.web_sales.ws_quantity AS DECIMAL(10,0))) ELSE CAST(0 AS DECIMAL(18,2)) END)
+|  group by: w_warehouse_name, w_warehouse_sq_ft, w_city, w_county, w_state, w_country
+|  mem-estimate=495.79MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
+|  tuple-ids=14 row-size=503B cardinality=22 cost=13132723
+|  in pipelines: 19(GETNEXT), 10(OPEN)
+|
+18:HASH JOIN [INNER JOIN]
+|  hash predicates: tpcds_partitioned_parquet_snap.web_sales.ws_warehouse_sk = w_warehouse_sk
+|  fk/pk conjuncts: tpcds_partitioned_parquet_snap.web_sales.ws_warehouse_sk = w_warehouse_sk
+|  runtime filters: RF000[bloom] <- w_warehouse_sk, RF001[min_max] <- w_warehouse_sk
+|  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
+|  tuple-ids=8,10,11,12,13 row-size=112B cardinality=4.40M cost=1926281
+|  in pipelines: 10(GETNEXT), 17(OPEN)
+|
+|--17:CTE CONSUMER [cte_suggestion_0]
+|     mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
+|     tuple-ids=13 row-size=123B cardinality=22 cost=0
+|     in pipelines: 17(GETNEXT)
+|
+16:HASH JOIN [INNER JOIN]
+|  hash predicates: tpcds_partitioned_parquet_snap.web_sales.ws_sold_date_sk = d_date_sk
+|  fk/pk conjuncts: tpcds_partitioned_parquet_snap.web_sales.ws_sold_date_sk = d_date_sk
+|  runtime filters: RF002[bloom] <- d_date_sk
+|  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
+|  tuple-ids=8,10,11,12 row-size=44B cardinality=4.40M cost=6317839
+|  in pipelines: 10(GETNEXT), 15(OPEN)
+|
+|--15:CTE CONSUMER [cte_suggestion_1]
+|     mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
+|     tuple-ids=12 row-size=12B cardinality=373 cost=0
+|     in pipelines: 15(GETNEXT)
+|
+14:HASH JOIN [INNER JOIN]
+|  hash predicates: tpcds_partitioned_parquet_snap.web_sales.ws_ship_mode_sk = sm_ship_mode_sk
+|  fk/pk conjuncts: tpcds_partitioned_parquet_snap.web_sales.ws_ship_mode_sk = sm_ship_mode_sk
+|  runtime filters: RF004[bloom] <- sm_ship_mode_sk, RF005[min_max] <- sm_ship_mode_sk
+|  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
+|  tuple-ids=8,10,11 row-size=36B cardinality=21.52M cost=59099830
+|  in pipelines: 10(GETNEXT), 13(OPEN)
+|
+|--13:CTE CONSUMER [cte_suggestion_2]
+|     mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
+|     tuple-ids=11 row-size=23B cardinality=2 cost=0
+|     in pipelines: 13(GETNEXT)
+|
+12:HASH JOIN [INNER JOIN]
+|  hash predicates: tpcds_partitioned_parquet_snap.web_sales.ws_sold_time_sk = t_time_sk
+|  fk/pk conjuncts: tpcds_partitioned_parquet_snap.web_sales.ws_sold_time_sk = t_time_sk
+|  runtime filters: RF006[bloom] <- t_time_sk, RF007[min_max] <- t_time_sk
+|  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
+|  tuple-ids=8,10 row-size=32B cardinality=215.21M cost=94229568
+|  in pipelines: 10(GETNEXT), 11(OPEN)
+|
+|--11:CTE CONSUMER [cte_suggestion_3]
+|     mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
+|     tuple-ids=10 row-size=8B cardinality=8.64K cost=0
+|     in pipelines: 11(GETNEXT)
+|
+10:SCAN HDFS [tpcds_partitioned_parquet_snap.web_sales]
+   partition predicates: tpcds_partitioned_parquet_snap.web_sales.ws_sold_date_sk IS NOT NULL
+   HDFS partitions=1823/1824 files=1823 size=145.67GB
+   predicates: tpcds_partitioned_parquet_snap.web_sales.ws_sold_time_sk IS NOT NULL, tpcds_partitioned_parquet_snap.web_sales.ws_ship_mode_sk IS NOT NULL, tpcds_partitioned_parquet_snap.web_sales.ws_warehouse_sk IS NOT NULL
+   runtime filters: RF007[min_max] -> tpcds_partitioned_parquet_snap.web_sales.ws_sold_time_sk, RF005[min_max] -> tpcds_partitioned_parquet_snap.web_sales.ws_ship_mode_sk, RF001[min_max] -> tpcds_partitioned_parquet_snap.web_sales.ws_warehouse_sk, RF006[bloom] -> tpcds_partitioned_parquet_snap.web_sales.ws_sold_time_sk, RF004[bloom] -> tpcds_partitioned_parquet_snap.web_sales.ws_ship_mode_sk, RF002[bloom] -> tpcds_partitioned_parquet_snap.web_sales.ws_sold_date_sk, RF000[bloom] -> tpcds_partitioned_parquet_snap.web_sales.ws_warehouse_sk
+   stored statistics:
+     table: rows=2.16G size=145.75GB
+     partitions: 1823/1823 rows=2.16G
+     columns: all
+   extrapolated-rows=disabled max-scan-range-rows=3.37M est-scan-range=373(filtered from 1823)
+   parquet dictionary predicates: tpcds_partitioned_parquet_snap.web_sales.ws_sold_time_sk IS NOT NULL, tpcds_partitioned_parquet_snap.web_sales.ws_ship_mode_sk IS NOT NULL, tpcds_partitioned_parquet_snap.web_sales.ws_warehouse_sk IS NOT NULL
+   mem-estimate=16.00MB mem-reservation=128.00KB thread-reservation=0
+   tuple-ids=8 row-size=28B cardinality=215.30M(filtered from 2.16G) cost=215274115
+   in pipelines: 10(GETNEXT)
+====

@@ -65,6 +65,7 @@ import org.apache.impala.calcite.rules.RemoveInfrequentCTERule;
 import org.apache.impala.calcite.schema.ImpalaCost;
 import org.apache.impala.calcite.util.LogUtil;
 import org.apache.impala.common.ImpalaException;
+import org.apache.impala.common.Pair;
 import org.apache.impala.thrift.TQueryCtx;
 import org.apache.impala.service.BackendConfig;
 import org.apache.impala.thrift.TQueryOptions;
@@ -72,6 +73,7 @@ import org.apache.impala.util.EventSequence;
 
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Function;
@@ -382,7 +384,14 @@ public class CalciteOptimizer implements CompilerStep {
     if (ctes.isEmpty()) {
       return plan;
     }
-
+    // Since we assign a name to every CTE we need to enforce
+    // some order among them to keep plans deterministic
+    // We could potentially delegate this responsibility to
+    // the suggester implementation. However, since suggesters
+    // are pluggable/configurable not sure if we should rely on
+    // the end user.
+    ctes = ctes.stream().map(cte -> Pair.create(RelOptUtil.toString(cte), cte))
+        .sorted(Comparator.comparing(Pair::getFirst)).map(Pair::getSecond).toList();
     List<RelOptMaterialization> cteMVs = new ArrayList<>();
     int i = 0;
     for (RelNode cte : ctes) {
