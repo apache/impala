@@ -178,6 +178,7 @@ public interface MetaProvider {
     List<VirtualColumn> getVirtualColumns();
     long getCatalogVersion();
     long getLoadedTimeMs();
+    boolean isIceberg();
   }
 
   /**

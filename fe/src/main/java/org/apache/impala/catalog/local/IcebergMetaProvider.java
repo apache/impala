@@ -249,6 +249,14 @@ public class IcebergMetaProvider implements MetaProvider {
       throws MetaException, TException {
     TableMetaRefImpl ref = (TableMetaRefImpl)table;
     Preconditions.checkState(!ref.isPartitioned());
+    return loadPartitionListHelper();
+  }
+
+  /**
+   * Helper method to load partition list for Iceberg tables.
+   * Iceberg tables are always handled as unpartitioned in catalog.
+   */
+  public static List<PartitionRef> loadPartitionListHelper() {
     return ImmutableList.of(new PartitionRefImpl(PartitionRefImpl.UNPARTITIONED_NAME));
   }
 
@@ -263,21 +271,18 @@ public class IcebergMetaProvider implements MetaProvider {
       TableMetaRef table, List<String> partitionColumnNames,
       ListMap<TNetworkAddress> hostIndex,
       List<PartitionRef> partitionRefs) throws CatalogException, TException {
-    Map<String, PartitionMetadata> ret = new HashMap<>();
-    ret.put("", new PartitionMetadataImpl(((TableMetaRefImpl)table).msTable_));
-    return ret;
+    TableMetaRefImpl ref = (TableMetaRefImpl)table;
+    return loadPartitionsByRefsHelper(ref.msTable_);
   }
 
   /**
-   * We model partitions slightly differently to Hive. So, in the case of an
-   * unpartitioned table, we have to create a fake Partition object which has the
-   * metadata of the table.
+   * Helper method to load dummy partition for Iceberg tables.
+   * Iceberg tables are always handled as unpartitioned in catalog.
    */
-  private Map<String, PartitionMetadata> loadUnpartitionedPartition(
-      TableMetaRefImpl table, List<PartitionRef> partitionRefs,
-      ListMap<TNetworkAddress> hostIndex) throws CatalogException {
+  public static Map<String, PartitionMetadata> loadPartitionsByRefsHelper(
+      Table msTable) throws CatalogException {
     Map<String, PartitionMetadata> ret = new HashMap<>();
-    ret.put("", new PartitionMetadataImpl(((TableMetaRefImpl)table).msTable_));
+    ret.put("", new PartitionMetadataImpl(msTable));
     return ret;
   }
 
@@ -523,6 +528,11 @@ public class IcebergMetaProvider implements MetaProvider {
     @Override
     public long getLoadedTimeMs() {
       return loadingTimeMs_;
+    }
+
+    @Override
+    public boolean isIceberg() {
+      return true;
     }
   }
 

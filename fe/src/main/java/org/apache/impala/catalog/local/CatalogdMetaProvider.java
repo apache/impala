@@ -70,6 +70,7 @@ import org.apache.impala.catalog.HdfsCachePool;
 import org.apache.impala.catalog.HdfsPartitionLocationCompressor;
 import org.apache.impala.catalog.HdfsStorageDescriptor;
 import org.apache.impala.catalog.HdfsTable;
+import org.apache.impala.catalog.IcebergTable;
 import org.apache.impala.catalog.ImpaladCatalog.ObjectUpdateSequencer;
 import org.apache.impala.catalog.Principal;
 import org.apache.impala.catalog.PrincipalPrivilege;
@@ -982,6 +983,10 @@ public class CatalogdMetaProvider implements MetaProvider {
   @Override
   public List<PartitionRef> loadPartitionList(final TableMetaRef table)
       throws TException {
+    // For Iceberg tables, delegate to the dummy Iceberg partition loading logic
+    if (table.isIceberg()) {
+      return IcebergMetaProvider.loadPartitionListHelper();
+    }
     PartitionListCacheKey key = new PartitionListCacheKey((TableMetaRefImpl) table);
     return (List<PartitionRef>) loadWithCaching("partition list for " + table,
         PARTITION_LIST_STATS_CATEGORY, key, new Callable<List<PartitionRef>>() {
@@ -1019,6 +1024,11 @@ public class CatalogdMetaProvider implements MetaProvider {
       throws CatalogException, TException {
     Preconditions.checkArgument(table instanceof TableMetaRefImpl);
     TableMetaRefImpl refImpl = (TableMetaRefImpl)table;
+    // For Iceberg tables, delegate to the dummy Iceberg partition loading logic
+    if (table.isIceberg()) {
+      return IcebergMetaProvider.loadPartitionsByRefsHelper(refImpl.msTable_);
+    }
+
     Stopwatch sw = Stopwatch.createStarted();
     // Load what we can from the cache.
     Map<PartitionRef, PartitionMetadata> refToMeta = loadPartitionsFromCache(refImpl,
@@ -2126,6 +2136,11 @@ public class CatalogdMetaProvider implements MetaProvider {
 
     @Override
     public long getLoadedTimeMs() { return loadedTimeMs_; }
+
+    @Override
+    public boolean isIceberg() {
+      return IcebergTable.isIcebergTable(msTable_);
+    }
   }
 
   /**

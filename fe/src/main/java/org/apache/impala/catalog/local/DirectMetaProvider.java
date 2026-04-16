@@ -43,6 +43,7 @@ import org.apache.impala.catalog.FileMetadataLoader;
 import org.apache.impala.catalog.Function;
 import org.apache.impala.catalog.HdfsCachePool;
 import org.apache.impala.catalog.HdfsPartitionLocationCompressor;
+import org.apache.impala.catalog.IcebergTable;
 import org.apache.impala.catalog.HdfsStorageDescriptor;
 import org.apache.impala.catalog.MetaStoreClientPool;
 import org.apache.impala.catalog.MetaStoreClientPool.MetaStoreClient;
@@ -558,6 +559,11 @@ class DirectMetaProvider implements MetaProvider {
     @Override
     public long getLoadedTimeMs() {
       return 0;
+    }
+
+    @Override
+    public boolean isIceberg() {
+      return IcebergTable.isIcebergTable(msTable_);
     }
   }
 
