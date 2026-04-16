@@ -210,6 +210,12 @@ parser.add_option("--use_calcite_planner", type="choice", choices=BOOLEAN_STRING
 parser.add_option("--enable_ranger_authz", dest="enable_ranger_authz",
                   action="store_true", default=False,
                   help="If true, enable Ranger authorization in Impala cluster.")
+parser.add_option("--enable_tls", dest="enable_tls",
+                  action="store_true", default=False,
+                  help="If true, enable TLS on webserver and Thrift ports. "
+                       "uses be/src/testutil/localhost.pem as the server certificate and "
+                       "be/src/testutil/wildcardCA.pem as the CA certificate. Also binds "
+                       "all server sockets to localhost instead of 0.0.0.0")
 
 # For testing: list of comma-separated delays, in milliseconds, that delay impalad catalog
 # replica initialization. The ith delay is applied to the ith impalad.
@@ -237,6 +243,9 @@ KUDU_RPC_TIMEOUT = build_flavor_timeout(0, slow_build_timeout=60000)
 # HTTP connections don't keep alive their associated sessions. We increase the timeout
 # during builds to make spurious session expiration less likely.
 DISCONNECTED_SESSION_TIMEOUT = 60 * 60 * 6
+
+# Directory where TLS certificates are located.
+CERT_DIR = "{}/be/src/testutil".format(os.environ['IMPALA_HOME'])
 
 def check_process_exists(binary, attempts=1):
   """Checks if a process exists given the binary name. The `attempts` count allows us to
@@ -462,6 +471,14 @@ def build_statestored_arg_list(num_statestored, remap_ports):
       args.extend(["-enable_catalogd_ha=true"])
     if options.enable_statestored_ha:
       args.extend(["-enable_statestored_ha=true"])
+    if options.enable_tls:
+      args.extend(["--hostname=localhost",
+                   "--webserver_interface=localhost",
+                   "--webserver_certificate_file={0}/localhost.pem".format(CERT_DIR),
+                   "--webserver_private_key_file={0}/localhost.key".format(CERT_DIR),
+                   "--ssl_client_ca_certificate={0}/wildcardCA.pem".format(CERT_DIR),
+                   "--ssl_server_certificate={0}/localhost.pem".format(CERT_DIR),
+                   "--ssl_private_key={0}/localhost.key".format(CERT_DIR)])
     statestored_arg_list.append(args)
   return statestored_arg_list
 
@@ -491,6 +508,14 @@ def build_catalogd_arg_list(num_catalogd, remap_ports):
     if options.enable_ranger_authz:
       args.extend(["--server-name=server1", "--ranger_service_type=hive",
                    "--ranger_app_id=impala", "--authorization_provider=ranger"])
+    if options.enable_tls:
+      args.extend(["--hostname=localhost",
+                   "--webserver_interface=localhost",
+                   "--webserver_certificate_file={0}/localhost.pem".format(CERT_DIR),
+                   "--webserver_private_key_file={0}/localhost.key".format(CERT_DIR),
+                   "--ssl_client_ca_certificate={0}/wildcardCA.pem".format(CERT_DIR),
+                   "--ssl_server_certificate={0}/localhost.pem".format(CERT_DIR),
+                   "--ssl_private_key={0}/localhost.key".format(CERT_DIR)])
     catalogd_arg_list.append(args)
   return catalogd_arg_list
 
@@ -507,6 +532,14 @@ def build_admissiond_arg_list():
         ["-state_store_port={0}".format(state_store_port)])
     args.extend(
         ["-state_store_2_port={0}".format(state_store_port + 1)])
+    if options.enable_tls:
+      args.extend(["--hostname=localhost",
+                   "--webserver_interface=localhost",
+                   "--webserver_certificate_file={0}/localhost.pem".format(CERT_DIR),
+                   "--webserver_private_key_file={0}/localhost.key".format(CERT_DIR),
+                   "--ssl_client_ca_certificate={0}/wildcardCA.pem".format(CERT_DIR),
+                   "--ssl_server_certificate={0}/localhost.pem".format(CERT_DIR),
+                   "--ssl_private_key={0}/localhost.key".format(CERT_DIR)])
   return args
 
 
@@ -726,6 +759,16 @@ def build_impalad_arg_lists(cluster_size, num_coordinators, use_exclusive_coordi
     if options.enable_ranger_authz:
       args = ("--server-name=server1 --ranger_service_type=hive --ranger_app_id=impala "
               "--authorization_provider=ranger {args}").format(args=args)
+
+    if options.enable_tls:
+      args = ("--hostname=localhost "
+              "--webserver_interface=localhost "
+              "--webserver_certificate_file={cert_dir}/localhost.pem "
+              "--webserver_private_key_file={cert_dir}/localhost.key "
+              "--ssl_client_ca_certificate={cert_dir}/wildcardCA.pem "
+              "--ssl_server_certificate={cert_dir}/localhost.pem "
+              "--ssl_private_key={cert_dir}/localhost.key {args}") \
+              .format(args=args, cert_dir=CERT_DIR)
 
     # Appended at the end so they can override previous args.
     if i < len(per_impalad_args):

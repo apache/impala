@@ -20,8 +20,8 @@
 from __future__ import absolute_import, division, print_function
 import socket
 import ssl
+import subprocess
 
-from tests.common.environ import IS_REDHAT_DERIVATIVE
 
 # Retrieves the host external IP rather than localhost/127.0.0.1 so we have an IP that
 # Impala will consider distinct from storage backends to force remote scheduling.
@@ -58,12 +58,73 @@ def to_host_port(host, port):
   return fmt.format(host, port)
 
 
+def run_openssl_cmd(args, timeout_s=3):
+  """
+     Runs the 'openssl' command with the provided args array as a subprocess. Force closes
+     STDIN without writing any data to it which avoids openssl commands hanging due to
+     waiting for input.
+
+     Args:
+       args: List of strings forming the arguments to the 'openssl' command.
+       timeout_s: Optional timeout in seconds. If provided and exceeded, the process is
+                  killed.
+
+     Returns: Tuple containing the return code and the combined stdout and stderr output
+              as a string.
+  """
+
+  assert args[0] != "openssl", "'openssl' command must not be included in the args list."
+  args = ["openssl"] + args
+
+  proc = subprocess.Popen(args, stdin=subprocess.PIPE, stdout=subprocess.PIPE,
+      stderr=subprocess.STDOUT, universal_newlines=True)
+
+  try:
+    if timeout_s is None:
+      stdout, stderr = proc.communicate(input="")
+    else:
+      stdout, stderr = proc.communicate(input="", timeout=timeout_s)
+  except subprocess.TimeoutExpired as e:
+    # TimeoutExpired exceptions usually indicate the server port does not support TLS.
+    proc.kill()
+    stdout = proc.communicate()
+    raise e
+
+  out = stdout
+  if not isinstance(out, str):
+    out = out.decode("utf-8", "replace")
+
+  return proc.returncode, out
+
+
+def __get_openssl_supported_ciphers(tls_flag):
+  """
+     Note: Do not call this function directly. Use the OPENSSL_TLS_1_2_CIPHERSUITES and
+     OPENSSL_TLS_1_3_CIPHERSUITES variables instead which are initialized at module load.
+
+     Returns a sorted list of ciphersuites supported by the OS OpenSSL for the given
+     TLS version flag. Allowed values for tls_flag are '-tls1_2' and '-tls1_3'.
+
+     If querying openssl fails, returns an empty list.
+  """
+  rc, out = run_openssl_cmd(["ciphers", "-s", tls_flag])
+  if rc != 0:
+    return []
+  ciphers = set([c.strip() for c in out.strip().split(":") if c.strip()])
+  return sorted(ciphers)
+
+
+OPENSSL_TLS_1_2_CIPHERSUITES = __get_openssl_supported_ciphers("-tls1_2")
+OPENSSL_TLS_1_3_CIPHERSUITES = __get_openssl_supported_ciphers("-tls1_3")
+
 CERT_TO_CA_MAP = {
   "wildcard-cert.pem": "wildcardCA.pem",
-  "wildcard-san-cert.pem": "wildcardCA.pem"
+  "wildcard-san-cert.pem": "wildcardCA.pem",
+  "localhost.pem": "wildcardCA.pem",
+  "localhost-ecdsa.pem": "wildcardCA-ecdsa.pem",
 }
 
-REQUIRED_MIN_OPENSSL_VERSION = 0x10001000
+REQUIRED_MIN_OPENSSL_VERSION = 0x10101000
 _openssl_version_number = getattr(ssl, "OPENSSL_VERSION_NUMBER", None)
 if _openssl_version_number is None:
   SKIP_SSL_MSG = "Legacy OpenSSL module detected"

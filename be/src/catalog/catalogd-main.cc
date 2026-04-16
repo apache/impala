@@ -47,6 +47,7 @@ DECLARE_string(ssl_private_key);
 DECLARE_string(ssl_private_key_password_cmd);
 DECLARE_string(ssl_cipher_list);
 DECLARE_string(ssl_minimum_version);
+DECLARE_string(tls_ciphersuites);
 #include "common/names.h"
 
 using namespace impala;
@@ -97,7 +98,8 @@ int CatalogdMain(int argc, char** argv) {
     builder.ssl(FLAGS_ssl_server_certificate, FLAGS_ssl_private_key)
         .pem_password_cmd(FLAGS_ssl_private_key_password_cmd)
         .ssl_version(ssl_version)
-        .cipher_list(FLAGS_ssl_cipher_list);
+        .cipher_list(FLAGS_ssl_cipher_list)
+        .tls_ciphersuites(FLAGS_tls_ciphersuites);
   }
   ABORT_IF_ERROR(builder.metrics(daemon_env.metrics()).Build(&server));
   ABORT_IF_ERROR(server->Start());

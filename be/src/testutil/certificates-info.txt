@@ -82,6 +82,35 @@ responsible for and how they were created:
       This was created the same as 1) with a different commonName.
 
 -------------
+  6) localhost.pem & localhost.key:
+
+    This is a certificate signed by wildcardCA.pem/wildcardCA.key for localhost
+    testing. The subject has no locality or emailAddress and uses:
+    C=US, ST=CA, O=Cloudera, OU=Impala, CN=localhost
+    It has the subject alternative name "DNS:localhost,IP:127.0.0.1".
+
+-------------
+  7) wildcardCA-ecdsa.pem & wildcardCA-ecdsa.key:
+
+    This is a root CA certificate and it's private key that uses the signature algorithm
+    "ecdsa-with-SHA256" and public key algorithm "id-ecPublicKey". It was used to sign
+    localhost-ecdsa.pem.
+
+    This root CA certificate differs from wildcardCA.pem in the supported TLS 1.2
+    ciphersuites. Can be used to sign client/server certificates for use with the
+    TLS 1.2 ciphersuites who's names start with "ECDHE-ECDSA-".
+
+-------------
+  8) localhost-ecdsa.pem & localhost-ecdsa.key:
+
+    This is a certificate signed by wildcardCA-ecdsa.pem/wildcardCA-ecdsa.key for
+    localhost testing that uses the signature algorithm "ecdsa-with-SHA256" and public key
+    algorithm "id-ecPublicKey". The subject has no locality or emailAddress and uses:
+    C=US, ST=CA, O=Cloudera, OU=Impala, CN=localhost
+    It has the subject alternative name "DNS:localhost,IP:127.0.0.1".
+
+-------------
+
 To verify the contents of any certificate, do the following:
 
   openssl x509 -in <certificate_name> -text

@@ -167,7 +167,8 @@ class CustomClusterTestSuite(ImpalaTestSuite):
       impalad_timeout_s=None, expect_cores=None, reset_ranger=False,
       tmp_dir_placeholders=[],
       expect_startup_fail=False, disable_log_buffering=False, log_symlinks=False,
-      workload_mgmt=False, force_restart=False, custom_core_site_dir=None):
+      workload_mgmt=False, force_restart=False, custom_core_site_dir=None,
+      admissiond_args=None):
     """Records arguments to be passed to a cluster by adding them to the decorated
     method's func_dict"""
     args = dict()
@@ -217,6 +218,8 @@ class CustomClusterTestSuite(ImpalaTestSuite):
       # When sharding tests, always restart the cluster to avoid issues with tests
       # that depend on a specific test order within a shard.
       args[FORCE_RESTART] = True
+    if admissiond_args is not None:
+      args[ADMISSIOND_ARGS] = admissiond_args
 
     def merge_args(args_first, args_last):
       result = args_first.copy()
@@ -230,7 +233,8 @@ class CustomClusterTestSuite(ImpalaTestSuite):
               CATALOGD_ARGS,
               START_ARGS,
               JVM_ARGS,
-              KUDU_ARGS
+              KUDU_ARGS,
+              ADMISSIOND_ARGS
           ):
             # Let the server decide.
             result[key] = " ".join((result[key], args_last[key]))

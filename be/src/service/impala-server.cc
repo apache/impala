@@ -3283,7 +3283,8 @@ Status ImpalaServer::Start(int32_t beeswax_port, int32_t hs2_port,
         builder.ssl(FLAGS_ssl_server_certificate, FLAGS_ssl_private_key)
               .pem_password_cmd(FLAGS_ssl_private_key_password_cmd)
               .ssl_version(ssl_version)
-              .cipher_list(FLAGS_ssl_cipher_list);
+              .cipher_list(FLAGS_ssl_cipher_list)
+              .tls_ciphersuites(FLAGS_tls_ciphersuites);
       }
 
       ThriftServer* server;
@@ -3316,7 +3317,8 @@ Status ImpalaServer::Start(int32_t beeswax_port, int32_t hs2_port,
         builder.ssl(FLAGS_ssl_server_certificate, FLAGS_ssl_private_key)
               .pem_password_cmd(FLAGS_ssl_private_key_password_cmd)
               .ssl_version(ssl_version)
-              .cipher_list(FLAGS_ssl_cipher_list);
+              .cipher_list(FLAGS_ssl_cipher_list)
+              .tls_ciphersuites(FLAGS_tls_ciphersuites);
       }
 
       ThriftServer* server;
@@ -3386,7 +3388,8 @@ Status ImpalaServer::Start(int32_t beeswax_port, int32_t hs2_port,
         http_builder.ssl(FLAGS_ssl_server_certificate, FLAGS_ssl_private_key)
             .pem_password_cmd(FLAGS_ssl_private_key_password_cmd)
             .ssl_version(ssl_version)
-            .cipher_list(FLAGS_ssl_cipher_list);
+            .cipher_list(FLAGS_ssl_cipher_list)
+            .tls_ciphersuites(FLAGS_tls_ciphersuites);
       }
 
       RETURN_IF_ERROR(

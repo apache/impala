@@ -171,6 +171,7 @@ DECLARE_string(ssl_private_key);
 DECLARE_string(ssl_private_key_password_cmd);
 DECLARE_string(ssl_cipher_list);
 DECLARE_string(ssl_minimum_version);
+DECLARE_string(tls_ciphersuites);
 #ifndef NDEBUG
 DECLARE_int32(stress_statestore_startup_delay_ms);
 #endif
@@ -796,7 +797,8 @@ Status Statestore::Init(int32_t state_store_port) {
     builder.ssl(FLAGS_ssl_server_certificate, FLAGS_ssl_private_key)
         .pem_password_cmd(FLAGS_ssl_private_key_password_cmd)
         .ssl_version(ssl_version)
-        .cipher_list(FLAGS_ssl_cipher_list);
+        .cipher_list(FLAGS_ssl_cipher_list)
+        .tls_ciphersuites(FLAGS_tls_ciphersuites);
   }
   RETURN_IF_ERROR(subscriber_topic_update_threadpool_.Init());
   RETURN_IF_ERROR(subscriber_priority_topic_update_threadpool_.Init());
@@ -1844,7 +1846,8 @@ Status Statestore::InitStatestoreHa(
     builder.ssl(FLAGS_ssl_server_certificate, FLAGS_ssl_private_key)
         .pem_password_cmd(FLAGS_ssl_private_key_password_cmd)
         .ssl_version(ssl_version)
-        .cipher_list(FLAGS_ssl_cipher_list);
+        .cipher_list(FLAGS_ssl_cipher_list)
+        .tls_ciphersuites(FLAGS_tls_ciphersuites);
   }
   ThriftServer* ha_server;
   RETURN_IF_ERROR(builder.metrics(metrics_).Build(&ha_server));
