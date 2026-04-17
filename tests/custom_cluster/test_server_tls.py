@@ -29,6 +29,7 @@ from tests.common.impala_cluster import (
     DEFAULT_ADMISSIOND_WEBSERVER_PORT, DEFAULT_STATESTORE_SERVICE_PORT,
     DEFAULT_STATESTORE1_SERVICE_PORT, DEFAULT_STATESTORE_HA_SERVICE_PORT,
     DEFAULT_PEER_STATESTORE_HA_SERVICE_PORT, DEFAULT_CATALOG_SERVICE_PORT,
+    DEFAULT_EXTERNAL_FE_PORT,
 )
 from tests.common.network import (
     OPENSSL_TLS_1_2_CIPHERSUITES,
@@ -58,6 +59,7 @@ TLS_PORTS = [
     DEFAULT_ADMISSIOND_STATE_STORE_SUBSCRIBER_PORT,
     DEFAULT_ADMISSIOND_WEBSERVER_PORT,
     DEFAULT_STATESTORE_HA_SERVICE_PORT,
+    DEFAULT_EXTERNAL_FE_PORT,
 ]
 
 # TLS 1.2 RSA ciphersuites allowed by the cluster configuration.
@@ -310,7 +312,8 @@ class BaseTestServerTls(CustomClusterTestSuite):
                                   admissiond_args=TLS_RSA_LOCALHOST_ARGS,
                                   start_args="--enable_admission_service "
                                              "--enable_statestored_ha "
-                                             "--enable_catalogd_ha")
+                                             "--enable_catalogd_ha "
+                                             "--enable_external_fe_support")
 class TestServerTlsRSA(BaseTestServerTls):
   """
      Spins up a cluster configured to use TLS with RSA certificates and runs webserver
@@ -335,7 +338,8 @@ class TestServerTlsRSA(BaseTestServerTls):
                                   admissiond_args=TLS_ECDSA_LOCALHOST_ARGS,
                                   start_args="--enable_admission_service "
                                              "--enable_statestored_ha "
-                                             "--enable_catalogd_ha")
+                                             "--enable_catalogd_ha "
+                                             "--enable_external_fe_support")
 class TestServerTlsECDSA(BaseTestServerTls):
   """
      Spins up a cluster configured to use TLS with ECDSA certificates and runs webserver

@@ -3354,6 +3354,14 @@ Status ImpalaServer::Start(int32_t beeswax_port, int32_t hs2_port,
       ThriftServerBuilder builder(EXTERNAL_FRONTEND_SERVER_NAME, external_fe_processor,
           external_fe_port);
       ThriftServer* server;
+      if (IsExternalTlsConfigured()) {
+        LOG(INFO) << "Enabling SSL for External FE endpoint.";
+        builder.ssl(FLAGS_ssl_server_certificate, FLAGS_ssl_private_key)
+            .pem_password_cmd(FLAGS_ssl_private_key_password_cmd)
+            .ssl_version(ssl_version)
+            .cipher_list(FLAGS_ssl_cipher_list)
+            .tls_ciphersuites(FLAGS_tls_ciphersuites);
+      }
       RETURN_IF_ERROR(
           builder
               .auth_provider(
