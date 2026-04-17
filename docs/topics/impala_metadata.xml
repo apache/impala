@@ -126,10 +126,10 @@ under the License.
           </dlentry>
           <dlentry>
             <dt>Flags related to <codeph>use_local_catalog</codeph></dt>
-            <dd>When <codeph>use_local_catalog</codeph> is enabled or set to <codeph>True</codeph> on the impalad
-              coordinators the following list of flags configure various parameters as described below. It is not
-              recommended to change the default values on these flags.
-            </dd>
+            <dd>When <codeph>use_local_catalog</codeph> is enabled or set to <codeph>True</codeph>
+              on the impalad coordinators the following list of flags configure various parameters
+              as described below. It is not recommended to change the default values on these
+              flags.</dd>
             <dd>
               <ul>
                 <li>The flag <codeph>local_catalog_cache_mb</codeph> (defaults to -1) configures the
@@ -397,36 +397,41 @@ under the License.
 
       <conbody>
 
-        <p>
-          When the <codeph>‑‑hms_event_polling_interval_s</codeph> flag is set to a non-zero
-          value for your <codeph>catalogd</codeph>, the event-based automatic invalidation is
-          enabled for all databases and tables. If you wish to have the fine-grained control on
-          which tables or databases need to be synced using events, you can use the
-          <codeph>impala.disableHmsSync</codeph> property to disable the event processing at the
+        <p>When the <codeph>‑‑hms_event_polling_interval_s</codeph> flag is set to a non-zero value
+          for your <codeph>catalogd</codeph>, the event-based automatic invalidation is enabled for
+          all databases and tables by default. If you wish to have the fine-grained control on which
+          tables or databases need to be synced using events, you can use the
+            <codeph>impala.disableHmsSync</codeph> property to disable the event processing at the
           table or database level.
         </p>
-
+        <p id="IMPALA-14131">The <parmname>disable_hms_sync_by_default</parmname> flag controls the
+          default event synchronization behavior for the catalog service:<ul>
+            <li>If set to <codeph>true</codeph>, the catalog service
+              skips HMS event processing for all tables and databases by default. You can opt-in
+              specific tables or databases by setting their
+                <parmname>impala.disableHmsSync</parmname> property to <codeph>false</codeph>.</li>
+            <li>If set to <codeph>false</codeph>, which is the default value, the catalog service processes events as usual
+              unless specifically disabled at the table or database level.</li>
+          </ul><note type="note">HMS notification events polling remains independent and is not
+            affected by this flag. </note>
+        </p>
         <p>
           When you add the <codeph>DBPROPERTIES</codeph> or <codeph>TBLPROPERTIES</codeph> with
           the <codeph>impala.disableHmsSync</codeph> key, the HMS event based sync is turned on
           or off. The value of the <codeph>impala.disableHmsSync</codeph> property determines if
           the event processing needs to be disabled for a particular table or database.
         </p>
-
         <ul>
           <li>
             If <codeph>'impala.disableHmsSync'='true'</codeph>, the events for that table or
             database are ignored and not synced with HMS.
           </li>
-
-          <li>
-            If <codeph>'impala.disableHmsSync'='false'</codeph> or if
-            <codeph>impala.disableHmsSync</codeph> is not set, the automatic sync with HMS is
-            enabled if the <codeph>‑‑hms_event_polling_interval_s</codeph> global flag is
-            set to non-zero.
-          </li>
+          <li> If <codeph>'impala.disableHmsSync'='false'</codeph> or if
+              <codeph>impala.disableHmsSync</codeph> is not set, the automatic sync with HMS is
+            enabled if the <codeph>‑‑hms_event_polling_interval_s</codeph> global flag is set to
+            non-zero and the <codeph>--disable_hms_sync_by_default</codeph> flag is set to
+              <codeph>false</codeph>. </li>
         </ul>
-
         <ul>
           <li>
             To disable the event based HMS sync for a new database, set the
@@ -434,7 +439,6 @@ under the License.
             Impala does not support setting database properties:
 <codeblock>CREATE DATABASE &lt;name> WITH DBPROPERTIES ('impala.disableHmsSync'='true');</codeblock>
           </li>
-
           <li>
             To enable or disable the event based HMS sync for a table:
 <codeblock>CREATE TABLE &lt;name> WITH TBLPROPERTIES ('impala.disableHmsSync'='true' | 'false');</codeblock>
