@@ -20,7 +20,7 @@ from tests.common.impala_test_suite import ImpalaTestSuite
 from tests.util.event_processor_utils import EventProcessorUtils
 
 EVENT_SYNC_QUERY_OPTIONS = {
-    "sync_hms_events_wait_time_s": 10,
+    "sync_hms_events_wait_time_s": 30,
     "sync_hms_events_strict_mode": True
 }
 

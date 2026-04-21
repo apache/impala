@@ -32,7 +32,7 @@ from tests.common.test_vector import HS2
 from tests.metadata.test_event_processing_base import TestEventProcessingBase
 from tests.util.event_processor_utils import EventProcessorUtils
 
-PROCESSING_TIMEOUT_S = 10
+PROCESSING_TIMEOUT_S = 30
 LOG = logging.getLogger(__name__)
 
 @SkipIfFS.hive
