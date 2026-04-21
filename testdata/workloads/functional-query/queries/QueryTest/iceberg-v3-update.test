@@ -1,0 +1,243 @@
+====
+---- QUERY
+# Basic UPDATE on unpartitioned V3 table.
+CREATE TABLE update_v3_basic (i int, s string)
+STORED BY ICEBERG
+TBLPROPERTIES('format-version'='3');
+
+INSERT INTO update_v3_basic VALUES (1, 'one'), (2, 'two'), (3, 'three');
+UPDATE update_v3_basic SET s = 'updated' WHERE i = 2;
+---- RUNTIME_PROFILE
+NumModifiedRows: 1
+NumDeletedRows: 1
+====
+---- QUERY
+SELECT * FROM update_v3_basic ORDER BY i;
+---- RESULTS
+1,'one'
+2,'updated'
+3,'three'
+---- TYPES
+INT,STRING
+====
+---- QUERY
+# _row_id is preserved, _last_updated_sequence_number is updated.
+SELECT _row_id, _last_updated_sequence_number, '|', * FROM update_v3_basic ORDER BY i;
+---- RESULTS
+0,1,'|',1,'one'
+1,2,'|',2,'updated'
+2,1,'|',3,'three'
+---- TYPES
+BIGINT,BIGINT,STRING,INT,STRING
+====
+---- QUERY
+# The delete side of UPDATE creates a DV (Puffin) file.
+SELECT content, file_format, record_count, referenced_data_file IS NOT NULL, content_offset IS NOT NULL
+FROM $DATABASE.update_v3_basic.`files`
+ORDER BY content, file_format;
+---- RESULTS
+0,'PARQUET',1,false,false
+0,'PARQUET',3,false,false
+1,'PUFFIN',1,true,true
+---- TYPES
+INT,STRING,BIGINT,BOOLEAN,BOOLEAN
+====
+---- QUERY
+# UPDATE multiple rows at once.
+CREATE TABLE update_v3_multi (i int, s string)
+STORED BY ICEBERG
+TBLPROPERTIES('format-version'='3');
+
+INSERT INTO update_v3_multi VALUES (1, 'a'), (2, 'b'), (3, 'c'), (4, 'd'), (5, 'e');
+UPDATE update_v3_multi SET s = upper(s) WHERE i >= 3;
+---- RUNTIME_PROFILE
+NumModifiedRows: 3
+NumDeletedRows: 3
+====
+---- QUERY
+SELECT * FROM update_v3_multi ORDER BY i;
+---- RESULTS
+1,'a'
+2,'b'
+3,'C'
+4,'D'
+5,'E'
+---- TYPES
+INT,STRING
+====
+---- QUERY
+# _row_id is preserved, _last_updated_sequence_number is updated.
+SELECT _row_id, _last_updated_sequence_number, '|', * FROM update_v3_multi ORDER BY i;
+---- RESULTS
+0,1,'|',1,'a'
+1,1,'|',2,'b'
+2,2,'|',3,'C'
+3,2,'|',4,'D'
+4,2,'|',5,'E'
+---- TYPES
+BIGINT,BIGINT,STRING,INT,STRING
+====
+---- QUERY
+# No WHERE clause, but only update a subset of rows.
+UPDATE update_v3_multi SET s = lower(s);
+---- RUNTIME_PROFILE
+NumModifiedRows: 3
+NumDeletedRows: 3
+====
+---- QUERY
+SELECT * FROM update_v3_multi ORDER BY i;
+---- RESULTS
+1,'a'
+2,'b'
+3,'c'
+4,'d'
+5,'e'
+---- TYPES
+INT,STRING
+====
+---- QUERY
+SELECT content, file_format, record_count, referenced_data_file IS NOT NULL, content_offset IS NOT NULL
+FROM $DATABASE.update_v3_multi.`files`
+ORDER BY content, file_format, record_count;
+---- RESULTS
+0,'PARQUET',3,false,false
+0,'PARQUET',3,false,false
+0,'PARQUET',5,false,false
+1,'PUFFIN',3,true,true
+1,'PUFFIN',3,true,true
+---- TYPES
+INT,STRING,BIGINT,BOOLEAN,BOOLEAN
+====
+---- QUERY
+UPDATE update_v3_multi SET s = 'x';
+---- RUNTIME_PROFILE
+NumModifiedRows: 5
+NumDeletedRows: 5
+====
+---- QUERY
+SELECT * FROM update_v3_multi ORDER BY i;
+---- RESULTS
+1,'x'
+2,'x'
+3,'x'
+4,'x'
+5,'x'
+---- TYPES
+INT,STRING
+====
+---- QUERY
+# UPDATE on partitioned V3 table.
+CREATE TABLE update_v3_part (i int, s string)
+PARTITIONED BY SPEC (TRUNCATE(1, s))
+STORED BY ICEBERG
+TBLPROPERTIES('format-version'='3');
+
+INSERT INTO update_v3_part VALUES (1, 'aa'), (2, 'ab'), (3, 'ba');
+UPDATE update_v3_part SET i = 10 WHERE s = 'ab';
+---- RUNTIME_PROFILE
+NumModifiedRows: 1
+NumDeletedRows: 1
+====
+---- QUERY
+SELECT * FROM update_v3_part ORDER BY i;
+---- RESULTS
+1,'aa'
+3,'ba'
+10,'ab'
+---- TYPES
+INT,STRING
+====
+---- QUERY
+# UPDATE after DELETE on the same V3 table exercises DV merging on the same data file.
+CREATE TABLE update_v3_after_delete (i int, s string)
+STORED BY ICEBERG
+TBLPROPERTIES('format-version'='3');
+
+INSERT INTO update_v3_after_delete VALUES (1, 'a'), (2, 'b'), (3, 'c'), (4, 'd');
+DELETE FROM update_v3_after_delete WHERE i = 2;
+UPDATE update_v3_after_delete SET s = 'updated' WHERE i = 3;
+---- RUNTIME_PROFILE
+NumModifiedRows: 1
+NumDeletedRows: 1
+====
+---- QUERY
+SELECT * FROM update_v3_after_delete ORDER BY i;
+---- RESULTS
+1,'a'
+3,'updated'
+4,'d'
+---- TYPES
+INT,STRING
+====
+---- QUERY
+# Verify row lineage after DELETE + UPDATE.
+SELECT _row_id, _last_updated_sequence_number, '|', * FROM update_v3_after_delete ORDER BY i;
+---- RESULTS
+0,1,'|',1,'a'
+2,3,'|',3,'updated'
+3,1,'|',4,'d'
+---- TYPES
+BIGINT,BIGINT,STRING,INT,STRING
+====
+---- QUERY
+SELECT content, file_format, record_count, referenced_data_file IS NOT NULL, content_offset IS NOT NULL
+FROM $DATABASE.update_v3_after_delete.`files`
+ORDER BY content, file_format, record_count;
+---- RESULTS
+0,'PARQUET',1,false,false
+0,'PARQUET',4,false,false
+1,'PUFFIN',2,true,true
+---- TYPES
+INT,STRING,BIGINT,BOOLEAN,BOOLEAN
+====
+---- QUERY
+# UPDATE partition column on a V3 table moves the row to a different partition.
+CREATE TABLE update_v3_part_col (i int, s string)
+PARTITIONED BY SPEC (TRUNCATE(1, s))
+STORED BY ICEBERG
+TBLPROPERTIES('format-version'='3');
+
+INSERT INTO update_v3_part_col VALUES (1, 'aa'), (2, 'ab'), (3, 'ba');
+UPDATE update_v3_part_col SET s = 'bc' WHERE i = 1;
+---- RUNTIME_PROFILE
+NumModifiedRows: 1
+NumDeletedRows: 1
+====
+---- QUERY
+SELECT * FROM update_v3_part_col ORDER BY i;
+---- RESULTS
+1,'bc'
+2,'ab'
+3,'ba'
+---- TYPES
+INT,STRING
+====
+---- QUERY
+# V2 table with position deletes upgraded to V3: UPDATE must be blocked.
+CREATE TABLE update_v3_pos_del (i int, s string)
+STORED BY ICEBERG
+TBLPROPERTIES ('format-version'='2');
+
+INSERT INTO update_v3_pos_del VALUES (1, 'a'), (2, 'b'), (3, 'c');
+DELETE FROM update_v3_pos_del WHERE i = 2;
+ALTER TABLE update_v3_pos_del SET TBLPROPERTIES ('format-version'='3');
+UPDATE update_v3_pos_del SET s = 'updated' WHERE i = 1;
+---- CATCH
+UPDATE is not allowed on Iceberg format version 3 table
+====
+---- QUERY
+# After OPTIMIZE removes position deletes, UPDATE should work on the upgraded table.
+OPTIMIZE TABLE update_v3_pos_del;
+UPDATE update_v3_pos_del SET s = 'updated' WHERE i = 1;
+---- RUNTIME_PROFILE
+NumModifiedRows: 1
+NumDeletedRows: 1
+====
+---- QUERY
+SELECT * FROM update_v3_pos_del ORDER BY i;
+---- RESULTS
+1,'updated'
+3,'c'
+---- TYPES
+INT,STRING
+====

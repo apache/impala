@@ -448,7 +448,7 @@ public class IcebergCatalogOpExecutor {
           "iceberg_delete_files_fb must be empty when deletion vectors are present");
       applyDeletionVectors(feIcebergTable, removedDeletionVectorsFb, rowDelta,
           addedDeletionVectorsFb);
-    } else {
+    } else if (deleteFilesFb != null) {
       for (ByteBuffer buf : deleteFilesFb) {
         rowDelta.addDeletes(createDeleteFile(feIcebergTable, buf));
       }
@@ -517,12 +517,14 @@ public class IcebergCatalogOpExecutor {
   private static void updateRows(FeIcebergTable feIcebergTable, Transaction txn,
       TIcebergOperationParam icebergOp) throws ImpalaRuntimeException {
     List<ByteBuffer> deleteFilesFb = icebergOp.getIceberg_delete_files_fb();
+    List<ByteBuffer> addedDeletionVectorsFb =
+        icebergOp.getIceberg_added_deletion_vectors_fb();
+    List<ByteBuffer> removedDeletionVectorsFb =
+        icebergOp.getIceberg_removed_deletion_vectors_fb();
     List<ByteBuffer> dataFilesFb = icebergOp.getIceberg_data_files_fb();
     RowDelta rowDelta = txn.newRowDelta();
-    for (ByteBuffer buf : deleteFilesFb) {
-      DeleteFile deleteFile = createDeleteFile(feIcebergTable, buf);
-      rowDelta.addDeletes(deleteFile);
-    }
+    applyDeletes(feIcebergTable, removedDeletionVectorsFb, rowDelta,
+        addedDeletionVectorsFb, deleteFilesFb);
     for (ByteBuffer buf : dataFilesFb) {
       DataFile dataFile = createDataFile(feIcebergTable, buf);
       rowDelta.addRows(dataFile);

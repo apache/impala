@@ -2397,6 +2397,9 @@ class TestIcebergV3Table(IcebergTestSuite):
     finally:
       os.remove(local_file)
 
+  def test_v3_update(self, vector, unique_database):
+    self.run_test_case('QueryTest/iceberg-v3-update', vector, unique_database)
+
   def test_v3_optimize(self, vector, unique_database):
     self.run_test_case('QueryTest/iceberg-v3-optimize', vector, unique_database)
 

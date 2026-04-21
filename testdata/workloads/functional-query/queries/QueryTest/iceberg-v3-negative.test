@@ -9,11 +9,6 @@ INSERT INTO ice_v3 VALUES (2, 'iceberg');
 INSERT INTO ice_v3 VALUES (3, 'spark');
 ====
 ---- QUERY
-UPDATE ice_v3 SET s = 'updated' WHERE i = 1;
----- CATCH
-Impala does not support UPDATE statements on Iceberg tables with format version 3
-====
----- QUERY
 MERGE INTO ice_v3 AS target
 USING (SELECT 1 AS i, 'updated' AS s) AS source ON target.i = source.i
 WHEN MATCHED THEN UPDATE SET target.s = source.s;
