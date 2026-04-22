@@ -40,7 +40,8 @@ import org.apache.impala.thrift.TPrivilege;
 import org.apache.impala.thrift.TResultSet;
 import org.apache.impala.thrift.TResultSetMetadata;
 import org.apache.impala.util.TResultRowBuilder;
-import org.apache.log4j.Logger;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import com.google.common.base.Preconditions;
 import com.google.common.base.Strings;
@@ -67,7 +68,7 @@ import com.google.common.collect.Sets;
  * map.
  */
 public class AuthorizationPolicy {
-  private static final Logger LOG = Logger.getLogger(AuthorizationPolicy.class);
+  private static final Logger LOG = LoggerFactory.getLogger(AuthorizationPolicy.class);
 
   // Need to keep separate caches of role names and user names since there is
   // no uniqueness guarantee across roles and users

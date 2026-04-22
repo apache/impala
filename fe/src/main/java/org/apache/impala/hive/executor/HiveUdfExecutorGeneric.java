@@ -26,7 +26,8 @@ import org.apache.hadoop.hive.ql.udf.generic.GenericUDF.DeferredObject;
 import org.apache.impala.common.ImpalaRuntimeException;
 import org.apache.impala.thrift.THiveUdfExecutorCtorParams;
 import org.apache.impala.util.UnsafeUtil;
-import org.apache.log4j.Logger;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import com.google.common.base.Preconditions;
 
@@ -37,7 +38,7 @@ import com.google.common.base.Preconditions;
  * See the comments in be/src/exprs/hive-udf-call.h for more details.
  */
 public class HiveUdfExecutorGeneric extends HiveUdfExecutor {
-  private static final Logger LOG = Logger.getLogger(HiveUdfExecutorGeneric.class);
+  private static final Logger LOG = LoggerFactory.getLogger(HiveUdfExecutorGeneric.class);
 
   private GenericUDF genericUDF_;
 

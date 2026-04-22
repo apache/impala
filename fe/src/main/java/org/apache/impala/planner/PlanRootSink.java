@@ -28,7 +28,8 @@ import org.apache.impala.thrift.TExplainLevel;
 import org.apache.impala.thrift.TPlanRootSink;
 import org.apache.impala.thrift.TQueryOptions;
 import org.apache.impala.util.ExprUtil;
-import org.apache.log4j.Logger;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import com.google.common.base.Preconditions;
 
@@ -39,7 +40,7 @@ import com.google.common.base.Preconditions;
  * client, despite both executing concurrently.
  */
 public class PlanRootSink extends DataSink {
-  private static final Logger LOG = Logger.getLogger(PlanRootSink.class);
+  private static final Logger LOG = LoggerFactory.getLogger(PlanRootSink.class);
 
   // The default estimated memory consumption is 10 mb. Only used if statistics are not
   // available. 10 mb should be sufficient to buffer results from most queries. See

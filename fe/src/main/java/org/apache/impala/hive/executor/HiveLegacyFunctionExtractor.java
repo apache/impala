@@ -32,10 +32,12 @@ import org.apache.impala.catalog.ScalarType;
 import org.apache.impala.catalog.Type;
 import org.apache.impala.common.ImpalaException;
 import org.apache.impala.thrift.TFunctionBinaryType;
-import org.apache.log4j.Logger;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class HiveLegacyFunctionExtractor {
-  private static final Logger LOG = Logger.getLogger(HiveLegacyFunctionExtractor.class);
+  private static final Logger LOG =
+      LoggerFactory.getLogger(HiveLegacyFunctionExtractor.class);
 
   public ScalarFunction extract(Function function, Method method) {
     Class<?> returnType = method.getReturnType();

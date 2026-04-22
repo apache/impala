@@ -32,7 +32,8 @@ import org.apache.directory.server.annotations.CreateTransport;
 import org.apache.directory.server.core.annotations.ApplyLdifFiles;
 import org.apache.directory.server.core.integ.CreateLdapServerRule;
 import org.apache.impala.testutil.WebClient;
-import org.apache.log4j.Logger;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import com.google.common.collect.Range;
 import org.junit.After;
 import org.junit.Before;
@@ -49,7 +50,7 @@ import org.junit.Test;
     transports = { @CreateTransport(protocol = "LDAP", address = "localhost") })
 @ApplyLdifFiles({"users.ldif"})
 public class LdapImpylaHttpTest {
-  private static final Logger LOG = Logger.getLogger(LdapImpylaHttpTest.class);
+  private static final Logger LOG = LoggerFactory.getLogger(LdapImpylaHttpTest.class);
 
   @ClassRule
   public static CreateLdapServerRule serverRule = new CreateLdapServerRule();

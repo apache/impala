@@ -28,7 +28,8 @@ import org.apache.impala.common.JniUtil;
 import org.apache.impala.thrift.THiveUdfExecutorCtorParams;
 import org.apache.thrift.protocol.TBinaryProtocol;
 
-import org.apache.log4j.Logger;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 // Wrapper object to run hive UDFs. This class works with UdfCallExpr in the
 // backend to marshall data back and forth between the execution engine and
@@ -37,7 +38,7 @@ import org.apache.log4j.Logger;
 // TODO: should we cache loaded jars and classes?
 @SuppressWarnings("restriction")
 public class UdfExecutor implements AutoCloseable {
-  private static final Logger LOG = Logger.getLogger(UdfExecutor.class);
+  private static final Logger LOG = LoggerFactory.getLogger(UdfExecutor.class);
 
   private final static TBinaryProtocol.Factory PROTOCOL_FACTORY =
     new TBinaryProtocol.Factory();

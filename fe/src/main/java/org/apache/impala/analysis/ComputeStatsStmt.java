@@ -56,7 +56,8 @@ import org.apache.impala.thrift.TPartitionStats;
 import org.apache.impala.thrift.TTableName;
 import org.apache.impala.thrift.TUnit;
 import org.apache.impala.util.MetaStoreUtil;
-import org.apache.log4j.Logger;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
@@ -113,7 +114,7 @@ import com.google.common.collect.Sets;
  * TODO: Compute stats on complex types.
  */
 public class ComputeStatsStmt extends StatementBase implements SingleTableStmt {
-  private static final Logger LOG = Logger.getLogger(ComputeStatsStmt.class);
+  private static final Logger LOG = LoggerFactory.getLogger(ComputeStatsStmt.class);
 
   private static String AVRO_SCHEMA_MSG_PREFIX = "Cannot COMPUTE STATS on Avro table " +
       "'%s' because its column definitions do not match those in the Avro schema.";

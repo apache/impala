@@ -35,7 +35,8 @@ import org.apache.impala.catalog.Type;
 import org.apache.impala.common.ImpalaRuntimeException;
 import org.apache.impala.thrift.THiveUdfExecutorCtorParams;
 import org.apache.impala.util.UnsafeUtil;
-import org.apache.log4j.Logger;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 // Base Object to run hive UDFs. Hive has two ways in which UDFs are supported.
 // 1) Deriving off of the UDF class (legacy)
@@ -43,7 +44,7 @@ import org.apache.log4j.Logger;
 // The base class here supports portions that are common to both implementations.
 public abstract class HiveUdfExecutor {
 
-  private static final Logger LOG = Logger.getLogger(HiveUdfExecutor.class);
+  private static final Logger LOG = LoggerFactory.getLogger(HiveUdfExecutor.class);
 
   // Return type of the function inferred from the udf method signature.
   // The JavaUdfDataType enum maps it to corresponding primitive type.

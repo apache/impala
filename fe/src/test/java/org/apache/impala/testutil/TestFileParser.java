@@ -31,7 +31,8 @@ import java.util.Scanner;
 import org.apache.impala.common.InternalException;
 import org.apache.impala.service.FeSupport;
 import org.apache.impala.thrift.TQueryOptions;
-import org.apache.log4j.Logger;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
@@ -76,7 +77,7 @@ import com.google.common.collect.Maps;
  * lines. QUERYOPTIONS sections may contain multiple <QUERYOPTION>=<VALUE> lines.
  */
 public class TestFileParser {
-  private static final Logger LOG = Logger.getLogger(TestCase.class);
+  private static final Logger LOG = LoggerFactory.getLogger(TestCase.class);
 
   /**
    * Valid section titles.

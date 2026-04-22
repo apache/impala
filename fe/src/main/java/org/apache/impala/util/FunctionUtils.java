@@ -40,7 +40,8 @@ import org.apache.impala.common.JniUtil;
 import org.apache.impala.hive.executor.HiveUdfExecutorLegacy;
 import org.apache.impala.thrift.TFunction;
 import org.apache.impala.thrift.TFunctionCategory;
-import org.apache.log4j.Logger;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.apache.thrift.protocol.TCompactProtocol;
 
 import com.google.common.base.Joiner;
@@ -48,7 +49,7 @@ import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 
 public abstract class FunctionUtils {
-  public static final Logger LOG = Logger.getLogger(FunctionUtils.class);
+  public static final Logger LOG = LoggerFactory.getLogger(FunctionUtils.class);
 
   public static final FunctionResolutionOrder FUNCTION_RESOLUTION_ORDER =
       new FunctionResolutionOrder();

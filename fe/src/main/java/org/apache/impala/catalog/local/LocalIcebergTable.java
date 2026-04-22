@@ -56,13 +56,14 @@ import org.apache.impala.util.IcebergUtil;
 import com.google.common.base.Preconditions;
 import com.google.errorprone.annotations.Immutable;
 
-import org.apache.log4j.Logger;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Iceberg table for LocalCatalog
  */
 public class LocalIcebergTable extends LocalTable implements FeIcebergTable {
-  private static final Logger LOG = Logger.getLogger(LocalIcebergTable.class);
+  private static final Logger LOG = LoggerFactory.getLogger(LocalIcebergTable.class);
   private TableParams tableParams_;
   private TIcebergFileFormat icebergFileFormat_;
   private TCompressionCodec icebergParquetCompressionCodec_;

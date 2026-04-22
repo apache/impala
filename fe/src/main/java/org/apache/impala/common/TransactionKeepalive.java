@@ -35,7 +35,8 @@ import org.apache.impala.common.TransactionException;
 import org.apache.impala.compat.MetastoreShim;
 import org.apache.impala.thrift.TQueryCtx;
 import org.apache.impala.util.TUniqueIdUtil;
-import org.apache.log4j.Logger;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import com.google.common.base.Preconditions;
 
@@ -46,7 +47,7 @@ import com.google.common.base.Preconditions;
  * re-think our wait policy to spread out RPCs in time.
  */
 public class TransactionKeepalive {
-  public static final Logger LOG = Logger.getLogger(TransactionKeepalive.class);
+  public static final Logger LOG = LoggerFactory.getLogger(TransactionKeepalive.class);
 
   // (IMPALA-9775) The sleep interval is deduced from Hive configuration parameter
   // hive.txn.timeout. To be safe, set an upper limit for sleep interval as 100

@@ -22,7 +22,8 @@ import org.apache.impala.common.TransactionException;
 import org.apache.impala.common.TransactionKeepalive;
 import org.apache.impala.common.TransactionKeepalive.HeartbeatContext;
 import org.apache.impala.compat.MetastoreShim;
-import org.apache.log4j.Logger;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import com.google.common.base.Preconditions;
 
@@ -33,7 +34,7 @@ import com.google.common.base.Preconditions;
  * In close() it aborts the transaction if it wasn't committed earlier.
  */
 public class Transaction implements AutoCloseable {
-  private static final Logger LOG = Logger.getLogger(Transaction.class);
+  private static final Logger LOG = LoggerFactory.getLogger(Transaction.class);
 
   private long transactionId_ = -1;
   private IMetaStoreClient hmsClient_;

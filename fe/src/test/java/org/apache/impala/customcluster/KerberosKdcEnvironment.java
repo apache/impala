@@ -23,7 +23,8 @@ import org.apache.kerby.kerberos.kerb.KrbException;
 import org.apache.kerby.kerberos.kerb.client.KrbClient;
 import org.apache.kerby.kerberos.kerb.server.SimpleKdcServer;
 import org.apache.kerby.kerberos.kerb.type.ticket.TgtTicket;
-import org.apache.log4j.Logger;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.junit.rules.ExternalResource;
 import org.junit.rules.TemporaryFolder;
 
@@ -40,7 +41,7 @@ import java.util.stream.Collectors;
 class KerberosKdcEnvironment extends ExternalResource {
 
   private final Logger LOG =
-          Logger.getLogger(KerberosKdcEnvironment.class);
+          LoggerFactory.getLogger(KerberosKdcEnvironment.class);
 
   private final static String realm = "myorg.com";
   private final static String servicePrincipal =

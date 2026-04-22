@@ -22,7 +22,8 @@ import java.util.Map;
 import java.util.HashMap;
 
 import org.apache.commons.io.IOUtils;
-import org.apache.log4j.Logger;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Runs an Impala cluster with custom flags.
@@ -32,7 +33,7 @@ import org.apache.log4j.Logger;
  * not be used outside of this package.
  */
 class CustomClusterRunner {
-  private static final Logger LOG = Logger.getLogger(CustomClusterRunner.class);
+  private static final Logger LOG = LoggerFactory.getLogger(CustomClusterRunner.class);
 
   public static int StartImpalaCluster() throws IOException, InterruptedException {
     return StartImpalaCluster("");

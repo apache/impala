@@ -56,7 +56,8 @@ import org.apache.kudu.client.RangePartitionBound;
 import org.apache.kudu.client.RangePartitionWithCustomHashSchema;
 import org.apache.kudu.util.CharUtil;
 import org.apache.kudu.util.DecimalUtil;
-import org.apache.log4j.Logger;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import com.google.common.base.Preconditions;
 import com.google.common.base.Strings;
@@ -70,7 +71,7 @@ import com.google.common.collect.Sets;
  * such as creating and dropping tables from Kudu.
  */
 public class KuduCatalogOpExecutor {
-  public static final Logger LOG = Logger.getLogger(KuduCatalogOpExecutor.class);
+  public static final Logger LOG = LoggerFactory.getLogger(KuduCatalogOpExecutor.class);
 
   // Labels used in catalog timeline
   private static final String CHECKED_KUDU_TABLE_EXISTENCE =

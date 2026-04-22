@@ -17,7 +17,8 @@
 
 package org.apache.impala.planner;
 
-import org.apache.log4j.Logger;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.junit.Test;
 import static org.junit.Assert.assertEquals;
 
@@ -29,7 +30,7 @@ import java.util.HashMap;
 import java.util.Random;
 
 public class ParquetBloomFilterTblPropParserTest {
-  private static final Logger LOG = Logger.getLogger(
+  private static final Logger LOG = LoggerFactory.getLogger(
       ParquetBloomFilterTblPropParserTest.class);
 
   @Test

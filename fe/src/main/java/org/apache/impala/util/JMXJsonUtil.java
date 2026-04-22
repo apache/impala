@@ -17,7 +17,8 @@
 
 package org.apache.impala.util;
 
-import org.apache.log4j.Logger;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import com.fasterxml.jackson.core.JsonFactory;
 import com.fasterxml.jackson.core.JsonGenerator;
 
@@ -73,7 +74,7 @@ public class JMXJsonUtil {
   protected static transient MBeanServer mBeanServer =
       ManagementFactory.getPlatformMBeanServer();
 
-  private static final Logger LOG = Logger.getLogger(JMXJsonUtil.class);
+  private static final Logger LOG = LoggerFactory.getLogger(JMXJsonUtil.class);
 
   // Returns the JMX beans as a JSON string.
   public static String getJMXJson() {

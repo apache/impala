@@ -32,14 +32,15 @@ import java.util.UUID;
 
 import com.google.common.base.Preconditions;
 
-import org.apache.log4j.Logger;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Class responsible for the Java reflection needed to fetch the UDF
  * class and function.
  */
 public class HiveUdfLoader implements AutoCloseable {
-  private static final Logger LOG = Logger.getLogger(HiveUdfLoader.class);
+  private static final Logger LOG = LoggerFactory.getLogger(HiveUdfLoader.class);
   private final Class<?> udfClass_;
 
   private final UDFClassType classType_;

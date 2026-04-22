@@ -27,11 +27,12 @@ import org.apache.hadoop.io.Writable;
 import org.apache.impala.common.ImpalaRuntimeException;
 import org.apache.impala.thrift.THiveUdfExecutorCtorParams;
 import org.apache.impala.util.UnsafeUtil;
-import org.apache.log4j.Logger;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class HiveUdfInputHandler {
 
-  private static final Logger LOG = Logger.getLogger(HiveUdfInputHandler.class);
+  private static final Logger LOG = LoggerFactory.getLogger(HiveUdfInputHandler.class);
 
   // Argument types of the function inferred from the udf method signature.
   // The JavaUdfDataType enum maps it to corresponding primitive type.

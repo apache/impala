@@ -21,7 +21,8 @@ import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.hive.conf.HiveConf.ConfVars;
 import org.apache.impala.catalog.MetaStoreClientPool;
 import org.apache.hadoop.hive.conf.HiveConf;
-import org.apache.log4j.Logger;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.nio.file.Path;
 
@@ -35,7 +36,8 @@ import java.nio.file.Path;
  */
 public class EmbeddedMetastoreClientPool extends  MetaStoreClientPool {
 
-  private static final Logger LOG = Logger.getLogger(EmbeddedMetastoreClientPool.class);
+  private static final Logger LOG =
+      LoggerFactory.getLogger(EmbeddedMetastoreClientPool.class);
 
   private static final String CONNECTION_URL_TEMPLATE =
       "jdbc:derby:;databaseName=%s;create=true";

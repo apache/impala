@@ -37,14 +37,16 @@ import java.util.List;
 
 import com.google.common.base.Joiner;
 
-import org.apache.log4j.Logger;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * HiveGenericJavaFunction generates the instance of the GenericUDF object given
  * a className.
  */
 public class HiveGenericJavaFunction implements HiveJavaFunction {
-  private static final Logger LOG = Logger.getLogger(HiveGenericJavaFunction.class);
+  private static final Logger LOG =
+      LoggerFactory.getLogger(HiveGenericJavaFunction.class);
 
   private final Function hiveFn_;
 

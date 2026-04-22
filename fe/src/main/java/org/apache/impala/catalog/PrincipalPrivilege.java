@@ -24,7 +24,8 @@ import org.apache.impala.thrift.TPrincipalType;
 import org.apache.impala.thrift.TPrivilege;
 import org.apache.impala.thrift.TPrivilegeLevel;
 import org.apache.impala.thrift.TPrivilegeScope;
-import org.apache.log4j.Logger;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import com.google.common.base.Preconditions;
 
@@ -33,7 +34,7 @@ import com.google.common.base.Preconditions;
  * This class is thread safe.
  */
 public class PrincipalPrivilege extends CatalogObjectImpl {
-  private static final Logger LOG = Logger.getLogger(AuthorizationPolicy.class);
+  private static final Logger LOG = LoggerFactory.getLogger(AuthorizationPolicy.class);
   private static final String AUTHORIZABLE_SEPARATOR = "->";
   private static final String KV_SEPARATOR = "=";
   private final TPrivilege privilege_;

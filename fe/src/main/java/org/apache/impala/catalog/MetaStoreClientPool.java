@@ -28,7 +28,8 @@ import org.apache.hadoop.hive.metastore.HiveMetaStoreClient;
 import org.apache.hadoop.hive.metastore.IMetaStoreClient;
 import org.apache.hadoop.hive.metastore.api.MetaException;
 import org.apache.hadoop.hive.metastore.RetryingMetaStoreClient;
-import org.apache.log4j.Logger;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import com.google.common.base.Preconditions;
 
@@ -57,7 +58,7 @@ public class MetaStoreClientPool {
   // IMPALA-825.
   private final int clientCreationDelayMs_;
 
-  private static final Logger LOG = Logger.getLogger(MetaStoreClientPool.class);
+  private static final Logger LOG = LoggerFactory.getLogger(MetaStoreClientPool.class);
 
   private final ConcurrentLinkedQueue<MetaStoreClient> clientPool_ =
       new ConcurrentLinkedQueue<MetaStoreClient>();

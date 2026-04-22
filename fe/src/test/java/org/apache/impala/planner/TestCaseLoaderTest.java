@@ -25,14 +25,15 @@ import org.apache.impala.catalog.Db;
 import org.apache.impala.common.FileSystemUtil;
 import org.apache.impala.testutil.PlannerTestCaseLoader;
 import org.apache.impala.util.PatternMatcher;
-import org.apache.log4j.Logger;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.junit.Test;
 
 import java.util.List;
 import java.util.Random;
 
 public class TestCaseLoaderTest {
-  private static final Logger LOG = Logger.getLogger(TestCaseLoaderTest.class);
+  private static final Logger LOG = LoggerFactory.getLogger(TestCaseLoaderTest.class);
 
   // Testcase files are loaded along with the test-data snapshot. Refer to
   // create-tpcds-testcase-files.sh for details.

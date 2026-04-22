@@ -32,7 +32,8 @@ import org.apache.impala.thrift.TTableName;
 import org.apache.impala.thrift.TTableUsage;
 import org.apache.impala.thrift.TUpdateTableUsageRequest;
 import org.apache.impala.thrift.TUpdateTableUsageResponse;
-import org.apache.log4j.Logger;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.apache.thrift.TSerializer;
 import org.apache.thrift.protocol.TBinaryProtocol;
 
@@ -44,7 +45,8 @@ import com.google.common.base.Preconditions;
  * data to catalogd asynchronously in order to invalidate the recently unused tables.
  */
 public class ImpaladTableUsageTracker {
-  private static final Logger LOG = Logger.getLogger(ImpaladTableUsageTracker.class);
+  private static final Logger LOG =
+      LoggerFactory.getLogger(ImpaladTableUsageTracker.class);
   private final static long REPORT_INTERVAL_MS = 10000;
   private Map<TTableName, TTableUsage> unreportedUsages;
   private Thread reportThread_;

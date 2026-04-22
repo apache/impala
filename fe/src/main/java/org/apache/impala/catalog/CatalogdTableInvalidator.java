@@ -27,7 +27,8 @@ import org.apache.impala.common.Reference;
 import org.apache.impala.service.BackendConfig;
 import org.apache.impala.thrift.TTableName;
 import org.apache.impala.util.NoOpEventSequence;
-import org.apache.log4j.Logger;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import javax.management.Notification;
 import javax.management.NotificationEmitter;
@@ -50,7 +51,8 @@ import java.util.concurrent.atomic.AtomicLong;
  * threshold are invalidated periodically.
  */
 public class CatalogdTableInvalidator {
-  public static final Logger LOG = Logger.getLogger(CatalogdTableInvalidator.class);
+  public static final Logger LOG =
+      LoggerFactory.getLogger(CatalogdTableInvalidator.class);
   /**
    * Plugable time source for tests. Defined as static to avoid passing
    * CatalogdTableInvalidator everywhere the clock is used.

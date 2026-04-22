@@ -37,7 +37,8 @@ import org.apache.impala.thrift.TUniqueId;
 import org.apache.impala.util.EventSequence;
 import org.apache.impala.util.HdfsCachingUtil;
 import org.apache.impala.util.NoOpEventSequence;
-import org.apache.log4j.Logger;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import com.google.common.base.Preconditions;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
@@ -99,7 +100,7 @@ public class TableLoadingMgr {
     }
   }
 
-  private static final Logger LOG = Logger.getLogger(TableLoadingMgr.class);
+  private static final Logger LOG = LoggerFactory.getLogger(TableLoadingMgr.class);
 
   // A thread safe blocking deque that is used to prioritize the loading of table
   // metadata. The CatalogServer has a background thread that will always add unloaded

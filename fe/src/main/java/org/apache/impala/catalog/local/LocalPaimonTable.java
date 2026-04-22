@@ -25,7 +25,8 @@ import org.apache.impala.catalog.paimon.FePaimonTable;
 import org.apache.impala.catalog.paimon.PaimonUtil;
 import org.apache.impala.thrift.TTableDescriptor;
 import org.apache.impala.thrift.TTableType;
-import org.apache.log4j.Logger;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.apache.paimon.table.Table;
 
 import java.io.IOException;
@@ -36,7 +37,7 @@ import java.util.Set;
  * Paimon table for LocalCatalog
  */
 public class LocalPaimonTable extends LocalTable implements FePaimonTable {
-  private static final Logger LOG = Logger.getLogger(LocalPaimonTable.class);
+  private static final Logger LOG = LoggerFactory.getLogger(LocalPaimonTable.class);
   private Table table_;
 
   public static LocalPaimonTable load(LocalDb db,
