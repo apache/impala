@@ -389,10 +389,11 @@ class TestHS2(HS2TestSuite):
     assert get_operation_status_resp.operationState == \
         TCLIService.TOperationState.FINISHED_STATE
     # The long polling wait must have been interrupted by the completion, so it should
-    # not come anywhere close to waiting the full 10 seconds. 1 second is not a very
-    # tight time bound.
+    # not come anywhere close to waiting the full 10 seconds. Most of the time this
+    # completes within 1 second, but there are outliers that can be ~2.5 seconds. Set
+    # a loose time bound of 4 seconds.
     time_diff = end_time - start_time
-    assert time_diff < 1
+    assert time_diff < 4
 
     # Fetch the results so the query completes successfully
     fetch_results_req = TCLIService.TFetchResultsReq()
@@ -456,8 +457,8 @@ class TestHS2(HS2TestSuite):
 
     # The long polling wait must have been interrupted by the error, so it should
     # not come anywhere close to waiting the full 10 seconds. This is a very short
-    # statement, so it should hit the error within 1 second.
-    assert end_time - start_time < 1.0
+    # statement, so it should hit the error within 4 seconds.
+    assert end_time - start_time < 4.0
 
   @needs_session()
   def test_malformed_get_operation_status(self):
