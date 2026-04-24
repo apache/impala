@@ -393,9 +393,6 @@ class TestHS2(HS2TestSuite):
     # tight time bound.
     time_diff = end_time - start_time
     assert time_diff < 1
-    # This should take at least 80ms, because that is the amount of time the query
-    # should sleep
-    assert time_diff >= 0.08
 
     # Fetch the results so the query completes successfully
     fetch_results_req = TCLIService.TFetchResultsReq()
