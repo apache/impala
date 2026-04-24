@@ -685,7 +685,16 @@ class CustomClusterTestSuite(ImpalaTestSuite):
 
     LOG.info("Starting cluster with command: %s" % cmd_str)
     try:
-      check_call(cmd + options, close_fds=True)
+      subprocess.run(
+          cmd + options, close_fds=True, capture_output=True, text=True, check=True)
+    except subprocess.CalledProcessError as e:
+      out = e.output if e.output is not None else ""
+      err = e.stderr if e.stderr is not None else ""
+      detail_msg = (
+          "start-impala-cluster.py failed (exit code %d).\nstdout:\n%s\nstderr:\n%s"
+          % (e.returncode, out, err))
+      LOG.error(detail_msg)
+      raise
     finally:
       if log_symlinks:
         cls._log_symlinks(log=LOG)
