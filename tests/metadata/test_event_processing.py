@@ -771,6 +771,7 @@ class TestSelfRenameEvent(ImpalaTestSuite):
       self.execute_query("create table {}.tbl_a(i int)".format(unique_database))
       # Wait until the CREATE_DATABASE and CREATE_TABLE events are skipped.
       EventProcessorUtils.wait_for_event_processing(self)
+      events_skipped_before = EventProcessorUtils.get_int_metric('events-skipped', 0)
       self.execute_query(
           "alter table {0}.tbl_a rename to {0}.tbl_b".format(unique_database))
       self.execute_query(":event_processor('pause')")
@@ -795,8 +796,7 @@ class TestSelfRenameEvent(ImpalaTestSuite):
         alter_client.wait_for_finished_timeout(alter_handle, timeout=10)
         alter_client.close_query(alter_handle)
 
-      # Resume event processing. The first ALTER_TABLE RENAME events should be skipped.
-      events_skipped_before = EventProcessorUtils.get_int_metric('events-skipped', 0)
+      # Resume event processing. The ALTER_TABLE RENAME events should be skipped.
       self.execute_query(":event_processor('start')")
       EventProcessorUtils.wait_for_event_processing(self)
       events_skipped_after = EventProcessorUtils.get_int_metric('events-skipped', 0)
