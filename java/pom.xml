@@ -524,6 +524,12 @@ under the License.
         <artifactId>aircompressor</artifactId>
         <version>${aircompressor.version}</version>
       </dependency>
+      <dependency>
+        <groupId>junit</groupId>
+        <artifactId>junit</artifactId>
+        <version>${junit.version}</version>
+        <scope>test</scope>
+      </dependency>
     </dependencies>
   </dependencyManagement>
 
