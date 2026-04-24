@@ -1491,6 +1491,7 @@ public class HdfsScanNode extends ScanNode {
     int partitionHash = partitionLocation.hashCode();
     TFileSplitGeneratorSpec splitSpec = new TFileSplitGeneratorSpec(fileDesc.toThrift(),
         maxBlockSize, splittable, partition.getId(), partitionHash, isFooterOnly);
+    decorateSplitSpec(fileDesc, splitSpec);
     scanRangeSpecs_.addToSplit_specs(splitSpec);
     long scanRangeBytes = Math.min(maxBlockSize, fileDesc.getFileLength());
     if (splittable && !isPartitionKeyScan_) {
@@ -1599,6 +1600,15 @@ public class HdfsScanNode extends ScanNode {
   }
 
   protected void decorateScanRange(FileDescriptor fileDesc, TScanRange scanRange) {}
+
+  /**
+   * Called from generateScanRangeSpecs() to allow subclasses to attach extra metadata
+   * to the split spec before it is added to scanRangeSpecs_.split_specs. The default
+   * implementation is a no-op. IcebergScanNode overrides this to attach deletion
+   * vectors so they are available to the backend after spec expansion.
+   */
+  protected void decorateSplitSpec(FileDescriptor fileDesc,
+      TFileSplitGeneratorSpec splitSpec) {}
 
   /**
    * Computes the average row size, input and output cardinalities, and estimates the

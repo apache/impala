@@ -170,6 +170,9 @@ Status Scheduler::GenerateScanRanges(const vector<TFileSplitGeneratorSpec>& spec
       if (spec.file_desc.__isset.file_metadata) {
         scan_range.__set_file_metadata(spec.file_desc.file_metadata);
       }
+      if (spec.__isset.iceberg_deletion_vector) {
+        scan_range.__set_iceberg_deletion_vector(spec.iceberg_deletion_vector);
+      }
       TScanRangeLocationList scan_range_list;
       scan_range_list.__set_scan_range(scan_range);
 

@@ -25,6 +25,7 @@ import java.util.Collections;
 import java.util.BitSet;
 import java.util.List;
 import java.util.Map;
+import java.util.function.Consumer;
 
 import org.apache.iceberg.Snapshot;
 import org.apache.impala.analysis.Analyzer;
@@ -43,6 +44,7 @@ import org.apache.impala.common.ThriftSerializationCtx;
 import org.apache.impala.fb.FbIcebergDataFileFormat;
 import org.apache.impala.fb.FbIcebergDeletionVector;
 import org.apache.impala.thrift.TExplainLevel;
+import org.apache.impala.thrift.TFileSplitGeneratorSpec;
 import org.apache.impala.thrift.THash128;
 import org.apache.impala.thrift.TIcebergDeletionVector;
 import org.apache.impala.thrift.TPlanNode;
@@ -309,13 +311,26 @@ public class IcebergScanNode extends HdfsScanNode {
     if (hasOrc) fileFormats_.add(HdfsFileFormat.ORC);
     if (hasAvro) fileFormats_.add(HdfsFileFormat.AVRO);
   }
+
   @Override
   protected void decorateScanRange(FileDescriptor fileDesc, TScanRange scanRange) {
+    IcebergFileDescriptor iceFd = applyDeletionVector(fileDesc,
+        scanRange::setIceberg_deletion_vector);
+    scanRange.setFile_metadata(iceFd.getFbFileMetadata().getByteBuffer());
+  }
+
+  @Override
+  protected void decorateSplitSpec(FileDescriptor fileDesc,
+      TFileSplitGeneratorSpec splitSpec) {
+    applyDeletionVector(fileDesc, splitSpec::setIceberg_deletion_vector);
+  }
+
+  private IcebergFileDescriptor applyDeletionVector(FileDescriptor fileDesc,
+      Consumer<java.nio.ByteBuffer> dvSetter) {
     Preconditions.checkState(fileDesc instanceof IcebergFileDescriptor);
-    scanRange.setFile_metadata(
-        ((IcebergFileDescriptor)fileDesc).getFbFileMetadata().getByteBuffer());
+    IcebergFileDescriptor iceFd = (IcebergFileDescriptor) fileDesc;
     if (dataFileToDV_ != null) {
-      String absPath = fileDesc.getAbsolutePath(tbl_.getLocation());
+      String absPath = iceFd.getAbsolutePath(tbl_.getLocation());
       Hash128 pathHash = getFilePathHash(absPath);
       TIcebergDeletionVector delVec = dataFileToDV_.get(pathHash);
       if (delVec != null) {
@@ -324,8 +339,9 @@ public class IcebergScanNode extends HdfsScanNode {
             delVec.getPath(), delVec.getContent_offset(),
             delVec.getContent_size_in_bytes(), pathHash.getHigh(),
             pathHash.getLow(), recordCount);
-        scanRange.setIceberg_deletion_vector(fbIceDelVec.getByteBuffer());
+        dvSetter.accept(fbIceDelVec.getByteBuffer());
       }
     }
+    return iceFd;
   }
 }

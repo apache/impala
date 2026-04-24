@@ -286,6 +286,11 @@ struct TFileSplitGeneratorSpec {
   // True if only footer range (the last block in file) is needed.
   // If True, is_splittable must also be True as well.
   6: required bool is_footer_only
+
+  // FlatBuffer-encoded FbIcebergDeletionVector for the data file covered by this spec.
+  // Set only for Iceberg data files that have an associated deletion vector.
+  // Propagated to every TScanRange generated from this spec by the backend coordinator.
+  7: optional binary iceberg_deletion_vector
 }
 
 // Specification of an individual data range which is held in its entirety
