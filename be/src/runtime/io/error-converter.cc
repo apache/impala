@@ -30,7 +30,7 @@ using std::unordered_map;
 
 unordered_map<int, string> ErrorConverter::errno_to_error_text_map_(
     {{EACCES, "Access denied for the process' user"},
-     {EINTR,   "Internal error occured."},
+     {EINTR,   "Internal error occurred."},
      {EINVAL,  "Invalid inputs."},
      {EMFILE,  "Process level opened file descriptor count is reached."},
      {ENAMETOOLONG,
@@ -45,7 +45,7 @@ unordered_map<int, string> ErrorConverter::errno_to_error_text_map_(
      {EBADF,   "The given file descriptor is invalid."},
      {ENOMEM,  "Not enough memory."},
      {EFBIG,   "Maximum file size reached."},
-     {EIO,     "Disk level I/O error occured."},
+     {EIO,     "Disk level I/O error occurred."},
      {ENXIO,   "Device doesn't exist."}});
 
 Status ErrorConverter::GetErrorStatusFromErrno(const string& function_name,
