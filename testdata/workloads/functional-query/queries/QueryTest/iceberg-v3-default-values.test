@@ -294,3 +294,145 @@ FROM iceberg_v3_all_types ORDER BY id;
 ---- TYPES
 INT,BOOLEAN,INT,BIGINT,FLOAT,DOUBLE,DECIMAL,STRING,DATE,TIMESTAMP,TIMESTAMP,TIMESTAMP
 ====
+---- QUERY
+# Test write-default: INSERT omitting column j should use write-default value -999
+# Column j has initial-default=-1 and write-default=-999 in metadata
+INSERT INTO iceberg_v3_default_value (i) VALUES (100);
+SELECT i, j FROM iceberg_v3_default_value WHERE i = 100;
+---- RESULTS
+100,-999
+---- TYPES
+INT,INT
+====
+---- QUERY
+# Test write-default with explicit value
+# Explicitly providing a value should override write-default
+INSERT INTO iceberg_v3_default_value VALUES (101, 50);
+SELECT i, j FROM iceberg_v3_default_value WHERE i = 101;
+---- RESULTS
+101,50
+---- TYPES
+INT,INT
+====
+---- QUERY
+# Test write-default with explicit NULL
+# Explicitly specifying NULL should write NULL, not the write-default
+INSERT INTO iceberg_v3_default_value VALUES (102, NULL);
+SELECT i, j FROM iceberg_v3_default_value WHERE i = 102;
+---- RESULTS
+102,NULL
+---- TYPES
+INT,INT
+====
+---- QUERY
+# Verify all inserted rows with defaults
+SELECT i, j FROM iceberg_v3_default_value WHERE i >= 100 ORDER BY i;
+---- RESULTS
+100,-999
+101,50
+102,NULL
+---- TYPES
+INT,INT
+====
+---- QUERY
+# Test write-default on test_default_part: INSERT omitting partitioned column j should use write-default value -999
+# Column j has initial-default=-1 and write-default=-999 in metadata
+# Since j is a partition column, the write-default also determines the partition
+INSERT INTO test_default_part (i) VALUES (100);
+SELECT i, j FROM test_default_part WHERE i = 100;
+---- RESULTS
+100,-999
+---- TYPES
+INT,INT
+====
+---- QUERY
+# Test write-default on test_default_part with explicit partition value
+# Explicitly providing partition value should override write-default
+INSERT INTO test_default_part VALUES (101, 50);
+SELECT i, j FROM test_default_part WHERE i = 101;
+---- RESULTS
+101,50
+---- TYPES
+INT,INT
+====
+---- QUERY
+# Test write-default on test_default_part with explicit NULL partition
+# Explicitly specifying NULL for partition column should write NULL, not the write-default
+INSERT INTO test_default_part VALUES (102, NULL);
+SELECT i, j FROM test_default_part WHERE i = 102;
+---- RESULTS
+102,NULL
+---- TYPES
+INT,INT
+====
+---- QUERY
+# Verify all inserted rows with write-default on partitioned table
+SELECT i, j FROM test_default_part WHERE i >= 100 ORDER BY i;
+---- RESULTS
+100,-999
+101,50
+102,NULL
+---- TYPES
+INT,INT
+====
+---- QUERY
+# Supported write-default types: BOOLEAN, INT, BIGINT, FLOAT, DOUBLE, DECIMAL, STRING, DATE
+# NOT supported: TIMESTAMP, BINARY
+#
+# write-default values:
+# - col_boolean: true, col_int: -999, col_bigint: -999999999
+# - col_float: 9.99, col_double: 8.88, col_decimal: 999.99
+# - col_string: 'write_default', col_date: '2024-12-31'
+INSERT INTO iceberg_v3_all_types (id, col_timestamp, col_binary)
+VALUES (100, CAST('2024-01-01 00:00:00' AS TIMESTAMP), CAST(unhex('CAFEBABE') AS BINARY));
+SELECT id, col_boolean, col_int, col_bigint, col_float, col_double, col_decimal, col_string, col_date
+FROM iceberg_v3_all_types WHERE id = 100;
+---- RESULTS
+100,true,-999,-999999999,9.989999771118164,8.88,999.99,'write_default',2024-12-31
+---- TYPES
+INT,BOOLEAN,INT,BIGINT,FLOAT,DOUBLE,DECIMAL,STRING,DATE
+====
+---- QUERY
+# Test write-default with explicit values - explicit values should override write-default
+# Column list omits col_timestamp_epoch / col_timestamp_iso (initial-default only); those use NULL.
+INSERT INTO iceberg_v3_all_types (
+    id, col_boolean, col_int, col_bigint, col_float, col_double, col_decimal, col_string, col_date,
+    col_timestamp, col_binary)
+VALUES
+  (101, true, 123, 456789, 1.23, 4.56, 78.90, 'custom',
+  CAST('2025-06-15' AS DATE), CAST('2025-06-15 12:34:56.123456' AS TIMESTAMP), CAST(unhex('ABCD1234') AS BINARY));
+SELECT id, col_boolean, col_int, col_bigint, col_float, col_double, col_decimal, col_string, col_date
+FROM iceberg_v3_all_types WHERE id = 101;
+---- RESULTS
+101,true,123,456789,1.2300000190734863,4.56,78.90,'custom',2025-06-15
+---- TYPES
+INT,BOOLEAN,INT,BIGINT,FLOAT,DOUBLE,DECIMAL,STRING,DATE
+====
+---- QUERY
+# Test write-default with explicit NULL - NULL should override write-default
+INSERT INTO iceberg_v3_all_types (
+    id, col_boolean, col_int, col_bigint, col_float, col_double, col_decimal, col_string, col_date,
+    col_timestamp, col_binary)
+VALUES
+  (102, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
+  CAST('2024-01-01 00:00:00' AS TIMESTAMP), CAST(unhex('DEADBEEF') AS BINARY));
+SELECT id, col_boolean, col_int, col_bigint, col_float, col_double, col_decimal, col_string, col_date
+FROM iceberg_v3_all_types WHERE id = 102;
+---- RESULTS
+102,NULL,NULL,NULL,NULL,NULL,NULL,'NULL',NULL
+---- TYPES
+INT,BOOLEAN,INT,BIGINT,FLOAT,DOUBLE,DECIMAL,STRING,DATE
+====
+---- QUERY
+# Verify all rows with write-default insertions
+SELECT id, col_boolean, col_int, col_bigint, col_float, col_double, col_decimal, col_string, col_date
+FROM iceberg_v3_all_types
+WHERE id >= 100
+ORDER BY id;
+---- RESULTS
+100,true,-999,-999999999,9.989999771118164,8.88,999.99,'write_default',2024-12-31
+101,true,123,456789,1.2300000190734863,4.56,78.90,'custom',2025-06-15
+102,NULL,NULL,NULL,NULL,NULL,NULL,'NULL',NULL
+---- TYPES
+INT,BOOLEAN,INT,BIGINT,FLOAT,DOUBLE,DECIMAL,STRING,DATE
+====

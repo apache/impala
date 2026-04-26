@@ -36,12 +36,6 @@ SELECT j.f1 FROM test_complex_default;
 Default values are not supported for nested fields
 ====
 ---- QUERY
-# Negative test: INSERT omitting a column that has a write-default should fail until supported
-INSERT INTO iceberg_v3_default_value (i) VALUES (100);
----- CATCH
-Write-default values are not yet supported
-====
----- QUERY
 # Default values on binary/fixed types are rejected when materialized.
 # Table iceberg_v3_all_types: col_binary has a binary default in metadata.
 # Selecting col_binary should fail during planning when the column is materialized.
@@ -66,4 +60,26 @@ Default values are not supported for TIMESTAMPTZ types
 SELECT * FROM test_complex_default;
 ---- CATCH
 Default values are not supported for TIMESTAMPTZ types
+====
+---- QUERY
+# Test TIMESTAMP write-default rejection
+# Table iceberg_v3_all_types has write-default for col_timestamp in metadata.
+# INSERT omitting col_timestamp should fail during analysis with clear error message.
+INSERT INTO iceberg_v3_all_types (id, col_boolean, col_int, col_bigint, col_float,
+    col_double, col_decimal, col_string, col_date, col_binary)
+VALUES (200, true, 1, 2, 3.14, 2.71, 100.50, 'test', CAST('2024-01-01' AS DATE),
+    CAST(unhex('ABCD') AS BINARY));
+---- CATCH
+Iceberg write-default values for TIMESTAMP type are not supported
+====
+---- QUERY
+# Test BINARY write-default rejection
+# Table iceberg_v3_all_types has write-default for col_binary in metadata.
+# INSERT omitting col_binary should fail during analysis with clear error message.
+INSERT INTO iceberg_v3_all_types (id, col_boolean, col_int, col_bigint, col_float,
+    col_double, col_decimal, col_string, col_date, col_timestamp)
+VALUES (201, false, 10, 20, 1.5, 2.5, 50.25, 'binary_test', CAST('2024-06-15' AS DATE),
+    CAST('2024-06-15 10:30:00' AS TIMESTAMP));
+---- CATCH
+Iceberg write-default values for BINARY/FIXED types are not supported
 ====

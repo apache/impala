@@ -999,25 +999,17 @@ public class InsertStmt extends DmlStatementBase {
           } else {
             // Unmentioned non-clustering columns get NULL literals with the appropriate
             // target type because Parquet cannot handle NULL_TYPE (IMPALA-617).
-            // TODO: Add write-default support for Iceberg tables
-            if (isIcebergTarget()) {
-              IcebergColumn iceCol = (IcebergColumn) tblColumn;
-              if (iceCol.getWriteDefault() != null) {
-                throw new AnalysisException("Write-default values are not yet " +
-                    "supported. Column '" + iceCol.getName() + "' has a write-default " +
-                    "value defined.");
-              }
-            }
-            NullLiteral nullExpr = NullLiteral.create(tblColumn.getType());
-            resultExprs_.add(nullExpr);
+            // For Iceberg tables, use write-default if available.
+            Expr defaultExpr = getDefaultExpr(tblColumn);
+            resultExprs_.add(defaultExpr);
             // In the case of INSERT INTO iceberg_tbl (col_a, col_b, ...), if the
             // partition columns are not in the columnPermutation_, we should fill it
-            // with NullLiteral to partitionKeyExprs_ (IMPALA-11408).
+            // with default value or NullLiteral to partitionKeyExprs_ (IMPALA-11408).
             if (isIcebergTarget() && !CollectionUtils.isEmpty(columnPermutation_)
                 && icebergPartSpec != null) {
               IcebergColumn targetColumn = (IcebergColumn) tblColumn;
               if (IcebergUtil.isPartitionColumn(targetColumn, icebergPartSpec)) {
-                partitionKeyExprs_.add(nullExpr);
+                partitionKeyExprs_.add(defaultExpr);
                 partitionColPos_.add(targetColumn.getPosition());
               }
             }
@@ -1282,5 +1274,49 @@ public class InsertStmt extends DmlStatementBase {
     if (withClause_ != null) hasChange = withClause_.resolveTableMask(analyzer);
     if (queryStmt_ != null) hasChange |= queryStmt_.resolveTableMask(analyzer);
     return hasChange;
+  }
+
+  /**
+   * Returns the default expression for an unmentioned column in an INSERT statement.
+   * For Iceberg tables, attempts to use the write-default value from metadata.
+   * Falls back to NULL if no write-default is available or parsing fails.
+   */
+  private Expr getDefaultExpr(Column tblColumn) throws AnalysisException {
+    Expr defaultExpr = null;
+    if (isIcebergTarget() && tblColumn instanceof IcebergColumn) {
+      IcebergColumn iceCol = (IcebergColumn) tblColumn;
+      String writeDefault = iceCol.getWriteDefault();
+
+      if (writeDefault != null && !writeDefault.isEmpty()) {
+        Type colType = tblColumn.getType();
+        // Reject TIMESTAMP - LiteralExpr doesn't support it
+        if (colType.isTimestamp()) {
+          throw new AnalysisException(
+              "Iceberg write-default values for TIMESTAMP type are not supported. " +
+              "Please specify value for column '" + tblColumn.getName() +
+              "' explicitly.");
+        }
+        // Reject BINARY
+        if (colType.isBinary()) {
+          throw new AnalysisException(
+              "Iceberg write-default values for BINARY/FIXED types are not supported. " +
+              "Please specify value for column '" + tblColumn.getName() +
+              "' explicitly.");
+        }
+
+        try {
+          defaultExpr = LiteralExpr.createFromUnescapedStr(writeDefault, colType);
+        } catch (AnalysisException e) {
+          throw new AnalysisException("Failed to parse write-default value '" +
+              writeDefault + "' for column '" + tblColumn.getName() + "': " +
+              e.getMessage() + ". Please specify value explicitly.");
+        }
+      }
+    }
+
+    if (defaultExpr == null) {
+      defaultExpr = NullLiteral.create(tblColumn.getType());
+    }
+    return defaultExpr;
   }
 }

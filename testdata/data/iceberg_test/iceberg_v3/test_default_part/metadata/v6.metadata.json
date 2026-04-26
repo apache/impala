@@ -34,7 +34,8 @@
           "name": "j",
           "required": false,
           "type": "int",
-          "initial-default": -1
+          "initial-default": -1,
+          "write-default": -999
         }
       ]
     }
