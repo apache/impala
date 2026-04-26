@@ -239,21 +239,11 @@ NULL,1
 INT,BIGINT
 ====
 ---- QUERY
-# Table test_complex_default has two columns: i (int), j STRUCT<f1: INT, f2: STRING>
+# Table test_complex_default has three columns:
+# i (int), j STRUCT<f1: INT, f2: STRING>, ts_tz TIMESTAMPTZ
 # Nested field j.f1 with an int initial-default in metadata.
 # Selecting only column i should succeed because j is not materialized.
 SELECT i FROM test_complex_default ORDER BY i;
----- RESULTS
-1
-2
----- TYPES
-INT
-====
----- QUERY
-# SELECT * does not materialize complex columns like struct j unless they
-# are explicitly referenced. Since j is not materialized in this query, the nested default
-# on j.f1 is not checked and the scan succeeds.
-SELECT * FROM test_complex_default;
 ---- RESULTS
 1
 2
@@ -277,4 +267,30 @@ SELECT f2 FROM (SELECT j.f1 as f1, j.f2 as f2 FROM test_complex_default) v;
 'NULL'
 ---- TYPES
 STRING
+====
+---- QUERY
+# Negative-epoch TIMESTAMP initial-default (microseconds before Unix epoch) for id=1.
+SELECT id, col_timestamp FROM iceberg_v3_all_types WHERE id = 1;
+---- RESULTS
+1,1969-12-31 23:59:59.123456000
+---- TYPES
+INT,TIMESTAMP
+====
+---- QUERY
+# Test all supported primitive types with initial-default values
+# Row 1: Uses initial-default for all columns (id=1 inserted before schema evolution)
+# Row 2: Explicit values override defaults (id=2 inserted after adding columns)
+#
+# Tests initial-default for: BOOLEAN, INT, BIGINT, FLOAT, DOUBLE, DECIMAL,
+# STRING, DATE, TIMESTAMP (pre-epoch, epoch, ISO)
+# col_timestamp_epoch / col_timestamp_iso: not present in older data files,
+# so both rows use their initial-default from metadata.
+SELECT id, col_boolean, col_int, col_bigint, col_float, col_double, col_decimal,
+    col_string, col_date, col_timestamp, col_timestamp_epoch, col_timestamp_iso
+FROM iceberg_v3_all_types ORDER BY id;
+---- RESULTS
+1,false,-1,-1,1.5,2.5,123.45,'initial_default',2024-01-01,1969-12-31 23:59:59.123456000,1970-01-01 00:00:00,2024-01-15 10:30:45.123456000
+2,true,42,9999999999,3.140000104904175,2.71828,999.99,'explicit',2024-12-25,2024-12-25 10:30:45.123456000,1970-01-01 00:00:00,2024-01-15 10:30:45.123456000
+---- TYPES
+INT,BOOLEAN,INT,BIGINT,FLOAT,DOUBLE,DECIMAL,STRING,DATE,TIMESTAMP,TIMESTAMP,TIMESTAMP
 ====

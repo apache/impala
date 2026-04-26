@@ -17,6 +17,10 @@
 
 package org.apache.impala.util;
 
+import java.time.Instant;
+import java.time.LocalDate;
+import java.time.ZoneOffset;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -49,6 +53,9 @@ import org.apache.impala.thrift.TColumnType;
  * Utility class for converting between Iceberg and Impala schemas and types.
  */
 public class IcebergSchemaConverter {
+  private static final DateTimeFormatter TIMESTAMP_FORMATTER =
+      DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss.SSSSSS");
+
   // The methods in this class are public and static, hence it's possible to invoke
   // them from multiple threads. Hence we use this thread-local integer to generate
   // unique field ids for each schema element. Please note that Iceberg only care about
@@ -146,9 +153,11 @@ public class IcebergSchemaConverter {
         valueId = mapType.valueId();
       }
       String initialDefault = column.initialDefaultLiteral() != null ?
-          column.initialDefaultLiteral().toString() : null;
+          convertIcebergLiteralToString(column.initialDefaultLiteral(),
+          column.type()) : null;
       String writeDefault = column.writeDefaultLiteral() != null ?
-          column.writeDefaultLiteral().toString() : null;
+          convertIcebergLiteralToString(column.writeDefaultLiteral(),
+          column.type()) : null;
       ret.add(new IcebergColumn(column.name(), colType, column.doc(), pos++,
           column.fieldId(), keyId, valueId, column.isOptional(), false,
           initialDefault, writeDefault));
@@ -282,5 +291,45 @@ public class IcebergSchemaConverter {
     int nextId = iThreadLocal.get();
     iThreadLocal.set(nextId+1);
     return nextId;
+  }
+
+  /**
+   * Converts an Iceberg Literal to a string that Impala's TextConverter can parse.
+   * Iceberg stores defaults in metadata.json but the Literal API returns internal
+   * representations.
+   */
+  private static String convertIcebergLiteralToString(
+      org.apache.iceberg.expressions.Literal<?> literal,
+      org.apache.iceberg.types.Type icebergType) {
+    if (literal == null) return null;
+
+    switch (icebergType.typeId()) {
+      case DATE:
+        // Iceberg Literal.value() returns Integer (days since Unix epoch 1970-01-01)
+        // TextConverter expects "yyyy-MM-dd" format
+        Integer days = (Integer) literal.value();
+        if (days == null) return null;
+        return LocalDate.ofEpochDay(days).toString();
+
+      case TIMESTAMP:
+        // Iceberg Literal.value() returns Long (microseconds since Unix epoch)
+        // TextConverter expects "yyyy-MM-dd'T'HH:mm:ss.SSSSSS" format (ISO-8601)
+        Long micros = (Long) literal.value();
+        if (micros == null) return null;
+
+        // Use floor division/mod for handling pre-epoch timestamps.
+        long seconds = Math.floorDiv(micros, 1_000_000L);
+        long nanos = Math.floorMod(micros, 1_000_000L) * 1000L;
+        Instant instant = Instant.ofEpochSecond(seconds, nanos);
+
+        return instant.atZone(ZoneOffset.UTC).format(TIMESTAMP_FORMATTER);
+
+      case STRING:
+        Object val = literal.value();
+        return val != null ? val.toString() : null;
+
+      default:
+        return literal.toString();
+    }
   }
 }

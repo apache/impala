@@ -41,3 +41,29 @@ INSERT INTO iceberg_v3_default_value (i) VALUES (100);
 ---- CATCH
 Write-default values are not yet supported
 ====
+---- QUERY
+# Default values on binary/fixed types are rejected when materialized.
+# Table iceberg_v3_all_types: col_binary has a binary default in metadata.
+# Selecting col_binary should fail during planning when the column is materialized.
+SELECT col_binary FROM iceberg_v3_all_types;
+---- CATCH
+Default values are not supported for BINARY/FIXED types
+====
+---- QUERY
+SELECT * FROM iceberg_v3_all_types;
+---- CATCH
+Default values are not supported for BINARY/FIXED types
+====
+---- QUERY
+# Table test_complex_default: ts_tz is TIMESTAMPTZ with an initial-default in metadata.
+# Materializing ts_tz is rejected until session-timezone display is implemented.
+SELECT ts_tz FROM test_complex_default;
+---- CATCH
+Default values are not supported for TIMESTAMPTZ types
+====
+---- QUERY
+# SELECT * materializes ts_tz, so timestamptz default rejection applies.
+SELECT * FROM test_complex_default;
+---- CATCH
+Default values are not supported for TIMESTAMPTZ types
+====

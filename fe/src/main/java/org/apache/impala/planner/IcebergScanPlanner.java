@@ -53,6 +53,7 @@ import org.apache.iceberg.metrics.InMemoryMetricsReporter;
 import org.apache.iceberg.metrics.ScanMetricsResult;
 import org.apache.iceberg.metrics.ScanReport;
 import org.apache.iceberg.Schema;
+import org.apache.iceberg.types.Types;
 import org.apache.iceberg.types.Types.NestedField;
 import org.apache.impala.analysis.Analyzer;
 import org.apache.impala.analysis.BinaryPredicate;
@@ -1165,6 +1166,21 @@ public class IcebergScanPlanner {
             "Default values are not supported for complex types. " +
             "Column '%s' has type %s which cannot have default values.",
             field.name(), impalaType.toSql()));
+      }
+      if (impalaType.isBinary()) {
+        throw new AnalysisException(String.format(
+            "Default values are not supported for BINARY/FIXED types. " +
+            "Column '%s' has type %s which cannot have default values.",
+            field.name(), impalaType.toSql()));
+      }
+      if (field.type() instanceof Types.TimestampType) {
+        Types.TimestampType tsType = (Types.TimestampType) field.type();
+        if (tsType.shouldAdjustToUTC()) {
+          throw new AnalysisException(String.format(
+              "Default values are not supported for TIMESTAMPTZ types. " +
+              "Column '%s' has Iceberg type timestamptz which cannot have " +
+              "default values.", field.name()));
+        }
       }
     }
 

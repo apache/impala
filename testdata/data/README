@@ -1240,10 +1240,24 @@ testdata/data/iceberg_test/iceberg_v3/test_complex_default
 Iceberg V3 table for negative tests: struct column with an initial-default on a nested
 primitive field. Created with Spark/Iceberg, then copied from HDFS:
   1. Initial table: column i (int), inserted (1)
-  2. ALTER TABLE ADD COLUMN j STRUCT<f1: INT, f2: STRING>
-  3. Inserted (2, named_struct('f1', 100, 'f2', 'hello'))
-  4. Manually added initial-default=-1 to nested field j.f1 (field id 3) in metadata
+  2. ALTER TABLE ADD COLUMNS (j STRUCT<f1: INT, f2: STRING>, ts_tz TIMESTAMPTZ)
+  3. Inserted (2, named_struct('f1', 100, 'f2', 'hello'), TIMESTAMP '2024-12-25 18:30:45.123456')
+  4. Manually added initial-default=-1 to nested field j.f1 (field id 3) and
+     initial-default="2024-01-15T10:30:45.123456+00:00" to ts_tz (field id 5) in metadata
 Impala should reject scans that materialize any nested field with a default.
+
+testdata/data/iceberg_test/iceberg_v3/iceberg_v3_all_types
+Iceberg V3 table with comprehensive initial-default coverage for all supported primitive
+types (BOOLEAN, INT, BIGINT, FLOAT, DOUBLE, DECIMAL, STRING, DATE, TIMESTAMP, BINARY).
+Created with Spark/Iceberg, then copied from HDFS and modified:
+  1. Initial table: column id (int), inserted (1)
+  2. ALTER TABLE ADD COLUMNS (col_boolean, col_int, col_bigint, col_float, col_double,
+     col_decimal, col_string, col_date, col_timestamp, col_binary)
+  3. Inserted a second row with explicit values for all columns
+  4. Manually added initial-default values to all columns in the metadata.json file.
+This table tests that Impala correctly applies initial-default values for all supported
+primitive types when reading legacy data files. The BINARY column tests rejection of
+binary defaults.
 
 testdata/data/iceberg_test/iceberg_v3/iceberg_v3_row_lineage(_orc):
 Iceberg V3 table created by Spark 4.0.2, see above (iceberg_v3_deletion_vectors).

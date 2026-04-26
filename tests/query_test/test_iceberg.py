@@ -2377,6 +2377,7 @@ class TestIcebergV3Table(IcebergTestSuite):
     self.load_table(unique_database, "iceberg_v3_deletion_vectors")
     self.load_table(unique_database, "iceberg_v3_default_value")
     self.load_table(unique_database, "test_complex_default")
+    self.load_table(unique_database, "iceberg_v3_all_types")
     self.run_test_case('QueryTest/iceberg-v3-negative', vector, unique_database)
 
   def test_v3_row_lineage(self, vector, unique_database):
@@ -2460,6 +2461,7 @@ class TestIcebergV3Table(IcebergTestSuite):
     self.load_table(unique_database, "iceberg_v3_default_value_avro", format="avro")
     self.load_table(unique_database, "test_default_part")
     self.load_table(unique_database, "test_complex_default")
+    self.load_table(unique_database, "iceberg_v3_all_types")
     self.run_test_case('QueryTest/iceberg-v3-default-values', vector, unique_database)
 
   def _assert_puffin_file_layout(self, local_file, reported_size,
