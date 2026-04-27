@@ -120,7 +120,7 @@ Status IcebergMetadataScanNode::GetNext(RuntimeState* state, RowBatch* row_batch
 
 void IcebergMetadataScanNode::Close(RuntimeState* state) {
   if (is_closed()) return;
-  metadata_scanner_->Close(state);
+  if (metadata_scanner_) metadata_scanner_->Close(state);
   ScanNode::Close(state);
 }
 
