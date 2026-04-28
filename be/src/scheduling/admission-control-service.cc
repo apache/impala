@@ -236,7 +236,9 @@ void AdmissionControlService::GetQueryStatus(const GetQueryStatusRequestPB* req,
       TRuntimeProfileTree tree;
       admission_state->summary_profile->ToThrift(&tree);
       int sidecar_idx;
-      Status sidecar_status = SetFaststringSidecar(tree, rpc_context, &sidecar_idx);
+      int64_t sidecar_length = 0;
+      Status sidecar_status = SetFaststringSidecar(tree, rpc_context, &sidecar_idx,
+          &sidecar_length);
       if (!sidecar_status.ok()) {
         // We don't need to fail the query just because we can't return the profile, so
         // just log the error.

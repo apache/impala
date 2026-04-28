@@ -769,7 +769,7 @@ class TestWebPage(ImpalaTestSuite):
     backend_state_properties = ['cpu_user_s', 'rpc_latency', 'num_remaining_instances',
                                 'num_instances', 'peak_per_host_mem_consumption',
                                 'time_since_last_heard_from', 'status', 'host',
-                                'cpu_sys_s', 'done', 'bytes_read']
+                                'cpu_sys_s', 'done', 'bytes_read', 'rpc_size']
 
     for query in [sleep_query, ctas_sleep_query]:
       (_, response_json) = self.run_query_and_get_debug_page(

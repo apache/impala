@@ -84,6 +84,7 @@ using boost::filesystem::path;
 
 DECLARE_bool(gen_experimental_profile);
 DECLARE_string(hostname);
+DECLARE_int64(large_execquery_rpc_threshold_bytes);
 
 using namespace impala;
 
@@ -122,6 +123,8 @@ PROFILE_DEFINE_COUNTER(NumCompletedBackends, STABLE_HIGH, TUnit::UNIT,"The numbe
     "Does not count the number of CANCELLED Backends.");
 PROFILE_DEFINE_TIMER(FinalizationTimer, STABLE_LOW,
     "Total time spent in finalization (typically 0 except for INSERT into hdfs tables).");
+PROFILE_DEFINE_SUMMARY_STATS_COUNTER(ExecQueryRPCSizes, STABLE_LOW, TUnit::BYTES,
+    "Summary statistics about the size of RPCs sent to start query execution.");
 
 const string Coordinator::PROFILE_EVENT_LABEL_FIRST_ROW_FETCHED = "First row fetched";
 
@@ -162,6 +165,8 @@ Status Coordinator::Exec() {
       obj_pool(), "Execution Profile " + PrintId(query_id()), false);
   finalization_timer_ = PROFILE_FinalizationTimer.Instantiate(query_profile_);
   filter_updates_received_ = PROFILE_FiltersReceived.Instantiate(query_profile_);
+  execquery_rpc_stats_ = make_unique<ExecQueryRpcStats>(
+      PROFILE_ExecQueryRPCSizes.Instantiate(query_profile_));
 
   host_profiles_ = RuntimeProfile::Create(obj_pool(), "Per Node Profiles", false);
   query_profile_->AddChild(host_profiles_);
@@ -546,6 +551,12 @@ Status Coordinator::StartBackendExec() {
     return UpdateExecState(serialize_status, nullptr, FLAGS_hostname);
   }
   kudu::Slice query_ctx_slice(serialized_buf, serialized_len);
+  // Incorporate the size of the shared TQueryCtx into the ExecQueryRpcStats. This also
+  // includes information about the size of the descriptor table, because that can
+  // be a major component of the TQueryCtx's size.
+  int64_t descriptor_table_size = query_ctx().desc_tbl_serialized.thrift_desc_tbl.size();
+  execquery_rpc_stats_->SetSharedTQueryCtxSize(query_ctx_slice.size(),
+      descriptor_table_size);
 
   for (BackendState* backend_state: backend_states_) {
     if (exec_rpcs_status_barrier_.pending() <= 0) {
@@ -558,8 +569,11 @@ Status Coordinator::StartBackendExec() {
     // because it won't be torn down until WaitOnExecRpcs() has returned.
     DCHECK(filter_mode_ == TRuntimeFilterMode::OFF || filter_routing_table_->is_complete);
     backend_state->ExecAsync(debug_options, *filter_routing_table_, query_ctx_slice,
-        &exec_rpcs_status_barrier_);
+        &exec_rpcs_status_barrier_, execquery_rpc_stats_.get());
   }
+  // The ExecQueryRpcStats accumulated any warnings from sending the exec RPCs. Print the
+  // summary now.
+  execquery_rpc_stats_->PrintWarnings();
   Status exec_rpc_status = exec_rpcs_status_barrier_.Wait();
   if (!exec_rpc_status.ok()) {
     // One of the backends failed to startup, so we cancel the other ones.
@@ -1897,4 +1911,50 @@ const TFinalizeParams* Coordinator::finalize_params() const {
 bool Coordinator::IsExecuting() {
   ExecState current_state = exec_state_.Load();
   return current_state == ExecState::EXECUTING;
+}
+
+void Coordinator::ExecQueryRpcStats::SetSharedTQueryCtxSize(
+    int64_t tqueryctx_size, int64_t descriptor_table_size) {
+  tqueryctx_size_ = tqueryctx_size;
+  descriptor_table_size_ = descriptor_table_size;
+}
+
+void Coordinator::ExecQueryRpcStats::ReportRpcSize(int64_t size) {
+  execquery_rpc_sizes_->UpdateCounter(size);
+}
+
+void Coordinator::ExecQueryRpcStats::ReportRpcSizeWithWarning(int64_t size,
+    string&& warning_message) {
+  ReportRpcSize(size);
+  rpcs_above_warning_threshold_++;
+  if (largest_rpc_warnings_.size() >= MAX_EXEC_RPC_WARNINGS) {
+    // Compare to the smallest element and replace if bigger
+    auto smallest = largest_rpc_warnings_.begin();
+    if (smallest->first > size) return;
+    largest_rpc_warnings_.erase(smallest);
+  }
+  largest_rpc_warnings_.emplace(size, warning_message);
+}
+
+void Coordinator::ExecQueryRpcStats::PrintWarnings() {
+  if (rpcs_above_warning_threshold_ == 0) return;
+  LOG(WARNING) << "ExecQueryFInstances RPCs for " << rpcs_above_warning_threshold_
+      << " out of " << execquery_rpc_sizes_->TotalNumValues()
+      << " exceed the warning threshold of "
+      << PrettyPrinter::Print(FLAGS_large_execquery_rpc_threshold_bytes, TUnit::BYTES)
+      << ". Average RPC size: "
+      << PrettyPrinter::Print(execquery_rpc_sizes_->value(), TUnit::BYTES)
+      << " Shared TQueryCtx: " << PrettyPrinter::Print(tqueryctx_size_, TUnit::BYTES)
+      << " (" << PrettyPrinter::Print(descriptor_table_size_, TUnit::BYTES)
+      << " from descriptor table)";
+  LOG(WARNING) << "Additional information about the " << largest_rpc_warnings_.size()
+      << " largest RPCs:";
+  // Print the warnings from largest to smallest using a reverse iterator
+  DCHECK_LE(largest_rpc_warnings_.size(), MAX_EXEC_RPC_WARNINGS);
+  for (auto it = largest_rpc_warnings_.crbegin();
+       it != largest_rpc_warnings_.crend(); ++it) {
+    LOG(WARNING) << it->second;
+  }
+  // We no longer need the warnings structure, so free the memory.
+  largest_rpc_warnings_.clear();
 }

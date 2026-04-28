@@ -98,10 +98,14 @@ class Coordinator::BackendState {
   /// No RPC is issued if there are no fragment instances scheduled on this backend.
   /// The 'debug_options' are applied to the appropriate TPlanFragmentInstanceCtxs, based
   /// on their node_id/instance_idx.
+  /// If it issues an RPC, 'execquery_rpc_stats' is updated with the size of the
+  /// ExecQueryFInstances RPC. If the RPC is above the warning threshold, it will include
+  /// additional information to help diagnose the large RPCs.
   void ExecAsync(const DebugOptions& debug_options,
       const FilterRoutingTable& filter_routing_table,
       const kudu::Slice& serialized_query_ctx,
-      TypedCountingBarrier<Status>* exec_status_barrier);
+      TypedCountingBarrier<Status>* exec_status_barrier,
+      Coordinator::ExecQueryRpcStats* execquery_rpc_stats);
 
   /// Waits until the ExecQueryFInstances() rpc has completed. May be called multiple
   /// times and from different threads.
@@ -204,6 +208,7 @@ class Coordinator::BackendState {
   bool HasFragmentIdx(const std::unordered_set<int>& fragment_idxs) const;
 
   int64_t rpc_latency() const { return rpc_latency_; }
+  int64_t rpc_size() const { return rpc_size_; }
   kudu::Status exec_rpc_status() const { return exec_rpc_status_; }
 
   int64_t last_report_time_ms() {
@@ -377,6 +382,9 @@ class Coordinator::BackendState {
   /// Time, in ms, that it took to execute the ExecQueryFInstances() rpc.
   int64_t rpc_latency_ = 0;
 
+  /// Size, in bytes, for the ExecQueryFInstances rpc
+  int64_t rpc_size_ = 0;
+
   /////////////////////////////////////////
   /// BEGIN: Members that are protected by 'lock_'.
 
@@ -441,10 +449,12 @@ class Coordinator::BackendState {
   /////////////////////////////////////////
 
   /// Fill in 'request' and 'fragment_info' based on state. Uses 'filter_routing_table' to
-  /// remove filters that weren't selected during its construction.
+  /// remove filters that weren't selected during its construction. Sums the scan ranges
+  /// across all fragments and puts it in 'total_scan_ranges'.
   void SetRpcParams(const DebugOptions& debug_options,
       const FilterRoutingTable& filter_routing_table,
-      ExecQueryFInstancesRequestPB* request, TExecPlanFragmentInfo* fragment_info);
+      ExecQueryFInstancesRequestPB* request, TExecPlanFragmentInfo* fragment_info,
+      int64_t* total_scan_ranges);
 
   /// Expects that 'status' is an error. Sets 'status_' to a formatted version of its
   /// message and notifies 'exec_status_barrier' with it. Caller must hold 'lock_'.

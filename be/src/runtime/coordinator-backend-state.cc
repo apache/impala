@@ -61,6 +61,10 @@ DECLARE_bool(gen_experimental_profile);
 DECLARE_int32(backend_client_rpc_timeout_ms);
 DECLARE_int64(rpc_max_message_size);
 
+DEFINE_int64(large_execquery_rpc_threshold_bytes, 25 * 1024 * 1024,
+    "(Advanced) Threshold for considering an ExecQueryFInstances RPC to be unusually "
+    "large. Large RPCs trigger additional logging and other diagnostics.");
+
 namespace impala {
 PROFILE_DEFINE_COUNTER(BytesAssigned, STABLE_HIGH, TUnit::BYTES,
     "Total number of bytes of filesystem scan ranges assigned to this fragment "
@@ -127,7 +131,8 @@ void Coordinator::BackendState::Init(const vector<FragmentStats*>& fragment_stat
 
 void Coordinator::BackendState::SetRpcParams(const DebugOptions& debug_options,
     const FilterRoutingTable& filter_routing_table, ExecQueryFInstancesRequestPB* request,
-    TExecPlanFragmentInfo* fragment_info) {
+    TExecPlanFragmentInfo* fragment_info, int64_t* total_scan_ranges) {
+  *total_scan_ranges = 0;
   request->set_coord_state_idx(state_idx_);
   request->set_min_mem_reservation_bytes(
       backend_exec_params_.min_mem_reservation_bytes());
@@ -166,6 +171,10 @@ void Coordinator::BackendState::SetRpcParams(const DebugOptions& debug_options,
     UniqueIdPBToTUniqueId(params.instance_id(), &instance_ctx.fragment_instance_id);
     instance_ctx.per_fragment_instance_idx = params.per_fragment_instance_idx();
     *instance_ctx_pb->mutable_per_node_scan_ranges() = params.per_node_scan_ranges();
+    // Sum the scan ranges over all the fragments
+    for (const auto& pair : params.per_node_scan_ranges()) {
+      *total_scan_ranges += pair.second.scan_ranges().size();
+    }
     for (const auto& entry : fragment_exec_params.per_exch_num_senders()) {
       instance_ctx.per_exch_num_senders[entry.first] = entry.second;
     }
@@ -281,7 +290,8 @@ done:
 void Coordinator::BackendState::ExecAsync(const DebugOptions& debug_options,
     const FilterRoutingTable& filter_routing_table,
     const kudu::Slice& serialized_query_ctx,
-    TypedCountingBarrier<Status>* exec_status_barrier) {
+    TypedCountingBarrier<Status>* exec_status_barrier,
+    Coordinator::ExecQueryRpcStats* execquery_rpc_stats) {
   {
     lock_guard<mutex> l(lock_);
     DCHECK(!exec_done_);
@@ -305,7 +315,9 @@ void Coordinator::BackendState::ExecAsync(const DebugOptions& debug_options,
 
     ExecQueryFInstancesRequestPB request;
     TExecPlanFragmentInfo fragment_info;
-    SetRpcParams(debug_options, filter_routing_table, &request, &fragment_info);
+    int64_t total_scan_ranges;
+    SetRpcParams(debug_options, filter_routing_table, &request, &fragment_info,
+        &total_scan_ranges);
 
     exec_rpc_controller_.set_timeout(
         MonoDelta::FromMilliseconds(FLAGS_backend_client_rpc_timeout_ms));
@@ -319,9 +331,11 @@ void Coordinator::BackendState::ExecAsync(const DebugOptions& debug_options,
     }
 
     int sidecar_idx;
+    int64_t fragment_info_length = 0;
     // TODO: eliminate the extra copy here by using a Slice
     Status sidecar_status =
-        SetFaststringSidecar(fragment_info, &exec_rpc_controller_, &sidecar_idx);
+        SetFaststringSidecar(fragment_info, &exec_rpc_controller_, &sidecar_idx,
+            &fragment_info_length);
     if (UNLIKELY(!sidecar_status.ok())) {
       SetExecError(sidecar_status, exec_status_barrier);
       goto done;
@@ -344,9 +358,47 @@ void Coordinator::BackendState::ExecAsync(const DebugOptions& debug_options,
 
     CopyFilepathToHostsMappingToRequest(&request);
 
-    VLOG_FILE << "making rpc: ExecQueryFInstances"
-              << " host=" << impalad_address() << " query_id=" << PrintId(query_id_);
+    // Three components to the size of the RPC:
+    // 1. serialized_query_ctx.size(): Serialized shared TQueryCtx sent for every message
+    //    to every executor.
+    // 2. fragment_info_length: Serialized TExecPlanFragmentInfo for only this executor
+    // 3. request.ByteSizeLong(): Other fields on ExecQueryFInstancesRequestPB (including
+    //    the scan ranges)
+    // This may be off by a few bytes due to KRPC headers, but it covers the
+    // Impala-specific content.
+    rpc_size_ = request.ByteSizeLong() + serialized_query_ctx.size() +
+        fragment_info_length;
+    if (rpc_size_ >= FLAGS_large_execquery_rpc_threshold_bytes) {
+      // If this exceeds the threshold, we report a warning through the ExecQueryRpcStats
+      // structure. That triggers logging of the shared TQueryCtx part of the
+      // message. It logs more detailed information about the top few messages.
+      // To help diagnosing the backend specific pieces, we need to break down
+      // the size of the different pieces of the message. The number of fragments and
+      // scan ranges can be important contributors to the size, so include that
+      // information as well.
 
+      stringstream warn;
+      warn << "Destination: " << NetworkAddressPBToString(impalad_address())
+           << " Total size: " << PrettyPrinter::Print(rpc_size_, TUnit::BYTES)
+           << " Backend-specific size: "
+           << PrettyPrinter::Print(rpc_size_ - serialized_query_ctx.size(), TUnit::BYTES)
+           << " TExecPlanFragmentInfo: "
+           << PrettyPrinter::Print(fragment_info_length, TUnit::BYTES)
+           << " ExecQueryFInstancesRequestPB: "
+           << PrettyPrinter::Print(request.ByteSizeLong(), TUnit::BYTES)
+           << " num fragments: " << fragment_info.fragments.size()
+           << " num fragment instances: "
+           << fragment_info.fragment_instance_ctxs.size()
+           << " num scan ranges: " << total_scan_ranges;
+      // stringstream::str() returns a copy, so warn.str() is an rvalue reference and
+      // doesn't need std::move().
+      execquery_rpc_stats->ReportRpcSizeWithWarning(rpc_size_, warn.str());
+    } else {
+      execquery_rpc_stats->ReportRpcSize(rpc_size_);
+    }
+    VLOG_FILE << "making rpc: ExecQueryFInstances"
+              << " host=" << impalad_address() << " query_id=" << PrintId(query_id_)
+              << " size=" << PrettyPrinter::Print(rpc_size_, TUnit::BYTES);
     proxy->ExecQueryFInstancesAsync(request, &exec_response_, &exec_rpc_controller_,
         std::bind(&Coordinator::BackendState::ExecCompleteCb, this, exec_status_barrier,
             MonotonicMillis()));
@@ -1023,6 +1075,7 @@ void Coordinator::BackendState::ToJson(Value* value, Document* document) {
   value->AddMember("host", val, document->GetAllocator());
 
   value->AddMember("rpc_latency", rpc_latency(), document->GetAllocator());
+  value->AddMember("rpc_size", rpc_size(), document->GetAllocator());
   value->AddMember("time_since_last_heard_from", MonotonicMillis() - last_report_time_ms_,
       document->GetAllocator());
 

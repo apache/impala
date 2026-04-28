@@ -98,9 +98,10 @@ Status GetSidecar(int sidecar_idx, RPC* rpc, T* thrift_obj) {
 // where it would be tricky to manually ensure that the sidecar's memory is released after
 // the RPC has completed. 'rpc' may be either an RpcContext or an RpcController.
 //
-// If successful, the sidecar idx is returned in 'sidecar_idx'.
+// If successful, the sidecar idx is returned in 'sidecar_idx' and 'length' is set to
+// the serialized size.
 template <typename RPC, typename T>
-Status SetFaststringSidecar(const T& obj, RPC* rpc, int* sidecar_idx) {
+Status SetFaststringSidecar(const T& obj, RPC* rpc, int* sidecar_idx, int64_t* length) {
   ThriftSerializer serializer(/* compact */ true);
   uint8_t* serialized_buf = nullptr;
   uint32_t serialized_len = 0;
@@ -114,6 +115,7 @@ Status SetFaststringSidecar(const T& obj, RPC* rpc, int* sidecar_idx) {
       kudu::rpc::RpcSidecar::FromFaststring(std::move(sidecar_str));
   RETURN_IF_ERROR(FromKuduStatus(
       rpc->AddOutboundSidecar(move(rpc_sidecar), sidecar_idx), "Failed to add sidecar"));
+  *length = serialized_len;
   return Status::OK();
 }
 
