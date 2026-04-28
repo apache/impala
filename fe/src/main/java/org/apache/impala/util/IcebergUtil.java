@@ -45,11 +45,8 @@ import java.util.Set;
 import java.util.TreeMap;
 
 import org.apache.hadoop.conf.Configuration;
-import org.apache.iceberg.AddedRowsScanTask;
 import org.apache.iceberg.CatalogProperties;
-import org.apache.iceberg.ChangelogScanTask;
 import org.apache.iceberg.ContentFile;
-import org.apache.iceberg.DataFile;
 import org.apache.iceberg.DataOperations;
 import org.apache.iceberg.DeleteFile;
 import org.apache.iceberg.FileContent;

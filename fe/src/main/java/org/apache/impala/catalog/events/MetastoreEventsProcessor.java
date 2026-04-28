@@ -97,7 +97,6 @@ import org.apache.impala.thrift.TTableName;
 import org.apache.impala.thrift.TWaitForHmsEventRequest;
 import org.apache.impala.util.AcidUtils;
 import org.apache.impala.util.EventSequence;
-import org.apache.impala.util.MetaStoreUtil;
 import org.apache.impala.util.NoOpEventSequence;
 import org.apache.impala.util.ThreadNameAnnotator;
 import org.apache.thrift.TException;

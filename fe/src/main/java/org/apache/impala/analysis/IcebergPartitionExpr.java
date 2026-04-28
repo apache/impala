@@ -23,7 +23,6 @@ import java.util.stream.Collectors;
 import org.apache.iceberg.PartitionField;
 import org.apache.iceberg.PartitionSpec;
 import org.apache.iceberg.transforms.Transforms;
-import org.apache.impala.catalog.Column;
 import org.apache.impala.catalog.IcebergColumn;
 import org.apache.impala.catalog.Type;
 import org.apache.impala.common.AnalysisException;

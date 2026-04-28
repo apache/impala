@@ -37,7 +37,6 @@ import org.apache.impala.catalog.paimon.FeShowFileStmtSupport;
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.common.IcebergPartitionPredicateConverter;
 import org.apache.impala.common.IcebergPredicateConverter;
-import org.apache.impala.common.ImpalaException;
 
 import org.apache.impala.thrift.TShowFilesParams;
 import org.apache.impala.thrift.TTableName;

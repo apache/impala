@@ -47,8 +47,6 @@ import org.apache.impala.rewrite.NormalizeExprsRule;
 import org.apache.impala.rewrite.SimplifyCastStringToTimestamp;
 import org.apache.impala.rewrite.SimplifyConditionalsRule;
 import org.apache.impala.rewrite.SimplifyDistinctFromRule;
-import org.apache.impala.service.CompilerFactory;
-import org.apache.impala.service.CompilerFactoryImpl;
 import org.junit.BeforeClass;
 import org.junit.Test;
 

@@ -17,7 +17,6 @@
 
 package org.apache.impala.calcite.functions;
 
-import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import org.apache.calcite.rel.type.RelDataType;
 import org.apache.calcite.sql.type.SqlTypeFamily;

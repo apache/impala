@@ -19,10 +19,7 @@ package org.apache.impala.analysis;
 
 import org.apache.impala.catalog.Type;
 import org.apache.impala.common.AnalysisException;
-import org.apache.impala.common.Pair;
-import org.apache.impala.common.Reference;
 import org.apache.impala.thrift.TExprNode;
-import org.apache.impala.thrift.TExprNodeType;
 
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;

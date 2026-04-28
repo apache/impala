@@ -46,7 +46,6 @@ import org.apache.impala.fb.FbIcebergDataFileFormat;
 import org.apache.impala.fb.FbIcebergDeletionVector;
 import org.apache.impala.thrift.TExplainLevel;
 import org.apache.impala.thrift.TFileSplitGeneratorSpec;
-import org.apache.impala.thrift.THash128;
 import org.apache.impala.thrift.TIcebergDeletionVector;
 import org.apache.impala.thrift.TPlanNode;
 import org.apache.impala.thrift.TScanRange;

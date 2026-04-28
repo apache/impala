@@ -19,7 +19,6 @@ package org.apache.impala.authorization.ranger;
 
 import com.google.common.collect.Sets;
 import org.apache.hadoop.security.UserGroupInformation;
-import org.apache.impala.authorization.AuthorizationFactory;
 import org.apache.impala.common.RuntimeEnv;
 import org.apache.impala.service.BackendConfig;
 import org.apache.impala.thrift.TPrivilege;
@@ -28,7 +27,6 @@ import org.apache.ranger.plugin.model.RangerRole;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
-import java.util.function.Predicate;
 
 /**
  * Collection of static functions to support Apache Ranger implementation

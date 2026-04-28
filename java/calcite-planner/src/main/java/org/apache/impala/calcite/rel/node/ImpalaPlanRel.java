@@ -17,8 +17,6 @@
 
 package org.apache.impala.calcite.rel.node;
 
-import com.google.common.base.Preconditions;
-
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.core.Aggregate;
 import org.apache.calcite.rel.core.Filter;

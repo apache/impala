@@ -21,8 +21,6 @@ import com.google.common.base.Preconditions;
 import java.util.List;
 import java.util.function.Function;
 import org.apache.iceberg.PartitionSpec;
-import org.apache.impala.catalog.FeIcebergTable;
-import org.apache.impala.catalog.IcebergTable;
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.common.ImpalaRuntimeException;
 import org.apache.impala.rewrite.BetweenToCompoundRule;

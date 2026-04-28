@@ -29,7 +29,6 @@ import org.apache.ranger.plugin.model.RangerRole;
 
 import java.util.List;
 import java.util.Set;
-import java.util.function.Function;
 import java.util.stream.Collectors;
 
 public class CatalogServiceTestCatalogWithRanger extends CatalogServiceTestCatalog {

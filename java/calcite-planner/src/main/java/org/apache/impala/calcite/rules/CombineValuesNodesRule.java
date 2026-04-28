@@ -17,7 +17,6 @@
 
 package org.apache.impala.calcite.rules;
 
-import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
 import org.apache.calcite.plan.RelOptRule;
 import org.apache.calcite.plan.RelOptRuleCall;
@@ -26,12 +25,9 @@ import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.logical.LogicalUnion;
 import org.apache.calcite.rel.logical.LogicalValues;
 import org.apache.calcite.rel.type.RelDataType;
-import org.apache.calcite.rex.RexBuilder;
 import org.apache.calcite.rex.RexLiteral;
-import org.apache.calcite.rex.RexNode;
 
 import java.util.ArrayList;
-import java.util.HashSet;
 import java.util.List;
 
 /**

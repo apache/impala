@@ -50,8 +50,6 @@ import org.apache.impala.extdatasource.thrift.TComparisonOp;
 import org.apache.impala.extdatasource.thrift.TPrepareParams;
 import org.apache.impala.extdatasource.thrift.TPrepareResult;
 import org.apache.impala.service.BackendConfig;
-import org.apache.impala.service.FeSupport;
-import org.apache.impala.thrift.TCacheJarResult;
 import org.apache.impala.thrift.TColumnValue;
 import org.apache.impala.thrift.TDataSourceScanNode;
 import org.apache.impala.thrift.TErrorCode;

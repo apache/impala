@@ -35,7 +35,6 @@ import org.pac4j.saml.client.SAML2Client;
 import org.pac4j.saml.config.SAML2Configuration;
 import org.pac4j.core.exception.http.RedirectionActionHelper;
 import org.pac4j.saml.credentials.SAML2Credentials;
-import org.pac4j.saml.credentials.SAML2Credentials.SAMLAttribute;
 import org.pac4j.saml.credentials.extractor.SAML2CredentialsExtractor;
 
 import org.slf4j.Logger;

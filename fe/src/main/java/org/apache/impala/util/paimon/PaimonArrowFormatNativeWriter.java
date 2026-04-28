@@ -23,7 +23,6 @@ import org.apache.arrow.c.ArrowSchema;
 import org.apache.arrow.memory.BufferAllocator;
 import org.apache.arrow.vector.VectorSchemaRoot;
 import org.apache.paimon.arrow.vector.ArrowCStruct;
-import org.apache.paimon.arrow.vector.ArrowFormatCWriter;
 import org.apache.paimon.data.InternalRow;
 import org.apache.paimon.types.RowType;
 

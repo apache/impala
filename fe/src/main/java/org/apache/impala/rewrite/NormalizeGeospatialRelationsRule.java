@@ -21,13 +21,10 @@ import java.util.Arrays;
 import java.util.List;
 
 import org.apache.impala.analysis.Analyzer;
-import org.apache.impala.analysis.BoolLiteral;
-import org.apache.impala.analysis.CompoundPredicate;
 import org.apache.impala.analysis.Expr;
 import org.apache.impala.analysis.FunctionCallExpr;
 import org.apache.impala.analysis.FunctionName;
 
-import com.google.common.base.Preconditions;
 
 /**
  * Normalizes symmetric st_ relations by ensuring that if one child is constant then

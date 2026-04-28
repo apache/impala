@@ -39,7 +39,6 @@ import org.apache.calcite.sql.SqlIdentifier;
 import org.apache.calcite.sql.SqlNode;
 import org.apache.calcite.sql.SqlNumericLiteral;
 import org.apache.calcite.sql.SqlOperator;
-import org.apache.calcite.sql.SqlUtil;
 import org.apache.impala.analysis.Analyzer;
 import org.apache.impala.authorization.Privilege;
 import org.apache.impala.calcite.schema.CalciteTable;

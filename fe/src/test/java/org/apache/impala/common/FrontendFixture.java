@@ -35,7 +35,6 @@ import org.apache.impala.analysis.ParsedStatementImpl;
 import org.apache.impala.analysis.ParseNode;
 import org.apache.impala.analysis.Parser;
 import org.apache.impala.analysis.QueryStmt;
-import org.apache.impala.analysis.StatementBase;
 import org.apache.impala.analysis.StmtMetadataLoader;
 import org.apache.impala.analysis.StmtMetadataLoader.StmtTableCache;
 import org.apache.impala.authorization.AuthorizationFactory;

@@ -23,7 +23,6 @@ import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 
 import com.google.common.collect.Iterables;
-import com.google.common.collect.Lists;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Comparator;
@@ -35,7 +34,6 @@ import org.apache.hadoop.hive.metastore.api.GetPartitionsByNamesResult;
 import org.apache.hadoop.hive.metastore.api.Partition;
 import org.apache.hadoop.hive.metastore.api.Table;
 import org.apache.hadoop.hive.metastore.utils.MetaStoreUtils;
-import org.apache.impala.catalog.CatalogHmsAPIHelper;
 import org.apache.impala.catalog.FileBlock;
 import org.apache.impala.catalog.FileDescriptor;
 import org.apache.impala.catalog.HdfsPartition;

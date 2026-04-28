@@ -47,7 +47,6 @@ import org.apache.impala.common.AnalysisException;
 import org.apache.impala.common.PrintUtils;
 import org.apache.impala.common.RuntimeEnv;
 import org.apache.impala.service.BackendConfig;
-import org.apache.impala.service.CatalogOpExecutor;
 import org.apache.impala.service.FrontendProfile;
 import org.apache.impala.thrift.TComputeStatsParams;
 import org.apache.impala.thrift.TErrorCode;

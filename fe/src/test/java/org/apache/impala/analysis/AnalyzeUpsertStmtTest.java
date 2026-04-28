@@ -17,7 +17,6 @@
 
 package org.apache.impala.analysis;
 
-import org.apache.impala.testutil.TestUtils;
 import org.junit.Test;
 
 public class AnalyzeUpsertStmtTest extends AnalyzerTest {

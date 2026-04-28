@@ -18,7 +18,6 @@
 package org.apache.impala.calcite.type;
 
 import org.apache.calcite.avatica.util.TimeUnit;
-import org.apache.calcite.avatica.util.TimeUnitRange;
 import org.apache.calcite.rel.type.RelDataTypeSystem;
 import org.apache.calcite.runtime.CalciteContextException;
 import org.apache.calcite.sql.SqlUtil;
@@ -28,7 +27,6 @@ import org.apache.calcite.util.Util;
 
 import static org.apache.calcite.linq4j.Nullness.castNonNull;
 import static org.apache.calcite.util.Static.RESOURCE;
-import static java.util.Objects.requireNonNull;
 
 import java.math.BigDecimal;
 import java.util.regex.Matcher;

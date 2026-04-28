@@ -19,7 +19,6 @@ package org.apache.impala.calcite.schema;
 
 import org.apache.calcite.plan.hep.HepRelVertex;
 import org.apache.calcite.rel.RelNode;
-import org.apache.calcite.rel.core.Aggregate;
 import org.apache.calcite.rel.core.Filter;
 import org.apache.calcite.rel.core.Join;
 import org.apache.calcite.rel.core.TableScan;
@@ -30,9 +29,6 @@ import org.apache.calcite.rel.metadata.RelMetadataQuery;
 import org.apache.calcite.rex.RexBuilder;
 import org.apache.calcite.rex.RexNode;
 import org.apache.calcite.util.BuiltInMethod;
-import org.apache.impala.calcite.rel.util.PrunedPartitionHelper;
-import org.apache.impala.common.ImpalaException;
-import org.apache.impala.calcite.schema.JoinRelationInfo.EqualityConjunction;
 
 import com.google.common.base.Preconditions;
 

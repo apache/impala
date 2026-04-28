@@ -26,8 +26,6 @@ import org.apache.impala.authorization.Privilege;
 import org.apache.impala.catalog.FeDataSourceTable;
 import org.apache.impala.catalog.FeDb;
 import org.apache.impala.catalog.FeTable;
-import org.apache.impala.catalog.FeView;
-import org.apache.impala.catalog.Function;
 import org.apache.impala.catalog.TableLoadingException;
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.thrift.TPrivilege;

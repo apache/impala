@@ -30,7 +30,6 @@ import org.apache.arrow.vector.types.pojo.Field;
 import org.apache.arrow.vector.types.pojo.FieldType;
 import org.apache.arrow.vector.types.pojo.Schema;
 import org.apache.paimon.arrow.ArrowFieldTypeConversion;
-import org.apache.paimon.arrow.ArrowUtils;
 import org.apache.paimon.arrow.vector.ArrowCStruct;
 import org.apache.paimon.table.SpecialFields;
 import org.apache.paimon.types.ArrayType;

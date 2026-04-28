@@ -22,7 +22,6 @@ import java.util.Comparator;
 import java.util.List;
 
 import org.apache.impala.common.AnalysisException;
-import org.apache.impala.service.FeSupport;
 
 import com.google.common.base.Preconditions;
 

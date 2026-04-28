@@ -24,7 +24,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 
 import org.apache.hadoop.hive.common.ValidWriteIdList;
@@ -33,7 +32,6 @@ import org.apache.impala.analysis.TableName;
 import org.apache.impala.thrift.TCatalogObjectType;
 import org.apache.impala.thrift.TTableDescriptor;
 import org.apache.impala.thrift.TTableStats;
-import org.apache.impala.util.AcidUtils;
 
 /**
  * Helper class for creating CTAS target tables that can be used with Db and LocalDb

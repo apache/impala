@@ -17,7 +17,6 @@
 
 package org.apache.impala.calcite.operators;
 
-import com.google.common.base.Preconditions;
 import org.apache.calcite.rel.type.RelDataType;
 import org.apache.calcite.sql.SqlCallBinding;
 import org.apache.calcite.sql.SqlFunction;

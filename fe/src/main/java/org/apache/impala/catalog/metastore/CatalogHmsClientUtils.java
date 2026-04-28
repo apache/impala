@@ -33,7 +33,6 @@ import org.apache.hadoop.hive.metastore.api.ObjectDictionary;
 import org.apache.hadoop.hive.metastore.api.Partition;
 import org.apache.hadoop.hive.metastore.api.Table;
 import org.apache.impala.catalog.CatalogException;
-import org.apache.impala.catalog.CatalogHmsAPIHelper;
 import org.apache.impala.catalog.FileDescriptor;
 import org.apache.impala.thrift.THdfsFileDesc;
 import org.apache.impala.thrift.TNetworkAddress;

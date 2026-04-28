@@ -29,7 +29,6 @@ import org.apache.hadoop.hive.metastore.api.DecimalColumnStatsData;
 import org.apache.hadoop.hive.metastore.api.DoubleColumnStatsData;
 import org.apache.hadoop.hive.metastore.api.LongColumnStatsData;
 import org.apache.hadoop.hive.metastore.api.StringColumnStatsData;
-import org.apache.impala.catalog.ColumnStats;
 import org.apache.impala.catalog.SideloadTableStats;
 import org.json.simple.JSONObject;
 import org.json.simple.parser.JSONParser;

@@ -17,21 +17,16 @@
 
 package org.apache.impala.calcite.planner;
 
-import com.google.common.collect.ImmutableList;
-import com.google.common.collect.Sets;
 import com.google.common.io.Files;
 
 import org.apache.impala.catalog.SideloadTableStats;
 import org.apache.impala.common.ByteUnits;
 import org.apache.impala.common.RuntimeEnv;
 import org.apache.impala.planner.PlannerTestBase;
-import org.apache.impala.thrift.TExecutorGroupSet;
 import org.apache.impala.thrift.TPlannerType;
 import org.apache.impala.thrift.TQueryOptions;
 import org.apache.impala.thrift.TReplicaPreference;
 import org.apache.impala.thrift.TSlotCountStrategy;
-import org.apache.impala.thrift.TUpdateExecutorMembershipRequest;
-import org.apache.impala.util.ExecutorMembershipSnapshot;
 import org.apache.impala.util.RequestPoolService;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
@@ -42,7 +37,6 @@ import java.io.File;
 import java.io.IOException;
 import java.net.URISyntaxException;
 import java.nio.file.Paths;
-import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;

@@ -28,12 +28,8 @@ import org.apache.calcite.rel.logical.LogicalSort;
 import org.apache.calcite.rel.logical.LogicalTableScan;
 import org.apache.calcite.rel.logical.LogicalUnion;
 import org.apache.calcite.rel.logical.LogicalValues;
-import org.apache.calcite.rex.RexNode;
 import org.apache.calcite.rex.RexOver;
-import org.apache.calcite.rex.RexVisitor;
-import org.apache.calcite.rex.RexVisitorImpl;
 
-import java.util.ArrayList;
 import java.util.List;
 
 /**

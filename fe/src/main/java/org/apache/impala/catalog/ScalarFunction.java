@@ -17,7 +17,6 @@
 
 package org.apache.impala.catalog;
 
-import java.util.ArrayList;
 import java.util.List;
 
 import org.apache.impala.analysis.FunctionName;
@@ -31,7 +30,6 @@ import org.apache.impala.thrift.TSymbolType;
 
 import com.google.common.base.Preconditions;
 import com.google.common.base.Throwables;
-import com.google.common.collect.Lists;
 
 /**
  * Internal representation of a scalar function.

@@ -27,7 +27,6 @@ import org.apache.impala.common.ImpalaException;
 import org.apache.impala.planner.SingleNodePlannerIntf;
 import org.apache.impala.planner.PlannerContext;
 import org.apache.impala.thrift.TQueryCtx;
-import org.apache.impala.thrift.TQueryOptions;
 
 /**
  * CompilerFactory is the factory interface which provides methods to

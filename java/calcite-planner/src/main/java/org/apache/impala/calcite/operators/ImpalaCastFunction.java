@@ -16,22 +16,12 @@
  */
 package org.apache.impala.calcite.operators;
 
-import com.google.common.base.Preconditions;
 import org.apache.calcite.jdbc.JavaTypeFactoryImpl;
 import org.apache.calcite.rel.type.RelDataType;
 import org.apache.calcite.rel.type.RelDataTypeFactory;
 import org.apache.calcite.rex.RexBuilder;
-import org.apache.calcite.sql.SqlFunctionCategory;
 import org.apache.calcite.sql.SqlOperatorBinding;
-import org.apache.calcite.sql.SqlKind;
-import org.apache.calcite.sql.SqlSyntax;
-import org.apache.calcite.sql.type.OperandTypes;
-import org.apache.calcite.sql.type.ReturnTypes;
-import org.apache.calcite.util.Optionality;
-import org.apache.impala.calcite.functions.FunctionResolver;
-import org.apache.impala.calcite.type.ImpalaTypeConverter;
 import org.apache.impala.calcite.type.ImpalaTypeSystemImpl;
-import org.apache.impala.catalog.Function;
 
 import java.util.List;
 

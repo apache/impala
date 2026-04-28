@@ -18,7 +18,6 @@
 package org.apache.impala.calcite.coercenodes;
 
 import com.google.common.base.Preconditions;
-import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Lists;
 import org.apache.calcite.plan.Strong;

@@ -18,8 +18,6 @@
 package org.apache.impala.catalog;
 
 import java.util.ArrayList;
-import java.util.Collection;
-import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -46,7 +44,6 @@ import org.apache.impala.catalog.local.LocalView;
 import org.apache.impala.catalog.local.MetaProvider;
 import org.apache.impala.catalog.local.MultiMetaProvider;
 import org.apache.impala.common.ImpalaException;
-import org.apache.impala.common.ImpalaRuntimeException;
 import org.apache.impala.common.NotImplementedException;
 import org.apache.impala.service.BackendConfig;
 import org.apache.impala.thrift.TCatalogObject;

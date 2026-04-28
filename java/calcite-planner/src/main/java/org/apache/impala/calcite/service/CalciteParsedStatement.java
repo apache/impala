@@ -24,12 +24,10 @@ import org.apache.calcite.sql.SqlExplain;
 import org.apache.calcite.sql.SqlKind;
 import org.apache.calcite.sql.SqlNode;
 import org.apache.impala.analysis.AnalysisContext;
-import org.apache.impala.analysis.AnalysisDriver;
 import org.apache.impala.analysis.ParsedStatement;
 import org.apache.impala.analysis.TableName;
 import org.apache.impala.analysis.StmtMetadataLoader;
 import org.apache.impala.analysis.ColumnLineageGraph.OperationType;
-import org.apache.impala.catalog.FeCatalog;
 import org.apache.impala.common.ImpalaException;
 import org.apache.impala.thrift.TQueryCtx;
 

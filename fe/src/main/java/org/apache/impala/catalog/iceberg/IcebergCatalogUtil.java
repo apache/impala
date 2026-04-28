@@ -17,7 +17,6 @@
 
 package org.apache.impala.catalog.iceberg;
 
-
 import static org.apache.impala.catalog.Table.TBL_PROP_EXTERNAL_TABLE_PURGE;
 import static org.apache.impala.catalog.Table.TBL_PROP_EXTERNAL_TABLE_PURGE_DEFAULT;
 
@@ -25,15 +24,12 @@ import com.google.common.base.Preconditions;
 import com.google.common.collect.Streams;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.Properties;
 import java.util.stream.Collectors;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hive.conf.HiveConf;
 import org.apache.iceberg.CatalogUtil;
 import org.apache.iceberg.PartitionSpec;
-import org.apache.iceberg.PartitionSpecParser;
 import org.apache.iceberg.Schema;
-import org.apache.iceberg.SchemaParser;
 import org.apache.iceberg.Table;
 import org.apache.iceberg.catalog.Catalog;
 import org.apache.iceberg.catalog.TableIdentifier;

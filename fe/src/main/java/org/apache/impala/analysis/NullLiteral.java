@@ -19,7 +19,6 @@ package org.apache.impala.analysis;
 
 import org.apache.impala.catalog.Type;
 import org.apache.impala.catalog.TypeCompatibility;
-import org.apache.impala.common.AnalysisException;
 import org.apache.impala.thrift.TExprNode;
 import org.apache.impala.thrift.TExprNodeType;
 

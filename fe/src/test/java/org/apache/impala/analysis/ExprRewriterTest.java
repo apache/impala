@@ -18,13 +18,11 @@
 package org.apache.impala.analysis;
 
 import java.util.Arrays;
-import java.util.ArrayList;
 import java.util.List;
 
 import org.apache.impala.analysis.AnalysisContext.AnalysisResult;
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.common.ImpalaException;
-import org.apache.impala.common.RuntimeEnv;
 import org.apache.impala.rewrite.EqualityDisjunctsToInRule;
 import org.apache.impala.rewrite.ExprRewriteRule;
 import org.apache.impala.rewrite.ExprRewriter;

@@ -73,7 +73,6 @@ import org.apache.impala.common.Metrics;
 import org.apache.impala.common.PrintUtils;
 import org.apache.impala.common.Reference;
 import org.apache.impala.compat.MetastoreShim;
-import org.apache.impala.hive.common.MutableValidWriteIdList;
 
 import static org.apache.impala.catalog.Table.TBL_EVENTS_PROCESS_DURATION;
 

@@ -17,7 +17,6 @@
 
 package org.apache.impala.analysis;
 
-import java.io.UnsupportedEncodingException;
 import java.math.BigDecimal;
 import java.math.BigInteger;
 

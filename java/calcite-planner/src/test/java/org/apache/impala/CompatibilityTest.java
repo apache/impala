@@ -20,7 +20,6 @@ package org.apache.impala.calcite.service;
 import static org.junit.Assert.assertTrue;
 
 import org.apache.calcite.rel.type.RelDataType;
-import org.apache.commons.lang3.tuple.Pair;
 import org.apache.impala.calcite.functions.ImplicitTypeChecker;
 import org.apache.impala.calcite.type.ImpalaTypeConverter;
 import org.apache.impala.catalog.PrimitiveType;

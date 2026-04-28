@@ -20,22 +20,15 @@ package org.apache.impala.planner;
 import java.util.Map;
 import java.util.List;
 import java.util.ArrayList;
-import java.util.LinkedHashMap;
 
 import org.apache.impala.analysis.Analyzer;
 import org.apache.impala.analysis.Expr;
-import org.apache.impala.analysis.InlineViewRef;
 import org.apache.impala.analysis.LiteralExpr;
 import org.apache.impala.analysis.NullLiteral;
 import org.apache.impala.analysis.SlotDescriptor;
-import org.apache.impala.analysis.SlotId;
-import org.apache.impala.analysis.SlotRef;
-import org.apache.impala.analysis.TupleDescriptor;
-import org.apache.impala.analysis.TupleId;
 import org.apache.impala.analysis.UnpivotTableRef;
 import org.apache.impala.common.ThriftSerializationCtx;
 import org.apache.impala.thrift.TExplainLevel;
-import org.apache.impala.thrift.TExpr;
 import org.apache.impala.thrift.TPlanNode;
 import org.apache.impala.thrift.TPlanNodeType;
 import org.apache.impala.thrift.TUnpivotNode;
@@ -43,8 +36,6 @@ import org.apache.impala.thrift.TQueryOptions;
 import org.apache.impala.util.ExprUtil;
 import org.apache.impala.util.MathUtil;
 
-import com.google.common.base.Joiner;
-import com.google.common.base.MoreObjects;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 

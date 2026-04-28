@@ -33,7 +33,6 @@ import java.util.function.Consumer;
 import javax.annotation.Nullable;
 
 import org.apache.hadoop.fs.FileSystem;
-import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hive.common.ValidTxnList;
 import org.apache.hadoop.hive.common.ValidWriteIdList;
 import org.apache.impala.catalog.HdfsPartition.Builder;

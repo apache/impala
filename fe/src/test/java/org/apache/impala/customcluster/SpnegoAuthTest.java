@@ -20,7 +20,6 @@ package org.apache.impala.customcluster;
 import static org.apache.impala.testutil.LdapUtil.*;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
-import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
 import com.google.common.collect.ImmutableMap;
@@ -30,22 +29,16 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.InputStreamReader;
-
-import java.nio.file.Files;
-import java.nio.file.Paths;
 
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Base64;
 import java.util.HashMap;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.stream.Collectors;
 
-import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -61,7 +54,6 @@ import org.apache.directory.server.core.annotations.ApplyLdifFiles;
 import org.apache.directory.server.core.integ.CreateLdapServerRule;
 import org.apache.hive.service.rpc.thrift.*;
 import org.apache.impala.testutil.WebClient;
-import org.apache.thrift.transport.THttpClient;
 import org.apache.thrift.protocol.TBinaryProtocol;
 import org.ietf.jgss.*;
 import org.junit.After;

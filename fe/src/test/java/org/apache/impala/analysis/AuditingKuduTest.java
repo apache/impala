@@ -24,7 +24,6 @@ import java.util.Set;
 import org.apache.impala.authorization.AuthorizationException;
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.common.FrontendTestBase;
-import org.apache.impala.testutil.TestUtils;
 import org.apache.impala.thrift.TAccessEvent;
 import org.apache.impala.thrift.TCatalogObjectType;
 import org.junit.Assert;

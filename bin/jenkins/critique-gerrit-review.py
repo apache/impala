@@ -124,6 +124,23 @@ INCLUDE_FILE_RE = re.compile(r"include \"(\w+\.thrift)\"")
 THRIFT_WARNING_SUFFIX = (" might break the compatibility between impalad and "
                          "catalogd/statestore during upgrade")
 
+# Matches Java import lines with an optional trailing comment.
+JAVA_IMPORT_LINE_RE = re.compile(
+    r"^\s*import\s+(?P<body>.+?)\s*;\s*(?://.*)?$"
+)
+
+# Java test trees may use star imports (e.g. import static org.junit.Assert.*).
+JAVA_STAR_IMPORT_TEST_PATH_RE = re.compile(
+    r"(?:^|/)src/test/|/test/java/|/jamm/test/"
+)
+
+# Existing star imports in non-test production code (import body after "import ").
+JAVA_STAR_IMPORT_ALLOW_LIST = frozenset({
+    "org.apache.hadoop.hive.ql.udf.esri.*",
+    "org.apache.parquet.schema.LogicalTypeAnnotation.*",
+    "org.apache.thrift.server.AbstractNonblockingServer.*",
+})
+
 
 def setup_virtualenv():
   """Set up virtualenv with flake8-diff."""
@@ -137,6 +154,103 @@ def setup_virtualenv():
   # Add the libpath of the installed venv to import pyparsing
   sys.path.append(os.path.join(VENV_PATH, f"lib/python{sys.version_info.major}."
                                           f"{sys.version_info.minor}/site-packages/"))
+
+
+def get_changed_java_paths(base_revision, revision):
+  """Repository-relative .java paths in the commit range, added/copied/modified only."""
+  out = check_output(
+      ["git", "diff", "--diff-filter=ACM", "--name-only",
+       "{0}..{1}".format(base_revision, revision)], universal_newlines=True)
+  return [line for line in out.splitlines() if line.endswith(".java")]
+
+
+def _java_import_body(body):
+  """Import body with optional leading 'static ' removed."""
+  return re.sub(r"^\s*static\s+", "", body).strip()
+
+
+def _is_java_star_import_allowed(relpath, body):
+  """True if a star import is permitted in this file."""
+  if JAVA_STAR_IMPORT_TEST_PATH_RE.search(relpath):
+    return True
+  return body in JAVA_STAR_IMPORT_ALLOW_LIST
+
+
+def _check_unused_imports_java(lines, relpath):
+  """Return list of (1-based line number, message).
+
+  Star imports are allowed in Java test trees and for entries in
+  JAVA_STAR_IMPORT_ALLOW_LIST.
+  """
+  findings = []
+  non_import_lines = []
+  import_lines = []
+  in_block_comment = False
+  for idx, raw in enumerate(lines):
+    s = raw.lstrip()
+    if in_block_comment:
+      # End block on any line containing */, including Javadoc-style "**/"
+      # (does not necessarily start with */ after lstrip).
+      if "*/" in s:
+        in_block_comment = False
+    elif s.startswith("/*"):
+      rest_after_open = s[2:]
+      close_idx = rest_after_open.find("*/")
+      if close_idx != -1:
+        after_comment = rest_after_open[close_idx + 2:].strip()
+        if after_comment:
+          # Inline comment then code on same line (e.g. /*unused*/true); keep full line.
+          non_import_lines.append(raw)
+        continue
+      in_block_comment = True
+    elif s.startswith("//") or s.startswith("package "):
+      continue
+    elif s.startswith("import "):
+      import_lines.append((idx + 1, raw))
+    else:
+      non_import_lines.append(raw)
+  body_wo_imports = "\n".join(non_import_lines)
+
+  for lineno, raw in import_lines:
+    line = raw.strip()
+    m = JAVA_IMPORT_LINE_RE.match(line)
+    if not m:
+      continue
+    body = _java_import_body(m.group("body").strip())
+    if re.search(r"\.\*\s*$", body):
+      if not _is_java_star_import_allowed(relpath, body):
+        findings.append((lineno, (
+            "star import is not allowed. If you do need it, add it to "
+            "JAVA_STAR_IMPORT_ALLOW_LIST in bin/jenkins/critique-gerrit-review.py.")))
+      continue
+    imported_name = body.split(".")[-1]
+    if imported_name == "":
+      continue
+    pat = re.compile(r"\b" + re.escape(imported_name) + r"\b")
+    if not pat.search(body_wo_imports):
+      findings.append((lineno, "unused import: {0}".format(body)))
+  return findings
+
+
+def get_unused_import_comments(base_revision, revision):
+  """For each changed .java at 'revision', detect unused imports by checking whether
+  each imported simple name appears elsewhere in the file (heuristic). Star imports are
+  flagged unless the file is under a Java test tree or the import is in
+  JAVA_STAR_IMPORT_ALLOW_LIST. Python unused imports are left to flake8 (F401) in
+  get_flake8_comments."""
+  comments = defaultdict(list)
+  for relpath in get_changed_java_paths(base_revision, revision):
+    try:
+      file_body = check_output(
+          ["git", "show", f"{revision}:{relpath}"], universal_newlines=True)
+    except Exception as e:
+      print(f"Skipping unused-import check for {relpath}: {e}")
+      continue
+
+    lines = file_body.splitlines(True)
+    for fline, msg in _check_unused_imports_java(lines, relpath):
+      comments[relpath].append(get_comment_input(msg, fline))
+  return comments
 
 
 def get_comment_input(message, line_number=0, side=COMMENT_REVISION_SIDE,
@@ -491,6 +605,7 @@ if __name__ == "__main__":
   merge_comments(comments, get_misc_comments(base_revision, revision, args.dryrun))
   merge_comments(comments, get_catalog_compatibility_comments(base_revision, revision))
   merge_comments(comments, get_planner_tests_comments())
+  merge_comments(comments, get_unused_import_comments(base_revision, revision))
   merge_comments(comments, get_eslint_comments(base_revision, revision))
   review_input = {"comments": comments}
   if len(comments) > 0:

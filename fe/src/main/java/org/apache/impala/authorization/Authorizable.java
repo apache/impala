@@ -17,9 +17,6 @@
 
 package org.apache.impala.authorization;
 
-import java.util.Objects;
-import java.util.List;
-
 import com.google.common.base.Strings;
 /*
  * Abstract class representing an authorizable object (Table, Db, Column, etc).

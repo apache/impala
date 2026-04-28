@@ -20,7 +20,10 @@ package org.apache.impala.util;
 import com.google.common.base.Preconditions;
 import org.apache.impala.common.Pair;
 
-import java.util.*;
+import java.util.ArrayDeque;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.BitSet;
 
 import static java.lang.Math.min;
 

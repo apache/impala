@@ -19,7 +19,6 @@ package org.apache.impala.calcite.operators;
 
 import org.apache.calcite.rel.type.RelDataType;
 import org.apache.calcite.rel.type.RelDataTypeFactory;
-import org.apache.calcite.sql.ExplicitOperatorBinding;
 import org.apache.calcite.sql.SqlAggFunction;
 import org.apache.calcite.sql.SqlBinaryOperator;
 import org.apache.calcite.sql.SqlKind;
@@ -33,7 +32,6 @@ import org.apache.calcite.sql.type.InferTypes;
 import org.apache.calcite.sql.type.OperandTypes;
 import org.apache.calcite.sql.type.ReturnTypes;
 import org.apache.calcite.sql.type.SqlReturnTypeInference;
-import org.apache.calcite.sql.type.SqlTypeName;
 import org.apache.calcite.sql.type.SqlTypeUtil;
 import org.apache.calcite.sql.type.SqlTypeTransforms;
 import org.apache.calcite.sql.util.ReflectiveSqlOperatorTable;
@@ -43,9 +41,7 @@ import org.apache.impala.calcite.type.ImpalaTypeSystemImpl;
 import org.apache.impala.catalog.Type;
 
 import com.google.common.base.Suppliers;
-import com.google.common.collect.ImmutableList;
 
-import java.math.BigDecimal;
 import java.util.List;
 import java.util.function.Supplier;
 

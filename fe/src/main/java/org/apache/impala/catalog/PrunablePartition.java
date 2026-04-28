@@ -20,7 +20,6 @@ package org.apache.impala.catalog;
 import java.util.List;
 
 import org.apache.impala.analysis.LiteralExpr;
-import org.apache.impala.planner.HdfsPartitionPruner;
 
 /**
  * A specification of a partition that is part of a table, sufficient

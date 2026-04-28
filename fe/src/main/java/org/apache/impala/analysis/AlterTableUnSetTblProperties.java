@@ -33,7 +33,6 @@ import org.apache.impala.thrift.TTablePropertyType;
 import org.apache.impala.util.MetaStoreUtil;
 
 import com.google.common.base.Preconditions;
-import com.google.common.collect.Lists;
 
 import java.util.List;
 

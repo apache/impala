@@ -27,8 +27,6 @@ import java.util.Set;
 import org.apache.impala.catalog.Column;
 import org.apache.impala.catalog.ColumnStats;
 import org.apache.impala.catalog.FeKuduTable;
-import org.apache.impala.catalog.IcebergColumn;
-import org.apache.impala.catalog.KuduColumn;
 import org.apache.impala.catalog.Type;
 import org.apache.impala.common.ThriftSerializationCtx;
 import org.apache.impala.thrift.TSlotDescriptor;

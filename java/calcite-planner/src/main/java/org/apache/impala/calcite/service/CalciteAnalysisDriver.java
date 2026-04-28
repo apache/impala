@@ -17,27 +17,19 @@
 
 package org.apache.impala.calcite.service;
 
-import java.util.Collections;
-import java.util.Properties;
 import java.util.Set;
 
-import org.apache.calcite.config.CalciteConnectionConfig;
-import org.apache.calcite.config.CalciteConnectionConfigImpl;
-import org.apache.calcite.config.CalciteConnectionProperty;
-import org.apache.calcite.jdbc.CalciteSchema;
 import org.apache.calcite.jdbc.JavaTypeFactoryImpl;
 import org.apache.calcite.prepare.CalciteCatalogReader;
 import org.apache.calcite.rel.type.RelDataTypeFactory;
 import org.apache.calcite.runtime.CalciteContextException;
 import org.apache.calcite.sql.SqlNode;
 import org.apache.calcite.sql.validate.SqlValidator;
-import org.apache.calcite.sql.validate.SqlValidatorUtil;
 import org.apache.impala.analysis.AnalysisContext;
 import org.apache.impala.analysis.AnalysisContext.AnalysisResult;
 import org.apache.impala.analysis.AnalysisDriver;
 import org.apache.impala.analysis.Analyzer;
 import org.apache.impala.analysis.ParsedStatement;
-import org.apache.impala.analysis.StmtMetadataLoader;
 import org.apache.impala.analysis.StmtMetadataLoader.StmtTableCache;
 import org.apache.impala.analysis.TableName;
 import org.apache.impala.authorization.AuthorizationContext;
@@ -45,7 +37,6 @@ import org.apache.impala.authorization.AuthorizationFactory;
 import org.apache.impala.authorization.Privilege;
 import org.apache.impala.authorization.PrivilegeRequestBuilder;
 import org.apache.impala.calcite.operators.ImpalaOperatorTable;
-import org.apache.impala.calcite.schema.ImpalaCalciteCatalogReader;
 import org.apache.impala.calcite.type.ImpalaTypeCoercionFactory;
 import org.apache.impala.calcite.type.ImpalaTypeSystemImpl;
 import org.apache.impala.calcite.util.SimplifiedAnalyzer;
@@ -58,8 +49,6 @@ import org.apache.impala.common.AnalysisException;
 import org.apache.impala.common.ImpalaException;
 import org.apache.impala.common.ParseException;
 import org.apache.impala.common.UnsupportedFeatureException;
-import org.apache.impala.planner.PlannerContext;
-import org.apache.impala.planner.SingleNodePlannerIntf;
 import org.apache.impala.thrift.TQueryCtx;
 
 /**

@@ -27,7 +27,6 @@ import org.apache.impala.authorization.User;
 import org.apache.impala.catalog.Type;
 import org.apache.impala.common.ImpalaException;
 import org.apache.impala.common.InternalException;
-import org.apache.impala.common.UnsupportedFeatureException;
 import org.apache.impala.thrift.TCatalogServiceRequestHeader;
 import org.apache.impala.thrift.TColumn;
 import org.apache.impala.thrift.TCreateDropRoleParams;

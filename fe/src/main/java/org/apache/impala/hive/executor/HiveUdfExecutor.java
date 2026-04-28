@@ -17,8 +17,6 @@
 
 package org.apache.impala.hive.executor;
 
-import sun.misc.Unsafe;
-
 import java.lang.reflect.Method;
 
 import org.apache.hadoop.hive.serde2.io.ByteWritable;
@@ -30,7 +28,6 @@ import org.apache.hadoop.io.FloatWritable;
 import org.apache.hadoop.io.IntWritable;
 import org.apache.hadoop.io.LongWritable;
 import org.apache.hadoop.io.Text;
-import org.apache.hadoop.io.Writable;
 import org.apache.impala.catalog.Type;
 import org.apache.impala.common.ImpalaRuntimeException;
 import org.apache.impala.thrift.THiveUdfExecutorCtorParams;

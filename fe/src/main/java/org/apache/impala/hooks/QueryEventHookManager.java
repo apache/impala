@@ -19,7 +19,6 @@ package org.apache.impala.hooks;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.impala.common.InternalException;
 import org.apache.impala.service.BackendConfig;
-import org.apache.impala.thrift.TBackendGflags;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

@@ -18,7 +18,6 @@
 package org.apache.impala.catalog.events;
 
 import com.google.common.base.Joiner;
-import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
 import java.util.LinkedList;
 import java.util.List;

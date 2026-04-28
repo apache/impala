@@ -17,7 +17,6 @@
 
 package org.apache.impala.calcite.rel.phys;
 
-import com.google.common.base.Preconditions;
 import org.apache.impala.analysis.Analyzer;
 import org.apache.impala.analysis.Expr;
 import org.apache.impala.analysis.JoinOperator;

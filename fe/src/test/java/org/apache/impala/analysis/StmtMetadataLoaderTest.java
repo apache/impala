@@ -32,7 +32,6 @@ import org.apache.impala.catalog.local.FailedLoadLocalTable;
 import org.apache.impala.catalog.local.LocalCatalog;
 import org.apache.impala.catalog.local.LocalDb;
 import org.apache.impala.common.ImpalaException;
-import org.apache.impala.common.InternalException;
 import org.apache.impala.compat.MetastoreShim;
 import org.apache.impala.service.BackendConfig;
 import org.apache.impala.service.FeSupport;

@@ -33,7 +33,6 @@ import java.util.List;
 import java.util.Map;
 
 import org.apache.hive.service.rpc.thrift.*;
-import org.apache.impala.analysis.AnalyzerTest;
 import org.apache.impala.testutil.WebClient;
 import org.apache.impala.testutil.X509CertChain;
 import org.apache.thrift.transport.THttpClient;

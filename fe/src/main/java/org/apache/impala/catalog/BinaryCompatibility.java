@@ -19,7 +19,6 @@ package org.apache.impala.catalog;
 
 import static org.apache.impala.catalog.Type.BINARY;
 import static org.apache.impala.catalog.Type.STRING;
-import static org.apache.impala.catalog.Type.VARCHAR;
 
 // BINARY can be only cast to STRING.
 public class BinaryCompatibility implements CompatibilityRule {

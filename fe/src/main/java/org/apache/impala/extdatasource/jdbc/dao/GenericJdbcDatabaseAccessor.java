@@ -17,7 +17,6 @@
 
 package org.apache.impala.extdatasource.jdbc.dao;
 
-import java.io.IOException;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
@@ -28,8 +27,6 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Properties;
 import java.util.TimeZone;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.TimeUnit;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -41,10 +38,6 @@ import org.apache.impala.extdatasource.jdbc.conf.JdbcStorageConfig;
 import org.apache.impala.extdatasource.jdbc.conf.JdbcStorageConfigManager;
 import org.apache.impala.extdatasource.jdbc.exception.JdbcDatabaseAccessException;
 import org.apache.impala.service.BackendConfig;
-import org.apache.impala.service.FeSupport;
-import org.apache.impala.thrift.TCacheJarResult;
-import org.apache.impala.thrift.TErrorCode;
-import org.apache.impala.thrift.TStatus;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

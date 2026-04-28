@@ -21,8 +21,6 @@ import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
-import java.util.Set;
-import org.apache.calcite.jdbc.JavaTypeFactoryImpl;
 import org.apache.calcite.plan.RelOptRule;
 import org.apache.calcite.plan.RelOptRuleCall;
 import org.apache.calcite.rel.RelFieldCollation;
@@ -36,19 +34,14 @@ import org.apache.calcite.rex.RexFieldCollation;
 import org.apache.calcite.rex.RexNode;
 import org.apache.calcite.rex.RexOver;
 import org.apache.calcite.rex.RexShuttle;
-import org.apache.calcite.sql.SqlFunctionCategory;
 import org.apache.calcite.sql.SqlKind;
-import org.apache.calcite.sql.SqlOperator;
 import org.apache.calcite.sql.fun.SqlStdOperatorTable;
 import org.apache.calcite.sql.type.SqlTypeName;
 import org.apache.impala.calcite.operators.ImpalaAggOperator;
 import org.apache.impala.calcite.operators.ImpalaCustomOperatorTable;
-import org.apache.impala.calcite.operators.ImpalaOperatorTable;
 import org.apache.impala.calcite.operators.ImpalaOperator;
-import org.apache.impala.calcite.type.ImpalaTypeSystemImpl;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
-import com.google.common.collect.Lists;
 
 /**
  * Rule to replace unsupported RexOver with supported syntax. For instance,

@@ -17,34 +17,23 @@
 
 package org.apache.impala.util;
 
-import java.io.IOException;
-import java.lang.reflect.Method;
-import java.net.URL;
-import java.net.URLClassLoader;
 import java.util.Base64;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
-import java.util.UUID;
 
-import org.apache.hadoop.fs.Path;
 import org.apache.impala.catalog.Db;
 import org.apache.impala.catalog.Function;
 import org.apache.impala.catalog.Function.CompareMode;
-import org.apache.impala.catalog.ScalarFunction;
 import org.apache.impala.catalog.Type;
-import org.apache.impala.common.FileSystemUtil;
 import org.apache.impala.common.ImpalaException;
-import org.apache.impala.common.ImpalaRuntimeException;
 import org.apache.impala.common.JniUtil;
-import org.apache.impala.hive.executor.HiveUdfExecutorLegacy;
 import org.apache.impala.thrift.TFunction;
 import org.apache.impala.thrift.TFunctionCategory;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.apache.thrift.protocol.TCompactProtocol;
 
-import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 

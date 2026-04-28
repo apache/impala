@@ -17,7 +17,6 @@
 
 package org.apache.impala.common;
 
-import org.apache.impala.analysis.ExprRewriterTest;
 import org.apache.impala.catalog.Catalog;
 import org.apache.impala.service.Frontend;
 import org.apache.impala.testutil.ImpaladTestCatalog;

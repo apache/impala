@@ -32,10 +32,7 @@ import org.apache.impala.analysis.NumericLiteral;
 import org.apache.impala.analysis.StringLiteral;
 import org.apache.impala.calcite.type.ImpalaTypeConverter;
 import org.apache.impala.catalog.Function;
-import org.apache.impala.catalog.PrimitiveType;
-import org.apache.impala.catalog.ScalarType;
 import org.apache.impala.catalog.Type;
-import org.apache.impala.common.AnalysisException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

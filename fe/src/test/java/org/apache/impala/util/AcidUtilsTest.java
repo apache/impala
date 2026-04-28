@@ -32,7 +32,6 @@ import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hive.common.ValidReadTxnList;
 import org.apache.hadoop.hive.common.ValidWriteIdList;
 import org.apache.hadoop.hive.common.ValidReaderWriteIdList;
-import org.apache.hadoop.hive.metastore.api.MetaException;
 import org.apache.impala.catalog.CatalogException;
 import org.apache.impala.compat.MetastoreShim;
 import org.hamcrest.Matchers;

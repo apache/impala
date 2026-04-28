@@ -43,7 +43,6 @@ import org.apache.impala.thrift.TTable;
 import org.apache.impala.thrift.TTableInfoSelector;
 import org.apache.impala.thrift.TTableName;
 import org.apache.impala.util.AcidUtils;
-import org.apache.impala.util.EventSequence;
 import org.apache.impala.util.NoOpEventSequence;
 import org.apache.thrift.TDeserializer;
 import org.apache.thrift.TException;

@@ -24,7 +24,6 @@ import java.util.Objects;
 import org.apache.hadoop.hive.metastore.api.SerDeInfo;
 import org.apache.hadoop.hive.metastore.api.StorageDescriptor;
 import org.apache.hadoop.hive.serde.serdeConstants;
-import org.apache.impala.thrift.THdfsPartition;
 import org.apache.impala.thrift.THdfsStorageDescriptor;
 import org.apache.impala.thrift.TJsonBinaryFormat;
 import org.slf4j.Logger;

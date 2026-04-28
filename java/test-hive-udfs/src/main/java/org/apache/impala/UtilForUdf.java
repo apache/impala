@@ -17,9 +17,7 @@
 
 package org.apache.impala;
 
-import java.text.ParseException;
 import org.apache.hadoop.hive.ql.exec.UDF;
-import org.apache.hadoop.io.Text;
 
 /** IMPALA-8016 regression test: Helper for ImportNearbyClasses. */
 public class UtilForUdf extends UDF {

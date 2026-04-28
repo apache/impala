@@ -18,7 +18,6 @@
 package org.apache.impala.calcite.rules;
 
 import com.google.common.base.Preconditions;
-import com.google.common.collect.ImmutableList;
 import org.apache.calcite.plan.RelOptRule;
 import org.apache.calcite.plan.RelOptRuleCall;
 import org.apache.calcite.rel.RelNode;

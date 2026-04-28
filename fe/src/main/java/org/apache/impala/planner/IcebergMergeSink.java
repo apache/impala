@@ -21,8 +21,6 @@ import java.util.List;
 import org.apache.impala.analysis.Expr;
 import org.apache.impala.thrift.TDataSink;
 import org.apache.impala.thrift.TDataSinkType;
-import org.apache.impala.thrift.TExplainLevel;
-import org.apache.impala.thrift.TQueryOptions;
 
 /**
  * IcebergMergeSink is a specialized MultiDataSink that contains an insert sink for

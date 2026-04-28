@@ -18,7 +18,6 @@
 
 package org.apache.impala.catalog.paimon;
 
-import org.apache.impala.analysis.Analyzer;
 import org.apache.impala.catalog.HdfsFileFormat;
 import org.apache.impala.thrift.TResultSet;
 import org.apache.impala.thrift.TShowFilesParams;

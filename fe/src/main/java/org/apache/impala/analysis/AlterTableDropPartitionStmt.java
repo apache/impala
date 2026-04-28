@@ -38,7 +38,6 @@ import org.apache.impala.catalog.TableLoadingException;
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.common.IcebergPartitionPredicateConverter;
 import org.apache.impala.common.IcebergPredicateConverter;
-import org.apache.impala.common.ImpalaException;
 import org.apache.impala.common.ImpalaRuntimeException;
 import org.apache.impala.thrift.TAlterTableDropPartitionParams;
 import org.apache.impala.thrift.TAlterTableParams;

@@ -20,12 +20,10 @@ package org.apache.impala.calcite.functions;
 import org.apache.impala.analysis.Analyzer;
 import org.apache.impala.analysis.CastExpr;
 import org.apache.impala.analysis.Expr;
-import org.apache.impala.analysis.ExprSubstitutionMap;
 import org.apache.impala.catalog.Type;
 import org.apache.impala.catalog.TypeCompatibility;
 import org.apache.impala.common.AnalysisException;
 
-import java.util.Objects;
 
 /**
  * A CastExpr that is always in analyzed state

@@ -33,8 +33,6 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import org.apache.hadoop.hive.metastore.api.Database;
 import org.apache.hadoop.hive.metastore.api.PrincipalType;
-import org.apache.impala.authorization.NoopAuthorizationFactory;
-import org.apache.impala.authorization.NoopAuthorizationFactory.NoopAuthorizationManager;
 import org.apache.impala.common.ImpalaException;
 import org.apache.impala.service.CatalogOpExecutor;
 import org.apache.impala.testutil.CatalogServiceTestCatalog;

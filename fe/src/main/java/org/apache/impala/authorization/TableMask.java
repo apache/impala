@@ -18,7 +18,6 @@
 package org.apache.impala.authorization;
 
 import com.google.common.base.Preconditions;
-import com.google.common.collect.Lists;
 import org.apache.impala.analysis.Expr;
 import org.apache.impala.analysis.Parser;
 import org.apache.impala.analysis.SelectStmt;

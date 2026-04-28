@@ -31,7 +31,6 @@ import org.apache.calcite.rex.RexCall;
 import org.apache.calcite.rex.RexInputRef;
 import org.apache.calcite.rex.RexLiteral;
 import org.apache.calcite.rex.RexNode;
-import org.apache.calcite.sql.SqlKind;
 import org.apache.calcite.sql.type.SqlTypeName;
 import org.apache.calcite.util.ImmutableBitSet;
 import org.apache.calcite.util.Sarg;
@@ -44,7 +43,6 @@ import org.apache.calcite.plan.hep.HepRelVertex;
 import org.apache.calcite.rel.core.Join;
 
 import com.google.common.base.Preconditions;
-import com.google.common.collect.ImmutableSet;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;

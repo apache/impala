@@ -17,7 +17,6 @@
 
 package org.apache.impala.analysis;
 
-import org.apache.impala.catalog.Role;
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.thrift.TCreateDropRoleParams;
 

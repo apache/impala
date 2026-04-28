@@ -17,13 +17,9 @@
 
 package org.apache.impala.catalog.events;
 
-import org.apache.impala.catalog.CatalogException;
-import org.apache.impala.catalog.events.MetastoreEvents.MetastoreEventFactory;
-import org.apache.impala.service.CatalogOpExecutor;
 import org.apache.impala.thrift.TEventProcessorMetrics;
 import org.apache.impala.thrift.TEventProcessorMetricsSummaryRequest;
 import org.apache.impala.thrift.TEventProcessorMetricsSummaryResponse;
-import org.apache.kudu.client.Delete;
 
 /**
  * Interface to process external events

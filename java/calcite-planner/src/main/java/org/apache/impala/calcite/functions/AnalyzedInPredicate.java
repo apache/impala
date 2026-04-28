@@ -23,7 +23,6 @@ import org.apache.calcite.sql.SqlKind;
 import org.apache.impala.analysis.Analyzer;
 import org.apache.impala.analysis.Expr;
 import org.apache.impala.analysis.InPredicate;
-import org.apache.impala.catalog.Function;
 import org.apache.impala.catalog.Type;
 import org.apache.impala.common.AnalysisException;
 

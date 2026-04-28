@@ -19,7 +19,6 @@ package org.apache.impala.planner;
 
 import org.apache.impala.common.FrontendTestBase;
 import org.apache.impala.common.ImpalaException;
-import org.apache.impala.common.RuntimeEnv;
 import org.apache.impala.testutil.TestUtils;
 import org.apache.impala.thrift.TExecutorGroupSet;
 import org.apache.impala.thrift.TQueryCtx;

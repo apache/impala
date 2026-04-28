@@ -19,7 +19,6 @@ package org.apache.impala.catalog;
 
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
-import com.google.common.collect.Lists;
 
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
@@ -36,9 +35,7 @@ import org.apache.hadoop.hive.common.FileUtils;
 import org.apache.hadoop.hive.common.StatsSetupConst;
 import org.apache.hadoop.hive.common.ValidReaderWriteIdList;
 import org.apache.hadoop.hive.common.ValidTxnList;
-import org.apache.hadoop.hive.common.ValidTxnWriteIdList;
 import org.apache.hadoop.hive.common.ValidWriteIdList;
-import org.apache.hadoop.hive.conf.HiveConf;
 import org.apache.hadoop.hive.metastore.IMetaStoreClient;
 import org.apache.hadoop.hive.metastore.LockRequestBuilder;
 import org.apache.hadoop.hive.metastore.TableType;
@@ -80,7 +77,6 @@ import org.apache.impala.thrift.TImpalaTableType;
 import org.apache.impala.thrift.TMetadataOpRequest;
 import org.apache.impala.thrift.TResultSet;
 import org.apache.impala.thrift.TValidWriteIdList;
-import org.apache.impala.util.AcidUtils;
 import org.apache.impala.util.AcidUtils.TblTransaction;
 import org.apache.impala.util.HiveMetadataFormatUtils;
 import org.apache.impala.util.MetaStoreUtil;

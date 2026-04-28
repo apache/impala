@@ -29,7 +29,6 @@ import org.apache.impala.analysis.FunctionName;
 import org.apache.impala.common.AnalysisException;
 
 import com.google.common.base.Preconditions;
-import com.google.common.collect.Lists;
 
 /**
  * Turns st_envintersects() on points from x/y pairs to applying bounding rect

@@ -22,7 +22,6 @@ import org.apache.calcite.rel.type.RelDataTypeFactory;
 import org.apache.calcite.sql.SqlNode;
 import org.apache.calcite.sql.validate.SqlValidator;
 import org.apache.impala.analysis.AnalysisContext.AnalysisResult;
-import org.apache.impala.analysis.AnalysisDriver;
 import org.apache.impala.common.ImpalaException;
 
 /**

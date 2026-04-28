@@ -20,7 +20,6 @@ package org.apache.impala.calcite.rel.phys;
 import org.apache.impala.analysis.Analyzer;
 import org.apache.impala.analysis.Expr;
 import org.apache.impala.analysis.MultiAggregateInfo;
-import org.apache.impala.analysis.SlotDescriptor;
 import org.apache.impala.analysis.TableRef;
 import org.apache.impala.analysis.TupleDescriptor;
 import org.apache.impala.catalog.FeFsPartition;

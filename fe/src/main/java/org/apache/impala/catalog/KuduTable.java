@@ -34,7 +34,6 @@ import org.apache.impala.analysis.KuduPartitionParam;
 import org.apache.impala.common.ImpalaRuntimeException;
 import org.apache.impala.service.BackendConfig;
 import org.apache.impala.thrift.TCatalogObjectType;
-import org.apache.impala.thrift.TColumn;
 import org.apache.impala.thrift.TKuduPartitionByHashParam;
 import org.apache.impala.thrift.TKuduPartitionByRangeParam;
 import org.apache.impala.thrift.TKuduPartitionParam;

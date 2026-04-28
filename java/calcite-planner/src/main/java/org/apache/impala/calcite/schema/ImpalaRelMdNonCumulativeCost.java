@@ -18,22 +18,17 @@
 package org.apache.impala.calcite.schema;
 
 import org.apache.calcite.plan.RelOptCost;
-import org.apache.calcite.plan.hep.HepRelVertex;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.core.Aggregate;
 import org.apache.calcite.rel.core.Join;
 import org.apache.calcite.rel.core.TableScan;
 import org.apache.calcite.rel.metadata.BuiltInMetadata.NonCumulativeCost;
 import org.apache.calcite.rel.metadata.ReflectiveRelMetadataProvider;
-import org.apache.calcite.rel.metadata.RelMdPercentageOriginalRows;
 import org.apache.calcite.rel.metadata.RelMetadataProvider;
 import org.apache.calcite.rel.metadata.RelMetadataQuery;
 import org.apache.calcite.util.BuiltInMethod;
-import org.apache.calcite.util.Pair;
 import org.apache.impala.calcite.rules.ImpalaMQContext;
 
-import com.google.common.collect.ImmutableList;
-import java.util.ArrayList;
 import java.util.List;
 
 import org.slf4j.Logger;

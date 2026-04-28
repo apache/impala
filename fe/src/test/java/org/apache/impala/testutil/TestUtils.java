@@ -50,7 +50,6 @@ import javax.json.stream.JsonGenerator;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.impala.catalog.Catalog;
 import org.apache.impala.common.PrintUtils;
-import org.apache.impala.common.RuntimeEnv;
 import org.apache.impala.thrift.TClientRequest;
 import org.apache.impala.thrift.TNetworkAddress;
 import org.apache.impala.thrift.TQueryCtx;
@@ -58,7 +57,6 @@ import org.apache.impala.thrift.TQueryOptions;
 import org.apache.impala.thrift.TSessionState;
 import org.apache.impala.thrift.TSessionType;
 import org.apache.impala.thrift.TUniqueId;
-import org.junit.Assume;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

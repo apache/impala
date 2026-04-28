@@ -20,7 +20,6 @@ package org.apache.impala.compat;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Sets;
-import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -32,8 +31,6 @@ import org.apache.hadoop.hive.ql.exec.UDF;
 import org.apache.hadoop.hive.ql.udf.esri.*;
 import org.apache.hadoop.hive.ql.udf.generic.GenericUDF;
 
-import org.apache.hadoop.io.BytesWritable;
-import org.apache.hadoop.io.IntWritable;
 import org.apache.impala.builtins.ST_ConvexHull_Wrapper;
 import org.apache.impala.builtins.ST_LineString_Wrapper;
 import org.apache.impala.builtins.ST_MultiPoint_Wrapper;

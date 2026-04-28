@@ -19,14 +19,11 @@ package org.apache.impala.datagenerator;
 
 import java.io.File;
 import java.io.IOException;
-import java.nio.file.Files;
 import java.lang.StringBuilder;
 import java.util.ArrayList;
-import java.util.List;
 import java.util.HashMap;
 import java.util.Optional;
 import java.util.Random;
-import java.util.Date;
 
 import org.apache.avro.Schema;
 import org.apache.avro.Schema.Field;

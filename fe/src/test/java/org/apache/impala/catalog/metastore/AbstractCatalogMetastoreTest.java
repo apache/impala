@@ -28,16 +28,12 @@ import org.apache.hadoop.hive.metastore.api.FieldSchema;
 import org.apache.hadoop.hive.metastore.api.Partition;
 import org.apache.hadoop.hive.metastore.conf.MetastoreConf;
 import org.apache.hadoop.hive.metastore.conf.MetastoreConf.ConfVars;
-import org.apache.impala.authorization.NoopAuthorizationFactory;
-import org.apache.impala.authorization.NoopAuthorizationFactory.NoopAuthorizationManager;
-import org.apache.impala.catalog.CatalogServiceCatalog;
 import org.apache.impala.compat.MetastoreShim;
 import org.apache.impala.service.CatalogOpExecutor;
 import org.apache.impala.testutil.CatalogServiceTestCatalog;
 import org.apache.impala.testutil.CatalogTestMetastoreServer;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
-import org.junit.Test;
 
 /**
  * Base class for Catalog metastore server tests which sets up a Catalog metastore

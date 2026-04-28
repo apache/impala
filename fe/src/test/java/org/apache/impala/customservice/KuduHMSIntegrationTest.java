@@ -28,7 +28,6 @@ import org.apache.impala.customservice.CustomServiceRunner;
 import org.apache.impala.testutil.TestUtils;
 
 import org.junit.AfterClass;
-import org.junit.Assume;
 import org.junit.BeforeClass;
 import org.junit.runner.RunWith;
 import org.junit.runners.Suite;

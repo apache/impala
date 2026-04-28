@@ -38,19 +38,14 @@ import org.apache.calcite.sql.util.SqlBasicVisitor;
 import org.apache.impala.analysis.Analyzer;
 import org.apache.impala.analysis.StmtMetadataLoader;
 import org.apache.impala.analysis.TableName;
-import org.apache.impala.authorization.NoopAuthorizationFactory;
 import org.apache.impala.calcite.schema.CalciteDb;
 import org.apache.impala.calcite.schema.ImpalaCalciteCatalogReader;
 import org.apache.impala.calcite.type.ImpalaTypeSystemImpl;
-import org.apache.impala.calcite.util.SimplifiedAnalyzer;
 import org.apache.impala.catalog.FeCatalog;
 import org.apache.impala.catalog.FeDb;
 import org.apache.impala.catalog.FeTable;
 import org.apache.impala.common.ImpalaException;
-import org.apache.impala.common.UnsupportedFeatureException;
 import org.apache.impala.thrift.TQueryCtx;
-
-import com.google.common.collect.Sets;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -61,7 +56,6 @@ import java.util.Map;
 import java.util.Properties;
 import java.util.Set;
 import java.util.Stack;
-import java.util.stream.Collectors;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;

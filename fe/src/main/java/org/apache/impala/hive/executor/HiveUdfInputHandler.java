@@ -17,10 +17,6 @@
 
 package org.apache.impala.hive.executor;
 
-import sun.misc.Unsafe;
-
-import java.lang.reflect.Method;
-
 import com.google.common.base.Preconditions;
 
 import org.apache.hadoop.io.Writable;

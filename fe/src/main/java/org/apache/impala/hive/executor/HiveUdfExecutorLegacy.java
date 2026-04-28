@@ -22,9 +22,7 @@ import java.lang.reflect.Method;
 import org.apache.hadoop.hive.ql.exec.UDF;
 import org.apache.impala.common.ImpalaRuntimeException;
 import org.apache.impala.thrift.THiveUdfExecutorCtorParams;
-import org.apache.impala.util.UnsafeUtil;
 
-import com.google.common.base.Preconditions;
 
 // Wrapper object to run hive UDFs. This class works with UdfCallExpr in the
 // backend to marshall data back and forth between the execution engine and

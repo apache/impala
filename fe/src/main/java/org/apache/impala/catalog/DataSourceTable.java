@@ -34,7 +34,6 @@ import org.slf4j.LoggerFactory;
 import org.apache.impala.common.ImpalaRuntimeException;
 import org.apache.impala.extdatasource.ApiVersion;
 import org.apache.impala.extdatasource.jdbc.conf.JdbcStorageConfig;
-import org.apache.impala.extdatasource.v1.ExternalDataSource;
 import org.apache.impala.thrift.TCatalogObjectType;
 import org.apache.impala.thrift.TColumn;
 import org.apache.impala.thrift.TDataSource;

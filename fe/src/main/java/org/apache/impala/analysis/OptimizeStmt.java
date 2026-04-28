@@ -21,7 +21,6 @@ import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 import org.apache.iceberg.DataFile;
 import org.apache.impala.authorization.Privilege;
-import org.apache.impala.catalog.BuiltinsDb;
 import org.apache.impala.catalog.Column;
 import org.apache.impala.catalog.FeIcebergTable;
 import org.apache.impala.catalog.IcebergContentFileStore;

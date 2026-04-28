@@ -22,7 +22,6 @@ import org.apache.impala.analysis.Expr;
 import org.apache.impala.analysis.NullLiteral;
 import org.apache.impala.catalog.Type;
 import org.apache.impala.common.AnalysisException;
-import org.apache.impala.common.ImpalaException;
 
 /**
  * A NulLLiteral specialized for Calcite

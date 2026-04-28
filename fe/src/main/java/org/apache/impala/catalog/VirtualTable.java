@@ -23,7 +23,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 
 import org.apache.hadoop.hive.common.ValidWriteIdList;
@@ -31,7 +30,6 @@ import org.apache.hadoop.hive.metastore.api.Table;
 import org.apache.impala.analysis.TableName;
 import org.apache.impala.thrift.TCatalogObjectType;
 import org.apache.impala.thrift.TImpalaTableType;
-import org.apache.impala.util.AcidUtils;
 
 /**
  * Tables that aren't actually exist in HMS. E.g. Iceberg position delete tables.

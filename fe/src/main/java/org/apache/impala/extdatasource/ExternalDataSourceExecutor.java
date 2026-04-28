@@ -46,7 +46,6 @@ import org.apache.impala.extdatasource.thrift.TPrepareResult;
 import org.apache.impala.extdatasource.v1.ExternalDataSource;
 import org.apache.impala.thrift.TErrorCode;
 import org.apache.impala.thrift.TStatus;
-import com.google.common.base.Preconditions;
 import com.google.common.base.Strings;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;

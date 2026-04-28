@@ -30,7 +30,6 @@ import org.apache.impala.planner.SingleNodePlanner;
 import org.apache.impala.planner.SingleNodePlannerIntf;
 import org.apache.impala.planner.PlannerContext;
 import org.apache.impala.thrift.TQueryCtx;
-import org.apache.impala.thrift.TQueryOptions;
 
 
 /**

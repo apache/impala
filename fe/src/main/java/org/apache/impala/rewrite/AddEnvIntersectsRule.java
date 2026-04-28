@@ -21,15 +21,12 @@ import java.util.Arrays;
 import java.util.List;
 
 import org.apache.impala.analysis.Analyzer;
-import org.apache.impala.analysis.BinaryPredicate;
 import org.apache.impala.analysis.CompoundPredicate;
 import org.apache.impala.analysis.Expr;
 import org.apache.impala.analysis.FunctionCallExpr;
 import org.apache.impala.analysis.FunctionName;
 import org.apache.impala.common.AnalysisException;
 
-import com.google.common.base.Preconditions;
-import com.google.common.collect.Lists;
 
 /**
  * Add st_envintersects() to conjuncts with a geospatial relation that can be true only

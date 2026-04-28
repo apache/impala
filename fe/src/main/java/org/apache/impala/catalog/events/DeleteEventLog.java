@@ -25,8 +25,6 @@ import org.apache.hadoop.hive.common.FileUtils;
 import org.apache.hadoop.hive.metastore.api.Database;
 import org.apache.hadoop.hive.metastore.api.Table;
 import org.apache.impala.catalog.HdfsTable;
-import org.apache.impala.catalog.events.MetastoreEvents.MetastoreEvent;
-import org.apache.impala.service.CatalogOpExecutor;
 
 /**
  * This class is used to store delete events for catalog objects (database, tables and

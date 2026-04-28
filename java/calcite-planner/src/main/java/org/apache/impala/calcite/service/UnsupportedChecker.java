@@ -19,7 +19,6 @@ package org.apache.impala.calcite.service;
 
 import org.apache.impala.analysis.StmtMetadataLoader.StmtTableCache;
 import org.apache.impala.common.ImpalaException;
-import org.apache.impala.common.ParseException;
 import org.apache.impala.common.UnsupportedFeatureException;
 
 import java.util.regex.Matcher;

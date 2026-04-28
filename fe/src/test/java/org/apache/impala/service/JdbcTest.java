@@ -38,7 +38,6 @@ import java.util.Map;
 import org.apache.impala.testutil.ImpalaJdbcClient;
 import org.apache.impala.testutil.TestUtils;
 import org.apache.impala.testutil.WebClient;
-import org.junit.AfterClass;
 import org.junit.Before;
 import org.junit.Test;
 

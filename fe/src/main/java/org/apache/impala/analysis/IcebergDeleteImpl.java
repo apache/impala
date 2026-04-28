@@ -23,14 +23,10 @@ import org.apache.iceberg.TableProperties;
 import org.apache.impala.catalog.FeIcebergTable;
 import org.apache.impala.catalog.IcebergContentFileStore;
 import org.apache.impala.common.AnalysisException;
-import org.apache.impala.common.Pair;
 import org.apache.impala.planner.DataSink;
 import org.apache.impala.planner.IcebergBufferedDeleteSink;
-import org.apache.impala.planner.TableSink;
-import org.apache.impala.thrift.TSortingOrder;
 
 import com.google.common.base.Preconditions;
-import com.google.common.collect.ImmutableList;
 import org.apache.impala.util.ExprUtil;
 
 public class IcebergDeleteImpl extends IcebergModifyImpl {

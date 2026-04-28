@@ -17,7 +17,6 @@
 
 package org.apache.impala.analysis;
 
-import org.apache.impala.catalog.Column;
 import org.apache.impala.catalog.Type;
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.planner.DataSink;
@@ -27,9 +26,7 @@ import org.apache.impala.thrift.TSortingOrder;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
-import java.util.Map;
 
-import static java.lang.String.format;
 
 /**
  * Abstract class for implementing a Modify statement such as DELETE or UPDATE. Child

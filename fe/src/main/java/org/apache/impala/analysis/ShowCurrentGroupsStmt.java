@@ -17,7 +17,6 @@
 
 package org.apache.impala.analysis;
 
-import org.apache.impala.authorization.Privilege;
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.common.InternalException;
 import org.apache.impala.thrift.TShowCurrentGroupsParams;

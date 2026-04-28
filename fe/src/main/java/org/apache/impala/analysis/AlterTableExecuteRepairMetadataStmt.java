@@ -17,7 +17,6 @@
 
 package org.apache.impala.analysis;
 
-import hiveexec.com.google.common.base.Preconditions;
 import org.apache.impala.catalog.FeTable;
 import org.apache.impala.catalog.FeIcebergTable;
 import org.apache.impala.common.AnalysisException;

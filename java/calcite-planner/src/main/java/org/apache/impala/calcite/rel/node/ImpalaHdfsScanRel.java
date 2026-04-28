@@ -18,12 +18,8 @@
 package org.apache.impala.calcite.rel.node;
 
 import com.google.common.base.Preconditions;
-import com.google.common.collect.Lists;
 
-import org.apache.calcite.plan.RelOptUtil;
 import org.apache.calcite.rel.core.TableScan;
-import org.apache.calcite.rex.RexNode;
-import org.apache.calcite.util.ImmutableBitSet;
 import org.apache.impala.analysis.Analyzer;
 import org.apache.impala.analysis.BaseTableRef;
 import org.apache.impala.analysis.Expr;
@@ -40,7 +36,6 @@ import org.apache.impala.calcite.util.SimplifiedAnalyzer;
 import org.apache.impala.catalog.Column;
 import org.apache.impala.catalog.FeFsPartition;
 import org.apache.impala.catalog.FeFsTable;
-import org.apache.impala.catalog.Type;
 import org.apache.impala.common.ImpalaException;
 import org.apache.impala.common.UnsupportedFeatureException;
 import org.apache.impala.planner.HdfsScanNode;
@@ -49,8 +44,6 @@ import org.apache.impala.planner.PlanNodeId;
 import org.apache.impala.planner.ScanNode;
 import org.apache.impala.planner.ScanNodeHelper;
 import org.apache.impala.planner.SingleNodePlanner;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
 import java.util.Collections;

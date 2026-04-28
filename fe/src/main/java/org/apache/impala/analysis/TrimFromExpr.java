@@ -18,7 +18,6 @@
 package org.apache.impala.analysis;
 
 import com.google.common.collect.Lists;
-import com.google.common.base.Enums;
 
 import org.apache.impala.catalog.BuiltinsDb;
 import org.apache.impala.catalog.Type;

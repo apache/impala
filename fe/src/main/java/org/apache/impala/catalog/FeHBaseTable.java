@@ -59,7 +59,6 @@ import org.apache.impala.util.TResultRowBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.google.common.base.Charsets;
 import com.google.common.base.Preconditions;
 
 public interface FeHBaseTable extends FeTable {

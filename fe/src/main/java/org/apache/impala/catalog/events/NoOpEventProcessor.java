@@ -18,11 +18,6 @@
 package org.apache.impala.catalog.events;
 
 import com.codahale.metrics.Gauge;
-import org.apache.hadoop.hive.metastore.api.NotificationEvent;
-import org.apache.impala.catalog.CatalogException;
-import org.apache.impala.catalog.events.MetastoreEvents.IgnoredEvent;
-import org.apache.impala.catalog.events.MetastoreEvents.MetastoreEvent;
-import org.apache.impala.catalog.events.MetastoreEvents.MetastoreEventFactory;
 import org.apache.impala.catalog.events.MetastoreEventsProcessor.EventProcessorStatus;
 import org.apache.impala.common.Metrics;
 import org.apache.impala.thrift.TEventProcessorMetrics;

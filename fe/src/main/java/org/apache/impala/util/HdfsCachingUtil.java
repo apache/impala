@@ -30,7 +30,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import org.apache.impala.analysis.TableName;
-import org.apache.impala.catalog.FeFsPartition;
 import org.apache.impala.catalog.HdfsPartition;
 import org.apache.impala.common.FileSystemUtil;
 import org.apache.impala.common.ImpalaException;

@@ -23,7 +23,6 @@ import java.util.List;
 import org.apache.impala.analysis.Expr;
 import org.apache.impala.analysis.FunctionCallExpr;
 import org.apache.impala.thrift.TQueryOptions;
-import org.apache.impala.catalog.Function;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

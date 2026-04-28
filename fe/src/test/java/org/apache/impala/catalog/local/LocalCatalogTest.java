@@ -31,7 +31,6 @@ import org.apache.impala.analysis.ToSqlUtils;
 import org.apache.impala.authorization.NoopAuthorizationFactory;
 import org.apache.impala.catalog.CatalogTest;
 import org.apache.impala.catalog.ColumnStats;
-import org.apache.impala.catalog.FeCatalogUtils;
 import org.apache.impala.catalog.FeDb;
 import org.apache.impala.catalog.FeFsPartition;
 import org.apache.impala.catalog.FeFsTable;

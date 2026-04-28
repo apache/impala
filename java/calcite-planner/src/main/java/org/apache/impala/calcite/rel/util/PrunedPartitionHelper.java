@@ -17,11 +17,7 @@
 package org.apache.impala.calcite.rel.util;
 
 import com.google.common.collect.ImmutableList;
-import com.google.common.collect.Lists;
 import org.apache.calcite.rex.RexBuilder;
-import org.apache.calcite.rex.RexNode;
-import org.apache.calcite.sql.SqlOperator;
-import org.apache.calcite.sql.fun.SqlStdOperatorTable;
 import org.apache.impala.analysis.Analyzer;
 import org.apache.impala.analysis.Expr;
 import org.apache.impala.analysis.SlotId;
@@ -33,10 +29,7 @@ import org.apache.impala.common.Pair;
 import org.apache.impala.planner.HdfsPartitionPruner;
 
 import java.util.ArrayList;
-import java.util.HashSet;
 import java.util.List;
-import java.util.Map;
-import java.util.Set;
 
 /**
  * PrunedPartitionHelper is a wrapper around the Impala Planner's partition

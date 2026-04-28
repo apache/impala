@@ -19,7 +19,6 @@ package org.apache.impala.calcite.schema;
 
 import org.apache.calcite.plan.RelOptCost;
 import org.apache.calcite.plan.RelOptCostFactory;
-import org.apache.calcite.plan.RelOptUtil;
 
 import java.util.Objects;
 

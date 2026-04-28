@@ -30,8 +30,6 @@ import org.apache.impala.thrift.TPlanNodeType;
 import org.apache.impala.thrift.TQueryOptions;
 
 import com.google.common.base.Preconditions;
-import com.google.common.hash.Hasher;
-import com.google.common.hash.HashCode;
 
 /**
  * Node that serves as a caching intermediary with its child node. If the cache contains

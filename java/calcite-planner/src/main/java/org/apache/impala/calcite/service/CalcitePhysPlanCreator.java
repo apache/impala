@@ -19,15 +19,11 @@ package org.apache.impala.calcite.service;
 
 import org.apache.impala.calcite.rel.node.NodeWithExprs;
 import org.apache.impala.calcite.rel.node.ImpalaPlanRel;
-import org.apache.impala.calcite.util.SimplifiedAnalyzer;
-import org.apache.impala.authorization.AuthorizationFactory;
 import org.apache.impala.analysis.Analyzer;
 import org.apache.impala.calcite.rel.node.ParentPlanRelContext;
 import org.apache.impala.common.ImpalaException;
 import org.apache.impala.planner.PlannerContext;
 import org.apache.impala.planner.PlanNode;
-import org.apache.impala.service.BackendConfig;
-import org.apache.impala.util.AuthorizationUtil;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;

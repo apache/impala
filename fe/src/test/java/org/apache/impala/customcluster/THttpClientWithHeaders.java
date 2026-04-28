@@ -46,9 +46,7 @@ import org.apache.http.entity.ByteArrayEntity;
 import org.apache.http.params.CoreConnectionPNames;
 import org.apache.thrift.TConfiguration;
 import org.apache.thrift.transport.TEndpointTransport;
-import org.apache.thrift.transport.TTransport;
 import org.apache.thrift.transport.TTransportException;
-import org.apache.thrift.transport.TTransportFactory;
 
 /**
  * HTTP implementation of the TTransport interface. Used for working with a

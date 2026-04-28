@@ -35,7 +35,6 @@ import org.apache.impala.analysis.KuduPartitionParam;
 import org.apache.impala.catalog.events.InFlightEvents;
 import org.apache.impala.common.ImpalaException;
 import org.apache.impala.common.ImpalaRuntimeException;
-import org.apache.impala.service.BackendConfig;
 import org.apache.impala.thrift.TBriefTableMeta;
 import org.apache.impala.thrift.TCatalogObject;
 import org.apache.impala.thrift.TCatalogObjectType;

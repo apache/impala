@@ -18,7 +18,6 @@
 package org.apache.impala.hive.executor;
 
 import org.apache.hadoop.io.BytesWritable;
-import org.apache.impala.catalog.CatalogException;
 import org.apache.impala.catalog.PrimitiveType;
 import org.apache.impala.catalog.ScalarType;
 import org.apache.impala.common.ImpalaException;

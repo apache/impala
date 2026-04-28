@@ -19,13 +19,9 @@ package org.apache.impala.calcite.operators;
 import org.apache.calcite.rel.type.RelDataType;
 import org.apache.calcite.sql.SqlCallBinding;
 import org.apache.calcite.sql.SqlKind;
-import org.apache.calcite.sql.SqlStaticAggFunction;
-import org.apache.calcite.sql.SqlOperator;
 import org.apache.calcite.sql.SqlOperatorBinding;
 import org.apache.calcite.sql.fun.SqlAvgAggFunction;
 import org.apache.calcite.sql.type.SqlTypeName;
-import org.apache.impala.calcite.type.ImpalaTypeConverter;
-import org.apache.impala.catalog.Type;
 
 /**
  * Special implementation of Calcite's SqlAvgAggFunction which allows a TIMESTAMP
