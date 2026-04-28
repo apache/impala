@@ -577,6 +577,19 @@ createIcebergColumnStats(
   return stats_builder.Finish();
 }
 
+vector<flatbuffers::Offset<org::apache::impala::fb::FbIcebergPartitionField>>
+createRawPartitionFields(flatbuffers::FlatBufferBuilder& fbb,
+    const OutputPartition& partition) {
+  using namespace org::apache::impala::fb;
+  vector<flatbuffers::Offset<FbIcebergPartitionField>> raw_partition_fields;
+  for (const string& partition_name : partition.raw_partition_names) {
+    auto data = reinterpret_cast<const uint8_t*>(partition_name.data());
+    auto fb_vector = fbb.CreateVector(data, partition_name.size());
+    raw_partition_fields.push_back(CreateFbIcebergPartitionField(fbb, fb_vector));
+  }
+  return raw_partition_fields;
+}
+
 // Helper function to create an Iceberg data file FlatBuffer with deletion vectors.
 // Used for puffin files where we need to create one entry per data file with DVs.
 // Parameters:
@@ -597,17 +610,11 @@ string createIcebergDataFileWithDeletionVectorString(
   using namespace org::apache::impala::fb;
   flatbuffers::FlatBufferBuilder fbb;
 
-  // For puffin files with deletion vectors, we don't have column stats
-  vector<flatbuffers::Offset<FbIcebergColumnStats>> ice_col_stats_vec;
-
-  vector<flatbuffers::Offset<FbIcebergPartitionField>> raw_partition_fields;
-  for (const string& partition_name : partition.raw_partition_names) {
-    auto data = reinterpret_cast<const uint8_t*>(partition_name.data());
-    auto fb_vector = fbb.CreateVector(data, partition_name.size());
-    raw_partition_fields.push_back(CreateFbIcebergPartitionField(fbb, fb_vector));
-  }
-
   THash128 hash = THash128FromFilePath(referenced_data_file);
+
+  auto raw_partition_fields = createRawPartitionFields(fbb, partition);
+  auto raw_part_fields_for_old_dv = fbb.CreateVector(raw_partition_fields);
+  auto raw_part_fields_for_new_dv = fbb.CreateVector(raw_partition_fields);
 
   // Create FlatBuffer deletion vector reference for old DV
   flatbuffers::Offset<FbIcebergDeletionVector> old_dv_fb = 0;
@@ -618,7 +625,10 @@ string createIcebergDataFileWithDeletionVectorString(
         old_dv->content_size_in_bytes,
         hash.high,
         hash.low,
-        old_dv->__isset.record_count ? old_dv->record_count : 0);
+        old_dv->__isset.record_count ? old_dv->record_count : 0,
+        0,
+        partition.iceberg_spec_id,
+        raw_part_fields_for_old_dv);
   }
 
   // Create FlatBuffer deletion vector reference for new DV
@@ -630,11 +640,16 @@ string createIcebergDataFileWithDeletionVectorString(
       hash.high,
       hash.low,
       new_dv->__isset.record_count ? new_dv->record_count : 0,
-      puffin_file_size);
+      puffin_file_size,
+      partition.iceberg_spec_id,
+      raw_part_fields_for_new_dv);
 
   // For puffin files, use the deletion vector record count and the total
   // Puffin file size.
   int64_t num_rows = new_dv->__isset.record_count ? new_dv->record_count : 0;
+
+  // For puffin files with deletion vectors, we don't have column stats
+  vector<flatbuffers::Offset<FbIcebergColumnStats>> ice_col_stats_vec;
 
   flatbuffers::Offset<FbIcebergDataFile> data_file = CreateFbIcebergDataFile(fbb,
       fbb.CreateString(puffin_file_path),
@@ -663,13 +678,7 @@ string createIcebergDataFileString(
     ice_col_stats_vec.push_back(createIcebergColumnStats(fbb, it->first, it->second));
   }
 
-  vector<flatbuffers::Offset<FbIcebergPartitionField>> raw_partition_fields;
-
-  for (const string& partition_name : partition.raw_partition_names) {
-    auto data = reinterpret_cast<const uint8_t*>(partition_name.data());
-    auto fb_vector = fbb.CreateVector(data, partition_name.size());
-    raw_partition_fields.push_back(CreateFbIcebergPartitionField(fbb, fb_vector));
-  }
+  auto raw_partition_fields = createRawPartitionFields(fbb, partition);
 
   flatbuffers::Offset<FbIcebergDataFile> data_file = CreateFbIcebergDataFile(fbb,
       fbb.CreateString(final_path),
@@ -837,6 +846,18 @@ vector<string> DmlExecState::CollectDeletionVectors(GetDV get_dv) {
       // Serialize the DV into its own FlatBuffer.
       flatbuffers::FlatBufferBuilder builder(256);
       auto path_offset = builder.CreateString(dv->path()->c_str());
+
+      vector<flatbuffers::Offset<FbIcebergPartitionField>> raw_part_fields;
+      if (dv->raw_partition_fields()) {
+        for (int j = 0; j < dv->raw_partition_fields()->size(); ++j) {
+          auto* field = dv->raw_partition_fields()->Get(j);
+          auto fv = builder.CreateVector(
+              field->field_value()->data(), field->field_value()->size());
+          raw_part_fields.push_back(CreateFbIcebergPartitionField(builder, fv));
+        }
+      }
+      auto raw_part_fields_offset = builder.CreateVector(raw_part_fields);
+
       auto dv_offset = CreateFbIcebergDeletionVector(builder,
           path_offset,
           dv->content_offset(),
@@ -844,7 +865,9 @@ vector<string> DmlExecState::CollectDeletionVectors(GetDV get_dv) {
           dv->referenced_data_file_hash_high(),
           dv->referenced_data_file_hash_low(),
           dv->record_count(),
-          data_file->file_size_in_bytes());
+          data_file->file_size_in_bytes(),
+          dv->spec_id(),
+          raw_part_fields_offset);
       builder.Finish(dv_offset);
 
       ret.push_back(string(reinterpret_cast<const char*>(builder.GetBufferPointer()),

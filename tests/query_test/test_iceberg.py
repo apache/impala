@@ -1782,7 +1782,6 @@ class TestIcebergV2Table(IcebergTestSuite):
     if IS_HDFS and self.should_run_for_hive(vector):
       self._delete_partitioned_hive_tests(unique_database)
 
-
   def _delete_partitioned_hive_tests(self, db):
     hive_output = self.run_stmt_in_hive("SELECT * FROM {}.{} ORDER BY i".format(
         db, "id_part"))
@@ -2350,6 +2349,9 @@ class TestIcebergV3Table(IcebergTestSuite):
     self.run_test_case('QueryTest/iceberg-v3-delete-partition-sort',
         vector, unique_database)
 
+  def test_v3_delete_partitioned(self, vector, unique_database):
+    self.run_test_case('QueryTest/iceberg-v3-delete-partitioned', vector, unique_database)
+
   def test_v3_delete_on_existing_dv_table(self, vector, unique_database):
     """Test DELETE on a table that already has deletion vectors written by Spark.
     Verifies that Impala correctly reads and extends pre-existing Puffin DV files
@@ -2398,7 +2400,13 @@ class TestIcebergV3Table(IcebergTestSuite):
       os.remove(local_file)
 
   def test_v3_update(self, vector, unique_database):
-    self.run_test_case('QueryTest/iceberg-v3-update', vector, unique_database)
+    udf_location = get_fs_path('/test-warehouse/libTestUdfs.so')
+    self.run_test_case('QueryTest/iceberg-v3-update', vector, unique_database,
+                       test_file_vars={'UDF_LOCATION': udf_location})
+
+  def test_v3_update_partitions(self, vector, unique_database):
+    self.run_test_case('QueryTest/iceberg-v3-update-partitions', vector,
+        unique_database)
 
   def test_v3_optimize(self, vector, unique_database):
     self.run_test_case('QueryTest/iceberg-v3-optimize', vector, unique_database)

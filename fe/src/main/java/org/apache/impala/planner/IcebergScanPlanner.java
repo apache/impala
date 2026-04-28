@@ -727,25 +727,29 @@ public class IcebergScanPlanner {
         } else {
           dataFilesWithDeletes_.add(fileDesc.first);
           for (DeleteFile delFile : fileScanTask.deletes()) {
+            if (delFile.format() == FileFormat.PUFFIN) {
+              // A data file can have at most one DV, but may also be covered by legacy
+              // position-delete files simultaneously (e.g. after a partial V3 migration
+              // by an external engine). Assert there is no second DV for this file.
+              Hash128 dataFileHash = IcebergUtil.getFilePathHash(dataFile.location());
+              TIcebergDeletionVector dv = dataFileToDV_.put(dataFileHash,
+                  IcebergUtil.createTIcebergDeletionVector(delFile));
+              Preconditions.checkState(dv == null,
+                  "More than one deletion vector found for data file: %s",
+                  dataFile.location());
+              continue;
+            }
+            // Handle legacy delete files.
             Pair<IcebergFileDescriptor, Boolean> delFileDesc =
                 getFileDescriptor(delFile, fileStore);
             if (!delFileDesc.second) ++dataFilesCacheMisses;
             if (delFile.content() == FileContent.EQUALITY_DELETES) {
               addEqualityDeletesAndIds(delFileDesc.first);
+            } else if (delFile.content() == FileContent.POSITION_DELETES) {
+              positionDeleteFiles_.add(delFileDesc.first);
             } else {
-              if (delFile.format() == FileFormat.PUFFIN) {
-                // A data file can have at most one DV, but may also be covered by legacy
-                // position-delete files simultaneously (e.g. after a partial V3 migration
-                // by an external engine). Assert there is no second DV for this file.
-                Hash128 dataFileHash = IcebergUtil.getFilePathHash(dataFile.location());
-                TIcebergDeletionVector dv = dataFileToDV_.put(dataFileHash,
-                    IcebergUtil.createTIcebergDeletionVector(delFile));
-                Preconditions.checkState(dv == null,
-                    "More than one deletion vector found for data file: %s",
-                    dataFile.location());
-              } else {
-                positionDeleteFiles_.add(delFileDesc.first);
-              }
+              Preconditions.checkState(false,
+                  "Unknown delete file content type: " + delFile.content());
             }
           }
         }

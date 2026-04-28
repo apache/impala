@@ -191,6 +191,8 @@ public abstract class ModifyStmt extends DmlStatementBase {
   @Override
   public List<Expr> getPartitionKeyExprs() { return modifyImpl_.getPartitionKeyExprs(); }
   @Override
+  public List<Expr> getShuffleExprs() { return modifyImpl_.getShuffleExprs(); }
+  @Override
   public List<Expr> getSortExprs() { return modifyImpl_.getSortExprs(); }
 
   public Expr getWherePredicate() { return wherePredicate_; }

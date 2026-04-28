@@ -33,6 +33,7 @@ import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.time.temporal.ChronoUnit;
+import java.util.function.IntFunction;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Base64;
@@ -111,6 +112,7 @@ import org.apache.impala.common.ImpalaRuntimeException;
 import org.apache.impala.common.Pair;
 import org.apache.impala.fb.FbFileMetadata;
 import org.apache.impala.fb.FbIcebergDataFile;
+import org.apache.impala.fb.FbIcebergPartitionField;
 import org.apache.impala.fb.FbIcebergDataFileFormat;
 import org.apache.impala.fb.FbIcebergDeletionVector;
 import org.apache.impala.fb.FbIcebergMetadata;
@@ -854,7 +856,28 @@ public class IcebergUtil {
   public static PartitionData partitionDataFromDataFile(Types.StructType partitionType,
       IcebergPartitionSpec spec, FbIcebergDataFile dataFile)
       throws ImpalaRuntimeException {
-    if (dataFile == null || dataFile.rawPartitionFieldsLength() == 0) return null;
+    if (dataFile == null) return null;
+    return partitionDataFromRawFields(partitionType, spec,
+        dataFile.rawPartitionFieldsLength(), dataFile::rawPartitionFields);
+  }
+
+  /**
+   * Create a PartitionData object using partition information from
+   * FbIcebergDeletionVector.
+   */
+  public static PartitionData partitionDataFromDeletionVector(
+      Types.StructType partitionType, IcebergPartitionSpec spec,
+      FbIcebergDeletionVector dv) throws ImpalaRuntimeException {
+    if (dv == null) return null;
+    return partitionDataFromRawFields(partitionType, spec,
+        dv.rawPartitionFieldsLength(), dv::rawPartitionFields);
+  }
+
+  private static PartitionData partitionDataFromRawFields(
+      Types.StructType partitionType, IcebergPartitionSpec spec,
+      int rawFieldsLength, IntFunction<FbIcebergPartitionField> rawFieldAccessor)
+      throws ImpalaRuntimeException {
+    if (rawFieldsLength == 0) return null;
 
     PartitionData data = new PartitionData(spec.getIcebergPartitionFieldsSize());
     int path_i = 0;
@@ -863,9 +886,9 @@ public class IcebergUtil {
       TIcebergPartitionTransformType transformType = field.getTransformType();
       if (transformType == TIcebergPartitionTransformType.VOID) continue;
 
-      Preconditions.checkState(path_i < dataFile.rawPartitionFieldsLength());
+      Preconditions.checkState(path_i < rawFieldsLength);
       ByteBuffer fieldByteBuffer =
-          dataFile.rawPartitionFields(path_i).fieldValueAsByteBuffer();
+          rawFieldAccessor.apply(path_i).fieldValueAsByteBuffer();
 
       Charset charset = StandardCharsets.UTF_8;
       if (field.getType() == org.apache.impala.catalog.Type.BINARY) {
@@ -1367,7 +1390,7 @@ public class IcebergUtil {
     fbb.finish(
         FbIcebergDeletionVector.createFbIcebergDeletionVector(fbb, pathOffset,
             contentOffset, contentSizeInBytes, referencedDataFileHashHigh,
-            referencedDataFileHashLow, recordCount, 0));
+            referencedDataFileHashLow, recordCount, 0, 0, 0));
     ByteBuffer bb = fbb.dataBuffer().slice();
     ByteBuffer compressedBb = ByteBuffer.allocate(bb.capacity());
     compressedBb.put(bb);

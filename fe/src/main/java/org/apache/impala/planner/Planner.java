@@ -37,7 +37,6 @@ import org.apache.impala.analysis.Expr;
 import org.apache.impala.analysis.ExprSubstitutionMap;
 import org.apache.impala.analysis.InsertStmt;
 import org.apache.impala.analysis.JoinOperator;
-import org.apache.impala.analysis.MergeCase;
 import org.apache.impala.analysis.MergeStmt;
 import org.apache.impala.analysis.ParsedStatement;
 import org.apache.impala.analysis.QueryStmt;
@@ -300,7 +299,7 @@ public class Planner {
     // IcebergBufferedDeleteSink. UPDATE/MERGE statements will still require to
     // sort their data records.
     if (!(stmt instanceof DeleteStmt)) {
-      createPreDmlSort(stmt, rootFragment, ctx_.getRootAnalyzer());
+      createIcebergPreDmlSort(stmt, rootFragment, ctx_.getRootAnalyzer());
     }
     return rootFragment;
   }
@@ -1029,8 +1028,8 @@ public class Planner {
     inputFragment.setPlanRoot(node);
   }
 
-  public void createPreDmlSort(DmlStatementBase dmlStmt, PlanFragment inputFragment,
-      Analyzer analyzer) throws ImpalaException {
+  public void createIcebergPreDmlSort(DmlStatementBase dmlStmt,
+      PlanFragment inputFragment, Analyzer analyzer) throws ImpalaException {
     List<Expr> orderingExprs = new ArrayList<>();
 
     List<Expr> partitionKeyExprs = dmlStmt.getPartitionKeyExprs();

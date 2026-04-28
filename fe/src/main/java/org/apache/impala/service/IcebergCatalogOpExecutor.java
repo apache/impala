@@ -498,7 +498,9 @@ public class IcebergCatalogOpExecutor {
     String referencedDataFile = dataFileDescriptor
         .getAbsolutePath(feIcebergTable.getLocation());
 
-    PartitionSpec partSpec = feIcebergTable.getIcebergApiTable().spec();
+    int specId = dv.specId();
+    PartitionSpec partSpec = feIcebergTable.getIcebergApiTable().specs().get(specId);
+    Preconditions.checkNotNull(partSpec, "Unknown partition spec id: %s", specId);
 
     // Build the delete file metadata
     FileMetadata.Builder builder = FileMetadata.deleteFileBuilder(partSpec)
@@ -510,6 +512,12 @@ public class IcebergCatalogOpExecutor {
         .withReferencedDataFile(referencedDataFile)
         .withRecordCount(dv.recordCount())
         .withFileSizeInBytes(dv.fileSizeInBytes());
+
+    IcebergPartitionSpec impPartSpec = feIcebergTable.getPartitionSpec(specId);
+    IcebergUtil.PartitionData partitionData =
+        IcebergUtil.partitionDataFromDeletionVector(
+            partSpec.partitionType(), impPartSpec, dv);
+    if (partitionData != null) builder.withPartition(partitionData);
 
     return builder.build();
   }

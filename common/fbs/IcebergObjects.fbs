@@ -90,5 +90,7 @@ table FbIcebergDeletionVector {
   record_count: long;
   // Total size of the Puffin file containing this deletion vector, in bytes.
   file_size_in_bytes: long;
+  spec_id: ushort;
+  raw_partition_fields: [FbIcebergPartitionField];
 }
 

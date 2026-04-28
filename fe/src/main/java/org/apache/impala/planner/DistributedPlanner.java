@@ -207,22 +207,22 @@ public class DistributedPlanner {
 
     if (dmlStmt.hasNoShuffleHint() && !enforceHdfsWriterLimit) return inputFragment;
 
-    List<Expr> partitionExprs = new ArrayList<>(dmlStmt.getPartitionKeyExprs());
+    List<Expr> shuffleExprs = new ArrayList<>(dmlStmt.getShuffleExprs());
     // Ignore constants for the sake of partitioning.
-    Expr.removeConstants(partitionExprs);
+    Expr.removeConstants(shuffleExprs);
 
     // Do nothing if the input fragment is already appropriately partitioned. TODO: handle
     // Kudu tables here (IMPALA-5254).
     DataPartition inputPartition = inputFragment.getDataPartition();
-    if (!partitionExprs.isEmpty()
+    if (!shuffleExprs.isEmpty()
         && analyzer.setsHaveValueTransfer(
-            inputPartition.getPartitionExprs(), partitionExprs, true)
+            inputPartition.getPartitionExprs(), shuffleExprs, true)
         && !(dmlStmt.getTargetTable() instanceof FeKuduTable)
         && !enforceHdfsWriterLimit) {
       return inputFragment;
     }
 
-    long numPartitions = getNumDistinctValues(partitionExprs);
+    long numPartitions = getNumDistinctValues(shuffleExprs);
     int maxHdfsWriters = analyzer.getQueryOptions().getMax_fs_writers();
     // We also consider fragments containing union nodes along with scan fragments
     // (leaf fragments) since they are either a part of those scan fragments or are
@@ -244,7 +244,7 @@ public class DistributedPlanner {
           inputFragment.getNumNodes(), analyzer.getMaxParallelismPerNode());
       int costBasedMaxWriter = minInstances;
 
-      boolean isPartitioned = !partitionExprs.isEmpty();
+      boolean isPartitioned = !shuffleExprs.isEmpty();
       PlanNode root = inputFragment.getPlanRoot();
       if (root.getCardinality() > -1 && root.getAvgRowSize() > -1) {
         // Both cardinality and avg row size is known.
@@ -296,7 +296,7 @@ public class DistributedPlanner {
         // don't insert the exchange.
         // TODO: make a more sophisticated decision here for partitioned tables and when
         // we have info about tablet locations.
-        if (partitionExprs.isEmpty()) return inputFragment;
+        if (shuffleExprs.isEmpty()) return inputFragment;
       } else if (!enforceHdfsWriterLimit || !hasHdfsScanORUnion
           || (expectedNumInputInstance <= maxHdfsWriters)) {
         // Only consider skipping the addition of an exchange node if
@@ -322,10 +322,10 @@ public class DistributedPlanner {
         // check if it is distributed across all nodes. If so, don't repartition.
         // TODO: If input fragment has ScanNode leave(s), its inputPartitions can be
         // empty and numInputPartitions=1. But the scanned table(s) might be a
-        // partitioned table(s) that superset of partitionExprs. Repartition (shuffling)
+        // partitioned table(s) that superset of shuffleExprs. Repartition (shuffling)
         // might not needed in that case, but skipping repartition can risk producing
         // small files.
-        if (Expr.isSubset(inputPartition.getPartitionExprs(), partitionExprs)) {
+        if (Expr.isSubset(inputPartition.getPartitionExprs(), shuffleExprs)) {
           long numInputPartitions =
               getNumDistinctValues(inputPartition.getPartitionExprs());
           if (numInputPartitions >= inputInstances) { return inputFragment; }
@@ -350,7 +350,7 @@ public class DistributedPlanner {
     exchNode.init(analyzer);
     Preconditions.checkState(exchNode.hasValidStats());
     DataPartition partition;
-    if (partitionExprs.isEmpty()) {
+    if (shuffleExprs.isEmpty()) {
       if (enforceHdfsWriterLimit
           && inputFragment.getDataPartition().getType() == TPartitionType.RANDOM) {
         // This ensures the parallelism of the writers is maintained while maintaining
@@ -364,7 +364,7 @@ public class DistributedPlanner {
       partition = DataPartition.kuduPartitioned(
           KuduUtil.createPartitionExpr((InsertStmt)dmlStmt, ctx_.getRootAnalyzer()));
     } else {
-      partition = DataPartition.hashPartitioned(partitionExprs);
+      partition = DataPartition.hashPartitioned(shuffleExprs);
     }
     PlanFragment fragment =
         new PlanFragment(ctx_.getNextFragmentId(), exchNode, partition);

@@ -78,12 +78,24 @@ public class IcebergDeleteImpl extends IcebergModifyImpl {
       throws AnalysisException {
     deletePartitionKeyExprs_ = getDeletePartitionExprs(analyzer);
     deleteResultExprs_ = getDeleteResultExprs(analyzer);
+    shuffleExprs_ = buildShuffleExprs(analyzer);
     selectList.addAll(ExprUtil.exprsAsSelectList(deletePartitionKeyExprs_));
     selectList.addAll(ExprUtil.exprsAsSelectList(deleteResultExprs_));
+    if (originalTargetTable_.getFormatVersion() >= 3 &&
+        !originalTargetTable_.isPartitioned()) {
+      // For V3 tables, we need to add file name to the select list for shuffle to ensure
+      // that all rows from the same file are shuffled to the same node.
+      selectList.addAll(ExprUtil.exprsAsSelectList(shuffleExprs_));
+    }
   }
 
   @Override
   public List<Expr> getPartitionKeyExprs() { return deletePartitionKeyExprs_; }
+
+  @Override
+  protected List<Expr> getPartitionedShuffleExprs() {
+    return getPartitionKeyExprs();
+  }
 
   @Override
   public void addCastsToAssignmentsInSourceStmt(Analyzer analyzer)

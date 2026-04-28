@@ -42,6 +42,10 @@ abstract class IcebergModifyImpl extends ModifyImpl {
   // All Iceberg modify statements (DELETE, UPDATE) need delete exprs.
   protected List<Expr> deleteResultExprs_ = new ArrayList<>();
   protected List<Expr> deletePartitionKeyExprs_ = new ArrayList<>();
+  protected List<Expr> shuffleExprs_ = new ArrayList<>();
+
+  @Override
+  public List<Expr> getShuffleExprs() { return shuffleExprs_; }
 
   // For every column of the target table that is referenced in the optional
   // 'sort.columns' table property, this list will contain the corresponding result expr
@@ -96,6 +100,7 @@ abstract class IcebergModifyImpl extends ModifyImpl {
     deleteResultExprs_ = Expr.substituteList(deleteResultExprs_, smap, analyzer, true);
     deletePartitionKeyExprs_ = Expr.substituteList(
         deletePartitionKeyExprs_, smap, analyzer, true);
+    shuffleExprs_ = Expr.substituteList(shuffleExprs_, smap, analyzer, true);
   }
 
   public List<Expr> getDeletePartitionExprs(Analyzer analyzer) throws AnalysisException {
@@ -109,7 +114,7 @@ abstract class IcebergModifyImpl extends ModifyImpl {
         "INPUT__FILE__NAME", "FILE__POSITION"));
   }
 
-  private List<Expr> getSlotRefs(Analyzer analyzer, List<String> cols)
+  protected List<Expr> getSlotRefs(Analyzer analyzer, List<String> cols)
       throws AnalysisException {
     List<Expr> ret = new ArrayList<>();
     for (String col : cols) {
@@ -117,6 +122,18 @@ abstract class IcebergModifyImpl extends ModifyImpl {
     }
     return ret;
   }
+
+  protected List<Expr> buildShuffleExprs(Analyzer analyzer) throws AnalysisException {
+    if (!originalTargetTable_.isPartitioned()) {
+      if (originalTargetTable_.getFormatVersion() >= 3) {
+        return getSlotRefs(analyzer, Lists.newArrayList("INPUT__FILE__NAME"));
+      }
+      return Collections.emptyList();
+    }
+    return getPartitionedShuffleExprs();
+  }
+
+  protected abstract List<Expr> getPartitionedShuffleExprs();
 
   abstract String getModifyMode();
 

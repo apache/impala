@@ -119,6 +119,8 @@ abstract class ModifyImpl {
 
   abstract public List<Expr> getPartitionKeyExprs();
 
+  public List<Expr> getShuffleExprs() { return getPartitionKeyExprs(); }
+
   public List<Expr> getSortExprs() {
     return Collections.emptyList();
   }

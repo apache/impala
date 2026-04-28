@@ -69,7 +69,19 @@ public abstract class DmlStatementBase extends StatementBase {
 
   abstract public DataSink createDataSink();
   abstract public void substituteResultExprs(ExprSubstitutionMap smap, Analyzer analyzer);
+  /**
+   * The DML sink writes data into partitions according to the partition key exprs.
+   */
   abstract public List<Expr> getPartitionKeyExprs();
+  /**
+   * The DML sink requires shuffling on the returned shuffle exprs. In most cases, it
+   * is the same as partition key exprs, but in specific cases (e.g. Iceberg V3 tables
+   * with Deletion Vectors) we need to shuffle data differently, or we need to shuffle
+   * data even if the target table is not partitioned.
+   * Another use case is to fan out writers when partition key exprs have low
+   * cardinality. In that case, we can add additional shuffle exprs.
+   */
+  public List<Expr> getShuffleExprs() { return getPartitionKeyExprs(); }
   abstract public List<Expr> getSortExprs();
   abstract public TSortingOrder getSortingOrder();
 
