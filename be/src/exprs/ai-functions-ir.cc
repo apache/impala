@@ -26,6 +26,7 @@
 
 #include "common/compiler-util.h"
 #include "exprs/ai-functions.h"
+#include "util/openssl-util.h"
 
 using namespace impala_udf;
 using boost::algorithm::trim;
@@ -53,6 +54,9 @@ const string AiFunctions::AI_GENERATE_TXT_N_OVERRIDE_FORBIDDEN_ERROR =
     "Invalid override, 'n' must be of integer type and have value 1";
 const string AiFunctions::AI_GENERATE_TXT_COMMON_ERROR_PREFIX =
     "AI Generate Text Error: ";
+const string AiFunctions::AI_GENERATE_TXT_FIPS_UNSUPPORTED_ERROR =
+    AiFunctions::AI_GENERATE_TXT_COMMON_ERROR_PREFIX
+    + "This function is disabled in FIPS mode";
 string AiFunctions::ai_api_key_;
 const char* AiFunctions::OPEN_AI_REQUEST_FIELD_CONTENT_TYPE_HEADER =
     "Content-Type: application/json";
@@ -210,6 +214,11 @@ StringVal AiFunctions::AiGenerateTextHelper(FunctionContext* ctx,
     const StringVal& endpoint, const StringVal& prompt, const StringVal& model,
     const StringVal& auth_credential, const StringVal& platform_params,
     const StringVal& impala_options) {
+  DCHECK(ctx != nullptr);
+  if (UNLIKELY(IsFIPSMode())) {
+    ctx->SetError(AI_GENERATE_TXT_FIPS_UNSUPPORTED_ERROR.c_str());
+    return StringVal::null();
+  }
   string_view endpoint_sv(FLAGS_ai_endpoint);
   // endpoint validation
   if (!fastpath && endpoint.ptr != nullptr && endpoint.len != 0) {
