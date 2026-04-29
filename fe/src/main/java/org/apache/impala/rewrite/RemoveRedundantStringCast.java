@@ -75,8 +75,8 @@ public class RemoveRedundantStringCast implements ExprRewriteRule {
     Expr castExprChild = castExpr.getChild(0).ignoreImplicitCast();
     LiteralExpr literalExpr = (LiteralExpr) expr.getChild(1);
     // Now check for redundancy.
-    Expr castForRedundancyCheck = new CastExpr(new TypeDef(castExpr.getType()),
-        new CastExpr(new TypeDef(castExprChild.getType()), literalExpr));
+    Expr castForRedundancyCheck = CastExpr.createExplicit(new TypeDef(castExpr.getType()),
+        CastExpr.createExplicit(new TypeDef(castExprChild.getType()), literalExpr));
     castForRedundancyCheck.analyze(analyzer);
     LiteralExpr resultOfReverseCast = LiteralExpr.createBounded(castForRedundancyCheck,
         analyzer.getQueryCtx(), StringLiteral.MAX_STRING_LEN);

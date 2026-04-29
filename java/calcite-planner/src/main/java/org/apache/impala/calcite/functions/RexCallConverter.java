@@ -272,7 +272,11 @@ public class RexCallConverter {
       throw new AnalysisException("Invalid type cast " +
           "from " + paramsOperand.getType() + " to " + impalaRetType);
     }
-    return new AnalyzedCastExpr(impalaRetType, paramsOperand);
+
+    // The last parameter is only true if it is an implicit cast. An explicit
+    // cast will have a "kind" of SqlKind.OTHER and the name "explicit_cast".
+    return new AnalyzedCastExpr(impalaRetType, paramsOperand,
+        call.getOperator().getKind().equals(SqlKind.CAST));
   }
 
   private static Expr createDecodeExpr(Function fn, List<Expr> params,

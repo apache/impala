@@ -82,7 +82,7 @@ PLAN-ROOT SINK
 14:HASH JOIN [INNER JOIN]
 |  hash predicates: tpcds_partitioned_parquet_snap.date_dim.d_week_seq = subtract(tpcds_partitioned_parquet_snap.date_dim_1.d_week_seq, 52)
 |  fk/pk conjuncts: assumed fk/pk
-|  runtime filters: RF004[bloom] <- subtract(tpcds_partitioned_parquet_snap.date_dim_1.d_week_seq, 52)
+|  runtime filters: RF004[bloom] <- subtract(tpcds_partitioned_parquet_snap.date_dim_1.d_week_seq, 52), RF005[min_max] <- subtract(tpcds_partitioned_parquet_snap.date_dim_1.d_week_seq, 52)
 |  mem-estimate=750.92MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
 |  tuple-ids=4,5,7,13,14 row-size=304B cardinality=4.77M cost=6858066
 |  in pipelines: 03(GETNEXT), 11(OPEN)
@@ -183,7 +183,7 @@ PLAN-ROOT SINK
 |--04:SCAN HDFS [tpcds_partitioned_parquet_snap.date_dim]
 |     HDFS partitions=1/1 files=1 size=2.17MB
 |     predicates: tpcds_partitioned_parquet_snap.date_dim_0.d_month_seq <= CAST(1210 AS INT), tpcds_partitioned_parquet_snap.date_dim_0.d_month_seq >= CAST(1199 AS INT), tpcds_partitioned_parquet_snap.date_dim_0.d_week_seq IS NOT NULL
-|     runtime filters: RF004[bloom] -> tpcds_partitioned_parquet_snap.date_dim_0.d_week_seq
+|     runtime filters: RF005[min_max] -> tpcds_partitioned_parquet_snap.date_dim_0.d_week_seq, RF004[bloom] -> tpcds_partitioned_parquet_snap.date_dim_0.d_week_seq
 |     stored statistics:
 |       table: rows=73.05K size=2.17MB
 |       columns: all
@@ -212,7 +212,7 @@ PLAN-ROOT SINK
 |--01:SCAN HDFS [tpcds_partitioned_parquet_snap.date_dim]
 |     HDFS partitions=1/1 files=1 size=2.17MB
 |     predicates: tpcds_partitioned_parquet_snap.date_dim.d_date_sk IS NOT NULL, tpcds_partitioned_parquet_snap.date_dim.d_week_seq IS NOT NULL
-|     runtime filters: RF009[min_max] -> tpcds_partitioned_parquet_snap.date_dim.d_week_seq, RF008[bloom] -> tpcds_partitioned_parquet_snap.date_dim.d_week_seq, RF004[bloom] -> tpcds_partitioned_parquet_snap.date_dim.d_week_seq
+|     runtime filters: RF009[min_max] -> tpcds_partitioned_parquet_snap.date_dim.d_week_seq, RF005[min_max] -> tpcds_partitioned_parquet_snap.date_dim.d_week_seq, RF008[bloom] -> tpcds_partitioned_parquet_snap.date_dim.d_week_seq, RF004[bloom] -> tpcds_partitioned_parquet_snap.date_dim.d_week_seq
 |     stored statistics:
 |       table: rows=73.05K size=2.17MB
 |       columns: all
@@ -313,7 +313,7 @@ max-parallelism=10 segment-costs=[68583831, 743] cpu-comparison-result=284 [max(
 |  JOIN BUILD
 |  |  join-table-id=01 plan-id=02 cohort-id=01
 |  |  build expressions: subtract(tpcds_partitioned_parquet_snap.date_dim_1.d_week_seq, 52)
-|  |  runtime filters: RF004[bloom] <- subtract(tpcds_partitioned_parquet_snap.date_dim_1.d_week_seq, 52)
+|  |  runtime filters: RF004[bloom] <- subtract(tpcds_partitioned_parquet_snap.date_dim_1.d_week_seq, 52), RF005[min_max] <- subtract(tpcds_partitioned_parquet_snap.date_dim_1.d_week_seq, 52)
 |  |  mem-estimate=75.09MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0 cost=4770165
 |  |
 |  28:EXCHANGE [HASH(subtract(tpcds_partitioned_parquet_snap.date_dim_1.d_week_seq, 52))]
@@ -515,7 +515,7 @@ max-parallelism=210 segment-costs=[2080384558, 66155687] cpu-comparison-result=1
 |  04:SCAN HDFS [tpcds_partitioned_parquet_snap.date_dim, RANDOM]
 |     HDFS partitions=1/1 files=1 size=2.17MB
 |     predicates: tpcds_partitioned_parquet_snap.date_dim_0.d_month_seq <= CAST(1210 AS INT), tpcds_partitioned_parquet_snap.date_dim_0.d_month_seq >= CAST(1199 AS INT), tpcds_partitioned_parquet_snap.date_dim_0.d_week_seq IS NOT NULL
-|     runtime filters: RF004[bloom] -> tpcds_partitioned_parquet_snap.date_dim_0.d_week_seq
+|     runtime filters: RF005[min_max] -> tpcds_partitioned_parquet_snap.date_dim_0.d_week_seq, RF004[bloom] -> tpcds_partitioned_parquet_snap.date_dim_0.d_week_seq
 |     stored statistics:
 |       table: rows=73.05K size=2.17MB
 |       columns: all
@@ -578,7 +578,7 @@ max-parallelism=1823 segment-costs=[23016709757, 6873521098] cpu-comparison-resu
 |  01:SCAN HDFS [tpcds_partitioned_parquet_snap.date_dim, RANDOM]
 |     HDFS partitions=1/1 files=1 size=2.17MB
 |     predicates: tpcds_partitioned_parquet_snap.date_dim.d_date_sk IS NOT NULL, tpcds_partitioned_parquet_snap.date_dim.d_week_seq IS NOT NULL
-|     runtime filters: RF009[min_max] -> tpcds_partitioned_parquet_snap.date_dim.d_week_seq, RF008[bloom] -> tpcds_partitioned_parquet_snap.date_dim.d_week_seq, RF004[bloom] -> tpcds_partitioned_parquet_snap.date_dim.d_week_seq
+|     runtime filters: RF009[min_max] -> tpcds_partitioned_parquet_snap.date_dim.d_week_seq, RF005[min_max] -> tpcds_partitioned_parquet_snap.date_dim.d_week_seq, RF008[bloom] -> tpcds_partitioned_parquet_snap.date_dim.d_week_seq, RF004[bloom] -> tpcds_partitioned_parquet_snap.date_dim.d_week_seq
 |     stored statistics:
 |       table: rows=73.05K size=2.17MB
 |       columns: all
@@ -679,7 +679,7 @@ max-parallelism=10 segment-costs=[68583831, 743] cpu-comparison-result=284 [max(
 |  JOIN BUILD
 |  |  join-table-id=01 plan-id=02 cohort-id=01
 |  |  build expressions: subtract(tpcds_partitioned_parquet_snap.date_dim_1.d_week_seq, 52)
-|  |  runtime filters: RF004[bloom] <- subtract(tpcds_partitioned_parquet_snap.date_dim_1.d_week_seq, 52)
+|  |  runtime filters: RF004[bloom] <- subtract(tpcds_partitioned_parquet_snap.date_dim_1.d_week_seq, 52), RF005[min_max] <- subtract(tpcds_partitioned_parquet_snap.date_dim_1.d_week_seq, 52)
 |  |  mem-estimate=75.09MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0 cost=4770165
 |  |
 |  28:EXCHANGE [HASH(subtract(tpcds_partitioned_parquet_snap.date_dim_1.d_week_seq, 52))]
@@ -881,7 +881,7 @@ max-parallelism=210 segment-costs=[2080384558, 66155687] cpu-comparison-result=1
 |  04:SCAN HDFS [tpcds_partitioned_parquet_snap.date_dim, RANDOM]
 |     HDFS partitions=1/1 files=1 size=2.17MB
 |     predicates: tpcds_partitioned_parquet_snap.date_dim_0.d_month_seq <= CAST(1210 AS INT), tpcds_partitioned_parquet_snap.date_dim_0.d_month_seq >= CAST(1199 AS INT), tpcds_partitioned_parquet_snap.date_dim_0.d_week_seq IS NOT NULL
-|     runtime filters: RF004[bloom] -> tpcds_partitioned_parquet_snap.date_dim_0.d_week_seq
+|     runtime filters: RF005[min_max] -> tpcds_partitioned_parquet_snap.date_dim_0.d_week_seq, RF004[bloom] -> tpcds_partitioned_parquet_snap.date_dim_0.d_week_seq
 |     stored statistics:
 |       table: rows=73.05K size=2.17MB
 |       columns: all
@@ -944,7 +944,7 @@ max-parallelism=1823 segment-costs=[23016709757, 6873521098] cpu-comparison-resu
 |  01:SCAN HDFS [tpcds_partitioned_parquet_snap.date_dim, RANDOM]
 |     HDFS partitions=1/1 files=1 size=2.17MB
 |     predicates: tpcds_partitioned_parquet_snap.date_dim.d_date_sk IS NOT NULL, tpcds_partitioned_parquet_snap.date_dim.d_week_seq IS NOT NULL
-|     runtime filters: RF009[min_max] -> tpcds_partitioned_parquet_snap.date_dim.d_week_seq, RF008[bloom] -> tpcds_partitioned_parquet_snap.date_dim.d_week_seq, RF004[bloom] -> tpcds_partitioned_parquet_snap.date_dim.d_week_seq
+|     runtime filters: RF009[min_max] -> tpcds_partitioned_parquet_snap.date_dim.d_week_seq, RF005[min_max] -> tpcds_partitioned_parquet_snap.date_dim.d_week_seq, RF008[bloom] -> tpcds_partitioned_parquet_snap.date_dim.d_week_seq, RF004[bloom] -> tpcds_partitioned_parquet_snap.date_dim.d_week_seq
 |     stored statistics:
 |       table: rows=73.05K size=2.17MB
 |       columns: all

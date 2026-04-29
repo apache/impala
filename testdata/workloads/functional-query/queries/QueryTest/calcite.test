@@ -1316,3 +1316,14 @@ int,int,bigint
 ---- RUNTIME_PROFILE
 row_regex: PlannerType: CalcitePlanner
 ====
+---- QUERY
+# IMPALA-14814: Even with a cast, the parquet statitics predicates
+# and the parquet dictionary predicates should be created.
+select count(*) from functional_parquet.alltypessmall where tinyint_col > 1000000000000
+---- RESULTS
+0
+---- RUNTIME_PROFILE
+row_regex: PlannerType: CalcitePlanner
+parquet statistics predicates: CAST(functional_parquet.alltypessmall.tinyint_col AS BIGINT) > CAST(1000000000000 AS BIGINT)
+parquet dictionary predicates: CAST(functional_parquet.alltypessmall.tinyint_col AS BIGINT) > CAST(1000000000000 AS BIGINT)
+====

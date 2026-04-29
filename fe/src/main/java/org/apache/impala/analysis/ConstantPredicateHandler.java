@@ -193,7 +193,7 @@ public class ConstantPredicateHandler {
   // when mapping the source to the target expr we add an implicit cast if needed.
   private static Expr getTargetExpr(SlotRef source, Expr target) {
     Expr expr = source.getType().equals(target.getType()) ?
-        target : new CastExpr(source.getType(), target);
+        target : CastExpr.createImplicit(source.getType(), target);
     return expr;
   }
 

@@ -3902,7 +3902,7 @@ cast_format_val ::=
 
 cast_expr ::=
   KW_CAST LPAREN expr:e KW_AS type_def:targetType cast_format_val:format RPAREN
-  {: RESULT = new CastExpr(targetType, e, format); :}
+  {: RESULT = CastExpr.createExplicit(targetType, e, format); :}
   ;
 
 case_expr ::=

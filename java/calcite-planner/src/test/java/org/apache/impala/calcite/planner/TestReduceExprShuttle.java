@@ -114,8 +114,8 @@ public class TestReduceExprShuttle extends PlannerTestBase {
       reducedAdd.setInt_val((int)3);
 
       Map<String, TColumnValue> map = ImmutableMap.of
-          ("1", reducedCast1,
-          "2", reducedCast2,
+          ("CAST(1 AS SMALLINT)", reducedCast1,
+          "CAST(2 AS SMALLINT)", reducedCast2,
           "add(1, 2)", reducedAdd);
 
       TestReducerTmp testReducer = new TestReducerTmp(map);
@@ -146,8 +146,8 @@ public class TestReduceExprShuttle extends PlannerTestBase {
       reducedAdd.setLong_val(3);
 
       Map<String, TColumnValue> map = ImmutableMap.of
-          ("1", reducedCast1,
-          "2", reducedCast2,
+          ("CAST(1 AS INT)", reducedCast1,
+          "CAST(2 AS INT)", reducedCast2,
           "add(1, 2)", reducedAdd);
 
       TestReducerTmp testReducer = new TestReducerTmp(map);
@@ -327,9 +327,9 @@ public class TestReduceExprShuttle extends PlannerTestBase {
       reducedInt.setInt_val(2);
 
       Map<String, TColumnValue> map = ImmutableMap.of
-          ("'2012-07-01 00:00:00'", reducedTime1,
+          ("CAST('2012-07-01 00:00:00' AS TIMESTAMP)", reducedTime1,
           "add_months(casttotimestamp('2012-07-01 00:00:00'), 2)", reducedTime2,
-          "2", reducedInt);
+          "CAST(2 AS INT)", reducedInt);
 
       TestReducerTmp testReducer = new TestReducerTmp(map);
       List<RexNode> reducedExprs = new ArrayList<>();

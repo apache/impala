@@ -478,7 +478,7 @@ public class NumericLiteral extends LiteralExpr {
       throws SqlCastException {
     Preconditions.checkState(targetType.isNumericType() || targetType.isStringType());
     if (targetType.isStringType()) {
-      return new CastExpr(targetType, this, compatibility);
+      return CastExpr.createImplicit(targetType, this, compatibility);
     }
     if (type_ == targetType) return this;
     try {
@@ -492,7 +492,7 @@ public class NumericLiteral extends LiteralExpr {
         return new NumericLiteral(converted, targetType);
       }
     } catch (SqlCastException e) {
-      return new CastExpr(targetType, this, compatibility);
+      return CastExpr.createImplicit(targetType, this, compatibility);
     }
   }
 

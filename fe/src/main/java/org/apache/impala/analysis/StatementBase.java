@@ -244,7 +244,7 @@ public abstract class StatementBase extends StmtNode {
         ScalarType charType = (ScalarType) exprWithoutImplicitCast.getType();
         Preconditions.checkState(varcharType.getLength() >= charType.getLength());
         Type newCharType = ScalarType.createCharType(varcharType.getLength());
-        Expr newCharExpr = new CastExpr(newCharType, srcExpr);
+        Expr newCharExpr = CastExpr.createImplicit(newCharType, srcExpr);
         return checkTypeCompatibilityHelper(dstTableName, dstCol, newCharExpr,
             analyzer, null);
       }

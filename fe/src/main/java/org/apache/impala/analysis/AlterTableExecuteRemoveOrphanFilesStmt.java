@@ -104,7 +104,7 @@ public class AlterTableExecuteRemoveOrphanFilesStmt extends AlterTableExecuteStm
     Preconditions.checkNotNull(fnParamValue_);
     Expr timestampExpr = fnParamValue_;
     if (timestampExpr.getType().isStringType()) {
-      timestampExpr = new CastExpr(Type.TIMESTAMP, fnParamValue_);
+      timestampExpr = CastExpr.createImplicit(Type.TIMESTAMP, fnParamValue_);
     }
     if (timestampExpr.getType().isTimestamp()) { return timestampExpr; }
     return null;

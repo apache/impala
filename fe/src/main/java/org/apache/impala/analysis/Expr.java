@@ -1193,12 +1193,13 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
 
   /**
    * Recursive method that performs the actual substitution for try/substitute() while
-   * removing implicit casts. Resets the analysis state in all non-SlotRef expressions.
-   * Exprs that have non-child exprs which should be affected by substitutions must
-   * override this method and apply the substitution to such exprs as well.
+   * removing implicit casts. The implicit cast removal is in the CastExpr
+   * class which overrides this method. Resets the analysis state in all non-SlotRef
+   * expressions. Exprs that have non-child exprs which should be affected by
+   * substitutions must override this method and apply the substitution to such exprs as
+   * well.
    */
   protected Expr substituteImpl(ExprSubstitutionMap smap, Analyzer analyzer) {
-    if (isImplicitCast()) return getChild(0).substituteImpl(smap, analyzer);
     if (smap != null) {
       Expr substExpr = smap.get(this);
       if (substExpr != null) return substExpr.clone();
@@ -1627,7 +1628,7 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
    */
   protected Expr uncheckedCastTo(Type targetType, TypeCompatibility compatibility)
       throws AnalysisException {
-    return new CastExpr(targetType, this, compatibility);
+    return CastExpr.createImplicit(targetType, this, compatibility);
   }
 
   protected Expr uncheckedCastTo(Type targetType) throws AnalysisException {

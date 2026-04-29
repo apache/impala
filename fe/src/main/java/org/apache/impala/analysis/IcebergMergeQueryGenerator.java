@@ -143,13 +143,13 @@ public class IcebergMergeQueryGenerator {
     TupleIsNullPredicate sourcePresent =
         new TupleIsNullPredicate(sourceTableRef.getMaterializedTupleIds());
     CastExpr targetPresentAsTinyInt =
-        new CastExpr(new TypeDef(Type.TINYINT), targetPresent);
+        CastExpr.createExplicit(new TypeDef(Type.TINYINT), targetPresent);
     CastExpr sourcePresentAsTinyInt =
-        new CastExpr(new TypeDef(Type.TINYINT), sourcePresent);
+        CastExpr.createExplicit(new TypeDef(Type.TINYINT), sourcePresent);
     ArithmeticExpr sourcePresentShifted =
         new ArithmeticExpr(ArithmeticExpr.Operator.MULTIPLY, sourcePresentAsTinyInt,
             NumericLiteral.create(2));
-    return new CastExpr(new TypeDef(Type.TINYINT),
+    return CastExpr.createExplicit(new TypeDef(Type.TINYINT),
         new ArithmeticExpr(
             ArithmeticExpr.Operator.ADD, targetPresentAsTinyInt, sourcePresentShifted));
   }

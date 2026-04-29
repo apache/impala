@@ -114,7 +114,7 @@ public class TimeTravelSpec extends StmtNode {
           "FOR SYSTEM_TIME AS OF <expression> must be a constant expression: " + toSql());
     }
     if (asOfExpr_.getType().isStringType()) {
-      asOfExpr_ = new CastExpr(Type.TIMESTAMP, asOfExpr_);
+      asOfExpr_ = CastExpr.createImplicit(Type.TIMESTAMP, asOfExpr_);
     }
     if (!asOfExpr_.getType().isTimestamp()) {
       throw new AnalysisException(

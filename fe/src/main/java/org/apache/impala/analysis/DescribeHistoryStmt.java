@@ -135,7 +135,7 @@ public class DescribeHistoryStmt extends StatementBase implements SingleTableStm
       throw new AnalysisException("Unsupported expression: '" + expr.toSql() + "'");
     }
     if (expr.getType().isStringType()) {
-      expr = new CastExpr(Type.TIMESTAMP, expr);
+      expr = CastExpr.createImplicit(Type.TIMESTAMP, expr);
     }
     if (!expr.getType().isTimestamp()) {
       throw new AnalysisException(kind_.toString() +

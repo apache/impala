@@ -111,7 +111,7 @@ public class DateLiteral extends LiteralExpr {
     if (targetType.equals(type_)) {
       return this;
     } else {
-      return new CastExpr(targetType, this, compatibility);
+      return CastExpr.createImplicit(targetType, this, compatibility);
     }
   }
 

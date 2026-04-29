@@ -164,28 +164,28 @@ PLAN-ROOT SINK
 |  |
 |  34:ANALYTIC
 |  |  functions: rank()
-|  |  order by: divide(sum(coalesce(tpcds_partitioned_parquet_snap.store_returns.sr_return_amt, 0)), sum(coalesce(tpcds_partitioned_parquet_snap.store_sales.ss_net_paid, 0))) ASC
+|  |  order by: divide(CAST(sum(coalesce(tpcds_partitioned_parquet_snap.store_returns.sr_return_amt, 0)) AS DECIMAL(15,4)), CAST(sum(coalesce(tpcds_partitioned_parquet_snap.store_sales.ss_net_paid, 0)) AS DECIMAL(15,4))) ASC
 |  |  window: RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
 |  |  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
 |  |  tuple-ids=51,48 row-size=68B cardinality=360.18K cost=360180
 |  |  in pipelines: 33(GETNEXT)
 |  |
 |  33:SORT
-|  |  order by: divide(sum(coalesce(tpcds_partitioned_parquet_snap.store_returns.sr_return_amt, 0)), sum(coalesce(tpcds_partitioned_parquet_snap.store_sales.ss_net_paid, 0))) ASC NULLS LAST
+|  |  order by: divide(CAST(sum(coalesce(tpcds_partitioned_parquet_snap.store_returns.sr_return_amt, 0)) AS DECIMAL(15,4)), CAST(sum(coalesce(tpcds_partitioned_parquet_snap.store_sales.ss_net_paid, 0)) AS DECIMAL(15,4))) ASC NULLS LAST
 |  |  mem-estimate=20.61MB mem-reservation=6.00MB spill-buffer=2.00MB thread-reservation=0
 |  |  tuple-ids=51 row-size=60B cardinality=360.18K cost=1086699
 |  |  in pipelines: 33(GETNEXT), 31(OPEN)
 |  |
 |  32:ANALYTIC
 |  |  functions: rank()
-|  |  order by: divide(sum(coalesce(tpcds_partitioned_parquet_snap.store_returns.sr_return_quantity, 0)), sum(coalesce(tpcds_partitioned_parquet_snap.store_sales.ss_quantity, 0))) ASC
+|  |  order by: divide(CAST(sum(coalesce(tpcds_partitioned_parquet_snap.store_returns.sr_return_quantity, 0)) AS DECIMAL(15,4)), CAST(sum(coalesce(tpcds_partitioned_parquet_snap.store_sales.ss_quantity, 0)) AS DECIMAL(15,4))) ASC
 |  |  window: RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
 |  |  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
 |  |  tuple-ids=49,46 row-size=60B cardinality=360.18K cost=360180
 |  |  in pipelines: 31(GETNEXT)
 |  |
 |  31:SORT
-|  |  order by: divide(sum(coalesce(tpcds_partitioned_parquet_snap.store_returns.sr_return_quantity, 0)), sum(coalesce(tpcds_partitioned_parquet_snap.store_sales.ss_quantity, 0))) ASC NULLS LAST
+|  |  order by: divide(CAST(sum(coalesce(tpcds_partitioned_parquet_snap.store_returns.sr_return_quantity, 0)) AS DECIMAL(15,4)), CAST(sum(coalesce(tpcds_partitioned_parquet_snap.store_sales.ss_quantity, 0)) AS DECIMAL(15,4))) ASC NULLS LAST
 |  |  mem-estimate=17.86MB mem-reservation=6.00MB spill-buffer=2.00MB thread-reservation=0
 |  |  tuple-ids=49 row-size=52B cardinality=360.18K cost=961356
 |  |  in pipelines: 31(GETNEXT), 30(OPEN)
@@ -275,28 +275,28 @@ PLAN-ROOT SINK
 |  |
 |  22:ANALYTIC
 |  |  functions: rank()
-|  |  order by: divide(sum(coalesce(tpcds_partitioned_parquet_snap.catalog_returns.cr_return_amount, 0)), sum(coalesce(tpcds_partitioned_parquet_snap.catalog_sales.cs_net_paid, 0))) ASC
+|  |  order by: divide(CAST(sum(coalesce(tpcds_partitioned_parquet_snap.catalog_returns.cr_return_amount, 0)) AS DECIMAL(15,4)), CAST(sum(coalesce(tpcds_partitioned_parquet_snap.catalog_sales.cs_net_paid, 0)) AS DECIMAL(15,4))) ASC
 |  |  window: RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
 |  |  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
 |  |  tuple-ids=32,29 row-size=68B cardinality=253.55K cost=253553
 |  |  in pipelines: 21(GETNEXT)
 |  |
 |  21:SORT
-|  |  order by: divide(sum(coalesce(tpcds_partitioned_parquet_snap.catalog_returns.cr_return_amount, 0)), sum(coalesce(tpcds_partitioned_parquet_snap.catalog_sales.cs_net_paid, 0))) ASC NULLS LAST
+|  |  order by: divide(CAST(sum(coalesce(tpcds_partitioned_parquet_snap.catalog_returns.cr_return_amount, 0)) AS DECIMAL(15,4)), CAST(sum(coalesce(tpcds_partitioned_parquet_snap.catalog_sales.cs_net_paid, 0)) AS DECIMAL(15,4))) ASC NULLS LAST
 |  |  mem-estimate=14.51MB mem-reservation=6.00MB spill-buffer=2.00MB thread-reservation=0
 |  |  tuple-ids=32 row-size=60B cardinality=253.55K cost=764994
 |  |  in pipelines: 21(GETNEXT), 19(OPEN)
 |  |
 |  20:ANALYTIC
 |  |  functions: rank()
-|  |  order by: divide(sum(coalesce(tpcds_partitioned_parquet_snap.catalog_returns.cr_return_quantity, 0)), sum(coalesce(tpcds_partitioned_parquet_snap.catalog_sales.cs_quantity, 0))) ASC
+|  |  order by: divide(CAST(sum(coalesce(tpcds_partitioned_parquet_snap.catalog_returns.cr_return_quantity, 0)) AS DECIMAL(15,4)), CAST(sum(coalesce(tpcds_partitioned_parquet_snap.catalog_sales.cs_quantity, 0)) AS DECIMAL(15,4))) ASC
 |  |  window: RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
 |  |  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
 |  |  tuple-ids=30,27 row-size=60B cardinality=253.55K cost=253553
 |  |  in pipelines: 19(GETNEXT)
 |  |
 |  19:SORT
-|  |  order by: divide(sum(coalesce(tpcds_partitioned_parquet_snap.catalog_returns.cr_return_quantity, 0)), sum(coalesce(tpcds_partitioned_parquet_snap.catalog_sales.cs_quantity, 0))) ASC NULLS LAST
+|  |  order by: divide(CAST(sum(coalesce(tpcds_partitioned_parquet_snap.catalog_returns.cr_return_quantity, 0)) AS DECIMAL(15,4)), CAST(sum(coalesce(tpcds_partitioned_parquet_snap.catalog_sales.cs_quantity, 0)) AS DECIMAL(15,4))) ASC NULLS LAST
 |  |  mem-estimate=12.57MB mem-reservation=6.00MB spill-buffer=2.00MB thread-reservation=0
 |  |  tuple-ids=30 row-size=52B cardinality=253.55K cost=676758
 |  |  in pipelines: 19(GETNEXT), 18(OPEN)
@@ -375,28 +375,28 @@ PLAN-ROOT SINK
 |
 11:ANALYTIC
 |  functions: rank()
-|  order by: divide(sum(coalesce(tpcds_partitioned_parquet_snap.web_returns.wr_return_amt, 0)), sum(coalesce(tpcds_partitioned_parquet_snap.web_sales.ws_net_paid, 0))) ASC
+|  order by: divide(CAST(sum(coalesce(tpcds_partitioned_parquet_snap.web_returns.wr_return_amt, 0)) AS DECIMAL(15,4)), CAST(sum(coalesce(tpcds_partitioned_parquet_snap.web_sales.ws_net_paid, 0)) AS DECIMAL(15,4))) ASC
 |  window: RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
 |  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
 |  tuple-ids=15,12 row-size=68B cardinality=127.86K cost=127863
 |  in pipelines: 10(GETNEXT)
 |
 10:SORT
-|  order by: divide(sum(coalesce(tpcds_partitioned_parquet_snap.web_returns.wr_return_amt, 0)), sum(coalesce(tpcds_partitioned_parquet_snap.web_sales.ws_net_paid, 0))) ASC NULLS LAST
+|  order by: divide(CAST(sum(coalesce(tpcds_partitioned_parquet_snap.web_returns.wr_return_amt, 0)) AS DECIMAL(15,4)), CAST(sum(coalesce(tpcds_partitioned_parquet_snap.web_sales.ws_net_paid, 0)) AS DECIMAL(15,4))) ASC NULLS LAST
 |  mem-estimate=7.32MB mem-reservation=6.00MB spill-buffer=2.00MB thread-reservation=0
 |  tuple-ids=15 row-size=60B cardinality=127.86K cost=385775
 |  in pipelines: 10(GETNEXT), 08(OPEN)
 |
 09:ANALYTIC
 |  functions: rank()
-|  order by: divide(sum(coalesce(tpcds_partitioned_parquet_snap.web_returns.wr_return_quantity, 0)), sum(coalesce(tpcds_partitioned_parquet_snap.web_sales.ws_quantity, 0))) ASC
+|  order by: divide(CAST(sum(coalesce(tpcds_partitioned_parquet_snap.web_returns.wr_return_quantity, 0)) AS DECIMAL(15,4)), CAST(sum(coalesce(tpcds_partitioned_parquet_snap.web_sales.ws_quantity, 0)) AS DECIMAL(15,4))) ASC
 |  window: RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
 |  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
 |  tuple-ids=13,10 row-size=60B cardinality=127.86K cost=127863
 |  in pipelines: 08(GETNEXT)
 |
 08:SORT
-|  order by: divide(sum(coalesce(tpcds_partitioned_parquet_snap.web_returns.wr_return_quantity, 0)), sum(coalesce(tpcds_partitioned_parquet_snap.web_sales.ws_quantity, 0))) ASC NULLS LAST
+|  order by: divide(CAST(sum(coalesce(tpcds_partitioned_parquet_snap.web_returns.wr_return_quantity, 0)) AS DECIMAL(15,4)), CAST(sum(coalesce(tpcds_partitioned_parquet_snap.web_sales.ws_quantity, 0)) AS DECIMAL(15,4))) ASC NULLS LAST
 |  mem-estimate=6.34MB mem-reservation=6.00MB spill-buffer=2.00MB thread-reservation=0
 |  tuple-ids=13 row-size=52B cardinality=127.86K cost=341279
 |  in pipelines: 08(GETNEXT), 07(OPEN)
@@ -502,28 +502,28 @@ PLAN-ROOT SINK
 |  |
 |  34:ANALYTIC
 |  |  functions: rank()
-|  |  order by: divide(sum(coalesce(tpcds_partitioned_parquet_snap.store_returns.sr_return_amt, 0)), sum(coalesce(tpcds_partitioned_parquet_snap.store_sales.ss_net_paid, 0))) ASC
+|  |  order by: divide(CAST(sum(coalesce(tpcds_partitioned_parquet_snap.store_returns.sr_return_amt, 0)) AS DECIMAL(15,4)), CAST(sum(coalesce(tpcds_partitioned_parquet_snap.store_sales.ss_net_paid, 0)) AS DECIMAL(15,4))) ASC
 |  |  window: RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
 |  |  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
 |  |  tuple-ids=51,48 row-size=68B cardinality=360.18K cost=360180
 |  |  in pipelines: 33(GETNEXT)
 |  |
 |  33:SORT
-|  |  order by: divide(sum(coalesce(tpcds_partitioned_parquet_snap.store_returns.sr_return_amt, 0)), sum(coalesce(tpcds_partitioned_parquet_snap.store_sales.ss_net_paid, 0))) ASC NULLS LAST
+|  |  order by: divide(CAST(sum(coalesce(tpcds_partitioned_parquet_snap.store_returns.sr_return_amt, 0)) AS DECIMAL(15,4)), CAST(sum(coalesce(tpcds_partitioned_parquet_snap.store_sales.ss_net_paid, 0)) AS DECIMAL(15,4))) ASC NULLS LAST
 |  |  mem-estimate=20.61MB mem-reservation=6.00MB spill-buffer=2.00MB thread-reservation=0
 |  |  tuple-ids=51 row-size=60B cardinality=360.18K cost=1086699
 |  |  in pipelines: 33(GETNEXT), 31(OPEN)
 |  |
 |  32:ANALYTIC
 |  |  functions: rank()
-|  |  order by: divide(sum(coalesce(tpcds_partitioned_parquet_snap.store_returns.sr_return_quantity, 0)), sum(coalesce(tpcds_partitioned_parquet_snap.store_sales.ss_quantity, 0))) ASC
+|  |  order by: divide(CAST(sum(coalesce(tpcds_partitioned_parquet_snap.store_returns.sr_return_quantity, 0)) AS DECIMAL(15,4)), CAST(sum(coalesce(tpcds_partitioned_parquet_snap.store_sales.ss_quantity, 0)) AS DECIMAL(15,4))) ASC
 |  |  window: RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
 |  |  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
 |  |  tuple-ids=49,46 row-size=60B cardinality=360.18K cost=360180
 |  |  in pipelines: 31(GETNEXT)
 |  |
 |  55:MERGING-EXCHANGE [UNPARTITIONED]
-|  |  order by: divide(sum(coalesce(tpcds_partitioned_parquet_snap.store_returns.sr_return_quantity, 0)), sum(coalesce(tpcds_partitioned_parquet_snap.store_sales.ss_quantity, 0))) ASC NULLS LAST
+|  |  order by: divide(CAST(sum(coalesce(tpcds_partitioned_parquet_snap.store_returns.sr_return_quantity, 0)) AS DECIMAL(15,4)), CAST(sum(coalesce(tpcds_partitioned_parquet_snap.store_sales.ss_quantity, 0)) AS DECIMAL(15,4))) ASC NULLS LAST
 |  |  mem-estimate=2.33MB mem-reservation=0B thread-reservation=0
 |  |  tuple-ids=49 row-size=52B cardinality=360.18K cost=128548
 |  |  in pipelines: 31(GETNEXT)
@@ -532,7 +532,7 @@ PLAN-ROOT SINK
 |  Per-Instance Resources: mem-estimate=16.00MB mem-reservation=10.75MB thread-reservation=1
 |  max-parallelism=10 segment-costs=[1353418, 961356, 603913] cpu-comparison-result=71 [max(10 (self) vs 71 (sum children))]
 |  31:SORT
-|  |  order by: divide(sum(coalesce(tpcds_partitioned_parquet_snap.store_returns.sr_return_quantity, 0)), sum(coalesce(tpcds_partitioned_parquet_snap.store_sales.ss_quantity, 0))) ASC NULLS LAST
+|  |  order by: divide(CAST(sum(coalesce(tpcds_partitioned_parquet_snap.store_returns.sr_return_quantity, 0)) AS DECIMAL(15,4)), CAST(sum(coalesce(tpcds_partitioned_parquet_snap.store_sales.ss_quantity, 0)) AS DECIMAL(15,4))) ASC NULLS LAST
 |  |  mem-estimate=6.00MB mem-reservation=6.00MB spill-buffer=2.00MB thread-reservation=0
 |  |  tuple-ids=49 row-size=52B cardinality=360.18K cost=961356
 |  |  in pipelines: 31(GETNEXT), 54(OPEN)
@@ -680,28 +680,28 @@ PLAN-ROOT SINK
 |  |
 |  22:ANALYTIC
 |  |  functions: rank()
-|  |  order by: divide(sum(coalesce(tpcds_partitioned_parquet_snap.catalog_returns.cr_return_amount, 0)), sum(coalesce(tpcds_partitioned_parquet_snap.catalog_sales.cs_net_paid, 0))) ASC
+|  |  order by: divide(CAST(sum(coalesce(tpcds_partitioned_parquet_snap.catalog_returns.cr_return_amount, 0)) AS DECIMAL(15,4)), CAST(sum(coalesce(tpcds_partitioned_parquet_snap.catalog_sales.cs_net_paid, 0)) AS DECIMAL(15,4))) ASC
 |  |  window: RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
 |  |  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
 |  |  tuple-ids=32,29 row-size=68B cardinality=253.55K cost=253553
 |  |  in pipelines: 21(GETNEXT)
 |  |
 |  21:SORT
-|  |  order by: divide(sum(coalesce(tpcds_partitioned_parquet_snap.catalog_returns.cr_return_amount, 0)), sum(coalesce(tpcds_partitioned_parquet_snap.catalog_sales.cs_net_paid, 0))) ASC NULLS LAST
+|  |  order by: divide(CAST(sum(coalesce(tpcds_partitioned_parquet_snap.catalog_returns.cr_return_amount, 0)) AS DECIMAL(15,4)), CAST(sum(coalesce(tpcds_partitioned_parquet_snap.catalog_sales.cs_net_paid, 0)) AS DECIMAL(15,4))) ASC NULLS LAST
 |  |  mem-estimate=14.51MB mem-reservation=6.00MB spill-buffer=2.00MB thread-reservation=0
 |  |  tuple-ids=32 row-size=60B cardinality=253.55K cost=764994
 |  |  in pipelines: 21(GETNEXT), 19(OPEN)
 |  |
 |  20:ANALYTIC
 |  |  functions: rank()
-|  |  order by: divide(sum(coalesce(tpcds_partitioned_parquet_snap.catalog_returns.cr_return_quantity, 0)), sum(coalesce(tpcds_partitioned_parquet_snap.catalog_sales.cs_quantity, 0))) ASC
+|  |  order by: divide(CAST(sum(coalesce(tpcds_partitioned_parquet_snap.catalog_returns.cr_return_quantity, 0)) AS DECIMAL(15,4)), CAST(sum(coalesce(tpcds_partitioned_parquet_snap.catalog_sales.cs_quantity, 0)) AS DECIMAL(15,4))) ASC
 |  |  window: RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
 |  |  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
 |  |  tuple-ids=30,27 row-size=60B cardinality=253.55K cost=253553
 |  |  in pipelines: 19(GETNEXT)
 |  |
 |  49:MERGING-EXCHANGE [UNPARTITIONED]
-|  |  order by: divide(sum(coalesce(tpcds_partitioned_parquet_snap.catalog_returns.cr_return_quantity, 0)), sum(coalesce(tpcds_partitioned_parquet_snap.catalog_sales.cs_quantity, 0))) ASC NULLS LAST
+|  |  order by: divide(CAST(sum(coalesce(tpcds_partitioned_parquet_snap.catalog_returns.cr_return_quantity, 0)) AS DECIMAL(15,4)), CAST(sum(coalesce(tpcds_partitioned_parquet_snap.catalog_sales.cs_quantity, 0)) AS DECIMAL(15,4))) ASC NULLS LAST
 |  |  mem-estimate=1.80MB mem-reservation=0B thread-reservation=0
 |  |  tuple-ids=30 row-size=52B cardinality=253.55K cost=90493
 |  |  in pipelines: 19(GETNEXT)
@@ -710,7 +710,7 @@ PLAN-ROOT SINK
 |  Per-Instance Resources: mem-estimate=16.00MB mem-reservation=8.88MB thread-reservation=1
 |  max-parallelism=10 segment-costs=[877292, 676758, 425132] cpu-comparison-result=51 [max(10 (self) vs 51 (sum children))]
 |  19:SORT
-|  |  order by: divide(sum(coalesce(tpcds_partitioned_parquet_snap.catalog_returns.cr_return_quantity, 0)), sum(coalesce(tpcds_partitioned_parquet_snap.catalog_sales.cs_quantity, 0))) ASC NULLS LAST
+|  |  order by: divide(CAST(sum(coalesce(tpcds_partitioned_parquet_snap.catalog_returns.cr_return_quantity, 0)) AS DECIMAL(15,4)), CAST(sum(coalesce(tpcds_partitioned_parquet_snap.catalog_sales.cs_quantity, 0)) AS DECIMAL(15,4))) ASC NULLS LAST
 |  |  mem-estimate=6.00MB mem-reservation=6.00MB spill-buffer=2.00MB thread-reservation=0
 |  |  tuple-ids=30 row-size=52B cardinality=253.55K cost=676758
 |  |  in pipelines: 19(GETNEXT), 48(OPEN)
@@ -847,28 +847,28 @@ PLAN-ROOT SINK
 |
 11:ANALYTIC
 |  functions: rank()
-|  order by: divide(sum(coalesce(tpcds_partitioned_parquet_snap.web_returns.wr_return_amt, 0)), sum(coalesce(tpcds_partitioned_parquet_snap.web_sales.ws_net_paid, 0))) ASC
+|  order by: divide(CAST(sum(coalesce(tpcds_partitioned_parquet_snap.web_returns.wr_return_amt, 0)) AS DECIMAL(15,4)), CAST(sum(coalesce(tpcds_partitioned_parquet_snap.web_sales.ws_net_paid, 0)) AS DECIMAL(15,4))) ASC
 |  window: RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
 |  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
 |  tuple-ids=15,12 row-size=68B cardinality=127.86K cost=127863
 |  in pipelines: 10(GETNEXT)
 |
 10:SORT
-|  order by: divide(sum(coalesce(tpcds_partitioned_parquet_snap.web_returns.wr_return_amt, 0)), sum(coalesce(tpcds_partitioned_parquet_snap.web_sales.ws_net_paid, 0))) ASC NULLS LAST
+|  order by: divide(CAST(sum(coalesce(tpcds_partitioned_parquet_snap.web_returns.wr_return_amt, 0)) AS DECIMAL(15,4)), CAST(sum(coalesce(tpcds_partitioned_parquet_snap.web_sales.ws_net_paid, 0)) AS DECIMAL(15,4))) ASC NULLS LAST
 |  mem-estimate=7.32MB mem-reservation=6.00MB spill-buffer=2.00MB thread-reservation=0
 |  tuple-ids=15 row-size=60B cardinality=127.86K cost=385775
 |  in pipelines: 10(GETNEXT), 08(OPEN)
 |
 09:ANALYTIC
 |  functions: rank()
-|  order by: divide(sum(coalesce(tpcds_partitioned_parquet_snap.web_returns.wr_return_quantity, 0)), sum(coalesce(tpcds_partitioned_parquet_snap.web_sales.ws_quantity, 0))) ASC
+|  order by: divide(CAST(sum(coalesce(tpcds_partitioned_parquet_snap.web_returns.wr_return_quantity, 0)) AS DECIMAL(15,4)), CAST(sum(coalesce(tpcds_partitioned_parquet_snap.web_sales.ws_quantity, 0)) AS DECIMAL(15,4))) ASC
 |  window: RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
 |  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
 |  tuple-ids=13,10 row-size=60B cardinality=127.86K cost=127863
 |  in pipelines: 08(GETNEXT)
 |
 43:MERGING-EXCHANGE [UNPARTITIONED]
-|  order by: divide(sum(coalesce(tpcds_partitioned_parquet_snap.web_returns.wr_return_quantity, 0)), sum(coalesce(tpcds_partitioned_parquet_snap.web_sales.ws_quantity, 0))) ASC NULLS LAST
+|  order by: divide(CAST(sum(coalesce(tpcds_partitioned_parquet_snap.web_returns.wr_return_quantity, 0)) AS DECIMAL(15,4)), CAST(sum(coalesce(tpcds_partitioned_parquet_snap.web_sales.ws_quantity, 0)) AS DECIMAL(15,4))) ASC NULLS LAST
 |  mem-estimate=1.18MB mem-reservation=0B thread-reservation=0
 |  tuple-ids=13 row-size=52B cardinality=127.86K cost=45634
 |  in pipelines: 08(GETNEXT)
@@ -877,7 +877,7 @@ F04:PLAN FRAGMENT [HASH(tpcds_partitioned_parquet_snap.web_sales.ws_item_sk)] ho
 Per-Instance Resources: mem-estimate=16.00MB mem-reservation=7.94MB thread-reservation=1
 max-parallelism=10 segment-costs=[442405, 341279, 214387] cpu-comparison-result=41 [max(10 (self) vs 41 (sum children))]
 08:SORT
-|  order by: divide(sum(coalesce(tpcds_partitioned_parquet_snap.web_returns.wr_return_quantity, 0)), sum(coalesce(tpcds_partitioned_parquet_snap.web_sales.ws_quantity, 0))) ASC NULLS LAST
+|  order by: divide(CAST(sum(coalesce(tpcds_partitioned_parquet_snap.web_returns.wr_return_quantity, 0)) AS DECIMAL(15,4)), CAST(sum(coalesce(tpcds_partitioned_parquet_snap.web_sales.ws_quantity, 0)) AS DECIMAL(15,4))) ASC NULLS LAST
 |  mem-estimate=6.00MB mem-reservation=6.00MB spill-buffer=2.00MB thread-reservation=0
 |  tuple-ids=13 row-size=52B cardinality=127.86K cost=341279
 |  in pipelines: 08(GETNEXT), 42(OPEN)
@@ -1041,28 +1041,28 @@ PLAN-ROOT SINK
 |  |
 |  34:ANALYTIC
 |  |  functions: rank()
-|  |  order by: divide(sum(coalesce(tpcds_partitioned_parquet_snap.store_returns.sr_return_amt, 0)), sum(coalesce(tpcds_partitioned_parquet_snap.store_sales.ss_net_paid, 0))) ASC
+|  |  order by: divide(CAST(sum(coalesce(tpcds_partitioned_parquet_snap.store_returns.sr_return_amt, 0)) AS DECIMAL(15,4)), CAST(sum(coalesce(tpcds_partitioned_parquet_snap.store_sales.ss_net_paid, 0)) AS DECIMAL(15,4))) ASC
 |  |  window: RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
 |  |  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
 |  |  tuple-ids=51,48 row-size=68B cardinality=360.18K cost=360180
 |  |  in pipelines: 33(GETNEXT)
 |  |
 |  33:SORT
-|  |  order by: divide(sum(coalesce(tpcds_partitioned_parquet_snap.store_returns.sr_return_amt, 0)), sum(coalesce(tpcds_partitioned_parquet_snap.store_sales.ss_net_paid, 0))) ASC NULLS LAST
+|  |  order by: divide(CAST(sum(coalesce(tpcds_partitioned_parquet_snap.store_returns.sr_return_amt, 0)) AS DECIMAL(15,4)), CAST(sum(coalesce(tpcds_partitioned_parquet_snap.store_sales.ss_net_paid, 0)) AS DECIMAL(15,4))) ASC NULLS LAST
 |  |  mem-estimate=20.61MB mem-reservation=6.00MB spill-buffer=2.00MB thread-reservation=0
 |  |  tuple-ids=51 row-size=60B cardinality=360.18K cost=1086699
 |  |  in pipelines: 33(GETNEXT), 31(OPEN)
 |  |
 |  32:ANALYTIC
 |  |  functions: rank()
-|  |  order by: divide(sum(coalesce(tpcds_partitioned_parquet_snap.store_returns.sr_return_quantity, 0)), sum(coalesce(tpcds_partitioned_parquet_snap.store_sales.ss_quantity, 0))) ASC
+|  |  order by: divide(CAST(sum(coalesce(tpcds_partitioned_parquet_snap.store_returns.sr_return_quantity, 0)) AS DECIMAL(15,4)), CAST(sum(coalesce(tpcds_partitioned_parquet_snap.store_sales.ss_quantity, 0)) AS DECIMAL(15,4))) ASC
 |  |  window: RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
 |  |  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
 |  |  tuple-ids=49,46 row-size=60B cardinality=360.18K cost=360180
 |  |  in pipelines: 31(GETNEXT)
 |  |
 |  55:MERGING-EXCHANGE [UNPARTITIONED]
-|  |  order by: divide(sum(coalesce(tpcds_partitioned_parquet_snap.store_returns.sr_return_quantity, 0)), sum(coalesce(tpcds_partitioned_parquet_snap.store_sales.ss_quantity, 0))) ASC NULLS LAST
+|  |  order by: divide(CAST(sum(coalesce(tpcds_partitioned_parquet_snap.store_returns.sr_return_quantity, 0)) AS DECIMAL(15,4)), CAST(sum(coalesce(tpcds_partitioned_parquet_snap.store_sales.ss_quantity, 0)) AS DECIMAL(15,4))) ASC NULLS LAST
 |  |  mem-estimate=2.33MB mem-reservation=0B thread-reservation=0
 |  |  tuple-ids=49 row-size=52B cardinality=360.18K cost=128548
 |  |  in pipelines: 31(GETNEXT)
@@ -1071,7 +1071,7 @@ PLAN-ROOT SINK
 |  Per-Instance Resources: mem-estimate=16.00MB mem-reservation=10.75MB thread-reservation=1
 |  max-parallelism=10 segment-costs=[1353418, 961356, 603913] cpu-comparison-result=71 [max(10 (self) vs 71 (sum children))]
 |  31:SORT
-|  |  order by: divide(sum(coalesce(tpcds_partitioned_parquet_snap.store_returns.sr_return_quantity, 0)), sum(coalesce(tpcds_partitioned_parquet_snap.store_sales.ss_quantity, 0))) ASC NULLS LAST
+|  |  order by: divide(CAST(sum(coalesce(tpcds_partitioned_parquet_snap.store_returns.sr_return_quantity, 0)) AS DECIMAL(15,4)), CAST(sum(coalesce(tpcds_partitioned_parquet_snap.store_sales.ss_quantity, 0)) AS DECIMAL(15,4))) ASC NULLS LAST
 |  |  mem-estimate=6.00MB mem-reservation=6.00MB spill-buffer=2.00MB thread-reservation=0
 |  |  tuple-ids=49 row-size=52B cardinality=360.18K cost=961356
 |  |  in pipelines: 31(GETNEXT), 54(OPEN)
@@ -1219,28 +1219,28 @@ PLAN-ROOT SINK
 |  |
 |  22:ANALYTIC
 |  |  functions: rank()
-|  |  order by: divide(sum(coalesce(tpcds_partitioned_parquet_snap.catalog_returns.cr_return_amount, 0)), sum(coalesce(tpcds_partitioned_parquet_snap.catalog_sales.cs_net_paid, 0))) ASC
+|  |  order by: divide(CAST(sum(coalesce(tpcds_partitioned_parquet_snap.catalog_returns.cr_return_amount, 0)) AS DECIMAL(15,4)), CAST(sum(coalesce(tpcds_partitioned_parquet_snap.catalog_sales.cs_net_paid, 0)) AS DECIMAL(15,4))) ASC
 |  |  window: RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
 |  |  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
 |  |  tuple-ids=32,29 row-size=68B cardinality=253.55K cost=253553
 |  |  in pipelines: 21(GETNEXT)
 |  |
 |  21:SORT
-|  |  order by: divide(sum(coalesce(tpcds_partitioned_parquet_snap.catalog_returns.cr_return_amount, 0)), sum(coalesce(tpcds_partitioned_parquet_snap.catalog_sales.cs_net_paid, 0))) ASC NULLS LAST
+|  |  order by: divide(CAST(sum(coalesce(tpcds_partitioned_parquet_snap.catalog_returns.cr_return_amount, 0)) AS DECIMAL(15,4)), CAST(sum(coalesce(tpcds_partitioned_parquet_snap.catalog_sales.cs_net_paid, 0)) AS DECIMAL(15,4))) ASC NULLS LAST
 |  |  mem-estimate=14.51MB mem-reservation=6.00MB spill-buffer=2.00MB thread-reservation=0
 |  |  tuple-ids=32 row-size=60B cardinality=253.55K cost=764994
 |  |  in pipelines: 21(GETNEXT), 19(OPEN)
 |  |
 |  20:ANALYTIC
 |  |  functions: rank()
-|  |  order by: divide(sum(coalesce(tpcds_partitioned_parquet_snap.catalog_returns.cr_return_quantity, 0)), sum(coalesce(tpcds_partitioned_parquet_snap.catalog_sales.cs_quantity, 0))) ASC
+|  |  order by: divide(CAST(sum(coalesce(tpcds_partitioned_parquet_snap.catalog_returns.cr_return_quantity, 0)) AS DECIMAL(15,4)), CAST(sum(coalesce(tpcds_partitioned_parquet_snap.catalog_sales.cs_quantity, 0)) AS DECIMAL(15,4))) ASC
 |  |  window: RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
 |  |  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
 |  |  tuple-ids=30,27 row-size=60B cardinality=253.55K cost=253553
 |  |  in pipelines: 19(GETNEXT)
 |  |
 |  49:MERGING-EXCHANGE [UNPARTITIONED]
-|  |  order by: divide(sum(coalesce(tpcds_partitioned_parquet_snap.catalog_returns.cr_return_quantity, 0)), sum(coalesce(tpcds_partitioned_parquet_snap.catalog_sales.cs_quantity, 0))) ASC NULLS LAST
+|  |  order by: divide(CAST(sum(coalesce(tpcds_partitioned_parquet_snap.catalog_returns.cr_return_quantity, 0)) AS DECIMAL(15,4)), CAST(sum(coalesce(tpcds_partitioned_parquet_snap.catalog_sales.cs_quantity, 0)) AS DECIMAL(15,4))) ASC NULLS LAST
 |  |  mem-estimate=1.80MB mem-reservation=0B thread-reservation=0
 |  |  tuple-ids=30 row-size=52B cardinality=253.55K cost=90493
 |  |  in pipelines: 19(GETNEXT)
@@ -1249,7 +1249,7 @@ PLAN-ROOT SINK
 |  Per-Instance Resources: mem-estimate=16.00MB mem-reservation=8.88MB thread-reservation=1
 |  max-parallelism=10 segment-costs=[877292, 676758, 425132] cpu-comparison-result=51 [max(10 (self) vs 51 (sum children))]
 |  19:SORT
-|  |  order by: divide(sum(coalesce(tpcds_partitioned_parquet_snap.catalog_returns.cr_return_quantity, 0)), sum(coalesce(tpcds_partitioned_parquet_snap.catalog_sales.cs_quantity, 0))) ASC NULLS LAST
+|  |  order by: divide(CAST(sum(coalesce(tpcds_partitioned_parquet_snap.catalog_returns.cr_return_quantity, 0)) AS DECIMAL(15,4)), CAST(sum(coalesce(tpcds_partitioned_parquet_snap.catalog_sales.cs_quantity, 0)) AS DECIMAL(15,4))) ASC NULLS LAST
 |  |  mem-estimate=6.00MB mem-reservation=6.00MB spill-buffer=2.00MB thread-reservation=0
 |  |  tuple-ids=30 row-size=52B cardinality=253.55K cost=676758
 |  |  in pipelines: 19(GETNEXT), 48(OPEN)
@@ -1386,28 +1386,28 @@ PLAN-ROOT SINK
 |
 11:ANALYTIC
 |  functions: rank()
-|  order by: divide(sum(coalesce(tpcds_partitioned_parquet_snap.web_returns.wr_return_amt, 0)), sum(coalesce(tpcds_partitioned_parquet_snap.web_sales.ws_net_paid, 0))) ASC
+|  order by: divide(CAST(sum(coalesce(tpcds_partitioned_parquet_snap.web_returns.wr_return_amt, 0)) AS DECIMAL(15,4)), CAST(sum(coalesce(tpcds_partitioned_parquet_snap.web_sales.ws_net_paid, 0)) AS DECIMAL(15,4))) ASC
 |  window: RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
 |  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
 |  tuple-ids=15,12 row-size=68B cardinality=127.86K cost=127863
 |  in pipelines: 10(GETNEXT)
 |
 10:SORT
-|  order by: divide(sum(coalesce(tpcds_partitioned_parquet_snap.web_returns.wr_return_amt, 0)), sum(coalesce(tpcds_partitioned_parquet_snap.web_sales.ws_net_paid, 0))) ASC NULLS LAST
+|  order by: divide(CAST(sum(coalesce(tpcds_partitioned_parquet_snap.web_returns.wr_return_amt, 0)) AS DECIMAL(15,4)), CAST(sum(coalesce(tpcds_partitioned_parquet_snap.web_sales.ws_net_paid, 0)) AS DECIMAL(15,4))) ASC NULLS LAST
 |  mem-estimate=7.32MB mem-reservation=6.00MB spill-buffer=2.00MB thread-reservation=0
 |  tuple-ids=15 row-size=60B cardinality=127.86K cost=385775
 |  in pipelines: 10(GETNEXT), 08(OPEN)
 |
 09:ANALYTIC
 |  functions: rank()
-|  order by: divide(sum(coalesce(tpcds_partitioned_parquet_snap.web_returns.wr_return_quantity, 0)), sum(coalesce(tpcds_partitioned_parquet_snap.web_sales.ws_quantity, 0))) ASC
+|  order by: divide(CAST(sum(coalesce(tpcds_partitioned_parquet_snap.web_returns.wr_return_quantity, 0)) AS DECIMAL(15,4)), CAST(sum(coalesce(tpcds_partitioned_parquet_snap.web_sales.ws_quantity, 0)) AS DECIMAL(15,4))) ASC
 |  window: RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
 |  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
 |  tuple-ids=13,10 row-size=60B cardinality=127.86K cost=127863
 |  in pipelines: 08(GETNEXT)
 |
 43:MERGING-EXCHANGE [UNPARTITIONED]
-|  order by: divide(sum(coalesce(tpcds_partitioned_parquet_snap.web_returns.wr_return_quantity, 0)), sum(coalesce(tpcds_partitioned_parquet_snap.web_sales.ws_quantity, 0))) ASC NULLS LAST
+|  order by: divide(CAST(sum(coalesce(tpcds_partitioned_parquet_snap.web_returns.wr_return_quantity, 0)) AS DECIMAL(15,4)), CAST(sum(coalesce(tpcds_partitioned_parquet_snap.web_sales.ws_quantity, 0)) AS DECIMAL(15,4))) ASC NULLS LAST
 |  mem-estimate=1.18MB mem-reservation=0B thread-reservation=0
 |  tuple-ids=13 row-size=52B cardinality=127.86K cost=45634
 |  in pipelines: 08(GETNEXT)
@@ -1416,7 +1416,7 @@ F04:PLAN FRAGMENT [HASH(tpcds_partitioned_parquet_snap.web_sales.ws_item_sk)] ho
 Per-Instance Resources: mem-estimate=16.00MB mem-reservation=7.94MB thread-reservation=1
 max-parallelism=10 segment-costs=[442405, 341279, 214387] cpu-comparison-result=41 [max(10 (self) vs 41 (sum children))]
 08:SORT
-|  order by: divide(sum(coalesce(tpcds_partitioned_parquet_snap.web_returns.wr_return_quantity, 0)), sum(coalesce(tpcds_partitioned_parquet_snap.web_sales.ws_quantity, 0))) ASC NULLS LAST
+|  order by: divide(CAST(sum(coalesce(tpcds_partitioned_parquet_snap.web_returns.wr_return_quantity, 0)) AS DECIMAL(15,4)), CAST(sum(coalesce(tpcds_partitioned_parquet_snap.web_sales.ws_quantity, 0)) AS DECIMAL(15,4))) ASC NULLS LAST
 |  mem-estimate=6.00MB mem-reservation=6.00MB spill-buffer=2.00MB thread-reservation=0
 |  tuple-ids=13 row-size=52B cardinality=127.86K cost=341279
 |  in pipelines: 08(GETNEXT), 42(OPEN)

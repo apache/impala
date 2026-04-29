@@ -56,7 +56,7 @@ public class SimplifyCastStringToTimestamp implements ExprRewriteRule {
       if (fce.getChildren().size() == 1 &&
           fce.getChild(0).getType().isStringType()) {
         // Handle Case 1
-        return new CastExpr(new TypeDef(expr.getType()), fce.getChild(0));
+        return CastExpr.createExplicit(new TypeDef(expr.getType()), fce.getChild(0));
       } else if (fce.getChildren().size() == 2 &&
                  fce.getChild(0).getType().isStringType() &&
                  fce.getChild(1).getType().isStringType()) {

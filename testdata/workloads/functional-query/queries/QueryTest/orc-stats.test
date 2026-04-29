@@ -357,10 +357,6 @@ select count(*) from functional_orc_def.decimal_tbl where d1 > 132842.0
 0
 ---- RUNTIME_PROFILE
 aggregation(SUM, RowsRead): 0
----- CALCITE_PLANNER_RUNTIME_PROFILE
-# IMPALA-14814: Calcite planner is casting d1 to a decimal to match d1, but this
-# shouldn't be necessary
-aggregation(SUM, RowsRead): 5
 ====
 ---- QUERY
 # Test on predicate x < min_val for decimal(20,10). No rows should be read by the ORC
@@ -402,10 +398,6 @@ select count(*) from functional_orc_def.decimal_tbl where d4 > 0.123456789
 0
 ---- RUNTIME_PROFILE
 aggregation(SUM, RowsRead): 0
----- CALCITE_PLANNER_RUNTIME_PROFILE
-# IMPALA-14814: Calcite planner is casting d4 to a decimal to match the constant, but this
-# shouldn't be necessary
-aggregation(SUM, RowsRead): 5
 ====
 ---- QUERY
 select count(*) from functional_orc_def.decimal_tbl where d4 < 0.123456789
@@ -413,10 +405,6 @@ select count(*) from functional_orc_def.decimal_tbl where d4 < 0.123456789
 0
 ---- RUNTIME_PROFILE
 aggregation(SUM, RowsRead): 0
----- CALCITE_PLANNER_RUNTIME_PROFILE
-# IMPALA-14814: Calcite planner is casting d4 to a decimal to match the constant, but this
-# shouldn't be necessary
-aggregation(SUM, RowsRead): 5
 ====
 ---- QUERY
 select count(*) from functional_orc_def.decimal_tbl where d4 >= 0.12345678
@@ -431,10 +419,6 @@ select count(*) from functional_orc_def.decimal_tbl where d4 >= 0.12345679
 0
 ---- RUNTIME_PROFILE
 aggregation(SUM, RowsRead): 0
----- CALCITE_PLANNER_RUNTIME_PROFILE
-# IMPALA-14814: Calcite planner is casting d4 to a decimal to match the constant, but this
-# shouldn't be necessary
-aggregation(SUM, RowsRead): 5
 ====
 ---- QUERY
 # Test with inverted predicate
@@ -500,13 +484,6 @@ select count(*) from functional_orc_def.alltypessmall where tinyint_col > 100000
 0
 ---- RUNTIME_PROFILE
 aggregation(SUM, RowsRead): 0
----- CALCITE_PLANNER_RUNTIME_PROFILE
-# IMPALA-14814: Needs to be investigated. An implicit cast is being placed on tinyint_col
-# and there is code that does not unwrap the SlotRef because of this cast. Simply getting
-# rid of that code may cause other failures, that needs to be investigated. Another way
-# to fix this is by putting in a rule that simplifies this filter into a false expression
-# since there is no way that this can return any rows.
-aggregation(SUM, RowsRead): 100
 ====
 ---- QUERY
 # Predicates with explicit casts are not supported when evaluating orc statistics.

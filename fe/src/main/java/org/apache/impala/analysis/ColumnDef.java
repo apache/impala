@@ -293,7 +293,7 @@ public class ColumnDef {
       // Special case string literals in timestamp columns for convenience.
       if (defaultValLiteral.getType().isStringType() && type_.isTimestamp()) {
         // Add an explicit cast to TIMESTAMP
-        Expr e = new CastExpr(new TypeDef(Type.TIMESTAMP), defaultValLiteral);
+        Expr e = CastExpr.createExplicit(new TypeDef(Type.TIMESTAMP), defaultValLiteral);
         e.analyze(analyzer);
         defaultValLiteral = LiteralExpr.create(e, analyzer.getQueryCtx());
         Preconditions.checkNotNull(defaultValLiteral);

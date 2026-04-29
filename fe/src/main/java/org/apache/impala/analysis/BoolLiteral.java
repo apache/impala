@@ -95,7 +95,7 @@ public class BoolLiteral extends LiteralExpr {
     if (targetType.equals(this.type_)) {
       return this;
     } else {
-      return new CastExpr(targetType, this, compatibility);
+      return CastExpr.createImplicit(targetType, this, compatibility);
     }
   }
 

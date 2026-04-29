@@ -77,7 +77,7 @@ public class AlterTableExecuteExpireSnapshotsStmt extends AlterTableExecuteStmt 
           USAGE + " must be a constant expression: " + fnCallExpr_.toSql());
     }
     if (fnParamValue_.getType().isStringType()) {
-      fnParamValue_ = new CastExpr(Type.TIMESTAMP, fnParamValue_);
+      fnParamValue_ = CastExpr.createImplicit(Type.TIMESTAMP, fnParamValue_);
     }
     if (!fnParamValue_.getType().isTimestamp()) {
       throw new AnalysisException(USAGE + " must be a timestamp type but is '"

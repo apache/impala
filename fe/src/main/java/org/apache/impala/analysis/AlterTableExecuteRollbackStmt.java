@@ -117,7 +117,7 @@ public class AlterTableExecuteRollbackStmt extends AlterTableExecuteStmt {
   private Expr getParamConvertibleToTimestamp() {
     Expr timestampExpr = fnParamValue_;
     if (timestampExpr.getType().isStringType()) {
-      timestampExpr = new CastExpr(Type.TIMESTAMP, fnParamValue_);
+      timestampExpr = CastExpr.createImplicit(Type.TIMESTAMP, fnParamValue_);
     }
     if (timestampExpr.getType().isTimestamp()) {
       return timestampExpr;

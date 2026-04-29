@@ -221,7 +221,7 @@ public class StringLiteral extends LiteralExpr {
       // Let the BE do the cast
       // - it is in Boost format in case target type is TIMESTAMP
       // - CCTZ is used for conversion in case target type is DATE.
-      return new CastExpr(targetType, this, compatibility);
+      return CastExpr.createImplicit(targetType, this, compatibility);
     }
     return this;
   }

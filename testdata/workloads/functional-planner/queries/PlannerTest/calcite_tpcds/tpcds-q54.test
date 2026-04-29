@@ -62,11 +62,11 @@ F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Instance Resources: mem-estimate=1.96GB mem-reservation=151.94MB thread-reservation=1 runtime-filters-memory=38.00MB
 |  max-parallelism=1 segment-costs=[9391719349, 17041, 0, 17041, 0, 10140001904, 10725699, 8231261, 300]
 PLAN-ROOT SINK
-|  output exprs: divide(sum(tpcds_partitioned_parquet_snap.store_sales.ss_ext_sales_price), 50), count(), multiply(CAST(divide(sum(tpcds_partitioned_parquet_snap.store_sales.ss_ext_sales_price), 50) AS BIGINT), CAST(50 AS BIGINT))
+|  output exprs: CAST(divide(sum(tpcds_partitioned_parquet_snap.store_sales.ss_ext_sales_price), 50) AS INT), count(), multiply(CAST(CAST(divide(sum(tpcds_partitioned_parquet_snap.store_sales.ss_ext_sales_price), 50) AS INT) AS BIGINT), CAST(50 AS BIGINT))
 |  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0 cost=300
 |
 28:TOP-N [LIMIT=100]
-|  order by: divide(sum(tpcds_partitioned_parquet_snap.store_sales.ss_ext_sales_price), 50) ASC NULLS LAST, count() ASC NULLS LAST
+|  order by: CAST(divide(sum(tpcds_partitioned_parquet_snap.store_sales.ss_ext_sales_price), 50) AS INT) ASC NULLS LAST, count() ASC NULLS LAST
 |  mem-estimate=1.17KB mem-reservation=0B thread-reservation=0
 |  tuple-ids=28 row-size=12B cardinality=100 cost=8231261
 |  in pipelines: 28(GETNEXT), 27(OPEN)
@@ -343,33 +343,33 @@ F19:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Instance Resources: mem-estimate=4.02MB mem-reservation=4.00MB thread-reservation=1
 |  max-parallelism=1 segment-costs=[327] cpu-comparison-result=151 [max(1 (self) vs 151 (sum children))]
 PLAN-ROOT SINK
-|  output exprs: divide(sum(tpcds_partitioned_parquet_snap.store_sales.ss_ext_sales_price), 50), count(), multiply(CAST(divide(sum(tpcds_partitioned_parquet_snap.store_sales.ss_ext_sales_price), 50) AS BIGINT), CAST(50 AS BIGINT))
+|  output exprs: CAST(divide(sum(tpcds_partitioned_parquet_snap.store_sales.ss_ext_sales_price), 50) AS INT), count(), multiply(CAST(CAST(divide(sum(tpcds_partitioned_parquet_snap.store_sales.ss_ext_sales_price), 50) AS INT) AS BIGINT), CAST(50 AS BIGINT))
 |  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0 cost=300
 |
 50:MERGING-EXCHANGE [UNPARTITIONED]
-|  order by: divide(sum(tpcds_partitioned_parquet_snap.store_sales.ss_ext_sales_price), 50) ASC NULLS LAST, count() ASC NULLS LAST
+|  order by: CAST(divide(sum(tpcds_partitioned_parquet_snap.store_sales.ss_ext_sales_price), 50) AS INT) ASC NULLS LAST, count() ASC NULLS LAST
 |  limit: 100
 |  mem-estimate=16.00KB mem-reservation=0B thread-reservation=0
 |  tuple-ids=28 row-size=12B cardinality=100 cost=27
 |  in pipelines: 28(GETNEXT)
 |
-F18:PLAN FRAGMENT [HASH(divide(sum(tpcds_partitioned_parquet_snap.store_sales.ss_ext_sales_price), 50))] hosts=10 instances=10 (adjusted from 120)
+F18:PLAN FRAGMENT [HASH(CAST(divide(sum(tpcds_partitioned_parquet_snap.store_sales.ss_ext_sales_price), 50) AS INT))] hosts=10 instances=10 (adjusted from 120)
 Per-Instance Resources: mem-estimate=20.31MB mem-reservation=2.88MB thread-reservation=1
 max-parallelism=10 segment-costs=[13651310, 8231261, 62] cpu-comparison-result=151 [max(10 (self) vs 151 (sum children))]
 28:TOP-N [LIMIT=100]
-|  order by: divide(sum(tpcds_partitioned_parquet_snap.store_sales.ss_ext_sales_price), 50) ASC NULLS LAST, count() ASC NULLS LAST
+|  order by: CAST(divide(sum(tpcds_partitioned_parquet_snap.store_sales.ss_ext_sales_price), 50) AS INT) ASC NULLS LAST, count() ASC NULLS LAST
 |  mem-estimate=1.17KB mem-reservation=0B thread-reservation=0
 |  tuple-ids=28 row-size=12B cardinality=100 cost=8231261
 |  in pipelines: 28(GETNEXT), 49(OPEN)
 |
 49:AGGREGATE [FINALIZE]
 |  output: count:merge()
-|  group by: divide(sum(tpcds_partitioned_parquet_snap.store_sales.ss_ext_sales_price), 50)
+|  group by: CAST(divide(sum(tpcds_partitioned_parquet_snap.store_sales.ss_ext_sales_price), 50) AS INT)
 |  mem-estimate=10.00MB mem-reservation=2.88MB spill-buffer=128.00KB thread-reservation=0
 |  tuple-ids=27 row-size=12B cardinality=748.20K cost=9410221
 |  in pipelines: 49(GETNEXT), 47(OPEN)
 |
-48:EXCHANGE [HASH(divide(sum(tpcds_partitioned_parquet_snap.store_sales.ss_ext_sales_price), 50))]
+48:EXCHANGE [HASH(CAST(divide(sum(tpcds_partitioned_parquet_snap.store_sales.ss_ext_sales_price), 50) AS INT))]
 |  mem-estimate=10.31MB mem-reservation=0B thread-reservation=0
 |  tuple-ids=27 row-size=12B cardinality=25.50M cost=4241089
 |  in pipelines: 47(GETNEXT)
@@ -881,33 +881,33 @@ F19:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Instance Resources: mem-estimate=4.02MB mem-reservation=4.00MB thread-reservation=1
 |  max-parallelism=1 segment-costs=[327] cpu-comparison-result=151 [max(1 (self) vs 151 (sum children))]
 PLAN-ROOT SINK
-|  output exprs: divide(sum(tpcds_partitioned_parquet_snap.store_sales.ss_ext_sales_price), 50), count(), multiply(CAST(divide(sum(tpcds_partitioned_parquet_snap.store_sales.ss_ext_sales_price), 50) AS BIGINT), CAST(50 AS BIGINT))
+|  output exprs: CAST(divide(sum(tpcds_partitioned_parquet_snap.store_sales.ss_ext_sales_price), 50) AS INT), count(), multiply(CAST(CAST(divide(sum(tpcds_partitioned_parquet_snap.store_sales.ss_ext_sales_price), 50) AS INT) AS BIGINT), CAST(50 AS BIGINT))
 |  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0 cost=300
 |
 50:MERGING-EXCHANGE [UNPARTITIONED]
-|  order by: divide(sum(tpcds_partitioned_parquet_snap.store_sales.ss_ext_sales_price), 50) ASC NULLS LAST, count() ASC NULLS LAST
+|  order by: CAST(divide(sum(tpcds_partitioned_parquet_snap.store_sales.ss_ext_sales_price), 50) AS INT) ASC NULLS LAST, count() ASC NULLS LAST
 |  limit: 100
 |  mem-estimate=16.00KB mem-reservation=0B thread-reservation=0
 |  tuple-ids=28 row-size=12B cardinality=100 cost=27
 |  in pipelines: 28(GETNEXT)
 |
-F18:PLAN FRAGMENT [HASH(divide(sum(tpcds_partitioned_parquet_snap.store_sales.ss_ext_sales_price), 50))] hosts=10 instances=10 (adjusted from 120)
+F18:PLAN FRAGMENT [HASH(CAST(divide(sum(tpcds_partitioned_parquet_snap.store_sales.ss_ext_sales_price), 50) AS INT))] hosts=10 instances=10 (adjusted from 120)
 Per-Instance Resources: mem-estimate=20.31MB mem-reservation=2.88MB thread-reservation=1
 max-parallelism=10 segment-costs=[13651310, 8231261, 62] cpu-comparison-result=151 [max(10 (self) vs 151 (sum children))]
 28:TOP-N [LIMIT=100]
-|  order by: divide(sum(tpcds_partitioned_parquet_snap.store_sales.ss_ext_sales_price), 50) ASC NULLS LAST, count() ASC NULLS LAST
+|  order by: CAST(divide(sum(tpcds_partitioned_parquet_snap.store_sales.ss_ext_sales_price), 50) AS INT) ASC NULLS LAST, count() ASC NULLS LAST
 |  mem-estimate=1.17KB mem-reservation=0B thread-reservation=0
 |  tuple-ids=28 row-size=12B cardinality=100 cost=8231261
 |  in pipelines: 28(GETNEXT), 49(OPEN)
 |
 49:AGGREGATE [FINALIZE]
 |  output: count:merge()
-|  group by: divide(sum(tpcds_partitioned_parquet_snap.store_sales.ss_ext_sales_price), 50)
+|  group by: CAST(divide(sum(tpcds_partitioned_parquet_snap.store_sales.ss_ext_sales_price), 50) AS INT)
 |  mem-estimate=10.00MB mem-reservation=2.88MB spill-buffer=128.00KB thread-reservation=0
 |  tuple-ids=27 row-size=12B cardinality=748.20K cost=9410221
 |  in pipelines: 49(GETNEXT), 47(OPEN)
 |
-48:EXCHANGE [HASH(divide(sum(tpcds_partitioned_parquet_snap.store_sales.ss_ext_sales_price), 50))]
+48:EXCHANGE [HASH(CAST(divide(sum(tpcds_partitioned_parquet_snap.store_sales.ss_ext_sales_price), 50) AS INT))]
 |  mem-estimate=10.31MB mem-reservation=0B thread-reservation=0
 |  tuple-ids=27 row-size=12B cardinality=25.50M cost=4241089
 |  in pipelines: 47(GETNEXT)

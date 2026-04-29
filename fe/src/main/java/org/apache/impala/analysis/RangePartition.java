@@ -211,7 +211,7 @@ public class RangePartition extends StmtNode {
     // Special case string literals in timestamp columns for convenience.
     if (literal.getType().isStringType() && colType.isTimestamp()) {
       // Add an explicit cast to TIMESTAMP
-      Expr e = new CastExpr(new TypeDef(Type.TIMESTAMP), literal);
+      Expr e = CastExpr.createExplicit(new TypeDef(Type.TIMESTAMP), literal);
       e.analyze(analyzer);
       literal = LiteralExpr.createBounded(e, analyzer.getQueryCtx(),
         StringLiteral.MAX_STRING_LEN);
