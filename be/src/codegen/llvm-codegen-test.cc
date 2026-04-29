@@ -41,6 +41,8 @@ using std::unique_ptr;
 
 namespace impala {
 
+typedef void (*TestLoopFn)(int, int64_t*);
+
 class CodegenFnPtrTest : public testing:: Test {
  protected:
    typedef int (*FnPtr)(int);
@@ -234,7 +236,6 @@ llvm::Function* CodegenInnerLoop(
 TEST_F(LlvmCodeGenTest, ReplaceFnCall) {
   const string loop_call_name("_Z21DefaultImplementationPl");
   const string loop_name("_Z8TestLoopiPl");
-  typedef void (*TestLoopFn)(int, int64_t*);
 
   string module_file;
   PathBuilder::GetFullPath("llvm-ir/test-loop.bc", &module_file);
@@ -306,6 +307,57 @@ TEST_F(LlvmCodeGenTest, ReplaceFnCall) {
   TestLoopFn new_loop_fn2 = new_loop2.load();
   new_loop_fn2(5, &counter);
   EXPECT_EQ(0, counter);
+  codegen->Close();
+}
+
+// This test loads a precompiled IR file (compiled from testdata/llvm/test-loop.cc).
+// The test contains two functions, an outer loop function and an inner loop function.
+// The outer loop calls the inner loop function.
+// The test will
+//   1. Create a LlvmCodegen object from the precompiled file.
+//   2. Replaces the inner loop with with an implementation that increments the counter
+//      each time it is called.
+//   3. Remove the inner loop call from the outer loop.
+//   4. Compile and run all loops and make sure the inner loop is not called.
+TEST_F(LlvmCodeGenTest, RemoveFnCall) {
+  const string loop_call_name("_Z21DefaultImplementationPl");
+  const string loop_name("_Z8TestLoopiPl");
+
+  string module_file;
+  PathBuilder::GetFullPath("llvm-ir/test-loop.bc", &module_file);
+
+  // Part 1: Load the module and make sure everything is loaded correctly.
+  scoped_ptr<LlvmCodeGen> codegen;
+  ASSERT_OK(CreateFromFile(module_file.c_str(), &codegen));
+  EXPECT_TRUE(codegen.get() != nullptr);
+
+  llvm::Function* loop = codegen->GetFunction(loop_name, false);
+  EXPECT_TRUE(loop != nullptr);
+  EXPECT_EQ(loop->arg_size(), 2);
+
+  // Part 2: Replace the default inner loop implementation that does not modify counter
+  // with a function that increments the counter each time it is called.
+  llvm::Function* jitted_loop_call = CodegenInnerLoop(codegen.get(), 1);
+  llvm::Function* jitted_loop = codegen->CloneFunction(loop);
+  int num_replaced =
+      codegen->ReplaceCallSites(jitted_loop, jitted_loop_call, loop_call_name);
+  EXPECT_EQ(1, num_replaced);
+  EXPECT_TRUE(VerifyFunction(codegen.get(), jitted_loop));
+
+  // Part 3: Remove the inner loop call from the outer loop.
+  EXPECT_EQ(1, codegen->RemoveCallSites(jitted_loop, "JittedInnerLoop"));
+
+  // Part 4: compile all the function and run it.
+  CodegenFnPtr<TestLoopFn> new_loop;
+  AddFunctionToJit(codegen.get(), jitted_loop, &new_loop);
+  ASSERT_OK(LlvmCodeGenTest::FinalizeModule(codegen.get()));
+  ASSERT_TRUE(new_loop.load() != nullptr);
+
+  int64_t counter = 0;
+  TestLoopFn new_loop_fn = new_loop.load();
+  new_loop_fn(5, &counter);
+  EXPECT_EQ(0, counter);
+
   codegen->Close();
 }
 

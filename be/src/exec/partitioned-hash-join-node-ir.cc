@@ -49,6 +49,8 @@ bool IR_ALWAYS_INLINE PartitionedHashJoinNode::ProcessProbeRowInnerJoin(
     TupleRow* matched_build_row = hash_tbl_iterator_.GetRow();
     DCHECK(matched_build_row != NULL);
 
+    ClearExprResultsPool(num_conjuncts, num_other_join_conjuncts);
+
     // Create an output row with all probe/build tuples and evaluate the
     // non-equi-join conjuncts.
     CreateOutputRow(out_row, current_probe_row_, matched_build_row);
@@ -81,6 +83,8 @@ bool IR_ALWAYS_INLINE PartitionedHashJoinNode::ProcessProbeRowRightSemiJoins(
     DCHECK(matched_build_row != NULL);
 
     if (hash_tbl_iterator_.IsMatched()) continue;
+    ClearExprResultsPool(num_conjuncts, num_other_join_conjuncts);
+
     // Evaluate the non-equi-join conjuncts against a temp row assembled from all
     // build and probe tuples.
     if (num_other_join_conjuncts > 0) {
@@ -120,6 +124,9 @@ bool IR_ALWAYS_INLINE PartitionedHashJoinNode::ProcessProbeRowLeftSemiJoins(
   for (; !hash_tbl_iterator_.AtEnd(); hash_tbl_iterator_.NextDuplicate()) {
     TupleRow* matched_build_row = hash_tbl_iterator_.GetRow();
     DCHECK(matched_build_row != NULL);
+
+    ClearExprResultsPool(num_conjuncts, num_other_join_conjuncts);
+
     // Evaluate the non-equi-join conjuncts against a temp row assembled from all
     // build and probe tuples.
     if (num_other_join_conjuncts > 0) {
@@ -184,6 +191,9 @@ bool IR_ALWAYS_INLINE PartitionedHashJoinNode::ProcessProbeRowOuterJoins(
   for (; !hash_tbl_iterator_.AtEnd(); hash_tbl_iterator_.NextDuplicate()) {
     TupleRow* matched_build_row = hash_tbl_iterator_.GetRow();
     DCHECK(matched_build_row != NULL);
+
+    ClearExprResultsPool(num_conjuncts, num_other_join_conjuncts);
+
     // Create an output row with all probe/build tuples and evaluate the
     // non-equi-join conjuncts.
     CreateOutputRow(out_row, current_probe_row_, matched_build_row);

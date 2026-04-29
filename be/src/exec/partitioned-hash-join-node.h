@@ -546,6 +546,11 @@ class PartitionedHashJoinNode : public BlockingJoinNode {
 
   std::string NodeDebugString() const;
 
+  /// Checks if the expression results memory pool has exceeded the memory limit defined
+  /// by 'expr_results_mem_limit_'. If it has, clears the mem pool.
+  inline void ClearExprResultsPool(const int num_conjuncts,
+      const int num_other_join_conjuncts);
+
   RuntimeState* runtime_state_;
 
   /// Our equi-join predicates "<lhs> = <rhs>" are separated into
@@ -561,6 +566,10 @@ class PartitionedHashJoinNode : public BlockingJoinNode {
   /// PartitionedHashJoinPlanNode that was used to create this object. Its used to create
   /// an instance of the HashTableCtx in Prepare(). Not Owned.
   const HashTableConfig& hash_table_config_;
+
+  /// Memory limit for the conjunct expression results pool used during building probe
+  /// batches.
+  const int64_t expr_results_mem_limit_;
 
   /// Used for hash-related functionality, such as evaluating rows and calculating hashes.
   /// This owns the evaluators for the build and probe expressions used during insertion

@@ -410,6 +410,10 @@ class LlvmCodeGen {
   int ReplaceCallSitesWithValue(llvm::Function* caller, llvm::Value* replacement,
       const std::string& target_name);
 
+  /// Remove calls to functions with a name of 'target_name' from caller. The return value
+  /// is the number of calls removed.
+  int RemoveCallSites(llvm::Function* caller, const std::string& target_name);
+
   /// This function replaces calls to FunctionContextImpl::GetConstFnAttr() with constants
   /// derived from 'return_type', 'arg_types' and the runtime state 'state_'. Please note
   /// that this function only replaces call instructions inside 'fn' so to replace the
