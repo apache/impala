@@ -276,7 +276,7 @@ public class MergeInsertTest {
     FeTable table = Mockito.mock(IcebergTable.class);
     TableName tableName = Mockito.mock(TableName.class);
     TableRef tableRef = Mockito.mock(TableRef.class);
-    Mockito.when(table.getColumns()).thenReturn(columns);
+    Mockito.when(table.getColumnsInHiveOrder()).thenReturn(columns);
     Mockito.when(table.getTableName()).thenReturn(tableName);
     Mockito.when(mergeStmt.getTargetTable()).thenReturn(table);
     Mockito.when(mergeStmt.getTargetTableRef()).thenReturn(tableRef);

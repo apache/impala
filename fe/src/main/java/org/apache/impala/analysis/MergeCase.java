@@ -21,6 +21,7 @@ import com.google.common.collect.Lists;
 import java.util.Collections;
 import java.util.List;
 import java.util.StringJoiner;
+import java.util.stream.Collectors;
 import org.apache.impala.catalog.Column;
 import org.apache.impala.catalog.Type;
 import org.apache.impala.common.AnalysisException;
@@ -70,7 +71,7 @@ public abstract class MergeCase extends StatementBase {
 
   public void setParent(MergeStmt parent) {
     targetTableName_ = parent.getTargetTable().getTableName();
-    targetTableColumns_ = parent.getTargetTable().getColumns();
+    targetTableColumns_ = parent.getTargetTable().getColumnsInHiveOrder();
     targetTableRef_ = parent.getTargetTableRef();
     sourceTableRef_ = parent.getSourceTableRef();
   }
@@ -80,7 +81,8 @@ public abstract class MergeCase extends StatementBase {
       InlineViewRef source = (InlineViewRef) sourceTableRef_;
       return source.getColLabels();
     } else {
-      return sourceTableRef_.getTable().getColumnNames();
+      return sourceTableRef_.getTable().getColumnsInHiveOrder().stream()
+          .map(Column::getName).collect(Collectors.toList());
     }
   }
 

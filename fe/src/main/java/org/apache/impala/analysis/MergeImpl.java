@@ -65,6 +65,15 @@ public interface MergeImpl {
   List<Expr> getPartitionKeyExprs();
 
   /**
+   * Returns the expressions used to shuffle (hash-partition) rows across fragment
+   * instances before they reach the sink. By default delegates to getPartitionKeyExprs(),
+   * but implementations may override this to use a different set of expressions for
+   * routing (e.g. routing by input__file__name on unpartitioned V3 tables).
+   * @return list of shuffle expressions
+   */
+  default List<Expr> getShuffleExprs() { return getPartitionKeyExprs(); }
+
+  /**
    * Returns sort expressions originated from SORT BY property of the target table.
    * @return list of sort expressions
    */

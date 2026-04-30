@@ -25,6 +25,8 @@ import java.util.stream.Collectors;
 import org.apache.impala.catalog.FeIcebergTable;
 import org.apache.impala.catalog.Type;
 import org.apache.impala.catalog.VirtualColumn;
+import org.apache.impala.common.AnalysisException;
+import org.apache.impala.util.IcebergUtil;
 
 /**
  * Generates the SELECT statement driving a MERGE operation on an Iceberg table.
@@ -37,12 +39,20 @@ import org.apache.impala.catalog.VirtualColumn;
  *   target.input__file__name,
  *   target.file__position,
  *   [target.iceberg__data__sequence__number,]   -- only when equality delete files exist
+ *   [COALESCE(_file_row_id,                      -- only for V3 tables with UPDATE cases
+ *             ICEBERG__FIRST__ROW__ID + FILE__POSITION),]
  *   [target.__partition__spec__id,              -- only for partitioned tables
  *    target.iceberg__partition__serialized,]
  *   source.*
  * FROM target
  * [FULL OUTER | INNER] JOIN source ON &lt;on-clause&gt;
  * </pre>
+ *
+ * <p>For Iceberg V3 tables with UPDATE cases, {@link #generate} appends
+ * {@code COALESCE(_file_row_id, ICEBERG__FIRST__ROW__ID + FILE__POSITION)} to
+ * {@code targetExpressions}. For INSERT (source-only) rows the target tuple is absent
+ * from the full outer join, so both {@code _file_row_id} and
+ * {@code ICEBERG__FIRST__ROW__ID} are NULL, making the expression evaluate to NULL.
  */
 public class IcebergMergeQueryGenerator {
 
@@ -54,7 +64,8 @@ public class IcebergMergeQueryGenerator {
    * row-meta expressions → partition-meta expressions → SELECT assembly.
    */
   public static MergeQuery generate(TableRef targetTableRef, TableRef sourceTableRef,
-      FeIcebergTable icebergTable) {
+      FeIcebergTable icebergTable, MergeStmt mergeStmt, Analyzer analyzer)
+      throws AnalysisException {
     CastExpr rowPresentExpression =
         buildRowPresentExpression(targetTableRef, sourceTableRef);
     List<Expr> targetExpressions =
@@ -63,6 +74,24 @@ public class IcebergMergeQueryGenerator {
         buildRowMetaExpressions(targetTableRef, icebergTable);
     List<Expr> partitionMetaExpressions =
         buildPartitionMetaExpressions(targetTableRef, icebergTable);
+
+    if (icebergTable.getFormatVersion() >= IcebergUtil.FORMAT_VERSION_3
+        && mergeStmt.hasUpdateCase()) {
+      // To keep slot descriptor registration ordering, the previously registered
+      // row meta expressions must be analyzed. Ordering has to be fixed for backend
+      // evaluation in IcebergMergeNode
+      for (Expr expr : rowMetaExpressions) {
+        expr.analyze(analyzer);
+      }
+      // Expose the raw input slots in the output tuple so the backend evaluators find
+      // them at correct positions when resolving the COALESCE expression.
+      rowMetaExpressions.add(new SlotRef(ImmutableList.of(
+          targetTableRef.getUniqueAlias(), "_file_row_id")));
+      rowMetaExpressions.add(new SlotRef(ImmutableList.of(
+          targetTableRef.getUniqueAlias(),
+          VirtualColumn.ICEBERG_FIRST_ROW_ID.getName())));
+      targetExpressions.add(IcebergUtil.getAnalyzedRowIdExpr(analyzer, targetTableRef));
+    }
 
     List<SelectListItem> selectListItems = Lists.newArrayList();
     SelectList selectList = new SelectList(selectListItems);
@@ -92,11 +121,11 @@ public class IcebergMergeQueryGenerator {
   }
 
   /**
-   * Builds one expression per column in the target table.
+   * Builds one expression per non-hidden column in the target table.
    */
   protected static List<Expr> buildTargetExpressions(
       TableRef targetTableRef) {
-    return targetTableRef.getTable().getColumns().stream()
+    return targetTableRef.getTable().getColumnsInHiveOrder().stream()
         .map(column -> new SlotRef(
             ImmutableList.of(targetTableRef.getUniqueAlias(), column.getName())))
         .collect(Collectors.toList());

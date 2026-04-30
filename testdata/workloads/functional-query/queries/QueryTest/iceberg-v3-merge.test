@@ -1,0 +1,1267 @@
+====
+---- QUERY
+# S1: unpartitioned V3, separate INSERTs. Each INSERT is its own snapshot so
+# each row is alone in its own file.
+CREATE TABLE s1_target (id INT, val STRING)
+STORED BY ICEBERG
+TBLPROPERTIES ('format-version'='3');
+
+CREATE TABLE s1_source (id INT, val STRING)
+STORED BY ICEBERG
+TBLPROPERTIES ('format-version'='3');
+
+INSERT INTO s1_target VALUES (1, 'one');
+INSERT INTO s1_target VALUES (2, 'two');
+INSERT INTO s1_target VALUES (3, 'three');
+INSERT INTO s1_source VALUES (2, 'TWO'), (3, 'THREE'), (4, 'four');
+====
+---- QUERY
+SELECT id, val, _row_id, _last_updated_sequence_number AS last_seq
+FROM s1_target ORDER BY id;
+---- RESULTS
+1,'one',0,1
+2,'two',1,2
+3,'three',2,3
+---- TYPES
+INT,STRING,BIGINT,BIGINT
+====
+---- QUERY
+MERGE INTO s1_target USING s1_source ON s1_target.id = s1_source.id
+WHEN MATCHED THEN UPDATE SET s1_target.val = s1_source.val
+WHEN NOT MATCHED THEN INSERT VALUES (s1_source.id, s1_source.val);
+---- DML_RESULTS: s1_target
+1,'one'
+2,'TWO'
+3,'THREE'
+4,'four'
+---- TYPES
+INT,STRING
+---- RUNTIME_PROFILE
+NumModifiedRows: 3
+NumDeletedRows: 2
+====
+---- QUERY
+# id=1: untouched, row_id=0, last_seq=1.
+# id=2,3: updated, row_id preserved=1,2, last_seq=4.
+# id=4: inserted, last_seq=4.
+# Updated rows keep their exact row_id. The inserted row gets a fresh global
+# row_id.
+SELECT id, val, _row_id, _last_updated_sequence_number AS last_seq
+FROM s1_target WHERE id IN (1, 2, 3) ORDER BY id;
+---- RESULTS
+1,'one',0,1
+2,'TWO',1,4
+3,'THREE',2,4
+---- TYPES
+INT,STRING,BIGINT,BIGINT
+====
+---- QUERY
+# Inserted row (id=4) must have row_id strictly greater than all pre-existing rows
+# (whose max row_id was 2 before the MERGE).
+SELECT _row_id > 2, _last_updated_sequence_number
+FROM s1_target WHERE id = 4;
+---- RESULTS
+true,4
+---- TYPES
+BOOLEAN,BIGINT
+====
+---- QUERY
+TRUNCATE TABLE s1_source;
+INSERT INTO s1_source VALUES (2, 'TWO2'), (3, 'THREE3');
+====
+---- QUERY
+# Second MERGE (seq=5). Spark: row_id still preserved (1,2) for re-updated rows.
+MERGE INTO s1_target USING s1_source ON s1_target.id = s1_source.id
+WHEN MATCHED THEN UPDATE SET s1_target.val = s1_source.val;
+---- DML_RESULTS: s1_target
+1,'one'
+2,'TWO2'
+3,'THREE3'
+4,'four'
+---- TYPES
+INT,STRING
+---- RUNTIME_PROFILE
+NumModifiedRows: 2
+NumDeletedRows: 2
+====
+---- QUERY
+# last_seq advances: id=1 stays 1, id=2,3 become 5, id=4 stays 4.
+SELECT id, val, _last_updated_sequence_number AS last_seq
+FROM s1_target ORDER BY id;
+---- RESULTS
+1,'one',1
+2,'TWO2',5
+3,'THREE3',5
+4,'four',4
+---- TYPES
+INT,STRING,BIGINT
+====
+---- QUERY
+# S2: unpartitioned V3, single batch INSERT (all rows same file, seq=1).
+CREATE TABLE s2_target (id INT, val STRING)
+STORED BY ICEBERG
+TBLPROPERTIES ('format-version'='3');
+
+CREATE TABLE s2_source (id INT, val STRING)
+STORED BY ICEBERG
+TBLPROPERTIES ('format-version'='3');
+
+INSERT INTO s2_target VALUES (1,'keep'), (2,'update'), (3,'keep'), (4,'update');
+INSERT INTO s2_source VALUES (2,'UPDATE'), (4,'UPDATE'), (5,'new');
+====
+---- QUERY
+SELECT id, val, _row_id, _last_updated_sequence_number AS last_seq
+FROM s2_target ORDER BY id;
+---- RESULTS
+1,'keep',0,1
+2,'update',1,1
+3,'keep',2,1
+4,'update',3,1
+---- TYPES
+INT,STRING,BIGINT,BIGINT
+====
+---- QUERY
+MERGE INTO s2_target USING s2_source ON s2_target.id = s2_source.id
+WHEN MATCHED THEN UPDATE SET s2_target.val = s2_source.val
+WHEN NOT MATCHED THEN INSERT VALUES (s2_source.id, s2_source.val);
+---- DML_RESULTS: s2_target
+1,'keep'
+2,'UPDATE'
+3,'keep'
+4,'UPDATE'
+5,'new'
+---- TYPES
+INT,STRING
+---- RUNTIME_PROFILE
+NumModifiedRows: 3
+NumDeletedRows: 2
+====
+---- QUERY
+# Untouched (id=1,3) keep seq=1. Updated (id=2,4) and inserted (id=5) get seq=2.
+SELECT id, val, _last_updated_sequence_number AS last_seq
+FROM s2_target ORDER BY id;
+---- RESULTS
+1,'keep',1
+2,'UPDATE',2
+3,'keep',1
+4,'UPDATE',2
+5,'new',2
+---- TYPES
+INT,STRING,BIGINT
+====
+---- QUERY
+# S3: partitioned V3 (identity on cat).
+CREATE TABLE s3_target (id INT, cat STRING, val INT)
+PARTITIONED BY SPEC (cat)
+STORED BY ICEBERG
+TBLPROPERTIES ('format-version'='3');
+
+CREATE TABLE s3_source (id INT, cat STRING, val INT)
+STORED BY ICEBERG
+TBLPROPERTIES ('format-version'='3');
+
+INSERT INTO s3_target VALUES (1,'A',10),(2,'A',20),(3,'B',30),(4,'B',40);
+INSERT INTO s3_source VALUES (2,'A',200),(3,'B',300),(5,'C',500);
+====
+---- QUERY
+SELECT id, cat, val, _row_id, _last_updated_sequence_number AS last_seq
+FROM s3_target ORDER BY id;
+---- RESULTS
+1,'A',10,0,1
+2,'A',20,1,1
+3,'B',30,2,1
+4,'B',40,3,1
+---- TYPES
+INT,STRING,INT,BIGINT,BIGINT
+====
+---- QUERY
+MERGE INTO s3_target USING s3_source ON s3_target.id = s3_source.id
+WHEN MATCHED THEN UPDATE SET s3_target.val = s3_source.val
+WHEN NOT MATCHED THEN INSERT VALUES (s3_source.id, s3_source.cat, s3_source.val);
+---- DML_RESULTS: s3_target
+1,'A',10
+2,'A',200
+3,'B',300
+4,'B',40
+5,'C',500
+---- TYPES
+INT,STRING,INT
+---- RUNTIME_PROFILE
+# Verify that the plan shuffles on COALESCE(PARTITION__SPEC__ID, murmur_hash(cat))
+row_regex: .*EXCHANGE \[HASH\(coalesce\(.*partition__spec__id.*murmur_hash\(.*cat.*\).*\).*
+====
+---- QUERY
+# Untouched (id=1,4) keep seq=1. Touched (id=2,3,5) get seq=2.
+SELECT id, cat, val, _last_updated_sequence_number AS last_seq
+FROM s3_target ORDER BY id;
+---- RESULTS
+1,'A',10,1
+2,'A',200,2
+3,'B',300,2
+4,'B',40,1
+5,'C',500,2
+---- TYPES
+INT,STRING,INT,BIGINT
+====
+---- QUERY
+# S4: unpartitioned V3 with a pre-existing deletion vector (DV).
+CREATE TABLE s4_target (id INT, val STRING)
+STORED BY ICEBERG
+TBLPROPERTIES ('format-version'='3');
+
+CREATE TABLE s4_source (id INT, val STRING)
+STORED BY ICEBERG
+TBLPROPERTIES ('format-version'='3');
+
+INSERT INTO s4_target VALUES (1,'one'),(2,'two'),(3,'three'),(4,'four'),(5,'five');
+INSERT INTO s4_source VALUES (2,'TWO'),(4,'FOUR'),(6,'six');
+
+DELETE FROM s4_target WHERE id = 3;
+====
+---- QUERY
+SELECT id, val, _row_id, _last_updated_sequence_number AS last_seq
+FROM s4_target ORDER BY id;
+---- RESULTS
+1,'one',0,1
+2,'two',1,1
+4,'four',3,1
+5,'five',4,1
+---- TYPES
+INT,STRING,BIGINT,BIGINT
+====
+---- QUERY
+SELECT content, file_format
+FROM $DATABASE.s4_target.`files`
+ORDER BY content;
+---- RESULTS
+0,'PARQUET'
+1,'PUFFIN'
+---- TYPES
+INT,STRING
+====
+---- QUERY
+MERGE INTO s4_target USING s4_source ON s4_target.id = s4_source.id
+WHEN MATCHED THEN UPDATE SET s4_target.val = s4_source.val
+WHEN NOT MATCHED THEN INSERT VALUES (s4_source.id, s4_source.val);
+---- DML_RESULTS: s4_target
+1,'one'
+2,'TWO'
+4,'FOUR'
+5,'five'
+6,'six'
+---- TYPES
+INT,STRING
+---- RUNTIME_PROFILE
+NumModifiedRows: 3
+NumDeletedRows: 2
+====
+---- QUERY
+SELECT id, val, _row_id, _last_updated_sequence_number AS last_seq
+FROM s4_target WHERE id IN (1, 2, 4, 5) ORDER BY id;
+---- RESULTS
+1,'one',0,1
+2,'TWO',1,3
+4,'FOUR',3,3
+5,'five',4,1
+---- TYPES
+INT,STRING,BIGINT,BIGINT
+====
+---- QUERY
+# Inserted row (id=6) must have row_id strictly greater than all pre-existing rows
+# (whose max row_id was 4 before the MERGE).
+SELECT _row_id > 4, _last_updated_sequence_number
+FROM s4_target WHERE id = 6;
+---- RESULTS
+true,3
+---- TYPES
+BOOLEAN,BIGINT
+====
+---- QUERY
+# S5: WHEN MATCHED DELETE + WHEN NOT MATCHED INSERT.
+CREATE TABLE s5_target (id INT, val STRING)
+STORED BY ICEBERG
+TBLPROPERTIES ('format-version'='3');
+
+CREATE TABLE s5_source (id INT, val STRING)
+STORED BY ICEBERG
+TBLPROPERTIES ('format-version'='3');
+
+INSERT INTO s5_target VALUES (1,'keep'),(2,'remove'),(3,'keep'),(4,'remove');
+INSERT INTO s5_source VALUES (2,'x'),(4,'x'),(5,'new');
+====
+---- QUERY
+SELECT id, val, _row_id, _last_updated_sequence_number AS last_seq
+FROM s5_target ORDER BY id;
+---- RESULTS
+1,'keep',0,1
+2,'remove',1,1
+3,'keep',2,1
+4,'remove',3,1
+---- TYPES
+INT,STRING,BIGINT,BIGINT
+====
+---- QUERY
+MERGE INTO s5_target USING s5_source ON s5_target.id = s5_source.id
+WHEN MATCHED THEN DELETE
+WHEN NOT MATCHED THEN INSERT VALUES (s5_source.id, s5_source.val);
+---- DML_RESULTS: s5_target
+1,'keep'
+3,'keep'
+5,'new'
+---- TYPES
+INT,STRING
+---- RUNTIME_PROFILE
+NumModifiedRows: 1
+NumDeletedRows: 2
+====
+---- QUERY
+SELECT id, val, _row_id, _last_updated_sequence_number AS last_seq
+FROM s5_target ORDER BY id;
+---- RESULTS
+1,'keep',0,1
+3,'keep',2,1
+5,'new',4,2
+---- TYPES
+INT,STRING,BIGINT,BIGINT
+====
+---- QUERY
+# S6: partitioned V3 with per-partition DVs.
+CREATE TABLE s6_target (id INT, cat STRING, val INT)
+PARTITIONED BY SPEC (cat)
+STORED BY ICEBERG
+TBLPROPERTIES ('format-version'='3');
+
+CREATE TABLE s6_source (id INT, cat STRING, val INT)
+STORED BY ICEBERG
+TBLPROPERTIES ('format-version'='3');
+
+INSERT INTO s6_target VALUES (1,'X',1),(2,'X',2),(3,'Y',3),(4,'Y',4);
+INSERT INTO s6_source VALUES (1,'X',100),(3,'Y',300),(5,'Z',500);
+
+DELETE FROM s6_target WHERE id = 2;
+DELETE FROM s6_target WHERE id = 4;
+====
+---- QUERY
+SELECT id, cat, val, _last_updated_sequence_number AS last_seq
+FROM s6_target ORDER BY id;
+---- RESULTS
+1,'X',1,1
+3,'Y',3,1
+---- TYPES
+INT,STRING,INT,BIGINT
+====
+---- QUERY
+MERGE INTO s6_target USING s6_source ON s6_target.id = s6_source.id
+WHEN MATCHED THEN UPDATE SET s6_target.val = s6_source.val
+WHEN NOT MATCHED THEN INSERT VALUES (s6_source.id, s6_source.cat, s6_source.val);
+---- DML_RESULTS: s6_target
+1,'X',100
+3,'Y',300
+5,'Z',500
+---- TYPES
+INT,STRING,INT
+---- RUNTIME_PROFILE
+# Partitioned V3 with pre-existing DVs: verify shuffle uses COALESCE expression.
+row_regex: .*EXCHANGE \[HASH\(coalesce\(.*partition__spec__id.*murmur_hash\(.*cat.*\).*\).*
+====
+---- QUERY
+SELECT id, cat, val, _last_updated_sequence_number AS last_seq
+FROM s6_target ORDER BY id;
+---- RESULTS
+1,'X',100,4
+3,'Y',300,4
+5,'Z',500,4
+---- TYPES
+INT,STRING,INT,BIGINT
+====
+---- QUERY
+# S7: conditional MERGE (WHEN MATCHED AND score > target.score).
+CREATE TABLE s7_target (id INT, val STRING, score INT)
+STORED BY ICEBERG
+TBLPROPERTIES ('format-version'='3');
+
+CREATE TABLE s7_source (id INT, val STRING, score INT)
+STORED BY ICEBERG
+TBLPROPERTIES ('format-version'='3');
+
+INSERT INTO s7_target VALUES (1,'a',10),(2,'b',20),(3,'c',30),(4,'d',40);
+INSERT INTO s7_source VALUES (1,'A',100),(2,'B',5),(3,'C',300),(5,'E',500);
+====
+---- QUERY
+SELECT id, val, score, _row_id, _last_updated_sequence_number AS last_seq
+FROM s7_target ORDER BY id;
+---- RESULTS
+1,'a',10,0,1
+2,'b',20,1,1
+3,'c',30,2,1
+4,'d',40,3,1
+---- TYPES
+INT,STRING,INT,BIGINT,BIGINT
+====
+---- QUERY
+MERGE INTO s7_target USING s7_source ON s7_target.id = s7_source.id
+WHEN MATCHED AND s7_source.score > s7_target.score
+  THEN UPDATE SET s7_target.val = s7_source.val, s7_target.score = s7_source.score
+WHEN NOT MATCHED THEN INSERT VALUES (s7_source.id, s7_source.val, s7_source.score);
+---- DML_RESULTS: s7_target
+1,'A',100
+2,'b',20
+3,'C',300
+4,'d',40
+5,'E',500
+---- TYPES
+INT,STRING,INT
+---- RUNTIME_PROFILE
+NumModifiedRows: 3
+NumDeletedRows: 2
+====
+---- QUERY
+# Untouched id=2,4 keep seq=1. Updated/inserted id=1,3,5 get seq=2.
+SELECT id, val, score, _last_updated_sequence_number AS last_seq
+FROM s7_target ORDER BY id;
+---- RESULTS
+1,'A',100,2
+2,'b',20,1
+3,'C',300,2
+4,'d',40,1
+5,'E',500,2
+---- TYPES
+INT,STRING,INT,BIGINT
+====
+---- QUERY
+# S8: unpartitioned V3, separate INSERTs (one row per data file), MERGE with
+# MT_DOP=4. Verifies that each data file is referenced by at most one deletion
+# vector.
+set MT_DOP=4;
+CREATE TABLE s8_target (id INT, val STRING)
+STORED BY ICEBERG
+TBLPROPERTIES ('format-version'='3');
+
+CREATE TABLE s8_source (id INT, val STRING)
+STORED BY ICEBERG
+TBLPROPERTIES ('format-version'='3');
+
+-- Separate INSERTs so each row lands in its own data file.
+INSERT INTO s8_target VALUES (1, 'one');
+INSERT INTO s8_target VALUES (2, 'two');
+INSERT INTO s8_target VALUES (3, 'three');
+INSERT INTO s8_target VALUES (4, 'four');
+INSERT INTO s8_source VALUES (1,'ONE'),(2,'TWO'),(3,'THREE'),(5,'five');
+====
+---- QUERY
+MERGE INTO s8_target USING s8_source ON s8_target.id = s8_source.id
+WHEN MATCHED THEN UPDATE SET s8_target.val = s8_source.val
+WHEN NOT MATCHED THEN INSERT VALUES (s8_source.id, s8_source.val);
+---- DML_RESULTS: s8_target
+1,'ONE'
+2,'TWO'
+3,'THREE'
+4,'four'
+5,'five'
+---- TYPES
+INT,STRING
+---- RUNTIME_PROFILE
+NumModifiedRows: 4
+NumDeletedRows: 3
+# Verify that the plan shuffles on INPUT__FILE__NAME so all deletes for the same
+# data file are routed to the same sink instance.
+row_regex: .*EXCHANGE \[HASH\(.*INPUT__FILE__NAME.*\).*
+====
+---- QUERY
+# Each of the 3 updated data files must be referenced by exactly one deletion
+# vector. The total number of delete files (content=1, PUFFIN) must not exceed
+# the number of data files that were actually updated (3).
+SELECT count(*) FROM $DATABASE.s8_target.`files` WHERE content = 1;
+---- RESULTS
+3
+---- TYPES
+BIGINT
+====
+---- QUERY
+# Updated rows (id=1,2,3) must preserve their exact row_ids. Untouched row
+# (id=4) keeps its original row_id. Pre-MERGE row_ids: id=1→0, id=2→1, id=3→2,
+# id=4→3 (separate INSERTs, so first_row_id advances by 1 each snapshot).
+SELECT id, val, _row_id, _last_updated_sequence_number AS last_seq
+FROM s8_target WHERE id IN (1, 2, 3, 4) ORDER BY id;
+---- RESULTS
+1,'ONE',0,5
+2,'TWO',1,5
+3,'THREE',2,5
+4,'four',3,4
+---- TYPES
+INT,STRING,BIGINT,BIGINT
+====
+---- QUERY
+# Inserted row (id=5) must have row_id strictly greater than all pre-existing
+# rows (whose max row_id was 3 before the MERGE).
+SELECT _row_id > 3, _last_updated_sequence_number
+FROM s8_target WHERE id = 5;
+---- RESULTS
+true,5
+---- TYPES
+BOOLEAN,BIGINT
+====
+---- QUERY
+# S9: WHEN NOT MATCHED BY SOURCE (unpartitioned V3).
+set MT_DOP=0;
+CREATE TABLE s9_target (id INT, val STRING)
+STORED BY ICEBERG
+TBLPROPERTIES ('format-version'='3');
+
+CREATE TABLE s9_source (id INT, val STRING)
+STORED BY ICEBERG
+TBLPROPERTIES ('format-version'='3');
+
+INSERT INTO s9_target VALUES (1,'one'),(2,'two'),(3,'three');
+INSERT INTO s9_source VALUES (1,'ONE'),(2,'TWO'),(4,'four');
+====
+---- QUERY
+SELECT id, val, _row_id, _last_updated_sequence_number AS last_seq
+FROM s9_target ORDER BY id;
+---- RESULTS
+1,'one',0,1
+2,'two',1,1
+3,'three',2,1
+---- TYPES
+INT,STRING,BIGINT,BIGINT
+====
+---- QUERY
+MERGE INTO s9_target USING s9_source ON s9_target.id = s9_source.id
+WHEN MATCHED THEN UPDATE SET s9_target.val = s9_source.val
+WHEN NOT MATCHED BY SOURCE THEN UPDATE SET s9_target.val = 'GONE';
+---- DML_RESULTS: s9_target
+1,'ONE'
+2,'TWO'
+3,'GONE'
+---- TYPES
+INT,STRING
+---- RUNTIME_PROFILE
+NumModifiedRows: 3
+NumDeletedRows: 3
+====
+---- QUERY
+# All three rows are touched: id=1,2 via MATCHED UPDATE, id=3 via NOT MATCHED BY
+# SOURCE UPDATE. Row_ids preserved (0,1,2); all get seq=2.
+SELECT id, val, _row_id, _last_updated_sequence_number AS last_seq
+FROM s9_target ORDER BY id;
+---- RESULTS
+1,'ONE',0,2
+2,'TWO',1,2
+3,'GONE',2,2
+---- TYPES
+INT,STRING,BIGINT,BIGINT
+====
+---- QUERY
+# S10: multi-clause MERGE (MATCHED UPDATE + MATCHED DELETE + NOT MATCHED INSERT)
+# on unpartitioned V3.
+CREATE TABLE s10_target (id INT, val STRING)
+STORED BY ICEBERG
+TBLPROPERTIES ('format-version'='3');
+
+CREATE TABLE s10_source (id INT, val STRING)
+STORED BY ICEBERG
+TBLPROPERTIES ('format-version'='3');
+
+INSERT INTO s10_target VALUES (1,'keep'),(2,'update'),(3,'delete'),(4,'keep');
+INSERT INTO s10_source VALUES (2,'UPDATED'),(3,'x'),(5,'new');
+====
+---- QUERY
+SELECT id, val, _row_id, _last_updated_sequence_number AS last_seq
+FROM s10_target ORDER BY id;
+---- RESULTS
+1,'keep',0,1
+2,'update',1,1
+3,'delete',2,1
+4,'keep',3,1
+---- TYPES
+INT,STRING,BIGINT,BIGINT
+====
+---- QUERY
+MERGE INTO s10_target USING s10_source ON s10_target.id = s10_source.id
+WHEN MATCHED AND s10_source.val = 'x' THEN DELETE
+WHEN MATCHED THEN UPDATE SET s10_target.val = s10_source.val
+WHEN NOT MATCHED THEN INSERT VALUES (s10_source.id, s10_source.val);
+---- DML_RESULTS: s10_target
+1,'keep'
+2,'UPDATED'
+4,'keep'
+5,'new'
+---- TYPES
+INT,STRING
+---- RUNTIME_PROFILE
+NumModifiedRows: 2
+NumDeletedRows: 2
+====
+---- QUERY
+# id=1,4 untouched: keep seq=1. id=2 updated: row_id=1 preserved, seq=2.
+# id=5 inserted: seq=2. id=3 deleted (gone).
+SELECT id, val, _row_id, _last_updated_sequence_number AS last_seq
+FROM s10_target WHERE id IN (1, 2, 4) ORDER BY id;
+---- RESULTS
+1,'keep',0,1
+2,'UPDATED',1,2
+4,'keep',3,1
+---- TYPES
+INT,STRING,BIGINT,BIGINT
+====
+---- QUERY
+# Inserted row (id=5) must have row_id strictly greater than all pre-existing
+# rows (whose max row_id was 3 before the MERGE) and seq=2.
+SELECT _row_id > 3, _last_updated_sequence_number
+FROM s10_target WHERE id = 5;
+---- RESULTS
+true,2
+---- TYPES
+BOOLEAN,BIGINT
+====
+---- QUERY
+# S11: INSERT * and UPDATE SET * star syntax on unpartitioned V3.
+CREATE TABLE s11_target (id INT, val STRING)
+STORED BY ICEBERG
+TBLPROPERTIES ('format-version'='3');
+
+CREATE TABLE s11_source (id INT, val STRING)
+STORED BY ICEBERG
+TBLPROPERTIES ('format-version'='3');
+
+INSERT INTO s11_target VALUES (1,'one'),(2,'two'),(3,'three');
+INSERT INTO s11_source VALUES (1,'ONE'),(2,'TWO'),(4,'four');
+====
+---- QUERY
+SELECT id, val, _row_id, _last_updated_sequence_number AS last_seq
+FROM s11_target ORDER BY id;
+---- RESULTS
+1,'one',0,1
+2,'two',1,1
+3,'three',2,1
+---- TYPES
+INT,STRING,BIGINT,BIGINT
+====
+---- QUERY
+MERGE INTO s11_target USING s11_source ON s11_target.id = s11_source.id
+WHEN MATCHED THEN UPDATE SET *
+WHEN NOT MATCHED THEN INSERT *;
+---- DML_RESULTS: s11_target
+1,'ONE'
+2,'TWO'
+3,'three'
+4,'four'
+---- TYPES
+INT,STRING
+====
+---- QUERY
+# id=1,2 updated (row_id preserved 0,1; seq=2). id=3 untouched (seq=1).
+# id=4 inserted (seq=2).
+SELECT id, val, _row_id, _last_updated_sequence_number AS last_seq
+FROM s11_target WHERE id IN (1, 2, 3) ORDER BY id;
+---- RESULTS
+1,'ONE',0,2
+2,'TWO',1,2
+3,'three',2,1
+---- TYPES
+INT,STRING,BIGINT,BIGINT
+====
+---- QUERY
+# Inserted row (id=4) must have row_id strictly greater than all pre-existing
+# rows (max row_id was 2) and seq=2.
+SELECT _row_id > 2, _last_updated_sequence_number
+FROM s11_target WHERE id = 4;
+---- RESULTS
+true,2
+---- TYPES
+BOOLEAN,BIGINT
+====
+---- QUERY
+# S12: MT_DOP=4 with partitioned V3 table using two partition expressions
+# (cat, bucket(4, id)). Verifies that per-partition DVs are correctly written
+# and that the multi-expression murmur_hash XOR shuffle path is exercised for
+# INSERT rows whose PARTITION__SPEC__ID is NULL.
+set MT_DOP=4;
+CREATE TABLE s12_target (id INT, cat STRING, val INT)
+PARTITIONED BY SPEC (cat, bucket(4, id))
+STORED BY ICEBERG
+TBLPROPERTIES ('format-version'='3');
+
+CREATE TABLE s12_source (id INT, cat STRING, val INT)
+STORED BY ICEBERG
+TBLPROPERTIES ('format-version'='3');
+
+-- Separate INSERTs so rows land in their own snapshots/files.
+INSERT INTO s12_target VALUES (1,'A',10);
+INSERT INTO s12_target VALUES (2,'A',20);
+INSERT INTO s12_target VALUES (3,'B',30);
+INSERT INTO s12_target VALUES (4,'B',40);
+INSERT INTO s12_source VALUES (1,'A',100),(2,'A',200),(5,'C',500);
+====
+---- QUERY
+MERGE INTO s12_target USING s12_source ON s12_target.id = s12_source.id
+WHEN MATCHED THEN UPDATE SET s12_target.val = s12_source.val
+WHEN NOT MATCHED THEN INSERT VALUES (s12_source.id, s12_source.cat, s12_source.val);
+---- DML_RESULTS: s12_target
+1,'A',100
+2,'A',200
+3,'B',30
+4,'B',40
+5,'C',500
+---- TYPES
+INT,STRING,INT
+---- RUNTIME_PROFILE
+# Partitioned V3 with two partition exprs (cat, bucket(4, id)).
+row_regex: .*EXCHANGE \[HASH\(coalesce\(.*partition__spec__id.*murmur_hash\(.*\).*murmur_hash\(.*\).*\).*
+====
+---- QUERY
+# Each updated data file must have exactly one DV. id=1 and id=2 were each
+# written by a separate INSERT into their own (cat, bucket(4,id)) partition
+# cell, so there are exactly 2 puffin files after the MERGE.
+SELECT count(*) FROM $DATABASE.s12_target.`files` WHERE content = 1;
+---- RESULTS
+2
+---- TYPES
+BIGINT
+====
+---- QUERY
+# Updated rows (id=1,2) preserve their row_ids. Untouched rows (id=3,4) keep
+# seq=4 (4th snapshot: 4 separate INSERTs). Inserted row (id=5) gets seq=5.
+SELECT id, cat, val, _last_updated_sequence_number AS last_seq
+FROM s12_target ORDER BY id;
+---- RESULTS
+1,'A',100,5
+2,'A',200,5
+3,'B',30,3
+4,'B',40,4
+5,'C',500,5
+---- TYPES
+INT,STRING,INT,BIGINT
+====
+---- QUERY
+# Inserted row (id=5) must have row_id strictly greater than all pre-existing
+# rows (max row_id was 3, from 4 separate single-row INSERTs: ids 0,1,2,3).
+SELECT _row_id > 3, _last_updated_sequence_number
+FROM s12_target WHERE id = 5;
+---- RESULTS
+true,5
+---- TYPES
+BOOLEAN,BIGINT
+====
+---- QUERY
+# S13: Self-merge on unpartitioned V3 (target used as its own source, shifted by 1).
+set MT_DOP=0;
+CREATE TABLE s13_target (id INT, val STRING)
+STORED BY ICEBERG
+TBLPROPERTIES ('format-version'='3');
+
+INSERT INTO s13_target VALUES (1,'a'),(2,'b'),(3,'c'),(4,'d');
+====
+---- QUERY
+SELECT id, val, _row_id, _last_updated_sequence_number AS last_seq
+FROM s13_target ORDER BY id;
+---- RESULTS
+1,'a',0,1
+2,'b',1,1
+3,'c',2,1
+4,'d',3,1
+---- TYPES
+INT,STRING,BIGINT,BIGINT
+====
+---- QUERY
+MERGE INTO s13_target USING s13_target AS src ON s13_target.id = src.id + 1
+WHEN MATCHED THEN UPDATE SET s13_target.val = src.val;
+---- DML_RESULTS: s13_target
+1,'a'
+2,'a'
+3,'b'
+4,'c'
+---- TYPES
+INT,STRING
+---- RUNTIME_PROFILE
+NumModifiedRows: 3
+NumDeletedRows: 3
+====
+---- QUERY
+# id=1 untouched: row_id=0, seq=1. id=2,3,4 updated: row_ids preserved (1,2,3), seq=2.
+SELECT id, val, _row_id, _last_updated_sequence_number AS last_seq
+FROM s13_target ORDER BY id;
+---- RESULTS
+1,'a',0,1
+2,'a',1,2
+3,'b',2,2
+4,'c',3,2
+---- TYPES
+INT,STRING,BIGINT,BIGINT
+====
+---- QUERY
+# S14: Snapshot count validation. Each MERGE produces exactly one new snapshot.
+# We run two MERGEs on a fresh V3 table and verify 3 total snapshots (1 INSERT + 2 MERGEs).
+CREATE TABLE s14_target (id INT, val STRING)
+STORED BY ICEBERG
+TBLPROPERTIES ('format-version'='3');
+
+CREATE TABLE s14_source (id INT, val STRING)
+STORED BY ICEBERG
+TBLPROPERTIES ('format-version'='3');
+
+INSERT INTO s14_target VALUES (1,'one'),(2,'two');
+INSERT INTO s14_source VALUES (2,'TWO'),(3,'three');
+====
+---- QUERY
+MERGE INTO s14_target USING s14_source ON s14_target.id = s14_source.id
+WHEN MATCHED THEN UPDATE SET s14_target.val = s14_source.val
+WHEN NOT MATCHED THEN INSERT VALUES (s14_source.id, s14_source.val);
+---- DML_RESULTS: s14_target
+1,'one'
+2,'TWO'
+3,'three'
+---- TYPES
+INT,STRING
+====
+---- QUERY
+MERGE INTO s14_target USING s14_source ON s14_target.id = s14_source.id
+WHEN MATCHED THEN UPDATE SET s14_target.val = 'again';
+---- DML_RESULTS: s14_target
+1,'one'
+2,'again'
+3,'again'
+---- TYPES
+INT,STRING
+====
+---- QUERY
+# 1 INSERT + 2 MERGEs = 3 snapshots total.
+SELECT count(1) AS snapshots FROM $DATABASE.s14_target.snapshots;
+---- RESULTS
+3
+---- TYPES
+BIGINT
+====
+---- QUERY
+# S15: large-scale MERGE on unpartitioned V3 crossing row-batch boundaries (>1024 rows).
+CREATE TABLE s15_target (id INT, val STRING)
+STORED BY ICEBERG
+TBLPROPERTIES ('format-version'='3');
+
+CREATE TABLE s15_source (id INT, val STRING)
+STORED BY ICEBERG
+TBLPROPERTIES ('format-version'='3');
+
+INSERT INTO s15_target
+SELECT cast(id AS INT), concat('target_', cast(id AS STRING))
+FROM (SELECT row_number() OVER (ORDER BY a.id * 1000 + b.id) AS id
+      FROM functional.alltypes a, functional.alltypes b
+      LIMIT 10000) t;
+
+INSERT INTO s15_source
+SELECT cast(id AS INT), concat('source_', cast(id AS STRING))
+FROM (SELECT row_number() OVER (ORDER BY a.id * 1000 + b.id) AS id
+      FROM functional.alltypes a, functional.alltypes b
+      LIMIT 8000) t
+UNION ALL
+SELECT cast(10000 + id AS INT), concat('new_', cast(10000 + id AS STRING))
+FROM (SELECT row_number() OVER (ORDER BY a.id * 100 + b.id) AS id
+      FROM functional.alltypes a, functional.alltypes b
+      LIMIT 500) t;
+====
+---- QUERY
+MERGE INTO s15_target USING s15_source ON s15_target.id = s15_source.id
+WHEN MATCHED AND s15_target.id % 2 = 0
+  THEN UPDATE SET s15_target.val = s15_source.val
+WHEN MATCHED AND s15_target.id % 2 != 0
+  THEN DELETE
+WHEN NOT MATCHED THEN INSERT VALUES (s15_source.id, s15_source.val);
+---- RUNTIME_PROFILE
+NumModifiedRows: 4500
+NumDeletedRows: 8000
+====
+---- QUERY
+# Total rows after MERGE: 2000 untouched (id=8001..10000) + 4000 updated (even id=2..8000)
+# + 500 inserted (id=10001..10500) = 6500.
+SELECT count(*) FROM s15_target;
+---- RESULTS
+6500
+---- TYPES
+BIGINT
+====
+---- QUERY
+# Updated even rows must have val='source_<id>' and last_seq=2.
+SELECT count(*) FROM s15_target
+WHERE id % 2 = 0 AND id BETWEEN 2 AND 8000
+  AND val = concat('source_', cast(id AS STRING))
+  AND _last_updated_sequence_number = 2;
+---- RESULTS
+4000
+---- TYPES
+BIGINT
+====
+---- QUERY
+# Untouched rows (id=8001..10000, not in source) must still have val='target_<id>' and last_seq=1.
+SELECT count(*) FROM s15_target
+WHERE id BETWEEN 8001 AND 10000
+  AND val = concat('target_', cast(id AS STRING))
+  AND _last_updated_sequence_number = 1;
+---- RESULTS
+2000
+---- TYPES
+BIGINT
+====
+---- QUERY
+# Inserted rows (id=10001..10500) must have val='new_<id>' and last_seq=2.
+SELECT count(*) FROM s15_target
+WHERE id BETWEEN 10001 AND 10500
+  AND val = concat('new_', cast(id AS STRING))
+  AND _last_updated_sequence_number = 2;
+---- RESULTS
+500
+---- TYPES
+BIGINT
+====
+---- QUERY
+# Deleted odd rows (id=1..7999 odd) must not appear in the table.
+SELECT count(*) FROM s15_target WHERE id % 2 != 0 AND id BETWEEN 1 AND 7999;
+---- RESULTS
+0
+---- TYPES
+BIGINT
+====
+---- QUERY
+# S16: Partition evolution with MERGE.
+CREATE TABLE s16_target (i int, s string)
+STORED BY ICEBERG
+TBLPROPERTIES ('format-version'='3');
+INSERT INTO s16_target VALUES(1, 'one'), (2, 'two'), (3, 'three');
+ALTER TABLE s16_target SET PARTITION SPEC (i);
+INSERT INTO s16_target VALUES (10, 'ten'), (20, 'twenty');
+CREATE TABLE s16_source (i int, s string)
+STORED BY ICEBERG
+TBLPROPERTIES ('format-version'='3');
+INSERT INTO s16_source VALUES (1, 'ONE'), (10, 'TEN'), (30, 'thirty');
+====
+---- QUERY
+MERGE INTO s16_target USING s16_source ON s16_target.i = s16_source.i
+WHEN MATCHED THEN UPDATE SET s16_target.s = s16_source.s
+WHEN NOT MATCHED THEN INSERT VALUES (s16_source.i, s16_source.s);
+---- DML_RESULTS: s16_target
+1,'ONE'
+2,'two'
+3,'three'
+10,'TEN'
+20,'twenty'
+30,'thirty'
+---- TYPES
+INT,STRING
+====
+---- QUERY
+SELECT * FROM s16_target WHERE i IN (1, 2, 3) ORDER BY i;
+---- RESULTS
+1,'ONE'
+2,'two'
+3,'three'
+---- TYPES
+INT,STRING
+====
+---- QUERY
+SELECT * FROM s16_target WHERE i = 10;
+---- RESULTS
+10,'TEN'
+---- TYPES
+INT,STRING
+====
+---- QUERY
+# S17: MERGE updating the partition field (identity partition).
+CREATE TABLE s17_target (i int, s string)
+PARTITIONED BY SPEC (i)
+STORED BY ICEBERG
+TBLPROPERTIES ('format-version'='3');
+CREATE TABLE s17_source (i int, s string)
+STORED BY ICEBERG
+TBLPROPERTIES ('format-version'='3');
+INSERT INTO s17_target VALUES (1, 'one'), (2, 'two'), (3, 'three');
+INSERT INTO s17_source VALUES (1, 'ONE'), (2, 'TWO'), (4, 'four');
+====
+---- QUERY
+MERGE INTO s17_target USING s17_source ON s17_target.i = s17_source.i
+WHEN MATCHED THEN UPDATE SET s17_target.i = cast(s17_target.i * 10 as int),
+                              s17_target.s = s17_source.s
+WHEN NOT MATCHED THEN INSERT VALUES (s17_source.i, s17_source.s);
+---- DML_RESULTS: s17_target
+3,'three'
+4,'four'
+10,'ONE'
+20,'TWO'
+---- TYPES
+INT,STRING
+====
+---- QUERY
+SELECT count(*) FROM s17_target WHERE i = 2;
+---- RESULTS
+0
+---- TYPES
+BIGINT
+====
+---- QUERY
+SELECT * FROM s17_target WHERE i = 10;
+---- RESULTS
+10,'ONE'
+---- TYPES
+INT,STRING
+====
+---- QUERY
+# S18: MERGE with truncate partition and partition evolution.
+CREATE TABLE s18_target (i int, s string)
+PARTITIONED BY SPEC (truncate(1, s))
+STORED BY ICEBERG
+TBLPROPERTIES ('format-version'='3');
+INSERT INTO s18_target VALUES (1, 'one'), (2, 'two'), (3, 'three'),
+                               (4, 'four'), (5, 'five');
+CREATE TABLE s18_source (i int, s string)
+STORED BY ICEBERG
+TBLPROPERTIES ('format-version'='3');
+INSERT INTO s18_source VALUES (2, 'TWO'), (4, 'FOUR'), (6, 'six');
+====
+---- QUERY
+MERGE INTO s18_target USING s18_source ON s18_target.i = s18_source.i
+WHEN MATCHED THEN UPDATE SET s18_target.s = s18_source.s
+WHEN NOT MATCHED THEN INSERT VALUES (s18_source.i, s18_source.s);
+---- DML_RESULTS: s18_target
+1,'one'
+2,'TWO'
+3,'three'
+4,'FOUR'
+5,'five'
+6,'six'
+---- TYPES
+INT,STRING
+====
+---- QUERY
+SELECT * FROM s18_target WHERE s LIKE 't%' ORDER BY i;
+---- RESULTS
+3,'three'
+---- TYPES
+INT,STRING
+====
+---- QUERY
+# Evolve partition spec and do another MERGE.
+ALTER TABLE s18_target SET PARTITION SPEC (i);
+INSERT INTO s18_target VALUES (10, 'ten'), (20, 'twenty');
+CREATE TABLE s18_source2 (i int, s string)
+STORED BY ICEBERG
+TBLPROPERTIES ('format-version'='3');
+INSERT INTO s18_source2 VALUES (1, 'ONE'), (10, 'TEN'), (30, 'thirty');
+====
+---- QUERY
+MERGE INTO s18_target USING s18_source2 ON s18_target.i = s18_source2.i
+WHEN MATCHED THEN UPDATE SET s18_target.s = s18_source2.s
+WHEN NOT MATCHED THEN INSERT VALUES (s18_source2.i, s18_source2.s);
+---- DML_RESULTS: s18_target
+1,'ONE'
+2,'TWO'
+3,'three'
+4,'FOUR'
+5,'five'
+6,'six'
+10,'TEN'
+20,'twenty'
+30,'thirty'
+---- TYPES
+INT,STRING
+====
+---- QUERY
+SELECT * FROM s18_target WHERE i = 1;
+---- RESULTS
+1,'ONE'
+---- TYPES
+INT,STRING
+====
+---- QUERY
+SELECT count(*) FROM s18_target WHERE i BETWEEN 1 AND 5;
+---- RESULTS
+5
+---- TYPES
+BIGINT
+====
+---- QUERY
+# S19: V2 → V3 in-place upgrade. Start with a partitioned V2 table.
+# Phase 1: run a MERGE on the V2 table (position-delete path).
+# Phase 2: upgrade to V3, run a second MERGE (DV path) and verify row lineage
+# for rows written or updated under V3.
+CREATE TABLE s19_target (id INT, s STRING, val INT)
+PARTITIONED BY SPEC (truncate(1, s), bucket(4, id))
+STORED BY ICEBERG
+TBLPROPERTIES ('format-version'='2');
+
+CREATE TABLE s19_source (id INT, s STRING, val INT)
+STORED BY ICEBERG
+TBLPROPERTIES ('format-version'='3');
+
+-- Separate INSERTs so each row lands in its own data file. This avoids
+-- mixing V2 position-deletes and V3 DVs on the same data file after upgrade.
+INSERT INTO s19_target VALUES (1,'apple',10);
+INSERT INTO s19_target VALUES (2,'apricot',20);
+INSERT INTO s19_target VALUES (3,'banana',30);
+INSERT INTO s19_target VALUES (4,'berry',40);
+INSERT INTO s19_source VALUES (1,'APPLE',100),(3,'BANANA',300),(5,'cherry',500);
+====
+---- QUERY
+# V2 MERGE: update id=1,3; insert id=5. Uses position-delete files.
+MERGE INTO s19_target USING s19_source ON s19_target.id = s19_source.id
+WHEN MATCHED THEN UPDATE SET s19_target.s = s19_source.s,
+                              s19_target.val = s19_source.val
+WHEN NOT MATCHED THEN INSERT VALUES (s19_source.id, s19_source.s, s19_source.val);
+---- DML_RESULTS: s19_target
+1,'APPLE',100
+2,'apricot',20
+3,'BANANA',300
+4,'berry',40
+5,'cherry',500
+---- TYPES
+INT,STRING,INT
+====
+---- QUERY
+# Upgrade to V3 in-place, then OPTIMIZE to compact away the V2 position-delete
+# files. MERGE (and DELETE/UPDATE) on a V3 table that still has V2 position-delete
+# files is blocked — OPTIMIZE rewrites the data files and eliminates them first.
+ALTER TABLE s19_target SET TBLPROPERTIES ('format-version'='3');
+OPTIMIZE TABLE s19_target;
+====
+---- QUERY
+# Prepare second source for the V3 MERGE.
+TRUNCATE TABLE s19_source;
+INSERT INTO s19_source VALUES (2,'APRICOT',200),(4,'BERRY',400),(6,'date',600);
+====
+---- QUERY
+# V3 MERGE: update id=2,4 (matched, PARTITION__SPEC__ID non-NULL → DV path);
+# insert id=6 (not matched, PARTITION__SPEC__ID NULL → murmur_hash XOR fallback).
+MERGE INTO s19_target USING s19_source ON s19_target.id = s19_source.id
+WHEN MATCHED THEN UPDATE SET s19_target.s = s19_source.s,
+                              s19_target.val = s19_source.val
+WHEN NOT MATCHED THEN INSERT VALUES (s19_source.id, s19_source.s, s19_source.val);
+---- DML_RESULTS: s19_target
+1,'APPLE',100
+2,'APRICOT',200
+3,'BANANA',300
+4,'BERRY',400
+5,'cherry',500
+6,'date',600
+---- TYPES
+INT,STRING,INT
+====
+---- QUERY
+# V3 MERGE produced deletion vectors for the 2 updated rows,
+# each in their own (truncate, bucket) partition cell.
+SELECT count(*) FROM $DATABASE.s19_target.`files` WHERE content = 1;
+---- RESULTS
+2
+---- TYPES
+BIGINT
+====
+---- QUERY
+# Updated rows (id=2,4) must have _last_updated_sequence_number from the V3
+# MERGE snapshot. 4 V2 INSERTs=seq 1-4, V2 MERGE=seq 5, OPTIMIZE=seq 6,
+# V3 MERGE=seq 7.
+SELECT id, s, val, _last_updated_sequence_number AS last_seq
+FROM s19_target WHERE id IN (2, 4) ORDER BY id;
+---- RESULTS
+2,'APRICOT',200,7
+4,'BERRY',400,7
+---- TYPES
+INT,STRING,INT,BIGINT
+====
+---- QUERY
+# Inserted row (id=6) was written under V3 and must have a valid _row_id
+# and last_seq from the V3 MERGE snapshot (seq=6).
+SELECT _row_id IS NOT NULL, _last_updated_sequence_number
+FROM s19_target WHERE id = 6;
+---- RESULTS
+true,7
+---- TYPES
+BOOLEAN,BIGINT
+====
+---- QUERY
+# Rows untouched by the V3 MERGE (id=1,3,5) were rewritten by OPTIMIZE but
+# OPTIMIZE does not advance the data sequence number, so they retain seq=5
+# (the V2 MERGE snapshot sequence). They do get valid _row_id after OPTIMIZE.
+SELECT id, _row_id IS NOT NULL, _last_updated_sequence_number AS last_seq
+FROM s19_target WHERE id IN (1, 3, 5) ORDER BY id;
+---- RESULTS
+1,true,5
+3,true,5
+5,true,5
+---- TYPES
+INT,BOOLEAN,BIGINT
+====
+---- QUERY
+# S20: insert-only MERGE on unpartitioned V3 (WHEN NOT MATCHED only).
+CREATE TABLE s20_target (id INT, val STRING)
+STORED BY ICEBERG
+TBLPROPERTIES ('format-version'='3');
+
+CREATE TABLE s20_source (id INT, val STRING)
+STORED BY ICEBERG
+TBLPROPERTIES ('format-version'='3');
+
+INSERT INTO s20_target VALUES (1,'one'),(2,'two');
+INSERT INTO s20_source VALUES (3,'three'),(4,'four');
+====
+---- QUERY
+MERGE INTO s20_target USING s20_source ON s20_target.id = s20_source.id
+WHEN NOT MATCHED THEN INSERT VALUES (s20_source.id, s20_source.val);
+---- DML_RESULTS: s20_target
+1,'one'
+2,'two'
+3,'three'
+4,'four'
+---- TYPES
+INT,STRING
+---- RUNTIME_PROFILE
+# Insert-only on unpartitioned V3 must not shuffle on INPUT__FILE__NAME.
+!row_regex: .*EXCHANGE \[HASH\(.*INPUT__FILE__NAME.*\).*
+====
+---- QUERY
+# All rows have last_seq=1 (inserted) or last_seq=2 (newly inserted by MERGE).
+SELECT id, val, _last_updated_sequence_number AS last_seq
+FROM s20_target ORDER BY id;
+---- RESULTS
+1,'one',1
+2,'two',1
+3,'three',2
+4,'four',2
+---- TYPES
+INT,STRING,BIGINT
+====
+---- QUERY
+# S21: insert-only MERGE on partitioned V3 (identity on cat, WHEN NOT MATCHED only).
+CREATE TABLE s21_target (id INT, cat STRING, val INT)
+PARTITIONED BY SPEC (cat)
+STORED BY ICEBERG
+TBLPROPERTIES ('format-version'='3');
+
+CREATE TABLE s21_source (id INT, cat STRING, val INT)
+STORED BY ICEBERG
+TBLPROPERTIES ('format-version'='3');
+
+INSERT INTO s21_target VALUES (1,'A',10),(2,'B',20);
+INSERT INTO s21_source VALUES (3,'A',30),(4,'C',40);
+====
+---- QUERY
+MERGE INTO s21_target USING s21_source ON s21_target.id = s21_source.id
+WHEN NOT MATCHED THEN INSERT VALUES (s21_source.id, s21_source.cat, s21_source.val);
+---- DML_RESULTS: s21_target
+1,'A',10
+2,'B',20
+3,'A',30
+4,'C',40
+---- TYPES
+INT,STRING,INT
+---- RUNTIME_PROFILE
+# Insert-only partitioned V3 still shuffles on partition spec for correct file grouping.
+row_regex: .*EXCHANGE \[HASH\(coalesce\(.*partition__spec__id.*murmur_hash\(.*cat.*\).*\).*
+====
+---- QUERY
+# Existing rows keep seq=1; inserted rows get seq=2.
+SELECT id, cat, val, _last_updated_sequence_number AS last_seq
+FROM s21_target ORDER BY id;
+---- RESULTS
+1,'A',10,1
+2,'B',20,1
+3,'A',30,2
+4,'C',40,2
+---- TYPES
+INT,STRING,INT,BIGINT
+====

@@ -25,6 +25,7 @@ import org.apache.impala.authorization.Privilege;
 import org.apache.impala.catalog.Column;
 import org.apache.impala.catalog.FeIcebergTable;
 import org.apache.impala.catalog.FeTable;
+import org.apache.impala.catalog.VirtualColumn;
 import org.apache.impala.catalog.IcebergPositionDeleteTable;
 import org.apache.impala.catalog.Type;
 import org.apache.impala.common.AnalysisException;
@@ -80,6 +81,7 @@ public class IcebergMergeImpl implements MergeImpl {
   private List<Expr> targetRowMetaExpressions_;
   private List<Expr> targetPartitionMetaExpressions_;
   private List<Expr> targetPartitionExpressions_;
+  private List<Expr> shuffleExprs_;
   private MergeSorting targetSorting_;
   private Expr rowPresentExpression_;
   private Expr mergeActionExpression_;
@@ -113,10 +115,25 @@ public class IcebergMergeImpl implements MergeImpl {
     Preconditions.checkState(table instanceof FeIcebergTable);
     icebergTable_ = (FeIcebergTable) table;
     IcebergUtil.validateIcebergTableForInsert(icebergTable_);
-    if (icebergTable_.getFormatVersion() > 2) {
+    int formatVersion = icebergTable_.getFormatVersion();
+    if (formatVersion > IcebergUtil.FORMAT_VERSION_3) {
       throw new AnalysisException(String.format(
           "Impala does not support MERGE statements on Iceberg tables with format " +
-              "version %d", icebergTable_.getFormatVersion()));
+              "version %d", formatVersion));
+    }
+    if (formatVersion >= IcebergUtil.FORMAT_VERSION_3
+        && !mergeStmt_.hasOnlyInsertCases()) {
+      int positionDeletes =
+          icebergTable_.getContentFileStore().getPositionDeleteFiles().size();
+      if (positionDeletes > 0) {
+        throw new AnalysisException(String.format(
+            "MERGE is not allowed on Iceberg format version 3 table '%s' as it "
+                + "has existing version 2 position delete file(s): "
+                + "%d position delete file(s). Run 'OPTIMIZE TABLE %s' to rewrite the "
+                + "files and remove deletion files before attempting MERGE.",
+            icebergTable_.getFullName(), positionDeletes,
+            icebergTable_.getFullName()));
+      }
     }
     String modifyWriteMode = icebergTable_.getIcebergApiTable().properties()
         .get(TableProperties.MERGE_MODE);
@@ -126,7 +143,7 @@ public class IcebergMergeImpl implements MergeImpl {
           "Unsupported '%s': '%s' for Iceberg table: %s",
           TableProperties.MERGE_MODE, modifyWriteMode, icebergTable_.getFullName()));
     }
-    for (Column column : icebergTable_.getColumns()) {
+    for (Column column : icebergTable_.getColumnsInHiveOrder()) {
       Path slotPath =
           new Path(targetTableRef_.desc_, Collections.singletonList(column.getName()));
       slotPath.resolve();
@@ -137,7 +154,7 @@ public class IcebergMergeImpl implements MergeImpl {
 
     IcebergMergeQueryGenerator.MergeQuery mergeQuery =
         IcebergMergeQueryGenerator.generate(
-            targetTableRef_, sourceTableRef_, icebergTable_);
+            targetTableRef_, sourceTableRef_, icebergTable_, mergeStmt_, analyzer);
     queryStmt_ = mergeQuery.queryStmt;
     rowPresentExpression_ = mergeQuery.rowPresentExpression;
     targetExpressions_ = mergeQuery.targetExpressions;
@@ -155,12 +172,13 @@ public class IcebergMergeImpl implements MergeImpl {
           icebergPositionalDeleteTable_);
     }
 
-    IcebergUtil.populatePartitionExprs(analyzer, null, table_.getColumns(),
+    IcebergUtil.populatePartitionExprs(analyzer, null, table_.getColumnsInHiveOrder(),
         getResultExprs(), icebergTable_, targetPartitionExpressions_, null);
 
     analyzer.registerPrivReq(
         builder -> builder.onTable(icebergTable_).allOf(Privilege.ALL).build());
 
+    shuffleExprs_ = buildShuffleExprs(analyzer);
     targetSorting_ = getSorting();
     analyzer.getDescTbl().setTargetTable(icebergTable_);
   }
@@ -211,6 +229,7 @@ public class IcebergMergeImpl implements MergeImpl {
     mergeActionExpression_ = mergeActionExpression_.substitute(smap, analyzer, true);
     targetPartitionExpressions_ =
         Expr.substituteList(targetPartitionExpressions_, smap, analyzer, true);
+    shuffleExprs_ = Expr.substituteList(shuffleExprs_, smap, analyzer, true);
     for (MergeCase mergeCase : mergeStmt_.getCases()) {
       mergeCase.substituteResultExprs(smap, analyzer);
     }
@@ -227,6 +246,76 @@ public class IcebergMergeImpl implements MergeImpl {
 
   @Override
   public List<Expr> getPartitionKeyExprs() { return targetPartitionExpressions_; }
+
+  /**
+   * Returns expressions used to shuffle rows across fragment instances.
+   *
+   * Partitioned tables:
+   *   V3 — [COALESCE(PARTITION__SPEC__ID, murmur_hash(e1) ^ murmur_hash(e2) ^ ...),
+   *          ICEBERG__PARTITION__SERIALIZED]
+   *         For matched rows PARTITION__SPEC__ID is non-NULL and routes by the actual
+   *         spec+partition virtual columns so each sink instance sees at most one DV per
+   *         data file. For INSERT (WHEN NOT MATCHED) rows the target tuple is absent
+   *         from the full outer join so PARTITION__SPEC__ID is NULL; the fallback
+   *         XOR of per-expression murmur_hash values spreads inserts across instances
+   *         by logical partition.
+   *   V2 — computed partition transform expressions (e.g. year(ts), bucket(s, 5)).
+   *
+   * Unpartitioned tables:
+   *   V3 — input__file__name, so all deletes for the same data file land in the same
+   *         sink instance, producing exactly one DV. Skipped for INSERT-only statements
+   *         since no deletion vectors are produced.
+   *         WHEN NOT MATCHED rows have a NULL file name and hash to the same bucket,
+   *         which is acceptable for correctness.
+   *   V2 — no shuffle needed.
+   */
+  @Override
+  public List<Expr> getShuffleExprs() { return shuffleExprs_; }
+
+  private List<Expr> buildShuffleExprs(Analyzer analyzer) throws AnalysisException {
+    if (icebergTable_.isPartitioned()) {
+      if (icebergTable_.getFormatVersion() >= IcebergUtil.FORMAT_VERSION_3) {
+        return buildV3PartitionedShuffleExprs(analyzer);
+      }
+      return targetPartitionExpressions_;
+    }
+    if (icebergTable_.getFormatVersion() >= IcebergUtil.FORMAT_VERSION_3
+        && !mergeStmt_.hasOnlyInsertCases()) {
+      return Collections.singletonList(DmlStatementBase.createSlotRef(
+          analyzer, targetTableRef_.getUniqueAlias(), "INPUT__FILE__NAME"));
+    }
+    return Collections.emptyList();
+  }
+
+  /**
+   * Builds shuffle expressions for V3 partitioned tables:
+   *   [COALESCE(PARTITION__SPEC__ID, murmur_hash(e1) ^ murmur_hash(e2) ^ ...),
+   *    ICEBERG__PARTITION__SERIALIZED]
+   * murmur_hash takes a single argument, so N partition transform expressions are
+   * hashed individually and XOR'd together into one BIGINT.
+   */
+  private List<Expr> buildV3PartitionedShuffleExprs(Analyzer analyzer)
+      throws AnalysisException {
+    SlotRef specId = DmlStatementBase.createSlotRef(
+        analyzer, targetTableRef_.getUniqueAlias(),
+        VirtualColumn.PARTITION_SPEC_ID.getName());
+    Expr xorExpr = null;
+    for (Expr partExpr : Expr.cloneList(targetPartitionExpressions_)) {
+      FunctionCallExpr hashExpr = new FunctionCallExpr(
+          "murmur_hash", Lists.newArrayList(partExpr));
+      hashExpr.analyze(analyzer);
+      xorExpr = (xorExpr == null) ? hashExpr
+          : new ArithmeticExpr(ArithmeticExpr.Operator.BITXOR, xorExpr, hashExpr);
+      if (xorExpr instanceof ArithmeticExpr) xorExpr.analyze(analyzer);
+    }
+    FunctionCallExpr coalesceExpr = new FunctionCallExpr(
+        "coalesce", Lists.newArrayList(specId, xorExpr));
+    coalesceExpr.analyze(analyzer);
+    SlotRef partitionSerialized = DmlStatementBase.createSlotRef(
+        analyzer, targetTableRef_.getUniqueAlias(),
+        VirtualColumn.ICEBERG_PARTITION_SERIALIZED.getName());
+    return Lists.newArrayList(coalesceExpr, partitionSerialized);
+  }
 
   @Override
   public List<Expr> getSortExprs() { return targetSorting_.sortingExpressions_; }

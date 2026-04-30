@@ -138,6 +138,8 @@ import org.slf4j.LoggerFactory;
 
 @SuppressWarnings("UnstableApiUsage")
 public class IcebergUtil {
+  public static final int FORMAT_VERSION_3 = 3;
+
   public static final int ICEBERG_EPOCH_YEAR = 1970;
   private static final int ICEBERG_EPOCH_MONTH = 1;
   @SuppressWarnings("unused")
@@ -1685,7 +1687,7 @@ public class IcebergUtil {
   public static void addRowLineageExprs(Analyzer analyzer, TableRef tableRef,
       List<Expr> resultExprs) throws AnalysisException {
     FeIcebergTable table = (FeIcebergTable) tableRef.getTable();
-    if (table.getFormatVersion() < 3) return;
+    if (table.getFormatVersion() < FORMAT_VERSION_3) return;
     resultExprs.add(getAnalyzedRowIdExpr(analyzer, tableRef));
     resultExprs.add(getAnalyzedLastUpdatedSeqNoExpr(analyzer, tableRef));
     Preconditions.checkState(resultExprs.size() == table.getColumns().size());

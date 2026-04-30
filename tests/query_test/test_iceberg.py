@@ -2572,6 +2572,10 @@ class TestIcebergV3Table(IcebergTestSuite):
       self._assert_puffin_file_layout(local_file, reported_size,
                                       content_offset, content_size)
 
+  def test_v3_merge(self, vector, unique_database):
+    """MERGE INTO a table that was created as V2 then upgraded to V3."""
+    self.run_test_case('QueryTest/iceberg-v3-merge', vector, unique_database)
+
 
 # Tests to exercise the DIRECTED distribution mode for V2 Iceberg tables. Note, that most
 # of the test coverage is in TestIcebergV2Table.test_read_position_deletes but since it
