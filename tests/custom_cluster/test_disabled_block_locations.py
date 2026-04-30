@@ -20,7 +20,7 @@ import pytest
 from os import getenv
 from tests.common.file_utils import create_iceberg_table_from_directory
 from tests.common.skip import SkipIf
-from tests.util.filesystem_utils import IS_HDFS
+from tests.util.filesystem_utils import IS_HDFS, get_fs_path
 
 from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
 
@@ -80,4 +80,6 @@ class TestDisabledBlockLocations(CustomClusterTestSuite):
     self.run_test_case('QueryTest/iceberg-v3-delete-v2-equality-upgrade',
         vector, unique_database)
 
-    self.run_test_case('QueryTest/iceberg-v3-update', vector, unique_database)
+    udf_location = get_fs_path('/test-warehouse/libTestUdfs.so')
+    self.run_test_case('QueryTest/iceberg-v3-update', vector, unique_database,
+                       test_file_vars={'UDF_LOCATION': udf_location})
