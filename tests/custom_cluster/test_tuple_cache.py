@@ -707,6 +707,18 @@ class TestTupleCacheCluster(TestTupleCacheBase):
     # than 750 milliseconds.
     assert end_time - start_time < 0.75
 
+  def test_iceberg_v2_deletes(self, vector, unique_database):
+    """
+    This is a regression test for IMPALA-14951 where an Iceberg delete with a
+    IcebergDeleteNode hangs with tuple caching. This scenario consistently hangs without
+    the necessary logic.
+    """
+    # The scenario requires mt_dop > 1, because it depends on cache hits across different
+    # fragment instances inside the same delete statement.
+    vector.set_exec_option('mt_dop', '8')
+    self.run_test_case('QueryTest/tuple-cache-iceberg-v2-deletes', vector,
+        use_db=unique_database)
+
 
 @CustomClusterTestSuite.with_args(start_args=CACHE_START_ARGS, cluster_size=1)
 class TestTupleCacheRuntimeKeysBasic(TestTupleCacheBase):

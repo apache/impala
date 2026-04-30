@@ -90,6 +90,7 @@ Status IcebergDeleteNode::Prepare(RuntimeState* state) {
     }
   }
 
+  prepare_succeeded_ = true;
   return Status::OK();
 }
 
@@ -137,13 +138,7 @@ void IcebergDeleteNode::Close(RuntimeState* state) {
   // transfer reservation to 'builder_'.
   if (build_batch_ != nullptr) build_batch_->Reset();
   if (probe_batch_ != nullptr) probe_batch_->Reset();
-  if (builder_ != nullptr) {
-    bool separate_build = UseSeparateBuild(state->query_options());
-    if (!separate_build || waited_for_build_) {
-      builder_->CloseFromProbe(state);
-      waited_for_build_ = false;
-    }
-  }
+  UnregisterFromBuilder<IcebergDeleteBuilder>(state, &builder_);
   BlockingJoinNode::Close(state);
 }
 

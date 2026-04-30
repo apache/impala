@@ -167,32 +167,13 @@ Status NestedLoopJoinNode::Reset(RuntimeState* state, RowBatch* row_batch) {
 void NestedLoopJoinNode::Close(RuntimeState* state) {
   if (is_closed()) return;
   ScalarExprEvaluator::Close(join_conjunct_evals_, state);
-  bool separate_build = UseSeparateBuild(state->query_options());
-  if (prepare_succeeded_ && builder_ == nullptr && separate_build) {
-    DCHECK(builder_ == nullptr);
-    DCHECK(!waited_for_build_);
-    // Find the separate join builder. This can return an error status if the Prepare()
-    // phase failed. In that case, there is no need to notify the builder and it can
-    // be skipped.
-    JoinBuilder* separate_builder;
-    Status status = LookupSeparateJoinBuilder(state, &separate_builder);
-    if (status.ok()) {
-      builder_ = dynamic_cast<NljBuilder*>(separate_builder);
-      DCHECK(builder_ != nullptr);
-    }
-  }
-  if (builder_ != NULL) {
+  if (builder_ != nullptr) {
     // IMPALA-6595: builder must be closed before child. The separate build case is
     // handled in FragmentInstanceState.
-    DCHECK(separate_build || builder_->is_closed() || !children_[1]->is_closed());
-    if (separate_build && !waited_for_build_) {
-      // There is a separate build and we never reached the probe phase
-      builder_->CloseBeforeProbe(state);
-    } else {
-      builder_->CloseFromProbe(state);
-      waited_for_build_ = false;
-    }
+    DCHECK(UseSeparateBuild(state->query_options()) || builder_->is_closed()
+        || !children_[1]->is_closed());
   }
+  UnregisterFromBuilder(state, &builder_);
   build_batches_ = NULL;
   if (matching_build_rows_ != NULL) {
     mem_tracker()->Release(matching_build_rows_->MemUsage());
