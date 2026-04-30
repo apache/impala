@@ -18,7 +18,6 @@
 package org.apache.impala.analysis;
 
 import com.google.common.base.Preconditions;
-import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Lists;
 import java.util.Objects;
 import org.apache.iceberg.TableProperties;
@@ -28,7 +27,6 @@ import org.apache.impala.catalog.FeIcebergTable;
 import org.apache.impala.catalog.FeTable;
 import org.apache.impala.catalog.IcebergPositionDeleteTable;
 import org.apache.impala.catalog.Type;
-import org.apache.impala.catalog.VirtualColumn;
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.common.ImpalaException;
 import org.apache.impala.common.Pair;
@@ -64,7 +62,6 @@ import java.util.stream.Collectors;
  * the incoming row should be marked as deleted, written as a new row, or both.
  */
 public class IcebergMergeImpl implements MergeImpl {
-  private static final String ROW_PRESENT = "row_present";
   private static final String MERGE_ACTION_TUPLE_NAME = "merge-action";
 
   private final MergeStmt mergeStmt_;
@@ -80,7 +77,7 @@ public class IcebergMergeImpl implements MergeImpl {
   private TupleId targetTupleId_;
 
   private List<Expr> targetExpressions_;
-  private List<Expr> targetDeleteMetaExpressions_;
+  private List<Expr> targetRowMetaExpressions_;
   private List<Expr> targetPartitionMetaExpressions_;
   private List<Expr> targetPartitionExpressions_;
   private MergeSorting targetSorting_;
@@ -93,9 +90,6 @@ public class IcebergMergeImpl implements MergeImpl {
     sourceTableRef_ = source;
     on_ = on;
     table_ = targetTableRef_.getTable();
-    targetExpressions_ = Lists.newArrayList();
-    targetDeleteMetaExpressions_ = Lists.newArrayList();
-    targetPartitionMetaExpressions_ = Lists.newArrayList();
     targetPartitionExpressions_ = Lists.newArrayList();
   }
 
@@ -138,9 +132,17 @@ public class IcebergMergeImpl implements MergeImpl {
       slotPath.resolve();
       analyzer.registerSlotRef(slotPath);
     }
+
     sourceTableRef_.analyze(analyzer);
 
-    queryStmt_ = prepareQuery();
+    IcebergMergeQueryGenerator.MergeQuery mergeQuery =
+        IcebergMergeQueryGenerator.generate(
+            targetTableRef_, sourceTableRef_, icebergTable_);
+    queryStmt_ = mergeQuery.queryStmt;
+    rowPresentExpression_ = mergeQuery.rowPresentExpression;
+    targetExpressions_ = mergeQuery.targetExpressions;
+    targetRowMetaExpressions_ = mergeQuery.targetRowMetaExpressions;
+    targetPartitionMetaExpressions_ = mergeQuery.targetPartitionMetaExpressions;
     queryStmt_.analyze(analyzer);
 
     targetTupleId_ = targetTableRef_.getId();
@@ -204,8 +206,8 @@ public class IcebergMergeImpl implements MergeImpl {
     targetExpressions_ = Expr.substituteList(targetExpressions_, smap, analyzer, true);
     targetPartitionMetaExpressions_ =
         Expr.substituteList(targetPartitionMetaExpressions_, smap, analyzer, true);
-    targetDeleteMetaExpressions_ =
-        Expr.substituteList(targetDeleteMetaExpressions_, smap, analyzer, true);
+    targetRowMetaExpressions_ =
+        Expr.substituteList(targetRowMetaExpressions_, smap, analyzer, true);
     mergeActionExpression_ = mergeActionExpression_.substitute(smap, analyzer, true);
     targetPartitionExpressions_ =
         Expr.substituteList(targetPartitionExpressions_, smap, analyzer, true);
@@ -217,7 +219,7 @@ public class IcebergMergeImpl implements MergeImpl {
   @Override
   public List<Expr> getResultExprs() {
     List<Expr> result = Lists.newArrayList(targetExpressions_);
-    result.addAll(targetDeleteMetaExpressions_);
+    result.addAll(targetRowMetaExpressions_);
     result.addAll(targetPartitionMetaExpressions_);
     result.add(mergeActionExpression_);
     return result;
@@ -242,10 +244,10 @@ public class IcebergMergeImpl implements MergeImpl {
     // the sink and the merge node differs.
     List<MergeCase> copyOfCases =
         mergeStmt_.getCases().stream().map(MergeCase::clone).collect(Collectors.toList());
-    List<Expr> deleteMetaExprs = Expr.cloneList(targetDeleteMetaExpressions_);
+    List<Expr> rowMetaExprs = Expr.cloneList(targetRowMetaExpressions_);
     List<Expr> partitionMetaExprs = Expr.cloneList(targetPartitionMetaExpressions_);
     IcebergMergeNode mergeNode = new IcebergMergeNode(ctx.getNextNodeId(), child,
-        copyOfCases, rowPresentExpression_.clone(), deleteMetaExprs, partitionMetaExprs,
+        copyOfCases, rowPresentExpression_.clone(), rowMetaExprs, partitionMetaExprs,
         mergeActionTuple_, targetTupleId_);
     mergeNode.init(analyzer);
     return mergeNode;
@@ -278,7 +280,7 @@ public class IcebergMergeImpl implements MergeImpl {
       deletePartitionKeys = targetPartitionMetaExpressions_;
     }
     return new IcebergBufferedDeleteSink(icebergPositionalDeleteTable_,
-        deletePartitionKeys, targetDeleteMetaExpressions_, deleteTableId_);
+        deletePartitionKeys, targetRowMetaExpressions_, deleteTableId_);
   }
 
   public TableSink createInsertSink() {
@@ -286,120 +288,6 @@ public class IcebergMergeImpl implements MergeImpl {
         targetPartitionExpressions_, targetExpressions_, Collections.emptyList(), false,
         true, targetSorting_.sortingColumnsAndOrder(), -1, null,
         mergeStmt_.maxTableSinks_);
-  }
-
-  /**
-   * Creates the SELECT statement that contains all target and source columns
-   * and the 'row_present' calculated value. Virtual columns for the target
-   * table are also included for further use, e.g. writing delete files.
-   * Example:
-   * SELECT /* +straight_join * /;
-   *  CAST(TupleIsNull(0) + TupleIsNull(1) * 2 AS TINYINT) row_present,
-   *  target.*
-   *  target.file__position, target.partition__spec__id,
-   *  target.iceberg__partition__serialized,
-   *  source.*
-   * FROM
-   *  target
-   * FULL OUTER JOIN source
-   *  ON target.id = source.id
-   *
-   * @return Query statement that contains every target and source columns
-   */
-  public SelectStmt prepareQuery() {
-    List<SelectListItem> selectListItems = Lists.newArrayList();
-    SelectList selectList = new SelectList(selectListItems);
-    // Straight join hint is required to fix the join sides.
-    selectList.setPlanHints(Collections.singletonList(new PlanHint("straight_join")));
-    List<Expr> targetSlotRefs =
-        targetTableRef_.getTable().getColumns().stream()
-            .map(column -> new SlotRef(
-                ImmutableList.of(targetTableRef_.getUniqueAlias(),
-                    column.getName())))
-            .collect(Collectors.toList());
-    SelectListItem sourceColumns = SelectListItem.createStarItem(
-        Collections.singletonList(sourceTableRef_.getUniqueAlias()));
-
-    CastExpr rowPresentExpression =
-        createRowPresentExpression(targetTableRef_, sourceTableRef_);
-
-    List<Expr> partitionMetaExpressions = Collections.emptyList();
-    if (icebergTable_.isPartitioned()) {
-      partitionMetaExpressions = ImmutableList.of(
-          new SlotRef(
-              ImmutableList.of(targetTableRef_.getUniqueAlias(),
-                  VirtualColumn.PARTITION_SPEC_ID.getName())),
-          new SlotRef(ImmutableList.of(
-              targetTableRef_.getUniqueAlias(),
-              VirtualColumn.ICEBERG_PARTITION_SERIALIZED.getName())));
-    }
-
-    List<Expr> deleteMetaExpressions = Lists.newArrayList();
-
-    boolean hasEqualityDeleteFiles = !icebergTable_.getContentFileStore()
-        .getEqualityDeleteFiles().isEmpty();
-
-    // Required for duplicate checks and for UPDATE and DELETE clauses
-    deleteMetaExpressions.add(new SlotRef(
-            ImmutableList.of(targetTableRef_.getUniqueAlias(),
-                VirtualColumn.INPUT_FILE_NAME.getName())));
-    deleteMetaExpressions.add(new SlotRef(
-        ImmutableList.of(targetTableRef_.getUniqueAlias(),
-            VirtualColumn.FILE_POSITION.getName())));
-
-    if (hasEqualityDeleteFiles) {
-      deleteMetaExpressions.add(new SlotRef(
-          ImmutableList.of(targetTableRef_.getUniqueAlias(),
-              VirtualColumn.ICEBERG_DATA_SEQUENCE_NUMBER.getName())));
-    }
-
-    selectListItems.add(new SelectListItem(rowPresentExpression, ROW_PRESENT));
-    selectListItems.addAll(
-        targetSlotRefs.stream().map(expr -> new SelectListItem(expr, null))
-            .collect(Collectors.toList()));
-    selectListItems.addAll(deleteMetaExpressions.stream()
-        .map(expr -> new SelectListItem(expr, null))
-        .collect(Collectors.toList()));
-    selectListItems.addAll(partitionMetaExpressions.stream()
-        .map(expr -> new SelectListItem(expr, null))
-        .collect(Collectors.toList()));
-
-    selectListItems.add(sourceColumns);
-
-    rowPresentExpression_ = rowPresentExpression;
-    targetPartitionMetaExpressions_ = partitionMetaExpressions;
-    targetDeleteMetaExpressions_ = deleteMetaExpressions;
-    targetExpressions_ = targetSlotRefs;
-
-    FromClause fromClause =
-        new FromClause(Lists.newArrayList(targetTableRef_, sourceTableRef_));
-    return new SelectStmt(selectList, fromClause, null, null, null, null, null);
-  }
-
-  /**
-   * Creates the 'row_present' expression. It uses the internal
-   * TupleIsNullPredicate to create a 3-valued expression where the first bit
-   * denotes the target presence and the second the source presence.
-   * @param targetTableRef Target table reference
-   * @param sourceTableRef Source table reference
-   * @return Row present expression
-   */
-  private CastExpr createRowPresentExpression(
-      TableRef targetTableRef, TableRef sourceTableRef) {
-    TupleIsNullPredicate targetPresent =
-        new TupleIsNullPredicate(targetTableRef.getMaterializedTupleIds());
-    TupleIsNullPredicate sourcePresent =
-        new TupleIsNullPredicate(sourceTableRef.getMaterializedTupleIds());
-    CastExpr targetPresentAsTinyInt =
-        new CastExpr(new TypeDef(Type.TINYINT), targetPresent);
-    CastExpr sourcePresentAsTinyInt =
-        new CastExpr(new TypeDef(Type.TINYINT), sourcePresent);
-    ArithmeticExpr sourcePresentShifted =
-        new ArithmeticExpr(ArithmeticExpr.Operator.MULTIPLY, sourcePresentAsTinyInt,
-            NumericLiteral.create(2));
-    return new CastExpr(new TypeDef(Type.TINYINT),
-        new ArithmeticExpr(
-            ArithmeticExpr.Operator.ADD, targetPresentAsTinyInt, sourcePresentShifted));
   }
 
   private MergeSorting getSorting() throws AnalysisException {

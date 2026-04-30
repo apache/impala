@@ -64,7 +64,7 @@ class IcebergMergePlanNode : public PlanNode {
   ScalarExpr* row_present_ = nullptr;
 
   /// Exprs used to identify the position/delete information of each target record
-  std::vector<ScalarExpr*> delete_meta_exprs_;
+  std::vector<ScalarExpr*> row_meta_exprs_;
 
   /// Exprs used to identify the partitioning properties of a record
   std::vector<ScalarExpr*> partition_meta_exprs_;
@@ -93,7 +93,7 @@ class IcebergMergeNode : public ExecNode {
   Status GetNext(RuntimeState* state, RowBatch* row_batch, bool* eos) override;
   Status Reset(RuntimeState* state, RowBatch* row_batch) override;
   void Close(RuntimeState* state) override;
-  const std::vector<ScalarExprEvaluator*>& DeleteMetaEvals();
+  const std::vector<ScalarExprEvaluator*>& RowMetaEvals();
   const std::vector<ScalarExprEvaluator*>& PartitionMetaEvals();
 
  private:
@@ -123,9 +123,9 @@ class IcebergMergeNode : public ExecNode {
   int child_row_idx_;
   bool child_eos_;
   ScalarExpr* row_present_;
-  std::vector<ScalarExpr*> delete_meta_exprs_;
+  std::vector<ScalarExpr*> row_meta_exprs_;
   std::vector<ScalarExpr*> partition_meta_exprs_;
-  std::vector<ScalarExprEvaluator*> delete_meta_evaluators_;
+  std::vector<ScalarExprEvaluator*> row_meta_evaluators_;
   std::vector<ScalarExprEvaluator*> partition_meta_evaluators_;
   ScalarExprEvaluator* row_present_evaluator_;
 

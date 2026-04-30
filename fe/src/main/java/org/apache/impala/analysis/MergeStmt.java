@@ -183,6 +183,7 @@ public class MergeStmt extends DmlStatementBase {
     return cases_.stream().allMatch(
         mergeCase -> mergeCase.caseType().equals(TMergeCaseType.INSERT));
   }
+
   public boolean hasOnlyDeleteCases() {
     return cases_.stream().allMatch(
         mergeCase -> mergeCase.caseType().equals(TMergeCaseType.DELETE));
