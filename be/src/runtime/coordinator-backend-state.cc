@@ -377,6 +377,13 @@ void Coordinator::BackendState::ExecAsync(const DebugOptions& debug_options,
       // scan ranges can be important contributors to the size, so include that
       // information as well.
 
+      // Compute the size for the by_node_filepath_to_hosts
+      int64_t filepath_to_host_size = 0;
+      for (const auto& val : request.by_node_filepath_to_hosts()) {
+        filepath_to_host_size += sizeof(val.first);
+        filepath_to_host_size += val.second.ByteSizeLong();
+      }
+
       stringstream warn;
       warn << "Destination: " << NetworkAddressPBToString(impalad_address())
            << " Total size: " << PrettyPrinter::Print(rpc_size_, TUnit::BYTES)
@@ -390,6 +397,10 @@ void Coordinator::BackendState::ExecAsync(const DebugOptions& debug_options,
            << " num fragment instances: "
            << fragment_info.fragment_instance_ctxs.size()
            << " num scan ranges: " << total_scan_ranges;
+      if (filepath_to_host_size > 0) {
+        warn << " filepath to host map: "
+             << PrettyPrinter::Print(filepath_to_host_size, TUnit::BYTES);
+      }
       // stringstream::str() returns a copy, so warn.str() is an rvalue reference and
       // doesn't need std::move().
       execquery_rpc_stats->ReportRpcSizeWithWarning(rpc_size_, warn.str());
