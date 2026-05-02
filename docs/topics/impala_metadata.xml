@@ -122,14 +122,14 @@ under the License.
               on-demand:
 <codeblock>--use_local_catalog=true </codeblock>
             </dd>
-
           </dlentry>
           <dlentry>
             <dt>Flags related to <codeph>use_local_catalog</codeph></dt>
             <dd>When <codeph>use_local_catalog</codeph> is enabled or set to <codeph>True</codeph>
               on the impalad coordinators the following list of flags configure various parameters
-              as described below. It is not recommended to change the default values on these
-              flags.</dd>
+              as described below. It is recommended to maintain the default values for these flags;
+              however, you can modify the <codeph>max_stmt_metadata_loader_threads</codeph> flag as
+              needed for specific environment requirements. </dd>
             <dd>
               <ul>
                 <li>The flag <codeph>local_catalog_cache_mb</codeph> (defaults to -1) configures the
@@ -137,19 +137,29 @@ under the License.
                   cache is auto-configured to 60% of the configured Java heap size. Note that the
                   Java heap size is distinct from and typically smaller than the overall Impala
                   memory limit.</li>
-                <li>The flag <codeph>local_catalog_cache_expiration_s</codeph> (defaults to 3600) configures the
-                  expiration time of the catalog cache within each impalad. Even if the configured
-                  cache capacity has not been reached, items are removed from the cache if they have not
-                  been accessed in the defined amount of time.</li>
+                <li>The flag <codeph>local_catalog_cache_expiration_s</codeph> (defaults to 3600)
+                  configures the expiration time of the catalog cache within each impalad. Even if
+                  the configured cache capacity has not been reached, items are removed from the
+                  cache if they have not been accessed in the defined amount of time.</li>
                 <li>The flag <codeph>local_catalog_max_fetch_retries</codeph> (defaults to 40) configures
                   the maximum number of retries needed for queries to fetch a metadata object from the impalad
-                  coordinator's local catalog cache.</li>
+                  coordinator's local catalog cache.
+                </li>
+                <li id="IMPALA-14447">The flag <codeph>max_stmt_metadata_loader_threads</codeph>
+                  (defaults to 8) controls the maximum number of threads used per-query to load
+                  table metadata during query compilation. In local catalog mode, you can
+                  parallelize this process to reduce waiting time due to sequential loading. This
+                  flag allows you to parallelize that process, improving performance for complex
+                  queries that involve many tables. If a query requires metadata for only one table,
+                  or if you set this flag to 1, coordinator loads the metadata sequentially. Impala also
+                  falls back to sequential loading if the system cannot successfully start the
+                  requested number of threads.
+                </li>
               </ul>
             </dd>
           </dlentry>
         </dl>
       </p>
-
     </conbody>
 
   </concept>
