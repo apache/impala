@@ -403,4 +403,47 @@ public class IcebergFileMetadataLoader extends FileMetadataLoader {
     Preconditions.checkState(fd instanceof IcebergFileDescriptor);
     return (IcebergFileDescriptor) fd;
   }
+
+  /**
+   * Loads or refreshes the IcebergContentFileStore using the given content files.
+   * For incremental loads, 'existingFileStore' is updated in-place and returned.
+   * For full loads, a new IcebergContentFileStore is created and returned.
+   *
+   * 'outStats' is an optional output parameter. If non-null:
+   *   - For incremental loads: merged with the newly loaded file metadata stats.
+   *   - For full loads: set to the freshly loaded file metadata stats.
+   */
+  public static IcebergContentFileStore loadContentFilesStore(
+      org.apache.iceberg.Table icebergApiTable,
+      IcebergContentFileStore existingFileStore,
+      GroupedContentFiles icebergFiles,
+      ListMap<TNetworkAddress> hostIndex,
+      boolean requiresDataFilesInTableLocation,
+      boolean incremental,
+      FileMetadataStats outStats)
+      throws CatalogException, IOException {
+    // Don't pass oldFds in incremental case as all files should be new.
+    Iterable<IcebergFileDescriptor> oldFds = (existingFileStore == null || incremental)
+        ? Collections.emptyList() : existingFileStore.getAllFiles();
+
+    IcebergFileMetadataLoader loader = new IcebergFileMetadataLoader(
+        icebergApiTable, oldFds, hostIndex, icebergFiles,
+        existingFileStore == null
+            ? Collections.emptyList() : existingFileStore.getPartitionList(),
+        requiresDataFilesInTableLocation,
+        incremental ? existingFileStore.getPartitionMap() : null);
+    loader.load();
+
+    if (incremental) {
+      existingFileStore.mergeWithNewFiles(icebergFiles,
+          loader.getLoadedIcebergFds(), loader.getIcebergPartitions(),
+          icebergApiTable.location());
+      if (outStats != null) outStats.merge(loader.getFileMetadataStats());
+      return existingFileStore;
+    } else {
+      if (outStats != null) outStats.set(loader.getFileMetadataStats());
+      return new IcebergContentFileStore(icebergApiTable,
+          loader.getLoadedIcebergFds(), icebergFiles, loader.getIcebergPartitions());
+    }
+  }
 }

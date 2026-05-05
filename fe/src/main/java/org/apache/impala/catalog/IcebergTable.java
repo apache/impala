@@ -564,38 +564,16 @@ public class IcebergTable extends Table implements FeIcebergTable {
           incremental ? "Loaded Iceberg content file list incrementally"
                       : "Loaded Iceberg content file list");
 
-      // Don't pass olfFds in incremental case as all files should be new.
-      Iterable<IcebergFileDescriptor> oldFds = (fileStore_ == null || incremental)
-          ? Collections.emptyList() : fileStore_.getAllFiles();
+      fileStore_ = IcebergFileMetadataLoader.loadContentFilesStore(
+          icebergApiTable_, fileStore_, icebergFiles, getHostIndex(),
+          Utils.requiresDataFilesInTableLocation(this), incremental, fileMetadataStats_);
+      updateMetrics(fileMetadataStats_);
+      partitionStats_ = Utils.loadPartitionStats(
+          icebergApiTable_, icebergFiles, incremental ? partitionStats_ : null);
 
-      IcebergFileMetadataLoader loader = new IcebergFileMetadataLoader(
-          icebergApiTable_,
-          oldFds,
-          getHostIndex(),
-          Preconditions.checkNotNull(icebergFiles),
-          fileStore_ == null ? Collections.emptyList() : fileStore_.getPartitionList(),
-          Utils.requiresDataFilesInTableLocation(this),
-          incremental ? fileStore_.getPartitionMap() : null);
-      loader.load();
       catalogTimeline.markEvent(
           incremental ? "Loaded Iceberg file descriptors incrementally"
                       : "Loaded Iceberg file descriptors");
-
-      if (incremental) {
-        fileStore_.mergeWithNewFiles(icebergFiles,
-            loader.getLoadedIcebergFds(), loader.getIcebergPartitions(),
-            icebergApiTable_.location());
-        FileMetadataStats totalStats = new FileMetadataStats();
-        totalStats.set(fileMetadataStats_);
-        totalStats.merge(loader.getFileMetadataStats());
-        updateMetrics(totalStats);
-      } else {
-        fileStore_ = new IcebergContentFileStore(icebergApiTable_,
-            loader.getLoadedIcebergFds(), icebergFiles, loader.getIcebergPartitions());
-        updateMetrics(loader.getFileMetadataStats());
-      }
-      partitionStats_ = Utils.loadPartitionStats(
-          icebergApiTable_, icebergFiles, incremental ? partitionStats_ : null);
       setAvroSchema(msClient, msTable_, fileStore_, catalogTimeline);
       updateLoadedState();
     } catch (Exception e) {
