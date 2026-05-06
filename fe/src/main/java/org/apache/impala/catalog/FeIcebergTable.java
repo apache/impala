@@ -35,6 +35,7 @@ import java.util.Random;
 import java.util.Set;
 import java.util.TreeMap;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.function.Predicate;
 import java.util.stream.Collectors;
 
 import javax.annotation.Nullable;
@@ -196,6 +197,40 @@ public interface FeIcebergTable extends FeFsTable {
 
   default int getFormatVersion() {
     return ((BaseTable)getIcebergApiTable()).operations().current().formatVersion();
+  }
+
+  /**
+   * Returns a predicate that accepts only user-visible columns for this table.
+   * For Iceberg V3 tables, hidden metadata columns (e.g. _file_row_id,
+   * _file_last_updated_sequence_number) are excluded. For earlier format versions
+   * all columns are accepted.
+   */
+  default Predicate<Column> visibleColumnPredicate() {
+    if (getFormatVersion() < 3) return col -> true;
+    return col -> !col.isHidden();
+  }
+
+  /**
+   * Filters hidden columns from the given list using {@link #visibleColumnPredicate()}.
+   * Concrete implementations should call this from getNonClusteringColumns() passing
+   * their superclass's result.
+   */
+  default List<Column> filterHiddenColumns(List<Column> cols) {
+    return cols.stream()
+        .filter(visibleColumnPredicate())
+        .collect(Collectors.toList());
+  }
+
+  /**
+   * Returns column names from the given list using {@link #visibleColumnPredicate()}
+   * to exclude hidden columns. Concrete implementations should call this from
+   * getColumnNames() passing their superclass's getColumns() to preserve position order.
+   */
+  default List<String> filterHiddenColumnNames(List<Column> cols) {
+    return cols.stream()
+        .filter(visibleColumnPredicate())
+        .map(Column::getName)
+        .collect(Collectors.toList());
   }
 
   /**

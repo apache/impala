@@ -440,6 +440,16 @@ public class IcebergTable extends Table implements FeIcebergTable {
   }
 
   @Override
+  public List<String> getColumnNames() {
+    return filterHiddenColumnNames(super.getColumns());
+  }
+
+  @Override
+  public List<Column> getNonClusteringColumns() {
+    return filterHiddenColumns(super.getNonClusteringColumns());
+  }
+
+  @Override
   public TTable toThrift() {
     TTable table = super.toThrift();
     table.setTable_type(TTableType.ICEBERG_TABLE);

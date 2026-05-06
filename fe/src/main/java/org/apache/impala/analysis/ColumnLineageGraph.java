@@ -17,7 +17,6 @@
 
 package org.apache.impala.analysis;
 
-import java.nio.charset.Charset;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
@@ -34,7 +33,6 @@ import java.util.TreeSet;
 
 import com.google.common.collect.ImmutableSortedMap;
 import org.apache.impala.analysis.ColumnLineageGraph.Vertex.Metadata;
-import org.apache.impala.catalog.FeDataSource;
 import org.apache.impala.catalog.FeDataSourceTable;
 import org.apache.impala.catalog.FeFsTable;
 import org.apache.impala.catalog.FeHBaseTable;

@@ -194,6 +194,16 @@ public class LocalIcebergTable extends LocalTable implements FeIcebergTable {
   }
 
   @Override
+  public List<String> getColumnNames() {
+    return filterHiddenColumnNames(super.getColumns());
+  }
+
+  @Override
+  public List<Column> getNonClusteringColumns() {
+    return filterHiddenColumns(super.getNonClusteringColumns());
+  }
+
+  @Override
   public TIcebergFileFormat getIcebergFileFormat() {
     return icebergFileFormat_;
   }

@@ -37,6 +37,7 @@ class TestLineage(CustomClusterTestSuite):
   CREATE_TABLE_TIME_NO_HMS = "create_table_time_no_hms"
   DDL_LINEAGE = "ddl_lineage"
   LINEAGE = "lineage"
+  ICEBERG_V3_LINEAGE = "iceberg_v3_lineage"
 
   @classmethod
   def setup_class(cls):
@@ -178,6 +179,23 @@ class TestLineage(CustomClusterTestSuite):
         with open(log_path) as log_file:
           lineage_json = json.load(log_file)
           assert lineage_json["queryId"] is not profile_query_id
+
+  @pytest.mark.execute_serially
+  @CustomClusterTestSuite.with_args(
+      impalad_args="--lineage_event_log_dir={" + ICEBERG_V3_LINEAGE + "}",
+      tmp_dir_placeholders=[ICEBERG_V3_LINEAGE])
+  def test_iceberg_v3_ctas_lineage(self, unique_database):
+    """IMPALA-14952: Test that INSERT into an Iceberg V3 table succeeds without an
+       index-out-of-bounds error in HdfsTableSink caused by hidden V3 metadata columns
+       (_file_row_id, _file_last_updated_sequence_number) being counted as non-clustering
+       columns during lineage graph calculation."""
+    tbl_name = "{0}.v3_lineage_tbl".format(unique_database)
+    self.execute_query_expect_success(self.client,
+        "create table {0} (id int, bool_col boolean, string_col string) "
+        "stored by iceberg tblproperties('format-version'='3')".format(tbl_name))
+    self.execute_query_expect_success(self.client,
+        "insert into {0} select id, bool_col, string_col "
+        "from functional.alltypes".format(tbl_name))
 
   # IMPALA-14328: need to implement lineage for Calcite planner
   @SkipIfCalcite.lineage_not_supported
