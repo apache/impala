@@ -36,8 +36,9 @@ extern const char* FILESYS_PREFIX_OZONE;
 extern const char* FILESYS_PREFIX_OFS;
 
 /// Utility function to get error messages from HDFS. This function takes prefix/file and
-/// appends errno to it. Note: any stdlib function can reset errno, this should be called
-/// immediately following the failed call into libhdfs.
+/// appends errno plus any available libhdfs exception root cause and stack trace.
+/// Note: any stdlib function can reset errno, this should be called immediately
+/// following the failed call into libhdfs.
 std::string GetHdfsErrorMsg(const std::string& prefix, const std::string& file = "");
 
 /// Return the size, in bytes, of a file from the hdfs connection.
