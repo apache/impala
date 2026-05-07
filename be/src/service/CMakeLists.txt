@@ -43,6 +43,7 @@ add_library(Service
   internal-server.cc
   odbc-helper.cc
   query-options.cc
+  query-profile-redaction.cc
   query-result-set.cc
   query-state-record.cc
   workload-management-worker.cc
@@ -138,6 +139,7 @@ add_library(ServiceTests STATIC
   hs2-util-test.cc
   impala-http-handler-test.cc
   impala-server-test.cc
+  query-profile-redaction-test.cc
   query-options-test.cc
   query-state-record-test.cc
   workload-management-worker-test.cc
@@ -150,6 +152,8 @@ ADD_UNIFIED_BE_LSAN_TEST(hs2-util-test "StitchNullsTest.*:PrintTColumnValueTest.
 ADD_UNIFIED_BE_LSAN_TEST(query-options-test QueryOptions.*)
 ADD_UNIFIED_BE_LSAN_TEST(impala-http-handler-test ImpalaHttpHandlerTest.*)
 ADD_UNIFIED_BE_LSAN_TEST(impala-server-test ImpalaServerTest.*)
+ADD_UNIFIED_BE_LSAN_TEST(
+  query-profile-redaction-test QueryProfileRedactionTest.*)
 ADD_UNIFIED_BE_LSAN_TEST(query-state-record-test QueryStateRecordTest.*)
 ADD_UNIFIED_BE_LSAN_TEST(workload-management-worker-test WorkloadManagementWorkerTest.*)
 ADD_BE_LSAN_TEST(internal-server-test)
