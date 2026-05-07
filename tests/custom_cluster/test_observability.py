@@ -22,6 +22,7 @@ import re
 from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
 from tests.util.filesystem_utils import get_fs_path
 from tests.util.parse_util import parse_duration_string_ms
+from tests.util.query_profile_util import verify_profile_node_lifecycle_events
 
 
 class TestObservability(CustomClusterTestSuite):
@@ -80,3 +81,13 @@ class TestObservability(CustomClusterTestSuite):
     self.assert_catalogd_log_contains(
         "INFO", r"{}] Loading metadata for: {}.tbl2 \(Load for INSERT\)"
         .format(res.query_id, unique_database))
+
+  @pytest.mark.execute_serially
+  @CustomClusterTestSuite.with_args(workload_mgmt=True)
+  def test_query_profile_contains_system_table_scan_node_events(self):
+    """Test ExecNode lifecycle events for SystemTableScanNode."""
+    self.wait_for_wm_init_complete()
+    query = "select count(*) from sys.impala_query_live"
+    runtime_profile = self.execute_query(query).runtime_profile
+    assert "SYSTEM_TABLE_SCAN_NODE" in runtime_profile
+    verify_profile_node_lifecycle_events(runtime_profile)

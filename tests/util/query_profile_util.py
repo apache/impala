@@ -156,3 +156,36 @@ def parse_coordinator(profile_text):
   coordinator = re.search(r'\n\s+Coordinator:\s+(.*?)\n', profile_text)
   assert coordinator is not None, "Coordinator not found in query profile"
   return coordinator.group(1)
+
+
+def verify_profile_event_sequence(event_regexes, runtime_profile):
+  """Check that 'event_regexes' appear in a consecutive series of lines in
+     'runtime_profile'. All complete occurrences will be checked."""
+  event_regex_index = 0
+  found = False
+
+  for line in runtime_profile.splitlines():
+    match = re.search(event_regexes[event_regex_index], line)
+    if match is not None:
+      event_regex_index += 1
+      if event_regex_index == len(event_regexes):
+        found = True
+        event_regex_index = 0
+    else:
+      assert event_regex_index == 0, \
+          event_regexes[event_regex_index] + " not in " + line + "\n" + runtime_profile
+  assert found, "Didn't find any events in profile: \n" + runtime_profile
+  assert event_regex_index == 0, \
+      "Incomplete event sequence in profile: \n" + runtime_profile
+
+
+def verify_profile_node_lifecycle_events(runtime_profile):
+  """Check that the Node Lifecycle Event Timeline appears in the runtime profile."""
+  event_regexes = [r'Node Lifecycle Event Timeline',
+                   r'Open Started',
+                   r'Open Finished',
+                   r'First Batch Requested',
+                   r'First Batch Returned',
+                   r'Last Batch Returned',
+                   r'Closed']
+  verify_profile_event_sequence(event_regexes, runtime_profile)

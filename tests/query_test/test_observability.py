@@ -32,6 +32,8 @@ from tests.common.skip import (SkipIfFS, SkipIfLocal, SkipIfNotHdfsMinicluster,
 from tests.common.test_vector import HS2
 from tests.util.filesystem_utils import WAREHOUSE
 from tests.util.parse_util import get_duration_us_from_str
+from tests.util.query_profile_util import (verify_profile_event_sequence,
+                                           verify_profile_node_lifecycle_events)
 
 
 class TestObservability(ImpalaTestSuite):
@@ -329,7 +331,7 @@ class TestObservability(ImpalaTestSuite):
         r'Distributed plan created:']
     query = "select * from functional.alltypes"
     runtime_profile = self.execute_query(query).runtime_profile
-    self.__verify_profile_event_sequence(event_regexes, runtime_profile)
+    verify_profile_event_sequence(event_regexes, runtime_profile)
 
   def test_query_profile_contains_query_compilation_metadata_load_events(self,
         cluster_properties):
@@ -384,7 +386,7 @@ class TestObservability(ImpalaTestSuite):
         r'CatalogFetch.Tables.Misses',
         r'CatalogFetch.Tables.Requests',
         r'CatalogFetch.Tables.Time']
-    self.__verify_profile_event_sequence(load_event_regexes, runtime_profile)
+    verify_profile_event_sequence(load_event_regexes, runtime_profile)
 
   def test_query_profile_contains_query_compilation_metadata_cached_event(self):
     """Test that the Metadata cache available event appears in the query profile when
@@ -396,7 +398,7 @@ class TestObservability(ImpalaTestSuite):
     event_regexes = [r'Query Compilation:',
         r'Metadata of all .* tables cached:',
         r'Analysis finished:']
-    self.__verify_profile_event_sequence(event_regexes, runtime_profile)
+    verify_profile_event_sequence(event_regexes, runtime_profile)
 
   def test_query_profile_contains_query_compilation_lineage_event(self):
     """Test that the lineage information appears in the profile in the right place. This
@@ -417,7 +419,7 @@ class TestObservability(ImpalaTestSuite):
     self.execute_query_expect_success(self.client, "set enable_replan=0")
     query = "select * from functional.alltypes"
     runtime_profile = self.execute_query(query).runtime_profile
-    self.__verify_profile_event_sequence(event_regexes, runtime_profile)
+    verify_profile_event_sequence(event_regexes, runtime_profile)
 
   def test_query_profile_contains_query_timeline_events(self):
     """Test that the expected events show up in a query profile."""
@@ -437,7 +439,7 @@ class TestObservability(ImpalaTestSuite):
     # add an extra event to the above timeline).
     query_opts = {'request_pool': 'root.no-limits'}
     runtime_profile = self.execute_query(query, query_opts).runtime_profile
-    self.__verify_profile_event_sequence(event_regexes, runtime_profile)
+    verify_profile_event_sequence(event_regexes, runtime_profile)
 
   def test_query_profile_contains_instance_events(self):
     """Test that /query_profile_encoded contains an event timeline for fragment
@@ -450,40 +452,20 @@ class TestObservability(ImpalaTestSuite):
                      r'ExecInternal Finished']
     query = "select count(*) from functional.alltypes"
     runtime_profile = self.execute_query(query).runtime_profile
-    self.__verify_profile_event_sequence(event_regexes, runtime_profile)
+    verify_profile_event_sequence(event_regexes, runtime_profile)
 
   def test_query_profile_contains_node_events(self):
     """Test that ExecNode events show up in a profile."""
-    event_regexes = [r'Node Lifecycle Event Timeline',
-                     r'Open Started',
-                     r'Open Finished',
-                     r'First Batch Requested',
-                     r'First Batch Returned',
-                     r'Last Batch Returned',
-                     r'Closed']
-    query = "select count(*) from functional.alltypes"
-    runtime_profile = self.execute_query(query).runtime_profile
-    self.__verify_profile_event_sequence(event_regexes, runtime_profile)
-
-  def __verify_profile_event_sequence(self, event_regexes, runtime_profile):
-    """Check that 'event_regexes' appear in a consecutive series of lines in
-       'runtime_profile'"""
-    event_regex_index = 0
-
-    # Check that the strings appear in the above order with no gaps in the profile.
-    for line in runtime_profile.splitlines():
-      match = re.search(event_regexes[event_regex_index], line)
-      if match is not None:
-        event_regex_index += 1
-        if event_regex_index == len(event_regexes):
-          # Found all the lines - we're done.
-          return
-      else:
-        # Haven't found the first regex yet.
-        assert event_regex_index == 0, \
-            event_regexes[event_regex_index] + " not in " + line + "\n" + runtime_profile
-    assert event_regex_index == len(event_regexes), \
-        "Didn't find all events in profile: \n" + runtime_profile
+    queries_and_opts = [
+      ("select count(*) from functional.alltypes", None),
+      ("select count(*) from functional.alltypes", {"mt_dop": 4}),
+      ("select count(*) from functional_kudu.alltypes", None),
+      ("select count(*) from functional_kudu.alltypes", {"mt_dop": 4}),
+      ("select * from functional_parquet.iceberg_query_metadata.entries", None),
+    ]
+    for query, query_opts in queries_and_opts:
+      runtime_profile = self.execute_query(query, query_opts).runtime_profile
+      verify_profile_node_lifecycle_events(runtime_profile)
 
   def test_query_profile_contains_all_events(self, unique_database):
     """Test that the expected events show up in a query profile for various queries"""
@@ -883,7 +865,7 @@ class TestObservability(ImpalaTestSuite):
     event_regexes = [r'Per Host Number of Fragment Instances']
     query = "select count (*) from functional.alltypes"
     runtime_profile = self.execute_query(query).runtime_profile
-    self.__verify_profile_event_sequence(event_regexes, runtime_profile)
+    verify_profile_event_sequence(event_regexes, runtime_profile)
 
   def test_query_profile_contains_executor_group(self):
     """Test that the profile contains an info string with the executor group that was

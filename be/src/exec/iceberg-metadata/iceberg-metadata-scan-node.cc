@@ -17,6 +17,7 @@
 
 #include "exec/iceberg-metadata/iceberg-metadata-scan-node.h"
 #include "exec/exec-node.inline.h"
+#include "exec/exec-node-util.h"
 #include "runtime/exec-env.h"
 #include "runtime/runtime-state.h"
 #include "runtime/tuple-row.h"
@@ -52,7 +53,9 @@ Status IcebergMetadataScanNode::Prepare(RuntimeState* state) {
 }
 
 Status IcebergMetadataScanNode::Open(RuntimeState* state) {
+  SCOPED_TIMER(runtime_profile_->total_time_counter());
   SCOPED_TIMER(scan_prepare_timer_);
+  ScopedOpenEventAdder ea(this);
   RETURN_IF_ERROR(ScanNode::Open(state));
   JNIEnv* env = JniUtil::GetJNIEnv();
   if (env == nullptr) return Status("Failed to get/create JVM");
@@ -70,6 +73,8 @@ Status IcebergMetadataScanNode::Open(RuntimeState* state) {
 
 Status IcebergMetadataScanNode::GetNext(RuntimeState* state, RowBatch* row_batch,
     bool* eos) {
+  SCOPED_TIMER(runtime_profile_->total_time_counter());
+  ScopedGetNextEventAdder ea(this, eos);
   RETURN_IF_CANCELLED(state);
   JNIEnv* env = JniUtil::GetJNIEnv();
   if (env == nullptr) return Status("Failed to get/create JVM");

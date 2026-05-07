@@ -18,6 +18,7 @@
 #include "system-table-scan-node.h"
 
 #include "exec/exec-node.inline.h"
+#include "exec/exec-node-util.h"
 #include "exec/system-table-scanner.h"
 #include "runtime/descriptors.h"
 #include "runtime/row-batch.h"
@@ -37,10 +38,11 @@ Status SystemTableScanNode::Prepare(RuntimeState* state) {
 }
 
 Status SystemTableScanNode::Open(RuntimeState* state) {
+  SCOPED_TIMER(runtime_profile_->total_time_counter());
+  ScopedOpenEventAdder ea(this);
   RETURN_IF_ERROR(ScanNode::Open(state));
   RETURN_IF_CANCELLED(state);
   RETURN_IF_ERROR(QueryMaintenance(state));
-  SCOPED_TIMER(runtime_profile_->total_time_counter());
 
   RETURN_IF_ERROR(SystemTableScanner::CreateScanner(state, runtime_profile(),
       plan_node().tnode_->system_table_scan_node.table_name, &scanner_));
@@ -55,10 +57,11 @@ Status SystemTableScanNode::MaterializeNextTuple(MemPool* tuple_pool, Tuple* tup
 }
 
 Status SystemTableScanNode::GetNext(RuntimeState* state, RowBatch* row_batch, bool* eos) {
+  SCOPED_TIMER(runtime_profile_->total_time_counter());
+  ScopedGetNextEventAdder ea(this, eos);
   RETURN_IF_ERROR(ExecDebugAction(TExecNodePhase::GETNEXT, state));
   RETURN_IF_CANCELLED(state);
   RETURN_IF_ERROR(QueryMaintenance(state));
-  SCOPED_TIMER(runtime_profile_->total_time_counter());
 
   int64_t tuple_buffer_size;
   uint8_t* tuple_mem;

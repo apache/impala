@@ -20,6 +20,7 @@
 #include <thrift/protocol/TDebugProtocol.h>
 #include <vector>
 
+#include "exec/exec-node-util.h"
 #include "exec/kudu/kudu-scanner.h"
 #include "exec/kudu/kudu-util.h"
 
@@ -45,6 +46,7 @@ KuduScanNodeMt::~KuduScanNodeMt() {
 
 Status KuduScanNodeMt::Open(RuntimeState* state) {
   SCOPED_TIMER(runtime_profile_->total_time_counter());
+  ScopedOpenEventAdder ea(this);
   RETURN_IF_ERROR(KuduScanNodeBase::Open(state));
   scanner_.reset(new KuduScanner(this, runtime_state_));
   RETURN_IF_ERROR(scanner_->Open());
@@ -53,6 +55,7 @@ Status KuduScanNodeMt::Open(RuntimeState* state) {
 
 Status KuduScanNodeMt::GetNext(RuntimeState* state, RowBatch* row_batch, bool* eos) {
   SCOPED_TIMER(runtime_profile_->total_time_counter());
+  ScopedGetNextEventAdder ea(this, eos);
   DCHECK(row_batch != NULL);
   RETURN_IF_ERROR(ExecDebugAction(TExecNodePhase::GETNEXT, state));
   RETURN_IF_CANCELLED(state);
