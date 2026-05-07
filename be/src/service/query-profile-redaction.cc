@@ -16,6 +16,7 @@
 // under the License.
 
 #include "service/query-profile-redaction.h"
+#include "service/query-profile-size-limit-util.h"
 
 #include <arpa/inet.h>
 
@@ -37,8 +38,6 @@
 #include <rapidjson/writer.h>
 
 #include "common/logging.h"
-#include "runtime/exec-env.h"
-#include "runtime/mem-tracker.h"
 
 using namespace std;
 using rapidjson::Document;
@@ -85,22 +84,6 @@ static const regex IPV4_RE(
 static string BuildRedactedSqlPlaceholder(size_t index) {
   if (index <= 1) return REDACTED_SQL_STATEMENT;
   return string("[REDACTED_SQL_STATEMENT_") + std::to_string(index) + "]";
-}
-
-// Computes the default profile size limit as min(default max-bytes,
-// default percentage relative to process memory limit).
-static int64_t ComputeDefaultProfileSizeLimitBytes() {
-  ExecEnv* exec_env = ExecEnv::GetInstance();
-  if (exec_env == nullptr || exec_env->process_mem_tracker() == nullptr) {
-    return DEFAULT_REDACTION_PROFILE_SIZE_LIMIT_MAX_BYTES;
-  }
-  const int64_t process_mem_limit = exec_env->process_mem_tracker()->limit();
-  if (process_mem_limit <= 0) return DEFAULT_REDACTION_PROFILE_SIZE_LIMIT_MAX_BYTES;
-
-  int64_t percentage_limit_bytes = process_mem_limit / 100
-      * DEFAULT_REDACTION_PROFILE_SIZE_LIMIT_PERCENTAGE;
-  percentage_limit_bytes = max<int64_t>(1L, percentage_limit_bytes);
-  return min(DEFAULT_REDACTION_PROFILE_SIZE_LIMIT_MAX_BYTES, percentage_limit_bytes);
 }
 
 // Escapes a string so it can be safely matched within JSON-serialized text.
@@ -552,7 +535,9 @@ QueryProfileRedactor::QueryProfileRedactor(int64_t profile_size_limit_bytes)
     : profile_size_limit_bytes_(
           profile_size_limit_bytes > 0
               ? profile_size_limit_bytes
-              : ComputeDefaultProfileSizeLimitBytes()) {}
+              : ComputeDefaultProfileSizeLimitBytes(
+                    DEFAULT_REDACTION_PROFILE_SIZE_LIMIT_MAX_BYTES,
+                    DEFAULT_REDACTION_PROFILE_SIZE_LIMIT_PERCENTAGE)) {}
 
 Status QueryProfileRedactor::Redact(const string_view& profile_text) {
   DCHECK(redacted_profile_text_.empty()) << "Cannot call Redact function more than once";

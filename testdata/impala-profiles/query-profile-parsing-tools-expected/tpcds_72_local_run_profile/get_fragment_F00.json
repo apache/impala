@@ -1,0 +1,996 @@
+{
+  "summary_stats_counters": [
+    {
+      "value": 42132,
+      "unit": "BYTES",
+      "min": 41984,
+      "max": 83968,
+      "avg": 42132,
+      "num_of_samples": 1414,
+      "counter_name": "RowBatchMemPoolAllocBytes"
+    },
+    {
+      "value": 105,
+      "unit": "TIME_NS",
+      "min": 24,
+      "max": 17092,
+      "avg": 105,
+      "num_of_samples": 1414,
+      "counter_name": "RowBatchMemPoolAllocDuration"
+    },
+    {
+      "value": 42132,
+      "unit": "BYTES",
+      "min": 41984,
+      "max": 83968,
+      "avg": 42132,
+      "num_of_samples": 1414,
+      "counter_name": "RowBatchMemPoolFreeBytes"
+    },
+    {
+      "value": 178,
+      "unit": "TIME_NS",
+      "min": 44,
+      "max": 85074,
+      "avg": 178,
+      "num_of_samples": 1414,
+      "counter_name": "RowBatchMemPoolFreeDuration"
+    }
+  ],
+  "event_sequences": [
+    {
+      "events": [
+        {
+          "label": "Prepare Finished",
+          "ts_list": [
+            62774247,
+            518466,
+            19519248
+          ]
+        },
+        {
+          "label": "Open Finished",
+          "ts_list": [
+            7904466395,
+            7904288229,
+            7904353824
+          ]
+        },
+        {
+          "label": "First Batch Produced",
+          "ts_list": [
+            7908716310,
+            7910608867,
+            7910741056
+          ]
+        },
+        {
+          "label": "First Batch Sent",
+          "ts_list": [
+            7908832147,
+            7910759183,
+            7910879167
+          ]
+        },
+        {
+          "label": "ExecInternal Finished",
+          "ts_list": [
+            8694748959,
+            8735116391,
+            8001590901
+          ]
+        }
+      ]
+    }
+  ],
+  "counters": [
+    {
+      "unit": "DOUBLE_VALUE",
+      "value": 1.0,
+      "counter_name": "AverageThreadTokens"
+    },
+    {
+      "unit": "BYTES",
+      "value": 98636794,
+      "counter_name": "BytesAssigned"
+    },
+    {
+      "unit": "TIME_NS",
+      "value": 8764987447,
+      "counter_name": "CompletionTime"
+    },
+    {
+      "unit": "DOUBLE_VALUE",
+      "value": 0.0,
+      "counter_name": "ExchangeScanRatio"
+    },
+    {
+      "unit": "BYTES_PER_SECOND",
+      "value": 11243616,
+      "counter_name": "ExecutionRate"
+    },
+    {
+      "unit": "TIME_NS",
+      "value": 0,
+      "counter_name": "InactiveTotalTime"
+    },
+    {
+      "unit": "BYTES",
+      "value": 25420606,
+      "counter_name": "PeakMemoryUsage"
+    },
+    {
+      "unit": "BYTES",
+      "value": 25165824,
+      "counter_name": "PeakReservation"
+    },
+    {
+      "unit": "BYTES",
+      "value": 0,
+      "counter_name": "PeakUsedReservation"
+    },
+    {
+      "unit": "BYTES",
+      "value": 2078372198,
+      "counter_name": "PerHostPeakMemUsage"
+    },
+    {
+      "unit": "UNIT",
+      "value": 480516,
+      "counter_name": "RowsProduced"
+    },
+    {
+      "unit": "TIME_NS",
+      "value": 0,
+      "counter_name": "TotalNetworkReceiveTime"
+    },
+    {
+      "unit": "TIME_NS",
+      "value": 215089564,
+      "counter_name": "TotalNetworkSendTime"
+    },
+    {
+      "unit": "TIME_NS",
+      "value": 5133274,
+      "counter_name": "TotalStorageWaitTime"
+    },
+    {
+      "unit": "UNIT",
+      "value": 15,
+      "counter_name": "TotalThreadsInvoluntaryContextSwitches"
+    },
+    {
+      "unit": "UNIT",
+      "value": 0,
+      "counter_name": "TotalThreadsMajorPageFaults"
+    },
+    {
+      "unit": "UNIT",
+      "value": 1416,
+      "counter_name": "TotalThreadsMinorPageFaults"
+    },
+    {
+      "unit": "TIME_NS",
+      "value": 8449484838,
+      "counter_name": "TotalThreadsTotalWallClockTime",
+      "child_counters": [
+        {
+          "unit": "TIME_NS",
+          "value": 4306666,
+          "counter_name": "TotalThreadsSysTime"
+        },
+        {
+          "unit": "TIME_NS",
+          "value": 382571000,
+          "counter_name": "TotalThreadsUserTime"
+        }
+      ]
+    },
+    {
+      "unit": "UNIT",
+      "value": 23,
+      "counter_name": "TotalThreadsVoluntaryContextSwitches"
+    },
+    {
+      "unit": "TIME_NS",
+      "value": 8449698593,
+      "counter_name": "TotalTime"
+    }
+  ],
+  "split sizes": " min: 26.20 MB, max: 128.00 MB, avg: 94.07 MB, stddev: 47.99 MB",
+  "completion times": "min:8s743ms  max:8s807ms  mean: 8s764ms  stddev:29.874ms",
+  "execution rates": "min:3.00 MB/sec  max:14.64 MB/sec  mean:10.72 MB/sec  stddev:5.46 MB/sec",
+  "num instances": "3",
+  "Fragment Instance Lifecycle Timings": {
+    "counters": [
+      {
+        "unit": "TIME_NS",
+        "value": 572737253,
+        "counter_name": "ExecTime",
+        "child_counters": [
+          {
+            "unit": "TIME_NS",
+            "value": 296753819,
+            "counter_name": "ExecTreeExecTime"
+          }
+        ]
+      },
+      {
+        "unit": "TIME_NS",
+        "value": 7876755996,
+        "counter_name": "OpenTime",
+        "child_counters": [
+          {
+            "unit": "TIME_NS",
+            "value": 7824877705,
+            "counter_name": "ExecTreeOpenTime"
+          }
+        ]
+      },
+      {
+        "unit": "TIME_NS",
+        "value": 158697,
+        "counter_name": "PrepareTime",
+        "child_counters": [
+          {
+            "unit": "TIME_NS",
+            "value": 95331,
+            "counter_name": "ExecTreePrepareTime"
+          }
+        ]
+      }
+    ]
+  },
+  "KrpcDataStreamSender (dst_id=27)": {
+    "node_metadata": {
+      "data_sink_id": 3
+    },
+    "summary_stats_counters": [
+      {
+        "value": 122383731,
+        "unit": "BYTES_PER_SECOND",
+        "min": 15406314,
+        "max": 457557146,
+        "avg": 122383731,
+        "num_of_samples": 3617,
+        "counter_name": "NetworkThroughput"
+      },
+      {
+        "value": 121668,
+        "unit": "TIME_NS",
+        "min": 38872,
+        "max": 301359,
+        "avg": 121668,
+        "num_of_samples": 3626,
+        "counter_name": "RpcNetworkTime"
+      },
+      {
+        "value": 407755,
+        "unit": "TIME_NS",
+        "min": 10498,
+        "max": 322783503,
+        "avg": 407755,
+        "num_of_samples": 3626,
+        "counter_name": "RpcRecvrTime"
+      }
+    ],
+    "counters": [
+      {
+        "unit": "UNIT",
+        "value": 3,
+        "counter_name": "EosSent"
+      },
+      {
+        "unit": "TIME_NS",
+        "value": 215089564,
+        "counter_name": "InactiveTotalTime"
+      },
+      {
+        "unit": "BYTES",
+        "value": 152895,
+        "counter_name": "PeakMemoryUsage"
+      },
+      {
+        "unit": "UNIT",
+        "value": 480516,
+        "counter_name": "RowsSent"
+      },
+      {
+        "unit": "UNIT",
+        "value": 0,
+        "counter_name": "RpcFailure"
+      },
+      {
+        "unit": "UNIT",
+        "value": 0,
+        "counter_name": "RpcRetry"
+      },
+      {
+        "unit": "UNIT",
+        "value": 1208,
+        "counter_name": "RpcSuccess"
+      },
+      {
+        "unit": "TIME_NS",
+        "value": 29819153,
+        "counter_name": "SerializeBatchTime"
+      },
+      {
+        "unit": "BYTES",
+        "value": 14918602,
+        "counter_name": "TotalBytesSent"
+      },
+      {
+        "unit": "TIME_NS",
+        "value": 275497997,
+        "counter_name": "TotalTime"
+      },
+      {
+        "unit": "TIME_NS",
+        "value": 5615167,
+        "counter_name": "TransmitDataTime"
+      },
+      {
+        "unit": "BYTES",
+        "value": 23545284,
+        "counter_name": "UncompressedRowBatchSize"
+      }
+    ]
+  },
+  "HDFS_SCAN_NODE (id=0)": {
+    "node_metadata": {
+      "plan_node_id": 0
+    },
+    "summary_stats_counters": [
+      {
+        "value": 25165824,
+        "unit": "BYTES",
+        "min": 25165824,
+        "max": 25165824,
+        "avg": 25165824,
+        "num_of_samples": 3,
+        "counter_name": "InitialRangeActualReservation"
+      },
+      {
+        "value": 25165824,
+        "unit": "BYTES",
+        "min": 25165824,
+        "max": 25165824,
+        "avg": 25165824,
+        "num_of_samples": 3,
+        "counter_name": "InitialRangeIdealReservation"
+      }
+    ],
+    "event_sequences": [
+      {
+        "events": [
+          {
+            "label": "Open Started",
+            "ts_list": [
+              113586683,
+              65656219,
+              59190641
+            ]
+          },
+          {
+            "label": "Open Finished",
+            "ts_list": [
+              7904447594,
+              7904272688,
+              7904341582
+            ]
+          },
+          {
+            "label": "First Batch Requested",
+            "ts_list": [
+              7904467604,
+              7904290033,
+              7904354868
+            ]
+          },
+          {
+            "label": "First Batch Returned",
+            "ts_list": [
+              7908714909,
+              7910607051,
+              7910739198
+            ]
+          },
+          {
+            "label": "Last Batch Returned",
+            "ts_list": [
+              8694155910,
+              8734757362,
+              8001270912
+            ]
+          },
+          {
+            "label": "Closed",
+            "ts_list": [
+              8694218841,
+              8734839795,
+              8001321393
+            ]
+          }
+        ]
+      }
+    ],
+    "counters": [
+      {
+        "unit": "DOUBLE_VALUE",
+        "value": 0.0,
+        "counter_name": "AverageHdfsReadThreadConcurrency"
+      },
+      {
+        "unit": "BYTES",
+        "value": 98680485,
+        "counter_name": "BytesRead"
+      },
+      {
+        "unit": "BYTES",
+        "value": 0,
+        "counter_name": "BytesReadDataNodeCache"
+      },
+      {
+        "unit": "BYTES",
+        "value": 0,
+        "counter_name": "BytesReadEncrypted"
+      },
+      {
+        "unit": "BYTES",
+        "value": 0,
+        "counter_name": "BytesReadErasureCoded"
+      },
+      {
+        "unit": "BYTES",
+        "value": 98680485,
+        "counter_name": "BytesReadLocal"
+      },
+      {
+        "unit": "BYTES",
+        "value": 0,
+        "counter_name": "BytesReadRemoteUnexpected"
+      },
+      {
+        "unit": "BYTES",
+        "value": 98680485,
+        "counter_name": "BytesReadShortCircuit"
+      },
+      {
+        "unit": "UNIT",
+        "value": 12,
+        "counter_name": "CachedFileHandlesHitCount"
+      },
+      {
+        "unit": "UNIT",
+        "value": 0,
+        "counter_name": "CachedFileHandlesMissCount"
+      },
+      {
+        "unit": "UNIT",
+        "value": 0,
+        "counter_name": "CollectionItemsRead"
+      },
+      {
+        "unit": "BYTES",
+        "value": 0,
+        "counter_name": "DataCacheHitBytes"
+      },
+      {
+        "unit": "UNIT",
+        "value": 0,
+        "counter_name": "DataCacheHitCount"
+      },
+      {
+        "unit": "BYTES",
+        "value": 0,
+        "counter_name": "DataCacheMissBytes"
+      },
+      {
+        "unit": "UNIT",
+        "value": 0,
+        "counter_name": "DataCacheMissCount"
+      },
+      {
+        "unit": "UNIT",
+        "value": 0,
+        "counter_name": "DataCachePartialHitCount"
+      },
+      {
+        "unit": "TIME_NS",
+        "value": 0,
+        "counter_name": "DecodingTime"
+      },
+      {
+        "unit": "TIME_NS",
+        "value": 0,
+        "counter_name": "DecompressionTime"
+      },
+      {
+        "unit": "TIME_NS",
+        "value": 176258940,
+        "counter_name": "DelimiterParseTime"
+      },
+      {
+        "unit": "TIME_NS",
+        "value": 0,
+        "counter_name": "InactiveTotalTime"
+      },
+      {
+        "unit": "TIME_NS",
+        "value": 113888124,
+        "counter_name": "MaterializeTupleTime"
+      },
+      {
+        "unit": "BYTES",
+        "value": 0,
+        "counter_name": "MaxCompressedTextFileLength"
+      },
+      {
+        "unit": "UNIT",
+        "value": 1,
+        "counter_name": "NumDisksAccessed"
+      },
+      {
+        "unit": "BYTES",
+        "value": 25169920,
+        "counter_name": "PeakMemoryUsage"
+      },
+      {
+        "unit": "BYTES_PER_SECOND",
+        "value": 2804633909,
+        "counter_name": "PerReadThreadRawHdfsThroughput"
+      },
+      {
+        "unit": "UNIT",
+        "value": 0,
+        "counter_name": "RemoteScanRanges"
+      },
+      {
+        "unit": "UNIT",
+        "value": 480516,
+        "counter_name": "RowsRead"
+      },
+      {
+        "unit": "UNIT",
+        "value": 480516,
+        "counter_name": "RowsReturned"
+      },
+      {
+        "unit": "UNIT_PER_SECOND",
+        "value": 58660,
+        "counter_name": "RowsReturnedRate"
+      },
+      {
+        "unit": "UNIT",
+        "value": 1,
+        "counter_name": "ScanRangesComplete"
+      },
+      {
+        "unit": "TIME_NS",
+        "value": 5133274,
+        "counter_name": "ScannerIoWaitTime"
+      },
+      {
+        "unit": "TIME_NS",
+        "value": 34125,
+        "counter_name": "TotalRawHdfsOpenFileTime"
+      },
+      {
+        "unit": "TIME_NS",
+        "value": 32366543,
+        "counter_name": "TotalRawHdfsReadTime"
+      },
+      {
+        "unit": "BYTES_PER_SECOND",
+        "value": 11459397,
+        "counter_name": "TotalReadThroughput"
+      },
+      {
+        "unit": "TIME_NS",
+        "value": 8121713505,
+        "counter_name": "TotalTime"
+      }
+    ],
+    "Table Name": "",
+    "Buffer pool": {
+      "counters": [
+        {
+          "unit": "TIME_NS",
+          "value": 81601,
+          "counter_name": "AllocTime"
+        },
+        {
+          "unit": "TIME_NS",
+          "value": 0,
+          "counter_name": "CompressionTime"
+        },
+        {
+          "unit": "BYTES",
+          "value": 25209514,
+          "counter_name": "CumulativeAllocationBytes"
+        },
+        {
+          "unit": "UNIT",
+          "value": 3,
+          "counter_name": "CumulativeAllocations"
+        },
+        {
+          "unit": "TIME_NS",
+          "value": 0,
+          "counter_name": "EncryptionTime"
+        },
+        {
+          "unit": "BYTES",
+          "value": 25165824,
+          "counter_name": "PeakReservation"
+        },
+        {
+          "unit": "BYTES",
+          "value": 0,
+          "counter_name": "PeakUnpinnedBytes"
+        },
+        {
+          "unit": "BYTES",
+          "value": 25165824,
+          "counter_name": "PeakUsedReservation"
+        },
+        {
+          "unit": "BYTES",
+          "value": 0,
+          "counter_name": "ReadIoBytes"
+        },
+        {
+          "unit": "UNIT",
+          "value": 0,
+          "counter_name": "ReadIoOps"
+        },
+        {
+          "unit": "TIME_NS",
+          "value": 0,
+          "counter_name": "ReadIoWaitTime"
+        },
+        {
+          "unit": "TIME_NS",
+          "value": 79366,
+          "counter_name": "SystemAllocTime"
+        },
+        {
+          "unit": "BYTES",
+          "value": 0,
+          "counter_name": "WriteIoBytes"
+        },
+        {
+          "unit": "UNIT",
+          "value": 0,
+          "counter_name": "WriteIoOps"
+        },
+        {
+          "unit": "TIME_NS",
+          "value": 0,
+          "counter_name": "WriteIoWaitTime"
+        }
+      ]
+    },
+    "Filter 0 (64.00 KB)": {
+      "counters": [
+        {
+          "unit": "UNIT",
+          "value": 0,
+          "counter_name": "Files processed"
+        },
+        {
+          "unit": "UNIT",
+          "value": 0,
+          "counter_name": "Files rejected"
+        },
+        {
+          "unit": "UNIT",
+          "value": 0,
+          "counter_name": "Files total"
+        },
+        {
+          "unit": "UNIT",
+          "value": 0,
+          "counter_name": "RowGroups processed"
+        },
+        {
+          "unit": "UNIT",
+          "value": 0,
+          "counter_name": "RowGroups rejected"
+        },
+        {
+          "unit": "UNIT",
+          "value": 0,
+          "counter_name": "RowGroups total"
+        },
+        {
+          "unit": "UNIT",
+          "value": 0,
+          "counter_name": "Rows processed"
+        },
+        {
+          "unit": "UNIT",
+          "value": 0,
+          "counter_name": "Rows rejected"
+        },
+        {
+          "unit": "UNIT",
+          "value": 0,
+          "counter_name": "Rows total"
+        },
+        {
+          "unit": "UNIT",
+          "value": 0,
+          "counter_name": "Splits processed"
+        },
+        {
+          "unit": "UNIT",
+          "value": 0,
+          "counter_name": "Splits rejected"
+        },
+        {
+          "unit": "UNIT",
+          "value": 0,
+          "counter_name": "Splits total"
+        }
+      ]
+    },
+    "Filter 2 (512.00 KB)": {
+      "counters": [
+        {
+          "unit": "UNIT",
+          "value": 0,
+          "counter_name": "Files processed"
+        },
+        {
+          "unit": "UNIT",
+          "value": 0,
+          "counter_name": "Files rejected"
+        },
+        {
+          "unit": "UNIT",
+          "value": 0,
+          "counter_name": "Files total"
+        },
+        {
+          "unit": "UNIT",
+          "value": 0,
+          "counter_name": "RowGroups processed"
+        },
+        {
+          "unit": "UNIT",
+          "value": 0,
+          "counter_name": "RowGroups rejected"
+        },
+        {
+          "unit": "UNIT",
+          "value": 0,
+          "counter_name": "RowGroups total"
+        },
+        {
+          "unit": "UNIT",
+          "value": 0,
+          "counter_name": "Rows processed"
+        },
+        {
+          "unit": "UNIT",
+          "value": 0,
+          "counter_name": "Rows rejected"
+        },
+        {
+          "unit": "UNIT",
+          "value": 0,
+          "counter_name": "Rows total"
+        },
+        {
+          "unit": "UNIT",
+          "value": 0,
+          "counter_name": "Splits processed"
+        },
+        {
+          "unit": "UNIT",
+          "value": 0,
+          "counter_name": "Splits rejected"
+        },
+        {
+          "unit": "UNIT",
+          "value": 0,
+          "counter_name": "Splits total"
+        }
+      ]
+    },
+    "Filter 4 (8.00 KB)": {
+      "counters": [
+        {
+          "unit": "UNIT",
+          "value": 0,
+          "counter_name": "Files processed"
+        },
+        {
+          "unit": "UNIT",
+          "value": 0,
+          "counter_name": "Files rejected"
+        },
+        {
+          "unit": "UNIT",
+          "value": 0,
+          "counter_name": "Files total"
+        },
+        {
+          "unit": "UNIT",
+          "value": 0,
+          "counter_name": "RowGroups processed"
+        },
+        {
+          "unit": "UNIT",
+          "value": 0,
+          "counter_name": "RowGroups rejected"
+        },
+        {
+          "unit": "UNIT",
+          "value": 0,
+          "counter_name": "RowGroups total"
+        },
+        {
+          "unit": "UNIT",
+          "value": 0,
+          "counter_name": "Rows processed"
+        },
+        {
+          "unit": "UNIT",
+          "value": 0,
+          "counter_name": "Rows rejected"
+        },
+        {
+          "unit": "UNIT",
+          "value": 0,
+          "counter_name": "Rows total"
+        },
+        {
+          "unit": "UNIT",
+          "value": 0,
+          "counter_name": "Splits processed"
+        },
+        {
+          "unit": "UNIT",
+          "value": 0,
+          "counter_name": "Splits rejected"
+        },
+        {
+          "unit": "UNIT",
+          "value": 0,
+          "counter_name": "Splits total"
+        }
+      ]
+    },
+    "Filter 6 (64.00 KB)": {
+      "counters": [
+        {
+          "unit": "UNIT",
+          "value": 0,
+          "counter_name": "Files processed"
+        },
+        {
+          "unit": "UNIT",
+          "value": 0,
+          "counter_name": "Files rejected"
+        },
+        {
+          "unit": "UNIT",
+          "value": 0,
+          "counter_name": "Files total"
+        },
+        {
+          "unit": "UNIT",
+          "value": 0,
+          "counter_name": "RowGroups processed"
+        },
+        {
+          "unit": "UNIT",
+          "value": 0,
+          "counter_name": "RowGroups rejected"
+        },
+        {
+          "unit": "UNIT",
+          "value": 0,
+          "counter_name": "RowGroups total"
+        },
+        {
+          "unit": "UNIT",
+          "value": 0,
+          "counter_name": "Rows processed"
+        },
+        {
+          "unit": "UNIT",
+          "value": 0,
+          "counter_name": "Rows rejected"
+        },
+        {
+          "unit": "UNIT",
+          "value": 0,
+          "counter_name": "Rows total"
+        },
+        {
+          "unit": "UNIT",
+          "value": 0,
+          "counter_name": "Splits processed"
+        },
+        {
+          "unit": "UNIT",
+          "value": 0,
+          "counter_name": "Splits rejected"
+        },
+        {
+          "unit": "UNIT",
+          "value": 0,
+          "counter_name": "Splits total"
+        }
+      ]
+    },
+    "Filter 7 (16.00 KB)": {
+      "counters": [
+        {
+          "unit": "UNIT",
+          "value": 0,
+          "counter_name": "Files processed"
+        },
+        {
+          "unit": "UNIT",
+          "value": 0,
+          "counter_name": "Files rejected"
+        },
+        {
+          "unit": "UNIT",
+          "value": 0,
+          "counter_name": "Files total"
+        },
+        {
+          "unit": "UNIT",
+          "value": 0,
+          "counter_name": "RowGroups processed"
+        },
+        {
+          "unit": "UNIT",
+          "value": 0,
+          "counter_name": "RowGroups rejected"
+        },
+        {
+          "unit": "UNIT",
+          "value": 0,
+          "counter_name": "RowGroups total"
+        },
+        {
+          "unit": "UNIT",
+          "value": 0,
+          "counter_name": "Rows processed"
+        },
+        {
+          "unit": "UNIT",
+          "value": 0,
+          "counter_name": "Rows rejected"
+        },
+        {
+          "unit": "UNIT",
+          "value": 0,
+          "counter_name": "Rows total"
+        },
+        {
+          "unit": "UNIT",
+          "value": 0,
+          "counter_name": "Splits processed"
+        },
+        {
+          "unit": "UNIT",
+          "value": 0,
+          "counter_name": "Splits rejected"
+        },
+        {
+          "unit": "UNIT",
+          "value": 0,
+          "counter_name": "Splits total"
+        }
+      ]
+    }
+  }
+}

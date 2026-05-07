@@ -1,0 +1,2403 @@
+{
+  "summary_stats_counters": [
+    {
+      "value": 0,
+      "unit": "BYTES",
+      "num_of_samples": 0,
+      "counter_name": "RowBatchMemPoolAllocBytes"
+    },
+    {
+      "value": 0,
+      "unit": "TIME_NS",
+      "num_of_samples": 0,
+      "counter_name": "RowBatchMemPoolAllocDuration"
+    },
+    {
+      "value": 6144,
+      "unit": "BYTES",
+      "min": 4096,
+      "max": 8192,
+      "avg": 6144,
+      "num_of_samples": 2,
+      "counter_name": "RowBatchMemPoolFreeBytes"
+    },
+    {
+      "value": 74,
+      "unit": "TIME_NS",
+      "min": 52,
+      "max": 97,
+      "avg": 74,
+      "num_of_samples": 2,
+      "counter_name": "RowBatchMemPoolFreeDuration"
+    }
+  ],
+  "event_sequences": [
+    {
+      "events": [
+        {
+          "label": "Prepare Finished",
+          "ts_list": [
+            1099609
+          ]
+        },
+        {
+          "label": "Open Finished",
+          "ts_list": [
+            744037799
+          ]
+        },
+        {
+          "label": "First Batch Produced",
+          "ts_list": [
+            744047889
+          ]
+        },
+        {
+          "label": "First Batch Sent",
+          "ts_list": [
+            744068309
+          ]
+        },
+        {
+          "label": "ExecInternal Finished",
+          "ts_list": [
+            744503710
+          ]
+        }
+      ]
+    }
+  ],
+  "counters": [
+    {
+      "unit": "DOUBLE_VALUE",
+      "value": 1.0,
+      "counter_name": "AverageThreadTokens"
+    },
+    {
+      "unit": "BYTES",
+      "value": 13209372,
+      "counter_name": "BytesAssigned"
+    },
+    {
+      "unit": "TIME_NS",
+      "value": 795451118,
+      "counter_name": "CompletionTime"
+    },
+    {
+      "unit": "DOUBLE_VALUE",
+      "value": 0.0,
+      "counter_name": "ExchangeScanRatio"
+    },
+    {
+      "unit": "BYTES_PER_SECOND",
+      "value": 16606139,
+      "counter_name": "ExecutionRate"
+    },
+    {
+      "unit": "TIME_NS",
+      "value": 0,
+      "counter_name": "InactiveTotalTime"
+    },
+    {
+      "unit": "BYTES",
+      "value": 28445440,
+      "counter_name": "PeakMemoryUsage"
+    },
+    {
+      "unit": "BYTES",
+      "value": 27656192,
+      "counter_name": "PeakReservation"
+    },
+    {
+      "unit": "BYTES",
+      "value": 0,
+      "counter_name": "PeakUsedReservation"
+    },
+    {
+      "unit": "BYTES",
+      "value": 107304661,
+      "counter_name": "PerHostPeakMemUsage"
+    },
+    {
+      "unit": "UNIT",
+      "value": 100,
+      "counter_name": "RowsProduced"
+    },
+    {
+      "unit": "TIME_NS",
+      "value": 92583130,
+      "counter_name": "TotalNetworkReceiveTime"
+    },
+    {
+      "unit": "TIME_NS",
+      "value": 420516,
+      "counter_name": "TotalNetworkSendTime"
+    },
+    {
+      "unit": "TIME_NS",
+      "value": 2397644,
+      "counter_name": "TotalStorageWaitTime"
+    },
+    {
+      "unit": "UNIT",
+      "value": 4,
+      "counter_name": "TotalThreadsInvoluntaryContextSwitches"
+    },
+    {
+      "unit": "UNIT",
+      "value": 0,
+      "counter_name": "TotalThreadsMajorPageFaults"
+    },
+    {
+      "unit": "UNIT",
+      "value": 4332,
+      "counter_name": "TotalThreadsMinorPageFaults"
+    },
+    {
+      "unit": "TIME_NS",
+      "value": 871353015,
+      "counter_name": "TotalThreadsTotalWallClockTime",
+      "child_counters": [
+        {
+          "unit": "TIME_NS",
+          "value": 23368000,
+          "counter_name": "TotalThreadsSysTime"
+        },
+        {
+          "unit": "TIME_NS",
+          "value": 637298000,
+          "counter_name": "TotalThreadsUserTime"
+        }
+      ]
+    },
+    {
+      "unit": "UNIT",
+      "value": 163,
+      "counter_name": "TotalThreadsVoluntaryContextSwitches"
+    },
+    {
+      "unit": "TIME_NS",
+      "value": 743754370,
+      "counter_name": "TotalTime"
+    }
+  ],
+  "split sizes": " min: 12.60 MB, max: 12.60 MB, avg: 12.60 MB, stddev: 0",
+  "completion times": "min:795.451ms  max:795.451ms  mean: 795.451ms  stddev:0.000ns",
+  "execution rates": "min:15.84 MB/sec  max:15.84 MB/sec  mean:15.84 MB/sec  stddev:0.00 /sec",
+  "num instances": "1",
+  "Fragment Instance Lifecycle Timings": {
+    "counters": [
+      {
+        "unit": "TIME_NS",
+        "value": 461532,
+        "counter_name": "ExecTime",
+        "child_counters": [
+          {
+            "unit": "TIME_NS",
+            "value": 9056,
+            "counter_name": "ExecTreeExecTime"
+          }
+        ]
+      },
+      {
+        "unit": "TIME_NS",
+        "value": 742932556,
+        "counter_name": "OpenTime",
+        "child_counters": [
+          {
+            "unit": "TIME_NS",
+            "value": 126857519,
+            "counter_name": "ExecTreeOpenTime"
+          }
+        ]
+      },
+      {
+        "unit": "TIME_NS",
+        "value": 332410,
+        "counter_name": "PrepareTime",
+        "child_counters": [
+          {
+            "unit": "TIME_NS",
+            "value": 249972,
+            "counter_name": "ExecTreePrepareTime"
+          }
+        ]
+      }
+    ]
+  },
+  "KrpcDataStreamSender (dst_id=26)": {
+    "node_metadata": {
+      "data_sink_id": 1
+    },
+    "summary_stats_counters": [
+      {
+        "value": 16266253,
+        "unit": "BYTES_PER_SECOND",
+        "min": 16266253,
+        "max": 16266253,
+        "avg": 16266253,
+        "num_of_samples": 1,
+        "counter_name": "NetworkThroughput"
+      },
+      {
+        "value": 157875,
+        "unit": "TIME_NS",
+        "min": 112877,
+        "max": 202874,
+        "avg": 157875,
+        "num_of_samples": 2,
+        "counter_name": "RpcNetworkTime"
+      },
+      {
+        "value": 39762,
+        "unit": "TIME_NS",
+        "min": 16698,
+        "max": 62826,
+        "avg": 39762,
+        "num_of_samples": 2,
+        "counter_name": "RpcRecvrTime"
+      }
+    ],
+    "counters": [
+      {
+        "unit": "UNIT",
+        "value": 1,
+        "counter_name": "EosSent"
+      },
+      {
+        "unit": "TIME_NS",
+        "value": 420516,
+        "counter_name": "InactiveTotalTime"
+      },
+      {
+        "unit": "BYTES",
+        "value": 2901,
+        "counter_name": "PeakMemoryUsage"
+      },
+      {
+        "unit": "UNIT",
+        "value": 100,
+        "counter_name": "RowsSent"
+      },
+      {
+        "unit": "UNIT",
+        "value": 0,
+        "counter_name": "RpcFailure"
+      },
+      {
+        "unit": "UNIT",
+        "value": 0,
+        "counter_name": "RpcRetry"
+      },
+      {
+        "unit": "UNIT",
+        "value": 2,
+        "counter_name": "RpcSuccess"
+      },
+      {
+        "unit": "TIME_NS",
+        "value": 5655,
+        "counter_name": "SerializeBatchTime"
+      },
+      {
+        "unit": "BYTES",
+        "value": 3300,
+        "counter_name": "TotalBytesSent"
+      },
+      {
+        "unit": "TIME_NS",
+        "value": 460808,
+        "counter_name": "TotalTime"
+      },
+      {
+        "unit": "TIME_NS",
+        "value": 12197,
+        "counter_name": "TransmitDataTime"
+      },
+      {
+        "unit": "BYTES",
+        "value": 3700,
+        "counter_name": "UncompressedRowBatchSize"
+      }
+    ]
+  },
+  "SORT_NODE (id=14)": {
+    "node_metadata": {
+      "plan_node_id": 14
+    },
+    "event_sequences": [
+      {
+        "events": [
+          {
+            "label": "Open Started",
+            "ts_list": [
+              617172948
+            ]
+          },
+          {
+            "label": "Open Finished",
+            "ts_list": [
+              744029413
+            ]
+          },
+          {
+            "label": "First Batch Requested",
+            "ts_list": [
+              744039095
+            ]
+          },
+          {
+            "label": "First Batch Returned",
+            "ts_list": [
+              744047578
+            ]
+          },
+          {
+            "label": "Last Batch Returned",
+            "ts_list": [
+              744047675
+            ]
+          },
+          {
+            "label": "Closed",
+            "ts_list": [
+              744070307
+            ]
+          }
+        ]
+      }
+    ],
+    "counters": [
+      {
+        "unit": "TIME_NS",
+        "value": 0,
+        "counter_name": "InactiveTotalTime"
+      },
+      {
+        "unit": "TIME_NS",
+        "value": 582701,
+        "counter_name": "InsertBatchTime"
+      },
+      {
+        "unit": "BYTES",
+        "value": 354304,
+        "counter_name": "PeakMemoryUsage"
+      },
+      {
+        "unit": "UNIT",
+        "value": 100,
+        "counter_name": "RowsReturned"
+      },
+      {
+        "unit": "UNIT_PER_SECOND",
+        "value": 786,
+        "counter_name": "RowsReturnedRate"
+      },
+      {
+        "unit": "TIME_NS",
+        "value": 127115285,
+        "counter_name": "TotalTime"
+      },
+      {
+        "unit": "UNIT",
+        "value": 2,
+        "counter_name": "TuplePoolReclamations"
+      }
+    ],
+    "HASH_JOIN_NODE (id=13)": {
+      "node_metadata": {
+        "plan_node_id": 13
+      },
+      "event_sequences": [
+        {
+          "events": [
+            {
+              "label": "Open Started",
+              "ts_list": [
+                617175002
+              ]
+            },
+            {
+              "label": "Open Finished",
+              "ts_list": [
+                716980772
+              ]
+            },
+            {
+              "label": "First Batch Requested",
+              "ts_list": [
+                716989415
+              ]
+            },
+            {
+              "label": "First Batch Returned",
+              "ts_list": [
+                718579016
+              ]
+            },
+            {
+              "label": "Last Batch Returned",
+              "ts_list": [
+                743943728
+              ]
+            },
+            {
+              "label": "Closed",
+              "ts_list": [
+                744029129
+              ]
+            }
+          ]
+        }
+      ],
+      "counters": [
+        {
+          "unit": "TIME_NS",
+          "value": 0,
+          "counter_name": "InactiveTotalTime"
+        },
+        {
+          "unit": "BYTES",
+          "value": 2235648,
+          "counter_name": "PeakMemoryUsage"
+        },
+        {
+          "unit": "UNIT",
+          "value": 49933,
+          "counter_name": "ProbeRows"
+        },
+        {
+          "unit": "UNIT",
+          "value": 0,
+          "counter_name": "ProbeRowsPartitioned"
+        },
+        {
+          "unit": "TIME_NS",
+          "value": 5873504,
+          "counter_name": "ProbeTime"
+        },
+        {
+          "unit": "UNIT",
+          "value": 18976,
+          "counter_name": "RowsReturned"
+        },
+        {
+          "unit": "UNIT_PER_SECOND",
+          "value": 149900,
+          "counter_name": "RowsReturnedRate"
+        },
+        {
+          "unit": "TIME_NS",
+          "value": 126590977,
+          "counter_name": "TotalTime"
+        }
+      ],
+      "Buffer pool": {
+        "counters": [
+          {
+            "unit": "TIME_NS",
+            "value": 17596,
+            "counter_name": "AllocTime"
+          },
+          {
+            "unit": "TIME_NS",
+            "value": 0,
+            "counter_name": "CompressionTime"
+          },
+          {
+            "unit": "BYTES",
+            "value": 458752,
+            "counter_name": "CumulativeAllocationBytes"
+          },
+          {
+            "unit": "UNIT",
+            "value": 7,
+            "counter_name": "CumulativeAllocations"
+          },
+          {
+            "unit": "TIME_NS",
+            "value": 0,
+            "counter_name": "EncryptionTime"
+          },
+          {
+            "unit": "BYTES",
+            "value": 2031616,
+            "counter_name": "PeakReservation"
+          },
+          {
+            "unit": "BYTES",
+            "value": 0,
+            "counter_name": "PeakUnpinnedBytes"
+          },
+          {
+            "unit": "BYTES",
+            "value": 458752,
+            "counter_name": "PeakUsedReservation"
+          },
+          {
+            "unit": "BYTES",
+            "value": 0,
+            "counter_name": "ReadIoBytes"
+          },
+          {
+            "unit": "UNIT",
+            "value": 0,
+            "counter_name": "ReadIoOps"
+          },
+          {
+            "unit": "TIME_NS",
+            "value": 0,
+            "counter_name": "ReadIoWaitTime"
+          },
+          {
+            "unit": "TIME_NS",
+            "value": 16321,
+            "counter_name": "SystemAllocTime"
+          },
+          {
+            "unit": "BYTES",
+            "value": 0,
+            "counter_name": "WriteIoBytes"
+          },
+          {
+            "unit": "UNIT",
+            "value": 0,
+            "counter_name": "WriteIoOps"
+          },
+          {
+            "unit": "TIME_NS",
+            "value": 0,
+            "counter_name": "WriteIoWaitTime"
+          }
+        ]
+      },
+      "Hash Join Builder (join_node_id=13)": {
+        "counters": [
+          {
+            "unit": "UNIT",
+            "value": 7,
+            "counter_name": "BuildRows"
+          },
+          {
+            "unit": "TIME_NS",
+            "value": 22978,
+            "counter_name": "BuildRowsPartitionTime"
+          },
+          {
+            "unit": "TIME_NS",
+            "value": 25299,
+            "counter_name": "HashTablesBuildTime"
+          },
+          {
+            "unit": "TIME_NS",
+            "value": 0,
+            "counter_name": "InactiveTotalTime"
+          },
+          {
+            "unit": "UNIT",
+            "value": 16,
+            "counter_name": "LargestPartitionPercent"
+          },
+          {
+            "unit": "UNIT",
+            "value": 0,
+            "counter_name": "MaxPartitionLevel"
+          },
+          {
+            "unit": "UNIT",
+            "value": 0,
+            "counter_name": "NumHashTableBuildsSkipped"
+          },
+          {
+            "unit": "UNIT",
+            "value": 0,
+            "counter_name": "NumRepartitions"
+          },
+          {
+            "unit": "UNIT",
+            "value": 16,
+            "counter_name": "PartitionsCreated"
+          },
+          {
+            "unit": "BYTES",
+            "value": 17536,
+            "counter_name": "PeakMemoryUsage"
+          },
+          {
+            "unit": "TIME_NS",
+            "value": 0,
+            "counter_name": "RepartitionTime"
+          },
+          {
+            "unit": "UNIT",
+            "value": 0,
+            "counter_name": "SpilledPartitions"
+          },
+          {
+            "unit": "TIME_NS",
+            "value": 252518,
+            "counter_name": "TotalTime"
+          }
+        ],
+        "Hash Table": {
+          "counters": [
+            {
+              "unit": "UNIT",
+              "value": 6,
+              "counter_name": "HashBuckets"
+            },
+            {
+              "unit": "UNIT",
+              "value": 0,
+              "counter_name": "HashCollisions"
+            },
+            {
+              "unit": "UNIT",
+              "value": 49939,
+              "counter_name": "Probes"
+            },
+            {
+              "unit": "UNIT",
+              "value": 0,
+              "counter_name": "Resizes"
+            },
+            {
+              "unit": "UNIT",
+              "value": 0,
+              "counter_name": "Travel"
+            }
+          ]
+        }
+      },
+      "EXCHANGE_NODE (id=25)": {
+        "node_metadata": {
+          "plan_node_id": 25
+        },
+        "event_sequences": [
+          {
+            "events": [
+              {
+                "label": "Open Started",
+                "ts_list": [
+                  617251571
+                ]
+              },
+              {
+                "label": "Open Finished",
+                "ts_list": [
+                  617253852
+                ]
+              },
+              {
+                "label": "First Batch Requested",
+                "ts_list": [
+                  617434416
+                ]
+              },
+              {
+                "label": "First Batch Returned",
+                "ts_list": [
+                  617449654
+                ]
+              },
+              {
+                "label": "Last Batch Returned",
+                "ts_list": [
+                  617449742
+                ]
+              },
+              {
+                "label": "Closed",
+                "ts_list": [
+                  617597787
+                ]
+              }
+            ]
+          }
+        ],
+        "counters": [
+          {
+            "unit": "TIME_NS",
+            "value": 2748,
+            "counter_name": "ConvertRowBatchTime"
+          },
+          {
+            "unit": "TIME_NS",
+            "value": 0,
+            "counter_name": "InactiveTotalTime"
+          },
+          {
+            "unit": "BYTES",
+            "value": 114688,
+            "counter_name": "PeakMemoryUsage"
+          },
+          {
+            "unit": "UNIT",
+            "value": 7,
+            "counter_name": "RowsReturned"
+          },
+          {
+            "unit": "UNIT_PER_SECOND",
+            "value": 387039,
+            "counter_name": "RowsReturnedRate"
+          },
+          {
+            "unit": "TIME_NS",
+            "value": 18086,
+            "counter_name": "TotalTime"
+          }
+        ],
+        "Buffer pool": {
+          "counters": [
+            {
+              "unit": "TIME_NS",
+              "value": 2200,
+              "counter_name": "AllocTime"
+            },
+            {
+              "unit": "TIME_NS",
+              "value": 0,
+              "counter_name": "CompressionTime"
+            },
+            {
+              "unit": "BYTES",
+              "value": 114688,
+              "counter_name": "CumulativeAllocationBytes"
+            },
+            {
+              "unit": "UNIT",
+              "value": 14,
+              "counter_name": "CumulativeAllocations"
+            },
+            {
+              "unit": "TIME_NS",
+              "value": 0,
+              "counter_name": "EncryptionTime"
+            },
+            {
+              "unit": "BYTES",
+              "value": 114688,
+              "counter_name": "PeakReservation"
+            },
+            {
+              "unit": "BYTES",
+              "value": 0,
+              "counter_name": "PeakUnpinnedBytes"
+            },
+            {
+              "unit": "BYTES",
+              "value": 114688,
+              "counter_name": "PeakUsedReservation"
+            },
+            {
+              "unit": "BYTES",
+              "value": 0,
+              "counter_name": "ReadIoBytes"
+            },
+            {
+              "unit": "UNIT",
+              "value": 0,
+              "counter_name": "ReadIoOps"
+            },
+            {
+              "unit": "TIME_NS",
+              "value": 0,
+              "counter_name": "ReadIoWaitTime"
+            },
+            {
+              "unit": "TIME_NS",
+              "value": 0,
+              "counter_name": "SystemAllocTime"
+            },
+            {
+              "unit": "BYTES",
+              "value": 0,
+              "counter_name": "WriteIoBytes"
+            },
+            {
+              "unit": "UNIT",
+              "value": 0,
+              "counter_name": "WriteIoOps"
+            },
+            {
+              "unit": "TIME_NS",
+              "value": 0,
+              "counter_name": "WriteIoWaitTime"
+            }
+          ]
+        },
+        "Dequeue": {
+          "counters": [
+            {
+              "unit": "TIME_NS",
+              "value": 0,
+              "counter_name": "FirstBatchWaitTime"
+            },
+            {
+              "unit": "BYTES",
+              "value": 203,
+              "counter_name": "TotalBytesDequeued"
+            },
+            {
+              "unit": "TIME_NS",
+              "value": 5111,
+              "counter_name": "TotalGetBatchTime",
+              "child_counters": [
+                {
+                  "unit": "TIME_NS",
+                  "value": 0,
+                  "counter_name": "DataWaitTime"
+                }
+              ]
+            }
+          ]
+        },
+        "Enqueue": {
+          "summary_stats_counters": [
+            {
+              "value": 9172,
+              "unit": "TIME_NS",
+              "min": 8309,
+              "max": 11957,
+              "avg": 9172,
+              "num_of_samples": 7,
+              "counter_name": "DispatchTime"
+            }
+          ],
+          "counters": [
+            {
+              "unit": "TIME_NS",
+              "value": 11176,
+              "counter_name": "DeserializeRowBatchTime"
+            },
+            {
+              "unit": "UNIT",
+              "value": 7,
+              "counter_name": "TotalBatchesEnqueued"
+            },
+            {
+              "unit": "UNIT",
+              "value": 7,
+              "counter_name": "TotalBatchesReceived"
+            },
+            {
+              "unit": "BYTES",
+              "value": 175,
+              "counter_name": "TotalBytesReceived"
+            },
+            {
+              "unit": "UNIT",
+              "value": 0,
+              "counter_name": "TotalEarlySenders"
+            },
+            {
+              "unit": "UNIT",
+              "value": 1,
+              "counter_name": "TotalEosReceived"
+            },
+            {
+              "unit": "TIME_NS",
+              "value": 0,
+              "counter_name": "TotalHasDeferredRPCsTime"
+            },
+            {
+              "unit": "UNIT",
+              "value": 0,
+              "counter_name": "TotalRPCsDeferred"
+            }
+          ]
+        }
+      },
+      "HASH_JOIN_NODE (id=12)": {
+        "node_metadata": {
+          "plan_node_id": 12
+        },
+        "event_sequences": [
+          {
+            "events": [
+              {
+                "label": "Open Started",
+                "ts_list": [
+                  617253450
+                ]
+              },
+              {
+                "label": "Open Finished",
+                "ts_list": [
+                  716384337
+                ]
+              },
+              {
+                "label": "First Batch Requested",
+                "ts_list": [
+                  716411080
+                ]
+              },
+              {
+                "label": "First Batch Returned",
+                "ts_list": [
+                  716980130
+                ]
+              },
+              {
+                "label": "Last Batch Returned",
+                "ts_list": [
+                  743923949
+                ]
+              },
+              {
+                "label": "Closed",
+                "ts_list": [
+                  744027182
+                ]
+              }
+            ]
+          }
+        ],
+        "counters": [
+          {
+            "unit": "TIME_NS",
+            "value": 0,
+            "counter_name": "InactiveTotalTime"
+          },
+          {
+            "unit": "BYTES",
+            "value": 2223360,
+            "counter_name": "PeakMemoryUsage"
+          },
+          {
+            "unit": "UNIT",
+            "value": 50434,
+            "counter_name": "ProbeRows"
+          },
+          {
+            "unit": "UNIT",
+            "value": 0,
+            "counter_name": "ProbeRowsPartitioned"
+          },
+          {
+            "unit": "TIME_NS",
+            "value": 1919863,
+            "counter_name": "ProbeTime"
+          },
+          {
+            "unit": "UNIT",
+            "value": 49933,
+            "counter_name": "RowsReturned"
+          },
+          {
+            "unit": "UNIT_PER_SECOND",
+            "value": 414709,
+            "counter_name": "RowsReturnedRate"
+          },
+          {
+            "unit": "TIME_NS",
+            "value": 120404892,
+            "counter_name": "TotalTime"
+          }
+        ],
+        "Buffer pool": {
+          "counters": [
+            {
+              "unit": "TIME_NS",
+              "value": 48760,
+              "counter_name": "AllocTime"
+            },
+            {
+              "unit": "TIME_NS",
+              "value": 0,
+              "counter_name": "CompressionTime"
+            },
+            {
+              "unit": "BYTES",
+              "value": 917504,
+              "counter_name": "CumulativeAllocationBytes"
+            },
+            {
+              "unit": "UNIT",
+              "value": 14,
+              "counter_name": "CumulativeAllocations"
+            },
+            {
+              "unit": "TIME_NS",
+              "value": 0,
+              "counter_name": "EncryptionTime"
+            },
+            {
+              "unit": "BYTES",
+              "value": 2031616,
+              "counter_name": "PeakReservation"
+            },
+            {
+              "unit": "BYTES",
+              "value": 0,
+              "counter_name": "PeakUnpinnedBytes"
+            },
+            {
+              "unit": "BYTES",
+              "value": 917504,
+              "counter_name": "PeakUsedReservation"
+            },
+            {
+              "unit": "BYTES",
+              "value": 0,
+              "counter_name": "ReadIoBytes"
+            },
+            {
+              "unit": "UNIT",
+              "value": 0,
+              "counter_name": "ReadIoOps"
+            },
+            {
+              "unit": "TIME_NS",
+              "value": 0,
+              "counter_name": "ReadIoWaitTime"
+            },
+            {
+              "unit": "TIME_NS",
+              "value": 47044,
+              "counter_name": "SystemAllocTime"
+            },
+            {
+              "unit": "BYTES",
+              "value": 0,
+              "counter_name": "WriteIoBytes"
+            },
+            {
+              "unit": "UNIT",
+              "value": 0,
+              "counter_name": "WriteIoOps"
+            },
+            {
+              "unit": "TIME_NS",
+              "value": 0,
+              "counter_name": "WriteIoWaitTime"
+            }
+          ]
+        },
+        "Hash Join Builder (join_node_id=12)": {
+          "counters": [
+            {
+              "unit": "UNIT",
+              "value": 12,
+              "counter_name": "BuildRows"
+            },
+            {
+              "unit": "TIME_NS",
+              "value": 74665,
+              "counter_name": "BuildRowsPartitionTime"
+            },
+            {
+              "unit": "TIME_NS",
+              "value": 69310,
+              "counter_name": "HashTablesBuildTime"
+            },
+            {
+              "unit": "TIME_NS",
+              "value": 0,
+              "counter_name": "InactiveTotalTime"
+            },
+            {
+              "unit": "UNIT",
+              "value": 8,
+              "counter_name": "LargestPartitionPercent"
+            },
+            {
+              "unit": "UNIT",
+              "value": 0,
+              "counter_name": "MaxPartitionLevel"
+            },
+            {
+              "unit": "UNIT",
+              "value": 0,
+              "counter_name": "NumHashTableBuildsSkipped"
+            },
+            {
+              "unit": "UNIT",
+              "value": 0,
+              "counter_name": "NumRepartitions"
+            },
+            {
+              "unit": "UNIT",
+              "value": 16,
+              "counter_name": "PartitionsCreated"
+            },
+            {
+              "unit": "BYTES",
+              "value": 17536,
+              "counter_name": "PeakMemoryUsage"
+            },
+            {
+              "unit": "TIME_NS",
+              "value": 0,
+              "counter_name": "RepartitionTime"
+            },
+            {
+              "unit": "UNIT",
+              "value": 0,
+              "counter_name": "SpilledPartitions"
+            },
+            {
+              "unit": "TIME_NS",
+              "value": 514546,
+              "counter_name": "TotalTime"
+            }
+          ],
+          "Hash Table": {
+            "counters": [
+              {
+                "unit": "UNIT",
+                "value": 12,
+                "counter_name": "HashBuckets"
+              },
+              {
+                "unit": "UNIT",
+                "value": 0,
+                "counter_name": "HashCollisions"
+              },
+              {
+                "unit": "UNIT",
+                "value": 49945,
+                "counter_name": "Probes"
+              },
+              {
+                "unit": "UNIT",
+                "value": 0,
+                "counter_name": "Resizes"
+              },
+              {
+                "unit": "UNIT",
+                "value": 0,
+                "counter_name": "Travel"
+              }
+            ]
+          }
+        },
+        "EXCHANGE_NODE (id=19)": {
+          "node_metadata": {
+            "plan_node_id": 19
+          },
+          "event_sequences": [
+            {
+              "events": [
+                {
+                  "label": "Open Started",
+                  "ts_list": [
+                    617316625
+                  ]
+                },
+                {
+                  "label": "Open Finished",
+                  "ts_list": [
+                    618799417
+                  ]
+                },
+                {
+                  "label": "First Batch Requested",
+                  "ts_list": [
+                    618974710
+                  ]
+                },
+                {
+                  "label": "First Batch Returned",
+                  "ts_list": [
+                    619021944
+                  ]
+                },
+                {
+                  "label": "Last Batch Returned",
+                  "ts_list": [
+                    619022024
+                  ]
+                },
+                {
+                  "label": "Closed",
+                  "ts_list": [
+                    619231054
+                  ]
+                }
+              ]
+            }
+          ],
+          "counters": [
+            {
+              "unit": "TIME_NS",
+              "value": 525,
+              "counter_name": "ConvertRowBatchTime"
+            },
+            {
+              "unit": "TIME_NS",
+              "value": 1525270,
+              "counter_name": "InactiveTotalTime"
+            },
+            {
+              "unit": "BYTES",
+              "value": 16384,
+              "counter_name": "PeakMemoryUsage"
+            },
+            {
+              "unit": "UNIT",
+              "value": 12,
+              "counter_name": "RowsReturned"
+            },
+            {
+              "unit": "UNIT_PER_SECOND",
+              "value": 7839,
+              "counter_name": "RowsReturnedRate"
+            },
+            {
+              "unit": "TIME_NS",
+              "value": 1530677,
+              "counter_name": "TotalTime"
+            }
+          ],
+          "Buffer pool": {
+            "counters": [
+              {
+                "unit": "TIME_NS",
+                "value": 2641,
+                "counter_name": "AllocTime"
+              },
+              {
+                "unit": "TIME_NS",
+                "value": 0,
+                "counter_name": "CompressionTime"
+              },
+              {
+                "unit": "BYTES",
+                "value": 16384,
+                "counter_name": "CumulativeAllocationBytes"
+              },
+              {
+                "unit": "UNIT",
+                "value": 2,
+                "counter_name": "CumulativeAllocations"
+              },
+              {
+                "unit": "TIME_NS",
+                "value": 0,
+                "counter_name": "EncryptionTime"
+              },
+              {
+                "unit": "BYTES",
+                "value": 16384,
+                "counter_name": "PeakReservation"
+              },
+              {
+                "unit": "BYTES",
+                "value": 0,
+                "counter_name": "PeakUnpinnedBytes"
+              },
+              {
+                "unit": "BYTES",
+                "value": 16384,
+                "counter_name": "PeakUsedReservation"
+              },
+              {
+                "unit": "BYTES",
+                "value": 0,
+                "counter_name": "ReadIoBytes"
+              },
+              {
+                "unit": "UNIT",
+                "value": 0,
+                "counter_name": "ReadIoOps"
+              },
+              {
+                "unit": "TIME_NS",
+                "value": 0,
+                "counter_name": "ReadIoWaitTime"
+              },
+              {
+                "unit": "TIME_NS",
+                "value": 1575,
+                "counter_name": "SystemAllocTime"
+              },
+              {
+                "unit": "BYTES",
+                "value": 0,
+                "counter_name": "WriteIoBytes"
+              },
+              {
+                "unit": "UNIT",
+                "value": 0,
+                "counter_name": "WriteIoOps"
+              },
+              {
+                "unit": "TIME_NS",
+                "value": 0,
+                "counter_name": "WriteIoWaitTime"
+              }
+            ]
+          },
+          "Dequeue": {
+            "counters": [
+              {
+                "unit": "TIME_NS",
+                "value": 1480903,
+                "counter_name": "FirstBatchWaitTime"
+              },
+              {
+                "unit": "BYTES",
+                "value": 300,
+                "counter_name": "TotalBytesDequeued"
+              },
+              {
+                "unit": "TIME_NS",
+                "value": 1526826,
+                "counter_name": "TotalGetBatchTime",
+                "child_counters": [
+                  {
+                    "unit": "TIME_NS",
+                    "value": 1525270,
+                    "counter_name": "DataWaitTime"
+                  }
+                ]
+              }
+            ]
+          },
+          "Enqueue": {
+            "summary_stats_counters": [
+              {
+                "value": 38492,
+                "unit": "TIME_NS",
+                "min": 38492,
+                "max": 38492,
+                "avg": 38492,
+                "num_of_samples": 1,
+                "counter_name": "DispatchTime"
+              }
+            ],
+            "counters": [
+              {
+                "unit": "TIME_NS",
+                "value": 5550,
+                "counter_name": "DeserializeRowBatchTime"
+              },
+              {
+                "unit": "UNIT",
+                "value": 1,
+                "counter_name": "TotalBatchesEnqueued"
+              },
+              {
+                "unit": "UNIT",
+                "value": 1,
+                "counter_name": "TotalBatchesReceived"
+              },
+              {
+                "unit": "BYTES",
+                "value": 252,
+                "counter_name": "TotalBytesReceived"
+              },
+              {
+                "unit": "UNIT",
+                "value": 0,
+                "counter_name": "TotalEarlySenders"
+              },
+              {
+                "unit": "UNIT",
+                "value": 1,
+                "counter_name": "TotalEosReceived"
+              },
+              {
+                "unit": "TIME_NS",
+                "value": 0,
+                "counter_name": "TotalHasDeferredRPCsTime"
+              },
+              {
+                "unit": "UNIT",
+                "value": 0,
+                "counter_name": "TotalRPCsDeferred"
+              }
+            ]
+          }
+        },
+        "HASH_JOIN_NODE (id=11)": {
+          "node_metadata": {
+            "plan_node_id": 11
+          },
+          "event_sequences": [
+            {
+              "events": [
+                {
+                  "label": "Open Started",
+                  "ts_list": [
+                    617384705
+                  ]
+                },
+                {
+                  "label": "Open Finished",
+                  "ts_list": [
+                    715921671
+                  ]
+                },
+                {
+                  "label": "First Batch Requested",
+                  "ts_list": [
+                    715929197
+                  ]
+                },
+                {
+                  "label": "First Batch Returned",
+                  "ts_list": [
+                    716383601
+                  ]
+                },
+                {
+                  "label": "Last Batch Returned",
+                  "ts_list": [
+                    743735546
+                  ]
+                },
+                {
+                  "label": "Closed",
+                  "ts_list": [
+                    744025729
+                  ]
+                }
+              ]
+            }
+          ],
+          "counters": [
+            {
+              "unit": "TIME_NS",
+              "value": 0,
+              "counter_name": "InactiveTotalTime"
+            },
+            {
+              "unit": "BYTES",
+              "value": 6894848,
+              "counter_name": "PeakMemoryUsage"
+            },
+            {
+              "unit": "UNIT",
+              "value": 100000,
+              "counter_name": "ProbeRows"
+            },
+            {
+              "unit": "UNIT",
+              "value": 0,
+              "counter_name": "ProbeRowsPartitioned"
+            },
+            {
+              "unit": "TIME_NS",
+              "value": 5538281,
+              "counter_name": "ProbeTime"
+            },
+            {
+              "unit": "UNIT",
+              "value": 50434,
+              "counter_name": "RowsReturned"
+            },
+            {
+              "unit": "UNIT_PER_SECOND",
+              "value": 427527,
+              "counter_name": "RowsReturnedRate"
+            },
+            {
+              "unit": "TIME_NS",
+              "value": 117966706,
+              "counter_name": "TotalTime"
+            }
+          ],
+          "Buffer pool": {
+            "counters": [
+              {
+                "unit": "TIME_NS",
+                "value": 77456,
+                "counter_name": "AllocTime"
+              },
+              {
+                "unit": "TIME_NS",
+                "value": 0,
+                "counter_name": "CompressionTime"
+              },
+              {
+                "unit": "BYTES",
+                "value": 6815744,
+                "counter_name": "CumulativeAllocationBytes"
+              },
+              {
+                "unit": "UNIT",
+                "value": 26,
+                "counter_name": "CumulativeAllocations"
+              },
+              {
+                "unit": "TIME_NS",
+                "value": 0,
+                "counter_name": "EncryptionTime"
+              },
+              {
+                "unit": "BYTES",
+                "value": 6815744,
+                "counter_name": "PeakReservation"
+              },
+              {
+                "unit": "BYTES",
+                "value": 0,
+                "counter_name": "PeakUnpinnedBytes"
+              },
+              {
+                "unit": "BYTES",
+                "value": 6815744,
+                "counter_name": "PeakUsedReservation"
+              },
+              {
+                "unit": "BYTES",
+                "value": 0,
+                "counter_name": "ReadIoBytes"
+              },
+              {
+                "unit": "UNIT",
+                "value": 0,
+                "counter_name": "ReadIoOps"
+              },
+              {
+                "unit": "TIME_NS",
+                "value": 0,
+                "counter_name": "ReadIoWaitTime"
+              },
+              {
+                "unit": "TIME_NS",
+                "value": 60122,
+                "counter_name": "SystemAllocTime"
+              },
+              {
+                "unit": "BYTES",
+                "value": 0,
+                "counter_name": "WriteIoBytes"
+              },
+              {
+                "unit": "UNIT",
+                "value": 0,
+                "counter_name": "WriteIoOps"
+              },
+              {
+                "unit": "TIME_NS",
+                "value": 0,
+                "counter_name": "WriteIoWaitTime"
+              }
+            ]
+          },
+          "Hash Join Builder (join_node_id=11)": {
+            "counters": [
+              {
+                "unit": "UNIT",
+                "value": 50441,
+                "counter_name": "BuildRows"
+              },
+              {
+                "unit": "TIME_NS",
+                "value": 1943614,
+                "counter_name": "BuildRowsPartitionTime"
+              },
+              {
+                "unit": "TIME_NS",
+                "value": 2159049,
+                "counter_name": "HashTablesBuildTime"
+              },
+              {
+                "unit": "TIME_NS",
+                "value": 0,
+                "counter_name": "InactiveTotalTime"
+              },
+              {
+                "unit": "UNIT",
+                "value": 6,
+                "counter_name": "LargestPartitionPercent"
+              },
+              {
+                "unit": "UNIT",
+                "value": 0,
+                "counter_name": "MaxPartitionLevel"
+              },
+              {
+                "unit": "UNIT",
+                "value": 0,
+                "counter_name": "NumHashTableBuildsSkipped"
+              },
+              {
+                "unit": "UNIT",
+                "value": 0,
+                "counter_name": "NumRepartitions"
+              },
+              {
+                "unit": "UNIT",
+                "value": 16,
+                "counter_name": "PartitionsCreated"
+              },
+              {
+                "unit": "BYTES",
+                "value": 17536,
+                "counter_name": "PeakMemoryUsage"
+              },
+              {
+                "unit": "TIME_NS",
+                "value": 0,
+                "counter_name": "RepartitionTime"
+              },
+              {
+                "unit": "UNIT",
+                "value": 0,
+                "counter_name": "SpilledPartitions"
+              },
+              {
+                "unit": "TIME_NS",
+                "value": 4296841,
+                "counter_name": "TotalTime"
+              }
+            ],
+            "Hash Table": {
+              "counters": [
+                {
+                  "unit": "UNIT",
+                  "value": 131072,
+                  "counter_name": "HashBuckets"
+                },
+                {
+                  "unit": "UNIT",
+                  "value": 0,
+                  "counter_name": "HashCollisions"
+                },
+                {
+                  "unit": "UNIT",
+                  "value": 150434,
+                  "counter_name": "Probes"
+                },
+                {
+                  "unit": "UNIT",
+                  "value": 0,
+                  "counter_name": "Resizes"
+                },
+                {
+                  "unit": "UNIT",
+                  "value": 0,
+                  "counter_name": "Travel"
+                }
+              ]
+            }
+          },
+          "EXCHANGE_NODE (id=18)": {
+            "node_metadata": {
+              "plan_node_id": 18
+            },
+            "event_sequences": [
+              {
+                "events": [
+                  {
+                    "label": "Open Started",
+                    "ts_list": [
+                      617446770
+                    ]
+                  },
+                  {
+                    "label": "Open Finished",
+                    "ts_list": [
+                      706307651
+                    ]
+                  },
+                  {
+                    "label": "First Batch Requested",
+                    "ts_list": [
+                      706428835
+                    ]
+                  },
+                  {
+                    "label": "First Batch Returned",
+                    "ts_list": [
+                      706430292
+                    ]
+                  },
+                  {
+                    "label": "Last Batch Returned",
+                    "ts_list": [
+                      710745447
+                    ]
+                  },
+                  {
+                    "label": "Closed",
+                    "ts_list": [
+                      712973023
+                    ]
+                  }
+                ]
+              }
+            ],
+            "counters": [
+              {
+                "unit": "TIME_NS",
+                "value": 80022,
+                "counter_name": "ConvertRowBatchTime"
+              },
+              {
+                "unit": "TIME_NS",
+                "value": 90952765,
+                "counter_name": "InactiveTotalTime"
+              },
+              {
+                "unit": "BYTES",
+                "value": 122880,
+                "counter_name": "PeakMemoryUsage"
+              },
+              {
+                "unit": "UNIT",
+                "value": 50441,
+                "counter_name": "RowsReturned"
+              },
+              {
+                "unit": "UNIT_PER_SECOND",
+                "value": 553117,
+                "counter_name": "RowsReturnedRate"
+              },
+              {
+                "unit": "TIME_NS",
+                "value": 91193930,
+                "counter_name": "TotalTime"
+              }
+            ],
+            "Buffer pool": {
+              "counters": [
+                {
+                  "unit": "TIME_NS",
+                  "value": 40188,
+                  "counter_name": "AllocTime"
+                },
+                {
+                  "unit": "TIME_NS",
+                  "value": 0,
+                  "counter_name": "CompressionTime"
+                },
+                {
+                  "unit": "BYTES",
+                  "value": 2195456,
+                  "counter_name": "CumulativeAllocationBytes"
+                },
+                {
+                  "unit": "UNIT",
+                  "value": 124,
+                  "counter_name": "CumulativeAllocations"
+                },
+                {
+                  "unit": "TIME_NS",
+                  "value": 0,
+                  "counter_name": "EncryptionTime"
+                },
+                {
+                  "unit": "BYTES",
+                  "value": 122880,
+                  "counter_name": "PeakReservation"
+                },
+                {
+                  "unit": "BYTES",
+                  "value": 0,
+                  "counter_name": "PeakUnpinnedBytes"
+                },
+                {
+                  "unit": "BYTES",
+                  "value": 122880,
+                  "counter_name": "PeakUsedReservation"
+                },
+                {
+                  "unit": "BYTES",
+                  "value": 0,
+                  "counter_name": "ReadIoBytes"
+                },
+                {
+                  "unit": "UNIT",
+                  "value": 0,
+                  "counter_name": "ReadIoOps"
+                },
+                {
+                  "unit": "TIME_NS",
+                  "value": 0,
+                  "counter_name": "ReadIoWaitTime"
+                },
+                {
+                  "unit": "TIME_NS",
+                  "value": 0,
+                  "counter_name": "SystemAllocTime"
+                },
+                {
+                  "unit": "BYTES",
+                  "value": 0,
+                  "counter_name": "WriteIoBytes"
+                },
+                {
+                  "unit": "UNIT",
+                  "value": 0,
+                  "counter_name": "WriteIoOps"
+                },
+                {
+                  "unit": "TIME_NS",
+                  "value": 0,
+                  "counter_name": "WriteIoWaitTime"
+                }
+              ]
+            },
+            "Dequeue": {
+              "counters": [
+                {
+                  "unit": "TIME_NS",
+                  "value": 88842214,
+                  "counter_name": "FirstBatchWaitTime"
+                },
+                {
+                  "unit": "BYTES",
+                  "value": 1664553,
+                  "counter_name": "TotalBytesDequeued"
+                },
+                {
+                  "unit": "TIME_NS",
+                  "value": 91041390,
+                  "counter_name": "TotalGetBatchTime",
+                  "child_counters": [
+                    {
+                      "unit": "TIME_NS",
+                      "value": 90952765,
+                      "counter_name": "DataWaitTime"
+                    }
+                  ]
+                }
+              ]
+            },
+            "Enqueue": {
+              "summary_stats_counters": [
+                {
+                  "value": 13507,
+                  "unit": "TIME_NS",
+                  "min": 7330,
+                  "max": 73291,
+                  "avg": 13507,
+                  "num_of_samples": 62,
+                  "counter_name": "DispatchTime"
+                }
+              ],
+              "counters": [
+                {
+                  "unit": "TIME_NS",
+                  "value": 217207,
+                  "counter_name": "DeserializeRowBatchTime"
+                },
+                {
+                  "unit": "UNIT",
+                  "value": 62,
+                  "counter_name": "TotalBatchesEnqueued"
+                },
+                {
+                  "unit": "UNIT",
+                  "value": 62,
+                  "counter_name": "TotalBatchesReceived"
+                },
+                {
+                  "unit": "BYTES",
+                  "value": 1462789,
+                  "counter_name": "TotalBytesReceived"
+                },
+                {
+                  "unit": "UNIT",
+                  "value": 0,
+                  "counter_name": "TotalEarlySenders"
+                },
+                {
+                  "unit": "UNIT",
+                  "value": 1,
+                  "counter_name": "TotalEosReceived"
+                },
+                {
+                  "unit": "TIME_NS",
+                  "value": 0,
+                  "counter_name": "TotalHasDeferredRPCsTime"
+                },
+                {
+                  "unit": "UNIT",
+                  "value": 0,
+                  "counter_name": "TotalRPCsDeferred"
+                }
+              ]
+            }
+          },
+          "HDFS_SCAN_NODE (id=5)": {
+            "node_metadata": {
+              "plan_node_id": 5
+            },
+            "summary_stats_counters": [
+              {
+                "value": 16777216,
+                "unit": "BYTES",
+                "min": 16777216,
+                "max": 16777216,
+                "avg": 16777216,
+                "num_of_samples": 1,
+                "counter_name": "InitialRangeActualReservation"
+              },
+              {
+                "value": 16777216,
+                "unit": "BYTES",
+                "min": 16777216,
+                "max": 16777216,
+                "avg": 16777216,
+                "num_of_samples": 1,
+                "counter_name": "InitialRangeIdealReservation"
+              }
+            ],
+            "event_sequences": [
+              {
+                "events": [
+                  {
+                    "label": "Open Started",
+                    "ts_list": [
+                      617481837
+                    ]
+                  },
+                  {
+                    "label": "Open Finished",
+                    "ts_list": [
+                      617528433
+                    ]
+                  },
+                  {
+                    "label": "First Batch Requested",
+                    "ts_list": [
+                      713001655
+                    ]
+                  },
+                  {
+                    "label": "First Batch Returned",
+                    "ts_list": [
+                      715920337
+                    ]
+                  },
+                  {
+                    "label": "Last Batch Returned",
+                    "ts_list": [
+                      743563035
+                    ]
+                  },
+                  {
+                    "label": "Closed",
+                    "ts_list": [
+                      744023877
+                    ]
+                  }
+                ]
+              }
+            ],
+            "counters": [
+              {
+                "unit": "DOUBLE_VALUE",
+                "value": 0.0,
+                "counter_name": "AverageHdfsReadThreadConcurrency"
+              },
+              {
+                "unit": "DOUBLE_VALUE",
+                "value": 0.0,
+                "counter_name": "AverageScannerThreadConcurrency"
+              },
+              {
+                "unit": "BYTES",
+                "value": 13209372,
+                "counter_name": "BytesRead"
+              },
+              {
+                "unit": "BYTES",
+                "value": 0,
+                "counter_name": "BytesReadDataNodeCache"
+              },
+              {
+                "unit": "BYTES",
+                "value": 0,
+                "counter_name": "BytesReadEncrypted"
+              },
+              {
+                "unit": "BYTES",
+                "value": 0,
+                "counter_name": "BytesReadErasureCoded"
+              },
+              {
+                "unit": "BYTES",
+                "value": 13209372,
+                "counter_name": "BytesReadLocal"
+              },
+              {
+                "unit": "BYTES",
+                "value": 0,
+                "counter_name": "BytesReadRemoteUnexpected"
+              },
+              {
+                "unit": "BYTES",
+                "value": 13209372,
+                "counter_name": "BytesReadShortCircuit"
+              },
+              {
+                "unit": "UNIT",
+                "value": 2,
+                "counter_name": "CachedFileHandlesHitCount"
+              },
+              {
+                "unit": "UNIT",
+                "value": 0,
+                "counter_name": "CachedFileHandlesMissCount"
+              },
+              {
+                "unit": "UNIT",
+                "value": 0,
+                "counter_name": "CollectionItemsRead"
+              },
+              {
+                "unit": "BYTES",
+                "value": 0,
+                "counter_name": "DataCacheHitBytes"
+              },
+              {
+                "unit": "UNIT",
+                "value": 0,
+                "counter_name": "DataCacheHitCount"
+              },
+              {
+                "unit": "BYTES",
+                "value": 0,
+                "counter_name": "DataCacheMissBytes"
+              },
+              {
+                "unit": "UNIT",
+                "value": 0,
+                "counter_name": "DataCacheMissCount"
+              },
+              {
+                "unit": "UNIT",
+                "value": 0,
+                "counter_name": "DataCachePartialHitCount"
+              },
+              {
+                "unit": "TIME_NS",
+                "value": 0,
+                "counter_name": "DecodingTime"
+              },
+              {
+                "unit": "TIME_NS",
+                "value": 0,
+                "counter_name": "DecompressionTime"
+              },
+              {
+                "unit": "TIME_NS",
+                "value": 15890724,
+                "counter_name": "DelimiterParseTime"
+              },
+              {
+                "unit": "TIME_NS",
+                "value": 0,
+                "counter_name": "InactiveTotalTime"
+              },
+              {
+                "unit": "TIME_NS",
+                "value": 11568151,
+                "counter_name": "MaterializeTupleTime"
+              },
+              {
+                "unit": "BYTES",
+                "value": 0,
+                "counter_name": "MaxCompressedTextFileLength"
+              },
+              {
+                "unit": "UNIT",
+                "value": 1,
+                "counter_name": "NumDisksAccessed"
+              },
+              {
+                "unit": "UNIT",
+                "value": 0,
+                "counter_name": "NumScannerThreadMemUnavailable"
+              },
+              {
+                "unit": "UNIT",
+                "value": 0,
+                "counter_name": "NumScannerThreadReservationsDenied"
+              },
+              {
+                "unit": "UNIT",
+                "value": 1,
+                "counter_name": "NumScannerThreadsStarted"
+              },
+              {
+                "unit": "BYTES",
+                "value": 16867328,
+                "counter_name": "PeakMemoryUsage"
+              },
+              {
+                "unit": "UNIT",
+                "value": 1,
+                "counter_name": "PeakScannerThreadConcurrency"
+              },
+              {
+                "unit": "BYTES_PER_SECOND",
+                "value": 3513967287,
+                "counter_name": "PerReadThreadRawHdfsThroughput"
+              },
+              {
+                "unit": "UNIT",
+                "value": 0,
+                "counter_name": "RemoteScanRanges"
+              },
+              {
+                "unit": "BYTES",
+                "value": 5117952,
+                "counter_name": "RowBatchBytesEnqueued"
+              },
+              {
+                "unit": "TIME_NS",
+                "value": 16017434,
+                "counter_name": "RowBatchQueueGetWaitTime"
+              },
+              {
+                "unit": "BYTES",
+                "value": 68608,
+                "counter_name": "RowBatchQueuePeakMemoryUsage"
+              },
+              {
+                "unit": "TIME_NS",
+                "value": 0,
+                "counter_name": "RowBatchQueuePutWaitTime"
+              },
+              {
+                "unit": "UNIT",
+                "value": 99,
+                "counter_name": "RowBatchesEnqueued"
+              },
+              {
+                "unit": "UNIT",
+                "value": 100000,
+                "counter_name": "RowsRead"
+              },
+              {
+                "unit": "UNIT",
+                "value": 100000,
+                "counter_name": "RowsReturned"
+              },
+              {
+                "unit": "UNIT_PER_SECOND",
+                "value": 6051002,
+                "counter_name": "RowsReturnedRate"
+              },
+              {
+                "unit": "UNIT",
+                "value": 1,
+                "counter_name": "ScanRangesComplete"
+              },
+              {
+                "unit": "TIME_NS",
+                "value": 2397644,
+                "counter_name": "ScannerIoWaitTime"
+              },
+              {
+                "unit": "UNIT",
+                "value": 0,
+                "counter_name": "ScannerThreadWorklessLoops"
+              },
+              {
+                "unit": "UNIT",
+                "value": 0,
+                "counter_name": "ScannerThreadsInvoluntaryContextSwitches"
+              },
+              {
+                "unit": "UNIT",
+                "value": 0,
+                "counter_name": "ScannerThreadsMajorPageFaults"
+              },
+              {
+                "unit": "UNIT",
+                "value": 62,
+                "counter_name": "ScannerThreadsMinorPageFaults"
+              },
+              {
+                "unit": "TIME_NS",
+                "value": 30172981,
+                "counter_name": "ScannerThreadsTotalWallClockTime",
+                "child_counters": [
+                  {
+                    "unit": "TIME_NS",
+                    "value": 7373000,
+                    "counter_name": "ScannerThreadsSysTime"
+                  },
+                  {
+                    "unit": "TIME_NS",
+                    "value": 18432000,
+                    "counter_name": "ScannerThreadsUserTime"
+                  }
+                ]
+              },
+              {
+                "unit": "UNIT",
+                "value": 3,
+                "counter_name": "ScannerThreadsVoluntaryContextSwitches"
+              },
+              {
+                "unit": "TIME_NS",
+                "value": 3443,
+                "counter_name": "TotalRawHdfsOpenFileTime"
+              },
+              {
+                "unit": "TIME_NS",
+                "value": 3759105,
+                "counter_name": "TotalRawHdfsReadTime"
+              },
+              {
+                "unit": "BYTES_PER_SECOND",
+                "value": 0,
+                "counter_name": "TotalReadThroughput"
+              },
+              {
+                "unit": "TIME_NS",
+                "value": 16526187,
+                "counter_name": "TotalTime"
+              }
+            ],
+            "Table Name": "",
+            "Buffer pool": {
+              "counters": [
+                {
+                  "unit": "TIME_NS",
+                  "value": 35548,
+                  "counter_name": "AllocTime"
+                },
+                {
+                  "unit": "TIME_NS",
+                  "value": 0,
+                  "counter_name": "CompressionTime"
+                },
+                {
+                  "unit": "BYTES",
+                  "value": 16777216,
+                  "counter_name": "CumulativeAllocationBytes"
+                },
+                {
+                  "unit": "UNIT",
+                  "value": 2,
+                  "counter_name": "CumulativeAllocations"
+                },
+                {
+                  "unit": "TIME_NS",
+                  "value": 0,
+                  "counter_name": "EncryptionTime"
+                },
+                {
+                  "unit": "BYTES",
+                  "value": 16777216,
+                  "counter_name": "PeakReservation"
+                },
+                {
+                  "unit": "BYTES",
+                  "value": 0,
+                  "counter_name": "PeakUnpinnedBytes"
+                },
+                {
+                  "unit": "BYTES",
+                  "value": 16777216,
+                  "counter_name": "PeakUsedReservation"
+                },
+                {
+                  "unit": "BYTES",
+                  "value": 0,
+                  "counter_name": "ReadIoBytes"
+                },
+                {
+                  "unit": "UNIT",
+                  "value": 0,
+                  "counter_name": "ReadIoOps"
+                },
+                {
+                  "unit": "TIME_NS",
+                  "value": 0,
+                  "counter_name": "ReadIoWaitTime"
+                },
+                {
+                  "unit": "TIME_NS",
+                  "value": 34559,
+                  "counter_name": "SystemAllocTime"
+                },
+                {
+                  "unit": "BYTES",
+                  "value": 0,
+                  "counter_name": "WriteIoBytes"
+                },
+                {
+                  "unit": "UNIT",
+                  "value": 0,
+                  "counter_name": "WriteIoOps"
+                },
+                {
+                  "unit": "TIME_NS",
+                  "value": 0,
+                  "counter_name": "WriteIoWaitTime"
+                }
+              ]
+            },
+            "Filter 4 (64.00 KB)": {
+              "counters": [
+                {
+                  "unit": "UNIT",
+                  "value": 0,
+                  "counter_name": "Files processed"
+                },
+                {
+                  "unit": "UNIT",
+                  "value": 0,
+                  "counter_name": "Files rejected"
+                },
+                {
+                  "unit": "UNIT",
+                  "value": 0,
+                  "counter_name": "Files total"
+                },
+                {
+                  "unit": "UNIT",
+                  "value": 0,
+                  "counter_name": "RowGroups processed"
+                },
+                {
+                  "unit": "UNIT",
+                  "value": 0,
+                  "counter_name": "RowGroups rejected"
+                },
+                {
+                  "unit": "UNIT",
+                  "value": 0,
+                  "counter_name": "RowGroups total"
+                },
+                {
+                  "unit": "UNIT",
+                  "value": 0,
+                  "counter_name": "Rows processed"
+                },
+                {
+                  "unit": "UNIT",
+                  "value": 0,
+                  "counter_name": "Rows rejected"
+                },
+                {
+                  "unit": "UNIT",
+                  "value": 0,
+                  "counter_name": "Rows total"
+                },
+                {
+                  "unit": "UNIT",
+                  "value": 0,
+                  "counter_name": "Splits processed"
+                },
+                {
+                  "unit": "UNIT",
+                  "value": 0,
+                  "counter_name": "Splits rejected"
+                },
+                {
+                  "unit": "UNIT",
+                  "value": 0,
+                  "counter_name": "Splits total"
+                }
+              ]
+            }
+          }
+        }
+      }
+    }
+  }
+}

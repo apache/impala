@@ -1,0 +1,122 @@
+[
+  {
+    "fragment_id": "F13",
+    "full_key": "Coordinator Fragment F13",
+    "instance_count": 1
+  },
+  {
+    "fragment_id": "F00",
+    "full_key": "Fragment F00 [4]",
+    "instance_count": 3
+  },
+  {
+    "fragment_id": "F01",
+    "full_key": "Fragment F01 [3]",
+    "instance_count": 2
+  },
+  {
+    "fragment_id": "F02",
+    "full_key": "Fragment F02 [2]",
+    "instance_count": 1
+  },
+  {
+    "fragment_id": "F03",
+    "full_key": "Fragment F03 [2]",
+    "instance_count": 1
+  },
+  {
+    "fragment_id": "F04",
+    "full_key": "Fragment F04 [2]",
+    "instance_count": 1
+  },
+  {
+    "fragment_id": "F05",
+    "full_key": "Fragment F05 [2]",
+    "instance_count": 1
+  },
+  {
+    "fragment_id": "F06",
+    "full_key": "Fragment F06 [4]",
+    "instance_count": 3
+  },
+  {
+    "fragment_id": "F07",
+    "full_key": "Fragment F07 [2]",
+    "instance_count": 1
+  },
+  {
+    "fragment_id": "F08",
+    "full_key": "Fragment F08 [2]",
+    "instance_count": 1
+  },
+  {
+    "fragment_id": "F09",
+    "full_key": "Fragment F09 [2]",
+    "instance_count": 1
+  },
+  {
+    "fragment_id": "F10",
+    "full_key": "Fragment F10 [2]",
+    "instance_count": 1
+  },
+  {
+    "fragment_id": "F11",
+    "full_key": "Fragment F11 [2]",
+    "instance_count": 1
+  },
+  {
+    "fragment_id": "F12",
+    "full_key": "Fragment F12 [4]",
+    "instance_count": 3
+  },
+  {
+    "fragment_id": "F14",
+    "full_key": "Fragment F14 [4]",
+    "instance_count": 3
+  },
+  {
+    "fragment_id": "F15",
+    "full_key": "Fragment F15 [4]",
+    "instance_count": 3
+  },
+  {
+    "fragment_id": "F16",
+    "full_key": "Fragment F16 [4]",
+    "instance_count": 3
+  },
+  {
+    "fragment_id": "F17",
+    "full_key": "Fragment F17 [4]",
+    "instance_count": 3
+  },
+  {
+    "fragment_id": "F18",
+    "full_key": "Fragment F18 [4]",
+    "instance_count": 3
+  },
+  {
+    "fragment_id": "F19",
+    "full_key": "Fragment F19 [4]",
+    "instance_count": 3
+  },
+  {
+    "fragment_id": "F20",
+    "full_key": "Fragment F20 [3]",
+    "instance_count": 2
+  },
+  {
+    "fragment_id": "F21",
+    "full_key": "Fragment F21 [3]",
+    "instance_count": 2
+  },
+  {
+    "fragment_id": "F22",
+    "full_key": "Fragment F22 [3]",
+    "instance_count": 2
+  },
+  {
+    "fragment_id": "F23",
+    "full_key": "Fragment F23 [3]",
+    "instance_count": 2
+  }
+]

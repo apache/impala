@@ -16,6 +16,9 @@
 // under the License.
 
 #include <algorithm>
+#include <cctype>
+#include <string_view>
+#include <vector>
 
 #include "gutil/strings/substitute.h"
 #include "util/bit-util.h"
@@ -72,6 +75,37 @@ bool EndsWith(const std::string& full_string, const std::string& end) {
         end) == 0);
   }
   return false;
+}
+
+std::vector<std::string_view> SplitLines(std::string_view text) {
+  std::vector<std::string_view> lines;
+  size_t line_start = 0;
+  while (line_start <= text.size()) {
+    const size_t line_end = text.find('\n', line_start);
+    if (line_end == std::string_view::npos) {
+      lines.emplace_back(text.substr(line_start));
+      break;
+    }
+    lines.emplace_back(text.substr(line_start, line_end - line_start));
+    line_start = line_end + 1;
+  }
+  return lines;
+}
+
+std::string_view TrimWhiteSpace(std::string_view value) {
+  while (!value.empty()
+      && isspace(static_cast<unsigned char>(value.front())) != 0) {
+    value.remove_prefix(1);
+  }
+  while (!value.empty() && isspace(static_cast<unsigned char>(value.back())) != 0) {
+    value.remove_suffix(1);
+  }
+  return value;
+}
+
+bool IsAllDigits(std::string_view text) {
+  return std::all_of(text.begin(), text.end(),
+      [](unsigned char c) { return isdigit(c) != 0; });
 }
 
 const uint8_t* FindEndOfIdentifier(const uint8_t* start, const uint8_t* end) {

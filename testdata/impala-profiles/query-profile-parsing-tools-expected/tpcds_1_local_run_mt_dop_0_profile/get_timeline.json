@@ -1,0 +1,15 @@
+{
+  "Query submitted": "25.282us (25.282us)",
+  "Planning finished": "95.136ms (95.111ms)",
+  "Submit for admission": "95.440ms (303.543us)",
+  "Completed admission": "95.670ms (229.673us)",
+  "Ready to start on 1 backends": "96.099ms (428.818us)",
+  "All 1 execution backends (10 fragment instances) started": "104.236ms (8.137ms)",
+  "First dynamic filter received": "722.185ms (617.948ms)",
+  "Rows available": "848.823ms (126.638ms)",
+  "First row fetched": "896.825ms (48.002ms)",
+  "Last row fetched": "896.862ms (36.777us)",
+  "Released admission control resources": "902.139ms (5.276ms)",
+  "Unregister query": "907.241ms (5.101ms)",
+  "_value": "907.215ms"
+}

@@ -1,0 +1,6 @@
+[
+  "tpcds.customer",
+  "tpcds.store_returns",
+  "tpcds.date_dim",
+  "tpcds.store"
+]

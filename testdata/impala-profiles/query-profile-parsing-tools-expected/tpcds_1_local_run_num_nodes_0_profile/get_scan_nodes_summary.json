@@ -1,0 +1,26 @@
+[
+  {
+    "fragment": "Coordinator Fragment F00",
+    "node": "HDFS_SCAN_NODE (id=7)"
+  },
+  {
+    "fragment": "Coordinator Fragment F00",
+    "node": "HDFS_SCAN_NODE (id=6)"
+  },
+  {
+    "fragment": "Coordinator Fragment F00",
+    "node": "HDFS_SCAN_NODE (id=4)"
+  },
+  {
+    "fragment": "Coordinator Fragment F00",
+    "node": "HDFS_SCAN_NODE (id=1)"
+  },
+  {
+    "fragment": "Coordinator Fragment F00",
+    "node": "HDFS_SCAN_NODE (id=0)"
+  },
+  {
+    "fragment": "Coordinator Fragment F00",
+    "node": "HDFS_SCAN_NODE (id=5)"
+  }
+]

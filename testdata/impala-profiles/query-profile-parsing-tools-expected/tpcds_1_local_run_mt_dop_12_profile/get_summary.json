@@ -1,0 +1,337 @@
+{
+  "event_sequences": [
+    {
+      "offset": 0,
+      "events": [
+        {
+          "label": "Metadata of all 4 tables cached",
+          "timestamp": 24802569
+        },
+        {
+          "label": "Analysis finished",
+          "timestamp": 44414702
+        },
+        {
+          "label": "Authorization finished (noop)",
+          "timestamp": 44549661
+        },
+        {
+          "label": "Value transfer graph computed",
+          "timestamp": 44890131
+        },
+        {
+          "label": "Single node plan created",
+          "timestamp": 54284715
+        },
+        {
+          "label": "Runtime filters computed",
+          "timestamp": 58250853
+        },
+        {
+          "label": "Distributed plan created",
+          "timestamp": 59361227
+        },
+        {
+          "label": "Parallel plans created",
+          "timestamp": 60019132
+        },
+        {
+          "label": "Planning finished",
+          "timestamp": 84006752
+        }
+      ]
+    },
+    {
+      "offset": 0,
+      "events": [
+        {
+          "label": "Query submitted",
+          "timestamp": 22552
+        },
+        {
+          "label": "Planning finished",
+          "timestamp": 87680601
+        },
+        {
+          "label": "Submit for admission",
+          "timestamp": 88030718
+        },
+        {
+          "label": "Completed admission",
+          "timestamp": 88345842
+        },
+        {
+          "label": "Ready to start on 1 backends",
+          "timestamp": 88959770
+        },
+        {
+          "label": "All 1 execution backends (15 fragment instances) started",
+          "timestamp": 102717598
+        },
+        {
+          "label": "First dynamic filter received",
+          "timestamp": 445464927
+        },
+        {
+          "label": "Rows available",
+          "timestamp": 669399296
+        },
+        {
+          "label": "First row fetched",
+          "timestamp": 689326628
+        },
+        {
+          "label": "Last row fetched",
+          "timestamp": 689351572
+        },
+        {
+          "label": "Released admission control resources",
+          "timestamp": 694765636
+        },
+        {
+          "label": "Unregister query",
+          "timestamp": 697998819
+        }
+      ]
+    }
+  ],
+  "counters": [
+    {
+      "value": 70000000,
+      "unit": "TIME_NS",
+      "counter_name": "AdmissionControlTimeSinceLastUpdate"
+    },
+    {
+      "value": 164357,
+      "unit": "TIME_NS",
+      "counter_name": "ComputeScanRangeAssignmentTimer"
+    }
+  ],
+  "Session ID": "90433d8aaa134b05:d9e7ba8305935e9d",
+  "Session Type": "HIVESERVER2",
+  "HiveServer2 Protocol Version": "V6",
+  "Start Time": "2026-05-18 20:27:18.608458000",
+  "End Time": "2026-05-18 20:27:19.303225000",
+  "Duration": "694.767ms (694767 us)",
+  "Query Type": "QUERY",
+  "Query State": "FINISHED",
+  "Impala Query State": "FINISHED",
+  "Query Status": "OK",
+  "Impala Version": "impalad version 5.0.0-SNAPSHOT DEBUG (build fc52e7d96b31a8197766df71b2d9737c3ece9741)",
+  "User": "gokulkolady",
+  "Connected User": "gokulkolady",
+  "Delegated User": "",
+  "Network Address": "127.0.0.1:53440",
+  "Default Db": "default",
+  "Sql Statement": "with customer_total_return as (select sr_customer_sk as ctr_customer_sk, sr_store_sk as ctr_store_sk, sum(sr_fee) as ctr_total_return from tpcds.store_returns, tpcds.date_dim where sr_returned_date_sk = d_date_sk and d_year = 2000 group by sr_customer_sk, sr_store_sk) select c_customer_id from customer_total_return ctr1, tpcds.store, tpcds.customer where ctr1.ctr_total_return > (select avg(ctr_total_return) * 1.2 from customer_total_return ctr2 where ctr1.ctr_store_sk = ctr2.ctr_store_sk) and s_store_sk = ctr1.ctr_store_sk and s_state = 'TN' and ctr1.ctr_customer_sk = c_customer_sk order by c_customer_id limit 100",
+  "Coordinator": "cldr-21738:27000",
+  "Query Options (set by configuration)": "RUNTIME_FILTER_WAIT_TIME_MS=10000,MAX_NUM_RUNTIME_FILTERS=50,MT_DOP=12,RUNTIME_FILTER_MIN_SIZE=8192,RUNTIME_FILTER_MAX_SIZE=2097152,TIMEZONE=UTC,CLIENT_IDENTIFIER=Impala Shell v5.0.0-SNAPSHOT (fc52e7d) built on Mon May 18 08:17:47 PM PDT 2026,RUNTIME_FILTER_ERROR_RATE=0.1,MINMAX_FILTER_THRESHOLD=0.5,MINMAX_FILTERING_LEVEL=PAGE,MAX_FRAGMENT_INSTANCES_PER_NODE=12",
+  "Query Options (set by configuration and planner)": "RUNTIME_FILTER_WAIT_TIME_MS=10000,MAX_NUM_RUNTIME_FILTERS=50,MT_DOP=12,RUNTIME_FILTER_MIN_SIZE=8192,RUNTIME_FILTER_MAX_SIZE=2097152,TIMEZONE=UTC,CLIENT_IDENTIFIER=Impala Shell v5.0.0-SNAPSHOT (fc52e7d) built on Mon May 18 08:17:47 PM PDT 2026,RUNTIME_FILTER_ERROR_RATE=0.1,MINMAX_FILTER_THRESHOLD=0.5,MINMAX_FILTERING_LEVEL=PAGE,MAX_FRAGMENT_INSTANCES_PER_NODE=12",
+  "Tables Queried": "tpcds.customer,tpcds.store_returns,tpcds.date_dim,tpcds.store",
+  "Select Columns": "tpcds.customer.c_customer_id,tpcds.store_returns.sr_customer_sk,tpcds.store_returns.sr_fee,tpcds.store_returns.sr_store_sk",
+  "Where Columns": "tpcds.customer.c_customer_sk,tpcds.date_dim.d_date_sk,tpcds.date_dim.d_year,tpcds.store.s_state,tpcds.store.s_store_sk,tpcds.store_returns.sr_customer_sk,tpcds.store_returns.sr_returned_date_sk,tpcds.store_returns.sr_store_sk",
+  "Join Columns": "tpcds.customer.c_customer_sk,tpcds.date_dim.d_date_sk,tpcds.store.s_store_sk,tpcds.store_returns.sr_customer_sk,tpcds.store_returns.sr_fee,tpcds.store_returns.sr_returned_date_sk,tpcds.store_returns.sr_store_sk",
+  "Aggregate Columns": "tpcds.store_returns.sr_customer_sk,tpcds.store_returns.sr_store_sk",
+  "OrderBy Columns": "tpcds.customer.c_customer_id",
+  "Plan": "\n----------------\nMax Per-Host Resource Reservation: Memory=207.89MB Threads=15\nPer-Host Resource Estimates: Memory=387MB\nAnalyzed query: WITH customer_total_return AS (SELECT sr_customer_sk\nctr_customer_sk, sr_store_sk ctr_store_sk, sum(sr_fee) ctr_total_return FROM\ntpcds.store_returns, tpcds.date_dim WHERE sr_returned_date_sk = d_date_sk AND\nd_year = CAST(2000 AS INT) GROUP BY sr_customer_sk, sr_store_sk) SELECT\nc_customer_id FROM customer_total_return ctr1, tpcds.store, tpcds.customer LEFT\nSEMI JOIN (SELECT avg(ctr_total_return) * CAST(1.2 AS DECIMAL(2,1)),\nctr2.ctr_store_sk FROM customer_total_return ctr2 GROUP BY ctr2.ctr_store_sk)\n`$a$1` (`$c$1`, `$c$2`) ON ctr1.ctr_store_sk = `$a$1`.`$c$2` AND\nctr1.ctr_total_return > `$a$1`.`$c$1` WHERE TRUE AND s_store_sk =\nctr1.ctr_store_sk AND s_state = 'TN' AND ctr1.ctr_customer_sk = c_customer_sk\nORDER BY c_customer_id ASC LIMIT CAST(100 AS TINYINT)\n\nF09:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1\n|  Per-Instance Resources: mem-estimate=4.02MB mem-reservation=4.00MB thread-reservation=1\nPLAN-ROOT SINK\n|  output exprs: c_customer_id\n|  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0\n|\n26:MERGING-EXCHANGE [UNPARTITIONED]\n|  order by: c_customer_id ASC\n|  limit: 100\n|  mem-estimate=16.00KB mem-reservation=0B thread-reservation=0\n|  tuple-ids=13 row-size=28B cardinality=100\n|  in pipelines: 14(GETNEXT)\n|\nF00:PLAN FRAGMENT [RANDOM] hosts=1 instances=1\nPer-Host Shared Resources: mem-estimate=64.00KB mem-reservation=64.00KB thread-reservation=0 runtime-filters-memory=64.00KB\nPer-Instance Resources: mem-estimate=24.00MB mem-reservation=8.00MB thread-reservation=1\n14:TOP-N [LIMIT=100]\n|  order by: c_customer_id ASC\n|  mem-estimate=2.73KB mem-reservation=0B thread-reservation=0\n|  tuple-ids=13 row-size=28B cardinality=100\n|  in pipelines: 14(GETNEXT), 05(OPEN)\n|\n13:HASH JOIN [LEFT SEMI JOIN, BROADCAST]\n|  hash-table-id=00\n|  hash predicates: sr_store_sk = ctr2.ctr_store_sk\n|  other join predicates: sum(sr_fee) > avg(ctr_total_return) * CAST(1.2 AS DECIMAL(2,1))\n|  mem-estimate=0B mem-reservation=0B spill-buffer=64.00KB thread-reservation=0\n|  tuple-ids=5,2,4 row-size=74B cardinality=53.81K\n|  in pipelines: 05(GETNEXT), 24(OPEN)\n|\n|--F10:PLAN FRAGMENT [RANDOM] hosts=1 instances=1\n|  |  Per-Instance Resources: mem-estimate=23.27MB mem-reservation=23.26MB thread-reservation=1 runtime-filters-memory=8.00KB\n|  JOIN BUILD\n|  |  join-table-id=00 plan-id=01 cohort-id=01\n|  |  build expressions: ctr2.ctr_store_sk\n|  |  runtime filters: RF000[bloom] <- ctr2.ctr_store_sk\n|  |  mem-estimate=23.25MB mem-reservation=23.25MB spill-buffer=64.00KB thread-reservation=0\n|  |\n|  25:EXCHANGE [BROADCAST]\n|  |  mem-estimate=16.00KB mem-reservation=0B thread-reservation=0\n|  |  tuple-ids=11 row-size=20B cardinality=6\n|  |  in pipelines: 24(GETNEXT)\n|  |\n|  F08:PLAN FRAGMENT [HASH(ctr2.ctr_store_sk)] hosts=1 instances=1\n|  Per-Instance Resources: mem-estimate=10.09MB mem-reservation=1.94MB thread-reservation=1\n|  24:AGGREGATE [FINALIZE]\n|  |  output: avg:merge(ctr_total_return)\n|  |  group by: ctr2.ctr_store_sk\n|  |  mem-estimate=10.00MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0\n|  |  tuple-ids=11 row-size=20B cardinality=6\n|  |  in pipelines: 24(GETNEXT), 22(OPEN)\n|  |\n|  23:EXCHANGE [HASH(ctr2.ctr_store_sk)]\n|  |  mem-estimate=16.00KB mem-reservation=0B thread-reservation=0\n|  |  tuple-ids=10 row-size=20B cardinality=6\n|  |  in pipelines: 22(GETNEXT)\n|  |\n|  F07:PLAN FRAGMENT [HASH(sr_customer_sk,sr_store_sk)] hosts=1 instances=1\n|  Per-Instance Resources: mem-estimate=21.26MB mem-reservation=4.88MB thread-reservation=1\n|  10:AGGREGATE [STREAMING]\n|  |  output: avg(sum(sr_fee))\n|  |  group by: sr_store_sk\n|  |  mem-estimate=10.00MB mem-reservation=2.00MB spill-buffer=64.00KB thread-reservation=0\n|  |  tuple-ids=10 row-size=20B cardinality=6\n|  |  in pipelines: 22(GETNEXT)\n|  |\n|  22:AGGREGATE [FINALIZE]\n|  |  output: sum:merge(sr_fee)\n|  |  group by: sr_customer_sk, sr_store_sk\n|  |  mem-estimate=10.00MB mem-reservation=2.88MB spill-buffer=128.00KB thread-reservation=0\n|  |  tuple-ids=8 row-size=24B cardinality=53.81K\n|  |  in pipelines: 22(GETNEXT), 06(OPEN)\n|  |\n|  21:EXCHANGE [HASH(sr_customer_sk,sr_store_sk)]\n|  |  mem-estimate=1.26MB mem-reservation=0B thread-reservation=0\n|  |  tuple-ids=8 row-size=24B cardinality=53.81K\n|  |  in pipelines: 06(GETNEXT)\n|  |\n|  F05:PLAN FRAGMENT [RANDOM] hosts=1 instances=1\n|  Per-Host Shared Resources: mem-estimate=8.00KB mem-reservation=8.00KB thread-reservation=0 runtime-filters-memory=8.00KB\n|  Per-Instance Resources: mem-estimate=50.11MB mem-reservation=10.00MB thread-reservation=1\n|  09:AGGREGATE [STREAMING]\n|  |  output: sum(sr_fee)\n|  |  group by: sr_customer_sk, sr_store_sk\n|  |  mem-estimate=10.00MB mem-reservation=2.00MB spill-buffer=64.00KB thread-reservation=0\n|  |  tuple-ids=8 row-size=24B cardinality=53.81K\n|  |  in pipelines: 06(GETNEXT)\n|  |\n|  08:HASH JOIN [INNER JOIN, BROADCAST]\n|  |  hash-table-id=01\n|  |  hash predicates: sr_returned_date_sk = d_date_sk\n|  |  fk/pk conjuncts: sr_returned_date_sk = d_date_sk\n|  |  mem-estimate=0B mem-reservation=0B spill-buffer=64.00KB thread-reservation=0\n|  |  tuple-ids=6,7 row-size=24B cardinality=53.81K\n|  |  in pipelines: 06(GETNEXT), 07(OPEN)\n|  |\n|  |--F11:PLAN FRAGMENT [RANDOM] hosts=1 instances=1\n|  |  |  Per-Instance Resources: mem-estimate=23.27MB mem-reservation=23.26MB thread-reservation=1 runtime-filters-memory=8.00KB\n|  |  JOIN BUILD\n|  |  |  join-table-id=01 plan-id=02 cohort-id=02\n|  |  |  build expressions: d_date_sk\n|  |  |  runtime filters: RF008[bloom] <- d_date_sk\n|  |  |  mem-estimate=23.25MB mem-reservation=23.25MB spill-buffer=64.00KB thread-reservation=0\n|  |  |\n|  |  20:EXCHANGE [BROADCAST]\n|  |  |  mem-estimate=16.00KB mem-reservation=0B thread-reservation=0\n|  |  |  tuple-ids=7 row-size=8B cardinality=373\n|  |  |  in pipelines: 07(GETNEXT)\n|  |  |\n|  |  F06:PLAN FRAGMENT [RANDOM] hosts=1 instances=1\n|  |  Per-Instance Resources: mem-estimate=24.05MB mem-reservation=8.00MB thread-reservation=1\n|  |  07:SCAN HDFS [tpcds.date_dim, RANDOM]\n|  |     HDFS partitions=1/1 files=1 size=9.84MB\n|  |     predicates: d_year = CAST(2000 AS INT)\n|  |     stored statistics:\n|  |       table: rows=73.05K size=9.84MB\n|  |       columns: all\n|  |     extrapolated-rows=disabled max-scan-range-rows=73.05K\n|  |     mem-estimate=24.00MB mem-reservation=8.00MB thread-reservation=0\n|  |     tuple-ids=7 row-size=8B cardinality=373\n|  |     in pipelines: 07(GETNEXT)\n|  |\n|  06:SCAN HDFS [tpcds.store_returns, RANDOM]\n|     HDFS partitions=1/1 files=1 size=31.19MB\n|     runtime filters: RF008[bloom] -> sr_returned_date_sk\n|     stored statistics:\n|       table: rows=287.51K size=31.19MB\n|       columns: all\n|     extrapolated-rows=disabled max-scan-range-rows=287.51K\n|     mem-estimate=40.00MB mem-reservation=8.00MB thread-reservation=0\n|     tuple-ids=6 row-size=16B cardinality=287.51K\n|     in pipelines: 06(GETNEXT)\n|\n12:HASH JOIN [INNER JOIN, BROADCAST]\n|  hash-table-id=02\n|  hash predicates: sr_store_sk = s_store_sk\n|  fk/pk conjuncts: sr_store_sk = s_store_sk\n|  mem-estimate=0B mem-reservation=0B spill-buffer=64.00KB thread-reservation=0\n|  tuple-ids=5,2,4 row-size=74B cardinality=53.81K\n|  in pipelines: 05(GETNEXT), 04(OPEN)\n|\n|--F12:PLAN FRAGMENT [RANDOM] hosts=1 instances=1\n|  |  Per-Instance Resources: mem-estimate=23.27MB mem-reservation=23.26MB thread-reservation=1 runtime-filters-memory=8.00KB\n|  JOIN BUILD\n|  |  join-table-id=02 plan-id=03 cohort-id=01\n|  |  build expressions: s_store_sk\n|  |  runtime filters: RF002[bloom] <- s_store_sk\n|  |  mem-estimate=23.25MB mem-reservation=23.25MB spill-buffer=64.00KB thread-reservation=0\n|  |\n|  19:EXCHANGE [BROADCAST]\n|  |  mem-estimate=16.00KB mem-reservation=0B thread-reservation=0\n|  |  tuple-ids=4 row-size=18B cardinality=12\n|  |  in pipelines: 04(GETNEXT)\n|  |\n|  F04:PLAN FRAGMENT [RANDOM] hosts=1 instances=1\n|  Per-Host Shared Resources: mem-estimate=8.00KB mem-reservation=8.00KB thread-reservation=0 runtime-filters-memory=8.00KB\n|  Per-Instance Resources: mem-estimate=16.09MB mem-reservation=8.00KB thread-reservation=1\n|  04:SCAN HDFS [tpcds.store, RANDOM]\n|     HDFS partitions=1/1 files=1 size=3.08KB\n|     predicates: s_state = 'TN'\n|     runtime filters: RF000[bloom] -> tpcds.store.s_store_sk\n|     stored statistics:\n|       table: rows=12 size=3.08KB\n|       columns: all\n|     extrapolated-rows=disabled max-scan-range-rows=12\n|     mem-estimate=16.00MB mem-reservation=8.00KB thread-reservation=0\n|     tuple-ids=4 row-size=18B cardinality=12\n|     in pipelines: 04(GETNEXT)\n|\n11:HASH JOIN [INNER JOIN, BROADCAST]\n|  hash-table-id=03\n|  hash predicates: c_customer_sk = sr_customer_sk\n|  fk/pk conjuncts: none\n|  mem-estimate=0B mem-reservation=0B spill-buffer=256.00KB thread-reservation=0\n|  tuple-ids=5,2 row-size=56B cardinality=53.81K\n|  in pipelines: 05(GETNEXT), 17(OPEN)\n|\n|--F13:PLAN FRAGMENT [RANDOM] hosts=1 instances=1\n|  |  Per-Instance Resources: mem-estimate=58.32MB mem-reservation=57.06MB thread-reservation=1 runtime-filters-memory=64.00KB\n|  JOIN BUILD\n|  |  join-table-id=03 plan-id=04 cohort-id=01\n|  |  build expressions: sr_customer_sk\n|  |  runtime filters: RF004[bloom] <- sr_customer_sk\n|  |  mem-estimate=57.00MB mem-reservation=57.00MB spill-buffer=256.00KB thread-reservation=0\n|  |\n|  18:EXCHANGE [BROADCAST]\n|  |  mem-estimate=1.26MB mem-reservation=0B thread-reservation=0\n|  |  tuple-ids=2 row-size=24B cardinality=53.81K\n|  |  in pipelines: 17(GETNEXT)\n|  |\n|  F03:PLAN FRAGMENT [HASH(sr_customer_sk,sr_store_sk)] hosts=1 instances=1\n|  Per-Instance Resources: mem-estimate=11.26MB mem-reservation=2.88MB thread-reservation=1\n|  17:AGGREGATE [FINALIZE]\n|  |  output: sum:merge(sr_fee)\n|  |  group by: sr_customer_sk, sr_store_sk\n|  |  mem-estimate=10.00MB mem-reservation=2.88MB spill-buffer=128.00KB thread-reservation=0\n|  |  tuple-ids=2 row-size=24B cardinality=53.81K\n|  |  in pipelines: 17(GETNEXT), 00(OPEN)\n|  |\n|  16:EXCHANGE [HASH(sr_customer_sk,sr_store_sk)]\n|  |  mem-estimate=1.26MB mem-reservation=0B thread-reservation=0\n|  |  tuple-ids=2 row-size=24B cardinality=53.81K\n|  |  in pipelines: 00(GETNEXT)\n|  |\n|  F01:PLAN FRAGMENT [RANDOM] hosts=1 instances=1\n|  Per-Host Shared Resources: mem-estimate=24.00KB mem-reservation=24.00KB thread-reservation=0 runtime-filters-memory=24.00KB\n|  Per-Instance Resources: mem-estimate=50.11MB mem-reservation=10.00MB thread-reservation=1\n|  03:AGGREGATE [STREAMING]\n|  |  output: sum(sr_fee)\n|  |  group by: sr_customer_sk, sr_store_sk\n|  |  mem-estimate=10.00MB mem-reservation=2.00MB spill-buffer=64.00KB thread-reservation=0\n|  |  tuple-ids=2 row-size=24B cardinality=53.81K\n|  |  in pipelines: 00(GETNEXT)\n|  |\n|  02:HASH JOIN [INNER JOIN, BROADCAST]\n|  |  hash-table-id=04\n|  |  hash predicates: sr_returned_date_sk = d_date_sk\n|  |  fk/pk conjuncts: sr_returned_date_sk = d_date_sk\n|  |  mem-estimate=0B mem-reservation=0B spill-buffer=64.00KB thread-reservation=0\n|  |  tuple-ids=0,1 row-size=24B cardinality=53.81K\n|  |  in pipelines: 00(GETNEXT), 01(OPEN)\n|  |\n|  |--F14:PLAN FRAGMENT [RANDOM] hosts=1 instances=1\n|  |  |  Per-Instance Resources: mem-estimate=23.27MB mem-reservation=23.26MB thread-reservation=1 runtime-filters-memory=8.00KB\n|  |  JOIN BUILD\n|  |  |  join-table-id=04 plan-id=05 cohort-id=03\n|  |  |  build expressions: d_date_sk\n|  |  |  runtime filters: RF006[bloom] <- d_date_sk\n|  |  |  mem-estimate=23.25MB mem-reservation=23.25MB spill-buffer=64.00KB thread-reservation=0\n|  |  |\n|  |  15:EXCHANGE [BROADCAST]\n|  |  |  mem-estimate=16.00KB mem-reservation=0B thread-reservation=0\n|  |  |  tuple-ids=1 row-size=8B cardinality=373\n|  |  |  in pipelines: 01(GETNEXT)\n|  |  |\n|  |  F02:PLAN FRAGMENT [RANDOM] hosts=1 instances=1\n|  |  Per-Instance Resources: mem-estimate=24.05MB mem-reservation=8.00MB thread-reservation=1\n|  |  01:SCAN HDFS [tpcds.date_dim, RANDOM]\n|  |     HDFS partitions=1/1 files=1 size=9.84MB\n|  |     predicates: d_year = CAST(2000 AS INT)\n|  |     stored statistics:\n|  |       table: rows=73.05K size=9.84MB\n|  |       columns: all\n|  |     extrapolated-rows=disabled max-scan-range-rows=73.05K\n|  |     mem-estimate=24.00MB mem-reservation=8.00MB thread-reservation=0\n|  |     tuple-ids=1 row-size=8B cardinality=373\n|  |     in pipelines: 01(GETNEXT)\n|  |\n|  00:SCAN HDFS [tpcds.store_returns, RANDOM]\n|     HDFS partitions=1/1 files=1 size=31.19MB\n|     runtime filters: RF000[bloom] -> tpcds.store_returns.sr_store_sk, RF002[bloom] -> tpcds.store_returns.sr_store_sk, RF006[bloom] -> sr_returned_date_sk\n|     stored statistics:\n|       table: rows=287.51K size=31.19MB\n|       columns: all\n|     extrapolated-rows=disabled max-scan-range-rows=287.51K\n|     mem-estimate=40.00MB mem-reservation=8.00MB thread-reservation=0\n|     tuple-ids=0 row-size=16B cardinality=287.51K\n|     in pipelines: 00(GETNEXT)\n|\n05:SCAN HDFS [tpcds.customer, RANDOM]\n   HDFS partitions=1/1 files=1 size=12.60MB\n   runtime filters: RF004[bloom] -> c_customer_sk\n   stored statistics:\n     table: rows=100.00K size=12.60MB\n     columns: all\n   extrapolated-rows=disabled max-scan-range-rows=100.00K\n   mem-estimate=24.00MB mem-reservation=8.00MB thread-reservation=0\n   tuple-ids=5 row-size=32B cardinality=100.00K\n   in pipelines: 05(GETNEXT)\n----------------",
+  "Estimated Per-Host Mem": "405321984",
+  "Request Pool": "default-pool",
+  "Per Host Min Memory Reservation": "cldr-21738:27000(207.89 MB)",
+  "Per Host Number of Fragment Instances": "cldr-21738:27000(15)",
+  "Admission result": "Admitted immediately",
+  "Cluster Memory Admitted": "386.55 MB",
+  "Executor Group": "default",
+  "Number of running queries in designated executor group when admitted": "1",
+  "ExecSummary": "\nOperator                    #Hosts  #Inst   Avg Time   Max Time    #Rows  Est. #Rows   Peak Mem  Est. Peak Mem  Detail                           \n-------------------------------------------------------------------------------------------------------------------------------------------------\nF09:ROOT                         1      1  200.921us  200.921us                         4.01 MB        4.00 MB                                   \n26:MERGING-EXCHANGE              1      1   21.520us   21.520us      100         100   16.00 KB       16.00 KB  UNPARTITIONED                    \nF00:EXCHANGE SENDER              1      1   47.105us   47.105us                         2.83 KB      128.00 KB                                   \n14:TOP-N                         1      1  815.693us  815.693us      100         100  346.00 KB        2.73 KB                                   \n13:HASH JOIN                     1      1    5.826ms    5.826ms   18.98K      53.81K  198.12 KB              0  LEFT SEMI JOIN, BROADCAST        \n|--F10:JOIN BUILD                1      1  268.320us  268.320us                        23.27 MB       23.25 MB                                   \n|  25:EXCHANGE                   1      1   28.215us   28.215us        7           6   64.00 KB       16.00 KB  BROADCAST                        \n|  F08:EXCHANGE SENDER           1      1   66.481us   66.481us                         62.00 B       96.00 KB                                   \n|  24:AGGREGATE                  1      1  640.623us  640.623us        7           6    2.08 MB       10.00 MB  FINALIZE                         \n|  23:EXCHANGE                   1      1   64.143us   64.143us        7           6   64.00 KB       16.00 KB  HASH(ctr2.ctr_store_sk)          \n|  F07:EXCHANGE SENDER           1      1   90.625us   90.625us                         62.00 B       96.00 KB                                   \n|  10:AGGREGATE                  1      1    1.957ms    1.957ms        7           6    2.02 MB       10.00 MB  STREAMING                        \n|  22:AGGREGATE                  1      1    9.037ms    9.037ms   50.44K      53.81K    4.40 MB       10.00 MB  FINALIZE                         \n|  21:EXCHANGE                   1      1  155.359us  155.359us   50.44K      53.81K  768.00 KB        1.26 MB  HASH(sr_customer_sk,sr_store_sk) \n|  F05:EXCHANGE SENDER           1      1    2.076ms    2.076ms                        50.00 KB      112.00 KB                                   \n|  09:AGGREGATE                  1      1    9.017ms    9.017ms   50.44K      53.81K    3.76 MB       10.00 MB  STREAMING                        \n|  08:HASH JOIN                  1      1   11.302ms   11.302ms   55.82K      53.81K   42.12 KB              0  INNER JOIN, BROADCAST            \n|  |--F11:JOIN BUILD             1      1  430.397us  430.397us                        23.27 MB       23.25 MB                                   \n|  |  20:EXCHANGE                1      1   10.241us   10.241us      366         373   16.00 KB       16.00 KB  BROADCAST                        \n|  |  F06:EXCHANGE SENDER        1      1  102.307us  102.307us                         3.22 KB       48.00 KB                                   \n|  |  07:SCAN HDFS               1      1   32.599ms   32.599ms      366         373   16.01 MB       24.00 MB  tpcds.date_dim                   \n|  06:SCAN HDFS                  1      1   77.812ms   77.812ms  287.51K     287.51K   24.00 MB       40.00 MB  tpcds.store_returns              \n12:HASH JOIN                     1      1    2.142ms    2.142ms   49.93K      53.81K  186.12 KB              0  INNER JOIN, BROADCAST            \n|--F12:JOIN BUILD                1      1  291.052us  291.052us                        23.27 MB       23.25 MB                                   \n|  19:EXCHANGE                   1      1    7.252us    7.252us       12          12   16.00 KB       16.00 KB  BROADCAST                        \n|  F04:EXCHANGE SENDER           1      1   32.691us   32.691us                        205.00 B       88.00 KB                                   \n|  04:SCAN HDFS                  1      1  272.107ms  272.107ms       12          12   16.00 KB       16.00 MB  tpcds.store                      \n11:HASH JOIN                     1      1    5.805ms    5.805ms   50.43K      53.81K   76.12 KB              0  INNER JOIN, BROADCAST            \n|--F13:JOIN BUILD                1      1    4.716ms    4.716ms                        57.02 MB       57.00 MB                                   \n|  18:EXCHANGE                   1      1  179.166us  179.166us   50.44K      53.81K  120.00 KB        1.26 MB  BROADCAST                        \n|  F03:EXCHANGE SENDER           1      1    1.578ms    1.578ms                        50.00 KB      112.00 KB                                   \n|  17:AGGREGATE                  1      1    8.036ms    8.036ms   50.44K      53.81K    4.40 MB       10.00 MB  FINALIZE                         \n|  16:EXCHANGE                   1      1  137.116us  137.116us   50.44K      53.81K  512.00 KB        1.26 MB  HASH(sr_customer_sk,sr_store_sk) \n|  F01:EXCHANGE SENDER           1      1    1.594ms    1.594ms                        50.00 KB      112.00 KB                                   \n|  03:AGGREGATE                  1      1    8.673ms    8.673ms   50.44K      53.81K    3.82 MB       10.00 MB  STREAMING                        \n|  02:HASH JOIN                  1      1   11.039ms   11.039ms   55.82K      53.81K   42.12 KB              0  INNER JOIN, BROADCAST            \n|  |--F14:JOIN BUILD             1      1  299.436us  299.436us                        23.27 MB       23.25 MB                                   \n|  |  15:EXCHANGE                1      1    8.233us    8.233us      366         373   16.00 KB       16.00 KB  BROADCAST                        \n|  |  F02:EXCHANGE SENDER        1      1  145.468us  145.468us                         3.22 KB       48.00 KB                                   \n|  |  01:SCAN HDFS               1      1   28.555ms   28.555ms      366         373   16.01 MB       24.00 MB  tpcds.date_dim                   \n|  00:SCAN HDFS                  1      1  207.713ms  207.713ms  287.51K     287.51K   24.00 MB       40.00 MB  tpcds.store_returns              \n05:SCAN HDFS                     1      1   29.403ms   29.403ms  100.00K     100.00K   16.00 MB       24.00 MB  tpcds.customer",
+  "Errors": "",
+  "Frontend": {
+    "counters": [
+      {
+        "value": 0,
+        "unit": "NONE",
+        "counter_name": "CatalogFetch.ColumnStats.Hits"
+      },
+      {
+        "value": 95,
+        "unit": "NONE",
+        "counter_name": "CatalogFetch.ColumnStats.Misses"
+      },
+      {
+        "value": 95,
+        "unit": "NONE",
+        "counter_name": "CatalogFetch.ColumnStats.Requests"
+      },
+      {
+        "value": 5,
+        "unit": "TIME_MS",
+        "counter_name": "CatalogFetch.ColumnStats.Time"
+      },
+      {
+        "value": 1,
+        "unit": "NONE",
+        "counter_name": "CatalogFetch.Config.Hits"
+      },
+      {
+        "value": 0,
+        "unit": "NONE",
+        "counter_name": "CatalogFetch.Config.Misses"
+      },
+      {
+        "value": 1,
+        "unit": "NONE",
+        "counter_name": "CatalogFetch.Config.Requests"
+      },
+      {
+        "value": 0,
+        "unit": "TIME_MS",
+        "counter_name": "CatalogFetch.Config.Time"
+      },
+      {
+        "value": 1,
+        "unit": "NONE",
+        "counter_name": "CatalogFetch.DatabaseList.Hits"
+      },
+      {
+        "value": 0,
+        "unit": "NONE",
+        "counter_name": "CatalogFetch.DatabaseList.Misses"
+      },
+      {
+        "value": 1,
+        "unit": "NONE",
+        "counter_name": "CatalogFetch.DatabaseList.Requests"
+      },
+      {
+        "value": 0,
+        "unit": "TIME_MS",
+        "counter_name": "CatalogFetch.DatabaseList.Time"
+      },
+      {
+        "value": 0,
+        "unit": "NONE",
+        "counter_name": "CatalogFetch.PartitionLists.Hits"
+      },
+      {
+        "value": 4,
+        "unit": "NONE",
+        "counter_name": "CatalogFetch.PartitionLists.Misses"
+      },
+      {
+        "value": 4,
+        "unit": "NONE",
+        "counter_name": "CatalogFetch.PartitionLists.Requests"
+      },
+      {
+        "value": 0,
+        "unit": "TIME_MS",
+        "counter_name": "CatalogFetch.PartitionLists.Time"
+      },
+      {
+        "value": 10,
+        "unit": "NONE",
+        "counter_name": "CatalogFetch.Partitions.Hits"
+      },
+      {
+        "value": 0,
+        "unit": "NONE",
+        "counter_name": "CatalogFetch.Partitions.Misses"
+      },
+      {
+        "value": 10,
+        "unit": "NONE",
+        "counter_name": "CatalogFetch.Partitions.Requests"
+      },
+      {
+        "value": 0,
+        "unit": "TIME_MS",
+        "counter_name": "CatalogFetch.Partitions.Time"
+      },
+      {
+        "value": 23353,
+        "unit": "BYTES",
+        "counter_name": "CatalogFetch.RPCs.Bytes"
+      },
+      {
+        "value": 13,
+        "unit": "NONE",
+        "counter_name": "CatalogFetch.RPCs.Requests"
+      },
+      {
+        "value": 24,
+        "unit": "TIME_MS",
+        "counter_name": "CatalogFetch.RPCs.Time"
+      },
+      {
+        "value": 0,
+        "unit": "TIME_MS",
+        "counter_name": "CatalogFetch.StorageLoad.Time"
+      },
+      {
+        "value": 1,
+        "unit": "NONE",
+        "counter_name": "CatalogFetch.TableList.Hits"
+      },
+      {
+        "value": 1,
+        "unit": "NONE",
+        "counter_name": "CatalogFetch.TableList.Misses"
+      },
+      {
+        "value": 2,
+        "unit": "NONE",
+        "counter_name": "CatalogFetch.TableList.Requests"
+      },
+      {
+        "value": 0,
+        "unit": "TIME_MS",
+        "counter_name": "CatalogFetch.TableList.Time"
+      },
+      {
+        "value": 0,
+        "unit": "NONE",
+        "counter_name": "CatalogFetch.Tables.Hits"
+      },
+      {
+        "value": 4,
+        "unit": "NONE",
+        "counter_name": "CatalogFetch.Tables.Misses"
+      },
+      {
+        "value": 4,
+        "unit": "NONE",
+        "counter_name": "CatalogFetch.Tables.Requests"
+      },
+      {
+        "value": 28,
+        "unit": "TIME_MS",
+        "counter_name": "CatalogFetch.Tables.Time"
+      },
+      {
+        "value": 1,
+        "unit": "UNIT",
+        "counter_name": "ExecutorGroupsConsidered"
+      }
+    ],
+    "Referenced Tables": "tpcds.customer, tpcds.store_returns, tpcds.date_dim, tpcds.store",
+    "Original Table Versions": "tpcds.customer, 2194, 1779161226616, Mon May 18 20:27:06 PDT 2026\ntpcds.store_returns, 2191, 1779161225066, Mon May 18 20:27:05 PDT 2026\ntpcds.date_dim, 2192, 1779161225815, Mon May 18 20:27:05 PDT 2026\ntpcds.store, 2193, 1779161226051, Mon May 18 20:27:06 PDT 2026",
+    "Catalog Service ID": "9fd4d1e065cd4d1a:8a2402ed3d0bc655",
+    "Executor group 1": {
+      "counters": [
+        {
+          "value": 1215965952,
+          "unit": "BYTES",
+          "counter_name": "MemoryAsk"
+        },
+        {
+          "value": 9223372036854775807,
+          "unit": "BYTES",
+          "counter_name": "MemoryMax"
+        }
+      ],
+      "Verdict": "Match"
+    },
+    "PlannerInfo": {
+      "PlannerType": "OriginalPlanner"
+    }
+  }
+}

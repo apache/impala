@@ -1,0 +1,425 @@
+{
+  "cldr-21738:27000": {
+    "time_series_counters": [
+      {
+        "counter_name": "HostCpuIoWaitPercentage",
+        "unit": "BASIS_POINTS",
+        "num": 24,
+        "period": 50,
+        "data": "0,0,0,0,0,12,12,12,12,12,12,12,12,12,12,12,12,12,12,12,12,12,12,12"
+      },
+      {
+        "counter_name": "HostCpuSysPercentage",
+        "unit": "BASIS_POINTS",
+        "num": 24,
+        "period": 50,
+        "data": "138,138,138,138,138,87,87,87,87,87,87,87,87,87,87,37,37,37,37,37,37,37,37,37"
+      },
+      {
+        "counter_name": "HostCpuUserPercentage",
+        "unit": "BASIS_POINTS",
+        "num": 24,
+        "period": 50,
+        "data": "677,677,677,677,677,1620,1620,1620,1620,1620,1620,1620,1620,1620,1620,691,691,691,691,691,691,691,691,691"
+      },
+      {
+        "counter_name": "HostDiskReadThroughput",
+        "unit": "BYTES_PER_SECOND",
+        "num": 24,
+        "period": 50,
+        "data": "0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0"
+      },
+      {
+        "counter_name": "HostDiskWriteThroughput",
+        "unit": "BYTES_PER_SECOND",
+        "num": 24,
+        "period": 50,
+        "data": "0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,188039,188039,188039,188039,188039,188039,188039,188039,188039"
+      },
+      {
+        "counter_name": "HostNetworkRx",
+        "unit": "BYTES_PER_SECOND",
+        "num": 24,
+        "period": 50,
+        "data": "24656,24656,24656,24656,24656,21004,21004,21004,21004,21004,21004,21004,21004,21004,21004,10279,10279,10279,10279,10279,10279,10279,10279,10279"
+      },
+      {
+        "counter_name": "HostNetworkTx",
+        "unit": "BYTES_PER_SECOND",
+        "num": 24,
+        "period": 50,
+        "data": "9272,9272,9272,9272,9272,3400,3400,3400,3400,3400,3400,3400,3400,3400,3400,3964,3964,3964,3964,3964,3964,3964,3964,3964"
+      }
+    ],
+    "counters": [
+      {
+        "value": 1,
+        "unit": "UNIT",
+        "counter_name": "AdmissionSlots"
+      },
+      {
+        "value": 98304,
+        "unit": "BYTES",
+        "counter_name": "BloomFilterBytes"
+      },
+      {
+        "value": 0,
+        "unit": "UNIT",
+        "counter_name": "InListFilterItems"
+      },
+      {
+        "value": 0,
+        "unit": "BYTES",
+        "counter_name": "ScratchBytesRead"
+      },
+      {
+        "value": 0,
+        "unit": "BYTES",
+        "counter_name": "ScratchBytesReadUseLocalDisk"
+      },
+      {
+        "value": 0,
+        "unit": "BYTES",
+        "counter_name": "ScratchBytesReadUseMem"
+      },
+      {
+        "value": 0,
+        "unit": "BYTES",
+        "counter_name": "ScratchBytesWritten"
+      },
+      {
+        "value": 0,
+        "unit": "BYTES",
+        "counter_name": "ScratchFileUsedBytes"
+      },
+      {
+        "value": 0,
+        "unit": "UNIT",
+        "counter_name": "ScratchReads"
+      },
+      {
+        "value": 0,
+        "unit": "UNIT",
+        "counter_name": "ScratchReadsUseLocalDisk"
+      },
+      {
+        "value": 0,
+        "unit": "UNIT",
+        "counter_name": "ScratchReadsUseMem"
+      },
+      {
+        "value": 0,
+        "unit": "UNIT",
+        "counter_name": "ScratchWrites"
+      },
+      {
+        "value": 0,
+        "unit": "TIME_NS",
+        "counter_name": "TotalEncryptionTime"
+      },
+      {
+        "value": 0,
+        "unit": "TIME_NS",
+        "counter_name": "TotalReadBlockTime"
+      },
+      {
+        "value": 0,
+        "unit": "BYTES",
+        "counter_name": "UncompressedScratchBytesWritten"
+      }
+    ],
+    "Filter 8 arrival": "871ms",
+    "Filter 6 arrival": "872ms",
+    "Filter 0 arrival": "968ms",
+    "Filter 2 arrival": "969ms",
+    "Filter 4 arrival": "1s065ms",
+    "Buffer pool": {
+      "counters": [
+        {
+          "value": 5095,
+          "unit": "TIME_NS",
+          "counter_name": "AllocTime"
+        },
+        {
+          "value": 0,
+          "unit": "TIME_NS",
+          "counter_name": "CompressionTime"
+        },
+        {
+          "value": 98304,
+          "unit": "BYTES",
+          "counter_name": "CumulativeAllocationBytes"
+        },
+        {
+          "value": 5,
+          "unit": "UNIT",
+          "counter_name": "CumulativeAllocations"
+        },
+        {
+          "value": 0,
+          "unit": "TIME_NS",
+          "counter_name": "EncryptionTime"
+        },
+        {
+          "value": 98304,
+          "unit": "BYTES",
+          "counter_name": "PeakReservation"
+        },
+        {
+          "value": 0,
+          "unit": "BYTES",
+          "counter_name": "PeakUnpinnedBytes"
+        },
+        {
+          "value": 98304,
+          "unit": "BYTES",
+          "counter_name": "PeakUsedReservation"
+        },
+        {
+          "value": 0,
+          "unit": "BYTES",
+          "counter_name": "ReadIoBytes"
+        },
+        {
+          "value": 0,
+          "unit": "UNIT",
+          "counter_name": "ReadIoOps"
+        },
+        {
+          "value": 0,
+          "unit": "TIME_NS",
+          "counter_name": "ReadIoWaitTime"
+        },
+        {
+          "value": 98304,
+          "unit": "BYTES",
+          "counter_name": "ReservationLimit"
+        },
+        {
+          "value": 1027,
+          "unit": "TIME_NS",
+          "counter_name": "SystemAllocTime"
+        },
+        {
+          "value": 0,
+          "unit": "BYTES",
+          "counter_name": "WriteIoBytes"
+        },
+        {
+          "value": 0,
+          "unit": "UNIT",
+          "counter_name": "WriteIoOps"
+        },
+        {
+          "value": 0,
+          "unit": "TIME_NS",
+          "counter_name": "WriteIoWaitTime"
+        }
+      ]
+    },
+    "JVM": {
+      "counters": [
+        {
+          "value": 0,
+          "unit": "UNIT",
+          "counter_name": "GcCount"
+        },
+        {
+          "value": 0,
+          "unit": "UNIT",
+          "counter_name": "GcNumInfoThresholdExceeded"
+        },
+        {
+          "value": 0,
+          "unit": "UNIT",
+          "counter_name": "GcNumWarnThresholdExceeded"
+        },
+        {
+          "value": 0,
+          "unit": "TIME_MS",
+          "counter_name": "GcTimeMillis"
+        },
+        {
+          "value": 0,
+          "unit": "TIME_MS",
+          "counter_name": "GcTotalExtraSleepTimeMillis"
+        }
+      ]
+    },
+    "Fragment F00": {
+      "CodeGen": {
+        "counters": [
+          {
+            "value": 12595013,
+            "unit": "TIME_NS",
+            "counter_name": "CodegenCacheLookupTime"
+          },
+          {
+            "value": 352238,
+            "unit": "TIME_NS",
+            "counter_name": "CodegenCacheSaveTime"
+          },
+          {
+            "value": 0,
+            "unit": "UNIT",
+            "counter_name": "CodegenCompileThreadInvoluntaryContextSwitches"
+          },
+          {
+            "value": 0,
+            "unit": "UNIT",
+            "counter_name": "CodegenCompileThreadMajorPageFaults"
+          },
+          {
+            "value": 0,
+            "unit": "UNIT",
+            "counter_name": "CodegenCompileThreadMinorPageFaults"
+          },
+          {
+            "value": 0,
+            "unit": "TIME_NS",
+            "counter_name": "CodegenCompileThreadTotalWallClockTime",
+            "child_counters": [
+              {
+                "value": 0,
+                "unit": "TIME_NS",
+                "counter_name": "CodegenCompileThreadSysTime"
+              },
+              {
+                "value": 0,
+                "unit": "TIME_NS",
+                "counter_name": "CodegenCompileThreadUserTime"
+              }
+            ]
+          },
+          {
+            "value": 0,
+            "unit": "UNIT",
+            "counter_name": "CodegenCompileThreadVoluntaryContextSwitches"
+          },
+          {
+            "value": 1,
+            "unit": "UNIT",
+            "counter_name": "CodegenInvoluntaryContextSwitches"
+          },
+          {
+            "value": 0,
+            "unit": "UNIT",
+            "counter_name": "CodegenMajorPageFaults"
+          },
+          {
+            "value": 4364,
+            "unit": "UNIT",
+            "counter_name": "CodegenMinorPageFaults"
+          },
+          {
+            "value": 851190513,
+            "unit": "TIME_NS",
+            "counter_name": "CodegenTotalWallClockTime",
+            "child_counters": [
+              {
+                "value": 11993000,
+                "unit": "TIME_NS",
+                "counter_name": "CodegenSysTime"
+              },
+              {
+                "value": 839521000,
+                "unit": "TIME_NS",
+                "counter_name": "CodegenUserTime"
+              }
+            ]
+          },
+          {
+            "value": 0,
+            "unit": "UNIT",
+            "counter_name": "CodegenVoluntaryContextSwitches"
+          },
+          {
+            "value": 110671877,
+            "unit": "TIME_NS",
+            "counter_name": "CompileTime"
+          },
+          {
+            "value": 1908305,
+            "unit": "TIME_NS",
+            "counter_name": "FunctionPruneTime"
+          },
+          {
+            "value": 0,
+            "unit": "TIME_NS",
+            "counter_name": "InactiveTotalTime"
+          },
+          {
+            "value": 21779854,
+            "unit": "TIME_NS",
+            "counter_name": "IrGenerationTime"
+          },
+          {
+            "value": 0,
+            "unit": "TIME_NS",
+            "counter_name": "LoadTime"
+          },
+          {
+            "value": 838560506,
+            "unit": "TIME_NS",
+            "counter_name": "MainThreadCodegenTime"
+          },
+          {
+            "value": 12270260,
+            "unit": "TIME_NS",
+            "counter_name": "ModuleBitcodeGenTime"
+          },
+          {
+            "value": 3843472,
+            "unit": "BYTES",
+            "counter_name": "ModuleBitcodeSize"
+          },
+          {
+            "value": 0,
+            "unit": "UNIT",
+            "counter_name": "NumCachedFunctions"
+          },
+          {
+            "value": 347,
+            "unit": "UNIT",
+            "counter_name": "NumFunctions"
+          },
+          {
+            "value": 25474,
+            "unit": "UNIT",
+            "counter_name": "NumInstructions"
+          },
+          {
+            "value": 135,
+            "unit": "UNIT",
+            "counter_name": "NumOptimizedFunctions"
+          },
+          {
+            "value": 20478,
+            "unit": "UNIT",
+            "counter_name": "NumOptimizedInstructions"
+          },
+          {
+            "value": 685855699,
+            "unit": "TIME_NS",
+            "counter_name": "OptimizationTime"
+          },
+          {
+            "value": 13042688,
+            "unit": "BYTES",
+            "counter_name": "PeakMemoryUsage"
+          },
+          {
+            "value": 12636495,
+            "unit": "TIME_NS",
+            "counter_name": "PrepareTime"
+          },
+          {
+            "value": 851196055,
+            "unit": "TIME_NS",
+            "counter_name": "TotalTime"
+          }
+        ]
+      }
+    }
+  }
+}

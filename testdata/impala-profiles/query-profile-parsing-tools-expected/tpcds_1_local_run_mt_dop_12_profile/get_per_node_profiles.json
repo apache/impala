@@ -1,0 +1,2875 @@
+{
+  "cldr-21738:27000": {
+    "time_series_counters": [
+      {
+        "counter_name": "HostCpuIoWaitPercentage",
+        "unit": "BASIS_POINTS",
+        "num": 12,
+        "period": 50,
+        "data": "0,0,0,0,0,0,0,0,0,0,12,12"
+      },
+      {
+        "counter_name": "HostCpuSysPercentage",
+        "unit": "BASIS_POINTS",
+        "num": 12,
+        "period": 50,
+        "data": "188,188,188,188,188,188,188,188,188,188,262,262"
+      },
+      {
+        "counter_name": "HostCpuUserPercentage",
+        "unit": "BASIS_POINTS",
+        "num": 12,
+        "period": 50,
+        "data": "957,957,957,957,957,957,957,957,957,957,3391,3391"
+      },
+      {
+        "counter_name": "HostDiskReadThroughput",
+        "unit": "BYTES_PER_SECOND",
+        "num": 12,
+        "period": 50,
+        "data": "0,0,0,0,0,0,0,0,0,0,0,0"
+      },
+      {
+        "counter_name": "HostDiskWriteThroughput",
+        "unit": "BYTES_PER_SECOND",
+        "num": 12,
+        "period": 50,
+        "data": "310674,310674,310674,310674,310674,310674,310674,310674,310674,310674,475136,475136"
+      },
+      {
+        "counter_name": "HostNetworkRx",
+        "unit": "BYTES_PER_SECOND",
+        "num": 12,
+        "period": 50,
+        "data": "30688,30688,30688,30688,30688,30688,30688,30688,30688,30688,25864,25864"
+      },
+      {
+        "counter_name": "HostNetworkTx",
+        "unit": "BYTES_PER_SECOND",
+        "num": 12,
+        "period": 50,
+        "data": "5456,5456,5456,5456,5456,5456,5456,5456,5456,5456,10562,10562"
+      }
+    ],
+    "counters": [
+      {
+        "value": 1,
+        "unit": "UNIT",
+        "counter_name": "AdmissionSlots"
+      },
+      {
+        "value": 114688,
+        "unit": "BYTES",
+        "counter_name": "BloomFilterBytes"
+      },
+      {
+        "value": 0,
+        "unit": "UNIT",
+        "counter_name": "InListFilterItems"
+      },
+      {
+        "value": 0,
+        "unit": "BYTES",
+        "counter_name": "ScratchBytesRead"
+      },
+      {
+        "value": 0,
+        "unit": "BYTES",
+        "counter_name": "ScratchBytesReadUseLocalDisk"
+      },
+      {
+        "value": 0,
+        "unit": "BYTES",
+        "counter_name": "ScratchBytesReadUseMem"
+      },
+      {
+        "value": 0,
+        "unit": "BYTES",
+        "counter_name": "ScratchBytesWritten"
+      },
+      {
+        "value": 0,
+        "unit": "BYTES",
+        "counter_name": "ScratchFileUsedBytes"
+      },
+      {
+        "value": 0,
+        "unit": "UNIT",
+        "counter_name": "ScratchReads"
+      },
+      {
+        "value": 0,
+        "unit": "UNIT",
+        "counter_name": "ScratchReadsUseLocalDisk"
+      },
+      {
+        "value": 0,
+        "unit": "UNIT",
+        "counter_name": "ScratchReadsUseMem"
+      },
+      {
+        "value": 0,
+        "unit": "UNIT",
+        "counter_name": "ScratchWrites"
+      },
+      {
+        "value": 0,
+        "unit": "TIME_NS",
+        "counter_name": "TotalEncryptionTime"
+      },
+      {
+        "value": 0,
+        "unit": "TIME_NS",
+        "counter_name": "TotalReadBlockTime"
+      },
+      {
+        "value": 0,
+        "unit": "BYTES",
+        "counter_name": "UncompressedScratchBytesWritten"
+      }
+    ],
+    "Filter 6 arrival": "107ms",
+    "Filter 8 arrival": "113ms",
+    "Filter 0 arrival": "343ms",
+    "Filter 2 arrival": "344ms",
+    "Filter 4 arrival": "451ms",
+    "Buffer pool": {
+      "counters": [
+        {
+          "value": 13346,
+          "unit": "TIME_NS",
+          "counter_name": "AllocTime"
+        },
+        {
+          "value": 0,
+          "unit": "TIME_NS",
+          "counter_name": "CompressionTime"
+        },
+        {
+          "value": 114688,
+          "unit": "BYTES",
+          "counter_name": "CumulativeAllocationBytes"
+        },
+        {
+          "value": 7,
+          "unit": "UNIT",
+          "counter_name": "CumulativeAllocations"
+        },
+        {
+          "value": 0,
+          "unit": "TIME_NS",
+          "counter_name": "EncryptionTime"
+        },
+        {
+          "value": 204800,
+          "unit": "BYTES",
+          "counter_name": "PeakReservation"
+        },
+        {
+          "value": 0,
+          "unit": "BYTES",
+          "counter_name": "PeakUnpinnedBytes"
+        },
+        {
+          "value": 114688,
+          "unit": "BYTES",
+          "counter_name": "PeakUsedReservation"
+        },
+        {
+          "value": 0,
+          "unit": "BYTES",
+          "counter_name": "ReadIoBytes"
+        },
+        {
+          "value": 0,
+          "unit": "UNIT",
+          "counter_name": "ReadIoOps"
+        },
+        {
+          "value": 0,
+          "unit": "TIME_NS",
+          "counter_name": "ReadIoWaitTime"
+        },
+        {
+          "value": 204800,
+          "unit": "BYTES",
+          "counter_name": "ReservationLimit"
+        },
+        {
+          "value": 6118,
+          "unit": "TIME_NS",
+          "counter_name": "SystemAllocTime"
+        },
+        {
+          "value": 0,
+          "unit": "BYTES",
+          "counter_name": "WriteIoBytes"
+        },
+        {
+          "value": 0,
+          "unit": "UNIT",
+          "counter_name": "WriteIoOps"
+        },
+        {
+          "value": 0,
+          "unit": "TIME_NS",
+          "counter_name": "WriteIoWaitTime"
+        }
+      ]
+    },
+    "JVM": {
+      "counters": [
+        {
+          "value": 0,
+          "unit": "UNIT",
+          "counter_name": "GcCount"
+        },
+        {
+          "value": 0,
+          "unit": "UNIT",
+          "counter_name": "GcNumInfoThresholdExceeded"
+        },
+        {
+          "value": 0,
+          "unit": "UNIT",
+          "counter_name": "GcNumWarnThresholdExceeded"
+        },
+        {
+          "value": 0,
+          "unit": "TIME_MS",
+          "counter_name": "GcTimeMillis"
+        },
+        {
+          "value": 0,
+          "unit": "TIME_MS",
+          "counter_name": "GcTotalExtraSleepTimeMillis"
+        }
+      ]
+    },
+    "Fragment F09": {
+      "CodeGen": {
+        "counters": [
+          {
+            "value": 1694428,
+            "unit": "TIME_NS",
+            "counter_name": "CodegenCacheLookupTime"
+          },
+          {
+            "value": 100652,
+            "unit": "TIME_NS",
+            "counter_name": "CodegenCacheSaveTime"
+          },
+          {
+            "value": 0,
+            "unit": "UNIT",
+            "counter_name": "CodegenCompileThreadInvoluntaryContextSwitches"
+          },
+          {
+            "value": 0,
+            "unit": "UNIT",
+            "counter_name": "CodegenCompileThreadMajorPageFaults"
+          },
+          {
+            "value": 0,
+            "unit": "UNIT",
+            "counter_name": "CodegenCompileThreadMinorPageFaults"
+          },
+          {
+            "value": 0,
+            "unit": "TIME_NS",
+            "counter_name": "CodegenCompileThreadTotalWallClockTime",
+            "child_counters": [
+              {
+                "value": 0,
+                "unit": "TIME_NS",
+                "counter_name": "CodegenCompileThreadSysTime"
+              },
+              {
+                "value": 0,
+                "unit": "TIME_NS",
+                "counter_name": "CodegenCompileThreadUserTime"
+              }
+            ]
+          },
+          {
+            "value": 0,
+            "unit": "UNIT",
+            "counter_name": "CodegenCompileThreadVoluntaryContextSwitches"
+          },
+          {
+            "value": 15,
+            "unit": "UNIT",
+            "counter_name": "CodegenInvoluntaryContextSwitches"
+          },
+          {
+            "value": 0,
+            "unit": "UNIT",
+            "counter_name": "CodegenMajorPageFaults"
+          },
+          {
+            "value": 1400,
+            "unit": "UNIT",
+            "counter_name": "CodegenMinorPageFaults"
+          },
+          {
+            "value": 45700029,
+            "unit": "TIME_NS",
+            "counter_name": "CodegenTotalWallClockTime",
+            "child_counters": [
+              {
+                "value": 7294000,
+                "unit": "TIME_NS",
+                "counter_name": "CodegenSysTime"
+              },
+              {
+                "value": 36346000,
+                "unit": "TIME_NS",
+                "counter_name": "CodegenUserTime"
+              }
+            ]
+          },
+          {
+            "value": 31,
+            "unit": "UNIT",
+            "counter_name": "CodegenVoluntaryContextSwitches"
+          },
+          {
+            "value": 3307811,
+            "unit": "TIME_NS",
+            "counter_name": "CompileTime"
+          },
+          {
+            "value": 2419985,
+            "unit": "TIME_NS",
+            "counter_name": "FunctionPruneTime"
+          },
+          {
+            "value": 0,
+            "unit": "TIME_NS",
+            "counter_name": "InactiveTotalTime"
+          },
+          {
+            "value": 762621,
+            "unit": "TIME_NS",
+            "counter_name": "IrGenerationTime"
+          },
+          {
+            "value": 0,
+            "unit": "TIME_NS",
+            "counter_name": "LoadTime"
+          },
+          {
+            "value": 21630266,
+            "unit": "TIME_NS",
+            "counter_name": "MainThreadCodegenTime"
+          },
+          {
+            "value": 1591326,
+            "unit": "TIME_NS",
+            "counter_name": "ModuleBitcodeGenTime"
+          },
+          {
+            "value": 3843472,
+            "unit": "BYTES",
+            "counter_name": "ModuleBitcodeSize"
+          },
+          {
+            "value": 0,
+            "unit": "UNIT",
+            "counter_name": "NumCachedFunctions"
+          },
+          {
+            "value": 14,
+            "unit": "UNIT",
+            "counter_name": "NumFunctions"
+          },
+          {
+            "value": 522,
+            "unit": "UNIT",
+            "counter_name": "NumInstructions"
+          },
+          {
+            "value": 5,
+            "unit": "UNIT",
+            "counter_name": "NumOptimizedFunctions"
+          },
+          {
+            "value": 257,
+            "unit": "UNIT",
+            "counter_name": "NumOptimizedInstructions"
+          },
+          {
+            "value": 12072645,
+            "unit": "TIME_NS",
+            "counter_name": "OptimizationTime"
+          },
+          {
+            "value": 267264,
+            "unit": "BYTES",
+            "counter_name": "PeakMemoryUsage"
+          },
+          {
+            "value": 24077415,
+            "unit": "TIME_NS",
+            "counter_name": "PrepareTime"
+          },
+          {
+            "value": 45707036,
+            "unit": "TIME_NS",
+            "counter_name": "TotalTime"
+          }
+        ]
+      }
+    },
+    "Fragment F00": {
+      "CodeGen": {
+        "counters": [
+          {
+            "value": 13040874,
+            "unit": "TIME_NS",
+            "counter_name": "CodegenCacheLookupTime"
+          },
+          {
+            "value": 216313,
+            "unit": "TIME_NS",
+            "counter_name": "CodegenCacheSaveTime"
+          },
+          {
+            "value": 0,
+            "unit": "UNIT",
+            "counter_name": "CodegenCompileThreadInvoluntaryContextSwitches"
+          },
+          {
+            "value": 0,
+            "unit": "UNIT",
+            "counter_name": "CodegenCompileThreadMajorPageFaults"
+          },
+          {
+            "value": 0,
+            "unit": "UNIT",
+            "counter_name": "CodegenCompileThreadMinorPageFaults"
+          },
+          {
+            "value": 0,
+            "unit": "TIME_NS",
+            "counter_name": "CodegenCompileThreadTotalWallClockTime",
+            "child_counters": [
+              {
+                "value": 0,
+                "unit": "TIME_NS",
+                "counter_name": "CodegenCompileThreadSysTime"
+              },
+              {
+                "value": 0,
+                "unit": "TIME_NS",
+                "counter_name": "CodegenCompileThreadUserTime"
+              }
+            ]
+          },
+          {
+            "value": 0,
+            "unit": "UNIT",
+            "counter_name": "CodegenCompileThreadVoluntaryContextSwitches"
+          },
+          {
+            "value": 51,
+            "unit": "UNIT",
+            "counter_name": "CodegenInvoluntaryContextSwitches"
+          },
+          {
+            "value": 0,
+            "unit": "UNIT",
+            "counter_name": "CodegenMajorPageFaults"
+          },
+          {
+            "value": 3009,
+            "unit": "UNIT",
+            "counter_name": "CodegenMinorPageFaults"
+          },
+          {
+            "value": 520875148,
+            "unit": "TIME_NS",
+            "counter_name": "CodegenTotalWallClockTime",
+            "child_counters": [
+              {
+                "value": 7919000,
+                "unit": "TIME_NS",
+                "counter_name": "CodegenSysTime"
+              },
+              {
+                "value": 510734000,
+                "unit": "TIME_NS",
+                "counter_name": "CodegenUserTime"
+              }
+            ]
+          },
+          {
+            "value": 15,
+            "unit": "UNIT",
+            "counter_name": "CodegenVoluntaryContextSwitches"
+          },
+          {
+            "value": 60960704,
+            "unit": "TIME_NS",
+            "counter_name": "CompileTime"
+          },
+          {
+            "value": 3161665,
+            "unit": "TIME_NS",
+            "counter_name": "FunctionPruneTime"
+          },
+          {
+            "value": 0,
+            "unit": "TIME_NS",
+            "counter_name": "InactiveTotalTime"
+          },
+          {
+            "value": 16983430,
+            "unit": "TIME_NS",
+            "counter_name": "IrGenerationTime"
+          },
+          {
+            "value": 0,
+            "unit": "TIME_NS",
+            "counter_name": "LoadTime"
+          },
+          {
+            "value": 497058738,
+            "unit": "TIME_NS",
+            "counter_name": "MainThreadCodegenTime"
+          },
+          {
+            "value": 12671226,
+            "unit": "TIME_NS",
+            "counter_name": "ModuleBitcodeGenTime"
+          },
+          {
+            "value": 3843472,
+            "unit": "BYTES",
+            "counter_name": "ModuleBitcodeSize"
+          },
+          {
+            "value": 0,
+            "unit": "UNIT",
+            "counter_name": "NumCachedFunctions"
+          },
+          {
+            "value": 160,
+            "unit": "UNIT",
+            "counter_name": "NumFunctions"
+          },
+          {
+            "value": 12697,
+            "unit": "UNIT",
+            "counter_name": "NumInstructions"
+          },
+          {
+            "value": 67,
+            "unit": "UNIT",
+            "counter_name": "NumOptimizedFunctions"
+          },
+          {
+            "value": 10543,
+            "unit": "UNIT",
+            "counter_name": "NumOptimizedInstructions"
+          },
+          {
+            "value": 397584971,
+            "unit": "TIME_NS",
+            "counter_name": "OptimizationTime"
+          },
+          {
+            "value": 6500864,
+            "unit": "BYTES",
+            "counter_name": "PeakMemoryUsage"
+          },
+          {
+            "value": 23823711,
+            "unit": "TIME_NS",
+            "counter_name": "PrepareTime"
+          },
+          {
+            "value": 520881118,
+            "unit": "TIME_NS",
+            "counter_name": "TotalTime"
+          }
+        ]
+      }
+    },
+    "Fragment F10": {
+      "CodeGen": {
+        "counters": [
+          {
+            "value": 2994203,
+            "unit": "TIME_NS",
+            "counter_name": "CodegenCacheLookupTime"
+          },
+          {
+            "value": 156130,
+            "unit": "TIME_NS",
+            "counter_name": "CodegenCacheSaveTime"
+          },
+          {
+            "value": 0,
+            "unit": "UNIT",
+            "counter_name": "CodegenCompileThreadInvoluntaryContextSwitches"
+          },
+          {
+            "value": 0,
+            "unit": "UNIT",
+            "counter_name": "CodegenCompileThreadMajorPageFaults"
+          },
+          {
+            "value": 0,
+            "unit": "UNIT",
+            "counter_name": "CodegenCompileThreadMinorPageFaults"
+          },
+          {
+            "value": 0,
+            "unit": "TIME_NS",
+            "counter_name": "CodegenCompileThreadTotalWallClockTime",
+            "child_counters": [
+              {
+                "value": 0,
+                "unit": "TIME_NS",
+                "counter_name": "CodegenCompileThreadSysTime"
+              },
+              {
+                "value": 0,
+                "unit": "TIME_NS",
+                "counter_name": "CodegenCompileThreadUserTime"
+              }
+            ]
+          },
+          {
+            "value": 0,
+            "unit": "UNIT",
+            "counter_name": "CodegenCompileThreadVoluntaryContextSwitches"
+          },
+          {
+            "value": 34,
+            "unit": "UNIT",
+            "counter_name": "CodegenInvoluntaryContextSwitches"
+          },
+          {
+            "value": 0,
+            "unit": "UNIT",
+            "counter_name": "CodegenMajorPageFaults"
+          },
+          {
+            "value": 1779,
+            "unit": "UNIT",
+            "counter_name": "CodegenMinorPageFaults"
+          },
+          {
+            "value": 105489099,
+            "unit": "TIME_NS",
+            "counter_name": "CodegenTotalWallClockTime",
+            "child_counters": [
+              {
+                "value": 3860000,
+                "unit": "TIME_NS",
+                "counter_name": "CodegenSysTime"
+              },
+              {
+                "value": 100366000,
+                "unit": "TIME_NS",
+                "counter_name": "CodegenUserTime"
+              }
+            ]
+          },
+          {
+            "value": 40,
+            "unit": "UNIT",
+            "counter_name": "CodegenVoluntaryContextSwitches"
+          },
+          {
+            "value": 10766035,
+            "unit": "TIME_NS",
+            "counter_name": "CompileTime"
+          },
+          {
+            "value": 2875209,
+            "unit": "TIME_NS",
+            "counter_name": "FunctionPruneTime"
+          },
+          {
+            "value": 0,
+            "unit": "TIME_NS",
+            "counter_name": "InactiveTotalTime"
+          },
+          {
+            "value": 2914071,
+            "unit": "TIME_NS",
+            "counter_name": "IrGenerationTime"
+          },
+          {
+            "value": 0,
+            "unit": "TIME_NS",
+            "counter_name": "LoadTime"
+          },
+          {
+            "value": 80707323,
+            "unit": "TIME_NS",
+            "counter_name": "MainThreadCodegenTime"
+          },
+          {
+            "value": 2872146,
+            "unit": "TIME_NS",
+            "counter_name": "ModuleBitcodeGenTime"
+          },
+          {
+            "value": 3843472,
+            "unit": "BYTES",
+            "counter_name": "ModuleBitcodeSize"
+          },
+          {
+            "value": 0,
+            "unit": "UNIT",
+            "counter_name": "NumCachedFunctions"
+          },
+          {
+            "value": 41,
+            "unit": "UNIT",
+            "counter_name": "NumFunctions"
+          },
+          {
+            "value": 1936,
+            "unit": "UNIT",
+            "counter_name": "NumInstructions"
+          },
+          {
+            "value": 20,
+            "unit": "UNIT",
+            "counter_name": "NumOptimizedFunctions"
+          },
+          {
+            "value": 1070,
+            "unit": "UNIT",
+            "counter_name": "NumOptimizedInstructions"
+          },
+          {
+            "value": 58987523,
+            "unit": "TIME_NS",
+            "counter_name": "OptimizationTime"
+          },
+          {
+            "value": 991232,
+            "unit": "BYTES",
+            "counter_name": "PeakMemoryUsage"
+          },
+          {
+            "value": 24788495,
+            "unit": "TIME_NS",
+            "counter_name": "PrepareTime"
+          },
+          {
+            "value": 105494093,
+            "unit": "TIME_NS",
+            "counter_name": "TotalTime"
+          }
+        ]
+      }
+    },
+    "Fragment F08": {
+      "CodeGen": {
+        "counters": [
+          {
+            "value": 2383357,
+            "unit": "TIME_NS",
+            "counter_name": "CodegenCacheLookupTime"
+          },
+          {
+            "value": 106537,
+            "unit": "TIME_NS",
+            "counter_name": "CodegenCacheSaveTime"
+          },
+          {
+            "value": 0,
+            "unit": "UNIT",
+            "counter_name": "CodegenCompileThreadInvoluntaryContextSwitches"
+          },
+          {
+            "value": 0,
+            "unit": "UNIT",
+            "counter_name": "CodegenCompileThreadMajorPageFaults"
+          },
+          {
+            "value": 0,
+            "unit": "UNIT",
+            "counter_name": "CodegenCompileThreadMinorPageFaults"
+          },
+          {
+            "value": 0,
+            "unit": "TIME_NS",
+            "counter_name": "CodegenCompileThreadTotalWallClockTime",
+            "child_counters": [
+              {
+                "value": 0,
+                "unit": "TIME_NS",
+                "counter_name": "CodegenCompileThreadSysTime"
+              },
+              {
+                "value": 0,
+                "unit": "TIME_NS",
+                "counter_name": "CodegenCompileThreadUserTime"
+              }
+            ]
+          },
+          {
+            "value": 0,
+            "unit": "UNIT",
+            "counter_name": "CodegenCompileThreadVoluntaryContextSwitches"
+          },
+          {
+            "value": 30,
+            "unit": "UNIT",
+            "counter_name": "CodegenInvoluntaryContextSwitches"
+          },
+          {
+            "value": 0,
+            "unit": "UNIT",
+            "counter_name": "CodegenMajorPageFaults"
+          },
+          {
+            "value": 1676,
+            "unit": "UNIT",
+            "counter_name": "CodegenMinorPageFaults"
+          },
+          {
+            "value": 70191016,
+            "unit": "TIME_NS",
+            "counter_name": "CodegenTotalWallClockTime",
+            "child_counters": [
+              {
+                "value": 0,
+                "unit": "TIME_NS",
+                "counter_name": "CodegenSysTime"
+              },
+              {
+                "value": 68761000,
+                "unit": "TIME_NS",
+                "counter_name": "CodegenUserTime"
+              }
+            ]
+          },
+          {
+            "value": 24,
+            "unit": "UNIT",
+            "counter_name": "CodegenVoluntaryContextSwitches"
+          },
+          {
+            "value": 7020258,
+            "unit": "TIME_NS",
+            "counter_name": "CompileTime"
+          },
+          {
+            "value": 2783466,
+            "unit": "TIME_NS",
+            "counter_name": "FunctionPruneTime"
+          },
+          {
+            "value": 0,
+            "unit": "TIME_NS",
+            "counter_name": "InactiveTotalTime"
+          },
+          {
+            "value": 1794850,
+            "unit": "TIME_NS",
+            "counter_name": "IrGenerationTime"
+          },
+          {
+            "value": 0,
+            "unit": "TIME_NS",
+            "counter_name": "LoadTime"
+          },
+          {
+            "value": 45134091,
+            "unit": "TIME_NS",
+            "counter_name": "MainThreadCodegenTime"
+          },
+          {
+            "value": 2269422,
+            "unit": "TIME_NS",
+            "counter_name": "ModuleBitcodeGenTime"
+          },
+          {
+            "value": 3843472,
+            "unit": "BYTES",
+            "counter_name": "ModuleBitcodeSize"
+          },
+          {
+            "value": 0,
+            "unit": "UNIT",
+            "counter_name": "NumCachedFunctions"
+          },
+          {
+            "value": 37,
+            "unit": "UNIT",
+            "counter_name": "NumFunctions"
+          },
+          {
+            "value": 748,
+            "unit": "UNIT",
+            "counter_name": "NumInstructions"
+          },
+          {
+            "value": 18,
+            "unit": "UNIT",
+            "counter_name": "NumOptimizedFunctions"
+          },
+          {
+            "value": 480,
+            "unit": "UNIT",
+            "counter_name": "NumOptimizedInstructions"
+          },
+          {
+            "value": 29566867,
+            "unit": "TIME_NS",
+            "counter_name": "OptimizationTime"
+          },
+          {
+            "value": 382976,
+            "unit": "BYTES",
+            "counter_name": "PeakMemoryUsage"
+          },
+          {
+            "value": 25062931,
+            "unit": "TIME_NS",
+            "counter_name": "PrepareTime"
+          },
+          {
+            "value": 70196421,
+            "unit": "TIME_NS",
+            "counter_name": "TotalTime"
+          }
+        ]
+      }
+    },
+    "Fragment F07": {
+      "CodeGen": {
+        "counters": [
+          {
+            "value": 3893507,
+            "unit": "TIME_NS",
+            "counter_name": "CodegenCacheLookupTime"
+          },
+          {
+            "value": 150365,
+            "unit": "TIME_NS",
+            "counter_name": "CodegenCacheSaveTime"
+          },
+          {
+            "value": 0,
+            "unit": "UNIT",
+            "counter_name": "CodegenCompileThreadInvoluntaryContextSwitches"
+          },
+          {
+            "value": 0,
+            "unit": "UNIT",
+            "counter_name": "CodegenCompileThreadMajorPageFaults"
+          },
+          {
+            "value": 0,
+            "unit": "UNIT",
+            "counter_name": "CodegenCompileThreadMinorPageFaults"
+          },
+          {
+            "value": 0,
+            "unit": "TIME_NS",
+            "counter_name": "CodegenCompileThreadTotalWallClockTime",
+            "child_counters": [
+              {
+                "value": 0,
+                "unit": "TIME_NS",
+                "counter_name": "CodegenCompileThreadSysTime"
+              },
+              {
+                "value": 0,
+                "unit": "TIME_NS",
+                "counter_name": "CodegenCompileThreadUserTime"
+              }
+            ]
+          },
+          {
+            "value": 0,
+            "unit": "UNIT",
+            "counter_name": "CodegenCompileThreadVoluntaryContextSwitches"
+          },
+          {
+            "value": 26,
+            "unit": "UNIT",
+            "counter_name": "CodegenInvoluntaryContextSwitches"
+          },
+          {
+            "value": 0,
+            "unit": "UNIT",
+            "counter_name": "CodegenMajorPageFaults"
+          },
+          {
+            "value": 1998,
+            "unit": "UNIT",
+            "counter_name": "CodegenMinorPageFaults"
+          },
+          {
+            "value": 181518486,
+            "unit": "TIME_NS",
+            "counter_name": "CodegenTotalWallClockTime",
+            "child_counters": [
+              {
+                "value": 4037000,
+                "unit": "TIME_NS",
+                "counter_name": "CodegenSysTime"
+              },
+              {
+                "value": 174220000,
+                "unit": "TIME_NS",
+                "counter_name": "CodegenUserTime"
+              }
+            ]
+          },
+          {
+            "value": 28,
+            "unit": "UNIT",
+            "counter_name": "CodegenVoluntaryContextSwitches"
+          },
+          {
+            "value": 20778633,
+            "unit": "TIME_NS",
+            "counter_name": "CompileTime"
+          },
+          {
+            "value": 3084004,
+            "unit": "TIME_NS",
+            "counter_name": "FunctionPruneTime"
+          },
+          {
+            "value": 0,
+            "unit": "TIME_NS",
+            "counter_name": "InactiveTotalTime"
+          },
+          {
+            "value": 5570739,
+            "unit": "TIME_NS",
+            "counter_name": "IrGenerationTime"
+          },
+          {
+            "value": 0,
+            "unit": "TIME_NS",
+            "counter_name": "LoadTime"
+          },
+          {
+            "value": 157322205,
+            "unit": "TIME_NS",
+            "counter_name": "MainThreadCodegenTime"
+          },
+          {
+            "value": 3743213,
+            "unit": "TIME_NS",
+            "counter_name": "ModuleBitcodeGenTime"
+          },
+          {
+            "value": 3843472,
+            "unit": "BYTES",
+            "counter_name": "ModuleBitcodeSize"
+          },
+          {
+            "value": 0,
+            "unit": "UNIT",
+            "counter_name": "NumCachedFunctions"
+          },
+          {
+            "value": 86,
+            "unit": "UNIT",
+            "counter_name": "NumFunctions"
+          },
+          {
+            "value": 2916,
+            "unit": "UNIT",
+            "counter_name": "NumInstructions"
+          },
+          {
+            "value": 40,
+            "unit": "UNIT",
+            "counter_name": "NumOptimizedFunctions"
+          },
+          {
+            "value": 1833,
+            "unit": "UNIT",
+            "counter_name": "NumOptimizedInstructions"
+          },
+          {
+            "value": 121594971,
+            "unit": "TIME_NS",
+            "counter_name": "OptimizationTime"
+          },
+          {
+            "value": 1492992,
+            "unit": "BYTES",
+            "counter_name": "PeakMemoryUsage"
+          },
+          {
+            "value": 24203029,
+            "unit": "TIME_NS",
+            "counter_name": "PrepareTime"
+          },
+          {
+            "value": 181524645,
+            "unit": "TIME_NS",
+            "counter_name": "TotalTime"
+          }
+        ]
+      }
+    },
+    "Fragment F05": {
+      "CodeGen": {
+        "counters": [
+          {
+            "value": 5970504,
+            "unit": "TIME_NS",
+            "counter_name": "CodegenCacheLookupTime"
+          },
+          {
+            "value": 143395,
+            "unit": "TIME_NS",
+            "counter_name": "CodegenCacheSaveTime"
+          },
+          {
+            "value": 0,
+            "unit": "UNIT",
+            "counter_name": "CodegenCompileThreadInvoluntaryContextSwitches"
+          },
+          {
+            "value": 0,
+            "unit": "UNIT",
+            "counter_name": "CodegenCompileThreadMajorPageFaults"
+          },
+          {
+            "value": 0,
+            "unit": "UNIT",
+            "counter_name": "CodegenCompileThreadMinorPageFaults"
+          },
+          {
+            "value": 0,
+            "unit": "TIME_NS",
+            "counter_name": "CodegenCompileThreadTotalWallClockTime",
+            "child_counters": [
+              {
+                "value": 0,
+                "unit": "TIME_NS",
+                "counter_name": "CodegenCompileThreadSysTime"
+              },
+              {
+                "value": 0,
+                "unit": "TIME_NS",
+                "counter_name": "CodegenCompileThreadUserTime"
+              }
+            ]
+          },
+          {
+            "value": 0,
+            "unit": "UNIT",
+            "counter_name": "CodegenCompileThreadVoluntaryContextSwitches"
+          },
+          {
+            "value": 29,
+            "unit": "UNIT",
+            "counter_name": "CodegenInvoluntaryContextSwitches"
+          },
+          {
+            "value": 0,
+            "unit": "UNIT",
+            "counter_name": "CodegenMajorPageFaults"
+          },
+          {
+            "value": 2124,
+            "unit": "UNIT",
+            "counter_name": "CodegenMinorPageFaults"
+          },
+          {
+            "value": 231919756,
+            "unit": "TIME_NS",
+            "counter_name": "CodegenTotalWallClockTime",
+            "child_counters": [
+              {
+                "value": 7829000,
+                "unit": "TIME_NS",
+                "counter_name": "CodegenSysTime"
+              },
+              {
+                "value": 222932000,
+                "unit": "TIME_NS",
+                "counter_name": "CodegenUserTime"
+              }
+            ]
+          },
+          {
+            "value": 25,
+            "unit": "UNIT",
+            "counter_name": "CodegenVoluntaryContextSwitches"
+          },
+          {
+            "value": 15606530,
+            "unit": "TIME_NS",
+            "counter_name": "CompileTime"
+          },
+          {
+            "value": 2896722,
+            "unit": "TIME_NS",
+            "counter_name": "FunctionPruneTime"
+          },
+          {
+            "value": 0,
+            "unit": "TIME_NS",
+            "counter_name": "InactiveTotalTime"
+          },
+          {
+            "value": 7883628,
+            "unit": "TIME_NS",
+            "counter_name": "IrGenerationTime"
+          },
+          {
+            "value": 0,
+            "unit": "TIME_NS",
+            "counter_name": "LoadTime"
+          },
+          {
+            "value": 207454572,
+            "unit": "TIME_NS",
+            "counter_name": "MainThreadCodegenTime"
+          },
+          {
+            "value": 5768968,
+            "unit": "TIME_NS",
+            "counter_name": "ModuleBitcodeGenTime"
+          },
+          {
+            "value": 3843472,
+            "unit": "BYTES",
+            "counter_name": "ModuleBitcodeSize"
+          },
+          {
+            "value": 0,
+            "unit": "UNIT",
+            "counter_name": "NumCachedFunctions"
+          },
+          {
+            "value": 112,
+            "unit": "UNIT",
+            "counter_name": "NumFunctions"
+          },
+          {
+            "value": 4374,
+            "unit": "UNIT",
+            "counter_name": "NumInstructions"
+          },
+          {
+            "value": 47,
+            "unit": "UNIT",
+            "counter_name": "NumOptimizedFunctions"
+          },
+          {
+            "value": 2777,
+            "unit": "UNIT",
+            "counter_name": "NumOptimizedInstructions"
+          },
+          {
+            "value": 172483273,
+            "unit": "TIME_NS",
+            "counter_name": "OptimizationTime"
+          },
+          {
+            "value": 2239488,
+            "unit": "BYTES",
+            "counter_name": "PeakMemoryUsage"
+          },
+          {
+            "value": 24472332,
+            "unit": "TIME_NS",
+            "counter_name": "PrepareTime"
+          },
+          {
+            "value": 231926095,
+            "unit": "TIME_NS",
+            "counter_name": "TotalTime"
+          }
+        ]
+      }
+    },
+    "Fragment F11": {
+      "CodeGen": {
+        "counters": [
+          {
+            "value": 3033688,
+            "unit": "TIME_NS",
+            "counter_name": "CodegenCacheLookupTime"
+          },
+          {
+            "value": 129558,
+            "unit": "TIME_NS",
+            "counter_name": "CodegenCacheSaveTime"
+          },
+          {
+            "value": 0,
+            "unit": "UNIT",
+            "counter_name": "CodegenCompileThreadInvoluntaryContextSwitches"
+          },
+          {
+            "value": 0,
+            "unit": "UNIT",
+            "counter_name": "CodegenCompileThreadMajorPageFaults"
+          },
+          {
+            "value": 0,
+            "unit": "UNIT",
+            "counter_name": "CodegenCompileThreadMinorPageFaults"
+          },
+          {
+            "value": 0,
+            "unit": "TIME_NS",
+            "counter_name": "CodegenCompileThreadTotalWallClockTime",
+            "child_counters": [
+              {
+                "value": 0,
+                "unit": "TIME_NS",
+                "counter_name": "CodegenCompileThreadSysTime"
+              },
+              {
+                "value": 0,
+                "unit": "TIME_NS",
+                "counter_name": "CodegenCompileThreadUserTime"
+              }
+            ]
+          },
+          {
+            "value": 0,
+            "unit": "UNIT",
+            "counter_name": "CodegenCompileThreadVoluntaryContextSwitches"
+          },
+          {
+            "value": 70,
+            "unit": "UNIT",
+            "counter_name": "CodegenInvoluntaryContextSwitches"
+          },
+          {
+            "value": 0,
+            "unit": "UNIT",
+            "counter_name": "CodegenMajorPageFaults"
+          },
+          {
+            "value": 1948,
+            "unit": "UNIT",
+            "counter_name": "CodegenMinorPageFaults"
+          },
+          {
+            "value": 110633395,
+            "unit": "TIME_NS",
+            "counter_name": "CodegenTotalWallClockTime",
+            "child_counters": [
+              {
+                "value": 0,
+                "unit": "TIME_NS",
+                "counter_name": "CodegenSysTime"
+              },
+              {
+                "value": 101824000,
+                "unit": "TIME_NS",
+                "counter_name": "CodegenUserTime"
+              }
+            ]
+          },
+          {
+            "value": 34,
+            "unit": "UNIT",
+            "counter_name": "CodegenVoluntaryContextSwitches"
+          },
+          {
+            "value": 10692275,
+            "unit": "TIME_NS",
+            "counter_name": "CompileTime"
+          },
+          {
+            "value": 2796109,
+            "unit": "TIME_NS",
+            "counter_name": "FunctionPruneTime"
+          },
+          {
+            "value": 0,
+            "unit": "TIME_NS",
+            "counter_name": "InactiveTotalTime"
+          },
+          {
+            "value": 3121498,
+            "unit": "TIME_NS",
+            "counter_name": "IrGenerationTime"
+          },
+          {
+            "value": 0,
+            "unit": "TIME_NS",
+            "counter_name": "LoadTime"
+          },
+          {
+            "value": 85569181,
+            "unit": "TIME_NS",
+            "counter_name": "MainThreadCodegenTime"
+          },
+          {
+            "value": 2913257,
+            "unit": "TIME_NS",
+            "counter_name": "ModuleBitcodeGenTime"
+          },
+          {
+            "value": 3843472,
+            "unit": "BYTES",
+            "counter_name": "ModuleBitcodeSize"
+          },
+          {
+            "value": 0,
+            "unit": "UNIT",
+            "counter_name": "NumCachedFunctions"
+          },
+          {
+            "value": 41,
+            "unit": "UNIT",
+            "counter_name": "NumFunctions"
+          },
+          {
+            "value": 1936,
+            "unit": "UNIT",
+            "counter_name": "NumInstructions"
+          },
+          {
+            "value": 20,
+            "unit": "UNIT",
+            "counter_name": "NumOptimizedFunctions"
+          },
+          {
+            "value": 1062,
+            "unit": "UNIT",
+            "counter_name": "NumOptimizedInstructions"
+          },
+          {
+            "value": 63516602,
+            "unit": "TIME_NS",
+            "counter_name": "OptimizationTime"
+          },
+          {
+            "value": 991232,
+            "unit": "BYTES",
+            "counter_name": "PeakMemoryUsage"
+          },
+          {
+            "value": 25070057,
+            "unit": "TIME_NS",
+            "counter_name": "PrepareTime"
+          },
+          {
+            "value": 110638799,
+            "unit": "TIME_NS",
+            "counter_name": "TotalTime"
+          }
+        ]
+      }
+    },
+    "Fragment F06": {
+      "CodeGen": {
+        "counters": [
+          {
+            "value": 2543656,
+            "unit": "TIME_NS",
+            "counter_name": "CodegenCacheLookupTime"
+          },
+          {
+            "value": 223580,
+            "unit": "TIME_NS",
+            "counter_name": "CodegenCacheSaveTime"
+          },
+          {
+            "value": 0,
+            "unit": "UNIT",
+            "counter_name": "CodegenCompileThreadInvoluntaryContextSwitches"
+          },
+          {
+            "value": 0,
+            "unit": "UNIT",
+            "counter_name": "CodegenCompileThreadMajorPageFaults"
+          },
+          {
+            "value": 0,
+            "unit": "UNIT",
+            "counter_name": "CodegenCompileThreadMinorPageFaults"
+          },
+          {
+            "value": 0,
+            "unit": "TIME_NS",
+            "counter_name": "CodegenCompileThreadTotalWallClockTime",
+            "child_counters": [
+              {
+                "value": 0,
+                "unit": "TIME_NS",
+                "counter_name": "CodegenCompileThreadSysTime"
+              },
+              {
+                "value": 0,
+                "unit": "TIME_NS",
+                "counter_name": "CodegenCompileThreadUserTime"
+              }
+            ]
+          },
+          {
+            "value": 0,
+            "unit": "UNIT",
+            "counter_name": "CodegenCompileThreadVoluntaryContextSwitches"
+          },
+          {
+            "value": 45,
+            "unit": "UNIT",
+            "counter_name": "CodegenInvoluntaryContextSwitches"
+          },
+          {
+            "value": 0,
+            "unit": "UNIT",
+            "counter_name": "CodegenMajorPageFaults"
+          },
+          {
+            "value": 1685,
+            "unit": "UNIT",
+            "counter_name": "CodegenMinorPageFaults"
+          },
+          {
+            "value": 66257116,
+            "unit": "TIME_NS",
+            "counter_name": "CodegenTotalWallClockTime",
+            "child_counters": [
+              {
+                "value": 7351000,
+                "unit": "TIME_NS",
+                "counter_name": "CodegenSysTime"
+              },
+              {
+                "value": 55566000,
+                "unit": "TIME_NS",
+                "counter_name": "CodegenUserTime"
+              }
+            ]
+          },
+          {
+            "value": 27,
+            "unit": "UNIT",
+            "counter_name": "CodegenVoluntaryContextSwitches"
+          },
+          {
+            "value": 6414077,
+            "unit": "TIME_NS",
+            "counter_name": "CompileTime"
+          },
+          {
+            "value": 2600770,
+            "unit": "TIME_NS",
+            "counter_name": "FunctionPruneTime"
+          },
+          {
+            "value": 0,
+            "unit": "TIME_NS",
+            "counter_name": "InactiveTotalTime"
+          },
+          {
+            "value": 1117727,
+            "unit": "TIME_NS",
+            "counter_name": "IrGenerationTime"
+          },
+          {
+            "value": 0,
+            "unit": "TIME_NS",
+            "counter_name": "LoadTime"
+          },
+          {
+            "value": 41730126,
+            "unit": "TIME_NS",
+            "counter_name": "MainThreadCodegenTime"
+          },
+          {
+            "value": 2418998,
+            "unit": "TIME_NS",
+            "counter_name": "ModuleBitcodeGenTime"
+          },
+          {
+            "value": 3843472,
+            "unit": "BYTES",
+            "counter_name": "ModuleBitcodeSize"
+          },
+          {
+            "value": 0,
+            "unit": "UNIT",
+            "counter_name": "NumCachedFunctions"
+          },
+          {
+            "value": 28,
+            "unit": "UNIT",
+            "counter_name": "NumFunctions"
+          },
+          {
+            "value": 521,
+            "unit": "UNIT",
+            "counter_name": "NumInstructions"
+          },
+          {
+            "value": 10,
+            "unit": "UNIT",
+            "counter_name": "NumOptimizedFunctions"
+          },
+          {
+            "value": 343,
+            "unit": "UNIT",
+            "counter_name": "NumOptimizedInstructions"
+          },
+          {
+            "value": 27589828,
+            "unit": "TIME_NS",
+            "counter_name": "OptimizationTime"
+          },
+          {
+            "value": 266752,
+            "unit": "BYTES",
+            "counter_name": "PeakMemoryUsage"
+          },
+          {
+            "value": 24532495,
+            "unit": "TIME_NS",
+            "counter_name": "PrepareTime"
+          },
+          {
+            "value": 66261960,
+            "unit": "TIME_NS",
+            "counter_name": "TotalTime"
+          }
+        ]
+      }
+    },
+    "Fragment F12": {
+      "CodeGen": {
+        "counters": [
+          {
+            "value": 3182223,
+            "unit": "TIME_NS",
+            "counter_name": "CodegenCacheLookupTime"
+          },
+          {
+            "value": 112897,
+            "unit": "TIME_NS",
+            "counter_name": "CodegenCacheSaveTime"
+          },
+          {
+            "value": 0,
+            "unit": "UNIT",
+            "counter_name": "CodegenCompileThreadInvoluntaryContextSwitches"
+          },
+          {
+            "value": 0,
+            "unit": "UNIT",
+            "counter_name": "CodegenCompileThreadMajorPageFaults"
+          },
+          {
+            "value": 0,
+            "unit": "UNIT",
+            "counter_name": "CodegenCompileThreadMinorPageFaults"
+          },
+          {
+            "value": 0,
+            "unit": "TIME_NS",
+            "counter_name": "CodegenCompileThreadTotalWallClockTime",
+            "child_counters": [
+              {
+                "value": 0,
+                "unit": "TIME_NS",
+                "counter_name": "CodegenCompileThreadSysTime"
+              },
+              {
+                "value": 0,
+                "unit": "TIME_NS",
+                "counter_name": "CodegenCompileThreadUserTime"
+              }
+            ]
+          },
+          {
+            "value": 0,
+            "unit": "UNIT",
+            "counter_name": "CodegenCompileThreadVoluntaryContextSwitches"
+          },
+          {
+            "value": 16,
+            "unit": "UNIT",
+            "counter_name": "CodegenInvoluntaryContextSwitches"
+          },
+          {
+            "value": 0,
+            "unit": "UNIT",
+            "counter_name": "CodegenMajorPageFaults"
+          },
+          {
+            "value": 1867,
+            "unit": "UNIT",
+            "counter_name": "CodegenMinorPageFaults"
+          },
+          {
+            "value": 107582884,
+            "unit": "TIME_NS",
+            "counter_name": "CodegenTotalWallClockTime",
+            "child_counters": [
+              {
+                "value": 0,
+                "unit": "TIME_NS",
+                "counter_name": "CodegenSysTime"
+              },
+              {
+                "value": 106286000,
+                "unit": "TIME_NS",
+                "counter_name": "CodegenUserTime"
+              }
+            ]
+          },
+          {
+            "value": 42,
+            "unit": "UNIT",
+            "counter_name": "CodegenVoluntaryContextSwitches"
+          },
+          {
+            "value": 11043664,
+            "unit": "TIME_NS",
+            "counter_name": "CompileTime"
+          },
+          {
+            "value": 2888372,
+            "unit": "TIME_NS",
+            "counter_name": "FunctionPruneTime"
+          },
+          {
+            "value": 0,
+            "unit": "TIME_NS",
+            "counter_name": "InactiveTotalTime"
+          },
+          {
+            "value": 3159870,
+            "unit": "TIME_NS",
+            "counter_name": "IrGenerationTime"
+          },
+          {
+            "value": 0,
+            "unit": "TIME_NS",
+            "counter_name": "LoadTime"
+          },
+          {
+            "value": 83405970,
+            "unit": "TIME_NS",
+            "counter_name": "MainThreadCodegenTime"
+          },
+          {
+            "value": 3058829,
+            "unit": "TIME_NS",
+            "counter_name": "ModuleBitcodeGenTime"
+          },
+          {
+            "value": 3843472,
+            "unit": "BYTES",
+            "counter_name": "ModuleBitcodeSize"
+          },
+          {
+            "value": 0,
+            "unit": "UNIT",
+            "counter_name": "NumCachedFunctions"
+          },
+          {
+            "value": 41,
+            "unit": "UNIT",
+            "counter_name": "NumFunctions"
+          },
+          {
+            "value": 1936,
+            "unit": "UNIT",
+            "counter_name": "NumInstructions"
+          },
+          {
+            "value": 20,
+            "unit": "UNIT",
+            "counter_name": "NumOptimizedFunctions"
+          },
+          {
+            "value": 1070,
+            "unit": "UNIT",
+            "counter_name": "NumOptimizedInstructions"
+          },
+          {
+            "value": 60979123,
+            "unit": "TIME_NS",
+            "counter_name": "OptimizationTime"
+          },
+          {
+            "value": 991232,
+            "unit": "BYTES",
+            "counter_name": "PeakMemoryUsage"
+          },
+          {
+            "value": 24183129,
+            "unit": "TIME_NS",
+            "counter_name": "PrepareTime"
+          },
+          {
+            "value": 107588495,
+            "unit": "TIME_NS",
+            "counter_name": "TotalTime"
+          }
+        ]
+      }
+    },
+    "Fragment F04": {
+      "CodeGen": {
+        "counters": [
+          {
+            "value": 2532198,
+            "unit": "TIME_NS",
+            "counter_name": "CodegenCacheLookupTime"
+          },
+          {
+            "value": 148671,
+            "unit": "TIME_NS",
+            "counter_name": "CodegenCacheSaveTime"
+          },
+          {
+            "value": 0,
+            "unit": "UNIT",
+            "counter_name": "CodegenCompileThreadInvoluntaryContextSwitches"
+          },
+          {
+            "value": 0,
+            "unit": "UNIT",
+            "counter_name": "CodegenCompileThreadMajorPageFaults"
+          },
+          {
+            "value": 0,
+            "unit": "UNIT",
+            "counter_name": "CodegenCompileThreadMinorPageFaults"
+          },
+          {
+            "value": 0,
+            "unit": "TIME_NS",
+            "counter_name": "CodegenCompileThreadTotalWallClockTime",
+            "child_counters": [
+              {
+                "value": 0,
+                "unit": "TIME_NS",
+                "counter_name": "CodegenCompileThreadSysTime"
+              },
+              {
+                "value": 0,
+                "unit": "TIME_NS",
+                "counter_name": "CodegenCompileThreadUserTime"
+              }
+            ]
+          },
+          {
+            "value": 0,
+            "unit": "UNIT",
+            "counter_name": "CodegenCompileThreadVoluntaryContextSwitches"
+          },
+          {
+            "value": 17,
+            "unit": "UNIT",
+            "counter_name": "CodegenInvoluntaryContextSwitches"
+          },
+          {
+            "value": 0,
+            "unit": "UNIT",
+            "counter_name": "CodegenMajorPageFaults"
+          },
+          {
+            "value": 1713,
+            "unit": "UNIT",
+            "counter_name": "CodegenMinorPageFaults"
+          },
+          {
+            "value": 69397665,
+            "unit": "TIME_NS",
+            "counter_name": "CodegenTotalWallClockTime",
+            "child_counters": [
+              {
+                "value": 8070000,
+                "unit": "TIME_NS",
+                "counter_name": "CodegenSysTime"
+              },
+              {
+                "value": 60438000,
+                "unit": "TIME_NS",
+                "counter_name": "CodegenUserTime"
+              }
+            ]
+          },
+          {
+            "value": 22,
+            "unit": "UNIT",
+            "counter_name": "CodegenVoluntaryContextSwitches"
+          },
+          {
+            "value": 6878540,
+            "unit": "TIME_NS",
+            "counter_name": "CompileTime"
+          },
+          {
+            "value": 2433366,
+            "unit": "TIME_NS",
+            "counter_name": "FunctionPruneTime"
+          },
+          {
+            "value": 0,
+            "unit": "TIME_NS",
+            "counter_name": "InactiveTotalTime"
+          },
+          {
+            "value": 1250755,
+            "unit": "TIME_NS",
+            "counter_name": "IrGenerationTime"
+          },
+          {
+            "value": 0,
+            "unit": "TIME_NS",
+            "counter_name": "LoadTime"
+          },
+          {
+            "value": 45397042,
+            "unit": "TIME_NS",
+            "counter_name": "MainThreadCodegenTime"
+          },
+          {
+            "value": 2397170,
+            "unit": "TIME_NS",
+            "counter_name": "ModuleBitcodeGenTime"
+          },
+          {
+            "value": 3843472,
+            "unit": "BYTES",
+            "counter_name": "ModuleBitcodeSize"
+          },
+          {
+            "value": 0,
+            "unit": "UNIT",
+            "counter_name": "NumCachedFunctions"
+          },
+          {
+            "value": 32,
+            "unit": "UNIT",
+            "counter_name": "NumFunctions"
+          },
+          {
+            "value": 589,
+            "unit": "UNIT",
+            "counter_name": "NumInstructions"
+          },
+          {
+            "value": 13,
+            "unit": "UNIT",
+            "counter_name": "NumOptimizedFunctions"
+          },
+          {
+            "value": 388,
+            "unit": "UNIT",
+            "counter_name": "NumOptimizedInstructions"
+          },
+          {
+            "value": 30824940,
+            "unit": "TIME_NS",
+            "counter_name": "OptimizationTime"
+          },
+          {
+            "value": 301568,
+            "unit": "BYTES",
+            "counter_name": "PeakMemoryUsage"
+          },
+          {
+            "value": 24007882,
+            "unit": "TIME_NS",
+            "counter_name": "PrepareTime"
+          },
+          {
+            "value": 69404224,
+            "unit": "TIME_NS",
+            "counter_name": "TotalTime"
+          }
+        ]
+      }
+    },
+    "Fragment F13": {
+      "CodeGen": {
+        "counters": [
+          {
+            "value": 3028445,
+            "unit": "TIME_NS",
+            "counter_name": "CodegenCacheLookupTime"
+          },
+          {
+            "value": 109464,
+            "unit": "TIME_NS",
+            "counter_name": "CodegenCacheSaveTime"
+          },
+          {
+            "value": 0,
+            "unit": "UNIT",
+            "counter_name": "CodegenCompileThreadInvoluntaryContextSwitches"
+          },
+          {
+            "value": 0,
+            "unit": "UNIT",
+            "counter_name": "CodegenCompileThreadMajorPageFaults"
+          },
+          {
+            "value": 0,
+            "unit": "UNIT",
+            "counter_name": "CodegenCompileThreadMinorPageFaults"
+          },
+          {
+            "value": 0,
+            "unit": "TIME_NS",
+            "counter_name": "CodegenCompileThreadTotalWallClockTime",
+            "child_counters": [
+              {
+                "value": 0,
+                "unit": "TIME_NS",
+                "counter_name": "CodegenCompileThreadSysTime"
+              },
+              {
+                "value": 0,
+                "unit": "TIME_NS",
+                "counter_name": "CodegenCompileThreadUserTime"
+              }
+            ]
+          },
+          {
+            "value": 0,
+            "unit": "UNIT",
+            "counter_name": "CodegenCompileThreadVoluntaryContextSwitches"
+          },
+          {
+            "value": 75,
+            "unit": "UNIT",
+            "counter_name": "CodegenInvoluntaryContextSwitches"
+          },
+          {
+            "value": 0,
+            "unit": "UNIT",
+            "counter_name": "CodegenMajorPageFaults"
+          },
+          {
+            "value": 1877,
+            "unit": "UNIT",
+            "counter_name": "CodegenMinorPageFaults"
+          },
+          {
+            "value": 102889216,
+            "unit": "TIME_NS",
+            "counter_name": "CodegenTotalWallClockTime",
+            "child_counters": [
+              {
+                "value": 4073000,
+                "unit": "TIME_NS",
+                "counter_name": "CodegenSysTime"
+              },
+              {
+                "value": 94441000,
+                "unit": "TIME_NS",
+                "counter_name": "CodegenUserTime"
+              }
+            ]
+          },
+          {
+            "value": 25,
+            "unit": "UNIT",
+            "counter_name": "CodegenVoluntaryContextSwitches"
+          },
+          {
+            "value": 8960793,
+            "unit": "TIME_NS",
+            "counter_name": "CompileTime"
+          },
+          {
+            "value": 2689053,
+            "unit": "TIME_NS",
+            "counter_name": "FunctionPruneTime"
+          },
+          {
+            "value": 0,
+            "unit": "TIME_NS",
+            "counter_name": "InactiveTotalTime"
+          },
+          {
+            "value": 3023728,
+            "unit": "TIME_NS",
+            "counter_name": "IrGenerationTime"
+          },
+          {
+            "value": 0,
+            "unit": "TIME_NS",
+            "counter_name": "LoadTime"
+          },
+          {
+            "value": 78016251,
+            "unit": "TIME_NS",
+            "counter_name": "MainThreadCodegenTime"
+          },
+          {
+            "value": 2909943,
+            "unit": "TIME_NS",
+            "counter_name": "ModuleBitcodeGenTime"
+          },
+          {
+            "value": 3843472,
+            "unit": "BYTES",
+            "counter_name": "ModuleBitcodeSize"
+          },
+          {
+            "value": 0,
+            "unit": "UNIT",
+            "counter_name": "NumCachedFunctions"
+          },
+          {
+            "value": 41,
+            "unit": "UNIT",
+            "counter_name": "NumFunctions"
+          },
+          {
+            "value": 1936,
+            "unit": "UNIT",
+            "counter_name": "NumInstructions"
+          },
+          {
+            "value": 20,
+            "unit": "UNIT",
+            "counter_name": "NumOptimizedFunctions"
+          },
+          {
+            "value": 1070,
+            "unit": "UNIT",
+            "counter_name": "NumOptimizedInstructions"
+          },
+          {
+            "value": 58012365,
+            "unit": "TIME_NS",
+            "counter_name": "OptimizationTime"
+          },
+          {
+            "value": 991232,
+            "unit": "BYTES",
+            "counter_name": "PeakMemoryUsage"
+          },
+          {
+            "value": 24878148,
+            "unit": "TIME_NS",
+            "counter_name": "PrepareTime"
+          },
+          {
+            "value": 102893894,
+            "unit": "TIME_NS",
+            "counter_name": "TotalTime"
+          }
+        ]
+      }
+    },
+    "Fragment F03": {
+      "CodeGen": {
+        "counters": [
+          {
+            "value": 2486053,
+            "unit": "TIME_NS",
+            "counter_name": "CodegenCacheLookupTime"
+          },
+          {
+            "value": 83338,
+            "unit": "TIME_NS",
+            "counter_name": "CodegenCacheSaveTime"
+          },
+          {
+            "value": 0,
+            "unit": "UNIT",
+            "counter_name": "CodegenCompileThreadInvoluntaryContextSwitches"
+          },
+          {
+            "value": 0,
+            "unit": "UNIT",
+            "counter_name": "CodegenCompileThreadMajorPageFaults"
+          },
+          {
+            "value": 0,
+            "unit": "UNIT",
+            "counter_name": "CodegenCompileThreadMinorPageFaults"
+          },
+          {
+            "value": 0,
+            "unit": "TIME_NS",
+            "counter_name": "CodegenCompileThreadTotalWallClockTime",
+            "child_counters": [
+              {
+                "value": 0,
+                "unit": "TIME_NS",
+                "counter_name": "CodegenCompileThreadSysTime"
+              },
+              {
+                "value": 0,
+                "unit": "TIME_NS",
+                "counter_name": "CodegenCompileThreadUserTime"
+              }
+            ]
+          },
+          {
+            "value": 0,
+            "unit": "UNIT",
+            "counter_name": "CodegenCompileThreadVoluntaryContextSwitches"
+          },
+          {
+            "value": 23,
+            "unit": "UNIT",
+            "counter_name": "CodegenInvoluntaryContextSwitches"
+          },
+          {
+            "value": 0,
+            "unit": "UNIT",
+            "counter_name": "CodegenMajorPageFaults"
+          },
+          {
+            "value": 1832,
+            "unit": "UNIT",
+            "counter_name": "CodegenMinorPageFaults"
+          },
+          {
+            "value": 64232652,
+            "unit": "TIME_NS",
+            "counter_name": "CodegenTotalWallClockTime",
+            "child_counters": [
+              {
+                "value": 8640000,
+                "unit": "TIME_NS",
+                "counter_name": "CodegenSysTime"
+              },
+              {
+                "value": 54754000,
+                "unit": "TIME_NS",
+                "counter_name": "CodegenUserTime"
+              }
+            ]
+          },
+          {
+            "value": 36,
+            "unit": "UNIT",
+            "counter_name": "CodegenVoluntaryContextSwitches"
+          },
+          {
+            "value": 4789089,
+            "unit": "TIME_NS",
+            "counter_name": "CompileTime"
+          },
+          {
+            "value": 2652830,
+            "unit": "TIME_NS",
+            "counter_name": "FunctionPruneTime"
+          },
+          {
+            "value": 0,
+            "unit": "TIME_NS",
+            "counter_name": "InactiveTotalTime"
+          },
+          {
+            "value": 1951111,
+            "unit": "TIME_NS",
+            "counter_name": "IrGenerationTime"
+          },
+          {
+            "value": 0,
+            "unit": "TIME_NS",
+            "counter_name": "LoadTime"
+          },
+          {
+            "value": 39595259,
+            "unit": "TIME_NS",
+            "counter_name": "MainThreadCodegenTime"
+          },
+          {
+            "value": 2381677,
+            "unit": "TIME_NS",
+            "counter_name": "ModuleBitcodeGenTime"
+          },
+          {
+            "value": 3843472,
+            "unit": "BYTES",
+            "counter_name": "ModuleBitcodeSize"
+          },
+          {
+            "value": 0,
+            "unit": "UNIT",
+            "counter_name": "NumCachedFunctions"
+          },
+          {
+            "value": 38,
+            "unit": "UNIT",
+            "counter_name": "NumFunctions"
+          },
+          {
+            "value": 796,
+            "unit": "UNIT",
+            "counter_name": "NumInstructions"
+          },
+          {
+            "value": 19,
+            "unit": "UNIT",
+            "counter_name": "NumOptimizedFunctions"
+          },
+          {
+            "value": 513,
+            "unit": "UNIT",
+            "counter_name": "NumOptimizedInstructions"
+          },
+          {
+            "value": 26184707,
+            "unit": "TIME_NS",
+            "counter_name": "OptimizationTime"
+          },
+          {
+            "value": 407552,
+            "unit": "BYTES",
+            "counter_name": "PeakMemoryUsage"
+          },
+          {
+            "value": 24643013,
+            "unit": "TIME_NS",
+            "counter_name": "PrepareTime"
+          },
+          {
+            "value": 64237902,
+            "unit": "TIME_NS",
+            "counter_name": "TotalTime"
+          }
+        ]
+      }
+    },
+    "Fragment F01": {
+      "CodeGen": {
+        "counters": [
+          {
+            "value": 5918395,
+            "unit": "TIME_NS",
+            "counter_name": "CodegenCacheLookupTime"
+          },
+          {
+            "value": 126339,
+            "unit": "TIME_NS",
+            "counter_name": "CodegenCacheSaveTime"
+          },
+          {
+            "value": 0,
+            "unit": "UNIT",
+            "counter_name": "CodegenCompileThreadInvoluntaryContextSwitches"
+          },
+          {
+            "value": 0,
+            "unit": "UNIT",
+            "counter_name": "CodegenCompileThreadMajorPageFaults"
+          },
+          {
+            "value": 0,
+            "unit": "UNIT",
+            "counter_name": "CodegenCompileThreadMinorPageFaults"
+          },
+          {
+            "value": 0,
+            "unit": "TIME_NS",
+            "counter_name": "CodegenCompileThreadTotalWallClockTime",
+            "child_counters": [
+              {
+                "value": 0,
+                "unit": "TIME_NS",
+                "counter_name": "CodegenCompileThreadSysTime"
+              },
+              {
+                "value": 0,
+                "unit": "TIME_NS",
+                "counter_name": "CodegenCompileThreadUserTime"
+              }
+            ]
+          },
+          {
+            "value": 0,
+            "unit": "UNIT",
+            "counter_name": "CodegenCompileThreadVoluntaryContextSwitches"
+          },
+          {
+            "value": 48,
+            "unit": "UNIT",
+            "counter_name": "CodegenInvoluntaryContextSwitches"
+          },
+          {
+            "value": 0,
+            "unit": "UNIT",
+            "counter_name": "CodegenMajorPageFaults"
+          },
+          {
+            "value": 1841,
+            "unit": "UNIT",
+            "counter_name": "CodegenMinorPageFaults"
+          },
+          {
+            "value": 201545780,
+            "unit": "TIME_NS",
+            "counter_name": "CodegenTotalWallClockTime",
+            "child_counters": [
+              {
+                "value": 3908000,
+                "unit": "TIME_NS",
+                "counter_name": "CodegenSysTime"
+              },
+              {
+                "value": 191492000,
+                "unit": "TIME_NS",
+                "counter_name": "CodegenUserTime"
+              }
+            ]
+          },
+          {
+            "value": 12,
+            "unit": "UNIT",
+            "counter_name": "CodegenVoluntaryContextSwitches"
+          },
+          {
+            "value": 16184736,
+            "unit": "TIME_NS",
+            "counter_name": "CompileTime"
+          },
+          {
+            "value": 2567952,
+            "unit": "TIME_NS",
+            "counter_name": "FunctionPruneTime"
+          },
+          {
+            "value": 0,
+            "unit": "TIME_NS",
+            "counter_name": "InactiveTotalTime"
+          },
+          {
+            "value": 7604959,
+            "unit": "TIME_NS",
+            "counter_name": "IrGenerationTime"
+          },
+          {
+            "value": 0,
+            "unit": "TIME_NS",
+            "counter_name": "LoadTime"
+          },
+          {
+            "value": 178444607,
+            "unit": "TIME_NS",
+            "counter_name": "MainThreadCodegenTime"
+          },
+          {
+            "value": 5706125,
+            "unit": "TIME_NS",
+            "counter_name": "ModuleBitcodeGenTime"
+          },
+          {
+            "value": 3843472,
+            "unit": "BYTES",
+            "counter_name": "ModuleBitcodeSize"
+          },
+          {
+            "value": 0,
+            "unit": "UNIT",
+            "counter_name": "NumCachedFunctions"
+          },
+          {
+            "value": 112,
+            "unit": "UNIT",
+            "counter_name": "NumFunctions"
+          },
+          {
+            "value": 4374,
+            "unit": "UNIT",
+            "counter_name": "NumInstructions"
+          },
+          {
+            "value": 47,
+            "unit": "UNIT",
+            "counter_name": "NumOptimizedFunctions"
+          },
+          {
+            "value": 2777,
+            "unit": "UNIT",
+            "counter_name": "NumOptimizedInstructions"
+          },
+          {
+            "value": 143840231,
+            "unit": "TIME_NS",
+            "counter_name": "OptimizationTime"
+          },
+          {
+            "value": 2239488,
+            "unit": "BYTES",
+            "counter_name": "PeakMemoryUsage"
+          },
+          {
+            "value": 23107773,
+            "unit": "TIME_NS",
+            "counter_name": "PrepareTime"
+          },
+          {
+            "value": 201552525,
+            "unit": "TIME_NS",
+            "counter_name": "TotalTime"
+          }
+        ]
+      }
+    },
+    "Fragment F14": {
+      "CodeGen": {
+        "counters": [
+          {
+            "value": 2887487,
+            "unit": "TIME_NS",
+            "counter_name": "CodegenCacheLookupTime"
+          },
+          {
+            "value": 152212,
+            "unit": "TIME_NS",
+            "counter_name": "CodegenCacheSaveTime"
+          },
+          {
+            "value": 0,
+            "unit": "UNIT",
+            "counter_name": "CodegenCompileThreadInvoluntaryContextSwitches"
+          },
+          {
+            "value": 0,
+            "unit": "UNIT",
+            "counter_name": "CodegenCompileThreadMajorPageFaults"
+          },
+          {
+            "value": 0,
+            "unit": "UNIT",
+            "counter_name": "CodegenCompileThreadMinorPageFaults"
+          },
+          {
+            "value": 0,
+            "unit": "TIME_NS",
+            "counter_name": "CodegenCompileThreadTotalWallClockTime",
+            "child_counters": [
+              {
+                "value": 0,
+                "unit": "TIME_NS",
+                "counter_name": "CodegenCompileThreadSysTime"
+              },
+              {
+                "value": 0,
+                "unit": "TIME_NS",
+                "counter_name": "CodegenCompileThreadUserTime"
+              }
+            ]
+          },
+          {
+            "value": 0,
+            "unit": "UNIT",
+            "counter_name": "CodegenCompileThreadVoluntaryContextSwitches"
+          },
+          {
+            "value": 19,
+            "unit": "UNIT",
+            "counter_name": "CodegenInvoluntaryContextSwitches"
+          },
+          {
+            "value": 0,
+            "unit": "UNIT",
+            "counter_name": "CodegenMajorPageFaults"
+          },
+          {
+            "value": 1465,
+            "unit": "UNIT",
+            "counter_name": "CodegenMinorPageFaults"
+          },
+          {
+            "value": 105943297,
+            "unit": "TIME_NS",
+            "counter_name": "CodegenTotalWallClockTime",
+            "child_counters": [
+              {
+                "value": 3890000,
+                "unit": "TIME_NS",
+                "counter_name": "CodegenSysTime"
+              },
+              {
+                "value": 101160000,
+                "unit": "TIME_NS",
+                "counter_name": "CodegenUserTime"
+              }
+            ]
+          },
+          {
+            "value": 32,
+            "unit": "UNIT",
+            "counter_name": "CodegenVoluntaryContextSwitches"
+          },
+          {
+            "value": 11283877,
+            "unit": "TIME_NS",
+            "counter_name": "CompileTime"
+          },
+          {
+            "value": 3221628,
+            "unit": "TIME_NS",
+            "counter_name": "FunctionPruneTime"
+          },
+          {
+            "value": 0,
+            "unit": "TIME_NS",
+            "counter_name": "InactiveTotalTime"
+          },
+          {
+            "value": 3209376,
+            "unit": "TIME_NS",
+            "counter_name": "IrGenerationTime"
+          },
+          {
+            "value": 0,
+            "unit": "TIME_NS",
+            "counter_name": "LoadTime"
+          },
+          {
+            "value": 82081439,
+            "unit": "TIME_NS",
+            "counter_name": "MainThreadCodegenTime"
+          },
+          {
+            "value": 2764638,
+            "unit": "TIME_NS",
+            "counter_name": "ModuleBitcodeGenTime"
+          },
+          {
+            "value": 3843472,
+            "unit": "BYTES",
+            "counter_name": "ModuleBitcodeSize"
+          },
+          {
+            "value": 0,
+            "unit": "UNIT",
+            "counter_name": "NumCachedFunctions"
+          },
+          {
+            "value": 41,
+            "unit": "UNIT",
+            "counter_name": "NumFunctions"
+          },
+          {
+            "value": 1936,
+            "unit": "UNIT",
+            "counter_name": "NumInstructions"
+          },
+          {
+            "value": 20,
+            "unit": "UNIT",
+            "counter_name": "NumOptimizedFunctions"
+          },
+          {
+            "value": 1062,
+            "unit": "UNIT",
+            "counter_name": "NumOptimizedInstructions"
+          },
+          {
+            "value": 59282565,
+            "unit": "TIME_NS",
+            "counter_name": "OptimizationTime"
+          },
+          {
+            "value": 991232,
+            "unit": "BYTES",
+            "counter_name": "PeakMemoryUsage"
+          },
+          {
+            "value": 23870682,
+            "unit": "TIME_NS",
+            "counter_name": "PrepareTime"
+          },
+          {
+            "value": 105951409,
+            "unit": "TIME_NS",
+            "counter_name": "TotalTime"
+          }
+        ]
+      }
+    },
+    "Fragment F02": {
+      "CodeGen": {
+        "counters": [
+          {
+            "value": 2518513,
+            "unit": "TIME_NS",
+            "counter_name": "CodegenCacheLookupTime"
+          },
+          {
+            "value": 156588,
+            "unit": "TIME_NS",
+            "counter_name": "CodegenCacheSaveTime"
+          },
+          {
+            "value": 0,
+            "unit": "UNIT",
+            "counter_name": "CodegenCompileThreadInvoluntaryContextSwitches"
+          },
+          {
+            "value": 0,
+            "unit": "UNIT",
+            "counter_name": "CodegenCompileThreadMajorPageFaults"
+          },
+          {
+            "value": 0,
+            "unit": "UNIT",
+            "counter_name": "CodegenCompileThreadMinorPageFaults"
+          },
+          {
+            "value": 0,
+            "unit": "TIME_NS",
+            "counter_name": "CodegenCompileThreadTotalWallClockTime",
+            "child_counters": [
+              {
+                "value": 0,
+                "unit": "TIME_NS",
+                "counter_name": "CodegenCompileThreadSysTime"
+              },
+              {
+                "value": 0,
+                "unit": "TIME_NS",
+                "counter_name": "CodegenCompileThreadUserTime"
+              }
+            ]
+          },
+          {
+            "value": 0,
+            "unit": "UNIT",
+            "counter_name": "CodegenCompileThreadVoluntaryContextSwitches"
+          },
+          {
+            "value": 34,
+            "unit": "UNIT",
+            "counter_name": "CodegenInvoluntaryContextSwitches"
+          },
+          {
+            "value": 0,
+            "unit": "UNIT",
+            "counter_name": "CodegenMajorPageFaults"
+          },
+          {
+            "value": 1413,
+            "unit": "UNIT",
+            "counter_name": "CodegenMinorPageFaults"
+          },
+          {
+            "value": 65531321,
+            "unit": "TIME_NS",
+            "counter_name": "CodegenTotalWallClockTime",
+            "child_counters": [
+              {
+                "value": 3788000,
+                "unit": "TIME_NS",
+                "counter_name": "CodegenSysTime"
+              },
+              {
+                "value": 60619000,
+                "unit": "TIME_NS",
+                "counter_name": "CodegenUserTime"
+              }
+            ]
+          },
+          {
+            "value": 31,
+            "unit": "UNIT",
+            "counter_name": "CodegenVoluntaryContextSwitches"
+          },
+          {
+            "value": 6051362,
+            "unit": "TIME_NS",
+            "counter_name": "CompileTime"
+          },
+          {
+            "value": 2829512,
+            "unit": "TIME_NS",
+            "counter_name": "FunctionPruneTime"
+          },
+          {
+            "value": 0,
+            "unit": "TIME_NS",
+            "counter_name": "InactiveTotalTime"
+          },
+          {
+            "value": 1195525,
+            "unit": "TIME_NS",
+            "counter_name": "IrGenerationTime"
+          },
+          {
+            "value": 0,
+            "unit": "TIME_NS",
+            "counter_name": "LoadTime"
+          },
+          {
+            "value": 41200527,
+            "unit": "TIME_NS",
+            "counter_name": "MainThreadCodegenTime"
+          },
+          {
+            "value": 2377078,
+            "unit": "TIME_NS",
+            "counter_name": "ModuleBitcodeGenTime"
+          },
+          {
+            "value": 3843472,
+            "unit": "BYTES",
+            "counter_name": "ModuleBitcodeSize"
+          },
+          {
+            "value": 0,
+            "unit": "UNIT",
+            "counter_name": "NumCachedFunctions"
+          },
+          {
+            "value": 28,
+            "unit": "UNIT",
+            "counter_name": "NumFunctions"
+          },
+          {
+            "value": 521,
+            "unit": "UNIT",
+            "counter_name": "NumInstructions"
+          },
+          {
+            "value": 10,
+            "unit": "UNIT",
+            "counter_name": "NumOptimizedFunctions"
+          },
+          {
+            "value": 343,
+            "unit": "UNIT",
+            "counter_name": "NumOptimizedInstructions"
+          },
+          {
+            "value": 27008511,
+            "unit": "TIME_NS",
+            "counter_name": "OptimizationTime"
+          },
+          {
+            "value": 266752,
+            "unit": "BYTES",
+            "counter_name": "PeakMemoryUsage"
+          },
+          {
+            "value": 24337188,
+            "unit": "TIME_NS",
+            "counter_name": "PrepareTime"
+          },
+          {
+            "value": 65537293,
+            "unit": "TIME_NS",
+            "counter_name": "TotalTime"
+          }
+        ]
+      }
+    }
+  }
+}

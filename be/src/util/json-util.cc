@@ -24,6 +24,7 @@
 #include <google/protobuf/message.h>
 #include <rapidjson/document.h>
 #include <rapidjson/rapidjson.h>
+#include <rapidjson/stringbuffer.h>
 #include <rapidjson/writer.h>
 
 #include "util/redactor.h"
@@ -160,5 +161,12 @@ void ProtobufToJson(const google::protobuf::Message& pb, Document* document, Val
         DCHECK(false) << "Type NYI: " << field->cpp_type() << " " << field->name();
     }
   }
+}
+
+std::string JsonToString(const rapidjson::Value& value) {
+  rapidjson::StringBuffer buffer;
+  rapidjson::Writer<rapidjson::StringBuffer> writer(buffer);
+  value.Accept(writer);
+  return std::string(buffer.GetString(), buffer.GetSize());
 }
 } // namespace impala

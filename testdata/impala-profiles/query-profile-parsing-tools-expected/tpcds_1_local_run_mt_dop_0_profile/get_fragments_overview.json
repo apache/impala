@@ -1,0 +1,52 @@
+[
+  {
+    "fragment_id": "F09",
+    "full_key": "Coordinator Fragment F09",
+    "instance_count": 1
+  },
+  {
+    "fragment_id": "F00",
+    "full_key": "Fragment F00 [2]",
+    "instance_count": 1
+  },
+  {
+    "fragment_id": "F01",
+    "full_key": "Fragment F01 [2]",
+    "instance_count": 1
+  },
+  {
+    "fragment_id": "F02",
+    "full_key": "Fragment F02 [2]",
+    "instance_count": 1
+  },
+  {
+    "fragment_id": "F03",
+    "full_key": "Fragment F03 [2]",
+    "instance_count": 1
+  },
+  {
+    "fragment_id": "F04",
+    "full_key": "Fragment F04 [2]",
+    "instance_count": 1
+  },
+  {
+    "fragment_id": "F05",
+    "full_key": "Fragment F05 [2]",
+    "instance_count": 1
+  },
+  {
+    "fragment_id": "F06",
+    "full_key": "Fragment F06 [2]",
+    "instance_count": 1
+  },
+  {
+    "fragment_id": "F07",
+    "full_key": "Fragment F07 [2]",
+    "instance_count": 1
+  },
+  {
+    "fragment_id": "F08",
+    "full_key": "Fragment F08 [2]",
+    "instance_count": 1
+  }
+]

@@ -1,0 +1,11 @@
+[
+  "tpcds.catalog_sales",
+  "tpcds.customer_demographics",
+  "tpcds.inventory",
+  "tpcds.warehouse",
+  "tpcds.item",
+  "tpcds.household_demographics",
+  "tpcds.date_dim",
+  "tpcds.promotion",
+  "tpcds.catalog_returns"
+]

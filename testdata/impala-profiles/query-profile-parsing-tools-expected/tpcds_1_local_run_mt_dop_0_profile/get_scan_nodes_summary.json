@@ -1,0 +1,26 @@
+[
+  {
+    "fragment": "Fragment F00 [2]",
+    "node": "HDFS_SCAN_NODE (id=5)"
+  },
+  {
+    "fragment": "Fragment F01 [2]",
+    "node": "HDFS_SCAN_NODE (id=0)"
+  },
+  {
+    "fragment": "Fragment F02 [2]",
+    "node": "HDFS_SCAN_NODE (id=1)"
+  },
+  {
+    "fragment": "Fragment F04 [2]",
+    "node": "HDFS_SCAN_NODE (id=4)"
+  },
+  {
+    "fragment": "Fragment F05 [2]",
+    "node": "HDFS_SCAN_NODE (id=6)"
+  },
+  {
+    "fragment": "Fragment F06 [2]",
+    "node": "HDFS_SCAN_NODE (id=7)"
+  }
+]

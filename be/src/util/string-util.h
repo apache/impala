@@ -19,6 +19,8 @@
 #define IMPALA_UTIL_STRING_UTIL_H
 
 #include <string>
+#include <string_view>
+#include <vector>
 
 #include "common/status.h"
 
@@ -44,6 +46,16 @@ bool CommaSeparatedContains(const std::string& cs_list, const std::string& item)
 /// Return true if a given string 'full_str' ends with the characters in the
 /// 'end' string
 bool EndsWith(const std::string& full_string, const std::string& end);
+
+/// Splits text into lines using '\n' delimiters.
+/// Returns non-owning std::string_view slices into the input text.
+std::vector<std::string_view> SplitLines(std::string_view text);
+
+/// Trims leading and trailing ASCII whitespace.
+std::string_view TrimWhiteSpace(std::string_view value);
+
+/// Returns true if all characters are ASCII digits.
+bool IsAllDigits(std::string_view text);
 
 /// This function returns a pointer past the end of the longest identifier
 /// that is a prefix of given string or NULL if the given string does not start with

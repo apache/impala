@@ -1,0 +1,11 @@
+{
+  "Metadata of all 4 tables cached": "22.934ms (22.934ms)",
+  "Analysis finished": "45.034ms (22.100ms)",
+  "Authorization finished (noop)": "45.171ms (136.674us)",
+  "Value transfer graph computed": "45.635ms (464.189us)",
+  "Single node plan created": "56.388ms (10.752ms)",
+  "Runtime filters computed": "59.819ms (3.431ms)",
+  "Distributed plan created": "60.739ms (919.263us)",
+  "Planning finished": "78.269ms (17.530ms)",
+  "_value": "55.334ms"
+}
