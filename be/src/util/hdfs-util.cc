@@ -51,6 +51,10 @@ string GetHdfsErrorMsg(const string& prefix, const string& file) {
   if (root_cause != nullptr) {
     ss << "\nRoot cause: " << root_cause;
   }
+  char* stack_trace = hdfsGetLastExceptionStackTrace();
+  if (stack_trace != nullptr) {
+    ss << "\nStack trace:\n" << stack_trace;
+  }
   return ss.str();
 }
 
