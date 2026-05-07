@@ -16,10 +16,13 @@
 # under the License.
 
 from __future__ import absolute_import, division, print_function
+import logging
 import pytest
+import threading
 
 from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
-from tests.common.skip import SkipIfBuildType
+from tests.common.skip import SkipIfBuildType, SkipIfExploration
+from tests.util.retry import retry
 
 
 @SkipIfBuildType.not_dev_build
@@ -124,3 +127,129 @@ class TestCatalogStartupDelay(CustomClusterTestSuite):
     # The actual test here is successful startup, and we assume nothing about the
     # functionality of the impalads before the catalogd finishes starting up.
     self.execute_query("select count(*) from functional.alltypes")
+
+
+class TestCatalogStartupDeadlock(CustomClusterTestSuite):
+  @SkipIfExploration.is_not_exhaustive()
+  @CustomClusterTestSuite.with_args(
+      cluster_size=2,
+      num_exclusive_coordinators=1,
+      catalogd_args="--reset_metadata_lock_duration_ms=1 "
+                    "--debug_actions=reset_metadata_loop_locked:SLEEP@2000|"
+                    "reset_metadata_loop_unlocked:SLEEP@500")
+  def test_catalog_startup_deadlock(self):
+    """Regression test for IMPALA-14949 to verify that Catalogd does not deadlock during
+       startup when processing the initial reset metadata requests while under load."""
+    stop_workload = False
+
+    # Impyla logs a vast amount of errors when Catalogd is down, so turn off logging to
+    # avoid cluttering the test output.
+    for logger in ["thrift.transport.TSocket", "impala.hiveserver2"]:
+      lg = logging.getLogger(logger)
+      lg.handlers = []
+      lg.propagate = False
+      lg.disabled = True
+
+    def run_query_workload():
+      with self.create_impala_client() as client:
+        while True:
+          if stop_workload:
+            break
+
+          try:
+            self.execute_query_unchecked(client,
+                "invalidate metadata functional_parquet.widetable_1000_cols")
+            self.execute_query_unchecked(client,
+                "refresh functional_parquet.widetable_1000_cols")
+            self.execute_query_unchecked(client,
+                "select * from functional_parquet.widetable_1000_cols")
+          except Exception:
+            # Ignore exceptions since Catalogd will be down during its restart.
+            pass
+
+    # Spawn threads to repeatedly run queries that will force metadata reloading.
+    threads = []
+    num_threads = 25
+    for _ in range(num_threads):
+      t = threading.Thread(target=run_query_workload)
+      t.start()
+      threads.append(t)
+
+    try:
+      # Allow time for the threads to start and run queries.
+      def count_completed_queries():
+        queries_json = \
+            self.cluster.get_first_impalad().service.get_debug_webpage_json('/queries')
+        return len(queries_json["completed_queries"]) > 100
+
+      assert retry(
+          func=count_completed_queries, max_attempts=60, sleep_time_s=2, backoff=1), \
+          "Expected some queries to complete but not enough completed."
+
+      # Force stop Catalogd to trigger the deadlock scenario.
+      self.cluster.catalogd.kill()
+      self.cluster.catalogd.wait_for_exit()
+
+      # Wait for queries from each thread to queue up. These queries will be in CREATED
+      # state since they require interacting with the Catalogd which is currently down.
+      inflight_query = None
+      num_inflight = None
+
+      def count_inflight_queries():
+        nonlocal inflight_query, num_inflight
+        queries_json = \
+            self.cluster.get_first_impalad().service.get_debug_webpage_json('/queries')
+        num_inflight = len(queries_json["in_flight_queries"])
+        if num_inflight > 0:
+          inflight_query = queries_json["in_flight_queries"][0]["query_id"]
+        return num_inflight == num_threads
+
+      assert retry(
+          func=count_inflight_queries, max_attempts=30, sleep_time_s=2, backoff=1), \
+          "Expected {} queries to be in-flight but there were {}." \
+              .format(num_threads, num_inflight)
+
+      # Start Catalogd again.
+      self.cluster.catalogd.start(wait_until_ready=False)
+      self.assert_catalogd_log_contains("INFO",
+          "resetMetadata request: INVALIDATE ALL issued by null", timeout_s=10)
+
+      # Assert queries are progressing and not hung due to the deadlock. Since so many
+      # queries are being run, a particular query will roll off the list of 200 most
+      # recent queries. Thus to assert the query completed, verify it is no longer in the
+      # list of in-flight queries.
+      def check_query_progress():
+        assert inflight_query is not None, "No in-flight query."
+        query_completed = True
+        queries_json = \
+            self.cluster.get_first_impalad().service.get_debug_webpage_json('/queries')
+
+        for query in queries_json["in_flight_queries"]:
+          if query["query_id"] == inflight_query:
+            query_completed = False
+            break
+
+        return query_completed
+
+      assert retry(
+          func=check_query_progress, max_attempts=60, sleep_time_s=2, backoff=1), \
+          "Expected query '{}' to complete but it did not".format(inflight_query)
+    finally:
+      stop_workload = True
+
+      # If the deadlock occurred, the queries will be stuck in-flight and never complete
+      # which means the test will hung instead of failing. To prevent this, check that
+      # no queries are in-flight at the end of the test, and force shutdown the
+      # coordinator to force end the hung queries.
+      def check_no_deadlock():
+        queries_json = \
+            self.cluster.get_first_impalad().service.get_debug_webpage_json('/queries')
+
+        return len(queries_json["in_flight_queries"]) == 0
+
+      if not retry(func=check_no_deadlock, max_attempts=60, sleep_time_s=0.5, backoff=1):
+        for impalad in self.cluster.impalads:
+          impalad.kill()
+
+      for t in threads:
+        t.join()

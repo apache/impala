@@ -2815,9 +2815,13 @@ public class CatalogServiceCatalog extends Catalog {
 
     long previousCatalogVersion = -1;
     // Return the table if it is already loaded or submit a new load request.
-    acquireVersionReadLock(catalogTimeline);
-    try {
-      tbl = getTable(dbName, tblName);
+    try (ReadLockAndLookupDb result = new ReadLockAndLookupDb(dbName)) {
+      catalogTimeline.markEvent(GOT_CATALOG_VERSION_READ_LOCK);
+      Db db = result.getDb();
+      if (db == null) {
+        throw new DatabaseNotFoundException("Database '" + dbName + "' not found");
+      }
+      tbl = db.getTable(tblName);
       // tbl doesn't exist in the catalog
       if (tbl == null) return null;
       LOG.trace("table {} exits in cache, last synced id {}", tbl.getFullName(),
@@ -2882,8 +2886,6 @@ public class CatalogServiceCatalog extends Catalog {
         loadReq = tableLoadingMgr_.loadAsync(tableName, tbl.getCreateEventId(), reason,
             queryId, catalogTimeline);
       }
-    } finally {
-      versionLock_.readLock().unlock();
     }
     if (!partsToBeRefreshed.isEmpty()) {
       return refreshFileMetadata((HdfsTable) tbl, partsToBeRefreshed, catalogTimeline);
@@ -3813,11 +3815,6 @@ public class CatalogServiceCatalog extends Catalog {
 
   public long getNumCatalogResetStarts() {
     return numCatalogResetStarts_.get();
-  }
-
-  private void acquireVersionReadLock(EventSequence catalogTimeline) {
-    versionLock_.readLock().lock();
-    catalogTimeline.markEvent(GOT_CATALOG_VERSION_READ_LOCK);
   }
 
   public ReentrantReadWriteLock getLock() { return versionLock_; }
