@@ -42,6 +42,7 @@
 #include "service/client-request-state.h"
 #include "service/frontend.h"
 #include "service/impala-server.h"
+#include "service/query-profile-ai-analysis.h"
 #include "service/query-state-record.h"
 #include "thrift/protocol/TDebugProtocol.h"
 #include "util/debug-util.h"
@@ -65,6 +66,7 @@ using namespace strings;
 DECLARE_int32(query_log_size);
 DECLARE_int64(query_log_size_in_bytes);
 DECLARE_int32(query_stmt_size);
+DECLARE_int32(query_profile_ai_analysis_max_concurrent_runs);
 DECLARE_bool(use_local_catalog);
 DECLARE_string(admission_service_host);
 
@@ -200,6 +202,14 @@ void ImpalaHttpHandler::RegisterHandlers(Webserver* webserver, bool metrics_only
       [this](const auto& req, auto* doc) {
         this->QuerySummaryHandler(false, false, req, doc); }, false);
 
+  if (FLAGS_query_profile_ai_analysis_max_concurrent_runs > 0) {
+    webserver->RegisterUrlCallback("/query_ai_analysis", "query_ai_analysis.tmpl",
+        MakeCallback(this, &ImpalaHttpHandler::QueryAiAnalysisHandler), false);
+
+    webserver->RegisterUrlCallback("/query_ai_analysis_generate", "raw_text.tmpl",
+        MakeCallback(this, &ImpalaHttpHandler::QueryAiGenerateAnalysisHandler), false);
+  }
+
   // Only enable the admission control endpoints for impalads if the admission service is
   // not enabled, otherwise these will be exposed on the admissiond.
   if (!ExecEnv::GetInstance()->AdmissionServiceEnabled()) {
@@ -328,6 +338,20 @@ void ImpalaHttpHandler::QueryProfileHandler(const Webserver::WebRequest& req,
   document->AddMember("profile", profile, document->GetAllocator());
 }
 
+void ImpalaHttpHandler::QueryAiAnalysisHandler(const Webserver::WebRequest& req,
+    Document* document) {
+  TUniqueId unique_id;
+  Status parse_status = ParseIdFromRequest(req, &unique_id, "query_id");
+  if (!parse_status.ok()) {
+    Value error(parse_status.GetDetail(), document->GetAllocator());
+    document->AddMember("error", error, document->GetAllocator());
+    return;
+  }
+
+  Value query_id_val(PrintId(unique_id), document->GetAllocator());
+  document->AddMember("query_id", query_id_val, document->GetAllocator());
+}
+
 void ImpalaHttpHandler::QueryProfileHelper(const Webserver::WebRequest& req,
     Document* document, TRuntimeProfileFormat::type format, bool internal_profile) {
   TUniqueId unique_id;
@@ -426,6 +450,39 @@ void ImpalaHttpHandler::QueryMemoryHandler(const Webserver::WebRequest& req,
   const auto& args = req.parsed_args;
   Value query_id(args.find("query_id")->second, document->GetAllocator());
   document->AddMember("query_id", query_id, document->GetAllocator());
+}
+
+void ImpalaHttpHandler::QueryAiGenerateAnalysisHandler(const Webserver::WebRequest& req,
+    Document* document) {
+  auto set_error = [&](const string& error_msg) {
+    Value error(error_msg.c_str(), document->GetAllocator());
+    document->AddMember("error", error, document->GetAllocator());
+  };
+
+  TUniqueId unique_id;
+  Status status = ParseIdFromRequest(req, &unique_id, "query_id");
+  if (!status.ok()) return set_error(status.GetDetail());
+
+  ImpalaServer::RuntimeProfileOutput runtime_profile;
+  Document profile_doc;
+  profile_doc.SetObject();
+  runtime_profile.json_output = &profile_doc;
+  status = server_->GetRuntimeProfileOutput(
+      unique_id, "", TRuntimeProfileFormat::JSON, &runtime_profile);
+  if (!status.ok()) return set_error(status.GetDetail());
+
+  const Value* profile_json = &profile_doc;
+  if (profile_doc.HasMember("contents")) profile_json = &profile_doc["contents"];
+
+  string analysis;
+  status = GenerateAiAnalysisFromProfile(*profile_json, &analysis);
+  if (!status.ok()) return set_error(status.GetDetail());
+
+  Value query_id(PrintId(unique_id), document->GetAllocator());
+  document->AddMember("query_id", query_id, document->GetAllocator());
+  Value analysis_value(analysis, document->GetAllocator());
+  document->AddMember("analysis", analysis_value, document->GetAllocator());
+  document->AddMember("status", rapidjson::StringRef("OK"), document->GetAllocator());
 }
 
 void ImpalaHttpHandler::AddQueryRecordTips(Document* document) {

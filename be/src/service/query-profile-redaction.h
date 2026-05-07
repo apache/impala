@@ -22,6 +22,8 @@
 #include <string_view>
 #include <unordered_map>
 
+#include <rapidjson/document.h>
+
 #include "common/status.h"
 
 namespace impala {
@@ -31,8 +33,8 @@ namespace impala {
 //
 // Usage/lifecycle:
 // 1) Create a QueryProfileRedactor instance.
-// 2) Call Redact(profile_json_text) exactly once per instance.
-// 3) Read redacted_profile_text() to get the full redacted profile JSON.
+// 2) Call Redact(profile_json) exactly once per instance.
+// 3) Read redacted_profile_json() for redacted output.
 // 4) Call Unredact(text) on any derived text that may contain aliases to map
 //    aliases back to their original values.
 //
@@ -64,13 +66,15 @@ class QueryProfileRedactor {
   // If process_mem_limit is unavailable, 256 MB is used.
   explicit QueryProfileRedactor(int64_t profile_size_limit_bytes = -1);
 
-  Status Redact(const std::string_view& profile_text);
+  Status Redact(const rapidjson::Value& profile_json);
   std::string Unredact(const std::string_view& text) const;
-  const std::string& redacted_profile_text() const { return redacted_profile_text_; }
+  const rapidjson::Document& redacted_profile_json() const {
+    return redacted_profile_json_;
+  }
 
  private:
   int64_t profile_size_limit_bytes_;
-  std::string redacted_profile_text_;
+  rapidjson::Document redacted_profile_json_;
   std::unordered_map<std::string, std::string> alias_to_original_;
 };
 

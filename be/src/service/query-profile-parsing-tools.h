@@ -43,8 +43,8 @@ typedef rapidjson::Document ParsedProfile;
 ///   and query scoping decisions internally, so callers can request high-level sections.
 ///
 /// Usage:
-/// - Preferred path: call CreateQueryProfileToolExecutorForProfile() with raw profile
-///   JSON text, then invoke tools through the returned QueryProfileToolExecutor.
+/// - Preferred path: call CreateQueryProfileToolExecutorForProfile() with a profile
+///   JSON DOM value, then invoke tools through the returned QueryProfileToolExecutor.
 /// - Direct path: construct QueryProfileToolAccessor with a ParsedProfile when the
 ///   profile is already parsed and validated by the caller.
 ///
@@ -204,14 +204,20 @@ class QueryProfileToolAccessor {
 
 using QueryProfileToolExecutor = std::function<Status(
     std::string_view tool_name, std::string_view tool_args_json,
-    std::string* tool_output_json)>;
+    rapidjson::Document* tool_output_doc)>;
 
-/// Parses one query profile and returns a reusable tool executor.
-/// If profile_size_limit_bytes is <= 0, a default limit is chosen as:
-/// min(256 MB, 1% of process_mem_limit).
-/// If process_mem_limit is unavailable, 256 MB is used.
+// Parses one already-materialized profile JSON object and returns a reusable tool
+// executor.
+//
+// If profile_size_limit_bytes is <= 0, a default limit is chosen as:
+// min(256 MB, 1% of process_mem_limit). If process_mem_limit is unavailable,
+// 256 MB is used.
+//
+// If profile_size_bytes is 0, the function computes it by serializing
+// profile_json, then rejects parsing when the effective size exceeds the
+// effective profile size limit.
 Status CreateQueryProfileToolExecutorForProfile(
-    const std::string& profile_text, QueryProfileToolExecutor* tool_executor,
-    int64_t profile_size_limit_bytes = -1);
+    const rapidjson::Value& profile_json, QueryProfileToolExecutor* tool_executor,
+    int64_t profile_size_limit_bytes = -1, size_t profile_size_bytes = 0);
 
 } // namespace impala

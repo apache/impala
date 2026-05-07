@@ -38,6 +38,7 @@
 #include <re2/re2.h>
 
 #include "common/logging.h"
+#include "util/json-util.h"
 
 using namespace std;
 using rapidjson::Document;
@@ -530,6 +531,41 @@ static string UnredactTextWithAliases(
   return unredacted;
 }
 
+static Status RedactSourceJson(const Value& source_json, int64_t profile_size_limit_bytes,
+    unordered_map<string, string>* alias_to_original, Document* redacted_profile_json) {
+  DCHECK(alias_to_original != nullptr);
+  DCHECK(redacted_profile_json != nullptr);
+
+  const string profile_text = JsonToString(source_json);
+  if (profile_text.size() > static_cast<size_t>(profile_size_limit_bytes)) {
+    LOG(WARNING) << "Profile redaction failed because input size " << profile_text.size()
+                 << " bytes exceeds configured profile size limit "
+                 << profile_size_limit_bytes << " bytes";
+    return Status("Query profile size exceeds configured redaction profile size limit");
+  }
+
+  alias_to_original->clear();
+  string redacted_profile_text;
+  RETURN_IF_ERROR(RedactQueryProfileWithAliases(
+      profile_text, source_json, *alias_to_original, &redacted_profile_text));
+
+  redacted_profile_json->Parse(redacted_profile_text.data(),
+      static_cast<rapidjson::SizeType>(redacted_profile_text.size()));
+  if (redacted_profile_json->HasParseError()) {
+    LOG(WARNING) << "Profile redaction failed while parsing redacted output JSON with "
+                 << "RapidJSON error code: "
+                 << redacted_profile_json->GetParseError() << " at offset: "
+                 << redacted_profile_json->GetErrorOffset();
+    return Status("Redacted query profile must be a valid JSON object");
+  }
+  if (!redacted_profile_json->IsObject()) {
+    LOG(WARNING)
+        << "Profile redaction failed because redacted JSON root is not an object";
+    return Status("Redacted query profile must be a valid JSON object");
+  }
+  return Status::OK();
+}
+
 QueryProfileRedactor::QueryProfileRedactor(int64_t profile_size_limit_bytes)
     : profile_size_limit_bytes_(
           profile_size_limit_bytes > 0
@@ -538,37 +574,19 @@ QueryProfileRedactor::QueryProfileRedactor(int64_t profile_size_limit_bytes)
                     DEFAULT_REDACTION_PROFILE_SIZE_LIMIT_MAX_BYTES,
                     DEFAULT_REDACTION_PROFILE_SIZE_LIMIT_PERCENTAGE)) {}
 
-Status QueryProfileRedactor::Redact(const string_view& profile_text) {
-  DCHECK(redacted_profile_text_.empty()) << "Cannot call Redact function more than once";
-  if (profile_text.size() > static_cast<size_t>(profile_size_limit_bytes_)) {
-    LOG(WARNING) << "Profile redaction failed because input size " << profile_text.size()
-                 << " bytes exceeds configured profile size limit "
-                 << profile_size_limit_bytes_ << " bytes";
-    return Status("Query profile size exceeds configured redaction profile size limit");
-  }
-  alias_to_original_.clear();
-  Document source_json;
-  source_json.Parse(profile_text.data(),
-      static_cast<rapidjson::SizeType>(profile_text.size()));
-  if (source_json.HasParseError()) {
-    LOG(WARNING) << "Profile redaction failed with the RapidJSON error code: "
-                 << source_json.GetParseError() << " at offset: "
-                 << source_json.GetErrorOffset();
-    return Status("Query profile input must be a valid JSON object");
-  }
-  if (!source_json.IsObject()) {
+Status QueryProfileRedactor::Redact(const Value& profile_json) {
+  DCHECK(redacted_profile_json_.IsNull()) << "Cannot call Redact function more than once";
+  if (!profile_json.IsObject()) {
     LOG(WARNING)
         << "Profile redaction failed because input JSON root is not an object";
     return Status("Query profile input must be a valid JSON object");
   }
-  Status status = RedactQueryProfileWithAliases(
-      profile_text, source_json, alias_to_original_, &redacted_profile_text_);
-  if (!status.ok()) return status;
-  return Status::OK();
+  return RedactSourceJson(profile_json, profile_size_limit_bytes_,
+      &alias_to_original_, &redacted_profile_json_);
 }
 
 string QueryProfileRedactor::Unredact(const string_view& text) const {
-  DCHECK(!redacted_profile_text_.empty())
+  DCHECK(redacted_profile_json_.IsObject())
       << "Redact function has not been called, no profile to unredact";
   return UnredactTextWithAliases(text, alias_to_original_);
 }

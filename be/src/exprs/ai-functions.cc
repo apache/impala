@@ -51,7 +51,7 @@ DEFINE_string(ai_additional_platforms, "",
     "A comma-separated list of additional platforms allowed for Impala to access via "
     "the AI api, formatted as 'site1,site2'.");
 
-DEFINE_int32(ai_connection_timeout_s, 10,
+DEFINE_int32(ai_connection_timeout_s, 60,
     "(Advanced) The time in seconds for connection timed out when communicating with an "
     "external AI engine");
 TAG_FLAG(ai_api_key_jceks_secret, sensitive);

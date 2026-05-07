@@ -1,0 +1,109 @@
+<!--
+Licensed to the Apache Software Foundation (ASF) under one
+or more contributor license agreements.  See the NOTICE file
+distributed with this work for additional information
+regarding copyright ownership.  The ASF licenses this file
+to you under the Apache License, Version 2.0 (the
+"License"); you may not use this file except in compliance
+with the License.  You may obtain a copy of the License at
+
+  http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing,
+software distributed under the License is distributed on an
+"AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+KIND, either express or implied.  See the License for the
+specific language governing permissions and limitations
+under the License.
+-->
+
+{{> www/common-header.tmpl }}
+
+{{> www/query_detail_tabs.tmpl }}
+
+<br/>
+
+<div class="card">
+  <div class="card-body">
+    <h5 class="card-title">AI Analysis</h5>
+    <p class="card-text">
+      Generate an AI analysis of this query's performance bottlenecks using the configured Impala AI Functions endpoint.
+      <br/>
+      <em>Note: Because AI output is inherently probabilistic, correctness is not guaranteed and conclusions should be verified against the query profile.</em>
+    </p>
+    <button id="generate-ai-analysis" class="btn btn-primary">Generate AI Analysis</button>
+  </div>
+</div>
+
+<br/>
+<div id="ai-analysis-status" class="text-muted"></div>
+<div id="ai-analysis-output" style="white-space:pre-wrap;"></div>
+
+<script>
+$("#ai-analysis-tab").addClass("active");
+
+const generateBtn = document.getElementById("generate-ai-analysis");
+const statusEl = document.getElementById("ai-analysis-status");
+const outputEl = document.getElementById("ai-analysis-output");
+const REQUEST_TIMEOUT_MS = 600000;
+const MESSAGES = {
+  generating: "Generating AI analysis...",
+  failed: "Failed to generate AI analysis.",
+  invalidResponse: "Received an invalid response while generating AI analysis.",
+  networkError: "Network error while generating AI analysis.",
+  timeout: "Timed out while waiting for AI analysis.",
+  generated: "AI analysis generated.",
+  noAnalysis: "No analysis returned.",
+};
+const REQUEST_URL_PATH =
+    "/query_ai_analysis_generate?query_id={{query_id}}&json";
+
+function setLoadingState(isLoading) {
+  generateBtn.disabled = isLoading;
+  generateBtn.textContent = isLoading ? "Generating..." : "Generate AI Analysis";
+  statusEl.textContent = isLoading ? MESSAGES.generating : "";
+}
+
+function setStatus(message) {
+  statusEl.textContent = message;
+}
+
+function setFailureState(message) {
+  setLoadingState(false);
+  setStatus(message);
+}
+
+generateBtn.addEventListener("click", () => {
+  setLoadingState(true);
+  outputEl.textContent = "";
+  const xhr = new XMLHttpRequest();
+  xhr.responseType = "text";
+  xhr.timeout = REQUEST_TIMEOUT_MS;
+  xhr.onload = () => {
+    setLoadingState(false);
+    if (xhr.status !== 200) {
+      setStatus(MESSAGES.failed);
+      return;
+    }
+    let payload;
+    try {
+      payload = JSON.parse(xhr.response);
+    } catch (_err) {
+      setStatus(MESSAGES.invalidResponse);
+      return;
+    }
+    if (payload.error) {
+      setStatus(`Error: ${payload.error}`);
+      return;
+    }
+    setStatus(MESSAGES.generated);
+    outputEl.textContent = payload.analysis || MESSAGES.noAnalysis;
+  };
+  xhr.onerror = () => setFailureState(MESSAGES.networkError);
+  xhr.ontimeout = () => setFailureState(MESSAGES.timeout);
+  xhr.open("GET", make_url(REQUEST_URL_PATH), true);
+  xhr.send();
+});
+</script>
+
+{{> www/common-footer.tmpl }}

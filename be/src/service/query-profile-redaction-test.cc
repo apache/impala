@@ -23,8 +23,11 @@
 #include <sstream>
 #include <string>
 
+#include <rapidjson/document.h>
+
 #include "gutil/strings/substitute.h"
 #include "testutil/gtest-util.h"
+#include "util/json-util.h"
 
 using std::string;
 using strings::Substitute;
@@ -35,8 +38,6 @@ static constexpr const char* PROFILE_FILE = "tpcds_72_local_run_profile.json";
 static constexpr const char* UPDATE_GOLDENS_ENV_VAR =
     "UPDATE_QUERY_PROFILE_AI_ANALYSIS_TOOL_GOLDENS";
 static constexpr const char* TESTDATA_BASE_RELATIVE_PATH = "testdata/impala-profiles";
-static constexpr const char* NON_JSON_PROFILE_INPUT = "not a json query profile";
-
 static string ReadFileToString(const string& path) {
   std::ifstream in(path);
   if (!in.is_open()) return "";
@@ -76,19 +77,42 @@ static bool WriteStringToFile(const string& path, const string& contents) {
   return out.good();
 }
 
+static void ParseProfileJsonOrDie(const string& profile_text,
+    rapidjson::Document* profile_json) {
+  ASSERT_NE(profile_json, nullptr);
+  profile_json->Parse(
+      profile_text.data(), static_cast<rapidjson::SizeType>(profile_text.size()));
+  ASSERT_FALSE(profile_json->HasParseError());
+  ASSERT_TRUE(profile_json->IsObject());
+}
+
+static string CanonicalizeJsonTextOrDie(const string& json_text) {
+  rapidjson::Document profile_json;
+  ParseProfileJsonOrDie(json_text, &profile_json);
+  return JsonToString(profile_json);
+}
+
+static string RedactedProfileText(const QueryProfileRedactor& redactor) {
+  return JsonToString(redactor.redacted_profile_json());
+}
+
 TEST(QueryProfileRedactionTest, RedactedProfileMatchesGoldenForTpcds72) {
   const char* impala_home = GetImpalaHome();
   ASSERT_NE(nullptr, impala_home);
   string profile_path;
   const string profile_text = LoadTestProfileText(impala_home, &profile_path);
   ASSERT_FALSE(profile_text.empty()) << "failed to read " << profile_path;
+  rapidjson::Document profile_json;
+  ParseProfileJsonOrDie(profile_text, &profile_json);
 
   QueryProfileRedactor redactor;
-  ASSERT_OK(redactor.Redact(profile_text));
-  const string& redacted_text = redactor.redacted_profile_text();
+  ASSERT_OK(redactor.Redact(profile_json));
+  const string redacted_text = RedactedProfileText(redactor);
   ASSERT_FALSE(redacted_text.empty());
   const string unredacted_text = redactor.Unredact(redacted_text);
-  EXPECT_EQ(profile_text, unredacted_text);
+  EXPECT_EQ(
+      CanonicalizeJsonTextOrDie(profile_text),
+      CanonicalizeJsonTextOrDie(unredacted_text));
 
   const string golden_dir = Substitute(
       "$0/testdata/impala-profiles/query-profile-redaction-expected",
@@ -107,22 +131,28 @@ TEST(QueryProfileRedactionTest, RedactedProfileMatchesGoldenForTpcds72) {
   ASSERT_FALSE(expected_redacted_text.empty())
       << "missing redaction golden at " << golden_path
       << ". Re-run test with UPDATE_QUERY_PROFILE_AI_ANALYSIS_TOOL_GOLDENS=1";
-  EXPECT_EQ(expected_redacted_text, redacted_text);
+  EXPECT_EQ(CanonicalizeJsonTextOrDie(expected_redacted_text),
+      CanonicalizeJsonTextOrDie(redacted_text));
 }
 
-TEST(QueryProfileRedactionTest, RedactionRejectsNonJsonProfileInput) {
+TEST(QueryProfileRedactionTest, RedactionRejectsNonObjectProfileInput) {
   QueryProfileRedactor redactor;
-  Status status = redactor.Redact(NON_JSON_PROFILE_INPUT);
+  rapidjson::Document profile_json;
+  profile_json.SetString("not-a-json-object", profile_json.GetAllocator());
+  Status status = redactor.Redact(profile_json);
   ExpectRejectedNonJsonProfileInput(status);
 }
 
-TEST(QueryProfileRedactionTest, RedactionRejectsEmptyAndMalformedJsonInput) {
-  QueryProfileRedactor empty_redactor;
-  ExpectRejectedNonJsonProfileInput(empty_redactor.Redact(""));
+TEST(QueryProfileRedactionTest, RedactionRejectsNullAndArrayInput) {
+  QueryProfileRedactor null_redactor;
+  rapidjson::Document null_profile_json;
+  null_profile_json.SetNull();
+  ExpectRejectedNonJsonProfileInput(null_redactor.Redact(null_profile_json));
 
-  QueryProfileRedactor malformed_redactor;
-  ExpectRejectedNonJsonProfileInput(
-      malformed_redactor.Redact(R"({"info_strings":[{"key":"x","value":}])"));
+  QueryProfileRedactor array_redactor;
+  rapidjson::Document array_profile_json;
+  array_profile_json.SetArray();
+  ExpectRejectedNonJsonProfileInput(array_redactor.Redact(array_profile_json));
 }
 
 TEST(QueryProfileRedactionTest, RedactionRejectsInputLargerThanConfiguredLimit) {
@@ -134,8 +164,10 @@ TEST(QueryProfileRedactionTest, RedactionRejectsInputLargerThanConfiguredLimit) 
     }
   ]
 })";
+  rapidjson::Document profile_json;
+  ParseProfileJsonOrDie(profile_text, &profile_json);
   QueryProfileRedactor redactor(/*profile_size_limit_bytes=*/32);
-  const Status status = redactor.Redact(profile_text);
+  const Status status = redactor.Redact(profile_json);
   EXPECT_FALSE(status.ok());
   EXPECT_STR_CONTAINS(
       status.GetDetail(), "configured redaction profile size limit");
@@ -150,9 +182,12 @@ TEST(QueryProfileRedactionTest, RedactionRespectsConfiguredProfileSizeLimitOverr
     }
   ]
 })";
+  rapidjson::Document profile_json;
+  ParseProfileJsonOrDie(profile_text, &profile_json);
   QueryProfileRedactor redactor(/*profile_size_limit_bytes=*/1024);
-  ASSERT_OK(redactor.Redact(profile_text));
-  ASSERT_FALSE(redactor.redacted_profile_text().empty());
+  ASSERT_OK(redactor.Redact(profile_json));
+  ASSERT_TRUE(redactor.redacted_profile_json().IsObject());
+  ASSERT_FALSE(RedactedProfileText(redactor).empty());
 }
 
 TEST(QueryProfileRedactionTest, UnredactionLeavesUnrelatedTextUntouched) {
@@ -164,8 +199,10 @@ TEST(QueryProfileRedactionTest, UnredactionLeavesUnrelatedTextUntouched) {
     }
   ]
 })";
+  rapidjson::Document profile_json;
+  ParseProfileJsonOrDie(profile_text, &profile_json);
   QueryProfileRedactor redactor;
-  ASSERT_OK(redactor.Redact(profile_text));
+  ASSERT_OK(redactor.Redact(profile_json));
 
   const string unrelated_text = "totally unrelated text that has no aliases";
   EXPECT_EQ(unrelated_text, redactor.Unredact(unrelated_text));
@@ -209,10 +246,12 @@ TEST(QueryProfileRedactionTest, RegexDrivenRedactionsAreCoveredAndReversible) {
       "    }\n"
       "  ]\n"
       "}";
+  rapidjson::Document profile_json;
+  ParseProfileJsonOrDie(profile_text, &profile_json);
 
   QueryProfileRedactor redactor;
-  ASSERT_OK(redactor.Redact(profile_text));
-  const string& redacted_text = redactor.redacted_profile_text();
+  ASSERT_OK(redactor.Redact(profile_json));
+  const string redacted_text = RedactedProfileText(redactor);
   ASSERT_FALSE(redacted_text.empty());
 
   EXPECT_STR_CONTAINS(redacted_text, "[REDACTED_SQL_STATEMENT]");
@@ -229,7 +268,8 @@ TEST(QueryProfileRedactionTest, RegexDrivenRedactionsAreCoveredAndReversible) {
   EXPECT_EQ(string::npos, redacted_text.find("sales_db.order_table"));
   EXPECT_EQ(string::npos, redacted_text.find("snake_case_col"));
 
-  EXPECT_EQ(profile_text, redactor.Unredact(redacted_text));
+  EXPECT_EQ(CanonicalizeJsonTextOrDie(profile_text),
+      CanonicalizeJsonTextOrDie(redactor.Unredact(redacted_text)));
 }
 
 TEST(QueryProfileRedactionTest, UnredactionDoesNotCascadeAliasReplacements) {
@@ -243,12 +283,15 @@ TEST(QueryProfileRedactionTest, UnredactionDoesNotCascadeAliasReplacements) {
       "    }\n"
       "  ]\n"
       "}";
+  rapidjson::Document profile_json;
+  ParseProfileJsonOrDie(profile_text, &profile_json);
   QueryProfileRedactor redactor;
-  ASSERT_OK(redactor.Redact(profile_text));
-  const string& redacted_text = redactor.redacted_profile_text();
+  ASSERT_OK(redactor.Redact(profile_json));
+  const string redacted_text = RedactedProfileText(redactor);
   EXPECT_STR_CONTAINS(redacted_text, "table_001");
   EXPECT_STR_CONTAINS(redacted_text, "table_002");
-  EXPECT_EQ(profile_text, redactor.Unredact(redacted_text));
+  EXPECT_EQ(CanonicalizeJsonTextOrDie(profile_text),
+      CanonicalizeJsonTextOrDie(redactor.Unredact(redacted_text)));
 }
 
 TEST(QueryProfileRedactionTest, RedactionDoesNotReplaceInsideLargerIdentifiers) {
@@ -264,14 +307,17 @@ TEST(QueryProfileRedactionTest, RedactionDoesNotReplaceInsideLargerIdentifiers) 
     }
   ]
 })";
+  rapidjson::Document profile_json;
+  ParseProfileJsonOrDie(profile_text, &profile_json);
   QueryProfileRedactor redactor;
-  ASSERT_OK(redactor.Redact(profile_text));
+  ASSERT_OK(redactor.Redact(profile_json));
 
-  const string& redacted_text = redactor.redacted_profile_text();
+  const string redacted_text = RedactedProfileText(redactor);
   EXPECT_STR_CONTAINS(redacted_text, "from table_");
   EXPECT_STR_CONTAINS(redacted_text, "foo_tablex");
   EXPECT_EQ(string::npos, redacted_text.find("table_001x"));
-  EXPECT_EQ(profile_text, redactor.Unredact(redacted_text));
+  EXPECT_EQ(CanonicalizeJsonTextOrDie(profile_text),
+      CanonicalizeJsonTextOrDie(redactor.Unredact(redacted_text)));
 }
 
 } // namespace impala

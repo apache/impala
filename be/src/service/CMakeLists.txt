@@ -44,6 +44,7 @@ add_library(Service
   odbc-helper.cc
   query-options.cc
   query-profile-parsing-tools.cc
+  query-profile-ai-analysis.cc
   query-profile-redaction.cc
   query-result-set.cc
   query-state-record.cc
@@ -140,6 +141,7 @@ add_library(ServiceTests STATIC
   hs2-util-test.cc
   impala-http-handler-test.cc
   impala-server-test.cc
+  query-profile-ai-analysis-test.cc
   query-profile-parsing-tools-test.cc
   query-profile-redaction-test.cc
   query-options-test.cc
@@ -154,6 +156,9 @@ ADD_UNIFIED_BE_LSAN_TEST(hs2-util-test "StitchNullsTest.*:PrintTColumnValueTest.
 ADD_UNIFIED_BE_LSAN_TEST(query-options-test QueryOptions.*)
 ADD_UNIFIED_BE_LSAN_TEST(impala-http-handler-test ImpalaHttpHandlerTest.*)
 ADD_UNIFIED_BE_LSAN_TEST(impala-server-test ImpalaServerTest.*)
+ADD_UNIFIED_BE_LSAN_TEST(
+  query-profile-ai-analysis-test
+  QueryProfileAiAnalysisHelpersTest.*:QueryProfileAiAnalysisDeathTest.*)
 ADD_UNIFIED_BE_LSAN_TEST(
   query-profile-parsing-tools-test QueryProfileParsingToolsTest.*)
 ADD_UNIFIED_BE_LSAN_TEST(

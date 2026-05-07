@@ -23,6 +23,8 @@
 #include <boost/algorithm/string/trim.hpp>
 #include <gutil/strings/util.h>
 #include <rapidjson/document.h>
+#include <rapidjson/stringbuffer.h>
+#include <rapidjson/writer.h>
 
 #include "common/compiler-util.h"
 #include "exprs/ai-functions.h"
@@ -74,6 +76,7 @@ const char* AiFunctions::OPEN_AI_PUBLIC_ENDPOINT = "api.openai.com";
 static const char* OPEN_AI_RESPONSE_FIELD_CHOICES = "choices";
 static const char* OPEN_AI_RESPONSE_FIELD_MESSAGE = "message";
 static const char* OPEN_AI_RESPONSE_FIELD_CONTENT = "content";
+static const char* OPEN_AI_RESPONSE_FIELD_TOOL_CALLS = "tool_calls";
 
 /**
  * Singleton class for managing the additional AI platforms endpoints.
@@ -200,13 +203,22 @@ string AiFunctions::AiGenerateTextParseOpenAiResponse(const string_view& respons
 
   // Access the "content" field within "message"
   const rapidjson::Value& message = firstChoice[OPEN_AI_RESPONSE_FIELD_MESSAGE];
-  if (!message.HasMember(OPEN_AI_RESPONSE_FIELD_CONTENT)
-      || !message[OPEN_AI_RESPONSE_FIELD_CONTENT].IsString()) {
-    LOG(WARNING) << AI_GENERATE_TXT_JSON_PARSE_ERROR << ": " << response;
-    return AI_GENERATE_TXT_JSON_PARSE_ERROR;
+  if (message.HasMember(OPEN_AI_RESPONSE_FIELD_CONTENT)
+      && message[OPEN_AI_RESPONSE_FIELD_CONTENT].IsString()) {
+    return message[OPEN_AI_RESPONSE_FIELD_CONTENT].GetString();
   }
 
-  return message[OPEN_AI_RESPONSE_FIELD_CONTENT].GetString();
+  // Native tool-calling responses can set content=null and provide tool_calls.
+  if (message.HasMember(OPEN_AI_RESPONSE_FIELD_TOOL_CALLS)
+      && message[OPEN_AI_RESPONSE_FIELD_TOOL_CALLS].IsArray()) {
+    rapidjson::StringBuffer buffer;
+    rapidjson::Writer<rapidjson::StringBuffer> writer(buffer);
+    message.Accept(writer);
+    return string(buffer.GetString(), buffer.GetSize());
+  }
+
+  LOG(WARNING) << AI_GENERATE_TXT_JSON_PARSE_ERROR << ": " << response;
+  return AI_GENERATE_TXT_JSON_PARSE_ERROR;
 }
 
 template <bool fastpath>

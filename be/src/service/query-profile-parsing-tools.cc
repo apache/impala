@@ -241,18 +241,9 @@ static Status ConvertJsonProfile(
   return Status::OK();
 }
 
-static Status ParseProfile(const string& profile_text, ParsedProfile* out) {
+static Status ParseProfile(const Value& source_json, ParsedProfile* out) {
   if (out == nullptr) return Status("parsed profile output pointer cannot be null");
   out->SetObject();
-  Document source_json;
-  source_json.Parse(
-      profile_text.data(), static_cast<rapidjson::SizeType>(profile_text.size()));
-  if (source_json.HasParseError()) {
-    return Status("Query profile input must be a valid JSON object: parse error '" +
-        string(rapidjson::GetParseError_En(source_json.GetParseError()))
-        + "' (error code " + std::to_string(static_cast<int>(source_json.GetParseError()))
-        + ") at offset " + std::to_string(source_json.GetErrorOffset()));
-  }
   if (!source_json.IsObject()) {
     return Status("Query profile input must be a valid JSON object");
   }
@@ -1375,35 +1366,13 @@ static Status ExecuteTool(string_view tool_name, const Value& args,
   return Status(TOOL_UNKNOWN_PREFIX + string(tool_name));
 }
 
-// Public API: parses one profile and returns a reusable query-profile tool executor.
-Status CreateQueryProfileToolExecutorForProfile(
-    const string& profile_text, QueryProfileToolExecutor* tool_executor,
-    int64_t profile_size_limit_bytes) {
-  if (tool_executor == nullptr) {
-    return Status("tool executor pointer cannot be null");
-  }
-  if (profile_text.empty()) return Status("Query profile is empty.");
-  const int64_t effective_profile_size_limit_bytes = profile_size_limit_bytes > 0
-      ? profile_size_limit_bytes
-      : ComputeDefaultProfileSizeLimitBytes(
-            DEFAULT_PARSING_PROFILE_SIZE_LIMIT_MAX_BYTES,
-            DEFAULT_PARSING_PROFILE_SIZE_LIMIT_PERCENTAGE);
-  if (profile_text.size() > static_cast<size_t>(effective_profile_size_limit_bytes)) {
-    LOG(WARNING) << "Query profile parsing failed because input size "
-                 << profile_text.size()
-                 << " bytes exceeds configured profile size limit "
-                 << effective_profile_size_limit_bytes << " bytes";
-    return Status("Query profile size exceeds configured parsing profile size limit");
-  }
-
-  ParsedProfile parsed;
-  RETURN_IF_ERROR(ParseProfile(profile_text, &parsed));
+static Status BuildQueryProfileToolExecutor(
+    ParsedProfile&& parsed, QueryProfileToolExecutor* tool_executor) {
   auto profile = make_shared<QueryProfileToolAccessor>(move(parsed));
-
   *tool_executor =
       [profile](string_view tool_name, string_view tool_args_json,
-          string* tool_output_json) {
-        if (tool_output_json == nullptr) {
+          Document* tool_output_doc) {
+        if (tool_output_doc == nullptr) {
           return Status("tool output pointer cannot be null");
         }
         if (tool_name.empty()) return Status("tool_name cannot be empty.");
@@ -1427,14 +1396,46 @@ Status CreateQueryProfileToolExecutorForProfile(
           args_doc.SetObject();
         }
 
-        Document out_doc;
         Value out;
         RETURN_IF_ERROR(
-            ExecuteTool(tool_name, args_doc, *profile, out_doc.GetAllocator(), &out));
-        *tool_output_json = JsonToString(out);
+            ExecuteTool(tool_name, args_doc, *profile, tool_output_doc->GetAllocator(),
+                &out));
+        tool_output_doc->SetObject();
+        static_cast<Value&>(*tool_output_doc) = move(out);
         return Status::OK();
       };
   return Status::OK();
+}
+
+Status CreateQueryProfileToolExecutorForProfile(
+    const Value& profile_json, QueryProfileToolExecutor* tool_executor,
+    int64_t profile_size_limit_bytes, size_t profile_size_bytes) {
+  if (tool_executor == nullptr) {
+    return Status("tool executor pointer cannot be null");
+  }
+  if (!profile_json.IsObject()) {
+    return Status("Query profile input must be a valid JSON object");
+  }
+  const int64_t effective_profile_size_limit_bytes = profile_size_limit_bytes > 0
+      ? profile_size_limit_bytes
+      : ComputeDefaultProfileSizeLimitBytes(
+            DEFAULT_PARSING_PROFILE_SIZE_LIMIT_MAX_BYTES,
+            DEFAULT_PARSING_PROFILE_SIZE_LIMIT_PERCENTAGE);
+  const size_t effective_profile_size_bytes = profile_size_bytes > 0
+      ? profile_size_bytes
+      : JsonToString(profile_json).size();
+  if (effective_profile_size_bytes
+      > static_cast<size_t>(effective_profile_size_limit_bytes)) {
+    LOG(WARNING) << "Query profile parsing failed because input size "
+                 << effective_profile_size_bytes
+                 << " bytes exceeds configured profile size limit "
+                 << effective_profile_size_limit_bytes << " bytes";
+    return Status("Query profile size exceeds configured parsing profile size limit");
+  }
+
+  ParsedProfile parsed;
+  RETURN_IF_ERROR(ParseProfile(profile_json, &parsed));
+  return BuildQueryProfileToolExecutor(move(parsed), tool_executor);
 }
 
 } // namespace impala

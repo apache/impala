@@ -22,6 +22,10 @@
 
 #include <rapidjson/document.h>
 #include <rapidjson/rapidjson.h>
+#include <rapidjson/stringbuffer.h>
+#include <rapidjson/writer.h>
+
+#include <string>
 
 #include "util/pretty-printer.h"
 #include "util/template-util.h"

@@ -142,6 +142,15 @@ class ImpalaHttpHandler {
   void QueryProfileHandler(const Webserver::WebRequest& req,
       rapidjson::Document* document);
 
+  /// Json callback for /query_ai_analysis. Expects query_id as an argument.
+  void QueryAiAnalysisHandler(const Webserver::WebRequest& req,
+      rapidjson::Document* document);
+
+  /// Json callback for /query_ai_analysis_generate. Expects query_id as an argument.
+  /// Generates an AI analysis from the query profile.
+  void QueryAiGenerateAnalysisHandler(const Webserver::WebRequest& req,
+      rapidjson::Document* document);
+
   /// Webserver callback. Produces a Json structure with query summary information.
   /// Example:
   /// { "summary": <....>,

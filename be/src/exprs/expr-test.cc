@@ -11623,6 +11623,21 @@ TEST_P(ExprTest, AiFunctionsTest) {
   content.replace(pos, from_null.length(), to_null);
   EXPECT_EQ(res, content);
 
+  string bad_type_response = R"({
+    "choices": [
+      {
+        "message": {
+          "role": "assistant",
+          "content": null,
+          "tool_calls": "A string, not an array"
+        }
+      }
+    ]
+  })";
+  string bad_type_parsed =
+      AiFunctions::AiGenerateTextParseOpenAiResponse(bad_type_response);
+  EXPECT_EQ(bad_type_parsed, AiFunctions::AI_GENERATE_TXT_JSON_PARSE_ERROR);
+
   // resource cleanup
   pool.FreeAll();
   UdfTestHarness::CloseContext(ctx);
