@@ -327,8 +327,10 @@ public class IcebergTable extends Table implements FeIcebergTable {
   public void setCatalogVersion(long newVersion) {
     // We use 'hdfsTable_' to answer CatalogServiceCatalog.doGetPartialCatalogObject(), so
     // its version number needs to be updated as well.
-    super.setCatalogVersion(newVersion);
-    hdfsTable_.setCatalogVersion(newVersion);
+    // Use setCatalogVersionAndGet() to atomically apply pendingVersion promotion in
+    // HdfsTable and get back the effective version in a single synchronized block
+    long effectiveVersion = hdfsTable_.setCatalogVersionAndGet(newVersion);
+    super.setCatalogVersion(effectiveVersion);
   }
 
   @Override

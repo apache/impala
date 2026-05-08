@@ -92,7 +92,7 @@ DEFINE_int32(catalog_partial_fetch_max_files, 1000000, "Maximum number of file "
 
 DEFINE_int32(catalog_max_lock_skipped_topic_updates, 3, "Maximum number of topic "
     "updates skipped for a table due to lock contention in catalogd after which it must"
-    "be added to the topic the update log. This limit only applies to distinct lock "
+    "be added to the topic update log. This limit only applies to distinct lock "
     "operations which block the topic update thread.");
 
 DEFINE_int64(topic_update_tbl_max_wait_time_ms, 120000, "Maximum time "
