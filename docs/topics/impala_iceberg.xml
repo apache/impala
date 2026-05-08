@@ -1111,8 +1111,8 @@ ORDER BY made_current_at;
       is more recent.
       </p>
       <p>
-      Reading Puffin stats is disabled by default; set the "--enable_reading_puffin_stats"
-      startup flag to true to enable it.
+      Reading Puffin stats is enabled by default. Set the "--enable_reading_puffin_stats"
+      startup flag to false to disable it.
       </p>
       <p>
       Some engines, e.g. Trino, also write the NDV as a property (with key "ndv") in the

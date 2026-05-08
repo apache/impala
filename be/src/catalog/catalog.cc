@@ -47,7 +47,7 @@ DEFINE_int32(max_nonhdfs_partitions_parallel_load, 20,
 DEFINE_int32(initial_hms_cnxn_timeout_s, 120,
     "Number of seconds catalogd will wait to establish an initial connection to the HMS "
     "before exiting.");
-DEFINE_bool(enable_reading_puffin_stats, false, "Impala will only read Iceberg Puffin "
+DEFINE_bool(enable_reading_puffin_stats, true, "Impala will only read Iceberg Puffin "
     "stats files if this flag is set to true.");
 DEFINE_bool(consolidate_grant_revoke_requests, false, "Impala will create only one "
     "Ranger policy when there are multiple columns in the GRANT statement if this flag "
