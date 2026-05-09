@@ -510,7 +510,7 @@ class TestAdmissionController(TestAdmissionControllerBase):
       for query in queries:
         handles.append(client.execute_async(query))
       for query, handle in zip(queries, handles):
-        state = client.wait_for_any_impala_state(handle, expected_states, timeout_s)
+        state, _ = client.wait_for_any_impala_state(handle, expected_states, timeout_s)
         if state == FINISHED:
           self.client.fetch(query, handle)
         profiles.append(client.get_runtime_profile(handle))

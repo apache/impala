@@ -50,13 +50,15 @@ class TestFetch(ImpalaTestSuite):
     handle = client.execute_async(query)
     try:
       # Wait until the query is 'FINISHED' and results are available for fetching.
-      client.wait_for_impala_state(handle, FINISHED, 30)
+      state, num_state_checks = client.wait_for_impala_state(handle, FINISHED, 30)
+      assert state == FINISHED
       # Sleep for 2.5 seconds so that the ClientFetchWaitTimer is >= 1s.
       sleep(2.5)
       # Fetch the results so that the fetch related counters are updated.
-      assert client.fetch(query, handle).success
+      res = client.fetch(query, handle)
+      assert res.success
 
-      runtime_profile = client.get_runtime_profile(handle)
+      runtime_profile = res.runtime_profile
       fetch_timer = re.search("ClientFetchWaitTimer: (.*)", runtime_profile)
       assert fetch_timer and len(fetch_timer.groups()) == 1 and \
           parse_duration_string_ms(fetch_timer.group(1)) > 1000
@@ -68,7 +70,9 @@ class TestFetch(ImpalaTestSuite):
       assert materialization_timer and len(materialization_timer.groups()) == 1 and \
           parse_duration_string_ms(materialization_timer.group(1)) > 1000
       rpc_count = int(re.search("RPCCount: ([0-9]+)", runtime_profile).group(1))
-      assert rpc_count >= 5 and rpc_count <= 9
+      # Apart from the GetOperationStatus RPCs for state checking, there are 5 additional
+      # RPCs: GetResultSetMetadata, FetchResults * 2, GetLog, GetRuntimeProfile.
+      assert rpc_count == num_state_checks + 5
 
       rpc_read_timer = re.search("RPCReadTimer: (.*)", runtime_profile)
       assert rpc_read_timer and len(rpc_read_timer.groups()) == 1

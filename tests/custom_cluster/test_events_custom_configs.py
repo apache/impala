@@ -704,7 +704,7 @@ class TestEventProcessingCustomConfigs(TestEventProcessingCustomConfigsBase):
     # Before IMPALA-12855, REFRESH usually fails in 2-3 rounds.
     for i in range(100):
       self.execute_query(drop_part_stmt)
-      refresh_state = self.client.wait_for_any_impala_state(
+      refresh_state, _ = self.client.wait_for_any_impala_state(
         refresh_handle, end_states, 10)
       is_finished = (refresh_state == FINISHED)
       error_log = None if is_finished else self.client.get_log(refresh_handle)
