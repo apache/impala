@@ -70,12 +70,11 @@ public class ListMap<T> {
   }
 
   /**
-   * Populate the bi-map from the given list. Does not perform a copy
-   * of the list.
+   * Populate the bi-map from the given list. We copy the list to ensure it's modifiable.
    */
   public synchronized void populate(List<T> list) {
     Preconditions.checkState(list_.isEmpty() && map_.isEmpty());
-    list_ = Collections.synchronizedList(list);
+    list_ = Collections.synchronizedList(new ArrayList<>(list));
     for (int i = 0; i < list_.size(); ++i) {
       map_.put(list_.get(i), i);
     }

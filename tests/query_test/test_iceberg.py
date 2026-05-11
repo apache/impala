@@ -819,6 +819,45 @@ class TestIcebergTable(IcebergTestSuite):
     self.run_test_case('QueryTest/iceberg-time-travel', vector, use_db=unique_database)
 
   @SkipIf.not_dfs
+  def test_time_travel_after_optimize(self, unique_database):
+    """IMPALA-14970: Regression test for time-travel queries after OPTIMIZE on HDFS
+    clusters with replication factor 1. After OPTIMIZE, old data files (referenced by
+    earlier snapshots) may reside on different data nodes than the compacted file.
+    Time-traveling to a pre-optimize snapshot must be able to add new host entries to
+    the table's host index."""
+    tbl_name = unique_database + ".ice_tt_optimize"
+    self.client.execute("""CREATE TABLE {0} (i INT, p INT)
+        PARTITIONED BY SPEC (p)
+        STORED AS ICEBERG
+        TBLPROPERTIES('iceberg.catalog'='hadoop.tables')""".format(tbl_name))
+
+    self.client.execute("INSERT INTO {0} VALUES (1, 1)".format(tbl_name))
+    self.client.execute("INSERT INTO {0} VALUES (2, 1)".format(tbl_name))
+    self.client.execute("INSERT INTO {0} VALUES (3, 1)".format(tbl_name))
+
+    snapshots_before = get_snapshots(self.client, tbl_name)
+    snapshot_before_optimize = snapshots_before[-1]
+
+    self.client.execute("OPTIMIZE TABLE {0}".format(tbl_name))
+    # Get the single data file after OPTIMIZE and set its replication factor to 1.
+    # This ensures the host index after INVALIDATE METADATA only contains a single
+    # datanode entry. When time-traveling to the pre-optimize snapshot, the old files
+    # may be on a different datanode, forcing modification of the host index.
+    files_result = self.execute_query(
+        "SELECT file_path FROM {0}.`files`".format(tbl_name))
+    assert len(files_result.data) == 1
+    data_file = files_result.data[0]
+    check_call(["hdfs", "dfs", "-setrep", "-w", "-R", "1", data_file])
+
+    self.client.execute("INVALIDATE METADATA {0}".format(tbl_name))
+
+    result_current = self.execute_query("SELECT * FROM {0} ORDER BY i".format(tbl_name))
+    result_time_travel = self.execute_query(
+        "SELECT * FROM {0} FOR SYSTEM_VERSION AS OF {1} ORDER BY i".format(
+            tbl_name, snapshot_before_optimize.get_snapshot_id()))
+    assert result_current.data == result_time_travel.data
+
+  @SkipIf.not_dfs
   def test_strings_utf8(self, unique_database):
     # Create table
     table_name = "ice_str_utf8"
