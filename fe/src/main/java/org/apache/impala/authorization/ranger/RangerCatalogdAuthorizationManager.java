@@ -19,6 +19,7 @@ package org.apache.impala.authorization.ranger;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
+import org.apache.commons.collections.map.UnmodifiableMap;
 import org.apache.hadoop.hive.metastore.api.PrincipalType;
 import org.apache.impala.authorization.AuthorizationDelta;
 import org.apache.impala.authorization.AuthorizationManager;
@@ -43,7 +44,11 @@ import org.apache.impala.thrift.TShowGrantPrincipalParams;
 import org.apache.impala.thrift.TShowRolesParams;
 import org.apache.impala.thrift.TShowRolesResult;
 import org.apache.impala.util.ClassUtil;
+import org.apache.ranger.plugin.model.RangerPolicy;
 import org.apache.ranger.plugin.model.RangerRole;
+import org.apache.ranger.plugin.policyengine.RangerAccessRequestImpl;
+import org.apache.ranger.plugin.policyengine.RangerAccessResourceImpl;
+import org.apache.ranger.plugin.policyengine.RangerAccessResult;
 import org.apache.ranger.plugin.util.GrantRevokeRequest;
 import org.apache.ranger.plugin.util.GrantRevokeRoleRequest;
 import org.slf4j.Logger;
@@ -74,6 +79,10 @@ public class RangerCatalogdAuthorizationManager implements AuthorizationManager 
   private static final Logger LOG = LoggerFactory.getLogger(
       RangerCatalogdAuthorizationManager.class);
   private static final String AUTHZ_CACHE_INVALIDATION_MARKER = "ranger";
+
+  public static final String ALTER_ACCESS_TYPE = "alter";
+  public static final String GRANT_ROLE_ACTION = "GRANT_ROLE";
+  public static final String REVOKE_ROLE_ACTION = "REVOKE_ROLE";
 
   private final Supplier<RangerImpalaPlugin> plugin_;
   private final CatalogServiceCatalog catalog_;
@@ -137,12 +146,41 @@ public class RangerCatalogdAuthorizationManager implements AuthorizationManager 
         "%s is not supported in Catalogd", ClassUtil.getMethodName()));
   }
 
+  private void auditGrantRevokeRole(TCatalogServiceRequestHeader header, String action,
+      boolean isAllowed, User requestingUser) throws InternalException {
+    // We produce the Ranger audit event here. This mimics what
+    // RangerHiveAuthorizer#grantRole() and revokeRole() do in their finally blocks.
+    RangerAccessResourceImpl resource = new RangerImpalaResourceBuilder()
+        .global(/* globalName */ "*").build();
+    // This mimics what RangerHiveAuthorizer#grantRole() and revokeRole() do when
+    // creating a RangerAccessRequestImpl, although under the covers due to the
+    // observations as described in RANGER-5594 and IMPALA-14991, eventually the fields
+    // of 'access/accessType' and 'action' in the resulting AuthzAuditEvent will be
+    // determined only by 'access/accessType' of 'accessRequest'.
+    RangerAccessRequestImpl accessRequest = createRangerAccessRequest(resource,
+        requestingUser.getShortName(), header.getRedacted_sql_stmt(), plugin_.get(),
+        /* accessType */ ALTER_ACCESS_TYPE, /* action */ action,
+        header.getClient_ip());
+    RangerAccessResult accessResult = createRangerAccessResult(plugin_.get(),
+        accessRequest, isAllowed);
+    // Use a try-with-resources block so we don't have to call auditHandler.flush()
+    // explicitly.
+    try (AutoFlush auditHandler = createAuditHandler(
+        header.getRedacted_sql_stmt(), plugin_.get().getClusterName(),
+        header.getClient_ip())) {
+      plugin_.get().evalAuditPolicies(accessResult);
+      auditHandler.processResult(accessResult);
+    }
+  }
+
   @Override
-  public void grantRoleToGroupOrUser(User requestingUser, TGrantRevokeRoleParams params,
-      TDdlExecResponse response) throws ImpalaException {
+  public void grantRoleToGroupOrUser(TCatalogServiceRequestHeader header,
+      TGrantRevokeRoleParams params, TDdlExecResponse response) throws ImpalaException {
     Preconditions.checkState(
         (params.getGroup_names().size() == 1 && params.getUser_names().size() == 0) ||
             (params.getGroup_names().size() == 0 && params.getUser_names().size() == 1));
+    User requestingUser = new User(header.getRequesting_user());
+    Preconditions.checkNotNull(requestingUser);
     GrantRevokeRoleRequest request = createGrantRevokeRoleRequest(
         requestingUser.getShortName(), new HashSet<>(params.getRole_names()),
         params.getGroup_names(), params.getUser_names());
@@ -150,6 +188,7 @@ public class RangerCatalogdAuthorizationManager implements AuthorizationManager 
     String granteeType = isGranteeGroup ? "group" : "user";
     String granteeName = isGranteeGroup ? params.getGroup_names().get(0) :
         params.getUser_names().get(0);
+    boolean isAllowed = false;
     try {
       // We found that granting a role to a group that is already assigned the role would
       // actually revoke the role from the group. This should be considered a bug of
@@ -164,7 +203,11 @@ public class RangerCatalogdAuthorizationManager implements AuthorizationManager 
       // TODO: Remove the call to revokeRole() after the bug of Ranger is fixed.
       // RANGER-3126 has been created to keep track of the issue.
       plugin_.get().revokeRole(request, /*resultProcessor*/ null);
+      // Because of the issue reported in RANGER-5595, we could not provide
+      // grantRole() with a RangerBufferAuditHandler to produce the Ranger audit event.
+      // Instead, we produce the Ranger audit event in the finally block below.
       plugin_.get().grantRole(request, /*resultProcessor*/ null);
+      isAllowed = true;
     } catch (Exception e) {
       Pattern pattern = Pattern.compile(".*doesn't have permissions.*");
       Matcher matcher = pattern.matcher(e.getMessage());
@@ -201,6 +244,8 @@ public class RangerCatalogdAuthorizationManager implements AuthorizationManager 
             requestingUser.getShortName() + " in Ranger. " +
             "Ranger error message: " + e.getMessage());
       }
+    } finally {
+      auditGrantRevokeRole(header, GRANT_ROLE_ACTION, isAllowed, requestingUser);
     }
     // Update the authorization refresh marker so that the Impalads can refresh their
     // Ranger caches.
@@ -208,11 +253,13 @@ public class RangerCatalogdAuthorizationManager implements AuthorizationManager 
   }
 
   @Override
-  public void revokeRoleFromGroupOrUser(User requestingUser,
+  public void revokeRoleFromGroupOrUser(TCatalogServiceRequestHeader header,
       TGrantRevokeRoleParams params, TDdlExecResponse response) throws ImpalaException {
     Preconditions.checkState(
         (params.getGroup_names().size() == 1 && params.getUser_names().size() == 0) ||
             (params.getGroup_names().size() == 0 && params.getUser_names().size() == 1));
+    User requestingUser = new User(header.getRequesting_user());
+    Preconditions.checkNotNull(requestingUser);
     GrantRevokeRoleRequest request = createGrantRevokeRoleRequest(
         requestingUser.getShortName(), new HashSet<>(params.getRole_names()),
         params.getGroup_names(), params.getUser_names());
@@ -220,8 +267,10 @@ public class RangerCatalogdAuthorizationManager implements AuthorizationManager 
     String revokeeType = isRevokeeGroup ? "group" : "user";
     String revokeeName = isRevokeeGroup ? params.getGroup_names().get(0) :
         params.getUser_names().get(0);
+    boolean isAllowed = false;
     try {
       plugin_.get().revokeRole(request, /*resultProcessor*/ null);
+      isAllowed = true;
     } catch (Exception e) {
       LOG.error("Error revoking role {} from {} {} by user {} in Ranger. " +
           "Ranger error message: " + e.getMessage(), params.getRole_names().get(0),
@@ -231,10 +280,17 @@ public class RangerCatalogdAuthorizationManager implements AuthorizationManager 
           revokeeType + " " + revokeeName + " by user " +
           requestingUser.getShortName() + " in Ranger. " +
           "Ranger error message: " + e.getMessage());
+    } finally {
+      auditGrantRevokeRole(header, REVOKE_ROLE_ACTION, isAllowed, requestingUser);
     }
     // Update the authorization refresh marker so that the Impalads can refresh their
     // Ranger caches.
     refreshAuthorization(response);
+  }
+
+  protected AutoFlush createAuditHandler(String sqlStmt, String clusterName,
+      String clientIp) {
+    return RangerBufferAuditHandler.autoFlush(sqlStmt, clusterName, clientIp);
   }
 
   @Override
@@ -571,5 +627,51 @@ public class RangerCatalogdAuthorizationManager implements AuthorizationManager 
     // other groups.
 
     return request;
+  }
+
+  private RangerAccessRequestImpl createRangerAccessRequest(
+      RangerAccessResourceImpl resource, String user, String commandString,
+      RangerImpalaPlugin plugin, String accessType, String action, String clientIp) {
+    RangerAccessRequestImpl request = new RangerAccessRequestImpl();
+    request.setResource(resource);
+    request.setUser(user);
+    request.setAction(action);
+    request.setAccessType(accessType);
+    request.setRequestData(commandString);
+    request.setClusterName(plugin.getClusterName());
+    request.setClientIPAddress(clientIp);
+    request.setRemoteIPAddress(clientIp);
+
+    return request;
+  }
+
+  private RangerAccessResult createRangerAccessResult(RangerImpalaPlugin plugin,
+      RangerAccessRequestImpl request, boolean isAllowed) {
+    String reason = String.format("%s is %san Admin", request.getUser(),
+        isAllowed ? "" : "not ");
+
+    RangerAccessResult result = new RangerAccessResult(
+        RangerPolicy.POLICY_TYPE_ACCESS,
+        plugin.getServiceName(),
+        plugin.getServiceDef(),
+        request
+    );
+
+    result.setIsAccessDetermined(true);
+    result.setIsAudited(true);
+    result.setIsAllowed(isAllowed);
+    result.setAuditPolicyId(-1L);
+    result.setPolicyId(-1L);
+    result.setPolicyPriority(RangerPolicy.POLICY_PRIORITY_NORMAL);
+    result.setZoneName(null);
+    result.setPolicyVersion(null);
+    // Note that due to the issue reported in RANGER-5594, the field of 'reason' in the
+    // resulting AuthzAuditEvent will not be populated even though we set up the field
+    // here.
+    result.setReason(reason);
+    result.setAdditionalInfo(UnmodifiableMap.decorate(
+        new HashMap(/* initialCapacity */ 1)));
+
+    return result;
   }
 }

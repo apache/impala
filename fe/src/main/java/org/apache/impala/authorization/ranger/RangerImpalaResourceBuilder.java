@@ -24,6 +24,7 @@ import org.apache.ranger.plugin.policyengine.RangerAccessResourceImpl;
  * A builder for creating {@link RangerAccessResourceImpl} instance.
  */
 public class RangerImpalaResourceBuilder {
+  public static final String GLOBAL = "global";
   public static final String DATABASE = "database";
   public static final String TABLE = "table";
   public static final String COLUMN = "column";
@@ -36,6 +37,11 @@ public class RangerImpalaResourceBuilder {
 
   private final RangerAccessResourceImpl rangerAccessResource =
       new RangerAccessResourceImpl();
+
+  public RangerImpalaResourceBuilder global(String globalName) {
+    rangerAccessResource.setValue(GLOBAL, Preconditions.checkNotNull(globalName));
+    return this;
+  }
 
   public RangerImpalaResourceBuilder database(String dbName) {
     rangerAccessResource.setValue(DATABASE, Preconditions.checkNotNull(dbName));

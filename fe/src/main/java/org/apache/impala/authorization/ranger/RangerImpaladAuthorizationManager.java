@@ -176,14 +176,14 @@ public class RangerImpaladAuthorizationManager implements AuthorizationManager {
   }
 
   @Override
-  public void grantRoleToGroupOrUser(User requestingUser, TGrantRevokeRoleParams params,
-      TDdlExecResponse response) throws ImpalaException {
+  public void grantRoleToGroupOrUser(TCatalogServiceRequestHeader header,
+      TGrantRevokeRoleParams params, TDdlExecResponse response) throws ImpalaException {
     throw new UnsupportedOperationException(String.format(
         "%s is not supported in Impalad", ClassUtil.getMethodName()));
   }
 
   @Override
-  public void revokeRoleFromGroupOrUser(User requestingUser,
+  public void revokeRoleFromGroupOrUser(TCatalogServiceRequestHeader header,
       TGrantRevokeRoleParams params, TDdlExecResponse response) throws ImpalaException {
     throw new UnsupportedOperationException(String.format(
         "%s is not supported in Impalad", ClassUtil.getMethodName()));

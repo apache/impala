@@ -97,15 +97,17 @@ public class NoopAuthorizationFactory implements AuthorizationFactory {
     }
 
     @Override
-    public void grantRoleToGroupOrUser(User requestingUser, TGrantRevokeRoleParams params,
-        TDdlExecResponse response) throws ImpalaException {
+    public void grantRoleToGroupOrUser(TCatalogServiceRequestHeader header,
+        TGrantRevokeRoleParams params, TDdlExecResponse response)
+        throws ImpalaException {
       throw new UnsupportedOperationException(String.format("%s is not supported",
           ClassUtil.getMethodName()));
     }
 
     @Override
-    public void revokeRoleFromGroupOrUser(User requestingUser,
-        TGrantRevokeRoleParams params, TDdlExecResponse response) throws ImpalaException {
+    public void revokeRoleFromGroupOrUser(TCatalogServiceRequestHeader header,
+        TGrantRevokeRoleParams params, TDdlExecResponse response)
+        throws ImpalaException {
       throw new UnsupportedOperationException(String.format("%s is not supported",
           ClassUtil.getMethodName()));
     }
