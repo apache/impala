@@ -29,6 +29,7 @@ CONFIG = {
   'dfs.container.ipc': '${DATANODE_PORT}',
   'ozone.scm.block.client.address': '${INTERNAL_LISTEN_HOST}',
   'ozone.scm.client.address': '${INTERNAL_LISTEN_HOST}',
+  'ozone.scm.datanode.address': '${INTERNAL_LISTEN_HOST}',
   'ozone.scm.names': '${INTERNAL_LISTEN_HOST}',
   'ozone.om.address': '${INTERNAL_LISTEN_HOST}',
   # Select a random available port
@@ -39,7 +40,9 @@ CONFIG = {
   # Directories
   'ozone.metadata.dirs': '${NODE_DIR}/data/ozone',
   'hdds.datanode.dir': '${NODE_DIR}/data/ozone/dn',
+  'hdds.datanode.container.db.dir': '${NODE_DIR}/data/ozone/dn-container-db',
   'ozone.om.ratis.storage.dir': '${NODE_DIR}/data/ozone/om-ratis',
+  'ozone.scm.ha.ratis.storage.dir': '${NODE_DIR}/data/ozone/scm-ratis',
   'dfs.container.ratis.datanode.storage.dir': '${NODE_DIR}/data/ozone/ratis',
 }
 
