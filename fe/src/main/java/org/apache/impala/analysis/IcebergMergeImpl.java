@@ -275,6 +275,11 @@ public class IcebergMergeImpl implements MergeImpl {
   private List<Expr> buildShuffleExprs(Analyzer analyzer) throws AnalysisException {
     if (icebergTable_.isPartitioned()) {
       if (icebergTable_.getFormatVersion() >= IcebergUtil.FORMAT_VERSION_3) {
+        // targetPartitionExpressions_ may be empty when isPartitioned() returns true
+        // based on a historical spec while the current default spec is all-VOID.
+        if (targetPartitionExpressions_.isEmpty()) {
+          return targetPartitionMetaExpressions_;
+        }
         return buildV3PartitionedShuffleExprs(analyzer);
       }
       return targetPartitionExpressions_;
@@ -293,6 +298,7 @@ public class IcebergMergeImpl implements MergeImpl {
    *    ICEBERG__PARTITION__SERIALIZED]
    * murmur_hash takes a single argument, so N partition transform expressions are
    * hashed individually and XOR'd together into one BIGINT.
+   * Precondition: targetPartitionExpressions_ is non-empty.
    */
   private List<Expr> buildV3PartitionedShuffleExprs(Analyzer analyzer)
       throws AnalysisException {

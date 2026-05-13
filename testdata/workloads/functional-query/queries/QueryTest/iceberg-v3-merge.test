@@ -1265,3 +1265,37 @@ FROM s21_target ORDER BY id;
 ---- TYPES
 INT,STRING,INT,BIGINT
 ====
+---- QUERY
+# S22: MERGE on a V3 table whose partition spec was evolved to all-VOID.
+CREATE TABLE s22_target (id INT, val STRING)
+PARTITIONED BY SPEC (id)
+STORED BY ICEBERG
+TBLPROPERTIES ('format-version'='3');
+
+CREATE TABLE s22_source (id INT, val STRING)
+STORED BY ICEBERG
+TBLPROPERTIES ('format-version'='3');
+
+INSERT INTO s22_target VALUES (1,'one'),(2,'two'),(3,'three');
+INSERT INTO s22_source VALUES (2,'TWO'),(4,'four');
+====
+---- QUERY
+-- Evolve to all-VOID: current default spec has no active partition fields.
+ALTER TABLE s22_target SET PARTITION SPEC (void(id));
+====
+---- QUERY
+MERGE INTO s22_target USING s22_source ON s22_target.id = s22_source.id
+WHEN MATCHED THEN UPDATE SET s22_target.val = s22_source.val
+WHEN NOT MATCHED THEN INSERT VALUES (s22_source.id, s22_source.val);
+---- DML_RESULTS: s22_target
+1,'one'
+2,'TWO'
+3,'three'
+4,'four'
+---- TYPES
+INT,STRING
+---- RUNTIME_PROFILE
+# After evolving to all-VOID the plan must shuffle on PARTITION__SPEC__ID and
+# ICEBERG__PARTITION__SERIALIZED.
+row_regex: .*EXCHANGE \[HASH\(.*partition__spec__id.*iceberg__partition__serialized.*\).*
+====
