@@ -29,7 +29,7 @@ flake8-unused-arguments==0.0.14
 future == 0.18.3
 hdfs == 2.7.3
   docopt == 0.6.2
-impyla == 0.21a3
+impyla == 0.23a2
   bitarray == 2.3.0
   pure-sasl == 0.6.2
   # six == 1.17.0 (specified separately)
