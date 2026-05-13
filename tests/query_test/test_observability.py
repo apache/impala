@@ -30,7 +30,7 @@ from tests.common.impala_test_suite import ImpalaTestSuite
 from tests.common.skip import (SkipIfFS, SkipIfLocal, SkipIfNotHdfsMinicluster,
                                SkipIfCalcite)
 from tests.common.test_vector import HS2
-from tests.util.filesystem_utils import WAREHOUSE
+from tests.util.filesystem_utils import FILESYSTEM_NAME, WAREHOUSE
 from tests.util.parse_util import get_duration_us_from_str
 from tests.util.query_profile_util import (verify_profile_event_sequence,
                                            verify_profile_node_lifecycle_events)
@@ -106,7 +106,7 @@ class TestObservability(ImpalaTestSuite):
     query = "select count(*) from functional.alltypestiny"
     result = self.client.execute(query, fetch_exec_summary=True)
     scan_idx = len(result.exec_summary) - 1
-    assert result.exec_summary[scan_idx]['operator'] == '00:SCAN HDFS'
+    assert result.exec_summary[scan_idx]['operator'] == '00:SCAN ' + FILESYSTEM_NAME
     assert result.exec_summary[scan_idx]['detail'] == 'functional.alltypestiny'
 
     # KUDU table
@@ -178,10 +178,11 @@ class TestObservability(ImpalaTestSuite):
     # 00:UNION                 30          10
     # |--02:SCAN HDFS           0     150.00K  tpch.customer, CANCELLED
     # 01:SCAN HDFS          3.07K       6.00M  tpch.lineitem, CANCELLED
-    assert result.exec_summary[4]['operator'] == '02:SCAN HDFS', result.runtime_profile
+    scan_op = 'SCAN ' + FILESYSTEM_NAME
+    assert result.exec_summary[4]['operator'] == '02:' + scan_op, result.runtime_profile
     assert result.exec_summary[4]['detail'] == 'tpch.customer, CANCELLED', \
         result.runtime_profile
-    assert result.exec_summary[5]['operator'] == '01:SCAN HDFS', result.runtime_profile
+    assert result.exec_summary[5]['operator'] == '01:' + scan_op, result.runtime_profile
     assert result.exec_summary[5]['detail'] == 'tpch.lineitem, CANCELLED', \
         result.runtime_profile
 
@@ -210,13 +211,13 @@ class TestObservability(ImpalaTestSuite):
     # 06:EXCHANGE                    1           1  UNPARTITIONED
     # F00:EXCHANGE SENDER
     # 00:SCAN HDFS                   3           1  tpch.lineitem a
-    assert result.exec_summary[8]['operator'] == '03:SCAN HDFS', result.runtime_profile
+    assert result.exec_summary[8]['operator'] == '03:' + scan_op, result.runtime_profile
     assert result.exec_summary[8]['detail'] == 'tpch.lineitem, CANCELLED', \
         result.runtime_profile
-    assert result.exec_summary[9]['operator'] == '02:SCAN HDFS', result.runtime_profile
+    assert result.exec_summary[9]['operator'] == '02:' + scan_op, result.runtime_profile
     assert result.exec_summary[9]['detail'] == 'tpch.lineitem, CANCELLED', \
         result.runtime_profile
-    assert result.exec_summary[12]['operator'] == '00:SCAN HDFS', result.runtime_profile
+    assert result.exec_summary[12]['operator'] == '00:' + scan_op, result.runtime_profile
     assert result.exec_summary[12]['detail'] == 'tpch.lineitem a', result.runtime_profile
 
     # Test on other node types
@@ -241,7 +242,7 @@ class TestObservability(ImpalaTestSuite):
     # F00:EXCHANGE SENDER
     # 02:SORT               661.05K       6.00M  CANCELLED
     # 01:SCAN HDFS            6.00M       6.00M  tpch.lineitem
-    assert result.exec_summary[4]['operator'] == '04:SCAN HDFS', result.runtime_profile
+    assert result.exec_summary[4]['operator'] == '04:' + scan_op, result.runtime_profile
     assert result.exec_summary[4]['detail'] == 'tpch.customer, CANCELLED', \
         result.runtime_profile
     assert result.exec_summary[5]['operator'] == '06:EXCHANGE', result.runtime_profile
@@ -254,7 +255,7 @@ class TestObservability(ImpalaTestSuite):
         result.runtime_profile
     assert result.exec_summary[10]['operator'] == '02:SORT', result.runtime_profile
     assert result.exec_summary[10]['detail'] == 'CANCELLED', result.runtime_profile
-    assert result.exec_summary[11]['operator'] == '01:SCAN HDFS', result.runtime_profile
+    assert result.exec_summary[11]['operator'] == '01:' + scan_op, result.runtime_profile
     assert result.exec_summary[11]['detail'] == 'tpch.lineitem', result.runtime_profile
 
     # Test limit on Subplan. As the SubplanNode reaches its limit, it finishes as expected
@@ -289,7 +290,7 @@ class TestObservability(ImpalaTestSuite):
     assert result.exec_summary[3]['detail'] == '', result.runtime_profile
     assert result.exec_summary[4]['operator'] == '03:UNNEST', result.runtime_profile
     assert result.exec_summary[4]['detail'] == 'c.c_orders arr', result.runtime_profile
-    assert result.exec_summary[5]['operator'] == '00:SCAN HDFS', result.runtime_profile
+    assert result.exec_summary[5]['operator'] == '00:' + scan_op, result.runtime_profile
     assert result.exec_summary[5]['detail'] == \
         'tpch_nested_parquet.customer c, CANCELLED', result.runtime_profile
 
@@ -326,7 +327,7 @@ class TestObservability(ImpalaTestSuite):
     assert result.exec_summary[7]['operator'] == '04:UNNEST', result.runtime_profile
     assert result.exec_summary[7]['detail'] == 'c.c_orders arr, CANCELLED', \
         result.runtime_profile
-    assert result.exec_summary[8]['operator'] == '01:SCAN HDFS', result.runtime_profile
+    assert result.exec_summary[8]['operator'] == '01:' + scan_op, result.runtime_profile
     assert result.exec_summary[8]['detail'] == \
         'tpch_nested_orc_def.customer c, CANCELLED', result.runtime_profile
 
