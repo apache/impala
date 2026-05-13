@@ -233,26 +233,29 @@ class TestClientSsl(CustomClusterTestSuite):
     return False
 
   def _verify_negative_cases(self, vector, ca_cert, host=""):
+    def run_shell(args, host=host):
+      """Run impala-shell after adding common args and expect failure"""
+      if host:
+        args.extend(["-i", host])
+      args.extend([ "-q", "select 1 + 2"])
+      return run_impala_shell_cmd(vector, args, expect_success=False)
+
     # Expect the shell to not start successfully if we connect to an endpoint that
     # doesn't match the certificate.
     invalid_host = "localhost" if host else "127.0.0.1"
-    args = ["--ssl", "-q", "select 1 + 2", "-i", invalid_host, "--ca_cert=%s" % ca_cert]
-    result = run_impala_shell_cmd(vector, args, expect_success=False)
+    result = run_shell(["--ssl", "--ca_cert=%s" % ca_cert], invalid_host)
     assert self._is_cert_error(result.stderr), result.stderr
 
     # Expect the shell to not start successfully if we point --ca_cert to an incorrect
     # certificate.
-    args = ["--ssl", "-q", "select 1 + 2",
-            "--ca_cert=%s/incorrect-commonname-cert.pem" % CERT_DIR]
-    if host:
-      args.extend(["-i", host])
-    run_impala_shell_cmd(vector, args, expect_success=False)
+    run_shell(["--ssl", "--ca_cert=%s/incorrect-commonname-cert.pem" % CERT_DIR])
 
     # Expect the shell to not start successfully if we don't specify the --ssl option
-    args = ["-q", "select 1 + 2"]
-    if host:
-      args.extend(["-i", host])
-    run_impala_shell_cmd(vector, args, expect_success=False)
+    run_shell([])
+
+    # Expect the shell to not start successfully with --verify_cert which uses
+    # default CA certs from OS while test certs are self signed.
+    run_shell(["--ssl", "--verify_cert"])
 
   def _validate_positive_cases(self, vector, ca_cert="", host=None):
     python3_10_version_re = re.compile(r"using Python 3\.1[0-9]")

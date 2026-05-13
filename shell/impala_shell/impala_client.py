@@ -161,7 +161,8 @@ class ImpalaClient(object):
                verbose=True, use_http_base_transport=False, http_path=None,
                http_cookie_names=None, http_socket_timeout_s=None, value_converter=None,
                connect_max_tries=4, rpc_stdout=False, rpc_file=None, http_tracing=True,
-               jwt=None, oauth=None, hs2_x_forward=None, reuse_http_connection=True):
+               jwt=None, oauth=None, hs2_x_forward=None, reuse_http_connection=True,
+               verify_cert=False):
     self.connected = False
     self.impalad_host = impalad[0]
     self.impalad_port = int(impalad[1])
@@ -172,6 +173,7 @@ class ImpalaClient(object):
     self.kerberos_service_name = kerberos_service_name
     self.use_ssl = use_ssl
     self.ca_cert = ca_cert
+    self.verify_cert = verify_cert
     self.user, self.ldap_password = user, ldap_password
     self.use_ldap = use_ldap
     self.client_connect_timeout_ms = int(client_connect_timeout_ms)
@@ -430,7 +432,8 @@ class ImpalaClient(object):
     # connection to the server.
     if self.use_ssl:
       ssl_ctx = ssl.create_default_context(cafile=self.ca_cert)
-      if self.ca_cert:
+      if self.ca_cert or self.verify_cert:
+        ssl_ctx.check_hostname = True
         ssl_ctx.verify_mode = ssl.CERT_REQUIRED
       else:
         ssl_ctx.check_hostname = False  # Mandated by the SSL lib for CERT_NONE mode.
@@ -507,14 +510,17 @@ class ImpalaClient(object):
     sock_host = self.impalad_host
     sock_port = self.impalad_port
     if self.use_ssl:
-      if self.ca_cert is None:
+      if self.ca_cert:
+        sock = TSSLSocket(
+            sock_host, sock_port, cert_reqs=ssl.CERT_REQUIRED, ca_certs=self.ca_cert)
+      elif self.verify_cert:
+        # Verify using the system's default CA certificates.
+        sock = TSSLSocket(sock_host, sock_port, cert_reqs=ssl.CERT_REQUIRED)
+      else:
         # No CA cert means don't try to verify the certificate. TSSLSocket defaults to
         # ssl.PROTOCOL_TLS_CLIENT - which verifies certs - so override to PROTOCOL_TLS.
         sock = TSSLSocket(
             sock_host, sock_port, cert_reqs=ssl.CERT_NONE, ssl_version=ssl.PROTOCOL_TLS)
-      else:
-        sock = TSSLSocket(
-            sock_host, sock_port, cert_reqs=ssl.CERT_REQUIRED, ca_certs=self.ca_cert)
     else:
       sock = TSocket(sock_host, sock_port)
 

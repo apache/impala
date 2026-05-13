@@ -222,6 +222,7 @@ class ImpalaShell(cmd.Cmd, object):
     self.kerberos_service_name = options.kerberos_service_name
     self.use_ssl = options.ssl
     self.ca_cert = options.ca_cert
+    self.verify_cert = options.verify_cert
     self.user = options.user
     self.ldap_password_cmd = options.ldap_password_cmd
     self.jwt_cmd = options.jwt_cmd
@@ -676,7 +677,8 @@ class ImpalaShell(cmd.Cmd, object):
                           use_http_base_transport=False, http_path=self.http_path,
                           http_cookie_names=None, value_converter=value_converter,
                           rpc_stdout=self.rpc_stdout, rpc_file=self.rpc_file,
-                          http_tracing=self.http_tracing)
+                          http_tracing=self.http_tracing,
+                          verify_cert=self.verify_cert)
       elif protocol == 'hs2-http':
         return StrictHS2Client(self.impalad, self.fetch_size, self.kerberos_host_fqdn,
                           self.use_kerberos, self.kerberos_service_name, self.use_ssl,
@@ -688,7 +690,8 @@ class ImpalaShell(cmd.Cmd, object):
                           rpc_file=self.rpc_file, http_tracing=self.http_tracing,
                           jwt=self.jwt, oauth=self.oauth,
                           hs2_x_forward=self.hs2_x_forward,
-                          reuse_http_connection=self.reuse_http_connection)
+                          reuse_http_connection=self.reuse_http_connection,
+                          verify_cert=self.verify_cert)
     if protocol == 'hs2':
       return ImpalaHS2Client(self.impalad, self.fetch_size, self.kerberos_host_fqdn,
                           self.use_kerberos, self.kerberos_service_name, self.use_ssl,
@@ -697,7 +700,8 @@ class ImpalaShell(cmd.Cmd, object):
                           use_http_base_transport=False, http_path=self.http_path,
                           http_cookie_names=None, value_converter=value_converter,
                           rpc_stdout=self.rpc_stdout, rpc_file=self.rpc_file,
-                          http_tracing=self.http_tracing)
+                          http_tracing=self.http_tracing,
+                          verify_cert=self.verify_cert)
     elif protocol == 'hs2-http':
       return ImpalaHS2Client(self.impalad, self.fetch_size, self.kerberos_host_fqdn,
                           self.use_kerberos, self.kerberos_service_name, self.use_ssl,
@@ -711,12 +715,14 @@ class ImpalaShell(cmd.Cmd, object):
                           rpc_stdout=self.rpc_stdout, rpc_file=self.rpc_file,
                           http_tracing=self.http_tracing, jwt=self.jwt, oauth=self.oauth,
                           hs2_x_forward=self.hs2_x_forward,
-                          reuse_http_connection=self.reuse_http_connection)
+                          reuse_http_connection=self.reuse_http_connection,
+                          verify_cert=self.verify_cert)
     elif protocol == 'beeswax':
       return ImpalaBeeswaxClient(self.impalad, self.fetch_size, self.kerberos_host_fqdn,
                           self.use_kerberos, self.kerberos_service_name, self.use_ssl,
                           self.ca_cert, self.user, self.ldap_password, self.use_ldap,
-                          self.client_connect_timeout_ms, self.verbose)
+                          self.client_connect_timeout_ms, self.verbose,
+                          verify_cert=self.verify_cert)
     else:
       err_msg = "Invalid --protocol value {0}, must be beeswax, hs2 or hs2-http."
       print(err_msg.format(protocol), file=sys.stderr)
@@ -2445,10 +2451,10 @@ def impala_shell_main():
           "OAuth mock response", True)
 
   if options.ssl:
-    if options.ca_cert is None:
+    if options.ca_cert is None and not options.verify_cert:
       if options.verbose:
         print("SSL is enabled. Impala server certificates will NOT be verified "
-              "(set --ca_cert to change)", file=sys.stderr)
+              "(set --ca_cert or --verify_cert to change)", file=sys.stderr)
     else:
       if options.verbose:
         print("SSL is enabled", file=sys.stderr)

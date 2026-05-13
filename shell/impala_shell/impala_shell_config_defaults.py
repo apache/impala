@@ -50,6 +50,7 @@ impala_shell_defaults = {
             'rpc_stdout': False,
             'rpc_file': None,
             'ssl': False,
+            'verify_cert': False,
             'use_kerberos': False,
             'use_ldap': False,
             'user': getpass.getuser(),
