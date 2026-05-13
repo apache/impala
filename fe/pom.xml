@@ -852,6 +852,7 @@ under the License.
                     <exclude>org.apache.avro:*</exclude>
                     <exclude>org.apache.orc:*</exclude>
                     <exclude>org.jdom:jdom</exclude>
+                    <exclude>org.apache.logging.log4j:*</exclude>
                     <exclude>org.bouncycastle:bcprov-jdk15on:*</exclude>
                     <exclude>org.bouncycastle:bcprov-jdk15to18:*</exclude>
                     <exclude>org.bouncycastle:bcprov-jdk15on:*</exclude>
@@ -884,6 +885,8 @@ under the License.
                     <include>org.apache.ozone:*:${ozone.version}</include>
                     <!-- orc-format does not match orc version -->
                     <include>org.apache.orc:orc-format:1.0</include>
+                    <include>org.apache.logging.log4j:log4j-core:${log4j2.version}</include>
+                    <include>org.apache.logging.log4j:log4j-api:${log4j2.version}</include>
                   </includes>
                 </bannedDependencies>
               </rules>
@@ -1035,11 +1038,7 @@ under the License.
             </exclusion>
             <exclusion>
               <groupId>org.apache.logging.log4j</groupId>
-              <artifactId>log4j-slf4j-impl</artifactId>
-            </exclusion>
-            <exclusion>
-              <groupId>org.apache.logging.log4j</groupId>
-              <artifactId>log4j-1.2-api</artifactId>
+              <artifactId>*</artifactId>
             </exclusion>
             <exclusion>
               <groupId>log4j</groupId>
