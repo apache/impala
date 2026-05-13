@@ -33,7 +33,7 @@ class TestIcebergStrictDataFileLocation(CustomClusterTestSuite):
   @CustomClusterTestSuite.with_args(
       catalogd_args='--iceberg_allow_datafiles_in_table_location_only=true')
   @pytest.mark.execute_serially
-  def test_restricted_location(self, vector):
+  def test_restricted_location(self):
     """If the flag is enabled, tables with multiple storage locations will fail
     to load their datafiles."""
     result = self.execute_query_expect_failure(self.client, self.SELECT_STATEMENT)

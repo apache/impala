@@ -16,8 +16,6 @@ from subprocess import check_call
 
 from tests.common.impala_connection import IMPALA_CONNECTION_EXCEPTION
 from tests.common.impala_test_suite import ImpalaTestSuite
-from tests.common.test_dimensions import create_single_exec_option_dimension
-from tests.common.test_dimensions import create_uncompressed_text_dimension
 from tests.common.skip import SkipIfFS
 from tests.common.test_vector import HS2
 from tests.util.filesystem_utils import get_fs_path
@@ -33,15 +31,6 @@ class TestRefreshPartition(ImpalaTestSuite):
   @classmethod
   def default_test_protocol(cls):
     return HS2
-
-  @classmethod
-  def add_test_dimensions(cls):
-    super(TestRefreshPartition, cls).add_test_dimensions()
-
-    # There is no reason to run these tests using all dimensions.
-    cls.ImpalaTestMatrix.add_dimension(create_single_exec_option_dimension())
-    cls.ImpalaTestMatrix.add_dimension(
-        create_uncompressed_text_dimension(cls.get_workload()))
 
   def test_refresh_invalid_partition(self, unique_database):
     """

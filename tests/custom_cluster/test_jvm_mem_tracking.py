@@ -30,7 +30,7 @@ class TestJvmMemTracker(CustomClusterTestSuite):
   @CustomClusterTestSuite.with_args(impalad_args="--mem_limit_includes_jvm=true \
                                     --codegen_cache_capacity=0",
                                     start_args="--jvm_args=-Xmx1g", cluster_size=1)
-  def test_jvm_mem_tracking(self, vector):
+  def test_jvm_mem_tracking(self):
     service = ImpalaCluster.get_e2e_test_cluster().impalads[0].service
     verifier = MemUsageVerifier(service)
     proc_values = verifier.get_mem_usage_values('Process')

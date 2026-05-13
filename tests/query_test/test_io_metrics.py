@@ -20,24 +20,16 @@ import pytest
 
 from tests.common.environ import IS_DOCKERIZED_TEST_CLUSTER
 from tests.common.impala_test_suite import ImpalaTestSuite, LOG
-from tests.common.test_dimensions import create_single_exec_option_dimension
 from tests.util.filesystem_utils import IS_EC, IS_HDFS, IS_ENCRYPTED
-
 
 class TestIOMetrics(ImpalaTestSuite):
   @classmethod
   def get_workload(self):
     return 'tpch'
 
-  @classmethod
-  def add_test_dimensions(cls):
-    super(TestIOMetrics, cls).add_test_dimensions()
-    # Run with num_nodes=1 to make it easy to verify metric changes.
-    cls.ImpalaTestMatrix.add_dimension(create_single_exec_option_dimension(num_nodes=1))
-
   # Issue a local query and test that read metrics are updated.
   @pytest.mark.execute_serially
-  def test_local_read(self, vector):
+  def test_local_read(self):
     # Accumulate metrics that are expected to update from a read, and metrics that are
     # expected not to change with this configuration. Metrics that shouldn't change for
     # this test should be 0 throughout the whole test suite so we can just verify they're
@@ -57,7 +49,8 @@ class TestIOMetrics(ImpalaTestSuite):
 
     nonzero_before = self.impalad_test_service.get_metric_values(expect_nonzero_metrics)
 
-    result = self.execute_query("select count(*) from tpch.nation")
+    result = self.execute_query("select count(*) from tpch.nation",
+        query_options={'num_nodes': 1})
     assert(len(result.data) == 1)
     assert(result.data[0] == '25')
     nation_data_file_length = 2199

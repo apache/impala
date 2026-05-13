@@ -31,12 +31,6 @@ TBL_LOC = '%s/%s' % (WAREHOUSE, TEST_TBL)
 @SkipIfFS.hdfs_acls
 @SkipIfLocal.hdfs_client
 class TestHdfsPermissions(ImpalaTestSuite):
-  @classmethod
-  def add_test_dimensions(cls):
-    super(TestHdfsPermissions, cls).add_test_dimensions()
-    cls.ImpalaTestMatrix.add_dimension(create_single_exec_option_dimension())
-    cls.ImpalaTestMatrix.add_dimension(
-        create_uncompressed_text_dimension(cls.get_workload()))
 
   def setup_method(self, method):
     super().setup_method(method)
@@ -51,7 +45,7 @@ class TestHdfsPermissions(ImpalaTestSuite):
     self.hdfs_client.delete_file_dir('test-warehouse/%s' % TEST_TBL, recursive=True)
 
   @SkipIfCatalogV2.impala_7539()
-  def test_insert_into_read_only_table(self, vector):
+  def test_insert_into_read_only_table(self):
     permission = 444
     if IS_ISILON:
       # In Isilon OneFS 8.0, a change was introduced that requires this. See IMPALA-3698.

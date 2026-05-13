@@ -388,7 +388,7 @@ class TestCodegenCache(CustomClusterTestSuite):
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args(cluster_size=1,
           impalad_args="--codegen_cache_capacity=1GB")
-  def test_codegen_cache_timezone_crash(self, vector):
+  def test_codegen_cache_timezone_crash(self):
       # The testcase tests whether it would crash using the broken builtin function
       # from_utc_timestamp from the codegen cache.
       database = "test_codegen_cache_timezone_crash"

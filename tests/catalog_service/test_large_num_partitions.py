@@ -20,20 +20,10 @@
 
 from __future__ import absolute_import, division, print_function
 from tests.common.impala_test_suite import ImpalaTestSuite
-from tests.common.test_dimensions import create_single_exec_option_dimension
 
 class TestLargeNumPartitions(ImpalaTestSuite):
-  @classmethod
-  def add_test_dimensions(cls):
-    super(TestLargeNumPartitions, cls).add_test_dimensions()
-    cls.ImpalaTestMatrix.add_dimension(create_single_exec_option_dimension())
 
-    # There is no reason to run these tests using all dimensions.
-    cls.ImpalaTestMatrix.add_constraint(lambda v:\
-        v.get_value('table_format').file_format == 'text' and\
-        v.get_value('table_format').compression_codec == 'none')
-
-  def test_list_partitions(self, vector):
+  def test_list_partitions(self):
     full_tbl_name = 'scale_db.num_partitions_1234_blocks_per_partition_1'
     result = self.client.execute("show table stats %s" % full_tbl_name)
     # Should list all 1,234 partitions + 1 result for the summary
@@ -51,7 +41,7 @@ class TestLargeNumPartitions(ImpalaTestSuite):
     result = self.client.execute("show table stats %s" % full_tbl_name)
     assert len(result.data) == 1234 + 1
 
-  def test_predicates_on_partition_attributes(self, vector):
+  def test_predicates_on_partition_attributes(self):
     # Test predicate evaluation on partition columns for a table with more
     # than 1024 partitions (see IMPALA-887)
     full_tbl_name = 'scale_db.num_partitions_1234_blocks_per_partition_1'

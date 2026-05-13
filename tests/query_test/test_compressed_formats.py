@@ -26,6 +26,7 @@ import subprocess
 from os.path import join
 
 from tests.common.impala_test_suite import ImpalaTestSuite
+from tests.common.skip import SkipIfFS, SkipIfExploration
 from tests.common.test_dimensions import (
     add_exec_option_dimension,
     create_single_exec_option_dimension)
@@ -192,6 +193,7 @@ class TestUnsupportedTableWriters(ImpalaTestSuite):
     self.run_test_case('QueryTest/unsupported-writers', vector, unique_database)
 
 
+@SkipIfExploration.is_not_exhaustive()
 @pytest.mark.execute_serially
 class TestLargeCompressedFile(ImpalaTestSuite):
   """
@@ -211,16 +213,6 @@ class TestLargeCompressedFile(ImpalaTestSuite):
   # uncompressing the buffer. 2GB is sufficient to show that we support
   # size beyond maximum 32-bit signed value.
   MAX_FILE_SIZE = 2 * CHUNK_SIZE
-
-  @classmethod
-  def add_test_dimensions(cls):
-    super(TestLargeCompressedFile, cls).add_test_dimensions()
-
-    if cls.exploration_strategy() != 'exhaustive':
-      pytest.skip("skipping if it's not exhaustive test.")
-    cls.ImpalaTestMatrix.add_constraint(lambda v:
-        (v.get_value('table_format').file_format == 'text'
-         and v.get_value('table_format').compression_codec == 'snap'))
 
   def teardown_method(self, method):
     self.__drop_test_table()
@@ -265,7 +257,7 @@ class TestLargeCompressedFile(ImpalaTestSuite):
     hdfs_put.stdin.close()
     hdfs_put.wait()
 
-  def test_query_large_file(self, vector):
+  def test_query_large_file(self):
     self.__create_test_table()
     dst_path = "%s/%s" % (self.TABLE_LOCATION, self.FILE_NAME)
     file_size = self.MAX_FILE_SIZE
@@ -285,15 +277,13 @@ class TestLargeCompressedFile(ImpalaTestSuite):
     self.client.execute("DROP TABLE IF EXISTS %s" % self.TABLE_NAME)
 
 
+@SkipIfExploration.is_not_exhaustive()
 class TestBzip2Streaming(ImpalaTestSuite):
   MAX_SCAN_RANGE_LENGTHS = [0, 5]
 
   @classmethod
   def add_test_dimensions(cls):
     super(TestBzip2Streaming, cls).add_test_dimensions()
-
-    if cls.exploration_strategy() != 'exhaustive':
-      pytest.skip("skipping if it's not exhaustive test.")
     add_exec_option_dimension(
       cls, 'max_scan_range_length', cls.MAX_SCAN_RANGE_LENGTHS)
     cls.ImpalaTestMatrix.add_constraint(lambda v:
@@ -304,6 +294,7 @@ class TestBzip2Streaming(ImpalaTestSuite):
     self.run_test_case('QueryTest/text-bzip-scan', vector)
 
 
+@SkipIfExploration.is_not_exhaustive()
 class TestReadZtsdLibCompressedFile(ImpalaTestSuite):
   """
   Test that file compressed by zstd standard library can be read by Impala
@@ -316,16 +307,6 @@ class TestReadZtsdLibCompressedFile(ImpalaTestSuite):
   UNCOMPRESSED_LOCAL_FILE_PATH = "testdata/data/text_large_zstd.txt"
 
   IMPALA_HOME = os.environ['IMPALA_HOME']
-
-  @classmethod
-  def add_test_dimensions(cls):
-    super(TestReadZtsdLibCompressedFile, cls).add_test_dimensions()
-
-    if cls.exploration_strategy() != 'exhaustive':
-      pytest.skip('runs only in exhaustive')
-    cls.ImpalaTestMatrix.add_constraint(lambda v:
-        (v.get_value('table_format').file_format == 'text'
-         and v.get_value('table_format').compression_codec == 'zstd'))
 
   def __generate_file(self, local_file_location, table_location):
     """

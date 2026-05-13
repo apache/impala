@@ -74,13 +74,6 @@ class TestIcebergConcurrentUpdateStress(ImpalaTestSuite):
   def get_workload(self):
     return 'targeted-stress'
 
-  @classmethod
-  def add_test_dimensions(cls):
-    super(TestIcebergConcurrentUpdateStress, cls).add_test_dimensions()
-    cls.ImpalaTestMatrix.add_constraint(
-        lambda v: (v.get_value('table_format').file_format == 'parquet'
-            and v.get_value('table_format').compression_codec == 'snappy'))
-
   def _impala_role_concurrent_writer(self, tbl_name, col, num_updates):
     """Increments values in column 'total' and in the column which is passed in 'col'."""
     target_impalad = random.randint(0, self.get_impalad_cluster_size() - 1)
@@ -154,13 +147,6 @@ class TestIcebergConcurrentOperations(ImpalaTestSuite):
   @classmethod
   def get_workload(self):
     return 'targeted-stress'
-
-  @classmethod
-  def add_test_dimensions(cls):
-    super(TestIcebergConcurrentOperations, cls).add_test_dimensions()
-    cls.ImpalaTestMatrix.add_constraint(
-        lambda v: (v.get_value('table_format').file_format == 'parquet'
-            and v.get_value('table_format').compression_codec == 'snappy'))
 
   def _impala_role_concurrent_deleter(self, tbl_name, all_rows_deleted, num_rows):
     """Deletes every row from the table one by one."""

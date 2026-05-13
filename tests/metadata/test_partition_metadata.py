@@ -81,7 +81,7 @@ class TestPartitionMetadata(ImpalaTestSuite):
     assert data.split('\t') == ['6', '9']
 
   @SkipIfFS.hive
-  def test_partition_metadata_compatibility(self, vector, unique_database):
+  def test_partition_metadata_compatibility(self, unique_database):
     """Regression test for IMPALA-2048. For partitioned tables, test that when Impala
     updates the partition metadata (e.g. by doing a compute stats), the tables are
     accessible in Hive."""

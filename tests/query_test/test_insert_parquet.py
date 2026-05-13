@@ -244,7 +244,7 @@ class TestHdfsParquetTableWriter(ImpalaTestSuite):
     cls.ImpalaTestMatrix.add_constraint(
         lambda v: v.get_value('table_format').file_format == 'parquet')
 
-  def test_def_level_encoding(self, vector, unique_database, tmpdir):
+  def test_def_level_encoding(self, unique_database, tmpdir):
     """IMPALA-3376: Tests that parquet files are written to HDFS correctly by generating a
     parquet table and running the parquet-reader tool on it, which performs sanity
     checking, such as that the correct number of definition levels were encoded.
@@ -266,7 +266,7 @@ class TestHdfsParquetTableWriter(ImpalaTestSuite):
                     os.path.join(impalad_basedir, 'util/parquet-reader'), '--file',
                     os.path.join(tmpdir.strpath, str(f))])
 
-  def test_sorting_columns(self, vector, unique_database, tmpdir):
+  def test_sorting_columns(self, unique_database, tmpdir):
     """Tests that RowGroup::sorting_columns gets populated when the table has SORT BY
     columns."""
     source_table = "functional_parquet.alltypessmall"
@@ -297,7 +297,7 @@ class TestHdfsParquetTableWriter(ImpalaTestSuite):
     for row_group in row_groups:
       assert row_group.sorting_columns == expected
 
-  def test_set_column_orders(self, vector, unique_database, tmpdir):
+  def test_set_column_orders(self, unique_database, tmpdir):
     """Tests that the Parquet writers set FileMetaData::column_orders."""
     source_table = "functional_parquet.alltypessmall"
     target_table = "test_set_column_orders"
@@ -323,7 +323,7 @@ class TestHdfsParquetTableWriter(ImpalaTestSuite):
     for file_metadata in file_metadata_list:
       assert file_metadata.column_orders == expected_col_orders
 
-  def test_read_write_integer_logical_types(self, vector, unique_database, tmpdir):
+  def test_read_write_integer_logical_types(self, unique_database):
     """IMPALA-5052: Read and write signed integer parquet logical types
     This test creates a src_tbl like a parquet file. The parquet file was generated
     to have columns with different signed integer logical types. The test verifies
@@ -536,7 +536,7 @@ class TestHdfsParquetTableWriter(ImpalaTestSuite):
   # precision uptil 16 decimal digits and test needs 17.
   # IMPALA-9365 describes why HS2 is not started on non-HDFS test env.
   @SkipIfFS.hive
-  def test_double_precision(self, vector, unique_database):
+  def test_double_precision(self, unique_database):
     # IMPALA-10654: Test inserting double into Parquet table retains the precision.
     src_tbl = "{0}.{1}".format(unique_database, "i10654_parquet")
     create_tbl_stmt = """create table {0} (dbl1 double)
@@ -925,7 +925,7 @@ class TestHdfsParquetTableStatsWriter(ImpalaTestSuite):
                                       expected_min_max_values,
                                       table_name="int64_nanos")
 
-  def test_too_many_columns(self, vector, unique_database):
+  def test_too_many_columns(self, unique_database):
     """Test that writing a Parquet table with too many columns results in an error."""
     num_cols = 12000
     query = "create table %s.wide stored as parquet as select \n" % unique_database

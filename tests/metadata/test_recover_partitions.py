@@ -394,7 +394,7 @@ class TestRecoverPartitions(ImpalaTestSuite):
 
   @SkipIfLocal.hdfs_client
   @SkipIfFS.empty_directory
-  def test_empty_directory(self, vector, unique_database):
+  def test_empty_directory(self, unique_database):
     """Explicitly test how empty directories are handled when partitions are recovered."""
 
     TBL_NAME = "test_recover_partitions"

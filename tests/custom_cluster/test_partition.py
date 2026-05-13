@@ -80,15 +80,6 @@ class TestPartitionDeletion(CustomClusterTestSuite):
   """Tests catalogd sends deletion updates (i.e. isDeleted=true) for dropped partitions.
      Use a normal catalog update frequency (2s) instead of the default one in custom
      cluster tests (50ms) so the race conditions of IMPALA-13009 could happen."""
-  @classmethod
-  def add_test_dimensions(cls):
-    super(TestPartitionDeletion, cls).add_test_dimensions()
-    cls.ImpalaTestMatrix.add_dimension(create_single_exec_option_dimension())
-
-    # It doesn't matter what the file format is. So just test on text/none.
-    cls.ImpalaTestMatrix.add_constraint(lambda v:
-        (v.get_value('table_format').file_format == 'text'
-         and v.get_value('table_format').compression_codec == 'none'))
 
   @CustomClusterTestSuite.with_args(
     statestored_args="--statestore_update_frequency_ms=2000",

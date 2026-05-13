@@ -20,7 +20,7 @@ from builtins import range
 import pytest
 
 from tests.common.impala_test_suite import ImpalaTestSuite
-from tests.common.skip import SkipIfFS
+from tests.common.skip import SkipIfExploration, SkipIfFS
 
 # Number of tables to create per thread
 NUM_TBLS_PER_THREAD = 10
@@ -31,6 +31,7 @@ TEST_INDICES = range(10)
 
 # Simple stress test for DDL operations. Attempts to create, cache,
 # uncache, then drop many different tables in parallel.
+@SkipIfExploration.is_not_exhaustive()
 class TestDdlStress(ImpalaTestSuite):
   SHARED_DATABASE = 'test_ddl_stress_db'
 
@@ -41,9 +42,6 @@ class TestDdlStress(ImpalaTestSuite):
   @classmethod
   def add_test_dimensions(cls):
     super(TestDdlStress, cls).add_test_dimensions()
-
-    if cls.exploration_strategy() != 'exhaustive':
-      pytest.skip("Should only run in exhaustive due to long execution time.")
 
     cls.ImpalaTestMatrix.add_constraint(
         lambda v: (v.get_value('table_format').file_format == 'text' and

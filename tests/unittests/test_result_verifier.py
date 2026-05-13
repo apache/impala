@@ -17,19 +17,13 @@
 
 from __future__ import absolute_import, division, print_function
 from tests.common.impala_test_suite import ImpalaTestSuite
-from tests.common.test_dimensions import create_uncompressed_text_dimension
 from tests.common.test_result_verifier import create_query_result
 from tests.common.test_result_verifier import compute_aggregation
 
 # Unittest class for the test_result_verifier module.
 class TestResultVerifier(ImpalaTestSuite):
-  @classmethod
-  def add_test_dimensions(cls):
-    super(TestResultVerifier, cls).add_test_dimensions()
-    cls.ImpalaTestMatrix.add_dimension(
-        create_uncompressed_text_dimension(cls.get_workload()))
 
-  def test_result_row_indexing(self, vector):
+  def test_result_row_indexing(self):
     res = create_query_result(self.client.execute("select 1 as int_col, 'A' as str_col"))
     assert len(res.rows) == 1
     # Can index columns by case insensitive string (column alias) or column position
@@ -54,7 +48,7 @@ class TestResultVerifier(ImpalaTestSuite):
     except IndexError as e:
       assert 'list index out of range' in str(e)
 
-  def test_compute_aggregation(self, vector):
+  def test_compute_aggregation(self):
     profile = '''
       FieldA: 5 (5)
       FieldB: bla bla

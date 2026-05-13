@@ -32,13 +32,6 @@ class TestIcebergConcurrentMergeStress(ImpalaTestSuite):
   def get_workload(self):
     return 'targeted-stress'
 
-  @classmethod
-  def add_test_dimensions(cls):
-    super(TestIcebergConcurrentMergeStress, cls).add_test_dimensions()
-    cls.ImpalaTestMatrix.add_constraint(
-        lambda v: (v.get_value('table_format').file_format == 'parquet'
-            and v.get_value('table_format').compression_codec == 'snappy'))
-
   def _impala_role_concurrent_updater(self, tbl_name, col, num_writes):
     """Increments values in column 'total' and in the column which is passed in 'col'."""
     target_impalad = random.randint(0, self.get_impalad_cluster_size() - 1)

@@ -28,7 +28,6 @@ from impala_thrift_gen.ErrorCodes.ttypes import TErrorCode
 from tests.common.impala_cluster import ImpalaCluster
 from tests.common.impala_test_suite import ImpalaTestSuite
 from tests.common.skip import SkipIfDockerizedCluster
-from tests.common.test_dimensions import create_single_exec_option_dimension
 from tests.util.filesystem_utils import WAREHOUSE
 from tests.util.thrift_util import create_transport
 
@@ -38,16 +37,6 @@ LOG = logging.getLogger('test_catalog_service_client')
 # to create/drop function requests. For example, BDR relies
 # on a stable catalog Thrift API.
 class TestCatalogServiceClient(ImpalaTestSuite):
-
-  @classmethod
-  def add_test_dimensions(cls):
-    super(TestCatalogServiceClient, cls).add_test_dimensions()
-    cls.ImpalaTestMatrix.add_dimension(create_single_exec_option_dimension())
-
-    # There is no reason to run these tests using all dimensions.
-    cls.ImpalaTestMatrix.add_constraint(lambda v:\
-        v.get_value('table_format').file_format == 'parquet' and\
-        v.get_value('table_format').compression_codec == 'none')
 
   @SkipIfDockerizedCluster.catalog_service_not_exposed
   def test_get_functions(self, unique_database):

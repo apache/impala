@@ -33,7 +33,7 @@ class TestSchedulerLocality(CustomClusterTestSuite):
 
   @CustomClusterTestSuite.with_args(
       impalad_args='--hostname=localhost', cluster_size=1)
-  def test_local_assignment(self, vector):
+  def test_local_assignment(self):
     self.client.execute('select count(1) from functional.alltypes')
     for impalad in self.cluster.impalads:
       impalad.service.wait_for_metric_value(LOCAL_ASSIGNMENTS_METRIC, 1,
@@ -44,7 +44,7 @@ class TestSchedulerLocality(CustomClusterTestSuite):
 
   @CustomClusterTestSuite.with_args(
       impalad_args='--hostname=' + get_external_ip(), cluster_size=1)
-  def test_remote_assignment(self, vector):
+  def test_remote_assignment(self):
     self.client.execute('select count(1) from functional.alltypes')
     for impalad in self.cluster.impalads:
       impalad.service.wait_for_metric_value(TOTAL_ASSIGNMENTS_METRIC, 1,

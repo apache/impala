@@ -26,7 +26,7 @@ from testdata.common import widetable
 from tests.common.impala_cluster import ImpalaCluster
 from tests.common.impala_test_suite import ImpalaTestSuite
 from tests.common.parametrize import UniqueDatabase
-from tests.common.skip import (SkipIfFS, SkipIfLocal, SkipIfHive2,
+from tests.common.skip import (SkipIfExploration, SkipIfFS, SkipIfLocal, SkipIfHive2,
     SkipIfNotHdfsMinicluster)
 from tests.common.test_dimensions import (
     add_exec_option_dimension,
@@ -211,6 +211,9 @@ class TestInsertQueriesWithDefaultFormat(TestInsertBase):
         multiple_impalad=self.is_sync_ddl(vector))
 
 
+# Don't run on core. This test is very slow (IMPALA-864) and we are unlikely to
+# regress here.
+@SkipIfExploration.is_not_exhaustive()
 class TestInsertWideTable(ImpalaTestSuite):
   @classmethod
   def add_test_dimensions(cls):
@@ -228,10 +231,6 @@ class TestInsertWideTable(ImpalaTestSuite):
     cls.ImpalaTestMatrix.add_constraint(lambda v:
         v.get_value('table_format').compression_codec == 'none')
 
-    # Don't run on core. This test is very slow (IMPALA-864) and we are unlikely to
-    # regress here.
-    if cls.exploration_strategy() != 'exhaustive':
-      pytest.skip("Test only run in exhaustive exploration.")
 
   @SkipIfLocal.parquet_file_size
   def test_insert_wide_table(self, vector, unique_database):
@@ -419,12 +418,6 @@ class TestInsertHdfsWriterLimit(ImpalaTestSuite):
   @classmethod
   def default_test_protocol(cls):
     return HS2
-
-  @classmethod
-  def add_test_dimensions(cls):
-    super(TestInsertHdfsWriterLimit, cls).add_test_dimensions()
-    cls.ImpalaTestMatrix.add_constraint(lambda v:
-        (v.get_value('table_format').file_format == 'parquet'))
 
   @UniqueDatabase.parametrize(sync_ddl=True)
   @SkipIfNotHdfsMinicluster.tuned_for_minicluster

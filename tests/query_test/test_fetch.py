@@ -32,14 +32,6 @@ from tests.util.parse_util import parse_duration_string_ms, \
 class TestFetch(ImpalaTestSuite):
   """Tests that are independent of whether result spooling is enabled or not."""
 
-  @classmethod
-  def add_test_dimensions(cls):
-    super(TestFetch, cls).add_test_dimensions()
-    # Result fetching should be independent of file format, so only test against
-    # text files.
-    cls.ImpalaTestMatrix.add_dimension(
-      create_uncompressed_text_dimension(cls.get_workload()))
-
   def test_rows_sent_counters(self):
     """Validate that ClientFetchWaitTimer, NumRowsFetched, RowMaterializationRate,
     and RowMaterializationTimer are set to valid values in the ImpalaServer section

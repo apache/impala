@@ -22,7 +22,6 @@ import shlex
 
 from tests.common.impala_test_suite import ImpalaTestSuite
 from tests.common.skip import SkipIf, SkipIfFS, SkipIfHive2
-from tests.common.test_dimensions import create_uncompressed_text_dimension
 from tests.util.test_file_parser import QueryTestSectionReader, remove_comments
 from tests.common.environ import HIVE_MAJOR_VERSION, ICEBERG_DEFAULT_FORMAT_VERSION
 from tests.util.filesystem_utils import WAREHOUSE
@@ -68,18 +67,6 @@ class TestShowCreateTable(ImpalaTestSuite):
                          "RESULTS-HIVE-3"]
   # Properties to filter before comparing results
   FILTER_TBL_PROPERTIES = ["bucketing_version", "OBJCAPABILITIES"]
-
-  @classmethod
-  def add_test_dimensions(cls):
-    super(TestShowCreateTable, cls).add_test_dimensions()
-    # don't use any exec options, running exactly once is fine
-    cls.ImpalaTestMatrix.clear_dimension('exec_option')
-    # There is no reason to run these tests using all dimensions.
-    cls.ImpalaTestMatrix.add_dimension(
-        create_uncompressed_text_dimension(cls.get_workload()))
-    cls.ImpalaTestMatrix.add_constraint(
-        lambda v: (v.get_value('table_format').file_format == 'text'
-                   and v.get_value('table_format').compression_codec == 'none'))
 
   def test_show_create_table(self, unique_database):
     self.__run_show_create_table_test_case('QueryTest/show-create-table',
@@ -498,15 +485,6 @@ class TestShowCreateTableIcebergProperties(ImpalaTestSuite):
   Test that the SHOW CREATE TABLE statement does not contain irrelevant Iceberg-related
   table properties.
   """
-
-  @classmethod
-  def add_test_dimensions(cls):
-    super(TestShowCreateTableIcebergProperties, cls).add_test_dimensions()
-    # don't use any exec options, running exactly once is fine
-    cls.ImpalaTestMatrix.clear_dimension('exec_option')
-    cls.ImpalaTestMatrix.add_constraint(
-        lambda v: v.get_value('table_format').file_format == 'parquet'
-        and v.get_value('table_format').compression_codec == 'none')
 
   def test_iceberg_properties(self, unique_database):
     """

@@ -950,7 +950,7 @@ class TestTupleCacheFullCluster(TestTupleCacheBase):
 
   @SkipIfDockerizedCluster.internal_hostname
   @SkipIf.hardcoded_uris
-  def test_iceberg_deletes(self, vector):  # noqa: U100
+  def test_iceberg_deletes(self):
     """
     Test basic Iceberg v2 deletes, which relies on the directed mode and looking
     past TupleCacheNodes to find the scan nodes.

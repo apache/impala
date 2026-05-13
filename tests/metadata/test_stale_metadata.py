@@ -21,7 +21,6 @@ from subprocess import check_call
 from tests.common.impala_connection import IMPALA_CONNECTION_EXCEPTION
 from tests.common.impala_test_suite import ImpalaTestSuite
 from tests.common.skip import SkipIfFS
-from tests.common.test_dimensions import create_single_exec_option_dimension
 from tests.util.filesystem_utils import get_fs_path
 
 
@@ -38,14 +37,6 @@ class TestRewrittenFile(ImpalaTestSuite):
   LONG_FILE = get_fs_path("/test-warehouse/alltypesagg_parquet/year=2010/month=1/" \
       "day=9/*.parq")
   LONG_FILE_NUM_ROWS = 1000
-
-  @classmethod
-  def add_test_dimensions(cls):
-    super(TestRewrittenFile, cls).add_test_dimensions()
-    cls.ImpalaTestMatrix.add_dimension(create_single_exec_option_dimension())
-    # TODO: add more file formats
-    cls.ImpalaTestMatrix.add_constraint(
-        lambda v: v.get_value('table_format').file_format == 'parquet')
 
   def __overwrite_file_and_query(self, db_name, table_name, old_file, new_file,
     expected_error, expected_new_count):

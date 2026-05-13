@@ -968,11 +968,6 @@ class TestQueryLogQueuedQueries(WorkloadManagementTestSuite):
   """Simulates a cluster that is under load and has queries that are queueing in
      admission control."""
 
-  @classmethod
-  def add_test_dimensions(cls):
-    super(TestQueryLogQueuedQueries, cls).add_test_dimensions()
-    cls.ImpalaTestMatrix.add_dimension(hs2_client_protocol_dimension())
-
   @CustomClusterTestSuite.with_args(
       impalad_args=impalad_admission_ctrl_config_args(
           fs_allocation_file="fair-scheduler-one-query.xml",

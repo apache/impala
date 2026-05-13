@@ -19,19 +19,10 @@ from __future__ import absolute_import, division, print_function
 import json
 import requests
 from tests.common.impala_test_suite import ImpalaTestSuite
-from tests.common.test_dimensions import create_uncompressed_text_dimension
 
 
 class TestReusePartitions(ImpalaTestSuite):
   """Tests for catalogd reusing unchanged partition instances for DDL/DMLs"""
-
-  @classmethod
-  def add_test_dimensions(cls):
-    super(TestReusePartitions, cls).add_test_dimensions()
-
-    # There is no reason to run these tests using all dimensions.
-    cls.ImpalaTestMatrix.add_dimension(
-        create_uncompressed_text_dimension(cls.get_workload()))
 
   def test_reuse_partitions_nontransactional(self, unique_database):
     self.__test_reuse_partitions_helper(unique_database, transactional=False)

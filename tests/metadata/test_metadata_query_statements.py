@@ -111,7 +111,7 @@ class TestMetadataQueryStatements(ImpalaTestSuite):
   # Missing Coverage: Describe formatted compatibility between Impala and Hive when the
   # data doesn't reside in hdfs.
   @SkipIfFS.hive
-  def test_describe_formatted(self, vector, unique_database):
+  def test_describe_formatted(self, unique_database):
     # IMPALA-10176: test_describe_formatted is broken, so disable it for now
     pytest.skip()
     # For describe formmated, we try to match Hive's output as closely as possible.

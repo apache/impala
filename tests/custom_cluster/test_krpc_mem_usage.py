@@ -60,7 +60,7 @@ class TestKrpcMemUsage(CustomClusterTestSuite):
           assert usage["peak"] > 0, metric_name
 
   @pytest.mark.execute_serially
-  def test_krpc_unqueued_memory_usage(self, vector):
+  def test_krpc_unqueued_memory_usage(self):
     """Executes a simple query and checks that the data stream service consumed some
     memory.
     """
@@ -71,7 +71,7 @@ class TestKrpcMemUsage(CustomClusterTestSuite):
   @SkipIfBuildType.not_dev_build
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args("--stress_datastream_recvr_delay_ms=1000")
-  def test_krpc_early_sender_memory_usage(self, vector):
+  def test_krpc_early_sender_memory_usage(self):
     """Executes a simple query. The cluster is started with delayed receiver creation to
     trigger RPC queueing.
     """
@@ -80,7 +80,7 @@ class TestKrpcMemUsage(CustomClusterTestSuite):
   @SkipIfBuildType.not_dev_build
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args("--stress_datastream_recvr_delay_ms=1000")
-  def test_krpc_early_sender_memory_cancellation(self, vector):
+  def test_krpc_early_sender_memory_cancellation(self):
     """Executes a query and cancels it while RPCs are still queued up. This exercises the
     code to flush the early sender RPC queue in the receiver.
     """

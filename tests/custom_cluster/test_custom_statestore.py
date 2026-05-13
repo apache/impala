@@ -126,7 +126,7 @@ class TestCustomStatestore(CustomClusterTestSuite):
       impalad_args="--statestore_subscriber_use_resolved_address=true",
       catalogd_args="--statestore_subscriber_use_resolved_address=true",
       disable_log_buffering=True)
-  def test_subscriber_with_resolved_address(self, vector):
+  def test_subscriber_with_resolved_address(self):
     # Ensure cluster has started up by running a query.
     result = self.execute_query("select count(*) from functional_parquet.alltypes")
     assert result.success, str(result)

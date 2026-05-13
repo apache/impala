@@ -114,13 +114,6 @@ class TestLoadData(ImpalaTestSuite):
 @SkipIfLocal.hdfs_client
 class TestLoadDataExternal(ImpalaTestSuite):
 
-  @classmethod
-  def add_test_dimensions(cls):
-    super(TestLoadDataExternal, cls).add_test_dimensions()
-    cls.ImpalaTestMatrix.add_dimension(create_single_exec_option_dimension())
-    cls.ImpalaTestMatrix.add_dimension(
-        create_uncompressed_text_dimension(cls.get_workload()))
-
   def _clean_test_tables(self):
     self.client.execute("drop table if exists functional.{0}".format(TEST_TBL_NOPART_EXT))
     self.filesystem_client.delete_file_dir(TMP_STAGING_PATH, recursive=True)

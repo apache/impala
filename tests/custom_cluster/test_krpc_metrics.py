@@ -38,7 +38,7 @@ class TestKrpcMetrics(CustomClusterTestSuite):
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args('-datastream_service_queue_mem_limit=1B \
                                      -datastream_service_num_svc_threads=1')
-  def test_krpc_queue_overflow_rpcz(self, vector):
+  def test_krpc_queue_overflow_rpcz(self):
     """Test that rejected RPCs show up on the /rpcz debug web page.
     """
     def get_rpc_overflows():
@@ -60,7 +60,7 @@ class TestKrpcMetrics(CustomClusterTestSuite):
   @CustomClusterTestSuite.with_args('-datastream_service_queue_mem_limit=1B \
                                      -datastream_service_num_svc_threads=1',
                                      force_restart=True)
-  def test_krpc_queue_overflow_metrics(self, vector):
+  def test_krpc_queue_overflow_metrics(self):
     """Test that rejected RPCs show up on the /metrics debug web page.
     """
     metric_name = 'rpc.impala.DataStreamService.rpcs_queue_overflow'
@@ -72,7 +72,7 @@ class TestKrpcMetrics(CustomClusterTestSuite):
     assert before < after
 
   @pytest.mark.execute_serially
-  def test_krpc_service_queue_metrics(self, vector):
+  def test_krpc_service_queue_metrics(self):
     """Test that memory usage metrics for the data stream service queue show up on the
     /metrics debug web page.
     """

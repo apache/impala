@@ -23,7 +23,6 @@ import re
 
 from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
 from tests.common.skip import SkipIfFS
-from tests.common.test_dimensions import create_uncompressed_text_dimension
 from tests.util.filesystem_utils import get_fs_path
 
 
@@ -44,12 +43,6 @@ class TestUdfPersistence(CustomClusterTestSuite):
     if cls.exploration_strategy() != 'exhaustive':
       pytest.skip('runs only in exhaustive')
     super(TestUdfPersistence, cls).setup_class()
-
-  @classmethod
-  def add_test_dimensions(cls):
-    super(TestUdfPersistence, cls).add_test_dimensions()
-    cls.ImpalaTestMatrix.add_dimension(
-        create_uncompressed_text_dimension(cls.get_workload()))
 
   def setup_method(self, method):
     super(TestUdfPersistence, self).setup_method(method)

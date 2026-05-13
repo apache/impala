@@ -36,7 +36,7 @@ class TestExternalPlanner(CustomClusterTestSuite):
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args(
     impalad_args="-jni_frontend_class=org/apache/impala/externalfrontend/TestJniFrontend")
-  def test_external_frontend(self, vector):
+  def test_external_frontend(self):
     setup_client = self.create_impala_client()
     assert setup_client.execute("select 2").data == ['2']
     # The custom JniFrontend overrides the 'select 1' query with a 'select 42' query.

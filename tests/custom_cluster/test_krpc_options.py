@@ -33,7 +33,7 @@ class TestKrpcOptions(CustomClusterTestSuite):
 
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args("--rpc_use_loopback=true")
-  def test_krpc_use_loopback(self, vector):
+  def test_krpc_use_loopback(self):
     """Sanity test for the --rpc_use_loopback flag."""
     # Run a query that will execute on multiple hosts.
     self.client.execute("select min(int_col) from functional_parquet.alltypes")

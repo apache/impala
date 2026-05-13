@@ -372,13 +372,6 @@ class TestCorruptTableStats(ImpalaTestSuite):
 
 
 class TestIncompatibleColStats(ImpalaTestSuite):
-  @classmethod
-  def add_test_dimensions(cls):
-    super(TestIncompatibleColStats, cls).add_test_dimensions()
-    # There is no reason to run these tests using all dimensions.
-    cls.ImpalaTestMatrix.add_dimension(create_single_exec_option_dimension())
-    cls.ImpalaTestMatrix.add_dimension(
-        create_uncompressed_text_dimension(cls.get_workload()))
 
   def test_incompatible_col_stats(self, unique_database):
     """Tests Impala is able to use tables when the column stats data is not compatible
@@ -426,13 +419,6 @@ class TestParquetComputeColumnMinMax(ImpalaTestSuite):
 
 
 class TestInvalidStatsFromHms(ImpalaTestSuite):
-  @classmethod
-  def add_test_dimensions(cls):
-    super(TestInvalidStatsFromHms, cls).add_test_dimensions()
-    cls.ImpalaTestMatrix.add_dimension(create_single_exec_option_dimension())
-    cls.ImpalaTestMatrix.add_constraint(
-        lambda v: v.get_value('table_format').file_format == 'text'
-        and v.get_value('table_format').compression_codec == 'none')
 
   def test_invalid_col_stats(self, unique_database):
     """Test that invalid column stats, i.e. values < -1, are normalized in Impala"""

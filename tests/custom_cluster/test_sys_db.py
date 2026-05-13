@@ -19,7 +19,6 @@ from __future__ import absolute_import, division, print_function
 
 from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
 from tests.common.impala_connection import IMPALA_CONNECTION_EXCEPTION
-from tests.common.test_dimensions import create_single_exec_option_dimension
 from tests.common.test_result_verifier import error_msg_startswith
 
 
@@ -27,11 +26,6 @@ class TestSysDb(CustomClusterTestSuite):
   """Tests that are specific to the 'sys' database."""
 
   SYS_DB_NAME = "sys"
-
-  @classmethod
-  def add_test_dimensions(cls):
-    super(TestSysDb, cls).add_test_dimensions()
-    cls.ImpalaTestMatrix.add_dimension(create_single_exec_option_dimension())
 
   @CustomClusterTestSuite.with_args()
   def test_query_log_table_create_sys_db_blocked(self):

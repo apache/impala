@@ -18,7 +18,6 @@ import time
 
 from tests.common.impala_connection import ERROR, FINISHED
 from tests.common.impala_test_suite import ImpalaTestSuite, LOG
-from tests.common.test_dimensions import create_uncompressed_text_dimension
 from tests.common.skip import SkipIfLocal, SkipIfFS
 from tests.util.filesystem_utils import WAREHOUSE
 
@@ -32,14 +31,6 @@ class TestRecursiveListing(ImpalaTestSuite):
   enable_fs_tracing_url = "http://localhost:25020/set_java_loglevel?" \
                           "class=org.apache.impala.common.FileSystemUtil&level=trace"
   reset_log_level_url = "http://localhost:25020/reset_java_loglevel"
-
-  @classmethod
-  def add_test_dimensions(cls):
-    super(TestRecursiveListing, cls).add_test_dimensions()
-    # don't use any exec options, running exactly once is fine
-    cls.ImpalaTestMatrix.clear_dimension('exec_option')
-    cls.ImpalaTestMatrix.add_dimension(
-        create_uncompressed_text_dimension(cls.get_workload()))
 
   def _show_files(self, table):
     files = self.client.execute("show files in {0}".format(table))

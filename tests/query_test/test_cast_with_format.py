@@ -36,7 +36,7 @@ class TestCastWithFormat(ImpalaTestSuite):
   def test_basic_inputs_from_table(self, vector):
     self.run_test_case('QueryTest/cast_format_from_table', vector)
 
-  def test_basic_inputs_without_row(self, vector):
+  def test_basic_inputs_without_row(self):
     # Cast without format clause to cover the default format
     result = self.client.execute("select cast('2017-05-01 01:23:45.678912345' as "
         "timestamp)")

@@ -32,7 +32,7 @@ import string
 
 from tests.common.environ import HIVE_MAJOR_VERSION
 from tests.common.impala_test_suite import ImpalaTestSuite
-from tests.common.skip import SkipIfFS, SkipIfHive2, SkipIfHive3
+from tests.common.skip import SkipIfExploration, SkipIfFS, SkipIfHive2, SkipIfHive3
 from tests.common.test_dimensions import (
     create_single_exec_option_dimension,
     create_uncompressed_text_dimension)
@@ -43,13 +43,6 @@ from tests.util.hive_utils import HiveDbWrapper, HiveTableWrapper
 
 @SkipIfFS.hive
 class TestHmsIntegrationSanity(ImpalaTestSuite):
-  @classmethod
-  def add_test_dimensions(cls):
-    super(TestHmsIntegrationSanity, cls).add_test_dimensions()
-    # There is no reason to run these tests using all dimensions.
-    cls.ImpalaTestMatrix.add_dimension(create_single_exec_option_dimension())
-    cls.ImpalaTestMatrix.add_dimension(
-        create_uncompressed_text_dimension(cls.get_workload()))
 
   @pytest.mark.execute_serially
   def test_sanity(self, cluster_properties):
@@ -131,24 +124,13 @@ class TestHmsIntegrationSanity(ImpalaTestSuite):
       self.run_stmt_in_hive("drop database %s cascade" % db)
 
 
+@SkipIfExploration.is_not_exhaustive()
 @SkipIfFS.hive
 class TestHmsIntegration(ImpalaTestSuite):
 
   @classmethod
   def default_test_protocol(cls):
     return HS2
-
-  @classmethod
-  def add_test_dimensions(cls):
-    super(TestHmsIntegration, cls).add_test_dimensions()
-
-    if cls.exploration_strategy() != 'exhaustive':
-      pytest.skip("Should only run in exhaustive due to long execution time.")
-
-    # There is no reason to run these tests using all dimensions.
-    cls.ImpalaTestMatrix.add_dimension(create_single_exec_option_dimension())
-    cls.ImpalaTestMatrix.add_dimension(
-        create_uncompressed_text_dimension(cls.get_workload()))
 
   class ImpalaDbWrapper(object):
     """

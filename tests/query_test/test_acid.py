@@ -284,7 +284,7 @@ class TestAcid(ImpalaTestSuite):
 
   @SkipIfHive2.acid
   @SkipIfFS.hive
-  def test_in_progress_compactions(self, vector, unique_database):
+  def test_in_progress_compactions(self, unique_database):
     """Checks that in-progress compactions are not visible. The test mimics
     in-progress compactions by opening a transaction and creating a new base
     directory. The new base directory is empty and must not have an effect
@@ -332,7 +332,7 @@ class TestAcid(ImpalaTestSuite):
     result = self.execute_query("select count(*) from {0}".format(fq_table_name))
     assert "3" in result.data
 
-  def test_add_partition_write_id(self, vector, unique_database):
+  def test_add_partition_write_id(self, unique_database):
     """Test that ALTER TABLE ADD PARTITION increases the write id of the table."""
     # Test INSERT-only table
     io_tbl_name = "insert_only_table"

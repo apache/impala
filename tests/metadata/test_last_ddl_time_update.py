@@ -18,6 +18,7 @@
 # Impala tests for DDL statements
 from __future__ import absolute_import, division, print_function
 from builtins import int
+import pytest
 import time
 
 from tests.common.impala_test_suite import ImpalaTestSuite
@@ -27,17 +28,10 @@ from tests.util.filesystem_utils import WAREHOUSE, IS_S3
 class TestLastDdlTimeUpdate(ImpalaTestSuite):
 
   @classmethod
-  def add_test_dimensions(cls):
-    super(TestLastDdlTimeUpdate, cls).add_test_dimensions()
-    # There is no reason to run these tests using all dimensions.
-    cls.ImpalaTestMatrix.add_constraint(lambda v:\
-        v.get_value('table_format').file_format == 'text' and\
-        v.get_value('table_format').compression_codec == 'none')
-
-    if cls.exploration_strategy() == 'core' and not IS_S3:
-      # Don't run on core.  This test is very slow and we are unlikely
-      # to regress here.
-      cls.ImpalaTestMatrix.add_constraint(lambda v: False)
+  def setup_class(cls):
+    if cls.exploration_strategy() != 'exhaustive' and not IS_S3:
+      pytest.skip('runs only in exhaustive or on S3')
+    super(TestLastDdlTimeUpdate, cls).setup_class()
 
   class TableFormat:
     HDFS = 1
@@ -194,7 +188,7 @@ class TestLastDdlTimeUpdate(ImpalaTestSuite):
     self.execute_query("compute stats %s" % helper.fq_tbl_name)
     return helper
 
-  def test_hdfs_alter(self, vector, unique_database):
+  def test_hdfs_alter(self, unique_database):
     TBL_NAME = "alter_test_tbl"
     h = self._create_and_init_test_helper(
         unique_database, TBL_NAME, self.TableFormat.HDFS)
@@ -233,7 +227,7 @@ class TestLastDdlTimeUpdate(ImpalaTestSuite):
     # compute sampled statistics
     h.expect_stat_time_change("compute stats %(TBL)s tablesample system(20)")
 
-  def test_hdfs_insert(self, vector, unique_database):
+  def test_hdfs_insert(self, unique_database):
     TBL_NAME = "insert_test_tbl"
     h = self._create_and_init_test_helper(
         unique_database, TBL_NAME, self.TableFormat.HDFS)
@@ -250,7 +244,7 @@ class TestLastDdlTimeUpdate(ImpalaTestSuite):
     # dynamic partition insert modifying an existing partition
     h.expect_no_time_change("insert into %(TBL)s partition(j, s) select 20, 1, '2012'")
 
-  def test_kudu_alter_and_insert(self, vector, unique_database):
+  def test_kudu_alter_and_insert(self, unique_database):
     TBL_NAME = "kudu_test_tbl"
     h = self._create_and_init_test_helper(
         unique_database, TBL_NAME, self.TableFormat.KUDU)
@@ -260,7 +254,7 @@ class TestLastDdlTimeUpdate(ImpalaTestSuite):
 
     self.run_common_test_cases(h)
 
-  def test_iceberg_alter_and_insert(self, vector, unique_database):
+  def test_iceberg_alter_and_insert(self, unique_database):
     TBL_NAMES = ("iceberg_test_tbl", "non_integrated_iceberg_test_tbl")
     helpers = (self._create_and_init_test_helper(
                 unique_database, TBL_NAMES[0], self.TableFormat.INTEGRATED_ICEBERG),
@@ -288,7 +282,7 @@ class TestLastDdlTimeUpdate(ImpalaTestSuite):
 
       self.run_common_test_cases(h)
 
-  def test_rename(self, vector, unique_database):
+  def test_rename(self, unique_database):
     # Test HDFS table
     OLD_HDFS_TBL_NAME = "hdfs_rename_from_test_tbl"
     NEW_HDFS_TBL_NAME = "hdfs_rename_to_test_tbl"

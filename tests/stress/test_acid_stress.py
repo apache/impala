@@ -38,16 +38,6 @@ class TestAcidStress(ImpalaTestSuite):
   def get_workload(self):
     return 'targeted-stress'
 
-  @classmethod
-  def add_test_dimensions(cls):
-    super(TestAcidStress, cls).add_test_dimensions()
-    if cls.exploration_strategy() != 'exhaustive':
-      pytest.skip("Should only run in exhaustive due to long execution time.")
-
-    cls.ImpalaTestMatrix.add_constraint(
-        lambda v: (v.get_value('table_format').file_format == 'text' and
-                   v.get_value('table_format').compression_codec == 'none'))
-
 
 class TestAcidInsertsBasic(TestAcidStress):
   @classmethod

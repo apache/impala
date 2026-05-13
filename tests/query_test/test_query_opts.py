@@ -24,31 +24,16 @@ from __future__ import absolute_import, division, print_function
 
 from impala_thrift_gen.TCLIService import TCLIService
 from tests.common.impala_test_suite import ImpalaTestSuite
-from tests.common.test_dimensions import create_exec_option_dimension
 from tests.hs2.hs2_test_suite import HS2TestSuite, needs_session
 
 
 class TestQueryOptions(ImpalaTestSuite):
-  @classmethod
-  def add_test_dimensions(cls):
-    super(TestQueryOptions, cls).add_test_dimensions()
-    cls.ImpalaTestMatrix.add_constraint(lambda v:\
-        v.get_value('table_format').file_format == 'text')
-    cls.ImpalaTestMatrix.add_dimension(create_exec_option_dimension(
-        cluster_sizes=[0], disable_codegen_options=[False], batch_sizes=[0]))
 
-  def test_set_invalid_query_option(self, vector):
+  def test_set_invalid_query_option(self):
     ex = self.execute_query_expect_failure(self.client, "select 1", {'foo':'bar'})
     assert "invalid query option: foo" in str(ex).lower()
 
 class TestQueryOptionsHS2(HS2TestSuite):
-  @classmethod
-  def add_test_dimensions(cls):
-    super(TestQueryOptions, cls).add_test_dimensions()
-    cls.ImpalaTestMatrix.add_constraint(lambda v:\
-        v.get_value('table_format').file_format == 'text')
-    cls.ImpalaTestMatrix.add_dimension(create_exec_option_dimension(
-        cluster_sizes=[0], disable_codegen_options=[False], batch_sizes=[0]))
 
   @needs_session()
   def test_set_invalid_query_option(self):
