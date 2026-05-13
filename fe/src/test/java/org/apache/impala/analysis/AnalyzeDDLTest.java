@@ -3174,9 +3174,14 @@ public class AnalyzeDDLTest extends FrontendTestBase {
     // Test HMS constraint on comment length.
     AnalyzesOk(String.format("create table t (i int comment '%s')",
         StringUtils.repeat("c", MetaStoreUtil.CREATE_MAX_COMMENT_LENGTH)));
+    AnalyzesOk(String.format("create table t (i int comment '%s')",
+        StringUtils.repeat("c", 500)));
+    AnalyzesOk(String.format("create table t (i int comment '%s')",
+        StringUtils.repeat("c", 1000)));
     AnalysisError(String.format("create table t (i int comment '%s')",
         StringUtils.repeat("c", MetaStoreUtil.CREATE_MAX_COMMENT_LENGTH + 1)),
-        "Comment of column 'i' exceeds maximum length of 256 characters:");
+        String.format("Comment of column 'i' exceeds maximum length of %d characters:",
+            MetaStoreUtil.CREATE_MAX_COMMENT_LENGTH));
 
     // Valid URI values.
     AnalyzesOk("create table tbl (i int) location '/test-warehouse/new_table'");
@@ -4792,9 +4797,16 @@ public class AnalyzeDDLTest extends FrontendTestBase {
     AnalyzesOk("comment on database functional is null");
     AnalysisError("comment on database doesntexist is 'comment'",
         "Database does not exist: doesntexist");
+    AnalyzesOk(String.format("comment on database functional is '%s'",
+        StringUtils.repeat("a", 500)));
+    AnalyzesOk(String.format("comment on database functional is '%s'",
+        StringUtils.repeat("a", MetaStoreUtil.CREATE_MAX_COMMENT_LENGTH)));
     AnalysisError(String.format("comment on database functional is '%s'",
-        buildLongComment()), "Comment exceeds maximum length of 256 characters. " +
-        "The given comment has 261 characters.");
+        buildLongComment()), String.format(
+        "Comment exceeds maximum length of %d characters. " +
+        "The given comment has %d characters.",
+        MetaStoreUtil.CREATE_MAX_COMMENT_LENGTH,
+        MetaStoreUtil.CREATE_MAX_COMMENT_LENGTH + 5));
   }
 
   @Test
@@ -4811,9 +4823,16 @@ public class AnalyzeDDLTest extends FrontendTestBase {
         "Could not resolve table reference: 'default.doesntexist'");
     AnalysisError("comment on table functional.alltypes_view is 'comment'",
         "COMMENT ON TABLE not allowed on a view: functional.alltypes_view");
+    AnalyzesOk(String.format("comment on table functional.alltypes is '%s'",
+        StringUtils.repeat("a", 500)));
+    AnalyzesOk(String.format("comment on table functional.alltypes is '%s'",
+        StringUtils.repeat("a", MetaStoreUtil.CREATE_MAX_COMMENT_LENGTH)));
     AnalysisError(String.format("comment on table functional.alltypes is '%s'",
-        buildLongComment()), "Comment exceeds maximum length of 256 characters. " +
-        "The given comment has 261 characters.");
+        buildLongComment()), String.format(
+        "Comment exceeds maximum length of %d characters. " +
+        "The given comment has %d characters.",
+        MetaStoreUtil.CREATE_MAX_COMMENT_LENGTH,
+        MetaStoreUtil.CREATE_MAX_COMMENT_LENGTH + 5));
   }
 
   @Test
@@ -4830,9 +4849,16 @@ public class AnalyzeDDLTest extends FrontendTestBase {
         "Could not resolve table reference: 'default.doesntexist'");
     AnalysisError("comment on view functional.alltypes is 'comment'",
         "COMMENT ON VIEW not allowed on a table: functional.alltypes");
+    AnalyzesOk(String.format("comment on view functional.alltypes_view is '%s'",
+        StringUtils.repeat("a", 500)));
+    AnalyzesOk(String.format("comment on view functional.alltypes_view is '%s'",
+        StringUtils.repeat("a", MetaStoreUtil.CREATE_MAX_COMMENT_LENGTH)));
     AnalysisError(String.format("comment on view functional.alltypes_view is '%s'",
-        buildLongComment()), "Comment exceeds maximum length of 256 characters. " +
-        "The given comment has 261 characters.");
+        buildLongComment()), String.format(
+        "Comment exceeds maximum length of %d characters. " +
+        "The given comment has %d characters.",
+        MetaStoreUtil.CREATE_MAX_COMMENT_LENGTH,
+        MetaStoreUtil.CREATE_MAX_COMMENT_LENGTH + 5));
   }
 
   @Test
@@ -4850,9 +4876,16 @@ public class AnalyzeDDLTest extends FrontendTestBase {
     }
     AnalysisError("comment on column functional.alltypes.doesntexist is 'comment'",
         "Column 'doesntexist' does not exist in table: functional.alltypes");
+    AnalyzesOk(String.format("comment on column functional.alltypes.id is '%s'",
+        StringUtils.repeat("a", 500)));
+    AnalyzesOk(String.format("comment on column functional.alltypes.id is '%s'",
+        StringUtils.repeat("a", MetaStoreUtil.CREATE_MAX_COMMENT_LENGTH)));
     AnalysisError(String.format("comment on column functional.alltypes.id is '%s'",
-        buildLongComment()), "Comment exceeds maximum length of 256 characters. " +
-        "The given comment has 261 characters.");
+        buildLongComment()), String.format(
+        "Comment exceeds maximum length of %d characters. " +
+        "The given comment has %d characters.",
+        MetaStoreUtil.CREATE_MAX_COMMENT_LENGTH,
+        MetaStoreUtil.CREATE_MAX_COMMENT_LENGTH + 5));
   }
 
   private static String buildLongComment() {

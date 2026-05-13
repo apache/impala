@@ -56,10 +56,7 @@ public class MetaStoreUtil {
   private static final Logger LOG = LoggerFactory.getLogger(MetaStoreUtil.class);
 
   // Maximum comment length, e.g., for columns, that can be stored in the HMS.
-  // This number is a lower bound of the constraint set in the HMS DB schema,
-  // because the constraint varies among different backing databases, e.g.,
-  // for Postgres it is 4000, but for most other databases it is 256.
-  public static final int CREATE_MAX_COMMENT_LENGTH = 256;
+  public static final int CREATE_MAX_COMMENT_LENGTH = 4000;
 
   // The longest strings Hive accepts for [serde] property keys.
   public static final int MAX_PROPERTY_KEY_LENGTH = 256;
