@@ -25,7 +25,6 @@
 #include <utility>
 
 #include <gflags/gflags.h>
-#include <gperftools/malloc_extension.h>
 #include <gutil/strings/substitute.h>
 
 #include "common/compiler-util.h"
@@ -37,6 +36,7 @@
 #include "util/container-util.h"
 #include "util/debug-util.h"
 #include "util/impalad-metrics.h"
+#include "util/malloc-util.h"
 #include "util/metrics.h"
 #include "util/network-util.h"
 #include "util/thread-pool.h"
@@ -169,18 +169,13 @@ void QueryExecMgr::ExecuteQueryHelper(QueryState* qs) {
   // Start the query fragment instances and wait for completion or errors.
   if (LIKELY(qs->StartFInstances())) qs->MonitorFInstances();
 
-#if !defined(ADDRESS_SANITIZER) && !defined(THREAD_SANITIZER)
-  // tcmalloc and address or thread sanitizer cannot be used together
   if (FLAGS_log_mem_usage_interval > 0) {
     uint64_t num_complete = ImpaladMetrics::IMPALA_SERVER_NUM_FRAGMENTS->GetValue();
     if (num_complete % FLAGS_log_mem_usage_interval == 0) {
-      char buf[2048];
       // This outputs how much memory is currently being used by this impalad
-      MallocExtension::instance()->GetStats(buf, 2048);
-      LOG(INFO) << buf;
+      LOG(INFO) << MallocUtil::GetInstance()->GetTextDescription();
     }
   }
-#endif
 
   // decrement refcount taken in QueryState::Init();
   qs->ReleaseBackendResourceRefcount();

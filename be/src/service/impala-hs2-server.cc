@@ -25,8 +25,6 @@
 #include <boost/algorithm/string/join.hpp>
 #include <boost/bind.hpp>
 #include <boost/unordered_set.hpp>
-#include <gperftools/heap-profiler.h>
-#include <gperftools/malloc_extension.h>
 #include <gtest/gtest.h>
 #include <gutil/strings/substitute.h>
 

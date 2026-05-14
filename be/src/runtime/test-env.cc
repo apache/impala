@@ -31,6 +31,7 @@
 #include "service/control-service.h"
 #include "util/disk-info.h"
 #include "util/impalad-metrics.h"
+#include "util/malloc-util.h"
 #include "util/memory-metrics.h"
 #include "util/uid-util.h"
 
@@ -40,6 +41,7 @@ using boost::scoped_ptr;
 using std::numeric_limits;
 
 DECLARE_string(hostname);
+DECLARE_bool(tcmalloc_aggressive_memory_decommit);
 
 namespace impala {
 
@@ -51,6 +53,9 @@ TestEnv::TestEnv()
     buffer_pool_capacity_(0) {}
 
 Status TestEnv::Init() {
+  // Always use aggressive decommit for backend tests
+  FLAGS_tcmalloc_aggressive_memory_decommit = true;
+  RETURN_IF_ERROR(MallocUtil::GetInstance()->Init());
   if (static_metrics_ == NULL) {
     static_metrics_.reset(new MetricGroup("test-env-static-metrics"));
     ImpaladMetrics::CreateMetrics(static_metrics_.get());
@@ -73,11 +78,6 @@ Status TestEnv::Init() {
   if (enable_buffer_pool_) {
     exec_env_->InitBufferPool(buffer_pool_min_buffer_len_, buffer_pool_capacity_,
         static_cast<int64_t>(0.1 * buffer_pool_capacity_));
-  } else {
-    // The buffer pool requires tcmalloc's aggressive_memory_decommit to be set.
-    // Since this codepath will never call InitBufferPool(), this needs to manually
-    // set it.
-    exec_env_->InitTcMallocAggressiveDecommit();
   }
   if (process_mem_tracker_use_metrics_) {
     exec_env_->InitMemTracker(process_mem_limit_);

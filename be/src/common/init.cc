@@ -20,7 +20,6 @@
 #include <csignal>
 #include <regex>
 #include <boost/filesystem.hpp>
-#include <gperftools/heap-profiler.h>
 #include <third_party/lss/linux_syscall_support.h>
 
 #include "common/global-flags.h"
@@ -49,6 +48,7 @@
 #include "util/filesystem-util.h"
 #include "util/jni-util.h"
 #include "util/logging-support.h"
+#include "util/malloc-util.h"
 #include "util/mem-info.h"
 #include "util/memory-metrics.h"
 #include "util/minidump.h"
@@ -717,12 +717,11 @@ void impala::InitCommonRuntime(int argc, char** argv, bool init_jvm,
 
   if (impala::KuduIsAvailable()) impala::InitKuduLogging();
 
-#if !defined(ADDRESS_SANITIZER) && !defined(THREAD_SANITIZER)
-  // tcmalloc and address sanitizer can not be used together
-  if (FLAGS_enable_process_lifetime_heap_profiling) {
-    HeapProfilerStart(FLAGS_heap_profile_dir.c_str());
+  // Start lifetime heap profiling if it is supported and configured
+  if (MallocUtil::GetInstance()->SupportsHeapProfiling() &&
+      FLAGS_enable_process_lifetime_heap_profiling) {
+    MallocUtil::GetInstance()->HeapProfilerStart(FLAGS_heap_profile_dir.c_str());
   }
-#endif
 
   // Signal handler for handling the SIGTERM. We want to log a message when catalogd or
   // impalad or statestored is being shutdown using a SIGTERM.

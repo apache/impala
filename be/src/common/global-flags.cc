@@ -110,6 +110,13 @@ DEFINE_int64(tcmalloc_max_total_thread_cache_bytes, 0, "(Advanced) Bound on the 
     "amount of bytes allocated to TCMalloc thread caches. If left at 0 (default), use "
     "the default value in TCMalloc library.");
 
+DEFINE_bool(tcmalloc_aggressive_memory_decommit, false, "(Advanced) Whether to use "
+    "tcmalloc's aggressive memory decommit mode. Setting this to true frees memory "
+    "immediately to minimize memory overhead. Setting this to false can improve "
+    "performance at the cost of extra memory use. Impalad does not respect the value "
+    "of this flag and hard codes this to true. Other daemons respect the value of the "
+    "flag and default to false.");
+
 DEFINE_bool(abort_on_config_error, true, "Abort Impala startup if there are improper "
     "configs or running on unsupported hardware.");
 

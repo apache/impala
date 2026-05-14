@@ -17,10 +17,9 @@
 
 #include "util/memusage-path-handlers.h"
 
-#include <gperftools/malloc_extension.h>
-
 #include "runtime/mem-tracker.h"
 #include "util/common-metrics.h"
+#include "util/malloc-util.h"
 #include "util/mem-info.h"
 #include "util/metrics.h"
 #include "util/pretty-printer.h"
@@ -56,16 +55,8 @@ void AddMemTracker(MemTracker* mem_tracker,
 /// - Freelist of central cache, each class.
 /// - Page heap freelist.
 void AddTCmallocOverview(const Webserver::WebRequest& req, Document* document) {
-  stringstream ss;
-#if defined(ADDRESS_SANITIZER) || defined(THREAD_SANITIZER)
-  ss << "Memory tracking is not available with address or thread sanitizer builds.";
-#else
-  char buf[2048];
-  MallocExtension::instance()->GetStats(buf, 2048);
-  ss << string(buf);
-#endif
-
-  Value overview(ss.str().c_str(), document->GetAllocator());
+  string s = MallocUtil::GetInstance()->GetTextDescription();
+  Value overview(s, document->GetAllocator());
   document->AddMember("overview", overview, document->GetAllocator());
 }
 

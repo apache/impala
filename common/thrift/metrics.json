@@ -2645,6 +2645,18 @@
     "key": "tcmalloc.transfer-cache-free-bytes"
   },
   {
+    "description": "Number of bytes overhead for TCMalloc. This is memory allocated by TCMalloc that is not used by the application. It can include thread caches, free memory in the page heap, etc.",
+    "contexts": [
+      "STATESTORE",
+      "CATALOGSERVER",
+      "IMPALAD"
+    ],
+    "label": "TCMalloc Overhead Bytes",
+    "units": "BYTES",
+    "kind": "GAUGE",
+    "key": "tcmalloc.overhead-bytes"
+  },
+  {
     "description": "Bytes allocated from the sanitizer malloc (Sanitizer debug builds only)",
     "contexts": [
       "STATESTORE",
@@ -2655,6 +2667,18 @@
     "units": "BYTES",
     "kind": "GAUGE",
     "key": "sanitizer-total-bytes-allocated"
+  },
+  {
+    "description": "Resident set size using the libc malloc (Default malloc debug builds only)",
+    "contexts": [
+      "STATESTORE",
+      "CATALOGSERVER",
+      "IMPALAD"
+    ],
+    "label": "Libc Resident Set Size",
+    "units": "BYTES",
+    "kind": "GAUGE",
+    "key": "libc-resident-set-size"
   },
   {
     "description": "Maximum allowed bytes allocated by the buffer pool.",

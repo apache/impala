@@ -22,6 +22,7 @@
 
 #include "testutil/gtest-util.h"
 #include "util/collection-metrics.h"
+#include "util/malloc-util.h"
 #include "util/memory-metrics.h"
 #include "util/metrics.h"
 #include "util/histogram-metric.h"
@@ -30,6 +31,8 @@
 #include "common/names.h"
 
 using namespace rapidjson;
+
+DECLARE_bool(tcmalloc_aggressive_memory_decommit);
 
 namespace impala {
 
@@ -246,6 +249,9 @@ TEST_F(MetricsTest, StatsMetricsSingle) {
 
 TEST_F(MetricsTest, MemMetric) {
 #if !defined(ADDRESS_SANITIZER) && !defined(THREAD_SANITIZER)
+  // Always use aggressive decommit for backend tests
+  FLAGS_tcmalloc_aggressive_memory_decommit = true;
+  ASSERT_OK(MallocUtil::GetInstance()->Init());
   MetricGroup metrics("MemMetrics");
   ASSERT_OK(RegisterMemoryMetrics(&metrics, false, nullptr, nullptr));
   // Smoke test to confirm that tcmalloc metrics are returning reasonable values.

@@ -39,6 +39,7 @@
 #include "util/collection-metrics.h"
 #include "util/debug-util.h"
 #include "util/histogram-metric.h"
+#include "util/malloc-util.h"
 #include "util/memory-metrics.h"
 #include "util/metrics.h"
 #include "util/pretty-printer.h"
@@ -365,13 +366,10 @@ static bool RejectForAdmissionServiceMemory(
   int64_t mem_limit = AdmissiondEnv::GetInstance()->admission_service_mem_limit();
   if (mem_limit <= 0) return false;
 
-#if defined(ADDRESS_SANITIZER) || defined(THREAD_SANITIZER)
-  DCHECK(SanitizerMallocMetric::BYTES_ALLOCATED != nullptr);
-  int64_t bytes_inuse = SanitizerMallocMetric::BYTES_ALLOCATED->GetValue();
-#else
-  DCHECK(TcmallocMetric::BYTES_IN_USE != nullptr);
-  int64_t bytes_inuse = TcmallocMetric::BYTES_IN_USE->GetValue();
-#endif
+  IntGauge* used_bytes_gauge = MallocUtil::GetInstance()->GetUsedBytesMetric(
+      /*include_overhead*/ false);
+  DCHECK(used_bytes_gauge != nullptr);
+  int64_t bytes_inuse = used_bytes_gauge->GetValue();
 
   if (bytes_inuse + additional_mem > mem_limit) {
     LOG(INFO) << "Rejected admission with additional_mem: " << additional_mem

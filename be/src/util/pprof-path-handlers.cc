@@ -20,11 +20,9 @@
 #include <boost/bind.hpp>
 #include <fstream>
 #include <sys/stat.h>
-#include <gperftools/profiler.h>
-#include <gperftools/heap-profiler.h>
-#include <gperftools/malloc_extension.h>
 
 #include "common/logging.h"
+#include "util/malloc-util.h"
 #include "util/webserver.h"
 
 #include "common/names.h"
@@ -54,10 +52,13 @@ void PprofCmdLineHandler(const Webserver::WebRequest& req, stringstream* output)
 // by calling HeapProfileStart(filename), continue to do work, and then, some number of
 // seconds later, call GetHeapProfile() followed by HeapProfilerStop().
 void PprofHeapHandler(const Webserver::WebRequest& req, stringstream* output) {
-#if defined(ADDRESS_SANITIZER) || defined(THREAD_SANITIZER)
-  (void)PPROF_DEFAULT_SAMPLE_SECS; // Avoid unused variable warning.
-  (*output) << "Heap profiling is not available with address/thread sanitizer builds.";
-#else
+  MallocUtil* mallocUtil = MallocUtil::GetInstance();
+  if (!mallocUtil->SupportsHeapProfiling()) {
+    (*output) << "Heap profiling is not available with "
+              << mallocUtil->GetName()
+              << " builds.";
+    return;
+  }
   const auto& args = req.parsed_args;
   Webserver::ArgumentMap::const_iterator it = args.find("seconds");
   int seconds = PPROF_DEFAULT_SAMPLE_SECS;
@@ -65,23 +66,27 @@ void PprofHeapHandler(const Webserver::WebRequest& req, stringstream* output) {
     seconds = atoi(it->second.c_str());
   }
 
-  HeapProfilerStart(FLAGS_heap_profile_dir.c_str());
+  mallocUtil->HeapProfilerStart(FLAGS_heap_profile_dir);
   // Sleep to allow for some samples to be collected.
   sleep(seconds);
-  const char* profile = GetHeapProfile();
-  HeapProfilerStop();
+  const char* profile = mallocUtil->GetHeapProfile();
+  mallocUtil->HeapProfilerStop();
   (*output) << profile;
-  delete profile;
-#endif
+  // free() doesn't understand const, so cast the const away
+  free(const_cast<char*>(profile));
 }
 
 // pprof asks for the url /pprof/profile?seconds=XX to get cpu-profiling information.
 // The server should respond by calling ProfilerStart(), continuing to do its work,
 // and then, XX seconds later, calling ProfilerStop().
 void PprofCpuProfileHandler(const Webserver::WebRequest& req, stringstream* output) {
-#if defined(ADDRESS_SANITIZER) || defined(THREAD_SANITIZER)
-  (*output) << "CPU profiling is not available with address/thread sanitizer builds.";
-#else
+  MallocUtil* mallocUtil = MallocUtil::GetInstance();
+  if (!mallocUtil->SupportsCPUProfiling()) {
+    (*output) << "CPU profiling is not available with "
+              << mallocUtil->GetName()
+              << " builds.";
+    return;
+  }
   const auto& args = req.parsed_args;
   Webserver::ArgumentMap::const_iterator it = args.find("seconds");
   int seconds = PPROF_DEFAULT_SAMPLE_SECS;
@@ -91,9 +96,9 @@ void PprofCpuProfileHandler(const Webserver::WebRequest& req, stringstream* outp
   ostringstream tmp_prof_file_name;
   // Build a temporary file name that is hopefully unique.
   tmp_prof_file_name << "/tmp/impala_cpu_profile." << getpid() << "." << rand();
-  ProfilerStart(tmp_prof_file_name.str().c_str());
+  mallocUtil->CPUProfilerStart(tmp_prof_file_name.str());
   sleep(seconds);
-  ProfilerStop();
+  mallocUtil->CPUProfilerStop();
   ifstream prof_file(tmp_prof_file_name.str().c_str(), ios::in);
   if (!prof_file.is_open()) {
     (*output) << "Unable to open cpu profile: " << tmp_prof_file_name.str();
@@ -101,20 +106,22 @@ void PprofCpuProfileHandler(const Webserver::WebRequest& req, stringstream* outp
   }
   (*output) << prof_file.rdbuf();
   prof_file.close();
-#endif
 }
 
 // pprof asks for the url /pprof/growth to get heap-profiling delta (growth) information.
 // The server should respond by calling:
 // MallocExtension::instance()->GetHeapGrowthStacks(&output);
 void PprofGrowthHandler(const Webserver::WebRequest& req, stringstream* output) {
-#if defined(ADDRESS_SANITIZER) || defined(THREAD_SANITIZER)
-  (*output) << "Growth profiling is not available with address/thread sanitizer builds.";
-#else
+  MallocUtil* mallocUtil = MallocUtil::GetInstance();
+  if (!mallocUtil->SupportsHeapGrowthStacks()) {
+    (*output) << "Growth profiling is not available with "
+              << mallocUtil->GetName()
+              << " builds.";
+    return;
+  }
   string heap_growth_stack;
-  MallocExtension::instance()->GetHeapGrowthStacks(&heap_growth_stack);
+  mallocUtil->GetHeapGrowthStacks(&heap_growth_stack);
   (*output) << heap_growth_stack;
-#endif
 }
 
 // pprof asks for the url /pprof/symbol to map from hex addresses to variable names.

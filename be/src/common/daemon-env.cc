@@ -21,6 +21,7 @@
 #include "rpc/rpc-trace.h"
 #include "util/common-metrics.h"
 #include "util/default-path-handlers.h"
+#include "util/malloc-util.h"
 #include "util/memory-metrics.h"
 #include "util/metrics.h"
 #include "util/thread.h"
@@ -49,6 +50,8 @@ DaemonEnv::DaemonEnv(const string& name)
 }
 
 Status DaemonEnv::Init(bool init_jvm) {
+  RETURN_IF_ERROR(MallocUtil::GetInstance()->Init());
+
   if (FLAGS_enable_webserver) {
     AddDefaultUrlCallbacks(webserver_.get(), metrics_.get());
     RETURN_IF_ERROR(metrics_->RegisterHttpHandlers(webserver_.get()));

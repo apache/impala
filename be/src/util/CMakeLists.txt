@@ -178,6 +178,31 @@ target_link_libraries(ProfileToolUtil PRIVATE GlobalFlags)
 set_target_properties(ProfileToolUtil PROPERTIES
   COMPILE_FLAGS "-ffunction-sections -fdata-sections")
 
+# Build a variant of MallocUtil for each separate implementation
+
+add_library(MallocUtilLibc
+  malloc-util.cc
+)
+add_dependencies(MallocUtilLibc gen-deps)
+target_compile_definitions(MallocUtilLibc PRIVATE MALLOC_UTIL_LIBC_IMPL)
+
+add_library(MallocUtilGperftools
+  malloc-util.cc
+)
+add_dependencies(MallocUtilGperftools gen-deps)
+target_compile_definitions(MallocUtilGperftools PRIVATE MALLOC_UTIL_GPERFTOOLS_IMPL)
+target_link_libraries(MallocUtilGperftools tcmallocstatic pprof)
+
+if ("${CMAKE_BUILD_TYPE}" STREQUAL "ADDRESS_SANITIZER" OR
+    "${CMAKE_BUILD_TYPE}" STREQUAL "TSAN" OR
+    "${CMAKE_BUILD_TYPE}" STREQUAL "TSAN_FULL")
+  add_library(MallocUtilSanitizer
+    malloc-util.cc
+  )
+  add_dependencies(MallocUtilSanitizer gen-deps)
+  target_compile_definitions(MallocUtilSanitizer PRIVATE MALLOC_UTIL_SANITIZER_IMPL)
+endif()
+
 # Squeasel requires C99 compatibility to build.
 SET_SOURCE_FILES_PROPERTIES(${SQUEASEL_SRC_DIR}/squeasel.c
   PROPERTIES COMPILE_FLAGS -std=c99)

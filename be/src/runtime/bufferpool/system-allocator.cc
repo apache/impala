@@ -19,10 +19,9 @@
 
 #include <sys/mman.h>
 
-#include <gperftools/malloc_extension.h>
-
 #include "gutil/strings/substitute.h"
 #include "util/bit-util.h"
+#include "util/malloc-util.h"
 
 #include "common/names.h"
 
@@ -46,13 +45,11 @@ static int64_t HUGE_PAGE_SIZE = 2LL * 1024 * 1024;
 SystemAllocator::SystemAllocator(int64_t min_buffer_len)
   : min_buffer_len_(min_buffer_len) {
   DCHECK(BitUtil::IsPowerOf2(min_buffer_len));
-#if !defined(ADDRESS_SANITIZER) && !defined(THREAD_SANITIZER)
-  // Free() assumes that aggressive decommit is enabled for TCMalloc.
-  size_t aggressive_decommit_enabled;
-  MallocExtension::instance()->GetNumericProperty(
-      "tcmalloc.aggressive_memory_decommit", &aggressive_decommit_enabled);
-  CHECK_EQ(true, aggressive_decommit_enabled);
-#endif
+  if (FLAGS_madvise_huge_pages) {
+    MallocUtil::HugePageSupport support =
+        MallocUtil::GetInstance()->GetHugePageSupport();
+    CHECK_EQ(support, MallocUtil::HugePageSupport::MADVISE_COMPATIBLE);
+  }
 }
 
 Status SystemAllocator::Allocate(int64_t len, BufferPool::BufferHandle* buffer) {

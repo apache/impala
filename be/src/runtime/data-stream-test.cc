@@ -47,6 +47,7 @@
 #include "util/debug-util.h"
 #include "util/thread.h"
 #include "util/time.h"
+#include "util/malloc-util.h"
 #include "util/mem-info.h"
 #include "util/parse-util.h"
 #include "util/scope-exit-trigger.h"
@@ -83,6 +84,7 @@ DECLARE_int32(datastream_service_deserialization_queue_size);
 DECLARE_string(datastream_service_queue_mem_limit);
 DECLARE_int32(datastream_service_num_svc_threads);
 DECLARE_string(debug_actions);
+DECLARE_bool(tcmalloc_aggressive_memory_decommit);
 
 static const PlanNodeId DEST_NODE_ID = 1;
 static const int BATCH_CAPACITY = 100;  // rows
@@ -184,6 +186,9 @@ class DataStreamTest : public testing::Test {
   virtual void SetUp() {
     exec_env_.reset(new ExecEnv());
     ABORT_IF_ERROR(exec_env_->InitForFeSupport());
+    // Always use aggressive decommit for backend tests
+    FLAGS_tcmalloc_aggressive_memory_decommit = true;
+    ABORT_IF_ERROR(MallocUtil::GetInstance()->Init());
     exec_env_->InitBufferPool(32 * 1024, 1024 * 1024 * 1024, 32 * 1024);
     runtime_state_.reset(new RuntimeState(TQueryCtx(), exec_env_.get()));
     TPlanFragment* fragment = runtime_state_->obj_pool()->Add(new TPlanFragment());

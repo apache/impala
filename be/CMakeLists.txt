@@ -696,7 +696,6 @@ set (IMPALA_DEPENDENCIES
   krb5
   libev
   libunwind
-  pprof
   breakpad_client
   hdfs
   zlib
@@ -750,12 +749,15 @@ endif()
 # FE (for tests) the jvm has already made allocations before tcmalloc can be loaded. In
 # all other binaries, we can use tcmalloc except the address sanitizer build. Address
 # sanitizer is incompatible with tcmalloc (they both intercept malloc/free)
-set (IMPALA_LINK_LIBS_NO_TCMALLOC ${IMPALA_LINK_LIBS})
-if (NOT "${CMAKE_BUILD_TYPE}" STREQUAL "ADDRESS_SANITIZER" AND
-    NOT "${CMAKE_BUILD_TYPE}" STREQUAL "TSAN" AND
-    NOT "${CMAKE_BUILD_TYPE}" STREQUAL "TSAN_FULL")
-  set (IMPALA_LINK_LIBS ${IMPALA_LINK_LIBS} tcmallocstatic)
-  set (UNIFIED_TEST_LINK_LIBS ${UNIFIED_TEST_LINK_LIBS} tcmallocstatic)
+set (IMPALA_LINK_LIBS_NO_TCMALLOC ${IMPALA_LINK_LIBS} MallocUtilLibc)
+if ("${CMAKE_BUILD_TYPE}" STREQUAL "ADDRESS_SANITIZER" OR
+    "${CMAKE_BUILD_TYPE}" STREQUAL "TSAN" OR
+    "${CMAKE_BUILD_TYPE}" STREQUAL "TSAN_FULL")
+  set (IMPALA_LINK_LIBS ${IMPALA_LINK_LIBS} MallocUtilSanitizer)
+  set (UNIFIED_TEST_LINK_LIBS ${UNIFIED_TEST_LINK_LIBS} MallocUtilSanitizer)
+else()
+  set (IMPALA_LINK_LIBS ${IMPALA_LINK_LIBS} MallocUtilGperftools)
+  set (UNIFIED_TEST_LINK_LIBS ${UNIFIED_TEST_LINK_LIBS} MallocUtilGperftools)
 endif()
 
 # When we link statically, we need to replace the static libhdfs.a with the dynamic
