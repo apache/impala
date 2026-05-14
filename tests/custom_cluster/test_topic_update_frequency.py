@@ -97,9 +97,9 @@ class TestTopicUpdateFrequency(CustomClusterTestSuite):
     # holding the table lock. These debug actions are tuned such that each of the blocking
     # queries below take little more than 10 seconds (much slower than fast queries).
     debug_action = (
-      "catalogd_refresh_hdfs_listing_delay:SLEEP@6|"
-      "catalogd_table_recover_delay:SLEEP@2000|"
-      "catalogd_update_stats_delay:SLEEP@2000")
+      "catalogd_refresh_hdfs_listing_delay:SLEEP@12|"
+      "catalogd_table_recover_delay:SLEEP@4000|"
+      "catalogd_update_stats_delay:SLEEP@4000")
     blocking_query_options = {
       "debug_action": debug_action
     }
@@ -160,9 +160,9 @@ class TestTopicUpdateFrequency(CustomClusterTestSuite):
     self.client.execute("refresh tpcds.store_sales")
     self.client.execute("refresh functional.alltypes")
     debug_action = (
-      "catalogd_refresh_hdfs_listing_delay:SLEEP@6|"
-      "catalogd_table_recover_delay:SLEEP@2000|"
-      "catalogd_update_stats_delay:SLEEP@2000")
+      "catalogd_refresh_hdfs_listing_delay:SLEEP@12|"
+      "catalogd_table_recover_delay:SLEEP@4000|"
+      "catalogd_update_stats_delay:SLEEP@4000")
     blocking_query_options = {
       "debug_action": debug_action,
       "sync_ddl": "true"
@@ -183,8 +183,8 @@ class TestTopicUpdateFrequency(CustomClusterTestSuite):
 
   def __run_topic_update_test_inner(self, slow_blocking_query, fast_queries,
       init_queries, blocking_query_options,
-      non_blocking_query_options=None, blocking_query_min_time=2000,
-      fast_query_timeout_ms=1000, non_blocking_impalad=0,
+      non_blocking_query_options=None, blocking_query_min_time=4000,
+      fast_query_timeout_ms=2000, non_blocking_impalad=0,
       expect_topic_updates_to_block=False):
     """This function runs the slow query in a Impala client and then creates separate
     Impala clients to run the fast_queries. It makes sure that the
@@ -252,9 +252,9 @@ class TestTopicUpdateFrequency(CustomClusterTestSuite):
       "compute stats functional.alltypes"
     ]
     debug_action = (
-      "catalogd_refresh_hdfs_listing_delay:SLEEP@6|"
-      "catalogd_table_recover_delay:SLEEP@2000|"
-      "catalogd_update_stats_delay:SLEEP@2000")
+      "catalogd_refresh_hdfs_listing_delay:SLEEP@12|"
+      "catalogd_table_recover_delay:SLEEP@4000|"
+      "catalogd_update_stats_delay:SLEEP@4000")
     blocking_query_options = {
       "debug_action": debug_action,
       "sync_ddl": "true"
@@ -406,7 +406,7 @@ class TestTopicUpdateFrequency(CustomClusterTestSuite):
     # Debug action delays compute stats operations on the Iceberg table
     # catalogd_update_stats_delay works for both HdfsTable and IcebergTable
     # since IcebergTable delegates to its internal HdfsTable
-    debug_action = "catalogd_update_stats_delay:SLEEP@2000"
+    debug_action = "catalogd_update_stats_delay:SLEEP@4000"
     blocking_query_options = {
       "debug_action": debug_action,
     }
