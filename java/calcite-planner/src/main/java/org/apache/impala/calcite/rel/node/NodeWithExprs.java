@@ -18,6 +18,7 @@
 package org.apache.impala.calcite.rel.node;
 
 import org.apache.impala.analysis.Expr;
+import org.apache.impala.analysis.TableRef;
 import org.apache.impala.planner.PlanNode;
 
 import java.util.List;
@@ -33,22 +34,24 @@ public class NodeWithExprs {
   public final List<Expr> outputExprs_;
   public final List<String> fieldNames_;
   public final Expr countStarOptimization_;
+  public final List<TableRef> tblRefs_;
 
   public NodeWithExprs(PlanNode planNode, List<Expr> outputExprs,
-      List<String> fieldNames) {
-    this(planNode, outputExprs, fieldNames, null);
+      List<String> fieldNames, List<TableRef> tblRefs) {
+    this(planNode, outputExprs, fieldNames, tblRefs, null);
   }
 
   public NodeWithExprs(PlanNode planNode, NodeWithExprs childNodeWithExprs) {
     this(planNode, childNodeWithExprs.outputExprs_, childNodeWithExprs.fieldNames_,
-        null);
+        childNodeWithExprs.tblRefs_, null);
   }
 
   public NodeWithExprs(PlanNode planNode, List<Expr> outputExprs,
-      List<String> fieldNames, Expr countStarOptimization) {
+      List<String> fieldNames, List<TableRef> tblRefs, Expr countStarOptimization) {
     this.planNode_ = planNode;
     this.outputExprs_ = outputExprs;
     this.fieldNames_ = fieldNames;
     this.countStarOptimization_ = countStarOptimization;
+    this.tblRefs_ = tblRefs;
   }
 }

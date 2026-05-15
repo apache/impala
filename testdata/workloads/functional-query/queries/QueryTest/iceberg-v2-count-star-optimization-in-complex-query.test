@@ -81,6 +81,9 @@ join diff_count using (id);
 BIGINT,BIGINT
 ---- RUNTIME_PROFILE:
   |  output exprs: count(*) - count(*) + CAST(3 AS BIGINT), count(*)
+---- CALCITE_PLANNER_RUNTIME_PROFILE:
+# db name is included in "expected_merge_exclude_columns_1, so using regex
+row_regex:.*output exprs: subtract.*\(sum_init_zero\(.*expected_merge_exclude_columns_1.*.stats: num_rows\).*, .*add\(count\(\), CAST\(3 AS BIGINT\)\)\), count\(\)
 ====
 ---- QUERY
 -- Let's have modifications in the reference table as well.
@@ -132,4 +135,6 @@ join diff_count using (id);
 BIGINT,BIGINT
 ---- RUNTIME_PROFILE:
   |  output exprs: count(*) + CAST(1 AS BIGINT) - count(*) + CAST(3 AS BIGINT), count(*)
+---- CALCITE_PLANNER_RUNTIME_PROFILE:
+  |  output exprs: subtract(add(count(), CAST(1 AS BIGINT)), add(count(), CAST(3 AS BIGINT))), count()
 ====

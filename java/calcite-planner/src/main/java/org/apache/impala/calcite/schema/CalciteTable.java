@@ -59,6 +59,7 @@ import org.apache.impala.planner.HdfsPartitionPruner;
 import org.apache.impala.util.AcidUtils;
 
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -270,7 +271,7 @@ public class CalciteTable extends RelOptAbstractTable
    * Returns true if the conditions on the table meet the requirements
    * needed to apply the count star optimization.
    */
-  public boolean canApplyCountStarOptimization(List<String> fieldNames) {
+  public boolean canApplyCountStarOptimization() {
     Set<HdfsFileFormat> fileFormats = table_.getFileFormats();
     if (fileFormats.size() != 1) {
       return false;
@@ -283,12 +284,14 @@ public class CalciteTable extends RelOptAbstractTable
     if (AcidUtils.isFullAcidTable(table_.getMetaStoreTable().getParameters())) {
       return false;
     }
-    return isOnlyClusteredCols(fieldNames);
+
+    return true;
   }
 
-  public boolean isOnlyClusteredCols(List<String> fieldNames) {
-    for (int i = 0; i < fieldNames.size(); i++) {
-      if (!table_.isClusteringColumn(table_.getColumn(fieldNames.get(i)))) {
+  public boolean isOnlyClusteredCols(Collection<String> fieldNames) {
+    for (String fieldName : fieldNames) {
+      Column c = table_.getColumn(fieldName);
+      if (!table_.isClusteringColumn(c)) {
         return false;
       }
     }

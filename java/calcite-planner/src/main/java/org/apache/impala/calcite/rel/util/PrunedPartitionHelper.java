@@ -23,6 +23,7 @@ import org.apache.impala.analysis.Expr;
 import org.apache.impala.analysis.SlotId;
 import org.apache.impala.analysis.TupleDescriptor;
 import org.apache.impala.calcite.schema.CalciteTable;
+import org.apache.impala.calcite.schema.CalciteIcebergTable;
 import org.apache.impala.catalog.FeFsPartition;
 import org.apache.impala.common.ImpalaException;
 import org.apache.impala.common.Pair;
@@ -64,12 +65,17 @@ public class PrunedPartitionHelper {
         new ImmutableList.Builder();
     List<SlotId> partitionSlots = tupleDesc.getPartitionSlots();
 
-    for (Expr conjunct : conjuncts) {
-      if (HdfsPartitionPruner.isPartitionPrunedFilterConjunct(partitionSlots, conjunct,
-          false)) {
-        partitionedConjBuilder.add(conjunct);
-      } else {
-        nonPartitionedConjBuilder.add(conjunct);
+    if (table instanceof CalciteIcebergTable) {
+      // Iceberg tables handle partitioned conjuncts in a different way.
+      nonPartitionedConjBuilder.addAll(conjuncts);
+    } else {
+      for (Expr conjunct : conjuncts) {
+        if (HdfsPartitionPruner.isPartitionPrunedFilterConjunct(partitionSlots, conjunct,
+            false)) {
+          partitionedConjBuilder.add(conjunct);
+        } else {
+          nonPartitionedConjBuilder.add(conjunct);
+        }
       }
     }
 

@@ -23,6 +23,29 @@ aggregation(SUM, NumOrcStripes): 4
 aggregation(SUM, NumFileMetadataRead): 0
 ====
 ---- QUERY
+select sum(i), count(*) as c from functional_parquet.iceberg_v2_positional_not_all_data_files_have_delete_files
+union all
+(select sum(i), count(*) c from functional_parquet.iceberg_v2_positional_not_all_data_files_have_delete_files_orc)
+union all
+(select -1, -1 as c)
+union all
+(select sum(i), count(*) as c from functional_parquet.iceberg_v2_no_deletes)
+union all
+(select sum(i), count(*) as c from functional_parquet.iceberg_v2_no_deletes_orc) order by c;
+---- RESULTS
+-1,-1
+6,3
+6,3
+21,6
+21,6
+---- TYPES
+BIGINT, BIGINT
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 7
+aggregation(SUM, NumOrcStripes): 7
+aggregation(SUM, NumFileMetadataRead): 0
+====
+---- QUERY
 with u1 as (select count(*) as c from functional_parquet.iceberg_v2_positional_not_all_data_files_have_delete_files),
 u2 as (select count(*) c from functional_parquet.iceberg_v2_positional_not_all_data_files_have_delete_files_orc),
 u3 as (select -1 as c),
@@ -88,4 +111,17 @@ select 1 from functional_parquet.iceberg_v2_positional_not_all_data_files_have_d
 1
 ---- TYPES
 TINYINT
+====
+---- QUERY
+select count(*) + 1000 from functional_parquet.iceberg_v2_positional_not_all_data_files_have_delete_files
+---- RESULTS
+1006
+---- TYPES
+BIGINT
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 6
+aggregation(SUM, NumFileMetadataRead): 0
+---- CALCITE_PLANNER_RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 4
+aggregation(SUM, NumFileMetadataRead): 0
 ====

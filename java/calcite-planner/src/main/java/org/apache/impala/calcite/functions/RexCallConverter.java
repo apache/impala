@@ -38,6 +38,8 @@ import org.apache.impala.analysis.CompoundPredicate;
 import org.apache.impala.analysis.Expr;
 import org.apache.impala.analysis.FunctionCallExpr;
 import org.apache.impala.analysis.IsNullPredicate;
+import org.apache.impala.analysis.LikePredicate;
+import org.apache.impala.analysis.LiteralExpr;
 import org.apache.impala.analysis.NumericLiteral;
 import org.apache.impala.analysis.TimestampArithmeticExpr;
 import org.apache.impala.calcite.operators.ImpalaInOperator;
@@ -84,6 +86,7 @@ public class RexCallConverter {
     switch (rexCall.getOperator().getKind()) {
       case OR:
       case AND:
+      case NOT:
         return createCompoundExpr(rexCall, params);
       case CAST:
         return createCastExpr(rexCall, params, analyzer);
@@ -93,6 +96,8 @@ public class RexCallConverter {
         return new IsNullPredicate(params.get(0), false);
       case IS_NOT_NULL:
         return new IsNullPredicate(params.get(0), true);
+      case LIKE:
+        return createLikeExpr(rexCall, params);
       case OTHER:
         if (rexCall.getOperator() instanceof ImpalaInOperator) {
           return createInExpr(rexCall, params);
@@ -177,9 +182,18 @@ public class RexCallConverter {
         return CompoundPredicate.createDisjunctivePredicate(params);
       case AND:
         return CompoundPredicate.createConjunctivePredicate(params);
+      case NOT:
+        return new CompoundPredicate(CompoundPredicate.Operator.NOT, params.get(0), null);
     }
     Preconditions.checkState(false, "Unknown type: " + rexCall.getOperator().getKind());
     return null;
+  }
+
+  private static Expr createLikeExpr(RexCall rexCall, List<Expr> params)
+      throws ImpalaException {
+    String funcName = rexCall.getOperator().getName().toUpperCase();
+    LikePredicate.Operator likeOp = LikePredicate.Operator.valueOf(funcName);
+    return new LikePredicate(likeOp, params.get(0), params.get(1));
   }
 
   /**
@@ -227,8 +241,18 @@ public class RexCallConverter {
 
     // The last parameter is only true if it is an implicit cast. An explicit
     // cast will have a "kind" of SqlKind.OTHER and the name "explicit_cast".
-    return new AnalyzedCastExpr(impalaRetType, paramsOperand,
+    CastExpr castExpr = new AnalyzedCastExpr(impalaRetType, paramsOperand,
         call.getOperator().getKind().equals(SqlKind.CAST));
+
+    if (paramsOperand instanceof LiteralExpr) {
+      // remove the cast expression and create the exact literal.
+      Expr retExpr = LiteralExpr.createBounded(castExpr, analyzer.getQueryCtx(),
+          LiteralExpr.MAX_STRING_LITERAL_SIZE, true);
+      // retExpr can be null if trying to cast "Inf" to double. In that case, let the
+      // backend handle the cast rather than trying to fold it here.
+      return retExpr != null ? retExpr : castExpr;
+    }
+    return castExpr;
   }
 
   private static Expr createDecodeExpr(Function fn, List<Expr> params,

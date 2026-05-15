@@ -25,14 +25,19 @@ import org.apache.calcite.rex.RexLiteral;
 import org.apache.calcite.sql.type.SqlTypeName;
 import org.apache.calcite.util.DateString;
 import org.apache.calcite.util.TimestampString;
+import org.apache.impala.analysis.Analyzer;
+import org.apache.impala.analysis.CastExpr;
 import org.apache.impala.analysis.Expr;
 import org.apache.impala.analysis.BoolLiteral;
 import org.apache.impala.analysis.DateLiteral;
+import org.apache.impala.analysis.LiteralExpr;
 import org.apache.impala.analysis.NumericLiteral;
 import org.apache.impala.analysis.StringLiteral;
+import org.apache.impala.calcite.functions.AnalyzedCastExpr;
 import org.apache.impala.calcite.type.ImpalaTypeConverter;
 import org.apache.impala.catalog.Function;
 import org.apache.impala.catalog.Type;
+import org.apache.impala.common.AnalysisException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -49,7 +54,8 @@ public class RexLiteralConverter {
   /*
    * Returns Expr object for ImpalaRexLiteral
    */
-  public static Expr getExpr(RexLiteral rexLiteral) {
+  public static Expr getExpr(RexLiteral rexLiteral, Analyzer analyzer)
+      throws AnalysisException {
     if (SqlTypeName.INTERVAL_TYPES.contains(rexLiteral.getTypeName())) {
       return NumericLiteral.create(
           new BigDecimal(rexLiteral.getValueAs(Long.class)), Type.BIGINT);
@@ -100,7 +106,7 @@ public class RexLiteralConverter {
         Expr dateExpr = new DateLiteral(rexLiteral.getValueAs(Integer.class), dateString);
         return dateExpr;
       case TIMESTAMP:
-          return createCastTimestampExpr(rexLiteral);
+          return createTimestampExpr(rexLiteral, analyzer);
       default:
         Preconditions.checkState(false, "Unsupported RexLiteral: "
             + rexLiteral.getTypeName());
@@ -109,21 +115,22 @@ public class RexLiteralConverter {
   }
 
   /**
-   * Create a cast timestamp expression from a String to a Timestamp.
-   * The only way to create a TimestampLiteral directly in Impala is by accessing
-   * the backend. This will normally be done earlier in Calcite via constant folding.
-   * If constant folding was not allowed, it means we did not have access to the backend
-   * and thus need to do a cast in order to support conversion to a Timestamp.
+   * Create a LiteralExpr timestamp expression from a String to a Timestamp.
+   * The RexLiteral will be retrieved out as a String and then the backend will
+   * use constant folding to create the TimeStamp LiteralExpr object.
    */
-  private static Expr createCastTimestampExpr(RexLiteral rexLiteral) {
+  private static Expr createTimestampExpr(RexLiteral rexLiteral, Analyzer analyzer)
+      throws AnalysisException {
     List<RelDataType> typeNames =
         ImmutableList.of(ImpalaTypeConverter.getRelDataType(Type.STRING));
 
     String timestamp = rexLiteral.getValueAs(TimestampString.class).toString();
-    List<Expr> argList =
-        Lists.newArrayList(new StringLiteral(timestamp, Type.STRING, false));
-    Function castFunc = FunctionResolver.getExactFunction("casttotimestamp", typeNames);
-    return new AnalyzedFunctionCallExpr(castFunc, argList, Type.TIMESTAMP);
+    StringLiteral stringLiteral = new StringLiteral(timestamp, Type.STRING, false);
+    stringLiteral.analyze(analyzer);
+    CastExpr castExpr = new AnalyzedCastExpr(Type.TIMESTAMP, stringLiteral, true);
+    castExpr.analyze(analyzer);
+    return LiteralExpr.createBounded(castExpr, analyzer.getQueryCtx(),
+          LiteralExpr.MAX_STRING_LITERAL_SIZE, true);
   }
 
   private static Expr createCastNanOrInf(Object o, Type t) {

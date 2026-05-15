@@ -295,6 +295,24 @@ BIGINT
 ---- RUNTIME_PROFILE
 aggregation(SUM, NumRowGroups): 0
 aggregation(SUM, NumFileMetadataRead): 4
+---- CALCITE_PLANNER_RUNTIME_PROFILE
+# IMPALA-15077: Calcite is converting bool_col = true to bool_col which is not being recognized
+# for count star optimization
+aggregation(SUM, NumRowGroups): 8 
+aggregation(SUM, NumFileMetadataRead): 0
+====
+---- QUERY
+# IMPALA-15077: "where bool_col" is not being recognized in count star optimization for
+# both original planner and Calcite planner
+select count(*) from alltypes_part
+where bool_col
+---- RESULTS
+4
+---- TYPES
+BIGINT
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 8
+aggregation(SUM, NumFileMetadataRead): 0
 ====
 ---- QUERY
 select count(*) from alltypes_part

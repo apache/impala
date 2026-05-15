@@ -1905,7 +1905,7 @@ public class SingleNodePlanner implements SingleNodePlannerIntf {
     if (table instanceof FeFsTable) {
       if (table instanceof FeIcebergTable) {
         IcebergScanPlanner icebergPlanner = new IcebergScanPlanner(analyzer, ctx_, tblRef,
-            conjuncts, aggInfo, new ScanNodeHelperImpl());
+            conjuncts, aggInfo, new ScanNodeHelperImpl(aggInfo));
         return icebergPlanner.createIcebergScanPlan();
       }
       return createHdfsScanPlan(tblRef, aggInfo, conjuncts, analyzer);

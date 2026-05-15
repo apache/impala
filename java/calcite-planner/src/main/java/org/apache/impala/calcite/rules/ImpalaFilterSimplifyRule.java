@@ -20,10 +20,12 @@ import org.apache.calcite.plan.RelOptCluster;
 import org.apache.calcite.plan.RelOptRule;
 import org.apache.calcite.plan.RelOptRuleCall;
 import org.apache.calcite.rel.core.Filter;
+import org.apache.calcite.rel.logical.LogicalValues;
 import org.apache.calcite.rex.RexBuilder;
 import org.apache.calcite.rex.RexExecutor;
 import org.apache.calcite.rex.RexNode;
 import org.apache.impala.calcite.operators.ImpalaRexSimplify;
+
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
 
@@ -57,6 +59,12 @@ public class ImpalaFilterSimplifyRule extends RelOptRule {
     executor.reduce(rexBuilder, ImmutableList.of(newCondition), reducedExprs);
     Preconditions.checkState(reducedExprs.size() == 1);
     newCondition = reducedExprs.get(0);
+
+    if (newCondition.isAlwaysFalse()) {
+      call.transformTo(LogicalValues.create(cluster, filter.getRowType(),
+          ImmutableList.of()));
+      return;
+    }
 
     if (newCondition.equals(condition)) {
       return;

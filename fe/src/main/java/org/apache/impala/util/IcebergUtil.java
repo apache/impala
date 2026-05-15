@@ -1895,4 +1895,35 @@ public class IcebergUtil {
     }
     return result;
   }
+
+  public static boolean canUsePartitionKeyScan(FeIcebergTable table,
+      IcebergColumn column) {
+    // We check all partition specs here. We are a bit stricter than necessary,
+    // because old partition specs might no longer have any data.
+    // TODO: later we could group data files (without deletes) into categories:
+    // - files eligible for partition key scan
+    // - files non-eligible for partition key scans
+    // Then we could do the following plan:
+    //              UNION  ALL
+    //           /       |      \
+    //         /         |        \
+    //       /           |          \
+    //  PARTITION     SCAN         ICEBERG
+    //  KEY          WITHOUT       DELETE
+    //  SCAN         DELETES        NODE
+    //                              /  \
+    //                             /    \
+    //                           SCAN   SCAN
+    //                           data   delete
+    //                           files  files
+    // Later PARTITION KEY SCAN could be a UNION NODE that produces the partition keys,
+    // see SingleNodePlanner.createOptimizedPartitionUnionNode().
+    for (IcebergPartitionSpec spec : table.getPartitionSpecs()) {
+      if (IcebergUtil.getPartitionTransformType(column, spec) !=
+          TIcebergPartitionTransformType.IDENTITY) {
+        return false;
+      }
+    }
+    return true;
+  }
 }

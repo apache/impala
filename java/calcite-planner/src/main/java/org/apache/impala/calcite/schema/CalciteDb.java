@@ -29,6 +29,7 @@ import org.apache.calcite.schema.impl.AbstractSchema;
 import org.apache.calcite.schema.impl.ViewTable;
 import org.apache.impala.analysis.Analyzer;
 import org.apache.impala.calcite.type.ImpalaTypeSystemImpl;
+import org.apache.impala.catalog.FeIcebergTable;
 import org.apache.impala.catalog.FeTable;
 import org.apache.impala.catalog.FeView;
 import org.apache.impala.catalog.HdfsTable;
@@ -69,6 +70,12 @@ public class CalciteDb extends AbstractSchema {
       if (table instanceof LocalFsTable || table instanceof HdfsTable) {
         tableMap_.put(
             tableName.toLowerCase(), new CalciteTable(table, reader_, analyzer));
+        return this;
+      }
+
+      if (table instanceof FeIcebergTable) {
+        tableMap_.put(tableName.toLowerCase(),
+            new CalciteIcebergTable((FeIcebergTable) table, reader_, analyzer));
         return this;
       }
 

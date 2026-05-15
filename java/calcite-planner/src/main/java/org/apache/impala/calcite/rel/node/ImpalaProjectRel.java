@@ -98,7 +98,8 @@ public class ImpalaProjectRel extends Project
     // There is no Impala Plan Node mapped to Project, so we just return the child
     // PlanNode. However, the outputExprs change with the Project.
     return new NodeWithExprs(inputWithExprs.planNode_, outputExprs,
-        getRowType().getFieldNames(), inputWithExprs.countStarOptimization_);
+        getRowType().getFieldNames(), inputWithExprs.tblRefs_,
+        inputWithExprs.countStarOptimization_);
   }
 
   /**
@@ -233,7 +234,7 @@ public class ImpalaProjectRel extends Project
     PlanNodeId nodeId = context.ctx_.getNextNodeId();
     List<NodeWithExprs> nodeWithExprsList = new ArrayList<>();
     nodeWithExprsList.add(new NodeWithExprs(null, outputExprs,
-        getRowType().getFieldNames()));
+        getRowType().getFieldNames(), ImmutableList.of()));
     NodeWithExprs retNode = NodeCreationUtils.createUnionPlanNode(nodeId,
         context.ctx_.getRootAnalyzer(), rowType, nodeWithExprsList, true);
     return NodeCreationUtils.wrapInSelectNodeIfNeeded(context, retNode,

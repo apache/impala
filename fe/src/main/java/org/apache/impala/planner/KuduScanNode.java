@@ -142,7 +142,7 @@ public class KuduScanNode extends ScanNode {
 
   public KuduScanNode(PlanNodeId id, TupleDescriptor desc, List<Expr> conjuncts,
       MultiAggregateInfo aggInfo, TableRef kuduTblRef) {
-    super(id, desc, "SCAN KUDU", new ScanNodeHelperImpl());
+    super(id, desc, "SCAN KUDU", new ScanNodeHelperImpl(aggInfo));
     kuduTable_ = (FeKuduTable) desc_.getTable();
     conjuncts_ = conjuncts;
     aggInfo_ = aggInfo;

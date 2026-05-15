@@ -16,6 +16,22 @@ aggregation(SUM, NumRowGroups): 0
 aggregation(SUM, NumFileMetadataRead): 0
 ====
 ---- QUERY
+select count(*) + 1000 from ice_tbl;
+---- RESULTS
+1000
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 0
+aggregation(SUM, NumFileMetadataRead): 0
+====
+---- QUERY
+select count(1) from ice_tbl;
+---- RESULTS
+0
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 0
+aggregation(SUM, NumFileMetadataRead): 0
+====
+---- QUERY
 insert into
   ice_tbl
 values
@@ -121,6 +137,8 @@ explain select count(col_i), count(*) from ice_tbl;
 ---- RESULTS: VERIFY_IS_SUBSET
 'Analyzed query: SELECT count(col_i), CAST(8 AS BIGINT) FROM'
 '$DATABASE.ice_tbl'
+---- CALCITE_PLANNER_RESULTS: VERIFY_IS_SUBSET
+# Calcite planner does not contain 'Analyzed query'
 ====
 ---- QUERY
 set explain_level=3;
@@ -128,6 +146,8 @@ explain select count(distinct col_i), count(*) from ice_tbl;
 ---- RESULTS: VERIFY_IS_SUBSET
 'Analyzed query: SELECT count(DISTINCT col_i), CAST(8 AS BIGINT) FROM'
 '$DATABASE.ice_tbl'
+---- CALCITE_PLANNER_RESULTS: VERIFY_IS_SUBSET
+# Calcite planner does not contain 'Analyzed query'
 ====
 ---- QUERY
 set explain_level=3;
@@ -135,6 +155,8 @@ explain select min(col_i), count(*), max(col_i) from ice_tbl;
 ---- RESULTS: VERIFY_IS_SUBSET
 'Analyzed query: SELECT min(col_i), CAST(8 AS BIGINT), max(col_i) FROM'
 '$DATABASE.ice_tbl'
+---- CALCITE_PLANNER_RESULTS: VERIFY_IS_SUBSET
+# Calcite planner does not contain 'Analyzed query'
 ====
 ---- QUERY
 set explain_level=3;
@@ -142,6 +164,8 @@ explain select 123, count(*), 321 from ice_tbl;
 ---- RESULTS: VERIFY_IS_SUBSET
 'Analyzed query: SELECT CAST(123 AS TINYINT), CAST(8 AS BIGINT), CAST(321 AS'
 'SMALLINT)'
+---- CALCITE_PLANNER_RESULTS: VERIFY_IS_SUBSET
+# Calcite planner does not contain 'Analyzed query'
 ====
 ---- QUERY
 # Filtering by a partition column results in Iceberg doing the filtering instead of Impala.
@@ -180,8 +204,12 @@ group by
 4
 4
 ---- RUNTIME_PROFILE
+# IMPALA-14995: need to add optimization for count star on grouped partitioned column
 aggregation(SUM, NumRowGroups): 4
 aggregation(SUM, NumFileMetadataRead): 0
+---- CALCITE_PLANNER_RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 0
+aggregation(SUM, NumFileMetadataRead): 4
 ====
 ---- QUERY
 select

@@ -45,7 +45,6 @@ import org.apache.impala.calcite.functions.AnalyzedFunctionCallExpr;
 import org.apache.impala.calcite.functions.AnalyzedNullLiteral;
 import org.apache.impala.calcite.functions.FunctionResolver;
 import org.apache.impala.calcite.rel.phys.ImpalaHashJoinNode;
-import org.apache.impala.calcite.rel.phys.ImpalaHdfsScanNode;
 import org.apache.impala.calcite.rel.phys.ImpalaNestedLoopJoinNode;
 import org.apache.impala.calcite.rel.util.CreateExprVisitor;
 import org.apache.impala.calcite.rel.util.ExprConjunctsConverter;
@@ -168,11 +167,16 @@ public class ImpalaJoinRel extends Join
     exprsToRegister.addAll(filterConjuncts);
     exprsToRegister.addAll(otherJoinConjuncts);
     registerConjuncts(getJoinConjunctListToRegister(exprsToRegister), analyzer,
-        joinNode, joinOp);
+        joinNode, joinOp, leftInput.tblRefs_, rightInput.tblRefs_);
 
     joinNode.setOutputSmap(new ExprSubstitutionMap());
 
-    return new NodeWithExprs(joinNode, outputExprs, getRowType().getFieldNames());
+    List<TableRef> tableRefs = ImmutableList.<TableRef> builder()
+        .addAll(leftInput.tblRefs_)
+        .addAll(rightInput.tblRefs_)
+        .build();
+    return new NodeWithExprs(joinNode, outputExprs, getRowType().getFieldNames(),
+        tableRefs);
   }
 
   private NodeWithExprs getChildPlanNode(RelNode relInput,
@@ -511,16 +515,15 @@ public class ImpalaJoinRel extends Join
    * valueTransfersGraph to determine if runtime filters can be created.
    */
   private void registerConjuncts(List<Expr> equiJoinExprs, Analyzer analyzer,
-      PlanNode joinNode, JoinOperator joinOp) throws ImpalaException {
+      PlanNode joinNode, JoinOperator joinOp, List<TableRef> lhsTableRefs,
+      List<TableRef> rhsTableRefs) throws ImpalaException {
     if (equiJoinExprs.size() == 0) {
       return;
     }
 
     if (joinOp == JoinOperator.RIGHT_OUTER_JOIN) {
-      List<TableRef> lhsTableRefs = getTableRefs(joinNode.getChild(0));
       registerOuterJoinedTids(lhsTableRefs, analyzer, joinOp);
     }
-    List<TableRef> rhsTableRefs = getTableRefs(joinNode.getChild(1));
     if (joinOp == JoinOperator.LEFT_OUTER_JOIN) {
       registerOuterJoinedTids(rhsTableRefs, analyzer, joinOp);
     }
@@ -535,19 +538,6 @@ public class ImpalaJoinRel extends Join
       analyzer.registerOuterJoinedTids(tableRef.getId().asList(), tableRef);
       tableRef.setJoinOp(joinOp);
     }
-  }
-
-  private List<TableRef> getTableRefs(PlanNode planNode) {
-    if (planNode instanceof ImpalaHdfsScanNode) {
-      ImpalaHdfsScanNode scanNode = (ImpalaHdfsScanNode) planNode;
-      return Lists.newArrayList(scanNode.getTableRef());
-    }
-
-    List<TableRef> tableRefs = new ArrayList<>();
-    for (PlanNode child : planNode.getChildren()) {
-      tableRefs.addAll(getTableRefs(child));
-    }
-    return tableRefs;
   }
 
   private boolean isStraightJoin() {

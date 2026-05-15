@@ -23,12 +23,28 @@ import com.google.common.base.Preconditions;
 
 import org.apache.impala.analysis.Analyzer;
 import org.apache.impala.analysis.Expr;
+import org.apache.impala.analysis.MultiAggregateInfo;
 import org.apache.impala.analysis.SlotDescriptor;
 
 /**
  * Default {@link ScanNodeHelper} for the classic Impala planner.
  */
 public final class ScanNodeHelperImpl implements ScanNodeHelper {
+
+  private final boolean isDistinctOnly_;
+
+  public ScanNodeHelperImpl() {
+    this(null);
+  }
+
+  public ScanNodeHelperImpl(MultiAggregateInfo aggInfo) {
+    isDistinctOnly_ = aggInfo != null && aggInfo.hasAllDistinctAgg();
+  }
+
+  @Override
+  public boolean isDistinctOnly() {
+    return isDistinctOnly_;
+  }
 
   /**
    * Returns the count star optimization descriptor for the given scan node if

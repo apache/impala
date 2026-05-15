@@ -27,6 +27,8 @@ import org.apache.impala.analysis.SlotDescriptor;
  * Shared scan planning helpers and flags for the physical planner.
  */
 public interface ScanNodeHelper {
+  boolean isDistinctOnly();
+
   SlotDescriptor getCountStarOptimizationDescriptor(ScanNode scanNode,
       Analyzer analyzer, List<Expr> conjuncts);
 }

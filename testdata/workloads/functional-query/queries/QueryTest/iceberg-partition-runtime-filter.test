@@ -97,6 +97,16 @@ aggregation(SUM, Rows processed): 3
 aggregation(SUM, Rows rejected): 1
 aggregation(SUM, NumRowGroups): 12
 aggregation(SUM, NumDictFilteredRowGroups): 4
+---- CALCITE_PLANNER_RUNTIME_PROFILE
+# Calcite adds an extra runtime filter for "is not null"
+aggregation(SUM, Files processed): 0
+aggregation(SUM, Files rejected): 0
+aggregation(SUM, RowGroups processed): 5
+aggregation(SUM, RowGroups rejected): 0
+aggregation(SUM, Rows processed): 2
+aggregation(SUM, Rows rejected): 0
+aggregation(SUM, NumRowGroups): 6
+aggregation(SUM, NumDictFilteredRowGroups): 4
 ====
 ---- QUERY
 CREATE TABLE iceberg_bucket_partition_runtime_filter (col_1 int, col_2 int, col_3 string)
@@ -131,6 +141,15 @@ aggregation(SUM, Rows processed): 2
 aggregation(SUM, Rows rejected): 0
 aggregation(SUM, NumRowGroups): 6
 aggregation(SUM, NumDictFilteredRowGroups): 2
+---- CALCITE_PLANNER_RUNTIME_PROFILE
+aggregation(SUM, Files processed): 0
+aggregation(SUM, Files rejected): 0
+aggregation(SUM, RowGroups processed): 3
+aggregation(SUM, RowGroups rejected): 0
+aggregation(SUM, Rows processed): 2
+aggregation(SUM, Rows rejected): 0
+aggregation(SUM, NumRowGroups): 4
+aggregation(SUM, NumDictFilteredRowGroups): 2
 ====
 ---- QUERY
 # Bucketting columns can not be evaluated during file runtime filtering. However, other
@@ -152,5 +171,14 @@ aggregation(SUM, RowGroups rejected): 0
 aggregation(SUM, Rows processed): 4
 aggregation(SUM, Rows rejected): 0
 aggregation(SUM, NumRowGroups): 4
+aggregation(SUM, NumDictFilteredRowGroups): 0
+---- CALCITE_PLANNER_RUNTIME_PROFILE
+aggregation(SUM, Files processed): 3
+aggregation(SUM, Files rejected): 2
+aggregation(SUM, RowGroups processed): 1
+aggregation(SUM, RowGroups rejected): 0
+aggregation(SUM, Rows processed): 4
+aggregation(SUM, Rows rejected): 0
+aggregation(SUM, NumRowGroups): 2
 aggregation(SUM, NumDictFilteredRowGroups): 0
 ====

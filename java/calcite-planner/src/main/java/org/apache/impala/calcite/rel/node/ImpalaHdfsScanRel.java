@@ -31,19 +31,25 @@ import org.apache.impala.analysis.TupleDescriptor;
 import org.apache.impala.calcite.rel.phys.ImpalaHdfsScanNode;
 import org.apache.impala.calcite.rel.util.ExprConjunctsConverter;
 import org.apache.impala.calcite.rel.util.PrunedPartitionHelper;
+import org.apache.impala.calcite.schema.CalciteIcebergTable;
 import org.apache.impala.calcite.schema.CalciteTable;
 import org.apache.impala.calcite.util.SimplifiedAnalyzer;
 import org.apache.impala.catalog.Column;
 import org.apache.impala.catalog.FeFsPartition;
 import org.apache.impala.catalog.FeFsTable;
+import org.apache.impala.catalog.FeIcebergTable;
+import org.apache.impala.common.IcebergPredicateConverter;
 import org.apache.impala.common.ImpalaException;
 import org.apache.impala.common.UnsupportedFeatureException;
 import org.apache.impala.planner.HdfsScanNode;
+import org.apache.impala.planner.IcebergScanPlanner;
 import org.apache.impala.planner.PlanNode;
 import org.apache.impala.planner.PlanNodeId;
 import org.apache.impala.planner.ScanNode;
 import org.apache.impala.planner.ScanNodeHelper;
 import org.apache.impala.planner.SingleNodePlanner;
+
+import com.google.common.collect.ImmutableList;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -93,11 +99,15 @@ public class ImpalaHdfsScanRel extends TableScan
     // Under special conditions, a count star optimization can be applied, which
     // needs a special slot descriptor and slot ref.
     SlotDescriptor countStarDesc =
-        canUseCountStarOptimization(table, context, filterConjuncts)
+        canUseCountStarOptimization(table, context, filterConjuncts, analyzer)
             ? ScanNode.createCountStarOptimizationDesc(tupleDesc, analyzer)
             : null;
 
-    CalcitePlanNodeHelper helper = new CalcitePlanNodeHelper(countStarDesc);
+    boolean isDistinctOnly = context.parentAggregate_ != null
+        && context.parentAggregate_.hasDistinctOnly();
+
+    CalcitePlanNodeHelper helper =
+         new CalcitePlanNodeHelper(countStarDesc, isDistinctOnly);
 
     PlanNode physicalNode;
     if (SingleNodePlanner.addAcidSlotsIfNeeded(analyzer, baseTblRef,
@@ -114,6 +124,19 @@ public class ImpalaHdfsScanRel extends TableScan
         physicalNode =
             SingleNodePlanner.createOptimizedPartitionUnionNode(nodeId, impalaPartitions,
             tupleDesc, analyzer);
+      } else if (table instanceof CalciteIcebergTable) {
+        CalciteIcebergTable iceTable = (CalciteIcebergTable) table;
+        // Can't use filterConjuncts because it is in an immutable list and the iceberg
+        // planner can't handle that.
+        List<Expr> allConjuncts = new ArrayList<>(filterConjuncts);
+        if (context.parentAggregate_ != null &&
+            context.parentAggregate_.hasIcebergCountStarOptimization() &&
+            filterConjuncts.size() == 0) {
+          iceTable.testAndSetOptimizeCountStarForIcebergV2(baseTblRef);
+        }
+        IcebergScanPlanner icebergPlanner = new IcebergScanPlanner(analyzer, context.ctx_,
+            baseTblRef, allConjuncts, null, helper);
+        physicalNode = icebergPlanner.createIcebergScanPlan();
       } else {
         physicalNode = new ImpalaHdfsScanNode(nodeId, tupleDesc, impalaPartitions,
             baseTblRef, null, partitionConjuncts, filterConjuncts,
@@ -125,8 +148,8 @@ public class ImpalaHdfsScanRel extends TableScan
 
     Expr countStarOptimizationExpr = getCountStarOptimizationExpr(physicalNode);
 
-    return new NodeWithExprs(physicalNode, outputExprs,
-        getRowType().getFieldNames(), countStarOptimizationExpr);
+    return new NodeWithExprs(physicalNode, outputExprs, getRowType().getFieldNames(),
+        ImmutableList.of(baseTblRef), countStarOptimizationExpr);
   }
 
   private Expr getCountStarOptimizationExpr(PlanNode physicalNode) {
@@ -204,9 +227,8 @@ public class ImpalaHdfsScanRel extends TableScan
         throw new UnsupportedFeatureException(String.format(fieldName + " "
             + "is a complex type (array/map) column. "
             + "This is not currently supported."));
-      } else {
-        slotDesc.setIsMaterialized(true);
       }
+      slotDesc.setIsMaterialized(true);
     }
   }
 
@@ -238,20 +260,36 @@ public class ImpalaHdfsScanRel extends TableScan
    * Returns true if we can use the count star optimization. The re
    */
   private boolean canUseCountStarOptimization(CalciteTable table,
-      ParentPlanRelContext context, List<Expr> filterConjuncts) {
+      ParentPlanRelContext context, List<Expr> filterConjuncts,
+      Analyzer analyzer) {
     // The count(*) will exist in the parent aggregate if it can be used.
     if (context.parentAggregate_ == null ||
         !context.parentAggregate_.hasCountStarOnly()) {
       return false;
     }
 
-    if (!table.canApplyCountStarOptimization(getInputRefFieldNames(context))) {
+    if (!table.canApplyCountStarOptimization()) {
       return false;
     }
 
-    // Can only use the optimization if there are no filters applied on this scan.
-    if (filterConjuncts.size() > 0) {
+    if (!(table.isOnlyClusteredCols(getInputRefFieldNames(context)))) {
       return false;
+    }
+
+    // The conjuncts for non-iceberg tables will be handled by the partition pruner and
+    // will not be present here. However, Iceberg conjuncts need to be evaluated. Check
+    // the Iceberg converter to see if the conjuncts can be pushed down to Iceberg.
+    if (filterConjuncts.size() > 0) {
+      if (!(table instanceof CalciteIcebergTable)) {
+        return false;
+      } else {
+        for (Expr conjunct : filterConjuncts) {
+          if (!canConvertIcebergPredicate((FeIcebergTable) table.getFeFsTable(),
+              conjunct, analyzer)) {
+            return false;
+          }
+        }
+      }
     }
     return true;
   }
@@ -275,14 +313,30 @@ public class ImpalaHdfsScanRel extends TableScan
     return RelNodeType.HDFSSCAN;
   }
 
+  private static boolean canConvertIcebergPredicate(FeIcebergTable table, Expr expr,
+      Analyzer analyzer) {
+    IcebergPredicateConverter converter =
+        new IcebergPredicateConverter(table.getIcebergSchema(), analyzer);
+    IcebergPredicateConverter.ConverterResult result = converter.convert(expr);
+
+    return !(result.isFailed() || result.isPartiallyConverted());
+  }
+
   /**
    * Calcite-specific {@link ScanNodeHelper} helper implementation.
    */
   private static final class CalcitePlanNodeHelper implements ScanNodeHelper {
 
     private final SlotDescriptor countStarDesc_;
-    CalcitePlanNodeHelper(SlotDescriptor countStarDesc) {
+    private final boolean isDistinctOnly_;
+    CalcitePlanNodeHelper(SlotDescriptor countStarDesc, boolean isDistinctOnly) {
       countStarDesc_ = countStarDesc;
+      isDistinctOnly_ = isDistinctOnly;
+    }
+
+    @Override
+    public boolean isDistinctOnly() {
+      return isDistinctOnly_;
     }
 
     @Override

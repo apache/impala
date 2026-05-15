@@ -73,6 +73,7 @@ import org.apache.impala.calcite.type.ImpalaTypeConverter;
 import org.apache.impala.calcite.util.SimplifiedAnalyzer;
 import org.apache.impala.catalog.Function;
 import org.apache.impala.catalog.Type;
+import org.apache.impala.common.AnalysisException;
 import org.apache.impala.common.ImpalaException;
 import org.apache.impala.planner.AnalyticPlanner;
 import org.apache.impala.planner.AnalyticPlanner.PartitionLimit;
@@ -186,8 +187,8 @@ public class ImpalaAnalyticRel extends Project
 
     List<Expr> outputExprs = getOutputExprs(mapping, projects, simplifiedAnalyzer);
 
-    NodeWithExprs retNode =
-        new NodeWithExprs(planNode, outputExprs, getRowType().getFieldNames());
+    NodeWithExprs retNode = new NodeWithExprs(planNode, outputExprs,
+        getRowType().getFieldNames(), inputNodeWithExprs.tblRefs_);
 
     RexBuilder rexBuilder = getCluster().getRexBuilder();
     return context.filterCondition_ != null
@@ -349,7 +350,15 @@ public class ImpalaAnalyticRel extends Project
     // Walk through all the projects and grab the already created Expr object that exists
     // in the "mapping" variable.
     for (RexNode rexNode : projects) {
-      Expr expr = rexNode.accept(visitor);
+      Expr expr;
+      try {
+        expr = rexNode.accept(visitor);
+      } catch(Exception e) {
+        if (visitor.exception_ != null) {
+          throw visitor.exception_;
+        }
+        throw new AnalysisException(e);
+      }
       expr.analyze(analyzer);
       outputExprs.add(expr);
     }
@@ -637,6 +646,8 @@ public class ImpalaAnalyticRel extends Project
 
     private final Analyzer analyzer_;
 
+    private ImpalaException exception_;
+
     public AnalyticRexVisitor(Map<RexNode, Expr> exprsMap,
         RexBuilder rexBuilder, Analyzer analyzer) {
       super(false);
@@ -654,13 +665,19 @@ public class ImpalaAnalyticRel extends Project
       try {
         return RexCallConverter.getExpr(rexCall, params, rexBuilder_, analyzer_);
       } catch (ImpalaException e) {
+        exception_ = e;
         throw new RuntimeException(e);
       }
     }
 
     @Override
     public Expr visitLiteral(RexLiteral rexLiteral) {
-      return RexLiteralConverter.getExpr(rexLiteral);
+      try {
+        return RexLiteralConverter.getExpr(rexLiteral, analyzer_);
+      } catch (ImpalaException e) {
+        exception_ = e;
+        throw new RuntimeException(e);
+      }
     }
 
     @Override

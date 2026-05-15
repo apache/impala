@@ -33,6 +33,8 @@ import org.apache.impala.common.ImpalaException;
 import org.apache.impala.planner.PlanNode;
 import org.apache.impala.planner.PlanNodeId;
 
+import com.google.common.collect.ImmutableList;
+
 import java.util.ArrayList;
 import java.util.List;
 
@@ -116,7 +118,8 @@ public class ImpalaValuesRel extends Values
       i++;
     }
 
-    return new NodeWithExprs(retNode, outputExprs, getRowType().getFieldNames());
+    return new NodeWithExprs(retNode, outputExprs, getRowType().getFieldNames(),
+        ImmutableList.of());
   }
 
   private LiteralExpr getLiteralExprWithType(LiteralExpr expr, RelDataType type,

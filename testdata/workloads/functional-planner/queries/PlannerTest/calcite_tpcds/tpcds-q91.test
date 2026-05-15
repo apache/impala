@@ -147,12 +147,12 @@ PLAN-ROOT SINK
 |  |
 |  |--08:SCAN HDFS [tpcds_partitioned_parquet_snap.household_demographics]
 |  |     HDFS partitions=1/1 files=1 size=41.69KB
-|  |     predicates: like(tpcds_partitioned_parquet_snap.household_demographics.hd_buy_potential, '5001-10000%'), tpcds_partitioned_parquet_snap.household_demographics.hd_demo_sk IS NOT NULL
+|  |     predicates: tpcds_partitioned_parquet_snap.household_demographics.hd_buy_potential LIKE '5001-10000%', tpcds_partitioned_parquet_snap.household_demographics.hd_demo_sk IS NOT NULL
 |  |     stored statistics:
 |  |       table: rows=7.20K size=41.69KB
 |  |       columns: all
 |  |     extrapolated-rows=disabled max-scan-range-rows=7.20K
-|  |     parquet dictionary predicates: like(tpcds_partitioned_parquet_snap.household_demographics.hd_buy_potential, '5001-10000%'), tpcds_partitioned_parquet_snap.household_demographics.hd_demo_sk IS NOT NULL
+|  |     parquet dictionary predicates: tpcds_partitioned_parquet_snap.household_demographics.hd_buy_potential LIKE '5001-10000%', tpcds_partitioned_parquet_snap.household_demographics.hd_demo_sk IS NOT NULL
 |  |     mem-estimate=16.00MB mem-reservation=64.00KB thread-reservation=0
 |  |     tuple-ids=12 row-size=24B cardinality=720 cost=1596
 |  |     in pipelines: 08(GETNEXT)
@@ -443,12 +443,12 @@ max-parallelism=10 segment-costs=[23612458, 202734] cpu-comparison-result=73 [ma
 |  |  max-parallelism=1 segment-costs=[1657]
 |  |  08:SCAN HDFS [tpcds_partitioned_parquet_snap.household_demographics, RANDOM]
 |  |     HDFS partitions=1/1 files=1 size=41.69KB
-|  |     predicates: like(tpcds_partitioned_parquet_snap.household_demographics.hd_buy_potential, '5001-10000%'), tpcds_partitioned_parquet_snap.household_demographics.hd_demo_sk IS NOT NULL
+|  |     predicates: tpcds_partitioned_parquet_snap.household_demographics.hd_buy_potential LIKE '5001-10000%', tpcds_partitioned_parquet_snap.household_demographics.hd_demo_sk IS NOT NULL
 |  |     stored statistics:
 |  |       table: rows=7.20K size=41.69KB
 |  |       columns: all
 |  |     extrapolated-rows=disabled max-scan-range-rows=7.20K
-|  |     parquet dictionary predicates: like(tpcds_partitioned_parquet_snap.household_demographics.hd_buy_potential, '5001-10000%'), tpcds_partitioned_parquet_snap.household_demographics.hd_demo_sk IS NOT NULL
+|  |     parquet dictionary predicates: tpcds_partitioned_parquet_snap.household_demographics.hd_buy_potential LIKE '5001-10000%', tpcds_partitioned_parquet_snap.household_demographics.hd_demo_sk IS NOT NULL
 |  |     mem-estimate=16.00MB mem-reservation=64.00KB thread-reservation=0
 |  |     tuple-ids=12 row-size=24B cardinality=720 cost=1596
 |  |     in pipelines: 08(GETNEXT)
@@ -782,12 +782,12 @@ max-parallelism=10 segment-costs=[23612458, 202734] cpu-comparison-result=73 [ma
 |  |  max-parallelism=1 segment-costs=[1657]
 |  |  08:SCAN HDFS [tpcds_partitioned_parquet_snap.household_demographics, RANDOM]
 |  |     HDFS partitions=1/1 files=1 size=41.69KB
-|  |     predicates: like(tpcds_partitioned_parquet_snap.household_demographics.hd_buy_potential, '5001-10000%'), tpcds_partitioned_parquet_snap.household_demographics.hd_demo_sk IS NOT NULL
+|  |     predicates: tpcds_partitioned_parquet_snap.household_demographics.hd_buy_potential LIKE '5001-10000%', tpcds_partitioned_parquet_snap.household_demographics.hd_demo_sk IS NOT NULL
 |  |     stored statistics:
 |  |       table: rows=7.20K size=41.69KB
 |  |       columns: all
 |  |     extrapolated-rows=disabled max-scan-range-rows=7.20K
-|  |     parquet dictionary predicates: like(tpcds_partitioned_parquet_snap.household_demographics.hd_buy_potential, '5001-10000%'), tpcds_partitioned_parquet_snap.household_demographics.hd_demo_sk IS NOT NULL
+|  |     parquet dictionary predicates: tpcds_partitioned_parquet_snap.household_demographics.hd_buy_potential LIKE '5001-10000%', tpcds_partitioned_parquet_snap.household_demographics.hd_demo_sk IS NOT NULL
 |  |     mem-estimate=16.00MB mem-reservation=64.00KB thread-reservation=0
 |  |     tuple-ids=12 row-size=24B cardinality=720 cost=1596
 |  |     in pipelines: 08(GETNEXT)

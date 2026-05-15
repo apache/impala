@@ -61,7 +61,6 @@ import org.apache.impala.analysis.BinaryPredicate;
 import org.apache.impala.analysis.BinaryPredicate.Operator;
 import org.apache.impala.analysis.Expr;
 import org.apache.impala.analysis.IcebergExpressionCollector;
-import org.apache.impala.analysis.IcebergPartitionSpec;
 import org.apache.impala.analysis.JoinOperator;
 import org.apache.impala.analysis.MultiAggregateInfo;
 import org.apache.impala.analysis.Path;
@@ -329,8 +328,7 @@ public class IcebergScanPlanner {
 
   private boolean IsPartitionKeyScan() {
     if (tblRef_.optimizeCountStarForIcebergV2()) return false;
-    boolean allAggsDistinct = aggInfo_ != null && aggInfo_.hasAllDistinctAgg();
-    if (!allAggsDistinct) return false;
+    if (!helper_.isDistinctOnly()) return false;
     TupleDescriptor tDesc = tblRef_.getDesc();
     if (!tDesc.hasMaterializedSlots()) return true;
 
@@ -339,31 +337,8 @@ public class IcebergScanPlanner {
       if (!slotDesc.isMaterialized()) continue;
       IcebergColumn column = (IcebergColumn) slotDesc.getColumn();
       if (column == null) continue;
-      // We check all partition specs here. We are a bit stricter than necessary,
-      // because old partition specs might no longer have any data.
-      // TODO: later we could group data files (without deletes) into categories:
-      // - files eligible for partition key scan
-      // - files non-eligible for partition key scans
-      // Then we could do the following plan:
-      //              UNION  ALL
-      //           /       |      \
-      //         /         |        \
-      //       /           |          \
-      //  PARTITION     SCAN         ICEBERG
-      //  KEY          WITHOUT       DELETE
-      //  SCAN         DELETES        NODE
-      //                              /  \
-      //                             /    \
-      //                           SCAN   SCAN
-      //                           data   delete
-      //                           files  files
-      // Later PARTITION KEY SCAN could be a UNION NODE that produces the partition keys,
-      // see SingleNodePlanner.createOptimizedPartitionUnionNode().
-      for (IcebergPartitionSpec spec : iceTable.getPartitionSpecs()) {
-        if (IcebergUtil.getPartitionTransformType(column, spec) !=
-            TIcebergPartitionTransformType.IDENTITY) {
-          return false;
-        }
+      if (!IcebergUtil.canUsePartitionKeyScan(iceTable, column)) {
+        return false;
       }
     }
     return true;

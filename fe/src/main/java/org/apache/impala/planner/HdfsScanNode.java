@@ -356,7 +356,7 @@ public class HdfsScanNode extends ScanNode {
       List<? extends FeFsPartition> partitions, TableRef hdfsTblRef,
       MultiAggregateInfo aggInfo, List<Expr> partConjuncts, boolean isPartitionKeyScan) {
     this(id, desc, conjuncts, partitions, hdfsTblRef, aggInfo, partConjuncts,
-        isPartitionKeyScan, new ScanNodeHelperImpl());
+        isPartitionKeyScan, new ScanNodeHelperImpl(aggInfo));
   }
 
   /**

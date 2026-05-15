@@ -104,6 +104,10 @@ where
 1
 ---- RUNTIME_PROFILE
 aggregation(SUM, NumRowGroups): 9
+---- CALCITE_PLANNER_RUNTIME_PROFILE
+# Calcite simplifies the 'col_bi + 1 is null' predicate to
+# 'col_bi is null' which reduces the NumRowGroups fetched.
+aggregation(SUM, NumRowGroups): 1
 ====
 ---- QUERY
 # The NOT_NULL predicate matches 8 row group

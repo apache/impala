@@ -37,8 +37,6 @@ public class ImpalaHdfsScanNode extends HdfsScanNode {
 
   private final List<Expr> assignedConjuncts_;
 
-  private final TableRef hdfsTblRef_;
-
   public ImpalaHdfsScanNode(PlanNodeId id, TupleDescriptor tupleDesc,
       List<? extends FeFsPartition> partitions,
       TableRef hdfsTblRef, MultiAggregateInfo aggInfo, List<Expr> partConjuncts,
@@ -47,11 +45,6 @@ public class ImpalaHdfsScanNode extends HdfsScanNode {
     super(id, tupleDesc, assignedConjuncts, partitions, hdfsTblRef, aggInfo,
         partConjuncts, isPartitionScanOnly, helper);
     this.assignedConjuncts_ = assignedConjuncts;
-    this.hdfsTblRef_ = hdfsTblRef;
-  }
-
-  public TableRef getTableRef() {
-    return hdfsTblRef_;
   }
 
   @Override
