@@ -32,3 +32,18 @@ github:
     - RANGER
     - HBASE
     - MAPREDUCE
+  rulesets:
+    - name: "Default Branch Protection"
+      type: branch
+      branches:
+        includes:
+          - "~DEFAULT_BRANCH"
+          - "branch-*.*.*"
+          - "asf-site"
+          - "2.x"
+          - "3.x"
+        excludes: []
+      bypass_teams:
+        - root
+      restrict_deletion: true
+      restrict_force_push: true
