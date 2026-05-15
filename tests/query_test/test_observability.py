@@ -190,7 +190,7 @@ class TestObservability(ImpalaTestSuite):
     query = """
         with l as (select * from tpch.lineitem UNION ALL select * from tpch.lineitem)
         select STRAIGHT_JOIN count(*) from
-          (select * from tpch.lineitem a LIMIT 1) a
+          (select * from tpch.lineitem a where l_orderkey = 1) a
         join
           (select * from l LIMIT 125000) b
         on a.l_orderkey = -b.l_orderkey"""
@@ -198,27 +198,30 @@ class TestObservability(ImpalaTestSuite):
     # ExecSummary:
     # Operator                   #Rows  Est. #Rows  Detail
     # -----------------------------------------------------------------------
-    # F01:ROOT
-    # 05:AGGREGATE                   1           1  FINALIZE
-    # 04:HASH JOIN                   0           1  INNER JOIN, BROADCAST
-    # |--08:EXCHANGE           125.00K     125.00K  UNPARTITIONED
-    # |  F05:EXCHANGE SENDER
-    # |  07:EXCHANGE           125.00K     125.00K  UNPARTITIONED
+    # F06:ROOT
+    # 10:AGGREGATE                   1           1  FINALIZE
+    # 09:EXCHANGE                    3           3  UNPARTITIONED
+    # F05:EXCHANGE SENDER
+    # 05:AGGREGATE                   3           3
+    # 04:HASH JOIN                   0           4  INNER JOIN, PARTITIONED
+    # |--08:EXCHANGE           125.00K     125.00K  HASH(-1 * l_orderkey)
     # |  F04:EXCHANGE SENDER
+    # |  06:EXCHANGE           125.00K     125.00K  UNPARTITIONED
+    # |  F03:EXCHANGE SENDER
     # |  01:UNION              375.00K     125.00K
     # |  |--03:SCAN HDFS             0       6.00M  tpch.lineitem, CANCELLED
     # |  02:SCAN HDFS          377.86K       6.00M  tpch.lineitem, CANCELLED
-    # 06:EXCHANGE                    1           1  UNPARTITIONED
+    # 07:EXCHANGE                    6           4  HASH(a.l_orderkey)
     # F00:EXCHANGE SENDER
-    # 00:SCAN HDFS                   3           1  tpch.lineitem a
-    assert result.exec_summary[8]['operator'] == '03:' + scan_op, result.runtime_profile
-    assert result.exec_summary[8]['detail'] == 'tpch.lineitem, CANCELLED', \
+    # 00:SCAN HDFS                   6           4  tpch.lineitem a
+    assert result.exec_summary[11]['operator'] == '03:' + scan_op, result.runtime_profile
+    assert result.exec_summary[11]['detail'] == 'tpch.lineitem, CANCELLED', \
         result.runtime_profile
-    assert result.exec_summary[9]['operator'] == '02:' + scan_op, result.runtime_profile
-    assert result.exec_summary[9]['detail'] == 'tpch.lineitem, CANCELLED', \
+    assert result.exec_summary[12]['operator'] == '02:' + scan_op, result.runtime_profile
+    assert result.exec_summary[12]['detail'] == 'tpch.lineitem, CANCELLED', \
         result.runtime_profile
-    assert result.exec_summary[12]['operator'] == '00:' + scan_op, result.runtime_profile
-    assert result.exec_summary[12]['detail'] == 'tpch.lineitem a', result.runtime_profile
+    assert result.exec_summary[15]['operator'] == '00:' + scan_op, result.runtime_profile
+    assert result.exec_summary[15]['detail'] == 'tpch.lineitem a', result.runtime_profile
 
     # Test on other node types
     query = """
