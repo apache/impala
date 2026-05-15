@@ -102,9 +102,10 @@ public class IcebergScanNode extends HdfsScanNode {
       MultiAggregateInfo aggInfo, List<IcebergFileDescriptor> fileDescs,
       int numPartitions,
       List<Expr> nonIdentityConjuncts, List<Expr> skippedConjuncts, long snapshotId,
-      boolean isPartitionKeyScan, Map<Hash128, TIcebergDeletionVector> dataFileToDV) {
+      boolean isPartitionKeyScan, Map<Hash128, TIcebergDeletionVector> dataFileToDV,
+      ScanNodeHelper helper) {
     this(id, tblRef, conjuncts, aggInfo, fileDescs, numPartitions, nonIdentityConjuncts,
-        skippedConjuncts, null, snapshotId, isPartitionKeyScan, dataFileToDV);
+        skippedConjuncts, null, snapshotId, isPartitionKeyScan, dataFileToDV, helper);
   }
 
   public IcebergScanNode(PlanNodeId id, TableRef tblRef, List<Expr> conjuncts,
@@ -113,10 +114,10 @@ public class IcebergScanNode extends HdfsScanNode {
       List<Expr> nonIdentityConjuncts, List<Expr> skippedConjuncts,
       PlanNodeId deleteId,
       long snapshotId, boolean isPartitionKeyScan,
-      Map<Hash128, TIcebergDeletionVector> dataFileToDV) {
+      Map<Hash128, TIcebergDeletionVector> dataFileToDV, ScanNodeHelper helper) {
     super(id, tblRef.getDesc(), conjuncts,
         getIcebergPartition(((FeIcebergTable)tblRef.getTable()).getFeFsTable()), tblRef,
-        aggInfo, null, isPartitionKeyScan);
+        aggInfo, null, isPartitionKeyScan, helper);
     // Hdfs table transformed from iceberg table only has one partition
     Preconditions.checkState(partitions_.size() == 1);
 
@@ -193,7 +194,7 @@ public class IcebergScanNode extends HdfsScanNode {
 
     cardinality_ = capCardinalityAtLimit(cardinality_);
 
-    if (countStarSlot_ != null) {
+    if (getCountStarSlot() != null) {
       // We are doing optimized count star. Override cardinality with total num files.
       inputCardinality_ = fileDescs_.size();
       cardinality_ = fileDescs_.size();

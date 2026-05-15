@@ -93,7 +93,7 @@ public class DataSourceScanNode extends ScanNode {
   private long numRowsEstimate_;
 
   public DataSourceScanNode(PlanNodeId id, TupleDescriptor desc, List<Expr> conjuncts) {
-    super(id, desc, "SCAN DATA SOURCE");
+    super(id, desc, "SCAN DATA SOURCE", new ScanNodeHelperImpl());
     table_ = (FeDataSourceTable) desc_.getTable();
     conjuncts_ = conjuncts;
     acceptedPredicates_ = null;

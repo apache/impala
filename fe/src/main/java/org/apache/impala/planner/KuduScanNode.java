@@ -142,7 +142,7 @@ public class KuduScanNode extends ScanNode {
 
   public KuduScanNode(PlanNodeId id, TupleDescriptor desc, List<Expr> conjuncts,
       MultiAggregateInfo aggInfo, TableRef kuduTblRef) {
-    super(id, desc, "SCAN KUDU");
+    super(id, desc, "SCAN KUDU", new ScanNodeHelperImpl());
     kuduTable_ = (FeKuduTable) desc_.getTable();
     conjuncts_ = conjuncts;
     aggInfo_ = aggInfo;
@@ -161,11 +161,8 @@ public class KuduScanNode extends ScanNode {
           analyzer.getKuduTable(kuduTable_);
       validateSchema(rpcTable);
 
-      if (canApplyCountStarOptimization(analyzer)) {
-        Preconditions.checkState(desc_.getPath().destTable() != null);
-        Preconditions.checkState(kuduConjuncts_.isEmpty());
-        countStarSlot_ = applyCountStarOptimization(analyzer);
-      }
+      countStarSlot_ =
+          helper_.getCountStarOptimizationDescriptor(this, analyzer, conjuncts_);
 
       // Extract predicates that can be evaluated by Kudu.
       extractKuduConjuncts(analyzer, client, rpcTable);

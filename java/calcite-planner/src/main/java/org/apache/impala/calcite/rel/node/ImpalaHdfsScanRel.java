@@ -43,9 +43,11 @@ import org.apache.impala.catalog.FeFsTable;
 import org.apache.impala.catalog.Type;
 import org.apache.impala.common.ImpalaException;
 import org.apache.impala.common.UnsupportedFeatureException;
+import org.apache.impala.planner.HdfsScanNode;
 import org.apache.impala.planner.PlanNode;
 import org.apache.impala.planner.PlanNodeId;
 import org.apache.impala.planner.ScanNode;
+import org.apache.impala.planner.ScanNodeHelper;
 import org.apache.impala.planner.SingleNodePlanner;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -102,9 +104,7 @@ public class ImpalaHdfsScanRel extends TableScan
             ? ScanNode.createCountStarOptimizationDesc(tupleDesc, analyzer)
             : null;
 
-    Expr countStarOptimizationExpr = countStarDesc != null
-        ? new SlotRef(countStarDesc)
-        : null;
+    CalcitePlanNodeHelper helper = new CalcitePlanNodeHelper(countStarDesc);
 
     PlanNode physicalNode;
     if (SingleNodePlanner.addAcidSlotsIfNeeded(analyzer, baseTblRef,
@@ -123,15 +123,26 @@ public class ImpalaHdfsScanRel extends TableScan
             tupleDesc, analyzer);
       } else {
         physicalNode = new ImpalaHdfsScanNode(nodeId, tupleDesc, impalaPartitions,
-            baseTblRef, null, partitionConjuncts, filterConjuncts, countStarDesc,
-            isPartitionScanOnly(context, table));
+            baseTblRef, null, partitionConjuncts, filterConjuncts,
+            isPartitionScanOnly(context, table), helper);
       }
     }
     physicalNode.setOutputSmap(new ExprSubstitutionMap());
     physicalNode.init(analyzer);
 
+    Expr countStarOptimizationExpr = getCountStarOptimizationExpr(physicalNode);
+
     return new NodeWithExprs(physicalNode, outputExprs,
         getRowType().getFieldNames(), countStarOptimizationExpr);
+  }
+
+  private Expr getCountStarOptimizationExpr(PlanNode physicalNode) {
+    if (physicalNode instanceof HdfsScanNode) {
+      HdfsScanNode hdfsScan = (HdfsScanNode) physicalNode;
+      SlotDescriptor countStarSlot = hdfsScan.getCountStarSlot();
+      return countStarSlot != null ? new SlotRef(countStarSlot) : null;
+    }
+    return null;
   }
 
   /**
@@ -269,5 +280,22 @@ public class ImpalaHdfsScanRel extends TableScan
   @Override
   public RelNodeType relNodeType() {
     return RelNodeType.HDFSSCAN;
+  }
+
+  /**
+   * Calcite-specific {@link ScanNodeHelper} helper implementation.
+   */
+  private static final class CalcitePlanNodeHelper implements ScanNodeHelper {
+
+    private final SlotDescriptor countStarDesc_;
+    CalcitePlanNodeHelper(SlotDescriptor countStarDesc) {
+      countStarDesc_ = countStarDesc;
+    }
+
+    @Override
+    public SlotDescriptor getCountStarOptimizationDescriptor(ScanNode scanNode,
+        Analyzer analyzer, List<Expr> conjuncts) {
+      return countStarDesc_;
+    }
   }
 }

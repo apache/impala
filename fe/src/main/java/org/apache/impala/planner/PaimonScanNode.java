@@ -85,7 +85,7 @@ public class PaimonScanNode extends ScanNode {
 
   public PaimonScanNode(PlanNodeId id, TupleDescriptor desc, List<Expr> conjuncts,
       MultiAggregateInfo aggInfo, FePaimonTable table) {
-    super(id, desc, "SCAN PAIMON");
+    super(id, desc, "SCAN PAIMON", new ScanNodeHelperImpl());
     conjuncts_ = conjuncts;
     aggInfo_ = aggInfo;
     table_ = table;

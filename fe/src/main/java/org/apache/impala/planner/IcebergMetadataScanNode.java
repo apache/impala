@@ -41,7 +41,7 @@ public class IcebergMetadataScanNode extends ScanNode {
 
   protected IcebergMetadataScanNode(PlanNodeId id, List<Expr> conjuncts,
       TableRef tblRef) {
-    super(id, tblRef.getDesc(), "SCAN ICEBERG METADATA");
+    super(id, tblRef.getDesc(), "SCAN ICEBERG METADATA", new ScanNodeHelperImpl());
     conjuncts_ = conjuncts;
     metadataTableName_ = ((IcebergMetadataTable)tblRef.getTable()).getMetadataTableName();
   }

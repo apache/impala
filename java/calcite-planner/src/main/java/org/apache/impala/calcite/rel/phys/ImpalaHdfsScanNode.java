@@ -26,6 +26,7 @@ import org.apache.impala.analysis.TupleDescriptor;
 import org.apache.impala.catalog.FeFsPartition;
 import org.apache.impala.planner.HdfsScanNode;
 import org.apache.impala.planner.PlanNodeId;
+import org.apache.impala.planner.ScanNodeHelper;
 
 import java.util.List;
 
@@ -42,12 +43,11 @@ public class ImpalaHdfsScanNode extends HdfsScanNode {
   public ImpalaHdfsScanNode(PlanNodeId id, TupleDescriptor tupleDesc,
       List<? extends FeFsPartition> partitions,
       TableRef hdfsTblRef, MultiAggregateInfo aggInfo, List<Expr> partConjuncts,
-      List<Expr> assignedConjuncts, SlotDescriptor countStarDescriptor,
-      boolean isPartitionScanOnly) {
+      List<Expr> assignedConjuncts,
+      boolean isPartitionScanOnly, ScanNodeHelper helper) {
     super(id, tupleDesc, assignedConjuncts, partitions, hdfsTblRef, aggInfo,
-        partConjuncts, isPartitionScanOnly);
+        partConjuncts, isPartitionScanOnly, helper);
     this.assignedConjuncts_ = assignedConjuncts;
-    this.countStarSlot_ = countStarDescriptor;
     this.hdfsTblRef_ = hdfsTblRef;
   }
 

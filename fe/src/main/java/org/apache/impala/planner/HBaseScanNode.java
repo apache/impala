@@ -121,7 +121,7 @@ public class HBaseScanNode extends ScanNode {
   private int suggestedCaching_ = DEFAULT_SUGGESTED_CACHING;
 
   public HBaseScanNode(PlanNodeId id, TupleDescriptor desc) {
-    super(id, desc, "SCAN HBASE");
+    super(id, desc, "SCAN HBASE", new ScanNodeHelperImpl());
   }
 
   @Override

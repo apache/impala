@@ -331,7 +331,11 @@ public class HdfsScanNode extends ScanNode {
 
   // Slot that is used to record the Parquet metadata for the count(*) aggregation if
   // this scan node has the count(*) optimization enabled.
-  protected SlotDescriptor countStarSlot_ = null;
+  private SlotDescriptor countStarSlot_ = null;
+
+  public SlotDescriptor getCountStarSlot() {
+    return countStarSlot_;
+  }
 
   // Sampled file descriptors if table sampling is used. Grouped by partition id.
   // Initialized in checkSamplingAndCountStar();
@@ -346,6 +350,13 @@ public class HdfsScanNode extends ScanNode {
   private HdfsEstimatedMissingTableStats estimatedMissingStats_ =
       new HdfsEstimatedMissingTableStats();
 
+  public HdfsScanNode(PlanNodeId id, TupleDescriptor desc, List<Expr> conjuncts,
+      List<? extends FeFsPartition> partitions, TableRef hdfsTblRef,
+      MultiAggregateInfo aggInfo, List<Expr> partConjuncts, boolean isPartitionKeyScan) {
+    this(id, desc, conjuncts, partitions, hdfsTblRef, aggInfo, partConjuncts,
+        isPartitionKeyScan, new ScanNodeHelperImpl());
+  }
+
   /**
    * Construct a node to scan given data files into tuples described by 'desc',
    * with 'conjuncts' being the unevaluated conjuncts bound by the tuple and
@@ -354,8 +365,9 @@ public class HdfsScanNode extends ScanNode {
    */
   public HdfsScanNode(PlanNodeId id, TupleDescriptor desc, List<Expr> conjuncts,
       List<? extends FeFsPartition> partitions, TableRef hdfsTblRef,
-      MultiAggregateInfo aggInfo, List<Expr> partConjuncts, boolean isPartitionKeyScan) {
-    super(id, desc, createDisplayName(hdfsTblRef.getTable()));
+      MultiAggregateInfo aggInfo, List<Expr> partConjuncts, boolean isPartitionKeyScan,
+      ScanNodeHelper helper) {
+    super(id, desc, createDisplayName(hdfsTblRef.getTable()), helper);
     tbl_ = (FeFsTable)desc.getTable();
     conjuncts_ = conjuncts;
     partitions_ = new ArrayList<>(partitions);
@@ -421,12 +433,12 @@ public class HdfsScanNode extends ScanNode {
    * Returns true if the count(*) optimization can be applied to the query block
    * of this scan node.
    */
-  protected boolean canApplyCountStarOptimization(Analyzer analyzer,
-      Set<HdfsFileFormat> fileFormats) {
-    if (fileFormats.size() != 1) return false;
+  @Override
+  protected boolean canApplyCountStarOptimization(Analyzer analyzer) {
+    if (fileFormats_.size() != 1) return false;
     if (isFullAcidTable_) return false;
-    if (!hasParquet(fileFormats) && !hasOrc(fileFormats)) return false;
-    return canApplyCountStarOptimization(analyzer);
+    if (!hasParquet(fileFormats_) && !hasOrc(fileFormats_)) return false;
+    return super.canApplyCountStarOptimization(analyzer);
   }
 
   // Return sampledPartitions_ if not null. Otherwise, return partitions_.
@@ -508,12 +520,8 @@ public class HdfsScanNode extends ScanNode {
 
     populateFileFormats();
 
-    // Initialize countStarSlot_.
-    if (canApplyCountStarOptimization(analyzer, fileFormats_)) {
-      Preconditions.checkState(desc_.getPath().destTable() != null);
-      Preconditions.checkState(collectionConjuncts_.isEmpty());
-      countStarSlot_ = applyCountStarOptimization(analyzer);
-    }
+    countStarSlot_ =
+        helper_.getCountStarOptimizationDescriptor(this, analyzer, conjuncts_);
   }
 
   protected void populateFileFormats() throws ImpalaRuntimeException {

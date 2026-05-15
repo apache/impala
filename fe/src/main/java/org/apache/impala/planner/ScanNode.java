@@ -102,9 +102,13 @@ abstract public class ScanNode extends PlanNode {
   // distributed across all partitions. Set in reduceCardinalityByRuntimeFilter().
   protected double scanRangeSelectivity_ = 1.0;
 
-  public ScanNode(PlanNodeId id, TupleDescriptor desc, String displayName) {
+  protected final ScanNodeHelper helper_;
+
+  public ScanNode(PlanNodeId id, TupleDescriptor desc, String displayName,
+      ScanNodeHelper helper) {
     super(id, desc.getId().asList(), displayName);
     desc_ = desc;
+    helper_ = helper;
   }
 
   @Override
@@ -154,10 +158,6 @@ abstract public class ScanNode extends PlanNode {
     return desc.getLabel().equals(STATS_NUM_ROWS);
   }
 
-  protected SlotDescriptor applyCountStarOptimization(Analyzer analyzer) {
-    return applyCountStarOptimization(analyzer, null);
-  }
-
   /**
    * Adds a new slot descriptor to the tuple descriptor of this scan. The new slot
    * will be used for storing the data extracted from the Parquet or Kudu num rows
@@ -166,9 +166,8 @@ abstract public class ScanNode extends PlanNode {
    * entry to 'optimizedAggSmap_' that substitutes count(*) with
    * sum_init_zero(<new-slotref>). Returns the new slot descriptor.
    */
-  protected SlotDescriptor applyCountStarOptimization(Analyzer analyzer,
-      FunctionCallExpr countFnExpr) {
-    FunctionCallExpr countFn = countFnExpr != null ? countFnExpr :
+  protected SlotDescriptor applyCountStarOptimization(Analyzer analyzer) {
+    FunctionCallExpr countFn =
         new FunctionCallExpr(new FunctionName("count"),
             FunctionParams.createStarParam());
     countFn.analyzeNoThrow(analyzer);

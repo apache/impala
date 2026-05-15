@@ -42,7 +42,7 @@ import com.google.common.collect.Lists;
 
 public class SystemTableScanNode extends ScanNode {
   public SystemTableScanNode(PlanNodeId id, TupleDescriptor desc) {
-    super(id, desc, "SCAN SYSTEM_TABLE");
+    super(id, desc, "SCAN SYSTEM_TABLE", new ScanNodeHelperImpl());
     table_ = (FeSystemTable) desc_.getTable();
   }
 
