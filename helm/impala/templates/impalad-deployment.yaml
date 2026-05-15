@@ -1,0 +1,111 @@
+{{/*
+Licensed to the Apache Software Foundation (ASF) under one
+or more contributor license agreements.  See the NOTICE file
+distributed with this work for additional information
+regarding copyright ownership.  The ASF licenses this file
+to you under the Apache License, Version 2.0 (the
+"License"); you may not use this file except in compliance
+with the License.  You may obtain a copy of the License at
+
+  http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing,
+software distributed under the License is distributed on an
+"AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+KIND, either express or implied.  See the License for the
+specific language governing permissions and limitations
+under the License.
+*/}}
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "impala.fullname" . }}-impalad
+  labels:
+{{ include "impala.labels" . | indent 4 }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/instance: {{ .Release.Name }}
+      app.kubernetes.io/name: {{ include "impala.name" . }}
+      app.kubernetes.io/component: impalad
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/instance: {{ .Release.Name }}
+        app.kubernetes.io/name: {{ include "impala.name" . }}
+        app.kubernetes.io/component: impalad
+    spec:
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+{{ toYaml . | indent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+{{ toYaml . | indent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+{{ toYaml . | indent 8 }}
+      {{- end }}
+      containers:
+        - name: impalad
+          image: {{ include "impala.image" (dict "Values" .Values "imageName" "impalad_coord_exec") }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          args:
+            - -v={{ .Values.impalad.v }}
+            - -redirect_stdout_stderr=false
+            - -logtostderr
+            - -state_store_host={{ .Values.statestore.host | default (printf "%s-statestored" (include "impala.fullname" .)) }}
+            - -catalog_service_host={{ .Values.catalog.host | default (printf "%s-catalogd" (include "impala.fullname" .)) }}
+{{- if or .Values.impalad.kuduMasterHosts .Values.kudu.enabled }}
+            - -kudu_master_hosts={{ .Values.impalad.kuduMasterHosts | default (printf "%s:%d" (include "impala.kuduMasterService" .) (.Values.kudu.master.rpcPort | int)) }}
+{{- end }}
+{{- if .Values.auth.ldap.enabled }}
+            - -enable_ldap_auth
+            - -ldap_uri={{ .Values.auth.ldap.uri }}
+            - -ldap_bind_pattern={{ .Values.auth.ldap.bindPattern }}
+{{- if .Values.auth.ldap.passwordsInClearOk }}
+            - -ldap_passwords_in_clear_ok
+{{- end }}
+{{- end }}
+{{- if .Values.auth.ranger.enabled }}
+            - -authorization_provider=ranger
+            - -ranger_service_type={{ .Values.auth.ranger.serviceType }}
+            - -ranger_app_id={{ .Values.auth.ranger.appId }}
+            - -server_name={{ .Values.auth.ranger.serverName }}
+{{- end }}
+            - -mt_dop_auto_fallback={{ .Values.impalad.mtDopAutoFallback }}
+            - -default_query_options={{ .Values.impalad.defaultQueryOptions }}
+            - -mem_limit={{ .Values.impalad.memLimit }}
+{{- range .Values.impalad.extraArgs }}
+            - {{ . | quote }}
+{{- end }}
+          env:
+            - name: JAVA_TOOL_OPTIONS
+              value: {{ .Values.impalad.javaToolOptions | quote }}
+          ports:
+            - name: hs2
+              containerPort: 21050
+            - name: web
+              containerPort: 25000
+            - name: hs2-http
+              containerPort: 28000
+          volumeMounts:
+            - name: warehouse
+              mountPath: /user/hive/warehouse
+            - name: conf
+              mountPath: /opt/impala/conf/hive-site.xml
+              subPath: hive-site.xml
+      volumes:
+        - name: conf
+          configMap:
+            name: {{ include "impala.fullname" . }}-conf
+        - name: warehouse
+{{- if .Values.persistence.enabled }}
+          persistentVolumeClaim:
+            claimName: {{ include "impala.fullname" . }}-warehouse
+{{- else }}
+          emptyDir: {}
+{{- end }}

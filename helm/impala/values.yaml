@@ -1,0 +1,135 @@
+# Licensed to the Apache Software Foundation (ASF) under one
+# or more contributor license agreements.  See the NOTICE file
+# distributed with this work for additional information
+# regarding copyright ownership.  The ASF licenses this file
+# to you under the Apache License, Version 2.0 (the
+# "License"); you may not use this file except in compliance
+# with the License.  You may obtain a copy of the License at
+#
+#   http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing,
+# software distributed under the License is distributed on an
+# "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+# KIND, either express or implied.  See the License for the
+# specific language governing permissions and limitations
+# under the License.
+
+image:
+  # Prefix used for all Impala component images.
+  # Resulting image names include suffixes like "catalogd" and "impalad_coord_exec".
+  prefix: "apache/impala:4.5.0-"
+  pullPolicy: IfNotPresent
+
+persistence:
+  enabled: true
+  storageClassName: ""
+  size: 10Gi
+  # A single warehouse PVC is shared by HMS, catalogd, and impalad.
+  # Default to ReadWriteMany for multi-node scheduling compatibility.
+  # If your cluster does not provide RWX-capable storage classes, override
+  # this one list to ReadWriteOnce and co-locate dependent pods on one node.
+  accessModes:
+    - ReadWriteMany
+
+impalad:
+  v: 1
+  memLimit: "8gb"
+  javaToolOptions: "-Xmx2g"
+  defaultQueryOptions: "mt_dop=4,default_file_format=parquet,default_transactional_type=insert_only"
+  mtDopAutoFallback: true
+  # Optional Kudu master hosts. Set to enable Kudu integration.
+  kuduMasterHosts: ""
+  extraArgs: []
+
+catalogd:
+  v: 1
+  # Set to 0 to disable HMS event polling if the metastore backend does not
+  # support notification APIs in your environment.
+  hmsEventPollingIntervalS: 1
+  invalidateTablesTimeoutS: 999999
+  extraArgs: []
+
+statestored:
+  v: 1
+  extraArgs: []
+
+hms:
+  extraArgs: []
+  # Leave empty by default. In environments where the warehouse volume has
+  # restrictive ownership, set runAsUser/runAsGroup (for example, 0/0) so HMS
+  # can create required directories.
+  securityContext: {}
+
+auth:
+  ldap:
+    enabled: false
+    uri: ""
+    bindPattern: ""
+    passwordsInClearOk: false
+  ranger:
+    enabled: false
+    serviceType: "hive"
+    appId: "impala"
+    serverName: "server1"
+
+kudu:
+  enabled: false
+  image: "apache/kudu:1.17"
+  master:
+    replicas: 1
+    rpcPort: 7051
+    webPort: 8051
+    securityContext: {}
+    extraArgs:
+      - --default_num_replicas=1
+      - --rpc_authentication=disabled
+      - --rpc_encryption=disabled
+    resources: {}
+    persistence:
+      enabled: true
+      size: 20Gi
+      accessModes:
+        - ReadWriteOnce
+      storageClassName: ""
+  tserver:
+    replicas: 1
+    rpcPort: 7050
+    webPort: 8050
+    securityContext: {}
+    extraArgs:
+      - --rpc_authentication=disabled
+      - --rpc_encryption=disabled
+    resources: {}
+    persistence:
+      enabled: true
+      size: 50Gi
+      accessModes:
+        - ReadWriteOnce
+      storageClassName: ""
+
+ranger:
+  enabled: false
+  image: "apache/ranger:2.7.0"
+  imagePullPolicy: IfNotPresent
+  adminPort: 6080
+  service:
+    type: ClusterIP
+  env: []
+
+nodeSelector: {}
+tolerations: []
+affinity: {}
+
+statestore:
+  host: ""
+
+catalog:
+  host: ""
+
+service:
+  impalad:
+    type: ClusterIP
+    annotations: {}
+    loadBalancerIP: ""
+    loadBalancerSourceRanges: []
