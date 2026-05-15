@@ -450,6 +450,7 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
     );
   }
 
+  @Test
   public void TestPivotClause() {
     AnalysisError(
         "select month from functional_parquet.alltypestiny pivot (" +
@@ -484,7 +485,7 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
     AnalysisError(
         "select year from functional_parquet.alltypestiny pivot (" +
         "    min(month) for month in (1, 2 as `1`)) as t;",
-        "Duplicate alias in the PIVOT clause: 1"
+        "Duplicate alias for header values in the PIVOT clause: 1"
     );
     AnalysisError(
         "select alltypes from functional_parquet.complextypes_structs pivot (" +
@@ -501,7 +502,7 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
     AnalysisError(
         "SELECT v1, v2 FROM functional.alltypes PIVOT ( " +
         "    count(id) for month in (int_col AS v1, 2 AS v2) ) AS t;",
-        "Only literals are suppoted in the header value list of the PIVOT clause"
+        "Only literals are supported in the header value list of the PIVOT clause"
     );
     AnalysisError(
         "with t1 (v2_min, b) as (select 1, 2) " +
