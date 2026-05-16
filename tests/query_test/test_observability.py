@@ -24,6 +24,7 @@ from time import sleep, time
 import pytest
 
 from impala_thrift_gen.RuntimeProfile.ttypes import TRuntimeProfileFormat
+from tests.common.environ import IS_CALCITE_PLANNER
 from tests.common.impala_cluster import ImpalaCluster
 from tests.common.impala_connection import IMPALA_CONNECTION_EXCEPTION
 from tests.common.impala_test_suite import ImpalaTestSuite
@@ -214,14 +215,33 @@ class TestObservability(ImpalaTestSuite):
     # 07:EXCHANGE                    6           4  HASH(a.l_orderkey)
     # F00:EXCHANGE SENDER
     # 00:SCAN HDFS                   6           4  tpch.lineitem a
-    assert result.exec_summary[11]['operator'] == '03:' + scan_op, result.runtime_profile
-    assert result.exec_summary[11]['detail'] == 'tpch.lineitem, CANCELLED', \
-        result.runtime_profile
-    assert result.exec_summary[12]['operator'] == '02:' + scan_op, result.runtime_profile
-    assert result.exec_summary[12]['detail'] == 'tpch.lineitem, CANCELLED', \
-        result.runtime_profile
-    assert result.exec_summary[15]['operator'] == '00:' + scan_op, result.runtime_profile
-    assert result.exec_summary[15]['detail'] == 'tpch.lineitem a', result.runtime_profile
+    if IS_CALCITE_PLANNER:
+      assert result.exec_summary[12]['operator'] == '03:' + scan_op, \
+          result.runtime_profile
+      assert result.exec_summary[12]['detail'] == 'tpch.lineitem, CANCELLED', \
+          result.runtime_profile
+      assert result.exec_summary[13]['operator'] == '02:' + scan_op, \
+          result.runtime_profile
+      assert result.exec_summary[13]['detail'] == 'tpch.lineitem, CANCELLED', \
+          result.runtime_profile
+      assert result.exec_summary[16]['operator'] == '00:' + scan_op, \
+          result.runtime_profile
+      # Calcite planner does not include the alias 'a' here.
+      assert result.exec_summary[16]['detail'] == 'tpch.lineitem', \
+          result.runtime_profile
+    else:
+      assert result.exec_summary[11]['operator'] == '03:' + scan_op, \
+          result.runtime_profile
+      assert result.exec_summary[11]['detail'] == 'tpch.lineitem, CANCELLED', \
+          result.runtime_profile
+      assert result.exec_summary[12]['operator'] == '02:' + scan_op, \
+          result.runtime_profile
+      assert result.exec_summary[12]['detail'] == 'tpch.lineitem, CANCELLED', \
+          result.runtime_profile
+      assert result.exec_summary[15]['operator'] == '00:' + scan_op, \
+          result.runtime_profile
+      assert result.exec_summary[15]['detail'] == 'tpch.lineitem a', \
+          result.runtime_profile
 
     # Test on other node types
     query = """
