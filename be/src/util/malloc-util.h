@@ -33,7 +33,12 @@ namespace impala {
     // Initialize the settings for the malloc implementation. This should be called once
     // at startup. Since backend tests may call this repeatedly, any additional calls
     // are ignored.
-    virtual Status Init() = 0;
+    virtual Status Init(int64_t process_memory_limit) = 0;
+
+    // Malloc implementations that retain extra memory usually provide a way to manually
+    // free excess memory. This should try to free the specified amount of excess
+    // memory.
+    virtual void ReleaseMemoryToSystem(int64_t bytes_to_free) {}
 
     // Gets a human readable description of malloc state / statistics
     virtual std::string GetTextDescription() const = 0;
@@ -53,11 +58,17 @@ namespace impala {
     // implementation does not have an overhead metric.
     virtual IntGauge* GetOverheadBytesMetric() const = 0;
 
-    // Get information about whether the malloc's implementation is compatible with
-    // madvising huge pages. If a malloc implementation holds on to memory and can
-    // break it up into smaller pieces, then it must return MADVISE_INCOMPATIBLE.
-    // An implementation that will either immediately free a huge page should return
-    // MADVISE_COMPATIBLE. This can only be called after initialization.
+    // Get information about the malloc implementation's support for huge pages.
+    // MADVISE_COMPATIBLE - It is permissible to use madvise() with MADV_HUGEPAGE
+    //   on properly aligned large buffers to use huge pages. The malloc
+    //   implementation does not split them up or decommit them in smaller chunks.
+    //   A malloc implementation that immediately frees memory (e.g. Gperftools
+    //   TCMalloc's aggressive decommit mode) can guarantee this.
+    // MADVISE_INCOMPATIBLE - The malloc implementation can't guarantee that it
+    //   will operate properly with huge pages. It may break up huge pages. This
+    //   is true for most malloc implementations that retain memory without
+    //   explicit huge page support.
+    // This can only be called after initialization.
     enum class HugePageSupport {
       MADVISE_COMPATIBLE,
       MADVISE_INCOMPATIBLE

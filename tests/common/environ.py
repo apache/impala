@@ -347,6 +347,13 @@ class ImpalaTestClusterProperties(object):
         ImpalaBuildFlavors.CODE_COVERAGE_DEBUG, ImpalaBuildFlavors.TSAN,
         ImpalaBuildFlavors.UBSAN)
 
+  def is_sanitizer(self):
+    """
+    Return whether the Impala under test was compiled with any sanitizer
+    (ASAN, TSAN, or UBSAN).
+    """
+    return self.is_asan() or self.is_tsan() or self.is_ubsan()
+
   def runs_slowly(self):
     """
     Return whether the Impala under test "runs slowly". For our purposes this means

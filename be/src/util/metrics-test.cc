@@ -251,7 +251,7 @@ TEST_F(MetricsTest, MemMetric) {
 #if !defined(ADDRESS_SANITIZER) && !defined(THREAD_SANITIZER)
   // Always use aggressive decommit for backend tests
   FLAGS_tcmalloc_aggressive_memory_decommit = true;
-  ASSERT_OK(MallocUtil::GetInstance()->Init());
+  ASSERT_OK(MallocUtil::GetInstance()->Init(/*process_mem_limit*/ -1));
   MetricGroup metrics("MemMetrics");
   ASSERT_OK(RegisterMemoryMetrics(&metrics, false, nullptr, nullptr));
   // Smoke test to confirm that tcmalloc metrics are returning reasonable values.

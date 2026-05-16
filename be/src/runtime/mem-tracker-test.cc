@@ -312,7 +312,9 @@ class GcFunctionHelper {
 };
 
 TEST(MemTestTest, GcFunctions) {
-  MemTracker t(10);
+  // By default, a MemTracker will try to free extra memory when performing GC. To make
+  // things predictable, turn this off.
+  MemTracker t(/* byte_limit */ 10, /* extra_bytes_to_gc */ 0);
   ASSERT_TRUE(t.has_limit());
 
   t.Consume(9);
@@ -359,6 +361,35 @@ TEST(MemTestTest, GcFunctions) {
 
   // Clean up.
   t.Release(10);
+
+  // Create a new MemTracker to test that GC frees extra memory properly.
+  MemTracker t_extra(/* byte_limit */ 10, /* extra_bytes_to_gc */ 1);
+  ASSERT_TRUE(t_extra.has_limit());
+
+  // Attach three GcFunctions that each release 1 byte
+  GcFunctionHelper gc_extra_func_helper(&t_extra);
+  t_extra.AddGcFunction(boost::bind(&GcFunctionHelper::GcFunc, &gc_extra_func_helper));
+  GcFunctionHelper gc_extra_func_helper2(&t_extra);
+  t_extra.AddGcFunction(boost::bind(&GcFunctionHelper::GcFunc, &gc_extra_func_helper2));
+  GcFunctionHelper gc_extra_func_helper3(&t_extra);
+  t_extra.AddGcFunction(boost::bind(&GcFunctionHelper::GcFunc, &gc_extra_func_helper3));
+
+  // Freeing extra bytes for GC doesn't change when we call GC. We can go up to the limit
+  // and it will not call GC.
+  t_extra.Consume(10);
+  EXPECT_FALSE(t_extra.LimitExceeded(MemLimit::HARD));
+  EXPECT_EQ(t_extra.consumption(), 10);
+
+  // Go one byte over the limit. Test that we only call the GC functions until we
+  // free the necessary amount plus the extra byte. In this case, it will call the
+  // first two GC functions, but not the third.
+  t_extra.Consume(1);
+  EXPECT_EQ(t_extra.consumption(), 11);
+  EXPECT_FALSE(t_extra.LimitExceeded(MemLimit::HARD));
+  EXPECT_EQ(t_extra.consumption(), 9);
+
+  // Clean up
+  t_extra.Release(9);
 }
 
 // Test that we can compute topN queries from a hierarchy of mem trackers. These

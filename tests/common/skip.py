@@ -179,6 +179,8 @@ class SkipIfBuildType:
       reason="Test depends on debug build startup option.")
   remote = pytest.mark.skipif(IMPALA_TEST_CLUSTER_PROPERTIES.is_remote_cluster(),
       reason="Test depends on running against a local Impala cluster")
+  sanitizer = pytest.mark.skipif(IMPALA_TEST_CLUSTER_PROPERTIES.is_sanitizer(),
+      reason="Test depends on a non-sanitizer build.")
 
 
 class SkipIfEC:

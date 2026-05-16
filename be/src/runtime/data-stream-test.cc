@@ -188,7 +188,7 @@ class DataStreamTest : public testing::Test {
     ABORT_IF_ERROR(exec_env_->InitForFeSupport());
     // Always use aggressive decommit for backend tests
     FLAGS_tcmalloc_aggressive_memory_decommit = true;
-    ABORT_IF_ERROR(MallocUtil::GetInstance()->Init());
+    ABORT_IF_ERROR(MallocUtil::GetInstance()->Init(/*process_mem_limit*/ -1));
     exec_env_->InitBufferPool(32 * 1024, 1024 * 1024 * 1024, 32 * 1024);
     runtime_state_.reset(new RuntimeState(TQueryCtx(), exec_env_.get()));
     TPlanFragment* fragment = runtime_state_->obj_pool()->Add(new TPlanFragment());

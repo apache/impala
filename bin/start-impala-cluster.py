@@ -215,6 +215,13 @@ parser.add_option("--enable_tls", dest="enable_tls",
 parser.add_option("--enable_beeswax", dest="enable_beeswax",
                   action="store_true", default=ENABLE_BEESWAX,
                   help="If true, enable beeswax port in Impala cluster.")
+parser.add_option("--tcmalloc_aggressive_decommit",
+                  type="choice", choices=BOOLEAN_STRINGS,
+                  default=os.environ.get("IMPALA_TCMALLOC_AGGRESSIVE_DECOMMIT", "true"),
+                  help="Sets Gperftools TCMalloc's aggressive decommit setting for the "
+                       "Impalads. This has no effect when using a different malloc "
+                       "implementation. This does not change the setting for non-Impalad "
+                       "daemons")
 
 # For testing: list of comma-separated delays, in milliseconds, that delay impalad catalog
 # replica initialization. The ith delay is applied to the ith impalad.
@@ -773,6 +780,13 @@ def build_impalad_arg_lists(cluster_size, num_coordinators, use_exclusive_coordi
               "--ssl_server_certificate={cert_dir}/localhost.pem "
               "--ssl_private_key={cert_dir}/localhost.key {args}") \
               .format(args=args, cert_dir=CERT_DIR)
+
+    args = ("--tcmalloc_aggressive_memory_decommit={val} {args}") \
+            .format(val=options.tcmalloc_aggressive_decommit, args=args)
+    # Currently, madvise_huge_pages is incompatible with turning off aggressive
+    # decommit.
+    if options.tcmalloc_aggressive_decommit == "false":
+      args = "--madvise_huge_pages=false {args}".format(args=args)
 
     # Appended at the end so they can override previous args.
     if i < len(per_impalad_args):

@@ -17,6 +17,10 @@
 
 #pragma once
 
+#include <algorithm>
+#include <memory>
+#include <vector>
+
 #include <gflags/gflags.h>
 #include <glog/logging.h>
 #include <gperftools/heap-profiler.h>
@@ -26,9 +30,14 @@
 #include "gutil/strings/substitute.h"
 #include "util/malloc-util.h"
 #include "util/metrics.h"
+#include "util/parse-util.h"
+#include "util/thread.h"
+#include "util/time.h"
 
 DECLARE_int64(tcmalloc_max_total_thread_cache_bytes);
 DECLARE_bool(tcmalloc_aggressive_memory_decommit);
+DECLARE_string(tcmalloc_max_free_bytes);
+DECLARE_int64(tcmalloc_garbage_collection_chunk_size);
 
 using strings::Substitute;
 
@@ -133,8 +142,9 @@ TcmallocMetric::OverheadBytesMetric* TcmallocMetric::OVERHEAD_BYTES = nullptr;
 
 class GperftoolsMallocUtil : public MallocUtil {
  public:
-  Status Init() override {
-    if (initialized_) { return Status::OK(); }
+  Status Init(int64_t process_mem_limit) override {
+    // Some backend tests call this multiple times
+    if (initialized_) return Status::OK();
 
     if (FLAGS_tcmalloc_aggressive_memory_decommit) {
       // By default tcmalloc does not use aggressive decommit. Set it if it is enabled.
@@ -168,8 +178,50 @@ class GperftoolsMallocUtil : public MallocUtil {
                    << "actually using " << actual_max_total_thread_cache_bytes
                    << " bytes.";
     }
+
+    // Start the background garbage collector thread if aggressive decommit
+    // is disabled.
+    if (!FLAGS_tcmalloc_aggressive_memory_decommit) {
+      // Determine the maximum overhead
+      bool is_percent;
+      max_overhead_ = ParseUtil::ParseMemSpec(FLAGS_tcmalloc_max_free_bytes,
+                                                      &is_percent, process_mem_limit);
+      if (max_overhead_ <= 0) {
+        if (process_mem_limit <= 0) {
+          // If the process_mem_limit is not specified, then this cannot accept a
+          // percentage value.
+          return Status(Substitute("Invalid --tcmalloc_max_free_bytes value, must be a "
+              "positive bytes value: $0", FLAGS_tcmalloc_max_free_bytes));
+        } else {
+          return Status(Substitute("Invalid --tcmalloc_max_free_bytes value, must be a "
+              "positive bytes value or percentage: $0", FLAGS_tcmalloc_max_free_bytes));
+        }
+      }
+      LOG(INFO) << "TCMalloc max overhead = " << max_overhead_;
+
+      RETURN_IF_ERROR(Thread::Create("malloc-util", "gc_thread",
+          [this]() { this->GarbageCollectorThread(); }, &gc_thread_));
+    }
     initialized_ = true;
     return Status::OK();
+  }
+
+  void ReleaseMemoryToSystem(int64_t bytes_to_free) override {
+    // If aggressive memory decommit is enabled, tcmalloc is not holding on to large
+    // amounts of memory, so there is no need to manually release it.
+    if (FLAGS_tcmalloc_aggressive_memory_decommit) return;
+
+    int64_t extra = bytes_to_free;
+    while (extra > 0) {
+      // Tcmalloc holds the page heap lock while releasing the memory, so release in
+      // chunks to avoid holding the lock for an extended period of time. This does
+      // not call sched_yield() between calls, because the kernel already gave us a
+      // time slice and sched_yield() is often a no-op in that case.
+      int64_t amount_to_release =
+        std::min(FLAGS_tcmalloc_garbage_collection_chunk_size, extra);
+      MallocExtension::instance()->ReleaseToSystem(amount_to_release);
+      extra -= amount_to_release;
+    }
   }
 
   std::string GetTextDescription() const override {
@@ -307,8 +359,56 @@ class GperftoolsMallocUtil : public MallocUtil {
     ::ProfilerStop();
   }
 
- private:
+private:
+  int64_t max_overhead_;
+  std::unique_ptr<Thread> gc_thread_;
   bool initialized_ = false;
+
+  // When using TCMalloc with aggressive decommit off, TCMalloc accumulates memory
+  // indefinitely unless we manually garbage collect it. TCMalloc releases memory
+  // every N deletes, where N is based on the TCMALLOC_RELEASE_RATE property.
+  // When TCMalloc decides to release memory, it removes a single span from the
+  // page heap. This means that there are certain allocation patterns that can lead
+  // to continuous accumulation of memory. One example is continually resizing a
+  // vector, which results in many allocations. Even after the vector goes out of
+  // scope, it will not release all the memory unless there are enough other deletions
+  // occuring in the system. Impala must have these types of memory patterns, as
+  // our experience is that even high TCMALLOC_RELEASE_RATE settings do not bound
+  // memory use.
+  //
+  // This background thread frees memory periodically to keep TCMalloc's memory overhead
+  // limited. To smooth out the release, this keeps track of the last N samples and
+  // frees memory based on the minimum sample. This avoids releasing memory that will
+  // be reused quickly.
+  static constexpr int GARBAGE_COLLECTOR_HISTORY_SIZE = 10;
+  [[noreturn]] void GarbageCollectorThread() {
+    DCHECK(!FLAGS_tcmalloc_aggressive_memory_decommit);
+    // Initialize the history to all zeros
+    std::vector<int64_t> bytes_overhead_history(GARBAGE_COLLECTOR_HISTORY_SIZE, 0);
+    int cur_history_index = 0;
+    while (true) {
+      // Number of bytes in the 'NORMAL' free list (i.e. reserved by tcmalloc but
+      // not in use).
+      if (TcmallocMetric::PAGEHEAP_FREE_BYTES != nullptr) {
+        bytes_overhead_history[cur_history_index] =
+            TcmallocMetric::PAGEHEAP_FREE_BYTES->GetValue();
+        cur_history_index++;
+        if (cur_history_index == bytes_overhead_history.size()) {
+          cur_history_index = 0;
+        }
+      }
+
+      // Free based on the minimum overhead in the history. This avoids releasing memory
+      // that will be reused very quickly. However, the max_overhead is usually a fairly
+      // substantial amount of memory, so it is ok to aggressively enforce the limit.
+      int64_t min_bytes_overhead = *std::min_element(bytes_overhead_history.cbegin(),
+          bytes_overhead_history.cend());
+      if (min_bytes_overhead > max_overhead_) {
+        ReleaseMemoryToSystem(min_bytes_overhead - max_overhead_);
+      }
+      SleepForMs(1000);
+    }
+  }
 };
 
 } // namespace impala

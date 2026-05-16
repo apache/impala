@@ -45,7 +45,7 @@ SanitizerMallocMetric* SanitizerMallocMetric::BYTES_ALLOCATED = nullptr;
 
 class SanitizerMallocUtil : public MallocUtil {
  public:
-  Status Init() override { return Status::OK(); }
+  Status Init(int64_t process_mem_limit) override { return Status::OK(); }
 
   std::string GetName() const override {
 #if defined(ADDRESS_SANITIZER)

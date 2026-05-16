@@ -57,7 +57,8 @@ static int64_t CalcSoftLimit(int64_t limit) {
 }
 
 MemTracker::MemTracker(int64_t byte_limit, const string& label, MemTracker* parent,
-    bool log_usage_if_zero, bool is_query_mem_tracker, const TUniqueId& query_id)
+    bool log_usage_if_zero, bool is_query_mem_tracker, const TUniqueId& query_id,
+    int64_t extra_bytes_to_gc)
   : is_query_mem_tracker_(is_query_mem_tracker),
     query_id_(query_id),
     limit_(byte_limit),
@@ -66,34 +67,36 @@ MemTracker::MemTracker(int64_t byte_limit, const string& label, MemTracker* pare
     parent_(parent),
     consumption_(&local_counter_),
     local_counter_(TUnit::BYTES),
-    consumption_metric_(NULL),
+    consumption_metric_(nullptr),
+    extra_bytes_to_gc_(extra_bytes_to_gc),
     log_usage_if_zero_(log_usage_if_zero),
-    num_gcs_metric_(NULL),
-    bytes_freed_by_last_gc_metric_(NULL),
-    bytes_over_limit_metric_(NULL),
-    limit_metric_(NULL) {
+    num_gcs_metric_(nullptr),
+    bytes_freed_by_last_gc_metric_(nullptr),
+    bytes_over_limit_metric_(nullptr),
+    limit_metric_(nullptr) {
   Init();
 }
 
 MemTracker::MemTracker(RuntimeProfile* profile, int64_t byte_limit,
-    const std::string& label, MemTracker* parent)
+    const std::string& label, MemTracker* parent, int64_t extra_bytes_to_gc)
   : limit_(byte_limit),
     soft_limit_(CalcSoftLimit(byte_limit)),
     label_(label),
     parent_(parent),
     consumption_(profile->AddHighWaterMarkCounter(COUNTER_NAME, TUnit::BYTES)),
     local_counter_(TUnit::BYTES),
-    consumption_metric_(NULL),
+    consumption_metric_(nullptr),
+    extra_bytes_to_gc_(extra_bytes_to_gc),
     log_usage_if_zero_(true),
-    num_gcs_metric_(NULL),
-    bytes_freed_by_last_gc_metric_(NULL),
-    bytes_over_limit_metric_(NULL),
-    limit_metric_(NULL) {
+    num_gcs_metric_(nullptr),
+    bytes_freed_by_last_gc_metric_(nullptr),
+    bytes_over_limit_metric_(nullptr),
+    limit_metric_(nullptr) {
   Init();
 }
 
-MemTracker::MemTracker(IntGauge* consumption_metric,
-    int64_t byte_limit, const string& label, MemTracker* parent)
+MemTracker::MemTracker(IntGauge* consumption_metric, int64_t byte_limit,
+    const string& label, MemTracker* parent, int64_t extra_bytes_to_gc)
   : limit_(byte_limit),
     soft_limit_(CalcSoftLimit(byte_limit)),
     label_(label),
@@ -101,21 +104,22 @@ MemTracker::MemTracker(IntGauge* consumption_metric,
     consumption_(&local_counter_),
     local_counter_(TUnit::BYTES),
     consumption_metric_(consumption_metric),
+    extra_bytes_to_gc_(extra_bytes_to_gc),
     log_usage_if_zero_(true),
-    num_gcs_metric_(NULL),
-    bytes_freed_by_last_gc_metric_(NULL),
-    bytes_over_limit_metric_(NULL),
-    limit_metric_(NULL) {
+    num_gcs_metric_(nullptr),
+    bytes_freed_by_last_gc_metric_(nullptr),
+    bytes_over_limit_metric_(nullptr),
+    limit_metric_(nullptr) {
   Init();
 }
 
 void MemTracker::Init() {
   DCHECK_GE(limit_, -1);
   DCHECK_LE(soft_limit_, limit_);
-  if (parent_ != NULL) parent_->AddChildTracker(this);
+  if (parent_ != nullptr) parent_->AddChildTracker(this);
   // populate all_trackers_ and limit_trackers_
   MemTracker* tracker = this;
-  while (tracker != NULL) {
+  while (tracker != nullptr) {
     all_trackers_.push_back(tracker);
     if (tracker->has_limit()) limit_trackers_.push_back(tracker);
     tracker = tracker->parent_;
@@ -545,11 +549,11 @@ bool MemTracker::LimitExceededSlow(MemLimit mode) {
 bool MemTracker::GcMemory(int64_t max_consumption) {
   if (max_consumption < 0) return true;
   lock_guard<mutex> l(gc_lock_);
-  if (consumption_metric_ != NULL) RefreshConsumptionFromMetric();
+  if (consumption_metric_ != nullptr) RefreshConsumptionFromMetric();
   int64_t pre_gc_consumption = consumption();
   // Check if someone gc'd before us
   if (pre_gc_consumption < max_consumption) return false;
-  if (num_gcs_metric_ != NULL) num_gcs_metric_->Increment(1);
+  if (num_gcs_metric_ != nullptr) num_gcs_metric_->Increment(1);
 
   int64_t curr_consumption = pre_gc_consumption;
   // Try to free up some memory
@@ -557,15 +561,14 @@ bool MemTracker::GcMemory(int64_t max_consumption) {
     // Try to free up the amount we are over plus some extra so that we don't have to
     // immediately GC again. Don't free all the memory since that can be unnecessarily
     // expensive.
-    const int64_t EXTRA_BYTES_TO_FREE = 512L * 1024L * 1024L;
-    int64_t bytes_to_free = curr_consumption - max_consumption + EXTRA_BYTES_TO_FREE;
+    int64_t bytes_to_free = curr_consumption - max_consumption + extra_bytes_to_gc_;
     gc_functions_[i](bytes_to_free);
-    if (consumption_metric_ != NULL) RefreshConsumptionFromMetric();
+    if (consumption_metric_ != nullptr) RefreshConsumptionFromMetric();
     curr_consumption = consumption();
-    if (max_consumption - curr_consumption <= EXTRA_BYTES_TO_FREE) break;
+    if (max_consumption - curr_consumption >= extra_bytes_to_gc_) break;
   }
 
-  if (bytes_freed_by_last_gc_metric_ != NULL) {
+  if (bytes_freed_by_last_gc_metric_ != nullptr) {
     bytes_freed_by_last_gc_metric_->SetValue(pre_gc_consumption - curr_consumption);
   }
   return curr_consumption > max_consumption;

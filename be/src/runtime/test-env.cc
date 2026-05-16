@@ -55,7 +55,7 @@ TestEnv::TestEnv()
 Status TestEnv::Init() {
   // Always use aggressive decommit for backend tests
   FLAGS_tcmalloc_aggressive_memory_decommit = true;
-  RETURN_IF_ERROR(MallocUtil::GetInstance()->Init());
+  RETURN_IF_ERROR(MallocUtil::GetInstance()->Init(/*process_mem_limit*/ -1));
   if (static_metrics_ == NULL) {
     static_metrics_.reset(new MetricGroup("test-env-static-metrics"));
     ImpaladMetrics::CreateMetrics(static_metrics_.get());

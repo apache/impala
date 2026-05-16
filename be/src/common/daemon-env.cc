@@ -50,7 +50,7 @@ DaemonEnv::DaemonEnv(const string& name)
 }
 
 Status DaemonEnv::Init(bool init_jvm) {
-  RETURN_IF_ERROR(MallocUtil::GetInstance()->Init());
+  RETURN_IF_ERROR(MallocUtil::GetInstance()->Init(/*process_mem_limit*/ -1));
 
   if (FLAGS_enable_webserver) {
     AddDefaultUrlCallbacks(webserver_.get(), metrics_.get());

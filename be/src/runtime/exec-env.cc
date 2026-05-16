@@ -426,12 +426,7 @@ Status ExecEnv::Init() {
   if (FLAGS_tcmalloc_max_total_thread_cache_bytes == 0) {
     FLAGS_tcmalloc_max_total_thread_cache_bytes = 1 << 30;
   }
-  // Aggressive decommit is required so that unused pages in the TCMalloc page heap are
-  // not backed by physical pages and do not contribute towards memory consumption.
-  // Enable it unconditionally for Impalad.
-  FLAGS_tcmalloc_aggressive_memory_decommit = true;
-
-  RETURN_IF_ERROR(MallocUtil::GetInstance()->Init());
+  RETURN_IF_ERROR(MallocUtil::GetInstance()->Init(admit_mem_limit_));
 
   int64_t buffer_pool_limit = ParseUtil::ParseMemSpec(FLAGS_buffer_pool_limit,
       &is_percent, admit_mem_limit_);
@@ -672,6 +667,10 @@ void ExecEnv::InitMemTracker(int64_t bytes_limit) {
         int64_t allocated_from_sys = BufferPoolMetric::SYSTEM_ALLOCATED->GetValue();
         if (reserved >= allocated_from_sys) return;
         buffer_pool->ReleaseMemory(min(bytes_to_free, allocated_from_sys - reserved));
+    });
+    mem_tracker_->AddGcFunction([] (int64_t bytes_to_free)
+    {
+        MallocUtil::GetInstance()->ReleaseMemoryToSystem(bytes_to_free);
     });
   }
 }

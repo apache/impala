@@ -94,19 +94,28 @@ class MemTracker {
   /// in LogUsage() output if consumption is 0.
   MemTracker(int64_t byte_limit = -1, const std::string& label = std::string(),
       MemTracker* parent = nullptr, bool log_usage_if_zero = true,
-      bool is_query_mem_tracker = false, const TUniqueId& query_id = TUniqueId());
+      bool is_query_mem_tracker = false, const TUniqueId& query_id = TUniqueId(),
+      int64_t extra_bytes_to_gc = DEFAULT_EXTRA_BYTES_TO_GC);
+
+  /// Specialized C'tor for unit tests for GC functions.
+  MemTracker(int64_t byte_limit, int64_t extra_bytes_to_gc)
+    : MemTracker(byte_limit, /* label */ std::string(), /* parent */ nullptr,
+          /* log_usage_if_zero */ true, /* is_query_mem_tracker */ false,
+          /* query_id */ TUniqueId(), extra_bytes_to_gc) {}
 
   /// C'tor for tracker for which consumption counter is created as part of a profile.
   /// The counter is created with name COUNTER_NAME.
   MemTracker(RuntimeProfile* profile, int64_t byte_limit,
-      const std::string& label = std::string(), MemTracker* parent = nullptr);
+             const std::string& label = std::string(), MemTracker* parent = nullptr,
+             int64_t extra_bytes_to_gc = DEFAULT_EXTRA_BYTES_TO_GC);
 
   /// C'tor for tracker that uses consumption_metric as the consumption value.
   /// Consume()/Release() can still be called. This is used for the root process tracker
   /// (if 'parent' is NULL). It is also to report on other categories of memory under the
   /// process tracker, e.g. buffer pool free buffers (if 'parent - non-NULL).
   MemTracker(IntGauge* consumption_metric, int64_t byte_limit = -1,
-      const std::string& label = std::string(), MemTracker* parent = nullptr);
+             const std::string& label = std::string(), MemTracker* parent = nullptr,
+             int64_t extra_bytes_to_gc = DEFAULT_EXTRA_BYTES_TO_GC);
 
   ~MemTracker();
 
@@ -520,6 +529,12 @@ class MemTracker {
 
   /// Functions to call after the limit is reached to free memory.
   std::vector<GcFunction> gc_functions_;
+
+  /// A GC will free extra memory to avoid immediately needing to GC again.
+  /// The default amount is 512MB, currently applicable for the process memory tracker.
+  /// Unit tests need to tune this to test GC.
+  static constexpr int64_t DEFAULT_EXTRA_BYTES_TO_GC = 512L * 1024L * 1024L;
+  int64_t extra_bytes_to_gc_;
 
   /// If false, this tracker (and its children) will not be included in LogUsage() output
   /// if consumption is 0.
