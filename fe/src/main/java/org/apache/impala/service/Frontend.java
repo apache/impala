@@ -2146,6 +2146,13 @@ public class Frontend {
       result.setProfile(FrontendProfile.getCurrent().emitAsThrift());
       result.setProfile_children(FrontendProfile.getCurrent().emitChildrenAsThrift());
       return result;
+    } finally {
+      // In normal processing, the Otel tracing gets updated immediately after the
+      // parsing statement. In cases where it fails because of parsing, it gets set
+      // here.
+      if (BackendConfig.INSTANCE.isOtelTraceEnabled()) {
+        updateQueryOtelTracing(planCtx.queryCtx_.getQuery_id(), planCtx, null);
+      }
     }
   }
 
@@ -3315,15 +3322,7 @@ public class Frontend {
     ParsedStatement parsedStmt;
 
     // Parse stmt and collect/load metadata to populate a stmt-local table cache
-    try {
-      parsedStmt = compilerFactory.createParsedStatement(queryCtx);
-    } catch (ImpalaException e) {
-      if (planCtx.queryTraced_ == null && BackendConfig.INSTANCE.isOtelTraceEnabled()) {
-        planCtx.queryTraced_ = Boolean.FALSE;
-        updateQueryOtelTracingInBE(queryCtx.getQuery_id(), false);
-      }
-      throw e;
-    }
+    parsedStmt = compilerFactory.createParsedStatement(queryCtx);
 
     // Determine whether to enable OpenTelemetry tracing for the query.
     if (planCtx.queryTraced_ == null) {
@@ -3354,7 +3353,7 @@ public class Frontend {
   private void updateQueryOtelTracing(final TUniqueId queryId, final PlanCtx planCtx,
       final ParsedStatement parsedStmt) throws AnalysisException {
     if (planCtx.queryTraced_ == null) {
-      planCtx.queryTraced_ = Boolean.valueOf(
+      planCtx.queryTraced_ = parsedStmt != null && Boolean.valueOf(
           !parsedStmt.isExplain()
           && !parsedStmt.isValuesStmt()
           && (
