@@ -65,18 +65,25 @@ class DescriptorTblBuilder {
 class TupleDescBuilder {
  public:
   TupleDescBuilder& operator<< (const ColumnType& slot_type) {
-    slot_types_.push_back(slot_type);
-    return *this;
+    return AddSlot(slot_type, true);
   }
 
   TupleDescBuilder& operator<< (PrimitiveType slot_type) {
     return *this << ColumnType(slot_type);
   }
 
+  TupleDescBuilder& AddSlot(const ColumnType& slot_type, bool nullable) {
+    slot_types_.push_back(slot_type);
+    slot_nullable_.push_back(nullable);
+    return *this;
+  }
+
   std::vector<ColumnType> slot_types() const { return slot_types_; }
+  const std::vector<bool>& slot_nullable() const { return slot_nullable_; }
 
  private:
   std::vector<ColumnType> slot_types_;
+  std::vector<bool> slot_nullable_;
 };
 
 }

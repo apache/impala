@@ -303,18 +303,26 @@ public class DescriptorTable {
 
   /**
    * Creates a thrift descriptor table for testing. Each entry in 'slotTypes' is a list
-   * of slot types for one tuple.
+   * of slot types for one tuple. 'slotNullable' has the same shape as 'slotTypes', or
+   * is null if all slots are nullable.
    */
   public static TDescriptorTable buildTestDescriptorTable(
-      List<List<TColumnType>> slotTypes) {
+      List<List<TColumnType>> slotTypes, List<List<Boolean>> slotNullable) {
     DescriptorTable descTbl = new DescriptorTable();
-    for (List<TColumnType> ttupleSlots: slotTypes) {
+    for (int i = 0; i < slotTypes.size(); ++i) {
+      List<TColumnType> ttupleSlots = slotTypes.get(i);
       List<StructField> fields = Lists.newArrayListWithCapacity(ttupleSlots.size());
       for (TColumnType ttype: ttupleSlots) {
         fields.add(new StructField("testField", Type.fromThrift(ttype)));
       }
       StructType tupleType = new StructType(fields);
-      createTupleDesc(tupleType, descTbl);
+      TupleDescriptor tupleDesc = createTupleDesc(tupleType, descTbl);
+      if (slotNullable == null) continue;
+      List<SlotDescriptor> slots = tupleDesc.getSlots();
+      Preconditions.checkState(slots.size() == slotNullable.get(i).size());
+      for (int j = 0; j < slots.size(); ++j) {
+        slots.get(j).setIsNullable(slotNullable.get(i).get(j));
+      }
     }
     descTbl.computeMemLayout();
     return descTbl.toThrift();

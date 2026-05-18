@@ -202,6 +202,8 @@ private:
   friend class ParquetPlainEncoder;
   friend class ParquetDeltaLengthByteArrayDecoder;
   friend class GroupingAggregator;
+  template<typename ArrowArrayType>
+  friend class StringSlotWriter;
   /// !!! THIS IS UNSAFE TO CALL ON EXISTING STRINGVALUE OBJECTS !!!
   /// Please make sure you only invoke it for newly created StringValues, e.g. on the
   /// target StringValue object of a deep copy operation.

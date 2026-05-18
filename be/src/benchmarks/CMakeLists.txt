@@ -34,6 +34,7 @@ FUNCTION(ADD_BE_BENCHMARK BENCHMARK_NAME)
   ADD_DEPENDENCIES(be-benchmarks ${BENCHMARK_NAME})
 ENDFUNCTION()
 
+ADD_BE_BENCHMARK(arrow-converter-benchmark)
 ADD_BE_BENCHMARK(atod-benchmark)
 ADD_BE_BENCHMARK(atof-benchmark)
 ADD_BE_BENCHMARK(atoi-benchmark)

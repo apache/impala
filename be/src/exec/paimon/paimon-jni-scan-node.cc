@@ -16,12 +16,14 @@
 // under the License.
 
 #include "exec/paimon/paimon-jni-scan-node.h"
+
 #include "common/status.h"
+#include "exec/arrow-converter.h"
 #include "exec/exec-node-util.h"
 #include "exec/exec-node.inline.h"
-#include "exec/paimon/paimon-jni-row-reader.h"
 #include "exec/paimon/paimon-jni-scanner.h"
 #include "exec/paimon/paimon-scan-plan-node.h"
+#include "exec/scratch-tuple-batch.h"
 #include "rpc/thrift-util.h"
 #include "runtime/exec-env.h"
 #include "runtime/runtime-state.h"
@@ -42,9 +44,7 @@ PaimonJniScanNode::PaimonJniScanNode(
     tuple_id_(pnode.tnode_->paimon_table_scan_node.tuple_id),
     table_name_(pnode.tnode_->paimon_table_scan_node.table_name),
     splits_empty_(false),
-    paimon_last_arrow_record_batch_consumed_bytes_(0),
-    arrow_record_batch_row_count_(0),
-    arrow_record_batch_row_index_(0) {}
+    paimon_last_arrow_record_batch_consumed_bytes_(0) {}
 
 Status PaimonJniScanNode::Prepare(RuntimeState* state) {
   RETURN_IF_ERROR(ScanNode::Prepare(state));
@@ -87,6 +87,10 @@ Status PaimonJniScanNode::Prepare(RuntimeState* state) {
   /// serialize the jni scan param to binary.
   RETURN_IF_ERROR(serializer.SerializeToString<TPaimonJniScanParam>(
       &paimon_jni_scan_param_, &paimon_jni_scan_param_serialized_));
+  scratch_batch_.reset(
+      new ScratchTupleBatch(*tuple_desc_, state->batch_size(), mem_tracker()));
+  arrow_converter_.reset(new ArrowToTupleConverter(tuple_desc_));
+  RETURN_IF_ERROR(arrow_converter_->Init(state));
   return Status::OK();
 }
 
@@ -102,7 +106,6 @@ Status PaimonJniScanNode::Open(RuntimeState* state) {
   jni_scanner_.reset(
       new PaimonJniScanner(paimon_jni_scan_param_serialized_, tuple_desc_, table_name_));
   RETURN_IF_ERROR(jni_scanner_->Init(env));
-  paimon_row_reader_.reset(new PaimonJniRowReader());
   SCOPED_TIMER(paimon_api_scan_timer_);
   RETURN_IF_ERROR(jni_scanner_->ScanTable(env));
   return Status::OK();
@@ -125,56 +128,51 @@ Status PaimonJniScanNode::CollectProjectionFieldIds(
   return Status::OK();
 }
 
-Status PaimonJniScanNode::GetNextBatchIfNeeded(bool* is_empty_batch) {
-  /// Check if we need to fetch next arrow record batch from jni. if yes,
-  /// fetch it.
-  if (paimon_arrow_record_batch_holder_ == nullptr
-      || arrow_record_batch_row_index_ >= arrow_record_batch_row_count_) {
-    SCOPED_TIMER(paimon_api_scan_timer_);
-    JNIEnv* env = JniUtil::GetJNIEnv();
-    struct ArrowArray* array;
-    struct ArrowSchema* schema;
-    long row_count;
-    long offheap_consumed_bytes;
+Status PaimonJniScanNode::GetNextBatch(bool* is_empty_batch) {
+  SCOPED_TIMER(paimon_api_scan_timer_);
+  JNIEnv* env = JniUtil::GetJNIEnv();
+  struct ArrowArray* array;
+  struct ArrowSchema* schema;
+  long row_count;
+  long offheap_consumed_bytes;
 
-    DCHECK(is_empty_batch != nullptr);
+  DCHECK(is_empty_batch != nullptr);
 
-    RETURN_IF_ERROR(jni_scanner_->GetNextBatchDirect(
-        env, &array, &schema, &row_count, &offheap_consumed_bytes));
+  RETURN_IF_ERROR(jni_scanner_->GetNextBatchDirect(
+      env, &array, &schema, &row_count, &offheap_consumed_bytes));
 
-    *is_empty_batch = false;
-    if (row_count > 0) {
-      auto resultImportVectorSchemaRoot = arrow::ImportRecordBatch(array, schema);
-      /// since the result type is arrow::Status, need to check status manually
-      /// without using macro RETURN_IF_ERROR
-      if (!resultImportVectorSchemaRoot.ok()) {
-        return Status(resultImportVectorSchemaRoot.status().message());
-      }
-      paimon_arrow_record_batch_holder_ = resultImportVectorSchemaRoot.ValueUnsafe();
-      arrow_record_batch_row_count_ = row_count;
-      DCHECK_EQ(row_count, paimon_arrow_record_batch_holder_->num_rows());
-      arrow_record_batch_row_index_ = 0;
-      /// update allocated offheap memory reported from Jni.
-      /// need to do for each batch since we need to check the
-      /// memory usage hit the limit of mem tracker.
-      OffheapTrackFree();
-      RETURN_IF_ERROR(OffheapTrackAllocation(offheap_consumed_bytes));
-
-    } else {
-      /// No more batches to fetch.
-      paimon_arrow_record_batch_holder_ = nullptr;
-      arrow_record_batch_row_count_ = 0;
-      arrow_record_batch_row_index_ = 0;
-      OffheapTrackFree();
+  *is_empty_batch = false;
+  if (row_count > 0) {
+    auto resultImportVectorSchemaRoot = arrow::ImportRecordBatch(array, schema);
+    /// since the result type is arrow::Status, need to check status manually
+    /// without using macro RETURN_IF_ERROR
+    if (!resultImportVectorSchemaRoot.ok()) {
+      return Status(resultImportVectorSchemaRoot.status().message());
     }
+    paimon_arrow_record_batch_holder_ = resultImportVectorSchemaRoot.ValueUnsafe();
+    DCHECK_EQ(row_count, paimon_arrow_record_batch_holder_->num_rows());
+    /// update allocated offheap memory reported from Jni.
+    /// need to do for each batch since we need to check the
+    /// memory usage hit the limit of mem tracker.
+    OffheapTrackFree();
+    RETURN_IF_ERROR(OffheapTrackAllocation(offheap_consumed_bytes));
+
+  } else {
+    /// No more batches to fetch.
+    paimon_arrow_record_batch_holder_ = nullptr;
+    OffheapTrackFree();
   }
 
-  *is_empty_batch = arrow_record_batch_row_count_ > 0
-      && arrow_record_batch_row_index_ < arrow_record_batch_row_count_;
+  *is_empty_batch = row_count == 0;
 
   return Status::OK();
 }
 
+// Arrow record batches are converted to row batch in two steps:
+//   1. Arrow record batches are converted into scratch_batch_
+//   2. Rows are added to row_batch from scratch_batch_
+// If at either point unconverted rows remain, they will be converted in the following
+// GetNext call.
 Status PaimonJniScanNode::GetNext(RuntimeState* state, RowBatch* row_batch, bool* eos) {
   SCOPED_TIMER(runtime_profile_->total_time_counter());
   ScopedGetNextEventAdder ea(this, eos);
@@ -187,60 +185,70 @@ Status PaimonJniScanNode::GetNext(RuntimeState* state, RowBatch* row_batch, bool
     *eos = true;
     return Status::OK();
   }
-
-  /// Set eos to false initially for the batch.
   *eos = false;
-
-  /// Allocate buffer for RowBatch and init the tuple
-  uint8_t* tuple_buffer;
-  int64_t tuple_buffer_size;
-  RETURN_IF_ERROR(
-      row_batch->ResizeAndAllocateTupleBuffer(state, &tuple_buffer_size, &tuple_buffer));
-  Tuple* tuple = reinterpret_cast<Tuple*>(tuple_buffer);
-  tuple->Init(tuple_buffer_size);
 
   SCOPED_TIMER(materialize_tuple_timer());
   while (!ReachedLimit() && !row_batch->AtCapacity()) {
     /// Break the loop if is canceled, or maintainance is needed.
-    if (state->is_cancelled() || !QueryMaintenance(state).ok()) {
-      break;
-    }
-    int row_idx = row_batch->AddRow();
-    TupleRow* tuple_row = row_batch->GetRow(row_idx);
-    tuple_row->SetTuple(0, tuple);
+    if (state->is_cancelled() || !QueryMaintenance(state).ok()) break;
 
-    /// Get the next arrow batch from 'org.apache.impala.util.paimon.PaimonJniScanner'
-    /// if the current arrow batch is already consumed.
-    bool fetched;
-    RETURN_IF_ERROR(GetNextBatchIfNeeded(&fetched));
-    /// When fetched is false, there are no more arrow batches to read
-    if (!fetched) {
-      *eos = true;
-      break;
+    // If no remaining rows in scratch_batch_, fetch a new batch from arrow.
+    // Otherwise, handle remaining rows first.
+    if (scratch_batch_->AtEnd()) {
+      // Step 1: write values from arrow batch to scratch batch
+      if (paimon_arrow_record_batch_holder_ == nullptr
+          || arrow_batch_row_idx_ >= paimon_arrow_record_batch_holder_->num_rows()) {
+        bool is_empty_batch;
+        RETURN_IF_ERROR(GetNextBatch(&is_empty_batch));
+        if (is_empty_batch) {
+          *eos = true;
+          return Status::OK();
+        }
+        arrow_batch_row_idx_ = 0;
+      }
+
+      // Start a new scratch batch.
+      RETURN_IF_ERROR(scratch_batch_->Reset(state));
+
+      // The scratch batch may hold fewer rows than the arrow batch.
+      int num_rows = std::min<int64_t>(scratch_batch_->capacity,
+          paimon_arrow_record_batch_holder_->num_rows() - arrow_batch_row_idx_);
+      int end_row_idx = arrow_batch_row_idx_ + num_rows;
+
+      RETURN_IF_ERROR(arrow_converter_->Convert(*paimon_arrow_record_batch_holder_,
+          arrow_batch_row_idx_, end_row_idx, scratch_batch_->tuple_mem,
+          &scratch_batch_->aux_mem_pool));
+
+      arrow_batch_row_idx_ = end_row_idx;
+      scratch_batch_->num_tuples = num_rows;
+      COUNTER_ADD(rows_read_counter(), num_rows);
     }
-    DCHECK(paimon_arrow_record_batch_holder_ != nullptr);
-    COUNTER_ADD(rows_read_counter(), 1);
-    RETURN_IF_ERROR(paimon_row_reader_->MaterializeTuple(
-        *paimon_arrow_record_batch_holder_, arrow_record_batch_row_index_, tuple_desc_,
-        tuple, row_batch->tuple_data_pool(), state));
-    /// Evaluate conjuncts on this tuple row
-    if (ExecNode::EvalConjuncts(
-            conjunct_evals().data(), conjunct_evals().size(), tuple_row)) {
-      row_batch->CommitLastRow();
-      tuple = reinterpret_cast<Tuple*>(
-          reinterpret_cast<uint8_t*>(tuple) + tuple_desc_->byte_size());
-      IncrementNumRowsReturned(1);
-    } else {
-      /// Reset the null bits, everyhing else will be overwritten
-      Tuple::ClearNullBits(
-          tuple, tuple_desc_->null_bytes_offset(), tuple_desc_->num_null_bytes());
+
+    // Step 2: add rows from scratch batch to tuple row
+    int num_rows_added = 0;
+    while (!scratch_batch_->AtEnd()) {
+      int row_batch_row_idx = row_batch->num_rows() + num_rows_added;
+
+      if (ReachedLimit() || row_batch_row_idx >= row_batch->capacity()) break;
+
+      Tuple* tuple = scratch_batch_->GetTuple(scratch_batch_->tuple_idx);
+      scratch_batch_->tuple_idx++;
+
+      TupleRow* tuple_row = row_batch->GetRow(row_batch_row_idx);
+      tuple_row->SetTuple(0, tuple);
+
+      if (ExecNode::EvalConjuncts(conjunct_evals().data(), conjunct_evals().size(),
+          tuple_row)) {
+        IncrementNumRowsReturned(1);
+        num_rows_added++;
+      }
     }
-    /// will process the next row of arrow RecordBatch in next iteration.
-    arrow_record_batch_row_index_++;
+
+    scratch_batch_->FinalizeTupleTransfer(row_batch, num_rows_added);
+    row_batch->CommitRows(num_rows_added);
   }
-  if (ReachedLimit()) {
-    *eos = true;
-  }
+
+  *eos = ReachedLimit();
   return Status::OK();
 }
 
@@ -252,8 +260,6 @@ void PaimonJniScanNode::Close(RuntimeState* state) {
   /// canceled.
   if (paimon_arrow_record_batch_holder_ != nullptr) {
     paimon_arrow_record_batch_holder_.reset();
-    arrow_record_batch_row_index_ = 0;
-    arrow_record_batch_row_count_ = 0;
   }
   /// 'jni_scanner_' is only created in Open(), and only if there are splits. Close()
   /// is also called if Prepare() or Open() failed before that, or Open() was not called.
@@ -261,6 +267,9 @@ void PaimonJniScanNode::Close(RuntimeState* state) {
   OffheapTrackFree();
   if (arrow_batch_mem_tracker_ != nullptr) {
     arrow_batch_mem_tracker_->Close();
+  }
+  if (scratch_batch_ != nullptr) {
+    scratch_batch_->ReleaseResources(nullptr);
   }
   ScanNode::Close(state);
 }

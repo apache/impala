@@ -18,9 +18,10 @@
 #pragma once
 
 #include "common/global-types.h"
-#include "exec/paimon/paimon-jni-row-reader.h"
+#include "exec/arrow-converter.h"
 #include "exec/paimon/paimon-jni-scanner.h"
 #include "exec/scan-node.h"
+#include "exec/scratch-tuple-batch.h"
 #include "runtime/descriptors.h"
 
 #include <jni.h>
@@ -29,7 +30,6 @@
 namespace impala {
 
 class ExecNode;
-class PaimonJniRowReader;
 class RuntimeState;
 class Status;
 
@@ -90,12 +90,16 @@ class PaimonJniScanNode : public ScanNode {
   /// Java Heap.
   std::unique_ptr<PaimonJniScanner> jni_scanner_;
 
-  /// Helper class to transform Paimon rows to Impala tuples.
-  std::unique_ptr<PaimonJniRowReader> paimon_row_reader_;
+  /// Values from arrow record batch will be written into this scratch batch first,
+  /// and rows will be added to row batch from this scratch batch.
+  std::unique_ptr<ScratchTupleBatch> scratch_batch_;
+
+  /// Converts the arrow record batches into the tuples of 'scratch_batch_'.
+  std::unique_ptr<ArrowToTupleConverter> arrow_converter_;
 
   /// Get the next arrow row record batch from the jni scanner.
-  /// returns false if no record is available anymore, true if valid row is returned.
-  Status GetNextBatchIfNeeded(bool* is_empty_batch);
+  /// returns true if no record is available anymore, false if valid row is returned.
+  Status GetNextBatch(bool* is_empty_batch);
 
   /// The TupleId and TupleDescriptor of the tuple that this scan node will populate.
   const TupleId tuple_id_;
@@ -123,10 +127,9 @@ class PaimonJniScanNode : public ScanNode {
   std::string paimon_jni_scan_param_serialized_;
   /// current unconsumed arrow record batch.
   std::shared_ptr<arrow::RecordBatch> paimon_arrow_record_batch_holder_;
-  /// current row_count of the arrow record batch.
-  long arrow_record_batch_row_count_;
-  /// current row_index of the arrow record batch.
-  long arrow_record_batch_row_index_;
+  /// Index of the first row in 'paimon_arrow_record_batch_holder_' that has not been
+  /// converted into 'scratch_batch_' yet.
+  int arrow_batch_row_idx_ = 0;
   /// Paimon scan specific counters.
   RuntimeProfile::Counter* scan_open_timer_;
   RuntimeProfile::Counter* paimon_api_scan_timer_;

@@ -1091,6 +1091,8 @@ struct TGetHadoopGroupsResponse {
 struct TBuildTestDescriptorTableParams {
   // Every entry describes the slot types of one tuple.
   1: required list<list<Types.TColumnType>> slot_types
+  // Same shape as 'slot_types'. If not set, all slots are nullable.
+  2: optional list<list<bool>> slot_nullable
 }
 
 // Output format for generating a testcase for a given query_stmt. The resulting bytes

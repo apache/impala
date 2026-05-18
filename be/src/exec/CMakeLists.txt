@@ -55,6 +55,7 @@ add_library(Exec
   aggregation-node-base.cc
   aggregator.cc
   analytic-eval-node.cc
+  arrow-converter.cc
   base-sequence-scanner.cc
   blocking-join-node.cc
   blocking-plan-root-sink.cc
@@ -134,6 +135,7 @@ endif()
 
 add_library(ExecTests STATIC
   acid-metadata-utils-test.cc
+  arrow-converter-test.cc
   delimited-text-parser-test.cc
   hash-table-test.cc
   incr-stats-util-test.cc
@@ -145,6 +147,7 @@ add_library(ExecTests STATIC
 add_dependencies(ExecTests gen-deps)
 
 ADD_UNIFIED_BE_LSAN_TEST(acid-metadata-utils-test ValidWriteIdListTest.*)
+ADD_UNIFIED_BE_LSAN_TEST(arrow-converter-test ArrowConverterTest.*)
 ADD_UNIFIED_BE_LSAN_TEST(zigzag-test ZigzagTest.*)
 ADD_UNIFIED_BE_LSAN_TEST(hash-table-test HashTableTest.*)
 ADD_UNIFIED_BE_LSAN_TEST(delimited-text-parser-test DelimitedTextParser.*)

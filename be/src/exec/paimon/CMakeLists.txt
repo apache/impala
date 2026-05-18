@@ -22,7 +22,6 @@ set(LIBRARY_OUTPUT_PATH "${BUILD_OUTPUT_ROOT_DIRECTORY}/exec/paimon")
 set(EXECUTABLE_OUTPUT_PATH "${BUILD_OUTPUT_ROOT_DIRECTORY}/exec/paimon")
 
 add_library(ExecPaimon
- paimon-jni-row-reader.cc
  paimon-jni-scan-node.cc
  paimon-jni-scanner.cc
  paimon-scan-plan-node.cc

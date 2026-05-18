@@ -92,6 +92,15 @@ struct ScratchTupleBatch {
     DCHECK_EQ(row_desc.tuple_descriptors().size(), 1);
   }
 
+  ScratchTupleBatch(
+      const TupleDescriptor& tuple_desc, int batch_size, MemTracker* mem_tracker)
+    : capacity(batch_size),
+      tuple_byte_size(tuple_desc.byte_size()),
+      tuple_mem_pool(mem_tracker),
+      aux_mem_pool(mem_tracker),
+      selected_rows(new bool[batch_size]) {
+  }
+
   Status Reset(RuntimeState* state) {
     tuple_idx = 0;
     num_tuples = 0;

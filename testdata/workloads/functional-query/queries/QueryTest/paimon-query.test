@@ -184,4 +184,34 @@ AnalysisException: Paimon Scanner doesn't support nested columns.
 select INPUT__FILE__NAME from functional_parquet.alltypes_structs_paimon where year=2009 and month=1 and id > 300
 ---- CATCH
 AnalysisException: Could not resolve column/field reference: 'input__file__name'
+====
+---- QUERY
+# A Paimon table without data has no splits, so the scan node gets no scan ranges.
+CREATE TABLE empty_paimon_tbl (id INT, s STRING) STORED AS PAIMON;
+select * from empty_paimon_tbl;
+---- RESULTS
+---- TYPES
+INT,STRING
+====
+---- QUERY
+select count(id) from functional_parquet.alltypes_paimon
+---- RESULTS
+7300
+---- TYPES
+BIGINT
+---- RUNTIME_PROFILE
+aggregation(SUM, RowsRead): 7300
+====
+---- QUERY
+set debug_action="0:GETNEXT:FAIL";
+select * from functional_parquet.alltypes_paimon
+---- CATCH
+Debug Action: FAIL
+====
+---- QUERY
+# Close() must handle a scan node whose Prepare() failed early.
+set debug_action="0:PREPARE:FAIL";
+select * from functional_parquet.alltypes_paimon
+---- CATCH
+Debug Action: FAIL
 

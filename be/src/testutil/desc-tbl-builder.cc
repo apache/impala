@@ -48,6 +48,8 @@ DescriptorTbl* DescriptorTblBuilder::Build() {
   DCHECK(!tuples_descs_.empty());
 
   TBuildTestDescriptorTableParams params;
+  vector<vector<bool>> slot_nullable;
+  bool any_non_nullable = false;
   for (int i = 0; i < tuples_descs_.size(); ++i) {
     params.slot_types.push_back(vector<TColumnType>());
     vector<TColumnType>& tslot_types = params.slot_types.back();
@@ -55,7 +57,10 @@ DescriptorTbl* DescriptorTblBuilder::Build() {
     for (const ColumnType& slot_type : slot_types) {
       tslot_types.push_back(slot_type.ToThrift());
     }
+    slot_nullable.push_back(tuples_descs_[i]->slot_nullable());
+    for (bool nullable : slot_nullable.back()) any_non_nullable |= !nullable;
   }
+  if (any_non_nullable) params.__set_slot_nullable(slot_nullable);
 
   Status buildDescTblStatus = fe_->BuildTestDescriptorTable(params, &thrift_desc_tbl_);
   DCHECK(buildDescTblStatus.ok()) << buildDescTblStatus.GetDetail();

@@ -666,8 +666,8 @@ public class JniFrontend {
     TBuildTestDescriptorTableParams params = new TBuildTestDescriptorTableParams();
     JniUtil.deserializeThrift(protocolFactory_, params, buildTestDescTblParams);
     Preconditions.checkNotNull(params.slot_types);
-    TDescriptorTable result =
-        DescriptorTable.buildTestDescriptorTable(params.slot_types);
+    TDescriptorTable result = DescriptorTable.buildTestDescriptorTable(
+        params.slot_types, params.isSetSlot_nullable() ? params.slot_nullable : null);
     try {
       TSerializer serializer = new TSerializer(protocolFactory_);
       byte[] ret = serializer.serialize(result);
