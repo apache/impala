@@ -180,12 +180,10 @@ class TestObservability(ImpalaTestSuite):
     # |--02:SCAN HDFS           0     150.00K  tpch.customer, CANCELLED
     # 01:SCAN HDFS          3.07K       6.00M  tpch.lineitem, CANCELLED
     scan_op = 'SCAN ' + FILESYSTEM_NAME
-    assert result.exec_summary[4]['operator'] == '02:' + scan_op, result.runtime_profile
-    assert result.exec_summary[4]['detail'] == 'tpch.customer, CANCELLED', \
-        result.runtime_profile
-    assert result.exec_summary[5]['operator'] == '01:' + scan_op, result.runtime_profile
-    assert result.exec_summary[5]['detail'] == 'tpch.lineitem, CANCELLED', \
-        result.runtime_profile
+    self.verify_exec_summary_operator_details(result, {
+      '02:' + scan_op: 'tpch.customer, CANCELLED',
+      '01:' + scan_op: 'tpch.lineitem, CANCELLED',
+    })
 
     # A more complex case with completed and cancelled nodes.
     query = """
@@ -215,33 +213,12 @@ class TestObservability(ImpalaTestSuite):
     # 07:EXCHANGE                    6           4  HASH(a.l_orderkey)
     # F00:EXCHANGE SENDER
     # 00:SCAN HDFS                   6           4  tpch.lineitem a
-    if IS_CALCITE_PLANNER:
-      assert result.exec_summary[12]['operator'] == '03:' + scan_op, \
-          result.runtime_profile
-      assert result.exec_summary[12]['detail'] == 'tpch.lineitem, CANCELLED', \
-          result.runtime_profile
-      assert result.exec_summary[13]['operator'] == '02:' + scan_op, \
-          result.runtime_profile
-      assert result.exec_summary[13]['detail'] == 'tpch.lineitem, CANCELLED', \
-          result.runtime_profile
-      assert result.exec_summary[16]['operator'] == '00:' + scan_op, \
-          result.runtime_profile
+    self.verify_exec_summary_operator_details(result, {
+      '03:' + scan_op: 'tpch.lineitem, CANCELLED',
+      '02:' + scan_op: 'tpch.lineitem, CANCELLED',
       # Calcite planner does not include the alias 'a' here.
-      assert result.exec_summary[16]['detail'] == 'tpch.lineitem', \
-          result.runtime_profile
-    else:
-      assert result.exec_summary[11]['operator'] == '03:' + scan_op, \
-          result.runtime_profile
-      assert result.exec_summary[11]['detail'] == 'tpch.lineitem, CANCELLED', \
-          result.runtime_profile
-      assert result.exec_summary[12]['operator'] == '02:' + scan_op, \
-          result.runtime_profile
-      assert result.exec_summary[12]['detail'] == 'tpch.lineitem, CANCELLED', \
-          result.runtime_profile
-      assert result.exec_summary[15]['operator'] == '00:' + scan_op, \
-          result.runtime_profile
-      assert result.exec_summary[15]['detail'] == 'tpch.lineitem a', \
-          result.runtime_profile
+      '00:' + scan_op: 'tpch.lineitem' if IS_CALCITE_PLANNER else 'tpch.lineitem a',
+    })
 
     # Test on other node types
     query = """
@@ -265,21 +242,14 @@ class TestObservability(ImpalaTestSuite):
     # F00:EXCHANGE SENDER
     # 02:SORT               661.05K       6.00M  CANCELLED
     # 01:SCAN HDFS            6.00M       6.00M  tpch.lineitem
-    assert result.exec_summary[4]['operator'] == '04:' + scan_op, result.runtime_profile
-    assert result.exec_summary[4]['detail'] == 'tpch.customer, CANCELLED', \
-        result.runtime_profile
-    assert result.exec_summary[5]['operator'] == '06:EXCHANGE', result.runtime_profile
-    assert result.exec_summary[5]['detail'] == 'RANDOM, CANCELLED', result.runtime_profile
-    assert result.exec_summary[7]['operator'] == '03:ANALYTIC', result.runtime_profile
-    assert result.exec_summary[7]['detail'] == 'CANCELLED', result.runtime_profile
-    assert result.exec_summary[8]['operator'] == '05:MERGING-EXCHANGE', \
-        result.runtime_profile
-    assert result.exec_summary[8]['detail'] == 'UNPARTITIONED, CANCELLED', \
-        result.runtime_profile
-    assert result.exec_summary[10]['operator'] == '02:SORT', result.runtime_profile
-    assert result.exec_summary[10]['detail'] == 'CANCELLED', result.runtime_profile
-    assert result.exec_summary[11]['operator'] == '01:' + scan_op, result.runtime_profile
-    assert result.exec_summary[11]['detail'] == 'tpch.lineitem', result.runtime_profile
+    self.verify_exec_summary_operator_details(result, {
+      '04:' + scan_op: 'tpch.customer, CANCELLED',
+      '06:EXCHANGE': 'RANDOM, CANCELLED',
+      '03:ANALYTIC': 'CANCELLED',
+      '05:MERGING-EXCHANGE': 'UNPARTITIONED, CANCELLED',
+      '02:SORT': 'CANCELLED',
+      '01:' + scan_op: 'tpch.lineitem',
+    })
 
     # Test limit on Subplan. As the SubplanNode reaches its limit, it finishes as expected
     # and shouldn't be marked as CANCELLED.
@@ -303,19 +273,13 @@ class TestObservability(ImpalaTestSuite):
     # |  |--02:SINGULAR ROW SRC   0           1
     # |  03:UNNEST                7          10  c.c_orders arr
     # 00:SCAN HDFS                6     150.00K  tpch_nested_parquet.customer c, CANCELLED
-    assert result.exec_summary[1]['operator'] == '01:SUBPLAN', result.runtime_profile
-    assert result.exec_summary[1]['detail'] == '', result.runtime_profile
-    assert result.exec_summary[2]['operator'] == '04:NESTED LOOP JOIN', \
-        result.runtime_profile
-    assert result.exec_summary[2]['detail'] == 'CROSS JOIN', result.runtime_profile
-    assert result.exec_summary[3]['operator'] == '02:SINGULAR ROW SRC', \
-        result.runtime_profile
-    assert result.exec_summary[3]['detail'] == '', result.runtime_profile
-    assert result.exec_summary[4]['operator'] == '03:UNNEST', result.runtime_profile
-    assert result.exec_summary[4]['detail'] == 'c.c_orders arr', result.runtime_profile
-    assert result.exec_summary[5]['operator'] == '00:' + scan_op, result.runtime_profile
-    assert result.exec_summary[5]['detail'] == \
-        'tpch_nested_parquet.customer c, CANCELLED', result.runtime_profile
+    self.verify_exec_summary_operator_details(result, {
+      '01:SUBPLAN': '',
+      '04:NESTED LOOP JOIN': 'CROSS JOIN',
+      '02:SINGULAR ROW SRC': '',
+      '03:UNNEST': 'c.c_orders arr',
+      '00:' + scan_op: 'tpch_nested_parquet.customer c, CANCELLED',
+    })
 
     # Test limit on parent (UnionNode) of SubplanNode. All nodes in the SubplanNode should
     # be marked as CANCELLED.
@@ -338,21 +302,13 @@ class TestObservability(ImpalaTestSuite):
     # |  |--03:SINGULAR ROW SRC     0         1  CANCELLED
     # |  04:UNNEST                 22        10  c.c_orders arr, CANCELLED
     # 01:SCAN HDFS              1.03K   150.00K  tpch_nested_orc_def.customer c, CANCELLED
-    assert result.exec_summary[4]['operator'] == '02:SUBPLAN', result.runtime_profile
-    assert result.exec_summary[4]['detail'] == 'CANCELLED', result.runtime_profile
-    assert result.exec_summary[5]['operator'] == '05:NESTED LOOP JOIN', \
-        result.runtime_profile
-    assert result.exec_summary[5]['detail'] == 'CROSS JOIN, CANCELLED', \
-        result.runtime_profile
-    assert result.exec_summary[6]['operator'] == '03:SINGULAR ROW SRC', \
-        result.runtime_profile
-    assert result.exec_summary[6]['detail'] == 'CANCELLED', result.runtime_profile
-    assert result.exec_summary[7]['operator'] == '04:UNNEST', result.runtime_profile
-    assert result.exec_summary[7]['detail'] == 'c.c_orders arr, CANCELLED', \
-        result.runtime_profile
-    assert result.exec_summary[8]['operator'] == '01:' + scan_op, result.runtime_profile
-    assert result.exec_summary[8]['detail'] == \
-        'tpch_nested_orc_def.customer c, CANCELLED', result.runtime_profile
+    self.verify_exec_summary_operator_details(result, {
+      '02:SUBPLAN': 'CANCELLED',
+      '05:NESTED LOOP JOIN': 'CROSS JOIN, CANCELLED',
+      '03:SINGULAR ROW SRC': 'CANCELLED',
+      '04:UNNEST': 'c.c_orders arr, CANCELLED',
+      '01:' + scan_op: 'tpch_nested_orc_def.customer c, CANCELLED',
+    })
 
   def test_cancelled_markers_in_running_query(self):
     """Test that the CANCELLED markers are not added to the summary for running queries"""

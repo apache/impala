@@ -749,6 +749,12 @@ class ImpalaTestSuite(BaseTestSuite):
         return
     assert False, "'- {}:' not found in\n{}".format(label, profile)
 
+  def verify_exec_summary_operator_details(self, result, operator_details):
+    """Verifies that the details of the operators in the exec summary are as expected."""
+    for row in result.exec_summary:
+      if row['operator'] in operator_details:
+        assert row['detail'] == operator_details[row['operator']], result.runtime_profile
+
   def __do_replacements(self, s, use_db=None, extra=None):
     globs = globals()
     # following assignment are purposefully redundant to avoid flake8 warnings (F401).
