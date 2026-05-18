@@ -2870,7 +2870,10 @@ SqlNode Pivot(SqlNode tableRef) :
     final SqlNodeList inList;
 }
 {
-    <PIVOT> { s = span(); checkNotJoin(tableRef); }
+    <PIVOT>
+    { throw new ParseException("Pivot not supported for Calcite Planner");}
+    // TODO: implement PIVOT with Impala semantics
+    // { s = span(); checkNotJoin(tableRef); }
     <LPAREN>
     AddPivotAgg(aggList) ( <COMMA> AddPivotAgg(aggList) )*
     <FOR> axisList = SimpleIdentifierOrList()
@@ -2938,7 +2941,10 @@ SqlNode Unpivot(SqlNode tableRef) :
     final SqlNodeList inList;
 }
 {
-    <UNPIVOT> { s = span(); checkNotJoin(tableRef); }
+    <UNPIVOT>
+    { throw new ParseException("Unpivot not supported for Calcite Planner");}
+    // TODO: implement UNPIVOT with Impala semantics
+    //{ s = span(); checkNotJoin(tableRef); }
     (
         <INCLUDE> <NULLS> { includeNulls = true; }
     |   <EXCLUDE> <NULLS> { includeNulls = false; }
