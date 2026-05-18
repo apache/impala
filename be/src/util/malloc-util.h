@@ -68,10 +68,15 @@ namespace impala {
     //   will operate properly with huge pages. It may break up huge pages. This
     //   is true for most malloc implementations that retain memory without
     //   explicit huge page support.
+    // MADVISE_UNNECESSARY - The malloc implementation uses huge pages natively.
+    //   Callers should not use madvise() with MADV_HUGEPAGE themselves, because
+    //   the malloc implementation is already doing this. If the malloc implementation
+    //   retains memory, it does so in a way that is aware of huge pages.
     // This can only be called after initialization.
     enum class HugePageSupport {
       MADVISE_COMPATIBLE,
-      MADVISE_INCOMPATIBLE
+      MADVISE_INCOMPATIBLE,
+      MADVISE_UNNECESSARY
     };
     virtual HugePageSupport GetHugePageSupport() const = 0;
     friend std::ostream& operator<<(std::ostream& os, const HugePageSupport& h);

@@ -17,13 +17,15 @@
 
 import pytest
 from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
-from tests.common.skip import SkipIfBuildType
+from tests.common.skip import SkipIf, SkipIfBuildType
 from tests.util.test_file_parser import load_tpc_queries_name_sorted
 
 
 # Basic test running TPCDS with tcmalloc's aggressive decommit turned off.
-# This doesn't make any sense with sanitizer builds.
+# This doesn't make any sense with sanitizer builds or when running with
+# a malloc other than gperftools
 @SkipIfBuildType.sanitizer
+@SkipIf.not_gperftools
 @CustomClusterTestSuite.with_args(cluster_size=3,
     start_args="--tcmalloc_aggressive_decommit false")
 class TestAggressiveDecommitOffTpcds(CustomClusterTestSuite):

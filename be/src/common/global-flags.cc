@@ -127,6 +127,14 @@ DEFINE_int64(tcmalloc_garbage_collection_chunk_size, /* 10 MB */ 10 * 1024 * 102
     "amount of free memory to return in a single call into tcmalloc. This does not "
     "impact the total amount of memory returned.");
 
+DEFINE_int32(googletcmalloc_max_per_cpu_cache_size, /* 5 MB */ 5 * 1024 * 1024,
+    "(Advanced) Bound on the amount of bytes allocated for each Google TCMalloc CPU "
+    "cache.");
+
+DEFINE_uint64(googletcmalloc_memory_release_rate_bytes_per_sec,
+    /* 50MB / sec */ 50 * 1024 * 1024, "(Advanced) Rate at which memory is released "
+    "from Google TCMalloc's page heap. Setting to zero inhibits the release path.");
+
 DEFINE_bool(abort_on_config_error, true, "Abort Impala startup if there are improper "
     "configs or running on unsupported hardware.");
 

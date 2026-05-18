@@ -115,6 +115,8 @@ else
   export IMPALA_AVRO_VERSION=1.7.4-p5
 fi
 unset IMPALA_AVRO_URL
+export IMPALA_ABSEIL_CPP_VERSION=20250512.2
+unset IMPALA_ABSEIL_CPP_URL
 export IMPALA_BINUTILS_VERSION=2.42-p24
 unset IMPALA_BINUTILS_URL
 export IMPALA_BOOST_VERSION=1.74.0-p1
@@ -199,6 +201,8 @@ export IMPALA_SNAPPY_VERSION=1.1.8
 unset IMPALA_SNAPPY_URL
 export IMPALA_SQUEASEL_VERSION=3.3
 unset IMPALA_SQUEASEL_URL
+export IMPALA_TCMALLOC_VERSION=5aa90af663
+unset IMPALA_TCMALLOC_URL
 # TPC utilities used for test/benchmark data generation.
 export IMPALA_TPC_DS_VERSION=2.1.0-p1
 unset IMPALA_TPC_DS_URL
@@ -676,6 +680,10 @@ export ENABLE_IMPALA_IR_DEBUG_INFO=${ENABLE_IMPALA_IR_DEBUG_INFO-false}
 export IMPALA_MINIMAL_DEBUG_INFO=${IMPALA_MINIMAL_DEBUG_INFO-false}
 export IMPALA_COMPRESSED_DEBUG_INFO=${IMPALA_COMPRESSED_DEBUG_INFO-true}
 export IMPALA_SPLIT_DEBUG_INFO=${IMPALA_SPLIT_DEBUG_INFO-false}
+
+# Set preferred malloc implementation, default to gperftools
+# The other option is googletcmalloc.
+export IMPALA_MALLOC_IMPL=${IMPALA_MALLOC_IMPL:-gperftools}
 
 # Download and use the CDH components from S3. It can be useful to set this to false if
 # building against a custom local build using HIVE_SRC_DIR_OVERRIDE,

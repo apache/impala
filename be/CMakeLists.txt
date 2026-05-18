@@ -25,6 +25,10 @@ enable_testing()
 #      to CMakeFiles/<currentdir>.dir/<srcfile>.s
 PROJECT(ASSEMBLER)
 
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_EXTENSIONS OFF)
+
 option(BUILD_WITH_NO_TESTS "Do not generate test and benchmark targets" OFF)
 
 # Validate the IMPALA_LINKER environment variable
@@ -73,7 +77,6 @@ endif()
 SET(CXX_COMMON_FLAGS "${CXX_COMMON_FLAGS} -Wall -Wno-sign-compare -Wno-unknown-pragmas -pthread")
 SET(CXX_COMMON_FLAGS "${CXX_COMMON_FLAGS} -fno-strict-aliasing -fno-omit-frame-pointer")
 SET(CXX_COMMON_FLAGS "${CXX_COMMON_FLAGS} -fsigned-char")
-SET(CXX_COMMON_FLAGS "${CXX_COMMON_FLAGS} -std=c++17")
 SET(CXX_COMMON_FLAGS "${CXX_COMMON_FLAGS} -Wno-vla")
 SET(CXX_COMMON_FLAGS "${CXX_COMMON_FLAGS} -DBOOST_DATE_TIME_POSIX_TIME_STD_CONFIG")
 SET(CXX_COMMON_FLAGS "${CXX_COMMON_FLAGS} -DBOOST_SYSTEM_NO_DEPRECATED")
@@ -755,9 +758,21 @@ if ("${CMAKE_BUILD_TYPE}" STREQUAL "ADDRESS_SANITIZER" OR
     "${CMAKE_BUILD_TYPE}" STREQUAL "TSAN_FULL")
   set (IMPALA_LINK_LIBS ${IMPALA_LINK_LIBS} MallocUtilSanitizer)
   set (UNIFIED_TEST_LINK_LIBS ${UNIFIED_TEST_LINK_LIBS} MallocUtilSanitizer)
-else()
+elseif("$ENV{IMPALA_MALLOC_IMPL}" STREQUAL "gperftools")
   set (IMPALA_LINK_LIBS ${IMPALA_LINK_LIBS} MallocUtilGperftools)
   set (UNIFIED_TEST_LINK_LIBS ${UNIFIED_TEST_LINK_LIBS} MallocUtilGperftools)
+elseif("$ENV{IMPALA_MALLOC_IMPL}" STREQUAL "googletcmalloc")
+  # Our Clang is too old to build with Google TCMalloc, so use gperftools
+  # for this configuration. This only impacts Clang Tidy and UBSAN builds.
+  if ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang")
+    set (IMPALA_LINK_LIBS ${IMPALA_LINK_LIBS} MallocUtilGperftools)
+    set (UNIFIED_TEST_LINK_LIBS ${UNIFIED_TEST_LINK_LIBS} MallocUtilGperftools)
+  else()
+    set (IMPALA_LINK_LIBS ${IMPALA_LINK_LIBS} MallocUtilGoogleTcmalloc)
+    set (UNIFIED_TEST_LINK_LIBS ${UNIFIED_TEST_LINK_LIBS} MallocUtilGoogleTcmalloc)
+  endif()
+else()
+  message(FATAL_ERROR "Unknown IMPALA_MALLOC_IMPL: $ENV{IMPALA_MALLOC_IMPL}")
 endif()
 
 # When we link statically, we need to replace the static libhdfs.a with the dynamic

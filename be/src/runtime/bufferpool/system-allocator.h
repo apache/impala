@@ -47,6 +47,10 @@ class SystemAllocator {
   Status AllocateViaMalloc(int64_t len, uint8_t** buffer_mem);
 
   const int64_t min_buffer_len_;
+
+  // If the malloc implementation natively handles huge pages, then we don't
+  // need to use madvise ourselves.
+  bool madvise_unnecessary_ = false;
 };
 }
 

@@ -2657,6 +2657,18 @@
     "key": "tcmalloc.overhead-bytes"
   },
   {
+    "description": "Number of free bytes in CPU caches. They always count towards virtual memory usage, and unless the underlying memory is swapped out by the OS, they also count towards physical memory usage.",
+    "contexts": [
+      "STATESTORE",
+      "CATALOGSERVER",
+      "IMPALAD"
+    ],
+    "label": "TCMalloc CPU Cache Free Bytes",
+    "units": "BYTES",
+    "kind": "GAUGE",
+    "key": "tcmalloc.cpu-cache-free-bytes"
+  },
+  {
     "description": "Bytes allocated from the sanitizer malloc (Sanitizer debug builds only)",
     "contexts": [
       "STATESTORE",

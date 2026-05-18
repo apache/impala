@@ -48,7 +48,11 @@ SystemAllocator::SystemAllocator(int64_t min_buffer_len)
   if (FLAGS_madvise_huge_pages) {
     MallocUtil::HugePageSupport support =
         MallocUtil::GetInstance()->GetHugePageSupport();
-    CHECK_EQ(support, MallocUtil::HugePageSupport::MADVISE_COMPATIBLE);
+    if (support == MallocUtil::HugePageSupport::MADVISE_UNNECESSARY) {
+      madvise_unnecessary_ = true;
+    } else {
+      CHECK_EQ(support, MallocUtil::HugePageSupport::MADVISE_COMPATIBLE);
+    }
   }
 }
 
@@ -127,7 +131,7 @@ Status SystemAllocator::AllocateViaMalloc(int64_t len, uint8_t** buffer_mem) {
     return Status(TErrorCode::BUFFER_ALLOCATION_FAILED, len,
         Substitute("posix_memalign() failed to allocate buffer: $0", GetStrErrMsg()));
   }
-  if (use_huge_pages) {
+  if (use_huge_pages && !madvise_unnecessary_) {
 #ifdef MADV_HUGEPAGE
     // According to madvise() docs it may return EAGAIN to signal that we should retry.
     do {
@@ -145,7 +149,7 @@ void SystemAllocator::Free(BufferPool::BufferHandle&& buffer) {
     DCHECK_EQ(rc, 0) << "Unexpected munmap() error: " << errno;
   } else {
     bool use_huge_pages = buffer.len() % HUGE_PAGE_SIZE == 0 && FLAGS_madvise_huge_pages;
-    if (use_huge_pages) {
+    if (use_huge_pages && !madvise_unnecessary_) {
       // Undo the madvise so that is isn't a candidate to be newly backed by huge pages.
       // We depend on TCMalloc's "aggressive decommit" mode decommitting the physical
       // huge pages with madvise(DONTNEED) when we call free(). Otherwise, this huge

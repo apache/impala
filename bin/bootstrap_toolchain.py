@@ -471,11 +471,12 @@ def get_toolchain_downloads():
   gcc_package = ToolchainPackage("gcc")
   toolchain_packages += [llvm_package, llvm_package_asserts, gcc_package]
   toolchain_packages += [ToolchainPackage(p) for p in
-      ["arrow", "avro", "binutils", "boost", "breakpad", "bzip2", "calloncehack", "cctz",
-       "cloudflarezlib", "cmake", "crcutil", "curl", "flatbuffers", "gdb", "gflags",
-       "glog", "gperftools", "jwt-cpp", "libev", "libunwind", "lz4", "mold",
-       "openldap", "opentelemetry-cpp", "orc", "protobuf", "python", "rapidjson", "re2",
-       "snappy", "tpc-h", "tpc-ds", "zlib", "zstd"]]
+      ["abseil-cpp", "arrow", "avro", "binutils", "boost", "breakpad", "bzip2",
+       "calloncehack", "cctz", "cloudflarezlib", "cmake", "crcutil", "curl",
+       "flatbuffers", "gdb", "gflags", "glog", "gperftools", "jwt-cpp", "libev",
+       "libunwind", "lz4", "mold", "openldap", "opentelemetry-cpp", "orc",
+       "protobuf", "python", "rapidjson", "re2", "snappy", "tcmalloc", "tpc-h",
+       "tpc-ds", "zlib", "zstd"]]
   gtest_package = ToolchainPackage(
       "googletest", explicit_version=os.environ.get("IMPALA_GTEST_VERSION"))
   toolchain_packages += [gtest_package]

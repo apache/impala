@@ -28,7 +28,8 @@ from tests.common.environ import (ImpalaTestClusterProperties,
                                   IS_DOCKERIZED_TEST_CLUSTER, IS_BUGGY_EL6_KERNEL,
                                   HIVE_MAJOR_VERSION,
                                   IS_APACHE_HIVE, IS_TEST_JDK,
-                                  IS_TUPLE_CACHE, IS_CALCITE_PLANNER)
+                                  IS_TUPLE_CACHE, IS_CALCITE_PLANNER,
+                                  IMPALA_MALLOC_IMPL)
 from tests.common.impala_test_suite import ImpalaTestSuite
 from tests.common.kudu_test_suite import get_kudu_master_flag
 from tests.util.filesystem_utils import (
@@ -137,6 +138,8 @@ class SkipIf:
   not_tuple_cache = pytest.mark.skipif(not IS_TUPLE_CACHE,
       reason="Tuple Cache needed")
   no_beeswax = pytest.mark.skipif(not ENABLE_BEESWAX, reason="Beeswax disabled")
+  not_gperftools = pytest.mark.skipif(IMPALA_MALLOC_IMPL != 'gperftools',
+      reason="Test requires gperftools build")
 
 
 class SkipIfLocal:

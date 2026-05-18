@@ -24,6 +24,13 @@ set -euo pipefail
 
 . "${IMPALA_HOME}/bin/set-ld-library-path.sh"
 
+# glibc's use of RSEQ conflicts with google tcmalloc's use, so disable
+# glibc's RSEQ functionality. More details are available at
+# https://github.com/google/tcmalloc/issues/144
+if [[ "${IMPALA_MALLOC_IMPL}" == "googletcmalloc" ]]; then
+  export GLIBC_TUNABLES=glibc.pthread.rseq=0
+fi
+
 # LLVM must be on path to symbolise sanitiser stack traces.
 export PATH="${IMPALA_TOOLCHAIN_PACKAGES_HOME}/llvm-${IMPALA_LLVM_VERSION}/bin:${PATH}"
 exec "$@"

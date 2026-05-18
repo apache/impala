@@ -31,7 +31,7 @@ import sys
 from time import sleep
 from optparse import OptionParser, SUPPRESS_HELP
 from subprocess import call, check_call, check_output
-from tests.common.environ import build_flavor_timeout, ENABLE_BEESWAX
+from tests.common.environ import build_flavor_timeout, ENABLE_BEESWAX, IMPALA_MALLOC_IMPL
 from tests.common.impala_cluster import (ImpalaCluster, DEFAULT_BEESWAX_PORT,
     DEFAULT_HS2_PORT, DEFAULT_KRPC_PORT, DEFAULT_HS2_HTTP_PORT,
     DEFAULT_STATE_STORE_SUBSCRIBER_PORT, DEFAULT_IMPALAD_WEBSERVER_PORT,
@@ -781,12 +781,14 @@ def build_impalad_arg_lists(cluster_size, num_coordinators, use_exclusive_coordi
               "--ssl_private_key={cert_dir}/localhost.key {args}") \
               .format(args=args, cert_dir=CERT_DIR)
 
-    args = ("--tcmalloc_aggressive_memory_decommit={val} {args}") \
-            .format(val=options.tcmalloc_aggressive_decommit, args=args)
-    # Currently, madvise_huge_pages is incompatible with turning off aggressive
-    # decommit.
-    if options.tcmalloc_aggressive_decommit == "false":
-      args = "--madvise_huge_pages=false {args}".format(args=args)
+    # This option only makes sense for gperftools
+    if IMPALA_MALLOC_IMPL == "gperftools":
+      args = ("--tcmalloc_aggressive_memory_decommit={val} {args}") \
+              .format(val=options.tcmalloc_aggressive_decommit, args=args)
+      # Currently, madvise_huge_pages is incompatible with turning off aggressive
+      # decommit.
+      if options.tcmalloc_aggressive_decommit == "false":
+        args = "--madvise_huge_pages=false {args}".format(args=args)
 
     # Appended at the end so they can override previous args.
     if i < len(per_impalad_args):

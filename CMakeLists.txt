@@ -159,6 +159,15 @@ set_dep_root(CURL)
 set_dep_root(CALLONCEHACK)
 set_dep_root(CLOUDFLAREZLIB)
 set_dep_root(OPENTELEMETRY_CPP)
+set_dep_root(TCMALLOC)
+
+set(ABSL_ROOT
+    $ENV{IMPALA_TOOLCHAIN_PACKAGES_HOME}/abseil-cpp-$ENV{IMPALA_ABSEIL_CPP_VERSION})
+message(STATUS "ABSL_ROOT: ${ABSL_ROOT}")
+find_package(absl)
+
+message(STATUS "TCMALLOC_ROOT: ${TCMALLOC_ROOT}")
+find_package(tcmalloc)
 
 # Adds a third-party library with name ${NAME}. If BUILD_SHARED_LIBS is true, the new
 # library refers to ${SHARED_LIB}; otherwise it refers to ${STATIC_LIB}. If only one

@@ -23,6 +23,8 @@
 #include "util/malloc-util-sanitizers.h"
 #elif defined(MALLOC_UTIL_GPERFTOOLS_IMPL)
 #include "util/malloc-util-gperftools.h"
+#elif defined(MALLOC_UTIL_GOOGLETCMALLOC_IMPL)
+#include "util/malloc-util-googletcmalloc.h"
 #elif defined(MALLOC_UTIL_LIBC_IMPL)
 #include "util/malloc-util-libc.h"
 #else
@@ -38,6 +40,8 @@ MallocUtil* MallocUtil::GetInstance() {
   static MallocUtil* malloc_util_instance = new SanitizerMallocUtil();
 #elif defined(MALLOC_UTIL_GPERFTOOLS_IMPL)
   static MallocUtil* malloc_util_instance = new GperftoolsMallocUtil();
+#elif defined(MALLOC_UTIL_GOOGLETCMALLOC_IMPL)
+  static MallocUtil* malloc_util_instance = new GoogleTcmallocMallocUtil();
 #elif defined(MALLOC_UTIL_LIBC_IMPL)
   static MallocUtil* malloc_util_instance = new LibcMallocUtil();
 #endif
@@ -51,6 +55,9 @@ std::ostream& operator<<(std::ostream& out, const MallocUtil::HugePageSupport& h
     break;
   case MallocUtil::HugePageSupport::MADVISE_INCOMPATIBLE:
     out << "MADVISE_INCOMPATIBLE";
+    break;
+  case MallocUtil::HugePageSupport::MADVISE_UNNECESSARY:
+    out << "MADVISE_UNNECESSARY";
     break;
   }
   return out;

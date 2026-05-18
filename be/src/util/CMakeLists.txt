@@ -194,6 +194,18 @@ add_dependencies(MallocUtilGperftools gen-deps)
 target_compile_definitions(MallocUtilGperftools PRIVATE MALLOC_UTIL_GPERFTOOLS_IMPL)
 target_link_libraries(MallocUtilGperftools tcmallocstatic pprof)
 
+# Our Clang is too old to build with Google TCMalloc. The Clang builds are
+# for sanitizers, Clang Tidy, etc, so they don't really need this.
+if (NOT "${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang")
+  add_library(MallocUtilGoogleTcmalloc
+    malloc-util.cc
+  )
+  add_dependencies(MallocUtilGoogleTcmalloc gen-deps)
+  target_compile_definitions(MallocUtilGoogleTcmalloc
+    PRIVATE MALLOC_UTIL_GOOGLETCMALLOC_IMPL)
+  target_link_libraries(MallocUtilGoogleTcmalloc tcmalloc::tcmalloc)
+endif()
+
 if ("${CMAKE_BUILD_TYPE}" STREQUAL "ADDRESS_SANITIZER" OR
     "${CMAKE_BUILD_TYPE}" STREQUAL "TSAN" OR
     "${CMAKE_BUILD_TYPE}" STREQUAL "TSAN_FULL")

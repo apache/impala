@@ -123,6 +123,9 @@ IS_CALCITE_PLANNER = os.environ.get("USE_CALCITE_PLANNER", False) == 'true'
 # Whether to enable deprecated beeswax protocol or not.
 ENABLE_BEESWAX = os.getenv("ENABLE_BEESWAX", False) == "true"
 
+# The malloc implementation used to build Impala
+IMPALA_MALLOC_IMPL = os.getenv("IMPALA_MALLOC_IMPL")
+
 
 class ImpalaBuildFlavors:
   """
