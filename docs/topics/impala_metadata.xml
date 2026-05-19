@@ -317,14 +317,13 @@ under the License.
         </li>
       </ul>
 
-      <p>
-        This feature is controlled by the
-        <codeph>&#8209;&#8209;hms_event_polling_interval_s</codeph> flag. Start the
-        <codeph>catalogd</codeph> with the <codeph>‑‑hms_event_polling_interval_s</codeph>
-        flag set to a positive double value to enable the feature and set the polling frequency in
-        seconds. We recommend the value between 1.0 to 5.0 seconds.
-      </p>
-
+      <p> This feature is controlled by the
+          <codeph>&#8209;&#8209;hms_event_polling_interval_s</codeph> flag. Start the
+          <codeph>catalogd</codeph> with the <codeph>‑‑hms_event_polling_interval_s</codeph> flag
+        set to a positive double value to enable the feature and set the polling frequency in
+        seconds. When hierarchical event processing is disabled, we recommend a value between 1.0
+        and 5.0 seconds. When hierarchical event processing is enabled, we recommend the default
+        value of 0.5 seconds.</p>
       <p>
         The following use cases are not supported:
       </p>
@@ -487,6 +486,139 @@ under the License.
 
       </conbody>
 
+    </concept>
+    <concept id="hierarchical_event_processing">
+      <title>Hierarchical metastore event processing</title>
+      <conbody>
+        <p>In <keyword keyref="impala50"/> and higher versions, the metastore event processor
+          supports a multi-layered approach to improve synchronization speed.</p>
+        <p>Without hierarchical processing, the event processor is single-threaded and processes
+          events sequentially in batches of up to 1000 events. Lock contention and metadata loading
+          delays can slow processing and block unrelated events, resulting in long HMS
+          synchronization times.</p>
+        <p><b>How it works</b></p>
+        <p>Hierarchical event processing routes events through three layers to enable parallel
+          processing while maintaining ordering constraints:</p>
+        <ul>
+          <li>Event polling and dispatch – Fetches events from HMS and dispatches them to database
+            event executors.</li>
+          <li>Database event executor – Processes database-level events and dispatches table events
+            to table event executors within the same database.</li>
+          <li>Table event executor – Processes table events sequentially, ensuring all events for a
+            table are processed in the order they occurred.</li>
+        </ul>
+        <p><b>Executor assignment</b></p>
+        <p>When an event arrives for a database for the first time, the catalog assigns the database
+          to the database event executor with the fewest databases already assigned. If multiple
+          executors have the same database count, the catalog breaks the tie by choosing the executor
+          with the fewest outstanding events. Similarly, tables are assigned to table event
+          executors within their database's executor using the same load-balancing logic. Once
+          assigned, a database or table is always handled by the same executor thread, maintaining
+          event ordering.</p>
+        <p>Event processing runs on <codeph>num_db_event_executors + (num_db_event_executors ×
+            num_table_event_executors_per_db_event_executor)</codeph> threads total. With the
+          default configuration (5 database executors and 5 table executors per database), event
+          processing uses 30 threads.</p>
+        <p><b>Ordering barriers</b></p>
+        <p>Certain events act as synchronization barriers to maintain metadata consistency:</p>
+        <ul>
+          <li><b>Database barrier:</b> When a database event occurs, all table events for that
+            database that arrive after it are held until the database event is fully processed.
+            This ensures database-level changes take effect before table-level changes.</li>
+          <li><b>Rename barrier:</b> An <cmdname>ALTER TABLE</cmdname> rename event synchronizes
+            the source and target table processors. The source processor removes the old table
+            before the target processor creates the renamed table, preventing metadata
+            inconsistencies.</li>
+        </ul>
+        <p><b>Backpressure mechanism</b></p>
+        <p>When the outstanding event count exceeds
+            <parmname>max_outstanding_events_on_executors</parmname>, the catalog stops fetching new
+          events from HMS. This backpressure prevents unbounded memory growth and allows executors
+          to catch up with processing.</p>
+        <p><b>Configuration properties</b></p>
+        <p>Use the following properties to configure the event executors and processing limits for
+          the metastore event processor:<table frame="all" rowsep="1" colsep="1"
+            id="table_event_processing_configs">
+            <title>Hierarchical event processor configuration properties</title>
+            <tgroup cols="2">
+              <colspec colname="c1" colnum="1" colwidth="1*"/>
+              <colspec colname="c2" colnum="2" colwidth="2*"/>
+              <thead>
+                <row>
+                  <entry>Property</entry>
+                  <entry>Description</entry>
+                </row>
+              </thead>
+              <tbody>
+                <row>
+                  <entry><parmname>enable_hierarchical_event_processing</parmname></entry>
+                  <entry>Enables hierarchical event processing on Catalogd. This is enabled by
+                    default. To disable it, set
+                      <codeph>--enable_hierarchical_event_processing=false</codeph>.</entry>
+                </row>
+                <row>
+                  <entry><parmname>num_db_event_executors</parmname></entry>
+                  <entry>Sets the number of database event executors (defaults to 5).</entry>
+                </row>
+                <row>
+                  <entry><parmname>num_table_event_executors_per_db_event_executor</parmname></entry>
+                  <entry>Sets the number of table event executors within a database event executor
+                    (defaults to 5).</entry>
+                </row>
+                <row>
+                  <entry><parmname>min_event_processor_idle_ms</parmname></entry>
+                  <entry>Sets the minimum time to retain idle database and table processors when
+                    they have no events to process (defaults to 60000).</entry>
+                </row>
+                <row>
+                  <entry><parmname>max_outstanding_events_on_executors</parmname></entry>
+                  <entry>Sets the maximum number of outstanding events to process on event executors
+                    (defaults to 1000).</entry>
+                </row>
+              </tbody>
+            </tgroup>
+          </table>
+        </p>
+        <p><b>Tuning the hierarchical event processor</b></p>
+        <p>The hierarchical processor performs best when the executor configuration matches your
+          workload's concurrency pattern. Use the following guidance:</p>
+        <ul>
+          <li><b>Increase table executors for database-heavy workloads:</b> If your workload
+            concentrates modifications within a few databases (such as ETL jobs that update many
+            tables in the same database), increase
+              <parmname>num_table_event_executors_per_db_event_executor</parmname>. This allows
+            multiple tables in the same database to be processed in parallel. To determine the right
+            value, estimate how many tables in the database are modified concurrently by your ETL
+            jobs. For example, if an ETL pipeline typically updates 8-10 tables in parallel within
+            the same database, set this value to at least 10. You can also observe the metric
+              <codeph>events-processor.outstanding-event-count</codeph> while ETL runs; if it grows
+            but lags persist, increase this value. Creating more executors than concurrent tables
+            wastes resources; idle tables consume minimal memory.</li>
+          <li><b>Increase database executors for workload spread across databases:</b> If your
+            workload modifies tables across many different databases concurrently, increase
+              <parmname>num_db_event_executors</parmname>. Each database can only be served by one
+            database executor, so setting this higher than the number of concurrent active databases
+            does not help.</li>
+          <li><b>Monitor for executor saturation:</b> Check the metric
+              <codeph>events-processor.outstanding-event-count</codeph> to see if executors are
+            keeping up with incoming events. If this count stays close to
+              <parmname>max_outstanding_events_on_executors</parmname> while
+              <codeph>events-processor.lag-time</codeph> grows, the executors are saturated. Add
+            more executors to process events faster. If outstanding count is low but lag still
+            grows, the bottleneck is elsewhere (typically HMS fetch time); check
+              <codeph>events-processor.events-fetch-duration-avg</codeph>.</li>
+          <li><b>Adjust queue depth with max_outstanding_events:</b>
+            <parmname>max_outstanding_events_on_executors</parmname> controls how many events can
+            queue before Impala stops fetching from HMS (backpressure). Since HMS fetches up to 1000
+            events per batch, the queue can exceed this threshold by one batch. Increase this value
+            to allow more buffering before throttling, at the cost of higher catalogd memory usage.</li>
+          <li><b>Control processor lifetime with idle timeout:</b>
+            <parmname>min_event_processor_idle_ms</parmname> determines how long an executor keeps
+            an idle table processor before discarding it. Lower values save memory when the workload
+            touches many different tables infrequently. Higher values prevent unnecessary
+            recreation of processors when tables receive periodic updates.</li>
+        </ul>
+      </conbody>
     </concept>
 
     <concept id="event_processor_metrics">
@@ -714,7 +846,5 @@ under the License.
       </concept>
 
     </concept>
-
   </concept>
-
 </concept>
