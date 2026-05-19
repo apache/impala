@@ -107,6 +107,8 @@ public class NumericLiteral extends LiteralExpr {
   private static BigDecimal LOW_EXPONENT = new BigDecimal(Math.pow(10, -8));
   private static BigDecimal HIGH_EXPONENT = new BigDecimal(Math.pow(10, 8));
 
+  public static final NumericLiteral ZERO_LITERAL = create(0, Type.TINYINT);
+
   // The explicit type of the literal, which must be wider than the "natural"
   // type. Set via the constructor or as the result of pushing an explicit
   // (user-provided) CAST into this literal.

@@ -24,6 +24,8 @@ import org.apache.impala.analysis.Expr;
 import org.apache.impala.analysis.FunctionCallExpr;
 import org.apache.impala.analysis.FunctionName;
 import org.apache.impala.analysis.HdfsUri;
+import org.apache.impala.analysis.NumericLiteral;
+import org.apache.impala.analysis.StringLiteral;
 import org.apache.impala.thrift.TAggregateFunction;
 import org.apache.impala.thrift.TFunction;
 import org.apache.impala.thrift.TFunctionBinaryType;
@@ -71,6 +73,7 @@ public class AggregateFunction extends Function {
   // TODO: Instead of manually setting this flag, we should identify this
   // property from the function itself (e.g. evaluating the function on an
   // empty input in BE).
+  // TODO: This is only valid for builtin functions. For UDAFs it is always false.
   private boolean returnsNonNullOnEmpty_;
 
   public AggregateFunction(FunctionName fnName, List<Type> argTypes, Type retType,
@@ -217,6 +220,18 @@ public class AggregateFunction extends Function {
   public boolean isAnalyticFn() { return isAnalyticFn_; }
   public boolean isAggregateFn() { return isAggregateFn_; }
   public boolean returnsNonNullOnEmpty() { return returnsNonNullOnEmpty_; }
+
+  // Similar to the code in StmtRewriter.SubqueryRewriter.createJoinConjunct().
+  public Expr getReturnExprOnEmpty() {
+    Preconditions.checkState(returnsNonNullOnEmpty());
+    if (getReturnType().isNumericType()) {
+      return NumericLiteral.ZERO_LITERAL;
+    }
+    if (getReturnType().isStringType()) {
+      return StringLiteral.EMPTY_STRING_LITERAL;
+    }
+    return null;
+  }
 
   /**
    * Returns the intermediate type of this aggregate function or null

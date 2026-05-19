@@ -27,6 +27,7 @@ import java.util.UUID;
 
 import org.apache.impala.analysis.BinaryPredicate.Operator;
 import org.apache.impala.analysis.GroupByClause.GroupingSetsType;
+import org.apache.impala.catalog.AggregateFunction;
 import org.apache.impala.catalog.Column;
 import org.apache.impala.catalog.StructField;
 import org.apache.impala.catalog.StructType;
@@ -197,6 +198,13 @@ public class PivotTableRef extends TableRef {
             "Aliases are required when multiple aggregate expressions are specified " +
             "in the PIVOT clause");
       }
+      FunctionCallExpr aggExpr = (FunctionCallExpr)e;
+      AggregateFunction aggFn = (AggregateFunction)(aggExpr.getFn());
+      if (aggExpr.returnsNonNullOnEmpty() && aggFn.getReturnExprOnEmpty() == null) {
+        throw new AnalysisException(
+            "Aggregate function in the PIVOT clause is not supported: " +
+            aggFn.getName());
+      }
       if (analyzedAggList_.put(item.getAlias(), (FunctionCallExpr)e) != null) {
         throw new AnalysisException(
             "Duplicate alias for aggregations in the PIVOT clause: " + item.getAlias());
@@ -311,14 +319,22 @@ public class PivotTableRef extends TableRef {
     }
     SlotRef headerColumnSlotRef = new SlotRef(Lists.newArrayList(headerColumn_));
     for (Map.Entry<String, LiteralExpr> entry : headerValueMap_.entrySet()) {
-      for (SelectListItem aggItem : aggList_.getItems()) {
+      for (Map.Entry<String, FunctionCallExpr> aggEntry : analyzedAggList_.entrySet()) {
         String aggAlias =
-            aggItem.getAlias() == null ?singleAggAlias : aggItem.getAlias();
+            aggEntry.getKey() == null ? singleAggAlias : aggEntry.getKey();
         // clone() is needed to keep the headerValueMap read-only.
-        Expr cond = new BinaryPredicate(
-            Operator.EQ, headerColumnSlotRef, entry.getValue().clone());
+        Expr cond = Expr.IS_NULL_LITERAL.apply(entry.getValue()) ?
+            new IsNullPredicate(headerColumnSlotRef, false) :
+            new BinaryPredicate(
+                Operator.EQ, headerColumnSlotRef, entry.getValue().clone());
         FunctionCallExpr transAggExpr = new FunctionCallExpr("aggif",
             Lists.newArrayList(cond, new SlotRef(Lists.newArrayList(aggAlias))));
+        if (aggEntry.getValue().returnsNonNullOnEmpty()) {
+          AggregateFunction aggFn = (AggregateFunction)(aggEntry.getValue().getFn());
+          Expr returnExpr = aggFn.getReturnExprOnEmpty();
+          transAggExpr = new FunctionCallExpr("ifnull",
+              Lists.newArrayList(transAggExpr, returnExpr));
+        }
         String alias = entry.getKey();
         if (aggList_.getItems().size() > 1) {
           alias = alias + "_" + aggAlias;

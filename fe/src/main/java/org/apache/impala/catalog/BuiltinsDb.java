@@ -1057,7 +1057,7 @@ public class BuiltinsDb extends Db {
           prefix + SAMPLE_MERGE_SYMBOL.get(t),
           prefix + SAMPLE_SERIALIZE_SYMBOL.get(t),
           prefix + APPX_MEDIAN_FINALIZE_SYMBOL.get(t),
-          false, false, true));
+          false, false, false));
 
       // Histogram
       db.addBuiltin(AggregateFunction.createBuiltin(db, "histogram",
@@ -1215,7 +1215,7 @@ public class BuiltinsDb extends Db {
           prefix + AGGIF_MERGE_SYMBOL.get(t),
           null,
           prefix + AGGIF_FINALIZE_SYMBOL.get(t),
-          true, false, true));
+          true, false, false));
 
       Type pcIntermediateType =
           ScalarType.createFixedUdaIntermediateType(PC_INTERMEDIATE_SIZE);

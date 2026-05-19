@@ -147,8 +147,8 @@ select a1, v2, v4 from t3 pivot (
 ---- TYPES
 TINYINT,BIGINT,BIGINT
 ---- RESULTS
-1,NULL,NULL
-3,NULL,NULL
+1,0,0
+3,0,0
 ====
 ---- QUERY
 # The PIVOT clause is in an inline view.
@@ -432,3 +432,66 @@ insert into test_pivot_insert
 ---- CATCH
 NotImplementedException: Planning not implemented for table ref class: class org.apache.impala.analysis.PivotTableRef
 ====
+---- QUERY
+# The PIVOT clause contains the NULL literal.
+with t1(a, b) as (
+    values (1, null), (2, null)
+)
+select * from t1 pivot (
+    count(a) as c for b in (2 as v2, 4 as v4, null as `null`)
+) as t;
+---- LABELS
+a,v2,v4,null
+---- TYPES
+TINYINT,BIGINT,BIGINT,BIGINT
+---- RESULTS
+1,0,0,1
+2,0,0,1
+====
+---- QUERY
+# The PIVOT clause contains the ndv() function.
+with t1(a, b) as (
+    values (1, null), (2, null)
+)
+select * from t1 pivot (
+    ndv(a) as c for b in (2 as v2, 4 as v4, null as `null`)
+) as t;
+---- LABELS
+a,v2,v4,null
+---- TYPES
+TINYINT,BIGINT,BIGINT,BIGINT
+---- RESULTS
+1,0,0,1
+2,0,0,1
+====
+---- QUERY
+# The aggregate function in the PIVOT clause returns an empty string on an
+# empty table.
+with t1(a, b) as (
+    values (1, null), (2, null)
+)
+select * from t1 pivot (
+    sample(a) as c for b in (2 as v2, 4 as v4, null as `null`)
+) as t;
+---- LABELS
+a,v2,v4,null
+---- TYPES
+TINYINT,STRING,STRING,STRING
+---- RESULTS
+1,'','','1'
+2,'','','2'
+====
+---- QUERY
+with v(a, b, p) as (
+    values
+        (1, null, 1),
+        (2, 2, 1),
+        (null, 2, 2),
+        (2, 2, 2),
+        (null, null, 2)
+) select p1, p2 from v pivot(
+  regr_count(a,b) for p in (1 as p1, 2 as p2)) t;
+---- TYPES
+BIGINT,BIGINT
+---- RESULTS
+1,1

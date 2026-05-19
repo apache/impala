@@ -463,6 +463,11 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
         "The function called in the PIVOT clause should be an aggregate"
     );
     AnalysisError(
+        "select * from functional_parquet.alltypestiny pivot (" +
+        "    row_number() over (order by 1) for month in (1 as v1)) as t;",
+        "The function called in the PIVOT clause should be an aggregate"
+    );
+    AnalysisError(
         "select year, v1 from functional_parquet.alltypestiny pivot (" +
         "    min(month) for month in (1 as v1, 2 as v1)) as t;",
         "Duplicate alias for header values in the PIVOT clause: v1"
