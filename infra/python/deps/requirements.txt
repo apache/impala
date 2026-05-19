@@ -66,7 +66,7 @@ pywebhdfs == 0.3.2
   pbr == 7.0.3
 requests == 2.32.5
   charset_normalizer == 3.4.4
-  idna == 3.11
+  idna == 3.15
   urllib3 == 2.6.3
   certifi == 2026.1.4
 sasl == 0.4a1
