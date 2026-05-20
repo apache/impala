@@ -818,7 +818,7 @@ class TestIcebergTable(IcebergTestSuite):
   def test_time_travel_queries(self, vector, unique_database):
     self.run_test_case('QueryTest/iceberg-time-travel', vector, use_db=unique_database)
 
-  @SkipIf.not_dfs
+  @SkipIf.not_hdfs
   def test_time_travel_after_optimize(self, unique_database):
     """IMPALA-14970: Regression test for time-travel queries after OPTIMIZE on HDFS
     clusters with replication factor 1. After OPTIMIZE, old data files (referenced by
