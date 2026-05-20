@@ -19,7 +19,6 @@
 # in the future will support HS2 connections. Provides tracing around all
 # operations.
 
-from __future__ import absolute_import, division, print_function
 import abc
 import getpass
 import logging
@@ -27,7 +26,6 @@ import math
 import re
 import time
 
-from future.utils import with_metaclass
 import impala.dbapi as impyla
 import impala.error as impyla_error
 import impala.hiveserver2 as hs2
@@ -141,7 +139,7 @@ class OperationHandle(object):
 
 
 # Represents an Impala connection.
-class ImpalaConnection(with_metaclass(abc.ABCMeta, object)):
+class ImpalaConnection(metaclass=abc.ABCMeta):
 
   def __enter__(self):
     return self
@@ -938,7 +936,7 @@ class ImpylaHS2ResultSet(object):
     that would have been returned via beeswax."""
     if val is None:
       return 'NULL'
-    if type(val) == float:
+    if isinstance(val, float):
       # Same format as what Beeswax uses in the backend.
       if math.isnan(val):
         return 'NaN'

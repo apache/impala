@@ -17,7 +17,6 @@
 #
 # Tests for Hive-IMPALA compression codec interoperability
 
-from __future__ import absolute_import, division, print_function
 import pytest
 
 from tests.common.environ import HIVE_MAJOR_VERSION

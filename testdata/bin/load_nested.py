@@ -20,8 +20,6 @@
 '''This script creates a nested version of TPC-H. Non-nested TPC-H must already be
    loaded.
 '''
-from __future__ import absolute_import, division, print_function
-from builtins import range
 import logging
 import os
 

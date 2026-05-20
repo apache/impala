@@ -17,7 +17,6 @@
 
 # Validates table stored on the LocalFileSystem.
 #
-from __future__ import absolute_import, division, print_function
 from tests.common.impala_test_suite import ImpalaTestSuite
 from tests.common.skip import SkipIfDockerizedCluster
 from tests.common.test_dimensions import create_single_exec_option_dimension

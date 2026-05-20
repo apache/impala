@@ -15,7 +15,6 @@
 # specific language governing permissions and limitations
 # under the License.
 
-from __future__ import absolute_import, division, print_function
 from collections import defaultdict, namedtuple
 import datetime
 import glob
@@ -33,7 +32,6 @@ import time
 
 from avro.datafile import DataFileReader
 from avro.io import DatumReader
-from builtins import range
 import pytest
 import pytz
 
@@ -2718,16 +2716,8 @@ class TestIcebergTableWithPuffinStats(IcebergTestSuite):
     return query_res.data
 
   def _copy_files_to_puffin_tbl(self, tbl_loc, uuid):
-    version_info = sys.version_info
-    if version_info.major >= 3 and version_info.minor >= 2:
-      with tempfile.TemporaryDirectory() as tmpdir:
-        self._copy_files_to_puffin_tbl_impl(tbl_loc, uuid, tmpdir)
-    else:
-      try:
-        tmpdir = tempfile.mkdtemp()
-        self._copy_files_to_puffin_tbl_impl(tbl_loc, uuid, tmpdir)
-      finally:
-        shutil.rmtree(tmpdir)
+    with tempfile.TemporaryDirectory() as tmpdir:
+      self._copy_files_to_puffin_tbl_impl(tbl_loc, uuid, tmpdir)
 
   def _copy_files_to_puffin_tbl_impl(self, tbl_loc, uuid, tmpdir):
     metadata_dir = os.path.join(os.getenv("IMPALA_HOME"), "testdata/ice_puffin")

@@ -1,4 +1,4 @@
-#!/usr/bin/python -u
+#!/usr/bin/python3 -u
 #
 # Licensed to the Apache Software Foundation (ASF) under one
 # or more contributor license agreements.  See the NOTICE file
@@ -23,7 +23,6 @@
 #
 # Note that "python -u" disables buffering.
 
-from __future__ import absolute_import, division, print_function
 import sys
 import datetime
 

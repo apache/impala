@@ -15,7 +15,6 @@
 # specific language governing permissions and limitations
 # under the License.
 
-from __future__ import absolute_import, division, print_function
 import json
 import logging
 import os
@@ -160,11 +159,7 @@ class OtelSpan:
     return self.parent_span_id is None
 
   def add_attribute(self, key, value):
-    if sys.version_info.major < 3:
-      assert isinstance(key, unicode), "key must be a string"  # noqa: F821
-      key = str(key)
-    else:
-      assert isinstance(key, str), "key must be a string"
+    assert isinstance(key, str), "key must be a string"
 
     assert isinstance(value, AttributeValue), "Value must be an instance of " \
         "AttributeValue, got: {}".format(type(value))
@@ -174,15 +169,8 @@ class OtelSpan:
       self.query_id = value.value
 
   def add_event(self, name, time_unix_nano):
-    if sys.version_info.major < 3:
-      assert isinstance(name, unicode), "Event name must be a string"  # noqa: F821
-      name = str(name)
-      assert isinstance(time_unix_nano, unicode), \
-          "Time value must be a string"  # noqa: F821
-      time_unix_nano = str(time_unix_nano)
-    else:
-      assert isinstance(name, str), "Event name must be a string"
-      assert isinstance(time_unix_nano, str), "Time value must be a string"
+    assert isinstance(name, str), "Event name must be a string"
+    assert isinstance(time_unix_nano, str), "Time value must be a string"
 
     try:
       self.events[name] = int(time_unix_nano)

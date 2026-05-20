@@ -17,7 +17,6 @@
 #
 # Tests to validate the Catalog Service client APIs.
 
-from __future__ import absolute_import, division, print_function
 import logging
 
 from thrift.protocol import TBinaryProtocol

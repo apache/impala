@@ -17,8 +17,6 @@
 
 # Targeted Impala insert tests
 
-from __future__ import absolute_import, division, print_function
-from builtins import map
 from tests.common.impala_test_suite import ImpalaTestSuite
 from tests.common.test_dimensions import (
     create_exec_option_dimension,

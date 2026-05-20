@@ -17,7 +17,6 @@
 #
 # The base class that should be used for almost all Impala tests
 
-from __future__ import absolute_import, division, print_function
 import logging
 import pytest
 import os

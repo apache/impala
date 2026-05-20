@@ -17,7 +17,6 @@
 #
 # Tests for query expiration.
 
-from __future__ import absolute_import, division, print_function
 import json
 from time import time
 from urllib.request import urlopen

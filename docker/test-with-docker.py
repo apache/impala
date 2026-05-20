@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/python3
 #
 # Licensed to the Apache Software Foundation (ASF) under one
 # or more contributor license agreements.  See the NOTICE file
@@ -21,7 +21,6 @@
 # We do not use Impala's python environment here, nor do we depend on
 # non-standard python libraries to avoid needing extra build steps before
 # triggering this.
-from __future__ import absolute_import, division, print_function
 import argparse
 import datetime
 import itertools

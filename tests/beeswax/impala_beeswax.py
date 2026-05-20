@@ -25,7 +25,6 @@
 #   client.connect()
 #   result = client.execute(query_string)
 #   where result is an object of the class ImpalaBeeswaxResult.
-from __future__ import absolute_import, division, print_function
 from datetime import datetime
 import getpass
 import logging
@@ -33,8 +32,6 @@ import re
 import shlex
 import sys
 import time
-
-from builtins import filter, map
 
 from thrift.protocol import TBinaryProtocol
 from thrift.Thrift import TApplicationException
@@ -430,10 +427,6 @@ class ImpalaBeeswaxClient(object):
     return exec_result
 
   def __get_query_type(self, query_string):
-    # Python 2's shlex does not work if the query string contains Unicode characters.
-    # Convert to bytes.
-    if sys.version_info.major == 2:
-      query_string = query_string.encode('utf-8')
     # Set posix=True and add "'" to escaped quotes
     # to deal with escaped quotes in string literals
     lexer = shlex.shlex(query_string.lstrip(), posix=True)

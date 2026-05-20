@@ -17,7 +17,6 @@
 
 # This file contains library functions to decode and access Impala query profiles.
 
-from __future__ import absolute_import, division, print_function
 import base64
 import datetime
 import zlib

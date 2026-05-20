@@ -16,8 +16,6 @@
 # under the License.
 
 # Functional tests running the TPCH workload.
-from __future__ import absolute_import, division, print_function
-
 from tests.common.impala_test_suite import ImpalaTestSuite
 from tests.common.test_dimensions import (
   create_parquet_dimension,

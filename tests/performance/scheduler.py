@@ -19,8 +19,6 @@
 # defined as a set of queries for a given  data set, scale factor and a specific test
 # vector. It treats a workload an the unit of parallelism.
 
-from __future__ import absolute_import, division, print_function
-from builtins import range
 import logging
 
 from collections import defaultdict

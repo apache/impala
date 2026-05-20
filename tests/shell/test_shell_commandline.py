@@ -17,7 +17,6 @@
 # specific language governing permissions and limitations
 # under the License.
 
-from __future__ import absolute_import, division, print_function
 from contextlib import closing
 import errno
 import getpass
@@ -28,8 +27,6 @@ import socket
 from subprocess import call, Popen
 import tempfile
 from time import sleep, time
-
-from builtins import range
 import pytest
 
 from impala_shell.impala_client import utf8_encode_if_needed

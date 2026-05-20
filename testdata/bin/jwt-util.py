@@ -26,8 +26,6 @@
 # Python custom cluster tests. Since the generated JWTs are valid for 10 years, they
 # should not need to be regenerated.
 
-from __future__ import absolute_import, division, print_function
-
 import json
 import os
 import sys

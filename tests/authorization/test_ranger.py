@@ -17,7 +17,6 @@
 #
 # Client tests for SQL statement authorization
 
-from __future__ import absolute_import, division, print_function
 from getpass import getuser
 import grp
 import json
@@ -27,7 +26,6 @@ from subprocess import check_call
 import tempfile
 from time import sleep
 
-from builtins import map, range
 import pytest
 import requests
 

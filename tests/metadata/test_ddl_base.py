@@ -15,7 +15,6 @@
 # specific language governing permissions and limitations
 # under the License.
 #
-from __future__ import absolute_import, division, print_function
 from tests.common.test_dimensions import (
     ALL_NODES_ONLY,
     create_exec_option_dimension,

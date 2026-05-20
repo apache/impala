@@ -21,12 +21,10 @@
 # TODO: Re-factor tests into multiple classes.
 # TODO: Add a test that cancels queries while a retry is running
 
-from __future__ import absolute_import, division, print_function
 from random import randint
 import re
 import time
 
-from builtins import map, range
 import pytest
 
 from impala_thrift_gen.RuntimeProfile.ttypes import TRuntimeProfileFormat

@@ -15,8 +15,6 @@
 # specific language governing permissions and limitations
 # under the License.
 
-from __future__ import absolute_import, division, print_function
-from builtins import range, int
 from copy import copy
 import itertools
 import logging
@@ -31,7 +29,7 @@ from subprocess import check_call
 from tests.common.environ import HIVE_MAJOR_VERSION
 from tests.common.test_dimensions import create_exec_option_dimension_from_dict
 from tests.common.impala_test_suite import ImpalaTestSuite
-from tests.util.filesystem_utils import IS_HDFS, WAREHOUSE, get_fs_path
+from tests.util.filesystem_utils import IS_HDFS, get_fs_path
 from tests.util.test_file_parser import QueryTestSectionReader
 
 LOG = logging.getLogger(__name__)

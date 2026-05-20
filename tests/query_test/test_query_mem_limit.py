@@ -17,7 +17,6 @@
 #
 # Targeted tests to validate per-query memory limit.
 
-from __future__ import absolute_import, division, print_function
 import pytest
 import re
 import sys

@@ -15,8 +15,6 @@
 # specific language governing permissions and limitations
 # under the License.
 
-from __future__ import absolute_import, division, print_function
-from builtins import map, range
 import getpass
 import itertools
 import pytest
@@ -40,8 +38,7 @@ from tests.common.skip import (
     SkipIfFS,
     SkipIfHive2,
     SkipIfKudu,
-    SkipIfLocal,
-    SkipIf)
+    SkipIfLocal)
 from tests.common.test_dimensions import create_single_exec_option_dimension
 from tests.common.test_dimensions import (create_exec_option_dimension,
     create_client_protocol_dimension, create_exec_option_dimension_from_dict)
@@ -49,7 +46,6 @@ from tests.common.test_vector import ImpalaTestDimension
 from tests.util.filesystem_utils import (
     get_fs_path,
     WAREHOUSE,
-    WAREHOUSE_PREFIX,
     IS_HDFS,
     IS_S3,
     IS_ADLS,

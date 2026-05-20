@@ -27,8 +27,6 @@
 # create the files in the interval [now - duration, now]. Minidumps are simulated by
 # making the files easily compressible by having some repeated data.
 
-from __future__ import absolute_import, division, print_function
-from builtins import range
 import errno
 import os
 import random

@@ -16,8 +16,6 @@
 # under the License.
 
 # Impala tests for DDL statements
-from __future__ import absolute_import, division, print_function
-from builtins import int
 import pytest
 import time
 

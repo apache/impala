@@ -17,7 +17,6 @@
 #
 # Unit tests for collect_diagnostics.Command
 
-from __future__ import absolute_import, division, print_function
 import os
 import sys
 

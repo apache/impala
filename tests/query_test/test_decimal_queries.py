@@ -17,8 +17,6 @@
 
 # Targeted tests for decimal type.
 
-from __future__ import absolute_import, division, print_function
-
 import pytest
 
 from tests.common.impala_connection import IMPALA_CONNECTION_EXCEPTION

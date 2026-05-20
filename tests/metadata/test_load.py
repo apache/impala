@@ -17,8 +17,6 @@
 
 # Functional tests for LOAD DATA statements.
 
-from __future__ import absolute_import, division, print_function
-from builtins import range
 import time
 from copy import deepcopy
 from tests.common.impala_connection import FINISHED, PENDING, RUNNING

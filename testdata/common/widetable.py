@@ -22,9 +22,6 @@
 # generate a CSV data file and prints a SQL load statement to incorporate
 # into dataload SQL script generation.
 
-from __future__ import absolute_import, division, print_function
-from builtins import range
-from datetime import datetime, timedelta
 import itertools
 import optparse
 

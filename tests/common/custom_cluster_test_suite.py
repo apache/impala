@@ -18,7 +18,6 @@
 # Superclass for all tests that need a custom cluster.
 # TODO: Configure cluster size and other parameters.
 
-from __future__ import absolute_import, division, print_function
 import inspect
 import logging
 import os

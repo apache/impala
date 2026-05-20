@@ -16,7 +16,6 @@
 # under the License.
 #
 
-from __future__ import absolute_import, division, print_function
 import base64
 import datetime
 import os
@@ -51,8 +50,6 @@ def format_time(time):
 
 def encode_if_needed(value):
   """ Encodes the value to bytes if needed, depending on the python version. """
-  if sys.version_info.major < 3:
-    return value.encode('utf-8') if isinstance(value, str) else value
   return value if isinstance(value, bytes) else value.encode('utf-8')
 
 
@@ -183,8 +180,7 @@ class TestClientSaml(CustomClusterTestSuite):
     new_url = response.info()["location"]
     assert new_url.startswith(TestClientSaml.IDP_URL)
     query_part = urlparse(new_url).query
-    query = parse_qs(query_part.encode('ASCII') if sys.version_info.major < 3
-                     else query_part)
+    query = parse_qs(query_part)
     assert "RelayState" in query, query
     relay_state = query["RelayState"][0]
     assert relay_state is not None

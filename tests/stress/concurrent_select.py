@@ -55,19 +55,14 @@
 #  8) Verify the result set hash of successful queries if there are no DML queries in the
 #     current run.
 
-from __future__ import absolute_import, division, print_function
-
-from builtins import range
 import logging
 import os
 import re
 import signal
 import sys
-import threading
 from queue import Empty   # Must be before Queue below
 from argparse import ArgumentDefaultsHelpFormatter, ArgumentParser, Namespace, SUPPRESS
 from collections import defaultdict
-from copy import copy
 from datetime import datetime
 from multiprocessing import Lock, Process, Queue, Value
 from random import choice, random, randrange, shuffle
@@ -79,7 +74,6 @@ from time import sleep, time
 
 import tests.comparison.cli_options as cli_options
 from tests.comparison.cluster import Timeout
-from tests.comparison.db_types import Int, TinyInt, SmallInt, BigInt
 from tests.stress.mem_broker import MemBroker
 from tests.stress.runtime_info import save_runtime_info, load_runtime_info
 from tests.stress.queries import (QueryType, generate_compute_stats_queries,

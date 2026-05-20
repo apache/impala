@@ -18,7 +18,6 @@
 # Utility functions used by the stress test to save and load runtime info
 # about queries to and from JSON files.
 
-from __future__ import absolute_import, division, print_function
 from collections import defaultdict
 import json
 import logging

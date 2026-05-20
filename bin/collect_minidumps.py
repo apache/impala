@@ -24,7 +24,6 @@
 #       --role_name=statestored --max_output_size=50000000 --end_time=1463033495000 \
 #       --output_file_path=/tmp/minidump_package.tar.gz
 
-from __future__ import absolute_import, division, print_function
 import os
 import re
 import sys

@@ -17,14 +17,11 @@
 
 # Targeted Impala insert tests
 
-from __future__ import absolute_import, division, print_function
 from collections import namedtuple
 from datetime import date, datetime
 from decimal import Decimal
 import os
 from subprocess import check_call
-
-from builtins import map, range, round
 
 from impala_thrift_gen.parquet.ttypes import (
     ColumnOrder,

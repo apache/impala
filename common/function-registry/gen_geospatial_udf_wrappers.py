@@ -22,7 +22,6 @@
 # in Impala. A generated class is extending the original UDF and adding wrapper
 # 'evaluate' methods projecting the varargs method as an n parameter method.
 
-from __future__ import absolute_import, division, print_function
 import os
 from gen_builtins_catalog import FE_PATH
 

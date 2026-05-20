@@ -54,7 +54,6 @@
 # The script is directly executable, and it takes no parameters:
 #     ./bootstrap_toolchain.py
 
-from __future__ import absolute_import, division, print_function
 import logging
 import multiprocessing.pool
 import os

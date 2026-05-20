@@ -17,12 +17,10 @@
 #
 # Superclass of all HS2 tests containing commonly used functions.
 
-from __future__ import absolute_import, division, print_function
 from getpass import getuser
 import sys
 from time import sleep, time
 
-from builtins import range
 from thrift.protocol import TBinaryProtocol
 from thrift.transport.TSocket import TSocket
 from thrift.transport.TTransport import TBufferedTransport
@@ -94,9 +92,6 @@ def needs_session_cluster_properties(protocol_version=
 
 def operation_id_to_query_id(operation_id):
   lo, hi = operation_id.guid[:8],  operation_id.guid[8:]
-  if sys.version_info.major < 3:
-    lo = [ord(x) for x in lo]
-    hi = [ord(x) for x in hi]
   lo = ''.join(['%0.2X' % c for c in lo[::-1]])
   hi = ''.join(['%0.2X' % c for c in hi[::-1]])
   return "%s:%s" % (lo, hi)
@@ -303,8 +298,6 @@ class HS2TestSuite(ImpalaTestSuite):
           typed_col = getattr(c, col_type)
           if typed_col != None:
             indicator = typed_col.nulls[i // 8]
-            if sys.version_info.major < 3:
-              indicator = ord(indicator)
             if indicator & (1 << (i % 8)):
               row.append("NULL")
             else:

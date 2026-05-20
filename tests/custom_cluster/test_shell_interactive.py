@@ -15,7 +15,6 @@
 # specific language governing permissions and limitations
 # under the License.
 
-from __future__ import absolute_import, division, print_function
 import pytest
 
 from multiprocessing.pool import ThreadPool
@@ -79,7 +78,7 @@ class TestShellInteractive(CustomClusterTestSuite):
     proc.sendline("profile all;")
     proc.expect("Query Runtime Profile:")
     proc.expect("Query State: FINISHED")
-    proc.expect("Failed Query Runtime Profile\(s\):")
+    proc.expect(r"Failed Query Runtime Profile\(s\):")
     proc.expect("Query State: EXCEPTION")
     proc.expect("Retry Status: RETRIED")
 
@@ -90,7 +89,7 @@ class TestShellInteractive(CustomClusterTestSuite):
       proc.expect("Query Runtime Profile:")
       proc.expect("Query State: FINISHED")
       # Validate that the output does not contain info about the failed profile.
-      self.__proc_not_expect(proc, "Failed Query Runtime Profile\(s\):")
+      self.__proc_not_expect(proc, r"Failed Query Runtime Profile\(s\):")
       self.__proc_not_expect(proc, "Query State: EXCEPTION")
       self.__proc_not_expect(proc, "Retry Status: RETRIED")
 
@@ -99,29 +98,29 @@ class TestShellInteractive(CustomClusterTestSuite):
     proc.expect("Query Runtime Profile:")
     proc.expect("Query State: EXCEPTION")
     proc.expect("Retry Status: RETRIED")
-    self.__proc_not_expect(proc, "Failed Query Runtime Profile\(s\):")
+    self.__proc_not_expect(proc, r"Failed Query Runtime Profile\(s\):")
     self.__proc_not_expect(proc, "Query State: FINISHED")
 
     # Check the output of 'summary all'
     proc.sendline("summary all;")
     proc.expect("Query Summary:")
     # The retried query runs on 2 instances.
-    proc.expect("00:SCAN HDFS\w*| 2\w*| 2")
+    proc.expect(r"00:SCAN HDFS\w*| 2\w*| 2")
     proc.expect("Failed Query Summary:")
     # The original query runs on 3 instances.
-    proc.expect("00:SCAN HDFS\w*| 3\w*| 3")
+    proc.expect(r"00:SCAN HDFS\w*| 3\w*| 3")
 
     # Check the output of 'summary latest' and 'summary'. The output of both cmds
     # should be equivalent.
     for summary_cmd in ["summary latest;", "summary;"]:
       proc.sendline(summary_cmd)
       # The retried query runs on 2 instances.
-      proc.expect("00:SCAN HDFS\w*| 2\w*| 2")
+      proc.expect(r"00:SCAN HDFS\w*| 2\w*| 2")
 
     # Check the output of 'summary original'
     proc.sendline("summary original")
     # The original query runs on 3 instances.
-    proc.expect("00:SCAN HDFS\w*| 3\w*| 3")
+    proc.expect(r"00:SCAN HDFS\w*| 3\w*| 3")
 
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args(force_restart=True)

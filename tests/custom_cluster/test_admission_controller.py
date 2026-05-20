@@ -17,7 +17,6 @@
 
 # Tests admission control
 
-from __future__ import absolute_import, division, print_function
 from copy import deepcopy
 import itertools
 import logging
@@ -29,7 +28,6 @@ import sys
 import threading
 from time import sleep, time
 
-from builtins import int, range, round
 import pytest
 
 from impala_thrift_gen.ImpalaService import ImpalaHiveServer2Service

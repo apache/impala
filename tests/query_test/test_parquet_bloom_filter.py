@@ -15,13 +15,10 @@
 # specific language governing permissions and limitations
 # under the License.
 
-from __future__ import absolute_import, division, print_function
 from collections import namedtuple
 import math
 import os
 from subprocess import check_call
-
-from builtins import range
 
 from impala_thrift_gen.parquet.ttypes import BloomFilterHeader
 from tests.common.file_utils import create_table_and_copy_files

@@ -18,7 +18,6 @@
 # Tests to validate the Catalog Service works properly when partitions
 # need to be fetched in multiple batches.
 
-from __future__ import absolute_import, division, print_function
 from tests.common.impala_test_suite import ImpalaTestSuite
 
 class TestLargeNumPartitions(ImpalaTestSuite):

@@ -14,13 +14,9 @@
 # KIND, either express or implied.  See the License for the
 # specific language governing permissions and limitations
 # under the License.
-from __future__ import absolute_import, division, print_function
-
-from builtins import range
-
 from impala_thrift_gen.hive_metastore.ttypes import FireEventRequest, FireEventRequestData
 from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
-from tests.common.skip import SkipIfCatalogV2, SkipIfFS
+from tests.common.skip import SkipIfFS
 from tests.metadata.test_event_processing_base import TestEventProcessingBase
 from tests.util.acid_txn import AcidTxn
 from tests.util.event_processor_utils import EventProcessorUtils

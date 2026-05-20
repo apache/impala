@@ -71,8 +71,6 @@
 #   --exec_options        query exec option string to run workload
 #                         (formatted as 'opt1:val1;opt2:val2')
 
-from __future__ import absolute_import, division, print_function
-from builtins import range
 from optparse import OptionParser
 from tempfile import mkdtemp
 

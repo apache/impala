@@ -17,7 +17,6 @@
 
 # These are unit tests for cluster.py.
 
-from __future__ import absolute_import, division, print_function
 from time import time
 
 from tests.common.errors import Timeout

@@ -24,8 +24,6 @@
 '''
 
 # TODO: IMPALA-4600: refactor this module
-from __future__ import absolute_import, division, print_function
-from builtins import range, round, zip
 from copy import deepcopy
 from decimal import Decimal
 from logging import getLogger

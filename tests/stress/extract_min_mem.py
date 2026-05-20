@@ -33,7 +33,6 @@
 #
 #   ./tests/stress/extract_min_mem.py mem_usage_scaling_runtime_info.json
 #
-from __future__ import absolute_import, division, print_function
 import json
 import sys
 

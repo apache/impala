@@ -15,8 +15,6 @@
 # specific language governing permissions and limitations
 # under the License.
 
-from __future__ import absolute_import, division, print_function
-from future.utils import with_metaclass
 import re
 import sys
 
@@ -59,7 +57,7 @@ class DataTypeMetaclass(type):
             < getattr(other, 'CMP_VALUE', other.__name__))
 
 
-class DataType(with_metaclass(DataTypeMetaclass, ValExpr)):
+class DataType(ValExpr, metaclass=DataTypeMetaclass):
   '''Base class for data types.
 
      Data types are represented as classes so inheritance can be used.

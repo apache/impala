@@ -39,7 +39,6 @@ REPL:
 
 """
 
-from __future__ import absolute_import, division, print_function
 import os
 import re
 import sys
@@ -111,16 +110,6 @@ def load_source_with_importlib(modname, filename):
   return module
 
 
-def import_template(name, module_path):
-  """Handle module import differences between Python2 and Python3"""
-  mod = None
-  if sys.version_info.major < 3:
-    import imp
-    mod = imp.load_source('template', module_path)
-  else:
-    mod = load_source_with_importlib(name, module_path)
-  return mod
-
 def main():
   if len(sys.argv) != 3:
     print("usage: {prog} <template> <out>".format(prog=sys.argv[0]), file=sys.stderr)
@@ -128,7 +117,7 @@ def main():
 
   _, in_path, out_path = sys.argv
   try:
-    mod = import_template('template', in_path)
+    mod = load_source_with_importlib('template', in_path)
   except:  # noqa
     print("Unable to load template: %s" % in_path, file=sys.stderr)
     raise

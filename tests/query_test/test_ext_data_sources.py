@@ -15,10 +15,6 @@
 # specific language governing permissions and limitations
 # under the License.
 
-from __future__ import absolute_import, division, print_function
-
-import re
-
 from tests.common.impala_test_suite import ImpalaTestSuite
 from tests.common.test_dimensions import (create_uncompressed_text_dimension,
     create_exec_option_dimension)

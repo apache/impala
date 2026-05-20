@@ -18,11 +18,9 @@
 # Tests query cancellation using the ImpalaService.Cancel API
 #
 
-from __future__ import absolute_import, division, print_function
 from threading import Thread
 from time import sleep
 
-from builtins import range
 import pytest
 
 from impala_thrift_gen.RuntimeProfile.ttypes import TRuntimeProfileFormat

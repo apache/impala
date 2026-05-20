@@ -17,8 +17,6 @@
 #
 # The base class that should be used for almost all Impala tests
 
-from __future__ import absolute_import, division, print_function
-from builtins import range, round
 import contextlib
 import glob
 import grp

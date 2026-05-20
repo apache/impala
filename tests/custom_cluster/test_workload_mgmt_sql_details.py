@@ -15,8 +15,6 @@
 # specific language governing permissions and limitations
 # under the License.
 
-from __future__ import absolute_import, division, print_function
-
 import os
 
 from impala_thrift_gen.SystemTables.ttypes import TQueryTableColumn
