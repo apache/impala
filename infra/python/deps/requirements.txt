@@ -55,7 +55,7 @@ pytest == 6.2.5
   pytest-timeout == 2.2.0
   pytest-xdist == 3.5.0
     execnet == 2.1.2
-      hatchling == 1.28.0
+      hatchling == 1.29.0
       pathspec == 1.0.4
       trove-classifiers == 2026.1.14.14
         calver == 2025.10.20
@@ -64,13 +64,14 @@ pytest == 6.2.5
 python-magic == 0.4.27
 pywebhdfs == 0.3.2
   pbr == 7.0.3
-requests == 2.32.5
-  charset_normalizer == 3.4.4
-  idna == 3.11
-  urllib3 == 2.6.3
-  certifi == 2026.1.4
+requests == 2.34.2
+  charset_normalizer == 3.4.7
+  idna == 3.15
+  urllib3 == 2.7.0
+  certifi == 2026.5.20
 sasl == 0.4a1
 six == 1.17.0
+# Can't upgrade until https://github.com/andialbrecht/sqlparse/issues/814 is fixed.
 sqlparse == 0.3.1
 avro==1.12.1
 thrift==0.16.0
@@ -78,4 +79,4 @@ distro==1.9.0
 
 # Required for Kudu:
   Cython == 0.29.37
-  pytz == 2025.2
+  pytz == 2026.2

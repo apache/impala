@@ -18,12 +18,12 @@
 # Requirements for gcovr, which are only needed for coverage runs
 
 gcovr == 7.2
-  Jinja2 == 3.1.4
+  Jinja2 == 3.1.6
     flit-core == 3.9.0
-  lxml == 5.2.2
-    Cython == 3.0.10
+  lxml == 6.1.0
+    Cython == 3.2.4
   colorlog == 6.8.2
-  Pygments == 2.13.0
+  Pygments == 2.20.0
     MarkupSafe == 2.1.5
   tomli == 2.0.1
     packaging == 24.1

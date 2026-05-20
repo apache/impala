@@ -19,8 +19,20 @@
 # is bootstrapped and all requirements in requirements.txt and compiled-requirements.txt
 # are installed into the virtualenv.
 
-pycparser == 2.17
-cffi==1.10.0
-cryptography==1.8.1
-  scandir == 1.5
-azure-datalake-store == 0.0.9
+pycparser == 2.23
+cffi==2.0.0
+cryptography==46.0.7
+  maturin==1.13.3
+    setuptools-rust==1.12.1
+      semantic_version==2.10.0
+    puccinialin==0.1.12
+      filelock==3.29.0
+      httpx==0.28.1
+        anyio==4.13.0
+          typing_extensions==4.15.0
+        hatch-fancy-pypi-readme==25.1.0
+        httpcore==1.0.9
+          h11==0.16.0
+      platformdirs==4.9.6
+      tqdm==4.67.3
+azure-datalake-store == 1.0.1
