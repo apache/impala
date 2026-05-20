@@ -23,7 +23,7 @@ gcovr == 7.2
   lxml == 5.2.2
     Cython == 3.0.10
   colorlog == 6.8.2
-  Pygments == 2.13.0
+  Pygments == 2.20.0
     MarkupSafe == 2.1.5
   tomli == 2.0.1
     packaging == 24.1
