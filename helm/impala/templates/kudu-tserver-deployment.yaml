@@ -1,0 +1,94 @@
+{{/*
+Licensed to the Apache Software Foundation (ASF) under one
+or more contributor license agreements.  See the NOTICE file
+distributed with this work for additional information
+regarding copyright ownership.  The ASF licenses this file
+to you under the Apache License, Version 2.0 (the
+"License"); you may not use this file except in compliance
+with the License.  You may obtain a copy of the License at
+
+  http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing,
+software distributed under the License is distributed on an
+"AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+KIND, either express or implied.  See the License for the
+specific language governing permissions and limitations
+under the License.
+*/}}
+
+{{- if .Values.kudu.enabled }}
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ include "impala.fullname" . }}-kudu-tserver
+  labels:
+{{ include "impala.labels" . | indent 4 }}
+spec:
+  serviceName: {{ include "impala.kuduTserverService" . }}
+  podManagementPolicy: OrderedReady
+  replicas: {{ .Values.kudu.tserver.replicas }}
+  selector:
+    matchLabels:
+      app.kubernetes.io/instance: {{ .Release.Name }}
+      app.kubernetes.io/name: {{ include "impala.name" . }}
+      app.kubernetes.io/component: kudu-tserver
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/instance: {{ .Release.Name }}
+        app.kubernetes.io/name: {{ include "impala.name" . }}
+        app.kubernetes.io/component: kudu-tserver
+    spec:
+      containers:
+        - name: kudu-tserver
+          image: {{ .Values.kudu.image | quote }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+{{- with .Values.kudu.tserver.securityContext }}
+          securityContext:
+{{ toYaml . | indent 12 }}
+{{- end }}
+          command: ["kudu"]
+          args:
+            - tserver
+            - run
+            - --fs_wal_dir=/var/lib/kudu/tserver/wal
+            - --fs_data_dirs=/var/lib/kudu/tserver/data
+            - --rpc_bind_addresses=0.0.0.0:{{ .Values.kudu.tserver.rpcPort | default 7050 }}
+            - --rpc_advertised_addresses=$(POD_IP):{{ .Values.kudu.tserver.rpcPort | default 7050 }}
+            - --tserver_master_addrs={{ include "impala.kuduMasterService" . }}:{{ .Values.kudu.master.rpcPort | default 7051 }}
+            - --webserver_port={{ .Values.kudu.tserver.webPort | default 8050 }}
+{{- range .Values.kudu.tserver.extraArgs }}
+            - {{ . | quote }}
+{{- end }}
+          env:
+            - name: POD_IP
+              valueFrom:
+                fieldRef:
+                  fieldPath: status.podIP
+          ports:
+            - name: rpc
+              containerPort: {{ .Values.kudu.tserver.rpcPort | default 7050 }}
+            - name: web
+              containerPort: {{ .Values.kudu.tserver.webPort | default 8050 }}
+{{- with .Values.kudu.tserver.resources }}
+          resources:
+{{ toYaml . | indent 12 }}
+{{- end }}
+          volumeMounts:
+            - name: kudu-tserver-data
+              mountPath: /var/lib/kudu/tserver
+      volumes:
+        - name: kudu-tserver-data
+{{- $tserverPersistence := .Values.kudu.tserver.persistence | default dict }}
+{{- $tserverPersistenceEnabled := true }}
+{{- if hasKey $tserverPersistence "enabled" }}
+{{- $tserverPersistenceEnabled = $tserverPersistence.enabled }}
+{{- end }}
+{{- if $tserverPersistenceEnabled }}
+          persistentVolumeClaim:
+            claimName: {{ include "impala.kuduTserverPvc" . }}
+{{- else }}
+          emptyDir: {}
+{{- end }}
+{{- end }}

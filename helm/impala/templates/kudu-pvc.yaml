@@ -1,0 +1,64 @@
+{{/*
+Licensed to the Apache Software Foundation (ASF) under one
+or more contributor license agreements.  See the NOTICE file
+distributed with this work for additional information
+regarding copyright ownership.  The ASF licenses this file
+to you under the Apache License, Version 2.0 (the
+"License"); you may not use this file except in compliance
+with the License.  You may obtain a copy of the License at
+
+  http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing,
+software distributed under the License is distributed on an
+"AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+KIND, either express or implied.  See the License for the
+specific language governing permissions and limitations
+under the License.
+*/}}
+
+{{- $masterPersistence := .Values.kudu.master.persistence | default dict }}
+{{- $masterPersistenceEnabled := true }}
+{{- if hasKey $masterPersistence "enabled" }}
+{{- $masterPersistenceEnabled = $masterPersistence.enabled }}
+{{- end }}
+{{- if and .Values.kudu.enabled $masterPersistenceEnabled }}
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ include "impala.kuduMasterPvc" . }}
+  labels:
+{{ include "impala.labels" . | indent 4 }}
+spec:
+  accessModes:
+{{ toYaml (.Values.kudu.master.persistence.accessModes | default (list "ReadWriteOnce")) | indent 4 }}
+  resources:
+    requests:
+      storage: {{ .Values.kudu.master.persistence.size | default "20Gi" }}
+{{- if .Values.kudu.master.persistence.storageClassName }}
+  storageClassName: {{ .Values.kudu.master.persistence.storageClassName | quote }}
+{{- end }}
+---
+{{- end }}
+{{- $tserverPersistence := .Values.kudu.tserver.persistence | default dict }}
+{{- $tserverPersistenceEnabled := true }}
+{{- if hasKey $tserverPersistence "enabled" }}
+{{- $tserverPersistenceEnabled = $tserverPersistence.enabled }}
+{{- end }}
+{{- if and .Values.kudu.enabled $tserverPersistenceEnabled }}
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ include "impala.kuduTserverPvc" . }}
+  labels:
+{{ include "impala.labels" . | indent 4 }}
+spec:
+  accessModes:
+{{ toYaml (.Values.kudu.tserver.persistence.accessModes | default (list "ReadWriteOnce")) | indent 4 }}
+  resources:
+    requests:
+      storage: {{ .Values.kudu.tserver.persistence.size | default "50Gi" }}
+{{- if .Values.kudu.tserver.persistence.storageClassName }}
+  storageClassName: {{ .Values.kudu.tserver.persistence.storageClassName | quote }}
+{{- end }}
+{{- end }}

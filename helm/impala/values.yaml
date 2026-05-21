@@ -77,8 +77,10 @@ kudu:
   enabled: false
   image: "apache/kudu:1.17"
   master:
+    # Multi-replica Kudu is out of scope for this chart baseline.
     replicas: 1
     rpcPort: 7051
+    # Web UI port for the single exposed Kudu master service endpoint.
     webPort: 8051
     securityContext: {}
     extraArgs:
@@ -93,8 +95,10 @@ kudu:
         - ReadWriteOnce
       storageClassName: ""
   tserver:
+    # Multi-replica Kudu is out of scope for this chart baseline.
     replicas: 1
     rpcPort: 7050
+    # Web UI port for the single exposed Kudu tserver service endpoint.
     webPort: 8050
     securityContext: {}
     extraArgs:

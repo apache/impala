@@ -1,0 +1,93 @@
+{{/*
+Licensed to the Apache Software Foundation (ASF) under one
+or more contributor license agreements.  See the NOTICE file
+distributed with this work for additional information
+regarding copyright ownership.  The ASF licenses this file
+to you under the Apache License, Version 2.0 (the
+"License"); you may not use this file except in compliance
+with the License.  You may obtain a copy of the License at
+
+  http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing,
+software distributed under the License is distributed on an
+"AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+KIND, either express or implied.  See the License for the
+specific language governing permissions and limitations
+under the License.
+*/}}
+
+{{- if .Values.kudu.enabled }}
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ include "impala.fullname" . }}-kudu-master
+  labels:
+{{ include "impala.labels" . | indent 4 }}
+spec:
+  serviceName: {{ include "impala.kuduMasterService" . }}
+  podManagementPolicy: OrderedReady
+  replicas: {{ .Values.kudu.master.replicas }}
+  selector:
+    matchLabels:
+      app.kubernetes.io/instance: {{ .Release.Name }}
+      app.kubernetes.io/name: {{ include "impala.name" . }}
+      app.kubernetes.io/component: kudu-master
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/instance: {{ .Release.Name }}
+        app.kubernetes.io/name: {{ include "impala.name" . }}
+        app.kubernetes.io/component: kudu-master
+    spec:
+      containers:
+        - name: kudu-master
+          image: {{ .Values.kudu.image | quote }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+{{- with .Values.kudu.master.securityContext }}
+          securityContext:
+{{ toYaml . | indent 12 }}
+{{- end }}
+          command: ["kudu"]
+          args:
+            - master
+            - run
+            - --fs_wal_dir=/var/lib/kudu/master/wal
+            - --fs_data_dirs=/var/lib/kudu/master/data
+            - --rpc_bind_addresses=0.0.0.0:{{ .Values.kudu.master.rpcPort | default 7051 }}
+            - --rpc_advertised_addresses=$(POD_IP):{{ .Values.kudu.master.rpcPort | default 7051 }}
+            - --webserver_port={{ .Values.kudu.master.webPort | default 8051 }}
+{{- range .Values.kudu.master.extraArgs }}
+            - {{ . | quote }}
+{{- end }}
+          env:
+            - name: POD_IP
+              valueFrom:
+                fieldRef:
+                  fieldPath: status.podIP
+          ports:
+            - name: rpc
+              containerPort: {{ .Values.kudu.master.rpcPort | default 7051 }}
+            - name: web
+              containerPort: {{ .Values.kudu.master.webPort | default 8051 }}
+{{- with .Values.kudu.master.resources }}
+          resources:
+{{ toYaml . | indent 12 }}
+{{- end }}
+          volumeMounts:
+            - name: kudu-master-data
+              mountPath: /var/lib/kudu/master
+      volumes:
+        - name: kudu-master-data
+{{- $masterPersistence := .Values.kudu.master.persistence | default dict }}
+{{- $masterPersistenceEnabled := true }}
+{{- if hasKey $masterPersistence "enabled" }}
+{{- $masterPersistenceEnabled = $masterPersistence.enabled }}
+{{- end }}
+{{- if $masterPersistenceEnabled }}
+          persistentVolumeClaim:
+            claimName: {{ include "impala.kuduMasterPvc" . }}
+{{- else }}
+          emptyDir: {}
+{{- end }}
+{{- end }}
