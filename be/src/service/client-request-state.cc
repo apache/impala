@@ -522,6 +522,14 @@ Status ClientRequestState::ExecLocalCatalogOp(
       SetResultSet(result.role_names);
       return Status::OK();
     }
+    case TCatalogOpType::SHOW_ROLES_PRINCIPAL: {
+      const TShowRolesParams& params = catalog_op.show_roles_params;
+      TResultSet response;
+      RETURN_IF_ERROR(frontend_->GetPrincipalRoles(params, &response));
+      request_result_set_.reset(new vector(response.rows));
+      result_metadata_ = response.schema;
+      return Status::OK();
+    }
     case TCatalogOpType::SHOW_CURRENT_GROUPS: {
       const TShowCurrentGroupsParams& params = catalog_op.show_current_groups_params;
       TShowCurrentGroupsResult result;

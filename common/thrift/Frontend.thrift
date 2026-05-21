@@ -498,6 +498,7 @@ enum TCatalogOpType {
   SHOW_VIEWS = 16
   SHOW_METADATA_TABLES = 17
   SHOW_CURRENT_GROUPS = 18
+  SHOW_ROLES_PRINCIPAL = 19
 }
 
 // TODO: Combine SHOW requests with a single struct that contains a field

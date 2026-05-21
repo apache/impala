@@ -7208,7 +7208,8 @@ public class CatalogOpExecutor {
     Preconditions.checkNotNull(resp);
     Preconditions.checkArgument(!grantRevokeRoleParams.isIs_grant());
     authzManager_.revokeRoleFromGroupOrUser(header, grantRevokeRoleParams, resp);
-    addSummary(resp, "Role has been revoked.");
+    addSummary(resp, grantRevokeRoleParams.isHas_admin_opt() ?
+        "Admin option has been revoked." : "Role has been revoked.");
   }
 
   /**

@@ -97,6 +97,13 @@ public class NoopAuthorizationFactory implements AuthorizationFactory {
     }
 
     @Override
+    public TResultSet getPrincipalRoles(TShowRolesParams params)
+        throws ImpalaException {
+      throw new UnsupportedOperationException(String.format("%s is not supported",
+          ClassUtil.getMethodName()));
+    }
+
+    @Override
     public void grantRoleToGroupOrUser(TCatalogServiceRequestHeader header,
         TGrantRevokeRoleParams params, TDdlExecResponse response)
         throws ImpalaException {

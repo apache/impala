@@ -760,6 +760,9 @@ struct TGrantRevokeRoleParams {
   // When 'group_names' is empty, the grantee/revokee would be a user, and thus
   // 'user_names' would consist of exactly one non-empty name of the grantee/revokee.
   4: optional list<string> user_names
+
+  // True if WITH ADMIN OPTION is set.
+  5: optional bool has_admin_opt
 }
 
 // Parameters for GRANT/REVOKE privilege TO/FROM user/role.

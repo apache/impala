@@ -19,7 +19,6 @@ package org.apache.impala.authorization.ranger;
 
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
-import com.google.common.collect.Sets;
 import org.apache.hadoop.hive.metastore.api.PrincipalType;
 import org.apache.impala.authorization.AuthorizationDelta;
 import org.apache.impala.authorization.AuthorizationManager;
@@ -29,6 +28,7 @@ import org.apache.impala.common.ImpalaException;
 import org.apache.impala.common.InternalException;
 import org.apache.impala.thrift.TCatalogServiceRequestHeader;
 import org.apache.impala.thrift.TColumn;
+import org.apache.impala.thrift.TColumnValue;
 import org.apache.impala.thrift.TCreateDropRoleParams;
 import org.apache.impala.thrift.TDdlExecResponse;
 import org.apache.impala.thrift.TGrantRevokePrivParams;
@@ -79,6 +79,8 @@ public class RangerImpaladAuthorizationManager implements AuthorizationManager {
   private static final Logger LOG = LoggerFactory.getLogger(
       RangerImpaladAuthorizationManager.class);
   private static final String ANY = "*";
+  private static final String PRINCIPAL_USER = "USER";
+  private static final String PRINCIPAL_GROUP = "GROUP";
 
   private final Supplier<RangerImpalaPlugin> plugin_;
 
@@ -102,8 +104,7 @@ public class RangerImpaladAuthorizationManager implements AuthorizationManager {
 
   /**
    * This method will be called for the statements of 1) SHOW ROLES,
-   * 2) SHOW CURRENT ROLES, 3) SHOW ROLE GRANT GROUP <group_name>,
-   * or, 4) SHOW ROLE GRANT USER <user_name>.
+   * 2) SHOW CURRENT ROLES.
    */
   @Override
   public TShowRolesResult getRoles(TShowRolesParams params) throws ImpalaException {
@@ -111,32 +112,17 @@ public class RangerImpaladAuthorizationManager implements AuthorizationManager {
       TShowRolesResult result = new TShowRolesResult();
       Set<String> groups = RangerUtil.getGroups(params.getRequesting_user());
 
-      boolean adminOp =
-          !(groups.contains(params.getGrant_group())
-              || params.getRequesting_user().equals(params.getGrant_user())
-              || params.is_show_current_roles);
+      boolean adminOp = !params.is_show_current_roles;
 
       if (adminOp) {
         RangerUtil.validateRangerAdmin(plugin_.get(), params.getRequesting_user());
       }
 
-      // The branch for SHOW CURRENT ROLES, SHOW ROLE GRANT GROUP/USER.
       Set<String> roleNames;
-      if (params.isIs_show_current_roles() || params.isSetGrant_group() ||
-          params.isSetGrant_user()) {
-        Set<String> groupNames;
-        if (params.isIs_show_current_roles()) {
-          roleNames = plugin_.get().getRolesFromUserAndGroups(
-              params.getRequesting_user(), groups);
-        } else if (params.isSetGrant_group()) {
-          groupNames = Sets.newHashSet(params.getGrant_group());
-          roleNames = plugin_.get().getRolesFromUserAndGroups(/* user */ null,
-              groupNames);
-        } else {
-          Preconditions.checkState(params.isSetGrant_user());
-          roleNames = plugin_.get().getRolesFromUserAndGroups(params.getGrant_user(),
-              /* group */ null);
-        }
+      // The branch for SHOW CURRENT ROLES.
+      if (params.isIs_show_current_roles()) {
+        roleNames = plugin_.get().getRolesFromUserAndGroups(
+            params.getRequesting_user(), groups);
       } else {
         // The branch for SHOW ROLES.
         Preconditions.checkState(!params.isIs_show_current_roles());
@@ -157,22 +143,96 @@ public class RangerImpaladAuthorizationManager implements AuthorizationManager {
         LOG.error("Error executing SHOW CURRENT ROLES.", e);
         throw new InternalException("Error executing SHOW CURRENT ROLES."
             + " Ranger error message: " + e.getMessage());
-      } else if (params.isSetGrant_group()) {
-        LOG.error("Error executing SHOW ROLE GRANT GROUP " + params.getGrant_group() +
-            ".");
-        throw new InternalException("Error executing SHOW ROLE GRANT GROUP "
-            + params.getGrant_group() + ". Ranger error message: " + e.getMessage());
-      } else if (params.isSetGrant_user()) {
-        LOG.error("Error executing SHOW ROLE GRANT USER " + params.getGrant_user() +
-            ".");
-        throw new InternalException("Error executing SHOW ROLE GRANT USER "
-            + params.getGrant_user() + ". Ranger error message: " + e.getMessage());
       } else {
-        LOG.error("Error executing SHOW ROLES.");
+        LOG.error("Error executing SHOW ROLES.", e);
         throw new InternalException("Error executing SHOW ROLES."
             + " Ranger error message: " + e.getMessage());
       }
     }
+  }
+
+  /**
+   * This method will be called for the statements of
+   * 1) SHOW ROLE GRANT GROUP <group_name>, 2) SHOW ROLE GRANT USER <user_name>.
+   */
+  @Override
+  public TResultSet getPrincipalRoles(TShowRolesParams params)
+      throws ImpalaException {
+    TResultSet result = new TResultSet();
+    TResultSetMetadata schema = new TResultSetMetadata();
+    schema.addToColumns(new TColumn("role_name", Type.STRING.toThrift()));
+    schema.addToColumns(new TColumn("grant_option", Type.BOOLEAN.toThrift()));
+    result.setSchema(schema);
+    result.setRows(new ArrayList<>());
+    try {
+      Set<String> groups = RangerUtil.getGroups(params.getRequesting_user());
+
+      boolean adminOp =
+          !(groups.contains(params.getGrant_group())
+              || params.getRequesting_user().equals(params.getGrant_user()));
+
+      if (adminOp) {
+        RangerUtil.validateRangerAdmin(plugin_.get(), params.getRequesting_user());
+      }
+
+      Set<RangerRole> roles;
+      if (params.isSetGrant_group()) {
+        roles = plugin_.get().getRangerRoleForPrincipal(params.getGrant_group(),
+            PRINCIPAL_GROUP);
+      } else {
+        Preconditions.checkState(params.isSetGrant_user());
+        roles = plugin_.get().getRangerRoleForPrincipal(params.getGrant_user(),
+            PRINCIPAL_USER);
+      }
+
+      for (RangerRole role : roles) {
+        TResultRow row = new TResultRow();
+        row.addToColVals(new TColumnValue().setString_val(role.getName()));
+
+        boolean hasGrantOption = hasGrantOption(params, role);
+        row.addToColVals(new TColumnValue().setBool_val(hasGrantOption));
+        result.addToRows(row);
+      }
+
+      // Sort the resulting TResultSet according to the column 'role_name', which is the
+      // first column in 'result'.
+      result.getRows().sort((row1, row2) ->
+          row1.getColVals().get(0).getString_val().compareTo(
+              row2.getColVals().get(0).getString_val()));
+      return result;
+    } catch (Exception e) {
+      if (params.isSetGrant_group()) {
+        LOG.error("Error executing SHOW ROLE GRANT GROUP {}.", params.getGrant_group(),
+            e);
+        throw new InternalException("Error executing SHOW ROLE GRANT GROUP "
+            + params.getGrant_group() + ". Ranger error message: " + e.getMessage());
+      } else {
+        LOG.error("Error executing SHOW ROLE GRANT USER {}.", params.getGrant_user(),
+            e);
+        throw new InternalException("Error executing SHOW ROLE GRANT USER "
+            + params.getGrant_user() + ". Ranger error message: " + e.getMessage());
+      }
+    }
+  }
+
+  private static boolean hasGrantOption(TShowRolesParams params, RangerRole role) {
+    boolean hasGrantOption = false;
+    if (params.isSetGrant_group()) {
+      for (RangerRole.RoleMember member : role.getGroups()) {
+        if (member.getName().equals(params.getGrant_group())) {
+          hasGrantOption = member.getIsAdmin();
+          break;
+        }
+      }
+    } else {
+      for (RangerRole.RoleMember member : role.getUsers()) {
+        if (member.getName().equals(params.getGrant_user())) {
+          hasGrantOption = member.getIsAdmin();
+          break;
+        }
+      }
+    }
+    return hasGrantOption;
   }
 
   @Override

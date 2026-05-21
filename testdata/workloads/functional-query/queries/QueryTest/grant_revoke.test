@@ -118,7 +118,7 @@ does_not_exist
 show role grant $GRANTEE_TYPE non_owner
 ---- RESULTS: VERIFY_IS_SUBSET
 ---- TYPES
-STRING
+STRING, BOOLEAN
 ---- CATCH
 User does_not_exist does not have permission for this operation
 ====
@@ -136,7 +136,7 @@ non_owner
 show role grant $GRANTEE_TYPE non_owner
 ---- RESULTS: VERIFY_IS_SUBSET
 ---- TYPES
-STRING
+STRING, BOOLEAN
 ====
 ---- QUERY
 drop database if exists grant_rev_db

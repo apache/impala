@@ -179,7 +179,7 @@ public class RangerCatalogdAuthorizationManagerTest extends AuthorizationTestBas
       String grantorUser, String role, String granteeGroup, String granteeUser,
       boolean expectSuccess) throws Exception {
     GrantRevokeRoleStmt stmt = new GrantRevokeRoleStmt(role, granteeGroup, granteeUser,
-        /* isGrantStmt */ true);
+        /* isGrantStmt */ true, /* hasAdminOpt */ false);
     String grantSqlStmt = stmt.toSql();
     TCatalogServiceRequestHeader header = createHeader(grantorUser, grantSqlStmt,
         CLIENT_IP_ADDRESS);
@@ -212,7 +212,7 @@ public class RangerCatalogdAuthorizationManagerTest extends AuthorizationTestBas
       String role, String revokeeGroup, String revokeeUser, boolean expectSuccess)
       throws Exception {
     GrantRevokeRoleStmt stmt = new GrantRevokeRoleStmt(role, revokeeGroup, revokeeUser,
-        /* isGrantStmt */ false);
+        /* isGrantStmt */ false, /* hasAdminOpt */ false);
     String revokeSqlStmt = stmt.toSql();
     TCatalogServiceRequestHeader header = createHeader(revokerUser, revokeSqlStmt,
         CLIENT_IP_ADDRESS);

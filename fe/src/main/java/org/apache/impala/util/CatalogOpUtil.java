@@ -106,10 +106,13 @@ public class CatalogOpUtil {
         case REVOKE_ROLE:
           boolean principalIsGroup =
               req.getGrant_revoke_role_params().getUser_names().isEmpty();
+          boolean hasAdminOpt =
+              req.getGrant_revoke_role_params().isHas_admin_opt();
           TGrantRevokeRoleParams params = req.getGrant_revoke_role_params();
           target = req.getGrant_revoke_role_params().getRole_names() +
               (principalIsGroup ? " GROUP " : " USER ") +
-              (principalIsGroup ? params.getGroup_names() : params.getUser_names());
+              (principalIsGroup ? params.getGroup_names() : params.getUser_names()) +
+              (hasAdminOpt ? " WITH ADMIN OPTION" : "");
           break;
         case GRANT_PRIVILEGE:
           target = "TO " + req.getGrant_revoke_priv_params().getPrincipal_name();

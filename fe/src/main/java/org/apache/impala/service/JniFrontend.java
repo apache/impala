@@ -667,6 +667,21 @@ public class JniFrontend {
   }
 
   /**
+   * Gets all roles associated with the given principal.
+   */
+  public byte[] getPrincipalRoles(byte[] showRolesParams) throws ImpalaException {
+    Preconditions.checkNotNull(frontend_);
+    TShowRolesParams params = new TShowRolesParams();
+    JniUtil.deserializeThrift(protocolFactory_, params, showRolesParams);
+    try {
+      TSerializer serializer = new TSerializer(protocolFactory_);
+      return serializer.serialize(frontend_.getAuthzManager().getPrincipalRoles(params));
+    } catch (TException e) {
+      throw new InternalException(e.getMessage());
+    }
+  }
+
+  /**
    * This is only used by the SHOW CURRENT GROUPS statement.
    */
   public byte[] getCurrentGroups(byte[] showCurrentGroupsParams) throws ImpalaException {

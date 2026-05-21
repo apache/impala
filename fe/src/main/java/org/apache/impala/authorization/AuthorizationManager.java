@@ -54,6 +54,11 @@ public interface AuthorizationManager {
   TShowRolesResult getRoles(TShowRolesParams params) throws ImpalaException;
 
   /**
+   * Gets all roles associated with the given principal.
+   */
+  TResultSet getPrincipalRoles(TShowRolesParams params) throws ImpalaException;
+
+  /**
    * Grants a role to a group.
    */
   void grantRoleToGroupOrUser(TCatalogServiceRequestHeader header,

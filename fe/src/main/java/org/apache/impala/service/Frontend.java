@@ -104,6 +104,7 @@ import org.apache.impala.analysis.ShowDbsStmt;
 import org.apache.impala.analysis.ShowFunctionsStmt;
 import org.apache.impala.analysis.ShowGrantPrincipalStmt;
 import org.apache.impala.analysis.ShowRolesStmt;
+import org.apache.impala.analysis.ShowRolesPrincipalStmt;
 import org.apache.impala.analysis.ShowTablesOrViewsStmt;
 import org.apache.impala.analysis.SingleTableStmt;
 import org.apache.impala.analysis.StatementBase;
@@ -886,6 +887,17 @@ public class Frontend {
       ddl.setShow_roles_params(showRolesStmt.toThrift());
       metadata.setColumns(Arrays.asList(
           new TColumn("role_name", Type.STRING.toThrift())));
+    } else if (analysis.isShowRolesPrincipalStmt()) {
+      ddl.op_type = TCatalogOpType.SHOW_ROLES_PRINCIPAL;
+      ShowRolesPrincipalStmt showRolesPrincipalStmt =
+          (ShowRolesPrincipalStmt) analysis.getStmt();
+      ddl.setShow_roles_params(showRolesPrincipalStmt.toThrift());
+      // For SHOW_ROLES_PRINCIPAL, the schema will be set in
+      // RangerImpaladAuthorizationManager#getPrincipalRoles().
+      // We still have to set a non-null 'columns' here. Otherwise,
+      // TResultSetMetadata#validate() would throw an exception during the execution of
+      // serializer.serialize(result) in JniFrontend#createExecRequest().
+      metadata.setColumns(Collections.emptyList());
     } else if (analysis.isShowCurrentGroupsStmt()) {
       ddl.op_type = TCatalogOpType.SHOW_CURRENT_GROUPS;
       ShowCurrentGroupsStmt stmt = (ShowCurrentGroupsStmt) analysis.getStmt();

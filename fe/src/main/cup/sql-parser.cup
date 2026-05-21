@@ -610,6 +610,7 @@ nonterminal Boolean enable_spec, validate_spec, rely_spec;
 
 // For GRANT/REVOKE/AUTH DDL statements
 nonterminal ShowRolesStmt show_roles_stmt;
+nonterminal ShowRolesPrincipalStmt show_roles_principal_stmt;
 nonterminal ShowCurrentGroupsStmt show_current_groups_stmt;
 nonterminal ShowGrantPrincipalStmt show_grant_principal_stmt;
 nonterminal TPrincipalType principal_type;
@@ -622,6 +623,8 @@ nonterminal PrivilegeSpec privilege_spec;
 nonterminal TPrivilegeLevel privilege;
 nonterminal Boolean opt_with_grantopt;
 nonterminal Boolean opt_grantopt_for;
+nonterminal Boolean opt_with_adminopt;
+nonterminal Boolean admin_ident;
 
 // To avoid creating common keywords such as 'SERVER' or 'SOURCES' we treat them as
 // identifiers rather than keywords. Throws a parse exception if the identifier does not
@@ -800,6 +803,8 @@ stmt ::=
   {: RESULT = unset; :}
   | show_roles_stmt:show_roles
   {: RESULT = show_roles; :}
+  | show_roles_principal_stmt:show_roles_principal
+  {: RESULT = show_roles_principal; :}
   | show_current_groups_stmt:stmt
   {: RESULT = stmt; :}
   | show_grant_principal_stmt:show_grant_principal
@@ -1176,16 +1181,19 @@ opt_kw_table ::=
 
 show_roles_stmt ::=
   KW_SHOW KW_ROLES
-  {: RESULT = new ShowRolesStmt(false, null, null); :}
-  | KW_SHOW KW_ROLE KW_GRANT KW_GROUP ident_or_unreserved:group
-  {: RESULT = new ShowRolesStmt(false, group, null); :}
+  {: RESULT = new ShowRolesStmt(false); :}
+  | KW_SHOW KW_CURRENT KW_ROLES
+  {: RESULT = new ShowRolesStmt(true); :}
+  ;
+
+show_roles_principal_stmt ::=
+  KW_SHOW KW_ROLE KW_GRANT KW_GROUP ident_or_unreserved:group
+  {: RESULT = new ShowRolesPrincipalStmt(TPrincipalType.GROUP, group); :}
   | KW_SHOW KW_ROLE KW_GRANT IDENT:user_id ident_or_unreserved:user
   {:
     parser.checkIdentKeyword("USER", user_id);
-    RESULT = new ShowRolesStmt(false, null, user);
+    RESULT = new ShowRolesPrincipalStmt(TPrincipalType.USER, user);
   :}
-  | KW_SHOW KW_CURRENT KW_ROLES
-  {: RESULT = new ShowRolesStmt(true, null, null); :}
   ;
 
 show_current_groups_stmt ::=
@@ -1252,23 +1260,33 @@ create_drop_role_stmt ::=
 
 grant_role_stmt ::=
   KW_GRANT KW_ROLE ident_or_unreserved:role KW_TO KW_GROUP ident_or_unreserved:group
-  {: RESULT = new GrantRevokeRoleStmt(role, group, null, true); :}
+  opt_with_adminopt:admin_opt
+  {: RESULT = new GrantRevokeRoleStmt(role, group, null, true, admin_opt); :}
   | KW_GRANT KW_ROLE ident_or_unreserved:role KW_TO IDENT:user_id
-    ident_or_unreserved:user
+    ident_or_unreserved:user opt_with_adminopt:admin_opt
   {:
     parser.checkIdentKeyword("USER", user_id);
-    RESULT = new GrantRevokeRoleStmt(role, null, user, true);
+    RESULT = new GrantRevokeRoleStmt(role, null, user, true, admin_opt);
   :}
   ;
 
 revoke_role_stmt ::=
   KW_REVOKE KW_ROLE ident_or_unreserved:role KW_FROM KW_GROUP ident_or_unreserved:group
-  {: RESULT = new GrantRevokeRoleStmt(role, group, null, false); :}
+  {: RESULT = new GrantRevokeRoleStmt(role, group, null, false, false); :}
+  | KW_REVOKE admin_ident:admin option_ident:option KW_FOR ident_or_unreserved:role
+    KW_FROM KW_GROUP ident_or_unreserved:group
+  {: RESULT = new GrantRevokeRoleStmt(role, group, null, false, true); :}
   | KW_REVOKE KW_ROLE ident_or_unreserved:role KW_FROM IDENT:user_id
     ident_or_unreserved:user
   {:
     parser.checkIdentKeyword("USER", user_id);
-    RESULT = new GrantRevokeRoleStmt(role, null, user, false);
+    RESULT = new GrantRevokeRoleStmt(role, null, user, false, false);
+  :}
+  | KW_REVOKE admin_ident:admin option_ident:option KW_FOR ident_or_unreserved:role
+    KW_FROM IDENT:user_id ident_or_unreserved:user
+  {:
+    parser.checkIdentKeyword("USER", user_id);
+    RESULT = new GrantRevokeRoleStmt(role, null, user, false, true);
   :}
   ;
 
@@ -1374,6 +1392,13 @@ opt_grantopt_for ::=
 
 opt_with_grantopt ::=
   KW_WITH KW_GRANT option_ident:option
+  {: RESULT = true; :}
+  | /* empty */
+  {: RESULT = false; :}
+  ;
+
+opt_with_adminopt ::=
+  KW_WITH admin_ident:admin option_ident:option
   {: RESULT = true; :}
   | /* empty */
   {: RESULT = false; :}
@@ -2657,6 +2682,16 @@ option_ident ::=
   {:
     if (!ident.toUpperCase().equals("OPTION")) {
       parser.parseError("identifier", SqlParserSymbols.IDENT, "OPTION");
+    }
+    RESULT = true;
+  :}
+  ;
+
+admin_ident ::=
+  IDENT:ident
+  {:
+    if (!ident.toUpperCase().equals("ADMIN")) {
+      parser.parseError("identifier", SqlParserSymbols.IDENT, "ADMIN");
     }
     RESULT = true;
   :}

@@ -216,11 +216,19 @@ public class CatalogOpUtilTest {
     req.setDdl_type(TDdlType.GRANT_ROLE);
     TGrantRevokeRoleParams grantRevokeRoleGroupParams;
     TGrantRevokeRoleParams grantRevokeRoleUserParams;
+    TGrantRevokeRoleParams grantRevokeRoleGroupParamsWithAdminOpt;
+    TGrantRevokeRoleParams grantRevokeRoleUserParamsWithAdminOpt;
     grantRevokeRoleGroupParams = new GrantRevokeRoleStmt("my_role", "my_group",
-        /* userName */ null, /* isGrantStmt */ true)
+        /* userName */ null, /* isGrantStmt */ true, /* hasAdminOpt */ false)
         .toThrift();
     grantRevokeRoleUserParams = new GrantRevokeRoleStmt("my_role", /* groupName */ null,
-        "my_user", /* isGrantStmt */ true)
+        "my_user", /* isGrantStmt */ true, /* hasAdminOpt */ false)
+        .toThrift();
+    grantRevokeRoleGroupParamsWithAdminOpt = new GrantRevokeRoleStmt("my_role",
+        "my_group", /* userName */ null, /* isGrantStmt */ true, /* hasAdminOpt */ true)
+        .toThrift();
+    grantRevokeRoleUserParamsWithAdminOpt = new GrantRevokeRoleStmt("my_role",
+        /* groupName */ null, "my_user", /* isGrantStmt */ true, /* hasAdminOpt */ true)
         .toThrift();
 
     req.setGrant_revoke_role_params(grantRevokeRoleGroupParams);
@@ -229,6 +237,12 @@ public class CatalogOpUtilTest {
     req.setGrant_revoke_role_params(grantRevokeRoleUserParams);
     assertEquals("GRANT_ROLE [my_role] USER [my_user] issued by unknown user",
         CatalogOpUtil.getShortDescForExecDdl(req));
+    req.setGrant_revoke_role_params(grantRevokeRoleGroupParamsWithAdminOpt);
+    assertEquals("GRANT_ROLE [my_role] GROUP [my_group] WITH ADMIN OPTION issued by " +
+        "unknown user", CatalogOpUtil.getShortDescForExecDdl(req));
+    req.setGrant_revoke_role_params(grantRevokeRoleUserParamsWithAdminOpt);
+    assertEquals("GRANT_ROLE [my_role] USER [my_user] WITH ADMIN OPTION issued by " +
+        "unknown user", CatalogOpUtil.getShortDescForExecDdl(req));
 
     req.setDdl_type(TDdlType.REVOKE_ROLE);
     req.setGrant_revoke_role_params(grantRevokeRoleGroupParams);
@@ -237,6 +251,12 @@ public class CatalogOpUtilTest {
     req.setGrant_revoke_role_params(grantRevokeRoleUserParams);
     assertEquals("REVOKE_ROLE [my_role] USER [my_user] issued by unknown user",
         CatalogOpUtil.getShortDescForExecDdl(req));
+    req.setGrant_revoke_role_params(grantRevokeRoleGroupParamsWithAdminOpt);
+    assertEquals("REVOKE_ROLE [my_role] GROUP [my_group] WITH ADMIN OPTION issued by " +
+        "unknown user", CatalogOpUtil.getShortDescForExecDdl(req));
+    req.setGrant_revoke_role_params(grantRevokeRoleUserParamsWithAdminOpt);
+    assertEquals("REVOKE_ROLE [my_role] USER [my_user] WITH ADMIN OPTION issued by " +
+        "unknown user", CatalogOpUtil.getShortDescForExecDdl(req));
 
     req.setDdl_type(TDdlType.GRANT_PRIVILEGE);
     TGrantRevokePrivParams grantRevokePrivParams = new GrantRevokePrivStmt("my_role",

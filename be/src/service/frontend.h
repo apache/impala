@@ -149,6 +149,10 @@ class Frontend {
   /// Call FE to get the roles.
   Status ShowRoles(const TShowRolesParams& params, TShowRolesResult* result);
 
+  /// Call FE to get the roles associated with the given principal.
+  Status GetPrincipalRoles(const TShowRolesParams& params,
+      TResultSet* result);
+
   /// Call FE to get the groups associated with the effective user.
   Status ShowCurrentGroups(const TShowCurrentGroupsParams& params,
       TShowCurrentGroupsResult* result);
@@ -298,6 +302,7 @@ class Frontend {
   jmethodID get_catalog_object_id_; // JniFrontend.getCatalogObject
   jmethodID get_catalog_table_id_; // JniFrontend.getCatalogTable
   jmethodID show_roles_id_; // JniFrontend.getRoles
+  jmethodID get_principal_roles_id_; // JniFrontend.getPrincipalRoles
   jmethodID show_current_groups_id_; // JniFrontend.showCurrentGroups
   jmethodID get_principal_privileges_id_; // JniFrontend.getPrincipalPrivileges
   jmethodID exec_hs2_metadata_op_id_; // JniFrontend.execHiveServer2MetadataOp

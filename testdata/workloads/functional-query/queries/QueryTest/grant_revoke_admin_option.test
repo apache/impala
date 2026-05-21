@@ -1,0 +1,204 @@
+====
+---- USER
+admin
+---- QUERY
+create role role_01
+---- RESULTS
+'Role has been created.'
+====
+---- USER
+admin
+---- QUERY
+create role role_02
+---- RESULTS
+'Role has been created.'
+====
+---- USER
+admin
+---- QUERY
+create role role_03
+---- RESULTS
+'Role has been created.'
+====
+---- USER
+admin
+---- QUERY
+grant role role_01 to $GRANTEE_TYPE $GRANTEE_NAME
+---- RESULTS
+'Role has been granted.'
+====
+---- USER
+admin
+---- QUERY
+grant role role_02 to $GRANTEE_TYPE $GRANTEE_NAME with admin option
+---- RESULTS
+'Role has been granted.'
+====
+---- USER
+admin
+---- QUERY
+show role grant $GRANTEE_TYPE $GRANTEE_NAME
+---- TYPES
+STRING, BOOLEAN
+---- RESULTS
+'role_01',false
+'role_02',true
+====
+---- QUERY
+# Since the $GRANTEE_TYPE '$GRANTEE_NAME' is not an admin of the role 'role_01',
+# the following query should fail.
+grant role role_01 to user non_owner
+---- RESULTS: VERIFY_IS_SUBSET
+---- CATCH
+User doesn't have permissions to grant role role_01
+====
+---- QUERY
+# Since the $GRANTEE_TYPE '$GRANTEE_NAME' is not an admin of the role 'role_01',
+# the following query should fail.
+grant role role_01 to group non_owner_2
+---- RESULTS: VERIFY_IS_SUBSET
+---- CATCH
+User doesn't have permissions to grant role role_01
+====
+---- QUERY
+# Since the $GRANTEE_TYPE '$GRANTEE_NAME' is an admin of the role 'role_02',
+# the following query should succeed.
+grant role role_02 to user non_owner
+---- RESULTS
+'Role has been granted.'
+====
+---- USER
+admin
+---- QUERY
+show role grant user non_owner
+---- TYPES
+STRING, BOOLEAN
+---- RESULTS
+'role_02',false
+====
+---- QUERY
+# Since the $GRANTEE_TYPE '$GRANTEE_NAME' is an admin of the role 'role_02',
+# the following query should succeed.
+revoke role role_02 from user non_owner
+---- RESULTS
+'Role has been revoked.'
+====
+---- USER
+admin
+---- QUERY
+show role grant user non_owner
+---- TYPES
+STRING, BOOLEAN
+---- RESULTS
+====
+---- QUERY
+# Since the $GRANTEE_TYPE '$GRANTEE_NAME' is an admin of the role 'role_02',
+# the following query should succeed.
+grant role role_02 to group non_owner_2
+---- RESULTS
+'Role has been granted.'
+====
+---- USER
+admin
+---- QUERY
+show role grant group non_owner_2
+---- TYPES
+STRING, BOOLEAN
+---- RESULTS
+'role_02',false
+====
+---- QUERY
+# Since the $GRANTEE_TYPE '$GRANTEE_NAME' is an admin of the role 'role_02',
+# the following query should succeed.
+revoke role role_02 from group non_owner_2
+---- RESULTS
+'Role has been revoked.'
+====
+---- USER
+admin
+---- QUERY
+show role grant group non_owner_2
+---- TYPES
+STRING, BOOLEAN
+---- RESULTS
+====
+---- USER
+admin
+---- QUERY
+revoke admin option for role_02 from $GRANTEE_TYPE $GRANTEE_NAME
+---- RESULTS
+'Admin option has been revoked.'
+====
+---- USER
+admin
+---- QUERY
+# Verify that the $GRANTEE_TYPE '$GRANTEE_NAME' is no longer an admin of the role
+# 'role_02'.
+show role grant $GRANTEE_TYPE $GRANTEE_NAME
+---- TYPES
+STRING, BOOLEAN
+---- RESULTS
+'role_01',false
+'role_02',false
+====
+---- USER
+admin
+---- QUERY
+grant role role_03 to $GRANTEE_TYPE $GRANTEE_NAME
+---- RESULTS
+'Role has been granted.'
+====
+---- USER
+admin
+---- QUERY
+# Verify that the $GRANTEE_TYPE '$GRANTEE_NAME' is granted the role 'role_03', but is not
+# an admin of 'role_03'.
+show role grant $GRANTEE_TYPE $GRANTEE_NAME
+---- TYPES
+STRING, BOOLEAN
+---- RESULTS
+'role_01',false
+'role_02',false
+'role_03',false
+====
+---- USER
+admin
+---- QUERY
+grant role role_03 to $GRANTEE_TYPE $GRANTEE_NAME with admin option
+---- RESULTS
+'Role has been granted.'
+====
+---- USER
+admin
+---- QUERY
+# Verify that the $GRANTEE_TYPE '$GRANTEE_NAME' is an admin of the role 'role_03'.
+show role grant $GRANTEE_TYPE $GRANTEE_NAME
+---- TYPES
+STRING, BOOLEAN
+---- RESULTS
+'role_01',false
+'role_02',false
+'role_03',true
+====
+---- USER
+admin
+---- QUERY
+drop role role_01
+---- RESULTS
+'Role has been dropped.'
+====
+---- USER
+admin
+---- QUERY
+drop role role_02
+---- RESULTS
+'Role has been dropped.'
+====
+====
+---- USER
+admin
+---- QUERY
+drop role role_03
+---- RESULTS
+'Role has been dropped.'
+====

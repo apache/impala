@@ -146,6 +146,13 @@ public class RangerCatalogdAuthorizationManager implements AuthorizationManager 
         "%s is not supported in Catalogd", ClassUtil.getMethodName()));
   }
 
+  @Override
+  public TResultSet getPrincipalRoles(TShowRolesParams params)
+      throws ImpalaException {
+    throw new UnsupportedOperationException(String.format(
+        "%s is not supported in Catalogd", ClassUtil.getMethodName()));
+  }
+
   private void auditGrantRevokeRole(TCatalogServiceRequestHeader header, String action,
       boolean isAllowed, User requestingUser) throws InternalException {
     // We produce the Ranger audit event here. This mimics what
@@ -183,7 +190,7 @@ public class RangerCatalogdAuthorizationManager implements AuthorizationManager 
     Preconditions.checkNotNull(requestingUser);
     GrantRevokeRoleRequest request = createGrantRevokeRoleRequest(
         requestingUser.getShortName(), new HashSet<>(params.getRole_names()),
-        params.getGroup_names(), params.getUser_names());
+        params.getGroup_names(), params.getUser_names(), params.isHas_admin_opt());
     boolean isGranteeGroup = params.getUser_names().isEmpty();
     String granteeType = isGranteeGroup ? "group" : "user";
     String granteeName = isGranteeGroup ? params.getGroup_names().get(0) :
@@ -262,7 +269,7 @@ public class RangerCatalogdAuthorizationManager implements AuthorizationManager 
     Preconditions.checkNotNull(requestingUser);
     GrantRevokeRoleRequest request = createGrantRevokeRoleRequest(
         requestingUser.getShortName(), new HashSet<>(params.getRole_names()),
-        params.getGroup_names(), params.getUser_names());
+        params.getGroup_names(), params.getUser_names(), params.isHas_admin_opt());
     boolean isRevokeeGroup = params.getUser_names().isEmpty();
     String revokeeType = isRevokeeGroup ? "group" : "user";
     String revokeeName = isRevokeeGroup ? params.getGroup_names().get(0) :
@@ -615,16 +622,17 @@ public class RangerCatalogdAuthorizationManager implements AuthorizationManager 
    */
   private static GrantRevokeRoleRequest createGrantRevokeRoleRequest(
       String grantor, Set<String> targetRoleNames, List<String> groupNames,
-      List<String> userNames) {
+      List<String> userNames, boolean hasAdminOpt) {
     GrantRevokeRoleRequest request = new GrantRevokeRoleRequest();
     request.setGrantor(grantor);
+    // Need to provide the Ranger plug-in with the groups 'grantor' belongs to,
+    // otherwise the plug-in won't take into account the user-to-groups mapping
+    // when authorizing the request.
+    request.setGrantorGroups(RangerUtil.getGroups(grantor));
     request.setTargetRoles(targetRoleNames);
     if (groupNames != null) { request.setGroups(new HashSet<>(groupNames)); }
     if (userNames != null) { request.setUsers(new HashSet<>(userNames)); }
-    // We do not set the field of 'grantOption' since WITH GRANT OPTION is not supported
-    // when granting/revoking roles. By default, 'grantOption' is set to Boolean.FALSE so
-    // that a user in a group assigned a role is not able to grant/revoke the role to/from
-    // other groups.
+    request.setGrantOption(hasAdminOpt);
 
     return request;
   }

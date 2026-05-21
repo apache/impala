@@ -2067,6 +2067,22 @@ class TestRanger(CustomClusterTestSuite):
       TestRanger._remove_policy(unique_name)
       admin_client.execute("revoke all on server from user {0}".format(user))
 
+  def _test_grant_revoke_role_admin_option(self, grantee_type, vector, admin_client):
+    try:
+      self.run_test_case('QueryTest/grant_revoke_admin_option', vector,
+          use_db="default",
+          test_file_vars={
+            "$GRANTEE_TYPE": grantee_type,
+            "$GRANTEE_NAME": getuser()
+          })
+    finally:
+      existing_roles = admin_client.execute("show roles").data
+      roles_to_clean_up = ['role_01', 'role_02']
+      for role in roles_to_clean_up:
+        if role in existing_roles:
+          admin_client.execute("drop role {0}".format(role))
+          LOG.info("Dropped role {0}".format(role))
+
 
 class TestRangerIndependent(TestRanger):
   """
@@ -2375,6 +2391,26 @@ class TestRangerIndependent(TestRanger):
       TestRanger._test_grant_revoke_with_role(self, 'GROUP', vector, admin_client)
       TestRanger._test_grant_revoke_with_role(self, 'USER', vector, admin_client)
 
+  @pytest.mark.execute_serially
+  @SkipIfFS.incorrent_reported_ec
+  @CustomClusterTestSuite.with_args(
+      # We additionally provide impalad and catalogd with the customized user-to-groups
+      # mapper since some test cases in grant_revoke.test require Impala to retrieve the
+      # groups a given user belongs to and such users might not exist in the underlying
+      # OS in the testing environment, e.g., the user 'non_owner'.
+      impalad_args="{0} {1}".format(IMPALAD_ARGS,
+                                    "--use_customized_user_groups_mapper_for_ranger"),
+      catalogd_args="{0} {1}".format(CATALOGD_ARGS,
+                                     "--use_customized_user_groups_mapper_for_ranger"))
+  def test_grant_revoke_role_admin_option(self, vector):
+      """Test GRANT ROLE <role_name> WITH ADMIN OPTION and
+      REVOKE ADMIN OPTION FOR <role_name>."""
+      with self.create_impala_client(user=ADMIN) as admin_client:
+        TestRanger._test_grant_revoke_role_admin_option(self, 'USER', vector,
+            admin_client)
+        TestRanger._test_grant_revoke_role_admin_option(self, 'GROUP', vector,
+            admin_client)
+
   @CustomClusterTestSuite.with_args(
     impalad_args="{0} {1}".format(IMPALAD_ARGS,
                                   "--use_customized_user_groups_mapper_for_ranger"),
@@ -2387,50 +2423,115 @@ class TestRangerIndependent(TestRanger):
     impalad_args=IMPALAD_ARGS, catalogd_args=CATALOGD_ARGS)
   def test_show_roles(self):
     """Test SHOW ROLE GRANT GROUP/USER and SHOW CURRENT ROLES."""
-    user = getuser()
-    group = getuser()
+    user_1 = getuser()
+    user_2 = "non_owner"
+    group_1 = getuser()
+    group_2 = "non_owner"
+
     with self.create_impala_client(user=ADMIN) as admin_client, \
-        self.create_impala_client(user=user) as user_client:
+        self.create_impala_client(user=user_1) as user_1_client:
       try:
         admin_client.execute("create role r_1")
         admin_client.execute("create role r_2")
-        admin_client.execute("grant role r_1 to group {}".format(group))
-        admin_client.execute("grant role r_2 to user {}".format(user))
+        admin_client.execute("grant role r_1 to group {}".format(group_1))
+        admin_client.execute("grant role r_2 to user {}".format(user_1))
 
         # Verify that the group with the name 'getuser()' is associated with the role
         # 'r_1'.
-        result_1 = admin_client.execute("show role grant group {}".format(group))
-        TestRanger._check_rows(result_1, [['r_1']])
+        result = admin_client.execute("show role grant group {}".format(group_1))
+        TestRanger._check_rows(result, [['r_1', 'false']])
+
+        # Verify that the group with the name 'getuser()' becomes an administrator of
+        # role 'r_2'.
+        admin_client.execute("grant role r_1 to group {} with admin option"
+            .format(group_1))
+        result = admin_client.execute("show role grant group {}".format(group_1))
+        TestRanger._check_rows(result, [['r_1', 'true']])
+
+        # Verify that the column 'grant_option' of the group with the name 'getuser()'
+        # becomes false. This shows how to revoke the ADMIN OPTION other than executing
+        # REVOKE ADMIN OPTION FOR as shown below.
+        admin_client.execute("grant role r_1 to group {}".format(group_1))
+        result = admin_client.execute("show role grant group {}".format(group_1))
+        TestRanger._check_rows(result, [['r_1', 'false']])
+
+        admin_client.execute("grant role r_1 to group {} with admin option"
+            .format(group_1))
+        # Verify that the column 'grant_option' of the group with the name 'getuser()'
+        # becomes false.
+        admin_client.execute("revoke admin option for r_1 from group {}".format(group_1))
+        result = admin_client.execute("show role grant group {}".format(group_1))
+        TestRanger._check_rows(result, [['r_1', 'false']])
 
         # Verify that the user 'getuser()' is associated with the role 'r_2'.
-        result_2 = admin_client.execute("show role grant user {}".format(user))
-        TestRanger._check_rows(result_2, [['r_2']])
+        result = admin_client.execute("show role grant user {}".format(user_1))
+        TestRanger._check_rows(result, [['r_2', 'false']])
+
+        # Verify that the user 'getuser()' becomes an administrator of role 'r_2'.
+        admin_client.execute("grant role r_2 to user {} with admin option".format(user_1))
+        result = admin_client.execute("show role grant user {}".format(user_1))
+        TestRanger._check_rows(result, [['r_2', 'true']])
+
+        # Verify that the column 'grant_option' of the user 'getuser()' becomes false.
+        # This shows how to revoke the ADMIN OPTION other than executing REVOKE ADMIN
+        # OPTION FOR as shown below.
+        admin_client.execute("grant role r_2 to user {}".format(user_1))
+        result = admin_client.execute("show role grant user {}".format(user_1))
+        TestRanger._check_rows(result, [['r_2', 'false']])
+
+        admin_client.execute("grant role r_2 to user {} with admin option".format(user_1))
+        # Verify that the column 'grant_option' of the user 'getuser()' becomes false.
+        admin_client.execute("revoke admin option for r_2 from user {}".format(user_1))
+        result = admin_client.execute("show role grant user {}".format(user_1))
+        TestRanger._check_rows(result, [['r_2', 'false']])
 
         # Verify as the user 'getuser()' that its current roles are 'r_1' and 'r_2'.
-        result_3 = user_client.execute("show current roles")
-        TestRanger._check_rows(result_3, [['r_1'], ['r_2']])
+        result = user_1_client.execute("show current roles")
+        TestRanger._check_rows(result, [['r_1'], ['r_2']])
+
+        # As the user 'getuser()', verify we could execute SHOW ROLE GRANT USER for
+        # itself.
+        result = user_1_client.execute("show role grant user {}".format(user_1))
+        TestRanger._check_rows(result, [['r_2', 'false']])
+        # As the user 'getuser()', verify we could execute SHOW ROLE GRANT GROUP for the
+        # group it belongs to.
+        result = user_1_client.execute("show role grant group {}".format(group_1))
+        TestRanger._check_rows(result, [['r_1', 'false']])
+
+        # As the user 'getuser()', verify we could not execute SHOW ROLE GRANT USER for
+        # another user.
+        result = self.execute_query_expect_failure(user_1_client,
+            "show role grant user {}".format(user_2))
+        assert "User {} does not have permission for this operation".format(user_1) in \
+            str(result)
+        # As the user 'getuser()', verify we could not execute SHOW ROLE GRANT GROUP for
+        # another group that 'getuser()' does not belong to.
+        result = self.execute_query_expect_failure(user_1_client,
+            "show role grant group {}".format(group_2))
+        assert "User {} does not have permission for this operation".format(user_1) in \
+               str(result)
 
         # Try to revoke role 'r_1' from the user 'getuser()'.
-        admin_client.execute("revoke role r_1 from user {}".format(user))
+        admin_client.execute("revoke role r_1 from user {}".format(user_1))
         # Verify as the user 'getuser()' that its current roles are still 'r_1' and
         # 'r_2', i.e., the role 'r_1' is still associated with the user 'getuser()'
         # because the user 'getuser()' belongs to the group 'getuser()', and 'r_1' is
         # still associated with the group 'getuser()'.
-        result_4 = user_client.execute("show current roles")
-        TestRanger._check_rows(result_4, [['r_1'], ['r_2']])
+        result = user_1_client.execute("show current roles")
+        TestRanger._check_rows(result, [['r_1'], ['r_2']])
 
-        # Revoke the role 'r_2' from the group 'getuser()'.
-        admin_client.execute("revoke role r_1 from group {}".format(user))
+        # Revoke the role 'r_1' from the group 'getuser()'.
+        admin_client.execute("revoke role r_1 from group {}".format(user_1))
         # Verify as the user 'getuser()' its current roles do not include 'r_1'.
-        result_5 = user_client.execute("show current roles")
-        TestRanger._check_rows(result_5, [['r_2']])
+        result = user_1_client.execute("show current roles")
+        TestRanger._check_rows(result, [['r_2']])
       finally:
-        admin_client.execute("revoke role r_1 from group {}".format(group))
-        admin_client.execute("revoke role r_2 from user {}".format(user))
-        result_6 = admin_client.execute("show role grant user {}".format(user))
-        TestRanger._check_rows(result_6, [])
-        result_7 = admin_client.execute("show role grant group {}".format(group))
-        TestRanger._check_rows(result_7, [])
+        admin_client.execute("revoke role r_1 from group {}".format(group_1))
+        admin_client.execute("revoke role r_2 from user {}".format(user_1))
+        result = admin_client.execute("show role grant user {}".format(user_1))
+        TestRanger._check_rows(result, [])
+        result = admin_client.execute("show role grant group {}".format(group_1))
+        TestRanger._check_rows(result, [])
         admin_client.execute("drop role r_1")
         admin_client.execute("drop role r_2")
 

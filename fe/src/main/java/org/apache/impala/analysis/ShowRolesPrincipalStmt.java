@@ -20,31 +20,46 @@ package org.apache.impala.analysis;
 import org.apache.impala.authorization.User;
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.common.InternalException;
+import org.apache.impala.thrift.TPrincipalType;
 import org.apache.impala.thrift.TShowRolesParams;
+import com.google.common.base.Preconditions;
 
 /**
- * Represents "SHOW [CURRENT] ROLES" statements.
+ * Represents "SHOW ROLE GRANT GROUP <groupName>" and
+ * "SHOW ROLE GRANT USER <userName>" statements.
  */
-public class ShowRolesStmt extends AuthorizationStmt {
-  private final boolean isShowCurrentRoles_;
+public class ShowRolesPrincipalStmt extends AuthorizationStmt {
+  private final TPrincipalType principalType_;
+  private final String name_;
 
   // Set during analysis.
   private User requestingUser_;
 
-  public ShowRolesStmt(boolean isShowCurrentRoles) {
-    isShowCurrentRoles_ = isShowCurrentRoles;
+  public ShowRolesPrincipalStmt(TPrincipalType principalType, String name) {
+    Preconditions.checkNotNull(principalType);
+    Preconditions.checkArgument(principalType == TPrincipalType.USER ||
+        principalType == TPrincipalType.GROUP);
+    // The name should be an identifier and Impala does not allow empty identifiers.
+    Preconditions.checkState(name != null && !name.isEmpty());
+    principalType_ = principalType;
+    name_ = name;
   }
 
   @Override
   public String toSql(ToSqlOptions options) {
-    return isShowCurrentRoles_ ? "SHOW CURRENT ROLES" : "SHOW ROLES";
+    return "SHOW ROLE GRANT " + principalType_.name() + " " + name_;
   }
 
   public TShowRolesParams toThrift() throws InternalException {
     TShowRolesParams params = new TShowRolesParams();
     params.setRequesting_user(requestingUser_.getShortName());
-    params.setIs_show_current_roles(isShowCurrentRoles_);
-    // Users should always be able to execute SHOW CURRENT ROLES.
+    params.setIs_show_current_roles(false);
+
+    if (principalType_ == TPrincipalType.GROUP) {
+      params.setGrant_group(name_);
+    } else {
+      params.setGrant_user(name_);
+    }
     return params;
   }
 

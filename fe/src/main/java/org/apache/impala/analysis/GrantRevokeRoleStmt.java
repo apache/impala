@@ -31,10 +31,11 @@ public class GrantRevokeRoleStmt extends AuthorizationStmt {
   private final String groupName_;
   private final String userName_;
   private final boolean isGrantStmt_;
+  private final boolean hasAdminOpt_;
   private final boolean principalIsGroup_;
 
   public GrantRevokeRoleStmt(String roleName, String groupName,
-      String userName, boolean isGrantStmt) {
+      String userName, boolean isGrantStmt, boolean hasAdminOpt) {
     Preconditions.checkNotNull(roleName);
     Preconditions.checkArgument((groupName != null && userName == null) ||
         (groupName == null && userName != null));
@@ -42,17 +43,27 @@ public class GrantRevokeRoleStmt extends AuthorizationStmt {
     groupName_ = groupName;
     userName_ = userName;
     isGrantStmt_ = isGrantStmt;
+    hasAdminOpt_ = hasAdminOpt;
     // If 'userName_' is null, then the grantee/revokee is a group.
     principalIsGroup_ = (userName_ == null);
   }
 
   @Override
   public String toSql(ToSqlOptions options) {
-    return String.format("%s ROLE %s %s %s %s",
-        isGrantStmt_ ? "GRANT" : "REVOKE", roleName_,
-        isGrantStmt_ ? "TO" : "FROM",
-        principalIsGroup_ ? "GROUP" : "USER",
-        principalIsGroup_ ? groupName_ : userName_);
+    StringBuilder sb = new StringBuilder(isGrantStmt_ ? "GRANT " : "REVOKE ");
+    if (!isGrantStmt_ && hasAdminOpt_) {
+      sb.append("ADMIN OPTION FOR");
+    } else {
+      sb.append("ROLE");
+    }
+    sb.append(" ");
+    sb.append(roleName_);
+    sb.append(isGrantStmt_ ? " TO " : " FROM ");
+    sb.append(principalIsGroup_ ? "GROUP" : "USER");
+    sb.append(" ");
+    sb.append(principalIsGroup_ ? groupName_ : userName_);
+    if (isGrantStmt_ && hasAdminOpt_) sb.append(" WITH ADMIN OPTION");
+    return sb.toString();
   }
 
   public TGrantRevokeRoleParams toThrift() {
@@ -66,6 +77,7 @@ public class GrantRevokeRoleStmt extends AuthorizationStmt {
       params.setUser_names(Lists.newArrayList(userName_));
     }
     params.setIs_grant(isGrantStmt_);
+    params.setHas_admin_opt(hasAdminOpt_);
     return params;
   }
 

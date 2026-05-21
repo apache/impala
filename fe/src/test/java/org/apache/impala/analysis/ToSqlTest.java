@@ -1895,11 +1895,22 @@ public class ToSqlTest extends FrontendTestBase {
     AnalysisContext ctx = createAnalysisCtx(createAuthorizationFactory());
     String testRole = "test_role";
     String testGroup = "test_group";
+    String testUser = "test_user";
 
     try {
       catalog_.addRole(testRole);
       testToSql(ctx, String.format("GRANT ROLE %s TO GROUP %s", testRole, testGroup));
+      testToSql(ctx, String.format("GRANT ROLE %s TO GROUP %s WITH ADMIN OPTION",
+          testRole, testGroup));
+      testToSql(ctx, String.format("GRANT ROLE %s TO USER %s", testRole, testUser));
+      testToSql(ctx, String.format("GRANT ROLE %s TO USER %s WITH ADMIN OPTION",
+          testRole, testUser));
       testToSql(ctx, String.format("REVOKE ROLE %s FROM GROUP %s", testRole, testGroup));
+      testToSql(ctx, String.format("REVOKE ADMIN OPTION FOR %s FROM GROUP %s",
+          testRole, testGroup));
+      testToSql(ctx, String.format("REVOKE ROLE %s FROM USER %s", testRole, testGroup));
+      testToSql(ctx, String.format("REVOKE ADMIN OPTION FOR %s FROM USER %s",
+          testRole, testUser));
     } finally {
       catalog_.removeRole(testRole);
     }
