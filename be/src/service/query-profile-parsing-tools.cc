@@ -16,12 +16,11 @@
 // under the License.
 
 #include "service/query-profile-parsing-tools.h"
-#include "service/query-profile-size-limit-util.h"
 
 #include <algorithm>
 #include <array>
-#include <charconv>
 #include <cctype>
+#include <charconv>
 #include <cstdint>
 #include <cstdlib>
 #include <cstring>
@@ -37,12 +36,14 @@
 
 #include <rapidjson/document.h>
 #include <rapidjson/error/en.h>
+#include <re2/re2.h>
 
 #include "common/logging.h"
 #include "common/status.h"
 #include "gen-cpp/Types_types.h"
 #include "gutil/strings/strip.h"
 #include "gutil/strings/substitute.h"
+#include "service/query-profile-size-limit-util.h"
 #include "util/debug-util.h"
 #include "util/json-util.h"
 #include "util/pretty-printer.h"
@@ -88,8 +89,8 @@ static const regex RES_RE(
 // Captures estimate text after "Per-Host Resource Estimates:".
 static const regex EST_RE(R"(Per-Host Resource Estimates:\s*(.+))", regex::optimize);
 // Captures the analyzed SQL between "Analyzed query:" and the first fragment section.
-static const regex ANALYZED_RE(
-    R"(Analyzed query:\s*([\s\S]*?)\n\nF\d+:PLAN FRAGMENT)", regex::optimize);
+static const re2::RE2 ANALYZED_RE(
+    R"(Analyzed query:\s*([\s\S]*?)\n\nF\d+:PLAN FRAGMENT)");
 // Matches scan node keys like "1:SCAN ..." or "...SCAN_NODE" (case-insensitive).
 static const regex SCAN_NODE_RE(
     R"((?:^\d+:\s*SCAN\b)|(?:\b[A-Z_]*SCAN_NODE\b))",
@@ -822,11 +823,11 @@ string QueryProfileToolAccessor::GetAnalyzedQuery() const {
   const Value* summary = GetSummaryPtr();
   if (summary != nullptr && summary->HasMember("Plan") && (*summary)["Plan"].IsString()) {
     const Value& plan_value = (*summary)["Plan"];
-    const string_view plan(plan_value.GetString(), plan_value.GetStringLength());
-    match_results<string_view::const_iterator> match;
-    if (regex_search(plan.begin(), plan.end(), match, ANALYZED_RE) && match.size() > 1) {
+    re2::StringPiece plan(plan_value.GetString(), plan_value.GetStringLength());
+    re2::StringPiece match;
+    if (re2::RE2::PartialMatch(plan, ANALYZED_RE, &match)) {
       const string_view analyzed =
-          TrimWhiteSpace(string_view(match[1].first, match[1].length()));
+          TrimWhiteSpace(string_view(match.data(), match.length()));
       return string(analyzed);
     }
   }

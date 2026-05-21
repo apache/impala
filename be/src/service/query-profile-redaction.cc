@@ -18,8 +18,6 @@
 #include "service/query-profile-redaction.h"
 #include "service/query-profile-size-limit-util.h"
 
-#include <arpa/inet.h>
-
 #include <algorithm>
 #include <cctype>
 #include <cstdint>
@@ -32,10 +30,12 @@
 #include <unordered_set>
 #include <vector>
 
+#include <arpa/inet.h>
 #include <boost/algorithm/string.hpp>
 #include <rapidjson/document.h>
 #include <rapidjson/stringbuffer.h>
 #include <rapidjson/writer.h>
+#include <re2/re2.h>
 
 #include "common/logging.h"
 
@@ -55,8 +55,8 @@ static constexpr int64_t DEFAULT_REDACTION_PROFILE_SIZE_LIMIT_PERCENTAGE = 1;
 static const regex HOST_WITH_PORT_RE(
     R"(\b([A-Za-z][A-Za-z0-9-]*(?:\.[A-Za-z0-9-]+)*)\:(\d{2,5})\b)", regex::optimize);
 // Matches the analyzed query subsection embedded in the textual plan.
-static const regex ANALYZED_RE(
-    R"(Analyzed query:\s*([\s\S]*?)\n\nF\d+:PLAN FRAGMENT)", regex::optimize);
+static const re2::RE2 ANALYZED_RE(
+    R"(Analyzed query:\s*([\s\S]*?)\n\nF\d+:PLAN FRAGMENT)");
 // Matches fully-qualified identifiers with at least one dot (e.g. db.tbl.col).
 static const regex QUALIFIED_ID_RE(
     R"(\b([A-Za-z_][A-Za-z0-9_]*(?:\.[A-Za-z_][A-Za-z0-9_]*)+)\b)", regex::optimize);
@@ -281,13 +281,12 @@ static Status ApplyAliasMap(const unordered_map<string, string>& alias_map,
 
 // Extracts the analyzed query section from a plan text block.
 static string ExtractAnalyzedQueryFromPlanText(const string_view& plan_text) {
-  match_results<const char*> m;
-  const char* begin = plan_text.data();
-  const char* end = begin + plan_text.size();
-  if (!regex_search(begin, end, m, ANALYZED_RE) || m.size() <= 1) {
+  re2::StringPiece input(plan_text.data(), plan_text.size());
+  string extracted_query;
+  if (!re2::RE2::PartialMatch(input, ANALYZED_RE, &extracted_query)) {
     return string();
   }
-  return boost::algorithm::trim_copy(string(m[1].first, m[1].second));
+  return boost::algorithm::trim_copy(extracted_query);
 }
 
 // Parses an info_strings entry and returns validated key/value pointers.
