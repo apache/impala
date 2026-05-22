@@ -354,7 +354,7 @@ class ExecNode {
   MemPool* expr_results_pool() { return expr_results_pool_.get(); }
   const TBackendResourceProfile& resource_profile() { return resource_profile_; }
   bool is_closed() const { return is_closed_; }
-  bool last_batch_returned() const { return last_batch_returned_; }
+  bool last_batch_returned() const { return last_batch_returned_.Load(); }
 
   /// Returns true if this node is inside the right-hand side plan tree of a SubplanNode.
   bool IsInSubplan() const { return plan_node_.IsInSubplan(); }
@@ -419,7 +419,7 @@ class ExecNode {
   bool first_getnext_added_ = false;
 
   /// Used to track whether the "Last Batch Returned" event was added to 'events_'.
-  bool last_batch_returned_ = false;
+  AtomicBool last_batch_returned_;
 
   /// Conjuncts and their evaluators in this node. 'conjuncts_' live in the
   /// query-state's object pool while the evaluators live in this exec node's

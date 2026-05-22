@@ -67,7 +67,7 @@ class ScopedGetNextEventAdder {
     // e.g. if an ancestor node hits a limit.
     if (*eos_) {
       node_->events_->MarkEvent("Last Batch Returned");
-      node_->last_batch_returned_ = true;
+      node_->last_batch_returned_.Store(true);
     }
   }
 

@@ -57,7 +57,7 @@ namespace internal {
 /// is performed atomically and has a specified memory-ordering semantic:
 ///
 /// Acquire: these operations ensure no later memory access by the same thread can be
-/// reordered ahead of the operation. (C++11: memory_order_relaxed)
+/// reordered ahead of the operation. (C++11: memory_order_acquire)
 ///
 /// Release: these operations ensure that no previous memory access by the same thread
 /// can be reordered after the operation (C++11: memory_order_release).
