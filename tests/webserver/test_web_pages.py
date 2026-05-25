@@ -1494,7 +1494,7 @@ class TestWebPage(ImpalaTestSuite):
         assert json_part["state"] == "RUNNING"
         assert json_part["waiting"] is False
         assert json_part["executing"] is True
-        assert json_part["query_progress"] == "0 / 4 ( 0%)"
+        assert json_part["query_progress"] == "0 / 4 (   0%)"
     assert found, "Query {} not found in response_json\n{}".format(
         query_id, json.dumps(response_json, sort_keys=True, indent=4))
 

@@ -22,9 +22,29 @@ import datetime
 import zlib
 
 from thrift.protocol import TCompactProtocol
-from thrift.TSerialization import deserialize
+from thrift.TSerialization import deserialize, serialize
 
 from impala_thrift_gen.RuntimeProfile.ttypes import TRuntimeProfileTree
+
+
+def decode_profile_archive(base64_encoded):
+  possibly_compressed = base64.b64decode(base64_encoded)
+  # Handle both compressed and uncompressed Thrift profiles.
+  try:
+    thrift = zlib.decompress(possibly_compressed)
+  except zlib.error:
+    thrift = possibly_compressed
+
+  tree = TRuntimeProfileTree()
+  deserialize(tree, thrift, protocol_factory=TCompactProtocol.TCompactProtocolFactory())
+  tree.validate()
+  return tree
+
+
+def encode_profile_archive(tree):
+  tree.validate()
+  thrift = serialize(tree, protocol_factory=TCompactProtocol.TCompactProtocolFactory())
+  return base64.b64encode(zlib.compress(thrift)).decode('ascii')
 
 
 def decode_profile_line(line):
@@ -37,15 +57,4 @@ def decode_profile_line(line):
     base64_encoded = space_separated[0]
   else:
     raise Exception("Unexpected line: " + line)
-  possibly_compressed = base64.b64decode(base64_encoded)
-  # Handle both compressed and uncompressed Thrift profiles
-  try:
-    thrift = zlib.decompress(possibly_compressed)
-  except zlib.error:
-    thrift = possibly_compressed
-
-  tree = TRuntimeProfileTree()
-  deserialize(tree, thrift, protocol_factory=TCompactProtocol.TCompactProtocolFactory())
-  tree.validate()
-
-  return tree
+  return decode_profile_archive(base64_encoded)

@@ -18,6 +18,7 @@
 #include "testutil/gtest-util.h"
 
 #include "gen-cpp/ExecStats_types.h"
+#include "util/progress-util.h"
 #include "util/summary-util.h"
 
 namespace impala {
@@ -108,6 +109,13 @@ TEST(PrintTableTest, HappyPath) {
 
   string actual = PrintExecSummary(input);
   EXPECT_EQ(expected_str, actual);
+}
+
+TEST(ProgressToStringTest, BasicProgress) {
+  EXPECT_EQ("0 / 10 (   0%)", ProgressToString(0, 10));
+  // Keep the percentage width-aligned with the Web UI progress formatter.
+  EXPECT_EQ("5 / 10 (  50%)", ProgressToString(5, 10));
+  EXPECT_EQ("10 / 0 (   0%)", ProgressToString(10, 0));
 }
 
 } // namespace impala

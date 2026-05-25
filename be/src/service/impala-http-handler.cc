@@ -48,6 +48,7 @@
 #include "util/debug-util.h"
 #include "util/logging-support.h"
 #include "util/pretty-printer.h"
+#include "util/progress-util.h"
 #include "util/redactor.h"
 #include "util/summary-util.h"
 #include "util/time.h"
@@ -570,17 +571,6 @@ void ImpalaHttpHandler::AddQueryRecordTips(Document* document) {
   document->AddMember("tips_executor_slots",
       "The number of admission control slots used on the executors.",
       document->GetAllocator());
-}
-
-std::string ImpalaHttpHandler::ProgressToString(int64_t num_completed, int64_t total) {
-  stringstream ss;
-  ss << num_completed << " / " << total << " (" << setw(4);
-  if (num_completed == 0 || total == 0) {
-    ss << "0%)";
-  } else {
-    ss << (100.0 * num_completed / (1.f * total)) << "%)";
-  }
-  return ss.str();
 }
 
 void ImpalaHttpHandler::QueryStateToJson(const QueryStateRecord& record,
