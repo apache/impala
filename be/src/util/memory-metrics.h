@@ -89,48 +89,57 @@ class AggregateMemoryMetrics {
 };
 
 /// Specialised metric which exposes numeric properties from tcmalloc.
+/// These metrics line up with the text description used for /memz:
+/// MALLOC:     3388499040 ( 3231.5 MiB) Bytes in use by application (#1)
+/// MALLOC: +            0 (    0.0 MiB) Bytes in page heap freelist (#2)
+/// MALLOC: +     98309992 (   93.8 MiB) Bytes in central cache freelist (#3)
+/// MALLOC: +      4746496 (    4.5 MiB) Bytes in transfer cache freelist (#4)
+/// MALLOC: +    177297208 (  169.1 MiB) Bytes in thread cache freelists (#5)
+/// MALLOC: +     14942208 (   14.2 MiB) Bytes in malloc metadata
+/// MALLOC:   ------------
+/// MALLOC: =   3683794944 ( 3513.1 MiB) Actual memory used (physical + swap) (#6)
+/// MALLOC: +    149757952 (  142.8 MiB) Bytes released to OS (aka unmapped) (#7)
+/// MALLOC:   ------------
+/// MALLOC: =   3833552896 ( 3656.0 MiB) Virtual address space used (#8)
 class TcmallocMetric : public IntGauge {
  public:
-  /// Number of bytes allocated by tcmalloc, currently used by the application.
+  /// #1: Number of bytes allocated by tcmalloc, currently used by the application.
   static TcmallocMetric* BYTES_IN_USE;
 
-  /// Number of bytes of system memory reserved by tcmalloc, including that in use by the
-  /// application. Does not include what tcmalloc accounts for as 'malloc metadata' in
-  /// /memz. That is, this is memory reserved by tcmalloc that the application can use.
-  /// Includes unmapped virtual memory.
-  static TcmallocMetric* TOTAL_BYTES_RESERVED;
-
-  /// Number of bytes reserved and still mapped by tcmalloc that are not allocated to the
-  /// application.
+  /// #2: Number of bytes reserved and still mapped by tcmalloc that are not allocated
+  /// to the application.
   static TcmallocMetric* PAGEHEAP_FREE_BYTES;
 
-  /// Number of bytes once reserved by tcmalloc, but released back to the operating system
-  /// so that their use incurs a pagefault. Contributes to the total amount of virtual
-  /// address space used, but not to the physical memory usage.
-  static TcmallocMetric* PAGEHEAP_UNMAPPED_BYTES;
-
-  /// Number of bytes used across all thread caches.
-  static TcmallocMetric* CURRENT_TOTAL_THREAD_CACHE_BYTES;
-
-  /// Number of free bytes in the central cache assigned to size classes.
+  /// #3: Number of free bytes in the central cache assigned to size classes.
   static TcmallocMetric* CENTRAL_CACHE_FREE_BYTES;
 
-  /// Number of free bytes waiting to be transferred between central and thread caches.
+  /// #4: Number of free bytes waiting to be transferred between central and thread
+  /// caches.
   static TcmallocMetric* TRANSFER_CACHE_FREE_BYTES;
 
-  /// Derived metric computing the amount of physical memory (in bytes) used by the
-  /// process, including that actually in use and free bytes reserved by tcmalloc. Does not
-  /// include the tcmalloc metadata.
-  class PhysicalBytesMetric : public IntGauge {
-   public:
-    PhysicalBytesMetric(const TMetricDef& def) : IntGauge(def, 0) { }
+  /// #5: Number of bytes used across all thread caches.
+  static TcmallocMetric* CURRENT_TOTAL_THREAD_CACHE_BYTES;
+
+  /// #6: Number of physical bytes in use (including any tcmalloc caches and metadata)
+  static TcmallocMetric* PHYSICAL_BYTES_RESERVED;
+
+  /// #7: Number of bytes once reserved by tcmalloc, but released back to the operating
+  /// system so that their use incurs a pagefault. Contributes to the total amount of
+  /// virtual address space used, but not to the physical memory usage.
+  static TcmallocMetric* PAGEHEAP_UNMAPPED_BYTES;
+
+  /// #8: Derived metric computing the amount of virtual memory (in bytes) used by the
+  /// process, including all different types of tcmalloc memory including unmapped
+  /// virtual memory.
+  class TotalBytesReservedMetric : public IntGauge {
+  public:
+    TotalBytesReservedMetric(const TMetricDef& def) : IntGauge(def, 0) { }
 
     virtual int64_t GetValue() override {
-      return TOTAL_BYTES_RESERVED->GetValue() - PAGEHEAP_UNMAPPED_BYTES->GetValue();
+      return PHYSICAL_BYTES_RESERVED->GetValue() + PAGEHEAP_UNMAPPED_BYTES->GetValue();
     }
   };
-
-  static PhysicalBytesMetric* PHYSICAL_BYTES_RESERVED;
+  static TotalBytesReservedMetric* TOTAL_BYTES_RESERVED;
 
   static TcmallocMetric* CreateAndRegister(MetricGroup* metrics, const std::string& key,
       const std::string& tcmalloc_var);

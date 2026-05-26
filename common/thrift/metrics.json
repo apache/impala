@@ -2585,7 +2585,7 @@
     "key": "tcmalloc.pageheap-unmapped-bytes"
   },
   {
-    "description": "Derived metric computing the amount of physical memory (in bytes) used by the process, including that actually in use and free bytes reserved by tcmalloc. Does not include the tcmalloc metadata.",
+    "description": "Number of bytes of physical memory in use by the process, including tcmalloc caches and metadata.",
     "contexts": [
       "STATESTORE",
       "CATALOGSERVER",
@@ -2597,7 +2597,7 @@
     "key": "tcmalloc.physical-bytes-reserved"
   },
   {
-    "description": "Bytes of system memory reserved by TCMalloc.",
+    "description": "Derived metric computing the amount of system memory reserved by TCMalloc. This includes all tcmalloc caches, metadata, and unmapped virtual memory.",
     "contexts": [
       "STATESTORE",
       "CATALOGSERVER",
