@@ -52,6 +52,6 @@ spec:
             - name: DEFAULT_IMPALA_VALUES_FILE
               value: /charts/impala/values-example.yaml
             - name: DEFAULT_LDAP_VALUES_FILE
-              value: /charts/impala/values-impala-ldap-example.yaml
+              value: /charts/impala/values-ldap-example.yaml
             - name: DEFAULT_HELM_TIMEOUT_SECONDS
               value: "900"
