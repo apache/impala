@@ -1,0 +1,94 @@
+# Licensed to the Apache Software Foundation (ASF) under one
+# or more contributor license agreements.  See the NOTICE file
+# distributed with this work for additional information
+# regarding copyright ownership.  The ASF licenses this file
+# to you under the Apache License, Version 2.0 (the
+# "License"); you may not use this file except in compliance
+# with the License.  You may obtain a copy of the License at
+#
+#   http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing,
+# software distributed under the License is distributed on an
+# "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+# KIND, either express or implied.  See the License for the
+# specific language governing permissions and limitations
+# under the License.
+
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: impalaclusters.impala.apache.org
+spec:
+  group: impala.apache.org
+  scope: Namespaced
+  names:
+    kind: ImpalaCluster
+    singular: impalacluster
+    plural: impalaclusters
+    shortNames:
+      - icluster
+  versions:
+    - name: v1alpha1
+      served: true
+      storage: true
+      subresources:
+        status: {}
+      schema:
+        openAPIV3Schema:
+          type: object
+          properties:
+            spec:
+              type: object
+              properties:
+                impalaReleaseName:
+                  type: string
+                  default: impala
+                ldapReleaseName:
+                  type: string
+                  default: impala-ldap
+                ldapEnabled:
+                  type: boolean
+                ldapUri:
+                  type: string
+                ldapBindPattern:
+                  type: string
+                kuduEnabled:
+                  type: boolean
+                rangerEnabled:
+                  type: boolean
+                rangerAuthEnabled:
+                  type: boolean
+                storageClassName:
+                  type: string
+                impalaChartPath:
+                  type: string
+                  description: Path in operator container for Impala chart.
+                impalaValuesFile:
+                  type: string
+                  description: Path in operator container for Impala values file.
+                ldapValuesFile:
+                  type: string
+                  description: Path in operator container for LDAP values file.
+                helmTimeoutSeconds:
+                  type: integer
+                  minimum: 60
+                  default: 900
+                set:
+                  type: object
+                  additionalProperties:
+                    type: string
+                  description: Extra Helm --set values merged into release.
+            status:
+              type: object
+              properties:
+                phase:
+                  type: string
+                message:
+                  type: string
+                observedGeneration:
+                  type: integer
+                lastReconcileTime:
+                  type: string
+                targetNamespace:
+                  type: string
