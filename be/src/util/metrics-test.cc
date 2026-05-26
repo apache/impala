@@ -287,10 +287,6 @@ TEST_F(MetricsTest, MemMetric) {
   IntGauge* transfer_cache_free_bytes =
       metrics.FindMetricForTesting<IntGauge>("tcmalloc.transfer-cache-free-bytes");
   ASSERT_TRUE(transfer_cache_free_bytes != NULL);
-
-  IntGauge* thread_cache_free_bytes =
-      metrics.FindMetricForTesting<IntGauge>("tcmalloc.thread-cache-free-bytes");
-  ASSERT_TRUE(thread_cache_free_bytes != NULL);
 #endif
 }
 

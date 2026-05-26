@@ -2609,7 +2609,7 @@
     "key": "tcmalloc.total-bytes-reserved"
   },
   {
-    "description": "Number of bytes used across all thread caches.",
+    "description": "Number of bytes used across all thread caches. They always count towards virtual memory usage, and unless the underlying memory is swapped out by the OS, they also count towards physical memory usage.",
     "contexts": [
       "STATESTORE",
       "CATALOGSERVER",
@@ -2643,18 +2643,6 @@
     "units": "BYTES",
     "kind": "GAUGE",
     "key": "tcmalloc.transfer-cache-free-bytes"
-  },
-  {
-    "description": "Number of free bytes in thread caches. They always count towards virtual memory usage, and unless the underlying memory is swapped out by the OS, they also count towards physical memory usage.",
-    "contexts": [
-      "STATESTORE",
-      "CATALOGSERVER",
-      "IMPALAD"
-    ],
-    "label": "TCMalloc Thread Cache Free Bytes",
-    "units": "BYTES",
-    "kind": "GAUGE",
-    "key": "tcmalloc.thread-cache-free-bytes"
   },
   {
     "description": "Bytes allocated from the sanitizer malloc (Sanitizer debug builds only)",
