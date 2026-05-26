@@ -74,6 +74,47 @@ spec:
                   type: integer
                   minimum: 60
                   default: 900
+                config:
+                  type: object
+                  description: Typed daemon configuration mapped by the operator into Helm values.
+                  properties:
+                    impalad:
+                      type: object
+                      properties:
+                        flags:
+                          type: object
+                          additionalProperties:
+                            type: string
+                          description: impalad startup flags as key-value pairs.
+                        queryDefaults:
+                          type: object
+                          additionalProperties:
+                            type: string
+                          description: Query option defaults rendered into impalad default_query_options.
+                    catalogd:
+                      type: object
+                      properties:
+                        flags:
+                          type: object
+                          additionalProperties:
+                            type: string
+                          description: catalogd startup flags as key-value pairs.
+                    statestored:
+                      type: object
+                      properties:
+                        flags:
+                          type: object
+                          additionalProperties:
+                            type: string
+                          description: statestored startup flags as key-value pairs.
+                    hms:
+                      type: object
+                      properties:
+                        flags:
+                          type: object
+                          additionalProperties:
+                            type: string
+                          description: Hive Metastore startup flags as key-value pairs.
                 set:
                   type: object
                   additionalProperties:

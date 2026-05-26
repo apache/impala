@@ -124,8 +124,27 @@ def _bool_string(value: bool) -> str:
     return "true" if value else "false"
 
 
+def _to_string_dict(values: Dict) -> Dict[str, str]:
+    return {str(key): str(val) for key, val in (values or {}).items()}
+
+
+def _flag_args(flags: Dict[str, str]) -> List[str]:
+    args: List[str] = []
+    for key in sorted(flags.keys()):
+        normalized = key.lstrip("-")
+        args.append(f"-{normalized}={flags[key]}")
+    return args
+
+
+def _query_defaults(defaults: Dict[str, str]) -> str:
+    pairs = []
+    for key in sorted(defaults.keys()):
+        pairs.append(f"{key}={defaults[key]}")
+    return ",".join(pairs)
+
+
 def _helm_set_value(value: str) -> str:
-    # Helm parses --set values as CSV-like entries; escape commas to keep one value.
+    # Helm parses --set values as CSV-like entries; escape commas to keep a single value.
     return value.replace("\\", "\\\\").replace(",", "\\,")
 
 
@@ -133,6 +152,7 @@ def _set_args(spec: Dict) -> List[str]:
     ldap_enabled = spec.get("ldapEnabled", False)
     ldap_uri = spec.get("ldapUri", "ldaps://impala-ldap-openldap:636")
     ldap_bind_pattern = spec.get("ldapBindPattern", "cn=#UID,dc=example,dc=org")
+    config_spec = spec.get("config") or {}
 
     values = {
         "kudu.enabled": _bool_string(spec.get("kuduEnabled", False)),
@@ -146,12 +166,37 @@ def _set_args(spec: Dict) -> List[str]:
         values["kudu.master.persistence.storageClassName"] = storage_class_name
         values["kudu.tserver.persistence.storageClassName"] = storage_class_name
 
+    impalad_config = config_spec.get("impalad") or {}
+    impalad_flags = _to_string_dict(impalad_config.get("flags") or {})
+    impalad_query_defaults = _to_string_dict(impalad_config.get("queryDefaults") or {})
+
+    for idx, arg in enumerate(_flag_args(impalad_flags)):
+        values[f"impalad.extraArgs[{idx}]"] = arg
+    if impalad_query_defaults:
+        values["impalad.defaultQueryOptions"] = _query_defaults(impalad_query_defaults)
+
+    catalogd_flags = _to_string_dict(
+        (config_spec.get("catalogd") or {}).get("flags") or {}
+    )
+    for idx, arg in enumerate(_flag_args(catalogd_flags)):
+        values[f"catalogd.extraArgs[{idx}]"] = arg
+
+    statestored_flags = _to_string_dict(
+        (config_spec.get("statestored") or {}).get("flags") or {}
+    )
+    for idx, arg in enumerate(_flag_args(statestored_flags)):
+        values[f"statestored.extraArgs[{idx}]"] = arg
+
+    hms_flags = _to_string_dict((config_spec.get("hms") or {}).get("flags") or {})
+    for idx, arg in enumerate(_flag_args(hms_flags)):
+        values[f"hms.extraArgs[{idx}]"] = arg
+
     for key, val in (spec.get("set") or {}).items():
         values[key] = str(val)
 
     args = []
     for key, val in values.items():
-        args.extend(["--set", f"{key}={_helm_set_value(str(val))}"])
+        args.extend(["--set", f"{key}={_helm_set_value(val)}"])
     if ldap_enabled:
         args.extend(["--set-string", f"auth.ldap.uri={_helm_set_value(ldap_uri)}"])
         bind_pattern_value = _helm_set_value(ldap_bind_pattern)

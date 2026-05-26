@@ -222,6 +222,28 @@ kubectl apply -f operator/impala-operator/manifests/sample-impalacluster.yaml
 kubectl get impalacluster -n impala
 ```
 
+Update daemon and query configs with typed CR keys:
+
+```bash
+kubectl patch impalacluster impala-demo -n impala --type merge -p '{
+  "spec": {
+    "config": {
+      "impalad": {
+        "flags": {
+          "num_reactor_threads": "0"
+        },
+        "queryDefaults": {
+          "mt_dop": "4",
+          "default_file_format": "parquet"
+        }
+      }
+    }
+  }
+}'
+```
+
+For advanced overrides that are not modeled by typed keys, continue to use `spec.set`.
+
 Enable optional services via CR patch:
 
 ```bash

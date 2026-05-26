@@ -28,5 +28,12 @@ spec:
   rangerEnabled: false
   rangerAuthEnabled: false
   storageClassName: ""
+  config:
+    impalad:
+      flags:
+        num_reactor_threads: "0"
+      queryDefaults:
+        mt_dop: "4"
+        default_file_format: "parquet"
   set:
     service.impalad.type: ClusterIP
