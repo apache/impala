@@ -70,6 +70,30 @@ spec:
             - -ldap_passwords_in_clear_ok
 {{- end }}
 {{- end }}
+{{- if .Values.auth.oauth.enabled }}
+            - -oauth_token_auth=true
+            - -oauth_jwt_custom_claim_username={{ .Values.auth.oauth.jwtCustomClaimUsername }}
+{{- if .Values.auth.oauth.allowWithoutTls }}
+            - -oauth_allow_without_tls=true
+{{- end }}
+{{- if .Values.auth.oauth.jwtValidateSignature }}
+            - -oauth_jwt_validate_signature=true
+{{- if .Values.auth.oauth.jwksFilePath }}
+            - -oauth_jwks_file_path={{ .Values.auth.oauth.jwksFilePath }}
+{{- end }}
+{{- if .Values.auth.oauth.jwksUrl }}
+            - -oauth_jwks_url={{ .Values.auth.oauth.jwksUrl }}
+            - -oauth_jwks_verify_server_certificate={{ .Values.auth.oauth.jwksVerifyServerCertificate }}
+            - -oauth_jwks_update_frequency_s={{ .Values.auth.oauth.jwksUpdateFrequencyS }}
+            - -oauth_jwks_pulling_timeout_s={{ .Values.auth.oauth.jwksPullingTimeoutS }}
+{{- if .Values.auth.oauth.jwksCaCertificate }}
+            - -oauth_jwks_ca_certificate={{ .Values.auth.oauth.jwksCaCertificate }}
+{{- end }}
+{{- end }}
+{{- else }}
+            - -oauth_jwt_validate_signature=false
+{{- end }}
+{{- end }}
 {{- if .Values.auth.ranger.enabled }}
             - -authorization_provider=ranger
             - -ranger_service_type={{ .Values.auth.ranger.serviceType }}

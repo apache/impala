@@ -153,6 +153,26 @@ For custom bind patterns, use `--set-string auth.ldap.bindPattern='cn=#UID\,dc=e
 When using `--set` for LDAP bind patterns, escape commas (`\,`) so Helm does
 not split the value into multiple assignments.
 
+### Enable OAuth token authentication
+
+```bash
+helm upgrade impala ./helm/impala -n impala \
+  -f ./helm/impala/values-example.yaml \
+  --set auth.oauth.enabled=true \
+  --set auth.oauth.jwksUrl="https://idp.example.org/.well-known/jwks.json" \
+  --set auth.oauth.jwtCustomClaimUsername="sub"
+```
+
+For non-TLS development environments only:
+
+```bash
+helm upgrade impala ./helm/impala -n impala \
+  -f ./helm/impala/values-example.yaml \
+  --set auth.oauth.enabled=true \
+  --set auth.oauth.jwtValidateSignature=false \
+  --set auth.oauth.allowWithoutTls=true
+```
+
 ## Run Impala shell from laptop (tunnel)
 
 Port-forward HS2:
@@ -262,6 +282,20 @@ kubectl patch impalacluster impala-demo -n impala --type merge -p '{
 
 For `ImpalaCluster.spec.ldapBindPattern`, provide raw DN syntax (no comma escaping).
 The operator handles Helm `--set-string` escaping internally.
+
+Enable OAuth via advanced `spec.set` overrides:
+
+```bash
+kubectl patch impalacluster impala-demo -n impala --type merge -p '{
+  "spec": {
+    "set": {
+      "auth.oauth.enabled": "true",
+      "auth.oauth.jwksUrl": "https://idp.example.org/.well-known/jwks.json",
+      "auth.oauth.jwtCustomClaimUsername": "sub"
+    }
+  }
+}'
+```
 
 ## Troubleshooting
 

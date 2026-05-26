@@ -67,6 +67,22 @@ auth:
     uri: ""
     bindPattern: ""
     passwordsInClearOk: false
+  oauth:
+    enabled: false
+    # Validate OAuth token signatures using JWKS data.
+    jwtValidateSignature: true
+    # Exactly one of jwksFilePath or jwksUrl should be set when signature
+    # validation is enabled.
+    jwksFilePath: ""
+    jwksUrl: ""
+    jwksVerifyServerCertificate: true
+    jwksCaCertificate: ""
+    jwksUpdateFrequencyS: 60
+    jwksPullingTimeoutS: 10
+    # Token claim used as the authenticated username.
+    jwtCustomClaimUsername: "username"
+    # For development only. Keep false in production.
+    allowWithoutTls: false
   ranger:
     enabled: false
     serviceType: "hive"

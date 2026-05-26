@@ -45,3 +45,8 @@ auth:
     enabled: false
   ranger:
     enabled: false
+  oauth:
+    enabled: false
+    # Example OAuth settings:
+    # jwksUrl: "https://idp.example.org/.well-known/jwks.json"
+    # jwtCustomClaimUsername: "sub"
