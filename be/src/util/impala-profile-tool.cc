@@ -25,19 +25,22 @@
 #include <gflags/gflags.h>
 
 #include "common/object-pool.h"
+#include "gutil/strings/strip.h"
 #include "util/os-info.h"
 #include "util/runtime-profile.h"
 
 #include "common/names.h"
 
 static const char* USAGE =
-    "Utility to decode an Impala profile log from standard input.\n"
+    "Utility to decode an Impala profile log or WebUI thrift profile download"
+    " from standard input.\n"
     "\n"
-    "The profile log is consumed from standard input and each successfully parsed entry"
+    "The input is consumed from standard input and each successfully parsed profile"
     " is pretty-printed to standard output.\n"
     "\n"
-    "Usage:"
+    "Usage:\n"
     "  impala-profile-tool < impala_profile_log_1.1-1607057366897\n"
+    "  impala-profile-tool < thrift_profile_<query id>.txt\n"
     "\n"
     "The following options are supported:\n"
     "Output options:\n"
@@ -54,7 +57,9 @@ static const char* USAGE =
     "--min_timestamp=<integer timestamp>: only process profiles at or after this"
     " timestamp\n"
     "--max_timestamp=<integer timestamp>: only process profiles at or before this"
-    " timestamp\n";
+    " timestamp\n"
+    "Filtering options only apply to profile log entries that include timestamp and"
+    " query id metadata.\n";
 
 DEFINE_string(
     profile_format, "text", "Profile format to output: either text, json or prettyjson");
@@ -104,23 +109,25 @@ int main(int argc, char** argv) {
   int profiles_emitted = 0;
   string line;
   int lineno = 1;
-  // Read profile log lines from stdin.
+  // Read profile log or WebUI thrift profile lines from stdin.
   for (; getline(cin, line); ++lineno) {
-    // Parse out fields from the line.
+    // Profile logs prefix each encoded profile with timestamp and query id. WebUI
+    // thrift profile downloads contain only the encoded profile.
     istringstream liness(line);
-    int64_t timestamp;
+    int64_t timestamp = -1;
     string query_id, encoded_profile;
     liness >> timestamp >> query_id >> encoded_profile;
-    if (liness.fail()) {
-      cerr << "Error parsing line " << lineno << ": '" << line << "'\n";
-      ++errors;
-      continue;
+    const bool has_log_metadata = !liness.fail();
+    if (!has_log_metadata) {
+      encoded_profile = line;
+      StripWhiteSpace(&encoded_profile);
     }
 
     // Skip decoding entries that don't match our parameters.
-    if ((FLAGS_query_id != "" && FLAGS_query_id != query_id) ||
-        (FLAGS_min_timestamp != -1 && timestamp < FLAGS_min_timestamp) ||
-        (FLAGS_max_timestamp != -1 && timestamp > FLAGS_max_timestamp)) {
+    if (has_log_metadata
+        && ((FLAGS_query_id != "" && FLAGS_query_id != query_id) ||
+            (FLAGS_min_timestamp != -1 && timestamp < FLAGS_min_timestamp) ||
+            (FLAGS_max_timestamp != -1 && timestamp > FLAGS_max_timestamp))) {
       continue;
     }
 

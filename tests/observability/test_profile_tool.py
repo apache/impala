@@ -80,12 +80,53 @@ class TestProfileTool(BaseTestSuite):
         get_profile_path(
             'impala_profile_log_tpcds_compute_stats_v2_extended.expected.pretty.json'))
 
+  def test_webui_thrift_profile_text_output(self):
+    # WebUI thrift profile downloads contain only the archived profile string, without
+    # the timestamp and query id prefix found in profile log lines.
+    self._compare_webui_thrift_profile_output([],
+        get_profile_path('impala_profile_log_tpcds_compute_stats'))
+    self._compare_webui_thrift_profile_output([],
+        get_profile_path('impala_profile_log_tpcds_compute_stats_v2'))
+
+  def test_webui_thrift_profile_prettyjson_output(self):
+    self._compare_webui_thrift_profile_output(['--profile_format=prettyjson'],
+        get_profile_path('impala_profile_log_tpcds_compute_stats'))
+
+  def test_webui_thrift_profile_ignores_surrounding_whitespace(self):
+    self._compare_webui_thrift_profile_output([],
+        get_profile_path('impala_profile_log_tpcds_compute_stats'),
+        profile_prefix=' \t', profile_suffix=' \r')
+
   def _compare_profile_tool_output(self, args, input_log, expected_output):
     """Run impala-profile-tool on input_log and compare it to the contents of the
     file at 'expected_output'."""
     with tempfile.NamedTemporaryFile() as tmp:
-      with open(input_log, 'r') as f:
-        check_call([os.path.join(IMPALA_HOME, "bin/run-binary.sh"),
-                    os.path.join(impalad_basedir, 'util/impala-profile-tool')] + args,
-                    stdin=f, stdout=tmp)
-        check_call(['diff', expected_output, tmp.name])
+      self._run_profile_tool(args, input_log, tmp)
+      check_call(['diff', expected_output, tmp.name])
+
+  def _compare_webui_thrift_profile_output(
+      self, args, input_log, profile_prefix='', profile_suffix=''):
+    """Compare a bare WebUI thrift profile to the same profile in a profile log."""
+    query_id, encoded_profile = self._get_first_profile_log_entry(input_log)
+    with tempfile.NamedTemporaryFile() as thrift_profile:
+      with tempfile.NamedTemporaryFile() as expected_output:
+        with tempfile.NamedTemporaryFile() as actual_output:
+          profile_input = profile_prefix + encoded_profile + profile_suffix + '\n'
+          thrift_profile.write(profile_input.encode('utf-8'))
+          thrift_profile.flush()
+          self._run_profile_tool(
+              args + ['--query_id=%s' % query_id], input_log, expected_output)
+          self._run_profile_tool(args, thrift_profile.name, actual_output)
+          check_call(['diff', expected_output.name, actual_output.name])
+
+  def _get_first_profile_log_entry(self, input_log):
+    with open(input_log, 'r') as f:
+      _timestamp, query_id, encoded_profile = f.readline().split(None, 2)
+    return query_id, encoded_profile.rstrip()
+
+  def _run_profile_tool(self, args, input_log, output=None):
+    with open(input_log, 'r') as f:
+      command = [os.path.join(IMPALA_HOME, "bin/run-binary.sh"),
+                 os.path.join(impalad_basedir, 'util/impala-profile-tool')] + args
+      check_call(command, stdin=f, stdout=output)
+      output.flush()
