@@ -112,6 +112,7 @@ bin/distcc/README.md
 tests/comparison/POSTGRES.txt
 docs/README.md
 docker/README.md
+helm/impala/README.md
 be/src/thirdparty/pcg-cpp-0.98/README.md
 lib/python/README.md
 lib/python/impala_py_lib/gdb/README.md
