@@ -29,19 +29,25 @@ metadata:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
-  name: impala-operator-crd
+  name: impala-operator-control-plane
 rules:
   - apiGroups: ["impala.apache.org"]
-    resources: ["impalaclusters", "impalaclusters/status", "impalaclusters/finalizers"]
-    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+    resources: ["impalaclusters"]
+    verbs: ["get", "list", "watch", "patch", "update"]
+  - apiGroups: ["impala.apache.org"]
+    resources: ["impalaclusters/status", "impalaclusters/finalizers"]
+    verbs: ["patch", "update"]
   - apiGroups: [""]
-    resources: ["events", "namespaces"]
-    verbs: ["get", "list", "watch", "create", "update", "patch"]
+    resources: ["events"]
+    verbs: ["create", "patch"]
+  - apiGroups: ["apiextensions.k8s.io"]
+    resources: ["customresourcedefinitions"]
+    verbs: ["get", "list", "watch"]
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
-  name: impala-operator-crd
+  name: impala-operator-control-plane
 subjects:
   - kind: ServiceAccount
     name: impala-operator
@@ -49,14 +55,47 @@ subjects:
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole
-  name: impala-operator-crd
+  name: impala-operator-control-plane
 ---
-# This binding gives Helm in the operator broad permissions to create/update
-# Impala resources across namespaces. Tighten this for production hardening.
+# Namespaced resources managed by Helm for core + optional components.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: impala-operator-helm
+rules:
+  - apiGroups: [""]
+    resources:
+      - "configmaps"
+      - "endpoints"
+      - "persistentvolumeclaims"
+      - "pods"
+      - "secrets"
+      - "serviceaccounts"
+      - "services"
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+  - apiGroups: ["apps"]
+    resources: ["deployments", "replicasets", "statefulsets"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+  - apiGroups: ["batch"]
+    resources: ["jobs", "cronjobs"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+  - apiGroups: ["networking.k8s.io"]
+    resources: ["ingresses", "networkpolicies"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+  - apiGroups: ["policy"]
+    resources: ["poddisruptionbudgets"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+  - apiGroups: ["autoscaling"]
+    resources: ["horizontalpodautoscalers"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+  - apiGroups: ["rbac.authorization.k8s.io"]
+    resources: ["roles", "rolebindings"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
-  name: impala-operator-helm-admin
+  name: impala-operator-helm
 subjects:
   - kind: ServiceAccount
     name: impala-operator
@@ -64,4 +103,4 @@ subjects:
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole
-  name: cluster-admin
+  name: impala-operator-helm

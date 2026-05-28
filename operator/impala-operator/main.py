@@ -21,8 +21,7 @@ import subprocess
 from typing import Dict, List
 
 import kopf
-from kubernetes import client, config
-from kubernetes.client.exceptions import ApiException
+from kubernetes import config
 
 
 GROUP = "impala.apache.org"
@@ -110,16 +109,6 @@ def _run(cmd: List[str], logger, ignore_error: bool = False) -> str:
     return stdout
 
 
-def _ensure_namespace(name: str) -> None:
-    api = client.CoreV1Api()
-    try:
-        api.read_namespace(name=name)
-    except ApiException as exc:
-        if exc.status != 404:
-            raise
-        api.create_namespace(client.V1Namespace(metadata=client.V1ObjectMeta(name=name)))
-
-
 def _bool_string(value: bool) -> str:
     return "true" if value else "false"
 
@@ -191,6 +180,8 @@ def _set_args(spec: Dict) -> List[str]:
     for idx, arg in enumerate(_flag_args(hms_flags)):
         values[f"hms.extraArgs[{idx}]"] = arg
 
+    # Keep user-provided --set list indices contiguous (e.g. extraArgs[0..N]).
+    # Sparse indices can cause Helm to render empty list items.
     for key, val in (spec.get("set") or {}).items():
         values[key] = str(val)
 
@@ -326,7 +317,6 @@ def reconcile(spec, name, namespace, patch, logger, meta, **_):
             namespace,
         )
     target_ns = namespace
-    _ensure_namespace(target_ns)
 
     try:
         _ensure_ldap(spec, target_ns, logger)

@@ -17,3 +17,4 @@
 
 kopf==1.44.6
 kubernetes==30.1.0
+PyYAML==6.0.3

@@ -173,9 +173,9 @@ class TestOperatorSetArgs(unittest.TestCase):
         logger = mock.Mock()
         patch = mock.Mock()
         patch.status = {}
-        with mock.patch.object(MAIN, "_ensure_namespace") as ensure_ns, mock.patch.object(
-            MAIN, "_ensure_ldap"
-        ) as ensure_ldap, mock.patch.object(MAIN, "_ensure_impala") as ensure_impala:
+        with mock.patch.object(MAIN, "_ensure_ldap") as ensure_ldap, mock.patch.object(
+            MAIN, "_ensure_impala"
+        ) as ensure_impala:
             MAIN.reconcile(
                 spec={"namespace": "other"},
                 name="impala-demo",
@@ -185,7 +185,6 @@ class TestOperatorSetArgs(unittest.TestCase):
                 meta={"generation": 3},
             )
 
-        ensure_ns.assert_called_once_with("impala")
         ensure_ldap.assert_called_once_with({"namespace": "other"}, "impala", logger)
         ensure_impala.assert_called_once_with({"namespace": "other"}, "impala", logger)
         logger.warning.assert_called_once()

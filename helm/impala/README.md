@@ -153,6 +153,11 @@ For custom bind patterns, use `--set-string auth.ldap.bindPattern='cn=#UID\,dc=e
 When using `--set` for LDAP bind patterns, escape commas (`\,`) so Helm does
 not split the value into multiple assignments.
 
+When using `--set` for list entries (for example `kudu.master.extraArgs[0]`,
+`kudu.master.extraArgs[1]`, ...), keep indices contiguous from `0`. Sparse
+indices can render empty list elements, which may pass blank arguments to
+containers.
+
 ### Enable OAuth token authentication
 
 ```bash
@@ -284,6 +289,26 @@ kubectl -n impala-operator-system set image deploy/impala-operator \
   operator=<registry>/impala-operator:latest
 kubectl -n impala-operator-system rollout status deploy/impala-operator
 ```
+
+### Operator RBAC scope
+
+The operator no longer relies on `cluster-admin`.
+
+The default RBAC in `operator/impala-operator/manifests/rbac.yaml` grants:
+
+- control-plane permissions for `impalaclusters` status/finalizers and CRD discovery
+- namespaced Helm reconcile permissions for resources used by the Impala chart
+  (`Deployment`, `StatefulSet`, `Service`, `ConfigMap`, `PersistentVolumeClaim`,
+  `Secret`, and related supporting resources)
+
+Optional-component notes:
+
+- Kudu and Ranger are covered by the default namespaced permissions above.
+- LDAP (OpenLDAP chart) may enable additional namespaced resources depending on
+  values (for example `Role`, `RoleBinding`, `Job`, `NetworkPolicy`, `Ingress`,
+  and `HorizontalPodAutoscaler`), which are also included in the default role.
+- If you customize LDAP values to use resource kinds outside this set, extend the
+  operator ClusterRole accordingly.
 
 Create the target namespace used by the sample CR:
 
