@@ -353,6 +353,18 @@ class ImpalaServer : public ImpalaServiceIf,
   virtual void RenewDelegationToken(
       apache::hive::service::cli::thrift::TRenewDelegationTokenResp& return_val,
       const apache::hive::service::cli::thrift::TRenewDelegationTokenReq& req);
+  virtual void GetQueryId(
+      apache::hive::service::cli::thrift::TGetQueryIdResp& return_val,
+      const apache::hive::service::cli::thrift::TGetQueryIdReq& request);
+  virtual void SetClientInfo(
+      apache::hive::service::cli::thrift::TSetClientInfoResp& return_val,
+      const apache::hive::service::cli::thrift::TSetClientInfoReq& request);
+  virtual void UploadData(
+      apache::hive::service::cli::thrift::TUploadDataResp& return_val,
+      const apache::hive::service::cli::thrift::TUploadDataReq& request);
+  virtual void DownloadData(
+      apache::hive::service::cli::thrift::TDownloadDataResp& return_val,
+      const apache::hive::service::cli::thrift::TDownloadDataReq& request);
 
   // Extensions to HS2 implemented by ImpalaHiveServer2Service.
 

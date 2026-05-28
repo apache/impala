@@ -83,6 +83,10 @@ class TestHS2Service : public ImpalaHiveServer2ServiceIf {
   virtual void RenewDelegationToken(
       TRenewDelegationTokenResp& _return, const TRenewDelegationTokenReq& req) {}
   virtual void GetLog(TGetLogResp& _return, const TGetLogReq& req) {}
+  virtual void GetQueryId(TGetQueryIdResp& _return, const TGetQueryIdReq& req) {}
+  virtual void SetClientInfo(TSetClientInfoResp& _return, const TSetClientInfoReq& req) {}
+  virtual void UploadData(TUploadDataResp& _return, const TUploadDataReq& req) {}
+  virtual void DownloadData(TDownloadDataResp& _return, const TDownloadDataReq& req) {}
   virtual void GetExecSummary(
       TGetExecSummaryResp& _return, const TGetExecSummaryReq& req) {}
   virtual void GetRuntimeProfile(

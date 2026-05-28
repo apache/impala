@@ -58,6 +58,18 @@ enum TProtocolVersion {
 
   // V7 adds support for delegation token based connection
   HIVE_CLI_SERVICE_PROTOCOL_V7
+
+  // V8 adds support for interval types
+  HIVE_CLI_SERVICE_PROTOCOL_V8
+
+  // V9 adds support for serializing ResultSets in SerDe
+  HIVE_CLI_SERVICE_PROTOCOL_V9
+
+  // V10 adds support for in place updates via GetOperationStatus
+  HIVE_CLI_SERVICE_PROTOCOL_V10
+
+  // V11 adds timestamp with local time zone type
+  HIVE_CLI_SERVICE_PROTOCOL_V11
 }
 
 enum TTypeId {
@@ -80,7 +92,10 @@ enum TTypeId {
   NULL_TYPE,
   DATE_TYPE,
   VARCHAR_TYPE,
-  CHAR_TYPE
+  CHAR_TYPE,
+  INTERVAL_YEAR_MONTH_TYPE,
+  INTERVAL_DAY_TIME_TYPE,
+  TIMESTAMPLOCALTZ_TYPE
 }
 
 const set<TTypeId> PRIMITIVE_TYPES = [
@@ -98,7 +113,10 @@ const set<TTypeId> PRIMITIVE_TYPES = [
   TTypeId.NULL_TYPE,
   TTypeId.DATE_TYPE,
   TTypeId.VARCHAR_TYPE,
-  TTypeId.CHAR_TYPE
+  TTypeId.CHAR_TYPE,
+  TTypeId.INTERVAL_YEAR_MONTH_TYPE,
+  TTypeId.INTERVAL_DAY_TIME_TYPE,
+  TTypeId.TIMESTAMPLOCALTZ_TYPE
 ]
 
 const set<TTypeId> COMPLEX_TYPES = [
@@ -134,6 +152,9 @@ const map<TTypeId,string> TYPE_NAMES = {
   TTypeId.DATE_TYPE: "DATE"
   TTypeId.VARCHAR_TYPE: "VARCHAR"
   TTypeId.CHAR_TYPE: "CHAR"
+  TTypeId.INTERVAL_YEAR_MONTH_TYPE: "INTERVAL_YEAR_MONTH"
+  TTypeId.INTERVAL_DAY_TIME_TYPE: "INTERVAL_DAY_TIME"
+  TTypeId.TIMESTAMPLOCALTZ_TYPE: "TIMESTAMP WITH LOCAL TIME ZONE"
 }
 
 // Thrift does not support recursively defined types or forward declarations,
@@ -324,7 +345,7 @@ union TColumnValue {
   4: TI32Value    i32Val       // INT
   5: TI64Value    i64Val       // BIGINT, TIMESTAMP
   6: TDoubleValue doubleVal    // FLOAT, DOUBLE
-  7: TStringValue stringVal    // STRING, LIST, MAP, STRUCT, UNIONTYPE, BINARY, DECIMAL, NULL
+  7: TStringValue stringVal    // STRING, LIST, MAP, STRUCT, UNIONTYPE, BINARY, DECIMAL, NULL, INTERVAL_YEAR_MONTH, INTERVAL_DAY_TIME
 }
 
 // Represents a row in a rowset.
@@ -394,6 +415,8 @@ struct TRowSet {
   1: required i64 startRowOffset
   2: required list<TRow> rows
   3: optional list<TColumn> columns
+  4: optional binary binaryColumns
+  5: optional i32 columnCount
 }
 
 // The return status code contained in each response.
@@ -448,6 +471,9 @@ enum TOperationState {
 
   // The operation is in an pending state
   PENDING_STATE,
+
+  // The operation is in an timedout state
+  TIMEDOUT_STATE,
 }
 
 // A string identifier. This is interpreted literally.
@@ -498,6 +524,7 @@ enum TOperationType {
   GET_COLUMNS,
   GET_FUNCTIONS,
   UNKNOWN,
+  PROCEDURAL_SQL
 }
 
 // Client-side reference to a task running
@@ -543,7 +570,7 @@ struct TOperationHandle {
 // which operations may be executed.
 struct TOpenSessionReq {
   // The version of the HiveServer2 protocol that the client is using.
-  1: required TProtocolVersion client_protocol = TProtocolVersion.HIVE_CLI_SERVICE_PROTOCOL_V6
+  1: required TProtocolVersion client_protocol = TProtocolVersion.HIVE_CLI_SERVICE_PROTOCOL_V10
 
   // Username and password for authentication.
   // Depending on the authentication scheme being used,
@@ -562,13 +589,22 @@ struct TOpenSessionResp {
   1: required TStatus status
 
   // The protocol version that the server is using.
-  2: required TProtocolVersion serverProtocolVersion = TProtocolVersion.HIVE_CLI_SERVICE_PROTOCOL_V6
+  2: required TProtocolVersion serverProtocolVersion = TProtocolVersion.HIVE_CLI_SERVICE_PROTOCOL_V10
 
   // Session Handle
   3: optional TSessionHandle sessionHandle
 
   // The configuration settings for this session.
   4: optional map<string, string> configuration
+}
+
+struct TSetClientInfoReq {
+  1: required TSessionHandle sessionHandle,
+  2: optional map<string, string> configuration
+}
+
+struct TSetClientInfoResp {
+  1: required TStatus status
 }
 
 
@@ -636,7 +672,7 @@ enum TGetInfoType {
   CLI_CATALOG_NAME =                     10003,
   CLI_COLLATION_SEQ =                    10004,
   CLI_MAX_IDENTIFIER_LEN =               10005,
-  CLI_ODBC_KEYWORDS =                    10006,
+  CLI_ODBC_KEYWORDS =                    10006
 }
 
 union TGetInfoValue {
@@ -688,6 +724,9 @@ struct TExecuteStatementReq {
 
   // Execute asynchronously when runAsync is true
   4: optional bool runAsync = false
+
+  // The number of seconds after which the query will timeout on the server
+  5: optional i64 queryTimeout = 0
 }
 
 struct TExecuteStatementResp {
@@ -713,6 +752,52 @@ struct TGetTypeInfoResp {
   2: optional TOperationHandle operationHandle
 }
 
+// UploadData()
+//
+// UploadData data to table or path. One of tableName or path must be set.
+struct TUploadDataReq {
+  // The session to execute the statement against
+  1: required TSessionHandle sessionHandle
+
+  // The table to be stored
+  2: optional string tableName
+
+  // The path to be stored
+  3: optional string path
+
+  // The data to be transferred
+  4: required binary values
+}
+
+struct TUploadDataResp {
+  1: required TStatus status
+  2: required TOperationHandle operationHandle
+}
+
+// DownloadData()
+//
+// Download data to JDBC client. One of tableName or query must be set.
+struct TDownloadDataReq {
+  // The session to download data
+  1: required TSessionHandle sessionHandle
+
+  // The download table name
+  2: optional TPatternOrIdentifier tableName
+
+  // The download query. For example: SELECT * FROM t1 JOIN t2 ON t1.id = t2.id
+  3: optional string query
+
+  // The download file format. For example: Parquet, ORC, CSV, JSON, Avro, etc.
+  4: optional string format
+
+  // The download options. For example: dateFormat=yyyy-MM-dd, compression=gzip
+  5: optional map<string, string> downloadOptions
+}
+
+struct TDownloadDataResp {
+  1: required TStatus status
+  2: required TOperationHandle operationHandle
+}
 
 // GetCatalogs()
 //
@@ -738,7 +823,7 @@ struct TGetCatalogsResp {
 
 // GetSchemas()
 //
-// Retrieves the schema names available in this database.
+// Retrieves the schema names available in this database. 
 // The results are ordered by TABLE_CATALOG and TABLE_SCHEM.
 // col1
 // name: TABLE_SCHEM
@@ -995,13 +1080,29 @@ struct TGetCrossReferenceResp {
   2: optional TOperationHandle operationHandle
 }
 
-
 // GetOperationStatus()
 //
 // Get the status of an operation running on the server.
 struct TGetOperationStatusReq {
   // Session to run this request against
   1: required TOperationHandle operationHandle
+  // optional arguments to get progress information
+  2: optional bool getProgressUpdate
+}
+
+enum TJobExecutionStatus {
+    IN_PROGRESS,
+    COMPLETE,
+    NOT_AVAILABLE
+}
+
+struct TProgressUpdateResp {
+  1: required list<string> headerNames
+  2: required list<list<string>> rows
+  3: required double progressedPercentage
+  4: required TJobExecutionStatus status
+  5: required string footerSummary
+  6: required i64 startTime
 }
 
 struct TGetOperationStatusResp {
@@ -1017,6 +1118,22 @@ struct TGetOperationStatusResp {
 
   // Error message
   5: optional string errorMessage
+
+  // List of statuses of sub tasks
+  6: optional string taskStatus
+
+  // When was the operation started
+  7: optional i64 operationStarted
+
+  // When was the operation completed
+  8: optional i64 operationCompleted
+
+  // If the operation has the result
+  9: optional bool hasResultSet
+
+  10: optional TProgressUpdateResp progressUpdateResponse
+
+  11: optional i64 numModifiedRows
 }
 
 
@@ -1187,6 +1304,14 @@ struct TGetLogResp {
   2: required string log
 }
 
+struct TGetQueryIdReq {
+  1: required TOperationHandle operationHandle
+}
+
+struct TGetQueryIdResp {
+  1: required string queryId
+}
+
 service TCLIService {
 
   TOpenSessionResp OpenSession(1:TOpenSessionReq req);
@@ -1233,4 +1358,12 @@ service TCLIService {
 
   // Not present in Hive 0.13, re-added for backwards compatibility.
   TGetLogResp GetLog(1:TGetLogReq req);
+
+  TGetQueryIdResp GetQueryId(1:TGetQueryIdReq req);
+
+  TSetClientInfoResp SetClientInfo(1:TSetClientInfoReq req);
+
+  TUploadDataResp UploadData(1:TUploadDataReq req);
+
+  TDownloadDataResp DownloadData(1:TDownloadDataReq req);
 }

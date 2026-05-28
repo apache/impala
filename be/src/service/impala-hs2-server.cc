@@ -1359,10 +1359,14 @@ void ImpalaServer::GetRuntimeProfile(
   return_val.status.__set_statusCode(thrift::TStatusCode::SUCCESS_STATUS);
 }
 
+static void SetNotImplementedError(thrift::TStatus& status) {
+  status.__set_statusCode(thrift::TStatusCode::ERROR_STATUS);
+  status.__set_errorMessage("Not implemented");
+}
+
 void ImpalaServer::GetDelegationToken(TGetDelegationTokenResp& return_val,
     const TGetDelegationTokenReq& req) {
-  return_val.status.__set_statusCode(thrift::TStatusCode::ERROR_STATUS);
-  return_val.status.__set_errorMessage("Not implemented");
+  SetNotImplementedError(return_val.status);
 }
 
 void ImpalaServer::GetBackendConfig(TGetBackendConfigResp& return_val,
@@ -1428,14 +1432,12 @@ void ImpalaServer::GetExecutorMembership(
 
 void ImpalaServer::CancelDelegationToken(TCancelDelegationTokenResp& return_val,
     const TCancelDelegationTokenReq& req) {
-  return_val.status.__set_statusCode(thrift::TStatusCode::ERROR_STATUS);
-  return_val.status.__set_errorMessage("Not implemented");
+  SetNotImplementedError(return_val.status);
 }
 
 void ImpalaServer::RenewDelegationToken(TRenewDelegationTokenResp& return_val,
     const TRenewDelegationTokenReq& req) {
-  return_val.status.__set_statusCode(thrift::TStatusCode::ERROR_STATUS);
-  return_val.status.__set_errorMessage("Not implemented");
+  SetNotImplementedError(return_val.status);
 }
 
 void ImpalaServer::AddSessionToConnection(
@@ -1482,5 +1484,29 @@ void ImpalaServer::PingImpalaHS2Service(TPingImpalaHS2ServiceResp& return_val,
   }
   return_val.__set_timestamp(MonotonicStopWatch::Now());
   VLOG_RPC << "PingImpalaHS2Service(): return_val=" << ThriftDebugString(return_val);
+}
+
+void ImpalaServer::GetQueryId(TGetQueryIdResp& return_val,
+    const TGetQueryIdReq& request) {
+  VLOG_QUERY << "GetQueryId(): request=" << RedactedDebugString(request);
+  TUniqueId query_id, op_secret;
+  Status status = THandleIdentifierToTUniqueId(
+      request.operationHandle.operationId, &query_id, &op_secret);
+  return_val.__set_queryId(status.ok() ? PrintId(query_id) : "");
+}
+
+void ImpalaServer::SetClientInfo(TSetClientInfoResp& return_val,
+    const TSetClientInfoReq& request) {
+  SetNotImplementedError(return_val.status);
+}
+
+void ImpalaServer::UploadData(TUploadDataResp& return_val,
+    const TUploadDataReq& request) {
+  SetNotImplementedError(return_val.status);
+}
+
+void ImpalaServer::DownloadData(TDownloadDataResp& return_val,
+    const TDownloadDataReq& request) {
+  SetNotImplementedError(return_val.status);
 }
 }

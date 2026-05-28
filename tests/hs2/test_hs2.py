@@ -1354,6 +1354,77 @@ class TestHS2(HS2TestSuite):
     assert "Http Origin: value1" in profile
     assert "Http Origin: value2" not in profile
 
+  @needs_session()
+  def test_get_query_id(self):
+    """ Test hs2's GetQueryId API. This is a trivial function in Impala that prints
+    the query id passed in the request.
+    """
+    # Check that the string returned by GetQueryId matches the query id in the profile.
+    execute_statement_resp = self.execute_statement('select 1')
+    op_handle = execute_statement_resp.operationHandle
+    get_query_id_req = TCLIService.TGetQueryIdReq(op_handle)
+    get_query_id_resp = self.hs2_client.GetQueryId(get_query_id_req)
+    get_profile_resp = self.hs2_client.GetRuntimeProfile(
+        ImpalaHiveServer2Service.TGetRuntimeProfileReq(op_handle, self.session_handle))
+    profile = get_profile_resp.profile
+    assert profile is not None
+    assert "Query (id=" + get_query_id_resp.queryId in profile
+
+    # Check that invalid query id leads to returning empty string.
+    invalid_id = TCLIService.THandleIdentifier(b"bad", op_handle.operationId.secret)
+    invalide_op_handle = TCLIService.TOperationHandle(
+        invalid_id, TCLIService.TOperationType.EXECUTE_STATEMENT, False)
+    invalid_req = TCLIService.TGetQueryIdReq(invalide_op_handle)
+    invalid_resp = self.hs2_client.GetQueryId(invalid_req)
+    assert invalid_resp.queryId == ""
+
+  @needs_session()
+  def test_unimplemented_functions(self):
+    """Test that unimplemented functions return the expected error."""
+    get_delegation_token_req = TCLIService.TGetDelegationTokenReq()
+    get_delegation_token_req.sessionHandle = self.session_handle
+    get_delegation_token_req.owner = "test_owner"
+    get_delegation_token_req.renewer = "test_renewer"
+    get_delegation_token_resp = self.hs2_client.GetDelegationToken(
+        get_delegation_token_req)
+    TestHS2.check_response(get_delegation_token_resp,
+        TCLIService.TStatusCode.ERROR_STATUS, "Not implemented")
+
+    cancel_delegation_token_req = TCLIService.TCancelDelegationTokenReq()
+    cancel_delegation_token_req.sessionHandle = self.session_handle
+    cancel_delegation_token_req.delegationToken = "test_token"
+    cancel_delegation_token_resp = self.hs2_client.CancelDelegationToken(
+        cancel_delegation_token_req)
+    TestHS2.check_response(cancel_delegation_token_resp,
+        TCLIService.TStatusCode.ERROR_STATUS, "Not implemented")
+
+    renew_delegation_token_req = TCLIService.TRenewDelegationTokenReq()
+    renew_delegation_token_req.sessionHandle = self.session_handle
+    renew_delegation_token_req.delegationToken = "test_token"
+    renew_delegation_token_resp = self.hs2_client.RenewDelegationToken(
+        renew_delegation_token_req)
+    TestHS2.check_response(renew_delegation_token_resp,
+        TCLIService.TStatusCode.ERROR_STATUS, "Not implemented")
+
+    set_client_info_req = TCLIService.TSetClientInfoReq()
+    set_client_info_req.sessionHandle = self.session_handle
+    set_client_info_req.client_info = "test_client"
+    set_client_info_resp = self.hs2_client.SetClientInfo(set_client_info_req)
+    TestHS2.check_response(set_client_info_resp,
+        TCLIService.TStatusCode.ERROR_STATUS, "Not implemented")
+
+    upload_data_req = TCLIService.TUploadDataReq()
+    upload_data_req.sessionHandle = self.session_handle
+    upload_data_req.values = b""
+    upload_data_resp = self.hs2_client.UploadData(upload_data_req)
+    TestHS2.check_response(upload_data_resp,
+        TCLIService.TStatusCode.ERROR_STATUS, "Not implemented")
+
+    download_data_req = TCLIService.TDownloadDataReq()
+    download_data_req.sessionHandle = self.session_handle
+    download_data_resp = self.hs2_client.DownloadData(download_data_req)
+    TestHS2.check_response(download_data_resp,
+        TCLIService.TStatusCode.ERROR_STATUS, "Not implemented")
 
 def get_user_custom_headers():
   """Add duplicate X-Forwarded-For headers."""
