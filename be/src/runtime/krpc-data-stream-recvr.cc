@@ -244,10 +244,7 @@ class KrpcDataStreamRecvr::SenderQueue {
   // Queue of deferred RPCs that are already enqueued for deserialization.
   std::queue<std::unique_ptr<TransmitDataCtx>> pending_deferred_rpcs_;
 
-  // Monotonic time in nanoseconds of when 'deferred_rpcs_' goes from being empty to
-  // non-empty. Set to 0 when 'deferred_rpcs_' becomes empty again. Used for computing
-  // 'total_has_deferred_rpcs_timer_'.
-  int64_t has_deferred_rpcs_start_time_ns_ = 0;
+  // Tracks the start time of the current 'pending_deferred_rpcs_' interval.
   int64_t has_pending_deferred_rpcs_start_time_ns_ = 0;
 
   /// Current number of bytes held. Includes:
@@ -257,12 +254,12 @@ class KrpcDataStreamRecvr::SenderQueue {
 
   /// Mem requirement of scheduled deserialize tasks (pending_deferred_rpcs_).
   int64_t pending_deserialized_size_ = 0;
-
 };
 
 KrpcDataStreamRecvr::SenderQueue::SenderQueue(
     KrpcDataStreamRecvr* parent_recvr, int num_senders)
-  : recvr_(parent_recvr), num_remaining_senders_(num_senders) { }
+  : recvr_(parent_recvr),
+    num_remaining_senders_(num_senders) { }
 
 Status KrpcDataStreamRecvr::SenderQueue::GetBatch(RowBatch** next_batch) {
   SCOPED_TIMER(recvr_->queue_get_batch_timer_);
@@ -365,7 +362,7 @@ void KrpcDataStreamRecvr::SenderQueue::EnqueueDeferredRpc(
     unique_ptr<TransmitDataCtx> payload) {
   lock_.DCheckLocked();
   TRACE_TO(payload->rpc_context->trace(), "Enqueuing deferred RPC");
-  if (deferred_rpcs_.empty()) has_deferred_rpcs_start_time_ns_ = MonotonicNanos();
+  if (deferred_rpcs_.empty()) recvr_->total_has_deferred_rpcs_timer_->Start();
   deferred_rpcs_.push(move(payload));
   recvr_->num_deferred_rpcs_.Add(1);
   COUNTER_ADD(recvr_->total_deferred_rpcs_counter_, 1);
@@ -376,12 +373,7 @@ unique_ptr<TransmitDataCtx> KrpcDataStreamRecvr::SenderQueue::DequeueDeferredRpc
   DCHECK(!deferred_rpcs_.empty());
   unique_ptr<TransmitDataCtx> ctx = move(deferred_rpcs_.front());
   deferred_rpcs_.pop();
-  if (deferred_rpcs_.empty()) {
-    DCHECK_NE(has_deferred_rpcs_start_time_ns_, 0);
-    int64_t duration = MonotonicNanos() - has_deferred_rpcs_start_time_ns_;
-    COUNTER_ADD(recvr_->total_has_deferred_rpcs_timer_, duration);
-    has_deferred_rpcs_start_time_ns_ = 0;
-  }
+  if (deferred_rpcs_.empty()) recvr_->total_has_deferred_rpcs_timer_->Stop();
   recvr_->num_deferred_rpcs_.Add(-1);
   return ctx;
 }
@@ -851,7 +843,8 @@ KrpcDataStreamRecvr::KrpcDataStreamRecvr(KrpcDataStreamMgr* stream_mgr,
       enqueue_profile_->AddSamplingTimeSeriesCounter("DeferredQueueSize", TUnit::UNIT,
       bind<int64_t>(mem_fn(&KrpcDataStreamRecvr::num_deferred_rpcs), this), true);
   total_has_deferred_rpcs_timer_ =
-      ADD_TIMER(enqueue_profile_, "TotalHasDeferredRPCsTime");
+      enqueue_profile_->AddConcurrentTimerCounter("TotalHasDeferredRPCsTime",
+          TUnit::TIME_NS);
   total_has_pending_deferred_rpcs_timer_ =
       ADD_TIMER(enqueue_profile_, "TotalHasPendingDeferredRPCsTime");
   dispatch_timer_ =

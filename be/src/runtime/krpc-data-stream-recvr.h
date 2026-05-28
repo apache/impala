@@ -291,7 +291,7 @@ class KrpcDataStreamRecvr {
   RuntimeProfile::TimeSeriesCounter* deferred_rpcs_time_series_counter_;
 
   /// Total wall-clock time in which the 'deferred_rpcs_' queues are not empty.
-  RuntimeProfile::Counter* total_has_deferred_rpcs_timer_;
+  RuntimeProfile::ConcurrentTimerCounter* total_has_deferred_rpcs_timer_;
 
   /// Total wall-clock time in which the 'pending_deferred_rpcs_' queues are not empty.
   RuntimeProfile::Counter* total_has_pending_deferred_rpcs_timer_;

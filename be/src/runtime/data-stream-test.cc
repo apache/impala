@@ -49,6 +49,7 @@
 #include "util/time.h"
 #include "util/mem-info.h"
 #include "util/parse-util.h"
+#include "util/scope-exit-trigger.h"
 #include "util/test-info.h"
 #include "util/tuple-row-compare.h"
 #include "util/uid-util.h"
@@ -430,10 +431,10 @@ class DataStreamTest : public testing::Test {
     }
   }
 
-  // Start receiver (expecting given number of senders) in separate thread.
+  // Start receiver expecting the given number of senders.
   void StartReceiver(TPartitionType::type stream_type, int num_senders, int receiver_num,
       int buffer_size, bool is_merging, TUniqueId* out_id = nullptr,
-      RuntimeProfile** out_profile = nullptr) {
+      RuntimeProfile** out_profile = nullptr, bool start_reader = true) {
     VLOG_QUERY << "start receiver";
     RuntimeProfile* profile = RuntimeProfile::Create(&obj_pool_, "TestReceiver");
     TUniqueId instance_id;
@@ -444,7 +445,9 @@ class DataStreamTest : public testing::Test {
     info->stream_recvr = stream_mgr_->CreateRecvr(row_desc_, *runtime_state_.get(),
         instance_id, DEST_NODE_ID, num_senders, buffer_size, is_merging, profile,
         &tracker_, &buffer_pool_client_);
-   if (!is_merging) {
+    if (!start_reader) {
+      DCHECK(!is_merging);
+    } else if (!is_merging) {
       info->thread_handle.reset(new thread(&DataStreamTest::ReadStream, this, info));
     } else {
       TupleRowComparator* less_than_comparator = nullptr;
@@ -458,10 +461,19 @@ class DataStreamTest : public testing::Test {
     if (out_profile != nullptr) *out_profile = profile;
   }
 
+  void StartReceiverWithoutReader(TPartitionType::type stream_type, int num_senders,
+      int receiver_num, int buffer_size, TUniqueId* out_id = nullptr,
+      RuntimeProfile** out_profile = nullptr) {
+    StartReceiver(stream_type, num_senders, receiver_num, buffer_size, false, out_id,
+        out_profile, false);
+  }
+
   void JoinReceivers() {
     VLOG_QUERY << "join receiver\n";
     for (int i = 0; i < receiver_info_.size(); ++i) {
-      receiver_info_[i]->thread_handle->join();
+      if (receiver_info_[i]->thread_handle != nullptr) {
+        receiver_info_[i]->thread_handle->join();
+      }
       receiver_info_[i]->stream_recvr->Close();
     }
   }
@@ -779,6 +791,51 @@ TEST_F(DataStreamTest, Cancel) {
   JoinReceivers();
   EXPECT_TRUE(receiver_info_[0]->status.IsCancelled());
   EXPECT_TRUE(receiver_info_[1]->status.IsCancelled());
+}
+
+TEST_F(DataStreamTest, TotalHasDeferredRpcsTimeIncludesOpenInterval) {
+  FLAGS_datastream_sender_timeout_ms = 10000;
+
+  // Keep the receiver reader stopped so the sender defers an RPC. The IMPALA-14838
+  // regression test verifies TotalHasDeferredRPCsTime while the deferred-RPC interval
+  // is still open.
+  TUniqueId instance_id;
+  RuntimeProfile* profile = nullptr;
+  StartReceiverWithoutReader(TPartitionType::UNPARTITIONED, 1, 1, 1024, &instance_id,
+      &profile);
+  const auto cancel_and_join = MakeScopeExitTrigger([&]() {
+    stream_mgr_->Cancel(GetQueryId(instance_id));
+    JoinSenders();
+    JoinReceivers();
+  });
+
+  vector<RuntimeProfile::Counter*> total_deferred_rpcs_counters;
+  profile->GetCounters("TotalRPCsDeferred", &total_deferred_rpcs_counters);
+  ASSERT_EQ(1, total_deferred_rpcs_counters.size());
+  RuntimeProfile::Counter* total_deferred_rpcs = total_deferred_rpcs_counters[0];
+
+  vector<RuntimeProfile::Counter*> deferred_rpcs_time_counters;
+  profile->GetCounters("TotalHasDeferredRPCsTime", &deferred_rpcs_time_counters);
+  ASSERT_EQ(1, deferred_rpcs_time_counters.size());
+  RuntimeProfile::Counter* deferred_rpcs_time = deferred_rpcs_time_counters[0];
+
+  StartSender(TPartitionType::UNPARTITIONED, 1024);
+
+  int64_t waited_ms = 0;
+  while (total_deferred_rpcs->value() == 0 && waited_ms < 5000) {
+    SleepForMs(1);
+    ++waited_ms;
+  }
+  ASSERT_GT(total_deferred_rpcs->value(), 0);
+
+  int64_t open_interval_time = 0;
+  waited_ms = 0;
+  while ((open_interval_time = deferred_rpcs_time->value()) == 0 && waited_ms < 5000) {
+    SleepForMs(1);
+    ++waited_ms;
+  }
+
+  EXPECT_GT(open_interval_time, 0);
 }
 
 TEST_F(DataStreamTest, BasicTest) {
