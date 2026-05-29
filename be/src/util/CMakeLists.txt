@@ -97,7 +97,10 @@ set(UTIL_SRCS
   progress-updater.cc
   process-state-info.cc
   redactor.cc
+  runtime-profile-archive.cc
   runtime-profile.cc
+  runtime-profile-periodic.cc
+  runtime-profile-serialization.cc
   sharded-query-map-util.cc
   simple-logger.cc
   sql-util.cc

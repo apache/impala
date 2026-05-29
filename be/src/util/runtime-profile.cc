@@ -36,25 +36,14 @@
 #include "common/object-pool.h"
 #include "gutil/strings/strip.h"
 #include "kudu/util/logging.h"
-#include "rpc/thrift-util.h"
 #include "runtime/mem-pool.h"
-#include "runtime/mem-tracker.h"
-#include "util/coding-util.h"
-#include "util/compress.h"
 #include "util/container-util.h"
-#include "util/debug-util.h"
-#include "util/periodic-counter-updater.h"
 #include "util/pretty-printer.h"
 #include "util/redactor.h"
-#include "util/scope-exit-trigger.h"
 #include "util/ubsan.h"
 #include "gutil/strings/strcat.h"
 
 #include "common/names.h"
-
-DECLARE_int32(status_report_interval_ms);
-DECLARE_int32(periodic_counter_update_period_ms);
-DECLARE_int32(periodic_system_counter_update_period_ms);
 
 // This must be set on the coordinator to enable the alternative profile representation.
 // It should not be set on executors - the setting is sent to the executors by
@@ -126,11 +115,6 @@ static int64_t BitcastToInt64(T val) {
   int64_t res;
   memcpy(&res, &val, sizeof(int64_t));
   return res;
-}
-
-static int32_t GetProfileVersion(const TRuntimeProfileTree& tree) {
-  // Assume version 1 if not set, because profile_version was only added in v2.
-  return tree.__isset.profile_version ? tree.profile_version : 1;
 }
 
 static bool UntimedProfileNode(const string& name) {
@@ -282,24 +266,6 @@ RuntimeProfile::RuntimeProfile(
 
 RuntimeProfile::~RuntimeProfile() {
   DCHECK(!has_active_periodic_counters_);
-}
-
-void RuntimeProfile::StopPeriodicCounters() {
-  lock_guard<SpinLock> l(counter_map_lock_);
-  if (!has_active_periodic_counters_) return;
-  for (Counter* sampling_counter : sampling_counters_) {
-    PeriodicCounterUpdater::StopSamplingCounter(sampling_counter);
-  }
-  for (Counter* rate_counter : rate_counters_) {
-    PeriodicCounterUpdater::StopRateCounter(rate_counter);
-  }
-  for (vector<Counter*>* counters : bucketing_counters_) {
-    PeriodicCounterUpdater::StopBucketingCounters(counters);
-  }
-  for (auto& time_series_counter_entry : time_series_counter_map_) {
-    PeriodicCounterUpdater::StopTimeSeriesCounter(time_series_counter_entry.second);
-  }
-  has_active_periodic_counters_ = false;
 }
 
 RuntimeProfile* RuntimeProfile::CreateFromThrift(ObjectPool* pool,
@@ -1651,108 +1617,6 @@ void RuntimeProfile::PrettyPrintSubclassCounters(
   }
 }
 
-Status RuntimeProfile::Compress(vector<uint8_t>* out) const {
-  Status status;
-  TRuntimeProfileTree thrift_object;
-  const_cast<RuntimeProfile*>(this)->ToThrift(&thrift_object);
-  ThriftSerializer serializer(true);
-  vector<uint8_t> serialized_buffer;
-  RETURN_IF_ERROR(serializer.SerializeToVector(&thrift_object, &serialized_buffer));
-
-  // Compress the serialized thrift string.  This uses string keys and is very
-  // easy to compress.
-  scoped_ptr<Codec> compressor;
-  Codec::CodecInfo codec_info(THdfsCompression::DEFAULT);
-  RETURN_IF_ERROR(Codec::CreateCompressor(NULL, false, codec_info, &compressor));
-  const auto close_compressor =
-      MakeScopeExitTrigger([&compressor]() { compressor->Close(); });
-
-  int64_t max_compressed_size = compressor->MaxOutputLen(serialized_buffer.size());
-  DCHECK_GT(max_compressed_size, 0);
-  out->resize(max_compressed_size);
-  int64_t result_len = out->size();
-  uint8_t* compressed_buffer_ptr = out->data();
-  RETURN_IF_ERROR(compressor->ProcessBlock(true, serialized_buffer.size(),
-      serialized_buffer.data(), &result_len, &compressed_buffer_ptr));
-  out->resize(result_len);
-  return Status::OK();
-}
-
-Status RuntimeProfile::DecompressToThrift(
-    const vector<uint8_t>& compressed_profile, TRuntimeProfileTree* out) {
-  scoped_ptr<Codec> decompressor;
-  MemTracker mem_tracker;
-  MemPool mem_pool(&mem_tracker);
-  const auto close_mem_tracker = MakeScopeExitTrigger([&mem_pool, &mem_tracker]() {
-    mem_pool.FreeAll();
-    mem_tracker.Close();
-  });
-  RETURN_IF_ERROR(Codec::CreateDecompressor(
-      &mem_pool, false, THdfsCompression::DEFAULT, &decompressor));
-  const auto close_decompressor =
-      MakeScopeExitTrigger([&decompressor]() { decompressor->Close(); });
-
-  int64_t result_len;
-  uint8_t* decompressed_buffer;
-  RETURN_IF_ERROR(decompressor->ProcessBlock(false, compressed_profile.size(),
-      compressed_profile.data(), &result_len, &decompressed_buffer));
-
-  uint32_t deserialized_len = static_cast<uint32_t>(result_len);
-  RETURN_IF_ERROR(
-      DeserializeThriftMsg(decompressed_buffer, &deserialized_len, true, out));
-  return Status::OK();
-}
-
-Status RuntimeProfile::DecompressToProfile(
-    const vector<uint8_t>& compressed_profile, ObjectPool* pool, RuntimeProfile** out) {
-  TRuntimeProfileTree thrift_profile;
-  RETURN_IF_ERROR(
-      RuntimeProfile::DecompressToThrift(compressed_profile, &thrift_profile));
-  *out = RuntimeProfile::CreateFromThrift(pool, thrift_profile);
-  return Status::OK();
-}
-
-Status RuntimeProfile::SerializeToArchiveString(string* out) const {
-  stringstream ss;
-  RETURN_IF_ERROR(SerializeToArchiveString(&ss));
-  *out = ss.str();
-  return Status::OK();
-}
-
-Status RuntimeProfile::SerializeToArchiveString(stringstream* out) const {
-  vector<uint8_t> compressed_buffer;
-  RETURN_IF_ERROR(Compress(&compressed_buffer));
-  Base64Encode(compressed_buffer, out);
-  return Status::OK();
-}
-
-Status RuntimeProfile::DeserializeFromArchiveString(
-    const std::string& archive_str, TRuntimeProfileTree* out) {
-  int64_t decoded_max;
-  if (!Base64DecodeBufLen(archive_str.c_str(), archive_str.size(), &decoded_max)) {
-    return Status("Error in DeserializeFromArchiveString: Base64DecodeBufLen failed.");
-  }
-
-  vector<uint8_t> decoded_buffer;
-  decoded_buffer.resize(decoded_max);
-  unsigned decoded_len;
-  if (!Base64Decode(archive_str.c_str(), archive_str.size(), decoded_max,
-          reinterpret_cast<char*>(decoded_buffer.data()), &decoded_len)) {
-    return Status("Error in DeserializeFromArchiveString: Base64Decode failed.");
-  }
-  decoded_buffer.resize(decoded_len);
-  return DecompressToThrift(decoded_buffer, out);
-}
-
-Status RuntimeProfile::CreateFromArchiveString(const string& archive_str,
-    ObjectPool* pool, RuntimeProfile** out, int32_t* profile_version_out) {
-  TRuntimeProfileTree tree;
-  RETURN_IF_ERROR(DeserializeFromArchiveString(archive_str, &tree));
-  *profile_version_out = GetProfileVersion(tree);
-  *out = RuntimeProfile::CreateFromThrift(pool, tree);
-  return Status::OK();
-}
-
 void RuntimeProfile::SetTExecSummary(const TExecSummary& summary) {
   lock_guard<SpinLock> l(t_exec_summary_lock_);
   t_exec_summary_ = summary;
@@ -1935,88 +1799,6 @@ int64_t RuntimeProfile::CounterSum(const vector<Counter*>* counters) {
   return value;
 }
 
-RuntimeProfileBase::Counter* RuntimeProfile::AddRateCounter(
-    const string& name, Counter* src_counter) {
-  TUnit::type dst_unit;
-  switch (src_counter->unit()) {
-    case TUnit::BYTES:
-      dst_unit = TUnit::BYTES_PER_SECOND;
-      break;
-    case TUnit::UNIT:
-      dst_unit = TUnit::UNIT_PER_SECOND;
-      break;
-    default:
-      DCHECK(false) << "Unsupported src counter unit: " << src_counter->unit();
-      return NULL;
-  }
-  {
-    lock_guard<SpinLock> l(counter_map_lock_);
-    bool created;
-    Counter* dst_counter = AddCounterLocked(name, dst_unit, ROOT_COUNTER, &created);
-    if (!created) return dst_counter;
-    rate_counters_.push_back(dst_counter);
-    PeriodicCounterUpdater::RegisterPeriodicCounter(src_counter, NULL, dst_counter,
-        PeriodicCounterUpdater::RATE_COUNTER);
-    has_active_periodic_counters_ = true;
-    return dst_counter;
-  }
-}
-
-RuntimeProfileBase::Counter* RuntimeProfile::AddRateCounter(
-    const string& name, SampleFunction fn, TUnit::type dst_unit) {
-  lock_guard<SpinLock> l(counter_map_lock_);
-  bool created;
-  Counter* dst_counter = AddCounterLocked(name, dst_unit, ROOT_COUNTER, &created);
-  if (!created) return dst_counter;
-  rate_counters_.push_back(dst_counter);
-  PeriodicCounterUpdater::RegisterPeriodicCounter(
-      NULL, std::move(fn), dst_counter, PeriodicCounterUpdater::RATE_COUNTER);
-  has_active_periodic_counters_ = true;
-  return dst_counter;
-}
-
-RuntimeProfileBase::Counter* RuntimeProfile::AddSamplingCounter(
-    const string& name, Counter* src_counter) {
-  DCHECK(src_counter->unit() == TUnit::UNIT);
-  lock_guard<SpinLock> l(counter_map_lock_);
-  bool created;
-  Counter* dst_counter =
-      AddCounterLocked(name, TUnit::DOUBLE_VALUE, ROOT_COUNTER, &created);
-  if (!created) return dst_counter;
-  sampling_counters_.push_back(dst_counter);
-  PeriodicCounterUpdater::RegisterPeriodicCounter(src_counter, NULL, dst_counter,
-      PeriodicCounterUpdater::SAMPLING_COUNTER);
-  has_active_periodic_counters_ = true;
-  return dst_counter;
-}
-
-RuntimeProfileBase::Counter* RuntimeProfile::AddSamplingCounter(
-    const string& name, SampleFunction sample_fn) {
-  lock_guard<SpinLock> l(counter_map_lock_);
-  bool created;
-  Counter* dst_counter =
-      AddCounterLocked(name, TUnit::DOUBLE_VALUE, ROOT_COUNTER, &created);
-  if (!created) return dst_counter;
-  sampling_counters_.push_back(dst_counter);
-  PeriodicCounterUpdater::RegisterPeriodicCounter(
-      NULL, std::move(sample_fn), dst_counter, PeriodicCounterUpdater::SAMPLING_COUNTER);
-  has_active_periodic_counters_ = true;
-  return dst_counter;
-}
-
-vector<RuntimeProfileBase::Counter*>* RuntimeProfile::AddBucketingCounters(
-    Counter* src_counter, int num_buckets) {
-  lock_guard<SpinLock> l(counter_map_lock_);
-  vector<Counter*>* buckets = pool_->Add(new vector<Counter*>);
-  for (int i = 0; i < num_buckets; ++i) {
-    buckets->push_back(pool_->Add(new Counter(TUnit::DOUBLE_VALUE, 0)));
-  }
-  bucketing_counters_.insert(buckets);
-  has_active_periodic_counters_ = true;
-  PeriodicCounterUpdater::RegisterBucketingCounters(src_counter, buckets);
-  return buckets;
-}
-
 RuntimeProfile::EventSequence* RuntimeProfile::AddEventSequence(const string& name) {
   lock_guard<SpinLock> l(event_sequence_lock_);
   EventSequenceMap::iterator timer_it = event_sequence_map_.find(name);
@@ -2066,33 +1848,6 @@ RuntimeProfileBase::SummaryStatsCounter* RuntimeProfile::AddSummaryStatsCounter(
   return counter;
 }
 
-RuntimeProfile::TimeSeriesCounter* RuntimeProfile::AddSamplingTimeSeriesCounter(
-    const string& name, TUnit::type unit, SampleFunction fn, bool is_system) {
-  DCHECK(fn != nullptr);
-  lock_guard<SpinLock> l(counter_map_lock_);
-  TimeSeriesCounterMap::iterator it = time_series_counter_map_.find(name);
-  if (it != time_series_counter_map_.end()) return it->second;
-  int32_t update_interval = is_system ?
-      FLAGS_periodic_system_counter_update_period_ms :
-      FLAGS_periodic_counter_update_period_ms;
-  TimeSeriesCounter* counter = pool_->Add(
-      new SamplingTimeSeriesCounter(name, unit, std::move(fn), update_interval));
-  if (is_system) {
-    counter->SetIsSystem();
-  }
-  time_series_counter_map_[name] = counter;
-  PeriodicCounterUpdater::RegisterTimeSeriesCounter(counter);
-  has_active_periodic_counters_ = true;
-  return counter;
-}
-
-RuntimeProfile::TimeSeriesCounter* RuntimeProfile::AddSamplingTimeSeriesCounter(
-    const string& name, Counter* src_counter, bool is_system) {
-  DCHECK(src_counter != NULL);
-  return AddSamplingTimeSeriesCounter(name, src_counter->unit(),
-      bind(&Counter::value, src_counter), is_system);
-}
-
 void RuntimeProfile::TimeSeriesCounter::AddSample(int ms_elapsed) {
   lock_guard<SpinLock> l(lock_);
   int64_t sample = sample_fn_();
@@ -2122,12 +1877,6 @@ const int64_t* RuntimeProfile::SamplingTimeSeriesCounter::GetSamplesLocked(
 void RuntimeProfile::SamplingTimeSeriesCounter::Reset() {
     samples_.Reset();
 }
-
-RuntimeProfile::ChunkedTimeSeriesCounter::ChunkedTimeSeriesCounter(
-    const string& name, TUnit::type unit, SampleFunction fn)
-  : TimeSeriesCounter(name, unit, std::move(fn)),
-    period_(FLAGS_periodic_counter_update_period_ms),
-    max_size_(10 * FLAGS_status_report_interval_ms / period_) {}
 
 void RuntimeProfile::ChunkedTimeSeriesCounter::Clear() {
   lock_guard<SpinLock> l(lock_);
@@ -2185,20 +1934,6 @@ void RuntimeProfile::ChunkedTimeSeriesCounter::SetSamples(
   // Skip values we already received.
   auto start_it = samples.begin() + values_.size() - start_idx;
   values_.insert(values_.end(), start_it, samples.end());
-}
-
-RuntimeProfile::TimeSeriesCounter* RuntimeProfile::AddChunkedTimeSeriesCounter(
-    const string& name, TUnit::type unit, SampleFunction fn) {
-  DCHECK(fn != nullptr);
-  lock_guard<SpinLock> l(counter_map_lock_);
-  TimeSeriesCounterMap::iterator it = time_series_counter_map_.find(name);
-  if (it != time_series_counter_map_.end()) return it->second;
-  TimeSeriesCounter* counter =
-      pool_->Add(new ChunkedTimeSeriesCounter(name, unit, std::move(fn)));
-  time_series_counter_map_[name] = counter;
-  PeriodicCounterUpdater::RegisterTimeSeriesCounter(counter);
-  has_active_periodic_counters_ = true;
-  return counter;
 }
 
 void RuntimeProfileBase::ClearChunkedTimeSeriesCounters() {
