@@ -28,6 +28,7 @@
 #include "gutil/strings/strip.h"
 #include "util/os-info.h"
 #include "util/runtime-profile.h"
+#include "util/string-parser.h"
 
 #include "common/names.h"
 
@@ -80,6 +81,13 @@ using std::cin;
 using std::cout;
 using std::istringstream;
 
+static bool ParseTimestamp(const string& timestamp_str, int64_t* timestamp) {
+  StringParser::ParseResult result;
+  *timestamp = StringParser::StringToInt<int64_t>(
+      timestamp_str.c_str(), timestamp_str.length(), &result);
+  return result == StringParser::PARSE_SUCCESS;
+}
+
 int main(int argc, char** argv) {
   google::SetUsageMessage(USAGE);
   google::ParseCommandLineFlags(&argc, &argv, true);
@@ -114,9 +122,8 @@ int main(int argc, char** argv) {
     // Profile logs prefix each encoded profile with timestamp and query id. WebUI
     // thrift profile downloads contain only the encoded profile.
     istringstream liness(line);
-    int64_t timestamp = -1;
-    string query_id, encoded_profile;
-    liness >> timestamp >> query_id >> encoded_profile;
+    string timestamp_str, query_id, encoded_profile;
+    liness >> timestamp_str >> query_id >> encoded_profile;
     const bool has_log_metadata = !liness.fail();
     if (!has_log_metadata) {
       encoded_profile = line;
@@ -124,11 +131,21 @@ int main(int argc, char** argv) {
     }
 
     // Skip decoding entries that don't match our parameters.
-    if (has_log_metadata
-        && ((FLAGS_query_id != "" && FLAGS_query_id != query_id) ||
-            (FLAGS_min_timestamp != -1 && timestamp < FLAGS_min_timestamp) ||
-            (FLAGS_max_timestamp != -1 && timestamp > FLAGS_max_timestamp))) {
+    if (has_log_metadata && FLAGS_query_id != "" && FLAGS_query_id != query_id) {
       continue;
+    }
+    if (has_log_metadata && (FLAGS_min_timestamp != -1 || FLAGS_max_timestamp != -1)) {
+      int64_t timestamp;
+      if (!ParseTimestamp(timestamp_str, &timestamp)) {
+        cerr << "Error parsing timestamp on line " << lineno << ": '"
+             << timestamp_str << "'\n";
+        ++errors;
+        continue;
+      }
+      if ((FLAGS_min_timestamp != -1 && timestamp < FLAGS_min_timestamp)
+          || (FLAGS_max_timestamp != -1 && timestamp > FLAGS_max_timestamp)) {
+        continue;
+      }
     }
 
     ObjectPool pool;

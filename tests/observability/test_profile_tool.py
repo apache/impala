@@ -96,6 +96,41 @@ class TestProfileTool(BaseTestSuite):
         get_profile_path('impala_profile_log_tpcds_compute_stats'),
         profile_prefix=' \t', profile_suffix=' \r')
 
+  def test_timestamp_filter(self):
+    profile_log = get_profile_path('impala_profile_log_tpcds_compute_stats')
+    with open(profile_log, 'r') as f:
+      fields = f.readline().split(None, 2)
+    assert len(fields) == 3
+
+    self._compare_profile_tool_output(['--min_timestamp=%s' % fields[0]], profile_log,
+        get_profile_path('impala_profile_log_tpcds_compute_stats.expected.txt'))
+
+    with tempfile.NamedTemporaryFile() as tmp:
+      self._run_profile_tool(['--max_timestamp=%d' % (int(fields[0]) - 1)],
+          profile_log, tmp)
+      assert os.path.getsize(tmp.name) == 0
+
+  def test_oversized_timestamp_without_timestamp_filter(self):
+    with open(get_profile_path('impala_profile_log_tpcds_compute_stats'), 'r') as f:
+      profile_log_line = f.readline()
+    fields = profile_log_line.split(None, 2)
+    assert len(fields) == 3
+
+    with tempfile.NamedTemporaryFile(mode='w+') as valid_input, \
+        tempfile.NamedTemporaryFile(mode='w+') as oversized_timestamp_input, \
+        tempfile.NamedTemporaryFile() as valid_output, \
+        tempfile.NamedTemporaryFile() as oversized_timestamp_output:
+      valid_input.write(profile_log_line)
+      valid_input.flush()
+      oversized_timestamp_input.write(
+          '174830243931748302879977 %s %s' % (fields[1], fields[2]))
+      oversized_timestamp_input.flush()
+
+      self._run_profile_tool([], valid_input.name, valid_output)
+      self._run_profile_tool([], oversized_timestamp_input.name,
+          oversized_timestamp_output)
+      check_call(['diff', valid_output.name, oversized_timestamp_output.name])
+
   def _compare_profile_tool_output(self, args, input_log, expected_output):
     """Run impala-profile-tool on input_log and compare it to the contents of the
     file at 'expected_output'."""
