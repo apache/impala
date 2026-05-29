@@ -27,8 +27,6 @@ import org.apache.hadoop.hive.metastore.api.hive_metastoreConstants;
 import org.apache.hadoop.hive.serde.serdeConstants;
 import org.apache.hadoop.hive.serde2.avro.AvroSerdeUtils;
 import org.apache.iceberg.DataFile;
-import org.apache.iceberg.mr.Catalogs;
-import org.apache.iceberg.mr.InputFormatConfig;
 import org.apache.impala.authorization.AuthorizationConfig;
 import org.apache.impala.catalog.DataSourceTable;
 import org.apache.impala.catalog.FeDataSourceTable;
@@ -38,6 +36,7 @@ import org.apache.impala.catalog.FeHBaseTable;
 import org.apache.impala.catalog.FeIcebergTable;
 import org.apache.impala.catalog.FeKuduTable;
 import org.apache.impala.catalog.FeTable;
+import org.apache.impala.catalog.iceberg.IcebergCatalogUtil;
 import org.apache.impala.catalog.HdfsFileFormat;
 import org.apache.impala.catalog.HdfsStorageDescriptor;
 import org.apache.impala.catalog.IcebergTable;
@@ -182,8 +181,8 @@ public class AlterTableSetTblProperties extends AlterTableSetStmt {
     icebergPropertyCheck(IcebergTable.ICEBERG_CATALOG);
     icebergPropertyCheck(IcebergTable.ICEBERG_CATALOG_LOCATION);
     icebergPropertyCheck(IcebergTable.ICEBERG_TABLE_IDENTIFIER);
-    icebergPropertyCheck(Catalogs.NAME);
-    icebergPropertyCheck(InputFormatConfig.TABLE_IDENTIFIER);
+    icebergPropertyCheck(IcebergCatalogUtil.CATALOGS_NAME_PROPERTY);
+    icebergPropertyCheck(IcebergCatalogUtil.TABLE_IDENTIFIER);
     icebergPropertyCheck(IcebergTable.METADATA_LOCATION);
     if (tblProperties_.containsKey(IcebergTable.ICEBERG_FILE_FORMAT)) {
       icebergTableFormatCheck(tblProperties_.get(IcebergTable.ICEBERG_FILE_FORMAT));

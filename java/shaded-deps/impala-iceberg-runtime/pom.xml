@@ -51,7 +51,13 @@ under the License.
     </dependency>
     <dependency>
       <groupId>org.apache.iceberg</groupId>
-      <artifactId>iceberg-mr</artifactId>
+      <artifactId>iceberg-data</artifactId>
+      <version>${iceberg.version}</version>
+      <optional>true</optional>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.iceberg</groupId>
+      <artifactId>iceberg-orc</artifactId>
       <version>${iceberg.version}</version>
       <optional>true</optional>
     </dependency>
