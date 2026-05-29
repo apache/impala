@@ -53,6 +53,7 @@ add_library(ExprsIr
   tuple-is-null-predicate-ir.cc
   udf-builtins-ir.cc
   utility-functions-ir.cc
+  variant-functions-ir.cc
 )
 add_dependencies(ExprsIr gen-deps)
 

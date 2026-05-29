@@ -94,6 +94,7 @@ add_library(Runtime
   tuple-cache-mgr.cc
   tuple-row.cc
   tmp-file-mgr.cc
+  variant-value.cc
 )
 add_dependencies(Runtime gen-deps)
 
