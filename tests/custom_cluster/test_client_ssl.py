@@ -39,9 +39,7 @@ from tests.shell.util import run_impala_shell_cmd, run_impala_shell_cmd_no_expec
 
 CERT_DIR = "%s/be/src/testutil" % os.environ['IMPALA_HOME']
 
-# Due to THRIFT-792, SSL errors are suppressed when using OpenSSL hostname verification.
-# This is the only option on Python 3.12+, using ssl.PROTOCOL_TLS_CLIENT.
-CERT_ERR = ["doesn't match", "certificate verify failed", "Could not connect"]
+CERT_ERR = ["doesn't match", "certificate verify failed"]
 
 
 class TestClientSsl(CustomClusterTestSuite):

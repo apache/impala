@@ -28,10 +28,10 @@ flake8==7.3.0
 flake8-unused-arguments==0.0.14
 hdfs == 2.7.3
   docopt == 0.6.2
-impyla == 0.23a2
+  six == 1.17.0
+impyla == 0.24a1
   bitarray == 2.3.0
   pure-sasl == 0.6.2
-  six == 1.17.0
   thrift_sasl == 0.4.3
 isort == 5.13.2
   poetry-core == 1.9.1
@@ -72,7 +72,7 @@ sasl == 0.4a1
 # Can't upgrade until https://github.com/andialbrecht/sqlparse/issues/814 is fixed.
 sqlparse == 0.3.1
 avro==1.12.1
-thrift==0.16.0
+thrift==0.23.0
 
 # Required for Kudu:
   Cython == 0.29.37

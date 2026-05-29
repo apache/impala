@@ -66,9 +66,7 @@ WEBUI_PORTS = [25000, 25010, 25020]
 
 # Error text can depend on both protocol and python version.
 CONN_ERR = ["Could not connect", "Connection refused"]
-# Due to THRIFT-792, SSL errors are suppressed when using OpenSSL hostname verification.
-# This is the only option on Python 3.12+, using ssl.PROTOCOL_TLS_CLIENT.
-CERT_ERR = ["doesn't match", "certificate verify failed", "Could not connect"]
+CERT_ERR = ["doesn't match", "certificate verify failed"]
 WEB_CERT_ERR = "SSLCertVerificationError"
 
 
@@ -216,8 +214,8 @@ class TestIPv6DualSsl(TestIPv6Base):
       self._webui_smoke("https://ip6.impala.test:%d" % port)
       self._webui_smoke("https://ip46.impala.test:%d" % port)
 
-    self._smoke("[::1]", vector, CONN_ERR)
-    self._smoke("127.0.0.1", vector, CONN_ERR)
+    self._smoke("[::1]", vector, CERT_ERR)
+    self._smoke("127.0.0.1", vector, CERT_ERR)
     self._smoke("ip4.impala.test", vector)
     self._smoke("ip6.impala.test", vector)
     self._smoke("ip46.impala.test", vector)
@@ -249,7 +247,7 @@ class TestIPv6OnlySsl(TestIPv6Base):
       self._webui_smoke("https://ip6.impala.test:%d" % port)
       self._webui_smoke("https://ip46.impala.test:%d" % port)
 
-    self._smoke("[::1]", vector, CONN_ERR)
+    self._smoke("[::1]", vector, CERT_ERR)
     self._smoke("127.0.0.1", vector, CONN_ERR)
     self._smoke("ip4.impala.test", vector, CONN_ERR)
     self._smoke("ip6.impala.test", vector)

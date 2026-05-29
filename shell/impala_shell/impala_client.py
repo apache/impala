@@ -121,6 +121,17 @@ def utf8_encode_if_needed(val):
   return val
 
 
+def get_ssl_context(ca_cert, verify_cert):
+  ssl_ctx = ssl.create_default_context(cafile=ca_cert)
+  if ca_cert or verify_cert:
+    ssl_ctx.check_hostname = True
+    ssl_ctx.verify_mode = ssl.CERT_REQUIRED
+  else:
+    ssl_ctx.check_hostname = False  # Mandated by the SSL lib for CERT_NONE mode.
+    ssl_ctx.verify_mode = ssl.CERT_NONE
+  return ssl_ctx
+
+
 # Regular expression that matches the progress line added to HS2 logs by
 # the Impala server.
 HS2_LOG_PROGRESS_REGEX = re.compile(r"Query.*Complete \([0-9]* out of [0-9]*\)\n")
@@ -209,12 +220,17 @@ class ImpalaClient(object):
     was already connected, closes the previous connection."""
     self.close_connection()
 
-    if self.use_http_base_transport:
-        self.transport = self._get_http_transport(self.client_connect_timeout_ms)
-    else:
-        self.transport = self._get_transport(self.client_connect_timeout_ms)
-    assert self.transport and self.transport.isOpen()
-
+    try:
+      if self.use_http_base_transport:
+          self.transport = self._get_http_transport(self.client_connect_timeout_ms)
+      else:
+          self.transport = self._get_transport(self.client_connect_timeout_ms)
+      assert self.transport and self.transport.isOpen()
+    except TTransportException as e:
+      # Unwrap socket.error so we can handle it directly.
+      if isinstance(e.inner, socket.error):
+        raise e.inner
+      raise
     if self.verbose:
       msg = 'Opened TCP connection to %s:%s' % (self.impalad_host, self.impalad_port)
       print(msg, file=sys.stderr)
@@ -431,13 +447,7 @@ class ImpalaClient(object):
     # ImpalaHttpClient relies on the URI scheme (http vs https) to open an appropriate
     # connection to the server.
     if self.use_ssl:
-      ssl_ctx = ssl.create_default_context(cafile=self.ca_cert)
-      if self.ca_cert or self.verify_cert:
-        ssl_ctx.check_hostname = True
-        ssl_ctx.verify_mode = ssl.CERT_REQUIRED
-      else:
-        ssl_ctx.check_hostname = False  # Mandated by the SSL lib for CERT_NONE mode.
-        ssl_ctx.verify_mode = ssl.CERT_NONE
+      ssl_ctx = get_ssl_context(self.ca_cert, self.verify_cert)
       url = "https://{0}/{1}".format(host_and_port, self.http_path)
       transport = ImpalaHttpClient(url, ssl_context=ssl_ctx,
                                    http_cookie_names=self.http_cookie_names,
@@ -510,17 +520,8 @@ class ImpalaClient(object):
     sock_host = self.impalad_host
     sock_port = self.impalad_port
     if self.use_ssl:
-      if self.ca_cert:
-        sock = TSSLSocket(
-            sock_host, sock_port, cert_reqs=ssl.CERT_REQUIRED, ca_certs=self.ca_cert)
-      elif self.verify_cert:
-        # Verify using the system's default CA certificates.
-        sock = TSSLSocket(sock_host, sock_port, cert_reqs=ssl.CERT_REQUIRED)
-      else:
-        # No CA cert means don't try to verify the certificate. TSSLSocket defaults to
-        # ssl.PROTOCOL_TLS_CLIENT - which verifies certs - so override to PROTOCOL_TLS.
-        sock = TSSLSocket(
-            sock_host, sock_port, cert_reqs=ssl.CERT_NONE, ssl_version=ssl.PROTOCOL_TLS)
+      ssl_ctx = get_ssl_context(self.ca_cert, self.verify_cert)
+      sock = TSSLSocket(sock_host, sock_port, ssl_context=ssl_ctx)
     else:
       sock = TSocket(sock_host, sock_port)
 
