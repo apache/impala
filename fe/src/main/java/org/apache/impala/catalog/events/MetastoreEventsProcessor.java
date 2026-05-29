@@ -2145,15 +2145,16 @@ public class MetastoreEventsProcessor implements ExternalEventsProcessor {
       Set<String> dbNames, Map<String, List<String>> db2Tables) {
     for (TCatalogObject catalogObject: req.getObject_descs()) {
       if (catalogObject.isSetDb()) {
-        dbNames.add(catalogObject.getDb().db_name);
+        dbNames.add(catalogObject.getDb().db_name.toLowerCase());
       } else if (catalogObject.isSetTable()) {
         TTable table = catalogObject.getTable();
-        if (catalog_.getDb(table.db_name) == null) {
+        String dbName = table.db_name.toLowerCase();
+        if (catalog_.getDb(dbName) == null) {
           // We will check existence of missing dbs.
-          dbNames.add(table.db_name);
+          dbNames.add(dbName);
         }
-        db2Tables.computeIfAbsent(table.db_name, k -> new ArrayList<>())
-            .add(table.tbl_name);
+        db2Tables.computeIfAbsent(dbName, k -> new ArrayList<>())
+            .add(table.tbl_name.toLowerCase());
       }
     }
   }
@@ -2163,9 +2164,10 @@ public class MetastoreEventsProcessor implements ExternalEventsProcessor {
     for (TCatalogObject catalogObject : req.getObject_descs()) {
       if (catalogObject.isSetTable()) {
         TTable table = catalogObject.getTable();
-        tblFn.apply(new TTableName(table.db_name, table.tbl_name));
+        tblFn.apply(new TTableName(table.db_name.toLowerCase(),
+            table.tbl_name.toLowerCase()));
       } else if (dbFn != null && catalogObject.isSetDb()) {
-        dbFn.apply(catalogObject.getDb().getDb_name());
+        dbFn.apply(catalogObject.getDb().getDb_name().toLowerCase());
       }
     }
   }
@@ -2273,7 +2275,8 @@ public class MetastoreEventsProcessor implements ExternalEventsProcessor {
         throw new CatalogException(String.format(
             "Illegal table name found in view %s: %s", view.getFullName(), str));
       }
-      TTableName name = new TTableName(strs.get(0), strs.get(1));
+      TTableName name = new TTableName(strs.get(0).toLowerCase(),
+          strs.get(1).toLowerCase());
       if (!checkedNames.contains(name)) {
         uncheckedNames.add(name);
         LOG.info("Found new table name used by view {}: {}.{}", view.getFullName(),

@@ -416,7 +416,7 @@ public class EventExecutorService {
    */
   @Nullable DbEventExecutor getDbEventExecutor(String dbName) {
     Preconditions.checkNotNull(dbName);
-    return dbNameToEventExecutor_.get(dbName);
+    return dbNameToEventExecutor_.get(dbName.toLowerCase());
   }
 
   /**
@@ -431,7 +431,7 @@ public class EventExecutorService {
    */
   private DbEventExecutor getOrFindDbEventExecutor(String dbName) {
     Preconditions.checkNotNull(dbName);
-    DbEventExecutor eventExecutor = getDbEventExecutor(dbName.toLowerCase());
+    DbEventExecutor eventExecutor = getDbEventExecutor(dbName);
     if (eventExecutor == null) {
       long minOutStandingEvents = Long.MAX_VALUE;
       long minDbCount = Long.MAX_VALUE;

@@ -659,7 +659,7 @@ public class DbEventExecutor {
    * @return Fully qualified table name
    */
   String getFqTableName(String dbName, String tableName) {
-    return dbName + '.' + tableName;
+    return dbName.toLowerCase() + '.' + tableName.toLowerCase();
   }
 
   /**
@@ -670,7 +670,7 @@ public class DbEventExecutor {
    * @return True if all events up to the given event id are processed. False otherwise
    */
   boolean isProcessed(String dbName, long eventId) {
-    DbProcessor dbProcessor = dbProcessors_.get(dbName);
+    DbProcessor dbProcessor = dbProcessors_.get(dbName.toLowerCase());
     if (dbProcessor == null) return true;
     return dbProcessor.isProcessed(eventId);
   }
@@ -699,7 +699,7 @@ public class DbEventExecutor {
    * @return List of table names
    */
   List<String> getTableNames(String dbName) {
-    DbProcessor dbProcessor = dbProcessors_.get(dbName);
+    DbProcessor dbProcessor = dbProcessors_.get(dbName.toLowerCase());
     if (dbProcessor == null) return Collections.emptyList();
     return new ArrayList<>(dbProcessor.tableProcessors_.keySet());
   }

@@ -1635,6 +1635,26 @@ class TestEventProcessingCustomConfigs(TestEventProcessingCustomConfigsBase):
     self.assert_catalogd_log_contains('INFO', log_regex, expected_count=3, timeout_s=20)
 
   @CustomClusterTestSuite.with_args(
+    catalogd_args="--hms_event_polling_interval_s=0.2 "
+                  "--enable_hierarchical_event_processing=true "
+                  "--num_db_event_executors=1 "
+                  "--num_table_event_executors_per_db_event_executor=1")
+  def test_case_sensitive_table_rename(self, unique_database):
+    """Test rename table back to its original name but with a case-variant"""
+    t1 = unique_database + ".t1"
+    t2 = unique_database + ".t2"
+    self.execute_query("create table {} (i int)".format(t1))
+    self.execute_query("insert into table {} values (1)".format(t1))
+    # Rename table from t1 to t2 and back again to t1 in uppercase
+    self.execute_query("alter table {} rename to {}".format(t1, t2))
+    self.execute_query("alter table {} rename to {}".format(t2, t1.upper()))
+    EventProcessorUtils.wait_for_event_processing(self)
+    # Test if event processor state is active after invalidate metadata
+    self.execute_query("invalidate metadata")
+    assert EventProcessorUtils.get_event_processor_status() == "ACTIVE"
+    assert int(self.execute_scalar("select count(*) from {}".format(t1))) == 1
+
+  @CustomClusterTestSuite.with_args(
     catalogd_args="--hms_event_polling_interval_s=0.2"
                   " --enable_hierarchical_event_processing=true"
                   " --num_db_event_executors=2"
@@ -2085,6 +2105,30 @@ class TestEventSyncWaiting(TestEventProcessingCustomConfigsBase):
         "alter table {} partition(p=0) compact 'minor' and wait".format(tbl))
     res = self.execute_query_expect_success(client, "show files in " + tbl)
     assert len(res.data) == 1
+
+  @CustomClusterTestSuite.with_args(
+    catalogd_args="--hms_event_polling_interval_s=0.2 "
+                  "--enable_hierarchical_event_processing=true "
+                  "--num_db_event_executors=1 "
+                  "--num_table_event_executors_per_db_event_executor=1 "
+                  "--debug_actions=catalogd_event_processing_delay:SLEEP@200")
+  def test_case_sensitive_table_query(self, vector, unique_database):
+    """Test select query on a table with a case-variant name after inserting data from
+    hive. Check whether event sync waits till hive insert generated events are synced for
+    the table"""
+    client = self.default_impala_client(vector.get_value('protocol'))
+    t1 = unique_database + ".t1"
+    self.execute_query_expect_success(client, "create table {} (i int)".format(t1))
+    self.execute_query_expect_success(client, "insert into {} values (1)".format(t1))
+    query = "select * from {}".format(t1.upper())
+    res = self.execute_query_expect_success(client, query)
+    assert len(res.data) == 1
+    client.set_configuration(EVENT_SYNC_QUERY_OPTIONS)
+    # Insert data from hive
+    self.run_stmt_in_hive("insert into {} values (2)".format(t1))
+    # Test if new data is visible
+    res = self.execute_query_expect_success(client, query)
+    assert len(res.data) == 2
 
 
 @SkipIfFS.hive
