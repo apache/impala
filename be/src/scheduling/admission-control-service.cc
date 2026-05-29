@@ -19,6 +19,7 @@
 
 #include "common/constant-strings.h"
 #include "common/names.h"
+#include "common/status-serialization.h"
 #include "gen-cpp/admission_control_service.pb.h"
 #include "gutil/strings/substitute.h"
 #include "kudu/rpc/rpc_context.h"
@@ -411,7 +412,7 @@ void AdmissionControlService::AdmitFromThreadPool(const UniqueIdPB& query_id) {
 template <typename ResponsePBType>
 void AdmissionControlService::RespondAndReleaseRpc(
     const Status& status, ResponsePBType* response, RpcContext* rpc_context) {
-  status.ToProto(response->mutable_status());
+  StatusToProto(status, response->mutable_status());
   // Release the memory against the control service's memory tracker.
   mem_tracker_->Release(rpc_context->GetTransferSize());
   rpc_context->RespondSuccess();

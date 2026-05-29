@@ -46,15 +46,6 @@
 
 #include "common/names.h"
 
-// / WARNING this uses a private API of GLog: DumpStackTraceToString().
-namespace google {
-namespace glog_internal_namespace_ {
-extern void DumpStackTraceToString(std::string* s);
-}
-}
-
-#include "common/names.h"
-
 using boost::algorithm::iequals;
 using boost::char_separator;
 using boost::is_any_of;
@@ -382,12 +373,6 @@ string GetVersionString(bool compact) {
   ss << google::ProgramInvocationShortName()
      << " version " << GetBuildVersion(compact);
   return ss.str();
-}
-
-string GetStackTrace() {
-  string s;
-  google::glog_internal_namespace_::DumpStackTraceToString(&s);
-  return s;
 }
 
 string GetBackendString() {

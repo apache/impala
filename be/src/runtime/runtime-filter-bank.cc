@@ -21,6 +21,7 @@
 
 #include <boost/algorithm/string/join.hpp>
 
+#include "common/status-serialization.h"
 #include "gen-cpp/ImpalaInternalService_types.h"
 #include "gen-cpp/data_stream_service.proxy.h"
 #include "gutil/strings/substitute.h"
@@ -174,7 +175,7 @@ void RuntimeFilterBank::UpdateFilterCompleteCb(const RpcController* rpc_controll
   if (res->status().status_code() != TErrorCode::OK) {
     DCHECK(is_remote_update) << "DataStreamService::UpdateFilter() should never set an"
                              << " error status";
-    Status failed_status(res->status());
+    Status failed_status = StatusFromProto(res->status());
     LOG(ERROR) << "UpdateFilterFromRemote failed with error code "
                << res->status().status_code() << ". Detail:" << failed_status.GetDetail();
   }

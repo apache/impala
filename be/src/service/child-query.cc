@@ -16,6 +16,8 @@
 // under the License.
 
 #include "service/child-query.h"
+
+#include "common/status-serialization.h"
 #include "service/impala-server.inline.h"
 #include "service/client-request-state.h"
 #include "service/query-options.h"
@@ -66,7 +68,7 @@ Status ChildQuery::ExecAndFetch() {
     lock_guard<mutex> l(lock_);
     is_running_ = true;
   }
-  RETURN_IF_ERROR(Status(exec_stmt_resp.status));
+  RETURN_IF_ERROR(StatusFromHS2Status(exec_stmt_resp.status));
 
   TUniqueId query_id;
   TUniqueId secret_unused;
@@ -82,7 +84,7 @@ Status ChildQuery::ExecAndFetch() {
   meta_req.operationHandle = exec_stmt_resp.operationHandle;
   RETURN_IF_ERROR(IsCancelled());
   parent_server_->GetResultSetMetadata(meta_resp_, meta_req);
-  RETURN_IF_ERROR(Status(meta_resp_.status));
+  RETURN_IF_ERROR(StatusFromHS2Status(meta_resp_.status));
 
   // Fetch all results.
   TFetchResultsReq fetch_req;
@@ -92,7 +94,7 @@ Status ChildQuery::ExecAndFetch() {
   do {
     RETURN_IF_ERROR(IsCancelled());
     parent_server_->FetchResults(fetch_resp_, fetch_req);
-    status = Status(fetch_resp_.status);
+    status = StatusFromHS2Status(fetch_resp_.status);
   } while (status.ok() && fetch_resp_.hasMoreRows);
   RETURN_IF_ERROR(IsCancelled());
 
@@ -114,7 +116,7 @@ Status ChildQuery::ExecAndFetch() {
   ImpalaServer::TUniqueIdToTHandleIdentifier(
       session_id, session_id, &get_profile_req.sessionHandle.sessionId);
   parent_server_->GetRuntimeProfile(get_profile_resp, get_profile_req);
-  if (Status(get_profile_resp.status).ok()) {
+  if (StatusFromHS2Status(get_profile_resp.status).ok()) {
     RuntimeProfile* runtime_profile =
         RuntimeProfile::CreateFromThrift(profile_pool_, get_profile_resp.thrift_profile);
     if (runtime_profile != nullptr) profile_->AddChild(runtime_profile);
@@ -122,7 +124,7 @@ Status ChildQuery::ExecAndFetch() {
 
   // Don't overwrite error from fetch. A failed fetch unregisters the query and we want to
   // preserve the original error status (e.g., CANCELLED).
-  if (status.ok()) status = Status(close_resp.status);
+  if (status.ok()) status = StatusFromHS2Status(close_resp.status);
   return status;
 }
 

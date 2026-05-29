@@ -22,6 +22,7 @@
 #include <thrift/protocol/TJSONProtocol.h>
 
 #include "catalog/catalog-util.h"
+#include "common/status-serialization.h"
 #include "exec/read-write-util.h"
 #include "gen-cpp/CatalogInternalService_types.h"
 #include "gen-cpp/CatalogObjects_types.h"
@@ -414,7 +415,7 @@ class CatalogServiceThriftIf : public CatalogServiceIf {
     }
     if (!status.ok()) LOG(ERROR) << status.GetDetail();
     TStatus thrift_status;
-    status.ToThrift(&thrift_status);
+    StatusToThrift(status, &thrift_status);
     resp.result.__set_status(thrift_status);
     VLOG_RPC << "ExecDdl(): response=" << ThriftDebugString(resp);
   }
@@ -430,7 +431,7 @@ class CatalogServiceThriftIf : public CatalogServiceIf {
     }
     if (!status.ok()) LOG(ERROR) << status.GetDetail();
     TStatus thrift_status;
-    status.ToThrift(&thrift_status);
+    StatusToThrift(status, &thrift_status);
     resp.result.__set_status(thrift_status);
     VLOG_RPC << "ResetMetadata(): response=" << ThriftDebugString(resp);
   }
@@ -446,7 +447,7 @@ class CatalogServiceThriftIf : public CatalogServiceIf {
     }
     if (!status.ok()) LOG(ERROR) << status.GetDetail();
     TStatus thrift_status;
-    status.ToThrift(&thrift_status);
+    StatusToThrift(status, &thrift_status);
     resp.result.__set_status(thrift_status);
     VLOG_RPC << "UpdateCatalog(): response=" << ThriftDebugString(resp);
   }
@@ -462,7 +463,7 @@ class CatalogServiceThriftIf : public CatalogServiceIf {
     }
     if (!status.ok()) LOG(ERROR) << status.GetDetail();
     TStatus thrift_status;
-    status.ToThrift(&thrift_status);
+    StatusToThrift(status, &thrift_status);
     resp.__set_status(thrift_status);
     VLOG_RPC << "GetFunctions(): response=" << ThriftDebugString(resp);
   }
@@ -478,7 +479,7 @@ class CatalogServiceThriftIf : public CatalogServiceIf {
     }
     if (!status.ok()) LOG(ERROR) << status.GetDetail();
     TStatus thrift_status;
-    status.ToThrift(&thrift_status);
+    StatusToThrift(status, &thrift_status);
     resp.__set_status(thrift_status);
     VLOG_RPC << "GetCatalogObject(): response=" << ThriftDebugStringNoThrow(resp);
   }
@@ -501,7 +502,7 @@ class CatalogServiceThriftIf : public CatalogServiceIf {
     // Don't overwrite the non-OK status returned from catalogd
     if (!resp.__isset.status || resp.status.status_code == TErrorCode::OK) {
       TStatus thrift_status;
-      status.ToThrift(&thrift_status);
+      StatusToThrift(status, &thrift_status);
       resp.__set_status(thrift_status);
     }
     VLOG_RPC << "GetPartialCatalogObject(): response=" << ThriftDebugStringNoThrow(resp);
@@ -516,7 +517,7 @@ class CatalogServiceThriftIf : public CatalogServiceIf {
     }
     if (!status.ok()) LOG(ERROR) << status.GetDetail();
     TStatus thrift_status;
-    status.ToThrift(&thrift_status);
+    StatusToThrift(status, &thrift_status);
     resp.__set_status(thrift_status);
     VLOG_RPC << "GetPartitionStats(): response=" << ThriftDebugStringNoThrow(resp);
   }
@@ -533,7 +534,7 @@ class CatalogServiceThriftIf : public CatalogServiceIf {
     }
     if (!status.ok()) LOG(ERROR) << status.GetDetail();
     TStatus thrift_status;
-    status.ToThrift(&thrift_status);
+    StatusToThrift(status, &thrift_status);
     resp.__set_status(thrift_status);
     VLOG_RPC << "PrioritizeLoad(): response=" << ThriftDebugString(resp);
   }
@@ -547,7 +548,7 @@ class CatalogServiceThriftIf : public CatalogServiceIf {
     }
     if (!status.ok()) LOG(WARNING) << status.GetDetail();
     TStatus thrift_status;
-    status.ToThrift(&thrift_status);
+    StatusToThrift(status, &thrift_status);
     resp.__set_status(thrift_status);
     VLOG_RPC << "UpdateTableUsage(): response.status=" << resp.status;
   }
@@ -561,7 +562,7 @@ class CatalogServiceThriftIf : public CatalogServiceIf {
     }
     if (!status.ok()) LOG(ERROR) << status.GetDetail();
     TStatus thrift_status;
-    status.ToThrift(&thrift_status);
+    StatusToThrift(status, &thrift_status);
     resp.__set_status(thrift_status);
     VLOG_RPC << "GetNullPartitionName(): response=" << ThriftDebugStringNoThrow(resp);
   }
@@ -575,7 +576,7 @@ class CatalogServiceThriftIf : public CatalogServiceIf {
     }
     if (!status.ok()) LOG(ERROR) << status.GetDetail();
     TStatus thrift_status;
-    status.ToThrift(&thrift_status);
+    StatusToThrift(status, &thrift_status);
     resp.__set_status(thrift_status);
     VLOG_RPC << "GetLatestCompactions(): response=" << ThriftDebugStringNoThrow(resp);
   }
@@ -603,7 +604,7 @@ class CatalogServiceThriftIf : public CatalogServiceIf {
       // Status in response is not set if the error is due to an exception.
       if (resp.status.status_code == TErrorCode::OK) {
         TStatus thrift_status;
-        status.ToThrift(&thrift_status);
+        StatusToThrift(status, &thrift_status);
         resp.__set_status(thrift_status);
       }
     }

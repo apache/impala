@@ -21,6 +21,7 @@
 
 #include "common/constant-strings.h"
 #include "common/status.h"
+#include "common/status-serialization.h"
 #include "exec/kudu/kudu-util.h"
 #include "kudu/rpc/rpc_context.h"
 #include "kudu/util/monotime.h"
@@ -213,7 +214,7 @@ template<typename ResponsePBType>
 void DataStreamService::RespondRpc(const Status& status,
     ResponsePBType* response, kudu::rpc::RpcContext* ctx) {
   MonoDelta duration(MonoTime::Now() - ctx->GetTimeReceived());
-  status.ToProto(response->mutable_status());
+  StatusToProto(status, response->mutable_status());
   response->set_receiver_latency_ns(duration.ToNanoseconds());
   ctx->RespondSuccess();
 }

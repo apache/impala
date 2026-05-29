@@ -30,6 +30,7 @@
 
 #include "catalog/catalog-service-client-wrapper.h"
 #include "common/status.h"
+#include "common/status-serialization.h"
 #include "exprs/timezone_db.h"
 #include "gen-cpp/Types_types.h"
 #include "kudu/rpc/rpc_controller.h"
@@ -1182,7 +1183,7 @@ Status ClientRequestState::ExecShutdownRequest() {
     }
     return Status(err_string);
   }
-  Status shutdown_status(resp.status());
+  Status shutdown_status = StatusFromProto(resp.status());
   RETURN_IF_ERROR(shutdown_status);
   SetResultSet({ImpalaServer::ShutdownStatusToString(resp.shutdown_status())});
   return Status::OK();
@@ -1779,7 +1780,7 @@ Status ClientRequestState::UpdateCatalog() {
           summary_profile_->AddEventSequence(timeline_name, catalog_timeline);
         }
       }
-      if (status.ok()) status = Status(resp.result.status);
+      if (status.ok()) status = StatusFromThrift(resp.result.status);
       if (!status.ok()) {
         if (InTransaction()) AbortTransaction();
         LOG(ERROR) << "ERROR Finalizing DML: " << status.GetDetail();
@@ -2710,7 +2711,7 @@ Status ClientRequestState::TryKillQueryRemotely(
     }
     // Currently, we only support killing one query in one KILL QUERY statement.
     DCHECK_EQ(response.statuses_size(), 1);
-    status = Status(response.statuses(0));
+    status = StatusFromProto(response.statuses(0));
     if (status.ok()) {
       // Kill succeeded.
       VLOG_QUERY << "KillQuery: Found the coordinator at "

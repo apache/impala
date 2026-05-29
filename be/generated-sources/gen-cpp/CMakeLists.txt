@@ -22,6 +22,16 @@ set(LIBRARY_OUTPUT_PATH "${BUILD_OUTPUT_ROOT_DIRECTORY}/thrift")
 # where to put generated binaries
 set(EXECUTABLE_OUTPUT_PATH "${BUILD_OUTPUT_ROOT_DIRECTORY}/thrift")
 
+set(PROFILE_TOOL_SRC_FILES
+  ErrorCodes_types.cpp
+  ErrorCodes_constants.cpp
+  ExecStats_types.cpp
+  Metrics_types.cpp
+  RuntimeProfile_types.cpp
+  Status_types.cpp
+  Types_types.cpp
+)
+
 set(SRC_FILES
   CatalogObjects_constants.cpp
   CatalogObjects_types.cpp
@@ -43,9 +53,7 @@ set(SRC_FILES
   Data_types.cpp
   DataSinks_types.cpp
   Descriptors_types.cpp
-  ErrorCodes_types.cpp
-  ErrorCodes_constants.cpp
-  ExecStats_types.cpp
+  ${PROFILE_TOOL_SRC_FILES}
   Exprs_types.cpp
   ExternalDataSource_types.cpp
   Frontend_types.cpp
@@ -55,7 +63,6 @@ set(SRC_FILES
   JniCatalog_types.cpp
   Logging_types.cpp
   LineageGraph_types.cpp
-  Metrics_types.cpp
   MetricDefs_constants.cpp
   MetricDefs_types.cpp
   NetworkTest_types.cpp
@@ -68,15 +75,12 @@ set(SRC_FILES
   Query_constants.cpp
   Query_types.cpp
   ResourceProfile_types.cpp
-  RuntimeProfile_types.cpp
   SqlConstraints_types.cpp
   StatestoreHaService.cpp
   StatestoreService.cpp
   StatestoreService_types.cpp
   StatestoreSubscriber.cpp
-  Status_types.cpp
   SystemTables_types.cpp
-  Types_types.cpp
   Zip_types.cpp
 )
 
@@ -84,8 +88,11 @@ set(SRC_FILES
 # each other
 add_library(ImpalaThrift ${SRC_FILES})
 
+add_library(ProfileToolThrift STATIC ${PROFILE_TOOL_SRC_FILES})
+
 # Setting these files as code-generated lets make clean and incremental builds work
 # correctly
 set_source_files_properties(${SRC_FILES} PROPERTIES GENERATED TRUE)
 
 add_dependencies(ImpalaThrift thrift-deps)
+add_dependencies(ProfileToolThrift thrift-deps)

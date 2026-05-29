@@ -25,6 +25,7 @@
 #include <thrift/protocol/TDebugProtocol.h>
 
 #include "common/logging.h"
+#include "common/status-serialization.h"
 #include "codegen/codegen-anyval.h"
 #include "codegen/llvm-codegen.h"
 #include "exec/kudu/kudu-util.h"
@@ -538,7 +539,7 @@ void KrpcDataStreamSender::Channel::TransmitDataCompleteCb() {
     if (status_code == TErrorCode::DATASTREAM_RECVR_CLOSED) {
       remote_recvr_closed_ = true;
     } else {
-      rpc_status = Status(resp_.status());
+      rpc_status = StatusFromProto(resp_.status());
     }
     MarkDone(rpc_status);
   } else {
@@ -660,7 +661,7 @@ void KrpcDataStreamSender::Channel::EndDataStreamCompleteCb() {
     parent_->network_time_stats_->UpdateCounter(network_time_ns);
     parent_->recvr_time_stats_->UpdateCounter(eos_resp_.receiver_latency_ns());
     if (IsSlowRpc(total_time_ns)) LogSlowRpc("EndDataStream", total_time_ns, eos_resp_);
-    MarkDone(Status(eos_resp_.status()));
+    MarkDone(StatusFromProto(eos_resp_.status()));
   } else {
     if (IsSlowRpc(total_time_ns)) {
       LogSlowFailedRpc("EndDataStream", total_time_ns, controller_status);

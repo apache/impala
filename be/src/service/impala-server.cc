@@ -48,6 +48,7 @@
 #include "common/compiler-util.h"
 #include "common/logging.h"
 #include "common/object-pool.h"
+#include "common/status-serialization.h"
 #include "common/thread-debug-info.h"
 #include "exec/external-data-source-executor.h"
 #include "exprs/timezone_db.h"
@@ -3123,7 +3124,7 @@ void ImpalaServer::UnregisterSessionTimeout(int32_t session_timeout) {
       LOG(ERROR) << "Admission heartbeat rpc failed: " << rpc_status.ToString();
       continue;
     }
-    Status heartbeat_status(response.status());
+    Status heartbeat_status = StatusFromProto(response.status());
     if (!heartbeat_status.ok()) {
       LOG(ERROR) << "Admission heartbeat failed: " << heartbeat_status;
     }

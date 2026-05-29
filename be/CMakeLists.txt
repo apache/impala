@@ -534,6 +534,7 @@ set (IMPALA_LIBS
   Catalog
   CodeGen
   Common
+  StatusMinimal
   Exec
   ExecIr
   ExecAvro
@@ -667,6 +668,7 @@ if (BUILD_SHARED_LIBS)
     ImpalaThrift
     GlobalFlags
     Common
+    StatusMinimal
     Udf
     WorkloadMgmt
     )

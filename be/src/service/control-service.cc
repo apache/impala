@@ -18,6 +18,7 @@
 #include "service/control-service.h"
 
 #include "common/constant-strings.h"
+#include "common/status-serialization.h"
 #include "common/thread-debug-info.h"
 #include "exec/kudu/kudu-util.h"
 #include "kudu/rpc/rpc_context.h"
@@ -222,7 +223,7 @@ void ControlService::ReportExecStatus(const ReportExecStatusRequestPB* request,
 template <typename ResponsePBType>
 void ControlService::RespondAndReleaseRpc(
     const Status& status, ResponsePBType* response, RpcContext* rpc_context) {
-  status.ToProto(response->mutable_status());
+  StatusToProto(status, response->mutable_status());
   // Release the memory against the control service's memory tracker.
   mem_tracker_->Release(rpc_context->GetTransferSize());
   rpc_context->RespondSuccess();
@@ -232,7 +233,7 @@ template <typename ResponsePBType>
 void ControlService::RespondAndReleaseRpc(
     const vector<Status>& statuses, ResponsePBType* response, RpcContext* rpc_context) {
   for (int i = 0; i < statuses.size(); ++i) {
-    statuses[i].ToProto(response->add_statuses());
+    StatusToProto(statuses[i], response->add_statuses());
   }
   // Release the memory against the control service's memory tracker.
   mem_tracker_->Release(rpc_context->GetTransferSize());

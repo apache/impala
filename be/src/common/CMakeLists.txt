@@ -27,16 +27,25 @@ set(VERSION_CC_GEN_OUTPUT
   ${CMAKE_SOURCE_DIR}/be/src/common/version.cc
 )
 
+# Omit status-serialization.cc: slim binaries need normal Status construction
+# but not Status thrift/proto conversion helpers.
+add_library(StatusMinimal
+  status.cc
+)
+add_dependencies(StatusMinimal gen-deps)
+target_link_libraries(StatusMinimal PRIVATE StackTraceUtil)
+
 add_library(Common
   daemon-env.cc
   init.cc
   logging.cc
-  status.cc
+  status-serialization.cc
   kudu_version.cc
   thread-debug-info.cc
   ${VERSION_CC_GEN_OUTPUT}
 )
 add_dependencies(Common gen-deps)
+target_link_libraries(Common PUBLIC StatusMinimal)
 
 # Command to generate the build version file if not present. We don't automatically
 # regenerate the file if present, which speeds up incremental builds but can lead

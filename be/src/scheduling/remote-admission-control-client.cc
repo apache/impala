@@ -17,6 +17,7 @@
 
 #include "scheduling/remote-admission-control-client.h"
 
+#include "common/status-serialization.h"
 #include "common/names.h"
 #include "gen-cpp/admission_control_service.pb.h"
 #include "gen-cpp/admission_control_service.proxy.h"
@@ -91,7 +92,7 @@ Status RemoteAdmissionControlClient::TryAdmitQuery(AdmissionControlServiceProxy*
       return Status::OK();
     }
 
-    admit_status = Status(resp.status());
+    admit_status = StatusFromProto(resp.status());
     if (admit_status.ok()) {
       pending_admit_ = true;
     }
@@ -183,7 +184,7 @@ Status RemoteAdmissionControlClient::SubmitForAdmission(
       schedule_result->get()->Swap(get_status_resp.mutable_query_schedule());
       break;
     }
-    admit_status = Status(get_status_resp.status());
+    admit_status = StatusFromProto(get_status_resp.status());
     if (!admit_status.ok()) {
       break;
     }
@@ -231,7 +232,7 @@ void RemoteAdmissionControlClient::ReleaseQuery(int64_t peak_mem_consumption) {
   if (!rpc_status.ok()) {
     LOG(WARNING) << "ReleaseQuery rpc failed for " << query_id_ << ": " << rpc_status;
   }
-  Status resp_status(resp.status());
+  Status resp_status = StatusFromProto(resp.status());
   if (!resp_status.ok()) {
     LOG(WARNING) << "ReleaseQuery failed for " << query_id_ << ": " << resp_status;
   }
@@ -265,7 +266,7 @@ void RemoteAdmissionControlClient::ReleaseQueryBackends(
     LOG(WARNING) << "ReleaseQueryBackends rpc failed for " << query_id_ << ": "
                  << rpc_status;
   }
-  Status resp_status(resp.status());
+  Status resp_status = StatusFromProto(resp.status());
   if (!resp_status.ok()) {
     LOG(WARNING) << "ReleaseQueryBackends failed for " << query_id_ << ": "
                  << resp_status;
@@ -301,7 +302,7 @@ void RemoteAdmissionControlClient::CancelAdmission() {
   if (!rpc_status.ok()) {
     LOG(WARNING) << "CancelAdmission rpc failed for " << query_id_ << ": " << rpc_status;
   }
-  Status resp_status(resp.status());
+  Status resp_status = StatusFromProto(resp.status());
   if (!resp_status.ok()) {
     LOG(WARNING) << "CancelAdmission failed for " << query_id_ << ": " << resp_status;
   }

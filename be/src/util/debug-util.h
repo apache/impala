@@ -25,6 +25,7 @@
 
 #include "common/compiler-util.h"
 #include "common/config.h"
+#include "util/stack-trace.h"
 #include "common/status.h"
 #include "gen-cpp/CatalogObjects_types.h"
 #include "gen-cpp/Frontend_types.h"
@@ -134,11 +135,6 @@ constexpr const char* GetLibraryLinkType() {
 
 /// Returns "<program short name> version <GetBuildVersion(compact)>"
 std::string GetVersionString(bool compact = false);
-
-/// Returns the stack trace as a string from the current location.
-/// Note: there is a libc bug that causes this not to work on 64 bit machines
-/// for recursive calls.
-std::string GetStackTrace();
 
 /// Returns the backend name in "host:port" form suitable for human consumption.
 std::string GetBackendString();

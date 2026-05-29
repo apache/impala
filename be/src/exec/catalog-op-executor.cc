@@ -20,6 +20,7 @@
 #include <sstream>
 
 #include "common/status.h"
+#include "common/status-serialization.h"
 #include "catalog/catalog-service-client-wrapper.h"
 #include "exec/incr-stats-util.h"
 #include "runtime/lib-cache.h"
@@ -124,7 +125,7 @@ Status CatalogOpExecutor::Exec(const TCatalogOpRequest& request) {
       if (FLAGS_use_local_catalog) VerifyMinimalResponse(exec_response_->result);
       catalog_update_result_.reset(
           new TCatalogUpdateResult(exec_response_->result));
-      Status status(exec_response_->result.status);
+      Status status = StatusFromThrift(exec_response_->result.status);
       if (status.ok()) {
         if (request.ddl_params.ddl_type == TDdlType::DROP_FUNCTION) {
           HandleDropFunction(request.ddl_params.drop_fn_params);
@@ -164,7 +165,7 @@ Status CatalogOpExecutor::Exec(const TCatalogOpRequest& request) {
         catalog_profile_ = make_unique<TRuntimeProfileNode>(response.profile);
       }
       catalog_update_result_.reset(new TCatalogUpdateResult(response.result));
-      return Status(response.result.status);
+      return StatusFromThrift(response.result.status);
     }
     default: {
       return Status(Substitute("TCatalogOpType: $0 does not support execution against the"
@@ -508,7 +509,9 @@ Status CatalogOpExecutor::SetEventProcessorStatus(
           FLAGS_catalog_client_rpc_retry_interval_ms,
           [&attempt]() { return CatalogRpcDebugFn(&attempt); }, result);
   RETURN_IF_ERROR(rpc_status.status);
-  if (result->status.status_code != TErrorCode::OK) return Status(result->status);
+  if (result->status.status_code != TErrorCode::OK) {
+    return StatusFromThrift(result->status);
+  }
   return Status::OK();
 }
 
@@ -527,5 +530,5 @@ Status CatalogOpExecutor::WaitForHmsEvent(const TWaitForHmsEventRequest& req,
   RETURN_IF_ERROR(rpc_status.status);
   ImpaladMetrics::WAIT_FOR_HMS_EVENT_DURATIONS->Update(
     sw.ElapsedTime() / NANOS_PER_MICRO / MICROS_PER_MILLI);
-  return Status(resp->status);
+  return StatusFromThrift(resp->status);
 }

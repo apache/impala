@@ -19,16 +19,10 @@
 
 #include <ostream>
 
-#include <boost/algorithm/string/join.hpp>
-
 #include "gen-cpp/ErrorCodes_types.h"
-#include "gen-cpp/common.pb.h"
-#include "util/debug-util.h"
-#include "util/error-util.h"
+#include "util/stack-trace.h"
 
 #include "common/names.h"
-
-using namespace apache::hive::service::cli::thrift;
 
 namespace impala {
 
@@ -146,27 +140,6 @@ Status::Status(const string& error_msg, bool silent)
 Status::Status(const ErrorMsg& message)
   : msg_(new ErrorMsg(message)) { }
 
-Status::Status(const TStatus& status) {
-  FromThrift(status);
-}
-
-Status::Status(const StatusPB& status) {
-  FromProto(status);
-}
-
-Status& Status::operator=(const TStatus& status) {
-  delete msg_;
-  FromThrift(status);
-  return *this;
-}
-
-Status::Status(const apache::hive::service::cli::thrift::TStatus& hs2_status)
-  : msg_(hs2_status.statusCode == TStatusCode::SUCCESS_STATUS
-                || hs2_status.statusCode == TStatusCode::STILL_EXECUTING_STATUS ?
-            NULL :
-            new ErrorMsg(HS2TStatusCodeToTErrorCode(hs2_status.statusCode),
-                hs2_status.errorMessage)) {}
-
 Status Status::Expected(const ErrorMsg& error_msg) {
   return Status(error_msg, true);
 }
@@ -249,61 +222,6 @@ void Status::MergeStatus(const Status& status) {
 
 const string Status::GetDetail() const {
   return msg_ != NULL ? msg_->GetFullMessageDetails() : "";
-}
-
-void Status::ToThrift(TStatus* status) const {
-  status->error_msgs.clear();
-  if (msg_ == nullptr) {
-    status->status_code = TErrorCode::OK;
-  } else {
-    status->status_code = msg_->error();
-    status->error_msgs.push_back(msg_->msg());
-    for (const string& s: msg_->details()) status->error_msgs.push_back(s);
-    status->__isset.error_msgs = true;
-  }
-}
-
-void Status::ToProto(StatusPB* status) const {
-  status->Clear();
-  if (msg_ == nullptr) {
-    status->set_status_code(TErrorCode::OK);
-  } else {
-    status->set_status_code(msg_->error());
-    status->add_error_msgs(msg_->msg());
-    for (const string& s : msg_->details()) status->add_error_msgs(s);
-  }
-}
-
-void Status::FromThrift(const TStatus& status) {
-  if (status.status_code == TErrorCode::OK) {
-    msg_ = NULL;
-  } else {
-    msg_ = new ErrorMsg();
-    msg_->SetErrorCode(status.status_code);
-    if (status.error_msgs.size() > 0) {
-      // The first message is the actual error message. (See Status::ToThrift()).
-      msg_->SetErrorMsg(status.error_msgs.front());
-      // The following messages are details.
-      std::for_each(status.error_msgs.begin() + 1, status.error_msgs.end(),
-          [&](string const& detail) { msg_->AddDetail(detail); });
-    }
-  }
-}
-
-void Status::FromProto(const StatusPB& status) {
-  if (status.status_code() == TErrorCode::OK) {
-    msg_ = nullptr;
-  } else {
-    msg_ = new ErrorMsg();
-    msg_->SetErrorCode(static_cast<TErrorCode::type>(status.status_code()));
-    if (status.error_msgs().size() > 0) {
-      // The first message is the actual error message. (See Status::ToThrift()).
-      msg_->SetErrorMsg(status.error_msgs().Get(0));
-      // The following messages are details.
-      std::for_each(status.error_msgs().begin() + 1, status.error_msgs().end(),
-          [&](string const& detail) { msg_->AddDetail(detail); });
-    }
-  }
 }
 
 void Status::FreeMessage() noexcept {

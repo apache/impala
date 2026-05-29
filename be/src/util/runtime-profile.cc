@@ -36,7 +36,7 @@
 #include "common/object-pool.h"
 #include "gutil/strings/strip.h"
 #include "kudu/util/logging.h"
-#include "runtime/mem-pool.h"
+#include "runtime/summary-stats.h"
 #include "util/container-util.h"
 #include "util/pretty-printer.h"
 #include "util/redactor.h"

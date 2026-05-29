@@ -29,6 +29,7 @@
 
 #include "common/logging.h"
 #include "common/status.h"
+#include "common/status-serialization.h"
 #include "statestore/failure-detector.h"
 #include "gen-cpp/StatestoreService_types.h"
 #include "rpc/rpc-trace.h"
@@ -116,10 +117,10 @@ class StatestoreSubscriberThriftIf : public StatestoreSubscriberIf {
         statestore_id = params.statestore_id;
       }
 
-      subscriber_
-          ->UpdateState(params.topic_deltas, registration_id, statestore_id,
-              &response.topic_updates, &response.skipped)
-          .ToThrift(&response.status);
+      StatusToThrift(
+          subscriber_->UpdateState(params.topic_deltas, registration_id, statestore_id,
+              &response.topic_updates, &response.skipped),
+          &response.status);
       // Make sure Thrift thinks the field is set.
       response.__set_skipped(response.skipped);
     } else {
@@ -128,7 +129,7 @@ class StatestoreSubscriberThriftIf : public StatestoreSubscriberIf {
           params.protocol_version);
     }
     TStatus thrift_status;
-    status.ToThrift(&thrift_status);
+    StatusToThrift(status, &thrift_status);
     response.__set_status(thrift_status);
   }
 
@@ -161,7 +162,7 @@ class StatestoreSubscriberThriftIf : public StatestoreSubscriberIf {
           request.protocol_version);
     }
     TStatus thrift_status;
-    status.ToThrift(&thrift_status);
+    StatusToThrift(status, &thrift_status);
     response.__set_status(thrift_status);
   }
 
@@ -180,7 +181,7 @@ class StatestoreSubscriberThriftIf : public StatestoreSubscriberIf {
           request.protocol_version);
     }
     TStatus thrift_status;
-    status.ToThrift(&thrift_status);
+    StatusToThrift(status, &thrift_status);
     response.__set_status(thrift_status);
   }
 
@@ -208,7 +209,7 @@ class StatestoreSubscriberThriftIf : public StatestoreSubscriberIf {
           request.protocol_version);
     }
     TStatus thrift_status;
-    status.ToThrift(&thrift_status);
+    StatusToThrift(status, &thrift_status);
     response.__set_status(thrift_status);
   }
 
@@ -630,7 +631,7 @@ Status StatestoreSubscriber::StatestoreStub::Register(bool* has_active_catalogd,
           },
           &get_protocol_response);
   RETURN_IF_ERROR(rpc_status.status);
-  Status status = Status(get_protocol_response.status);
+  Status status = StatusFromThrift(get_protocol_response.status);
   if (status.ok()) {
     connected_to_statestore_metric_->SetValue(true);
     if (get_protocol_response.protocol_version < subscriber_->GetProtocolVersion()) {
@@ -680,7 +681,7 @@ Status StatestoreSubscriber::StatestoreStub::Register(bool* has_active_catalogd,
           },
           &response);
   RETURN_IF_ERROR(rpc_status.status);
-  status = Status(response.status);
+  status = StatusFromThrift(response.status);
   if (status.ok()) {
     connected_to_statestore_metric_->SetValue(true);
     last_registration_ms_.Store(MonotonicMillis());

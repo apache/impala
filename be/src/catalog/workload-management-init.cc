@@ -44,6 +44,7 @@
 #include "gen-cpp/Types_types.h"
 
 #include "common/status.h"
+#include "common/status-serialization.h"
 #include "kudu/util/version_util.h"
 #include "util/debug-util.h"
 #include "util/network-util.h"
@@ -118,7 +119,7 @@ static Status _dropTable(CatalogServiceIf* svc, const string& ip_addr, const str
 
   svc->ExecDdl(resp, req);
 
-  stat = Status(resp.result.status);
+  stat = StatusFromThrift(resp.result.status);
   if (!stat.ok()) {
     stat.AddDetail(StrCat("could not drop table '", _fullTableName(db, tbl_name), "'"));
   }
@@ -146,7 +147,7 @@ static Status _setupDb(CatalogServiceIf* svc, const string& ip_addr, const strin
   req.__set_query_options(t_query_opts);
 
   svc->ExecDdl(resp, req);
-  return Status(resp.result.status);
+  return StatusFromThrift(resp.result.status);
 } // function _setupDb
 
 /// Loops through all workload management columns definied in FIELD_DEFINITIONS and builds
@@ -290,7 +291,7 @@ static Status _createTable(CatalogServiceIf* svc, const string& ip_addr,
   req.__set_ddl_type(TDdlType::type::CREATE_TABLE);
 
   svc->ExecDdl(resp, req);
-  return Status(resp.result.status);
+  return StatusFromThrift(resp.result.status);
 } // function _createTable
 
 /// Upgrades a table by running alter table statements. Columns with a schema version
@@ -332,7 +333,7 @@ static Status _upgradeTable(CatalogServiceIf* svc, const string& ip_addr,
 
   svc->ExecDdl(resp, req);
   if (resp.result.status.status_code != TErrorCode::type::OK) {
-    return Status(resp.result.status);
+    return StatusFromThrift(resp.result.status);
   }
 
   // Update table schema version.
@@ -356,7 +357,7 @@ static Status _upgradeTable(CatalogServiceIf* svc, const string& ip_addr,
   req.__set_alter_table_params(t_alter_schema_ver);
 
   svc->ExecDdl(resp, req);
-  return Status(resp.result.status);
+  return StatusFromThrift(resp.result.status);
 } // function _upgradeTable
 
 /// Retrieves the schema version of the specified table by reading its table properties.
@@ -385,7 +386,7 @@ static Status _getTableSchemaVersion(Catalog* catalog, CatalogServiceIf* svc,
 
   svc->ResetMetadata(reset_resp, reset_req);
   if (reset_resp.result.status.status_code != TErrorCode::type::OK) {
-    return Status(reset_resp.result.status);
+    return StatusFromThrift(reset_resp.result.status);
   }
 
   // Read the table's catalog object to retrieve its table properties.
@@ -405,7 +406,7 @@ static Status _getTableSchemaVersion(Catalog* catalog, CatalogServiceIf* svc,
 
   svc->GetCatalogObject(o_resp, o_req);
   if (o_resp.status.status_code != TErrorCode::type::OK) {
-    return Status(o_resp.status);
+    return StatusFromThrift(o_resp.status);
   }
 
   // Determine the actual table schema version. The "wm_schema_version" table property

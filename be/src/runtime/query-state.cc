@@ -21,6 +21,7 @@
 
 #include "codegen/llvm-codegen-cache.h"
 #include "codegen/llvm-codegen.h"
+#include "common/status-serialization.h"
 #include "common/thread-debug-info.h"
 #include "exec/kudu/kudu-util.h"
 #include "exprs/expr.h"
@@ -549,7 +550,7 @@ void QueryState::ConstructReport(bool instances_started,
         DebugAction(query_options(), "CONSTRUCT_QUERY_STATE_REPORT");
     if (UNLIKELY(!debug_action_status.ok())) overall_status_ = debug_action_status;
 
-    overall_status_.ToProto(report->mutable_overall_status());
+    StatusToProto(overall_status_, report->mutable_overall_status());
     report_overall_status = overall_status_;
     if (IsValidFInstanceId(failed_finstance_id_)) {
       TUniqueIdToUniqueIdPB(failed_finstance_id_, report->mutable_fragment_instance_id());
@@ -725,7 +726,7 @@ bool QueryState::ReportExecStatus() {
   ReportExecStatusResponsePB resp;
   rpc_status = FromKuduStatus(proxy_->ReportExecStatus(report, &resp, &rpc_controller),
       "ReportExecStatus() RPC failed");
-  result_status = Status(resp.status());
+  result_status = StatusFromProto(resp.status());
   int64_t retry_time_ms = 0;
   if (rpc_status.ok()) {
     num_failed_reports_ = 0;

@@ -35,6 +35,21 @@ add_library(UtilIr
 )
 add_dependencies(UtilIr gen-deps)
 
+add_library(StackTraceUtil OBJECT
+  stack-trace.cc
+)
+add_dependencies(StackTraceUtil gen-deps)
+
+# Keep impala-profile-tool on a small utility subset instead of linking all of Util.
+set(PROFILE_TOOL_UTIL_SRCS
+  cpu-info.cc
+  error-msg.cc
+  os-info.cc
+  redactor.cc
+  runtime-profile-archive.cc
+  runtime-profile.cc
+)
+
 set(UTIL_SRCS
   auth-util.cc
   avro-util.cc
@@ -52,13 +67,13 @@ set(UTIL_SRCS
   common-metrics.cc
   compression-util.cc
   compress.cc
-  cpu-info.cc
   cyclic-barrier.cc
   dynamic-util.cc
   debug-util.cc
   decompress.cc
   default-path-handlers.cc
   disk-info.cc
+  ${PROFILE_TOOL_UTIL_SRCS}
   error-util.cc
   event-metrics.cc
   filesystem-util.cc
@@ -87,7 +102,6 @@ set(UTIL_SRCS
   mpfit-util.cc
   network-util.cc
   openssl-util.cc
-  os-info.cc
   os-util.cc
   parquet-bloom-filter.cc
   parse-util.cc
@@ -96,9 +110,6 @@ set(UTIL_SRCS
   pprof-path-handlers.cc
   progress-updater.cc
   process-state-info.cc
-  redactor.cc
-  runtime-profile-archive.cc
-  runtime-profile.cc
   runtime-profile-periodic.cc
   runtime-profile-serialization.cc
   sharded-query-map-util.cc
@@ -155,6 +166,17 @@ endif()
 
 add_library(Util ${UTIL_SRCS})
 add_dependencies(Util gen-deps)
+target_link_libraries(Util PUBLIC StackTraceUtil)
+
+add_library(ProfileToolUtil ${PROFILE_TOOL_UTIL_SRCS})
+add_dependencies(ProfileToolUtil gen-deps)
+# cpu-info.cc references flags defined in GlobalFlags. Keep the dependency on
+# ProfileToolUtil so shared builds record it as a runtime dependency.
+target_link_libraries(ProfileToolUtil PRIVATE GlobalFlags)
+# impala-profile-tool links ProfileToolUtil with --gc-sections so unused profile
+# methods do not drag extra dependencies into the standalone binary.
+set_target_properties(ProfileToolUtil PROPERTIES
+  COMPILE_FLAGS "-ffunction-sections -fdata-sections")
 
 # Squeasel requires C99 compatibility to build.
 SET_SOURCE_FILES_PROPERTIES(${SQUEASEL_SRC_DIR}/squeasel.c
@@ -168,7 +190,28 @@ add_executable(impala-profile-tool impala-profile-tool.cc)
 install(TARGETS impala-profile-tool DESTINATION ${IMPALA_INSTALLDIR}/util)
 
 target_link_libraries(parquet-reader ${IMPALA_LINK_LIBS})
-target_link_libraries(impala-profile-tool ${IMPALA_LINK_LIBS})
+if (NOT APPLE)
+  set(IMPALA_PROFILE_TOOL_LINK_FLAGS -Wl,--gc-sections -Wl,--as-needed)
+  set(IMPALA_PROFILE_TOOL_SYSTEM_LIBS -lrt -ldl)
+endif()
+
+target_link_libraries(impala-profile-tool
+  ${IMPALA_PROFILE_TOOL_LINK_FLAGS}
+  ${WL_START_GROUP}
+  StatusMinimal
+  GlobalFlags
+  ProfileToolThrift
+  ProfileToolUtil
+  ${WL_END_GROUP}
+  ${Boost_LIBRARIES}
+  thrift
+  protobuf
+  gutil
+  glog
+  gflags
+  zlib
+  re2
+  ${IMPALA_PROFILE_TOOL_SYSTEM_LIBS})
 
 if (BUILD_WITH_NO_TESTS)
   return()

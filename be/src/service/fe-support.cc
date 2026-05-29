@@ -27,6 +27,7 @@
 #include "common/init.h"
 #include "common/logging.h"
 #include "common/status.h"
+#include "common/status-serialization.h"
 #include "common/thread-debug-info.h"
 #include "exec/catalog-op-executor.h"
 #include "exprs/scalar-expr.h"
@@ -431,7 +432,7 @@ Java_org_apache_impala_service_FeSupport_NativeCacheJar(
   // TODO(IMPALA-6727): used for external data sources; add proper mtime.
   Status status = LibCache::instance()->GetLocalPath(
       params.hdfs_location, LibCache::TYPE_JAR, -1, &handle, &local_path);
-  status.ToThrift(&result.status);
+  StatusToThrift(status, &result.status);
   if (status.ok()) result.__set_local_path(local_path);
 
   jbyteArray result_bytes = NULL;
@@ -544,7 +545,7 @@ Java_org_apache_impala_service_FeSupport_NativePrioritizeLoad(
     LOG(ERROR) << status.GetDetail();
     // TODO: remove the wrapping; DoRPC's wrapping is sufficient.
     status.AddDetail("Error making an RPC call to Catalog server.");
-    status.ToThrift(&result.status);
+    StatusToThrift(status, &result.status);
   }
 
   jbyteArray result_bytes = NULL;
@@ -569,7 +570,7 @@ Java_org_apache_impala_service_FeSupport_NativeUpdateTableUsage(
   if (!status.ok()) {
     LOG(ERROR) << status.GetDetail();
     status.AddDetail("Error making an RPC call to Catalog server.");
-    status.SetTStatus(&result);
+    SetTStatus(status, &result);
   }
 
   jbyteArray result_bytes = nullptr;
@@ -622,7 +623,7 @@ Java_org_apache_impala_service_FeSupport_NativeGetPartitionStats(
   Status status = catalog_op_executor.GetPartitionStats(request, &result);
   if (!status.ok()) {
     LOG(ERROR) << status.GetDetail();
-    status.SetTStatus(&result);
+    SetTStatus(status, &result);
   }
   jbyteArray result_bytes = nullptr;
   THROW_IF_ERROR_RET(SerializeThriftMsg(env, &result, &result_bytes), env,
@@ -748,7 +749,7 @@ Java_org_apache_impala_service_FeSupport_NativeGetNullPartitionName(
   Status status = catalog_op_executor.GetNullPartitionName(request, &result);
   if (!status.ok()) {
     LOG(ERROR) << status.GetDetail();
-    status.ToThrift(&result.status);
+    StatusToThrift(status, &result.status);
   }
   jbyteArray result_bytes = nullptr;
   THROW_IF_ERROR_RET(SerializeThriftMsg(env, &result, &result_bytes), env,
@@ -768,7 +769,7 @@ Java_org_apache_impala_service_FeSupport_NativeGetLatestCompactions(
   Status status = catalog_op_executor.GetLatestCompactions(request, &result);
   if (!status.ok()) {
     LOG(ERROR) << status.GetDetail();
-    status.ToThrift(&result.status);
+    StatusToThrift(status, &result.status);
   }
   jbyteArray result_bytes = nullptr;
   THROW_IF_ERROR_RET(SerializeThriftMsg(env, &result, &result_bytes), env,
@@ -791,7 +792,7 @@ Java_org_apache_impala_service_FeSupport_NativeWaitForHmsEvents(JNIEnv* env,
   TStatus result;
   jbyteArray result_bytes = nullptr;
   if (!status.ok()) {
-    status.ToThrift(&result);
+    StatusToThrift(status, &result);
     THROW_IF_ERROR_RET(SerializeThriftMsg(env, &result, &result_bytes), env,
         JniUtil::internal_exc_class(), result_bytes);
     return result_bytes;
@@ -800,7 +801,7 @@ Java_org_apache_impala_service_FeSupport_NativeWaitForHmsEvents(JNIEnv* env,
   DCHECK(server != nullptr);
   status = server->ProcessCatalogUpdateResult(response.result,
       /*wait_for_all_subscribers*/false, query_options, /*timeline*/nullptr);
-  status.ToThrift(&result);
+  StatusToThrift(status, &result);
   THROW_IF_ERROR_RET(SerializeThriftMsg(env, &result, &result_bytes), env,
       JniUtil::internal_exc_class(), result_bytes);
   return result_bytes;

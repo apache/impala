@@ -20,6 +20,7 @@
 #include <boost/lexical_cast.hpp>
 
 #include "common/object-pool.h"
+#include "common/status-serialization.h"
 #include "exec/exec-node.h"
 #include "exec/kudu/kudu-util.h"
 #include "exec/scan-node.h"
@@ -269,7 +270,7 @@ void Coordinator::BackendState::ExecCompleteCb(
       goto done;
     }
 
-    Status exec_status = Status(exec_response_.status());
+    Status exec_status = StatusFromProto(exec_response_.status());
     if (!exec_status.ok()) {
       SetExecError(exec_status, exec_status_barrier);
       goto done;
@@ -649,7 +650,7 @@ bool Coordinator::BackendState::ApplyExecStatusReport(
   // status_ has incorporated the status from all fragment instances. If the overall
   // backend status is not OK, but no specific fragment instance reported an error, then
   // this is a general backend error. Incorporate the general error into status_.
-  Status overall_status(backend_exec_status.overall_status());
+  Status overall_status = StatusFromProto(backend_exec_status.overall_status());
   if (!overall_status.ok() && (status_.ok() || status_.IsCancelled())) {
     status_ = overall_status;
     if (backend_exec_status.has_fragment_instance_id()) {
@@ -808,7 +809,7 @@ Coordinator::BackendState::CancelResult Coordinator::BackendState::Cancel(
           Substitute("CancelQueryFInstances rpc failed: $0", rpc_status.msg().msg()));
       goto done;
     }
-    Status cancel_status = Status(response.status());
+    Status cancel_status = StatusFromProto(response.status());
     if (!cancel_status.ok()) {
       status_.MergeStatus(cancel_status);
       result.became_done = true;

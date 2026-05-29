@@ -18,6 +18,7 @@
 #include "service/impala-server.h"
 
 #include "common/logging.h"
+#include "common/status-serialization.h"
 #include "common/thread-debug-info.h"
 #include "gen-cpp/Frontend_types.h"
 #include "rpc/thrift-util.h"
@@ -552,11 +553,11 @@ void ImpalaServer::PingImpalaService(TPingImpalaServiceResp& return_val) {
 }
 
 void ImpalaServer::ResetCatalog(impala::TStatus& status) {
-  Status::DEPRECATED_RPC.ToThrift(&status);
+  StatusToThrift(Status::DEPRECATED_RPC, &status);
 }
 
 void ImpalaServer::ResetTable(impala::TStatus& status, const TResetTableReq& request) {
-  Status::DEPRECATED_RPC.ToThrift(&status);
+  StatusToThrift(Status::DEPRECATED_RPC, &status);
 }
 
 Status ImpalaServer::QueryToTQueryContext(const Query& query,

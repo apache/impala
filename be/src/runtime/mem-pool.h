@@ -29,30 +29,12 @@
 #include "common/logging.h"
 #include "gutil/dynamic_annotations.h"
 #include "gutil/threading/thread_collision_warner.h"
+#include "runtime/summary-stats.h"
 #include "util/bit-util.h"
 
 namespace impala {
 
 class MemTracker;
-
-/// Similar to SummaryStatsCounter without thread-safe support so don't need
-/// to acquire locks.
-struct SummaryStats {
-  /// The total number of values seen so far.
-  int32_t total_num_values_ = 0;
-
-  /// Summary statistics of values seen so far.
-  int64_t min_ = INT64_MAX;
-  int64_t max_ = INT64_MIN;
-  int64_t sum_ = 0;
-
-  void UpdateCounter(int64_t new_value) {
-    ++total_num_values_;
-    sum_ += new_value;
-    if (new_value < min_) min_ = new_value;
-    if (new_value > max_) max_ = new_value;
-  }
-};
 
 struct MemPoolCounters {
   /// Stats of duration in malloc()

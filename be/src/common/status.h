@@ -25,16 +25,12 @@
 
 #include "common/compiler-util.h"
 #include "common/logging.h"
-#include "gen-cpp/Status_types.h"  // for TStatus
 #include "gen-cpp/ErrorCodes_types.h"  // for TErrorCode
-#include "gen-cpp/TCLIService_types.h" // for HS2 TStatus
 #include "util/error-util.h" // for ErrorMessage
 
 #define STATUS_API_VERSION 2
 
 namespace impala {
-
-class StatusPB;
 
 /// Status is used as a function return type to indicate success, failure or cancellation
 /// of the function. In case of successful completion, it only occupies sizeof(void*)
@@ -161,18 +157,6 @@ class [[nodiscard]] Status {
   /// TODO: deprecate
   explicit Status(const std::string& error_msg);
 
-  /// "Copy" c'tor from TStatus.
-  /// Retains the TErrorCode value and the message
-  explicit Status(const TStatus& status);
-
-  /// "Copy" c'tor from StatusPB (a protobuf serialized version of Status object).
-  /// Retains the TErrorCode value and the message
-  explicit Status(const StatusPB& status);
-
-  /// "Copy c'tor from HS2 TStatus.
-  /// Retains the TErrorCode value and the message
-  explicit Status(const apache::hive::service::cli::thrift::TStatus& hs2_status);
-
   /// The below Status::Expected() functions create a status instance that represents
   /// an expected error. They behave the same as the constructors with the same
   /// argument types, except they do not log the error message and traceback.
@@ -230,9 +214,6 @@ class [[nodiscard]] Status {
     if (UNLIKELY(msg_ != NULL)) FreeMessage();
   }
 
-  /// Retains the TErrorCode value and the message
-  Status& operator=(const TStatus& status);
-
   bool ALWAYS_INLINE ok() const { return msg_ == NULL; }
 
   /// Return true if this is a user-initiated or internal cancellation.
@@ -281,19 +262,6 @@ class [[nodiscard]] Status {
   /// otherwise assigns 'status'.
   void MergeStatus(const Status& status);
 
-  /// Convert into TStatus. Call this if 'status_container' contains an optional TStatus
-  /// field named 'status'. This also sets status_container->__isset.status.
-  template <typename T> void SetTStatus(T* status_container) const {
-    ToThrift(&status_container->status);
-    status_container->__isset.status = true;
-  }
-
-  /// Convert into TStatus.
-  void ToThrift(TStatus* status) const;
-
-  /// Serialize into StatusPB
-  void ToProto(StatusPB* status) const;
-
   /// Returns the formatted message of the error message and the individual details of the
   /// additional messages as a single string. This should only be called internally and
   /// not to report an error back to the client.
@@ -337,12 +305,6 @@ class [[nodiscard]] Status {
 
   // A non-inline function for freeing status' message.
   void FreeMessage() noexcept;
-
-  /// A non-inline function for unwrapping a TStatus object.
-  void FromThrift(const TStatus& status);
-
-  /// A non-inline function for unwrapping a StatusPB object.
-  void FromProto(const StatusPB& status);
 
   /// Status uses a naked pointer to ensure the size of an instance on the stack is only
   /// the sizeof(ErrorMsg*). Every Status owns its ErrorMsg instance.

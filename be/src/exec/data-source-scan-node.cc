@@ -20,6 +20,7 @@
 #include <vector>
 #include <gutil/strings/substitute.h>
 
+#include "common/status-serialization.h"
 #include "exec/exec-node.inline.h"
 #include "exec/exec-node-util.h"
 #include "exec/parquet/parquet-common.h"
@@ -109,7 +110,7 @@ Status SharedJdbcConnection::Open(const string& jar_path, const string& class_na
     // All N C++ scanner threads share this single connection.
     Status s = executor_.Init(jar_path, class_name, api_version, init_string);
     if (s.ok()) s = executor_.Open(params, result);
-    if (s.ok()) s = Status(result->status);
+    if (s.ok()) s = StatusFromThrift(result->status);
     if (s.ok()) scan_handle_ = result->scan_handle;
     open_status_ = s;
     open_done_ = true;
@@ -138,7 +139,7 @@ Status SharedJdbcConnection::FetchBatch(extdatasource::TGetNextResult* result) {
   // holds the JDBC cursor at a time. Batch conversion happens in parallel in C++.
   RETURN_IF_ERROR(executor_.GetNext(params, result));
   if (result->eos) eos_.store(true, std::memory_order_release);
-  return Status(result->status);
+  return StatusFromThrift(result->status);
 }
 
 Status SharedJdbcConnection::Close(const extdatasource::TCloseParams& params,
