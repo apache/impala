@@ -251,18 +251,18 @@ class TestHBO(ImpalaTestSuite):
         select STRAIGHT_JOIN count(*)
         from functional.alltypes a join [SHUFFLE] functional.alltypestiny b
           on a.month = b.month + 10000
-        where a.string_col < 'hbo_test' and b.string_col < 'hbo_test'""")
+        where a.string_col < 'hbo_rf_test' and b.string_col < 'hbo_rf_test'""")
     # Wait for 1 second to ensure the stats are written to the cache.
     time.sleep(1)
-    # Scan node of the alltypes table with predicate string_col < 'hbo_test' has an
+    # Scan node of the alltypes table with predicate string_col < 'hbo_rf_test' has an
     # effective runtime filter. HBO stats on this shouldn't exist.
     res = self.execute_query(
-        "explain select * from functional.alltypes where string_col < 'hbo_test'")
+        "explain select * from functional.alltypes where string_col < 'hbo_rf_test'")
     assert "from HBO" not in '\n'.join(res.data), '\n'.join(res.data)
     # The other scan node doesn't have any runtime filters. HBO stats on this should
     # exist.
     res = self.execute_query(
-        "explain select * from functional.alltypestiny where string_col < 'hbo_test'")
+        "explain select * from functional.alltypestiny where string_col < 'hbo_rf_test'")
     assert "cardinality=8 (from HBO)" in '\n'.join(res.data), '\n'.join(res.data)
 
     # Test runtime filters applied on scan of aggregation node.
@@ -271,7 +271,7 @@ class TestHBO(ImpalaTestSuite):
     self.execute_query("""with l as ({0})
         select l.* from l join functional.alltypestiny t
         on l.year = t.year and l.month = t.month
-        where t.id < 5""".format(agg_stmt))
+        where t.id < 5 and t.string_col < 'hbo_rf_test'""".format(agg_stmt))
     # Wait for 1 second to ensure the stats are written to the cache.
     time.sleep(1)
     res = self.execute_query("explain " + agg_stmt)
@@ -361,3 +361,44 @@ class TestHBO(ImpalaTestSuite):
         select item from functional_parquet.complextypes_arrays.arr1 where item > 10
         """)
     self._run_hbo_explains('QueryTest/hbo-union-collection-scan')
+
+  def test_inner_join_cardinality(self):
+    self.client.set_configuration(QUERY_OPTIONS)
+    self.execute_query("""
+        select STRAIGHT_JOIN count(*) from functional.alltypes a
+          join functional.alltypessmall b on a.id = b.id
+          join functional.alltypestiny c on b.id = c.id
+        where a.year = 2009 and b.year = 2009 and c.year = 2009
+          and a.int_col = 0 and b.int_col = 0 and c.int_col = 0
+          and a.string_col != 'test_inner_join'
+          and b.string_col != 'test_inner_join'
+          and c.string_col != 'test_inner_join'""")
+    self._run_hbo_explains('QueryTest/hbo-inner-join')
+
+  def test_outer_join_cardinality(self):
+    self.client.set_configuration(QUERY_OPTIONS)
+    self.execute_query("""
+        select STRAIGHT_JOIN count(*) from functional.alltypes a
+          left outer join functional.alltypestiny b on a.id = b.id
+        where a.year = 2009 and a.string_col != 'test_outer_join'
+          and a.int_col = 0""")
+    self._run_hbo_explains('QueryTest/hbo-outer-join')
+
+  def test_except_cardinality(self):
+    self.client.set_configuration(QUERY_OPTIONS)
+    self.execute_query("""
+        select id from functional.alltypes where string_col != 'test_except'
+        except
+        select id from functional.alltypestiny where string_col != 'test_except'
+        """)
+    self._run_hbo_explains('QueryTest/hbo-except')
+
+  def test_intersect_cardinality(self):
+    self.client.set_configuration({
+        **QUERY_OPTIONS, 'runtime_filter_mode': 'off'})
+    self.execute_query("""
+        select id from functional.alltypes where string_col != 'test_intersect'
+        intersect
+        select id from functional.alltypestiny where string_col != 'test_intersect'
+        """)
+    self._run_hbo_explains('QueryTest/hbo-intersect')

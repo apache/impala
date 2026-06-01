@@ -1,0 +1,178 @@
+====
+---- QUERY
+# EXPLAIN the same 3-way inner join that has been executed
+EXPLAIN select STRAIGHT_JOIN count(*) from functional.alltypes a
+join functional.alltypessmall b on a.id = b.id
+join functional.alltypestiny c on b.id = c.id
+where a.year = 2009 and b.year = 2009 and c.year = 2009
+  and a.int_col = 0 and b.int_col = 0 and c.int_col = 0
+  and a.string_col != 'test_inner_join'
+  and b.string_col != 'test_inner_join'
+  and c.string_col != 'test_inner_join'
+---- PLAN
+PLAN-ROOT SINK
+|
+10:AGGREGATE [FINALIZE]
+|  output: count:merge(*)
+|  row-size=8B cardinality=1 (from HBO)
+|
+09:EXCHANGE [UNPARTITIONED]
+|
+05:AGGREGATE
+|  output: count(*)
+|  row-size=8B cardinality=3 (from HBO)
+|
+04:HASH JOIN [INNER JOIN, PARTITIONED]
+|  hash predicates: b.id = c.id
+|  runtime filters: RF000 <- c.id
+|  row-size=63B cardinality=1 (from HBO)
+|
+|--08:EXCHANGE [HASH(c.id)]
+|  |
+|  02:SCAN HDFS [functional.alltypestiny c]
+|     partition predicates: c.`year` = 2009
+|     HDFS partitions=4/4 files=4 size=460B
+|     predicates: c.int_col = 0, c.string_col != 'test_inner_join'
+|     row-size=21B cardinality=4 (from HBO)
+|
+07:EXCHANGE [HASH(b.id)]
+|
+03:HASH JOIN [INNER JOIN, BROADCAST]
+|  hash predicates: a.id = b.id
+|  runtime filters: RF002 <- b.id
+|  row-size=42B cardinality=6 (from HBO)
+|
+|--06:EXCHANGE [BROADCAST]
+|  |
+|  01:SCAN HDFS [functional.alltypessmall b]
+|     partition predicates: b.`year` = 2009
+|     HDFS partitions=4/4 files=4 size=6.32KB
+|     predicates: b.int_col = 0, b.string_col != 'test_inner_join'
+|     runtime filters: RF000 -> b.id
+|     row-size=21B cardinality=12 (from HBO)
+|
+00:SCAN HDFS [functional.alltypes a]
+   partition predicates: a.`year` = 2009
+   HDFS partitions=12/24 files=12 size=238.68KB
+   predicates: a.int_col = 0, a.string_col != 'test_inner_join'
+   runtime filters: RF000 -> a.id, RF002 -> a.id
+   row-size=21B cardinality=365 (from HBO)
+====
+---- QUERY
+# Same join predicates but different join order. The top join node should hit HBO stats.
+EXPLAIN select STRAIGHT_JOIN count(*) from functional.alltypestiny a
+join functional.alltypessmall b on a.id = b.id
+join functional.alltypes c on b.id = c.id
+where a.year = 2009 and b.year = 2009 and c.year = 2009
+  and a.int_col = 0 and b.int_col = 0 and c.int_col = 0
+  and a.string_col != 'test_inner_join'
+  and b.string_col != 'test_inner_join'
+  and c.string_col != 'test_inner_join'
+---- PLAN
+PLAN-ROOT SINK
+|
+10:AGGREGATE [FINALIZE]
+|  output: count:merge(*)
+|  row-size=8B cardinality=1 (from HBO)
+|
+09:EXCHANGE [UNPARTITIONED]
+|
+05:AGGREGATE
+|  output: count(*)
+|  row-size=8B cardinality=3 (from HBO)
+|
+04:HASH JOIN [INNER JOIN, PARTITIONED]
+|  hash predicates: b.id = c.id
+|  runtime filters: RF000 <- c.id
+|  row-size=63B cardinality=1 (from HBO)
+|
+|--08:EXCHANGE [HASH(c.id)]
+|  |
+|  02:SCAN HDFS [functional.alltypes c]
+|     partition predicates: c.`year` = 2009
+|     HDFS partitions=12/24 files=12 size=238.68KB
+|     predicates: c.int_col = 0, c.string_col != 'test_inner_join'
+|     row-size=21B cardinality=365 (from HBO)
+|
+03:HASH JOIN [INNER JOIN, PARTITIONED]
+|  hash predicates: a.id = b.id
+|  runtime filters: RF002 <- b.id
+|  row-size=42B cardinality=4
+|
+|--07:EXCHANGE [HASH(b.id)]
+|  |
+|  01:SCAN HDFS [functional.alltypessmall b]
+|     partition predicates: b.`year` = 2009
+|     HDFS partitions=4/4 files=4 size=6.32KB
+|     predicates: b.int_col = 0, b.string_col != 'test_inner_join'
+|     runtime filters: RF000 -> b.id
+|     row-size=21B cardinality=12 (from HBO)
+|
+06:EXCHANGE [HASH(a.id)]
+|
+00:SCAN HDFS [functional.alltypestiny a]
+   partition predicates: a.`year` = 2009
+   HDFS partitions=4/4 files=4 size=460B
+   predicates: a.int_col = 0, a.string_col != 'test_inner_join'
+   runtime filters: RF000 -> a.id, RF002 -> a.id
+   row-size=21B cardinality=4 (from HBO)
+====
+---- QUERY
+# Use a new table that hasn't been joined. a join b should hit HBO stats.
+EXPLAIN select STRAIGHT_JOIN count(*) from functional.alltypes a
+join functional.alltypessmall b on a.id = b.id
+join functional.alltypesagg c on b.id = c.id
+where a.year = 2009 and b.year = 2009 and c.year = 2010
+  and a.int_col = 0 and b.int_col = 0 and c.int_col = 0
+  and a.string_col != 'test_inner_join'
+  and b.string_col != 'test_inner_join'
+  and c.string_col != 'test_inner_join'
+---- PLAN
+PLAN-ROOT SINK
+|
+10:AGGREGATE [FINALIZE]
+|  output: count:merge(*)
+|  row-size=8B cardinality=1
+|
+09:EXCHANGE [UNPARTITIONED]
+|
+05:AGGREGATE
+|  output: count(*)
+|  row-size=8B cardinality=3
+|
+04:HASH JOIN [INNER JOIN, PARTITIONED]
+|  hash predicates: b.id = c.id
+|  runtime filters: RF000 <- c.id
+|  row-size=65B cardinality=6
+|
+|--08:EXCHANGE [HASH(c.id)]
+|  |
+|  02:SCAN HDFS [functional.alltypesagg c]
+|     partition predicates: c.`year` = 2010
+|     HDFS partitions=11/11 files=11 size=814.73KB
+|     predicates: c.int_col = 0, c.string_col != 'test_inner_join'
+|     row-size=23B cardinality=11
+|
+07:EXCHANGE [HASH(b.id)]
+|
+03:HASH JOIN [INNER JOIN, BROADCAST]
+|  hash predicates: a.id = b.id
+|  runtime filters: RF002 <- b.id
+|  row-size=42B cardinality=6 (from HBO)
+|
+|--06:EXCHANGE [BROADCAST]
+|  |
+|  01:SCAN HDFS [functional.alltypessmall b]
+|     partition predicates: b.`year` = 2009
+|     HDFS partitions=4/4 files=4 size=6.32KB
+|     predicates: b.int_col = 0, b.string_col != 'test_inner_join'
+|     runtime filters: RF000 -> b.id
+|     row-size=21B cardinality=12 (from HBO)
+|
+00:SCAN HDFS [functional.alltypes a]
+   partition predicates: a.`year` = 2009
+   HDFS partitions=12/24 files=12 size=238.68KB
+   predicates: a.int_col = 0, a.string_col != 'test_inner_join'
+   runtime filters: RF000 -> a.id, RF002 -> a.id
+   row-size=21B cardinality=365 (from HBO)
+====

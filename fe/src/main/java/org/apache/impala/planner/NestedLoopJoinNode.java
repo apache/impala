@@ -172,6 +172,7 @@ public class NestedLoopJoinNode extends JoinNode {
     for (Expr e : otherJoinConjuncts_) {
       msg.join_node.nested_loop_join_node.addToJoin_conjuncts(e.treeToThrift(serialCtx));
     }
+    populateHboThriftFields(msg, serialCtx);
   }
 
   @Override

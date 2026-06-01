@@ -161,6 +161,7 @@ public class HashJoinNode extends JoinNode implements SpillableOperator {
     if (!serialCtx.isTupleCache()) {
       msg.join_node.hash_join_node.setHash_seed(getFragment().getHashSeed());
     }
+    populateHboThriftFields(msg, serialCtx);
   }
 
   @Override

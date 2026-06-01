@@ -1,0 +1,77 @@
+====
+---- QUERY
+# EXPLAIN the same query
+EXPLAIN select STRAIGHT_JOIN count(*) from functional.alltypes a
+left outer join functional.alltypestiny b on a.id = b.id
+where a.year = 2009
+  and a.string_col != 'test_outer_join'
+  and a.int_col = 0
+---- PLAN
+PLAN-ROOT SINK
+|
+06:AGGREGATE [FINALIZE]
+|  output: count:merge(*)
+|  row-size=8B cardinality=1 (from HBO)
+|
+05:EXCHANGE [UNPARTITIONED]
+|
+03:AGGREGATE
+|  output: count(*)
+|  row-size=8B cardinality=3 (from HBO)
+|
+02:HASH JOIN [LEFT OUTER JOIN, BROADCAST]
+|  hash predicates: a.id = b.id
+|  row-size=25B cardinality=365 (from HBO)
+|
+|--04:EXCHANGE [BROADCAST]
+|  |
+|  01:SCAN HDFS [functional.alltypestiny b]
+|     HDFS partitions=4/4 files=4 size=460B
+|     row-size=4B cardinality=8 (from HBO)
+|
+00:SCAN HDFS [functional.alltypes a]
+   partition predicates: a.`year` = 2009
+   HDFS partitions=12/24 files=12 size=238.68KB
+   predicates: a.int_col = 0, a.string_col != 'test_outer_join'
+   row-size=21B cardinality=365 (from HBO)
+====
+---- QUERY
+# EXPLAIN the reverted query using right outer join
+EXPLAIN select STRAIGHT_JOIN count(*) from functional.alltypestiny a
+right outer join functional.alltypes b on a.id = b.id
+where b.year = 2009
+  and b.string_col != 'test_outer_join'
+  and b.int_col = 0
+---- PLAN
+PLAN-ROOT SINK
+|
+07:AGGREGATE [FINALIZE]
+|  output: count:merge(*)
+|  row-size=8B cardinality=1 (from HBO)
+|
+06:EXCHANGE [UNPARTITIONED]
+|
+03:AGGREGATE
+|  output: count(*)
+|  row-size=8B cardinality=3 (from HBO)
+|
+02:HASH JOIN [RIGHT OUTER JOIN, PARTITIONED]
+|  hash predicates: a.id = b.id
+|  runtime filters: RF000 <- b.id
+|  row-size=25B cardinality=365 (from HBO)
+|
+|--05:EXCHANGE [HASH(b.id)]
+|  |
+|  01:SCAN HDFS [functional.alltypes b]
+|     partition predicates: b.`year` = 2009
+|     HDFS partitions=12/24 files=12 size=238.68KB
+|     predicates: b.int_col = 0, b.string_col != 'test_outer_join'
+|     row-size=21B cardinality=365 (from HBO)
+|
+04:EXCHANGE [HASH(a.id)]
+|
+00:SCAN HDFS [functional.alltypestiny a]
+   HDFS partitions=4/4 files=4 size=460B
+   runtime filters: RF000 -> a.id
+   row-size=4B cardinality=8 (from HBO)
+====

@@ -369,10 +369,9 @@ public class UnionNode extends PlanNode {
   @Override
   public String generateHboKeyString(THboStatsType statsType,
       CanonicalizationStrategy strategy) {
-    StringBuilder sb = new StringBuilder(statsType.name()).append(":UnionNode:");
-    if (limit_ > 0) sb.append("limit:").append(limit_).append("|");
+    StringBuilder sb = startHboKeyString(statsType, ":UnionNode:");
     if (!constExprLists_.isEmpty() && !addConstOpsToHboKeyString(sb)) return null;
-    sb.append("operands:[");
+    sb.append("|Operands:[");
     boolean first = true;
     for (PlanNode operand : getHboOrderedOperands()) {
       String childKey = operand.generateHboKeyString(statsType, strategy);
@@ -386,7 +385,7 @@ public class UnionNode extends PlanNode {
   }
 
   private boolean addConstOpsToHboKeyString(StringBuilder sb) {
-    sb.append("constRows:[");
+    sb.append("|ConstRows:[");
     for (int i = 0; i < constExprLists_.size(); i++) {
       List<Expr> row = constExprLists_.get(i);
       if (i > 0) sb.append(",");
@@ -405,7 +404,7 @@ public class UnionNode extends PlanNode {
       }
       sb.append(")");
     }
-    sb.append("]|");
+    sb.append("]");
     return true;
   }
 

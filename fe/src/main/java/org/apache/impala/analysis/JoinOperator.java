@@ -75,6 +75,11 @@ public enum JoinOperator {
     return this == JoinOperator.RIGHT_SEMI_JOIN || this == JoinOperator.RIGHT_ANTI_JOIN;
   }
 
+  public boolean isRightHandedJoin() {
+    return this == RIGHT_OUTER_JOIN || this == JoinOperator.RIGHT_SEMI_JOIN
+        || this == JoinOperator.RIGHT_ANTI_JOIN;
+  }
+
   public boolean isCrossJoin() {
     return this == JoinOperator.CROSS_JOIN;
   }

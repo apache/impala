@@ -10,18 +10,18 @@ PLAN-ROOT SINK
 |
 06:AGGREGATE [FINALIZE]
 |  output: count:merge(*)
-|  row-size=8B cardinality=1
+|  row-size=8B cardinality=1 (from HBO)
 |
 05:EXCHANGE [UNPARTITIONED]
 |
 03:AGGREGATE
 |  output: count(*)
-|  row-size=8B cardinality=2
+|  row-size=8B cardinality=3 (from HBO)
 |
 02:HASH JOIN [INNER JOIN, BROADCAST]
 |  hash predicates: b.id = a.id
 |  runtime filters: RF000 <- a.id
-|  row-size=29B cardinality=2
+|  row-size=29B cardinality=31 (from HBO)
 |
 |--04:EXCHANGE [BROADCAST]
 |  |
@@ -50,18 +50,18 @@ PLAN-ROOT SINK
 |
 06:AGGREGATE [FINALIZE]
 |  output: count:merge(a.id), min:merge(b.int_col)
-|  row-size=12B cardinality=1
+|  row-size=12B cardinality=1 (from HBO)
 |
 05:EXCHANGE [UNPARTITIONED]
 |
 03:AGGREGATE
 |  output: count(a.id), min(b.int_col)
-|  row-size=12B cardinality=2
+|  row-size=12B cardinality=3 (from HBO)
 |
 02:HASH JOIN [INNER JOIN, BROADCAST]
 |  hash predicates: b.id = a.id
 |  runtime filters: RF000 <- a.id
-|  row-size=29B cardinality=2
+|  row-size=29B cardinality=31 (from HBO)
 |
 |--04:EXCHANGE [BROADCAST]
 |  |
@@ -89,18 +89,18 @@ PLAN-ROOT SINK
 |
 06:AGGREGATE [FINALIZE]
 |  output: count:merge(*)
-|  row-size=8B cardinality=1
+|  row-size=8B cardinality=1 (from HBO, key ignores partition constants)
 |
 05:EXCHANGE [UNPARTITIONED]
 |
 03:AGGREGATE
 |  output: count(*)
-|  row-size=8B cardinality=2
+|  row-size=8B cardinality=3 (from HBO, key ignores partition constants)
 |
 02:HASH JOIN [INNER JOIN, BROADCAST]
 |  hash predicates: b.id = a.id
 |  runtime filters: RF000 <- a.id
-|  row-size=29B cardinality=2
+|  row-size=29B cardinality=31 (from HBO, key ignores partition constants)
 |
 |--04:EXCHANGE [BROADCAST]
 |  |

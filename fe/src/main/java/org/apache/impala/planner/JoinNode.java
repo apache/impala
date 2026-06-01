@@ -18,7 +18,9 @@
 package org.apache.impala.planner;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -42,9 +44,11 @@ import org.apache.impala.common.ThriftSerializationCtx;
 import org.apache.impala.planner.TupleCacheInfo.IneligibilityReason;
 import org.apache.impala.thrift.TEqJoinCondition;
 import org.apache.impala.thrift.TExecNodePhase;
+import org.apache.impala.thrift.THboStatsType;
 import org.apache.impala.thrift.TJoinDistributionMode;
 import org.apache.impala.thrift.TJoinNode;
 import org.apache.impala.thrift.TPlanNode;
+import org.apache.impala.thrift.TPlanNodeRun;
 import org.apache.impala.thrift.TQueryOptions;
 import org.apache.impala.util.MathUtil;
 import org.slf4j.Logger;
@@ -275,6 +279,7 @@ public abstract class JoinNode extends PlanNode {
     // Do not call super.init() to defer computeStats() until all conjuncts
     // have been collected.
     assignConjuncts(analyzer);
+    computeHboOperandQualifierMap(analyzer);
     createDefaultSmap(analyzer);
     // Mark slots used by 'conjuncts_' as materialized after substitution. Recompute
     // memory layout for affected tuples. Note: only tuples of the masked tables could
@@ -896,9 +901,208 @@ public abstract class JoinNode extends PlanNode {
       }
     }
     cardinality_ = capCardinalityAtLimit(cardinality_);
+    tryUpdateCardinalityFromHbo(analyzer);
     Preconditions.checkState(hasValidStats());
     if (LOG.isTraceEnabled()) {
       LOG.trace("stats Join: cardinality=" + Long.toString(cardinality_));
+    }
+  }
+
+  /**
+   * Skips cardinality-preserving nodes until a non-preserving node is reached.
+   */
+  private static PlanNode skipCardinalityPreservingNodes(PlanNode node) {
+    while (node.isCardinalityPreserving()) {
+      Preconditions.checkState(node.getChildCount() == 1);
+      node = node.getChild(0);
+    }
+    return node;
+  }
+
+  /**
+   * Collects join group info for inner/cross joins by flattening the join tree.
+   * Contiguous group of inner/cross JoinNodes are collected in 'groupNodes'.
+   * Flatten operands are collected in 'operands'.
+   */
+  private static void collectInnerCrossJoinGroup(JoinNode node, List<JoinNode> groupNodes,
+      List<PlanNode> operands) {
+    groupNodes.add(node);
+    for (PlanNode child : node.getChildren()) {
+      PlanNode baseChild = skipCardinalityPreservingNodes(child);
+      if (baseChild instanceof JoinNode joinChild
+          && (joinChild.joinOp_.isInnerJoin() || joinChild.joinOp_.isCrossJoin())
+          && !joinChild.hasLimit()) {
+        collectInnerCrossJoinGroup(joinChild, groupNodes, operands);
+      } else {
+        operands.add(baseChild);
+      }
+    }
+  }
+
+  /**
+   * Returns the logical operands of this join for HBO ordering. For an inner/cross join
+   * this is the flattened maximal contiguous group of inner/cross joins. Every other join
+   * type keeps its two children (the default).
+   */
+  @Override
+  protected List<PlanNode> getFlattenOperands() {
+    if (joinOp_.isInnerJoin() || joinOp_.isCrossJoin()) {
+      List<JoinNode> groupNodes = new ArrayList<>();
+      List<PlanNode> operands = new ArrayList<>();
+      collectInnerCrossJoinGroup(this, groupNodes, operands);
+      return operands;
+    }
+    return children_;
+  }
+
+  /**
+   * Orders this join's operands into their canonical HBO positions, i.e. the order
+   * recorded in the HBO key. Inner/cross joins flatten their contiguous group and full
+   * outer joins keep their two children; both sort operands by scan table names because
+   * operand order is insignificant. Right-handed joins invert to [right, left] so a right
+   * join hashes like its left-handed counterpart. Every other (left-directional) join
+   * keeps [left, right], where operand order is significant.
+   */
+  @Override
+  protected List<PlanNode> getHboOrderedOperands() {
+    if (joinOp_.isInnerJoin() || joinOp_.isCrossJoin() || joinOp_.isFullOuterJoin()) {
+      return super.getHboOrderedOperands();
+    }
+    if (joinOp_.isRightHandedJoin()) {
+      return Arrays.asList(getChild(1), getChild(0));
+    }
+    return children_;
+  }
+
+  private String generateFlattenJoinGroupKeyString(THboStatsType statsType,
+      CanonicalizationStrategy strategy) {
+    List<PlanNode> sortedOperands = getHboOrderedOperands();
+
+    StringBuilder sb = startHboKeyString(statsType, ":JoinNode:INNER");
+
+    sb.append("|Operands:[");
+    for (int i = 0; i < sortedOperands.size(); ++i) {
+      String childKey = sortedOperands.get(i).generateHboKeyString(statsType, strategy);
+      if (childKey == null) return null;
+      if (i > 0) sb.append(",");
+      sb.append(childKey);
+    }
+    sb.append("]");
+
+    Map<TupleId, String> operandIdx = getHboOperandQualifierMap();
+    if (operandIdx == null) return null;
+    List<String> predStrs = ExprCanonicalizer.canonicalizeJoinConjuncts(
+        collectFlattenGroupPredicates(), strategy, operandIdx);
+    sb.append("|Predicates:[").append(String.join(",", predStrs)).append("]");
+    return sb.toString();
+  }
+
+  /**
+   * Collects all predicates of this join's flattened inner/cross group: the eq-join,
+   * other-join, and WHERE conjuncts of every JoinNode in the group.
+   * TODO: Here we simply collect all the predicates. We should canonicalize equality
+   * predicate sets, e.g. (a.id=b.id AND b.id=c.id) is equivalent to
+   * (a.id=c.id AND b.id=c.id).
+   */
+  private List<Expr> collectFlattenGroupPredicates() {
+    List<JoinNode> groupNodes = new ArrayList<>();
+    collectInnerCrossJoinGroup(this, groupNodes, new ArrayList<>());
+    List<Expr> allPredicates = new ArrayList<>();
+    for (JoinNode groupNode : groupNodes) {
+      allPredicates.addAll(groupNode.eqJoinConjuncts_);
+      allPredicates.addAll(groupNode.otherJoinConjuncts_);
+      allPredicates.addAll(groupNode.conjuncts_);
+    }
+    return allPredicates;
+  }
+
+  private static String extendPath(String prefix, int idx) {
+    return prefix.isEmpty() ? String.valueOf(idx) : prefix + "." + idx;
+  }
+
+  /**
+   * Recursively assigns each base tuple under this join a canonical operand path,
+   * descending through the same operand structure the HBO key uses. Operand-transparent
+   * nodes are skipped so a join nested under e.g. an ExchangeNode is still descended
+   * into.
+   * The path is a dotted sequence of operand indices, one segment per join level (e.g.
+   * "0", "0.1"). A single index suffices for a tuple that is its join's direct operand;
+   * deeper paths distinguish tuples nested within a multi-tuple operand (a non-flattened
+   * OUTER/SEMI/ANTI/FULL side, or an inner-group operand that is itself such a join).
+   * E.g. for ((A left join B) left join C) left join D, assuming A, B, C, D are scans so
+   * just have one tuple each, the operand qualifier map of the top join node would be:
+   * { A: "0.0.0", B: "0.0.1", C: "0.1", D: "1" }. Column A.id would be canonicalized to
+   * "op0.0.0.id".
+   */
+  @Override
+  protected Map<TupleId, String> buildHboOperandQualifierMap(String prefix) {
+    Map<TupleId, String> map = new HashMap<>();
+    List<PlanNode> operands = getHboOrderedOperands();
+    for (int i = 0; i < operands.size(); ++i) {
+      map.putAll(operands.get(i).buildHboOperandQualifierMap(extendPath(prefix, i)));
+    }
+    return map;
+  }
+
+  private String generateSingleJoinKeyString(THboStatsType statsType,
+      CanonicalizationStrategy strategy) {
+    List<PlanNode> operands = getHboOrderedOperands();
+    Preconditions.checkState(operands.size() == 2);
+    String[] childKeys = new String[2];
+    for (int i = 0; i < 2; i++) {
+      childKeys[i] = operands.get(i).generateHboKeyString(statsType, strategy);
+      if (childKeys[i] == null) {
+        LOG.debug("Child of {} doesn't support HBO.", getDisplayLabel());
+        return null;
+      }
+    }
+
+    JoinOperator keyJoinOp = joinOp_.isRightHandedJoin() ? joinOp_.invert() : joinOp_;
+    Map<TupleId, String> operandIdx = getHboOperandQualifierMap();
+    if (operandIdx == null) return null;
+
+    StringBuilder sb = startHboKeyString(statsType, ":JoinNode:" + keyJoinOp.name());
+
+    List<Expr> eqConjsAsExprs = new ArrayList<>(eqJoinConjuncts_);
+    List<String> eqConjStrs = ExprCanonicalizer.canonicalizeJoinConjuncts(
+        eqConjsAsExprs, strategy, operandIdx);
+    sb.append("|Eq:").append(String.join(",", eqConjStrs));
+
+    if (!otherJoinConjuncts_.isEmpty()) {
+      List<String> otherConjStrs = ExprCanonicalizer.canonicalizeJoinConjuncts(
+          otherJoinConjuncts_, strategy, operandIdx);
+      sb.append("|Other:").append(String.join(",", otherConjStrs));
+    }
+    if (!conjuncts_.isEmpty()) {
+      List<String> conjStrs = ExprCanonicalizer.canonicalizeExprs(
+          conjuncts_, strategy, operandIdx);
+      sb.append("|Where:").append(String.join(",", conjStrs));
+    }
+
+    sb.append("|Left:").append(childKeys[0]);
+    sb.append("|Right:").append(childKeys[1]);
+    return sb.toString();
+  }
+
+  @Override
+  public String generateHboKeyString(THboStatsType statsType,
+      CanonicalizationStrategy strategy) {
+    Preconditions.checkState(children_.size() == 2);
+    // Inner join is associative and commutative so we can flatten the continuous inner
+    // joins into a join group and sort the operands, which maps queries differ only in
+    // inner join order into the same HBO key. Cross join is a special case of inner join
+    // that the join condition is always true.
+    if (joinOp_.isInnerJoin() || joinOp_.isCrossJoin()) {
+      return generateFlattenJoinGroupKeyString(statsType, strategy);
+    }
+    return generateSingleJoinKeyString(statsType, strategy);
+  }
+
+  @Override
+  public void appendScanInputStats(TPlanNodeRun execStats) {
+    // Iterate in the same order as generateHboKeyString()
+    for (PlanNode operand : getHboOrderedOperands()) {
+      operand.appendScanInputStats(execStats);
     }
   }
 

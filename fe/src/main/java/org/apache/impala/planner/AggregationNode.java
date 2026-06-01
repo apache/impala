@@ -255,6 +255,7 @@ public class AggregationNode extends PlanNode implements SpillableOperator {
       aggInfo.getIntermediateTupleDesc().computeMemLayout();
     }
 
+    computeHboOperandQualifierMap(analyzer);
     // Do at the end so it can take all conjuncts into account
     computeStats(analyzer);
 
@@ -832,36 +833,42 @@ public class AggregationNode extends PlanNode implements SpillableOperator {
       return null;
     }
 
-    StringBuilder sb = new StringBuilder(statsType.name())
-        .append(":AggregationNode:");
-
     String logicalPhase = aggPhase_.isFirstPhase() ? "FIRST"
         : aggPhase_.isTranspose() ? "TRANSPOSE" : "MERGE";
-    sb.append(logicalPhase)
-        .append("|preagg:").append(isPreagg_)
-        .append("|groupingSet:")
-        .append(multiAggInfo_.getIsGroupingSet())
-        .append("|");
-    if (limit_ > 0) sb.append("limit:").append(limit_).append("|");
+    StringBuilder sb = startHboKeyString(statsType, ":AggregationNode:" + logicalPhase);
+    sb.append("|Preagg:").append(isPreagg_)
+        .append("|GroupingSet:")
+        .append(multiAggInfo_.getIsGroupingSet());
+
+    // When the aggregation sits on top of a join (directly or through
+    // operand-transparent nodes), qualify grouping/HAVING columns with the join's
+    // canonical operand index so that columns from different operands are
+    // distinguishable, e.g. "GROUP BY a.int_col, b.bigint_col" vs
+    // "GROUP BY b.int_col, a.bigint_col". A subtree with no join (e.g. a scan or union
+    // node) exposes a single tuple set with no such ambiguity, so its columns are left
+    // unqualified (getHboOperandQualifierMap returns null).
+    Map<TupleId, String> operandIdx = baseChild.getHboOperandQualifierMap();
 
     List<String> aggClassStrings = new ArrayList<>(aggInfos_.size());
     for (AggregateInfo aggInfo : aggInfos_) {
       List<Expr> groupingExprs = aggInfo.getGroupingExprs();
-      List<String> groupingStrs = ExprCanonicalizer.canonicalizeExprs(groupingExprs);
-      aggClassStrings.add("GROUP:" + String.join(",", groupingStrs));
+      List<String> groupingStrs = ExprCanonicalizer.canonicalizeExprs(
+          groupingExprs, CanonicalizationStrategy.EXPR_REWRITE, operandIdx);
+      aggClassStrings.add("Group:" + String.join(",", groupingStrs));
     }
     Collections.sort(aggClassStrings);
     for (int i = 0; i < aggClassStrings.size(); ++i) {
       aggClassStrings.set(i, i + ":" + aggClassStrings.get(i));
     }
-    sb.append("AggClasses:[").append(String.join(",", aggClassStrings)).append("]|");
+    sb.append("|AggClasses:[").append(String.join(",", aggClassStrings)).append("]");
 
     if (!conjuncts_.isEmpty()) {
-      List<String> conjunctStrs = ExprCanonicalizer.canonicalizeExprs(conjuncts_);
-      sb.append("HAVING:").append(String.join(",", conjunctStrs)).append("|");
+      List<String> conjunctStrs = ExprCanonicalizer.canonicalizeExprs(
+          conjuncts_, CanonicalizationStrategy.EXPR_REWRITE, operandIdx);
+      sb.append("|Having:").append(String.join(",", conjunctStrs));
     }
 
-    sb.append("CHILD:[").append(childKey).append("]");
+    sb.append("|Child:[").append(childKey).append("]");
     return sb.toString();
   }
 

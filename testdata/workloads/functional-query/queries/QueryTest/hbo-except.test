@@ -1,0 +1,166 @@
+====
+---- QUERY
+# EXPLAIN the same query that has been executed
+EXPLAIN select id from functional.alltypes where string_col != 'test_except'
+  except
+  select id from functional.alltypestiny where string_col != 'test_except'
+---- PLAN
+PLAN-ROOT SINK
+|
+07:EXCHANGE [UNPARTITIONED]
+|
+03:HASH JOIN [LEFT ANTI JOIN, PARTITIONED]
+|  hash predicates: id IS NOT DISTINCT FROM id
+|  row-size=4B cardinality=7.29K (from HBO)
+|
+|--06:EXCHANGE [HASH(id)]
+|  |
+|  02:SCAN HDFS [functional.alltypestiny]
+|     HDFS partitions=4/4 files=4 size=460B
+|     predicates: string_col != 'test_except'
+|     row-size=17B cardinality=8 (from HBO)
+|
+05:AGGREGATE [FINALIZE]
+|  group by: id
+|  row-size=4B cardinality=7.30K (from HBO)
+|
+04:EXCHANGE [HASH(id)]
+|
+01:AGGREGATE [STREAMING]
+|  group by: id
+|  row-size=4B cardinality=7.30K (from HBO)
+|
+00:SCAN HDFS [functional.alltypes]
+   HDFS partitions=24/24 files=24 size=478.45KB
+   predicates: string_col != 'test_except'
+   row-size=17B cardinality=7.30K (from HBO)
+---- CALCITE_PLANNER_PLAN
+# Calcite uses UNION+AGG instead of ANTI JOIN for EXCEPT
+PLAN-ROOT SINK
+|
+06:EXCHANGE [UNPARTITIONED]
+|
+05:AGGREGATE [FINALIZE]
+|  output: count:merge(if($f1 = 0, 1, NULL)), count:merge(if($f1 = 1, 1, NULL))
+|  group by: ID
+|  having: count(if($f1 = 0, 1, NULL)) > 0, count(if($f1 = 1, 1, NULL)) = 0
+|  row-size=20B cardinality=7.29K (from HBO)
+|
+04:EXCHANGE [HASH(ID)]
+|
+03:AGGREGATE [STREAMING]
+|  output: count(if($f1 = 0, 1, NULL)), count(if($f1 = 1, 1, NULL))
+|  group by: ID
+|  row-size=20B cardinality=7.30K (from HBO)
+|
+00:UNION
+|  row-size=5B cardinality=7.31K (from HBO)
+|
+|--02:SCAN HDFS [functional.alltypestiny]
+|     HDFS partitions=4/4 files=4 size=460B
+|     predicates: functional.alltypestiny.string_col != 'test_except'
+|     row-size=17B cardinality=8 (from HBO)
+|
+01:SCAN HDFS [functional.alltypes]
+   HDFS partitions=24/24 files=24 size=478.45KB
+   predicates: functional.alltypes.string_col != 'test_except'
+   row-size=17B cardinality=7.30K (from HBO)
+====
+---- QUERY
+# EXPLAIN the rewritten query which is equivalent to the EXCEPT query
+EXPLAIN select * from (
+  select distinct id from functional.alltypes
+  where string_col != 'test_except'
+) t1
+where not exists (
+  select 1 from functional.alltypestiny t2
+  where string_col != 'test_except' and t1.id <=> t2.id)
+---- PLAN
+PLAN-ROOT SINK
+|
+07:EXCHANGE [UNPARTITIONED]
+|
+03:HASH JOIN [LEFT ANTI JOIN, PARTITIONED]
+|  hash predicates: id IS NOT DISTINCT FROM id
+|  row-size=4B cardinality=7.29K (from HBO)
+|
+|--06:EXCHANGE [HASH(id)]
+|  |
+|  02:SCAN HDFS [functional.alltypestiny]
+|     HDFS partitions=4/4 files=4 size=460B
+|     predicates: string_col != 'test_except'
+|     row-size=17B cardinality=8 (from HBO)
+|
+05:AGGREGATE [FINALIZE]
+|  group by: id
+|  row-size=4B cardinality=7.30K (from HBO)
+|
+04:EXCHANGE [HASH(id)]
+|
+01:AGGREGATE [STREAMING]
+|  group by: id
+|  row-size=4B cardinality=7.30K (from HBO)
+|
+00:SCAN HDFS [functional.alltypes]
+   HDFS partitions=24/24 files=24 size=478.45KB
+   predicates: string_col != 'test_except'
+   row-size=17B cardinality=7.30K (from HBO)
+---- CALCITE_PLANNER_PLAN
+PLAN-ROOT SINK
+|
+14:EXCHANGE [UNPARTITIONED]
+|
+07:NESTED LOOP JOIN [LEFT OUTER JOIN, BROADCAST]
+|  join predicates: functional.alltypes.id IS NULL OR functional.alltypes_0.id = functional.alltypes.id, functional.alltypes_0.id IS NULL OR functional.alltypes_0.id = functional.alltypes.id
+|  predicates: if(TupleIsNull(3), NULL, TRUE) IS NULL
+|  row-size=8B cardinality=7.30K
+|
+|--13:EXCHANGE [BROADCAST]
+|  |
+|  04:AGGREGATE [FINALIZE]
+|  |  group by: functional.alltypes.id
+|  |  row-size=4B cardinality=7.30K
+|  |
+|  03:HASH JOIN [INNER JOIN, PARTITIONED]
+|  |  hash predicates: functional.alltypes.id IS NOT DISTINCT FROM functional.alltypestiny.id
+|  |  runtime filters: RF000 <- functional.alltypestiny.id
+|  |  row-size=21B cardinality=7.30K
+|  |
+|  |--12:EXCHANGE [HASH(functional.alltypestiny.id)]
+|  |  |
+|  |  02:SCAN HDFS [functional.alltypestiny]
+|  |     HDFS partitions=4/4 files=4 size=460B
+|  |     predicates: functional.alltypestiny.string_col != 'test_except'
+|  |     row-size=17B cardinality=8 (from HBO)
+|  |
+|  11:AGGREGATE [FINALIZE]
+|  |  group by: functional.alltypes.id
+|  |  row-size=4B cardinality=7.30K
+|  |
+|  10:EXCHANGE [HASH(functional.alltypes.id)]
+|  |
+|  01:AGGREGATE [STREAMING]
+|  |  group by: functional.alltypes.id
+|  |  row-size=4B cardinality=7.30K
+|  |
+|  00:SCAN HDFS [functional.alltypes]
+|     HDFS partitions=24/24 files=24 size=478.45KB
+|     predicates: functional.alltypes.string_col != 'test_except'
+|     runtime filters: RF000 -> functional.alltypes.id
+|     row-size=17B cardinality=7.30K (from HBO)
+|
+09:AGGREGATE [FINALIZE]
+|  group by: functional.alltypes_0.id
+|  row-size=4B cardinality=7.30K
+|
+08:EXCHANGE [HASH(functional.alltypes_0.id)]
+|
+06:AGGREGATE [STREAMING]
+|  group by: functional.alltypes_0.id
+|  row-size=4B cardinality=7.30K
+|
+05:SCAN HDFS [functional.alltypes]
+   HDFS partitions=24/24 files=24 size=478.45KB
+   predicates: functional.alltypes_0.string_col != 'test_except'
+   row-size=17B cardinality=7.30K (from HBO)
+====

@@ -128,6 +128,7 @@ public class IcebergDeleteJoinNode extends JoinNode {
     Preconditions.checkState(leftSampling <= 1.0);
     effectiveRightCardinality = (long)(effectiveRightCardinality * leftSampling);
     cardinality_ = Math.max(1, leftCardWithSelectivity - effectiveRightCardinality);
+    tryUpdateCardinalityFromHbo(analyzer);
   }
 
   @Override
@@ -154,6 +155,7 @@ public class IcebergDeleteJoinNode extends JoinNode {
     msg.join_node.iceberg_delete_node.setEq_join_conjuncts(
         getThriftEquiJoinConjuncts(serialCtx));
     msg.join_node.iceberg_delete_node.setClear_file_path_slot(clearFilePathSlot_);
+    populateHboThriftFields(msg, serialCtx);
   }
 
   @Override

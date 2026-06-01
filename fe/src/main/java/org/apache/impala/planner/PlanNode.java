@@ -216,6 +216,14 @@ abstract public class PlanNode extends TreeNode<PlanNode> {
   // Cardinality before an HBO match replaced it. Only meaningful when hboMatch_ is set.
   protected long cardinalityBeforeHbo_ = -1;
 
+  // Cached result for getHboOrderedOperands(). See more in method comments.
+  private List<PlanNode> hboOrderedOperands_;
+
+  // Cached operand-qualifier map, computed eagerly in init() when HBO is enabled.
+  // See buildHboOperandQualifierMap() for how the map is built. Null when HBO is off.
+  // Empty when this node's subtree exposes no join (a single unqualified operand).
+  private Map<TupleId, String> hboOperandQualifierMap_;
+
   protected PlanNode(PlanNodeId id, List<TupleId> tupleIds, String displayName) {
     this(id, displayName);
     tupleIds_.addAll(tupleIds);
@@ -368,6 +376,7 @@ abstract public class PlanNode extends TreeNode<PlanNode> {
   protected void setDisplayName(String s) { displayName_ = s; }
 
   final protected String getDisplayLabel() {
+    if (id_ == null) return displayName_;
     return String.format("%s:%s", id_.toString(), displayName_);
   }
 
@@ -710,6 +719,7 @@ abstract public class PlanNode extends TreeNode<PlanNode> {
    */
   public void init(Analyzer analyzer) throws ImpalaException {
     assignConjuncts(analyzer);
+    computeHboOperandQualifierMap(analyzer);
     computeStats(analyzer);
     validateCardinality();
     createDefaultSmap(analyzer);
@@ -1060,21 +1070,38 @@ abstract public class PlanNode extends TreeNode<PlanNode> {
    */
   public boolean isCardinalityPreserving() { return false; }
 
+  /**
+   * Returns true if parent node can reference operand alias in/under this node.
+   */
+  public boolean isOperandTransparent() { return false; }
+
   record HboKeyedNode(String key, int originalIndex, PlanNode node) {}
 
   /**
-   * Returns children_ sorted by their concatenated and sorted scan table names.
-   * The sort is stable so two children with the same names preserve their original order
-   * in the query. Another query that flips their order will have a different HBO key
-   * string, which misses the HBO stats. Such cases are rare in practice, so we don't
-   * optimize them for simplicity. The returned list is cached and reused since the order
-   * depends only on table names, which are fixed after tree construction.
+   * Returns the logical operands of this node that should be HBO-ordered by
+   * {@link #getHboOrderedOperands}. Defaults to children_ (e.g. UnionNode's operands are
+   * its children). Nodes whose operand list isn't simply children_ (e.g. JoinNode, which
+   * flattens a contiguous inner/cross join group) override this.
+   */
+  protected List<PlanNode> getFlattenOperands() { return children_; }
+
+  /**
+   * Returns getFlattenOperands() sorted by each operand's concatenated and sorted scan
+   * table names. The sort is stable that two operands with the same names keep their
+   * order in the query. Another query that flips their order will have a different HBO
+   * key string, which misses the HBO stats. Such cases are rare in practice, so we don't
+   * optimize them for simplicity.
+   * The returned list is cached and reused to ensure all the callers get a consistent
+   * view regardless of tree structure changes. E.g. join inversion swaps children in
+   * place. Recomputing the list would flip operands on the same table, which changes the
+   * HBO key and is what we want to avoid.
    */
   protected List<PlanNode> getHboOrderedOperands() {
     if (hboOrderedOperands_ == null) {
-      hboOrderedOperands_ = IntStream.range(0, children_.size())
+      List<PlanNode> operands = getFlattenOperands();
+      hboOrderedOperands_ = IntStream.range(0, operands.size())
           .mapToObj(i -> {
-            PlanNode node = children_.get(i);
+            PlanNode node = operands.get(i);
             List<ScanNode> scans = new ArrayList<>();
             node.collect(ScanNode.class, scans);
             String key = scans.stream()
@@ -1090,7 +1117,39 @@ abstract public class PlanNode extends TreeNode<PlanNode> {
     }
     return hboOrderedOperands_;
   }
-  private List<PlanNode> hboOrderedOperands_;
+
+  Map<TupleId, String> getHboOperandQualifierMap() { return hboOperandQualifierMap_; }
+
+  /**
+   * Builds the canonical operand-qualifier map (TupleId -> operand path) that this node's
+   * subtree exposes. Empty when the subtree exposes no join, e.g. a scan/aggregation
+   * (possibly wrapped by operand-transparent nodes) whose columns need no qualification.
+   */
+  protected Map<TupleId, String> buildHboOperandQualifierMap(String prefix) {
+    if (isOperandTransparent()) {
+      Preconditions.checkState(getChildCount() == 1);
+      return getChild(0).buildHboOperandQualifierMap(prefix);
+    }
+    // Empty prefix at a leaf means "no join above"
+    if (prefix.isEmpty()) return Collections.emptyMap();
+    // Keeps the prefix by default. Nodes that add nested operand index into the prefix,
+    // e.g. JoinNode, should override this.
+    Map<TupleId, String> map = new HashMap<>(tupleIds_.size());
+    tupleIds_.forEach(id -> map.put(id, prefix));
+    return map;
+  }
+
+  /**
+   * Computes and caches hboOperandQualifierMap_ when HBO is enabled. This only depends on
+   * the tree structure so should be invoked in init() where all the children have been
+   * added.
+   */
+  protected void computeHboOperandQualifierMap(Analyzer analyzer) {
+    TQueryOptions opts = analyzer.getQueryOptions();
+    if (opts.use_hbo_stats || opts.store_hbo_stats) {
+      hboOperandQualifierMap_ = buildHboOperandQualifierMap("");
+    }
+  }
 
   /**
    * Generates an HBO key string for this node, or null if HBO is not supported.
@@ -1122,6 +1181,17 @@ abstract public class PlanNode extends TreeNode<PlanNode> {
       Preconditions.checkState(children_.size() == 1);
       getChild(0).appendScanInputStats(execStats);
     }
+  }
+
+  /**
+   * Helper to start generating an HBO key string for a stats type and a given header.
+   * PlanNode fields like limit_ can be added here.
+   */
+  public StringBuilder startHboKeyString(THboStatsType statsType, String header) {
+    StringBuilder sb = new StringBuilder(statsType.name())
+        .append(header);
+    if (limit_ > 0) sb.append("|limit:").append(limit_);
+    return sb;
   }
 
   /** The caveat of the strategy that matched, ready to follow "from HBO" in EXPLAIN. */

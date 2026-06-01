@@ -57,6 +57,13 @@ public class SlotRef extends Expr {
   // would be used instead of a SlotRef.
   protected boolean isZippingUnnest_ = false;
 
+  // Transient rendering hint used only when producing HBO key strings
+  // (ToSqlOptions.FOR_HBO). When set, it is prepended (as "<qualifier>.") to the
+  // unqualified column name so that join predicates can record which operand a column
+  // belongs to (see ExprCanonicalizer.qualifyForHbo). It is NOT propagated by the copy
+  // constructor, analyzed, serialized to thrift, or considered in equals/hashCode.
+  private String hboQualifier_ = null;
+
   public SlotRef(List<String> rawPath) {
     super();
     rawPath_ = rawPath;
@@ -343,6 +350,13 @@ public class SlotRef extends Expr {
 
   public void setIsZippingUnnest(boolean b) { isZippingUnnest_ = b; }
 
+  /**
+   * Sets a transient HBO qualifier (e.g. "op0") that is prepended to the unqualified
+   * column name when rendering with ToSqlOptions.FOR_HBO. Used by ExprCanonicalizer to
+   * tag join-predicate columns with their canonical operand index.
+   */
+  public void setHboQualifier(String qualifier) { hboQualifier_ = qualifier; }
+
   @Override
   public String toSqlImpl(ToSqlOptions options) {
     if (options.showForHbo()) {
@@ -362,7 +376,11 @@ public class SlotRef extends Expr {
       } else {
         col = label_;
       }
-      return col;
+      // For join predicates the bare column name is ambiguous (e.g. "a.id = b.int_col"
+      // and "b.id = a.int_col" would both render as "id = int_col"). The qualifier, when
+      // set, records which operand the column belongs to using a canonical, alias-
+      // independent index.
+      return hboQualifier_ == null ? col : hboQualifier_ + "." + col;
     }
     if (label_ != null) return label_;
     if (rawPath_ != null) return ToSqlUtils.getPathSql(rawPath_);

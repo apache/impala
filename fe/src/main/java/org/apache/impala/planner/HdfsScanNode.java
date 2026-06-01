@@ -1929,15 +1929,14 @@ public class HdfsScanNode extends ScanNode {
   @Override
   public String generateHboKeyString(THboStatsType statsType,
       CanonicalizationStrategy strategy) {
-    // Start with stats type prefix
-    StringBuilder sb = new StringBuilder(statsType.name()).append(":ScanNode:");
+    StringBuilder sb = startHboKeyString(statsType, ":ScanNode:");
+    if (limit_ > 0) sb.append("|");
     // Use the full path including collection columns if available
     if (desc_.getPath() != null) {
       sb.append(desc_.getPath().toString());
     } else {
       sb.append(tbl_.getFullName());
     }
-    sb.append("|");
 
     // Canonicalize partition conjuncts and regular conjuncts.
     List<String> partConjStrings =
@@ -1946,16 +1945,12 @@ public class HdfsScanNode extends ScanNode {
         ExprCanonicalizer.canonicalizeScanConjuncts(conjuncts_, tbl_, strategy);
 
     for (String s: partConjStrings) {
-      sb.append(s).append("|");
+      sb.append("|").append(s);
       LOG.trace("HBO PARTITION CONJUNCT STR ({}, {}): {}", statsType, strategy, s);
     }
     for (String s: conjStrings) {
-      sb.append(s).append("|");
+      sb.append("|").append(s);
       LOG.trace("HBO CONJUNCT STR ({}, {}): {}", statsType, strategy, s);
-    }
-
-    if (limit_ != -1) {
-      sb.append("LIMIT:").append(limit_);
     }
     return sb.toString();
   }
