@@ -276,9 +276,38 @@ under the License.
           system.
         </li>
       </ul>
-
+      <p>The ImpalaServer section of a query profile includes counters that measure client-side
+        latency and internal execution states:
+      </p>
+      <ul>
+        <li><codeph>ClientFetchWaitTimer</codeph> property indicates the cumulative time that the
+          Impala server spends waiting for the client application to retrieve rows and complete
+          client-side processing.
+        </li>
+        <li><codeph>ClientFetchWaitTimeStats</codeph> property provides summary statistics for the
+          client fetch wait metrics.
+        </li>
+        <li><codeph>ClientFetchLockWaitTimer</codeph> property measures the cumulative time that
+          client fetch requests wait to acquire internal locks.
+        </li>
+        <li><codeph>GetInFlightProfileTimeStats</codeph> property provides summary statistics of the
+          time spent dumping profile records while the query execution is in flight.<note
+            type="note">Dumping the profile of an in-flight query blocks client requests that fetch
+            results. You can use this counter to monitor and identify potential delays in result
+            retrieval.</note>
+        </li>
+      </ul>
+      <p>A <codeph>ClientFetchWaitTimer</codeph> property value that is close to the total query
+        duration indicates a performance bottleneck on the client side. In this scenario, the Impala
+        server remains idle because the system must wait for the external client to fetch the query
+        results.
+      </p>
+      <p>The query state continues in the FINISHED state during this transfer process. The FINISHED
+        state indicates that the client can begin fetching results from the coordinator node, rather
+        than indicating that the data transfer is complete. Because Impala uses distributed pipeline
+        execution, the query engine cannot produce or compute subsequent results if the client
+        application does not fetch the already generated rows.
+      </p>
     </conbody>
-
   </concept>
-
 </concept>
