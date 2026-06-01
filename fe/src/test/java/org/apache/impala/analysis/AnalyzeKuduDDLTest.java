@@ -795,7 +795,7 @@ public class AnalyzeKuduDDLTest extends FrontendTestBase {
         "Column already exists: zip");
     // Kudu column options on an HDFS table
     AnalysisError("alter table functional.alltypes add columns (a int not null)",
-        "The specified column options are only supported in Kudu tables: " +
+        "The specified column options are only supported in Kudu and Iceberg tables: " +
         "a INT NOT NULL");
 
     // ALTER TABLE DROP COLUMN

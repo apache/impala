@@ -83,3 +83,102 @@ VALUES (201, false, 10, 20, 1.5, 2.5, 50.25, 'binary_test', CAST('2024-06-15' AS
 ---- CATCH
 Iceberg write-default values for BINARY/FIXED types are not supported
 ====
+---- QUERY
+# Iceberg format-version < 3: column DEFAULT on CREATE is rejected
+CREATE TABLE iceberg_neg_fv2_create (i INT DEFAULT 1)
+STORED AS ICEBERG TBLPROPERTIES ('format-version'='2');
+---- CATCH
+Column DEFAULT on Iceberg tables requires 'format-version' >= 3
+====
+---- QUERY
+# Iceberg format-version < 3: ADD COLUMN ... DEFAULT is rejected
+CREATE TABLE iceberg_neg_fv2_add (id INT) STORED AS ICEBERG TBLPROPERTIES ('format-version'='2');
+ALTER TABLE iceberg_neg_fv2_add ADD COLUMN j INT DEFAULT 1;
+---- CATCH
+Adding column with DEFAULT on Iceberg tables requires 'format-version' >= 3
+====
+---- QUERY
+# Iceberg format-version < 3: ALTER COLUMN SET DEFAULT is rejected
+CREATE TABLE iceberg_neg_fv2_alter (id INT, j INT) STORED AS ICEBERG TBLPROPERTIES ('format-version'='2');
+ALTER TABLE iceberg_neg_fv2_alter ALTER COLUMN j SET DEFAULT 99;
+---- CATCH
+ALTER COLUMN SET/DROP DEFAULT on Iceberg tables requires 'format-version' >= 3
+====
+---- QUERY
+# Iceberg format-version < 3: ALTER COLUMN DROP DEFAULT is rejected
+CREATE TABLE iceberg_neg_fv2_dropdef (id INT, j INT) STORED AS ICEBERG TBLPROPERTIES ('format-version'='2');
+ALTER TABLE iceberg_neg_fv2_dropdef ALTER COLUMN j DROP DEFAULT;
+---- CATCH
+ALTER COLUMN SET/DROP DEFAULT on Iceberg tables requires 'format-version' >= 3
+====
+---- QUERY
+# Iceberg v3 DDL: BINARY column default rejected at analysis (CREATE)
+CREATE TABLE iceberg_neg_ddl_bin_create (
+  id INT,
+  b BINARY DEFAULT CAST(unhex('41') AS BINARY)
+) STORED AS ICEBERG TBLPROPERTIES ('format-version'='3');
+---- CATCH
+Default values are not supported for type: BINARY
+====
+---- QUERY
+# Iceberg v3 DDL: BINARY column default rejected at analysis (ADD COLUMN)
+CREATE TABLE iceberg_neg_unsup_bin (id INT) STORED AS ICEBERG TBLPROPERTIES ('format-version'='3');
+ALTER TABLE iceberg_neg_unsup_bin ADD COLUMN b BINARY DEFAULT CAST(unhex('41') AS BINARY);
+---- CATCH
+Default values are not supported for type: BINARY
+====
+---- QUERY
+# Iceberg v3 DDL: TIMESTAMP column default rejected at analysis (CREATE)
+CREATE TABLE iceberg_neg_ddl_ts_create (
+  id INT,
+  ts TIMESTAMP DEFAULT CAST('2024-01-01 00:00:00' AS TIMESTAMP)
+) STORED AS ICEBERG TBLPROPERTIES ('format-version'='3');
+---- CATCH
+Iceberg DDL default values for TIMESTAMP type are not supported
+====
+---- QUERY
+# Iceberg v3 DDL: TIMESTAMP column default rejected at analysis (ADD COLUMN)
+CREATE TABLE iceberg_neg_unsup_ts (id INT) STORED AS ICEBERG TBLPROPERTIES ('format-version'='3');
+ALTER TABLE iceberg_neg_unsup_ts ADD COLUMN ts TIMESTAMP DEFAULT CAST('2024-01-01 00:00:00' AS TIMESTAMP);
+---- CATCH
+Iceberg DDL default values for TIMESTAMP type are not supported
+====
+---- QUERY
+# Iceberg v3 DDL: non-constant default on complex column rejected (CREATE TABLE)
+CREATE TABLE iceberg_neg_ddl_complex (
+  id INT,
+  arr ARRAY<INT> DEFAULT `array`(1)
+) STORED AS ICEBERG TBLPROPERTIES ('format-version'='3');
+---- CATCH
+Only constant values are allowed for default values
+====
+---- QUERY
+# ADD COLUMN with non-constant complex default
+CREATE TABLE iceberg_neg_ddl (id INT) STORED AS ICEBERG TBLPROPERTIES ('format-version'='3');
+ALTER TABLE iceberg_neg_ddl ADD COLUMN m MAP<STRING,INT> DEFAULT `map`('a', 1);
+---- CATCH
+Only constant values are allowed for default values
+====
+---- QUERY
+# ALTER COLUMN SET DEFAULT with a non-constant complex literal
+CREATE TABLE iceberg_neg_ddl_alter (id INT, s STRING) STORED AS ICEBERG TBLPROPERTIES ('format-version'='3');
+ALTER TABLE iceberg_neg_ddl_alter ALTER COLUMN s SET DEFAULT `map`('k', 'v');
+---- CATCH
+Only constant values are allowed for default values
+====
+---- QUERY
+# CHANGE COLUMN with DEFAULT is rejected (must use ALTER COLUMN SET DEFAULT instead)
+CREATE TABLE iceberg_neg_change_col (id INT, d_col DATE) STORED AS ICEBERG TBLPROPERTIES ('format-version'='3');
+ALTER TABLE iceberg_neg_change_col CHANGE COLUMN d_col d_col DATE DEFAULT CAST('2024-01-15' AS DATE);
+---- CATCH
+Unsupported column options in ALTER TABLE CHANGE COLUMN statement
+====
+---- QUERY
+# CREATE TABLE with DEFAULT but without explicit format-version=3 is rejected
+CREATE TABLE iceberg_neg_no_v3 (
+  id INT,
+  j INT DEFAULT 42
+) STORED AS ICEBERG;
+---- CATCH
+Column DEFAULT on Iceberg tables requires 'format-version' >= 3
+====

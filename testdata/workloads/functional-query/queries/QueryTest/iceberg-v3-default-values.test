@@ -436,3 +436,150 @@ ORDER BY id;
 ---- TYPES
 INT,BOOLEAN,INT,BIGINT,FLOAT,DOUBLE,DECIMAL,STRING,DATE
 ====
+---- QUERY
+# DDL CREATE: DEFAULT values directly specified in CREATE TABLE DDL.
+CREATE TABLE iceberg_ddl_create_defaults (
+  id INT,
+  i_col INT DEFAULT -1,
+  bi_col BIGINT DEFAULT 123456789012345,
+  bool_col BOOLEAN DEFAULT true,
+  float_col FLOAT DEFAULT CAST(3.14 AS FLOAT),
+  double_col DOUBLE DEFAULT CAST(2.718281828 AS DOUBLE),
+  dec_col DECIMAL(10,2) DEFAULT CAST(99.99 AS DECIMAL(10,2)),
+  str_col STRING DEFAULT 'hello',
+  d_col DATE DEFAULT CAST('2024-01-15' AS DATE)
+)
+STORED AS ICEBERG
+TBLPROPERTIES ('format-version'='3');
+====
+---- QUERY
+# INSERT omitting columns uses CREATE-time write-defaults.
+INSERT INTO iceberg_ddl_create_defaults (id) VALUES (1000);
+SELECT * FROM iceberg_ddl_create_defaults WHERE id = 1000;
+---- RESULTS
+1000,-1,123456789012345,true,3.140000104904175,2.718281828,99.99,'hello',2024-01-15
+---- TYPES
+INT,INT,BIGINT,BOOLEAN,FLOAT,DOUBLE,DECIMAL,STRING,DATE
+====
+---- QUERY
+# INSERT with explicit values overrides write-defaults.
+INSERT INTO iceberg_ddl_create_defaults VALUES (
+  2001, -2, 999, false, CAST(1.5 AS FLOAT), 1.25, CAST(12.34 AS DECIMAL(10,2)), 'explicit', CAST('2025-01-01' AS DATE));
+SELECT * FROM iceberg_ddl_create_defaults WHERE id = 2001;
+---- RESULTS
+2001,-2,999,false,1.5,1.25,12.34,'explicit',2025-01-01
+---- TYPES
+INT,INT,BIGINT,BOOLEAN,FLOAT,DOUBLE,DECIMAL,STRING,DATE
+====
+---- QUERY
+# DDL ADD COLUMN: all supported scalar types with DEFAULT on existing data.
+CREATE TABLE iceberg_ddl_add_defaults (id INT)
+STORED AS ICEBERG
+TBLPROPERTIES ('format-version'='3');
+INSERT INTO iceberg_ddl_add_defaults VALUES (10);
+ALTER TABLE iceberg_ddl_add_defaults ADD COLUMN i_col INT DEFAULT -1;
+ALTER TABLE iceberg_ddl_add_defaults ADD COLUMN bi_col BIGINT DEFAULT 123456789012345;
+ALTER TABLE iceberg_ddl_add_defaults ADD COLUMN bool_col BOOLEAN DEFAULT true;
+ALTER TABLE iceberg_ddl_add_defaults ADD COLUMN float_col FLOAT DEFAULT CAST(3.14 AS FLOAT);
+ALTER TABLE iceberg_ddl_add_defaults ADD COLUMN double_col DOUBLE DEFAULT CAST(2.718281828 AS DOUBLE);
+ALTER TABLE iceberg_ddl_add_defaults ADD COLUMN dec_col DECIMAL(10,2) DEFAULT CAST(99.99 AS DECIMAL(10,2));
+ALTER TABLE iceberg_ddl_add_defaults ADD COLUMN str_col STRING DEFAULT 'hello';
+ALTER TABLE iceberg_ddl_add_defaults ADD COLUMN d_col DATE DEFAULT CAST('2024-01-15' AS DATE);
+SELECT * FROM iceberg_ddl_add_defaults ORDER BY id;
+---- RESULTS
+10,-1,123456789012345,true,3.140000104904175,2.718281828,99.99,'hello',2024-01-15
+---- TYPES
+INT,INT,BIGINT,BOOLEAN,FLOAT,DOUBLE,DECIMAL,STRING,DATE
+====
+---- QUERY
+# ADD COLUMN initial-default on read; partial INSERT uses write-default.
+INSERT INTO iceberg_ddl_add_defaults (id, str_col) VALUES (30, 'custom');
+SELECT * FROM iceberg_ddl_add_defaults WHERE id = 30;
+---- RESULTS
+30,-1,123456789012345,true,3.140000104904175,2.718281828,99.99,'custom',2024-01-15
+---- TYPES
+INT,INT,BIGINT,BOOLEAN,FLOAT,DOUBLE,DECIMAL,STRING,DATE
+====
+---- QUERY
+# INSERT with explicit values overrides write-defaults.
+INSERT INTO iceberg_ddl_add_defaults VALUES (
+  40, -2, 999, false, CAST(1.5 AS FLOAT), 1.25, CAST(12.34 AS DECIMAL(10,2)), 'all_explicit', CAST('2025-01-01' AS DATE));
+SELECT * FROM iceberg_ddl_add_defaults WHERE id = 40;
+---- RESULTS
+40,-2,999,false,1.5,1.25,12.34,'all_explicit',2025-01-01
+---- TYPES
+INT,INT,BIGINT,BOOLEAN,FLOAT,DOUBLE,DECIMAL,STRING,DATE
+====
+---- QUERY
+# ALTER COLUMN SET DEFAULT on all scalar types (no defaults at CREATE).
+CREATE TABLE iceberg_ddl_alter_defaults (
+  id INT,
+  i_col INT,
+  bi_col BIGINT,
+  bool_col BOOLEAN,
+  float_col FLOAT,
+  double_col DOUBLE,
+  dec_col DECIMAL(10,2),
+  str_col STRING,
+  d_col DATE
+)
+STORED AS ICEBERG
+TBLPROPERTIES ('format-version'='3');
+INSERT INTO iceberg_ddl_alter_defaults (id) VALUES (1);
+ALTER TABLE iceberg_ddl_alter_defaults ALTER COLUMN i_col SET DEFAULT -1;
+ALTER TABLE iceberg_ddl_alter_defaults ALTER COLUMN bi_col SET DEFAULT 123456789012345;
+ALTER TABLE iceberg_ddl_alter_defaults ALTER COLUMN bool_col SET DEFAULT true;
+ALTER TABLE iceberg_ddl_alter_defaults ALTER COLUMN float_col SET DEFAULT CAST(3.14 AS FLOAT);
+ALTER TABLE iceberg_ddl_alter_defaults ALTER COLUMN double_col SET DEFAULT CAST(2.718281828 AS DOUBLE);
+ALTER TABLE iceberg_ddl_alter_defaults ALTER COLUMN dec_col SET DEFAULT CAST(99.99 AS DECIMAL(10,2));
+ALTER TABLE iceberg_ddl_alter_defaults ALTER COLUMN str_col SET DEFAULT 'hello';
+ALTER TABLE iceberg_ddl_alter_defaults ALTER COLUMN d_col SET DEFAULT CAST('2024-01-15' AS DATE);
+====
+---- QUERY
+# Row before SET DEFAULT stays NULL; omitting columns after SET uses write-defaults.
+INSERT INTO iceberg_ddl_alter_defaults (id) VALUES (2);
+INSERT INTO iceberg_ddl_alter_defaults VALUES (
+  3, -2, 999, false, CAST(1.5 AS FLOAT), 1.25, CAST(12.34 AS DECIMAL(10,2)), 'explicit', CAST('2025-01-01' AS DATE));
+SELECT * FROM iceberg_ddl_alter_defaults ORDER BY id;
+---- RESULTS
+1,NULL,NULL,NULL,NULL,NULL,NULL,'NULL',NULL
+2,-1,123456789012345,true,3.140000104904175,2.718281828,99.99,'hello',2024-01-15
+3,-2,999,false,1.5,1.25,12.34,'explicit',2025-01-01
+---- TYPES
+INT,INT,BIGINT,BOOLEAN,FLOAT,DOUBLE,DECIMAL,STRING,DATE
+====
+---- QUERY
+# ALTER COLUMN DROP DEFAULT: clears write-default; CREATE-time initial-default unchanged.
+CREATE TABLE iceberg_ddl_drop_default (
+  id INT,
+  j INT DEFAULT 7,
+  s STRING DEFAULT 'def'
+)
+STORED AS ICEBERG
+TBLPROPERTIES ('format-version'='3');
+INSERT INTO iceberg_ddl_drop_default (id) VALUES (1);
+ALTER TABLE iceberg_ddl_drop_default ALTER COLUMN j DROP DEFAULT;
+INSERT INTO iceberg_ddl_drop_default (id) VALUES (2);
+SELECT * FROM iceberg_ddl_drop_default ORDER BY id;
+---- RESULTS
+1,7,'def'
+2,NULL,'def'
+---- TYPES
+INT,INT,STRING
+====
+---- QUERY
+# DROP DEFAULT after ADD COLUMN: initial-default still backfills old rows on read.
+CREATE TABLE iceberg_ddl_drop_add (id INT)
+STORED AS ICEBERG
+TBLPROPERTIES ('format-version'='3');
+INSERT INTO iceberg_ddl_drop_add VALUES (10);
+ALTER TABLE iceberg_ddl_drop_add ADD COLUMN j INT DEFAULT 100;
+ALTER TABLE iceberg_ddl_drop_add ALTER COLUMN j DROP DEFAULT;
+INSERT INTO iceberg_ddl_drop_add (id) VALUES (20);
+SELECT * FROM iceberg_ddl_drop_add ORDER BY id;
+---- RESULTS
+10,100
+20,NULL
+---- TYPES
+INT,INT
+====

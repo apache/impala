@@ -163,7 +163,27 @@ public class IcebergCatalogOpExecutor {
     for (TColumn column : columns) {
       org.apache.iceberg.types.Type type =
           IcebergSchemaConverter.fromImpalaColumnType(column.getColumnType());
-      schema.addColumn(column.getColumnName(), type, column.getComment());
+
+      String defaultStr = null;
+      if (column.isSetIceberg_initial_default()) {
+        defaultStr = column.getIceberg_initial_default();
+      } else if (column.isSetIceberg_write_default()) {
+        defaultStr = column.getIceberg_write_default();
+      }
+      if (defaultStr != null) {
+        try {
+          org.apache.iceberg.expressions.Literal<?> defaultValue =
+              IcebergSchemaConverter.parseStringToIcebergLiteral(defaultStr, type);
+          schema.addColumn(column.getColumnName(), type,
+              column.getComment(), defaultValue);
+        } catch (Exception e) {
+          throw new ImpalaRuntimeException(String.format(
+              "Failed to parse default value '%s' for column '%s': %s",
+              defaultStr, column.getColumnName(), e.getMessage()));
+        }
+      } else {
+        schema.addColumn(column.getColumnName(), type, column.getComment());
+      }
     }
     schema.commit();
   }
@@ -192,6 +212,17 @@ public class IcebergCatalogOpExecutor {
     // Update column comment if not empty
     if (newCol.getComment() != null && !newCol.getComment().isEmpty()) {
       schema.updateColumnDoc(colName, newCol.getComment());
+    }
+
+    // Update or drop column write-default.
+    if (newCol.isSetIceberg_drop_write_default()
+        && newCol.isIceberg_drop_write_default()) {
+      schema.updateColumnDefault(newCol.getColumnName(), null);
+    } else if (newCol.isSetIceberg_write_default()) {
+      org.apache.iceberg.expressions.Literal<?> lit =
+          IcebergSchemaConverter.parseStringToIcebergLiteral(
+              newCol.getIceberg_write_default(), type);
+      schema.updateColumnDefault(newCol.getColumnName(), lit);
     }
     schema.commit();
   }

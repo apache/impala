@@ -42,6 +42,7 @@ import org.apache.impala.common.ImpalaRuntimeException;
 import org.apache.impala.common.RuntimeEnv;
 import org.apache.impala.service.BackendConfig;
 import org.apache.impala.thrift.TBucketInfo;
+import org.apache.impala.thrift.TColumn;
 import org.apache.impala.thrift.TCreateTableParams;
 import org.apache.impala.thrift.THdfsFileFormat;
 import org.apache.impala.thrift.TIcebergCatalog;
@@ -52,6 +53,7 @@ import org.apache.impala.thrift.TTableName;
 import org.apache.impala.util.AvroSchemaConverter;
 import org.apache.impala.util.AvroSchemaParser;
 import org.apache.impala.util.AvroSchemaUtils;
+import org.apache.impala.util.IcebergSchemaConverter;
 import org.apache.impala.util.IcebergUtil;
 import org.apache.impala.util.KuduUtil;
 import org.apache.impala.util.MetaStoreUtil;
@@ -207,8 +209,17 @@ public class CreateTableStmt extends StatementBase implements SingleTableStmt {
   public TCreateTableParams toThrift() {
     TCreateTableParams params = new TCreateTableParams();
     params.setTable_name(new TTableName(getDb(), getTbl()));
-    List<org.apache.impala.thrift.TColumn> tColumns = new ArrayList<>();
-    for (ColumnDef col: getColumnDefs()) tColumns.add(col.toThrift());
+    List<TColumn> tColumns = new ArrayList<>();
+    for (ColumnDef col : getColumnDefs()) {
+      TColumn tc = col.toThrift();
+      if (getFileFormat() == THdfsFileFormat.ICEBERG && col.hasDefaultValue()) {
+        tc.setIs_iceberg_column(true);
+        String defStr = col.getIcebergDefaultValueString();
+        tc.setIceberg_initial_default(defStr);
+        tc.setIceberg_write_default(defStr);
+      }
+      tColumns.add(tc);
+    }
     params.setColumns(tColumns);
     for (ColumnDef col: getPartitionColumnDefs()) {
       params.addToPartition_columns(col.toThrift());
@@ -693,6 +704,24 @@ public class CreateTableStmt extends StatementBase implements SingleTableStmt {
       catalog = IcebergUtil.getTIcebergCatalog(catalogStr);
     }
     validateIcebergTableProperties(catalog);
+
+    boolean anyColDefaults = false;
+    for (ColumnDef col : getColumnDefs()) {
+      if (col.hasDefaultValue()) {
+        anyColDefaults = true;
+        break;
+      }
+    }
+    if (anyColDefaults) {
+      String fv = getTblProperties().get(IcebergTable.FORMAT_VERSION);
+      Integer ver = (fv != null && !fv.isEmpty()) ? Ints.tryParse(fv.trim()) : null;
+      if (ver == null || ver < 3) {
+        throw new AnalysisException(String.format(
+            "Column DEFAULT on Iceberg tables requires '%s' >= 3. " +
+            "Please explicitly set TBLPROPERTIES('%s'='3').",
+            IcebergTable.FORMAT_VERSION, IcebergTable.FORMAT_VERSION));
+      }
+    }
   }
 
   /**
@@ -867,13 +896,16 @@ public class CreateTableStmt extends StatementBase implements SingleTableStmt {
    * Set column's nullable as true for default situation, so we can create optional
    * Iceberg field
    */
-  private void analyzeIcebergColumns() {
+  private void analyzeIcebergColumns() throws AnalysisException {
     if (!getPartitionColumnDefs().isEmpty()) {
       createIcebergPartitionSpecFromPartitionColumns();
     }
     for (ColumnDef def : getColumnDefs()) {
       if (!def.isNullabilitySet()) {
         def.setNullable(true);
+      }
+      if (def.hasDefaultValue()) {
+        IcebergSchemaConverter.validateIcebergDdlDefaultType(def.getType());
       }
     }
   }

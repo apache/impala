@@ -525,7 +525,7 @@ public class AnalyzeDDLTest extends FrontendTestBase {
 
     // A not null is a Kudu only option..
     AnalysisError("alter table functional.alltypes add column new_col int not null",
-        "The specified column options are only supported in Kudu tables: " +
+        "The specified column options are only supported in Kudu and Iceberg tables: " +
         "new_col INT NOT NULL");
     // Paimon ADD COLUMN Test
     String paimon_partitioned =
@@ -618,7 +618,7 @@ public class AnalyzeDDLTest extends FrontendTestBase {
 
     // A not null is a Kudu only option..
     AnalysisError("alter table functional.alltypes add columns(new_col int not null)",
-        "The specified column options are only supported in Kudu tables: " +
+        "The specified column options are only supported in Kudu and Iceberg tables: " +
         "new_col INT NOT NULL");
     // Paimon ADD COLUMNS Test
     String paimon_partitioned =

@@ -345,6 +345,8 @@ struct TColumn {
   // Iceberg V3 default value fields
   27: optional string iceberg_initial_default
   28: optional string iceberg_write_default
+  // When true, the write-default is removed from the Iceberg schema metadata.
+  29: optional bool iceberg_drop_write_default
 
 }
 

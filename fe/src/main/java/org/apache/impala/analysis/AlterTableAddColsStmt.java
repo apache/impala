@@ -24,13 +24,17 @@ import org.apache.impala.catalog.Column;
 import org.apache.impala.catalog.DataSourceTable;
 import org.apache.impala.catalog.FeDataSourceTable;
 import org.apache.impala.catalog.FeHBaseTable;
+import org.apache.impala.catalog.FeIcebergTable;
 import org.apache.impala.catalog.FeKuduTable;
 import org.apache.impala.catalog.FeTable;
+import org.apache.impala.catalog.IcebergTable;
 import org.apache.impala.catalog.KuduColumn;
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.thrift.TAlterTableAddColsParams;
 import org.apache.impala.thrift.TAlterTableParams;
 import org.apache.impala.thrift.TAlterTableType;
+import org.apache.impala.thrift.TColumn;
+import org.apache.impala.util.IcebergSchemaConverter;
 import org.apache.impala.util.KuduUtil;
 
 import java.util.HashSet;
@@ -117,9 +121,24 @@ public class AlterTableAddColsStmt extends AlterTableStmt {
           throw new AnalysisException("A new non-null column must have a default " +
               "value: " + c.toString());
         }
+      } else if (t instanceof FeIcebergTable) {
+        FeIcebergTable iceTbl = (FeIcebergTable) t;
+        // For Iceberg tables, only default values are supported as column options
+        if (c.hasIncompatibleIcebergOptions()) {
+          throw new AnalysisException("The specified column options are not supported " +
+              "in Iceberg tables: " + c.toString());
+        }
+        if (c.hasDefaultValue() && iceTbl.getFormatVersion() < 3) {
+          throw new AnalysisException(String.format(
+              "Adding column with DEFAULT on Iceberg tables requires '%s' >= 3 " +
+              "(current: %s).", IcebergTable.FORMAT_VERSION, iceTbl.getFormatVersion()));
+        }
+        if (c.hasDefaultValue()) {
+          IcebergSchemaConverter.validateIcebergDdlDefaultType(c.getType());
+        }
       } else if (c.hasKuduOptions()) {
         throw new AnalysisException("The specified column options are only supported " +
-            "in Kudu tables: " + c.toString());
+            "in Kudu and Iceberg tables: " + c.toString());
       } else if (t instanceof FeDataSourceTable) {
         if (!DataSourceTable.isSupportedColumnType(c.getType())) {
           throw new AnalysisException("Tables stored by JDBC do not support the " +
@@ -134,8 +153,18 @@ public class AlterTableAddColsStmt extends AlterTableStmt {
     TAlterTableParams params = super.toThrift();
     params.setAlter_type(TAlterTableType.ADD_COLUMNS);
     TAlterTableAddColsParams colParams = new TAlterTableAddColsParams();
+
+    boolean isIcebergTable = getTargetTable() instanceof FeIcebergTable;
     for (ColumnDef col: columnDefs_) {
-      colParams.addToColumns(col.toThrift());
+      TColumn tCol = col.toThrift();
+      // For Iceberg tables, populate default values if applicable.
+      if (isIcebergTable && col.hasDefaultValue()) {
+        String defaultValueStr = col.getIcebergDefaultValueString();
+        tCol.setIs_iceberg_column(true);
+        tCol.setIceberg_initial_default(defaultValueStr);
+        tCol.setIceberg_write_default(defaultValueStr);
+      }
+      colParams.addToColumns(tCol);
     }
     colParams.setIf_not_exists(ifNotExists_);
     params.setAdd_cols_params(colParams);

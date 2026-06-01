@@ -27,9 +27,12 @@ import org.apache.impala.catalog.FeHBaseTable;
 import org.apache.impala.catalog.FeIcebergTable;
 import org.apache.impala.catalog.FeKuduTable;
 import org.apache.impala.catalog.FeTable;
+import org.apache.impala.catalog.IcebergTable;
 import org.apache.impala.catalog.KuduColumn;
 import org.apache.impala.common.AnalysisException;
+import org.apache.impala.util.IcebergSchemaConverter;
 import org.apache.impala.thrift.TAlterTableAlterColParams;
+import org.apache.impala.thrift.TColumn;
 import org.apache.impala.thrift.TAlterTableParams;
 import org.apache.impala.thrift.TAlterTableType;
 
@@ -48,6 +51,7 @@ public class AlterTableAlterColStmt extends AlterTableStmt {
   private final String colName_;
   private final ColumnDef newColDef_;
   private final boolean isDropDefault_;
+  private boolean isAlterColumnOptionsStmt_;
 
   /**
    * Creates and returns a new AlterTableAlterColStmt for the operation:
@@ -98,7 +102,16 @@ public class AlterTableAlterColStmt extends AlterTableStmt {
     params.setAlter_type(TAlterTableType.ALTER_COLUMN);
     TAlterTableAlterColParams colParams = new TAlterTableAlterColParams();
     colParams.setCol_name(colName_);
-    colParams.setNew_col_def(newColDef_.toThrift());
+    TColumn newColThrift = newColDef_.toThrift();
+    if (getTargetTable() instanceof FeIcebergTable && isAlterColumnOptionsStmt_) {
+      newColThrift.setIs_iceberg_column(true);
+      if (isDropDefault_) {
+        newColThrift.setIceberg_drop_write_default(true);
+      } else if (newColDef_.hasDefaultValue()) {
+        newColThrift.setIceberg_write_default(newColDef_.getIcebergDefaultValueString());
+      }
+    }
+    colParams.setNew_col_def(newColThrift);
     params.setAlter_col_params(colParams);
     return params;
   }
@@ -134,6 +147,7 @@ public class AlterTableAlterColStmt extends AlterTableStmt {
       newColDef_.setType(column.getType());
       alterColumnSetStmt = true;
     }
+    isAlterColumnOptionsStmt_ = alterColumnSetStmt;
     // Check that the new column def's name is valid.
     newColDef_.analyze(analyzer);
     // Verify that if the column name is being changed, the new name doesn't conflict
@@ -143,8 +157,11 @@ public class AlterTableAlterColStmt extends AlterTableStmt {
       throw new AnalysisException("Column already exists: " + newColDef_.getColName());
     }
     if (newColDef_.hasKuduOptions()) {
-      // Disallow Kudu options on non-Kudu tables.
-      if (!(t instanceof FeKuduTable)) {
+      // Disallow Kudu options on non-Kudu tables EXCEPT for Iceberg ALTER COLUMN SET/DROP
+      // DEFAULT, where the only Kudu-style option is the default option.
+      boolean icebergAlterDefault = t instanceof FeIcebergTable &&
+          (newColDef_.hasDefaultValue() || isDropDefault_);
+      if (!(t instanceof FeKuduTable || icebergAlterDefault)) {
         if (isDropDefault_) {
           throw new AnalysisException(String.format(
               "Unsupported column option for non-Kudu table: DROP DEFAULT"));
@@ -155,7 +172,7 @@ public class AlterTableAlterColStmt extends AlterTableStmt {
         }
       }
       // Disallow Kudu options on Kudu tables in a CHANGE statement. We need to keep
-      // CHANGE for compatability, but we don't want to add new functionality to it.
+      // CHANGE for compatibility, but we don't want to add new functionality to it.
       if (!alterColumnSetStmt) {
         throw new AnalysisException(
             String.format("Unsupported column options in ALTER TABLE CHANGE COLUMN "
@@ -194,6 +211,16 @@ public class AlterTableAlterColStmt extends AlterTableStmt {
           newColDef_.getType().isComplexType()) {
         throw new AnalysisException(String.format("ALTER TABLE CHANGE COLUMN " +
             "is not supported for complex types in Iceberg tables."));
+      }
+      FeIcebergTable iceTbl = (FeIcebergTable) t;
+      if (alterColumnSetStmt && iceTbl.getFormatVersion() < 3
+          && (isDropDefault_ || newColDef_.hasDefaultValue())) {
+        throw new AnalysisException(String.format(
+            "ALTER COLUMN SET/DROP DEFAULT on Iceberg tables requires '%s' >= 3 " +
+            "(current: %s).", IcebergTable.FORMAT_VERSION, iceTbl.getFormatVersion()));
+      }
+      if (alterColumnSetStmt && newColDef_.hasDefaultValue()) {
+        IcebergSchemaConverter.validateIcebergDdlDefaultType(newColDef_.getType());
       }
     }
 

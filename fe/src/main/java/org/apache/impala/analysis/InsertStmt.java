@@ -1287,7 +1287,7 @@ public class InsertStmt extends DmlStatementBase {
       IcebergColumn iceCol = (IcebergColumn) tblColumn;
       String writeDefault = iceCol.getWriteDefault();
 
-      if (writeDefault != null && !writeDefault.isEmpty()) {
+      if (writeDefault != null) {
         Type colType = tblColumn.getType();
         // Reject TIMESTAMP - LiteralExpr doesn't support it
         if (colType.isTimestamp()) {

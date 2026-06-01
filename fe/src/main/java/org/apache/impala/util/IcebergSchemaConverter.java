@@ -34,8 +34,14 @@ import org.apache.hadoop.hive.metastore.api.FieldSchema;
 import org.apache.hadoop.hive.metastore.api.Table;
 import org.apache.iceberg.PartitionSpec;
 import org.apache.iceberg.Schema;
+import org.apache.iceberg.expressions.Literal;
 import org.apache.iceberg.hive.HiveSchemaUtil;
 import org.apache.iceberg.types.Types;
+import org.apache.impala.analysis.BoolLiteral;
+import org.apache.impala.analysis.DateLiteral;
+import org.apache.impala.analysis.LiteralExpr;
+import org.apache.impala.analysis.NumericLiteral;
+import org.apache.impala.analysis.StringLiteral;
 import org.apache.impala.catalog.ArrayType;
 import org.apache.impala.catalog.Column;
 import org.apache.impala.catalog.IcebergColumn;
@@ -45,6 +51,7 @@ import org.apache.impala.catalog.ScalarType;
 import org.apache.impala.catalog.StructField;
 import org.apache.impala.catalog.StructType;
 import org.apache.impala.catalog.Type;
+import org.apache.impala.common.AnalysisException;
 import org.apache.impala.common.ImpalaRuntimeException;
 import org.apache.impala.thrift.TColumn;
 import org.apache.impala.thrift.TColumnType;
@@ -211,21 +218,123 @@ public class IcebergSchemaConverter {
   }
 
   /**
+   * Validates that a column type supports Iceberg V3 DDL default values.
+   */
+  public static void validateIcebergDdlDefaultType(Type impalaType)
+      throws AnalysisException {
+    if (impalaType.isComplexType()) {
+      throw new AnalysisException(String.format(
+          "Default values are not supported for type: %s", impalaType.toSql()));
+    }
+    if (impalaType.isTimestamp()) {
+      throw new AnalysisException(
+          "Iceberg DDL default values for TIMESTAMP type are not supported; "
+          + "only DATE is supported among temporal types.");
+    }
+    if (impalaType.isBinary()) {
+      throw new AnalysisException(String.format(
+          "Default values are not supported for type: %s", impalaType.toSql()));
+    }
+  }
+
+  /**
+   * Converts an analyzed Impala literal to an Iceberg schema default literal.
+   */
+  public static Literal<?> literalExprToIcebergLiteral(LiteralExpr expr,
+      org.apache.iceberg.types.Type icebergType) throws ImpalaRuntimeException {
+    try {
+      switch (icebergType.typeId()) {
+        case BOOLEAN:
+          return Literal.of(((BoolLiteral) expr).getValue());
+        case INTEGER:
+          return Literal.of(((NumericLiteral) expr).getIntValue());
+        case LONG:
+          return Literal.of(((NumericLiteral) expr).getLongValue());
+        case FLOAT:
+          return Literal.of((float) ((NumericLiteral) expr).getDoubleValue());
+        case DOUBLE:
+          return Literal.of(((NumericLiteral) expr).getDoubleValue());
+        case STRING:
+          return Literal.of(((StringLiteral) expr).getUnescapedValue());
+        case DECIMAL:
+          return Literal.of(((NumericLiteral) expr).getValue());
+        case DATE:
+          return Literal.of(((DateLiteral) expr).getValue());
+        case TIME:
+        case TIMESTAMP:
+          throw new ImpalaRuntimeException(
+              "Iceberg DDL default values for " + icebergType.typeId()
+              + " type are not supported; only DATE is supported among temporal types.");
+        case BINARY:
+          throw new ImpalaRuntimeException(
+              "Default values are not supported for type: " + icebergType.typeId());
+        default:
+          throw new ImpalaRuntimeException(
+              "Default values are not supported for type: " + icebergType.typeId());
+      }
+    } catch (ClassCastException e) {
+      throw new ImpalaRuntimeException(String.format("Cannot convert default literal '%s'"
+          + " to Iceberg type %s", expr.toSql(), icebergType.typeId()));
+    }
+  }
+
+  /**
+   * Parses a default value string (from analyzed {@link LiteralExpr} serialization) into
+   * an Iceberg literal, using {@link LiteralExpr#createFromUnescapedStr}.
+   */
+  public static Literal<?> parseStringToIcebergLiteral(String defaultStr,
+      org.apache.iceberg.types.Type type) throws ImpalaRuntimeException {
+    if (defaultStr == null) {
+      return null;
+    }
+    if (defaultStr.isEmpty()) {
+      if (type.typeId() == org.apache.iceberg.types.Type.TypeID.STRING)
+        return org.apache.iceberg.expressions.Literal.of("");
+      throw new ImpalaRuntimeException(String.format("Invalid empty literal for " +
+          "non-STRING type: %s", type.typeId()));
+    }
+    try {
+      Type impalaType = toImpalaType(type);
+      LiteralExpr lit =
+          LiteralExpr.createFromUnescapedStr(defaultStr.trim(), impalaType);
+      return literalExprToIcebergLiteral(lit, type);
+    } catch (AnalysisException e) {
+      throw new ImpalaRuntimeException(String.format("Cannot parse default value '%s' as "
+          + "%s: %s", defaultStr, type.typeId(), e.getMessage()));
+    }
+  }
+
+  /**
    * Create iceberg field from TColumn
    */
   private static Types.NestedField createIcebergField(TColumn column)
-      throws ImpalaRuntimeException{
+      throws ImpalaRuntimeException {
     org.apache.iceberg.types.Type icebergType = fromImpalaColumnType(
         column.getColumnType());
-    if (column.isIs_nullable()) {
-      // Create 'optional' field for 'NULL' situation
-      return Types.NestedField.optional(
-          nextId(), column.getColumnName(), icebergType, column.getComment());
-    } else {
-      // Create 'required' field for 'NOT NULL' or default situation
-      return Types.NestedField.required(
-          nextId(), column.getColumnName(), icebergType, column.getComment());
+    Types.NestedField.Builder fieldBuilder = column.isIs_nullable()
+        ? Types.NestedField.optional(column.getColumnName())
+        : Types.NestedField.required(column.getColumnName());
+    fieldBuilder.withId(nextId()).ofType(icebergType);
+    if (column.getComment() != null && !column.getComment().isEmpty()) {
+      fieldBuilder.withDoc(column.getComment());
     }
+
+    boolean hasInit = column.isSetIceberg_initial_default();
+    boolean hasWrite = column.isSetIceberg_write_default();
+    String initStr = hasInit ? column.getIceberg_initial_default() : null;
+    String writeStr = hasWrite ? column.getIceberg_write_default() : null;
+    if (hasInit && hasWrite && !initStr.equals(writeStr)) {
+      throw new ImpalaRuntimeException(String.format(
+          "Iceberg ADD/CREATE column '%s' cannot set different initial-default and "
+              + "write-default literals in a single operation.",
+          column.getColumnName()));
+    }
+    String defStr = hasInit ? initStr : writeStr;
+    if (defStr != null) {
+      Literal<?> lit = parseStringToIcebergLiteral(defStr, icebergType);
+      fieldBuilder.withInitialDefault(lit).withWriteDefault(lit);
+    }
+    return fieldBuilder.build();
   }
 
   public static org.apache.iceberg.types.Type fromImpalaColumnType(TColumnType colType)
