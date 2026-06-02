@@ -492,11 +492,14 @@ class TestObservability(ImpalaTestSuite):
     verify_profile_event_sequence(event_regexes, runtime_profile)
 
   def test_query_profile_contains_query_compilation_metadata_load_events(self,
-        cluster_properties):
+        cluster_properties, unique_database):
     """Test that the Metadata load started and finished events appear in the query
     profile when Catalog cache is evicted."""
-    invalidate_query = "invalidate metadata functional.alltypes"
-    select_query = "select * from functional.alltypes"
+    table_name = "%s.test_table" % unique_database
+    self.execute_query(
+        "create table %s as select * from functional.alltypestiny" % table_name)
+    invalidate_query = "invalidate metadata %s" % table_name
+    select_query = "select * from %s" % table_name
     self.execute_query(invalidate_query).runtime_profile
     runtime_profile = self.execute_query(select_query).runtime_profile
     # Depending on whether this is a catalog-v2 cluster or not some of the metadata
