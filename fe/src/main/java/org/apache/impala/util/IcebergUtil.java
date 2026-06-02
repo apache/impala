@@ -53,6 +53,9 @@ import org.apache.iceberg.FileContent;
 import org.apache.iceberg.FileFormat;
 import org.apache.iceberg.FileScanTask;
 import org.apache.iceberg.IncrementalAppendScan;
+import org.apache.iceberg.ManifestFile;
+import org.apache.iceberg.ManifestFiles;
+import org.apache.iceberg.ManifestReader;
 import org.apache.iceberg.PartitionField;
 import org.apache.iceberg.PartitionSpec;
 import org.apache.iceberg.Schema;
@@ -1817,5 +1820,39 @@ public class IcebergUtil {
     SlotRef ref = new SlotRef(path);
     ref.analyze(analyzer);
     return ref;
+  }
+
+  /**
+   * Scans all delete manifests in the given base snapshot and returns a map from
+   * referenced data file path to its corresponding live DeleteFile entry.
+   *
+   * The live manifest entries must be used when calling RowDelta.removeDeletes() so
+   * that the correct partition(), manifestLocation(), and other manifest-sourced
+   * fields are present for Iceberg's ManifestFilterManager to match the entry.
+   */
+  public static Map<String, DeleteFile> lookupDeletionVectors(
+      FeIcebergTable icebergTable, long baseSnapshotId) throws ImpalaRuntimeException {
+    Table table = icebergTable.getIcebergApiTable();
+    Snapshot baseSnapshot = table.snapshot(baseSnapshotId);
+    if (baseSnapshot == null) {
+      throw new ImpalaRuntimeException(String.format(
+          "Base snapshot %d is no longer available; cannot look up deletion vectors. "
+              + "The snapshot may have been expired.", baseSnapshotId));
+    }
+    Map<String, DeleteFile> result = new HashMap<>();
+    for (ManifestFile deleteManifest : baseSnapshot.deleteManifests(table.io())) {
+      try (ManifestReader<DeleteFile> manifestReader = ManifestFiles.readDeleteManifest(
+          deleteManifest, table.io(), table.specs())) {
+        for (DeleteFile deleteFile : manifestReader) {
+          if (deleteFile.referencedDataFile() != null) {
+            result.put(deleteFile.referencedDataFile(), deleteFile);
+          }
+        }
+      } catch (IOException e) {
+        throw new ImpalaRuntimeException(
+            "Unable to read delete manifest while looking up deletion vectors", e);
+      }
+    }
+    return result;
   }
 }

@@ -41,6 +41,7 @@ import org.apache.iceberg.DataFile;
 import org.apache.iceberg.DeleteFile;
 import org.apache.iceberg.Table;
 import org.apache.impala.catalog.iceberg.GroupedContentFiles;
+import org.apache.impala.common.ImpalaRuntimeException;
 import org.apache.impala.common.Pair;
 import org.apache.impala.fb.FbFileDesc;
 import org.apache.impala.fb.FbFileMetadata;
@@ -369,6 +370,23 @@ public class IcebergContentFileStore {
     IcebergFileDescriptor desc = dataFilesWithoutDeletes_.get(pathHash);
     if (desc != null) return desc;
     return dataFilesWithDeletes_.get(pathHash);
+  }
+
+  /**
+   * Looks up a data file descriptor by its 128-bit path hash (low/high halves).
+   * Throws ImpalaRuntimeException if no matching entry is found.
+   */
+  public IcebergFileDescriptor getDataFileDescriptorOrThrow(long hash128Low,
+      long hash128High)
+      throws ImpalaRuntimeException {
+    Hash128 pathHash = new Hash128(hash128High, hash128Low);
+    IcebergFileDescriptor desc = getDataFileDescriptor(pathHash);
+    if (desc == null) {
+      throw new ImpalaRuntimeException(
+          String.format("Could not find data file for deletion vector with hash: %s",
+              pathHash));
+    }
+    return desc;
   }
 
   public IcebergFileDescriptor getDeleteFileDescriptor(Hash128 pathHash) {

@@ -1299,3 +1299,123 @@ INT,STRING
 # ICEBERG__PARTITION__SERIALIZED.
 row_regex: .*EXCHANGE \[HASH\(.*partition__spec__id.*iceberg__partition__serialized.*\).*
 ====
+====
+---- QUERY
+# Regression test for IMPALA-15065: multi-DV puffin files on a bool_col-partitioned
+# table after partition spec evolution to void(int_col).
+# When a puffin file holds two DV blobs (one per bool_col partition), the live
+# DeleteFile map must be keyed by (puffinPath, contentOffset) so both blobs are
+# correctly retired rather than the same live DeleteFile being removed twice.
+#
+# Table creation and initial data loading.
+# source is an unpartitioned Iceberg table seeded from functional.alltypes (1000 rows).
+# target_part is partitioned by bool_col; format-version=3 enables deletion vectors.
+drop table if exists source;
+create table source(id int, bool_col boolean, int_col int, float_col float,
+    decimal_col decimal(20,0), date_col date, string_col string)
+  stored as iceberg tblproperties('format-version'='3');
+insert into source select id, bool_col, int_col,
+  float_col, cast(bigint_col as decimal(20,0)), to_date(timestamp_col),
+  string_col from functional.alltypes order by id limit 1000;
+
+drop table if exists target_part;
+create table target_part(id int, bool_col boolean, int_col int, float_col float,
+    decimal_col decimal(20,0), date_col date, string_col string)
+  partitioned by spec (bool_col)
+  stored as iceberg tblproperties('format-version'='3');
+====
+---- QUERY
+# MERGE 1: fill target_part from source using WHEN NOT MATCHED INSERT.
+# Target is empty so all 1000 source rows are inserted with id shifted by +1000.
+merge into target_part target using source on target.id = source.id
+when not matched then insert values(
+    cast(source.id + 1000 as int), source.bool_col, source.int_col,
+    source.float_col, source.decimal_col,
+    source.date_col, 'constant string value');
+====
+---- QUERY
+select count(*), sum(id), sum(int_col) from target_part
+---- RESULTS
+1000,1499500,4500
+---- TYPES
+BIGINT,BIGINT,BIGINT
+====
+---- QUERY
+# MERGE 2: update all rows via WHEN MATCHED: id shifted back to source.id, int_col refreshed.
+# Exercises DVs on a bool_col-partitioned table (two partitions: true/false).
+merge into target_part target using (select * from source) source on target.id = source.id + 1000
+when matched then update set int_col = source.int_col, id = source.id;
+====
+---- QUERY
+select count(*), sum(id), sum(int_col) from target_part
+---- RESULTS
+1000,499500,4500
+---- TYPES
+BIGINT,BIGINT,BIGINT
+====
+---- QUERY
+# Evolve the partition spec to void(int_col).
+# Subsequent writes land in the new unpartitioned spec while old data stays in
+# the bool_col partitions.  This is the scenario that exercises multi-DV puffin
+# files: after this point each MERGE may produce a puffin file that holds two DV
+# blobs (one per old partition) for the same data file.
+alter table target_part set partition spec (void(int_col));
+====
+---- QUERY
+# MERGE 3: update int_col += 10 for all rows (target.id matches source.id 0..999).
+merge into target_part target using (select * from source) source on target.id = source.id
+when matched then update set int_col = cast(source.int_col + 10 as int);
+====
+---- QUERY
+select count(*), sum(id), sum(int_col) from target_part
+---- RESULTS
+1000,499500,14500
+---- TYPES
+BIGINT,BIGINT,BIGINT
+====
+---- QUERY
+# MERGE 4: WHEN NOT MATCHED BY SOURCE with a predicate.
+# source.id + 1000 is in range 1000..1999, target ids are 0..999, so no target row
+# has a matching source row.  All target rows are "not matched by source";
+# the predicate target.id > 570 further restricts the update to 429 rows.
+merge into target_part target using (select * from source) source on target.id = cast(source.id + 1000 as int)
+when not matched by source and target.id > 570 then update set int_col = cast(target.int_col + 10 as int);
+====
+---- QUERY
+select count(*), sum(id), sum(int_col) from target_part
+---- RESULTS
+1000,499500,18790
+---- TYPES
+BIGINT,BIGINT,BIGINT
+====
+---- QUERY
+# MERGE 5: WHEN NOT MATCHED BY SOURCE without a predicate — flips bool_col on every row.
+# Again no target row matches source (same join key offset), so all 1000 rows are updated.
+merge into target_part target using source source on target.id = cast(source.id + 1000 as int)
+when not matched by source then update set bool_col = !target.bool_col;
+====
+---- QUERY
+# Validate final state: bool_col was (id%2==1); after the flip it is (id%2==0).
+# Even ids (0,2,...,998) are now true — 500 rows each.
+select bool_col, count(*) from target_part group by bool_col order by bool_col
+---- RESULTS
+false,500
+true,500
+---- TYPES
+BOOLEAN,BIGINT
+====
+---- QUERY
+select count(*), sum(id), sum(int_col) from target_part
+---- RESULTS
+1000,499500,18790
+---- TYPES
+BIGINT,BIGINT,BIGINT
+====
+---- QUERY
+# 5 MERGE statements = 5 snapshots; the ALTER TABLE does not create a snapshot.
+select count(1) from $DATABASE.target_part.snapshots
+---- RESULTS
+5
+---- TYPES
+BIGINT
+====
