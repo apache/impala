@@ -30,10 +30,8 @@
 # 4. Install ADLS packages if applicable
 # 5. Install GCOVR packages if this is a code coverage build
 #
-# This module can be run with python >= 2.7. It makes no guarantees about usage on
-# python < 2.7.
+# This module can be run with python >= 3.6.
 
-from __future__ import absolute_import, division, print_function
 import glob
 import logging
 import optparse
@@ -41,7 +39,6 @@ import os
 import shutil
 import subprocess
 import sys
-import tarfile
 import tempfile
 try:
   from urllib.request import pathname2url
@@ -237,7 +234,6 @@ def download_toolchain_python():
 def install_deps(venv_dir):
   LOG.info("Installing setuptools into the python3 virtualenv")
   exec_pip_install(venv_dir, ["-r", SETUPTOOLS_REQS_PATH])
-  exec_pip_install(venv_dir, ["packaging==24.1"])
   cc = select_cc()
   if cc is None:
     raise Exception("CC not available")

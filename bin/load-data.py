@@ -20,7 +20,6 @@
 # This script is used to load the proper datasets for the specified workloads. It loads
 # all data via Hive except for parquet data which needs to be loaded via Impala.
 # Most ddl commands are executed by Impala.
-from __future__ import absolute_import, division, print_function
 import collections
 import getpass
 import logging

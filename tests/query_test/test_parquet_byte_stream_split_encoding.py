@@ -15,8 +15,6 @@
 # specific language governing permissions and limitations
 # under the License.
 
-from __future__ import absolute_import
-
 import os
 
 from tests.common.file_utils import create_table_and_copy_files

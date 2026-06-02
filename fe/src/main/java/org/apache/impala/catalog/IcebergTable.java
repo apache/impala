@@ -41,12 +41,11 @@ import org.apache.hadoop.hive.metastore.TableType;
 import org.apache.hadoop.hive.metastore.api.hive_metastoreConstants;
 import org.apache.iceberg.BaseTable;
 import org.apache.iceberg.Snapshot;
-import org.apache.iceberg.mr.Catalogs;
-import org.apache.iceberg.mr.InputFormatConfig;
 import org.apache.impala.analysis.IcebergPartitionField;
 import org.apache.impala.analysis.IcebergPartitionSpec;
 import org.apache.impala.analysis.IcebergPartitionTransform;
 import org.apache.impala.catalog.iceberg.GroupedContentFiles;
+import org.apache.impala.catalog.iceberg.IcebergCatalogUtil;
 import org.apache.impala.common.ImpalaRuntimeException;
 import org.apache.impala.common.PrintUtils;
 import org.apache.impala.service.BackendConfig;
@@ -744,9 +743,9 @@ public class IcebergTable extends Table implements FeIcebergTable {
       if (!tableId.equalsIgnoreCase(
               params.getOrDefault(IcebergTable.ICEBERG_TABLE_IDENTIFIER, tableId)) ||
           !tableId.equalsIgnoreCase(
-              params.getOrDefault(Catalogs.NAME, tableId)) ||
+              params.getOrDefault(IcebergCatalogUtil.CATALOGS_NAME_PROPERTY, tableId)) ||
           !tableId.equalsIgnoreCase(
-              params.getOrDefault(InputFormatConfig.TABLE_IDENTIFIER, tableId))) {
+              params.getOrDefault(IcebergCatalogUtil.TABLE_IDENTIFIER, tableId))) {
         throw new TableLoadingException(String.format(
             "Table %s cannot be loaded because it is an " +
             "EXTERNAL table in the HiveCatalog that points to another table. " +

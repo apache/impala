@@ -15,8 +15,6 @@
 # specific language governing permissions and limitations
 # under the License.
 
-from __future__ import absolute_import, division, print_function
-from builtins import filter
 from functools import reduce
 from logging import getLogger
 from random import choice, randint, random, shuffle

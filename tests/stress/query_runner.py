@@ -15,8 +15,6 @@
 # specific language governing permissions and limitations
 # under the License.
 
-from __future__ import absolute_import, division, print_function
-from builtins import round
 import logging
 from multiprocessing import Value
 import os
@@ -26,7 +24,7 @@ from time import sleep, time
 from sys import maxsize
 
 from tests.stress.queries import QueryType
-from tests.stress.util import create_and_start_daemon_thread, increment
+from tests.stress.util import increment
 from tests.util.thrift_util import op_handle_to_query_id
 
 LOG = logging.getLogger(os.path.splitext(os.path.basename(__file__))[0])

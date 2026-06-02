@@ -15,8 +15,6 @@
 # specific language governing permissions and limitations
 # under the License.
 
-from __future__ import absolute_import, division, print_function
-import distro
 import json
 import logging
 import os
@@ -45,13 +43,6 @@ if os.path.isfile(IMPALA_LOCAL_VERSION_INFO):
         IMPALA_LOCAL_BUILD_VERSION = match.group(1)
   if IMPALA_LOCAL_BUILD_VERSION is None:
     raise Exception("Could not find VERSION in {0}".format(IMPALA_LOCAL_VERSION_INFO))
-
-# Check if it is Red Hat/CentOS/Rocky/AlmaLinux Linux
-IS_REDHAT_DERIVATIVE = False
-# Python >= 3.8 removed platform.linux_distribution(). This now uses the 'distro'
-# package, which provides equivalent functionality across Python versions.
-if distro.id() in ['rhel', 'rocky', 'centos', 'almalinux']:
-  IS_REDHAT_DERIVATIVE = True
 
 # Find the likely BuildType of the running Impala. Assume it's found through the path
 # $IMPALA_HOME/be/build/latest as a fallback.

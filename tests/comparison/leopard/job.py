@@ -15,7 +15,6 @@
 # specific language governing permissions and limitations
 # under the License.
 
-from __future__ import absolute_import, division, print_function
 from os.path import join as join_path
 from tests.comparison.query_generator import QueryGenerator
 from time import time

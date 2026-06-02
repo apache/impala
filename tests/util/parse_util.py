@@ -15,7 +15,6 @@
 # specific language governing permissions and limitations
 # under the License.
 
-from __future__ import absolute_import, division, print_function
 import re
 import sys
 from datetime import datetime
@@ -289,8 +288,5 @@ def get_time_summary_stats_counter(counter_name, runtime_profile):
 
 
 def bytes_to_str(bytes):
-    """Utility function to convert bytes to string.
-    This is needed to handle the differences between Python 2 and 3."""
-    if sys.version_info.major < 3:
-        return str(bytes)
+    """Utility function to convert bytes to string."""
     return bytes.decode('utf-8', errors='replace')

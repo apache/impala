@@ -21,7 +21,6 @@
 #
 # External JDBC tables are created in the specified 'jdbc_db_name' database.
 
-from __future__ import absolute_import, division, print_function
 import logging
 import os
 import sqlparse

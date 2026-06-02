@@ -16,7 +16,6 @@
 # under the License.
 
 # Functional tests running the TPCH and TPCDS workload twice to test tuple cache.
-from __future__ import absolute_import, division, print_function
 import pytest
 
 from tests.common.environ import IS_TUPLE_CACHE_CORRECT_CHECK

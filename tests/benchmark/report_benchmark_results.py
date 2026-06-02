@@ -28,8 +28,6 @@
 # be an int (2). The following line changes this behavior so that float will be returned
 # if necessary (2.5).
 
-from __future__ import absolute_import, division, print_function
-from builtins import range
 import difflib
 import json
 import logging

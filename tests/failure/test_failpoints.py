@@ -18,8 +18,6 @@
 # Injects failures  at specific locations in each of the plan nodes. Currently supports
 # two types of failures - cancellation of the query and a failure test hook.
 #
-from __future__ import absolute_import, division, print_function
-from builtins import range
 import pytest
 import re
 from time import sleep

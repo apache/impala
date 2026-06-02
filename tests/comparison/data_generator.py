@@ -26,8 +26,6 @@
 
 '''
 
-from __future__ import absolute_import, division, print_function
-from builtins import filter, range
 import os
 from copy import deepcopy
 from logging import getLogger

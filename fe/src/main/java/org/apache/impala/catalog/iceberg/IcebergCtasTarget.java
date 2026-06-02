@@ -156,7 +156,7 @@ public class IcebergCtasTarget extends CtasTargetTable implements FeIcebergTable
     if (underlyingCatalog == TIcebergCatalog.HADOOP_CATALOG) {
       if (icebergCatalog_ == TIcebergCatalog.CATALOGS) {
         String catName = msTable_.getParameters().get(IcebergTable.ICEBERG_CATALOG);
-        icebergCatalogLocation_ = IcebergCatalogs.getInstance().getCatalogProperty(
+        icebergCatalogLocation_ = IcebergCatalogUtil.getInstance().getCatalogProperty(
             catName, CatalogProperties.WAREHOUSE_LOCATION);
       } else {
         icebergCatalogLocation_ = IcebergUtil.getIcebergCatalogLocation(msTable_);

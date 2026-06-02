@@ -18,13 +18,11 @@
 
 # Tests statestore with non-default startup options
 
-from __future__ import absolute_import, division, print_function
 import logging
 import socket
 from time import sleep
 import uuid
 
-from builtins import range
 import pytest
 from thrift.protocol import TBinaryProtocol
 from thrift.transport import TSocket, TTransport

@@ -17,8 +17,6 @@
 
 # Impala tests for queries that query metadata and set session settings
 
-from __future__ import absolute_import
-
 from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
 
 LOCAL_CATALOG_IMPALAD_ARGS = "--use_local_catalog=true"

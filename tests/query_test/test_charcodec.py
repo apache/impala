@@ -15,7 +15,6 @@
 # specific language governing permissions and limitations
 # under the License.
 
-from __future__ import absolute_import, division, print_function
 from tests.common.impala_test_suite import ImpalaTestSuite
 from tests.common.test_vector import ImpalaTestDimension
 from tests.common.skip import SkipIfFS
@@ -27,9 +26,6 @@ import tempfile
 import shutil
 import sys
 
-if sys.version_info[0] >= 3:
-    unichr = chr  # Python 3
-
 _hiragana_range = [codepoint for codepoint in range(0x3040, 0x309F) if codepoint not in
     # problematic symbols: unassigned, deprecated, etc:
     set([0x3040, 0x3094, 0x3095, 0x3096, 0x3097, 0x3098, 0x3099, 0x309A, 0x309B, 0x309C])]
@@ -40,11 +36,11 @@ _cyrillic_range = [codepoint for codepoint in range(0x0410, 0x045F) if codepoint
          0x0459, 0x045A, 0x045B, 0x045C, 0x045D, 0x045E])]
 
 _charsets = {
-  'gbk': u''.join(unichr(i) for i in range(0x4E00, 0x9FA6)),
-  'latin1': u''.join(unichr(i) for i in range(0x20, 0x7F)),
-  'shift_jis': u''.join(unichr(i) for i in _hiragana_range),
-  'cp1251': u''.join(unichr(i) for i in range(0x0410, 0x044F)),
-  'koi8-r': u''.join(unichr(i) for i in _cyrillic_range)
+  'gbk': u''.join(chr(i) for i in range(0x4E00, 0x9FA6)),
+  'latin1': u''.join(chr(i) for i in range(0x20, 0x7F)),
+  'shift_jis': u''.join(chr(i) for i in _hiragana_range),
+  'cp1251': u''.join(chr(i) for i in range(0x0410, 0x044F)),
+  'koi8-r': u''.join(chr(i) for i in _cyrillic_range)
 }
 
 

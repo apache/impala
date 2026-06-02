@@ -15,10 +15,7 @@
 # specific language governing permissions and limitations
 # under the License.
 
-from __future__ import absolute_import, division, print_function
-from builtins import range
 from copy import deepcopy
-
 from base64 import b64decode
 from kudu.schema import (
     BOOL,

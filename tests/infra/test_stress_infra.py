@@ -19,7 +19,6 @@
 # product or other constraints. We want to stop these assumptions from breaking at
 # pre-merge time, not later.
 
-from __future__ import absolute_import, division, print_function
 import pytest
 
 from decimal import Decimal

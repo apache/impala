@@ -17,7 +17,6 @@
 #
 # Client tests for Impala's HiveServer2 interface
 
-from __future__ import absolute_import, division, print_function
 from contextlib import contextmanager
 from getpass import getuser
 import json
@@ -28,7 +27,6 @@ import time
 from urllib.request import urlopen
 import uuid
 
-from builtins import range
 import impala.dbapi as impyla
 import pytest
 

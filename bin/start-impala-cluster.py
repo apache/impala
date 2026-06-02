@@ -20,8 +20,6 @@
 # Starts up an Impala cluster (ImpalaD + State Store) with the specified number of
 # ImpalaD instances. Each ImpalaD runs on a different port allowing this to be run
 # on a single machine.
-from __future__ import absolute_import, division, print_function
-from builtins import range
 import getpass
 import itertools
 import json

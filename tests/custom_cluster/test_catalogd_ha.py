@@ -15,14 +15,12 @@
 # specific language governing permissions and limitations
 # under the License.
 
-from __future__ import absolute_import, division, print_function
 import json
 import logging
 import re
 import requests
 import time
 
-from builtins import round
 from tests.common.custom_cluster_test_suite import CustomClusterTestSuite, IMPALA_HOME
 from tests.common.environ import build_flavor_timeout
 from tests.common.impala_connection import ERROR

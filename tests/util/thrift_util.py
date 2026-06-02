@@ -16,7 +16,6 @@
 # under the License.
 #
 # Thrift utility functions
-from __future__ import absolute_import, division, print_function
 import getpass
 import sasl
 import ssl

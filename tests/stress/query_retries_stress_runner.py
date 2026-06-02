@@ -24,8 +24,6 @@
 # TODO: Make the script cancellable; more of a nice to have, but Ctrl+C does not kill
 # the script, it has to be killed manually (e.g. kill [pid]).
 
-from __future__ import absolute_import, division, print_function
-from builtins import map, range
 import logging
 import os
 import random

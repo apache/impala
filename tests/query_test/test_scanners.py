@@ -21,15 +21,12 @@
 # tests can run with the normal exploration strategy and the overall test runtime doesn't
 # explode.
 
-from __future__ import absolute_import, division, print_function
 from copy import deepcopy
 import os
 import random
 import re
 from subprocess import check_call
 import tempfile
-
-from builtins import range
 import pytest
 
 from impala_thrift_gen.parquet.ttypes import ConvertedType

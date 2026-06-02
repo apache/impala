@@ -17,8 +17,6 @@
 #
 # Validates that casting to Decimal works.
 #
-from __future__ import absolute_import, division, print_function
-from builtins import range
 from decimal import Decimal, getcontext, ROUND_DOWN, ROUND_HALF_UP
 from random import randint
 

@@ -56,7 +56,6 @@
 #
 # Additional examples of usage can be found within the test suites.
 
-from __future__ import absolute_import, division, print_function
 from collections import OrderedDict
 from itertools import product
 from copy import deepcopy

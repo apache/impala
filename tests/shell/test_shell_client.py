@@ -17,8 +17,6 @@
 # specific language governing permissions and limitations
 # under the License.
 
-from __future__ import absolute_import, division, print_function
-
 from impala_shell.impala_client import ImpalaBeeswaxClient, ImpalaHS2Client
 from tests.common.impala_test_suite import ImpalaTestSuite
 from tests.common.test_dimensions import (

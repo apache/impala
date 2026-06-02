@@ -17,7 +17,6 @@
 
 # Validates limit on scan nodes
 
-from __future__ import absolute_import, division, print_function
 from tests.common.impala_connection import IMPALA_CONNECTION_EXCEPTION
 from tests.common.impala_test_suite import ImpalaTestSuite
 from tests.common.test_vector import ImpalaTestDimension

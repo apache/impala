@@ -15,7 +15,6 @@
 # specific language governing permissions and limitations
 # under the License.
 
-from __future__ import absolute_import, division, print_function
 import pytest
 import re
 import time
@@ -80,8 +79,8 @@ class TestHdfsTimeouts(CustomClusterTestSuite):
       assert False, "Query should have failed, but instead returned {0}".format(result)
 
     # The exception should contain the appropriate error message
-    error_pattern = "hdfsOpenFile\(\) for.*at backend.*"
-    "failed to finish before the 5 second timeout"
+    error_pattern = (r"hdfsOpenFile\(\) for.*at backend.*"
+                     r"failed to finish before the 5 second timeout")
     assert len(re.findall(error_pattern, str(ex))) > 0
 
     # The timeout is 5 seconds and seems to be enforced within about 20 seconds, so it

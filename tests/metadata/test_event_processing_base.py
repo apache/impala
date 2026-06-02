@@ -14,8 +14,6 @@
 # KIND, either express or implied.  See the License for the
 # specific language governing permissions and limitations
 # under the License.
-from __future__ import absolute_import, division, print_function
-
 from tests.common.impala_test_suite import ImpalaTestSuite
 from tests.util.event_processor_utils import EventProcessorUtils
 

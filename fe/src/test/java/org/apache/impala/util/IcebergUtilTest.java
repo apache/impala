@@ -46,7 +46,6 @@ import org.apache.iceberg.DataFiles;
 import org.apache.iceberg.PartitionSpec;
 import org.apache.iceberg.Schema;
 import org.apache.iceberg.catalog.TableIdentifier;
-import org.apache.iceberg.mr.Catalogs;
 import org.apache.iceberg.types.Types;
 import org.apache.impala.analysis.IcebergPartitionField;
 import org.apache.impala.analysis.IcebergPartitionSpec;
@@ -56,7 +55,7 @@ import org.apache.impala.catalog.IcebergColumn;
 import org.apache.impala.catalog.IcebergTable;
 import org.apache.impala.catalog.Type;
 import org.apache.impala.catalog.iceberg.IcebergCatalog;
-import org.apache.impala.catalog.iceberg.IcebergCatalogs;
+import org.apache.impala.catalog.iceberg.IcebergCatalogUtil;
 import org.apache.impala.catalog.iceberg.IcebergHadoopCatalog;
 import org.apache.impala.catalog.iceberg.IcebergHadoopTables;
 import org.apache.impala.catalog.iceberg.IcebergHiveCatalog;
@@ -88,7 +87,7 @@ public class IcebergUtilTest {
         new CatalogMapping("hadoop.catalog", HADOOP_CATALOG, IcebergHadoopCatalog.class),
         new CatalogMapping("hive.catalog", HIVE_CATALOG, IcebergHiveCatalog.class),
         new CatalogMapping(null, HIVE_CATALOG, IcebergHiveCatalog.class),
-        new CatalogMapping("other string", CATALOGS, IcebergCatalogs.class),
+        new CatalogMapping("other string", CATALOGS, IcebergCatalogUtil.class),
     };
     for (CatalogMapping testValue : mappings) {
       TIcebergCatalog catalog = IcebergUtil.getTIcebergCatalog(testValue.propertyName);
@@ -117,7 +116,7 @@ public class IcebergUtilTest {
     // If iceberg.table_identifier is not set then the value of the "name" property
     // is used.
     String nameId = "db.table";
-    table.putToParameters(Catalogs.NAME, nameId);
+    table.putToParameters(IcebergCatalogUtil.CATALOGS_NAME_PROPERTY, nameId);
     icebergTableIdentifier = IcebergUtil.getIcebergTableIdentifier(table);
     assertEquals(TableIdentifier.parse(nameId), icebergTableIdentifier);
 

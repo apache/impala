@@ -19,13 +19,8 @@
 
 # This class can be used to drive a concurrent workload against a local minicluster
 
-from __future__ import absolute_import, division, print_function
-from builtins import range
 import argparse
 import logging
-# Needed to work around datetime threading bug:
-# https://stackoverflow.com/questions/32245560/module-object-has-no-attribute-strptime-with-several-threads-python
-import _strptime  # noqa: F401
 import sys
 import time
 from queue import Queue

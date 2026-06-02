@@ -32,6 +32,22 @@ inline void PartitionedHashJoinNode::ResetForProbe() {
   ht_ctx_->expr_values_cache()->Reset();
 }
 
+// Must not be inlined during codegen since calls to this function from ProcessProbeBatch
+// are removed by codegen if there are no conjuncts.
+//
+// The actual function calls are in the ProcessProbeRow* functions which are inlined into
+// ProcessProbeBatch, thus the codegen of ProcessProbeBatch will be able to eliminate the
+// calls to this function.
+inline void IR_NO_INLINE PartitionedHashJoinNode::ClearExprResultsPool(
+    const int num_conjuncts, const int num_other_join_conjuncts) {
+  DCHECK(expr_results_pool_.get() != nullptr);
+  DCHECK(expr_results_mem_limit_ > 0);
+  if (num_conjuncts + num_other_join_conjuncts > 0 &&
+      UNLIKELY(expr_results_pool_->total_allocated_bytes() > expr_results_mem_limit_)) {
+    expr_results_pool_->Clear();
+  }
+}
+
 }
 
 #endif

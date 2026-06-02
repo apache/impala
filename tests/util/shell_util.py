@@ -17,7 +17,6 @@
 #
 # Utility functions related to executing shell commands.
 
-from __future__ import absolute_import, division, print_function
 import logging
 import os
 import shlex
@@ -94,12 +93,12 @@ def shell(cmd, cmd_prepend="set -euo pipefail\n", stdout=PIPE, stderr=STDOUT,
           if not data:
             del remaining_fds[0]
           else:
-            stdout.append(data if sys.version_info.major < 3 else data.decode())
+            stdout.append(data.decode())
         elif fd == stderr_fileno:
           if not data:
             del remaining_fds[-1]
           else:
-            stderr.append(data)
+            stderr.append(data.decode())
 
   deadline = time() + timeout_secs if timeout_secs is not None else None
   while True:

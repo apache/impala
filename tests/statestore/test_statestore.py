@@ -15,7 +15,6 @@
 # specific language governing permissions and limitations
 # under the License.
 
-from __future__ import absolute_import, division, print_function
 from collections import defaultdict
 import json
 import logging
@@ -29,7 +28,6 @@ import uuid
 
 import pytest
 
-from builtins import range
 from thrift.protocol import TBinaryProtocol
 from thrift.server.TServer import TServer
 from thrift.transport import TSocket, TTransport
@@ -158,12 +156,7 @@ class KillableThreadedServer(TServer):
       if self.is_shutdown:
         client.close()
         return
-      t = None
-      if sys.version_info.major < 3:
-        t = threading.Thread(target=self.handle, args=(client,))
-        t.setDaemon(True)
-      else:
-        t = threading.Thread(target=self.handle, args=(client,), daemon=self.daemon)
+      t = threading.Thread(target=self.handle, args=(client,), daemon=self.daemon)
       t.start()
 
   def handle(self, client):
@@ -262,11 +255,7 @@ class StatestoreSubscriber(object):
     pfactory = TBinaryProtocol.TBinaryProtocolFactory()
     self.server = KillableThreadedServer(processor, transport, tfactory, pfactory,
                                          daemon=True)
-    if sys.version_info.major < 3:
-      self.server_thread = threading.Thread(target=self.server.serve)
-      self.server_thread.setDaemon(True)
-    else:
-      self.server_thread = threading.Thread(target=self.server.serve, daemon=True)
+    self.server_thread = threading.Thread(target=self.server.serve, daemon=True)
     self.server_thread.start()
     self.server.wait_until_up()
     self.port = self.server.port

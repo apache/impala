@@ -15,10 +15,7 @@
 # specific language governing permissions and limitations
 # under the License.
 
-from __future__ import absolute_import, division, print_function
-from builtins import object, range
-from future.utils import with_metaclass
-from abc import ABCMeta, abstractproperty
+from abc import ABCMeta, abstractmethod
 from copy import deepcopy
 from logging import getLogger
 
@@ -48,7 +45,7 @@ class StatementExecutionMode(object):
   ) = range(5)
 
 
-class AbstractStatement(with_metaclass(ABCMeta, object)):
+class AbstractStatement(metaclass=ABCMeta):
   """
   Abstract query representation
   """
@@ -62,7 +59,8 @@ class AbstractStatement(with_metaclass(ABCMeta, object)):
     self.with_clause = None
     self._execution = None
 
-  @abstractproperty
+  @property
+  @abstractmethod
   def table_exprs(self):
     """
     Return a list of all table expressions that are declared by this query. This is
@@ -77,7 +75,8 @@ class AbstractStatement(with_metaclass(ABCMeta, object)):
       table_exprs.extend(self.with_clause.table_exprs)
     return table_exprs
 
-  @abstractproperty
+  @property
+  @abstractmethod
   def nested_queries(self):
     """
     Returns a list of queries contained within this query. Different queries may have

@@ -17,7 +17,6 @@
 #
 # Hdfs access utilities
 
-from __future__ import absolute_import, division, print_function
 import getpass
 import http.client
 import os.path

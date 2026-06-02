@@ -20,33 +20,22 @@
 # This should be moved into the test/util folder eventually. The problem is this
 # module depends on db_connection which use some query generator classes.
 
-from __future__ import absolute_import, division, print_function
-from builtins import int, range, zip
-from future.utils import with_metaclass
 import hdfs
 import logging
 import os
 import requests
 import shutil
 import subprocess
-from abc import ABCMeta, abstractproperty
-from collections import defaultdict
+from abc import ABCMeta, abstractmethod
 from collections import OrderedDict
 from contextlib import contextmanager
 from getpass import getuser
-from io import BytesIO
 from multiprocessing.pool import ThreadPool
 from random import choice
 from tempfile import mkdtemp
-from threading import Lock
-from time import mktime, strptime
+from time import mktime
+from urllib.parse import urlparse
 from xml.etree.ElementTree import parse as parse_xml
-from zipfile import ZipFile
-
-try:
-  from urllib.parse import urlparse
-except ImportError:
-  from urlparse import urlparse
 
 from tests.comparison.db_connection import HiveConnection, ImpalaConnection
 from tests.common.environ import HIVE_MAJOR_VERSION
@@ -64,7 +53,7 @@ DEFAULT_HIVE_PASSWORD = 'hive'
 DEFAULT_TIMEOUT = 300
 
 
-class Cluster(with_metaclass(ABCMeta, object)):
+class Cluster(metaclass=ABCMeta):
   """This is a base class for clusters. Cluster classes provide various methods for
      interacting with a cluster. Ideally the various cluster implementations provide
      the same set of methods so any cluster implementation can be chosen at runtime.
@@ -110,7 +99,8 @@ class Cluster(with_metaclass(ABCMeta, object)):
       raise KeyError
     return result
 
-  @abstractproperty
+  @property
+  @abstractmethod
   def shell(self, cmd, host_name, timeout_secs=DEFAULT_TIMEOUT):
     """Execute the shell command 'cmd' on the host 'host_name' and return the output.
        If the command does not complete before 'timeout_secs' an Timeout exception will
@@ -118,7 +108,8 @@ class Cluster(with_metaclass(ABCMeta, object)):
     """
     pass
 
-  @abstractproperty
+  @property
+  @abstractmethod
   def _init_local_hadoop_conf_dir():
     """Prepare a single directory that contains all hadoop configs and set
        '_local_hadoop_conf_dir' to the location of the dir.
@@ -131,7 +122,8 @@ class Cluster(with_metaclass(ABCMeta, object)):
       self._init_local_hadoop_conf_dir()
     return self._local_hadoop_conf_dir
 
-  @abstractproperty
+  @property
+  @abstractmethod
   def _init_hdfs():
     pass
 
@@ -150,7 +142,8 @@ class Cluster(with_metaclass(ABCMeta, object)):
       self._init_yarn()
     return self._yarn
 
-  @abstractproperty
+  @property
+  @abstractmethod
   def _init_hive():
     pass
 
@@ -160,7 +153,8 @@ class Cluster(with_metaclass(ABCMeta, object)):
       self._init_hive()
     return self._hive
 
-  @abstractproperty
+  @property
+  @abstractmethod
   def _init_impala():
     pass
 
@@ -513,7 +507,7 @@ class Impala(Service):
     raise NotImplementedError()
 
 
-class Impalad(with_metaclass(ABCMeta, object)):
+class Impalad(metaclass=ABCMeta):
 
   def __init__(self):
     self.impala = None
@@ -523,11 +517,13 @@ class Impalad(with_metaclass(ABCMeta, object)):
   def cluster(self):
     return self.impala.cluster
 
-  @abstractproperty
+  @property
+  @abstractmethod
   def host_name(self):
     pass
 
-  @abstractproperty
+  @property
+  @abstractmethod
   def web_ui_port(self):
     pass
 

@@ -17,8 +17,6 @@
 # specific language governing permissions and limitations
 # under the License.
 
-from __future__ import absolute_import, division, print_function
-
 from impala_shell.kerberos_util import get_kerb_host_from_kerberos_host_fqdn
 from tests.common.base_test_suite import BaseTestSuite
 

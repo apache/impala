@@ -11,7 +11,6 @@
 # limitations under the License.
 
 
-from __future__ import absolute_import, division, print_function
 from subprocess import check_call
 
 from tests.common.impala_connection import IMPALA_CONNECTION_EXCEPTION

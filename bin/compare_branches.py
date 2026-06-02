@@ -12,9 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Future imports must happen at the beginning of the file
-from __future__ import absolute_import, division, print_function
-
 HELP = '''
 Compares two specified branches, using the Gerrit Change-Id as the
 primary identifier. Ignored commits can be added via a JSON

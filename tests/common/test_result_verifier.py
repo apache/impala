@@ -15,15 +15,8 @@
 # specific language governing permissions and limitations
 # under the License.
 
-# This modules contians utility functions used to help verify query test results.
+# This module contains utility functions used to help verify query test results.
 
-from __future__ import absolute_import, division, print_function
-from builtins import map, range
-# Python 3 doesn't have the "unicode" type, as its regular string is Unicode. This
-# replaces Python 2's unicode with future's str. On Python 3, it is the builtin string.
-# On Python 2, it uses future's str implementation, which is similar to Python 3's string
-# but subclasses "unicode". See https://python-future.org/compatible_idioms.html#unicode
-from builtins import str as unicode_compat
 import logging
 import math
 import re
@@ -267,8 +260,8 @@ def verify_query_result_is_subset(expected_results, actual_results):
   """Check whether the results in expected_results are a subset of the results in
   actual_results. This uses set semantics, i.e. any duplicates are ignored."""
   expected_literals, expected_non_literals = expected_results.separate_rows()
-  expected_literal_strings = set([unicode_compat(row) for row in expected_literals])
-  actual_literal_strings = set([unicode_compat(row) for row in actual_results.rows])
+  expected_literal_strings = set([str(row) for row in expected_literals])
+  actual_literal_strings = set([str(row) for row in actual_results.rows])
   # Expected literal strings must all be present in the actual strings.
   assert expected_literal_strings <= actual_literal_strings
   # Expected patterns must be present in the actual strings.
@@ -279,17 +272,17 @@ def verify_query_result_is_subset(expected_results, actual_results):
         matched = True
         break
     assert matched, u"Could not find expected row {0} in actual rows:\n{1}".format(
-        unicode_compat(expected_row), unicode_compat(actual_results))
+        str(expected_row), str(actual_results))
 
 def verify_query_result_is_superset(expected_results, actual_results):
   """Check whether the results in expected_results are a superset of the results in
   actual_results. This uses set semantics, i.e. any duplicates are ignored."""
   expected_literals, expected_non_literals = expected_results.separate_rows()
-  expected_literal_strings = set([unicode_compat(row) for row in expected_literals])
+  expected_literal_strings = set([str(row) for row in expected_literals])
   # Check that all actual rows are present in either expected_literal_strings or
   # expected_non_literals.
   for actual_row in actual_results.rows:
-    if unicode_compat(actual_row) in expected_literal_strings:
+    if str(actual_row) in expected_literal_strings:
       # Matched to a literal string
       continue
     matched = False
@@ -298,7 +291,7 @@ def verify_query_result_is_superset(expected_results, actual_results):
         matched = True
         break
     assert matched, u"Could not find actual row {0} in expected rows:\n{1}".format(
-        unicode_compat(actual_row), unicode_compat(expected_results))
+        str(actual_row), str(expected_results))
 
 def verify_query_result_is_equal(expected_results, actual_results):
   assert_args_not_none(expected_results, actual_results)
@@ -310,8 +303,8 @@ def verify_query_result_is_not_in(banned_results, actual_results):
   banned_literals, banned_non_literals = banned_results.separate_rows()
 
   # Part 1: No intersection with the banned literals
-  banned_literals_set = set([unicode_compat(row) for row in banned_literals])
-  actual_set = set(map(unicode_compat, actual_results.rows))
+  banned_literals_set = set([str(row) for row in banned_literals])
+  actual_set = set(map(str, actual_results.rows))
   assert banned_literals_set.isdisjoint(actual_set)
 
   # Part 2: Walk through each banned non-literal / regex and make sure that no row
@@ -324,7 +317,7 @@ def verify_query_result_is_not_in(banned_results, actual_results):
         matched = True
         break
     assert not matched, u"Found banned row {0} in actual rows:\n{1}".format(
-      unicode_compat(banned_row), unicode_compat(actual_results))
+      str(banned_row), str(actual_results))
 
 # Global dictionary that maps the verification type to appropriate verifier.
 # The RESULTS section of a .test file is tagged with the verifier type. We may
@@ -402,15 +395,6 @@ def verify_raw_results(test_section, exec_result, vector, result_section,
   expected_results = None
   if result_section in test_section:
     expected_results = remove_comments(test_section[result_section])
-    if sys.version_info.major == 2 and isinstance(expected_results, str):
-      # Always convert 'str' to 'unicode' since pytest will fail to report assertion
-      # failures when any 'str' values contain non-ascii bytes (IMPALA-10419).
-      try:
-        expected_results = expected_results.decode('utf-8')
-      except UnicodeDecodeError as e:
-        LOG.info("Illegal UTF-8 characters in expected results: {0}\n{1}".format(
-            expected_results, e))
-        assert False
   else:
     assert 'ERRORS' not in test_section, "'ERRORS' section must have accompanying 'RESULTS' section"
     LOG.info("No results found. Skipping verification")
@@ -559,13 +543,6 @@ def parse_result_rows(exec_result, escape_strings=True):
     for i in range(len(cols)):
       if col_types[i] in ['STRING', 'CHAR', 'VARCHAR', 'BINARY']:
         col = cols[i]
-        if sys.version_info.major == 2 and isinstance(col, str):
-          try:
-            col = col.decode('utf-8')
-          except UnicodeDecodeError as e:
-            LOG.info("Illegal UTF-8 characters in actual results: {0}\n{1}".format(
-                col, e))
-            assert False
         if escape_strings:
           col = col.encode('unicode_escape').decode('utf-8')
           # Escape single quotes to match .test file format.

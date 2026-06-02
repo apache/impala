@@ -22,8 +22,9 @@ FROM trinodb/trino:latest
 ARG USERNAME
 
 RUN \
-    sed -i 's/http-server.http.port=8080/http-server.http.port=9091/' /etc/trino/config.properties && \
-    sed -i 's/localhost:8080/localhost:9091/' /etc/trino/config.properties && \
+    sed -i '/^http-server\.http\.port=/d' /etc/trino/config.properties && \
+    echo "http-server.http.port=9091" >> /etc/trino/config.properties && \
+    sed -i 's/localhost:8080/localhost:9091/g' /etc/trino/config.properties && \
     echo "-DHADOOP_USER_NAME=$USERNAME" >> /etc/trino/jvm.config
 
 COPY hive-site.xml core-site.xml hdfs-site.xml /etc/

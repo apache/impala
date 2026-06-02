@@ -17,8 +17,6 @@
 
 # py.test configuration module
 #
-from __future__ import absolute_import, division, print_function
-from builtins import map, range, zip
 from impala.dbapi import connect as impala_connect
 from kudu import connect as kudu_connect
 from random import choice, sample

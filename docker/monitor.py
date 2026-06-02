@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/python3
 #
 # Licensed to the Apache Software Foundation (ASF) under one
 # or more contributor license agreements.  See the NOTICE file
@@ -32,7 +32,6 @@
 #       re.compile(">>> "))
 #   timeline.create("output.html")
 
-from __future__ import absolute_import, division, print_function
 import datetime
 import json
 import logging

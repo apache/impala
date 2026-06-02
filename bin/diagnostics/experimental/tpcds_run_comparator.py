@@ -17,7 +17,6 @@
 # specific language governing permissions and limitations
 # under the License
 
-from __future__ import print_function
 import argparse
 import csv
 import math
@@ -53,7 +52,7 @@ ExecSumm = namedtuple('ExecSumm',
     ['id', 'name', 'num_host', 'num_inst', 'avg_time', 'max_time', 'num_rows',
       'est_rows', 'peak_mem', 'est_peak_mem', 'detail'])
 
-RE_PEAK_MEM = re.compile("\d+\.\d\d [GMK]?B")
+RE_PEAK_MEM = re.compile(r"\d+\.\d\d [GMK]?B")
 
 # Defines list of sections in a profile file.
 # Format: (Task Enum, Section Delimeter)

@@ -15,7 +15,6 @@
 # specific language governing permissions and limitations
 # under the License.
 
-from __future__ import absolute_import, division, print_function
 from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
 from tests.common.environ import ImpalaTestClusterProperties
 from tests.common.skip import SkipIf, IS_OZONE

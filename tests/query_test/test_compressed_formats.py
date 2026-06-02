@@ -15,8 +15,6 @@
 # specific language governing permissions and limitations
 # under the License.
 
-from __future__ import absolute_import, division, print_function
-from builtins import range
 import math
 import os
 import pytest
@@ -26,7 +24,7 @@ import subprocess
 from os.path import join
 
 from tests.common.impala_test_suite import ImpalaTestSuite
-from tests.common.skip import SkipIfFS, SkipIfExploration
+from tests.common.skip import SkipIfExploration
 from tests.common.test_dimensions import (
     add_exec_option_dimension,
     create_single_exec_option_dimension)

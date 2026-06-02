@@ -19,8 +19,6 @@
 # specific language governing permissions and limitations
 # under the License.
 
-from __future__ import absolute_import, division, print_function
-from string import Template
 import os
 import shutil
 import filecmp

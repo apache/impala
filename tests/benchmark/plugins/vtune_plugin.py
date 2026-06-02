@@ -15,7 +15,6 @@
 # specific language governing permissions and limitations
 # under the License.
 
-from __future__ import absolute_import, division, print_function
 from builtin import filter, map
 from os import environ
 from tests.util.cluster_controller import ClusterController

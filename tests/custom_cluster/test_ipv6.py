@@ -16,7 +16,6 @@
 # under the License.
 #
 
-from __future__ import absolute_import, division, print_function
 import json
 import logging
 import os
@@ -70,8 +69,7 @@ CONN_ERR = ["Could not connect", "Connection refused"]
 # Due to THRIFT-792, SSL errors are suppressed when using OpenSSL hostname verification.
 # This is the only option on Python 3.12+, using ssl.PROTOCOL_TLS_CLIENT.
 CERT_ERR = ["doesn't match", "certificate verify failed", "Could not connect"]
-WEB_CERT_ERR = ("CertificateError" if sys.version_info.major < 3
-                else "SSLCertVerificationError")
+WEB_CERT_ERR = "SSLCertVerificationError"
 
 
 class TestIPv6Base(CustomClusterTestSuite):

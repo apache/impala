@@ -17,7 +17,6 @@
 
 # General Impala query tests
 
-from __future__ import absolute_import, division, print_function
 from copy import deepcopy
 import re
 from subprocess import check_call

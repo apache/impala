@@ -18,8 +18,6 @@
 # Generates random decimal numbers and verifies that mathematical
 # operations return correct results under decimal_v2.
 
-from __future__ import absolute_import, division, print_function
-from builtins import range
 import decimal
 import math
 import random

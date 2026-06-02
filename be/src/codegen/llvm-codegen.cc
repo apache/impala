@@ -991,8 +991,8 @@ Status LlvmCodeGen::LoadFunction(const TFunction& fn, const string& symbol,
 int LlvmCodeGen::ReplaceCallSites(
     llvm::Function* caller, llvm::Function* new_fn, const string& target_name) {
   DCHECK(!is_compiled_);
-  DCHECK(caller->getParent() == module_);
   DCHECK(caller != NULL);
+  DCHECK(caller->getParent() == module_);
   DCHECK(new_fn != NULL);
   DCHECK(find(handcrafted_functions_.begin(), handcrafted_functions_.end(), new_fn)
           == handcrafted_functions_.end()
@@ -1012,8 +1012,8 @@ int LlvmCodeGen::ReplaceCallSites(
 int LlvmCodeGen::ReplaceCallSitesWithValue(
     llvm::Function* caller, llvm::Value* replacement, const string& target_name) {
   DCHECK(!is_compiled_);
-  DCHECK(caller->getParent() == module_);
   DCHECK(caller != NULL);
+  DCHECK(caller->getParent() == module_);
   DCHECK(replacement != NULL);
 
   vector<llvm::CallInst*> call_sites;
@@ -1030,6 +1030,21 @@ int LlvmCodeGen::ReplaceCallSitesWithBoolConst(llvm::Function* caller, bool cons
     const string& target_name) {
   llvm::Value* replacement = GetBoolConstant(constant);
   return ReplaceCallSitesWithValue(caller, replacement, target_name);
+}
+
+int LlvmCodeGen::RemoveCallSites(llvm::Function* caller, const std::string& target_name) {
+  DCHECK(!is_compiled_);
+  DCHECK(caller != NULL);
+  DCHECK(caller->getParent() == module_);
+
+  vector<llvm::CallInst*> call_sites;
+  FindCallSites(caller, target_name, &call_sites);
+
+  for (llvm::CallInst* call_instr : call_sites) {
+    call_instr->eraseFromParent();
+  }
+
+  return call_sites.size();
 }
 
 int LlvmCodeGen::InlineConstFnAttrs(const FunctionContext::TypeDesc& ret_type,

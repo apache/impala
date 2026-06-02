@@ -15,8 +15,6 @@
 # specific language governing permissions and limitations
 # under the License.
 
-from __future__ import absolute_import, division, print_function
-from builtins import filter, range
 from collections import defaultdict
 from copy import deepcopy
 from logging import getLogger

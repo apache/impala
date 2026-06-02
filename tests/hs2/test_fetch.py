@@ -16,7 +16,6 @@
 # under the License.
 #
 
-from __future__ import absolute_import, division, print_function
 import re
 
 import pytest

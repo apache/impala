@@ -17,12 +17,9 @@
 
 # Common test dimensions and associated utility functions.
 
-from __future__ import absolute_import, division, print_function
 import copy
 from itertools import product
 import os
-
-from builtins import range
 
 from tests.common.environ import ENABLE_BEESWAX, ImpalaTestClusterProperties
 from tests.common.test_vector import (

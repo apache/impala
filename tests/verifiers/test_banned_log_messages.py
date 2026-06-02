@@ -17,7 +17,6 @@
 #
 # Test that impalad logs omit specific messages we shouldn't see.
 
-from __future__ import absolute_import, division, print_function
 import os
 import subprocess
 

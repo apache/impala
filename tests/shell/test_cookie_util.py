@@ -17,7 +17,6 @@
 # specific language governing permissions and limitations
 # under the License.
 
-from __future__ import absolute_import, division, print_function
 from datetime import datetime, timedelta
 from http.client import HTTPMessage
 import sys
@@ -156,27 +155,12 @@ class TestCookieUtil(BaseTestSuite):
 
 
 def make_cookie_headers(cookie_vals):
-    """Make an HTTPMessage containing Set-Cookie headers for Python 2 or Python 3"""
-    if sys.version_info.major == 2:
-        # In Python 2 the HTTPMessage is a mimetools.Message object, and the
-        # Set-Cookie values all appear in a single header, separated by newlines.
-        cookies = ""
-        count = 0
-        for pair in cookie_vals:
-            name = pair[0]
-            value = pair[1]
-            cookies += name + '=' + value
-            if count + 1 < len(cookie_vals):
-                # Separate the cookies, unless it is the last cookie.
-                cookies += '\n '
-            count += 1
-        return {'Set-Cookie': cookies}
-    else:
-        # In Python 3 the HTTPMessage is an email.message.Message, and the
-        # Set-Cookie values appear as duplicate headers.
-        headers = HTTPMessage()
-        for pair in cookie_vals:
-            name = pair[0]
-            value = pair[1]
-            headers.add_header('Set-Cookie', name + "=" + value)
-        return headers
+    """Make an HTTPMessage containing Set-Cookie headers"""
+    # The HTTPMessage is an email.message.Message, and the
+    # Set-Cookie values appear as duplicate headers.
+    headers = HTTPMessage()
+    for pair in cookie_vals:
+        name = pair[0]
+        value = pair[1]
+        headers.add_header('Set-Cookie', name + "=" + value)
+    return headers

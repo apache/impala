@@ -17,7 +17,6 @@
 #
 # Client tests for SQL statement authorization
 
-from __future__ import absolute_import, division, print_function
 from getpass import getuser
 import random
 

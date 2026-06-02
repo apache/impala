@@ -15,14 +15,11 @@
 # specific language governing permissions and limitations
 # under the License.
 
-from __future__ import absolute_import, division, print_function
-from builtins import range
 import os
 import pytest
 import random
 import threading
 import time
-from subprocess import check_call
 
 from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
 from tests.common.impala_cluster import ImpalaCluster

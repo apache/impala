@@ -17,7 +17,6 @@
 #
 # Tests for Hive-IMPALA parquet compression codec interoperability
 
-from __future__ import absolute_import, division, print_function
 import pytest
 
 from tests.common.custom_cluster_test_suite import CustomClusterTestSuite

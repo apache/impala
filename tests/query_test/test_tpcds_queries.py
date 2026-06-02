@@ -17,7 +17,6 @@
 
 # Functional tests running the TPC-DS workload
 #
-from __future__ import absolute_import, division, print_function
 import os
 import pytest
 from copy import deepcopy

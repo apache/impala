@@ -17,12 +17,10 @@
 #
 # Filsystem access abstraction
 
-from __future__ import absolute_import, division, print_function
 from abc import ABCMeta, abstractmethod
-from future.utils import with_metaclass
 
 
-class BaseFilesystem(with_metaclass(ABCMeta, object)):
+class BaseFilesystem(metaclass=ABCMeta):
 
   @abstractmethod
   def create_file(self, path, file_data, overwrite):

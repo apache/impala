@@ -94,7 +94,6 @@ import org.apache.iceberg.TableProperties;
 import org.apache.iceberg.catalog.TableIdentifier;
 import org.apache.iceberg.exceptions.CommitStateUnknownException;
 import org.apache.iceberg.exceptions.ValidationException;
-import org.apache.iceberg.mr.Catalogs;
 import org.apache.impala.analysis.AlterTableSortByStmt;
 import org.apache.impala.analysis.FunctionName;
 import org.apache.impala.analysis.KuduPartitionParam;
@@ -115,6 +114,7 @@ import org.apache.impala.catalog.DatabaseNotFoundException;
 import org.apache.impala.catalog.Db;
 import org.apache.impala.catalog.FeCatalogUtils;
 import org.apache.impala.catalog.FileMetadataLoadOpts;
+import org.apache.impala.catalog.iceberg.IcebergCatalogUtil;
 import org.apache.impala.catalog.IcebergTable;
 import org.apache.impala.catalog.IcebergTableLoadingException;
 import org.apache.impala.catalog.FeFsPartition;
@@ -4651,8 +4651,8 @@ public class CatalogOpExecutor {
       IcebergTable srcIceTable = (IcebergTable) srcTable;
       Map<String, String> tableProperties = Maps
           .newHashMap(srcIceTable.getIcebergApiTable().properties());
-      tableProperties.remove(Catalogs.NAME);
-      tableProperties.remove(Catalogs.LOCATION);
+      tableProperties.remove(IcebergCatalogUtil.CATALOGS_NAME_PROPERTY);
+      tableProperties.remove(IcebergCatalogUtil.CATALOGS_LOCATION_PROPERTY);
       tableProperties.remove(IcebergTable.ICEBERG_CATALOG);
       tableProperties.remove(IcebergTable.ICEBERG_TABLE_IDENTIFIER);
       // Explicitly preserve the format version, since it is a metadata-level field
@@ -4663,9 +4663,11 @@ public class CatalogOpExecutor {
       // The table identifier of the new table will be 'database.table'
       TableIdentifier identifier = IcebergUtil
           .getIcebergTableIdentifier(tbl.getDbName(), tbl.getTableName());
-      if (tbl.getParameters().containsKey(Catalogs.NAME)) {
-        tbl.getParameters().put(Catalogs.NAME, identifier.toString());
-        tableProperties.put(Catalogs.NAME, identifier.toString());
+      if (tbl.getParameters().containsKey(IcebergCatalogUtil.CATALOGS_NAME_PROPERTY)) {
+        tbl.getParameters().put(
+            IcebergCatalogUtil.CATALOGS_NAME_PROPERTY, identifier.toString());
+        tableProperties.put(
+            IcebergCatalogUtil.CATALOGS_NAME_PROPERTY, identifier.toString());
       }
       if (tbl.getParameters().containsKey(IcebergTable.ICEBERG_CATALOG)) {
         tableProperties.put(IcebergTable.ICEBERG_CATALOG,

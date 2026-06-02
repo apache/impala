@@ -18,8 +18,6 @@
 # This module implements helpers for representing queries to be executed by the
 # stress test, loading them and generating them.
 
-from __future__ import absolute_import, division, print_function
-from builtins import range
 import logging
 import os
 from textwrap import dedent

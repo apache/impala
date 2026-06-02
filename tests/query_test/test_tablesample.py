@@ -17,7 +17,6 @@
 
 # Tests the TABLESAMPLE clause.
 
-from __future__ import absolute_import, division, print_function
 import subprocess
 
 from tests.common.impala_test_suite import ImpalaTestSuite

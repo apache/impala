@@ -15,7 +15,6 @@
 # specific language governing permissions and limitations
 # under the License.
 
-from __future__ import absolute_import, division, print_function
 import pytest
 import re
 
@@ -48,5 +47,5 @@ class TestAlwaysFalseFilter(CustomClusterTestSuite):
       # Fetch all rows to finalize the query profile.
       cursor.fetchall()
       profile = cursor.get_profile()
-      assert re.search("Files rejected: [^0] \([^0]\)", profile) is None
-      assert re.search("Splits rejected: 8 \(8\)", profile) is not None
+      assert re.search(r"Files rejected: [^0] \([^0]\)", profile) is None
+      assert re.search(r"Splits rejected: 8 \(8\)", profile) is not None

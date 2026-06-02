@@ -73,7 +73,6 @@ import org.apache.iceberg.expressions.Term;
 import org.apache.iceberg.hadoop.HadoopFileIO;
 import org.apache.iceberg.io.CloseableIterable;
 import org.apache.iceberg.metrics.MetricsReporter;
-import org.apache.iceberg.mr.Catalogs;
 import org.apache.iceberg.transforms.PartitionSpecVisitor;
 import org.apache.iceberg.transforms.Transforms;
 import org.apache.iceberg.types.Conversions;
@@ -107,7 +106,7 @@ import org.apache.impala.catalog.IcebergTableLoadingException;
 import org.apache.impala.catalog.TableLoadingException;
 import org.apache.impala.catalog.iceberg.GroupedContentFiles;
 import org.apache.impala.catalog.iceberg.IcebergCatalog;
-import org.apache.impala.catalog.iceberg.IcebergCatalogs;
+import org.apache.impala.catalog.iceberg.IcebergCatalogUtil;
 import org.apache.impala.catalog.iceberg.IcebergHadoopCatalog;
 import org.apache.impala.catalog.iceberg.IcebergHadoopTables;
 import org.apache.impala.catalog.iceberg.IcebergHiveCatalog;
@@ -179,7 +178,7 @@ public class IcebergUtil {
       case HADOOP_TABLES: return IcebergHadoopTables.getInstance();
       case HIVE_CATALOG: return IcebergHiveCatalog.getInstance();
       case HADOOP_CATALOG: return new IcebergHadoopCatalog(location);
-      case CATALOGS: return IcebergCatalogs.getInstance();
+      case CATALOGS: return IcebergCatalogUtil.getInstance();
       default: throw new ImpalaRuntimeException("Unexpected catalog type: " + catalog);
     }
   }
@@ -221,7 +220,7 @@ public class IcebergUtil {
     String name = msTable.getParameters().get(IcebergTable.ICEBERG_TABLE_IDENTIFIER);
     if (name == null || name.isEmpty()) {
       // Iceberg's Catalogs API uses table property 'name' for the table id.
-      name = msTable.getParameters().get(Catalogs.NAME);
+      name = msTable.getParameters().get(IcebergCatalogUtil.CATALOGS_NAME_PROPERTY);
     }
     if (name == null || name.isEmpty()) {
       return getIcebergTableIdentifier(msTable.getDbName(), msTable.getTableName());
@@ -350,7 +349,7 @@ public class IcebergUtil {
     if (tCat == TIcebergCatalog.HIVE_CATALOG) return true;
     if (tCat == TIcebergCatalog.CATALOGS) {
       String catName = props.get(IcebergTable.ICEBERG_CATALOG);
-      tCat = IcebergCatalogs.getInstance().getUnderlyingCatalogType(catName);
+      tCat = IcebergCatalogUtil.getInstance().getUnderlyingCatalogType(catName);
       return tCat == TIcebergCatalog.HIVE_CATALOG;
     }
     return false;
@@ -401,7 +400,7 @@ public class IcebergUtil {
   public static TIcebergCatalog getUnderlyingCatalog(String catalog) {
     TIcebergCatalog tCat = getTIcebergCatalog(catalog);
     if (tCat == TIcebergCatalog.CATALOGS) {
-      return IcebergCatalogs.getInstance().getUnderlyingCatalogType(catalog);
+      return IcebergCatalogUtil.getInstance().getUnderlyingCatalogType(catalog);
     }
     return tCat;
   }

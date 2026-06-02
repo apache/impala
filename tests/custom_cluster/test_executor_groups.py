@@ -15,8 +15,6 @@
 # specific language governing permissions and limitations
 # under the License.
 
-from __future__ import absolute_import, division, print_function
-from builtins import range
 from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
 from tests.common.environ import IS_CALCITE_PLANNER
 from tests.common.impala_connection import FINISHED, RUNNING
@@ -681,7 +679,7 @@ class TestExecutorGroups(CustomClusterTestSuite):
 
     def assert_hash_join():
       ret = self.execute_query_expect_success(self.client, QUERY)
-      assert re.search(":EXCHANGE \[HASH\(.*\.id\)\]", str(ret.data))
+      assert re.search(r":EXCHANGE \[HASH\(.*\.id\)\]", str(ret.data))
 
     # Without any executors we default to a hash join.
     assert_hash_join()
@@ -720,7 +718,7 @@ class TestExecutorGroups(CustomClusterTestSuite):
     # Predicate to assert that the planner decided on a hash join.
     def assert_hash_join():
       ret = self.execute_query_expect_success(self.client, QUERY)
-      assert re.search(":EXCHANGE \[HASH\(.*\.id\)\]", str(ret.data))
+      assert re.search(r":EXCHANGE \[HASH\(.*\.id\)\]", str(ret.data))
 
     # Without any executors we default to a hash join.
     assert_hash_join()

@@ -23,8 +23,6 @@ The tooling here is intended for Impala testing and is not installed
 as part of production Impala clusters.
 """
 
-from __future__ import absolute_import
-
 from setuptools import find_packages
 
 try:

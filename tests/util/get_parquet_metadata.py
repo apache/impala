@@ -15,7 +15,6 @@
 # specific language governing permissions and limitations
 # under the License.
 
-from __future__ import absolute_import, division, print_function
 from datetime import date, datetime, time, timedelta
 from decimal import Decimal
 from functools import reduce
@@ -24,7 +23,6 @@ import struct
 from subprocess import check_call
 import sys
 
-from builtins import map
 from thrift.protocol import TCompactProtocol
 from thrift.transport import TTransport
 
@@ -101,10 +99,7 @@ def decode_decimal(schema, value):
   assert schema.type_length == len(value)
   assert schema.type == Type.FIXED_LEN_BYTE_ARRAY
 
-  if sys.version_info.major < 3:
-    byte_values = list(map(ord, value))
-  else:
-    byte_values = list(value)
+  byte_values = list(value)
   numeric = Decimal(reduce(lambda x, y: x * 256 + y, byte_values))
 
   # Compute two's complement for negative values.

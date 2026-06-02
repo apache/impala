@@ -17,7 +17,6 @@
 
 # Functional tests for ACID integration with Hive.
 
-from __future__ import absolute_import, division, print_function
 from copy import deepcopy
 import os
 from subprocess import check_call

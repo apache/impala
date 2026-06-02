@@ -15,7 +15,6 @@
 # specific language governing permissions and limitations
 # under the License.
 
-from __future__ import absolute_import, division, print_function
 import logging
 import os
 import re
@@ -26,7 +25,6 @@ import threading
 import time
 from time import sleep
 
-from builtins import range
 from impala.error import HiveServer2Error
 import psutil
 import pytest

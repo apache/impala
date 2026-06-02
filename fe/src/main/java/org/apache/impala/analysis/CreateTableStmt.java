@@ -28,9 +28,9 @@ import org.apache.hadoop.hive.serde.serdeConstants;
 import org.apache.hadoop.hive.metastore.api.SQLForeignKey;
 import org.apache.hadoop.hive.metastore.api.SQLPrimaryKey;
 import org.apache.iceberg.TableProperties;
-import org.apache.iceberg.mr.Catalogs;
 import org.apache.impala.analysis.paimon.PaimonAnalyzer;
 import org.apache.impala.authorization.AuthorizationConfig;
+import org.apache.impala.catalog.iceberg.IcebergCatalogUtil;
 import org.apache.impala.catalog.DataSourceTable;
 import org.apache.impala.catalog.HdfsStorageDescriptor;
 import org.apache.impala.catalog.KuduTable;
@@ -829,7 +829,7 @@ public class CreateTableStmt extends StatementBase implements SingleTableStmt {
   private void validateTableInCatalogs() {
     String tableId = getTblProperties().get(IcebergTable.ICEBERG_TABLE_IDENTIFIER);
     if (tableId != null && !tableId.isEmpty()) {
-      putGeneratedProperty(Catalogs.NAME, tableId);
+      putGeneratedProperty(IcebergCatalogUtil.CATALOGS_NAME_PROPERTY, tableId);
     }
   }
 

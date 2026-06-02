@@ -15,7 +15,6 @@
 # specific language governing permissions and limitations
 # under the License.
 
-from __future__ import absolute_import, division, print_function
 from subprocess import check_call
 
 from tests.common.impala_test_suite import ImpalaTestSuite
