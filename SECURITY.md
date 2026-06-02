@@ -28,9 +28,9 @@
   most recently HEAD `b8be513` ("IMPALA-13033: Parse WebUI thrift profile downloads").
   A report against project release *N* should be triaged against the model as it stood
   at *N*, not at HEAD.
-- **Date**: 2026-05-29.
-- **Authors**: ASF Security team draft, awaiting Impala PMC review.
-- **Status**: draft — under maintainer review.
+- **Date**: 2026-06-02.
+- **Authors**: ASF Security team draft, Impala PMC.
+- **Status**: v1.
 - **Reporting**: vulnerabilities that fall under §8 (claimed properties) should be
   reported per the Apache Security Team disclosure channel
   (<security@impala.apache.org>); reports that fall under §3 (out of scope), §9
@@ -38,11 +38,7 @@
   triagers citing this document.
 - **Provenance legend** —
   *(documented)* = drawn from in-repo docs or website docs, with citation;
-  *(maintainer)* = stated by an Impala maintainer in response to this draft;
-  *(inferred)* = synthesized by the producer from code structure or domain
-  knowledge, awaiting PMC ratification (every *(inferred)* tag has a matching
-  §14 question).
-- **Draft confidence**: 47 documented / 0 maintainer / 28 inferred.
+  *(maintainer)* = stated by an Impala maintainer in response to this draft.
 
 Impala is a MPP SQL engine: clients submit SQL over the HiveServer2 (HS2) Thrift
 protocol or HS2-over-HTTP; the coordinator `impalad` parses, plans, and distributes
@@ -69,7 +65,7 @@ SAML, JWT, or OAuth bearer token; authorization is delegated to Apache Ranger.
 Impala is **not** an in-process library and is **not** a single-binary daemon. It
 is a cluster of cooperating processes, deployed by an operator inside a network
 perimeter the operator controls. The threat model is therefore that of a
-distributed service, not a library *(inferred — §14 Q1)*.
+distributed service, not a library *(maintainer)*.
 
 ### Caller roles
 
@@ -80,7 +76,7 @@ Following §2 of the output-structure rubric (network service split):
 | **End-user client** | untrusted but authenticated | Connects via HS2 / HS2-HTTP / Beeswax; identity verified by Kerberos, LDAP, SAML, JWT, or OAuth *(documented: `docs/topics/impala_security.xml`, `docs/topics/impala_ldap.xml`, `be/src/rpc/authentication.cc`)*. |
 | **Operator / cluster admin** | trusted | Sets startup flags, manages keytabs, configures Ranger, owns the Web UI `.htpasswd` *(documented: `docs/topics/impala_security_guidelines.xml`)*. |
 | **Internal Impala peer** | trusted (mutually-authenticated) | `impalad`↔`statestored`↔`catalogd` RPC; KRPC + Thrift RPC; auth is Kerberos-only between internal components *(documented: `docs/topics/impala_ldap.xml`, "Consideration for Connections Between Impala Components")*. |
-| **Hive Metastore / Ranger** | trusted control plane | Source of metadata + policy decisions; assumed honest *(inferred — §14 Q2)*. |
+| **Hive Metastore / Ranger** | trusted control plane | Source of metadata + policy decisions; assumed honest *(maintainer)*. |
 | **Underlying storage** | trusted by virtue of operator-granted credentials | HDFS / S3 / ADLS / Ozone / Kudu / HBase; Impala holds delegation tokens or static credentials and reads/writes as the `impala` Unix user (or impersonated user when Ranger is enabled) *(documented: `docs/topics/impala_security_files.xml`)*. |
 | **Delegated proxy user** | conditionally trusted | When `--authorized_proxy_user_config` is set, an authenticated front-end (Hue, BI tool) may forward queries as a different end user *(documented: `docs/topics/impala_delegation.xml`)*. |
 
@@ -100,7 +96,7 @@ Following §2 of the output-structure rubric (network service split):
 | `ai_generate_text` LLM connector | SQL function calling external LLM endpoint *(documented: `docs/topics/impala_ai_functions.xml`)* | outbound HTTPS | in-model for credential / prompt handling; out-of-model for the LLM provider |
 | `shell/` Python impala-shell | client-side, not server | n/a | **out of model** for server claims *(§3)*; in-model for credential handling of the shell binary itself |
 | `docker/`, `testdata/`, `infra/`, `tests/` | tooling | n/a | **out of model** *(§3)* |
-| Vendored Kudu security code under `be/src/kudu/security/` and `security/tls_socket-test.cc` | TLS/SASL primitives shared with the Apache Kudu codebase | n/a | in-model only insofar as Impala calls into it *(inferred — §14 Q3)* |
+| Vendored Kudu security code under `be/src/kudu/security/` | TLS/SASL primitives shared with the Apache Kudu codebase | n/a | in-model only insofar as Impala calls into it *(maintainer)* |
 
 ## §3 Out of scope (explicit non-goals)
 
@@ -115,8 +111,8 @@ these will be closed with the cited disposition:
    `OUT-OF-MODEL: adversary-not-in-scope`.
 2. **A defender against a malicious Hive Metastore, Ranger Admin, or other
    trusted control-plane component.** If the report requires the HMS or Ranger
-   to be hostile to Impala, it is out of model *(inferred from §2 trust table —
-   §14 Q2)*. → `OUT-OF-MODEL: trusted-input`.
+   to be hostile to Impala, it is out of model *(maintainer)*. →
+   `OUT-OF-MODEL: trusted-input`.
 3. **A defender against the operator.** Anyone with `root`, `sudo`, the
    `impala` Unix account, the keytab file, the cookie-secret file, or the Web
    UI `.htpasswd` already has unbounded power; "the operator misconfigured X" is
@@ -128,30 +124,30 @@ these will be closed with the cited disposition:
    `impala` Unix user; an authenticated user with appropriate SQL privileges
    can already cause arbitrary reads, writes, and resource consumption within
    the scope Ranger grants. A new way for an authorized user to do something
-   they are already authorized to do is not a vulnerability *(inferred —
-   §14 Q4)*. → `OUT-OF-MODEL: equivalent-harm`.
+   they are already authorized to do is not a vulnerability *(maintainer)*. →
+   `OUT-OF-MODEL: equivalent-harm`.
 5. **A sandbox for user-defined functions.** Native (C++) UDFs and Hive Java
    UDFs run in-process with the privileges of the `impalad` daemon. UDF
    sandboxing is not provided; admission of a `CREATE FUNCTION` is gated by
-   Ranger and that is the entire enforcement *(inferred from `docs/topics/impala_udf.xml`
-   — §14 Q5)*. → `BY-DESIGN: property-disclaimed` (§9).
+   Ranger and that is the entire enforcement *(maintainer)*. →
+   `BY-DESIGN: property-disclaimed` (§9).
 6. **A defender against malformed-but-parseable user data in scanned files.**
    Decoders (Parquet, ORC, Avro, text, Iceberg manifests) must not corrupt
    process memory, but raw runtime exceptions, slow paths on adversarial
    inputs, and OOM on pathological files are robustness work, not security
-   issues, unless they cross a trust boundary *(inferred — §14 Q6)*. →
+   issues, unless they cross a trust boundary *(maintainer)*. →
    `OUT-OF-MODEL: equivalent-harm` for writer-controlled files,
    `VALID-HARDENING` for reader-controlled files.
 7. **Code that ships but is not part of the supported product:**
    `tests/`, `testdata/`, `infra/`, `docker/`, `package/`, `ssh_keys/`,
    `cmake_modules/`, `experiments/`, `udf_samples/`. State the policy
    explicitly so integrators do not extend core guarantees to them
-   *(inferred — §14 Q7)*. → `OUT-OF-MODEL: unsupported-component`.
+   *(maintainer)*. → `OUT-OF-MODEL: unsupported-component`.
 8. **Apache Kudu, Apache Iceberg, Apache Ranger, Apache Hive client libraries,
    Hadoop libraries, OpenSSL, Apache Thrift, and other upstream dependencies.**
    Where Impala vendors source (e.g. `be/src/kudu/`), the vendored code is
    modeled at the wrapper boundary; vulnerabilities intrinsic to the upstream
-   project should be reported upstream *(inferred — §14 Q3)*. →
+   project should be reported upstream *(maintainer)*. →
    `OUT-OF-MODEL: unsupported-component` (with an upstream pointer).
 9. **The Impala documentation site, asf-site branch, downloads page, gem/npm
    packages with similar names, and other non-product surfaces.** Out of scope.
@@ -164,7 +160,7 @@ only when it cleanly maps to one of them.
 | # | Transition | Authentication | Authorization |
 | --- | --- | --- | --- |
 | B1 | End-user client → HS2 / Beeswax / HS2-HTTP | Kerberos / LDAP / SAML / JWT / OAuth / trusted-domain header *(documented: `be/src/rpc/authentication.cc`)* | Ranger on submitted SQL *(documented: `docs/topics/impala_authorization.xml`)* |
-| B2 | End-user client → Web UI (`:25000` and siblings) | `.htpasswd` + SPNEGO, optional TLS *(documented: `docs/topics/impala_security_webui.xml`)* | none beyond authentication; the Web UI exposes operator-grade endpoints *(inferred — §14 Q8)* |
+| B2 | End-user client → Web UI (`:25000` and siblings) | `.htpasswd` + SPNEGO, optional TLS *(documented: `docs/topics/impala_security_webui.xml`)* | none beyond authentication; the Web UI exposes operator-grade endpoints *(maintainer)* |
 | B3 | `impalad` ↔ `statestored` ↔ `catalogd` internal RPC (KRPC + Thrift) | Kerberos (mandatory for prod) + optional TLS *(documented: `docs/topics/impala_ssl.xml`, `docs/topics/impala_ldap.xml`)* | "internal_principals_whitelist" of allowed principals *(documented: `be/src/rpc/authentication.cc` line 121)* |
 | B4 | Coordinator `impalad` → worker `impalad` (query fragments over KRPC) | same as B3 | same as B3 |
 | B5 | Coordinator / catalogd → Hive Metastore | Kerberos / delegation token | HMS-side; Impala assumes truthful responses |
@@ -190,7 +186,7 @@ follows:
 - **Web UI**: reachable from a network peer with an `.htpasswd` credential
   (per §10) or who can reach an unprotected port. A finding that
   needs `.htpasswd` to be absent is `OUT-OF-MODEL: trusted-input` against a
-  guideline-violating operator (§3 item 3) *(inferred — §14 Q8)*.
+  guideline-violating operator (§3 item 3) *(maintainer)*.
 - **Query frontend / backend**: reachable from SQL submitted by an authenticated
   user with sufficient Ranger privileges. Findings here matter only if they
   break out of the user's Ranger-granted privilege set.
@@ -203,10 +199,10 @@ follows:
 
 ## §5 Assumptions about the environment
 
-- **Operating system**: Linux (Ubuntu 16.04/18.04, CentOS/RHEL 7/8 are the
+- **Operating system**: Linux (Ubuntu 20.04/22.04/24.04, Rocky/RHEL 8/9 are the
   declared supported set; others "may also be supported but are not tested by
-  the community") *(documented: `README.md` — Supported Platforms)*. x86_64
-  primary, arm64 experimental.
+  the community") *(documented: `README.md` — Supported Platforms)*. x86_64 and
+  arm64 supported.
 - **Process model**: at least three long-lived daemons (`impalad`,
   `statestored`, `catalogd`); operator runs them as the `impala` Unix user
   *(documented: `docs/topics/impala_security_files.xml`)*.
@@ -215,7 +211,7 @@ follows:
   reachable cluster members assumed.
 - **Time**: Kerberos requires loosely-synchronized clocks across the realm
   (KDC tolerance, default 5 min) — operator's responsibility, not Impala's
-  *(inferred — §14 Q9)*.
+  *(maintainer)*.
 - **Filesystem**: keytab and `.htpasswd` files have OS-level permissions
   restricted to the `impala` user and admins *(documented:
   `docs/topics/impala_security_webui.xml`)*.
@@ -223,15 +219,19 @@ follows:
   symmetric/asymmetric primitives, and RNG *(documented: `EXPORT_CONTROL.md`)*.
 - **Kerberos**: assumes a working MIT KDC with renewable-ticket support
   configured per `docs/topics/impala_kerberos.xml`.
-- **What Impala does to its host** (negative claims, awaiting maintainer ratification):
+- **What Impala does to its host**:
   - **does** open listening sockets on the documented ports;
-  - **does** spawn no child processes other than codegen-compiled native code
-    via LLVM in-process *(inferred — §14 Q10)*;
-  - **does** install no signal handlers besides those required for crash
-    reporting (breakpad) *(inferred — §14 Q10)*;
+  - **does** spawn child processes for `--ldap_bind_password_cmd`,
+    `--s3a_access_key_cmd`, `--s3a_secret_key_cmd`,
+    `--saml2_keystore_password_cmd`, `--saml2_private_key_password_cmd`,
+    `--ssl_private_key_password_cmd`, `--webserver_private_key_password_cmd`;
+    and `java -version` *(maintainer)*;
+  - **does** install signal handlers for crash reporting (SIGUSR1 → breakpad)
+    and generating stack traces (SIGRTMIN+10), ignores SIGPIPE, and handles
+    graceful shutdown with SIGTERM *(maintainer)*;
   - **does** read a documented set of environment variables (e.g.
-    `IMPALA_HOME`, `JAVA_HOME`) but does not consume arbitrary `LD_*` for
-    security-sensitive behavior *(inferred — §14 Q10)*;
+    `IMPALA_HOME`, `JAVA_HOME`, `JAVA_TOOL_OPTIONS`) but does not consume
+    arbitrary `LD_*` for security-sensitive behavior *(maintainer)*;
   - **does** write logs to operator-configured locations; redacted query text
     if log redaction is enabled *(documented:
     `docs/topics/impala_logging.xml`)*.
@@ -245,28 +245,27 @@ subset:
 
 | Flag | Default | Maintainer stance | Effect |
 | --- | --- | --- | --- |
-| `--enable_ldap_auth` | `false` *(documented)* | dev/test, operator must enable per §10 *(inferred — §14 Q11)* | enables LDAP auth on HS2 client port |
-| `--ssl_server_certificate` / `--ssl_private_key` | unset *(documented)* | dev/test, operator must enable per §10 *(inferred — §14 Q11)* | enables TLS on all listening sockets |
+| `--enable_ldap_auth` | `false` *(documented)* | dev/test or operating with Kerberos, operator must enable per §10 *(maintainer)* | enables LDAP auth on HS2 client port |
+| `--ssl_server_certificate` / `--ssl_private_key` | unset *(documented)* | dev/test, operator must enable per §10 *(maintainer)* | enables TLS on all listening sockets |
 | `--ssl_minimum_version` | `tlsv1.2` *(documented: `docs/topics/impala_ssl.xml`)* | hardened in Impala 4.0 from `tlsv1` *(documented)* | rejects pre-1.2 handshakes |
-| `--webserver_password_file` | unset *(documented: `docs/topics/impala_security_webui.xml`)* | **maintainer ruling required**: is an unprotected Web UI a `VALID` report or `OUT-OF-MODEL: non-default-build`? *(inferred — §14 Q12)* | Web UI authenticates against this `.htpasswd` |
-| `--webserver_certificate_file` | unset *(documented)* | dev/test, operator must enable per §10 *(inferred — §14 Q11)* | enables HTTPS on Web UI |
-| `--principal`, `--keytab-file` | unset | dev/test, operator must enable per §10 *(inferred — §14 Q11)* | enables Kerberos auth |
-| `--authorization_provider=ranger` | unset *(documented: `docs/topics/impala_authorization.xml`)* | dev/test, operator must enable per §10 *(inferred — §14 Q11)* | enables Ranger authz; absent → all queries run as `impala` user (no enforcement) |
+| `--webserver_password_file` | unset *(documented: `docs/topics/impala_security_webui.xml`)* | an unprotected Web UI is `OUT-OF-MODEL: non-default-build` *(maintainer)* | Web UI authenticates against this `.htpasswd` |
+| `--webserver_certificate_file` | unset *(documented)* | dev/test, operator must enable per §10 *(maintainer)* | enables HTTPS on Web UI |
+| `--principal`, `--keytab-file` | unset | dev/test or operating with LDAP, operator must enable per §10 *(maintainer)* | enables Kerberos auth |
+| `--authorization_provider=ranger` | unset *(documented: `docs/topics/impala_authorization.xml`)* | dev/test, operator must enable per §10 *(maintainer)* | enables Ranger authz; absent → all queries run as `impala` user (no enforcement) |
 | `--jwt_token_auth` / `--oauth_token_auth` | `false` | optional alternative auth *(documented: `be/src/rpc/authentication.cc`)* | enables bearer-token auth |
-| `--jwt_validate_signature`, `--oauth_jwt_validate_signature` | `true` | hardened default; flipping to `false` voids §8 P3 *(inferred — §14 Q13)* | turns off JWT/OAuth signature check |
-| `--jwt_allow_without_tls`, `--oauth_allow_without_tls`, `--saml2_allow_without_tls_debug_only` | `false`, marked `_hidden` | "debug only" per name *(inferred — §14 Q13)* | permits bearer / SAML auth over unencrypted transport |
+| `--jwt_validate_signature`, `--oauth_jwt_validate_signature` | `true` | hardened default; flipping to `false` voids §8 P3 *(maintainer)* | turns off JWT/OAuth signature check |
+| `--jwt_allow_without_tls`, `--oauth_allow_without_tls`, `--saml2_allow_without_tls_debug_only` | `false`, marked `_hidden` | "debug only" per name *(→)* | permits bearer / SAML auth over unencrypted transport |
 | `--trusted_domain`, `--trusted_auth_header` | unset *(documented)* | when set, Impala accepts identity assertions from named peer without re-auth | reachability for `OUT-OF-MODEL: trusted-input` reports |
-| `--trusted_domain_use_xff_header` | `false` | when `true`, parses `X-Forwarded-For` to identify the originating client *(documented: `be/src/rpc/authentication.cc` line 132)* | exposes a path where a misconfigured proxy can let a client claim any source address *(inferred — §14 Q14)* |
+| `--trusted_domain_use_xff_header` | `false` | when `true`, parses `X-Forwarded-For` to identify the originating client *(documented: `be/src/rpc/authentication.cc` line 132)* | exposes a path where a misconfigured proxy can let a client claim any source address *(maintainer)* |
 | `--internal_principals_whitelist` | `hdfs` *(documented: `be/src/rpc/authentication.cc` line 121)* | governs which Kerberos principals are accepted on internal RPC ports | misconfiguration permits external service to speak as a peer |
 | `--authorized_proxy_user_config` / `--authorized_proxy_group_config` | unset *(documented: `docs/topics/impala_delegation.xml`)* | required for Hue-style impersonation; whitelists which authenticated principals may `doas` to which users | breaks B1 if mis-scoped |
-| `--cookie_secret_file` | empty *(documented: `be/src/rpc/authentication.cc` line 98)* | when unset, HS2-HTTP cookies fall back to per-process random — sessions do not survive cluster restarts but are not forgeable *(inferred — §14 Q15)* | shared cluster-wide secret for cookie HMAC |
-| `--abort_on_config_error` | `true` *(inferred — §14 Q11)* | when off, security misconfigurations may not prevent startup | |
+| `--cookie_secret_file` | empty *(documented: `be/src/rpc/authentication.cc` line 98)* | when unset, HS2-HTTP cookies fall back to per-process random — sessions do not survive cluster restarts but are not forgeable *(maintainer)* | shared cluster-wide secret for cookie HMAC |
+| `--abort_on_config_error` | `true` *(maintainer)* | when off, security misconfigurations may not prevent startup | |
+| `impala-shell --ssl` | `false` | when true, must also configure `ca_cert` or `verify_cert` to validate server certificate | required for TLS configured endpoints |
 
 **The insecure-default case.** A number of these flags ship in the "off, must
 be turned on for production" posture. The maintainer ruling on whether the
-*default* is a supported production posture is captured in §14 Q11; the
-text of §3 item 3 and §10 assume the answer is **"dev/test default,
-operator must flip per §10 for production"**.
+*default* is a supported production posture is captured in "Maintainer stance".
 
 ## §6 Assumptions about inputs
 
@@ -275,28 +274,30 @@ operator must flip per §10 for production"**.
 | Surface / route | Parameter | Attacker-controllable? | Caller must enforce |
 | --- | --- | --- | --- |
 | HS2 binary `:21050`, HS2-HTTP `:28000`, Beeswax `:21000` | SQL text | **yes** | nothing — Impala parses, plans, and applies Ranger |
-| HS2-HTTP `:28000` | `X-Forwarded-For` header | **yes** if `--trusted_domain_use_xff_header` is on; **never trust** otherwise *(inferred — §14 Q14)* | per §10, only enable behind a load balancer that strips and resets XFF |
-| HS2-HTTP `:28000` | session cookie | signed with `--cookie_secret_file` HMAC; not attacker-forgeable when secret is unguessable *(inferred — §14 Q15)* | per §10, rotate the cookie-secret file if compromised |
+| HS2-HTTP `:28000` | `X-Forwarded-For` header | **yes** if `--trusted_domain_use_xff_header` is on; **never trust** otherwise *(maintainer)* | per §10, only enable behind a load balancer that strips and resets XFF |
+| HS2-HTTP `:28000` | session cookie | signed with `--cookie_secret_file` HMAC; not attacker-forgeable when secret is unguessable *(maintainer)* | per §10, rotate the cookie-secret file if compromised |
 | HS2-HTTP `:28000` | JWT / OAuth bearer | **yes**; signature checked when `--jwt_validate_signature=true` (default) *(documented: `be/src/rpc/authentication.cc`)* | per §10, leave signature checking on, set `--jwt_allow_without_tls=false` |
-| HS2-HTTP `:28000` | `--trusted_auth_header` value | **yes**; treated as the authenticated identity | **never** expose the port directly to untrusted peers when this flag is set *(inferred — §14 Q14)* |
+| HS2-HTTP `:28000` | `--trusted_auth_header` value | **yes**; treated as the authenticated identity | **never** expose the port directly to untrusted peers when this flag is set *(maintainer)* |
 | Web UI `:25000`/`:25010`/`:25020` | `.htpasswd` credential | **yes** if `--webserver_password_file` is set | per §10, set the flag; per §10, set `--webserver_certificate_file` for HTTPS |
+| Web UI `:25000`/`:25010`/`:25020` | session cookie | signed with `--cookie_secret_file` | per §10, rotate the cookie-secret file if compromised |
 | Web UI `:25000` — query-profile and admin endpoints | profile ID / GET parameters | **yes** | Web UI auth is the only gate; sensitive query bytes appear unless log redaction is enabled |
 | KRPC `:27000` and statestore/catalog ports `:23000`/`:24000`/`:26000` | Thrift / KRPC payload | **only by a peer that has cleared B3** | Kerberos + `internal_principals_whitelist` are the gate |
 | Scanned table files (Parquet, ORC, Avro, text, Iceberg manifests) | file bytes | **yes** if an authorized writer can land bytes the reader will scan | Ranger separates writers from readers; B7 enforces who can land bytes |
-| `ai_generate_text` LLM endpoint | LLM response | trusted only as far as the LLM is trusted | per §10, treat LLM output as untrusted text (do not pipe to executable contexts) *(inferred — §14 Q16)* |
+| `ai_generate_text` LLM endpoint | LLM response | trusted only as far as the LLM is trusted | per §10, treat LLM output as untrusted text (do not pipe to executable contexts) *(maintainer)* |
 | JDBC external table endpoint | rows returned by remote JDBC | trusted only as far as the remote endpoint is trusted | per §10, model JDBC external tables as data crossing a trust boundary |
 
 ### Size / shape / rate
 
 - Impala accepts arbitrary-length SQL but the analyzer rejects queries above
-  implementation limits *(inferred — §14 Q17)*.
+  implementation limits (controlled by query option `max_statement_length_bytes`
+  with max value of 2^31 - 1) *(maintainer)*.
 - Scanned files may be terabytes; row groups are streamed. Pathological
   encodings (e.g. enormous string lengths in Parquet headers) are robustness
-  concerns *(inferred — §14 Q6)*.
-- The HS2 / Beeswax surfaces have **no built-in rate limiting**; admission
+  concerns *(maintainer)*.
+- The HS2 / Beeswax surfaces have **limited built-in rate limiting**; admission
   control via the `--default_pool_max_requests` family of flags bounds
-  in-flight queries but not connection or auth-attempt rate *(inferred —
-  §14 Q18)*.
+  in-flight queries; `--fe_service_threads` provides a limited bound on
+  connection and auth-attempt rate *(maintainer)*.
 
 ## §7 Adversary model
 
@@ -309,13 +310,13 @@ operator must flip per §10 for production"**.
 | Authenticated end user with limited Ranger privileges | **yes** | execute SQL, read tables the user has `SELECT` on, write tables the user has `INSERT` on |
 | Authenticated end user with broad Ranger privileges | partial | only escapes from their Ranger envelope are in scope |
 | Co-tenant on the same cluster | **yes** | same as authenticated end user; cross-tenant leakage is in scope |
-| Authorized table writer producing data read by another user | **yes** for scanner robustness across the B7 boundary, but bounded — `VALID-HARDENING`, not `VALID`, unless memory corruption is reachable *(inferred — §14 Q6)* |
+| Authorized table writer producing data read by another user | **yes** for scanner robustness across the B7 boundary, but bounded — `VALID-HARDENING`, not `VALID`, unless memory corruption is reachable *(maintainer)* |
 | Authenticated proxy front-end (Hue) using `doas` | **yes** only when `--authorized_proxy_user_config` is mis-scoped |
 | Hostile peer impalad / statestored / catalogd | **out of scope** — see §3 item 2 |
 | Hostile HMS / Ranger | **out of scope** — see §3 item 2 |
 | Operator | **out of scope** — see §3 item 3 |
-| Local process on the same host as `impalad` running as a different user | **partial** *(inferred — §14 Q19)*: same-host attackers with non-`impala` UID can read the Web UI / HS2 ports unless host firewalling forbids; Impala does not defend against same-host UID-0 attackers |
-| Side-channel observer (cache timing, network timing) | **out of scope** *(inferred — §14 Q20)* |
+| Local process on the same host as `impalad` running as a different user | **partial** *(maintainer)*: same-host attackers with non-`impala` UID can read the Web UI / HS2 ports unless host firewalling forbids or authentication secured from non-`impala` local users; Impala does not defend against same-host UID-0 attackers |
+| Side-channel observer (cache timing, network timing) | **out of scope** *(maintainer)* |
 | Quantum adversary | **out of scope** |
 
 ### Authenticated-but-Byzantine peer (distributed-systems threshold)
@@ -324,7 +325,7 @@ Impala is **not** a Byzantine-fault-tolerant system. A compromised
 `impalad`/`catalogd`/`statestored` peer with a valid Kerberos identity can
 cause unbounded damage (read any data the cluster can read, produce wrong
 results, leak intermediate state). The cluster trusts its own membership
-*(inferred — §14 Q21)*. → reports requiring a Byzantine internal peer are
+*(maintainer)*. → reports requiring a Byzantine internal peer are
 `OUT-OF-MODEL: adversary-not-in-scope`.
 
 ## §8 Security properties the project provides
@@ -412,14 +413,13 @@ For each property: condition, violation symptom, severity tier, provenance.
 
 - **Condition**: input matches the documented protocol (HS2 / Beeswax / Thrift
   / KRPC / Parquet / ORC / Avro / Iceberg manifest / etc.); the host
-  conformant to §5; no `_hidden` debug flag is in use *(inferred —
-  §14 Q22)*.
+  conformant to §5; no `_hidden` debug flag is in use *(maintainer)*.
 - **Violation symptom**: heap or stack corruption, out-of-bounds read/write,
   use-after-free, double-free reachable from a §6 input.
 - **Severity**: **security-critical** when reachable from network input or from
   table data crossing B7; **`VALID-HARDENING`** when reachable only by a writer
   who already controls the bytes (§3 item 6).
-- *(inferred — §14 Q22)*
+- *(maintainer)*
 
 ### P9 — No SQL injection from end-user-supplied parameters into back-end queries against other systems
 
@@ -430,7 +430,7 @@ For each property: condition, violation symptom, severity tier, provenance.
   query string.
 - **Severity**: case-dependent; `VALID-HARDENING` if the remote system is also
   Impala-trusted, `VALID` if the remote system is a tenant boundary.
-- *(inferred — §14 Q23)*
+- *(maintainer)*
 
 ## §9 Security properties the project does *not* provide
 
@@ -440,41 +440,40 @@ disclaimer.
 - **No isolation between authenticated user SQL and the `impalad` process.** A
   user with Ranger privilege to `CREATE FUNCTION` and to `SELECT` from the
   resulting function can run arbitrary native or JVM code inside `impalad`. UDFs
-  are **not** sandboxed. See §3 item 5 *(inferred — §14 Q5)*.
+  are **not** sandboxed. See §3 item 5 *(maintainer)*.
 - **No defense against decompression / decoding bombs in scanned files.** A
   malicious or buggy table writer can land Parquet / ORC / Avro / text files
   designed to maximize CPU and memory; the reader has no built-in cap on
-  per-file resource use *(inferred — §14 Q6)*.
+  per-file resource use *(maintainer)*.
 - **No quotas on per-query or per-user resource consumption beyond what
   admission control provides.** A user with `SELECT` on a large table can
   cause arbitrary wall-clock and memory burn. Operator must configure
-  `--default_pool_*` admission-control flags *(inferred — §14 Q18)*.
+  `--default_pool_*` admission-control flags *(maintainer)*.
 - **No defense against intra-cluster Byzantine failure.** A compromised peer
   with a valid Kerberos identity can read any data the cluster can read; see
-  §7 *(inferred — §14 Q21)*.
+  §7 *(maintainer)*.
 - **No protection against the operator.** Anyone with the keytab, the
   cookie-secret file, the `.htpasswd`, the impala Unix account, or root on
   any impala host wins. See §3 item 3.
 - **No protection against a malicious HMS / Ranger.** See §3 item 2.
 - **No data-at-rest encryption.** Impala writes file bytes through the storage
   layer's existing protections (HDFS Transparent Data Encryption, S3 SSE,
-  etc.). Impala does not encrypt at the table format level *(inferred —
-  §14 Q24)*.
+  etc.). Impala does not encrypt at the table format level *(maintainer)*.
 - **No defense against side-channel observation** (cache, timing, branch
-  prediction) of query plans or data *(inferred — §14 Q20)*.
+  prediction) of query plans or data *(maintainer)*.
 - **No constant-time comparison of authentication secrets** beyond what the
-  underlying SASL/Kerberos libraries provide *(inferred — §14 Q25)*.
+  underlying SASL/Kerberos libraries provide *(maintainer)*.
 - **No defender stance against an attacker on the same Linux host running as
   a non-`impala` UID** — Impala defends only across the network surface;
   same-host attackers with shell access on the impala host already have many
-  paths to win *(inferred — §14 Q19)*.
+  paths to win *(maintainer)*.
 
 ### False-friend properties (call out separately)
 
 - **`SHOW TABLES` / `SHOW DATABASES` filtering is an authorization view, not
   an information-flow channel.** Object names a user is not authorized to
   see are hidden, but error messages, query-profile timing, and Web UI traces
-  may reveal existence indirectly *(inferred — §14 Q26)*.
+  may reveal existence indirectly *(maintainer)*.
 - **Log redaction is a *display* feature, not a confidentiality boundary.** It
   obfuscates literals in *new* log entries when patterns match; it cannot
   retroactively cleanse leaked log files, and a regex miss leaks the literal.
@@ -485,7 +484,7 @@ disclaimer.
   authorize.
 - **`.htpasswd` Web-UI authentication does not provide per-user authorization
   on the Web UI.** Any authenticated `.htpasswd` user sees all Web UI
-  contents, including query bytes and profiles *(inferred — §14 Q8)*.
+  contents, including query bytes and profiles *(maintainer)*.
 - **`--trusted_domain` / `--trusted_auth_header` is an explicit bypass of
   client authentication.** Setting it without controlling the load balancer
   hands an attacker the keys.
@@ -506,7 +505,7 @@ disclaimer.
 - **Confused-deputy via `doas`** when the proxy list is mis-scoped.
 - **Time-of-check-to-time-of-use** between Ranger policy fetch and query
   execution: policy changes mid-query are not retroactively enforced
-  *(inferred — §14 Q27)*.
+  *(maintainer)*.
 
 ## §10 Downstream responsibilities
 
@@ -532,11 +531,11 @@ The operator deploying Impala in production **must**:
    Kerberos principals of cluster members *(documented: `be/src/rpc/authentication.cc`)*.
 7. **Never** set `--jwt_allow_without_tls=true`,
    `--oauth_allow_without_tls=true`, or `--saml2_allow_without_tls_debug_only=true`
-   in production *(inferred — §14 Q13)*.
+   in production *(maintainer)*.
 8. **Never** set `--trusted_domain` / `--trusted_auth_header` /
    `--trusted_domain_use_xff_header` unless the listening port is exposed
    only to a load balancer that strips and resets the relevant header
-   *(inferred — §14 Q14)*.
+   *(maintainer)*.
 9. Set `--cookie_secret_file` to a long, random, cluster-wide secret with
    filesystem permissions restricted to the `impala` user *(documented:
    `be/src/rpc/authentication.cc`)*.
@@ -553,13 +552,15 @@ The operator deploying Impala in production **must**:
 13. Configure admission control (`--default_pool_max_requests`,
     `--default_pool_max_queued`, `--default_pool_mem_limit`) to bound
     per-query and per-pool resource use; Impala does not enforce DoS
-    protection by itself *(inferred — §14 Q18)*.
+    protection by itself *(maintainer)*.
 14. Treat `ai_generate_text` results and JDBC external-table rows as
     crossing a trust boundary; do not assume the remote system is honest
-    *(inferred — §14 Q16)*.
+    *(maintainer)*.
 15. Secure the underlying storage (HDFS, S3, ADLS, Ozone) with native ACLs;
     Impala enforces only what it can see *(documented:
     `docs/topics/impala_security_files.xml`)*.
+16. Provide `.impalarc` for `impala-shell` users configuring `ssl` and either
+    `ca_cert` or `verify_cert` *(maintainer)*.
 
 ## §11 Known misuse patterns
 
@@ -578,17 +579,20 @@ The operator deploying Impala in production **must**:
   UDFs run in-process. → Ranger-gate `CREATE FUNCTION` to administrators.
 - **Treating Impala's `SHOW TABLES` view as a confidentiality boundary.**
   Existence of a hidden object may leak through error messages or query
-  profiles *(inferred — §14 Q26)*.
+  profiles *(maintainer)*.
 - **Re-using `--cookie_secret_file` across clusters of different trust
   levels.** A leak in cluster A becomes a forgery primitive in cluster B
-  *(inferred — §14 Q15)*.
+  *(maintainer)*.
 - **Disabling TLS internally between `impalad`/`statestored`/`catalogd` in
   production.** Cleartext internal RPC + Kerberos `auth-int` is the documented
-  minimum; many deployments leave it at `auth` *(inferred — §14 Q28)*.
+  minimum; many deployments leave it at `auth` *(maintainer)*.
 - **Mixing authenticated and unauthenticated coordinator daemons in the same
   cluster.** Impala 2.0+ accepts both Kerberos and LDAP on the same port; an
   operator who *also* leaves a single coordinator unauthenticated produces a
   bypass *(documented: `docs/topics/impala_mixed_security.xml`)*.
+- **`impala-shell` failure to verify server certificate.** Invoking
+  `impala-shell --ssl` without specifying `--ca_cert` or `--verify_cert` is a
+  known insecure default that will be addressed in a future release.
 
 ## §11a Known non-findings (recurring false positives)
 
@@ -606,11 +610,11 @@ that licenses the call.
   responsibility per §10. → `OUT-OF-MODEL: non-default-build`.
 - **"`--jwt_allow_without_tls=true` permits credentials over plaintext" in a
   config file.** The flag is `_hidden` and named "debug only"; setting it
-  voids §8 P3. → `OUT-OF-MODEL: non-default-build` *(inferred — §14 Q13)*.
+  voids §8 P3. → `OUT-OF-MODEL: non-default-build` *(maintainer)*.
 - **"Path traversal in `gzopen`-style filename" against scanners.** All
   scanner paths are Ranger-checked URIs, not OS paths; the URI namespace is
   rooted at the operator-configured warehouse. → `OUT-OF-MODEL:
-  trusted-input` *(inferred — §14 Q29)*.
+  trusted-input` *(maintainer)*.
 - **"Hardcoded test password / keytab in `tests/`, `testdata/`,
   `ssh_keys/`."** `tests/`, `testdata/`, `ssh_keys/` are unsupported
   components. → `OUT-OF-MODEL: unsupported-component`.
@@ -633,7 +637,7 @@ that licenses the call.
 - **"Vendored Apache Kudu code under `be/src/kudu/security/` has CVE-X."**
   Report upstream to Apache Kudu; Impala will pick up the fix on the next
   vendored sync. → `OUT-OF-MODEL: unsupported-component` (upstream pointer)
-  *(inferred — §14 Q3)*.
+  *(maintainer)*.
 
 ## §12 Conditions that would change this model
 
@@ -670,187 +674,6 @@ A report against Impala receives exactly one of the following:
 | `BY-DESIGN: property-disclaimed` | Concerns a §9 property the project explicitly does not provide (UDF sandboxing, DoS protection, side channels, etc.). | §9 |
 | `KNOWN-NON-FINDING` | Matches a §11a recurring false positive. | §11a |
 | `MODEL-GAP` | Cannot be cleanly routed to any of the above — triggers §12 model revision. | §12 |
-
-## §14 Open questions for the maintainers
-
-Every *(inferred)* tag in the body maps to one of these. Proposed answers are
-inline; please confirm, correct, or strike.
-
-### Wave 1 — scope, intended use, insecure defaults
-
-**Q1.** The model assumes Impala is "a cluster of cooperating processes
-deployed inside an operator-controlled network perimeter" and is *not* a
-single-host library. Confirm? Will this answer change with the upcoming
-Iceberg-REST-only `impalad` mode? *(maps to §2)*
-
-**Q2.** Are the Hive Metastore, Ranger Admin, and other catalog/policy
-control-plane services modeled as trusted (we propose **yes**), or in-scope
-adversaries? If trusted, that licenses §3 item 2 and §11a's
-trusted-input dispositions. *(maps to §2, §3, §11a)*
-
-**Q3.** Code vendored from Apache Kudu under `be/src/kudu/security/`,
-`be/src/kudu/util/`, etc. — is the policy "report upstream to Apache Kudu;
-we pick up fixes via vendored sync" (proposed)? Same question for Apache
-Hive code under `fe/src/main/java/org/apache/impala/authentication/saml/Hive*.java`. *(maps to §3 item 8)*
-
-**Q4.** Is "an authorized user with Ranger privilege X causes harm Y that
-the same Ranger privilege already permits through a documented path" out of
-scope (proposed: **yes**, `OUT-OF-MODEL: equivalent-harm`)? *(maps to §3 item 4)*
-
-**Q5.** UDF sandboxing — confirmed that there is none, and that this is a
-deliberate `BY-DESIGN` disclaim (proposed)? *(maps to §3 item 5, §9)*
-
-**Q6.** What is the cut-line on malformed-input behavior in scanners
-(Parquet/ORC/Avro/Iceberg)? Proposed: memory corruption is `VALID`; crash /
-exception / slow path / OOM on a malformed file *landed by a writer with
-INSERT* is `OUT-OF-MODEL: equivalent-harm`; the same on a writer-controlled
-file in a *read-only-to-writer* deployment is `VALID-HARDENING`. *(maps to
-§3 item 6, §8 P8, §9, §11a)*
-
-**Q7.** Confirm the unsupported-component list: `tests/`, `testdata/`,
-`infra/`, `docker/`, `package/`, `ssh_keys/`, `cmake_modules/`,
-`experiments/`, `udf_samples/`. Anything to add or remove? *(maps to §3 item 7)*
-
-### Wave 2 — Web UI, internal RPC, insecure defaults
-
-**Q8.** Is the Web UI a per-user authentication surface or a flat-admin
-surface? Proposed answer: flat-admin (any `.htpasswd` user sees all query
-bytes); flag if per-user authorization on Web UI is intended. *(maps to
-§4 B2, §9 false-friend)*
-
-**Q9.** Clock-skew assumption for Kerberos: do you make any Impala-side
-claim about tolerance, or is that entirely the operator's responsibility
-(proposed)? *(maps to §5)*
-
-**Q10.** Confirm the "what Impala does not do to its host" inventory
-in §5: no child processes besides codegen; no signal handlers besides
-breakpad; no `LD_*` consumption for security-sensitive decisions. Any
-exceptions? *(maps to §5)*
-
-**Q11.** The big "insecure defaults" question, per §5a "insecure-default
-case" rule. Which of these is the supported production posture (a
-`VALID` report when violated), and which is dev/test (a
-`OUT-OF-MODEL: non-default-build`)?
-
-- `--principal`/`--keytab-file` unset
-- `--authorization_provider` unset (no Ranger)
-- `--ssl_server_certificate`/`--ssl_private_key` unset
-- `--webserver_password_file` unset
-- `--webserver_certificate_file` unset
-- `--enable_ldap_auth=false` (proposed: this one is fine — Kerberos may be the chosen auth)
-
-Proposed across the board: **dev/test, operator must flip per §10**, except
-the last. *(maps to §5a, §10, §13)*
-
-**Q12.** Web UI specifically: the docs strongly recommend
-`--webserver_password_file`. Is a Web UI port reachable without auth a
-`VALID` report on the operator's behalf, or `OUT-OF-MODEL:
-non-default-build`? *(maps to §5a, §11a)*
-
-**Q13.** The `_hidden` debug-only flags: `--jwt_allow_without_tls`,
-`--oauth_allow_without_tls`, `--saml2_allow_without_tls_debug_only`. Confirm
-that setting these is `OUT-OF-MODEL: non-default-build` and §10 mandates
-"never in production"? *(maps to §5a, §10, §11a)*
-
-**Q14.** `--trusted_domain` + `--trusted_domain_use_xff_header` +
-`--trusted_auth_header`. These are explicit auth bypasses for proxy
-deployments. Confirm that operator-supplied misuse is `OUT-OF-MODEL:
-trusted-input` *unless* Impala's parser of these headers itself has a
-defect? *(maps to §5a, §10)*
-
-**Q15.** `--cookie_secret_file`: when unset, do HS2-HTTP cookies fall back
-to a per-process random secret (proposed)? Is the cookie HMAC algorithm
-documented and considered a §8 property? *(maps to §5a, §6, §10)*
-
-### Wave 3 — externally-facing surfaces, distributed model
-
-**Q16.** Treat `ai_generate_text` responses and JDBC-external-table rows as
-data crossing a trust boundary (proposed)? Does Impala itself attempt any
-sanitization of LLM responses or external-JDBC rows? *(maps to §6, §10)*
-
-**Q17.** SQL-text size limit: is there an enforced maximum (proposed: yes,
-in the analyzer) or is "submit a 1 GB query" an unlimited-input concern?
-*(maps to §6, §9)*
-
-**Q18.** Per-query / per-user DoS protection: is admission control (the
-`--default_pool_*` family) the entire enforcement, with no engine-level
-guard? Should this be in §9 as a flat disclaim, or in §8 with a
-conditional guarantee? *(maps to §8, §9, §10)*
-
-**Q19.** Same-host non-`impala` UID: do we make any defense claim there, or
-is "shell access on an impala host" effectively game-over (proposed:
-game-over)? *(maps to §7, §9)*
-
-**Q20.** Side-channel observers (cache timing, branch prediction): out of
-scope (proposed)? *(maps to §7, §9)*
-
-**Q21.** Byzantine-internal-peer threshold: confirm Impala makes no BFT
-claim, so any compromised peer with a valid Kerberos identity is unbounded
-(proposed)? *(maps to §7, §9)*
-
-**Q22.** §8 P8 (memory safety) — the property is in the model on
-inference. Is the reachability boundary correctly "in-model for network and
-B7-writer-landed bytes; `VALID-HARDENING` for B7-writer-controlled bytes in
-read-only-to-writer deployments; out-of-model for `_hidden` debug
-configurations"? *(maps to §8 P8, §9)*
-
-**Q23.** §8 P9 (no SQL injection into back-end queries) — applies only to
-JDBC external tables and `ai_generate_text` (proposed). Confirm whether
-remote-query construction escapes end-user SQL parameters? *(maps to §8 P9)*
-
-### Wave 4 — false-friends and edge cases
-
-**Q24.** Is data-at-rest encryption an in-scope responsibility (proposed:
-**no** — delegated to storage layer)? *(maps to §9)*
-
-**Q25.** Constant-time comparison of authentication secrets — is anything
-relevant here a §8 property, or all delegated to SASL/Kerberos/JWT
-libraries? *(maps to §9)*
-
-**Q26.** Is `SHOW TABLES` filtering a confidentiality boundary (proposed:
-**no**, an authorization-view feature with known existence-leak side
-channels through error messages and query profiles)? *(maps to §9
-false-friend, §11)*
-
-**Q27.** Time-of-check-to-time-of-use between Ranger policy fetch and query
-execution: is mid-query policy revocation enforced (proposed: **no**, the
-plan is finalized at start)? *(maps to §9)*
-
-**Q28.** Internal RPC integrity vs confidentiality: is the documented
-production minimum Kerberos `auth-int` (integrity, no encryption) or
-`auth-conf` (encrypted)? Many operators leave it at `auth`. Is plaintext-
-but-Kerberos-authed internal RPC in or out of model? *(maps to §11)*
-
-**Q29.** Scanner path-traversal reports: confirm that all scanner paths are
-URIs resolved against an operator-configured warehouse root, not arbitrary
-OS paths, so traversal is a Ranger / configuration concern rather than a
-filesystem concern? *(maps to §11a)*
-
-### Wave 5 — meta
-
-**Q30.** Should this document live at `docs/threat-model.md` (proposed,
-under the existing docs tree) or as part of the DITA topics under
-`docs/topics/`? *(meta)*
-
-**Q31.** Is there an existing Impala threat-model document (Confluence,
-internal) that this should reconcile against rather than supersede?
-*(meta — §3.1a of the rubric)*
-
-**Q32.** What kind of change to Impala should trigger a revision (proposed
-list in §12 — confirm or correct)? *(meta, §12)*
-
-**Q33.** §11a known-non-findings is thin in this draft (~11 patterns,
-all doc-reasoned). Could the PMC populate §11a from recurring patterns in
-your IMPALA-* JIRA closures — specifically the "we ruled this out as not
-a vulnerability" category? Public Impala security artefacts (website,
-`announce@apache.org`, `[SECURITY]`-tagged threads on impala lists) carry
-essentially no project-direct CVE history to mine from, so this §11a is
-the highest-leverage section the scan agent uses for suppression and is
-currently the weakest by content. Concrete asks: 3–5 patterns the PMC sees
-recur in inbound reports (e.g. "exception-not-vuln from a malformed query
-plan", "OOM from a too-large IN list", etc.). *(meta — §11a)*
-
----
 
 ## Appendix: SECURITY.md → §x back-map
 
