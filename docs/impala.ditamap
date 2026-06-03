@@ -71,6 +71,9 @@ under the License.
     <topicref href="topics/impala_proxy.xml"/>
     <topicref href="topics/impala_disk_space.xml"/>
     <topicref href="topics/impala_workload_mgmt.xml"/>
+    <topicref href="topics/impala_opentelemetry_support.xml">
+      <topicref href="topics/impala_opentelemetry_data_collector.xml"/>
+    </topicref>
     <topicref audience="integrated" href="topics/impala_auditing.xml"/>
     <topicref audience="integrated" href="topics/impala_lineage.xml"/>
   </topicref>

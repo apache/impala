@@ -1,0 +1,194 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+Licensed to the Apache Software Foundation (ASF) under one
+or more contributor license agreements.  See the NOTICE file
+distributed with this work for additional information
+regarding copyright ownership.  The ASF licenses this file
+to you under the Apache License, Version 2.0 (the
+"License"); you may not use this file except in compliance
+with the License.  You may obtain a copy of the License at
+
+  http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing,
+software distributed under the License is distributed on an
+"AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+KIND, either express or implied.  See the License for the
+specific language governing permissions and limitations
+under the License.
+-->
+<!DOCTYPE concept PUBLIC "-//OASIS//DTD DITA Concept//EN" "concept.dtd">
+<concept id="impala_opentelemetry_support" rev="5.0">
+  <title>OpenTelemetry support for Impala</title>
+  <titlealts audience="PDF">
+    <navtitle>OpenTelemetry support</navtitle>
+  </titlealts>
+  <prolog>
+    <metadata>
+      <data name="Category" value="Impala"/>
+      <data name="Category" value="OpenTelemetry"/>
+      <data name="Category" value="Observability"/>
+      <data name="Category" value="Data Management"/>
+      <data name="Category" value="Administrators"/>
+    </metadata>
+  </prolog>
+  <conbody>
+    <p>Impala telemetry data is integrated with OTel-compatible collectors. This provides a
+      centralized flow of live query insights, with <codeph>SELECT</codeph> queries, DMLs, and DDLs
+      represented as OTel traces, and reduces the friction of sourcing data from multiple places.
+      See <xref href="https://opentelemetry.io/" format="html" scope="external">OpenTelemetry
+        (OTel)</xref> for more information.</p>
+    <section>
+      <title>Impala integration with OTel</title>
+      <p>Impala integrates the OTel C++ SDK to emit query lifecycle data as OpenTelemetry traces.
+        The system already tracks specific phases and events for each query and records them in the
+        query profile timeline section. By emitting these events to an OTel collector, observability
+        systems can track active queries in near real-time.</p>
+    </section>
+    <section>
+      <title>Collected telemetry data</title>
+      <p>Telemetry data emitted from Impala carries crucial information that is currently available
+        only in the query profile and workload management tables. Telemetry data includes the
+        following data:<ol>
+          <li>The initiating user</li>
+          <li>The SQL statement</li>
+          <li>Memory estimates and actual use</li>
+          <li>Other important data related to the query lifecycle</li>
+        </ol></p>
+    </section>
+    <section>
+      <title>Benefits of OTel Impala Integration</title>
+      <dl>
+        <dlentry>
+          <dt>Enhanced query lifecycle and historical data</dt>
+          <dd>Integrating OTel with Impala provides enhanced observability through comprehensive
+            data collection. The following data is collected:<ul>
+              <li>Live query data – Data about important events in the lifecycle of actively running
+                queries is sent to collectors in near real-time as the events happen.</li>
+              <li>Historical query data – Data about completed queries can be retained by the
+                destination OTel trace management system.</li>
+            </ul></dd>
+        </dlentry>
+      </dl>
+      <dl>
+        <dlentry>
+          <dt>Performance and scalability impact</dt>
+          <dd>The integration is designed to have negligible impact on Impala's performance and is
+            built for scalability. The following performance and scalability impacts are valid for
+            the integration:<ul>
+              <li>The performance impact on Impala is negligible because the system already collects
+                all the necessary event and metric data.</li>
+              <li>The process of sending data to the OTel endpoint is handled out-of-band in a
+                separate thread, limiting any additional resource usage to just the sending of this
+                data.</li>
+              <li>Scalability concerns are primarily limited to the OTel Collector endpoint. Impala
+                does not encounter scalability issues as long as communication with the Collector
+                happens without delay.</li>
+            </ul></dd>
+        </dlentry>
+      </dl>
+    </section>
+    <section>
+      <title>OpenTelemetry Impala query tracing example</title>
+      <p>
+        <note type="important">The example backend systems shown here are just for representation.
+          Along with having your own instance of the OTel collector, you must also have your own
+          instances of Jaeger, Zipkin, or other trace visualization system to view the telemetry data.</note>
+      </p>
+      <p>After configuring OpenTelemetry support for your Impala, you can view detailed telemetry
+        data for your queries in a trace visualization system like Jaeger. The following steps show
+        a typical workflow for finding and analyzing a query trace.</p>
+      <dl>
+        <dlentry>
+          <dt>Finding a query trace</dt>
+          <dd>
+            <ol>
+              <li>On the Jaeger UI, use the search function to find traces. You can filter by
+                service, such as Impalad, or other tags like the query ID. The search results
+                provide a high-level summary of the traces found.</li>
+              <li>From the search results, select a specific trace to view its summary and
+                timeline.</li>
+            </ol>
+          </dd>
+        </dlentry>
+        <dlentry>
+          <dt>Understanding the query trace timeline</dt>
+          <dd>A trace provides a detailed breakdown of a query execution from start to finish. Each
+            segment in the timeline is a span, representing a specific operation. The main query is
+            represented by a root span, and its various stages are shown as child spans.</dd>
+        </dlentry>
+        <dlentry>
+          <dt>Analyzing child spans</dt>
+          <dd>By inspecting the individual child spans, you can gain deep insights into the
+            performance of each stage of the query. For example, you can see how much time was spent
+            on planning, admission control, and execution.<p>The following query stages are shown in
+              the child spans:<ol>
+                <li>Query initialization – This span is generated immediately when a query is
+                  received to capture the initial setup and is useful for checking early details,
+                  such as the user and query ID.</li>
+                <li>Query planning – This span shows the time taken to plan the query. A long
+                  duration here might indicate a complex query or metadata-related issues.</li>
+                <li>Admission control – This span records the time spent waiting for resources. A
+                  long duration here suggests high resource contention.</li>
+                <li>Query execution – This span represents the time for the actual query to run.
+                  This is a crucial metric for evaluating performance.</li>
+                <li>Query close – This span marks the end of the query lifecycle, including cleanup
+                  and final reporting.</li>
+                <li>Failed query – A failed query will also generate a trace that can be analyzed to
+                  understand the cause of the failure.</li>
+              </ol></p><p>Analyzing these spans helps you identify performance bottlenecks and
+              understand the entire lifecycle of a query within your Impala.</p></dd>
+        </dlentry>
+      </dl>
+    </section>
+    <section>
+      <title>Enabling OpenTelemetry tracing in the Impala Coordinator</title>
+      <p>To enable OpenTelemetry (OTel) tracing for monitoring and diagnostics in your Impala
+        cluster, add the appropriate startup flags to your Impala Coordinator nodes.<ol>
+          <li>Configure the required flags - Restart your Impala Coordinator instances with the
+            following mandatory flags to activate tracing:<ul>
+              <li><codeph>--otel_trace_enabled</codeph>- Set to <codeph>true</codeph> to generate
+                and export OpenTelemetry traces. (Default: <codeph>false</codeph>)</li>
+              <li><codeph>--otel_trace_collector_url</codeph>- Specifies the valid URL endpoint of
+                the OpenTelemetry collector where trace data is
+                exported.<codeblock>--otel_trace_collector_url=https://collector-endpoint</codeblock></li>
+            </ul></li>
+          <li>Configure optional performance and network tuning flags (Optional) - You can append
+            any of the following optional configuration keys to fine-tune batch sizing, timeouts, or
+            connection behaviors:<ul>
+              <li><codeph>--otel_trace_batch_max_batch_size</codeph>- Maximum batch size for each
+                export to the OTel Collector. (Default: <codeph>512</codeph>)</li>
+              <li><codeph>--otel_trace_batch_queue_size</codeph>- Maximum buffer or queue size.
+                Spans are dropped after this limit is reached. (Default: <codeph>2048</codeph>)</li>
+              <li><codeph>--otel_trace_batch_schedule_delay_ms</codeph>- Delay interval in
+                milliseconds between consecutive batch exports. (Default:
+                <codeph>5000</codeph>)</li>
+              <li><codeph>--otel_trace_compression</codeph>- Uses ZLib compression when sending data
+                to the OTel Collector. (Default: <codeph>true</codeph>)</li>
+              <li><codeph>--otel_trace_timeout_s</codeph>- Export timeout threshold in seconds.
+                (Default: <codeph>10</codeph>)</li>
+              <li><codeph>--otel_debug</codeph>- Set to <codeph>true</codeph> to output additional
+                telemetry debug logs. (Default: <codeph>false</codeph>)</li>
+            </ul></li>
+        </ol></p>
+    </section>
+    <section>
+      <title>Limitations</title>
+      <p>The current OpenTelemetry integration for Impala has the following limitations:<dl
+          id="dl_uzw_kfw_lgc">
+          <dlentry>
+            <dt>Telemetry data scope</dt>
+            <dd>The scope of telemetry data is currently limited to only traces of select queries,
+              DMLs, and DDLs. Other types of data such as metrics or logs will not be handled in the
+              initial release. However, the design is prepared to allow metrics or logs to be added
+              in the future without significant architectural changes.</dd>
+          </dlentry>
+          <dlentry>
+            <dt>Fixed trace data</dt>
+            <dd>The traces being sent from Impala are not configurable. This means you cannot
+              customize the specific data points included in the traces.</dd>
+          </dlentry>
+        </dl></p>
+    </section>
+  </conbody>
+</concept>

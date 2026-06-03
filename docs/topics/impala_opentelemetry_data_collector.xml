@@ -1,0 +1,487 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+Licensed to the Apache Software Foundation (ASF) under one
+or more contributor license agreements.  See the NOTICE file
+distributed with this work for additional information
+regarding copyright ownership.  The ASF licenses this file
+to you under the Apache License, Version 2.0 (the
+"License"); you may not use this file except in compliance
+with the License.  You may obtain a copy of the License at
+
+  http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing,
+software distributed under the License is distributed on an
+"AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+KIND, either express or implied.  See the License for the
+specific language governing permissions and limitations
+under the License.
+-->
+<!DOCTYPE concept PUBLIC "-//OASIS//DTD DITA Concept//EN" "concept.dtd">
+<concept id="impala_opentelemetry_data_collector" rev="5.0">
+  <title>Telemetry data exposed to OTel collector for Impala</title>
+  <titlealts audience="PDF">
+    <navtitle>Telemetry data exposed to OTel collector</navtitle>
+  </titlealts>
+  <prolog>
+    <metadata>
+      <data name="Category" value="Impala"/>
+      <data name="Category" value="Telemetry"/>
+      <data name="Category" value="Observability"/>
+      <data name="Category" value="Data Management"/>
+      <data name="Category" value="Administrators"/>
+    </metadata>
+  </prolog>
+  <conbody>
+    <section>
+      <title>Root Span of the Trace</title>
+      <p>The root span represents the entire query and is of kind SERVER.</p>
+      <table>
+        <tgroup cols="4" colsep="1" rowsep="1">
+          <colspec colname="c1" colnum="1" colwidth="1*"/>
+          <colspec colname="c2" colnum="2" colwidth="1.2*"/>
+          <colspec colname="c3" colnum="3" colwidth="1.46*"/>
+          <colspec colname="c4" colnum="4" colwidth="1.22*"/>
+          <thead>
+            <row>
+              <entry>Metrics</entry>
+              <entry>Type</entry>
+              <entry>Description</entry>
+              <entry>Example</entry>
+            </row>
+          </thead>
+          <tbody>
+            <row>
+              <entry>ClusterId</entry>
+              <entry>String</entry>
+              <entry>A string that uniquely identifies a cluster, determined by the value of the
+                  <codeph>--cluster_id</codeph> startup flag.</entry>
+              <entry><codeph>impala-1982661901-6j1z</codeph></entry>
+            </row>
+            <row>
+              <entry>EndTime</entry>
+              <entry>Millisecond epoch time</entry>
+              <entry>The time when the query finished in millisecond epoch time.</entry>
+              <entry><codeph>1743474118301</codeph></entry>
+            </row>
+            <row>
+              <entry>ErrorMessage</entry>
+              <entry>String</entry>
+              <entry>A string containing the error message received from the query execution, or an
+                empty string if the query completed successfully.</entry>
+              <entry><codeph>Invalid syntax</codeph></entry>
+            </row>
+            <row>
+              <entry>OriginalQueryId</entry>
+              <entry>String</entry>
+              <entry>When a query is retried, a string containing the Impala query ID of the
+                original query. Otherwise, an empty string.</entry>
+              <entry><codeph>ef403b2690d243be:b960c0ba00000000</codeph></entry>
+            </row>
+            <row>
+              <entry>QueryId</entry>
+              <entry>String</entry>
+              <entry>The Impala query ID.</entry>
+              <entry><codeph>ef403b2690d243be:b960c0ba00000000</codeph></entry>
+            </row>
+            <row>
+              <entry>QueryStartTime</entry>
+              <entry>Millisecond epoch time</entry>
+              <entry>The time when the query was first received in millisecond epoch time.</entry>
+              <entry><codeph>1743473803667</codeph></entry>
+            </row>
+            <row>
+              <entry>RequestPool</entry>
+              <entry>String</entry>
+              <entry>A string containing the name of the request pool the query will be scheduled
+                into.</entry>
+              <entry><codeph>default-pool</codeph></entry>
+            </row>
+            <row>
+              <entry>RetriedQueryId</entry>
+              <entry>String</entry>
+              <entry>The ID of the query that successfully retried this query.</entry>
+              <entry><codeph>3a43a57ad0bf36df:dcd698b700000000</codeph></entry>
+            </row>
+            <row>
+              <entry>Runtime</entry>
+              <entry>Milliseconds</entry>
+              <entry>The time in milliseconds the query ran.</entry>
+              <entry><codeph>5231</codeph></entry>
+            </row>
+            <row>
+              <entry>SessionId</entry>
+              <entry>String</entry>
+              <entry>The Impala session ID.</entry>
+              <entry><codeph>024f45f3e0019fed:eb0fe00c00000000</codeph></entry>
+            </row>
+            <row>
+              <entry>State</entry>
+              <entry>String</entry>
+              <entry>The query state.</entry>
+              <entry><codeph>FINISHED</codeph>, <codeph>EXCEPTION</codeph>, or
+                  <codeph>RETRIED</codeph></entry>
+            </row>
+            <row>
+              <entry>QueryType</entry>
+              <entry>String</entry>
+              <entry>The type of the statement in uppercase letters, such as <codeph>QUERY</codeph>,
+                  <codeph>DML</codeph>, or <codeph>DDL</codeph>.</entry>
+              <entry><codeph>DML</codeph></entry>
+            </row>
+            <row>
+              <entry>UserName</entry>
+              <entry>String</entry>
+              <entry>The user who submitted the query.</entry>
+              <entry><codeph>usr123</codeph></entry>
+            </row>
+          </tbody>
+        </tgroup>
+      </table>
+    </section>
+    <section>
+      <title>Child spans</title>
+      <p>Child spans are of kind INTERNAL and contain both global and specific attributes and
+        events.</p>
+      <ul id="ul_uqq_hnk_pjc">
+        <li><b>Global child span attributes</b><p>The global child span attributes are present on
+            every child span.<table id="table_jsw_nlk_pjc">
+              <tgroup cols="4" colsep="1" rowsep="1">
+                <colspec colname="c1" colnum="1" colwidth="1*"/>
+                <colspec colname="c2" colnum="2" colwidth="1*"/>
+                <colspec colname="c3" colnum="3" colwidth="1*"/>
+                <colspec colname="c4" colnum="4" colwidth="1*"/>
+                <thead>
+                  <row>
+                    <entry>Metrics</entry>
+                    <entry>Type</entry>
+                    <entry>Description</entry>
+                    <entry>Example</entry>
+                  </row>
+                </thead>
+                <tbody>
+                  <row>
+                    <entry>BeginTime</entry>
+                    <entry>Millisecond epoch time</entry>
+                    <entry>The time the span started in millisecond epoch time.</entry>
+                    <entry><codeph>1743473803667</codeph></entry>
+                  </row>
+                  <row>
+                    <entry>ElapsedTime</entry>
+                    <entry>Millisecond </entry>
+                    <entry>The time in milliseconds the span ran.</entry>
+                    <entry><codeph>5231</codeph></entry>
+                  </row>
+                  <row>
+                    <entry>EndTime</entry>
+                    <entry>Millisecond epoch time</entry>
+                    <entry>The time the span finished in millisecond epoch time.</entry>
+                    <entry><codeph>1743474118301</codeph></entry>
+                  </row>
+                  <row>
+                    <entry>ErrorMsg</entry>
+                    <entry>String</entry>
+                    <entry>Error details if a failure occurred during this span.</entry>
+                    <entry><codeph>Could not read file</codeph></entry>
+                  </row>
+                  <row>
+                    <entry>Name</entry>
+                    <entry>String</entry>
+                    <entry>The name of the span, in the <codeph>{{query_id}} - Query Stage</codeph>
+                      format.</entry>
+                    <entry><codeph>cdf601fa776431c43:5e59cba4fe284ae22 - Submitted</codeph></entry>
+                  </row>
+                  <row>
+                    <entry>Running</entry>
+                    <entry>Boolean</entry>
+                    <entry>A boolean value indicating if the query is actively running and not in
+                      planning, admission control, or closing. It is set to <codeph>false</codeph>
+                      if the query fails during this span.</entry>
+                    <entry><codeph>true</codeph></entry>
+                  </row>
+                  <row>
+                    <entry>Status</entry>
+                    <entry>String</entry>
+                    <entry>The status of the task, for example, <codeph>OK</codeph>.</entry>
+                    <entry><codeph>OK</codeph></entry>
+                  </row>
+                </tbody>
+              </tgroup>
+            </table></p></li>
+        <li><b>Specific child span attributes</b><p>The following table lists the additional
+            attributes for the <codeph>Init</codeph> span, which are unique to that stage of the
+            query lifecycle.<table id="table_ox4_xkk_pjc">
+              <tgroup cols="4" colsep="1" rowsep="1">
+                <colspec colname="c1" colnum="1" colwidth="1*"/>
+                <colspec colname="c2" colnum="2" colwidth="1*"/>
+                <colspec colname="c3" colnum="3" colwidth="1*"/>
+                <colspec colname="c4" colnum="4" colwidth="1*"/>
+                <thead>
+                  <row>
+                    <entry>Metrics</entry>
+                    <entry>Type</entry>
+                    <entry>Description</entry>
+                    <entry>Example</entry>
+                  </row>
+                </thead>
+                <tbody>
+                  <row>
+                    <entry>ClusterId</entry>
+                    <entry>String</entry>
+                    <entry>A string that uniquely identifies a cluster, determined by the value of
+                      the <codeph>--cluster_id</codeph> startup flag.</entry>
+                    <entry><codeph>impala-1982661901-6j1z</codeph></entry>
+                  </row>
+                  <row>
+                    <entry>DefaultDb</entry>
+                    <entry>String</entry>
+                    <entry>The name of the default database.</entry>
+                    <entry><codeph>tpcds</codeph></entry>
+                  </row>
+                  <row>
+                    <entry>Name</entry>
+                    <entry>String</entry>
+                    <entry> The name of the span, in the <codeph>{{query_id}} - Init</codeph>
+                      format.</entry>
+                    <entry><codeph>cdf601fa776431c43:5e59cba4fe284ae22 - Init</codeph></entry>
+                  </row>
+                  <row>
+                    <entry>OriginalQueryId</entry>
+                    <entry>String</entry>
+                    <entry>The Impala query ID of the original query when retried. Otherwise, an
+                      empty string.</entry>
+                    <entry><codeph>ef403b2690d243be:b960c0ba00000000</codeph></entry>
+                  </row>
+                  <row>
+                    <entry>QueryId</entry>
+                    <entry>String</entry>
+                    <entry>The Impala query ID.</entry>
+                    <entry><codeph>ef403b2690d243be:b960c0ba00000000</codeph></entry>
+                  </row>
+                  <row>
+                    <entry>QueryString</entry>
+                    <entry>String</entry>
+                    <entry>The redacted string containing the SQL statement.</entry>
+                    <entry><codeph>select * from db.tbl where col1 = “val1”</codeph></entry>
+                  </row>
+                  <row>
+                    <entry>RequestPool</entry>
+                    <entry>String</entry>
+                    <entry>A string containing the name of the request pool the query will be
+                      scheduled into.</entry>
+                    <entry><codeph>default-pool</codeph></entry>
+                  </row>
+                  <row>
+                    <entry>SessionId</entry>
+                    <entry>String</entry>
+                    <entry>The Impala session ID.</entry>
+                    <entry><codeph>024f45f3e0019fed:eb0fe00c00000000</codeph></entry>
+                  </row>
+                  <row>
+                    <entry>UserName</entry>
+                    <entry>String</entry>
+                    <entry>The user who submitted the query.</entry>
+                    <entry><codeph>usr123</codeph></entry>
+                  </row>
+                </tbody>
+              </tgroup>
+            </table></p></li>
+      </ul>
+    </section>
+    <section>
+      <title>Query Submitted</title>
+      <table frame="all" rowsep="1" colsep="1" id="table_ddl_kcw_lgc">
+        <tgroup cols="4" colsep="1" rowsep="1">
+          <colspec colnum="1" colname="col1"/>
+          <colspec colnum="2" colname="col2"/>
+          <colspec colnum="3" colname="col3"/>
+          <colspec colnum="4" colname="col4"/>
+          <thead>
+            <row>
+              <entry>Metrics</entry>
+              <entry>Type</entry>
+              <entry>Description</entry>
+              <entry>Example</entry>
+            </row>
+          </thead>
+          <tbody>
+            <row>
+              <entry>Name</entry>
+              <entry>String</entry>
+              <entry>The name of the span, in the <codeph>{{query_id}} - Init</codeph>
+                format.</entry>
+              <entry><codeph>cdf601fa776431c43:5e59cba4fe284ae22 -
+                Submitted</codeph></entry>
+            </row>
+          </tbody>
+        </tgroup>
+      </table>
+    </section>
+    <section>
+      <title>Span: Planning</title>
+      <table frame="all" rowsep="1" colsep="1" id="table_js1_ncw_lgc">
+        <tgroup cols="4" colsep="1" rowsep="1">
+          <colspec colnum="1" colname="col1"/>
+          <colspec colnum="2" colname="col2"/>
+          <colspec colnum="3" colname="col3"/>
+          <colspec colnum="4" colname="col4"/>
+          <thead>
+            <row>
+              <entry>Metrics</entry>
+              <entry>Type</entry>
+              <entry><b>Description</b></entry>
+              <entry><b>Example</b></entry>
+            </row>
+          </thead>
+          <tbody>
+            <row>
+              <entry>Name</entry>
+              <entry>String</entry>
+              <entry>The name of the span, in the <codeph>{{query_id}} - Init</codeph>
+                format.</entry>
+              <entry><codeph>cdf601fa776431c43:5e59cba4fe284ae22 -
+                Planning</codeph></entry>
+            </row>
+            <row>
+              <entry>QueryType</entry>
+              <entry>String</entry>
+              <entry>The type of the statement in uppercase letters, such as
+                  <codeph>QUERY</codeph>, <codeph>DML</codeph>, or <codeph>DDL</codeph>.</entry>
+              <entry><codeph>DML</codeph>, <codeph>QUERY</codeph></entry>
+            </row>
+          </tbody>
+        </tgroup>
+      </table>
+    </section>
+    <section>
+      <title>Admission control</title>
+      <note>The admission control attributes are only applicable for <codeph>QUERY</codeph> and
+          <codeph>DML</codeph> statements.</note>
+      <table frame="all" rowsep="1" colsep="1" id="table_zb2_qcw_lgc">
+        <tgroup cols="4" colsep="1" rowsep="1">
+          <colspec colnum="1" colname="col1"/>
+          <colspec colnum="2" colname="col2"/>
+          <colspec colnum="3" colname="col3"/>
+          <colspec colnum="4" colname="col4"/>
+          <thead>
+            <row>
+              <entry>Metrics</entry>
+              <entry>Type</entry>
+              <entry>Description</entry>
+              <entry>Example</entry>
+            </row>
+          </thead>
+          <tbody>
+            <row>
+              <entry>Name</entry>
+              <entry>String</entry>
+              <entry>The name of the span, in the <codeph>{{query_id}} -
+                  AdmissionControl</codeph> format.</entry>
+              <entry><codeph>cdf601fa776431c43:5e59cba4fe284ae22 -
+                  AdmissionControl</codeph></entry>
+            </row>
+            <row>
+              <entry>AdmissionResult</entry>
+              <entry>String</entry>
+              <entry>A string containing the result from admission control.</entry>
+              <entry><codeph>Admitted immediately</codeph></entry>
+            </row>
+            <row>
+              <entry>Queued</entry>
+              <entry>Boolean</entry>
+              <entry>A boolean value where <codeph>true</codeph> indicates that the query
+                was queued and <codeph>false</codeph> indicates that the query was admitted
+                immediately.</entry>
+              <entry><codeph>false</codeph></entry>
+            </row>
+            <row>
+              <entry>RequestPool</entry>
+              <entry>String</entry>
+              <entry>A string containing the name of the request pool the query will be
+                scheduled into.</entry>
+              <entry><codeph>default-pool</codeph></entry>
+            </row>
+          </tbody>
+        </tgroup>
+      </table>
+    </section>
+    <section>
+      <title>Query execution</title>
+      <table frame="all" rowsep="1" colsep="1" id="table_wsw_5cw_lgc">
+        <tgroup cols="4" colsep="1" rowsep="1">
+          <colspec colnum="1" colname="col1"/>
+          <colspec colnum="2" colname="col2"/>
+          <colspec colnum="3" colname="col3"/>
+          <colspec colnum="4" colname="col4"/>
+          <thead>
+            <row>
+              <entry>Metrics</entry>
+              <entry>Type</entry>
+              <entry>Description</entry>
+              <entry>Example</entry>
+            </row>
+          </thead>
+          <tbody>
+            <row>
+              <entry>Name</entry>
+              <entry>String</entry>
+              <entry>The name of the span, in the <codeph>{{query_id}} -
+                  Execution</codeph> format.</entry>
+              <entry><codeph>cdf601fa776431c43:5e59cba4fe284ae22 -
+                Execution</codeph></entry>
+            </row>
+            <row>
+              <entry>NumDeletedRows</entry>
+              <entry>Integer</entry>
+              <entry>An integer containing the total number of rows deleted by the DML
+                statement.</entry>
+              <entry><codeph>0</codeph></entry>
+            </row>
+            <row>
+              <entry>NumModifiedRows</entry>
+              <entry>Integer</entry>
+              <entry>An integer containing the total number of rows modified by the DML
+                statement.</entry>
+              <entry><codeph>0</codeph></entry>
+            </row>
+            <row>
+              <entry>NumRowsFetched</entry>
+              <entry>Integer</entry>
+              <entry>An integer containing the total number of rows fetched by the
+                client.</entry>
+              <entry><codeph>5132</codeph></entry>
+            </row>
+          </tbody>
+        </tgroup>
+      </table>
+    </section>
+    <section>
+      <title>Close</title>
+      <table frame="all" rowsep="1" colsep="1" id="table_pwv_zcw_lgc">
+        <tgroup cols="4" colsep="1" rowsep="1">
+          <colspec colnum="1" colname="col1"/>
+          <colspec colnum="2" colname="col2"/>
+          <colspec colnum="3" colname="col3"/>
+          <colspec colnum="4" colname="col4"/>
+          <thead>
+            <row>
+              <entry>Metrics</entry>
+              <entry>Type</entry>
+              <entry>Description</entry>
+              <entry>Example</entry>
+            </row>
+          </thead>
+          <tbody>
+            <row>
+              <entry>Name</entry>
+              <entry>String</entry>
+              <entry>The name of the span, in the <codeph>{{query_id}} - Close</codeph>
+                format.</entry>
+              <entry><codeph>cdf601fa776431c43:5e59cba4fe284ae22 - Close</codeph></entry>
+            </row>
+          </tbody>
+        </tgroup>
+      </table>
+    </section>
+  </conbody>
+</concept>
