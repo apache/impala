@@ -24,3 +24,9 @@ metadata:
 data:
   hive-site.xml: |
 {{ .Files.Get "files/hive-site.xml" | replace "quickstart-hive-metastore" (printf "%s-hms" (include "impala.fullname" .)) | indent 4 }}
+{{- if .Values.auth.ranger.enabled }}
+  ranger-hive-security.xml: |
+{{ tpl (.Files.Get "files/ranger-hive-security.xml") . | indent 4 }}
+  ranger-hive-audit.xml: |
+{{ tpl (.Files.Get "files/ranger-hive-audit.xml") . | indent 4 }}
+{{- end }}

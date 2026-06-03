@@ -83,6 +83,14 @@ spec:
             - name: conf
               mountPath: /opt/impala/conf/hive-site.xml
               subPath: hive-site.xml
+{{- if .Values.auth.ranger.enabled }}
+            - name: conf
+              mountPath: /opt/impala/conf/ranger-hive-security.xml
+              subPath: ranger-hive-security.xml
+            - name: conf
+              mountPath: /opt/impala/conf/ranger-hive-audit.xml
+              subPath: ranger-hive-audit.xml
+{{- end }}
       volumes:
         - name: conf
           configMap:

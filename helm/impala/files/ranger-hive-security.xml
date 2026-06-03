@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Licensed to the Apache Software Foundation (ASF) under one
+  or more contributor license agreements.  See the NOTICE file
+  distributed with this work for additional information
+  regarding copyright ownership.  The ASF licenses this file
+  to you under the Apache License, Version 2.0 (the
+  "License"); you may not use this file except in compliance
+  with the License.  You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+  Unless required by applicable law or agreed to in writing,
+  software distributed under the License is distributed on an
+  "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+  KIND, either express or implied.  See the License for the
+  specific language governing permissions and limitations
+  under the License.
+-->
+{{- $rangerAdminUrl := .Values.auth.ranger.adminUrl | default (printf "http://%s-ranger:%d" (include "impala.fullname" .) (.Values.ranger.adminPort | int)) -}}
+<configuration>
+  <property>
+    <name>ranger.plugin.hive.service.name</name>
+    <value>{{ .Values.auth.ranger.serverName }}</value>
+    <description>Name of the Ranger service containing policies.</description>
+  </property>
+  <property>
+    <name>ranger.plugin.hive.policy.rest.url</name>
+    <value>{{ $rangerAdminUrl }}</value>
+    <description>URL to Ranger Admin.</description>
+  </property>
+  <property>
+    <name>ranger.plugin.hive.policy.cache.dir</name>
+    <value>/tmp</value>
+  </property>
+  <property>
+    <name>ranger.plugin.hive.policy.pollIntervalMs</name>
+    <value>30000</value>
+  </property>
+  <property>
+    <name>ranger.plugin.hive.policy.rest.client.connection.timeoutMs</name>
+    <value>120000</value>
+  </property>
+  <property>
+    <name>ranger.plugin.hive.policy.rest.client.read.timeoutMs</name>
+    <value>30000</value>
+  </property>
+</configuration>

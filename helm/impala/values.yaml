@@ -72,6 +72,9 @@ auth:
     serviceType: "hive"
     appId: "impala"
     serverName: "server1"
+    # Optional override for Ranger Admin URL. When empty, chart uses
+    # http://<release>-ranger:<ranger.adminPort>.
+    adminUrl: ""
 
 kudu:
   enabled: false
