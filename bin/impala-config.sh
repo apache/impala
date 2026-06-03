@@ -220,7 +220,7 @@ export IMPALA_MOLD_VERSION=2.40.4
 unset IMPALA_MOLD_URL
 
 # Impala JDBC driver for testing.
-export IMPALA_SIMBA_JDBC_DRIVER_VERSION=42-2.6.32.1041
+export IMPALA_SIMBA_JDBC_DRIVER_VERSION=2.6.39.1073
 
 # Find system python versions for testing
 export IMPALA_SYSTEM_PYTHON3="${IMPALA_SYSTEM_PYTHON3_OVERRIDE-$(command -v python3)}"
