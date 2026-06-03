@@ -36,6 +36,15 @@ spec:
         app.kubernetes.io/instance: {{ .Release.Name }}
         app.kubernetes.io/name: {{ include "impala.name" . }}
         app.kubernetes.io/component: statestored
+{{- if or .Values.security.istio.enabled .Values.security.istio.podAnnotations }}
+      annotations:
+{{- if .Values.security.istio.enabled }}
+        sidecar.istio.io/inject: "true"
+{{- end }}
+{{- with .Values.security.istio.podAnnotations }}
+{{ toYaml . | indent 8 }}
+{{- end }}
+{{- end }}
     spec:
       {{- with .Values.nodeSelector }}
       nodeSelector:
@@ -57,6 +66,25 @@ spec:
             - -redirect_stdout_stderr=false
             - -logtostderr
             - -v={{ .Values.statestored.v }}
+{{- if .Values.security.kerberos.enabled }}
+            - -principal={{ required "security.kerberos.principal is required when security.kerberos.enabled=true" .Values.security.kerberos.principal }}
+{{- if .Values.security.kerberos.bePrincipal }}
+            - -be_principal={{ .Values.security.kerberos.bePrincipal }}
+{{- end }}
+            - -keytab_file={{ printf "%s/%s" .Values.security.kerberos.keytabMountPath .Values.security.kerberos.keytabFileName }}
+{{- if .Values.security.kerberos.krb5ConfigMapName }}
+            - -krb5_conf={{ printf "%s/%s" .Values.security.kerberos.krb5ConfigMountPath .Values.security.kerberos.krb5ConfigFileName }}
+{{- end }}
+{{- end }}
+{{- if .Values.security.tls.enabled }}
+            - -ssl_server_certificate={{ printf "%s/%s" .Values.security.tls.mountPath .Values.security.tls.certFileName }}
+            - -ssl_private_key={{ printf "%s/%s" .Values.security.tls.mountPath .Values.security.tls.keyFileName }}
+            - -webserver_certificate_file={{ printf "%s/%s" .Values.security.tls.mountPath .Values.security.tls.certFileName }}
+            - -webserver_private_key_file={{ printf "%s/%s" .Values.security.tls.mountPath .Values.security.tls.keyFileName }}
+{{- if .Values.security.tls.clientCaFileName }}
+            - -ssl_client_ca_certificate={{ printf "%s/%s" .Values.security.tls.mountPath .Values.security.tls.clientCaFileName }}
+{{- end }}
+{{- end }}
 {{- range .Values.statestored.extraArgs }}
             - {{ . | quote }}
 {{- end }}
@@ -69,7 +97,39 @@ spec:
             - name: conf
               mountPath: /opt/impala/conf/hive-site.xml
               subPath: hive-site.xml
+{{- if .Values.security.kerberos.enabled }}
+            - name: kerberos-keytab
+              mountPath: {{ printf "%s/%s" .Values.security.kerberos.keytabMountPath .Values.security.kerberos.keytabFileName }}
+              subPath: {{ .Values.security.kerberos.keytabFileName }}
+              readOnly: true
+{{- if .Values.security.kerberos.krb5ConfigMapName }}
+            - name: kerberos-krb5
+              mountPath: {{ printf "%s/%s" .Values.security.kerberos.krb5ConfigMountPath .Values.security.kerberos.krb5ConfigFileName }}
+              subPath: {{ .Values.security.kerberos.krb5ConfigFileName }}
+              readOnly: true
+{{- end }}
+{{- end }}
+{{- if .Values.security.tls.enabled }}
+            - name: tls-certs
+              mountPath: {{ .Values.security.tls.mountPath }}
+              readOnly: true
+{{- end }}
       volumes:
         - name: conf
           configMap:
             name: {{ include "impala.fullname" . }}-conf
+{{- if .Values.security.kerberos.enabled }}
+        - name: kerberos-keytab
+          secret:
+            secretName: {{ required "security.kerberos.keytabSecretName is required when security.kerberos.enabled=true" .Values.security.kerberos.keytabSecretName }}
+{{- if .Values.security.kerberos.krb5ConfigMapName }}
+        - name: kerberos-krb5
+          configMap:
+            name: {{ .Values.security.kerberos.krb5ConfigMapName }}
+{{- end }}
+{{- end }}
+{{- if .Values.security.tls.enabled }}
+        - name: tls-certs
+          secret:
+            secretName: {{ required "security.tls.secretName is required when security.tls.enabled=true" .Values.security.tls.secretName }}
+{{- end }}

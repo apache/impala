@@ -50,3 +50,15 @@ auth:
     # Example OAuth settings:
     # jwksUrl: "https://idp.example.org/.well-known/jwks.json"
     # jwtCustomClaimUsername: "sub"
+
+security:
+  istio:
+    enabled: false
+  kerberos:
+    enabled: false
+    principal: ""
+    bePrincipal: ""
+    keytabSecretName: ""
+  tls:
+    enabled: false
+    secretName: ""

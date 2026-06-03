@@ -173,6 +173,62 @@ helm upgrade impala ./helm/impala -n impala \
   --set auth.oauth.allowWithoutTls=true
 ```
 
+## Secure cluster configuration (Helm)
+
+Security options are opt-in and preserve non-secure quickstart defaults.
+
+### 1) Create required inputs
+
+Create a keytab secret (required when Kerberos is enabled):
+
+```bash
+kubectl -n impala create secret generic impala-kerberos-keytab \
+  --from-file=impala.keytab=/path/to/impala.keytab
+```
+
+Create a TLS secret (required when TLS is enabled):
+
+```bash
+kubectl -n impala create secret generic impala-tls \
+  --from-file=tls.crt=/path/to/tls.crt \
+  --from-file=tls.key=/path/to/tls.key \
+  --from-file=ca.crt=/path/to/ca.crt
+```
+
+Optional non-default krb5.conf:
+
+```bash
+kubectl -n impala create configmap impala-krb5-conf \
+  --from-file=krb5.conf=/path/to/krb5.conf
+```
+
+### 2) Enable Kerberos/TLS flags in chart values
+
+```bash
+helm upgrade impala ./helm/impala -n impala \
+  -f ./helm/impala/values-example.yaml \
+  --set security.kerberos.enabled=true \
+  --set security.kerberos.principal='impala/_HOST@EXAMPLE.COM' \
+  --set security.kerberos.bePrincipal='impala/_HOST@EXAMPLE.COM' \
+  --set security.kerberos.keytabSecretName='impala-kerberos-keytab' \
+  --set security.kerberos.krb5ConfigMapName='impala-krb5-conf' \
+  --set security.tls.enabled=true \
+  --set security.tls.secretName='impala-tls'
+```
+
+### 3) (Optional) Enable Istio sidecar injection
+
+```bash
+helm upgrade impala ./helm/impala -n impala \
+  -f ./helm/impala/values-example.yaml \
+  --set security.istio.enabled=true
+```
+
+If Istio ingress/gateway terminates external TLS, prefer using Istio TLS and
+leave `security.tls.enabled=false`. Enabling both Istio TLS termination and
+`security.tls.secretName` at the same external endpoint can present different
+certificates to clients and is usually not desired unless explicitly configured.
+
 ## Run Impala shell from laptop (tunnel)
 
 Port-forward HS2:
@@ -292,6 +348,23 @@ kubectl patch impalacluster impala-demo -n impala --type merge -p '{
       "auth.oauth.enabled": "true",
       "auth.oauth.jwksUrl": "https://idp.example.org/.well-known/jwks.json",
       "auth.oauth.jwtCustomClaimUsername": "sub"
+    }
+  }
+}'
+```
+
+Enable secure-cluster overrides via `spec.set`:
+
+```bash
+kubectl patch impalacluster impala-demo -n impala --type merge -p '{
+  "spec": {
+    "set": {
+      "security.kerberos.enabled": "true",
+      "security.kerberos.principal": "impala/_HOST@EXAMPLE.COM",
+      "security.kerberos.keytabSecretName": "impala-kerberos-keytab",
+      "security.tls.enabled": "true",
+      "security.tls.secretName": "impala-tls",
+      "security.istio.enabled": "true"
     }
   }
 }'

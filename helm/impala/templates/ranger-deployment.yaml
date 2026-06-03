@@ -37,6 +37,15 @@ spec:
         app.kubernetes.io/instance: {{ .Release.Name }}
         app.kubernetes.io/name: {{ include "impala.name" . }}
         app.kubernetes.io/component: ranger
+{{- if or .Values.security.istio.enabled .Values.security.istio.podAnnotations }}
+      annotations:
+{{- if .Values.security.istio.enabled }}
+        sidecar.istio.io/inject: "true"
+{{- end }}
+{{- with .Values.security.istio.podAnnotations }}
+{{ toYaml . | indent 8 }}
+{{- end }}
+{{- end }}
     spec:
       containers:
         - name: ranger

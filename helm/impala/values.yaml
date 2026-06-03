@@ -92,6 +92,32 @@ auth:
     # http://<release>-ranger:<ranger.adminPort>.
     adminUrl: ""
 
+security:
+  istio:
+    # When enabled, annotate pods for Istio sidecar injection.
+    enabled: false
+    # Optional extra pod annotations, for example:
+    # proxy.istio.io/config: '{ "holdApplicationUntilProxyStarts": true }'
+    podAnnotations: {}
+  kerberos:
+    enabled: false
+    principal: ""
+    bePrincipal: ""
+    keytabSecretName: ""
+    keytabFileName: "impala.keytab"
+    keytabMountPath: "/etc/impala/security"
+    # Optional krb5.conf injection for non-standard configurations.
+    krb5ConfigMapName: ""
+    krb5ConfigFileName: "krb5.conf"
+    krb5ConfigMountPath: "/etc/krb5"
+  tls:
+    enabled: false
+    secretName: ""
+    mountPath: "/etc/impala/tls"
+    certFileName: "tls.crt"
+    keyFileName: "tls.key"
+    clientCaFileName: "ca.crt"
+
 kudu:
   enabled: false
   image: "apache/kudu:1.17"
