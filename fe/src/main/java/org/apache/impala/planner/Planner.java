@@ -226,8 +226,8 @@ public class Planner {
 
     ColumnLineageGraph graph = ctx_.getRootAnalyzer().getColumnLineageGraph();
     if (BackendConfig.INSTANCE.getComputeLineage() || RuntimeEnv.INSTANCE.isTestEnv()) {
-      // Lineage is disabled for UPDATE, DELETE and MERGE statements
-      if (ctx_.isUpdate() || ctx_.isDelete() || ctx_.isMerge())
+      // Lineage is disabled for UPDATE, DELETE, MERGE and OPTIMIZE statements
+      if (ctx_.isUpdate() || ctx_.isDelete() || ctx_.isMerge() || ctx_.isOptimize())
         return fragments;
       // Compute the column lineage graph
       if (ctx_.isInsertOrCtas()) {

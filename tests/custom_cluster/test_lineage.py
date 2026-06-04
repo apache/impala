@@ -37,6 +37,7 @@ class TestLineage(CustomClusterTestSuite):
   DDL_LINEAGE = "ddl_lineage"
   LINEAGE = "lineage"
   ICEBERG_V3_LINEAGE = "iceberg_v3_lineage"
+  ICEBERG_V3_OPTIMIZE_LINEAGE = "iceberg_v3_optimize_lineage"
 
   @classmethod
   def setup_class(cls):
@@ -195,6 +196,39 @@ class TestLineage(CustomClusterTestSuite):
     self.execute_query_expect_success(self.client,
         "insert into {0} select id, bool_col, string_col "
         "from functional.alltypes".format(tbl_name))
+
+  @pytest.mark.execute_serially
+  @CustomClusterTestSuite.with_args(
+      impalad_args="--lineage_event_log_dir={" + ICEBERG_V3_OPTIMIZE_LINEAGE + "}",
+      tmp_dir_placeholders=[ICEBERG_V3_OPTIMIZE_LINEAGE])
+  def test_iceberg_v3_optimize_lineage(self, unique_database):
+    """Test that OPTIMIZE TABLE on an Iceberg V3 table succeeds without an
+       IllegalStateException in ColumnLineageGraph caused by hidden V3 row lineage
+       columns (_file_row_id, _file_last_updated_sequence_number) being included in
+       the source statement's column labels but excluded from the sink's output exprs.
+       Also verifies that no lineage entry is written for OPTIMIZE statements."""
+    tbl_name = "{0}.v3_optimize_tbl".format(unique_database)
+    self.execute_query_expect_success(self.client,
+        "create table {0} (id int, bool_col boolean, string_col string) "
+        "stored by iceberg tblproperties('format-version'='3')".format(tbl_name))
+    self.execute_query_expect_success(self.client,
+        "insert into {0} select id, bool_col, string_col "
+        "from functional.alltypes".format(tbl_name))
+    self.execute_query_expect_success(self.client,
+        "optimize table {0}".format(tbl_name))
+
+    # Wait to flush the lineage log files.
+    time.sleep(3)
+
+    for log_filename in os.listdir(self.get_tmp_dir(self.ICEBERG_V3_OPTIMIZE_LINEAGE)):
+      log_path = os.path.join(
+          self.get_tmp_dir(self.ICEBERG_V3_OPTIMIZE_LINEAGE), log_filename)
+      with open(log_path) as log_file:
+        for line in log_file:
+          if line.strip():
+            lineage_json = json.loads(line)
+            assert lineage_json.get("operationType") != "OPTIMIZE", \
+                "OPTIMIZE statement should not produce a lineage entry"
 
   # IMPALA-14328: need to implement lineage for Calcite planner
   @SkipIfCalcite.lineage_not_supported
