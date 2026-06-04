@@ -232,20 +232,24 @@ redhat sudo yum install -y file gawk gcc gcc-c++ git krb5-devel krb5-server \
         cyrus-sasl-gssapi cyrus-sasl-devel cyrus-sasl-plain \
         postgresql postgresql-server rpm-build \
         wget vim-common nscd cmake zlib-devel \
-        procps psmisc lsof openssh-server python3-devel python3-setuptools \
+        procps psmisc lsof openssh-server \
         net-tools langpacks-en glibc-langpack-en libxml2-devel libxslt-devel \
         java-${REDHAT_JAVA_VERSION}-openjdk-src java-${REDHAT_JAVA_VERSION}-openjdk-devel
+redhat8 sudo yum install -y python38-devel python38-setuptools
+redhat9 sudo yum install -y python3-devel python3-setuptools
 
 redhat sudo alternatives --set java java-${REDHAT_JAVA_VERSION}-openjdk.${ARCH_NAME}
 redhat sudo alternatives --set javac java-${REDHAT_JAVA_VERSION}-openjdk.${ARCH_NAME}
 redhat sudo alternatives --set java_sdk_openjdk java-${REDHAT_JAVA_VERSION}-openjdk.${ARCH_NAME}
 redhat sudo alternatives --set jre_openjdk java-${REDHAT_JAVA_VERSION}-openjdk.${ARCH_NAME}
+redhat8 sudo alternatives --set python3 /usr/bin/python3.8
 
 # update-java-alternatives may not take effect if there is a Java in PATH
 which java
 java -version
 which javac
 javac -version
+python3 --version
 
 # fuse-devel doesn't exist for Redhat 9
 redhat8 sudo yum install -y fuse-devel curl
