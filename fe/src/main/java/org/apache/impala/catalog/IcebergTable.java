@@ -115,6 +115,7 @@ public class IcebergTable extends Table implements FeIcebergTable {
   // Iceberg format version numbers
   public static final int ICEBERG_FORMAT_V1 = 1;
   public static final int ICEBERG_FORMAT_V2 = 2;
+  public static final int ICEBERG_FORMAT_V3 = 3;
 
   // Iceberg table catalog location key in tblproperties when using HadoopCatalog
   // This property is necessary for both managed and external Iceberg table with

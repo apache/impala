@@ -5333,9 +5333,11 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
         + " tblproperties('format-version'='1')");
     AnalyzesOk("alter table functional_parquet.tinytable convert to iceberg"
         + " tblproperties('format-version'='2')");
+    AnalyzesOk("alter table functional_parquet.tinytable convert to iceberg"
+            + " tblproperties('format-version'='3')");
     AnalysisError("alter table functional_parquet.tinytable convert to iceberg"
-            + " tblproperties('format-version'='3')",
-        "Unsupported Iceberg format version '3'");
+            + " tblproperties('format-version'='4')",
+        "Unsupported Iceberg format version '4'");
     AnalysisError("alter table functional_parquet.tinytable convert to iceberg"
             + " tblproperties('format-version'='unknown')",
         "Invalid Iceberg format version 'unknown'");

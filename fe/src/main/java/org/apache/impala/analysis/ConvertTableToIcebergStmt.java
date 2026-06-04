@@ -142,7 +142,8 @@ public class ConvertTableToIcebergStmt extends StatementBase implements SingleTa
         try {
           int formatVersion = Integer.parseInt(value);
           if (formatVersion == IcebergTable.ICEBERG_FORMAT_V1
-              || formatVersion == IcebergTable.ICEBERG_FORMAT_V2) {
+              || formatVersion == IcebergTable.ICEBERG_FORMAT_V2
+              || formatVersion == IcebergTable.ICEBERG_FORMAT_V3) {
             continue;
           }
           throw new AnalysisException(

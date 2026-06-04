@@ -323,11 +323,18 @@ describe formatted converted_into_v1;
 string, string, string
 ====
 ---- QUERY
-# Currently not feasible to convert directly into a V3 Iceberg table.
+# Convert to Iceberg V3.
 create table converted_into_v3 (i int) partitioned by (s string) stored as parquet;
 alter table converted_into_v3 convert to iceberg tblproperties ('format-version'='3');
----- CATCH
-AnalysisException: Unsupported Iceberg format version '3'.
+---- RESULTS
+'Table has been migrated.'
+====
+---- QUERY
+describe formatted converted_into_v3;
+---- RESULTS: VERIFY_IS_SUBSET
+'','format-version      ','3                   '
+---- TYPES
+string, string, string
 ====
 ---- QUERY
 create table simple_tbl (i int) stored as parquet;
