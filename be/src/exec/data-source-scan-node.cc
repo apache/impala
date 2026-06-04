@@ -102,26 +102,24 @@ const size_t TIMESTAMP_SIZE = sizeof(int64_t) + sizeof(int32_t);
 Status SharedJdbcConnection::Open(const string& jar_path, const string& class_name,
     const string& api_version, const string& init_string,
     const extdatasource::TOpenParams& params, extdatasource::TOpenResult* result) {
-  ref_count_.fetch_add(1, std::memory_order_relaxed);
-
-  std::unique_lock<std::mutex> lk(open_mu_);
-  if (!open_done_) {
-    // First caller: initialize the executor and open the Java data source.
-    // All N C++ scanner threads share this single connection.
-    Status s = executor_.Init(jar_path, class_name, api_version, init_string);
-    if (s.ok()) s = executor_.Open(params, result);
-    if (s.ok()) s = StatusFromThrift(result->status);
-    if (s.ok()) scan_handle_ = result->scan_handle;
-    open_status_ = s;
-    open_done_ = true;
-    open_cv_.notify_all();
-    return s;
+  std::unique_lock<std::mutex> lk(lock_);
+  ++ref_count_;
+  if (ref_count_ > 1) {
+    // Subsequent callers: the first caller has already finished, reuse scan handle.
+    DCHECK(open_done_);
+    result->__set_scan_handle(scan_handle_);
+    return open_status_;
   }
 
-  // Subsequent callers: wait for the first caller to finish, then reuse.
-  open_cv_.wait(lk, [this] { return open_done_; });
-  result->__set_scan_handle(scan_handle_);
-  return open_status_;
+  // First caller: initialize the executor and open the Java data source.
+  // All N C++ scanner threads share this single connection.
+  Status s = executor_.Init(jar_path, class_name, api_version, init_string);
+  if (s.ok()) s = executor_.Open(params, result);
+  if (s.ok()) s = StatusFromThrift(result->status);
+  if (s.ok()) scan_handle_ = result->scan_handle;
+  open_status_ = s;
+  open_done_ = true;
+  return s;
 }
 
 Status SharedJdbcConnection::FetchBatch(extdatasource::TGetNextResult* result) {
@@ -144,16 +142,14 @@ Status SharedJdbcConnection::FetchBatch(extdatasource::TGetNextResult* result) {
 
 Status SharedJdbcConnection::Close(const extdatasource::TCloseParams& params,
     extdatasource::TCloseResult* result) {
-  // Only the last active instance closes the shared JDBC connection.
-  if (ref_count_.fetch_sub(1, std::memory_order_acq_rel) == 1) {
-    // Guard against the case where Open() was never called or failed: only invoke
-    // executor_.Close() if the Java data source was successfully opened.
-    std::unique_lock<std::mutex> lk(open_mu_);
-    bool should_close = open_done_ && open_status_.ok();
-    lk.unlock();
-    if (should_close) return executor_.Close(params, result);
+  {
+    std::unique_lock<std::mutex> lk(lock_);
+    DCHECK(open_done_);
+    --ref_count_;
+    // Only the last active instance closes the shared JDBC connection.
+    if (ref_count_ > 0 || !open_status_.ok()) return Status::OK();
   }
-  return Status::OK();
+  return executor_.Close(params, result);
 }
 
 // DataSourceScanPlanNode

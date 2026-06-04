@@ -76,16 +76,15 @@ class SharedJdbcConnection {
   ExternalDataSourceExecutor executor_;
   std::string scan_handle_;
 
-  /// Guards open_done_ / open_status_: used in Open() for one-time initialization
-  /// and in Close() to check whether executor_.Close() should be called.
-  std::mutex open_mu_;
-  std::condition_variable open_cv_;
+  /// Guards ref_count_ / open_done_ / open_status_: used in Open() for one-time
+  /// initialization and in Close() to check whether executor_.Close() should be called.
+  std::mutex lock_;
   bool open_done_ = false;
   Status open_status_;
 
   /// Reference count: incremented in Open(), decremented in Close(). When it reaches
   /// zero, the last DSSN instance calls executor_.Close().
-  std::atomic<int> ref_count_{0};
+  int ref_count_ = 0;
 
   /// Set to true when the JDBC stream is exhausted. Threads check this before
   /// crossing the JNI bridge to avoid unnecessary calls after EOS.
