@@ -634,8 +634,10 @@ public class SelectStmt extends QueryStmt {
       }
 
       for (Expr expr: resultExprs_) {
-        if (selectList_.isDistinct() && expr.getType().isComplexType()) {
-          throw new AnalysisException("Complex types are not supported " +
+        if (selectList_.isDistinct() && expr.getType().isComplexOrVariantType()) {
+          String subject =
+              expr.getType().isVariantType() ? "VARIANT type is" : "Complex types are";
+          throw new AnalysisException(subject + " not supported " +
               "in SELECT DISTINCT clauses. Expr: '" + expr.toSql() + "', type: '"
               + expr.getType().toSql() + "'.");
         }
@@ -1041,10 +1043,16 @@ public class SelectStmt extends QueryStmt {
           expr.collectAll(Predicates.instanceOf(SlotRef.class), slotRefs);
           for (Expr e: slotRefs) {
             SlotRef slotRef = (SlotRef) e;
+            // Synthetic child slots (e.g. a VARIANT's internal metadata/value slots)
+            // have no label and do not correspond to a view column, so there is no
+            // column privilege to register for them. Skip them; the enclosing
+            // top-level column's SlotRef is registered separately.
+            String columnLabel = slotRef.getDesc().getLabel();
+            if (columnLabel == null) continue;
             analyzer_.registerPrivReq(builder -> builder
                 .allOf(Privilege.SELECT)
                 .onColumn(view.getDb().getName(), view.getName(),
-                    slotRef.getDesc().getLabel(), view.getOwnerUser())
+                    columnLabel, view.getOwnerUser())
                 .build());
           }
         }
@@ -1159,10 +1167,11 @@ public class SelectStmt extends QueryStmt {
               "GROUP BY expression must not contain analytic expressions: "
                   + expr.toSql());
         }
-        if (expr.getType().isComplexType()) {
+        if (expr.getType().isComplexOrVariantType()) {
+          String detail = expr.getType().isVariantType()
+              ? "VARIANT type" : "complex types without specifying a field";
           throw new AnalysisException(
-              "GROUP BY expression cannot be used on complex types without specifying a "
-              + "field: " + expr.toSql());
+              "GROUP BY expression cannot be used on " + detail + ": " + expr.toSql());
         }
       }
 

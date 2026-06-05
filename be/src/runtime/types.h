@@ -56,7 +56,8 @@ enum PrimitiveType {
 
   TYPE_STRUCT,
   TYPE_ARRAY,
-  TYPE_MAP
+  TYPE_MAP,
+  TYPE_VARIANT
 };
 
 PrimitiveType ThriftToType(TPrimitiveType::type ttype);
@@ -100,9 +101,9 @@ struct ColumnType {
   /// Empty for scalar types
   std::vector<ColumnType> children;
 
-  /// Only set if type == TYPE_STRUCT. The field name of each child.
+  /// Only set if type == TYPE_STRUCT or TYPE_VARIANT. The field name of each child.
   std::vector<std::string> field_names;
-  /// Only set if type == TYPE_STRUCT. The field id of each child for Iceberg tables.
+  /// Only set if type == TYPE_STRUCT or TYPE_VARIANT. The field id of each child.
   std::vector<int> field_ids;
 
   static const char* LLVM_CLASS_NAME;
@@ -117,6 +118,7 @@ struct ColumnType {
     DCHECK_NE(type, TYPE_STRUCT);
     DCHECK_NE(type, TYPE_ARRAY);
     DCHECK_NE(type, TYPE_MAP);
+    DCHECK_NE(type, TYPE_VARIANT);
     DCHECK_NE(type, TYPE_FIXED_UDA_INTERMEDIATE);
     DCHECK_NE(type, TYPE_UUID);
   }
@@ -253,7 +255,8 @@ struct ColumnType {
   inline bool IsUuidType() const { return type == TYPE_UUID; }
 
   inline bool IsComplexType() const {
-    return type == TYPE_STRUCT || type == TYPE_ARRAY || type == TYPE_MAP;
+    return type == TYPE_STRUCT || type == TYPE_ARRAY || type == TYPE_MAP
+        || type == TYPE_VARIANT;
   }
 
   inline bool IsStructType() const {
@@ -266,6 +269,7 @@ struct ColumnType {
 
   inline bool IsArrayType() const { return type == TYPE_ARRAY; }
   inline bool IsMapType() const { return type == TYPE_MAP; }
+  inline bool IsVariantType() const { return type == TYPE_VARIANT; }
 
   /// Returns the byte size of this type.  Returns 0 for variable length types.
   inline int GetByteSize() const { return GetByteSize(*this); }
@@ -305,6 +309,11 @@ struct ColumnType {
   /// TTypeNodes for this type and its children.
   void ToThrift(TColumnType* thrift_type) const;
 
+  /// DCHECKs the fixed VARIANT shape (two BINARY children "metadata" and "value"), which
+  /// the Parquet scanner relies on to match children positionally. Only call when 'type'
+  /// is TYPE_VARIANT; compiled out in release builds.
+  void DCheckVariantShape() const;
+
   /// Helper function for GetSlotSize() so that struct size could be calculated
   /// recursively.
   static inline int GetSlotSize(const ColumnType& col_type) {
@@ -326,6 +335,8 @@ struct ColumnType {
       case TYPE_ARRAY:
       case TYPE_MAP:
         return 12;
+      case TYPE_VARIANT:
+        return 24;  // Two StringValues: metadata (12 bytes) + value (12 bytes)
       default:
         return GetByteSize(col_type);
     }
@@ -341,6 +352,7 @@ struct ColumnType {
         }
         return struct_size;
       }
+      case TYPE_VARIANT:
       case TYPE_ARRAY:
       case TYPE_MAP:
       case TYPE_STRING:

@@ -81,6 +81,21 @@ class TestBeeswax(CustomClusterTestSuite):
       if unset_user_client is not None:
         unset_user_client.close()
 
+  def test_variant_over_beeswax(self):
+    """IMPALA-15052: a VARIANT column must work over the legacy beeswax protocol.
+    ColumnTypeToBeeswaxTypeString() must report VARIANT as 'string' (not DCHECK/crash),
+    and the value must arrive as its JSON string. This needs the beeswax port open, so
+    it lives in this --enable_beeswax custom cluster rather than the default HS2 suite
+    (functional_parquet.trino_variant is bulk-loaded during data loading)."""
+    with self.create_impala_client(protocol=BEESWAX) as beeswax_client:
+      result = beeswax_client.execute(
+          "SELECT v FROM functional_parquet.trino_variant WHERE id IN (1, 4, 15) "
+          "ORDER BY id")
+    # Beeswax reports the VARIANT column's type as 'string' (like other complex types).
+    assert result.column_types == ['STRING'], result.column_types
+    # Values arrive as their JSON form: id=1 -> null, id=4 -> 42, id=15 -> "hello".
+    assert result.data == ['null', '42', '"hello"'], result.data
+
   def _assert_invalid_handle(self, fn):
     """Assert that invoking fn() raises an ImpalaBeeswaxException with an invalid query
     handle error."""

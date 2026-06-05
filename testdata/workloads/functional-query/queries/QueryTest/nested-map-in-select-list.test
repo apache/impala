@@ -93,7 +93,7 @@ bigint,string
 # for now we reject it in the FE.
 select id, int_map from complextypestbl union select id, int_map from complextypestbl;
 ---- CATCH
-IllegalStateException: UNION, EXCEPT and INTERSECT are not supported for collection types
+AnalysisException: UNION, EXCEPT and INTERSECT are not supported for MAP<STRING,INT> type.
 ====
 ---- QUERY
 # Changing a column to a different type leads to a "non-pass-through" union that does a

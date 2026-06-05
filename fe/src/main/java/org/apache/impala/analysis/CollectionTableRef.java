@@ -96,6 +96,17 @@ public class CollectionTableRef extends TableRef {
   @Override
   public void analyze(Analyzer analyzer) throws AnalysisException {
     if (isAnalyzed_) return;
+    // VARIANT is only supported as a top-level column, never nested inside a collection.
+    // Reject a collection that (recursively) contains a VARIANT here -- the single
+    // point reached by both a collection unnested in the FROM clause and a collection in
+    // the select list (registerCollectionSlotRef() constructs a CollectionTableRef and
+    // analyzes it). Covers ARRAY<VARIANT>, MAP<..,VARIANT> and deeper shapes such as
+    // ARRAY<STRUCT<v:VARIANT>>. IMPALA-15132 tracks VARIANTs nested in collections.
+    if (Type.containsVariant(resolvedPath_.destType())) {
+      throw new AnalysisException("VARIANT nested inside a complex type (ARRAY, MAP or "
+          + "STRUCT) is not supported; VARIANT is only supported as a top-level column: '"
+          + String.join(".", rawPath_) + "'.");
+    }
     InlineViewRef sourceView = null;
     if (resolvedPath_.getRootDesc() != null) {
       sourceView = resolvedPath_.getRootDesc().getSourceView();

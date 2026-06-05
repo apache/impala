@@ -906,9 +906,11 @@ public class MetadataOp {
             ScalarType.createType(PrimitiveType.INT));
       } else if (nodeType == TTypeNodeType.STRUCT) {
         type = new StructType();
+      } else if (nodeType == TTypeNodeType.VARIANT) {
+        continue;
       }
 
-      if (!type.isSupported()) continue;
+      if (type == null || !type.isSupported()) continue;
       TResultRow row = createGetTypeInfoResult(nodeType.name(), type);
       GET_TYPEINFO_RESULTS.add(row);
     }

@@ -28,7 +28,9 @@ class StructColumnReader : public ComplexColumnReader {
   StructColumnReader(HdfsParquetScanner* parent, const SchemaNode& node,
       const SlotDescriptor* slot_desc) : ComplexColumnReader(parent, node, slot_desc) {
     DCHECK(!node.children.empty());
-    if (slot_desc != nullptr) DCHECK(slot_desc->type().IsStructType());
+    if (slot_desc != nullptr) {
+      DCHECK(slot_desc->type().IsStructType() || slot_desc->type().IsVariantType());
+    }
   }
 
   virtual ~StructColumnReader() {}

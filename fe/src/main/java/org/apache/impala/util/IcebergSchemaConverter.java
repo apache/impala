@@ -124,6 +124,8 @@ public class IcebergSchemaConverter {
         }
         return new StructType(structFields);
       }
+      case VARIANT:
+        return Type.VARIANT;
       default:
         throw new ImpalaRuntimeException(String.format(
             "Iceberg type '%s' is not supported in Impala", t.typeId()));
@@ -138,7 +140,8 @@ public class IcebergSchemaConverter {
     List<FieldSchema> ret = new ArrayList<>();
     for (Types.NestedField column : schema.columns()) {
       Type colType = toImpalaType(column.type());
-      // Update sd cols by iceberg NestedField
+      // toHiveMetastoreType() maps HMS-incompatible types (UUID -> string, VARIANT ->
+      // struct<..>); Impala keeps the real Iceberg type from the metadata.
       ret.add(new FieldSchema(column.name().toLowerCase(), colType.toHiveMetastoreType(),
           column.doc()));
     }

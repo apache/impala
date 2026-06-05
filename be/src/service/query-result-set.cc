@@ -30,6 +30,7 @@
 #include "runtime/complex-value-writer.inline.h"
 #include "runtime/descriptors.h"
 #include "runtime/raw-value.h"
+#include "util/variant-util.h"
 #include "runtime/row-batch.h"
 #include "runtime/tuple.h"
 #include "runtime/tuple-row.h"
@@ -222,8 +223,8 @@ Status AsciiQueryResultSet::AddRows(const vector<ScalarExprEvaluator*>& expr_eva
         RawValue::PrintValue(expr_evals[i]->GetValue(it.Get()), types_[i],
             scales[i], &out_stream);
       } else {
-        PrintComplexValue(expr_evals[i], it.Get(), &out_stream, types_[i],
-            stringify_map_keys_);
+        RETURN_IF_ERROR(PrintComplexValue(expr_evals[i], it.Get(), &out_stream,
+            types_[i], stringify_map_keys_));
       }
     }
     result_set_->push_back(out_stream.str());
@@ -232,7 +233,7 @@ Status AsciiQueryResultSet::AddRows(const vector<ScalarExprEvaluator*>& expr_eva
   return Status::OK();
 }
 
-void QueryResultSet::PrintComplexValue(ScalarExprEvaluator* expr_eval,
+Status QueryResultSet::PrintComplexValue(ScalarExprEvaluator* expr_eval,
     const TupleRow* row, stringstream *stream, const ColumnType& type,
     bool stringify_map_keys) {
   DCHECK(type.IsComplexType());
@@ -243,7 +244,7 @@ void QueryResultSet::PrintComplexValue(ScalarExprEvaluator* expr_eval,
 
   if (value == nullptr) {
     (*stream) << RawValue::NullLiteral(/*top-level*/ true);
-    return;
+    return Status::OK();
   }
 
   rapidjson::BasicOStreamWrapper<stringstream> wrapped_stream(*stream);
@@ -258,6 +259,12 @@ void QueryResultSet::PrintComplexValue(ScalarExprEvaluator* expr_eval,
         complex_value_writer(&writer, stringify_map_keys);
     complex_value_writer.CollectionValueToJSON(*collection_val, type.type,
             item_tuple_desc);
+  } else if (type.IsVariantType()) {
+    // Write JSON straight into 'stream'. On a decode failure 'stream' is left untouched
+    // (no partial JSON leaks) and the error is propagated to fail the query, rather than
+    // silently substituting a wrong value that would misrepresent corrupt data as real.
+    RETURN_IF_ERROR(
+        VariantSlotToJson(reinterpret_cast<const VariantSlot*>(value), stream));
   } else {
     DCHECK(type.IsStructType());
     const StructVal* struct_val = static_cast<const StructVal*>(value);
@@ -270,6 +277,7 @@ void QueryResultSet::PrintComplexValue(ScalarExprEvaluator* expr_eval,
         complex_value_writer(&writer, stringify_map_keys);
     complex_value_writer.StructValToJSON(*struct_val, *slot_desc);
   }
+  return Status::OK();
 }
 
 Status AsciiQueryResultSet::AddOneRow(const TResultRow& row) {
@@ -373,8 +381,10 @@ Status HS2ColumnarResultSet::AddRows(const vector<ScalarExprEvaluator*>& expr_ev
   for (int i = 0; i < num_col; ++i) {
     const TColumnType& type = metadata_.columns[i].columnType;
     ScalarExprEvaluator* expr_eval = expr_evals[i];
+    Status status;
     ExprValuesToHS2TColumn(expr_eval, type, batch, start_idx, num_rows, num_rows_,
-        expected_result_count, stringify_map_keys_, &(result_set_->columns[i]));
+        expected_result_count, stringify_map_keys_, &(result_set_->columns[i]), &status);
+    RETURN_IF_ERROR(status);
   }
   num_rows_ += num_rows;
   return Status::OK();
@@ -501,7 +511,8 @@ void HS2ColumnarResultSet::InitColumns() {
     ThriftTColumn col_output;
     if (type_nodes[0].type == TTypeNodeType::STRUCT
         || type_nodes[0].type == TTypeNodeType::ARRAY
-        || type_nodes[0].type == TTypeNodeType::MAP) {
+        || type_nodes[0].type == TTypeNodeType::MAP
+        || type_nodes[0].type == TTypeNodeType::VARIANT) {
       // Return structs, arrays and maps as string.
       col_output.__isset.stringVal = true;
     } else {

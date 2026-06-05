@@ -359,8 +359,13 @@ public class SetOperationStmt extends QueryStmt {
     //       due to missing handling in BE.
     if (!hasOnlyUnionAllOps()) {
       for (Expr expr: widestExprs_) {
-        Preconditions.checkState(!expr.getType().isCollectionType(),
-            "UNION, EXCEPT and INTERSECT are not supported for collection types");
+        // UNION/INTERSECT/EXCEPT (DISTINCT) must hash/compare result columns, which is
+        // not supported for collection or variant types. Reject with a clear error rather
+        // than letting it reach (and crash) the backend.
+        if (expr.getType().isCollectionType() || expr.getType().isVariantType()) {
+          throw new AnalysisException("UNION, EXCEPT and INTERSECT are not supported "
+              + "for " + expr.getType().toSql() + " type.");
+        }
       }
     }
 
@@ -658,6 +663,12 @@ public class SetOperationStmt extends QueryStmt {
       slotDesc.setType(expr.getType());
       if (expr.getType().isCollectionType()) {
         slotDesc.setItemTupleDesc(((SlotRef)expr).getDesc().getItemTupleDesc());
+      } else if (expr.getType().isVariantType()) {
+        // Create a fresh item tuple descriptor for the variant's children (metadata,
+        // value). Unlike collections we must NOT share the source slot's item tuple
+        // descriptor: it is already laid out, which would make computeMemLayout() return
+        // null for it (see SlotRef.reExpandVariant for the same reason in sort tuples).
+        analyzer.createVariantTuplesAndSlotDescs(slotDesc);
       }
       slotDesc.setStats(columnStats.get(i));
       SlotRef outputSlotRef = new SlotRef(slotDesc);

@@ -541,6 +541,58 @@ public class JdbcTest extends JdbcTestBase {
   }
 
   /**
+   * IMPALA-15052: a read-only VARIANT column is presented to JDBC/ODBC clients as a
+   * STRING (java.sql.Types.VARCHAR) whose values are the JSON rendering of the variant.
+   * functional_parquet.trino_variant is an Iceberg V3 table (written by Trino) with an
+   * INT 'id', STRING 'descr' and VARIANT 'v' column, loaded during data loading.
+   */
+  @Test
+  public void testVariantType() throws SQLException {
+    // getColumns(): the VARIANT column reports DATA_TYPE = VARCHAR and TYPE_NAME =
+    // 'VARIANT' (the driver-visible presentation used by
+    // getColumns/getResultSetMetadata).
+    ResultSet rs = con_.getMetaData().getColumns(
+        null, "functional_parquet", "trino_variant", "v");
+    assertTrue(rs.next());
+    assertEquals("Incorrect column name", "v", rs.getString("COLUMN_NAME"));
+    assertEquals("Incorrect type", Types.VARCHAR, rs.getInt("DATA_TYPE"));
+    assertEquals("Incorrect type name", "VARIANT", rs.getString("TYPE_NAME"));
+    assertFalse(rs.next());
+    rs.close();
+
+    // The result set metadata of a query projecting the VARIANT column also reports
+    // VARCHAR, and the values come back as their JSON strings.
+    rs = con_.createStatement().executeQuery(
+        "select id, v from functional_parquet.trino_variant "
+        + "where id in (0, 1, 4, 15, 24, 31) order by id");
+    assertEquals(Types.INTEGER, rs.getMetaData().getColumnType(1));
+    assertEquals(Types.VARCHAR, rs.getMetaData().getColumnType(2));
+
+    // id = 0 stores a SQL NULL variant value.
+    assertTrue(rs.next());
+    assertEquals(0, rs.getInt(1));
+    assertNull(rs.getString(2));
+    // id = 1 stores the JSON null literal (the string "null", not a SQL NULL).
+    assertTrue(rs.next());
+    assertEquals(1, rs.getInt(1));
+    assertEquals("null", rs.getString(2));
+    // id = 4: integer.
+    assertTrue(rs.next());
+    assertEquals("42", rs.getString(2));
+    // id = 15: string (JSON-quoted).
+    assertTrue(rs.next());
+    assertEquals("\"hello\"", rs.getString(2));
+    // id = 24: array.
+    assertTrue(rs.next());
+    assertEquals("[1,2,3]", rs.getString(2));
+    // id = 31: object.
+    assertTrue(rs.next());
+    assertEquals("{\"age\":30,\"name\":\"Alice\"}", rs.getString(2));
+    assertFalse(rs.next());
+    rs.close();
+  }
+
+  /**
    * Validate the Metadata for the result set of a metadata getColumnNames call.
    */
   @Test

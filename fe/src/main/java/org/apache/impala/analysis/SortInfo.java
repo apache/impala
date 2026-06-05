@@ -275,6 +275,18 @@ public class SortInfo {
           // analysed.
           Preconditions.checkNotNull(null);
         }
+      } else if (dstType.isVariantType() &&
+          dstSlotDesc.getItemTupleDesc() != null) {
+        // The copied variant slot shares the source's already-laid-out item tuple
+        // descriptor; recreate it so the sort tuple gets a fresh one (otherwise
+        // TupleDescriptor.computeMemLayout() returns null for it and NPEs).
+        try {
+          dstExpr.reExpandVariant(analyzer);
+        } catch (AnalysisException ex) {
+          // Adding SlotRefs shouldn't throw here as the source SlotRef had already been
+          // analysed.
+          Preconditions.checkNotNull(null);
+        }
       } else if (dstType.isCollectionType()) {
         dstSlotDesc.setShouldMaterializeRecursively(true);
       }

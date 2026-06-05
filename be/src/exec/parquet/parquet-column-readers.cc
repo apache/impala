@@ -26,6 +26,7 @@
 #include "exec/parquet/parquet-level-decoder.h"
 #include "exec/parquet/parquet-metadata-utils.h"
 #include "exec/parquet/parquet-struct-column-reader.h"
+#include "exec/parquet/parquet-variant-column-reader.h"
 #include "exec/scratch-tuple-batch.h"
 #include "parquet-collection-column-reader.h"
 #include "runtime/runtime-state.h"
@@ -1910,6 +1911,8 @@ ParquetColumnReader* ParquetColumnReader::Create(const SchemaNode& node,
         return CreateDecimalColumnReader(node, slot_desc, parent);
       case TYPE_STRUCT:
         return new StructColumnReader(parent, node, slot_desc);
+      case TYPE_VARIANT:
+        return new VariantColumnReader(parent, node, slot_desc);
       default:
         DCHECK(false) << slot_desc->type().DebugString();
         return nullptr;

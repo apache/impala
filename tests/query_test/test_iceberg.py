@@ -44,7 +44,8 @@ from tests.common.file_utils import (
 from tests.common.iceberg_test_suite import IcebergTestSuite
 from tests.common.impala_connection import IMPALA_CONNECTION_EXCEPTION
 from tests.common.skip import SkipIf, SkipIfDockerizedCluster, SkipIfFS
-from tests.common.test_dimensions import add_exec_option_dimension
+from tests.common.test_dimensions import (add_exec_option_dimension,
+    create_exec_option_dimension)
 from tests.common.test_result_verifier import error_msg_startswith
 from tests.shell.util import run_impala_shell_cmd
 from tests.util.filesystem_utils import FILESYSTEM_PREFIX, get_fs_path, IS_HDFS, WAREHOUSE
@@ -2435,6 +2436,8 @@ class TestIcebergV3Table(IcebergTestSuite):
     super(TestIcebergV3Table, cls).add_test_dimensions()
     cls.ImpalaTestMatrix.add_constraint(
       lambda v: v.get_value('table_format').file_format == 'parquet')
+    cls.ImpalaTestMatrix.add_dimension(
+      create_exec_option_dimension(batch_sizes=[19, 1024]))
 
   def load_table(self, database, table_name, format="parquet"):
     create_iceberg_table_from_directory(self.client, database,
@@ -2529,6 +2532,27 @@ class TestIcebergV3Table(IcebergTestSuite):
 
   def test_v3_optimize(self, vector, unique_database):
     self.run_test_case('QueryTest/iceberg-v3-optimize', vector, unique_database)
+
+  def test_v3_variant(self, vector, unique_database):
+    """Test reading Iceberg V3 VARIANT values (written by Trino). The base table
+    functional_parquet.trino_variant is bulk-loaded during data loading; the test only
+    creates its own views (and loads trino_nested_variant) in unique_database."""
+    # Table with VARIANT nested inside ARRAY/MAP/STRUCT; used by the negative cases
+    # that assert nested VARIANT is rejected (only top-level VARIANT is queryable).
+    self.load_table(unique_database, "trino_nested_variant")
+    self.run_test_case('QueryTest/iceberg-v3-variant', vector, unique_database)
+
+  def test_v3_variant_shell(self, vector):
+    """IMPALA-15052: VARIANT values render through impala-shell's own client-side output
+    formatting, not just via impyla/HS2. The variant is returned to the shell as a STRING
+    and printed as its JSON representation."""
+    args = ['-q', "SELECT v FROM functional_parquet.trino_variant "
+            "WHERE id IN (15, 24, 31) ORDER BY id"]
+    result = run_impala_shell_cmd(vector, args)
+    # id=15 -> "hello", id=24 -> [1,2,3], id=31 -> {"age":30,"name":"Alice"}
+    assert '"hello"' in result.stdout, result.stdout
+    assert '[1,2,3]' in result.stdout, result.stdout
+    assert '{"age":30,"name":"Alice"}' in result.stdout, result.stdout
 
   def test_v3_default_values(self, vector, unique_database):
     """Test Iceberg V3 initial-default and write-default values."""

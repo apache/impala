@@ -36,6 +36,7 @@
 #include "runtime/types.h"
 #include "udf/udf-internal.h"
 #include "util/bit-util.h"
+#include "util/variant-util.h"
 
 #include <gutil/strings/substitute.h>
 
@@ -406,6 +407,32 @@ static void StructExprValuesToHS2TColumn(ScalarExprEvaluator* expr_eval,
   }
 }
 
+static void VariantExprValuesToHS2TColumn(ScalarExprEvaluator* expr_eval,
+    RowBatch* batch, int start_idx, int num_rows, uint32_t output_row_idx,
+    apache::hive::service::cli::thrift::TColumn* column, Status* out_status) {
+  string json;
+  FOREACH_ROW_LIMIT(batch, start_idx, num_rows, it) {
+    void* value = expr_eval->GetValue(it.Get());
+    if (value == nullptr) {
+      column->stringVal.values.emplace_back();
+      SetNullBit(output_row_idx, true, &column->stringVal.nulls);
+    } else {
+      Status status = impala::VariantSlotToJson(
+          reinterpret_cast<const impala::VariantSlot*>(value), &json);
+      if (!status.ok()) {
+        // Decoding a materialized variant slot should not fail for a well-formed file; a
+        // failure indicates corruption. Fail the query rather than silently substituting
+        // a wrong value (e.g. NULL), which would misrepresent corrupt data as real data.
+        *out_status = status;
+        return;
+      }
+      column->stringVal.values.emplace_back(std::move(json));
+      SetNullBit(output_row_idx, false, &column->stringVal.nulls);
+    }
+    ++output_row_idx;
+  }
+}
+
 static void CollectionExprValuesToHS2TColumn(ScalarExprEvaluator* expr_eval,
     const TColumnType& type, RowBatch* batch, int start_idx, int num_rows,
     uint32_t output_row_idx, bool stringify_map_keys,
@@ -450,7 +477,7 @@ static void CollectionExprValuesToHS2TColumn(ScalarExprEvaluator* expr_eval,
 void impala::ExprValuesToHS2TColumn(ScalarExprEvaluator* expr_eval,
     const TColumnType& type, RowBatch* batch, int start_idx, int num_rows,
     uint32_t output_row_idx, int expected_result_count, bool stringify_map_keys,
-    apache::hive::service::cli::thrift::TColumn* column) {
+    apache::hive::service::cli::thrift::TColumn* column, Status* out_status) {
   // Dispatch to a templated function for the loop over rows. This avoids branching on
   // the type for every row.
   // TODO: instead of relying on stamped out implementations, we could codegen this loop
@@ -466,6 +493,11 @@ void impala::ExprValuesToHS2TColumn(ScalarExprEvaluator* expr_eval,
       ReserveSpace(expected_result_count, &column->stringVal);
       CollectionExprValuesToHS2TColumn(expr_eval, type, batch, start_idx, num_rows,
           output_row_idx, stringify_map_keys, column);
+      return;
+    case TTypeNodeType::VARIANT:
+      ReserveSpace(expected_result_count, &column->stringVal);
+      VariantExprValuesToHS2TColumn(expr_eval, batch, start_idx, num_rows,
+          output_row_idx, column, out_status);
       return;
     default:
       break;
@@ -956,6 +988,7 @@ thrift::TTypeEntry impala::ColumnToHs2Type(
     case TYPE_STRUCT:
     case TYPE_ARRAY:
     case TYPE_MAP:
+    case TYPE_VARIANT:
       type_entry.__set_type(thrift::TTypeId::STRING_TYPE);
       break;
     case TYPE_BINARY:

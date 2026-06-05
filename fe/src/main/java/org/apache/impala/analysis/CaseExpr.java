@@ -327,6 +327,16 @@ public class CaseExpr extends Expr {
     if (whenType.isNull()) whenType = ScalarType.BOOLEAN;
     if (returnType.isNull()) returnType = ScalarType.BOOLEAN;
 
+    // A VARIANT (like other complex types) can only be a pass-through SlotRef; the BE
+    // cannot evaluate a non-SlotRef VARIANT expression. Reject a CASE/DECODE that would
+    // produce a complex or variant result instead of crashing in the backend.
+    if (returnType.isComplexOrVariantType()) {
+      String subject =
+          returnType.isVariantType() ? "VARIANT type is" : "Complex types are";
+      throw new AnalysisException(subject + " not supported in "
+          + (isDecode() ? "DECODE" : "CASE") + " expressions: " + toSql());
+    }
+
     // Add casts to case expr to compatible type.
     if (hasCaseExpr_) {
       // Cast case expr.

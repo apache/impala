@@ -358,8 +358,10 @@ public class MultiAggregateInfo {
   private static void checkComplexDistinctParams(FunctionCallExpr aggExpr,
       List<Expr> params) throws AnalysisException {
     for (Expr child : params) {
-      if (child.getType().isComplexType()) {
-        throw new AnalysisException("Complex types are not supported " +
+      if (child.getType().isComplexOrVariantType()) {
+        String subject =
+            child.getType().isVariantType() ? "VARIANT type is" : "Complex types are";
+        throw new AnalysisException(subject + " not supported " +
             "as DISTINCT parameters of aggregate functions. Distinct parameter: '" +
             child.toSql() + "', type: '" + child.getType().toSql() +
             "' in aggregate function '" + aggExpr.toSql() + "'.");

@@ -691,8 +691,9 @@ Status DescriptorTbl::CreateInternal(ObjectPool* pool, const TDescriptorTable& t
         (*tbl)->GetTupleDescriptor(tdesc.itemTupleId) : nullptr;
     SlotDescriptor* slot_d = pool->Add(
         new SlotDescriptor(tdesc, parent, children_tuple_descriptor));
-    if (slot_d->type().IsStructType() && children_tuple_descriptor != nullptr &&
-        children_tuple_descriptor->getMasterTuple() == nullptr) {
+    if ((slot_d->type().IsStructType() || slot_d->type().IsVariantType())
+        && children_tuple_descriptor != nullptr
+        && children_tuple_descriptor->getMasterTuple() == nullptr) {
       TupleDescriptor* master_tuple = parent;
       // If this struct is nested into other struct(s) then get the topmost tuple for the
       // master.

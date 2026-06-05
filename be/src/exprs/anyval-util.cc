@@ -95,6 +95,7 @@ FunctionContext::TypeDesc AnyValUtil::ColumnTypeToTypeDesc(const ColumnType& typ
       out.type = FunctionContext::TYPE_DATE;
       break;
     case TYPE_STRUCT:
+    case TYPE_VARIANT:
       out.type = FunctionContext::TYPE_STRUCT;
       break;
     default:

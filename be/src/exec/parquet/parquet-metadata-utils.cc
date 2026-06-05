@@ -730,7 +730,7 @@ Status ParquetSchemaResolver::ResolvePathHelper(ArrayEncoding array_encoding,
       DCHECK_EQ(col_type->children.size(), 2);
       RETURN_IF_ERROR(ResolveMap(path, i, node, missing_field));
       if (*missing_field) return Status::OK();
-    } else if (col_type->type == TYPE_STRUCT) {
+    } else if (col_type->type == TYPE_STRUCT || col_type->type == TYPE_VARIANT) {
       DCHECK_GT(col_type->children.size(), 0);
       RETURN_IF_ERROR(ResolveStruct(**node, *col_type, path, i));
     } else {
@@ -757,8 +757,8 @@ SchemaNode* ParquetSchemaResolver::NextSchemaNode(
       DCHECK_LT(table_idx, tbl_desc_.col_descs().size());
       const string& name = tbl_desc_.col_descs()[table_idx].name();
       file_idx = FindChildWithName(node, name);
-    } else if (col_type->type == TYPE_STRUCT) {
-      // Resolve struct field by name.
+    } else if (col_type->type == TYPE_STRUCT || col_type->type == TYPE_VARIANT) {
+      // Resolve struct/variant field by name.
       DCHECK_LT(table_idx, col_type->field_names.size());
       const string& name = col_type->field_names[table_idx];
       file_idx = FindChildWithName(node, name);
@@ -790,8 +790,8 @@ SchemaNode* ParquetSchemaResolver::NextSchemaNode(
       DCHECK_LT(table_idx, tbl_desc_.col_descs().size());
       const int& field_id = tbl_desc_.col_descs()[table_idx].field_id();
       file_idx = FindChildWithFieldId(node, field_id);
-    } else if (col_type->type == TYPE_STRUCT) {
-      // Resolve struct field by field id.
+    } else if (col_type->type == TYPE_STRUCT || col_type->type == TYPE_VARIANT) {
+      // Resolve struct/variant field by field id.
       DCHECK_LT(table_idx, col_type->field_ids.size());
       const int& field_id = col_type->field_ids[table_idx];
       file_idx = FindChildWithFieldId(node, field_id);

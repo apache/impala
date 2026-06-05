@@ -95,7 +95,8 @@ parser code {:
         tokenId == SqlParserSymbols.KW_DEFAULT ||
         tokenId == SqlParserSymbols.KW_KILL ||
         tokenId == SqlParserSymbols.KW_QUERY ||
-        tokenId == SqlParserSymbols.KW_UUID
+        tokenId == SqlParserSymbols.KW_UUID ||
+        tokenId == SqlParserSymbols.KW_VARIANT
     );
   }
 
@@ -354,7 +355,8 @@ terminal
   KW_TERMINATED, KW_TEXTFILE, KW_THEN, KW_TIMESTAMP, KW_TINYINT, KW_TRUNCATE, KW_STATS,
   KW_TO, KW_TRAILING, KW_TRUE, KW_UDF, KW_UNBOUNDED, KW_UNCACHED, KW_UNION, KW_UNIQUE, KW_UNKNOWN,
   KW_UNNEST, KW_UNPIVOT, KW_UNSET, KW_UPDATE, KW_UPDATE_FN, KW_UPSERT, KW_USE, KW_USING, KW_UUID,
-  KW_VALIDATE, KW_VALUES, KW_VARCHAR, KW_VIEW, KW_VIEWS, KW_WHEN, KW_WHERE, KW_WITH, KW_ZORDER;
+  KW_VALIDATE, KW_VALUES, KW_VARCHAR, KW_VARIANT, KW_VIEW, KW_VIEWS, KW_WHEN, KW_WHERE,
+  KW_WITH, KW_ZORDER;
 
 terminal UNUSED_RESERVED_WORD;
 
@@ -4526,6 +4528,8 @@ type ::=
   {: RESULT = new MapType(key_type, value_type); :}
   | KW_STRUCT LESSTHAN struct_field_def_list:fields GREATERTHAN
   {: RESULT = new StructType(fields); :}
+  | KW_VARIANT
+  {: RESULT = Type.VARIANT; :}
   ;
 
 // Recognize identifiers and keywords as struct-field names such
@@ -4562,6 +4566,8 @@ ident_or_unreserved ::=
   | KW_QUERY:name
   {: RESULT = name.toString(); :}
   | KW_UUID:name
+  {: RESULT = name.toString(); :}
+  | KW_VARIANT:name
   {: RESULT = name.toString(); :}
   ;
 
@@ -5045,6 +5051,8 @@ word ::=
   | KW_VALUES:r
   {: RESULT = r.toString(); :}
   | KW_VARCHAR:r
+  {: RESULT = r.toString(); :}
+  | KW_VARIANT:r
   {: RESULT = r.toString(); :}
   | KW_VIEW:r
   {: RESULT = r.toString(); :}

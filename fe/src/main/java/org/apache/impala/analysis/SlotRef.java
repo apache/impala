@@ -92,6 +92,7 @@ public class SlotRef extends Expr {
     numDistinctValues_ = adjustNumDistinctValues();
 
     if (type_.isStructType()) addStructChildrenAsSlotRefs();
+    if (type_.isVariantType()) addVariantChildrenAsSlotRefs();
 
     analysisDone();
   }
@@ -141,7 +142,7 @@ public class SlotRef extends Expr {
    */
   @Override
   public SlotRef reset() {
-    if (type_.isStructType()) clearChildren();
+    if (type_.isStructType() || type_.isVariantType()) clearChildren();
     super.reset();
     return this;
   }
@@ -190,6 +191,9 @@ public class SlotRef extends Expr {
       addStructChildrenAsSlotRefs();
       checkForUnsupportedStructFeatures();
     }
+    if (type_.isVariantType()) {
+      addVariantChildrenAsSlotRefs();
+    }
   }
 
   /**
@@ -205,6 +209,23 @@ public class SlotRef extends Expr {
     analyzer.createStructTuplesAndSlotDescs(desc_);
     addStructChildrenAsSlotRefs();
     checkForUnsupportedStructFeatures();
+  }
+
+  /**
+   * Re-expands the variant: recreates the item tuple descriptor of 'desc_' and the child
+   * 'SlotRef's. Needed when a variant slot is copied into a new tuple (e.g. the sort
+   * tuple) because the copy shares the source's already-laid-out item tuple descriptor;
+   * recreating it gives the new tuple a fresh, un-laid-out item tuple descriptor so
+   * TupleDescriptor.computeMemLayout() does not return null for it.
+   * Expects this 'SlotRef' to be a variant.
+   */
+  public void reExpandVariant(Analyzer analyzer) throws AnalysisException {
+    Preconditions.checkState(type_ != null && type_.isVariantType());
+    desc_.clearItemTupleDesc();
+    children_.clear();
+
+    analyzer.createVariantTuplesAndSlotDescs(desc_);
+    addVariantChildrenAsSlotRefs();
   }
 
   // Throws an AnalysisException if any of the struct fields, recursively, of this SlotRef
@@ -257,6 +278,16 @@ public class SlotRef extends Expr {
         throw new AnalysisException("Querying STRUCT is only supported for ORC and "
             + "Parquet file formats.");
       }
+    }
+  }
+
+  private void addVariantChildrenAsSlotRefs() {
+    Preconditions.checkState(desc_.getType().isVariantType());
+    TupleDescriptor variantTuple = desc_.getItemTupleDesc();
+    if (variantTuple == null) return;
+    for (SlotDescriptor childSlot : variantTuple.getSlots()) {
+      SlotRef childSlotRef = new SlotRef(childSlot);
+      children_.add(childSlotRef);
     }
   }
 

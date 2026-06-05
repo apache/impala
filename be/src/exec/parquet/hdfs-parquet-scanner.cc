@@ -2960,12 +2960,40 @@ Status HdfsParquetScanner::CreateColumnReaders(const TupleDescriptor& tuple_desc
         *node, slot_desc->type().IsCollectionType(), slot_desc, this);
     column_readers->push_back(col_reader);
 
-    if (col_reader->IsComplexReader()) {
+    if (slot_desc->type().IsVariantType()) {
+      // VARIANT is a Parquet group with 'metadata' and 'value' BINARY children.
+      // Create child readers directly (no schema resolution needed for variant children).
+      DCHECK(slot_desc->children_tuple_descriptor() != nullptr);
+      DCHECK(col_reader->IsComplexReader());
+      ComplexColumnReader* complex_reader =
+          static_cast<ComplexColumnReader*>(col_reader);
+      const TupleDescriptor* children_tuple = slot_desc->children_tuple_descriptor();
+      const vector<SlotDescriptor*>& child_slots = children_tuple->slots();
+      // An unshredded VARIANT must be a Parquet group with exactly the children the
+      // catalog expects (metadata + value). A mismatch means a malformed or shredded
+      // file; fail with a clear error rather than silently reading the wrong columns
+      // (the loop below would otherwise truncate to min(file, catalog) children, leaving
+      // some slots uninitialized). This is a runtime check, not a DCHECK, because it
+      // guards against untrusted file contents and must hold in release builds too.
+      if (node->children.size() != child_slots.size()) {
+        return Status(Substitute("VARIANT column '$0' in file '$1' has $2 children in "
+            "the Parquet schema but exactly $3 (metadata, value) are expected. This "
+            "indicates a malformed or a shredded VARIANT; shredded VARIANT is not "
+            "supported yet.",
+            PrintPath(*scan_node_->hdfs_table(), slot_desc->col_path()), filename(),
+            node->children.size(), child_slots.size()));
+      }
+      for (int i = 0; i < child_slots.size(); ++i) {
+        ParquetColumnReader* child_reader = ParquetColumnReader::Create(
+            node->children[i], false, child_slots[i], this);
+        complex_reader->children()->push_back(child_reader);
+      }
+    } else if (col_reader->IsComplexReader()) {
       // Recursively populate col_reader's children
       DCHECK(slot_desc->children_tuple_descriptor() != nullptr);
       const TupleDescriptor* item_tuple_desc = slot_desc->children_tuple_descriptor();
       ComplexColumnReader* complex_reader =
-          static_cast<CollectionColumnReader*>(col_reader);
+          static_cast<ComplexColumnReader*>(col_reader);
       RETURN_IF_ERROR(CreateColumnReaders(
           *item_tuple_desc, schema_resolver, complex_reader->children()));
     } else {

@@ -29,6 +29,7 @@ import org.apache.impala.catalog.MapType;
 import org.apache.impala.catalog.StructField;
 import org.apache.impala.catalog.StructType;
 import org.apache.impala.catalog.Type;
+import org.apache.impala.catalog.VariantType;
 import org.apache.impala.catalog.VirtualColumn;
 import org.apache.impala.catalog.iceberg.IcebergMetadataTable;
 import org.apache.impala.thrift.TVirtualColumnType;
@@ -327,8 +328,11 @@ public class Path {
    * a struct. Requires that the given type is a complex type.
    */
   public static StructType getTypeAsStruct(Type t) {
-    Preconditions.checkState(t.isComplexType());
+    Preconditions.checkState(t.isComplexOrVariantType());
     if (t.isStructType()) return (StructType) t;
+    if (t.isVariantType()) {
+      return new StructType(((VariantType) t).getFields());
+    }
     if (t.isArrayType()) {
       return CollectionStructType.createArrayStructType((ArrayType) t);
     } else {

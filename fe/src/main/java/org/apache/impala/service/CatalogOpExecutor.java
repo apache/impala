@@ -4947,7 +4947,7 @@ public class CatalogOpExecutor {
       if (fs.getName().toLowerCase().equals(colName.toLowerCase())) {
         fs.setName(newCol.getColumnName());
         Type type = Type.fromThrift(newCol.getColumnType());
-        fs.setType(type.toSql().toLowerCase());
+        fs.setType(type.toHiveMetastoreType());
         // Don't overwrite the existing comment unless a new comment is given
         if (newCol.getComment() != null) {
           fs.setComment(newCol.getComment());
@@ -7394,8 +7394,8 @@ public class CatalogOpExecutor {
     // Add in all the columns
     for (TColumn col: columns) {
       Type type = Type.fromThrift(col.getColumnType());
-      // The type string must be lowercase for Hive to read the column metadata properly.
-      String typeSql = type.toSql().toLowerCase();
+      // The type string must be lowercase for Hive; toHiveMetastoreType() lowercases.
+      String typeSql = type.toHiveMetastoreType();
       FieldSchema fs = new FieldSchema(col.getColumnName(), typeSql, col.getComment());
       fsList.add(fs);
     }

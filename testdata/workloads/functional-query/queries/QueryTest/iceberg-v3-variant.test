@@ -1,0 +1,562 @@
+====
+---- QUERY
+# Row count of the Trino-written VARIANT table.
+SELECT count(*) FROM functional_parquet.trino_variant;
+---- RESULTS
+55
+---- TYPES
+BIGINT
+====
+---- QUERY
+# Non-variant columns load correctly.
+SELECT id, descr FROM functional_parquet.trino_variant ORDER BY id;
+---- RESULTS
+0,'NULL'
+1,'variant null'
+2,'bool true'
+3,'bool false'
+4,'int32 42'
+5,'int8 34'
+6,'int8 -34'
+7,'int16 1000'
+8,'int16 -1234'
+9,'int32 100000'
+10,'int32 12345'
+11,'int32 -12345'
+12,'int64 1e10'
+13,'double 14.3'
+14,'double -14.3'
+15,'str hello'
+16,'str impala'
+17,'str context'
+18,'str home'
+19,'str mobile'
+20,'str Alice'
+21,'str iceberg'
+22,'long string x100'
+23,'escaped string value'
+24,'array [1,2,3]'
+25,'array [1,2,3,4,10]'
+26,'array empty'
+27,'array of string'
+28,'array of array'
+29,'mixed nested array'
+30,'array of objects'
+31,'obj age/name'
+32,'obj age/name/active'
+33,'obj page/retries'
+34,'obj nested data/items'
+35,'obj 6-field nested'
+36,'obj escaped keys'
+37,'obj ctrl-char keys'
+38,'obj large field ids'
+39,'obj empty'
+40,'obj null + string'
+41,'obj string + array'
+50,'decimal4 3.14'
+51,'decimal4 123456.789'
+52,'decimal8 -1.23e8..'
+53,'decimal16 big'
+54,'float -10.11'
+55,'date 2024-11-07'
+56,'date 1957-11-07'
+57,'binary 0a0b0c0d'
+58,'time 12:33:54.123456'
+59,'ts ntz micros'
+60,'ts ntz nanos'
+61,'ts tz micros'
+62,'uuid'
+---- TYPES
+INT, STRING
+====
+---- QUERY
+# VARIANT values render to their JSON representation. Covers primitives, strings
+# (incl. escaping), arrays, nested objects, and the physically-typed cases
+# (decimal/float/date/timestamp/binary/uuid).
+SELECT id, v FROM functional_parquet.trino_variant ORDER BY id;
+---- RESULTS
+0,'NULL'
+1,'null'
+2,'true'
+3,'false'
+4,'42'
+5,'34'
+6,'-34'
+7,'1000'
+8,'-1234'
+9,'100000'
+10,'12345'
+11,'-12345'
+12,'10000000000'
+13,'14.3'
+14,'-14.3'
+15,'"hello"'
+16,'"impala"'
+17,'"context"'
+18,'"home"'
+19,'"mobile"'
+20,'"Alice"'
+21,'"iceberg"'
+22,'"xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"'
+23,'"a\\t\\"\\\\\\u0000b"'
+24,'[1,2,3]'
+25,'[1,2,3,4,10]'
+26,'[]'
+27,'["iceberg","string"]'
+28,'[["string","iceberg"],["apple","banana"]]'
+29,'[["string","iceberg",34],[34,null],[],["string","iceberg"],34]'
+30,'[{"a":123456789,"c":"string"},{"a":123456789,"c":"string"},"iceberg",34]'
+31,'{"age":30,"name":"Alice"}'
+32,'{"active":true,"age":30,"name":"Alice"}'
+33,'{"page":"home","retries":3}'
+34,'{"data":{"items":[10,20,30]}}'
+35,'{"context":{"page":"home","retries":3},"device":"mobile","int_array":[1,2,3,4,10],"user":"Alice"}'
+36,'{"a\\"b":1,"c\\\\d":2,"e\\nf":3}'
+37,'{"a\\bb":10,"c\\fd":30,"e\\u0001f":20}'
+38,'{"f0":42,"f299":7}'
+39,'{}'
+40,'{"a":null,"d":"iceberg"}'
+41,'{"a":123456789,"c":["string","iceberg"]}'
+50,'3.14'
+51,'123456.789'
+52,'-123456789.987654321'
+53,'9876543210.123456789'
+54,'-10.11'
+55,'"2024-11-07"'
+56,'"1957-11-07"'
+57,'"CgsMDQ=="'
+58,'"<unsupported-type>"'
+59,'"2024-11-07 12:33:54.123456000"'
+60,'"1957-11-07 12:33:54.123456789"'
+61,'"<unsupported-type>"'
+62,'"<unsupported-type>"'
+---- TYPES
+INT, STRING
+====
+---- QUERY
+# Filtered scan: a predicate on a non-variant column exercises Parquet late
+# materialization, which must NOT call SkipRows() on the variant column reader
+SELECT id, v FROM functional_parquet.trino_variant WHERE id = 31;
+---- RESULTS
+31,'{"age":30,"name":"Alice"}'
+---- TYPES
+INT, STRING
+====
+---- QUERY
+# TOP-N (sort with LIMIT) materializes the variant into the sort/heap tuple via
+# RawValue::WriteVariant
+SELECT id, v FROM functional_parquet.trino_variant ORDER BY id LIMIT 5;
+---- RESULTS
+0,'NULL'
+1,'null'
+2,'true'
+3,'false'
+4,'42'
+---- TYPES
+INT, STRING
+====
+---- QUERY
+# UNION ALL of a variant column: type compatibility + union output tuple itemTupleDesc.
+SELECT id, v FROM functional_parquet.trino_variant WHERE id < 3
+UNION ALL
+SELECT id, v FROM functional_parquet.trino_variant WHERE id = 2
+ORDER BY id;
+---- RESULTS
+0,'NULL'
+1,'null'
+2,'true'
+2,'true'
+---- TYPES
+INT, STRING
+====
+---- QUERY
+# Non-pass-through UNION ALL: expressions in the select list (id-1, id+1) mean the union
+# cannot pass child tuples through unchanged and must materialize its own output tuple,
+# exercising the VARIANT deep-copy into the union result tuple.
+SELECT id - 1 AS id, v FROM functional_parquet.trino_variant WHERE id < 3
+UNION ALL
+SELECT id + 1 AS id, v FROM functional_parquet.trino_variant WHERE id = 2;
+---- RESULTS
+-1,'NULL'
+0,'null'
+1,'true'
+3,'true'
+---- TYPES
+BIGINT, STRING
+====
+---- QUERY
+# Inline (nested) view returning a VARIANT (pass-through).
+SELECT id, v FROM (SELECT id, v FROM functional_parquet.trino_variant) t WHERE id IN (2, 4, 31);
+---- RESULTS
+2,'true'
+4,'42'
+31,'{"age":30,"name":"Alice"}'
+---- TYPES
+INT, STRING
+====
+---- QUERY
+# WITH clause (common table expression) returning a VARIANT.
+WITH t AS (SELECT id, v FROM functional_parquet.trino_variant) SELECT id, v FROM t WHERE id IN (2, 4, 31);
+---- RESULTS
+2,'true'
+4,'42'
+31,'{"age":30,"name":"Alice"}'
+---- TYPES
+INT, STRING
+====
+---- QUERY
+# Catalog (HMS) view returning a VARIANT.
+CREATE VIEW variant_view AS SELECT id, v FROM functional_parquet.trino_variant;
+---- RESULTS
+'View has been created.'
+====
+---- QUERY
+SELECT id, v FROM variant_view WHERE id IN (2, 4, 31);
+---- RESULTS
+2,'true'
+4,'42'
+31,'{"age":30,"name":"Alice"}'
+---- TYPES
+INT, STRING
+====
+---- QUERY
+# Catalog (HMS) view with an explicit column list returning a VARIANT.
+CREATE VIEW variant_view_cols (vid, vv) AS SELECT id, v FROM functional_parquet.trino_variant;
+---- RESULTS
+'View has been created.'
+====
+---- QUERY
+SELECT vid, vv FROM variant_view_cols WHERE vid IN (2, 31);
+---- RESULTS
+2,'true'
+31,'{"age":30,"name":"Alice"}'
+---- TYPES
+INT, STRING
+====
+---- QUERY
+# Slot/tuple unification: the same VARIANT column referenced multiple times in the select
+# list is de-duplicated into a single materialized slot (as done for STRUCT). Verify both
+# references still render the correct value.
+SELECT id, v, v FROM functional_parquet.trino_variant WHERE id IN (2, 31) ORDER BY id;
+---- RESULTS
+2,'true','true'
+31,'{"age":30,"name":"Alice"}','{"age":30,"name":"Alice"}'
+---- TYPES
+INT, STRING, STRING
+====
+---- QUERY
+# Same VARIANT returned twice, but sourced from an HMS view.
+SELECT id, v, v FROM variant_view WHERE id IN (2, 31) ORDER BY id;
+---- RESULTS
+2,'true','true'
+31,'{"age":30,"name":"Alice"}','{"age":30,"name":"Alice"}'
+---- TYPES
+INT, STRING, STRING
+====
+---- QUERY
+# Nested views: an inline view wrapping an HMS view, projecting the VARIANT twice.
+SELECT id, v, v FROM (SELECT id, v FROM variant_view) t WHERE id IN (2, 31) ORDER BY id;
+---- RESULTS
+2,'true','true'
+31,'{"age":30,"name":"Alice"}','{"age":30,"name":"Alice"}'
+---- TYPES
+INT, STRING, STRING
+====
+---- QUERY
+# A WITH-clause (CTE) view used multiple times in the same query (self-join of the CTE),
+# with the VARIANT projected from both uses. Exercises unification across the two uses.
+WITH t AS (SELECT id, v FROM functional_parquet.trino_variant)
+SELECT t1.id, t1.v, t2.v
+FROM t t1 JOIN t t2 ON t1.id = t2.id
+WHERE t1.id IN (2, 31)
+ORDER BY t1.id;
+---- RESULTS
+2,'true','true'
+31,'{"age":30,"name":"Alice"}','{"age":30,"name":"Alice"}'
+---- TYPES
+INT, STRING, STRING
+====
+---- QUERY
+# Hash join with VARIANTs involved.
+SELECT b.id, b.v
+FROM functional_parquet.trino_variant a JOIN functional_parquet.trino_variant b ON a.id = b.id
+WHERE b.id IN (2, 31);
+---- RESULTS
+2,'true'
+31,'{"age":30,"name":"Alice"}'
+---- TYPES
+INT, STRING
+====
+---- QUERY
+# Hash join with the VARIANT column on the build (right) side and a partitioned (shuffle)
+# exchange. This deep-copies the VARIANT into the build-side hash table and sends it
+# through a partitioned exchange.
+SELECT STRAIGHT_JOIN b.id, b.v
+FROM functional_parquet.trino_variant a JOIN /* +SHUFFLE */ functional_parquet.trino_variant b ON a.id = b.id
+WHERE b.id IN (2, 31);
+---- RESULTS
+2,'true'
+31,'{"age":30,"name":"Alice"}'
+---- TYPES
+INT, STRING
+====
+---- QUERY
+# A catalog view producing a large VARIANT-carrying relation, reused by the spilling join
+# below. Each of the 55 source VARIANTs is repeated for every functional.alltypes row.
+# Also exercises an HMS view over a join whose output includes a VARIANT.
+CREATE VIEW big_variant_view AS
+SELECT a.id AS aid, b.id AS bid, b.v AS v
+FROM functional.alltypes a, functional_parquet.trino_variant b;
+---- RESULTS
+'View has been created.'
+====
+---- QUERY
+# Spilling hash join. SET_DENY_RESERVATION_PROBABILITY forces the build-side partitioned
+# hash join to spill, exercising the VARIANT StringValue pointer fixup on spill/restore.
+# The build (right) side is the large VARIANT-carrying big_variant_view; the join emits
+# one row per source VARIANT, so VERIFY_IS_SUBSET checks a representative sample (including
+# a large nested object whose metadata/value bytes must be copied intact through the
+# spill).
+set debug_action="-1:OPEN:SET_DENY_RESERVATION_PROBABILITY@1.0";
+SELECT STRAIGHT_JOIN b.bid, b.v
+FROM (SELECT 31 AS pid) p
+JOIN /* +SHUFFLE */ big_variant_view b
+ON p.pid = b.aid;
+---- RESULTS: VERIFY_IS_SUBSET
+2,'true'
+4,'42'
+31,'{"age":30,"name":"Alice"}'
+35,'{"context":{"page":"home","retries":3},"device":"mobile","int_array":[1,2,3,4,10],"user":"Alice"}'
+---- TYPES
+INT, STRING
+---- RUNTIME_PROFILE
+aggregation(SUM, SpilledPartitions)> 0
+====
+---- QUERY
+# Spilling sort carrying a VARIANT, exercising the VARIANT StringValue pointer fixup
+# through the sorter's run flush + merge (the sort analogue of the spilling-join case
+# above). disable_outermost_topn turns the LIMIT into a full sort so the spilling sorter is
+# used rather than a TOP-N; the small spillable buffer plus SET_DENY_RESERVATION_PROBABILITY
+# keep the sorter's reservation tiny so it spills into multiple runs and merges them.
+set default_spillable_buffer_size=64k;
+set min_spillable_buffer_size=64k;
+set debug_action="-1:OPEN:SET_DENY_RESERVATION_PROBABILITY@1.0";
+set disable_outermost_topn=true;
+SELECT b.bid, b.v FROM big_variant_view b ORDER BY b.aid, b.bid LIMIT 60;
+---- RESULTS: VERIFY_IS_SUBSET
+2,'true'
+4,'42'
+31,'{"age":30,"name":"Alice"}'
+35,'{"context":{"page":"home","retries":3},"device":"mobile","int_array":[1,2,3,4,10],"user":"Alice"}'
+---- TYPES
+INT, STRING
+---- RUNTIME_PROFILE
+aggregation(SUM, TotalMergesPerformed)> 0
+====
+---- QUERY
+# Negative cases: VARIANT is not comparable/orderable/hashable and can only be a
+# pass-through SlotRef, so these must raise a clean AnalysisException (never crash/NPE).
+# ORDER BY a variant.
+SELECT id FROM functional_parquet.trino_variant ORDER BY v;
+---- CATCH
+ORDER BY expression 'v' with complex type 'VARIANT' is not supported.
+====
+---- QUERY
+# GROUP BY a variant.
+SELECT count(*) FROM functional_parquet.trino_variant GROUP BY v;
+---- CATCH
+GROUP BY expression cannot be used on VARIANT type: v
+====
+---- QUERY
+# SELECT DISTINCT on a variant.
+SELECT DISTINCT v FROM functional_parquet.trino_variant;
+---- CATCH
+VARIANT type is not supported in SELECT DISTINCT clauses
+====
+---- QUERY
+# UNION (DISTINCT) of a variant.
+SELECT v FROM functional_parquet.trino_variant UNION SELECT v FROM functional_parquet.trino_variant;
+---- CATCH
+UNION, EXCEPT and INTERSECT are not supported for VARIANT type.
+====
+---- QUERY
+# INTERSECT of a variant.
+SELECT v FROM functional_parquet.trino_variant INTERSECT SELECT v FROM functional_parquet.trino_variant;
+---- CATCH
+UNION, EXCEPT and INTERSECT are not supported for VARIANT type.
+====
+---- QUERY
+# CASE producing a variant.
+SELECT CASE WHEN id > 0 THEN v ELSE v END FROM functional_parquet.trino_variant;
+---- CATCH
+VARIANT type is not supported in CASE expressions
+====
+---- QUERY
+# DECODE producing a variant.
+SELECT DECODE(id, 1, v, v) FROM functional_parquet.trino_variant;
+---- CATCH
+VARIANT type is not supported in DECODE expressions
+====
+---- QUERY
+# Analytic PARTITION BY a variant.
+SELECT row_number() OVER (PARTITION BY v) FROM functional_parquet.trino_variant;
+---- CATCH
+PARTITION BY expression 'v' with complex type 'VARIANT' is not supported.
+====
+---- QUERY
+# Analytic ORDER BY a variant.
+SELECT row_number() OVER (ORDER BY v) FROM functional_parquet.trino_variant;
+---- CATCH
+ORDER BY expression 'v' with complex type 'VARIANT' is not supported.
+====
+---- QUERY
+# count(DISTINCT) on a variant.
+SELECT count(DISTINCT v) FROM functional_parquet.trino_variant;
+---- CATCH
+VARIANT type is not supported as DISTINCT parameters
+====
+---- QUERY
+# IS NULL on a variant.
+SELECT id FROM functional_parquet.trino_variant WHERE v IS NULL;
+---- CATCH
+IS NULL predicate does not support VARIANT type: v IS NULL
+====
+---- QUERY
+# INSERT into a table that has a variant column.
+INSERT INTO functional_parquet.trino_variant SELECT id, descr, v FROM functional_parquet.trino_variant;
+---- CATCH
+has a complex type 'VARIANT'
+====
+---- QUERY
+# VARIANT cannot be specified by the user as a column type in CREATE TABLE.
+CREATE TABLE variant_ddl_not_allowed (id INT, v VARIANT) STORED AS ICEBERG;
+---- CATCH
+VARIANT type is not supported as a column type.
+====
+---- QUERY
+# VARIANT cannot be specified by the user as a CAST target type.
+SELECT CAST(id AS VARIANT) FROM functional_parquet.trino_variant;
+---- CATCH
+VARIANT type is not supported as a column type.
+====
+---- QUERY
+# VARIANT cannot be added as a column via ALTER TABLE. (Analysis fails before any change,
+# so this does not modify functional_parquet.trino_variant.)
+ALTER TABLE functional_parquet.trino_variant ADD COLUMN v2 VARIANT;
+---- CATCH
+VARIANT type is not supported as a column type.
+====
+---- QUERY
+# Nested VARIANT: only a top-level VARIANT column is queryable. trino_nested_variant has
+# a top-level VARIANT column (top_v) plus columns that nest VARIANT in ARRAY/MAP/STRUCT.
+# The top-level column still works, even though the table also has nested-VARIANT columns.
+DESCRIBE trino_nested_variant;
+---- RESULTS
+'id','int','','true'
+'descr','string','','true'
+'top_v','variant','','true'
+'arr_v','array<variant>','','true'
+'map_v','map<string,variant>','','true'
+'struct_v','struct<\n  a:variant,\n  b:int\n>','','true'
+'arr_struct_v','array<struct<\n  v:variant\n>>','','true'
+---- TYPES
+STRING,STRING,STRING,STRING
+====
+---- QUERY
+DESCRIBE FORMATTED trino_nested_variant;
+---- RESULTS: VERIFY_IS_SUBSET
+'top_v','variant','NULL'
+'arr_v','array<variant>','NULL'
+'map_v','map<string,variant>','NULL'
+'struct_v','struct<a:variant,b:int>','NULL'
+'arr_struct_v','array<struct<v:variant>>','NULL'
+---- TYPES
+STRING,STRING,STRING
+====
+---- QUERY
+SELECT top_v FROM trino_nested_variant WHERE id = 1;
+---- RESULTS
+'42'
+---- TYPES
+STRING
+====
+---- QUERY
+# ARRAY<VARIANT> in the select list is rejected.
+# (Selecting a whole collection expands it; assumes expand_complex_types=true, the default.)
+SELECT arr_v FROM trino_nested_variant;
+---- CATCH
+VARIANT nested inside a complex type
+====
+---- QUERY
+# ARRAY<VARIANT> unnested in the FROM clause is rejected too (different code path).
+SELECT count(*) FROM trino_nested_variant t, t.arr_v a;
+---- CATCH
+VARIANT nested inside a complex type
+====
+---- QUERY
+# MAP<..,VARIANT> (VARIANT value) is rejected.
+SELECT map_v FROM trino_nested_variant;
+---- CATCH
+VARIANT nested inside a complex type
+====
+---- QUERY
+# STRUCT<a:VARIANT,..>: selecting the whole struct materializes the VARIANT field.
+SELECT struct_v FROM trino_nested_variant;
+---- CATCH
+VARIANT nested inside a complex type
+====
+---- QUERY
+# STRUCT<a:VARIANT,..>: direct access of the VARIANT field is rejected.
+SELECT struct_v.a FROM trino_nested_variant;
+---- CATCH
+VARIANT nested inside a complex type
+====
+---- QUERY
+# Deeply nested: ARRAY<STRUCT<v:VARIANT>> is rejected (recursive check).
+SELECT arr_struct_v FROM trino_nested_variant;
+---- CATCH
+VARIANT nested inside a complex type
+====
+---- QUERY
+# Deeply nested via FROM-clause unnest: ARRAY<STRUCT<v:VARIANT>> is rejected before the
+# VARIANT field is even referenced.
+SELECT count(*) FROM trino_nested_variant t, t.arr_struct_v s;
+---- CATCH
+VARIANT nested inside a complex type
+====
+---- QUERY
+# SHOW CREATE TABLE renders the VARIANT column as 'v VARIANT'. LOCATION and TBLPROPERTIES
+# are volatile (Trino UUIDs / snapshot ids), so only the column declaration is asserted.
+SHOW CREATE TABLE functional_parquet.trino_variant
+---- RESULTS
+row_regex:(?s).*\bv\s+VARIANT\b.*
+---- TYPES
+STRING
+====
+---- QUERY
+# Iceberg metadata tables are queryable for a table that contains a VARIANT column.
+# The 'main' branch ref always exists.
+SELECT name, type FROM functional_parquet.trino_variant.refs
+---- RESULTS: VERIFY_IS_SUBSET
+'main','BRANCH'
+---- TYPES
+STRING,STRING
+====
+---- QUERY
+# readable_metrics on the .files metadata table builds without hitting an Iceberg-library
+# gap for VARIANT: VARIANT is non-primitive, so it is omitted from the per-column metrics
+# (primitive columns like 'id' still appear) rather than causing an error.
+SELECT readable_metrics FROM functional_parquet.trino_variant.`files`
+---- RESULTS: VERIFY_IS_SUBSET
+row_regex:(?s).*"id":\s*\{.*
+---- TYPES
+STRING
+====
+---- QUERY
+# The VARIANT column 'v' must NOT appear in readable_metrics.
+SELECT readable_metrics FROM functional_parquet.trino_variant.`files`
+---- RESULTS: VERIFY_IS_NOT_IN
+row_regex:(?s).*"v":\s*\{.*
+---- TYPES
+STRING
+====

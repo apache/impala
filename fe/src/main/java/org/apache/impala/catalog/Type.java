@@ -74,6 +74,7 @@ public abstract class Type {
   public static final ScalarType CHAR = ScalarType.createCharType(-1);
   public static final ScalarType FIXED_UDA_INTERMEDIATE =
       ScalarType.createFixedUdaIntermediateType(-1);
+  public static final VariantType VARIANT = new VariantType();
 
   private static List<ScalarType> integerTypes;
   private static List<ScalarType> numericTypes;
@@ -169,8 +170,9 @@ public abstract class Type {
 
   /**
    * Type string stored in the Hive Metastore for table columns. HMS does not support all
-   * Impala types (e.g. UUID is Iceberg-only), so those are mapped to compatible HMS
-   * types here while Impala retains the native type from Iceberg metadata.
+   * Impala types, so those are mapped to compatible HMS types while Impala keeps the
+   * native type from Iceberg metadata: UUID -> 'string', VARIANT -> struct<..> (see the
+   * VariantType override).
    */
   public String toHiveMetastoreType() {
     if (isUuid()) {
@@ -252,11 +254,44 @@ public abstract class Type {
   }
 
   public boolean isIntegerOrDateType() { return isIntegerType() || isDate(); }
-  public boolean isComplexType() { return isStructType() || isCollectionType(); }
+  public boolean isComplexType() {
+    return isStructType() || isCollectionType();
+  }
+  /**
+   * VARIANT is intentionally not part of isComplexType() (it is not a user-visible
+   * complex type and several isComplexType() callers must continue to exclude it).
+   * Most analysis-time restrictions that reject complex types, however, apply equally
+   * to VARIANT (it can only be a pass-through SlotRef). Those sites should use this
+   * helper instead of repeating "isComplexType() || isVariantType()".
+   */
+  public boolean isComplexOrVariantType() { return isComplexType() || isVariantType(); }
   public boolean isCollectionType() { return isMapType() || isArrayType(); }
   public boolean isMapType() { return this instanceof MapType; }
   public boolean isArrayType() { return this instanceof ArrayType; }
   public boolean isStructType() { return this instanceof StructType; }
+  public boolean isVariantType() { return this instanceof VariantType; }
+
+  /**
+   * Returns true if 't' is a VARIANT or (recursively) contains a VARIANT nested inside an
+   * ARRAY, MAP or STRUCT. Used to reject querying a nested VARIANT; only a top-level
+   * VARIANT column is supported (nested VARIANTS are tracked in IMPALA-15052).
+   */
+  public static boolean containsVariant(Type t) {
+    if (t.isVariantType()) return true;
+    if (t.isArrayType()) return containsVariant(((ArrayType) t).getItemType());
+    if (t.isMapType()) {
+      MapType mapType = (MapType) t;
+      return containsVariant(mapType.getKeyType())
+          || containsVariant(mapType.getValueType());
+    }
+    if (t.isStructType()) {
+      for (StructField field : ((StructType) t).getFields()) {
+        if (containsVariant(field.getType())) return true;
+      }
+    }
+    return false;
+  }
+
   public boolean isCollectionStructType() {
     return this instanceof CollectionStructType;
   }
@@ -445,6 +480,10 @@ public abstract class Type {
     } else if (t1.isMapType() && t2.isMapType()) {
       // Only support exact match for map types.
       if (t1.equals(t2)) return t2;
+    } else if (t1.isVariantType() && t2.isVariantType()) {
+      // Only support exact match for variant types. All unshredded variants are the same
+      // logical type (metadata + value), so VariantType.equals() returns true for them.
+      if (t1.equals(t2)) return t2;
     }
     return ScalarType.INVALID;
   }
@@ -481,6 +520,9 @@ public abstract class Type {
     } else if (isMapType()) {
       MapType mapType = (MapType) this;
       if (mapType.getValueType().exceedsMaxNestingDepth(d + 1)) return true;
+    } else if (isVariantType()) {
+      // VARIANT has internal children (metadata, value) but they don't contribute
+      // to user-visible nesting depth.
     } else {
       Preconditions.checkState(isScalarType());
     }
@@ -551,6 +593,20 @@ public abstract class Type {
         Pair<Type, Integer> valueType = fromThrift(col, keyType.second);
         type = new MapType(keyType.first, valueType.first);
         nodeIdx = valueType.second;
+        break;
+      }
+      case VARIANT: {
+        Preconditions.checkState(node.isSetVariant_fields());
+        List<StructField> variantFields = new ArrayList<>();
+        ++nodeIdx;
+        for (int i = 0; i < node.getVariant_fieldsSize(); ++i) {
+          TStructField thriftField = node.getVariant_fields().get(i);
+          String name = thriftField.getName();
+          Pair<Type, Integer> res = fromThrift(col, nodeIdx);
+          nodeIdx = res.second.intValue();
+          variantFields.add(new StructField(name, res.first));
+        }
+        type = new VariantType(variantFields);
         break;
       }
       case STRUCT: {
@@ -717,6 +773,10 @@ public abstract class Type {
     // Both MAP and ARRAY are reported as ARRAY, since there is no better matching
     // Java SQL type. This behavior is consistent with Hive.
     if (isCollectionType()) return java.sql.Types.ARRAY;
+    // VARIANT has no dedicated java.sql type. It is surfaced to clients as a JSON string
+    // (reported as STRING over HS2), so report VARCHAR here for consistency. TYPE_NAME
+    // still reports "VARIANT" (see MetadataOp.getHs2MetadataTypeName).
+    if (isVariantType()) return java.sql.Types.VARCHAR;
 
     Preconditions.checkState(isScalarType(), "Invalid non-scalar type: " + toSql());
     ScalarType t = (ScalarType) this;

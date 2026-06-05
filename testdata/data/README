@@ -1269,6 +1269,28 @@ sql("insert into iceberg_v3_row_lineage values(2)").collect()
 sql("insert into iceberg_v3_row_lineage values(3)").collect()
 sql("CALL spark_catalog.system.rewrite_data_files('iceberg_v3_row_lineage', options => map('min-input-files', '2'))").show()
 
+testdata/data/iceberg_test/iceberg_v3/trino_variant
+Iceberg V3 table with an (unshredded) VARIANT column, created by Trino 481. Used to test
+reading VARIANT values written by another engine.
+Schema: id INTEGER, descr VARCHAR (the test case name, for debugging), v VARIANT.
+Contains 55 rows covering the full range of variant-encoded values: primitives (null,
+bool, the int8/16/32/64 physical types, float, double), strings (incl. long strings and
+escaped characters), arrays, nested objects, and the physically-typed values
+(decimal4/8/16, date, time, timestamp ntz/tz, binary, uuid). The object rows carry real
+metadata dictionaries, which exercise variant-metadata handling/dedup.
+Created via Trino roughly as:
+  CREATE TABLE iceberg.default.trino_variant (id INTEGER, descr VARCHAR, v VARIANT)
+    WITH (format_version=3);
+  INSERT INTO trino_variant VALUES (1, 'null', CAST(JSON 'null' AS VARIANT)), ...;
+
+testdata/data/iceberg_test/iceberg_v3/trino_nested_variant
+Iceberg V3 table created by Trino 481 with VARIANT nested inside complex types, used to
+test that only a top-level VARIANT column is queryable (nested VARIANT is rejected).
+Schema: id INT, descr STRING, top_v VARIANT, arr_v ARRAY<VARIANT>,
+map_v MAP<STRING,VARIANT>, struct_v STRUCT<a:VARIANT, b:INT>,
+arr_struct_v ARRAY<STRUCT<v:VARIANT>>. The top-level top_v column reads normally; the
+arr_v/map_v/struct_v/arr_struct_v columns exercise the nested-VARIANT rejection paths.
+
 arrays_big.parq:
 Generated with RandomNestedDataGenerator.java from the following schema:
 {

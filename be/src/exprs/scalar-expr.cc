@@ -217,7 +217,7 @@ Status ScalarExpr::OpenEvaluator(FunctionContext::FunctionStateScope scope,
     RuntimeState* state, ScalarExprEvaluator* eval) const {
   for (int i = 0; i < children_.size(); ++i) {
     ScalarExprEvaluator* child_eval = eval;
-    if (type_.IsStructType()) {
+    if (type_.IsStructType() || type_.IsVariantType()) {
       DCHECK_EQ(children_.size(), eval->GetChildEvaluators().size());
       child_eval = eval->GetChildEvaluators()[i];
     }

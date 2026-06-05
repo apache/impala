@@ -223,6 +223,16 @@ void RawValue::Write(const void* value, Tuple* tuple, const SlotDescriptor* slot
   if (value == nullptr) {
     if (slot_desc->type().IsStructType()) {
       tuple->SetStructToNull(slot_desc);
+    } else if (slot_desc->type().IsVariantType()) {
+      // A variant is null as a whole. Mirror SetStructToNull: set the variant's null bit
+      // and each (nullable) child's null bit, so downstream var-len collection (which
+      // checks per-child null bits, e.g. the sorter's CollectNonNullNonSmallVarSlots)
+      // correctly skips the children.
+      tuple->SetNull(slot_desc->null_indicator_offset());
+      DCHECK(slot_desc->children_tuple_descriptor() != nullptr);
+      for (SlotDescriptor* child : slot_desc->children_tuple_descriptor()->slots()) {
+        tuple->SetNull(child->null_indicator_offset());
+      }
     } else {
       tuple->SetNull(slot_desc->null_indicator_offset());
     }
@@ -250,6 +260,8 @@ void RawValue::WriteNonNull(const void* value, Tuple* tuple,
   } else if (slot_desc->type().IsCollectionType()) {
     WriteCollection<COLLECT_VAR_LEN_VALS>(value, tuple, slot_desc, pool,
         string_values, collection_values);
+  } else if (slot_desc->type().IsVariantType()) {
+    WriteVariant<COLLECT_VAR_LEN_VALS>(value, tuple, slot_desc, pool, string_values);
   } else {
     WritePrimitiveCollectVarlen<COLLECT_VAR_LEN_VALS>(value, tuple, slot_desc, pool,
         string_values);
@@ -285,6 +297,35 @@ void RawValue::WriteStruct(const void* value, Tuple* tuple,
       WritePrimitiveCollectVarlen<COLLECT_VAR_LEN_VALS>(src_child, tuple, child_slot,
           pool, string_values);
     }
+  }
+}
+
+template <bool COLLECT_VAR_LEN_VALS>
+void RawValue::WriteVariant(const void* value, Tuple* tuple,
+    const SlotDescriptor* slot_desc, MemPool* pool, vector<StringValue*>* string_values) {
+  DCHECK(value != nullptr && tuple != nullptr && slot_desc != nullptr);
+  DCHECK(slot_desc->type().IsVariantType());
+  DCHECK(slot_desc->children_tuple_descriptor() != nullptr);
+  // Unlike a struct, a variant value is not a StructVal: 'value' points at the 24-byte
+  // variant slot in the source tuple (two adjacent StringValues: metadata + value). Child
+  // slot offsets are absolute in the master tuple (same as struct children), so each
+  // child's position within 'value' is child->tuple_offset() - slot_desc->tuple_offset()
+  // (0 for metadata, sizeof(StringValue) for value).
+  // TODO(variant_get): this assumes the source is always a materialized scan slot. When
+  // VARIANT becomes a first-class expression type (a VariantVal ABI, letting functions
+  // such as variant_get() produce VARIANT), this must also handle a VariantVal source.
+  const TupleDescriptor* children_tuple_desc = slot_desc->children_tuple_descriptor();
+  const uint8_t* src_base = reinterpret_cast<const uint8_t*>(value);
+  for (SlotDescriptor* child_slot : children_tuple_desc->slots()) {
+    // For unshredded variants the children (metadata, value) are always present when the
+    // variant itself is non-null, and per-child null info is not reachable from the raw
+    // slot pointer. Revisit when shredded variants (with nullable typed children) land.
+    DCHECK(child_slot->type().IsVarLenStringType())
+        << "Unexpected variant child type: " << child_slot->type().DebugString();
+    const void* src_child =
+        src_base + (child_slot->tuple_offset() - slot_desc->tuple_offset());
+    WritePrimitiveCollectVarlen<COLLECT_VAR_LEN_VALS>(src_child, tuple, child_slot, pool,
+        string_values);
   }
 }
 
@@ -553,6 +594,13 @@ template void RawValue::WriteStruct<false>(const void* value, Tuple* tuple,
     const SlotDescriptor* slot_desc, MemPool* pool,
     std::vector<StringValue*>* string_values,
     std::vector<std::pair<CollectionValue*, int64_t>>* collection_values);
+
+template void RawValue::WriteVariant<true>(const void* value, Tuple* tuple,
+    const SlotDescriptor* slot_desc, MemPool* pool,
+    std::vector<StringValue*>* string_values);
+template void RawValue::WriteVariant<false>(const void* value, Tuple* tuple,
+    const SlotDescriptor* slot_desc, MemPool* pool,
+    std::vector<StringValue*>* string_values);
 
 template void RawValue::WritePrimitiveCollectVarlen<true>(const void* value,
     Tuple* tuple, const SlotDescriptor* slot_desc, MemPool* pool,

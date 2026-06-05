@@ -15,6 +15,7 @@
 // specific language governing permissions and limitations
 // under the License.
 
+#include "common/status.h"
 #include "gen-cpp/ImpalaHiveServer2Service.h"
 #include "gen-cpp/Frontend_types.h"
 #include "gen-cpp/TCLIService_types.h"
@@ -38,11 +39,13 @@ void TColumnValueToHS2TColumn(const TColumnValue& col_val, const TColumnType& ty
 /// calling RuntimeState::GetQueryStatus() to check for expression evaluation errors. If
 /// 'stringify_map_keys' is true, converts map keys to strings; see IMPALA-11778.
 /// 'expected_result_count' is used for reserving space in the result vectors.
+/// Sets '*out_status' to an error if a value fails to serialize (only possible for a
+/// corrupt VARIANT); it is left unchanged otherwise, so the caller must initialize it.
 /// For V6->
 void ExprValuesToHS2TColumn(ScalarExprEvaluator* expr_eval, const TColumnType& type,
     RowBatch* batch, int start_idx, int num_rows, uint32_t output_row_idx,
      int expected_result_count, bool stringify_map_keys,
-     apache::hive::service::cli::thrift::TColumn* column);
+     apache::hive::service::cli::thrift::TColumn* column, Status* out_status);
 
 /// For V1->V5
 void TColumnValueToHS2TColumnValue(const TColumnValue& col_val, const TColumnType& type,

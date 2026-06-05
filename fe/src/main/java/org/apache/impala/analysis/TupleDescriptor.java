@@ -171,7 +171,8 @@ public class TupleDescriptor {
     for (SlotDescriptor slotDesc : slots_) {
       res.add(slotDesc);
       TupleDescriptor itemTupleDesc = slotDesc.getItemTupleDesc();
-      if (slotDesc.getType().isStructType() && itemTupleDesc != null) {
+      if ((slotDesc.getType().isStructType() || slotDesc.getType().isVariantType())
+          && itemTupleDesc != null) {
         res.addAll(itemTupleDesc.getSlotsRecursively());
       }
     }
@@ -221,7 +222,7 @@ public class TupleDescriptor {
   public void setPath(Path p) {
     Preconditions.checkNotNull(p);
     Preconditions.checkState(p.isResolved());
-    Preconditions.checkState(p.destType().isComplexType());
+    Preconditions.checkState(p.destType().isComplexOrVariantType());
     path_ = p;
     if (p.destTable() != null) {
       // Do not use Path.getTypeAsStruct() to only allow implicit path resolutions,
@@ -282,15 +283,17 @@ public class TupleDescriptor {
 
   public void setParentSlotDesc(SlotDescriptor parent) {
     Type parentType = parent.getType();
-    Preconditions.checkState(parentType.isStructType() || parentType.isCollectionType(),
-        "Parent for a TupleDescriptor should be a STRUCT or a COLLECTION. " +
+    Preconditions.checkState(parentType.isStructType() || parentType.isCollectionType()
+        || parentType.isVariantType(),
+        "Parent for a TupleDescriptor should be a STRUCT, COLLECTION, or VARIANT. " +
         "Actual type is " + parentType + " Tuple ID: " + getId());
     parentSlot_ = parent;
   }
   public SlotDescriptor getParentSlotDesc() { return parentSlot_; }
 
   public boolean isStructChild() {
-    return parentSlot_ != null && parentSlot_.getType().isStructType();
+    return parentSlot_ != null && (parentSlot_.getType().isStructType()
+        || parentSlot_.getType().isVariantType());
   }
 
   public String debugString() {
@@ -460,13 +463,13 @@ public class TupleDescriptor {
           d.setNullIndicatorBit(-1);
           d.setNullIndicatorByte(0);
         }
-        // For struct slots calculate the mem layout for the tuple representing it's
-        // children.
-        if (d.getType().isStructType()) {
+        // For struct/variant slots calculate the mem layout for the tuple representing
+        // their children.
+        if (d.getType().isStructType() || d.getType().isVariantType()) {
           Pair<Integer, Integer> nullIndicators =
               d.getItemTupleDesc().computeMemLayout();
           // Adjust the null indicator byte and bit according to what is set in the
-          // struct's children
+          // struct's/variant's children
           nullIndicatorByte = nullIndicators.first;
           nullIndicatorBit = nullIndicators.second;
         }
@@ -523,13 +526,15 @@ public class TupleDescriptor {
   }
 
   // Function to calculate the number of null bits required for a slot descriptor. In
-  // case of a struct slot it calls itself recursively to get the required null bits for
-  // the struct's children.
+  // case of a struct/variant slot it calls itself recursively to get the required null
+  // bits for the children.
   private int getNumNullBits(SlotDescriptor slotDesc, boolean alwaysAddNullBit) {
-    Preconditions.checkState(!slotDesc.getType().isStructType() ||
-        slotDesc.getIsNullable());
+    Preconditions.checkState(!slotDesc.getType().isStructType()
+        && !slotDesc.getType().isVariantType() || slotDesc.getIsNullable());
     if (!slotDesc.getIsNullable() && !alwaysAddNullBit) return 0;
-    if (!slotDesc.getType().isStructType()) return 1;
+    if (!slotDesc.getType().isStructType() && !slotDesc.getType().isVariantType()) {
+      return 1;
+    }
     TupleDescriptor childrenTuple = slotDesc.getItemTupleDesc();
     Preconditions.checkState(childrenTuple != null);
     int numNullBits = 1;

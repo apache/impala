@@ -25,3 +25,11 @@ www/datatables/**/*.min.css binary
 www/highlight/highlight.pack.js binary
 www/jquery/jquery-3.5.1.min.js binary
 www/pako.min.js binary
+
+# Data files are binary. Mark them explicitly so git never falls back to a textual
+# diff.
+testdata/data/**/*.avro binary
+testdata/data/**/*.parquet binary
+testdata/data/**/*.orc binary
+testdata/data/**/*.stats binary
+testdata/data/**/*.puffin binary

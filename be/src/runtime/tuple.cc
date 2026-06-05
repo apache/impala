@@ -405,6 +405,14 @@ Status Tuple::CodegenMaterializeExprs(LlvmCodeGen* codegen, bool collect_varlen_
   if (collect_varlen_vals) {
     return Status("CodegenMaterializeExprs() collect_varlen_vals == true NYI");
   }
+  // VARIANT slot writes are not codegen'd yet; fall back to the interpreted path
+  // (Tuple::MaterializeExprs -> RawValue::WriteVariant). Without this, codegen would
+  // reach GetLlvmStruct/GetSlotType for TYPE_VARIANT and DCHECK.
+  for (const SlotDescriptor* slot : desc.slots()) {
+    if (slot->type().IsVariantType()) {
+      return Status::Expected("CodegenMaterializeExprs() VARIANT type NYI");
+    }
+  }
   llvm::LLVMContext& context = codegen->context();
 
   // Codegen each compute function from slot_materialize_exprs

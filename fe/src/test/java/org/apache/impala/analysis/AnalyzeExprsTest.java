@@ -3371,6 +3371,40 @@ public class AnalyzeExprsTest extends AnalyzerTest {
       "THEN (" + clause + ") ELSE null END q FROM functional.alltypes");
   }
 
+  @Test
+  public void TestVariant() throws AnalysisException {
+    // VARIANT (IMPALA-15052) can currently only originate as a scanned column of an
+    // Iceberg table; it cannot be constructed by the user via CAST. The tests below lock
+    // in the current behavior (all produce analysis errors). When variant construction /
+    // typed access is added, the expectations here should be updated accordingly.
+
+    // A plain CAST to VARIANT is rejected while parsing the target type.
+    AnalysisError("select cast(null as variant)",
+        "VARIANT type is not supported as a column type.");
+    AnalysisError("select cast(1 as variant)",
+        "VARIANT type is not supported as a column type.");
+    AnalysisError("select cast('foo' as variant)",
+        "VARIANT type is not supported as a column type.");
+
+    // A VARIANT nested inside a complex target type is rejected the same way: the target
+    // TypeDef is analyzed recursively before the CAST itself is checked.
+    AnalysisError("select cast(null as array<variant>)",
+        "VARIANT type is not supported as a column type.");
+    AnalysisError("select cast(null as map<string, variant>)",
+        "VARIANT type is not supported as a column type.");
+    AnalysisError("select cast(null as struct<v: variant>)",
+        "VARIANT type is not supported as a column type.");
+
+    // Since the CAST already fails, expressions that would consume a VARIANT report the
+    // same error (the inner CAST is analyzed first).
+    AnalysisError("select cast(null as variant) is null",
+        "VARIANT type is not supported as a column type.");
+    AnalysisError("select cast(null as variant) = cast(null as variant)",
+        "VARIANT type is not supported as a column type.");
+    AnalysisError("select coalesce(cast(null as variant), cast(null as variant))",
+        "VARIANT type is not supported as a column type.");
+  }
+
   private void RunCastFormatTestOnType(String type) {
     String to_timestamp_cast = "cast('05-01-2017' as " + type + ")";
     AnalysisError(

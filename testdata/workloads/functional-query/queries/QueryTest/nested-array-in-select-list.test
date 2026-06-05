@@ -93,7 +93,7 @@ bigint,string
 #       several utility functions in the BE, so for now we should reject it in the FE
 select id, int_array from complextypestbl union select id, int_array from complextypestbl;
 ---- CATCH
-IllegalStateException: UNION, EXCEPT and INTERSECT are not supported for collection types
+AnalysisException: UNION, EXCEPT and INTERSECT are not supported for ARRAY<INT> type.
 ====
 ---- QUERY
 # Changing a column to a different type leads to a "non-pass-through" union that does a

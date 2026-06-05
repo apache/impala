@@ -22,6 +22,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 
+import org.apache.hadoop.hive.metastore.api.FieldSchema;
 import org.apache.hadoop.hive.metastore.api.PrincipalPrivilegeSet;
 import org.apache.hadoop.hive.metastore.api.PrincipalType;
 import org.apache.hadoop.hive.metastore.api.PrivilegeGrantInfo;
@@ -194,6 +195,23 @@ public class DescribeResultFactory {
   }
 
   /**
+   * Builds the FieldSchema list shown in DESCRIBE FORMATTED|EXTENDED output. Unlike
+   * Column.toFieldSchemas(), which emits the type persisted in the Hive Metastore
+   * (toHiveMetastoreType(), e.g. VARIANT -> struct<metadata:binary,value:binary>,
+   * UUID -> string), this shows the user-facing Impala type so the formatted output
+   * stays consistent with the minimal DESCRIBE (which uses prettyPrint()).
+   */
+  private static List<FieldSchema> toDescribeFieldSchemas(List<Column> columns) {
+    List<FieldSchema> ret = new ArrayList<>();
+    for (Column column: columns) {
+      Preconditions.checkNotNull(column.getType());
+      ret.add(new FieldSchema(column.getName(),
+          column.getType().toSql().toLowerCase(), column.getComment()));
+    }
+    return ret;
+  }
+
+  /**
    * Builds a TDescribeResult that contains the result of a DESCRIBE FORMATTED|EXTENDED
    * <table> command. For the formatted describe output the goal is to be exactly the
    * same as what Hive (via HiveServer2) outputs, for compatibility reasons. To do this,
@@ -222,8 +240,8 @@ public class DescribeResultFactory {
         nonClustered.add(col);
       }
     }
-    msTable.getSd().setCols(Column.toFieldSchemas(nonClustered));
-    msTable.setPartitionKeys(Column.toFieldSchemas(clustered));
+    msTable.getSd().setCols(toDescribeFieldSchemas(nonClustered));
+    msTable.setPartitionKeys(toDescribeFieldSchemas(clustered));
 
     org.apache.hadoop.hive.ql.metadata.PrimaryKeyInfo pki =
         new org.apache.hadoop.hive.ql.metadata.PrimaryKeyInfo(

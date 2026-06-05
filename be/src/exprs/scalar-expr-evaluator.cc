@@ -54,7 +54,10 @@
 #include "exprs/tuple-is-null-predicate.h"
 #include "exprs/udf-builtins.h"
 #include "exprs/utility-functions.h"
+#include "exprs/variant-functions.h"
 #include "runtime/date-value.h"
+#include "runtime/tuple.h"
+#include "runtime/tuple-row.h"
 #include "runtime/decimal-value.inline.h"
 #include "runtime/mem-pool.h"
 #include "runtime/mem-tracker.h"
@@ -93,7 +96,7 @@ Status ScalarExprEvaluator::Create(const ScalarExpr& root, RuntimeState* state,
     DCHECK_EQ(root.fn_ctx_idx_, -1);
     DCHECK((*eval)->fn_ctxs_ptr_ == nullptr);
   }
-  if (root.type().IsStructType()) {
+  if (root.type().IsStructType() || root.type().IsVariantType()) {
     DCHECK(root.GetNumChildren() > 0);
     Status status = Create(root.children(), state, pool, expr_perm_pool,
         expr_results_pool, &((*eval)->childEvaluators_));
@@ -374,6 +377,19 @@ void* ScalarExprEvaluator::GetValue(const ScalarExpr& expr, const TupleRow* row)
       result_.struct_val = v;
       return &result_.struct_val;
     }
+    case TYPE_VARIANT: {
+      // VARIANT slot is 24 bytes (two StringValues). Return pointer to slot directly.
+      // The SlotRef::GetValue will return the slot pointer.
+      // TODO(variant_get): VARIANT is currently scan-only, so a SlotRef is the only
+      // expression that can produce one. When VARIANT becomes a first-class expression
+      // type (a VariantVal ABI, letting functions such as variant_get() return VARIANT),
+      // this DCHECK must be relaxed and the non-SlotRef path handled here.
+      DCHECK(expr.IsSlotRef());
+      const SlotRef& slot_ref = static_cast<const SlotRef&>(expr);
+      Tuple* t = row->GetTuple(slot_ref.GetTupleIdx());
+      if (t == nullptr || t->IsNull(slot_ref.GetNullIndicatorOffset())) return nullptr;
+      return t->GetSlot(slot_ref.GetSlotOffset());
+    }
     default:
       DCHECK(false) << "Type not implemented: " << expr.type_.DebugString();
       return nullptr;
@@ -462,6 +478,7 @@ void ScalarExprEvaluator::InitBuiltinsDummy() {
   DecimalOperators::CastToDecimalVal(nullptr, DecimalVal::null());
   geo::GeospatialFunctions::st_MaxX(nullptr, StringVal::null());
   IcebergFunctions::TruncatePartitionTransform(nullptr, IntVal::null(), IntVal::null());
+  VariantFunctions::VariantToJson(nullptr, StringVal::null(), StringVal::null());
   InPredicate::InIterate(nullptr, BigIntVal::null(), 0, nullptr);
   IsNullPredicate::IsNull(nullptr, BooleanVal::null());
   LikePredicate::Like(nullptr, StringVal::null(), StringVal::null());

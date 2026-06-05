@@ -628,4 +628,15 @@ Status VariantValue::ToJson(impala_udf::FunctionContext* ctx,
   return Status::OK();
 }
 
+Status VariantValue::ToJson(std::ostream* out) const {
+  DCHECK(metadata_ != nullptr);
+  // Buffer the whole document first so that a decode failure (which can surface after
+  // some bytes have already been written to 'writer') does not leak partial JSON.
+  auto buffer = CreateStringBuffer(Len() * 2);
+  JsonWriter writer(buffer);
+  RETURN_IF_ERROR(ValueToJson(*this, *metadata_, &writer));
+  out->write(buffer.GetString(), buffer.GetSize());
+  return Status::OK();
+}
+
 }  // namespace impala

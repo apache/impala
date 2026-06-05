@@ -219,7 +219,8 @@ string ImpalaServer::ColumnTypeToBeeswaxTypeString(const TColumnType& type) {
     return TypeToOdbcString(type);
   } else if (type.types[0].type == TTypeNodeType::ARRAY
       || type.types[0].type == TTypeNodeType::MAP
-      || type.types[0].type == TTypeNodeType::STRUCT) {
+      || type.types[0].type == TTypeNodeType::STRUCT
+      || type.types[0].type == TTypeNodeType::VARIANT) {
     DCHECK_GT(type.types.size(), 1);
     // TODO (IMPALA-11041): consider returning the real type
     return "string";

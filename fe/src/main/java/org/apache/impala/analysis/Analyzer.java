@@ -69,6 +69,7 @@ import org.apache.impala.catalog.KuduTable;
 import org.apache.impala.catalog.ScalarType;
 import org.apache.impala.catalog.StructField;
 import org.apache.impala.catalog.StructType;
+import org.apache.impala.catalog.VariantType;
 import org.apache.impala.catalog.TableLoadingException;
 import org.apache.impala.catalog.Type;
 import org.apache.impala.catalog.TypeCompatibility;
@@ -1773,8 +1774,30 @@ public class Analyzer {
     SlotDescriptor result = createAndRegisterRawSlotDesc(slotPath, true);
     if (slotPath.destType().isStructType()) {
       createStructTuplesAndSlotDescs(result);
+    } else if (slotPath.destType().isVariantType()) {
+      // VARIANT is only supported as a top-level column, not nested inside a STRUCT. A
+      // VARIANT reached through an enclosing STRUCT has more than one matched type on
+      // its path (e.g. [STRUCT, VARIANT]); a top-level column (or an inline-view
+      // pass-through) matches exactly the VARIANT itself. VARIANT nested inside a
+      // collection is rejected before reaching here, in registerCollectionSlotRef()
+      // and registerSlotRef().
+      if (slotPath.getMatchedTypes().size() > 1) {
+        throw nestedVariantNotSupported(slotPath);
+      }
+      createVariantTuplesAndSlotDescs(result);
     }
     return result;
+  }
+
+  /**
+   * Returns an AnalysisException for a query that references a VARIANT value nested
+   * inside another complex type (ARRAY/MAP/STRUCT). Only top-level VARIANT columns can
+   * be queried; (IMPALA-15132).
+   */
+  private static AnalysisException nestedVariantNotSupported(Path slotPath) {
+    return new AnalysisException(String.format("VARIANT nested inside a complex type "
+        + "(ARRAY, MAP or STRUCT) is not supported; VARIANT is only supported as a "
+        + "top-level column: '%s'.", Joiner.on(".").join(slotPath.getRawPath())));
   }
 
   /**
@@ -1807,16 +1830,29 @@ public class Analyzer {
     registerColumnPrivReq(desc);
   }
 
+  /**
+   * Creates the item TupleDescriptor for a complex slot 'desc' (STRUCT or VARIANT),
+   * links it to 'desc' as its parent slot, and returns it. Only the shared scaffolding
+   * is done here; populating the child SlotDescriptors is left to the caller because it
+   * differs by type: STRUCT children are resolved from the table schema (with paths and
+   * privilege requests), while VARIANT children are synthetic (metadata + value) and
+   * have no schema path.
+   */
+  private TupleDescriptor createComplexItemTupleDesc(SlotDescriptor desc, String name) {
+    TupleDescriptor itemTuple = getDescTbl().createTupleDescriptor(name);
+    itemTuple.setParentSlotDesc(desc);
+    desc.setItemTupleDesc(itemTuple);
+    return itemTuple;
+  }
+
   public void createStructTuplesAndSlotDescs(SlotDescriptor desc)
       throws AnalysisException {
     Preconditions.checkState(desc.getType().isStructType());
-    TupleDescriptor structTuple = getDescTbl().createTupleDescriptor("struct_tuple");
+    TupleDescriptor structTuple = createComplexItemTupleDesc(desc, "struct_tuple");
     Path slotPath = desc.getPath();
     if (slotPath != null) structTuple.setPath(slotPath);
     final StructType type = (StructType) desc.getType();
     structTuple.setType(type);
-    structTuple.setParentSlotDesc(desc);
-    desc.setItemTupleDesc(structTuple);
 
     try (TupleStackGuard guard = new TupleStackGuard(structTuple)) {
       for (StructField structField : type.getFields()) {
@@ -1833,6 +1869,23 @@ public class Analyzer {
           childRelPath.resolve();
           SlotDescriptor childDesc = createAndRegisterSlotDesc(childRelPath);
         }
+      }
+    }
+  }
+
+  public void createVariantTuplesAndSlotDescs(SlotDescriptor desc)
+      throws AnalysisException {
+    Preconditions.checkState(desc.getType().isVariantType());
+    TupleDescriptor variantTuple = createComplexItemTupleDesc(desc, "variant_tuple");
+    desc.setShouldMaterializeRecursively(true);
+    final VariantType type = (VariantType) desc.getType();
+
+    // Create child slots without paths (VARIANT children don't exist in Iceberg schema).
+    try (TupleStackGuard guard = new TupleStackGuard(variantTuple)) {
+      for (StructField field : type.getFields()) {
+        SlotDescriptor childDesc = addSlotDescriptorAtCurrentLevel();
+        childDesc.setType(field.getType());
+        childDesc.setIsMaterialized(true);
       }
     }
   }

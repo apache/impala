@@ -161,7 +161,7 @@ public class SlotDescriptor {
   public boolean isFullyMaterialized() {
     if (!isMaterialized()) return false;
     if (itemTupleDesc_ != null) {
-      Preconditions.checkState(type_.isComplexType());
+      Preconditions.checkState(type_.isComplexOrVariantType());
       for (SlotDescriptor childSlotDesc : itemTupleDesc_.getSlots()) {
         if (!childSlotDesc.isFullyMaterialized()) return false;
       }
@@ -347,7 +347,9 @@ public class SlotDescriptor {
    */
   public int getMaterializedSlotSize() {
     if (!isMaterialized()) return 0;
-    if (!getType().isStructType()) return getType().getSlotSize();
+    if (!getType().isStructType() && !getType().isVariantType()) {
+      return getType().getSlotSize();
+    }
 
     Preconditions.checkNotNull(itemTupleDesc_);
     int size = 0;
@@ -424,8 +426,10 @@ public class SlotDescriptor {
     Preconditions.checkState(path_.isResolved());
 
     List<Integer> materializedPath = Lists.newArrayList(path_.getAbsolutePath());
-    // For scalar types and structs the materialized path is the same as path_
-    if (type_.isScalarType() || type_.isStructType()) return materializedPath;
+    // For scalar types, structs, and variants the materialized path is the same as path_
+    if (type_.isScalarType() || type_.isStructType() || type_.isVariantType()) {
+      return materializedPath;
+    }
     Preconditions.checkState(type_.isCollectionType());
     Preconditions.checkState(path_.getFirstCollectionIndex() != -1);
     // Truncate materializedPath after first collection element

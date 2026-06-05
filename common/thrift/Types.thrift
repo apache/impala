@@ -53,6 +53,7 @@ enum TPrimitiveType {
   VARCHAR = 16
   FIXED_UDA_INTERMEDIATE = 17
   UUID = 18
+  VARIANT = 19
 }
 
 enum TTypeNodeType {
@@ -60,6 +61,7 @@ enum TTypeNodeType {
   ARRAY = 1
   MAP = 2
   STRUCT = 3
+  VARIANT = 4
 }
 
 struct TScalarType {
@@ -92,6 +94,9 @@ struct TTypeNode {
 
   // only used for structs; has struct_fields.size() corresponding child types
   3: optional list<TStructField> struct_fields
+
+  // only used for variants; it contains 2 fields: "metadata" and "value" (both BINARY).
+  4: optional list<TStructField> variant_fields
 }
 
 // A flattened representation of a tree of column types obtained by depth-first

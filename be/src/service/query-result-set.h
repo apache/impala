@@ -85,9 +85,11 @@ class QueryResultSet {
 protected:
   /// Wrapper to call ComplexValueWriter::CollectionValueToJSON() or
   /// ComplexValueWriter::StructValToJSON() for a given complex column. expr_eval must be
-  /// a SlotRef on a complex-typed (collection or struct) slot. If 'stringify_map_keys' is
-  /// true, converts map keys to strings; see IMPALA-11778.
-  static void PrintComplexValue(ScalarExprEvaluator* expr_eval, const TupleRow* row,
+  /// a SlotRef on a complex-typed (collection, struct or variant) slot. If
+  /// 'stringify_map_keys' is true, converts map keys to strings; see IMPALA-11778.
+  /// Returns an error if the value fails to serialize (only possible for a corrupt
+  /// VARIANT); on such a failure 'stream' is left unmodified.
+  static Status PrintComplexValue(ScalarExprEvaluator* expr_eval, const TupleRow* row,
       std::stringstream *stream, const ColumnType& type, bool stringify_map_keys);
 };
 }

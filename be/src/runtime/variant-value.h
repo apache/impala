@@ -197,6 +197,9 @@ class VariantValue {
   // Serialize this variant value to JSON string.
   Status ToJson(std::string* json_out) const;
   Status ToJson(impala_udf::FunctionContext* ctx, impala_udf::StringVal* result) const;
+  // Serialize this variant value as JSON directly into 'out'. The JSON is fully
+  // buffered internally and only flushed to 'out' on success.
+  Status ToJson(std::ostream* out) const;
 
   bool IsValid() const { return data_ != nullptr; }
   const uint8_t* Data() const { return data_; }

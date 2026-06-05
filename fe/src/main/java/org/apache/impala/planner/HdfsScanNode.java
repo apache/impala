@@ -494,6 +494,15 @@ public class HdfsScanNode extends ScanNode {
 
     computeMemLayout(analyzer);
 
+    // Disable codegen for scans involving VARIANT columns (not yet fully supported).
+    // TODO(IMPALA-15141): Enable codegen for VARIANTs.
+    for (SlotDescriptor slot : desc_.getSlots()) {
+      if (slot.isMaterialized() && slot.getType().isVariantType()) {
+        analyzer.getQueryCtx().disable_codegen_hint = true;
+        break;
+      }
+    }
+
     // This is towards the end, so that it can take all conjuncts, scan ranges and mem
     // layout into account.
     computeStats(analyzer);
@@ -2499,6 +2508,14 @@ public class HdfsScanNode extends ScanNode {
         if (slot.isArrayPosRef()) {
           // Position virtual slots can be materialized by piggybacking on another slot.
           havePosSlot = true;
+        } else if (type.isVariantType()) {
+          // VARIANT expands to 2 physical Parquet columns (metadata + value).
+          Column column = slot.getColumn();
+          long estReservation = (column == null)
+              ? DEFAULT_COLUMN_SCAN_RANGE_RESERVATION
+              : computeMinScalarColumnMemReservation(column);
+          columnByteSizes.add(estReservation);
+          columnByteSizes.add(estReservation);
         } else if (type.isScalarType()) {
           Column column = slot.getColumn();
           long estReservation;

@@ -92,8 +92,31 @@ ColumnType::ColumnType(const std::vector<TTypeNode>& types, int* idx)
       ++(*idx);
       children.push_back(ColumnType(types, idx));
       break;
+    case TTypeNodeType::VARIANT:
+      type = TYPE_VARIANT;
+      for (int i = 0; i < node.variant_fields.size(); ++i) {
+        ++(*idx);
+        children.push_back(ColumnType(types, idx));
+        field_names.push_back(node.variant_fields[i].name);
+        field_ids.push_back(node.variant_fields[i].field_id);
+      }
+      DCheckVariantShape();
+      break;
     default:
       DCHECK(false) << node.type;
+  }
+}
+
+void ColumnType::DCheckVariantShape() const {
+  DCHECK_EQ(type, TYPE_VARIANT);
+  DCHECK_EQ(children.size(), 2) << "VARIANT must have exactly metadata+value children";
+  DCHECK_EQ(field_names.size(), children.size());
+  DCHECK_EQ(field_names[0], "metadata") << field_names[0];
+  DCHECK_EQ(field_names[1], "value") << field_names[1];
+  for (const ColumnType& child : children) {
+    // BINARY is represented as TYPE_STRING with string_val_subtype_ == BINARY
+    DCHECK_EQ(child.type, TYPE_STRING);
+    DCHECK(child.IsBinaryType()) << "VARIANT children must be BINARY";
   }
 }
 
@@ -119,6 +142,7 @@ PrimitiveType ThriftToType(TPrimitiveType::type ttype) {
     case TPrimitiveType::DECIMAL: return TYPE_DECIMAL;
     case TPrimitiveType::CHAR: return TYPE_CHAR;
     case TPrimitiveType::FIXED_UDA_INTERMEDIATE: return TYPE_FIXED_UDA_INTERMEDIATE;
+    case TPrimitiveType::VARIANT: return TYPE_VARIANT;
     default: return INVALID_TYPE;
   }
 }
@@ -153,6 +177,7 @@ TPrimitiveType::type ToThrift(PrimitiveType ptype, StringValSubtype subtype) {
     case TYPE_CHAR: return TPrimitiveType::CHAR;
     case TYPE_UUID: return TPrimitiveType::UUID;
     case TYPE_FIXED_UDA_INTERMEDIATE: return TPrimitiveType::FIXED_UDA_INTERMEDIATE;
+    case TYPE_VARIANT: return TPrimitiveType::VARIANT;
     case TYPE_STRUCT:
     case TYPE_ARRAY:
     case TYPE_MAP:
@@ -186,6 +211,7 @@ string TypeToString(PrimitiveType t) {
     case TYPE_STRUCT: return "STRUCT";
     case TYPE_ARRAY: return "ARRAY";
     case TYPE_MAP: return "MAP";
+    case TYPE_VARIANT: return "VARIANT";
   };
   return "";
 }
@@ -224,6 +250,7 @@ string TypeToOdbcString(const TColumnType& type) {
     case TYPE_STRUCT: return "struct";
     case TYPE_ARRAY: return "array";
     case TYPE_MAP: return "map";
+    case TYPE_VARIANT: return "variant";
     case TYPE_BINARY:
     case TYPE_FIXED_UDA_INTERMEDIATE:
       // This type is not exposed to clients and should not be returned.
@@ -241,6 +268,16 @@ void ColumnType::ToThrift(TColumnType* thrift_type) const {
       node.type = TTypeNodeType::ARRAY;
     } else if (type == TYPE_MAP) {
       node.type = TTypeNodeType::MAP;
+    } else if (type == TYPE_VARIANT) {
+      node.type = TTypeNodeType::VARIANT;
+      DCheckVariantShape();
+      node.__set_variant_fields(vector<TStructField>());
+      DCHECK_EQ(field_names.size(), field_ids.size());
+      for (int i = 0; i < field_names.size(); i++) {
+        node.variant_fields.push_back(TStructField());
+        node.variant_fields.back().name = field_names[i];
+        node.variant_fields.back().field_id = field_ids[i];
+      }
     } else {
       DCHECK_EQ(type, TYPE_STRUCT);
       node.type = TTypeNodeType::STRUCT;

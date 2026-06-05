@@ -26,6 +26,7 @@ from tests.hs2.hs2_test_suite import (
     create_op_handle_without_secret,
     HS2TestSuite,
     needs_session,
+    needs_session_cluster_properties,
 )
 
 
@@ -296,3 +297,41 @@ class TestFetch(HS2TestSuite):
         TCLIService.TGetResultSetMetadataReq(operationHandle=good_handle)))
     HS2TestSuite.check_response(self.hs2_client.CloseOperation(
         TCLIService.TCloseOperationReq(operationHandle=good_handle)))
+
+  @needs_session_cluster_properties()
+  def test_variant_type_metadata(self, cluster_properties, unique_database):  # noqa: U100
+    """IMPALA-15052: a VARIANT column is reported to clients as STRING over the HS2
+    GetResultSetMetadata RPC, and as DATA_TYPE=VARCHAR / TYPE_NAME='VARIANT' over the HS2
+    GetColumns RPC. These are the RPCs the JDBC/ODBC drivers use, so this covers the
+    client-facing type presentation of VARIANT. Reads the bulk-loaded
+    functional_parquet.trino_variant table."""
+    table = "functional_parquet.trino_variant"
+
+    # GetResultSetMetadata: the VARIANT column comes back as STRING_TYPE.
+    execute_req = TCLIService.TExecuteStatementReq()
+    execute_req.sessionHandle = self.session_handle
+    execute_req.statement = "SELECT v FROM %s LIMIT 1" % table
+    execute_resp = self.hs2_client.ExecuteStatement(execute_req)
+    HS2TestSuite.check_response(execute_resp)
+    metadata_resp = self.result_metadata(execute_resp.operationHandle)
+    col = metadata_resp.schema.columns[0]
+    assert col.typeDesc.types[0].primitiveEntry.type == TTypeId.STRING_TYPE, \
+        col.typeDesc.types[0]
+    self.close(execute_resp.operationHandle)
+
+    # GetColumns: DATA_TYPE = java.sql.Types.VARCHAR (12), TYPE_NAME = 'VARIANT'. Column
+    # order per MetadataOp.GET_COLUMNS_MD: [3]=COLUMN_NAME, [4]=DATA_TYPE, [5]=TYPE_NAME.
+    get_cols_req = TCLIService.TGetColumnsReq()
+    get_cols_req.sessionHandle = self.session_handle
+    get_cols_req.schemaName = "functional_parquet"
+    get_cols_req.tableName = "trino_variant"
+    get_cols_req.columnName = "v"
+    get_cols_resp = self.hs2_client.GetColumns(get_cols_req)
+    HS2TestSuite.check_response(get_cols_resp)
+    fetch_resp = self.fetch_at_most(
+        get_cols_resp.operationHandle, TCLIService.TFetchOrientation.FETCH_NEXT, 10)
+    cols = fetch_resp.results.columns
+    assert cols[3].stringVal.values[0] == "v", cols[3].stringVal.values
+    assert cols[4].i32Val.values[0] == 12, cols[4].i32Val.values  # Types.VARCHAR
+    assert cols[5].stringVal.values[0] == "VARIANT", cols[5].stringVal.values
+    self.close(get_cols_resp.operationHandle)

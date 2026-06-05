@@ -109,6 +109,9 @@ public:
 
   char* Ptr() const { return string_impl_.Ptr(); }
 
+  /// Returns uint8_t pointer to the start of the string buffer.
+  uint8_t* UPtr() const { return reinterpret_cast<uint8_t*>(string_impl_.Ptr()); }
+
   /// We can only call this if the string is not smallified.
   void SetPtr(char* ptr) { return string_impl_.SetPtr(ptr); }
 

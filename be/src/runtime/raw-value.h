@@ -187,6 +187,17 @@ private:
       std::vector<StringValue*>* string_values,
       std::vector<std::pair<CollectionValue*, int64_t>>* collection_values);
 
+  /// Helper function for Write() to handle variant slots. Unlike WriteStruct, 'value'
+  /// is not a StructVal: it points at the raw variant slot (two adjacent StringValues,
+  /// metadata + value) in the source tuple. Child slot offsets are absolute in the master
+  /// tuple (same invariant as struct children), so each child is located in 'value' at
+  /// child->tuple_offset() - slot_desc->tuple_offset(). 'value' must be non-null (a NULL
+  /// variant is handled in Write()).
+  template <bool COLLECT_VAR_LEN_VALS>
+  static void WriteVariant(const void* value, Tuple* tuple,
+      const SlotDescriptor* slot_desc, MemPool* pool,
+      std::vector<StringValue*>* string_values);
+
   /// Recursive helper function for Write() to handle collection slots.
   template <bool COLLECT_VAR_LEN_VALS>
   static void WriteCollection(const void* value, Tuple* tuple,

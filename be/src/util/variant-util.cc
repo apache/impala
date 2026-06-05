@@ -17,6 +17,9 @@
 
 #include "util/variant-util.h"
 
+#include <ostream>
+#include <utility>
+
 #include <rapidjson/writer.h>
 
 #include "common/names.h"
@@ -40,6 +43,20 @@ Status VariantToJson(impala_udf::FunctionContext* ctx,
   RETURN_IF_ERROR(metadata.Init(metadata_data, metadata_len));
   VariantValue value(value_data, value_len, &metadata);
   return value.ToJson(ctx, result);
+}
+
+Status VariantSlotToJson(const VariantSlot* slot, string* json_out) {
+  DCHECK(slot != nullptr);
+  return VariantToJson(slot->metadata.UPtr(), slot->metadata.Len(),
+      slot->value.UPtr(), slot->value.Len(), json_out);
+}
+
+Status VariantSlotToJson(const VariantSlot* slot, std::ostream* out) {
+  DCHECK(slot != nullptr);
+  VariantMetadata metadata;
+  RETURN_IF_ERROR(metadata.Init(slot->metadata.UPtr(), slot->metadata.Len()));
+  VariantValue value(slot->value.UPtr(), slot->value.Len(), &metadata);
+  return value.ToJson(out);
 }
 
 }  // namespace impala

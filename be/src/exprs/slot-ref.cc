@@ -85,7 +85,7 @@ SlotRef* SlotRef::TypeSafeCreate(const SlotDescriptor* desc) {
 
 Status SlotRef::Init(
     const RowDescriptor& row_desc, bool is_entry_point, FragmentState* state) {
-  DCHECK(type_.IsStructType() || children_.size() == 0);
+  DCHECK(type_.IsStructType() || type_.IsVariantType() || children_.size() == 0);
   RETURN_IF_ERROR(ScalarExpr::Init(row_desc, is_entry_point, state));
   if (slot_id_ != -1) {
     slot_desc_ = state->desc_tbl().GetSlotDescriptor(slot_id_);
@@ -134,7 +134,7 @@ string SlotRef::DebugString() const {
 }
 
 void SlotRef::AssignFnCtxIdx(int* next_fn_ctx_idx) {
-  if (!type_.IsStructType()) {
+  if (!type_.IsStructType() && !type_.IsVariantType()) {
     ScalarExpr::AssignFnCtxIdx(next_fn_ctx_idx);
     return;
   }
@@ -329,7 +329,8 @@ CodegenAnyValReadWriteInfo SlotRef::CodegenReadSlot(LlvmCodeGen* codegen,
 
   // This is not used for structs because the child expressions have their own slot
   // pointers and we only read through those, not through the struct slot pointer.
-  llvm::Value* val_ptr = type_.IsStructType() ? nullptr : builder->CreateBitCast(slot_ptr,
+  llvm::Value* val_ptr = (type_.IsStructType() || type_.IsVariantType()) ? nullptr :
+      builder->CreateBitCast(slot_ptr,
       codegen->GetSlotPtrType(type_), "val_ptr");
 
   // For structs the code that reads the value consists of multiple basic blocks, so the
@@ -343,7 +344,7 @@ CodegenAnyValReadWriteInfo SlotRef::CodegenReadSlot(LlvmCodeGen* codegen,
   // *Val. The optimizer does a better job when there is a phi node for each value, rather
   // than having read_slot_block generate an AnyVal and having a single phi node over
   // that.
-  if (type_.IsStructType()) {
+  if (type_.IsStructType() || type_.IsVariantType()) {
     llvm::Function* fn = builder->GetInsertBlock()->getParent();
     std::size_t num_children = children_.size();
     for (std::size_t i = 0; i < num_children; ++i) {

@@ -3683,6 +3683,7 @@ public class ParserTest extends FrontendTestBase {
     TypeDefsParseOk("DECIMAL");
     TypeDefsParseOk("TIMESTAMP");
     TypeDefsParseOk("DATE");
+    TypeDefsParseOk("VARIANT");
 
     // Test decimal.
     TypeDefsParseOk("DECIMAL");
@@ -4692,7 +4693,7 @@ public class ParserTest extends FrontendTestBase {
   public void TestUnreservedKeywords() {
     // Test if "unreserved keywords" can be used as identifiers, such as table names and
     // column names.
-    final String[] unreservedKeywords = { "DEFAULT", "KILL", "QUERY" };
+    final String[] unreservedKeywords = { "DEFAULT", "KILL", "QUERY", "VARIANT" };
     for (String keyword : unreservedKeywords) {
       ParsesOk(String.format("CREATE TABLE %s (%s INT);", keyword, keyword));
     }

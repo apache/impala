@@ -19,6 +19,7 @@ from functools import partial
 import glob
 import json
 import os
+import re
 
 from avro.datafile import DataFileReader, DataFileWriter
 from avro.io import DatumReader, DatumWriter
@@ -121,6 +122,13 @@ def generate_new_path(table_params, file_path):
 
   if prefix:
     result = prefix + result
+
+  # Trino writes table directories as "<table_name>-<uuid>"
+  # (e.g. trino_variant-134fa49d..).
+  # Normalize that segment to the bare table name so paths match the staged
+  # "<unique_db>.db/<table_name>" layout. The pattern only matches the Trino-style hex
+  # suffix, so Hive-generated tables (plain "/test-warehouse/<table>") are unaffected.
+  result = re.sub(re.escape(table_name) + r"-[0-9a-f]{16,}", table_name, result)
 
   if not unique_database:
     return result

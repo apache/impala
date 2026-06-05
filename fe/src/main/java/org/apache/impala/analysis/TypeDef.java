@@ -70,6 +70,10 @@ public class TypeDef extends StmtNode {
     } else if (type.isArrayType()) {
       ArrayType arrayType = (ArrayType) type;
       analyze(arrayType.getItemType(), analyzer);
+    } else if (type.isVariantType()) {
+      // VARIANT can be read from Iceberg tables written by other engines, but it cannot
+      // be specified by the user as a column type (in CREATE/ALTER TABLE or CAST).
+      throw new AnalysisException("VARIANT type is not supported as a column type.");
     } else {
       Preconditions.checkState(type.isMapType());
       analyzeMapType((MapType) type, analyzer);

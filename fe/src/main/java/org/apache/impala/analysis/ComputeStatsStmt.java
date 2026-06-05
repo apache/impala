@@ -961,7 +961,8 @@ public class ComputeStatsStmt extends StatementBase implements SingleTableStmt {
    */
   private boolean ignoreColumn(Column c) {
     Type t = c.getType();
-    return !t.isValid() || !t.isSupported() || t.isComplexType() || c.isHidden();
+    return !t.isValid() || !t.isSupported() || t.isComplexOrVariantType()
+        || c.isHidden();
   }
 
   public double getEffectiveSamplingPerc() { return effectiveSamplePerc_; }
