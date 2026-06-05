@@ -134,7 +134,7 @@ def get_version():
 
 setup(
   name='impala_shell',
-  python_requires='>2.6',
+  python_requires='>=3.8',
   version=get_version(),
   description='Impala Shell',
   long_description_content_type='text/markdown',
@@ -160,8 +160,6 @@ setup(
     'License :: OSI Approved :: Apache Software License',
     'Operating System :: MacOS :: MacOS X',
     'Operating System :: POSIX :: Linux',
-    'Programming Language :: Python :: 2.6',
-    'Programming Language :: Python :: 2.7',
     'Programming Language :: Python :: 3',
     'Topic :: Database :: Front-Ends'
   ]

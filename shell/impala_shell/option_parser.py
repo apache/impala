@@ -247,7 +247,9 @@ def get_option_parser(defaults):
                     help="User to authenticate with.")
   parser.add_option("--ssl", dest="ssl",
                     action="store_true",
-                    help="Connect to Impala via SSL-secured connection \t")
+                    help="Connect to Impala via SSL-secured connection. Does not verify "
+                    "the server's TLS certificate by default (see --ca_cert and "
+                    "--verify_cert options).")
   parser.add_option("--ca_cert", dest="ca_cert",
                     help=("Full path to "
                     "certificate file used to authenticate Impala's SSL certificate."
