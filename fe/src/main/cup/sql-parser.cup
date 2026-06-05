@@ -3339,8 +3339,8 @@ show_create_function_stmt ::=
   ;
 
 show_files_stmt ::=
-  KW_SHOW KW_FILES KW_IN table_name:table opt_partition_set:partitions
-  {: RESULT = new ShowFilesStmt(table, partitions); :}
+  KW_SHOW KW_FILES KW_IN table_name:table opt_asof:asof opt_partition_set:partitions
+  {: RESULT = new ShowFilesStmt(table, partitions, asof); :}
   ;
 
 describe_stmt ::=

@@ -1616,6 +1616,80 @@ class TestIcebergTable(IcebergTestSuite):
     self.run_test_case('QueryTest/iceberg-show-files-partition', vector,
                        use_db=unique_database)
 
+  def test_show_files_time_travel(self, vector, unique_database):
+    # Create non-partitioned table with 3 snapshots (one insert each)
+    tbl = unique_database + ".iceberg_timetravel_showfiles"
+    self.execute_query(
+        "CREATE TABLE {} (id INT, name STRING) STORED AS ICEBERG".format(tbl))
+    self.execute_query("INSERT INTO {} VALUES (1, 'a')".format(tbl))
+    self.execute_query("INSERT INTO {} VALUES (2, 'b')".format(tbl))
+    self.execute_query("INSERT INTO {} VALUES (3, 'c')".format(tbl))
+
+    snapshots = get_snapshots(self.client, tbl, expected_result_size=3)
+
+    # Create partitioned table with 3 snapshots
+    part_tbl = unique_database + ".iceberg_timetravel_partitioned_showfiles"
+    self.execute_query(
+        "CREATE TABLE {} (id INT, name STRING) "
+        "PARTITIONED BY SPEC (id) STORED AS ICEBERG".format(part_tbl))
+    self.execute_query("INSERT INTO {} VALUES (1, 'a')".format(part_tbl))
+    self.execute_query("INSERT INTO {} VALUES (2, 'b')".format(part_tbl))
+    self.execute_query("INSERT INTO {} VALUES (3, 'c')".format(part_tbl))
+
+    part_snapshots = get_snapshots(self.client, part_tbl, expected_result_size=3)
+
+    # Create table to test truncate scenario:
+    # insert -> truncate (empty snapshot) -> re-insert
+    trunc_tbl = unique_database + ".iceberg_truncate_showfiles"
+    self.execute_query(
+        "CREATE TABLE {} (id INT, name STRING) STORED AS ICEBERG".format(trunc_tbl))
+    self.execute_query("INSERT INTO {} VALUES (1, 'a')".format(trunc_tbl))
+    self.execute_query("TRUNCATE TABLE {}".format(trunc_tbl))
+    self.execute_query("INSERT INTO {} VALUES (2, 'b')".format(trunc_tbl))
+
+    trunc_snapshots = get_snapshots(self.client, trunc_tbl, expected_result_size=3)
+
+    # Create table to test compaction scenario:
+    # 3 inserts -> OPTIMIZE (compacts to one file per executor)
+    compact_tbl = unique_database + ".iceberg_compaction_showfiles"
+    self.execute_query(
+        "CREATE TABLE {} (id INT, name STRING) STORED AS ICEBERG".format(compact_tbl))
+    self.execute_query("INSERT INTO {} VALUES (1, 'a')".format(compact_tbl))
+    self.execute_query("INSERT INTO {} VALUES (2, 'b')".format(compact_tbl))
+    self.execute_query("INSERT INTO {} VALUES (3, 'c')".format(compact_tbl))
+
+    compact_snapshots_before = get_snapshots(self.client, compact_tbl,
+                                             expected_result_size=3)
+    self.execute_query("OPTIMIZE TABLE {}".format(compact_tbl))
+
+    self.run_test_case('QueryTest/iceberg-show-files-time-travel', vector,
+                       use_db=unique_database,
+                       test_file_vars={
+                           '$FIRST_SNAPSHOT': str(snapshots[0].get_snapshot_id()),
+                           '$SECOND_SNAPSHOT': str(snapshots[1].get_snapshot_id()),
+                           '$FIRST_TIMESTAMP':
+                           snapshots[0].get_creation_time().strftime(
+                               '%Y-%m-%d %H:%M:%S.%f'),
+                           '$SECOND_TIMESTAMP':
+                           snapshots[1].get_creation_time().strftime(
+                               '%Y-%m-%d %H:%M:%S.%f'),
+                           '$FIRST_PART_SNAPSHOT':
+                           str(part_snapshots[0].get_snapshot_id()),
+                           '$SECOND_PART_SNAPSHOT':
+                           str(part_snapshots[1].get_snapshot_id()),
+                           '$FIRST_PART_TIMESTAMP':
+                           part_snapshots[0].get_creation_time().strftime(
+                               '%Y-%m-%d %H:%M:%S.%f'),
+                           '$PRE_TRUNCATE_SNAPSHOT':
+                           str(trunc_snapshots[0].get_snapshot_id()),
+                           '$TRUNCATE_SNAPSHOT':
+                           str(trunc_snapshots[1].get_snapshot_id()),
+                           '$POST_REINSERT_SNAPSHOT':
+                           str(trunc_snapshots[2].get_snapshot_id()),
+                           '$PRE_COMPACTION_SNAPSHOT':
+                           str(compact_snapshots_before[2].get_snapshot_id()),
+                       })
+
   def test_scan_metrics_in_profile_basic(self, vector):
     self.run_test_case('QueryTest/iceberg-scan-metrics-basic', vector)
 

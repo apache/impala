@@ -1,0 +1,168 @@
+====
+---- QUERY
+# Test basic SHOW FILES without time-travel (should show all 3 files)
+SHOW FILES IN iceberg_timetravel_showfiles;
+---- RESULTS: VERIFY_IS_SUBSET
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/iceberg_timetravel_showfiles/data/.*_data.*.parq','.*','','$ERASURECODE_POLICY'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/iceberg_timetravel_showfiles/data/.*_data.*.parq','.*','','$ERASURECODE_POLICY'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/iceberg_timetravel_showfiles/data/.*_data.*.parq','.*','','$ERASURECODE_POLICY'
+---- TYPES
+STRING, STRING, STRING, STRING
+====
+---- QUERY
+# Test SHOW FILES with SYSTEM_VERSION AS OF first snapshot (should show 1 file)
+SHOW FILES IN iceberg_timetravel_showfiles FOR SYSTEM_VERSION AS OF $FIRST_SNAPSHOT;
+---- RESULTS
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/iceberg_timetravel_showfiles/data/.*_data.*.parq','.*','','$ERASURECODE_POLICY'
+---- TYPES
+STRING, STRING, STRING, STRING
+====
+---- QUERY
+# Test SHOW FILES with SYSTEM_VERSION AS OF second snapshot (should show 2 files)
+SHOW FILES IN iceberg_timetravel_showfiles FOR SYSTEM_VERSION AS OF $SECOND_SNAPSHOT;
+---- RESULTS: VERIFY_IS_SUBSET
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/iceberg_timetravel_showfiles/data/.*_data.*.parq','.*','','$ERASURECODE_POLICY'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/iceberg_timetravel_showfiles/data/.*_data.*.parq','.*','','$ERASURECODE_POLICY'
+---- TYPES
+STRING, STRING, STRING, STRING
+====
+---- QUERY
+# Test SHOW FILES with SYSTEM_TIME AS OF first timestamp (should show 1 file)
+SHOW FILES IN iceberg_timetravel_showfiles FOR SYSTEM_TIME AS OF '$FIRST_TIMESTAMP';
+---- RESULTS
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/iceberg_timetravel_showfiles/data/.*_data.*.parq','.*','','$ERASURECODE_POLICY'
+---- TYPES
+STRING, STRING, STRING, STRING
+====
+---- QUERY
+# Test SHOW FILES with SYSTEM_TIME AS OF second timestamp (should show 2 files)
+SHOW FILES IN iceberg_timetravel_showfiles FOR SYSTEM_TIME AS OF '$SECOND_TIMESTAMP';
+---- RESULTS: VERIFY_IS_SUBSET
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/iceberg_timetravel_showfiles/data/.*_data.*.parq','.*','','$ERASURECODE_POLICY'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/iceberg_timetravel_showfiles/data/.*_data.*.parq','.*','','$ERASURECODE_POLICY'
+---- TYPES
+STRING, STRING, STRING, STRING
+====
+---- QUERY
+# Test SHOW FILES with SYSTEM_TIME AS OF using now() - should show all files
+SHOW FILES IN iceberg_timetravel_showfiles FOR SYSTEM_TIME AS OF now();
+---- RESULTS: VERIFY_IS_SUBSET
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/iceberg_timetravel_showfiles/data/.*_data.*.parq','.*','','$ERASURECODE_POLICY'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/iceberg_timetravel_showfiles/data/.*_data.*.parq','.*','','$ERASURECODE_POLICY'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/iceberg_timetravel_showfiles/data/.*_data.*.parq','.*','','$ERASURECODE_POLICY'
+---- TYPES
+STRING, STRING, STRING, STRING
+====
+---- QUERY
+# Test SHOW FILES with time-travel at first snapshot (should only show partition id=1, first insert)
+SHOW FILES IN iceberg_timetravel_partitioned_showfiles
+FOR SYSTEM_VERSION AS OF $FIRST_PART_SNAPSHOT;
+---- RESULTS
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/iceberg_timetravel_partitioned_showfiles/data/id=1/.*_data.*.parq','.*','','$ERASURECODE_POLICY'
+---- TYPES
+STRING, STRING, STRING, STRING
+====
+---- QUERY
+# Test SHOW FILES with time-travel AND partition filter (version)
+SHOW FILES IN iceberg_timetravel_partitioned_showfiles
+FOR SYSTEM_VERSION AS OF $SECOND_PART_SNAPSHOT
+PARTITION (id = 2);
+---- RESULTS
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/iceberg_timetravel_partitioned_showfiles/data/id=2/.*_data.*.parq','.*','','$ERASURECODE_POLICY'
+---- TYPES
+STRING, STRING, STRING, STRING
+====
+---- QUERY
+# Test SHOW FILES with time-travel AND partition filter (timestamp)
+SHOW FILES IN iceberg_timetravel_partitioned_showfiles
+FOR SYSTEM_TIME AS OF '$FIRST_PART_TIMESTAMP'
+PARTITION (id = 1);
+---- RESULTS
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/iceberg_timetravel_partitioned_showfiles/data/id=1/.*_data.*.parq','.*','','$ERASURECODE_POLICY'
+---- TYPES
+STRING, STRING, STRING, STRING
+====
+---- QUERY
+# Verify SELECT time-travel and SHOW FILES time-travel are consistent
+# Count rows from first snapshot using SELECT
+SELECT COUNT(*) FROM iceberg_timetravel_showfiles FOR SYSTEM_VERSION AS OF $FIRST_SNAPSHOT;
+---- RESULTS
+1
+---- TYPES
+BIGINT
+====
+---- QUERY
+# Verify SELECT with timestamp
+SELECT COUNT(*) FROM iceberg_timetravel_showfiles FOR SYSTEM_TIME AS OF '$FIRST_TIMESTAMP';
+---- RESULTS
+1
+---- TYPES
+BIGINT
+====
+---- QUERY
+# Negative test: Invalid (non-existent) snapshot ID
+SHOW FILES IN iceberg_timetravel_showfiles FOR SYSTEM_VERSION AS OF 999999999999999;
+---- CATCH
+IllegalArgumentException: Cannot find snapshot with ID 999999999999999
+====
+---- QUERY
+# Negative test: Timestamp too far in the past (before any snapshots)
+SHOW FILES IN iceberg_timetravel_showfiles FOR SYSTEM_TIME AS OF '2000-01-01 00:00:00';
+---- CATCH
+IllegalArgumentException: Cannot find a snapshot older than 2000-01-01 00:00:00
+====
+---- QUERY
+# Negative test: Invalid timestamp format
+SHOW FILES IN iceberg_timetravel_showfiles FOR SYSTEM_TIME AS OF 'invalid-timestamp';
+---- CATCH
+AnalysisException: Invalid TIMESTAMP expression
+====
+---- QUERY
+# Negative test: Decimal value for SYSTEM_VERSION (analysis error - not an integer type)
+SHOW FILES IN iceberg_timetravel_showfiles FOR SYSTEM_VERSION AS OF 123.45;
+---- CATCH
+AnalysisException: FOR SYSTEM_VERSION AS OF <expression> must be an integer type
+====
+---- QUERY
+# Test SHOW FILES for the snapshot before truncate (should show files)
+SHOW FILES IN iceberg_truncate_showfiles FOR SYSTEM_VERSION AS OF $PRE_TRUNCATE_SNAPSHOT;
+---- RESULTS
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/iceberg_truncate_showfiles/data/.*_data.*.parq','.*','','$ERASURECODE_POLICY'
+---- TYPES
+STRING, STRING, STRING, STRING
+====
+---- QUERY
+# Test SHOW FILES for an empty snapshot (after truncate, before re-insert)
+SHOW FILES IN iceberg_truncate_showfiles FOR SYSTEM_VERSION AS OF $TRUNCATE_SNAPSHOT;
+---- RESULTS
+---- TYPES
+STRING, STRING, STRING, STRING
+====
+---- QUERY
+# Test SHOW FILES for snapshot after re-insert (should show only the new file)
+SHOW FILES IN iceberg_truncate_showfiles FOR SYSTEM_VERSION AS OF $POST_REINSERT_SNAPSHOT;
+---- RESULTS
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/iceberg_truncate_showfiles/data/.*_data.*.parq','.*','','$ERASURECODE_POLICY'
+---- TYPES
+STRING, STRING, STRING, STRING
+====
+---- QUERY
+# Test SHOW FILES for pre-compaction snapshot (should still show original files)
+SHOW FILES IN iceberg_compaction_showfiles FOR SYSTEM_VERSION AS OF $PRE_COMPACTION_SNAPSHOT;
+---- RESULTS: VERIFY_IS_SUBSET
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/iceberg_compaction_showfiles/data/.*_data.*.parq','.*','','$ERASURECODE_POLICY'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/iceberg_compaction_showfiles/data/.*_data.*.parq','.*','','$ERASURECODE_POLICY'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/iceberg_compaction_showfiles/data/.*_data.*.parq','.*','','$ERASURECODE_POLICY'
+---- TYPES
+STRING, STRING, STRING, STRING
+====
+---- QUERY
+# Test SHOW FILES after compaction (OPTIMIZE creates one file per executor)
+SHOW FILES IN iceberg_compaction_showfiles;
+---- RESULTS
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/iceberg_compaction_showfiles/data/.*_data.*.parq','.*','','$ERASURECODE_POLICY'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/iceberg_compaction_showfiles/data/.*_data.*.parq','.*','','$ERASURECODE_POLICY'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/iceberg_compaction_showfiles/data/.*_data.*.parq','.*','','$ERASURECODE_POLICY'
+---- TYPES
+STRING, STRING, STRING, STRING
+====

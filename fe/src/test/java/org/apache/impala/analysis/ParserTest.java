@@ -2162,6 +2162,21 @@ public class ParserTest extends FrontendTestBase {
     ParsesOk("SHOW FILES IN `db`.`tbl`");
     ParsesOk("SHOW FILES IN db.tbl PARTITION(x='a',y='b')");
 
+    // Show files with time-travel
+    ParsesOk("SHOW FILES IN tbl FOR SYSTEM_VERSION AS OF 123");
+    ParsesOk("SHOW FILES IN db.tbl FOR SYSTEM_VERSION AS OF 456");
+    ParsesOk("SHOW FILES IN tbl FOR SYSTEM_TIME AS OF '2023-01-01 00:00:00'");
+    ParsesOk("SHOW FILES IN db.tbl FOR SYSTEM_TIME AS OF now()");
+
+    // Show files with time-travel and partition filter
+    ParsesOk("SHOW FILES IN tbl FOR SYSTEM_VERSION AS OF 123 PARTITION(x='a')");
+    ParsesOk("SHOW FILES IN db.tbl FOR SYSTEM_TIME AS OF '2023-01-01' PARTITION(y=1)");
+
+    // Show files time-travel parse errors
+    ParserError("SHOW FILES IN tbl FOR SYSTEM_VERSION AS OF -1");
+    ParserError("SHOW FILES IN tbl FOR SYSTEM_VERSION AS OF 'string'");
+    ParserError("SHOW FILES IN tbl FOR SYSTEM_VERSION AS OF 1 + 2");
+
     // Missing arguments
     ParserError("SHOW");
     // Malformed pattern (no quotes)

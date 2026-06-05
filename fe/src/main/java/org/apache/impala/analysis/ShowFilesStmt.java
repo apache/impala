@@ -48,7 +48,10 @@ import com.google.common.base.Preconditions;
  * Representation of a SHOW FILES statement.
  * Acceptable syntax:
  *
- * SHOW FILES IN [dbName.]tableName [PARTITION(key=value,...)]
+ * SHOW FILES IN [dbName.]tableName
+ *     [FOR SYSTEM_VERSION AS OF <integer_literal> |
+ *      FOR SYSTEM_TIME AS OF <timestamp_expr>]
+ *     [PARTITION(<filter>)]
  *
  */
 public class ShowFilesStmt extends StatementBase implements SingleTableStmt {
@@ -57,21 +60,27 @@ public class ShowFilesStmt extends StatementBase implements SingleTableStmt {
   // Show files for all the partitions if this is null.
   private final PartitionSet partitionSet_;
 
+  // Time travel spec for Iceberg tables.
+  private final TimeTravelSpec timeTravelSpec_;
+
   // Set during analysis.
   protected FeTable table_;
 
   // File paths selected by Iceberg's partition filtering
   private List<String> icebergFilePaths_;
 
-  public ShowFilesStmt(TableName tableName, PartitionSet partitionSet) {
+  public ShowFilesStmt(TableName tableName, PartitionSet partitionSet,
+      TimeTravelSpec timeTravelSpec) {
     tableName_ = Preconditions.checkNotNull(tableName);
     partitionSet_ = partitionSet;
+    timeTravelSpec_ = timeTravelSpec;
   }
 
   @Override
   public String toSql(ToSqlOptions options) {
     StringBuilder strBuilder = new StringBuilder();
     strBuilder.append("SHOW FILES IN " + tableName_.toString());
+    if (timeTravelSpec_ != null) strBuilder.append(" " + timeTravelSpec_.toSql(options));
     if (partitionSet_ != null) strBuilder.append(" " + partitionSet_.toSql(options));
     return strBuilder.toString();
   }
@@ -105,6 +114,16 @@ public class ShowFilesStmt extends StatementBase implements SingleTableStmt {
     }
     tableRef.analyze(analyzer);
 
+    // Analyze the time travel spec, if one was specified.
+    if (timeTravelSpec_ != null) {
+      if (!(table_ instanceof FeIcebergTable)) {
+        throw new AnalysisException(
+            "FOR SYSTEM_TIME/FOR SYSTEM_VERSION AS OF clause is only supported for " +
+            "Iceberg tables.");
+      }
+      timeTravelSpec_.analyze(analyzer);
+    }
+
     // Analyze the partition spec, if one was specified.
     if (partitionSet_ != null) {
         if (table_ instanceof FeShowFileStmtSupport) {
@@ -127,47 +146,50 @@ public class ShowFilesStmt extends StatementBase implements SingleTableStmt {
   }
 
   public void analyzeIceberg(Analyzer analyzer) throws AnalysisException {
-    if (partitionSet_ == null) {
+    if (partitionSet_ == null && timeTravelSpec_ == null) {
       icebergFilePaths_ = null;
       return;
     }
 
     FeIcebergTable table = (FeIcebergTable) table_;
-    // To rewrite transforms and column references
-    IcebergPartitionExpressionRewriter rewriter =
-        new IcebergPartitionExpressionRewriter(analyzer,
-            table.getIcebergApiTable().spec());
-    // For Impala expression to Iceberg expression conversion
-    IcebergPredicateConverter converter =
-        new IcebergPartitionPredicateConverter(table.getIcebergSchema(), analyzer);
-
     List<Expression> icebergPartitionExprs = new ArrayList<>();
-    for (Expr expr : partitionSet_.getPartitionExprs()) {
-      expr = rewriter.rewrite(expr);
-      expr.analyze(analyzer);
-      analyzer.getConstantFolder().rewrite(expr, analyzer);
 
-      IcebergPredicateConverter.ConverterResult result = converter.convert(expr);
+    if (partitionSet_ != null) {
+      // To rewrite transforms and column references
+      IcebergPartitionExpressionRewriter rewriter =
+          new IcebergPartitionExpressionRewriter(analyzer,
+              table.getIcebergApiTable().spec());
+      // For Impala expression to Iceberg expression conversion
+      IcebergPredicateConverter converter =
+          new IcebergPartitionPredicateConverter(table.getIcebergSchema(), analyzer);
 
-      if (result.isFailed()) {
-        throw new AnalysisException(String.format(
-            "Invalid partition filtering expression: %s. %s",
-            expr.toSql(), result.getErrorMessage()));
+      for (Expr expr : partitionSet_.getPartitionExprs()) {
+        expr = rewriter.rewrite(expr);
+        expr.analyze(analyzer);
+        analyzer.getConstantFolder().rewrite(expr, analyzer);
+
+        IcebergPredicateConverter.ConverterResult result = converter.convert(expr);
+
+        if (result.isFailed()) {
+          throw new AnalysisException(String.format(
+              "Invalid partition filtering expression: %s. %s",
+              expr.toSql(), result.getErrorMessage()));
+        }
+
+        if (result.isPartiallyConverted()) {
+          throw new AnalysisException(String.format(
+              "Predicate '%s' can only be partially converted to Iceberg expression: " +
+              "'%s'. Partially converted predicates are not allowed in SHOW FILES as " +
+              "they could show more files than intended. Use a fully convertible " +
+              "predicate instead.", expr.toSql(), result.getIcebergExpression()));
+        }
+
+        icebergPartitionExprs.add(result.getIcebergExpression());
       }
-
-      if (result.isPartiallyConverted()) {
-        throw new AnalysisException(String.format(
-            "Predicate '%s' can only be partially converted to Iceberg expression: " +
-            "'%s'. Partially converted predicates are not allowed in SHOW FILES as " +
-            "they could show more files than intended. Use a fully convertible " +
-            "predicate instead.", expr.toSql(), result.getIcebergExpression()));
-      }
-
-      icebergPartitionExprs.add(result.getIcebergExpression());
     }
 
     try (CloseableIterable<FileScanTask> fileScanTasks = IcebergUtil.planFiles(table,
-        icebergPartitionExprs, null, null)) {
+        icebergPartitionExprs, timeTravelSpec_, null)) {
       // Collect file paths without sorting - sorting will be done in execution phase
       List<String> filePaths = new ArrayList<>();
       Set<String> uniquePaths = new HashSet<>();
@@ -193,7 +215,7 @@ public class ShowFilesStmt extends StatementBase implements SingleTableStmt {
       // Store unsorted file paths - lexicographic sorting will be applied in execution
       icebergFilePaths_ = filePaths;
 
-      if (icebergFilePaths_.isEmpty()) {
+      if (icebergFilePaths_.isEmpty() && partitionSet_ != null) {
         throw new AnalysisException("No matching partition(s) found.");
       }
     } catch (IOException | TableLoadingException e) {

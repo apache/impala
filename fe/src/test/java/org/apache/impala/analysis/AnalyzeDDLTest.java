@@ -4517,6 +4517,32 @@ public class AnalyzeDDLTest extends FrontendTestBase {
         "Invalid transform parameter value: string");
     AnalysisError(icebergPartitioned + " partition (truncate(1, 2, action))",
         "Invalid partition predicate: truncate(1, 2, action)");
+
+    // Test time-travel
+    AnalyzesOk(icebergPartitioned + " for system_version as of 8270633197658268308");
+    AnalyzesOk(icebergNonPartitioned + " for system_version as of 93996984692289973");
+    AnalyzesOk(icebergPartitioned + " for system_time as of '2020-08-31 22:58:08'");
+    AnalyzesOk(icebergNonPartitioned + " for system_time as of now()");
+
+    // Test time-travel with partition filter
+    AnalyzesOk(icebergPartitioned +
+        " for system_version as of 8270633197658268308 partition (action = 'click')");
+    AnalyzesOk(icebergPartitioned +
+        " for system_time as of '2023-01-01' partition " +
+        "(hour(event_time) = '2020-01-01-9')");
+
+    // Error: Time-travel with non-existent partition
+    AnalysisError(icebergPartitioned +
+        " for system_version as of 8270633197658268308 partition (action = 'Foo')",
+        "No matching partition(s) found.");
+
+    // Error: Time-travel on non-Iceberg table
+    AnalysisError("show files in functional.alltypes for system_version as of 123",
+        "FOR SYSTEM_TIME/FOR SYSTEM_VERSION AS OF clause is only supported for " +
+        "Iceberg tables.");
+    AnalysisError("show files in functional.alltypes for system_time as of now()",
+        "FOR SYSTEM_TIME/FOR SYSTEM_VERSION AS OF clause is only supported for " +
+        "Iceberg tables.");
   }
 
   @Test
