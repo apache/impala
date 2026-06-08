@@ -119,6 +119,7 @@ lib/python/impala_py_lib/gdb/README.md
 shell/README.md
 bin/kerberos/README-kerberos.md
 java/hive-geospatial-functions/src/main/java/org/apache/impala/hive/geospatial/esri/README.md
+.vscode-defaults/README.md
 
 # http://www.apache.org/legal/src-headers.html: "Test data for which the addition of a
 # source header would cause the tests to fail."

@@ -617,7 +617,7 @@ that licenses the call.
   rooted at the operator-configured warehouse. → `OUT-OF-MODEL:
   trusted-input` *(maintainer)*.
 - **"Hardcoded test password / keytab in `tests/`, `testdata/`,
-  `ssh_keys/`."** `tests/`, `testdata/`, `ssh_keys/` are unsupported
+  `ssh_keys/`."** `tests/`, `testdata/`, `ssh_keys/`, `.vscode-defaults/` are unsupported
   components. → `OUT-OF-MODEL: unsupported-component`.
 - **"SQL injection via end-user SQL text."** End-user SQL **is the input**;
   the engine is designed to interpret it. The Ranger envelope is the

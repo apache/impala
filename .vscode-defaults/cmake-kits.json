@@ -1,0 +1,10 @@
+[
+  {
+    "name": "Impala Toolchain GCC",
+    "compilers": {
+      "C": "${env:IMPALA_TOOLCHAIN_PACKAGES_HOME}/gcc-${env:IMPALA_GCC_VERSION}/bin/gcc",
+      "CXX": "${env:IMPALA_TOOLCHAIN_PACKAGES_HOME}/gcc-${env:IMPALA_GCC_VERSION}/bin/g++"
+    },
+    "isTrusted": true
+  }
+]

@@ -1,0 +1,226 @@
+/*
+Licensed to the Apache Software Foundation (ASF) under one
+or more contributor license agreements.  See the NOTICE file
+distributed with this work for additional information
+regarding copyright ownership.  The ASF licenses this file
+to you under the Apache License, Version 2.0 (the
+"License"); you may not use this file except in compliance
+with the License.  You may obtain a copy of the License at
+
+  http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing,
+software distributed under the License is distributed on an
+"AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+KIND, either express or implied.  See the License for the
+specific language governing permissions and limitations
+under the License.
+*/
+
+{
+  "chat.useAgentsMdFile": true,
+  "chat.useAgentSkills": true,
+  "chat.agentSkillsLocations": {
+    ".agents/skills": true
+  },
+  "editor.insertSpaces": true,
+  "editor.tabSize": 2,
+  "makefile.configureOnOpen": true,
+  "python.languageServer": "Default",
+  "java.jdt.ls.vmargs": "-XX:+UseParallelGC -XX:GCTimeRatio=4 -XX:AdaptiveSizePolicyWeight=90 -Dsun.zip.disableMemoryMapping=true -Xmx8G -Xms100m -Xlog:disable",
+  "java.configuration.runtimes": [
+    {
+      "default": true,
+      "name": "JavaSE-17",
+      "path": "/usr/lib/jvm/java-17-openjdk-amd64"
+    }
+  ],
+  "java.import.exclusions": [
+    "**/node_modules/**",
+    "**/.metadata/**",
+    "**/archetype-resources/**",
+    "**/META-INF/maven/**",
+    "**/be/**",
+    "**/bin/**",
+    "**/cmake_modules/**",
+    "**/common/**",
+    "**/docker/**",
+    "**/docs/**",
+    "**/infra/**",
+    "**/lib/**",
+    "**/logs/**",
+    "**/package/**",
+    "**/scripts/**",
+    "**/security/**",
+    "**/shell/**",
+    "**/ssh_keys/**",
+    "**/testdata/**",
+    "**/Testing/**",
+    "**/tests/**",
+    "**/toolchain/**",
+    "**/www/**"
+  ],
+  "java.compile.nullAnalysis.mode": "disabled",
+  "java.configuration.updateBuildConfiguration": "automatic",
+  "java.debug.settings.onBuildFailureProceed": true,
+  "java.editor.reloadChangedSources": "auto",
+  "maven.excludedFolders": [
+    "be",
+    "bin",
+    "cmake_modules",
+    "common",
+    "docker",
+    "docs",
+    "infra",
+    "lib",
+    "logs",
+    "package",
+    "scripts",
+    "security",
+    "shell",
+    "ssh_keys",
+    "testdata",
+    "Testing",
+    "tests",
+    "toolchain",
+    "www"
+  ],
+  "maven.executable.path": "/usr/local/bin/mvn",
+  "java.import.maven.enabled": true,
+  "C_Cpp.default.cStandard": "c17",
+  "C_Cpp.default.cppStandard": "c++17",
+  "C_Cpp.default.includePath": [
+    "${env:IMPALA_HOME}/be/generated-sources",
+    "${env:IMPALA_HOME}/be/src",
+    "${env:IMPALA_TOOLCHAIN_PACKAGES_HOME}/**",
+    "/usr/include/x86_64-linux-gnu"
+  ],
+  "C_Cpp.default.compileCommands": [
+    "${env:IMPALA_HOME}/compile_commands.json"
+  ],
+  "C_Cpp.default.defines": [],
+  "C_Cpp.default.configurationProvider": "ms-vscode.cmake-tools",
+  "C_Cpp.files.exclude": {
+    "${env:IMPALA_HOME}/*": true
+  },
+  "C_Cpp.exclusionPolicy": "checkFolders",
+  "cmake.cmakePath": "${env:IMPALA_TOOLCHAIN_PACKAGES_HOME}/cmake-${env:IMPALA_CMAKE_VERSION}/bin/cmake",
+  "cmake.showSystemKits": false,
+  "cmake.sourceDirectory": "${env:IMPALA_HOME}",
+  "cmake.defaultActiveFolder": "${env:IMPALA_HOME}",
+  "cmake.autoSelectActiveFolder": false,
+  "cmake.enableAutomaticKitScan": false,
+  "cmake.ignoreCMakeListsMissing": true,
+  "cmake.revealLog": "error",
+  "cmake.configureOnOpen": true,
+  "terminal.integrated.scrollback": 10000,
+  "terminal.integrated.cwd": "${env:IMPALA_HOME}",
+  "terminal.integrated.enableMultiLinePasteWarning": "never",
+  "terminal.integrated.defaultProfile.linux": "zsh",
+  "files.exclude": {
+    "**/.git": true,
+    "**/build": true,
+    "**/CMakeFiles": true,
+    "**/cython*": true,
+    "**/Cython*": true,
+    "gerrit_critic_venv": true,
+    "llvm-ir": true,
+    "toolchain": true
+  },
+  "search.exclude": {
+    "**/*.cmake": true,
+    "**/build.ninja": true,
+    "**/CMakeFiles": true,
+    "**/CMakeCache.txt": true,
+    "**/compile_commands.json": true,
+    "**/Makefile": true
+  },
+  "remote.autoForwardPorts": true,
+  "remote.restoreForwardedPorts": false,
+  "remote.autoForwardPortsSource": "process",
+  "remote.autoForwardPortsFallback": 0,
+  "remote.otherPortsAttributes": {
+    "onAutoForward": "ignore"
+  },
+  "remote.portsAttributes": {
+    "5070": {
+      "label": "HDFS NameNode",
+      "onAutoForward": "silent"
+    },
+    "6080": {
+      "label": "Ranger Web UI",
+      "onAutoForward": "silent"
+    },
+    "8051": {
+      "label": "Kudu Webserver",
+      "onAutoForward": "silent"
+    },
+    "8088": {
+      "label": "Yarn ResourceManager",
+      "onAutoForward": "silent"
+    },
+    "10001": {
+      "label": "Hive Thrift",
+      "onAutoForward": "silent"
+    },
+    "11050": {
+      "label": "Hiveserver2",
+      "onAutoForward": "silent"
+    },
+    "16686": {
+      "label": "Jaeger Web UI",
+      "onAutoForward": "silent"
+    },
+    "21050": {
+      "label": "Impala Daemon 1 HS2",
+      "onAutoForward": "silent"
+    },
+    "28000": {
+      "label": "Impala Daemon 1 HS2-HTTP",
+      "onAutoForward": "silent"
+    },
+    "25000": {
+      "label": "Impala Daemon 1 Web UI",
+      "onAutoForward": "silent"
+    },
+    "25001": {
+      "label": "Impala Daemon 2 Web UI",
+      "onAutoForward": "silent"
+    },
+    "25002": {
+      "label": "Impala Daemon 3 Web UI",
+      "onAutoForward": "silent"
+    },
+    "25010": {
+      "label": "Impala Statestore Web UI",
+      "onAutoForward": "silent"
+    },
+    "25020": {
+      "label": "Impala Catalog Web UI",
+      "onAutoForward": "silent"
+    },
+    "55888": {
+      "label": "OpenTelemetry Collector OTLP HTTP",
+      "onAutoForward": "ignore"
+    }
+  },
+  "files.associations": {
+    "*.tcc": "cpp",
+    "*.def": "cpp",
+    "*.hpp": "cpp",
+    "*.cc": "cpp"
+  },
+  "sqltools.connections": [
+    {
+      "ssh": "Disabled",
+      "previewLimit": 50,
+      "server": "localhost",
+      "port": 5432,
+      "driver": "PostgreSQL",
+      "name": "localhost-metastore",
+      "database": "in workspace settings, replace with value of ${METASTORE_DB}",
+      "username": "hiveuser",
+      "password": "password"
+    }
+  ]
+}
