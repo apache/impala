@@ -15,6 +15,7 @@
 # specific language governing permissions and limitations
 # under the License.
 
+from datetime import datetime, timezone
 import os.path
 import tempfile
 from subprocess import PIPE, Popen, check_call, check_output
@@ -152,6 +153,119 @@ class TestProfileTool(BaseTestSuite):
           profile_log, tmp)
       assert os.path.getsize(tmp.name) == 0
 
+  def test_iso8601_timestamp_filter(self):
+    profile_log = get_profile_path('impala_profile_log_tpcds_compute_stats')
+    with open(profile_log, 'r') as f:
+      fields = f.readline().split(None, 2)
+    assert len(fields) == 3
+    first_timestamp_ms = int(fields[0])
+
+    self._compare_profile_tool_output(
+        ['--min_time=%s' % self._iso8601_utc_from_epoch_ms(first_timestamp_ms)],
+        profile_log,
+        get_profile_path('impala_profile_log_tpcds_compute_stats.expected.txt'))
+
+    # Comparing at first+1 catches ignored offsets and incorrect offset magnitudes.
+    offsets = [(3 * 60, 'colon'), (5 * 60 + 30, 'colon'),
+               (-2 * 60, 'compact'), (3 * 60, 'hour')]
+    with tempfile.NamedTemporaryFile() as expected:
+      self._run_profile_tool(
+          ['--min_timestamp=%d' % (first_timestamp_ms + 1)], profile_log, expected)
+      for offset_minutes, offset_style in offsets:
+        with tempfile.NamedTemporaryFile() as actual:
+          self._run_profile_tool(
+              ['--min_time=%s' % self._iso8601_offset_from_epoch_ms(
+                  first_timestamp_ms + 1, offset_minutes, offset_style)],
+              profile_log, actual)
+          check_call(['diff', expected.name, actual.name])
+
+        with tempfile.NamedTemporaryFile() as actual:
+          self._run_profile_tool(
+              ['--max_time=%s' % self._iso8601_offset_from_epoch_ms(
+                  first_timestamp_ms - 1, offset_minutes, offset_style)],
+              profile_log, actual)
+          assert os.path.getsize(actual.name) == 0
+
+    with tempfile.NamedTemporaryFile() as tmp:
+      self._run_profile_tool(
+          ['--max_time=%s' % self._iso8601_utc_from_epoch_ms(
+              first_timestamp_ms - 1)],
+          profile_log, tmp)
+      assert os.path.getsize(tmp.name) == 0
+
+    with tempfile.NamedTemporaryFile() as expected:
+      with tempfile.NamedTemporaryFile() as actual:
+        self._run_profile_tool(
+            ['--min_timestamp=%d' % (first_timestamp_ms + 1)], profile_log,
+            expected)
+        self._run_profile_tool(
+            ['--min_time=%s' % self._iso8601_utc_from_epoch_us(
+                first_timestamp_ms * 1000 + 1)], profile_log, actual)
+        check_call(['diff', expected.name, actual.name])
+
+    with tempfile.NamedTemporaryFile() as expected:
+      with tempfile.NamedTemporaryFile() as actual:
+        self._run_profile_tool(
+            ['--max_timestamp=%d' % first_timestamp_ms], profile_log, expected)
+        self._run_profile_tool(
+            ['--max_time=%s' % self._iso8601_utc_from_epoch_us(
+                first_timestamp_ms * 1000 + 999)], profile_log, actual)
+        check_call(['diff', expected.name, actual.name])
+
+  def test_iso8601_timestamp_filter_rejects_invalid_time(self):
+    invalid_times = [
+        '2026-06-08T12:30:00',
+        '2026-06-08T12Z',
+        '2026-06-08T12:30Z',
+        '2026-06-08T24:00:00Z',
+        '2026-06-08T12:60:00Z',
+        '2026-06-08T12:30:60Z',
+        '2026-06-08T12:30:00.Z',
+        '2026-06-08T12:30:00.1234567890Z',
+        '2026-02-30T12:30:00Z',
+        '2026-06-08T12:30:00 Europe/Budapest',
+        '2026-06-08T12:30:00.123Zjunk',
+        '2026-06-08T12:30:00+0a:00',
+        '2026-06-08T12:30:00+01:0x',
+        '2026-06-08T12:30:00+24:00',
+        '2026-06-08T12:30:00+01:60',
+    ]
+    for flag in ['--min_time', '--max_time']:
+      for invalid_time in invalid_times:
+        stdout, stderr = self._run_profile_tool_error(
+            ['%s=%s' % (flag, invalid_time)],
+            get_profile_path('impala_profile_log_tpcds_compute_stats'))
+
+        assert stdout == ''
+        assert "Invalid %s value: '%s'" % (flag, invalid_time) in stderr
+        assert 'Expected a timezone-aware ISO-8601 timestamp' in stderr
+
+  def test_iso8601_timestamp_filter_handles_pre_epoch_fraction(self):
+    profile_log = get_profile_path('impala_profile_log_tpcds_compute_stats')
+    query_id, encoded_profile = self._get_first_profile_log_entry(profile_log)
+    with tempfile.NamedTemporaryFile(mode='w') as epoch_profile_log:
+      epoch_profile_log.write('0 %s %s\n' % (query_id, encoded_profile))
+      epoch_profile_log.flush()
+
+      with tempfile.NamedTemporaryFile() as tmp:
+        self._run_profile_tool(
+            ['--min_time=1969-12-31T23:59:59.999999Z'], epoch_profile_log.name, tmp)
+        assert os.path.getsize(tmp.name) > 0
+
+      with tempfile.NamedTemporaryFile() as tmp:
+        self._run_profile_tool(
+            ['--max_time=1969-12-31T23:59:59.999999Z'], epoch_profile_log.name, tmp)
+        assert os.path.getsize(tmp.name) == 0
+
+  def test_iso8601_timestamp_filter_rejects_mixed_flags(self):
+    stdout, stderr = self._run_profile_tool_error(
+        ['--min_timestamp=0', '--max_time=2026-06-08T12:30:00Z'],
+        get_profile_path('impala_profile_log_tpcds_compute_stats'))
+
+    assert stdout == ''
+    assert '--min_time/--max_time cannot be combined with' in stderr
+    assert '--min_timestamp/--max_timestamp' in stderr
+
   def test_oversized_timestamp_without_timestamp_filter(self):
     with open(get_profile_path('impala_profile_log_tpcds_compute_stats'), 'r') as f:
       profile_log_line = f.readline()
@@ -188,8 +302,8 @@ class TestProfileTool(BaseTestSuite):
     assert "Error parsing profile log timestamp prefix on line 1: " \
         "'not-a-timestamp'" in stderr
     assert 'Expected Unix epoch milliseconds' in stderr
-    assert 'timestamp prefixes are parsed only when' in stderr
-    assert '--min_timestamp/--max_timestamp filtering is enabled' in stderr
+    assert 'timestamp prefixes are parsed only when timestamp filtering is enabled' \
+        in stderr
 
   def test_summary_output(self):
     self._compare_profile_tool_output(['--profile_format=summary'],
@@ -356,6 +470,37 @@ class TestProfileTool(BaseTestSuite):
       next_idx += 1
       nodes_remaining -= 1
     return next_idx
+
+  def _iso8601_utc_from_epoch_ms(self, epoch_ms):
+    seconds, millis = divmod(epoch_ms, 1000)
+    timestamp = datetime.fromtimestamp(
+        seconds, timezone.utc).strftime('%Y-%m-%dT%H:%M:%S')
+    return '%s.%03dZ' % (timestamp, millis)
+
+  def _iso8601_utc_from_epoch_us(self, epoch_us):
+    seconds, micros = divmod(epoch_us, 1000 * 1000)
+    timestamp = datetime.fromtimestamp(
+        seconds, timezone.utc).strftime('%Y-%m-%dT%H:%M:%S')
+    return '%s.%06dZ' % (timestamp, micros)
+
+  def _iso8601_offset_from_epoch_ms(self, epoch_ms, offset_minutes,
+      offset_style='colon'):
+    offset_ms = offset_minutes * 60 * 1000
+    seconds, millis = divmod(epoch_ms + offset_ms, 1000)
+    timestamp = datetime.fromtimestamp(
+        seconds, timezone.utc).strftime('%Y-%m-%dT%H:%M:%S')
+    sign = '+' if offset_minutes >= 0 else '-'
+    offset_minutes = abs(offset_minutes)
+    offset_hour_part, offset_minute_part = divmod(offset_minutes, 60)
+    if offset_style == 'colon':
+      offset = '%s%02d:%02d' % (sign, offset_hour_part, offset_minute_part)
+    elif offset_style == 'compact':
+      offset = '%s%02d%02d' % (sign, offset_hour_part, offset_minute_part)
+    else:
+      assert offset_style == 'hour'
+      assert offset_minute_part == 0
+      offset = '%s%02d' % (sign, offset_hour_part)
+    return '%s.%03d%s' % (timestamp, millis, offset)
 
   def _run_profile_tool(self, args, input_log, output=None):
     with open(input_log, 'r') as f:

@@ -24,10 +24,11 @@
 #include <string>
 #include <vector>
 
+#include <absl/time/time.h>
 #include <boost/algorithm/string/case_conv.hpp>
-#include <boost/date_time/posix_time/ptime.hpp>
-#include <boost/date_time/posix_time/time_parsers.hpp>
+#include <boost/date_time/posix_time/posix_time.hpp>
 #include <gflags/gflags.h>
+#include <re2/re2.h>
 
 #include "common/object-pool.h"
 #include "gutil/strings/strip.h"
@@ -70,6 +71,10 @@ static const char* USAGE =
     " after this timestamp\n"
     "--max_timestamp=<Unix epoch milliseconds>: only process profiles at or"
     " before this timestamp\n"
+    "--min_time=<timezone-aware ISO-8601 timestamp>: only process profiles at or"
+    " after this time\n"
+    "--max_time=<timezone-aware ISO-8601 timestamp>: only process profiles at or"
+    " before this time\n"
     "Filtering options only apply to profile log entries that include timestamp and"
     " query id metadata.\n";
 
@@ -84,6 +89,10 @@ DEFINE_int64(min_timestamp, -1,
     "Minimum timestamp in Unix epoch milliseconds (inclusive) to output profiles for");
 DEFINE_int64(max_timestamp, -1,
     "Maximum timestamp in Unix epoch milliseconds (inclusive) to output profiles for");
+DEFINE_string(min_time, "",
+    "Minimum timezone-aware ISO-8601 timestamp (inclusive) to output profiles for");
+DEFINE_string(max_time, "",
+    "Maximum timezone-aware ISO-8601 timestamp (inclusive) to output profiles for");
 DEFINE_int32(summary_text_length, 250,
     "Maximum text field length in summary output. If <= 0, the full text is used.");
 
@@ -602,11 +611,93 @@ static void PrintSummaryRow(
   PrintTsvRow(values, out);
 }
 
+enum class TimeFilterBound {
+  MIN,
+  MAX,
+};
+
+struct TimestampFilters {
+  bool has_min;
+  bool has_max;
+  int64_t min;
+  int64_t max;
+
+  TimestampFilters() : has_min(false), has_max(false), min(0), max(0) {}
+};
+
 static bool ParseTimestamp(const string& timestamp_str, int64_t* timestamp) {
   StringParser::ParseResult result;
   *timestamp = StringParser::StringToInt<int64_t>(
       timestamp_str.c_str(), timestamp_str.length(), &result);
   return result == StringParser::PARSE_SUCCESS;
+}
+
+static bool ParseTimezoneAwareTime(
+    const string& time_str, TimeFilterBound bound, int64_t* unix_time_millis) {
+  // Restrict the input spelling and precision: ParseTime() also accepts lowercase
+  // z, normalizes leap seconds, and truncates fractions longer than nanoseconds.
+  static const re2::RE2 format(
+      R"(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:[0-5]\d(?:\.\d{1,9})?)"
+      R"((?:Z|[+-](?:[01]\d|2[0-3])(?::?[0-5]\d)?))");
+  if (!re2::RE2::FullMatch(time_str, format)) return false;
+
+  absl::Time utc_time;
+  if (!absl::ParseTime("%E4Y-%m-%dT%H:%M:%E*S%Ez", time_str,
+          &utc_time, nullptr)) return false;
+  // Preserve the calendar range supported by the previous Boost parser.
+  const auto utc_year = absl::ToCivilSecond(utc_time, absl::UTCTimeZone()).year();
+  if (time_str.compare(0, 4, "1400") < 0 || utc_year < 1400 || utc_year > 9999) {
+    return false;
+  }
+
+  // ToUnixMillis() rounds down, including before the epoch. Round MIN up so
+  // millisecond profile log entries below the bound are excluded. MAX can stay
+  // rounded down because integer timestamps <= MAX are also <= its floor.
+  *unix_time_millis = absl::ToUnixMillis(utc_time);
+  if (bound == TimeFilterBound::MIN
+      && utc_time > absl::FromUnixMillis(*unix_time_millis)) ++(*unix_time_millis);
+  return true;
+}
+
+static void PrintInvalidTimeFilter(const string& flag_name, const string& flag_value) {
+  cerr << "Invalid " << flag_name << " value: '" << flag_value << "'. Expected a "
+       << "timezone-aware ISO-8601 timestamp, e.g. 2026-06-08T12:30:00Z or "
+       << "2026-06-08T15:30:00+03:00.\n";
+}
+
+static bool ParseTimestampFilters(TimestampFilters* filters) {
+  const bool has_epoch_time_filter =
+      FLAGS_min_timestamp != -1 || FLAGS_max_timestamp != -1;
+  const bool has_iso_time_filter = FLAGS_min_time != "" || FLAGS_max_time != "";
+  if (has_epoch_time_filter && has_iso_time_filter) {
+    cerr << "--min_time/--max_time cannot be combined with "
+         << "--min_timestamp/--max_timestamp.\n";
+    return false;
+  }
+
+  if (FLAGS_min_timestamp != -1) {
+    filters->has_min = true;
+    filters->min = FLAGS_min_timestamp;
+  }
+  if (FLAGS_max_timestamp != -1) {
+    filters->has_max = true;
+    filters->max = FLAGS_max_timestamp;
+  }
+  if (FLAGS_min_time != "") {
+    filters->has_min = true;
+    if (!ParseTimezoneAwareTime(FLAGS_min_time, TimeFilterBound::MIN, &filters->min)) {
+      PrintInvalidTimeFilter("--min_time", FLAGS_min_time);
+      return false;
+    }
+  }
+  if (FLAGS_max_time != "") {
+    filters->has_max = true;
+    if (!ParseTimezoneAwareTime(FLAGS_max_time, TimeFilterBound::MAX, &filters->max)) {
+      PrintInvalidTimeFilter("--max_time", FLAGS_max_time);
+      return false;
+    }
+  }
+  return true;
 }
 
 int main(int argc, char** argv) {
@@ -629,6 +720,8 @@ int main(int argc, char** argv) {
          << DescribeOneFlag(GetCommandLineFlagInfoOrDie("profile_verbosity"));
     return 1;
   }
+  TimestampFilters timestamp_filters;
+  if (!ParseTimestampFilters(&timestamp_filters)) return 1;
 
   // Init OsInfo for StopWatch used in MemPool.
   // TODO: try using a fake MemPool that invokes malloc/free directly.
@@ -656,18 +749,18 @@ int main(int argc, char** argv) {
     if (has_log_metadata && FLAGS_query_id != "" && FLAGS_query_id != query_id) {
       continue;
     }
-    if (has_log_metadata && (FLAGS_min_timestamp != -1 || FLAGS_max_timestamp != -1)) {
+    if (has_log_metadata && (timestamp_filters.has_min || timestamp_filters.has_max)) {
       int64_t timestamp;
       if (!ParseTimestamp(timestamp_str, &timestamp)) {
         cerr << "Error parsing profile log timestamp prefix on line " << lineno
              << ": '" << timestamp_str << "'. Expected Unix epoch milliseconds; "
-             << "timestamp prefixes are parsed only when "
-             << "--min_timestamp/--max_timestamp filtering is enabled.\n";
+             << "timestamp prefixes are parsed only when timestamp filtering is "
+             << "enabled.\n";
         ++errors;
         continue;
       }
-      if ((FLAGS_min_timestamp != -1 && timestamp < FLAGS_min_timestamp)
-          || (FLAGS_max_timestamp != -1 && timestamp > FLAGS_max_timestamp)) {
+      if ((timestamp_filters.has_min && timestamp < timestamp_filters.min)
+          || (timestamp_filters.has_max && timestamp > timestamp_filters.max)) {
         continue;
       }
     }

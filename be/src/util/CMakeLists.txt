@@ -254,6 +254,7 @@ target_link_libraries(impala-profile-tool
   gflags
   zlib
   re2
+  absl::time
   ${IMPALA_PROFILE_TOOL_SYSTEM_LIBS})
 
 if (BUILD_WITH_NO_TESTS)
