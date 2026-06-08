@@ -55,10 +55,10 @@ static const char* USAGE =
     "Filtering options:\n"
     "--query_id=<query id>: given an impala query ID, only process profiles with this"
     " query id\n"
-    "--min_timestamp=<integer timestamp>: only process profiles at or after this"
-    " timestamp\n"
-    "--max_timestamp=<integer timestamp>: only process profiles at or before this"
-    " timestamp\n"
+    "--min_timestamp=<Unix epoch milliseconds>: only process profiles at or"
+    " after this timestamp\n"
+    "--max_timestamp=<Unix epoch milliseconds>: only process profiles at or"
+    " before this timestamp\n"
     "Filtering options only apply to profile log entries that include timestamp and"
     " query id metadata.\n";
 
@@ -68,8 +68,10 @@ DEFINE_string(profile_verbosity, "", "Verbosity of profile output. Must be one o
     "{0,1,2,3,4,minimal,legacy,default,extended,full}. If not set, picks based on "
     "version of each input profile.");
 DEFINE_string(query_id, "", "Query ID to output profiles for");
-DEFINE_int64(min_timestamp, -1, "Minimum timestamp (inclusive) to output profiles for");
-DEFINE_int64(max_timestamp, -1, "Maximum timestamp (inclusive) to output profiles for");
+DEFINE_int64(min_timestamp, -1,
+    "Minimum timestamp in Unix epoch milliseconds (inclusive) to output profiles for");
+DEFINE_int64(max_timestamp, -1,
+    "Maximum timestamp in Unix epoch milliseconds (inclusive) to output profiles for");
 
 using namespace impala;
 
@@ -137,8 +139,10 @@ int main(int argc, char** argv) {
     if (has_log_metadata && (FLAGS_min_timestamp != -1 || FLAGS_max_timestamp != -1)) {
       int64_t timestamp;
       if (!ParseTimestamp(timestamp_str, &timestamp)) {
-        cerr << "Error parsing timestamp on line " << lineno << ": '"
-             << timestamp_str << "'\n";
+        cerr << "Error parsing profile log timestamp prefix on line " << lineno
+             << ": '" << timestamp_str << "'. Expected Unix epoch milliseconds; "
+             << "timestamp prefixes are parsed only when "
+             << "--min_timestamp/--max_timestamp filtering is enabled.\n";
         ++errors;
         continue;
       }

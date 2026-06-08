@@ -17,7 +17,7 @@
 
 import os.path
 import tempfile
-from subprocess import check_call
+from subprocess import PIPE, Popen, check_call
 
 from tests.common.environ import impalad_basedir
 from tests.common.base_test_suite import BaseTestSuite
@@ -131,6 +131,24 @@ class TestProfileTool(BaseTestSuite):
           oversized_timestamp_output)
       check_call(['diff', valid_output.name, oversized_timestamp_output.name])
 
+  def test_timestamp_filter_invalid_timestamp_error(self):
+    query_id, encoded_profile = self._get_first_profile_log_entry(
+        get_profile_path('impala_profile_log_tpcds_compute_stats'))
+    with tempfile.NamedTemporaryFile(mode='w+') as invalid_timestamp_input:
+      invalid_timestamp_input.write(
+          'not-a-timestamp %s %s\n' % (query_id, encoded_profile))
+      invalid_timestamp_input.flush()
+
+      stdout, stderr = self._run_profile_tool_error(
+          ['--min_timestamp=0'], invalid_timestamp_input.name)
+
+    assert stdout == ''
+    assert "Error parsing profile log timestamp prefix on line 1: " \
+        "'not-a-timestamp'" in stderr
+    assert 'Expected Unix epoch milliseconds' in stderr
+    assert 'timestamp prefixes are parsed only when' in stderr
+    assert '--min_timestamp/--max_timestamp filtering is enabled' in stderr
+
   def _compare_profile_tool_output(self, args, input_log, expected_output):
     """Run impala-profile-tool on input_log and compare it to the contents of the
     file at 'expected_output'."""
@@ -164,3 +182,12 @@ class TestProfileTool(BaseTestSuite):
                  os.path.join(impalad_basedir, 'util/impala-profile-tool')] + args
       check_call(command, stdin=f, stdout=output)
       output.flush()
+
+  def _run_profile_tool_error(self, args, input_log):
+    with open(input_log, 'r') as f:
+      command = [os.path.join(IMPALA_HOME, "bin/run-binary.sh"),
+                 os.path.join(impalad_basedir, 'util/impala-profile-tool')] + args
+      process = Popen(command, stdin=f, stdout=PIPE, stderr=PIPE)
+      stdout, stderr = process.communicate()
+      assert process.returncode != 0
+      return stdout.decode('utf-8'), stderr.decode('utf-8')
