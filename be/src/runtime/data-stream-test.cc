@@ -794,8 +794,6 @@ TEST_F(DataStreamTest, Cancel) {
 }
 
 TEST_F(DataStreamTest, TotalHasDeferredRpcsTimeIncludesOpenInterval) {
-  FLAGS_datastream_sender_timeout_ms = 10000;
-
   // Keep the receiver reader stopped so the sender defers an RPC. The IMPALA-14838
   // regression test verifies TotalHasDeferredRPCsTime while the deferred-RPC interval
   // is still open.
