@@ -729,3 +729,33 @@ INT
 NumModifiedRows: 2
 NumDeletedRows: 2
 ====
+---- QUERY
+CREATE TABLE update_all (s STRING)
+STORED BY ICEBERG
+TBLPROPERTIES ('format-version'='3');
+
+INSERT INTO update_all VALUES ('a'), ('b');
+DELETE FROM update_all WHERE s='a';
+INSERT INTO update_all VALUES ('c'), ('d'), ('e');
+---- DML_RESULTS: update_all
+'b'
+'c'
+'d'
+'e'
+---- TYPES
+STRING
+====
+---- QUERY
+UPDATE update_all set s = 'updated';
+---- DML_RESULTS: update_all
+'updated'
+'updated'
+'updated'
+'updated'
+---- TYPES
+STRING
+---- RUNTIME_PROFILE
+# Unpartitioned V3 table must shuffle on INPUT__FILE__NAME to guarantee one
+# Deletion Vector per data file.
+row_regex: .*EXCHANGE \[HASH\(.*INPUT__FILE__NAME.*\)\].*
+====

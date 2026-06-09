@@ -17,6 +17,7 @@
 
 package org.apache.impala.analysis;
 
+import java.util.Collections;
 import java.util.Map;
 import org.apache.impala.catalog.Column;
 import org.apache.impala.catalog.FeKuduTable;
@@ -74,14 +75,14 @@ public abstract class DmlStatementBase extends StatementBase {
    */
   abstract public List<Expr> getPartitionKeyExprs();
   /**
-   * The DML sink requires shuffling on the returned shuffle exprs. In most cases, it
-   * is the same as partition key exprs, but in specific cases (e.g. Iceberg V3 tables
-   * with Deletion Vectors) we need to shuffle data differently, or we need to shuffle
-   * data even if the target table is not partitioned.
-   * Another use case is to fan out writers when partition key exprs have low
-   * cardinality. In that case, we can add additional shuffle exprs.
+   * Returns the expressions that the exchange node should use to hash-partition rows
+   * before they reach the sink. A non-empty list means the shuffle is required.
+   * E.g. getShuffleExprs() returns a non-empty list when:
+   *  1) shuffling is required for correctness (Iceberg V3 tables with DVs)
+   *     (even for non-partitioned tables)
+   *  2) partition exprs have low cardinality, so custom shuffle exprs can fan-out writers
    */
-  public List<Expr> getShuffleExprs() { return getPartitionKeyExprs(); }
+  public List<Expr> getShuffleExprs() { return Collections.emptyList(); }
   abstract public List<Expr> getSortExprs();
   abstract public TSortingOrder getSortingOrder();
 

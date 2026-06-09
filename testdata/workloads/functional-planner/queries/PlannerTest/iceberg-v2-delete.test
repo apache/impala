@@ -237,6 +237,8 @@ BUFFERED DELETE FROM ICEBERG [functional_parquet.iceberg_v2_partitioned_position
 ---- DISTRIBUTEDPLAN
 BUFFERED DELETE FROM ICEBERG [functional_parquet.iceberg_v2_partitioned_position_deletes-POSITION-DELETE]
 |
+04:EXCHANGE [HASH(functional_parquet.iceberg_v2_partitioned_position_deletes.PARTITION__SPEC__ID,functional_parquet.iceberg_v2_partitioned_position_deletes.ICEBERG__PARTITION__SERIALIZED)]
+|
 02:DELETE EVENTS ICEBERG DELETE [ICEBERG DELETE JOIN, DIRECTED]
 |  row-size=36B cardinality=3
 |

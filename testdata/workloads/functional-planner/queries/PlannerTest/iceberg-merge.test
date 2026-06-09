@@ -298,9 +298,11 @@ MERGE SINK
 |->WRITE TO HDFS [functional_parquet.iceberg_partition_transforms_zorder, OVERWRITE=false, PARTITION-KEYS=(year(target.ts),iceberg_bucket_transform(target.s, 5))]
 |->BUFFERED DELETE FROM ICEBERG [functional_parquet.iceberg_partition_transforms_zorder-POSITION-DELETE]
 |
-05:SORT
+06:SORT
 |  order by: LEXICAL: year(target.ts) ASC NULLS LAST, iceberg_bucket_transform(target.s, 5) ASC NULLS LAST, ZORDER: i, j
 |  row-size=81B cardinality=1
+|
+05:EXCHANGE [HASH(year(target.ts),iceberg_bucket_transform(target.s, 5))]
 |
 03:MERGE
 |  CASE 0: MATCHED

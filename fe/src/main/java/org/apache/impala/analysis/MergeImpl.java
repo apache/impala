@@ -24,6 +24,7 @@ import org.apache.impala.planner.PlanNode;
 import org.apache.impala.planner.PlannerContext;
 import org.apache.impala.thrift.TSortingOrder;
 
+import java.util.Collections;
 import java.util.List;
 
 /**
@@ -65,13 +66,13 @@ public interface MergeImpl {
   List<Expr> getPartitionKeyExprs();
 
   /**
-   * Returns the expressions used to shuffle (hash-partition) rows across fragment
-   * instances before they reach the sink. By default delegates to getPartitionKeyExprs(),
-   * but implementations may override this to use a different set of expressions for
-   * routing (e.g. routing by input__file__name on unpartitioned V3 tables).
-   * @return list of shuffle expressions
+   * Returns the expressions that the exchange node should use to hash-partition rows
+   * before they reach the sink. A non-empty list means the shuffle is required for
+   * correctness (cost-based skip logic is bypassed). An empty list (the default) means
+   * partition key exprs are used as the exchange key but the exchange may be skipped by
+   * cost-based logic if the data is already appropriately distributed.
    */
-  default List<Expr> getShuffleExprs() { return getPartitionKeyExprs(); }
+  default List<Expr> getShuffleExprs() { return Collections.emptyList(); }
 
   /**
    * Returns sort expressions originated from SORT BY property of the target table.

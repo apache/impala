@@ -211,9 +211,11 @@ MULTI DATA SINK
 |->WRITE TO HDFS [functional_parquet.iceberg_v2_partitioned_position_deletes, OVERWRITE=false, PARTITION-KEYS=(action)]
 |->BUFFERED DELETE FROM ICEBERG [functional_parquet.iceberg_v2_partitioned_position_deletes-POSITION-DELETE]
 |
-01:SORT
+02:SORT
 |  order by: action ASC NULLS LAST
 |  row-size=76B cardinality=0
+|
+01:EXCHANGE [HASH(functional_parquet.iceberg_v2_partitioned_position_deletes.action)]
 |
 00:SCAN HDFS [functional_parquet.iceberg_v2_partitioned_position_deletes]
    HDFS partitions=0/3 files=0 size=0B
@@ -251,9 +253,11 @@ MULTI DATA SINK
 |->WRITE TO HDFS [functional_parquet.iceberg_v2_partitioned_position_deletes, OVERWRITE=false, PARTITION-KEYS=(action)]
 |->BUFFERED DELETE FROM ICEBERG [functional_parquet.iceberg_v2_partitioned_position_deletes-POSITION-DELETE]
 |
-04:SORT
+05:SORT
 |  order by: action ASC NULLS LAST
 |  row-size=76B cardinality=1
+|
+04:EXCHANGE [HASH(functional_parquet.iceberg_v2_partitioned_position_deletes.action)]
 |
 02:DELETE EVENTS ICEBERG DELETE [ICEBERG DELETE JOIN, DIRECTED]
 |  row-size=80B cardinality=1
@@ -402,9 +406,11 @@ MULTI DATA SINK
 |->WRITE TO HDFS [functional_parquet.iceberg_partition_transforms_zorder, OVERWRITE=false, PARTITION-KEYS=(year(days_add(ts, 10)),iceberg_bucket_transform(functional_parquet.iceberg_partition_transforms_zorder.s, 5))]
 |->BUFFERED DELETE FROM ICEBERG [functional_parquet.iceberg_partition_transforms_zorder-POSITION-DELETE]
 |
-01:SORT
+02:SORT
 |  order by: LEXICAL: year(days_add(ts, 10)) ASC NULLS LAST, iceberg_bucket_transform(functional_parquet.iceberg_partition_transforms_zorder.s, 5) ASC NULLS LAST, ZORDER: CAST(i + 1000 AS INT), j
 |  row-size=80B cardinality=1
+|
+01:EXCHANGE [HASH(year(days_add(ts, 10)),iceberg_bucket_transform(functional_parquet.iceberg_partition_transforms_zorder.s, 5))]
 |
 00:SCAN HDFS [functional_parquet.iceberg_partition_transforms_zorder]
    HDFS partitions=1/1 files=1 size=1.08KB

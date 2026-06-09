@@ -537,3 +537,29 @@ BIGINT
 SELECT * FROM ice_lineitem WHERE l_orderkey % 5 = 1;
 ---- RESULTS
 ====
+---- QUERY
+CREATE TABLE delete_all (s STRING)
+STORED BY ICEBERG
+TBLPROPERTIES ('format-version'='3');
+
+INSERT INTO delete_all VALUES ('a'), ('b');
+DELETE FROM delete_all WHERE s='a';
+INSERT INTO delete_all VALUES ('c'), ('d'), ('e');
+---- DML_RESULTS: delete_all
+'b'
+'c'
+'d'
+'e'
+---- TYPES
+STRING
+====
+---- QUERY
+DELETE FROM delete_all where s > '';
+---- DML_RESULTS: delete_all
+---- TYPES
+STRING
+---- RUNTIME_PROFILE
+# Unpartitioned V3 table must shuffle on INPUT__FILE__NAME to guarantee one
+# Deletion Vector per data file.
+row_regex: .*EXCHANGE \[HASH\(.*INPUT__FILE__NAME.*\)\].*
+====

@@ -1419,3 +1419,32 @@ select count(1) from $DATABASE.target_part.snapshots
 ---- TYPES
 BIGINT
 ====
+---- QUERY
+# Merge from/into table with some positional deletes
+CREATE TABLE s23 (s STRING)
+STORED BY ICEBERG
+TBLPROPERTIES ('format-version'='3');
+
+INSERT INTO s23 VALUES ('a'), ('b');
+DELETE FROM s23 WHERE s='a';
+INSERT INTO s23 VALUES ('c'), ('d'), ('e');
+---- DML_RESULTS: s23
+'b'
+'c'
+'d'
+'e'
+---- TYPES
+STRING
+====
+---- QUERY
+MERGE INTO s23 AS tgt USING (SELECT * from s23) AS src on src.s = tgt.s
+WHEN MATCHED THEN DELETE
+WHEN NOT MATCHED THEN INSERT (s) VALUES ("what");
+---- DML_RESULTS: s23
+---- TYPES
+STRING
+---- RUNTIME_PROFILE
+# Unpartitioned V3 table must shuffle on INPUT__FILE__NAME to guarantee one
+# Deletion Vector per data file.
+row_regex: .*EXCHANGE \[HASH\(.*INPUT__FILE__NAME.*\)\].*
+====
