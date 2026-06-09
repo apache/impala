@@ -87,6 +87,8 @@ import org.apache.impala.analysis.FunctionParams;
 import org.apache.impala.analysis.IcebergPartitionField;
 import org.apache.impala.analysis.IcebergPartitionSpec;
 import org.apache.impala.analysis.IcebergPartitionTransform;
+import org.apache.impala.analysis.LiteralExpr;
+import org.apache.impala.analysis.NullLiteral;
 import org.apache.impala.analysis.NumericLiteral;
 import org.apache.impala.analysis.Path;
 import org.apache.impala.analysis.SlotRef;
@@ -1520,6 +1522,44 @@ public class IcebergUtil {
               "files, while table '%s' expects '%s' data files.",
           iceTable.getFullName(), iceTable.getIcebergFileFormat().toString()));
     }
+  }
+
+  /**
+   * Returns the default expression for an unmentioned Iceberg column during DML.
+   * If a write-default is defined in the Iceberg schema metadata, parses and returns it
+   * as a LiteralExpr. Falls back to a typed NullLiteral if no write-default is available.
+   */
+  public static Expr resolveWriteDefault(Column column) throws AnalysisException {
+    if (!(column instanceof IcebergColumn)) {
+      return NullLiteral.create(column.getType());
+    }
+    IcebergColumn iceCol = (IcebergColumn) column;
+    String writeDefault = iceCol.getWriteDefault();
+
+    if (writeDefault != null) {
+      org.apache.impala.catalog.Type colType = column.getType();
+      // Reject TIMESTAMP - LiteralExpr doesn't support it
+      if (colType.isTimestamp()) {
+        throw new AnalysisException(
+            "Iceberg write-default values for TIMESTAMP type are not supported. " +
+            "Please specify value for column '" + column.getName() + "' explicitly.");
+      }
+      // Reject BINARY
+      if (colType.isBinary()) {
+        throw new AnalysisException(
+            "Iceberg write-default values for BINARY/FIXED types are not supported. " +
+            "Please specify value for column '" + column.getName() + "' explicitly.");
+      }
+
+      try {
+        return LiteralExpr.createFromUnescapedStr(writeDefault, colType);
+      } catch (AnalysisException e) {
+        throw new AnalysisException("Failed to parse write-default value '" +
+            writeDefault + "' for column '" + column.getName() + "': " +
+            e.getMessage() + ". Please specify value explicitly.");
+      }
+    }
+    return NullLiteral.create(column.getType());
   }
 
   /**

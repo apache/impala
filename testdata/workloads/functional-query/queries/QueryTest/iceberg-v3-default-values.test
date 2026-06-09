@@ -583,3 +583,106 @@ SELECT * FROM iceberg_ddl_drop_add ORDER BY id;
 ---- TYPES
 INT,INT
 ====
+---- QUERY
+# MERGE INSERT: omitted column with write-default should use write-default, not NULL.
+# iceberg_v3_default_value has columns (i INT, j INT) where j has write-default=-999.
+CREATE TABLE merge_wd_target (i INT, j INT)
+STORED AS ICEBERG
+TBLPROPERTIES ('format-version'='3');
+ALTER TABLE merge_wd_target ALTER COLUMN j SET DEFAULT -999;
+INSERT INTO merge_wd_target VALUES (1, 10);
+CREATE TABLE merge_wd_source (i INT)
+STORED AS ICEBERG
+TBLPROPERTIES ('format-version'='3');
+INSERT INTO merge_wd_source VALUES (2), (3);
+
+# MERGE INSERT with column permutation omitting j: j should get write-default -999
+MERGE INTO merge_wd_target USING merge_wd_source
+ON merge_wd_target.i = merge_wd_source.i
+WHEN NOT MATCHED THEN INSERT (i) VALUES (merge_wd_source.i);
+SELECT * FROM merge_wd_target ORDER BY i;
+---- RESULTS
+1,10
+2,-999
+3,-999
+---- TYPES
+INT,INT
+====
+---- QUERY
+# MERGE INSERT with all columns specified: write-default not used when value is explicit
+CREATE TABLE merge_wd_target2 (i INT, j INT)
+STORED AS ICEBERG
+TBLPROPERTIES ('format-version'='3');
+ALTER TABLE merge_wd_target2 ALTER COLUMN j SET DEFAULT -999;
+INSERT INTO merge_wd_target2 VALUES (1, 10);
+CREATE TABLE merge_wd_source2 (i INT, j INT)
+STORED AS ICEBERG
+TBLPROPERTIES ('format-version'='3');
+INSERT INTO merge_wd_source2 VALUES (2, 42), (3, 99);
+
+MERGE INTO merge_wd_target2 USING merge_wd_source2
+ON merge_wd_target2.i = merge_wd_source2.i
+WHEN NOT MATCHED THEN INSERT VALUES (merge_wd_source2.i, merge_wd_source2.j);
+SELECT * FROM merge_wd_target2 ORDER BY i;
+---- RESULTS
+1,10
+2,42
+3,99
+---- TYPES
+INT,INT
+====
+---- QUERY
+# MERGE INSERT with explicit NULL: NULL overrides write-default
+CREATE TABLE merge_wd_target3 (i INT, j INT)
+STORED AS ICEBERG
+TBLPROPERTIES ('format-version'='3');
+ALTER TABLE merge_wd_target3 ALTER COLUMN j SET DEFAULT -999;
+INSERT INTO merge_wd_target3 VALUES (1, 10);
+CREATE TABLE merge_wd_source3 (i INT)
+STORED AS ICEBERG
+TBLPROPERTIES ('format-version'='3');
+INSERT INTO merge_wd_source3 VALUES (2);
+
+MERGE INTO merge_wd_target3 USING merge_wd_source3
+ON merge_wd_target3.i = merge_wd_source3.i
+WHEN NOT MATCHED THEN INSERT (i, j) VALUES (merge_wd_source3.i, NULL);
+SELECT * FROM merge_wd_target3 ORDER BY i;
+---- RESULTS
+1,10
+2,NULL
+---- TYPES
+INT,INT
+====
+---- QUERY
+# MERGE INSERT with multiple typed write-defaults.
+CREATE TABLE merge_wd_multi (
+  id INT,
+  i_col INT DEFAULT -999,
+  bi_col BIGINT DEFAULT 123456789,
+  bool_col BOOLEAN DEFAULT true,
+  float_col FLOAT DEFAULT CAST(7.88 AS FLOAT),
+  double_col DOUBLE DEFAULT CAST(2.7412818 AS DOUBLE),
+  dec_col DECIMAL(10,3) DEFAULT CAST(999.999 AS DECIMAL(10,3)),
+  str_col STRING DEFAULT 'hello_world',
+  d_col DATE DEFAULT CAST('2016-01-15' AS DATE)
+)
+STORED AS ICEBERG
+TBLPROPERTIES ('format-version'='3');
+INSERT INTO merge_wd_multi VALUES (
+  1, -21, 987654321, false, CAST(7.5 AS FLOAT), 6.25, CAST(123.456 AS DECIMAL(10,3)), 'explicit_data', CAST('1955-06-11' AS DATE));
+CREATE TABLE merge_wd_multi_src (id INT)
+STORED AS ICEBERG
+TBLPROPERTIES ('format-version'='3');
+INSERT INTO merge_wd_multi_src VALUES (2), (3);
+
+MERGE INTO merge_wd_multi USING merge_wd_multi_src
+ON merge_wd_multi.id = merge_wd_multi_src.id
+WHEN NOT MATCHED THEN INSERT (id) VALUES (merge_wd_multi_src.id);
+SELECT * FROM merge_wd_multi ORDER BY id;
+---- RESULTS
+1,-21,987654321,false,7.5,6.25,123.456,'explicit_data',1955-06-11
+2,-999,123456789,true,7.880000114440918,2.7412818,999.999,'hello_world',2016-01-15
+3,-999,123456789,true,7.880000114440918,2.7412818,999.999,'hello_world',2016-01-15
+---- TYPES
+INT,INT,BIGINT,BOOLEAN,FLOAT,DOUBLE,DECIMAL,STRING,DATE
+====

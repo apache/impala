@@ -1279,44 +1279,12 @@ public class InsertStmt extends DmlStatementBase {
   /**
    * Returns the default expression for an unmentioned column in an INSERT statement.
    * For Iceberg tables, attempts to use the write-default value from metadata.
-   * Falls back to NULL if no write-default is available or parsing fails.
+   * Falls back to NULL if no write-default is available.
    */
   private Expr getDefaultExpr(Column tblColumn) throws AnalysisException {
-    Expr defaultExpr = null;
-    if (isIcebergTarget() && tblColumn instanceof IcebergColumn) {
-      IcebergColumn iceCol = (IcebergColumn) tblColumn;
-      String writeDefault = iceCol.getWriteDefault();
-
-      if (writeDefault != null) {
-        Type colType = tblColumn.getType();
-        // Reject TIMESTAMP - LiteralExpr doesn't support it
-        if (colType.isTimestamp()) {
-          throw new AnalysisException(
-              "Iceberg write-default values for TIMESTAMP type are not supported. " +
-              "Please specify value for column '" + tblColumn.getName() +
-              "' explicitly.");
-        }
-        // Reject BINARY
-        if (colType.isBinary()) {
-          throw new AnalysisException(
-              "Iceberg write-default values for BINARY/FIXED types are not supported. " +
-              "Please specify value for column '" + tblColumn.getName() +
-              "' explicitly.");
-        }
-
-        try {
-          defaultExpr = LiteralExpr.createFromUnescapedStr(writeDefault, colType);
-        } catch (AnalysisException e) {
-          throw new AnalysisException("Failed to parse write-default value '" +
-              writeDefault + "' for column '" + tblColumn.getName() + "': " +
-              e.getMessage() + ". Please specify value explicitly.");
-        }
-      }
+    if (isIcebergTarget()) {
+      return IcebergUtil.resolveWriteDefault(tblColumn);
     }
-
-    if (defaultExpr == null) {
-      defaultExpr = NullLiteral.create(tblColumn.getType());
-    }
-    return defaultExpr;
+    return NullLiteral.create(tblColumn.getType());
   }
 }

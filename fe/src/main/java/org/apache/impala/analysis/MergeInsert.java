@@ -27,9 +27,11 @@ import java.util.Map;
 import java.util.Set;
 import java.util.StringJoiner;
 import org.apache.impala.catalog.Column;
+import org.apache.impala.catalog.FeIcebergTable;
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.thrift.TMergeCaseType;
 import org.apache.impala.thrift.TMergeMatchType;
+import org.apache.impala.util.IcebergUtil;
 
 /**
  * Insert clause for MERGE statements. This clause supports 2 different usage modes:
@@ -148,6 +150,9 @@ public class MergeInsert extends MergeCase {
         expr = selectList_.getItems().get(indexedColumnPermutation.get(name)).getExpr();
       } else if (emptyColumnPermutation) {
         expr = selectList_.getItems().get(i).getExpr();
+      } else if (targetTableRef_ != null
+          && targetTableRef_.getTable() instanceof FeIcebergTable) {
+        expr = IcebergUtil.resolveWriteDefault(column);
       } else {
         expr = new NullLiteral();
       }
