@@ -17,31 +17,12 @@
 
 package org.apache.impala.util;
 
-/**
- * Class that manages loading and calling the native logging library to forward
- * log4j log messages to be logged by glog.
- */
+/** Forwards log4j log messages to glog through native logging support. */
 public class NativeLogger {
-  private static boolean loaded_ = false;
-
   // Writes a log message to glog
   private native static void Log(int severity, String msg, String filename, int line);
 
   public static void LogToGlog(int severity, String msg, String filename, int line) {
-    try {
-      Log(severity, msg, filename, line);
-    } catch (UnsatisfiedLinkError e) {
-      loadLibrary();
-      Log(severity, msg, filename, line);
-    }
-  }
-
-  /**
-   * Loads the native logging support library.
-   */
-  private static synchronized void loadLibrary() {
-    if (loaded_) return;
-    NativeLibUtil.loadLibrary("libloggingsupport.so");
-    loaded_ = true;
+    Log(severity, msg, filename, line);
   }
 }

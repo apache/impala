@@ -162,11 +162,6 @@ SET_SOURCE_FILES_PROPERTIES(${SQUEASEL_SRC_DIR}/squeasel.c
 SET_SOURCE_FILES_PROPERTIES(${SQUEASEL_SRC_DIR}/squeasel.c
   PROPERTIES COMPILE_FLAGS -DUSE_IPV6)
 
-# shared library which provides native logging support to JVMs over JNI.
-add_library(loggingsupport SHARED
-  logging-support.cc
-)
-
 add_executable(parquet-reader parquet-reader.cc)
 add_executable(impala-profile-tool impala-profile-tool.cc)
 
@@ -174,8 +169,6 @@ install(TARGETS impala-profile-tool DESTINATION ${IMPALA_INSTALLDIR}/util)
 
 target_link_libraries(parquet-reader ${IMPALA_LINK_LIBS})
 target_link_libraries(impala-profile-tool ${IMPALA_LINK_LIBS})
-
-target_link_libraries(loggingsupport ${IMPALA_LINK_LIBS_DYNAMIC_TARGETS})
 
 if (BUILD_WITH_NO_TESTS)
   return()

@@ -539,7 +539,15 @@ add_custom_target(notests_independent_targets DEPENDS
   java cscope tarballs impala_python3 impala_shell_pypi
 )
 add_custom_target(notests_regular_targets DEPENDS
-  impalad statestored catalogd admissiond fesupport loggingsupport ImpalaUdf udasample udfsample impala-profile-tool
+  impalad
+  statestored
+  catalogd
+  admissiond
+  fesupport
+  ImpalaUdf
+  udasample
+  udfsample
+  impala-profile-tool
 )
 
 add_custom_target(notests_all_targets DEPENDS
