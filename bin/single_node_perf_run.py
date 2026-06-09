@@ -48,6 +48,9 @@
 # WARNING: When --load is used, this script calls load_data.py which can
 # overwrite your TPC-H and TPC-DS data.
 #
+# WARNING: This script does not respect any existing environment variables. Environment
+# variables should be placed into bin/impala-config-local.sh to have an effect.
+#
 # Options:
 #   -h, --help            show this help message and exit
 #   --workloads=WORKLOADS
@@ -93,17 +96,21 @@ def configured_call(cmd):
   if type(cmd) is list:
     cmd = " ".join([pipes.quote(arg) for arg in cmd])
   cmd = "source {0}/bin/impala-config.sh && {1}".format(IMPALA_HOME, cmd)
-  return subprocess.check_call(["bash", "-c", cmd])
+  # Set env={} to use a clean environment. Existing environment variables can cause
+  # complicated interactions. For example, this script runs with impala-python3,
+  # which sets LD_LIBRARY_PATH to use the toolchain libstdc++. On newer OSes, this
+  # can cause issues for system binaries that need to use a newer libstdc++.
+  return subprocess.check_call(["bash", "-c", cmd], env={})
 
 
 def run_git(args):
   """Runs git without capturing output (stdout passes through to stdout)"""
-  subprocess.check_call(["git"] + args, text=True)
+  subprocess.check_call(["git"] + args, text=True, env={})
 
 
 def get_git_output(args):
   """Runs git, capturing the output and returning it"""
-  return subprocess.check_output(["git"] + args, text=True)
+  return subprocess.check_output(["git"] + args, text=True, env={})
 
 
 def load_data(db_to_load, table_formats, scale):
@@ -175,6 +182,7 @@ def run_workload(base_dir, workloads, options):
 
 def report_benchmark_results(file_a, file_b, description):
   """Wrapper around report_benchmark_result.py."""
+  # This is using impala-python3, so it can tolerate inheriting the environment.
   performance_result = subprocess.check_output(
     ["{0}/tests/benchmark/report_benchmark_results.py".format(IMPALA_HOME),
      "--reference_result_file={0}".format(file_a),
@@ -205,14 +213,14 @@ def compare(base_dir, hash_a, hash_b, options):
     with open(os.path.join(IMPALA_HOME, "performance_result_profile_diff.txt"), "w") as f:
       # This does not check that the diff command succeeds
       subprocess.run(["diff", "-u", os.path.join(base_dir, hash_a + "_profiles"),
-        os.path.join(base_dir, hash_b + "_profiles")], stdout=f, text=True)
+        os.path.join(base_dir, hash_b + "_profiles")], stdout=f, text=True, env={})
   else:
     generate_profile_file(file_a, hash_a, base_dir)
     generate_profile_file(file_b, hash_b, base_dir)
     with open(os.path.join(IMPALA_HOME, "performance_result_profile_diff.txt"), "w") as f:
       # This does not check that the diff command succeeds
       subprocess.run(["diff", "-u", os.path.join(base_dir, hash_a + "_profile.txt"),
-        os.path.join(base_dir, hash_b + "_profile.txt")], stdout=f, text=True)
+        os.path.join(base_dir, hash_b + "_profile.txt")], stdout=f, text=True, env={})
 
 
 def generate_profile_file(name, hash, base_dir):
