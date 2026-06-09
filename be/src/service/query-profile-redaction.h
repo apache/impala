@@ -17,6 +17,7 @@
 
 #pragma once
 
+#include <cstddef>
 #include <cstdint>
 #include <string>
 #include <string_view>
@@ -40,10 +41,9 @@ namespace impala {
 // 4) Call Unredact(text) on any derived text that may contain aliases to map
 //    aliases back to their original values.
 //
-// Redact() builds a deterministic alias map (original -> alias) and also stores
-// the reverse map (alias -> original) used by Unredact(). SQL values are
-// restored using their JSON-escaped representation because unredaction is
-// applied against serialized JSON text.
+// Redact() builds deterministic alias maps and applies them directly on a copied
+// JSON DOM. It also stores the reverse map (alias -> original) used by Unredact()
+// for post-processing plain-text outputs that may contain redacted aliases.
 //
 // Redaction targets currently include:
 // - SQL statements from "Sql Statement" fields:
@@ -73,17 +73,27 @@ class QueryProfileRedactor {
   const rapidjson::Document& redacted_profile_json() const {
     return redacted_profile_json_;
   }
+  size_t redacted_profile_size_bytes() const { return redacted_profile_size_bytes_; }
 
  private:
   int64_t profile_size_limit_bytes_;
   rapidjson::Document redacted_profile_json_;
+  size_t redacted_profile_size_bytes_ = 0;
   std::unordered_map<std::string, std::string> alias_to_original_;
 };
 
-// Internal helper wrappers exposed for offline unit testing.
+// Internal helper wrappers exposed for unit testing.
 namespace test {
 std::vector<std::string> CollectRegexMatches(
     std::string_view text, const re2::RE2& pattern);
+std::vector<std::string> CollectStringValuesFromJsonForTest(
+    const rapidjson::Value& node);
+std::vector<std::string> CollectRegexMatchesFromTextsForTest(
+    const std::vector<std::string>& texts, const std::string& pattern,
+    size_t group_index = 0);
+std::vector<std::string> CollectIpv6MatchesFromTextsForTest(
+    const std::vector<std::string>& texts);
+size_t EstimateSerializedJsonSizeForTest(const rapidjson::Value& value);
 } // namespace test
 
 } // namespace impala

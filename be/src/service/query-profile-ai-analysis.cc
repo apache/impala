@@ -932,13 +932,11 @@ Status GenerateAiAnalysisFromProfile(const Value& profile_json, string* analysis
 
   QueryProfileRedactor redactor(profile_size_limit_bytes);
   RETURN_IF_ERROR(redactor.Redact(profile_json));
-  const size_t redacted_profile_size_bytes =
-      JsonToString(redactor.redacted_profile_json()).size();
 
   QueryProfileToolExecutor profile_tool_executor;
   RETURN_IF_ERROR(CreateQueryProfileToolExecutorForProfile(
       redactor.redacted_profile_json(), &profile_tool_executor,
-      profile_size_limit_bytes, redacted_profile_size_bytes));
+      profile_size_limit_bytes, redactor.redacted_profile_size_bytes()));
 
   Document summary_tool_output_doc;
   RETURN_IF_ERROR(profile_tool_executor("get_summary", "", &summary_tool_output_doc));

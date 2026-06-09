@@ -17,11 +17,14 @@
 
 #include "service/query-profile-redaction.h"
 
+#include <algorithm>
+#include <cctype>
 #include <cstdlib>
 #include <filesystem>
 #include <fstream>
 #include <sstream>
 #include <string>
+#include <vector>
 
 #include <rapidjson/document.h>
 
@@ -96,6 +99,28 @@ static string RedactedProfileText(const QueryProfileRedactor& redactor) {
   return JsonToString(redactor.redacted_profile_json());
 }
 
+static bool ContainsStandaloneIdentifierToken(
+    const string& text, const string& token) {
+  if (token.empty()) return false;
+  size_t pos = 0;
+  while ((pos = text.find(token, pos)) != string::npos) {
+    const bool start_boundary_ok = pos == 0
+        || (!std::isalnum(static_cast<unsigned char>(text[pos - 1]))
+               && text[pos - 1] != '_');
+    const size_t token_end = pos + token.size();
+    const bool end_boundary_ok = token_end == text.size()
+        || (!std::isalnum(static_cast<unsigned char>(text[token_end]))
+               && text[token_end] != '_');
+    if (start_boundary_ok && end_boundary_ok) return true;
+    pos = token_end;
+  }
+  return false;
+}
+
+static bool ContainsString(const std::vector<string>& values, const string& value) {
+  return std::find(values.begin(), values.end(), value) != values.end();
+}
+
 TEST(QueryProfileRedactionTest, RedactedProfileMatchesGoldenForTpcds72) {
   const char* impala_home = GetImpalaHome();
   ASSERT_NE(nullptr, impala_home);
@@ -109,10 +134,6 @@ TEST(QueryProfileRedactionTest, RedactedProfileMatchesGoldenForTpcds72) {
   ASSERT_OK(redactor.Redact(profile_json));
   const string redacted_text = RedactedProfileText(redactor);
   ASSERT_FALSE(redacted_text.empty());
-  const string unredacted_text = redactor.Unredact(redacted_text);
-  EXPECT_EQ(
-      CanonicalizeJsonTextOrDie(profile_text),
-      CanonicalizeJsonTextOrDie(unredacted_text));
 
   const string golden_dir = Substitute(
       "$0/testdata/impala-profiles/query-profile-redaction-expected",
@@ -268,8 +289,96 @@ TEST(QueryProfileRedactionTest, RegexDrivenRedactionsAreCoveredAndReversible) {
   EXPECT_EQ(string::npos, redacted_text.find("sales_db.order_table"));
   EXPECT_EQ(string::npos, redacted_text.find("snake_case_col"));
 
-  EXPECT_EQ(CanonicalizeJsonTextOrDie(profile_text),
-      CanonicalizeJsonTextOrDie(redactor.Unredact(redacted_text)));
+  const string redacted_summary =
+      "sql=[REDACTED_SQL_STATEMENT] user=user_001 ip=ip_001 "
+      "host=host_001 table=table_001 column=column_001";
+  const string unredacted_summary = redactor.Unredact(redacted_summary);
+  EXPECT_EQ(string::npos, unredacted_summary.find("[REDACTED_SQL_STATEMENT]"));
+  EXPECT_EQ(string::npos, unredacted_summary.find("user_001"));
+  EXPECT_EQ(string::npos, unredacted_summary.find("ip_001"));
+  EXPECT_EQ(string::npos, unredacted_summary.find("host_001"));
+  EXPECT_EQ(string::npos, unredacted_summary.find("table_001"));
+  EXPECT_EQ(string::npos, unredacted_summary.find("column_001"));
+  EXPECT_STR_CONTAINS(
+      unredacted_summary, "select raw_value from pii_db.customer_table");
+  EXPECT_STR_CONTAINS(unredacted_summary, "primary_user");
+  EXPECT_STR_CONTAINS(unredacted_summary, "10.20.30.40");
+  EXPECT_STR_CONTAINS(unredacted_summary, "worker-a.example.com");
+  EXPECT_STR_CONTAINS(unredacted_summary, "sales_db.order_table");
+  EXPECT_STR_CONTAINS(unredacted_summary, "customer_id");
+}
+
+TEST(QueryProfileRedactionTest, CollectStringValuesFromJsonCollectsNestedValues) {
+  const string json_text = R"({
+  "root": "value_one",
+  "nested": {
+    "key": "value_two",
+    "arr": ["value_three", {"leaf": "value_four"}]
+  },
+  "other": ["value_five", {"deep": ["value_six"]}]
+})";
+  rapidjson::Document profile_json;
+  ParseProfileJsonOrDie(json_text, &profile_json);
+
+  const std::vector<string> values =
+      test::CollectStringValuesFromJsonForTest(profile_json);
+  EXPECT_EQ(6, values.size());
+  EXPECT_TRUE(ContainsString(values, "value_one"));
+  EXPECT_TRUE(ContainsString(values, "value_two"));
+  EXPECT_TRUE(ContainsString(values, "value_three"));
+  EXPECT_TRUE(ContainsString(values, "value_four"));
+  EXPECT_TRUE(ContainsString(values, "value_five"));
+  EXPECT_TRUE(ContainsString(values, "value_six"));
+}
+
+TEST(QueryProfileRedactionTest, CollectRegexMatchesFromTextsHandlesCapturesAndDedup) {
+  const std::vector<string> texts = {
+      "owner=ops-team@example.com uid=service_user",
+      "owner=ops-team@example.com uid=service_user",
+      "owner=backup@example.com user=service_user"};
+  const std::vector<string> email_matches =
+      test::CollectRegexMatchesFromTextsForTest(
+          texts, R"([A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,})");
+  EXPECT_EQ(2, email_matches.size());
+  EXPECT_TRUE(ContainsString(email_matches, "ops-team@example.com"));
+  EXPECT_TRUE(ContainsString(email_matches, "backup@example.com"));
+
+  const std::vector<string> user_matches = test::CollectRegexMatchesFromTextsForTest(
+      texts, R"(\b(?:user|uid)=([A-Za-z0-9._@-]+)\b)", /*group_index=*/1);
+  EXPECT_EQ(1, user_matches.size());
+  EXPECT_EQ("service_user", user_matches[0]);
+}
+
+TEST(QueryProfileRedactionTest, CollectIpv6MatchesFromTextsFiltersInvalidCandidates) {
+  const std::vector<string> texts = {
+      "valid=2001:db8::7 invalid_time=12:34 invalid_short=abcd:ef01",
+      "valid=fe80::1 duplicate=2001:db8::7"};
+  const std::vector<string> ipv6_matches =
+      test::CollectIpv6MatchesFromTextsForTest(texts);
+  EXPECT_EQ(2, ipv6_matches.size());
+  EXPECT_TRUE(ContainsString(ipv6_matches, "2001:db8::7"));
+  EXPECT_TRUE(ContainsString(ipv6_matches, "fe80::1"));
+  EXPECT_FALSE(ContainsString(ipv6_matches, "12:34"));
+  EXPECT_FALSE(ContainsString(ipv6_matches, "abcd:ef01"));
+}
+
+TEST(QueryProfileRedactionTest, EstimateSerializedJsonSizeMatchesJsonSerialization) {
+  const string json_text = R"({
+  "plain": "abc",
+  "escaped": "a\"b\nc",
+  "arr": [1, true, null, {"x": "y\tz"}],
+  "double_values": [
+    3.1631581491853288,
+    0.00013492935534459787,
+    1.2345e-20,
+    -9.8765E+17
+  ]
+})";
+  rapidjson::Document profile_json;
+  ParseProfileJsonOrDie(json_text, &profile_json);
+
+  EXPECT_EQ(JsonToString(profile_json).size(),
+      test::EstimateSerializedJsonSizeForTest(profile_json));
 }
 
 TEST(QueryProfileRedactionTest, UnredactionDoesNotCascadeAliasReplacements) {
@@ -290,8 +399,12 @@ TEST(QueryProfileRedactionTest, UnredactionDoesNotCascadeAliasReplacements) {
   const string redacted_text = RedactedProfileText(redactor);
   EXPECT_STR_CONTAINS(redacted_text, "table_001");
   EXPECT_STR_CONTAINS(redacted_text, "table_002");
-  EXPECT_EQ(CanonicalizeJsonTextOrDie(profile_text),
-      CanonicalizeJsonTextOrDie(redactor.Unredact(redacted_text)));
+
+  const string unredacted_text = redactor.Unredact("table_001 table_002");
+  EXPECT_STR_CONTAINS(unredacted_text, "decoy_table_002");
+  EXPECT_STR_CONTAINS(unredacted_text, "original_target");
+  EXPECT_FALSE(ContainsStandaloneIdentifierToken(unredacted_text, "table_001"));
+  EXPECT_FALSE(ContainsStandaloneIdentifierToken(unredacted_text, "table_002"));
 }
 
 TEST(QueryProfileRedactionTest, RedactionDoesNotReplaceInsideLargerIdentifiers) {
@@ -316,8 +429,10 @@ TEST(QueryProfileRedactionTest, RedactionDoesNotReplaceInsideLargerIdentifiers) 
   EXPECT_STR_CONTAINS(redacted_text, "from table_");
   EXPECT_STR_CONTAINS(redacted_text, "foo_tablex");
   EXPECT_EQ(string::npos, redacted_text.find("table_001x"));
-  EXPECT_EQ(CanonicalizeJsonTextOrDie(profile_text),
-      CanonicalizeJsonTextOrDie(redactor.Unredact(redacted_text)));
+
+  const string unredacted_text = redactor.Unredact("table_001 table_001x");
+  EXPECT_STR_CONTAINS(unredacted_text, "foo_table");
+  EXPECT_STR_CONTAINS(unredacted_text, "table_001x");
 }
 
 TEST(QueryProfileRedactionTest,

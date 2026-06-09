@@ -32,18 +32,14 @@
 #include <arpa/inet.h>
 #include <boost/algorithm/string.hpp>
 #include <rapidjson/document.h>
-#include <rapidjson/stringbuffer.h>
 #include <rapidjson/writer.h>
 #include <re2/re2.h>
 
 #include "common/logging.h"
-#include "util/json-util.h"
 
 using namespace std;
 using rapidjson::Document;
-using rapidjson::StringBuffer;
 using rapidjson::Value;
-using rapidjson::Writer;
 
 namespace impala {
 
@@ -76,24 +72,14 @@ static const re2::RE2 USER_KV_RE(
 static const re2::RE2 IPV4_RE(
     R"((\b(?:(?:25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)\.){3})"
     R"((?:25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)\b))");
+// Collects IPv6-like candidates; inet_pton() validates true IPv6 values later.
+static const re2::RE2 IPV6_CANDIDATE_RE(
+    R"(([0-9A-Fa-f:]*:[0-9A-Fa-f:]+))");
 
 // Builds deterministic SQL placeholders while keeping the first token stable.
 static string BuildRedactedSqlPlaceholder(size_t index) {
   if (index <= 1) return REDACTED_SQL_STATEMENT;
   return string("[REDACTED_SQL_STATEMENT_") + std::to_string(index) + "]";
-}
-
-// Escapes a string so it can be safely matched within JSON-serialized text.
-static string JsonEscapeString(const string_view& input) {
-  StringBuffer buffer;
-  Writer<StringBuffer> writer(buffer);
-  writer.String(input.data(), static_cast<rapidjson::SizeType>(input.size()));
-  const char* p = buffer.GetString();
-  const size_t n = buffer.GetSize();
-  const size_t start = n >= 1 && p[0] == '"' ? 1 : 0;
-  const size_t end = n >= 1 && p[n - 1] == '"' ? n - 1 : n;
-  if (end < start) return "";
-  return string(p + start, end - start);
 }
 
 // Collects unique regex matches from text using the first capture group.
@@ -115,40 +101,6 @@ static vector<string> CollectRegexMatchesInternal(
 static bool IsValidIpv6Address(const string& candidate) {
   unsigned char address[16];
   return inet_pton(AF_INET6, candidate.c_str(), address) == 1;
-}
-
-// Collects valid IPv6 tokens from text by scanning contiguous hex/colon ranges.
-static vector<string> CollectIpv6Matches(const string_view& text) {
-  unordered_set<string_view> seen_matches;
-  vector<string> results;
-
-  auto is_ipv6_char = [](char c) -> bool {
-    return std::isxdigit(static_cast<unsigned char>(c)) || c == ':';
-  };
-
-  size_t pos = 0;
-  while (pos < text.size()) {
-    if (!is_ipv6_char(text[pos])) {
-      ++pos;
-      continue;
-    }
-
-    const size_t start = pos;
-    bool has_colon = false;
-    while (pos < text.size() && is_ipv6_char(text[pos])) {
-      if (text[pos] == ':') has_colon = true;
-      ++pos;
-    }
-    if (!has_colon) continue;
-
-    const string_view candidate(text.data() + start, pos - start);
-    if (!seen_matches.insert(candidate).second) continue;
-    string candidate_text(candidate);
-    if (!IsValidIpv6Address(candidate_text)) continue;
-    results.emplace_back(move(candidate_text));
-  }
-
-  return results;
 }
 
 // Adds a prefixed alias set into a global map while tracking reverse lookups.
@@ -198,43 +150,14 @@ static inline bool IsIdentifierChar(char c) {
   return std::isalnum(static_cast<unsigned char>(c)) || c == '_';
 }
 
-// Returns true if text[idx] is the escaped character in a JSON escape sequence.
-// Example: for "\\n", idx should point to 'n'.
-static inline bool IsEscapedJsonChar(const string_view& text, size_t idx) {
-  if (idx == 0 || idx >= text.size()) return false;
-  if (text[idx - 1] != '\\') return false;
-  switch (text[idx]) {
-    case '"':
-    case '\\':
-    case '/':
-    case 'b':
-    case 'f':
-    case 'n':
-    case 'r':
-    case 't':
-      return true;
-    case 'u': {
-      if (idx + 4 >= text.size()) return false;
-      for (size_t i = idx + 1; i <= idx + 4; ++i) {
-        if (!std::isxdigit(static_cast<unsigned char>(text[i]))) return false;
-      }
-      return true;
-    }
-    default:
-      return false;
-  }
-}
-
-// Applies a full alias map to a text blob in a single left-to-right pass.
-static Status ApplyAliasMap(const unordered_map<string, string>& alias_map,
+// Applies pre-sorted replacements in a single left-to-right pass.
+static Status ApplyAliasEntries(const vector<pair<string_view, string_view>>& entries,
     const string_view& text, string* output) {
   DCHECK(output != nullptr);
-  if (alias_map.empty()) {
+  if (entries.empty()) {
     *output = string(text);
     return Status::OK();
   }
-
-  const auto entries = GetSortedReplacementEntries(alias_map);
 
   string result;
   result.reserve(text.size());
@@ -247,9 +170,6 @@ static Status ApplyAliasMap(const unordered_map<string, string>& alias_map,
       if (text.compare(i, from.size(), from) != 0) continue;
 
       bool start_boundary_ok = (i == 0) || !IsIdentifierChar(text[i - 1]);
-      if (!start_boundary_ok && IsEscapedJsonChar(text, i - 1)) {
-        start_boundary_ok = true;
-      }
       const size_t after_idx = i + from.size();
       const bool end_boundary_ok =
           (after_idx == text.size()) || !IsIdentifierChar(text[after_idx]);
@@ -268,6 +188,13 @@ static Status ApplyAliasMap(const unordered_map<string, string>& alias_map,
 
   *output = move(result);
   return Status::OK();
+}
+
+// Applies a full alias map to a text blob in a single left-to-right pass.
+static Status ApplyAliasMap(const unordered_map<string, string>& alias_map,
+    const string_view& text, string* output) {
+  DCHECK(output != nullptr);
+  return ApplyAliasEntries(GetSortedReplacementEntries(alias_map), text, output);
 }
 
 // Extracts the analyzed query section from a plan text block.
@@ -363,6 +290,84 @@ static vector<string> CollectInfoStringValuesByKeys(
   return values;
 }
 
+// Recursive helper used by CollectStringValuesFromJson().
+static void CollectStringValuesFromJsonImpl(
+    const Value& node, vector<string_view>* values) {
+  DCHECK(values != nullptr);
+  if (node.IsString()) {
+    values->emplace_back(node.GetString(), node.GetStringLength());
+  } else if (node.IsArray()) {
+    for (const auto& item : node.GetArray()) {
+      CollectStringValuesFromJsonImpl(item, values);
+    }
+  } else if (node.IsObject()) {
+    for (auto it = node.MemberBegin(); it != node.MemberEnd(); ++it) {
+      CollectStringValuesFromJsonImpl(it->value, values);
+    }
+  }
+}
+
+// Collects all string values from the profile JSON DOM.
+static vector<string_view> CollectStringValuesFromJson(const Value& node) {
+  vector<string_view> values;
+  CollectStringValuesFromJsonImpl(node, &values);
+  return values;
+}
+
+// Collects unique regex matches across a sequence of text inputs.
+static vector<string> CollectRegexMatchesFromTexts(
+    const vector<string_view>& texts, const re2::RE2& pattern) {
+  unordered_set<string> seen;
+  vector<string> results;
+  for (const string_view& text : texts) {
+    vector<string> matches = CollectRegexMatchesInternal(text, pattern);
+    for (string& token : matches) {
+      if (!seen.emplace(token).second) continue;
+      results.emplace_back(move(token));
+    }
+  }
+  return results;
+}
+
+// Collects unique IPv6 matches across a sequence of text inputs.
+static vector<string> CollectIpv6MatchesFromTexts(const vector<string_view>& texts) {
+  vector<string> candidates = CollectRegexMatchesFromTexts(texts, IPV6_CANDIDATE_RE);
+  vector<string> results;
+  for (string& candidate : candidates) {
+    if (!IsValidIpv6Address(candidate)) continue;
+    results.emplace_back(move(candidate));
+  }
+  return results;
+}
+
+class CountingOutputStream {
+ public:
+  using Ch = char;
+  void Put(char) { ++size_bytes_; }
+  void Flush() {}
+  char Peek() const { return '\0'; }
+  char Take() { return '\0'; }
+  size_t Tell() const { return size_bytes_; }
+  char* PutBegin() { return nullptr; }
+  size_t PutEnd(char*) { return 0; }
+
+ private:
+  size_t size_bytes_ = 0;
+};
+
+// Estimates serialized JSON size in bytes directly from a DOM value.
+static size_t EstimateSerializedJsonSize(const Value& value) {
+  CountingOutputStream counting_output_stream;
+  rapidjson::Writer<CountingOutputStream> writer(counting_output_stream);
+  const bool write_success = value.Accept(writer);
+  if (UNLIKELY(!write_success)) {
+    LOG(WARNING) << "JSON size estimation failed. The estimated size "
+                 << counting_output_stream.Tell() << " bytes is incomplete.";
+  }
+  DCHECK(write_success) << "JSON size estimation failed";
+  return counting_output_stream.Tell();
+}
+
 // Extracts hostnames from specific profile sections that include host:port lists.
 static vector<string> ExtractHostTokensFromPerHostSections(const Value& source_json) {
   static const unordered_set<string_view> HOST_SECTION_KEYS = {
@@ -431,12 +436,15 @@ static pair<vector<string>, vector<string>> ExtractTableAndColumnTokens(
   return {table_tokens, column_tokens};
 }
 
-// Redacts sensitive profile values and optionally records alias-to-original mappings.
-static Status RedactQueryProfileWithAliases(const string_view& profile_text,
-    const Value& source_json,
-    unordered_map<string, string>& alias_to_original, string* redacted) {
-  DCHECK(redacted != nullptr);
-  unordered_map<string, string> global_aliases;
+// Builds deterministic alias maps for profile redaction and unredaction.
+static Status BuildRedactionAliasMaps(const Value& source_json,
+    unordered_map<string, string>* global_aliases,
+    unordered_map<string, string>* alias_to_original) {
+  DCHECK(global_aliases != nullptr);
+  DCHECK(alias_to_original != nullptr);
+  global_aliases->clear();
+  alias_to_original->clear();
+  const vector<string_view> profile_strings = CollectStringValuesFromJson(source_json);
 
   const vector<string> sql_statements =
       CollectInfoStringValuesByKeys(source_json, {"Sql Statement"});
@@ -444,44 +452,38 @@ static Status RedactQueryProfileWithAliases(const string_view& profile_text,
     const string& sql_statement = sql_statements[idx];
     if (sql_statement.empty()) continue;
     const string placeholder = BuildRedactedSqlPlaceholder(idx + 1);
-    const string escaped_sql = JsonEscapeString(sql_statement);
-    global_aliases.emplace(escaped_sql, placeholder);
-    global_aliases.emplace(sql_statement, placeholder);
-    // Unredaction runs against serialized JSON text, so restore escaped representation.
-    alias_to_original.emplace(placeholder, escaped_sql);
+    global_aliases->emplace(sql_statement, placeholder);
+    alias_to_original->emplace(placeholder, sql_statement);
   }
 
   vector<string> user_values = CollectInfoStringValuesByKeys(
       source_json, {"User", "Connected User", "Delegated User"});
-  vector<string> emails = CollectRegexMatchesInternal(profile_text, EMAIL_RE);
-  vector<string> user_kvs = CollectRegexMatchesInternal(profile_text, USER_KV_RE);
+  vector<string> emails = CollectRegexMatchesFromTexts(profile_strings, EMAIL_RE);
+  vector<string> user_kvs = CollectRegexMatchesFromTexts(profile_strings, USER_KV_RE);
   user_values.insert(user_values.end(), make_move_iterator(emails.begin()),
       make_move_iterator(emails.end()));
   user_values.insert(user_values.end(), make_move_iterator(user_kvs.begin()),
       make_move_iterator(user_kvs.end()));
   const size_t username_count =
-      AddAliasesByPrefix(user_values, "user", &global_aliases, &alias_to_original);
+      AddAliasesByPrefix(user_values, "user", global_aliases, alias_to_original);
 
-  vector<string> all_ip_tokens = CollectRegexMatchesInternal(profile_text, IPV4_RE);
-  vector<string> ipv6_tokens = CollectIpv6Matches(profile_text);
+  vector<string> all_ip_tokens = CollectRegexMatchesFromTexts(profile_strings, IPV4_RE);
+  vector<string> ipv6_tokens = CollectIpv6MatchesFromTexts(profile_strings);
   all_ip_tokens.insert(all_ip_tokens.end(), make_move_iterator(ipv6_tokens.begin()),
       make_move_iterator(ipv6_tokens.end()));
   const size_t ip_count =
-      AddAliasesByPrefix(all_ip_tokens, "ip", &global_aliases, &alias_to_original);
+      AddAliasesByPrefix(all_ip_tokens, "ip", global_aliases, alias_to_original);
 
   vector<string> contexts = CollectIdentifierContextsFromJsonProfile(source_json);
   auto [table_tokens, column_tokens] = ExtractTableAndColumnTokens(contexts);
   const size_t table_count =
-      AddAliasesByPrefix(table_tokens, "table", &global_aliases, &alias_to_original);
+      AddAliasesByPrefix(table_tokens, "table", global_aliases, alias_to_original);
   const size_t column_count =
-      AddAliasesByPrefix(column_tokens, "column", &global_aliases, &alias_to_original);
+      AddAliasesByPrefix(column_tokens, "column", global_aliases, alias_to_original);
 
   const vector<string> host_tokens = ExtractHostTokensFromPerHostSections(source_json);
   const size_t host_count =
-      AddAliasesByPrefix(host_tokens, "host", &global_aliases, &alias_to_original);
-
-  Status status = ApplyAliasMap(global_aliases, profile_text, redacted);
-  if (!status.ok()) return status;
+      AddAliasesByPrefix(host_tokens, "host", global_aliases, alias_to_original);
 
   VLOG(1) << "Query profile redaction complete. Extracted items : "
           << "SQL statements: " << sql_statements.size() << ", "
@@ -490,8 +492,55 @@ static Status RedactQueryProfileWithAliases(const string_view& profile_text,
           << "Tables: " << table_count << ", "
           << "Columns: " << column_count << ", "
           << "Hosts: " << host_count << ". "
-          << "Total aliases generated: " << alias_to_original.size();
+          << "Total aliases generated: " << alias_to_original->size();
 
+  return Status::OK();
+}
+
+// Recursively applies alias replacements in-place across a JSON value tree.
+static Status RedactJsonValueInPlace(
+    const vector<pair<string_view, string_view>>& alias_entries,
+    Value* json_value, Document::AllocatorType& alloc) {
+  DCHECK(json_value != nullptr);
+  if (alias_entries.empty()) return Status::OK();
+
+  if (json_value->IsString()) {
+    const string_view original_value(
+        json_value->GetString(), json_value->GetStringLength());
+    string redacted_value;
+    RETURN_IF_ERROR(ApplyAliasEntries(alias_entries, original_value, &redacted_value));
+    if (redacted_value.size() == original_value.size()
+        && memcmp(redacted_value.data(), original_value.data(),
+               original_value.size())
+            == 0) {
+      return Status::OK();
+    }
+    json_value->SetString(redacted_value.data(),
+        static_cast<rapidjson::SizeType>(redacted_value.size()), alloc);
+    return Status::OK();
+  }
+
+  if (json_value->IsArray()) {
+    for (auto& element : json_value->GetArray()) {
+      RETURN_IF_ERROR(RedactJsonValueInPlace(alias_entries, &element, alloc));
+    }
+    return Status::OK();
+  }
+
+  if (!json_value->IsObject()) return Status::OK();
+  for (auto member = json_value->MemberBegin(); member != json_value->MemberEnd();
+       ++member) {
+    const string_view original_key(
+        member->name.GetString(), member->name.GetStringLength());
+    string redacted_key;
+    RETURN_IF_ERROR(ApplyAliasEntries(alias_entries, original_key, &redacted_key));
+    if (redacted_key.size() != original_key.size()
+        || memcmp(redacted_key.data(), original_key.data(), original_key.size()) != 0) {
+      member->name.SetString(redacted_key.data(),
+          static_cast<rapidjson::SizeType>(redacted_key.size()), alloc);
+    }
+    RETURN_IF_ERROR(RedactJsonValueInPlace(alias_entries, &member->value, alloc));
+  }
   return Status::OK();
 }
 
@@ -513,33 +562,23 @@ static Status RedactSourceJson(const Value& source_json, int64_t profile_size_li
   DCHECK(alias_to_original != nullptr);
   DCHECK(redacted_profile_json != nullptr);
 
-  const string profile_text = JsonToString(source_json);
-  if (profile_text.size() > static_cast<size_t>(profile_size_limit_bytes)) {
-    LOG(WARNING) << "Profile redaction failed because input size " << profile_text.size()
+  const size_t profile_size_bytes = EstimateSerializedJsonSize(source_json);
+  if (profile_size_bytes > static_cast<size_t>(profile_size_limit_bytes)) {
+    LOG(WARNING) << "Profile redaction failed because input size " << profile_size_bytes
                  << " bytes exceeds configured profile size limit "
                  << profile_size_limit_bytes << " bytes";
     return Status("Query profile size exceeds configured redaction profile size limit");
   }
 
-  alias_to_original->clear();
-  string redacted_profile_text;
-  RETURN_IF_ERROR(RedactQueryProfileWithAliases(
-      profile_text, source_json, *alias_to_original, &redacted_profile_text));
-
-  redacted_profile_json->Parse(redacted_profile_text.data(),
-      static_cast<rapidjson::SizeType>(redacted_profile_text.size()));
-  if (redacted_profile_json->HasParseError()) {
-    LOG(WARNING) << "Profile redaction failed while parsing redacted output JSON with "
-                 << "RapidJSON error code: "
-                 << redacted_profile_json->GetParseError() << " at offset: "
-                 << redacted_profile_json->GetErrorOffset();
-    return Status("Redacted query profile must be a valid JSON object");
-  }
-  if (!redacted_profile_json->IsObject()) {
-    LOG(WARNING)
-        << "Profile redaction failed because redacted JSON root is not an object";
-    return Status("Redacted query profile must be a valid JSON object");
-  }
+  unordered_map<string, string> global_aliases;
+  RETURN_IF_ERROR(
+      BuildRedactionAliasMaps(source_json, &global_aliases, alias_to_original));
+  const auto alias_entries = GetSortedReplacementEntries(global_aliases);
+  redacted_profile_json->CopyFrom(source_json, redacted_profile_json->GetAllocator());
+  RETURN_IF_ERROR(
+      RedactJsonValueInPlace(alias_entries, redacted_profile_json,
+          redacted_profile_json->GetAllocator()));
+  DCHECK(redacted_profile_json->IsObject());
   return Status::OK();
 }
 
@@ -558,8 +597,10 @@ Status QueryProfileRedactor::Redact(const Value& profile_json) {
         << "Profile redaction failed because input JSON root is not an object";
     return Status("Query profile input must be a valid JSON object");
   }
-  return RedactSourceJson(profile_json, profile_size_limit_bytes_,
-      &alias_to_original_, &redacted_profile_json_);
+  RETURN_IF_ERROR(RedactSourceJson(profile_json, profile_size_limit_bytes_,
+      &alias_to_original_, &redacted_profile_json_));
+  redacted_profile_size_bytes_ = EstimateSerializedJsonSize(redacted_profile_json_);
+  return Status::OK();
 }
 
 string QueryProfileRedactor::Unredact(const string_view& text) const {
@@ -571,6 +612,38 @@ string QueryProfileRedactor::Unredact(const string_view& text) const {
 namespace test {
 vector<string> CollectRegexMatches(string_view text, const re2::RE2& pattern) {
   return CollectRegexMatchesInternal(text, pattern);
+}
+
+vector<string> CollectStringValuesFromJsonForTest(const Value& node) {
+  vector<string_view> values = impala::CollectStringValuesFromJson(node);
+  vector<string> result;
+  result.reserve(values.size());
+  for (const string_view value : values) result.emplace_back(value);
+  return result;
+}
+
+vector<string> CollectRegexMatchesFromTextsForTest(
+    const vector<string>& texts, const string& pattern, size_t group_index) {
+  DCHECK_LE(group_index, 1);
+  vector<string_view> text_views;
+  text_views.reserve(texts.size());
+  for (const string& text : texts) text_views.emplace_back(text);
+  string wrapped_pattern = pattern;
+  if (group_index == 0) wrapped_pattern = "(" + pattern + ")";
+  const re2::RE2 compiled_pattern(wrapped_pattern);
+  DCHECK(compiled_pattern.ok()) << "invalid regex pattern: " << wrapped_pattern;
+  return impala::CollectRegexMatchesFromTexts(text_views, compiled_pattern);
+}
+
+vector<string> CollectIpv6MatchesFromTextsForTest(const vector<string>& texts) {
+  vector<string_view> text_views;
+  text_views.reserve(texts.size());
+  for (const string& text : texts) text_views.emplace_back(text);
+  return impala::CollectIpv6MatchesFromTexts(text_views);
+}
+
+size_t EstimateSerializedJsonSizeForTest(const Value& value) {
+  return impala::EstimateSerializedJsonSize(value);
 }
 } // namespace test
 
