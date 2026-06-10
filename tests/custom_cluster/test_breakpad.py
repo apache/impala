@@ -20,6 +20,7 @@ import os
 import psutil
 import pytest
 import shutil
+import tempfile
 import time
 from resource import setrlimit, RLIMIT_CORE, RLIM_INFINITY
 from signal import SIGSEGV, SIGKILL, SIGUSR1, SIGTERM
@@ -404,6 +405,22 @@ class TestLoggingBase(TestBreakpadBase):
                                impala_log_dir=log_dir,
                                ignore_pid_on_log_rotation=True)
 
+  def preserve_logs(self):
+    """Preserve the logs by copying the temporary directory to a location that will
+       outlive the test. This returns the preserved log directory so that it can be
+       used in the error message."""
+    # TestBreakpad overrides impala_log_dir, so impala_log_dir doesn't include the
+    # test class. For preserving the logs, use the regular calculation that includes the
+    # test class. (Unfortunately, because this uses _start_impala_cluster() directly, it
+    # doesn't include the test method.) Put it in a unique subdirectory to avoid any
+    # collisions.
+    regular_log_dir = self.calculate_impala_log_dir()
+    if not os.path.isdir(regular_log_dir):
+      os.makedirs(regular_log_dir)
+    preserved_log_dir = tempfile.mkdtemp(dir=regular_log_dir, prefix="preserved_logs_")
+    shutil.copytree(self.tmp_dir, preserved_log_dir, dirs_exist_ok=True)
+    return preserved_log_dir
+
   def assert_logs(self, daemon, max_count, max_bytes, match_pid=True):
     """Assert that there are at most 'max_count' of INFO + ERROR log files for the
     specified daemon and the individual file size does not exceed 'max_bytes'.
@@ -411,7 +428,13 @@ class TestLoggingBase(TestBreakpadBase):
     log_dir = self.tmp_dir
     log_paths = glob.glob("%s/%s*log.ERROR.*" % (log_dir, daemon)) \
                 + glob.glob("%s/%s*log.INFO.*" % (log_dir, daemon))
-    assert len(log_paths) <= max_count
+    if len(log_paths) > max_count:
+      preserved_log_dir = self.preserve_logs()
+      msg = "Expected {} log files but found {}".format(max_count, len(log_paths))
+      for path in log_paths:
+        msg += "\nFound file: {}".format(path)
+      msg += "\nPreserved logs to {}".format(preserved_log_dir)
+      assert False, msg
 
     # group log_paths by kind and pid (if match_pid).
     log_group = {}
@@ -429,7 +452,11 @@ class TestLoggingBase(TestBreakpadBase):
           curr_path = paths[i]
           # check log size
           log_size = os.path.getsize(curr_path)
-          assert log_size <= max_bytes, "{} exceed {} bytes".format(curr_path, max_bytes)
+          if log_size > max_bytes:
+            preserved_log_dir = self.preserve_logs()
+            msg = "{}'s size {} exceeds {} bytes".format(curr_path, log_size, max_bytes)
+            msg += "\nPreserved logs to {}".format(preserved_log_dir)
+            assert False, msg
 
           if i < len(paths) - 1:
             # check that we print the next_path in last line of this log file
@@ -450,13 +477,10 @@ class TestLoggingBase(TestBreakpadBase):
               if not found_next_path:
                 # These logs are in a temporary directory. To improve debuggability,
                 # copy the logs to a location that would be preserved.
-                preserved_log_dir = os.getenv("LOG_DIR", "/tmp/")
-                preserved_path = os.path.join(preserved_log_dir,
-                    os.path.basename(curr_path))
-                shutil.copyfile(curr_path, preserved_path)
+                preserved_log_dir = self.preserve_logs()
                 msg = "Did not find {0} in the last {1} lines of {2}.".format(
                     next_path, NUM_LINES_TO_CHECK, curr_path)
-                msg += " Preserved the log contents at {0}".format(preserved_path)
+                msg += " Preserved logs to {0}".format(preserved_log_dir)
                 assert False, msg
         except OSError:
           # The daemon might delete the log in the middle of assertion.
@@ -468,6 +492,15 @@ class TestLoggingBase(TestBreakpadBase):
       os.remove(filename)
     except OSError:
       pass
+
+  def calculate_expected_max_log_files(self, cluster_size):
+    # The max log files are maintained by a background thread that wakes up periodically.
+    # For these tests, it can briefly have an extra log file above the limit.
+    test_max_log_files = self._default_max_log_files + 1
+    # The count is for both ERROR and INFO logs, which each follow the max count
+    # invidually.
+    num_severity_levels = 2
+    return test_max_log_files * cluster_size * num_severity_levels
 
   def start_excessive_cerr_cluster(self, test_cluster_size=1, remove_symlink=False,
                                    match_pid=True, max_log_count_begin=0,
@@ -484,7 +517,7 @@ class TestLoggingBase(TestBreakpadBase):
     daemon = 'impalad'
     os.chmod(self.tmp_dir, 0o744)
 
-    expected_log_max_bytes = int(1.2 * 1024**2)  # 1.2 MB
+    expected_log_max_bytes = int(1.3 * 1024**2)  # 1.3 MB
     self.assert_logs(daemon, max_log_count_begin, expected_log_max_bytes)
     self.start_cluster_with_args(test_cluster_size, self.tmp_dir,
                                  logbufsecs=test_logbufsecs,
@@ -495,7 +528,7 @@ class TestLoggingBase(TestBreakpadBase):
     self.wait_for_num_processes(daemon, test_cluster_size, 30)
     # Count both INFO and ERROR logs
     if max_log_count_end is None:
-      max_log_count_end = test_max_log_files * test_cluster_size * 2
+      max_log_count_end = self.calculate_expected_max_log_files(test_cluster_size)
     # Wait for log maintenance thread to flush and rotate the logs asynchronously.
     duration = test_logbufsecs * 10
     start = time.time()
@@ -529,7 +562,7 @@ class TestLogging(TestLoggingBase):
     assert self.get_num_processes('impalad') == 0
     assert self.get_num_processes('catalogd') == 0
     assert self.get_num_processes('statestored') == 0
-    max_count = self._default_max_log_files * 2
+    max_count = self.calculate_expected_max_log_files(1)
     self.start_excessive_cerr_cluster(test_cluster_size=1, remove_symlink=False,
                                       match_pid=False,
                                       max_log_count_begin=max_count,
@@ -567,7 +600,9 @@ class TestLoggingExhaustive(TestLoggingBase):
     assert self.get_num_processes('impalad') == 0
     assert self.get_num_processes('catalogd') == 0
     assert self.get_num_processes('statestored') == 0
-    max_count_begin = self._default_max_log_files * 2
+    max_count_begin = self.calculate_expected_max_log_files(1)
+    # The second startup ignores files from the first, because it only handles files with
+    # a matching pid. So, the final count should be double.
     max_count_end = max_count_begin * 2
     self.start_excessive_cerr_cluster(test_cluster_size=1, remove_symlink=False,
                                       match_pid=True,

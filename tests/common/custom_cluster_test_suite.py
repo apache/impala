@@ -579,6 +579,29 @@ class CustomClusterTestSuite(ImpalaTestSuite):
       log.info(file_list)
 
   @classmethod
+  def calculate_impala_log_dir(cls):
+    """This calculates a log directory for the current test that includes the class
+       name and test function name."""
+    # To find the log directory, we proceed in this order:
+    # 1. LOG_DIR environment variable (used in test scripts for Jenkins jobs, etc)
+    # 2. IMPALA_CUSTOM_CLUSTER_TEST_LOGS_DIR - set impala-config.sh (used in devenvs)
+    # 3. /tmp/ - This probably shouldn't happen, but at least the logs can go somewhere
+    impala_base_log_dir = os.getenv("LOG_DIR",
+        os.getenv("IMPALA_CUSTOM_CLUSTER_TEST_LOGS_DIR", "/tmp/"))
+
+    # To make it easier to find logs across multiple custom cluster tests, organize
+    # them into subdirectories based on their test class and their test method name
+    # (where applicable).
+    impala_log_dir_per_test = os.path.join(impala_base_log_dir, cls.__name__)
+    # The CURRENT_TEST_METHOD_NAME will be None when using SHARED_CLUSTER_ARGS as the
+    # cluster is not restarted for each test method
+    if cls.CURRENT_TEST_METHOD_NAME:
+      impala_log_dir_per_test = os.path.join(impala_log_dir_per_test,
+          cls.CURRENT_TEST_METHOD_NAME)
+
+    return impala_log_dir_per_test
+
+  @classmethod
   def _start_impala_cluster(cls,
                             options,
                             impala_log_dir=None,
@@ -603,22 +626,7 @@ class CustomClusterTestSuite(ImpalaTestSuite):
       cls.impala_log_dir = impala_log_dir
     else:
       # The test didn't customize the log dir, so calculate a reasonable base directory
-      # To find the log directory, we proceed in this order:
-      # 1. LOG_DIR environment variable (used in test scripts for Jenkins jobs, etc)
-      # 2. IMPALA_CUSTOM_CLUSTER_TEST_LOGS_DIR - set impala-config.sh (used in devenvs)
-      # 3. /tmp/ - This probably shouldn't happen, but at least the logs can go somewhere
-      impala_base_log_dir = os.getenv("LOG_DIR",
-          os.getenv("IMPALA_CUSTOM_CLUSTER_TEST_LOGS_DIR", "/tmp/"))
-
-      # To make it easier to find logs across multiple custom cluster tests, organize
-      # them into subdirectories based on their test class and their test method name
-      # (where applicable).
-      impala_log_dir_per_test = os.path.join(impala_base_log_dir, cls.__name__)
-      # The CURRENT_TEST_METHOD_NAME will be None when using SHARED_CLUSTER_ARGS as the
-      # cluster is not restarted for each test method
-      if cls.CURRENT_TEST_METHOD_NAME:
-        impala_log_dir_per_test = os.path.join(impala_log_dir_per_test,
-            cls.CURRENT_TEST_METHOD_NAME)
+      impala_log_dir_per_test = cls.calculate_impala_log_dir()
 
       if not os.path.isdir(impala_log_dir_per_test):
         os.makedirs(impala_log_dir_per_test)
