@@ -4343,6 +4343,12 @@ public class Analyzer {
    * Return true if the result can have null values when apply e on tupleIds
    */
   private boolean isNullableConjunct(Expr e, List<TupleId> tupleIds) {
+    // Push NOT inward (i.e. applying De Morgan's law) so that e.g.
+    // "NOT (t1.v1 IS NULL OR t2.v2 IS NULL)" becomes
+    // "t1.v1 IS NOT NULL AND t2.v2 IS NOT NULL".
+    // Conversely, "NOT (t1.v1 = 1 AND t2.v2 = 2)" becomes "t1.v1 != 1 OR t2.v2 != 2".
+    // This is required for proper nullability analysis of complex predicates.
+    e = Expr.pushNegationToOperands(e);
     // A clause like "t1.v1 IS NOT NULL OR t2.v2 IS NOT NULL" and t1 in 'tupleIds' does
     // not prove that t1.v1 can't be NULL, because when t2.v2 IS NOT NULL, t1.v1 can be
     // null. But a clause like "t1.v1 IS NOT NULL OR t1.v2 IS NOT NULL" proves that the

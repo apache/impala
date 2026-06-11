@@ -332,3 +332,29 @@ WHERE t2.group_str = 'a'
 ---- TYPES
 bigint
 ====
+---- QUERY
+# IMPALA-14685: NOT(t1.col = val AND t2.col = val) should not cause outer-to-inner
+# transformation because NOT(A AND B) is equivalent to (NOT A) OR (NOT B) which
+# doesn't prove that the nullable side is non-null.
+select count(*)
+from functional.alltypes t1
+left outer join functional.alltypessmall t2
+  on t1.id = t2.id
+where not (t1.int_col = 1 and t2.int_col = 1)
+---- RESULTS
+6574
+---- TYPES
+bigint
+====
+---- QUERY
+# IMPALA-14685: Verify with a more complex negated conjunction.
+select count(*)
+from functional.alltypes t1
+left outer join functional.alltypessmall t2
+  on t1.id = t2.id
+where not (t1.tinyint_col = 1 and t2.tinyint_col = 1 and t2.int_col > 0)
+---- RESULTS
+6574
+---- TYPES
+bigint
+====

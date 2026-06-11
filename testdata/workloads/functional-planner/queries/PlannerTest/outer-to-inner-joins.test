@@ -1222,3 +1222,75 @@ PLAN-ROOT SINK
    runtime filters: RF000 -> jointbl.test_id
    row-size=12B cardinality=19
 ====
+# IMPALA-14685: NOT(t2.col IS NULL OR t2.col IS NULL) is equivalent to
+# (t2.col IS NOT NULL AND t2.col IS NOT NULL) after De Morgan's law.
+# This is null-rejecting for t2, so the join can be converted to INNER.
+select 1
+from functional.alltypes t1
+left outer join functional.alltypessmall t2
+  on t1.id = t2.id
+where not (t2.int_col is null or t2.tinyint_col is null)
+---- PLAN
+PLAN-ROOT SINK
+|
+02:HASH JOIN [INNER JOIN]
+|  hash predicates: t1.id = t2.id
+|  runtime filters: RF000 <- t2.id
+|  row-size=13B cardinality=99
+|
+|--01:SCAN HDFS [functional.alltypessmall t2]
+|     HDFS partitions=4/4 files=4 size=6.32KB
+|     predicates: NOT (t2.int_col IS NULL OR t2.tinyint_col IS NULL)
+|     row-size=9B cardinality=100
+|
+00:SCAN HDFS [functional.alltypes t1]
+   HDFS partitions=24/24 files=24 size=478.45KB
+   runtime filters: RF000 -> t1.id
+   row-size=4B cardinality=7.30K
+====
+# IMPALA-14685: NOT(t1.col = val AND t2.col = val) is equivalent to
+# (t1.col != val OR t2.col != val). The OR means t2 can be null while
+# the predicate is still true, so the join must remain LEFT OUTER.
+select 1
+from functional.alltypes t1
+left outer join functional.alltypessmall t2
+  on t1.id = t2.id
+where not (t1.int_col = 1 and t2.int_col = 1)
+---- PLAN
+PLAN-ROOT SINK
+|
+02:HASH JOIN [LEFT OUTER JOIN]
+|  hash predicates: t1.id = t2.id
+|  other predicates: NOT (t1.int_col = 1 AND t2.int_col = 1)
+|  row-size=16B cardinality=7.30K
+|
+|--01:SCAN HDFS [functional.alltypessmall t2]
+|     HDFS partitions=4/4 files=4 size=6.32KB
+|     row-size=8B cardinality=100
+|
+00:SCAN HDFS [functional.alltypes t1]
+   HDFS partitions=24/24 files=24 size=478.45KB
+   row-size=8B cardinality=7.30K
+====
+# IMPALA-14685: Verify with a more complex negated conjunction.
+select 1
+from functional.alltypes t1
+left outer join functional.alltypessmall t2
+  on t1.id = t2.id
+where not (t1.tinyint_col = 1 and t2.tinyint_col = 1 and t2.int_col > 0)
+---- PLAN
+PLAN-ROOT SINK
+|
+02:HASH JOIN [LEFT OUTER JOIN]
+|  hash predicates: t1.id = t2.id
+|  other predicates: NOT (t1.tinyint_col = 1 AND t2.tinyint_col = 1 AND t2.int_col > 0)
+|  row-size=14B cardinality=7.30K
+|
+|--01:SCAN HDFS [functional.alltypessmall t2]
+|     HDFS partitions=4/4 files=4 size=6.32KB
+|     row-size=9B cardinality=100
+|
+00:SCAN HDFS [functional.alltypes t1]
+   HDFS partitions=24/24 files=24 size=478.45KB
+   row-size=5B cardinality=7.30K
+====
