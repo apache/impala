@@ -92,7 +92,7 @@ Following §2 of the output-structure rubric (network service split):
 | Catalog server (`catalogd`) | invoked by coordinators; reads HMS + storage | reads HMS, lists HDFS, reads object stores | **yes** |
 | Storage scanners (Parquet, ORC, Avro, text, Iceberg, Kudu, HBase, JDBC external table) | reads operator-configured locations | reads object stores / HDFS / external JDBC | **yes** (data trust = §6) |
 | User-defined functions (UDFs) | `CREATE FUNCTION … LOCATION …` (C++ native or Java) | runs operator-/user-permitted binaries in-process | **out of model** for UDF code itself *(§3)*; in-model for the privilege check that admits the UDF |
-| External Data Sources / JDBC external tables | `CREATE DATA SOURCE` / Iceberg REST catalog | outbound JDBC / HTTPS *(documented: `docs/topics/impala_jdbc_external_table.xml`, `docs/topics/impala_iceberg_rest_catalog.xml`)* | in-model for credential handling; out-of-model for the remote endpoint |
+| External Data Sources / JDBC external tables | `CREATE DATA SOURCE` / Iceberg REST catalog | outbound JDBC / HTTPS *(documented: `docs/topics/impala_jdbc_external_table.xml`, `docs/topics/impala_iceberg_rest_catalog.xml`)* | in-model for credential handling and privilege checks; **out of model** for the remote endpoint and data source JAR code |
 | `ai_generate_text` LLM connector | SQL function calling external LLM endpoint *(documented: `docs/topics/impala_ai_functions.xml`)* | outbound HTTPS | in-model for credential / prompt handling; out-of-model for the LLM provider |
 | `shell/` Python impala-shell | client-side, not server | n/a | **out of model** for server claims *(§3)*; in-model for credential handling of the shell binary itself |
 | `docker/`, `testdata/`, `infra/`, `tests/` | tooling | n/a | **out of model** *(§3)* |
@@ -126,11 +126,12 @@ these will be closed with the cited disposition:
    the scope Ranger grants. A new way for an authorized user to do something
    they are already authorized to do is not a vulnerability *(maintainer)*. →
    `OUT-OF-MODEL: equivalent-harm`.
-5. **A sandbox for user-defined functions.** Native (C++) UDFs and Hive Java
-   UDFs run in-process with the privileges of the `impalad` daemon. UDF
-   sandboxing is not provided; admission of a `CREATE FUNCTION` is gated by
-   Ranger and that is the entire enforcement *(maintainer)*. →
-   `BY-DESIGN: property-disclaimed` (§9).
+5. **A sandbox for user-defined functions.** Native (C++) UDFs, Hive Java
+   UDFs, and user-defined DATA SOURCES run in-process with the privileges of
+   the `impalad` daemon. UDF sandboxing is not provided; defining binaries or
+   JARs to be loaded by Impala are gated by Ranger requiring `ALL` privileges on
+   the location; admission of a `CREATE FUNCTION` is also gated by Ranger.
+   *(maintainer)*. → `BY-DESIGN: property-disclaimed` (§9).
 6. **A defender against malformed-but-parseable user data in scanned files.**
    Decoders (Parquet, ORC, Avro, text, Iceberg manifests) must not corrupt
    process memory, but raw runtime exceptions, slow paths on adversarial
