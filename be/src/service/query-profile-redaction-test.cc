@@ -320,4 +320,23 @@ TEST(QueryProfileRedactionTest, RedactionDoesNotReplaceInsideLargerIdentifiers) 
       CanonicalizeJsonTextOrDie(redactor.Unredact(redacted_text)));
 }
 
+TEST(QueryProfileRedactionTest,
+    RegexCollectorsCaptureUserKvValuesAndEmailTokens) {
+  const re2::RE2 user_kv_re(R"((?i:\b(?:user|uid)=([A-Za-z0-9._@-]+)\b))");
+  const re2::RE2 email_re(R"(([A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}))");
+
+  const auto user_kv_matches = test::CollectRegexMatches(
+      "uid=service_user UID=service_user user=analytics", user_kv_re);
+  ASSERT_EQ(2, user_kv_matches.size());
+  EXPECT_EQ("service_user", user_kv_matches[0]);
+  EXPECT_EQ("analytics", user_kv_matches[1]);
+
+  const auto email_matches = test::CollectRegexMatches(
+      "owner=ops-team@example.com cc=ops-team@example.com "
+      "alt=alerts@example.org", email_re);
+  ASSERT_EQ(2, email_matches.size());
+  EXPECT_EQ("ops-team@example.com", email_matches[0]);
+  EXPECT_EQ("alerts@example.org", email_matches[1]);
+}
+
 } // namespace impala

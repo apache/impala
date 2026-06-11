@@ -21,8 +21,10 @@
 #include <string>
 #include <string_view>
 #include <unordered_map>
+#include <vector>
 
 #include <rapidjson/document.h>
+#include <re2/re2.h>
 
 #include "common/status.h"
 
@@ -77,5 +79,11 @@ class QueryProfileRedactor {
   rapidjson::Document redacted_profile_json_;
   std::unordered_map<std::string, std::string> alias_to_original_;
 };
+
+// Internal helper wrappers exposed for offline unit testing.
+namespace test {
+std::vector<std::string> CollectRegexMatches(
+    std::string_view text, const re2::RE2& pattern);
+} // namespace test
 
 } // namespace impala

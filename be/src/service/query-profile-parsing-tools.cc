@@ -25,7 +25,6 @@
 #include <cstdlib>
 #include <cstring>
 #include <memory>
-#include <regex>
 #include <set>
 #include <string>
 #include <string_view>
@@ -82,39 +81,54 @@ static constexpr int64_t DEFAULT_PARSING_PROFILE_SIZE_LIMIT_MAX_BYTES =
 static constexpr int64_t DEFAULT_PARSING_PROFILE_SIZE_LIMIT_PERCENTAGE = 1;
 
 // Matches fragment ids like "F00", "F12", etc.
-static const regex FID_RE(R"(F\d+)", regex::optimize);
+static const re2::RE2 FID_RE(R"((F\d+))");
 // Captures reservation text after "Max Per-Host Resource Reservation:".
-static const regex RES_RE(
-    R"(Max Per-Host Resource Reservation:\s*(.+))", regex::optimize);
+static const re2::RE2 RES_RE(R"(Max Per-Host Resource Reservation:\s*(.+))");
 // Captures estimate text after "Per-Host Resource Estimates:".
-static const regex EST_RE(R"(Per-Host Resource Estimates:\s*(.+))", regex::optimize);
+static const re2::RE2 EST_RE(R"(Per-Host Resource Estimates:\s*(.+))");
 // Captures the analyzed SQL between "Analyzed query:" and the first fragment section.
 static const re2::RE2 ANALYZED_RE(
     R"(Analyzed query:\s*([\s\S]*?)\n\nF\d+:PLAN FRAGMENT)");
 // Matches scan node keys like "1:SCAN ..." or "...SCAN_NODE" (case-insensitive).
-static const regex SCAN_NODE_RE(
-    R"((?:^\d+:\s*SCAN\b)|(?:\b[A-Z_]*SCAN_NODE\b))",
-    regex::optimize | regex::icase | regex::nosubs);
+static const re2::RE2 SCAN_NODE_RE(
+    R"((?i:(?:^\d+:\s*SCAN\b)|(?:\b[A-Z_]*SCAN_NODE\b)))");
 // Captures query id from keys like "Query (id=...)".
-static const regex QUERY_ID_RE(R"(^Query \(id=([^)]+)\):?$)", regex::optimize);
+static const re2::RE2 QUERY_ID_RE(R"(^Query \(id=([^)]+)\):?$)");
 // Matches compact fragment prefixes like "F00" or "F12:" at string start.
-static const regex FRAG_SHORT_RE(R"(^F\d+(\b|:))", regex::optimize | regex::nosubs);
-// Captures hour components in duration strings like "3h".
-static const regex H_RE(R"((\d+)h)", regex::optimize);
-// Captures minute components in duration strings like "15m" (not "ms").
-static const regex M_RE(R"((\d+)m(?!s))", regex::optimize);
-// Captures second components in duration strings like "12s".
-static const regex S_RE(R"((\d+)s)", regex::optimize);
-// Captures millisecond components in duration strings like "123.4ms".
-static const regex MS_RE(R"((\d+(?:\.\d+)?)ms)", regex::optimize);
+static const re2::RE2 FRAG_SHORT_RE(R"(^F\d+(\b|:))");
+// Captures duration components as (value, unit), e.g. "12ms", "3h", "15m", "7s".
+static const re2::RE2 DURATION_COMPONENT_RE(R"((\d+(?:\.\d+)?)(ms|h|m|s))");
 // Extracts one operator-timing row: optional node id, operator name, hosts, instances,
 // avg time token, and max time token.
-static const regex ROW_RE(
+static const re2::RE2 ROW_RE(
     R"(^\s*(?:(\d+):)?)"
-    R"(([A-Z][A-Z _/\-]+(?:\[[^\]]+\])?)\s+(\d+)\s+(\d+)\s+(\S+)\s+(\S+))",
-    regex::optimize);
+    R"(([A-Z][A-Z _/\-]+(?:\[[^\]]+\])?)\s+(\d+)\s+(\d+)\s+(\S+)\s+(\S+))");
 // Matches and removes a leading fragment prefix like "F00:" from plan lines.
-static const regex FRAGMENT_PREFIX_RE(R"(^\s*F\d+:\s*)", regex::optimize);
+static const re2::RE2 FRAGMENT_PREFIX_RE(R"(^\s*F\d+:\s*)");
+
+static double ParseDurationMsInternal(string_view value) {
+  if (value.empty()) return -1.0;
+  double total_ms = 0.0;
+  bool matched = false;
+  re2::StringPiece remaining(value.data(), value.size());
+  re2::StringPiece unit_component;
+  double amount = 0.0;
+  while (re2::RE2::FindAndConsume(
+      &remaining, DURATION_COMPONENT_RE, &amount, &unit_component)) {
+    const string_view unit(unit_component.data(), unit_component.size());
+    if (unit == "h") {
+      total_ms += amount * 3600000.0;
+    } else if (unit == "m") {
+      total_ms += amount * 60000.0;
+    } else if (unit == "s") {
+      total_ms += amount * 1000.0;
+    } else {
+      total_ms += amount;
+    }
+    matched = true;
+  }
+  return matched ? total_ms : -1.0;
+}
 
 // Deep-copies a JSON value into a target allocator.
 static Value CloneValue(const Value& src, Document::AllocatorType& alloc) {
@@ -294,8 +308,10 @@ QueryProfileToolAccessor::QueryProfileToolAccessor(ParsedProfile parsed)
   }
   if (query_key_.empty()) query_key_ = first_query_key;
   if (!query_key_.empty()) {
-    smatch match;
-    if (regex_match(query_key_, match, QUERY_ID_RE)) query_id_ = match[1].str();
+    string extracted_query_id;
+    if (re2::RE2::FullMatch(query_key_, QUERY_ID_RE, &extracted_query_id)) {
+      query_id_ = move(extracted_query_id);
+    }
     DCHECK(!query_id_.empty()) << "failed to extract query id from query key: "
                                << query_key_;
     if (!query_id_.empty()) {
@@ -324,9 +340,9 @@ QueryProfileToolAccessor::QueryProfileToolAccessor(ParsedProfile parsed)
   unordered_map<string, pair<string, const Value*>> best_by_fragment_id;
   unordered_map<string, int> best_score;
   for (const auto& item : all_fragments_) {
-    smatch match;
     string bucket = item.first;
-    if (regex_search(item.first, match, FID_RE)) bucket = match[0].str();
+    string fragment_id;
+    if (re2::RE2::PartialMatch(item.first, FID_RE, &fragment_id)) bucket = fragment_id;
     // Multiple sections can map to the same fragment id (for example averaged vs
     // coordinator variants). Keep the richest object to preserve most details.
     const int score = item.second != nullptr ? DictComplexity(*item.second) : 0;
@@ -384,11 +400,11 @@ Value QueryProfileToolAccessor::GetFragmentsOverview(
     const string& key = fragment.first;
     const Value* frag_data = fragment.second;
     Value info(rapidjson::kObjectType);
-    smatch match;
-    if (regex_search(key, match, FID_RE)) {
+    string fragment_id;
+    if (re2::RE2::PartialMatch(key, FID_RE, &fragment_id)) {
       info.AddMember(
           Value(FRAGMENT_ID_KEY, alloc),
-          Value(match[0].str().c_str(), alloc), alloc);
+          Value(fragment_id.c_str(), alloc), alloc);
     } else {
       info.AddMember(Value(FRAGMENT_ID_KEY, alloc), Value("", alloc), alloc);
     }
@@ -780,11 +796,10 @@ Value QueryProfileToolAccessor::GetResourceEstimates(
     if (summary != nullptr && summary->HasMember("Plan")
         && (*summary)["Plan"].IsString()) {
       const Value& plan_value = (*summary)["Plan"];
-      const string_view plan(plan_value.GetString(), plan_value.GetStringLength());
-      match_results<string_view::const_iterator> match;
-      if (regex_search(plan.begin(), plan.end(), match, RES_RE) && match.size() > 1) {
-        const string_view reservation =
-            TrimWhiteSpace(string_view(match[1].first, match[1].length()));
+      re2::StringPiece plan(plan_value.GetString(), plan_value.GetStringLength());
+      string reservation_match;
+      if (re2::RE2::PartialMatch(plan, RES_RE, &reservation_match)) {
+        const string_view reservation = TrimWhiteSpace(reservation_match);
         if (!reservation.empty()) {
           obj.AddMember("reservation", MakeJsonString(reservation, alloc), alloc);
         }
@@ -795,11 +810,10 @@ Value QueryProfileToolAccessor::GetResourceEstimates(
     if (summary != nullptr && summary->HasMember("Plan")
         && (*summary)["Plan"].IsString()) {
       const Value& plan_value = (*summary)["Plan"];
-      const string_view plan(plan_value.GetString(), plan_value.GetStringLength());
-      match_results<string_view::const_iterator> match;
-      if (regex_search(plan.begin(), plan.end(), match, EST_RE) && match.size() > 1) {
-        const string_view estimates =
-            TrimWhiteSpace(string_view(match[1].first, match[1].length()));
+      re2::StringPiece plan(plan_value.GetString(), plan_value.GetStringLength());
+      string estimates_match;
+      if (re2::RE2::PartialMatch(plan, EST_RE, &estimates_match)) {
+        const string_view estimates = TrimWhiteSpace(estimates_match);
         if (!estimates.empty()) {
           obj.AddMember("estimates", MakeJsonString(estimates, alloc), alloc);
         }
@@ -967,8 +981,9 @@ Value QueryProfileToolAccessor::BuildEventTimelineSection(
 // Checks whether a key appears to represent a fragment block.
 bool QueryProfileToolAccessor::IsFragmentKey(string_view key) const {
   if (key.find("- ") == 0) return false;
+  const re2::StringPiece key_piece(key.data(), key.size());
   return key.find("Fragment F") != string::npos
-      || regex_search(key.begin(), key.end(), FRAG_SHORT_RE);
+      || re2::RE2::PartialMatch(key_piece, FRAG_SHORT_RE);
 }
 
 // Recursively gathers fragment object members as key/value pointers.
@@ -1118,7 +1133,8 @@ void QueryProfileToolAccessor::FindNodesByPatternNormalized(
         [](unsigned char c) { return toupper(c); });
     bool match = false;
     if (normalized_pattern == "SCAN") {
-      match = regex_search(key.begin(), key.end(), SCAN_NODE_RE);
+      const re2::StringPiece key_piece(key.data(), key.size());
+      match = re2::RE2::PartialMatch(key_piece, SCAN_NODE_RE);
     } else {
       match = upper_key.find(normalized_pattern) != string::npos;
     }
@@ -1129,27 +1145,7 @@ void QueryProfileToolAccessor::FindNodesByPatternNormalized(
 
 // Parses duration strings (h/m/s/ms) into milliseconds.
 double QueryProfileToolAccessor::ParseDurationMs(string_view value) const {
-  if (value.empty()) return -1.0;
-  double total_ms = 0.0;
-  bool matched = false;
-  match_results<string_view::const_iterator> match;
-  if (regex_search(value.begin(), value.end(), match, H_RE)) {
-    total_ms += atof(string(match[1].first, match[1].second).c_str()) * 3600000.0;
-    matched = true;
-  }
-  if (regex_search(value.begin(), value.end(), match, M_RE)) {
-    total_ms += atof(string(match[1].first, match[1].second).c_str()) * 60000.0;
-    matched = true;
-  }
-  if (regex_search(value.begin(), value.end(), match, S_RE)) {
-    total_ms += atof(string(match[1].first, match[1].second).c_str()) * 1000.0;
-    matched = true;
-  }
-  if (regex_search(value.begin(), value.end(), match, MS_RE)) {
-    total_ms += atof(string(match[1].first, match[1].second).c_str());
-    matched = true;
-  }
-  return matched ? total_ms : -1.0;
+  return ParseDurationMsInternal(value);
 }
 
 // Extracts operator timing rows from fragment summary text.
@@ -1173,36 +1169,38 @@ void QueryProfileToolAccessor::AddOperatorRows(
       normalized.erase(0, 1);
       StripWhiteSpace(&normalized);
     }
-    normalized = regex_replace(normalized, FRAGMENT_PREFIX_RE, "");
-    smatch match;
-    if (!regex_search(normalized, match, ROW_RE)) continue;
+    re2::RE2::Replace(&normalized, FRAGMENT_PREFIX_RE, "");
+    string node_id;
+    string op_name;
+    string hosts_text;
+    string instances_text;
+    string avg_time;
+    string max_time;
+    if (!re2::RE2::PartialMatch(normalized, ROW_RE, &node_id, &op_name, &hosts_text,
+            &instances_text, &avg_time, &max_time)) {
+      continue;
+    }
     Value row(rapidjson::kObjectType);
-    const auto submatch_view = [&normalized, &match](int idx) -> string_view {
-      if (!match[idx].matched) return string_view();
-      const size_t pos = static_cast<size_t>(match.position(idx));
-      const size_t len = static_cast<size_t>(match.length(idx));
-      return string_view(normalized.data() + pos, len);
-    };
-    const string_view node_id = submatch_view(1);
-    const string_view op_name = submatch_view(2);
-    const string_view hosts_text = submatch_view(3);
-    const string_view instances_text = submatch_view(4);
-    const string_view avg_time = submatch_view(5);
-    const string_view max_time = submatch_view(6);
+    const string_view hosts_text_view(hosts_text);
+    const string_view instances_text_view(instances_text);
+    const string_view avg_time_view(avg_time);
+    const string_view max_time_view(max_time);
     int hosts = 0;
     int instances = 0;
-    if (!parse_int(hosts_text, &hosts)
-        || !parse_int(instances_text, &instances)) continue;
+    if (!parse_int(hosts_text_view, &hosts)
+        || !parse_int(instances_text_view, &instances)) {
+      continue;
+    }
     row.AddMember(NODE_ID_KEY,
-        match[1].matched ? MakeJsonString(node_id, alloc) : Value("", alloc),
+        node_id.empty() ? Value("", alloc) : MakeJsonString(node_id, alloc),
         alloc);
-    row.AddMember("operator", MakeJsonString(op_name, alloc), alloc);
+    row.AddMember("operator", MakeJsonString(string_view(op_name), alloc), alloc);
     row.AddMember("hosts", hosts, alloc);
     row.AddMember("instances", instances, alloc);
-    row.AddMember("avg_time", MakeJsonString(avg_time, alloc), alloc);
-    row.AddMember("max_time", MakeJsonString(max_time, alloc), alloc);
-    const double avg_ms = ParseDurationMs(avg_time);
-    const double max_ms = ParseDurationMs(max_time);
+    row.AddMember("avg_time", MakeJsonString(avg_time_view, alloc), alloc);
+    row.AddMember("max_time", MakeJsonString(max_time_view, alloc), alloc);
+    const double avg_ms = ParseDurationMs(avg_time_view);
+    const double max_ms = ParseDurationMs(max_time_view);
     if (avg_ms > 0 && max_ms > 0) {
       row.AddMember("max_vs_avg_ratio", max_ms / avg_ms, alloc);
     }
@@ -1437,5 +1435,11 @@ Status CreateQueryProfileToolExecutorForProfile(
   RETURN_IF_ERROR(ParseProfile(profile_json, &parsed));
   return BuildQueryProfileToolExecutor(move(parsed), tool_executor);
 }
+
+namespace test {
+double ParseDurationMs(string_view value) {
+  return ParseDurationMsInternal(value);
+}
+} // namespace test
 
 } // namespace impala

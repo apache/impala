@@ -23,7 +23,6 @@
 #include <cstdint>
 #include <cstring>
 #include <iterator>
-#include <regex>
 #include <string>
 #include <string_view>
 #include <unordered_map>
@@ -53,33 +52,30 @@ static constexpr int64_t DEFAULT_REDACTION_PROFILE_SIZE_LIMIT_MAX_BYTES =
     256L * 1024L * 1024L;
 static constexpr int64_t DEFAULT_REDACTION_PROFILE_SIZE_LIMIT_PERCENTAGE = 1;
 // Matches hostnames followed by a port (e.g. coordinator.example.com:22000).
-static const regex HOST_WITH_PORT_RE(
-    R"(\b([A-Za-z][A-Za-z0-9-]*(?:\.[A-Za-z0-9-]+)*)\:(\d{2,5})\b)", regex::optimize);
+static const re2::RE2 HOST_WITH_PORT_RE(
+    R"(\b([A-Za-z][A-Za-z0-9-]*(?:\.[A-Za-z0-9-]+)*)\:(\d{2,5})\b)");
 // Matches the analyzed query subsection embedded in the textual plan.
 static const re2::RE2 ANALYZED_RE(
     R"(Analyzed query:\s*([\s\S]*?)\n\nF\d+:PLAN FRAGMENT)");
 // Matches fully-qualified identifiers with at least one dot (e.g. db.tbl.col).
-static const regex QUALIFIED_ID_RE(
-    R"(\b([A-Za-z_][A-Za-z0-9_]*(?:\.[A-Za-z_][A-Za-z0-9_]*)+)\b)", regex::optimize);
+static const re2::RE2 QUALIFIED_ID_RE(
+    R"(\b([A-Za-z_][A-Za-z0-9_]*(?:\.[A-Za-z_][A-Za-z0-9_]*)+)\b)");
 // Matches table tokens following FROM/JOIN clauses.
-static const regex FROM_JOIN_TABLE_RE(
-    R"(\b(?:from|join)\s+([A-Za-z_][A-Za-z0-9_\.]*)\b)",
-    regex::optimize | regex::icase);
+static const re2::RE2 FROM_JOIN_TABLE_RE(
+    R"((?i:\b(?:from|join)\s+([A-Za-z_][A-Za-z0-9_\.]*)\b))");
 // Matches snake_case identifiers that are candidates for column tokens.
-static const regex SNAKE_CASE_ID_RE(
-    R"(\b([A-Za-z_][A-Za-z0-9_]*_[A-Za-z0-9_]*)\b)", regex::optimize);
+static const re2::RE2 SNAKE_CASE_ID_RE(
+    R"(\b([A-Za-z_][A-Za-z0-9_]*_[A-Za-z0-9_]*)\b)");
 // Matches e-mail addresses.
-static const regex EMAIL_RE(
-    R"([A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,})",
-    regex::optimize | regex::nosubs);
+static const re2::RE2 EMAIL_RE(
+    R"(([A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}))");
 // Matches user/userid key-value pairs like user=alice.
-static const regex USER_KV_RE(
-    R"(\b(?:user|uid)=([A-Za-z0-9._@-]+)\b)", regex::optimize | regex::icase);
+static const re2::RE2 USER_KV_RE(
+    R"((?i:\b(?:user|uid)=([A-Za-z0-9._@-]+)\b))");
 // Matches IPv4 addresses.
-static const regex IPV4_RE(
-    R"(\b(?:(?:25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)\.){3})"
-    R"((?:25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)\b)",
-    regex::optimize | regex::nosubs);
+static const re2::RE2 IPV4_RE(
+    R"((\b(?:(?:25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)\.){3})"
+    R"((?:25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)\b))");
 
 // Builds deterministic SQL placeholders while keeping the first token stable.
 static string BuildRedactedSqlPlaceholder(size_t index) {
@@ -100,21 +96,15 @@ static string JsonEscapeString(const string_view& input) {
   return string(p + start, end - start);
 }
 
-// Collects unique regex matches from text for the requested capture group.
-static vector<string> CollectRegexMatches(
-    const string_view& text, const regex& pattern, size_t group_index = 0) {
-  using MatchIterator = regex_iterator<string_view::const_iterator>;
+// Collects unique regex matches from text using the first capture group.
+static vector<string> CollectRegexMatchesInternal(
+    const string_view& text, const re2::RE2& pattern) {
   unordered_set<string_view> seen_matches;
   vector<string> results;
-  for (MatchIterator it(text.cbegin(), text.cend(), pattern), end;
-       it != end; ++it) {
-    const auto& match = *it;
-    if (group_index >= match.size()) continue;
-    if (match.length(group_index) == 0) continue;
-    const auto token_pos = match.position(group_index);
-    DCHECK_GE(token_pos, 0);
-    const string_view token = text.substr(
-        static_cast<size_t>(token_pos), static_cast<size_t>(match.length(group_index)));
+  re2::StringPiece remaining(text.data(), text.size());
+  re2::StringPiece token_match;
+  while (re2::RE2::FindAndConsume(&remaining, pattern, &token_match)) {
+    const string_view token(token_match.data(), token_match.size());
     if (!seen_matches.insert(token).second) continue;
     results.emplace_back(token);
   }
@@ -381,17 +371,10 @@ static vector<string> ExtractHostTokensFromPerHostSections(const Value& source_j
   vector<string> host_sections =
       CollectInfoStringValuesByKeys(source_json, HOST_SECTION_KEYS);
   for (const string& section : host_sections) {
-    const string_view section_view(section);
-    for (sregex_iterator it(
-             section.cbegin(), section.cend(), HOST_WITH_PORT_RE),
-         end;
-         it != end; ++it) {
-      const smatch& match = *it;
-      if (match.length(1) == 0) continue;
-      const string_view host =
-          section_view.substr(match.position(1), match.length(1));
-      host_tokens.emplace_back(host);
-    }
+    vector<string> section_hosts =
+        CollectRegexMatchesInternal(section, HOST_WITH_PORT_RE);
+    host_tokens.insert(host_tokens.end(), make_move_iterator(section_hosts.begin()),
+        make_move_iterator(section_hosts.end()));
   }
   return host_tokens;
 }
@@ -406,13 +389,11 @@ static pair<vector<string>, vector<string>> ExtractTableAndColumnTokens(
   vector<string> column_tokens;
 
   for (const string& context : contexts) {
-    const string_view context_view(context);
-    for (sregex_iterator it(context.cbegin(), context.cend(), QUALIFIED_ID_RE), end;
-         it != end; ++it) {
-      const smatch& match = *it;
-      if (match.length(1) == 0) continue;
-      string_view fq =
-          context_view.substr(match.position(1), match.length(1));
+    re2::StringPiece qualified_remaining(context.data(), context.size());
+    re2::StringPiece qualified_match;
+    while (re2::RE2::FindAndConsume(&qualified_remaining, QUALIFIED_ID_RE,
+        &qualified_match)) {
+      const string_view fq(qualified_match.data(), qualified_match.size());
       const size_t last_dot = fq.rfind('.');
       if (last_dot == string_view::npos || last_dot == 0
           || last_dot + 1 >= fq.size()) {
@@ -427,25 +408,21 @@ static pair<vector<string>, vector<string>> ExtractTableAndColumnTokens(
           table_last_dot == string_view::npos ? table : table.substr(table_last_dot + 1));
     }
 
-    for (sregex_iterator it(context.cbegin(), context.cend(), FROM_JOIN_TABLE_RE),
-         end;
-         it != end; ++it) {
-      const smatch& match = *it;
-      if (match.length(1) == 0) continue;
-      const string_view table =
-          context_view.substr(match.position(1), match.length(1));
+    re2::StringPiece table_remaining(context.data(), context.size());
+    re2::StringPiece table_match;
+    while (re2::RE2::FindAndConsume(&table_remaining, FROM_JOIN_TABLE_RE, &table_match)) {
+      const string_view table(table_match.data(), table_match.size());
       if (table_set.insert(table).second) table_tokens.emplace_back(table);
       const size_t table_last_dot = table.rfind('.');
       table_leaf_set.insert(
           table_last_dot == string_view::npos ? table : table.substr(table_last_dot + 1));
     }
 
-    for (sregex_iterator it(context.cbegin(), context.cend(), SNAKE_CASE_ID_RE), end;
-         it != end; ++it) {
-      const smatch& match = *it;
-      if (match.length(1) == 0) continue;
-      const string_view token =
-          context_view.substr(match.position(1), match.length(1));
+    re2::StringPiece snake_case_remaining(context.data(), context.size());
+    re2::StringPiece snake_case_match;
+    while (re2::RE2::FindAndConsume(&snake_case_remaining, SNAKE_CASE_ID_RE,
+        &snake_case_match)) {
+      const string_view token(snake_case_match.data(), snake_case_match.size());
       if (table_set.find(token) != table_set.end()) continue;
       if (table_leaf_set.find(token) != table_leaf_set.end()) continue;
       if (column_set.insert(token).second) column_tokens.emplace_back(token);
@@ -476,8 +453,8 @@ static Status RedactQueryProfileWithAliases(const string_view& profile_text,
 
   vector<string> user_values = CollectInfoStringValuesByKeys(
       source_json, {"User", "Connected User", "Delegated User"});
-  vector<string> emails = CollectRegexMatches(profile_text, EMAIL_RE, 0);
-  vector<string> user_kvs = CollectRegexMatches(profile_text, USER_KV_RE, 1);
+  vector<string> emails = CollectRegexMatchesInternal(profile_text, EMAIL_RE);
+  vector<string> user_kvs = CollectRegexMatchesInternal(profile_text, USER_KV_RE);
   user_values.insert(user_values.end(), make_move_iterator(emails.begin()),
       make_move_iterator(emails.end()));
   user_values.insert(user_values.end(), make_move_iterator(user_kvs.begin()),
@@ -485,7 +462,7 @@ static Status RedactQueryProfileWithAliases(const string_view& profile_text,
   const size_t username_count =
       AddAliasesByPrefix(user_values, "user", &global_aliases, &alias_to_original);
 
-  vector<string> all_ip_tokens = CollectRegexMatches(profile_text, IPV4_RE);
+  vector<string> all_ip_tokens = CollectRegexMatchesInternal(profile_text, IPV4_RE);
   vector<string> ipv6_tokens = CollectIpv6Matches(profile_text);
   all_ip_tokens.insert(all_ip_tokens.end(), make_move_iterator(ipv6_tokens.begin()),
       make_move_iterator(ipv6_tokens.end()));
@@ -590,5 +567,11 @@ string QueryProfileRedactor::Unredact(const string_view& text) const {
       << "Redact function has not been called, no profile to unredact";
   return UnredactTextWithAliases(text, alias_to_original_);
 }
+
+namespace test {
+vector<string> CollectRegexMatches(string_view text, const re2::RE2& pattern) {
+  return CollectRegexMatchesInternal(text, pattern);
+}
+} // namespace test
 
 } // namespace impala

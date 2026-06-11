@@ -220,4 +220,9 @@ Status CreateQueryProfileToolExecutorForProfile(
     const rapidjson::Value& profile_json, QueryProfileToolExecutor* tool_executor,
     int64_t profile_size_limit_bytes = -1, size_t profile_size_bytes = 0);
 
+// Internal helper wrappers exposed for offline unit testing.
+namespace test {
+double ParseDurationMs(std::string_view value);
+} // namespace test
+
 } // namespace impala

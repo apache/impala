@@ -519,6 +519,14 @@ TEST(
 
 }
 
+TEST(QueryProfileParsingToolsTest,
+    ParseDurationMsParsesMixedUnitsIncludingDecimalMilliseconds) {
+  EXPECT_EQ(3723004.0, test::ParseDurationMs("1h2m3s4ms"));
+  EXPECT_EQ(3723001.34, test::ParseDurationMs("1h2m3s1.34ms"));
+  EXPECT_EQ(120125.0, test::ParseDurationMs("2m0.125s"));
+  EXPECT_EQ(-1.0, test::ParseDurationMs("not-a-duration"));
+}
+
 } // namespace
 
 } // namespace impala
