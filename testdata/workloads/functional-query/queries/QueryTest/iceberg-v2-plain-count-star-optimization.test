@@ -75,3 +75,17 @@ aggregation(SUM, NumRowGroups): 2
 aggregation(SUM, NumOrcStripes): 2
 aggregation(SUM, NumFileMetadataRead): 0
 ====
+---- QUERY
+# IMPALA-14993: Queries without count(*) should not be affected by the optimization.
+# 'SELECT 1' must return one row per row in the table, not be short-circuited.
+select 1 from functional_parquet.iceberg_v2_positional_not_all_data_files_have_delete_files;
+---- RESULTS
+1
+1
+1
+1
+1
+1
+---- TYPES
+TINYINT
+====

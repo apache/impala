@@ -2411,6 +2411,10 @@ class TestIcebergV3Table(IcebergTestSuite):
     self.run_test_case('QueryTest/iceberg-v3-delete-v2-equality-upgrade',
         vector, unique_database)
 
+  def test_v3_plain_count_star_optimization(self, vector, unique_database):
+    self.run_test_case('QueryTest/iceberg-v3-plain-count-star-optimization',
+        vector, unique_database)
+
   @SkipIf.not_dfs
   def test_v3_row_lineage_file_schema(self, unique_database):
     """Test that plain INSERTs only write user columns, not hidden metadata columns."""
