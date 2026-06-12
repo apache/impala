@@ -571,8 +571,8 @@ class TestWebPageAndCloseSession(CustomClusterTestSuite):
       .format("25000"), query_id)
     requests.get(cancel_query_url)
     response = requests.get(text_profile_url)
-    cancel_status = "Cancelled from Impala&apos;s debug web interface by user: " \
-                    "&apos;anonymous&apos; at"
+    cancel_status = "Cancelled from Impala's debug web interface by user: " \
+                    "'anonymous' at"
     assert cancel_status in response.text
     self.assert_impalad_log_contains("INFO", "Cancelled from Impala\'s debug web "
       "interface by user: 'anonymous' at", expected_count=-1, timeout_s=30)

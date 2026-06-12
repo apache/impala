@@ -1529,8 +1529,8 @@ class TestWebPage(ImpalaTestSuite):
 
     response = impalad.read_debug_webpage(
         "query_profile_plain_text?query_id={}".format(query_id))
-    assert "Cancelled from Impala&apos;s debug web interface by user: " \
-        "&apos;anonymous&apos; at" in response
+    assert "Cancelled from Impala's debug web interface by user: " \
+        "'anonymous' at" in response
 
   @pytest.mark.execute_serially
   def test_query_cancel_load_tables(self):
@@ -1565,8 +1565,8 @@ class TestWebPage(ImpalaTestSuite):
 
     response = impalad.read_debug_webpage(
         "query_profile_plain_text?query_id={}".format(query_id))
-    assert "Cancelled from Impala&apos;s debug web interface by user: " \
-        "&apos;anonymous&apos; at" in response
+    assert "Cancelled from Impala's debug web interface by user: " \
+        "'anonymous' at" in response
 
   @pytest.mark.execute_serially
   def test_hadoop_varz_page(self):

@@ -510,13 +510,16 @@ public class LdapWebserverTest {
             queryId);
     client_.readContent(cancelQueryUrl);
     String response =  client_.readContent(textProfileUrl);
-    String cancelStatus = String.format("Cancelled from Impala&apos;s debug web interface"
-        + " by user: &apos;%s&apos; at", TEST_USER_1);
-    assertTrue(response.contains(cancelStatus));
+    String rawCancelStatus = String.format("Cancelled from Impala's debug web interface"
+        + " by user: '%s' at", TEST_USER_1);
+    assertTrue(response.contains(rawCancelStatus));
     // Wait for logs to flush
     TimeUnit.SECONDS.sleep(6);
+    String escapedCancelStatus = String.format(
+        "Cancelled from Impala&apos;s debug web interface"
+            + " by user: &apos;%s&apos; at", TEST_USER_1);
     response = client_.readContent("/logs");
-    assertTrue(response.contains(cancelStatus));
+    assertTrue(response.contains(escapedCancelStatus));
 
     // Session closing from the WebUI does not produce the cause message in the profile,
     // so we will skip checking the runtime profile.

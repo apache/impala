@@ -65,6 +65,10 @@ const string SALUTATION_VALUE = "Hello!";
 const string TO_ESCAPE_KEY = "ToEscape";
 const string TO_ESCAPE_VALUE = "<script language='javascript'>";
 const string ESCAPED_VALUE = "&lt;script language=&apos;javascript&apos;&gt;";
+const string RAW_TEXT_VALUE =
+    "r_name = 'ASIA'\n"
+    "runtime filters: RF000 <- key, RF001 -> key\n"
+    "Hdfs split stats (<volume id>:<# splits>/<split lengths>): 0:1/1 KB\n";
 
 // Specialize a deleter for the pipe in exec() below
 template <>
@@ -202,6 +206,16 @@ void JsonCallback(bool always_text, const Webserver::WebRequest& req,
   }
 }
 
+void RawTextCallback(bool always_text, const Webserver::WebRequest& req,
+    Document* document) {
+  Value contents(RAW_TEXT_VALUE.c_str(), document->GetAllocator());
+  document->AddMember("contents", contents, document->GetAllocator());
+  if (always_text) {
+    document->AddMember(rapidjson::StringRef(Webserver::ENABLE_RAW_HTML_KEY), true,
+        document->GetAllocator());
+  }
+}
+
 TEST(Webserver, JsonTest) {
   MetricGroup metrics("webserver-test");
   Webserver webserver("", FLAGS_webserver_port, &metrics);
@@ -257,6 +271,44 @@ TEST(Webserver, EscapingTest) {
   ASSERT_OK(HttpGet("localhost", FLAGS_webserver_port, JSON_TEST_PATH, &contents));
   ASSERT_TRUE(contents.str().find(ESCAPED_VALUE) != string::npos);
   ASSERT_TRUE(contents.str().find(TO_ESCAPE_VALUE) == string::npos);
+}
+
+TEST(Webserver, RawTextTemplateDoesNotEscapeRawContents) {
+  MetricGroup metrics("webserver-test");
+  Webserver webserver("", FLAGS_webserver_port, &metrics);
+
+  const string RAW_TEXT_PATH = "/raw-text";
+  Webserver::UrlCallback callback = bind<void>(RawTextCallback, true, _1, _2);
+  webserver.RegisterUrlCallback(RAW_TEXT_PATH, "raw_text.tmpl", callback, true);
+  ASSERT_OK(webserver.Start());
+  stringstream contents;
+  ASSERT_OK(HttpGet("localhost", FLAGS_webserver_port, RAW_TEXT_PATH, &contents));
+
+  string contents_string = contents.str();
+  ASSERT_TRUE(contents_string.find("text/plain") != string::npos);
+  ASSERT_TRUE(contents_string.find(RAW_TEXT_VALUE) != string::npos);
+  ASSERT_TRUE(contents_string.find("&apos;ASIA&apos;") == string::npos);
+  ASSERT_TRUE(contents_string.find("&lt;-") == string::npos);
+  ASSERT_TRUE(contents_string.find("-&gt;") == string::npos);
+  ASSERT_TRUE(contents_string.find("&lt;volume id&gt;") == string::npos);
+}
+
+TEST(Webserver, RawTextTemplateEscapesNonRawContents) {
+  MetricGroup metrics("webserver-test");
+  Webserver webserver("", FLAGS_webserver_port, &metrics);
+
+  const string RAW_TEXT_PATH = "/raw-text";
+  Webserver::UrlCallback callback = bind<void>(RawTextCallback, false, _1, _2);
+  webserver.RegisterUrlCallback(RAW_TEXT_PATH, "raw_text.tmpl", callback, true);
+  ASSERT_OK(webserver.Start());
+  stringstream contents;
+  ASSERT_OK(HttpGet("localhost", FLAGS_webserver_port, RAW_TEXT_PATH, &contents));
+
+  string contents_string = contents.str();
+  ASSERT_TRUE(contents_string.find("&apos;ASIA&apos;") != string::npos);
+  ASSERT_TRUE(contents_string.find("&lt;-") != string::npos);
+  ASSERT_TRUE(contents_string.find("-&gt;") != string::npos);
+  ASSERT_TRUE(contents_string.find("&lt;volume id&gt;") != string::npos);
 }
 
 TEST(Webserver, EscapeErrorUriTest) {
