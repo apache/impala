@@ -187,8 +187,16 @@ public class FrontendFixture {
    * The test tables are registered in testTables_ and removed in the @After method.
    */
   public Table addTestTable(String createTableSql) {
+    return addTestTable(catalog_, createTableSql);
+  }
+
+  /**
+   * Adds a test-local table to the given catalog based on the given CREATE TABLE sql.
+   * Only HDFS tables are supported. Returns the new dummy table.
+   */
+  public Table addTestTable(Catalog catalog, String createTableSql) {
     CreateTableStmt createTableStmt = (CreateTableStmt) analyzeStmt(createTableSql);
-    Db db = catalog_.getDb(createTableStmt.getDb());
+    Db db = catalog.getDb(createTableStmt.getDb());
     Preconditions.checkNotNull(db, "Test tables must be created in an existing db.");
     org.apache.hadoop.hive.metastore.api.Table msTbl =
         CatalogOpExecutor.createMetaStoreTable(createTableStmt.toThrift());

@@ -17,6 +17,10 @@
 
 package org.apache.impala.analysis;
 
+import java.util.ArrayList;
+import java.util.Map;
+
+import org.apache.hadoop.hive.metastore.api.StorageDescriptor;
 import org.apache.impala.catalog.FeIcebergTable;
 import org.apache.impala.catalog.FeKuduTable;
 import org.apache.impala.catalog.FeTable;
@@ -25,6 +29,7 @@ import org.apache.impala.thrift.TAlterTableParams;
 import org.apache.impala.thrift.TAlterTableSetFileFormatParams;
 import org.apache.impala.thrift.TAlterTableType;
 import org.apache.impala.thrift.THdfsFileFormat;
+import org.apache.impala.util.AvroSchemaUtils;
 
 /**
  * Represents an ALTER TABLE [PARTITION partitionSet] SET FILEFORMAT statement.
@@ -68,6 +73,20 @@ public class AlterTableSetFileFormatStmt extends AlterTableSetStmt {
     if (tbl instanceof FeIcebergTable) {
       throw new AnalysisException("ALTER TABLE SET FILEFORMAT is not supported " +
           "on Iceberg tables: " + tbl.getFullName());
+    }
+
+    // When switching to AVRO format, if the table already has avro.schema.url as the
+    // effective schema source, register a privilege request for the URL. The actual
+    // fetch and validation are deferred to CatalogOpExecutor after authorization.
+    if (fileFormat_ == THdfsFileFormat.AVRO) {
+      ArrayList<Map<String, String>> avroSchemaLocs = new ArrayList<>();
+      StorageDescriptor sd = tbl.getMetaStoreTable().getSd();
+      if (sd != null && sd.getSerdeInfo() != null
+          && sd.getSerdeInfo().getParameters() != null) {
+        avroSchemaLocs.add(sd.getSerdeInfo().getParameters());
+      }
+      avroSchemaLocs.add(tbl.getMetaStoreTable().getParameters());
+      AvroSchemaUtils.analyzeAvroSchema(analyzer, tableName_, avroSchemaLocs, null);
     }
   }
 }

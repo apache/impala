@@ -131,6 +131,14 @@ public class FrontendTestBase extends AbstractFrontendTest {
   }
 
   /**
+   * Adds a test-local table to the given catalog based on the given CREATE TABLE sql.
+   * The test tables are registered and removed in the @After method.
+   */
+  protected Table addTestTable(Catalog catalog, String createTableSql) {
+    return feFixture_.addTestTable(catalog, createTableSql);
+  }
+
+  /**
    * Adds a test-local view to the catalog based on the given CREATE VIEW sql.
    * The test views are registered in testTables_ and removed in the @After method.
    * Returns the new view.

@@ -21,7 +21,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
-import org.apache.avro.SchemaParseException;
 import org.apache.hadoop.hive.metastore.api.hive_metastoreConstants;
 import org.apache.hadoop.hive.serde2.avro.AvroSerdeUtils;
 import org.apache.iceberg.DataFile;
@@ -46,7 +45,6 @@ import org.apache.impala.thrift.TAlterTableSetTblPropertiesParams;
 import org.apache.impala.thrift.TAlterTableType;
 import org.apache.impala.thrift.TSortingOrder;
 import org.apache.impala.thrift.TTablePropertyType;
-import org.apache.impala.util.AvroSchemaParser;
 import org.apache.impala.util.AvroSchemaUtils;
 import org.apache.impala.util.IcebergUtil;
 import org.apache.impala.util.MetaStoreUtil;
@@ -54,6 +52,7 @@ import org.apache.impala.util.MetaStoreUtil;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Splitter;
 import com.google.common.base.Strings;
+import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Lists;
 import com.google.common.primitives.Longs;
 
@@ -122,12 +121,8 @@ public class AlterTableSetTblProperties extends AlterTableSetStmt {
     // avoid potential metadata corruption (see IMPALA-2042).
     // If both properties are set then only check avro.schema.literal and ignore
     // avro.schema.url.
-    if (tblProperties_.containsKey(
-            AvroSerdeUtils.AvroTableProperties.SCHEMA_LITERAL.getPropName()) ||
-        tblProperties_.containsKey(
-            AvroSerdeUtils.AvroTableProperties.SCHEMA_URL.getPropName())) {
-      analyzeAvroSchema(analyzer);
-    }
+    AvroSchemaUtils.analyzeAvroSchema(analyzer,
+        tableName_, ImmutableList.of(tblProperties_), null);
 
     // Analyze 'skip.header.line.format' property.
     analyzeSkipHeaderLineCount(getTargetTable(), tblProperties_);
@@ -237,33 +232,6 @@ public class AlterTableSetTblProperties extends AlterTableSetStmt {
     if (tblProperties_.containsKey(property)) {
       throw new AnalysisException(String.format("Changing the '%s' table property is " +
           "not supported for DataSource table.", property));
-    }
-  }
-
-  /**
-   * Check that Avro schema provided in avro.schema.url or avro.schema.literal is valid
-   * Json and contains only supported Impala types. If both properties are set, then
-   * avro.schema.url is ignored.
-   */
-  private void analyzeAvroSchema(Analyzer analyzer)
-      throws AnalysisException {
-    List<Map<String, String>> schemaSearchLocations = new ArrayList<>();
-    schemaSearchLocations.add(tblProperties_);
-
-    String avroSchema = AvroSchemaUtils.getAvroSchema(schemaSearchLocations);
-    avroSchema = Strings.nullToEmpty(avroSchema);
-    if (avroSchema.isEmpty()) {
-      throw new AnalysisException("Avro schema is null or empty: " +
-          table_.getFullName());
-    }
-
-    // Check if the schema is valid and is supported by Impala
-    try {
-      AvroSchemaParser.parse(avroSchema);
-    } catch (SchemaParseException e) {
-      throw new AnalysisException(String.format(
-          "Error parsing Avro schema for table '%s': %s", table_.getFullName(),
-          e.getMessage()));
     }
   }
 

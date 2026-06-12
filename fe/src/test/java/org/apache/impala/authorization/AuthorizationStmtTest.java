@@ -1888,6 +1888,24 @@ public class AuthorizationStmtTest extends AuthorizationTestBase {
             "hdfs://localhost:20500/test-warehouse/schemas/alltypestiny.parquet"),
             onDatabase("functional", TPrivilegeLevel.CREATE));
 
+    // Create Avro table with avro.schema.url requires ALL privilege on the URI.
+    String avroSchemaUrl =
+        "hdfs://localhost:20500/test-warehouse/avro_schemas/functional/alltypes.json";
+    authorize("create table functional.new_table stored as avro " +
+        "tblproperties ('avro.schema.url'='" + avroSchemaUrl + "')")
+        .ok(onServer(TPrivilegeLevel.ALL))
+        .ok(onServer(TPrivilegeLevel.OWNER))
+        .ok(onDatabase("functional", TPrivilegeLevel.CREATE),
+            onUri(avroSchemaUrl, TPrivilegeLevel.ALL))
+        .ok(onDatabase("functional", TPrivilegeLevel.CREATE),
+            onUri(avroSchemaUrl, TPrivilegeLevel.OWNER))
+        .error(createError("functional"),
+            onUri(avroSchemaUrl, TPrivilegeLevel.ALL))
+        .error(accessError(avroSchemaUrl),
+            onDatabase("functional", TPrivilegeLevel.CREATE))
+        .error(createError("functional"), onServer(allExcept(
+            TPrivilegeLevel.ALL, TPrivilegeLevel.OWNER, TPrivilegeLevel.CREATE)));
+
     authorize("create table if not exists _impala_builtins.new_table(i int)")
         .error(systemDbError(), onServer(TPrivilegeLevel.ALL))
         .error(systemDbError(), onServer(TPrivilegeLevel.OWNER));
@@ -2445,6 +2463,54 @@ public class AuthorizationStmtTest extends AuthorizationTestBase {
           .error(accessError("hdfs://localhost:20500/test-warehouse/new_table"),
               onTable("functional", "alltypes", TPrivilegeLevel.ALTER));
     }
+
+    // Alter table set tblproperties with avro.schema.url requires ALL privilege on the
+    // URI.
+    String avroSchemaUrl =
+        "hdfs://localhost:20500/test-warehouse/avro_schemas/functional/alltypes.json";
+    authorize("alter table functional.alltypes set tblproperties " +
+        "('avro.schema.url'='" + avroSchemaUrl + "')")
+        .ok(onServer(TPrivilegeLevel.ALL))
+        .ok(onServer(TPrivilegeLevel.OWNER))
+        .ok(onServer(TPrivilegeLevel.ALTER), onUri(avroSchemaUrl, TPrivilegeLevel.ALL))
+        .ok(onServer(TPrivilegeLevel.ALTER), onUri(avroSchemaUrl, TPrivilegeLevel.OWNER))
+        .ok(onDatabase("functional", TPrivilegeLevel.ALTER),
+            onUri(avroSchemaUrl, TPrivilegeLevel.ALL))
+        .ok(onDatabase("functional", TPrivilegeLevel.ALTER),
+            onUri(avroSchemaUrl, TPrivilegeLevel.OWNER))
+        .ok(onTable("functional", "alltypes", TPrivilegeLevel.ALTER),
+            onUri(avroSchemaUrl, TPrivilegeLevel.ALL))
+        .ok(onTable("functional", "alltypes", TPrivilegeLevel.ALTER),
+            onUri(avroSchemaUrl, TPrivilegeLevel.OWNER))
+        .error(alterError("functional.alltypes"))
+        .error(accessError(avroSchemaUrl),
+            onTable("functional", "alltypes", TPrivilegeLevel.ALTER))
+        .error(alterError("functional.alltypes"),
+            onUri(avroSchemaUrl, TPrivilegeLevel.ALL));
+
+    // Alter table set fileformat avro on a table that already has avro.schema.url set
+    // in its properties requires ALL privilege on the URI.
+    String avroSetFmtTbl = "functional.avro_set_fmt_tbl";
+    addTestTable(authzCatalog_, "create table " + avroSetFmtTbl + " (id int) " +
+        "stored as parquet tblproperties ('avro.schema.url'='" + avroSchemaUrl + "')");
+    authorize("alter table " + avroSetFmtTbl + " set fileformat avro")
+        .ok(onServer(TPrivilegeLevel.ALL))
+        .ok(onServer(TPrivilegeLevel.OWNER))
+        .ok(onServer(TPrivilegeLevel.ALTER), onUri(avroSchemaUrl, TPrivilegeLevel.ALL))
+        .ok(onServer(TPrivilegeLevel.ALTER), onUri(avroSchemaUrl, TPrivilegeLevel.OWNER))
+        .ok(onDatabase("functional", TPrivilegeLevel.ALTER),
+            onUri(avroSchemaUrl, TPrivilegeLevel.ALL))
+        .ok(onDatabase("functional", TPrivilegeLevel.ALTER),
+            onUri(avroSchemaUrl, TPrivilegeLevel.OWNER))
+        .ok(onTable("functional", "avro_set_fmt_tbl", TPrivilegeLevel.ALTER),
+            onUri(avroSchemaUrl, TPrivilegeLevel.ALL))
+        .ok(onTable("functional", "avro_set_fmt_tbl", TPrivilegeLevel.ALTER),
+            onUri(avroSchemaUrl, TPrivilegeLevel.OWNER))
+        .error(alterError(avroSetFmtTbl))
+        .error(accessError(avroSchemaUrl),
+            onTable("functional", "avro_set_fmt_tbl", TPrivilegeLevel.ALTER))
+        .error(alterError(avroSetFmtTbl),
+            onUri(avroSchemaUrl, TPrivilegeLevel.ALL));
 
     // Database does not exist.
     authorize("alter table nodb.alltypes add columns(c1 int)")

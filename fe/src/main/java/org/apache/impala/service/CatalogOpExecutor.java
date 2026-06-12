@@ -151,6 +151,7 @@ import org.apache.impala.catalog.events.MetastoreEventsProcessor;
 import org.apache.impala.catalog.events.MetastoreNotificationException;
 import org.apache.impala.catalog.monitor.CatalogMonitor;
 import org.apache.impala.catalog.monitor.CatalogOperationTracker;
+import org.apache.impala.common.AnalysisException;
 import org.apache.impala.common.FileSystemUtil;
 import org.apache.impala.common.ImpalaException;
 import org.apache.impala.common.ImpalaRuntimeException;
@@ -261,6 +262,8 @@ import org.apache.impala.util.MetaStoreUtil;
 import org.apache.impala.util.MetaStoreUtil.TableInsertEventInfo;
 import org.apache.impala.util.NoOpEventSequence;
 import org.apache.impala.util.ThreadNameAnnotator;
+import org.apache.impala.util.AvroSchemaParser;
+import org.apache.impala.util.AvroSchemaUtils;
 import org.apache.thrift.TException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -3744,7 +3747,25 @@ public class CatalogOpExecutor {
       }
       return false;
     }
+    // Verify remote resources in table properties. Creation has been authorized, so we
+    // can now fetch remote resources and verify they are valid.
     org.apache.hadoop.hive.metastore.api.Table tbl = createMetaStoreTable(params);
+    // For AVRO tables, parse the schema (from a literal or URL) and reconcile it with
+    // the HMS column definitions. This overwrites the columns in the HMS table object
+    // before it is persisted so that column names and types match the Avro schema.
+    if (params.getFile_format() == THdfsFileFormat.AVRO) {
+      String avroSchema = AvroSchemaUtils.getRemoteAvroSchema(Arrays.asList(
+          params.getSerde_properties(), params.getTable_properties()));
+      if (avroSchema != null) {
+        List<FieldSchema> reconciledCols =
+            AvroSchemaUtils.reconcileAvroSchema(tbl, avroSchema);
+        tbl.getSd().setCols(reconciledCols);
+      }
+      if (tbl.getSd().getCols().isEmpty()) {
+        throw new AnalysisException(
+            "An Avro table requires column definitions or an Avro schema.");
+      }
+    }
     LOG.trace("Creating table {}", tableName);
     if (KuduTable.isKuduTable(tbl)) {
       return createKuduTable(tbl, params, wantMinimalResult, response, catalogTimeline);
@@ -3754,7 +3775,7 @@ public class CatalogOpExecutor {
           params.getPrimary_key_column_names(), params.getTable_properties(),
           params.getComment(), debugAction);
     }
-    Preconditions.checkState(params.getColumns().size() > 0,
+    Preconditions.checkState(tbl.getSd().getCols().size() > 0,
         "Empty column list given as argument to Catalog.createTable");
     MetastoreShim.setTableLocation(catalog_.getDb(tbl.getDbName()), tbl);
     return createTable(tbl, params.if_not_exists, params.getCache_op(),
@@ -5806,6 +5827,17 @@ public class CatalogOpExecutor {
       // The prototype partition must be updated if the file format is changed so that new
       // partitions are created with the new file format.
       if (tbl instanceof HdfsTable) ((HdfsTable) tbl).setPrototypePartition(msTbl.getSd());
+      // Validate any Avro schema (literal or URL) already on the table. For the URL
+      // case authorization was already verified during analysis.
+      if (fileFormat == THdfsFileFormat.AVRO) {
+        List<Map<String, String>> schemaSearchLocations = new ArrayList<>();
+        if (msTbl.getSd() != null && msTbl.getSd().getSerdeInfo() != null) {
+          schemaSearchLocations.add(msTbl.getSd().getSerdeInfo().getParameters());
+        }
+        schemaSearchLocations.add(msTbl.getParameters());
+        String avroSchema = AvroSchemaUtils.getRemoteAvroSchema(schemaSearchLocations);
+        if (avroSchema != null) AvroSchemaParser.parse(avroSchema);
+      }
       applyAlterAndInProgressTableModification(msTbl, catalogTimeline, modification);
       reloadFileMetadata = true;
     } else {
@@ -5953,6 +5985,12 @@ public class CatalogOpExecutor {
       // Alter table params.
       org.apache.hadoop.hive.metastore.api.Table msTbl =
           tbl.getMetaStoreTable().deepCopy();
+      // Validate any Avro schema (literal or URL) in the properties being set.
+      // This covers both avro.schema.literal and avro.schema.url; for the URL case
+      // authorization was already verified during analysis.
+      String avroSchema =
+          AvroSchemaUtils.getRemoteAvroSchema(Collections.singletonList(properties));
+      if (avroSchema != null) AvroSchemaParser.parse(avroSchema);
       switch (params.getTarget()) {
         case TBL_PROPERTY:
           if (KuduTable.isKuduTable(msTbl)) {

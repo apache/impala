@@ -423,8 +423,9 @@ public class ColumnDef {
       @Override
       public FieldSchema apply(ColumnDef colDef) {
         Preconditions.checkNotNull(colDef.getType());
-        return new FieldSchema(colDef.getColName(), colDef.getType().toSql(),
-            colDef.getComment());
+        // HMS requires lowercase type names (e.g. "int" not "INT").
+        return new FieldSchema(colDef.getColName(),
+            colDef.getType().toSql().toLowerCase(), colDef.getComment());
       }
     });
   }

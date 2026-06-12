@@ -1313,17 +1313,15 @@ public class AnalyzeDDLTest extends FrontendTestBase {
       // Invalid schema URL
       AnalysisError(String.format("alter table functional.alltypes set %s " +
           "('avro.schema.url'='')", propertyType),
-          "Invalid avro.schema.url: . Can not create a Path from an empty string");
+          "Avro schema url is empty: functional.alltypes");
       AnalysisError(String.format("alter table functional.alltypes set %s " +
           "('avro.schema.url'='hdfs://invalid*host/schema.avsc')", propertyType),
-          "Failed to read Avro schema at: hdfs://invalid*host/schema.avsc. " +
           "Incomplete HDFS URI, no host: hdfs://invalid*host/schema.avsc");
       AnalysisError(String.format("alter table functional.alltypes set %s" +
           "('avro.schema.url'='schema.avsc')", propertyType),
-          "Invalid avro.schema.url: schema.avsc. Path does not exist.");
+          "URI path must be absolute: schema.avsc");
       AnalysisError(String.format("alter table functional.alltypes set %s " +
           "('avro.schema.url'='foo://bar/schema.avsc')", propertyType),
-          "Failed to read Avro schema at: foo://bar/schema.avsc. " +
           "No FileSystem for scheme: foo");
 
       // Valid schema literal
@@ -1341,7 +1339,7 @@ public class AnalyzeDDLTest extends FrontendTestBase {
           "expected '}'");
       AnalysisError(String.format("alter table functional.alltypes set %s " +
           "('avro.schema.literal'='')", propertyType),
-          "Avro schema is null or empty: functional.alltypes");
+          "Avro schema literal is empty: functional.alltypes");
       AnalysisError(String.format("alter table functional.alltypes set %s " +
           "('avro.schema.literal'='{\"name\": \"my_record\"}')", propertyType),
           "Error parsing Avro schema for table 'functional.alltypes': " +
@@ -1372,7 +1370,7 @@ public class AnalyzeDDLTest extends FrontendTestBase {
           "\"fields\": {\"name\": \"string1\", \"type\": \"string\"}]}', " +
           "'avro.schema.url'='')", propertyType),
           "Error parsing Avro schema for table 'functional.alltypes': " +
-          "com.fasterxml.jackson.core.JsonParseException: Unexpected close marker ']': "+
+          "com.fasterxml.jackson.core.JsonParseException: Unexpected close marker ']': " +
           "expected '}'");
       // Url is invalid but ignored because literal is provided.
       AnalyzesOk(String.format("alter table functional.alltypes set %s " +
@@ -1383,7 +1381,7 @@ public class AnalyzeDDLTest extends FrontendTestBase {
       AnalysisError(String.format("alter table functional.alltypes set %s " +
           "('avro.schema.literal'='', 'avro.schema.url'=" +
           "'hdfs:///test-warehouse/avro_schemas/functional/alltypes.json')",
-          propertyType), "Avro schema is null or empty: functional.alltypes");
+          propertyType), "Avro schema literal is empty: functional.alltypes");
     }
   }
 
@@ -3136,53 +3134,12 @@ public class AnalyzeDDLTest extends FrontendTestBase {
         "\"fields\": [{\"name\": \"string1\", \"type\": \"string\"}]}')");
 
     // Analysis of Avro schemas. Column definitions do not match Avro schema.
-    AnalyzesOk(String.format(
-        "create table foo_avro (id int) with serdeproperties ('avro.schema.url'='%s')" +
-        "stored as avro", alltypesSchemaLoc),
-        "Ignoring column definitions in favor of Avro schema.\n" +
-        "The Avro schema has 11 column(s) but 1 column definition(s) were given.");
-    AnalyzesOk(String.format(
-        "create table foo_avro (bool_col boolean, string_col string) " +
-        "stored as avro tblproperties ('avro.schema.url'='%s')",
-        alltypesSchemaLoc),
-        "Ignoring column definitions in favor of Avro schema.\n" +
-        "The Avro schema has 11 column(s) but 2 column definition(s) were given.");
     AnalyzesOk("create table foo_avro (string1 string) stored as avro tblproperties " +
         "('avro.schema.literal'='{\"name\": \"my_record\", \"type\": \"record\", " +
         "\"fields\": [{\"name\": \"string1\", \"type\": \"string\"}," +
         "{\"name\": \"string2\", \"type\": \"string\"}]}')",
         "Ignoring column definitions in favor of Avro schema.\n" +
         "The Avro schema has 2 column(s) but 1 column definition(s) were given.");
-    // Mismatched name.
-    AnalyzesOk(String.format(
-        "create table foo_avro (id int, bool_col boolean, tinyint_col int, " +
-        "smallint_col int, bad_int_col int, bigint_col bigint, float_col float," +
-        "double_col double, date_string_col string, string_col string, " +
-        "timestamp_col timestamp) with serdeproperties ('avro.schema.url'='%s')" +
-        "stored as avro", alltypesSchemaLoc),
-        "Resolved the following name and/or type inconsistencies between the column " +
-        "definitions and the Avro schema.\n" +
-        "Column definition at position 4:  bad_int_col INT\n" +
-        "Avro schema column at position 4: int_col INT\n" +
-        "Resolution at position 4: int_col INT\n" +
-        "Column definition at position 10:  timestamp_col TIMESTAMP\n" +
-        "Avro schema column at position 10: timestamp_col STRING\n" +
-        "Resolution at position 10: timestamp_col STRING");
-    // Mismatched type.
-    AnalyzesOk(String.format(
-        "create table foo_avro (id int, bool_col boolean, tinyint_col int, " +
-        "smallint_col int, int_col int, bigint_col bigint, float_col float," +
-        "double_col bigint, date_string_col string, string_col string, " +
-        "timestamp_col timestamp) stored as avro tblproperties ('avro.schema.url'='%s')",
-        alltypesSchemaLoc),
-        "Resolved the following name and/or type inconsistencies between the column " +
-        "definitions and the Avro schema.\n" +
-        "Column definition at position 7:  double_col BIGINT\n" +
-        "Avro schema column at position 7: double_col DOUBLE\n" +
-        "Resolution at position 7: double_col DOUBLE\n" +
-        "Column definition at position 10:  timestamp_col TIMESTAMP\n" +
-        "Avro schema column at position 10: timestamp_col STRING\n" +
-        "Resolution at position 10: timestamp_col STRING");
 
     // Avro schema is inferred from column definitions.
     AnalyzesOk("create table foo_avro (c1 tinyint, c2 smallint, c3 int, c4 bigint, " +
@@ -3199,18 +3156,15 @@ public class AnalyzeDDLTest extends FrontendTestBase {
 
     // Invalid schema URL
     AnalysisError("create table foo_avro (i int) stored as avro tblproperties " +
-        "('avro.schema.url'='')",
-        "Invalid avro.schema.url: . Can not create a Path from an empty string");
+        "('avro.schema.url'='')", "Avro schema url is empty: default.foo_avro");
     AnalysisError("create table foo_avro (i int) stored as avro tblproperties " +
         "('avro.schema.url'='schema.avsc')",
-        "Invalid avro.schema.url: schema.avsc. Path does not exist.");
+        "URI path must be absolute: schema.avsc");
     AnalysisError("create table foo_avro (i int) stored as avro tblproperties " +
         "('avro.schema.url'='hdfs://invalid*host/schema.avsc')",
-        "Failed to read Avro schema at: hdfs://invalid*host/schema.avsc. " +
         "Incomplete HDFS URI, no host: hdfs://invalid*host/schema.avsc");
     AnalysisError("create table foo_avro (i int) stored as avro tblproperties " +
         "('avro.schema.url'='foo://bar/schema.avsc')",
-        "Failed to read Avro schema at: foo://bar/schema.avsc. " +
         "No FileSystem for scheme: foo");
 
     // Decimal parsing
@@ -3249,7 +3203,7 @@ public class AnalyzeDDLTest extends FrontendTestBase {
         "('avro.schema.literal'='{\"name\": \"my_record\", \"type\": \"record\", " +
         "\"fields\": {\"name\": \"string1\", \"type\": \"string\"}]}')",
         "Error parsing Avro schema for table 'default.foo_avro': " +
-        "com.fasterxml.jackson.core.JsonParseException: Unexpected close marker ']': "+
+        "com.fasterxml.jackson.core.JsonParseException: Unexpected close marker ']': " +
         "expected '}'");
 
     // Map/Array types in Avro schema.
