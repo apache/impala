@@ -54,7 +54,7 @@ ExecSumm = namedtuple('ExecSumm',
     ['id', 'name', 'num_host', 'num_inst', 'avg_time', 'max_time', 'num_rows',
       'est_rows', 'peak_mem', 'est_peak_mem', 'detail'])
 FilterTable = namedtuple('FilterTable',
-    ['id', 'src', 'targets', 'target_types', 'is_part_filter', 'pending',
+    ['id', 'src', 'targets', 'eff_targets', 'target_types', 'is_part_filter', 'pending',
       'first_arrived', 'completed', 'enabled', 'bloom_size', 'est_fpp', 'min_val',
       'max_val', 'in_list'])
 
@@ -117,7 +117,7 @@ RE_TIME = [RE_NS, RE_US, RE_MS, RE_S, RE_M, RE_H]
 
 # Other const.
 DEBUG = False
-FILTER_COL_COUNT = 14
+FILTER_COL_COUNT = 15
 MAX_ATTRIB_TOK = 5
 MAX_ATTRIB_TOK_LEN = 40
 
