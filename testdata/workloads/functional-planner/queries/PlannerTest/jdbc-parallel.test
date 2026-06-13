@@ -3797,3 +3797,106 @@ PLAN-ROOT SINK
 01:SCAN DATA SOURCE [tpch_jdbc.orders o]
    data source predicates: o.o_orderdate >= '1995-01-01'
    row-size=24B cardinality=1.50M
+====
+// JDBC UNION ALL: all DataSourceScanNode children must be collocated in one
+// UNPARTITIONED fragment (no exchange between union operands).
+select c_custkey from tpch_jdbc.customer
+union all
+select o_custkey from tpch_jdbc.orders
+---- PLAN
+PLAN-ROOT SINK
+|
+00:UNION
+|  pass-through-operands: all
+|  row-size=8B cardinality=1.65M
+|
+|--02:SCAN DATA SOURCE [tpch_jdbc.orders]
+|     row-size=8B cardinality=1.50M
+|
+01:SCAN DATA SOURCE [tpch_jdbc.customer]
+   row-size=8B cardinality=150.00K
+---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
+03:EXCHANGE [UNPARTITIONED]
+|
+00:UNION
+|  pass-through-operands: all
+|  row-size=8B cardinality=1.65M
+|
+|--02:SCAN DATA SOURCE [tpch_jdbc.orders]
+|     row-size=8B cardinality=1.50M
+|
+01:SCAN DATA SOURCE [tpch_jdbc.customer]
+   row-size=8B cardinality=150.00K
+====
+select c_custkey from tpch_jdbc.customer
+union all
+select o_custkey from tpch_jdbc.orders
+union all
+select l_orderkey from tpch_jdbc.lineitem
+---- PLAN
+PLAN-ROOT SINK
+|
+00:UNION
+|  pass-through-operands: all
+|  row-size=8B cardinality=7.65M
+|
+|--03:SCAN DATA SOURCE [tpch_jdbc.lineitem]
+|     row-size=8B cardinality=6.00M
+|
+|--02:SCAN DATA SOURCE [tpch_jdbc.orders]
+|     row-size=8B cardinality=1.50M
+|
+01:SCAN DATA SOURCE [tpch_jdbc.customer]
+   row-size=8B cardinality=150.00K
+---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
+04:EXCHANGE [UNPARTITIONED]
+|
+00:UNION
+|  pass-through-operands: all
+|  row-size=8B cardinality=7.65M
+|
+|--03:SCAN DATA SOURCE [tpch_jdbc.lineitem]
+|     row-size=8B cardinality=6.00M
+|
+|--02:SCAN DATA SOURCE [tpch_jdbc.orders]
+|     row-size=8B cardinality=1.50M
+|
+01:SCAN DATA SOURCE [tpch_jdbc.customer]
+   row-size=8B cardinality=150.00K
+====
+select c_custkey from tpch_jdbc.customer
+union all
+select o_custkey from tpch_jdbc.orders
+---- QUERYOPTIONS
+MT_DOP=4
+---- PLAN
+PLAN-ROOT SINK
+|
+00:UNION
+|  pass-through-operands: all
+|  row-size=8B cardinality=1.65M
+|
+|--02:SCAN DATA SOURCE [tpch_jdbc.orders]
+|     row-size=8B cardinality=1.50M
+|
+01:SCAN DATA SOURCE [tpch_jdbc.customer]
+   row-size=8B cardinality=150.00K
+---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
+03:EXCHANGE [UNPARTITIONED]
+|
+00:UNION
+|  pass-through-operands: all
+|  row-size=8B cardinality=1.65M
+|
+|--02:SCAN DATA SOURCE [tpch_jdbc.orders]
+|     row-size=8B cardinality=1.50M
+|
+01:SCAN DATA SOURCE [tpch_jdbc.customer]
+   row-size=8B cardinality=150.00K
+====

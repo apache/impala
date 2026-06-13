@@ -61,6 +61,12 @@ public class JdbcRecordIterator {
   private final Calendar utcCalendar =
       Calendar.getInstance(TimeZone.getTimeZone(ZoneOffset.UTC));
 
+  /**
+   * Tracks whether the ResultSet has been fully consumed. Guarded by fetchLock.
+   * This flag ensures we never call next() after reaching end-of-stream.
+   */
+  private boolean endOfStream = false;
+
   public JdbcRecordIterator(Connection conn, PreparedStatement ps, ResultSet rs,
       Configuration conf) throws JdbcDatabaseAccessException {
     this.conn = conn;
@@ -244,8 +250,21 @@ public class JdbcRecordIterator {
       synchronized (fetchLock) {
         final long lockAcquired = System.nanoTime();
         List<Object[]> rows = new ArrayList<>(batchSize);
+
+        // Fast-path: If a previous thread exhausted the ResultSet, return empty batch
+        // immediately. This prevents calling rs.next() after EOS, which is vendor
+        // specific behavior for TYPE_FORWARD_ONLY ResultSets (may throw SQLException).
+        if (endOfStream) {
+          final long fetchDoneNs = System.nanoTime();
+          LOGGER.debug("[{}] fetchBatch: already at EOS, returning empty batch", tname);
+          return new FetchResult(rows, fetchDoneNs - lockAcquired, 0);
+        }
+
         while (rows.size() < batchSize) {
-          if (!rs.next()) break;
+          if (!rs.next()) {
+            endOfStream = true;
+            break;
+          }
           Object[] row = new Object[scalarTypes.length];
           for (int i = 0; i < scalarTypes.length; i++) {
             row[i] = readColumnValue(scalarTypes[i], i);
@@ -255,11 +274,13 @@ public class JdbcRecordIterator {
         final long fetchDoneNs = System.nanoTime();
         final long lockWaitNs = lockAcquired - lockWaitStart;
         final long cursorFetchNs = fetchDoneNs - lockAcquired;
-        LOGGER.debug("[{}] fetchBatch: waited_for_lock={}ms jdbc_fetch={}ms rows={}",
+        LOGGER.debug("[{}] fetchBatch: waited_for_lock={}ms jdbc_fetch={}ms " +
+            "rows={} eos={}",
             tname,
             lockWaitNs / 1_000_000,
             cursorFetchNs / 1_000_000,
-            rows.size());
+            rows.size(),
+            endOfStream);
         return new FetchResult(rows, lockWaitNs, cursorFetchNs);
       }
     } catch (Exception e) {

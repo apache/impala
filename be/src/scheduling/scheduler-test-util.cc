@@ -687,7 +687,7 @@ Status SchedulerWrapper::Compute(bool exec_at_coord, Result* result,
   Scheduler::ExecutorConfig executor_config = {no_executor_group ? empty_group :
       it->second, *membership_snapshot->local_be_desc, coords};
   std::mt19937 rng(rand());
-  return scheduler_->ComputeScanRangeAssignment(executor_config, 0, nullptr, false,
+  return scheduler_->ComputeScanRangeAssignment(executor_config, 0, 0, nullptr, false,
       *locations, plan_.referenced_datanodes(), exec_at_coord, plan_.query_options(),
       nullptr, &rng, nullptr, assignment);
 }

@@ -533,13 +533,15 @@ void DataSourceScanNode::Close(RuntimeState* state) {
   if (is_closed()) return;
   SCOPED_TIMER(runtime_profile_->total_time_counter());
   input_batch_.reset();
-  TCloseParams params;
-  params.__set_scan_handle(scan_handle_);
-  TCloseResult result;
-  // shared_conn_->Close() only calls executor_.Close() when the last active
-  // DataSourceScanNode in the fragment decrements the reference count to zero.
-  Status status = shared_conn_->Close(params, &result);
-  if (!status.ok()) state->LogError(status.msg());
+  if (!scan_handle_.empty()) {
+    TCloseParams params;
+    params.__set_scan_handle(scan_handle_);
+    TCloseResult result;
+    // shared_conn_->Close() only calls executor_.Close() when the last active
+    // DataSourceScanNode in the fragment decrements the reference count to zero.
+    Status status = shared_conn_->Close(params, &result);
+    if (!status.ok()) state->LogError(status.msg());
+  }
   ScanNode::Close(state);
 }
 

@@ -253,9 +253,9 @@ public class PlannerTest extends PlannerTestBase {
   }
 
   @Test
-    public void testJdbcParallel() {
-      runPlannerTestFile("jdbc-parallel");
-    }
+  public void testJdbcParallel() {
+    runPlannerTestFile("jdbc-parallel");
+  }
 
   /**
    * Test of HBase in the case of disabling the key scan.

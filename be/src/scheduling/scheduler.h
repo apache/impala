@@ -357,7 +357,8 @@ class Scheduler {
   /// summary_profile:         Summary profile for any scheduler warnings.
   /// assignment:              Output parameter, to which new assignments will be added.
   Status ComputeScanRangeAssignment(const ExecutorConfig& executor_config,
-      PlanNodeId node_id, const TReplicaPreference::type* node_replica_preference,
+      PlanNodeId node_id, TFragmentIdx fragment_idx,
+      const TReplicaPreference::type* node_replica_preference,
       bool node_random_replica, const std::vector<TScanRangeLocationList>& locations,
       const std::vector<TNetworkAddress>& host_list, bool exec_at_coord,
       const TQueryOptions& query_options, RuntimeProfile::Counter* timer,
@@ -456,6 +457,9 @@ class Scheduler {
 
   /// Return true if 'plan' contains a scan node.
   static bool ContainsScanNode(const TPlan& plan);
+
+  /// Return true if 'plan' contains a data source (e.g. JDBC) scan node.
+  static bool ContainsDataSourceScanNode(const TPlan& plan);
 
   /// Return true if 'plan' contains a union node.
   static bool ContainsUnionNode(const TPlan& plan);
