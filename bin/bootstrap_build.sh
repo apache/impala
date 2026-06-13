@@ -42,7 +42,7 @@ PACKAGES='g++ gcc git libsasl2-dev libssl-dev make ninja-build
 sudo -E apt-get --yes --quiet install ${PACKAGES}
 
 JDK_VERSION=17
-if [[ "$(uname -p)" == 'aarch64' ]]; then
+if [[ "$(uname -m)" == 'aarch64' ]]; then
   PACKAGE_ARCH='arm64'
 else
   PACKAGE_ARCH='amd64'

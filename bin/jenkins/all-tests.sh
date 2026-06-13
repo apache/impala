@@ -31,8 +31,9 @@ export IMPALA_MAVEN_OPTIONS="-U"
 # Allow unlimited pytest failures
 export MAX_PYTEST_FAILURES=0
 
-# Use ninja for better link concurrency.
-export IMPALA_MAKE_CMD=ninja
+# Use ninja for better control over link concurrency. Allow overriding this for platforms
+# that don't install ninja.
+export IMPALA_MAKE_CMD=${IMPALA_MAKE_CMD:-ninja}
 
 # When UBSAN_FAIL is "death", the logs are monitored for UBSAN errors. Any errors will
 # then cause this script to exit.

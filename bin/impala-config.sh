@@ -81,13 +81,13 @@ export USE_AVRO_CPP=${USE_AVRO_CPP:=false}
 # moving to a different build of the toolchain, e.g. when a version is bumped or a
 # compile option is changed. The build id can be found in the output of the toolchain
 # build jobs, it is constructed from the build number and toolchain git hash prefix.
-export IMPALA_TOOLCHAIN_BUILD_ID_AARCH64=169-65bcf0ca99
-export IMPALA_TOOLCHAIN_BUILD_ID_X86_64=630-65bcf0ca99
+export IMPALA_TOOLCHAIN_BUILD_ID_AARCH64=177-d0713c535d
+export IMPALA_TOOLCHAIN_BUILD_ID_X86_64=640-d0713c535d
 export IMPALA_TOOLCHAIN_REPO=\
 ${IMPALA_TOOLCHAIN_REPO:-https://github.com/cloudera/native-toolchain.git}
 export IMPALA_TOOLCHAIN_BRANCH=${IMPALA_TOOLCHAIN_BRANCH:-master}
 export IMPALA_TOOLCHAIN_COMMIT_HASH=\
-${IMPALA_TOOLCHAIN_COMMIT_HASH-65bcf0ca99082360dffe1484425ec9a77e1212ca}
+${IMPALA_TOOLCHAIN_COMMIT_HASH-d0713c535d0beddaa5457e634c9e3a35d14bc92c}
 # Compare the build ref in build IDs by removing everything up-to-and-including the
 # first hyphen.
 if [ "${IMPALA_TOOLCHAIN_BUILD_ID_AARCH64#*-}" \
@@ -105,7 +105,7 @@ if [[ ! "$IMPALA_TOOLCHAIN_COMMIT_HASH" == "$TOOLCHAIN_SHORT_HASH"* ]]; then
   exit 1
 fi
 
-export ARCH_NAME=$(uname -p)
+export ARCH_NAME=$(uname -m)
 
 # Versions of toolchain dependencies.
 # -----------------------------------
@@ -157,7 +157,7 @@ export IMPALA_LLVM_VERSION=5.0.1-p8
 unset IMPALA_LLVM_URL
 export IMPALA_LLVM_ASAN_VERSION=5.0.1-p8
 unset IMPALA_LLVM_ASAN_URL
-export IMPALA_OPENTELEMETRY_CPP_VERSION=1.20.0
+export IMPALA_OPENTELEMETRY_CPP_VERSION=1.20.0-p1
 unset IMPALA_OPENTELEMTRY_CPP_URL
 
 # To limit maximum memory available for the mini-cluster and CDH cluster, add the
@@ -307,9 +307,9 @@ export IMPALA_PAIMON_VERSION=1.3.1
 # images (which have certain guarantees about maintenance, CVEs, etc).
 # These environment variables control the base images. They default to
 # free distributions, but Redhat UBI images are known to work.
-export IMPALA_REDHAT7_DOCKER_BASE=${IMPALA_REDHAT7_DOCKER_BASE:-"centos:centos7.9.2009"}
 export IMPALA_REDHAT8_DOCKER_BASE=${IMPALA_REDHAT8_DOCKER_BASE:-"rockylinux:8.5"}
 export IMPALA_REDHAT9_DOCKER_BASE=${IMPALA_REDHAT9_DOCKER_BASE:-"rockylinux:9.2"}
+export IMPALA_REDHAT10_DOCKER_BASE=${IMPALA_REDHAT10_DOCKER_BASE:-"rockylinux:10.2"}
 # Some users may want to use special, hardened base images for increased security.
 # These images are usually not related to the OS where the build is running.
 # The following environment variables allow a specific base image to be specified

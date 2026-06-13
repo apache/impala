@@ -21,7 +21,7 @@ set -euo pipefail
 . "$IMPALA_HOME/bin/report_build_error.sh"
 setup_report_build_error
 
-: ${ARCH_NAME:=$(uname -p)}
+: ${ARCH_NAME:=$(uname -m)}
 if [[ $ARCH_NAME == aarch64 ]]; then
   NODEJS_DISTRO=linux-arm64
 elif [[ $ARCH_NAME == x86_64 ]]; then

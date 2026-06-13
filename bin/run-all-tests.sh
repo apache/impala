@@ -143,7 +143,7 @@ if [[ "${ERASURE_CODING}" = true ]]; then
 fi
 
 if test -v CMAKE_BUILD_TYPE && [[ "${CMAKE_BUILD_TYPE}" =~ 'UBSAN' ]] \
-    && [[ "$(uname -p)" = "aarch64" ]]; then
+    && [[ "$(uname -m)" = "aarch64" ]]; then
   # FE tests fail on ARM with
   #   libfesupport.so: cannot allocate memory in static TLS block
   # https://bugzilla.redhat.com/show_bug.cgi?id=1722181 mentions this is more likely

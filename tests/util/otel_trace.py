@@ -221,12 +221,15 @@ def __parse_line(line):
 
   try:
     resource_spans = obj["resourceSpans"]
+    # Strip off any -pX patch level from the version
+    opentelemetry_base_version = \
+      os.environ.get("IMPALA_OPENTELEMETRY_CPP_VERSION").split("-")[0]
 
     # Expected resource span attribute keys/values.
     expected_resource_attrs = {
         "service.name": "Impala",
         "service.version": IMPALA_LOCAL_BUILD_VERSION,
-        "telemetry.sdk.version": os.environ.get("IMPALA_OPENTELEMETRY_CPP_VERSION"),
+        "telemetry.sdk.version": opentelemetry_base_version,
         "telemetry.sdk.name": "opentelemetry",
         "telemetry.sdk.language": "cpp"}
 

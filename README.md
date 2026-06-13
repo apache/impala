@@ -51,9 +51,9 @@ contains more detailed information on the minimum CPU requirements.
 Impala runs on Linux systems only. The supported distros are
 
 * Ubuntu 20.04/22.04/24.04
-* Rocky/RHEL 8/9
+* Rocky/RHEL 8/9/10
 
-Other systems, e.g. SLES15, may also be supported but are not tested by the community.
+Other systems, e.g. SLES15/16, may also be supported but are not tested by the community.
 
 ## Export Control Notice
 

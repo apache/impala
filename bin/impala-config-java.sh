@@ -18,10 +18,17 @@
 IMPALA_JDK_VERSION=${IMPALA_JDK_VERSION:-}
 
 # Set OS Java package variables for bootstrap_system and Docker builds.
-# Defaults to installing Java 17.
+# Defaults to installing Java 17 on most platforms. This uses Java 21
+# for Redhat 10, as Redhat 10 only has Java 21 or above in its package
+# repositories.
 if [[ "${IMPALA_JDK_VERSION}" == "" ]]; then
-  UBUNTU_JAVA_VERSION=17
-  REDHAT_JAVA_VERSION=17
+  if grep -q -s 'release 10\.' /etc/redhat-release; then
+    REDHAT_JAVA_VERSION=21
+    UBUNTU_JAVA_VERSION=invalid
+  else
+    UBUNTU_JAVA_VERSION=17
+    REDHAT_JAVA_VERSION=17
+  fi
 elif [[ "${IMPALA_JDK_VERSION}" == "8" ]]; then
   UBUNTU_JAVA_VERSION=8
   REDHAT_JAVA_VERSION=1.8.0
@@ -30,7 +37,7 @@ else
   REDHAT_JAVA_VERSION="${IMPALA_JDK_VERSION}"
 fi
 
-if [[ "$(uname -p)" == 'aarch64' ]]; then
+if [[ "$(uname -m)" == 'aarch64' ]]; then
   UBUNTU_PACKAGE_ARCH='arm64'
 else
   UBUNTU_PACKAGE_ARCH='amd64'

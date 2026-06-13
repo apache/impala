@@ -73,8 +73,6 @@ from string import Template
 # /etc/os-release files.
 OsMapping = namedtuple('OsMapping', ['release', 'toolchain'])
 OS_MAPPING = [
-  OsMapping("rhel7", "ec2-package-centos-7"),
-  OsMapping("centos7", "ec2-package-centos-7"),
   OsMapping("rhel8", "ec2-package-centos-8"),
   OsMapping("centos8", "ec2-package-centos-8"),
   OsMapping("rocky8", "ec2-package-centos-8"),
@@ -82,10 +80,11 @@ OS_MAPPING = [
   OsMapping("rhel9", "ec2-package-rocky-9"),
   OsMapping("rocky9", "ec2-package-rocky-9"),
   OsMapping("almalinux9", "ec2-package-rocky-9"),
-  OsMapping("sles12", "ec2-package-sles-12"),
+  OsMapping("rhel10", "ec2-package-rocky-10"),
+  OsMapping("rocky10", "ec2-package-rocky-10"),
+  OsMapping("almalinux10", "ec2-package-rocky-10"),
   OsMapping("sles15", "ec2-package-sles-15"),
-  OsMapping('ubuntu16', "ec2-package-ubuntu-16-04"),
-  OsMapping('ubuntu18', "ec2-package-ubuntu-18-04"),
+  OsMapping("sles16", "ec2-package-sles-16"),
   OsMapping('ubuntu20', "ec2-package-ubuntu-20-04"),
   OsMapping('ubuntu22', "ec2-package-ubuntu-22-04"),
   OsMapping('ubuntu24', "ec2-package-ubuntu-24-04")

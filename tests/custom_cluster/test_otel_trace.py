@@ -468,13 +468,13 @@ class TestOtelTraceSelectsDMLs(TestOtelTraceBase):
     # Assert the trace exporter debug log lines were emitted.
     self.assert_impalad_log_contains("INFO", r"otel-log-handler.cc:\d+\] \[OTLP TRACE "
         r"FILE Exporter\] Export \d+ trace span\(s\) success file=\".*?"
-        r"\/opentelemetry-cpp-\d+.\d+.\d+\/exporters\/otlp\/src\/otlp_file_exporter.cc\" "
-        r"line=\"\d+\"", -1)
+        r"\/opentelemetry-cpp-\d+.\d+.\d+.*\/exporters\/otlp\/src\/"
+        r"otlp_file_exporter.cc\" line=\"\d+\"", -1)
 
     self.assert_impalad_log_contains("INFO", r"otel-log-handler.cc:\d+\] \[OTLP FILE "
         r"Client\] Write body\(Json\).*? file=\".*?"
-        r"\/opentelemetry-cpp-\d+.\d+.\d+\/exporters\/otlp\/src\/otlp_file_client.cc\" "
-        r"line=\"\d+\"", -1)
+        r"\/opentelemetry-cpp-\d+.\d+.\d+.*\/exporters\/otlp\/src\/"
+        r"otlp_file_client.cc\" line=\"\d+\"", -1)
 
   def test_hs2_getcolums(self):
     """Asserts HS2 metadata operations do not cause crashes."""

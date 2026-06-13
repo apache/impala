@@ -49,18 +49,11 @@ if( "$ENV{USE_CUSTOM_IMPALA_BASE_IMAGE}" STREQUAL "true" )
   MESSAGE(STATUS "Picked custom base image: ${DISTRO_BASE_IMAGE}")
 else()
   if(${OS_DISTRIB_ID} STREQUAL "ubuntu")
-    if(${OS_DISTRIB_VERSION_ID} STREQUAL "16.04" OR
-       ${OS_DISTRIB_VERSION_ID} STREQUAL "18.04" OR
-       ${OS_DISTRIB_VERSION_ID} STREQUAL "20.04" OR
-       ${OS_DISTRIB_VERSION_ID} STREQUAL "22.04")
+    if(${OS_DISTRIB_VERSION_ID} STREQUAL "20.04" OR
+       ${OS_DISTRIB_VERSION_ID} STREQUAL "22.04" OR
+       ${OS_DISTRIB_VERSION_ID} STREQUAL "24.04")
       set(DISTRO_BASE_IMAGE "ubuntu:${OS_DISTRIB_VERSION_ID}")
       set(QUICKSTART_BASE_IMAGE "ubuntu:${OS_DISTRIB_VERSION_ID}")
-    endif()
-    if (${OS_DISTRIB_VERSION_ID} STREQUAL "16.04" OR
-        ${OS_DISTRIB_VERSION_ID} STREQUAL "18.04")
-      set(PIP "python-pip")
-    elseif (${OS_DISTRIB_VERSION_ID} STREQUAL "20.04" OR
-            ${OS_DISTRIB_VERSION_ID} STREQUAL "22.04")
       set(PIP "python3-pip")
     endif()
   elseif(${OS_DISTRIB_ID} STREQUAL "rhel" OR
@@ -69,12 +62,12 @@ else()
          ${OS_DISTRIB_ID} STREQUAL "centos")
     # The Quickstart images currently don't support using a Redhat
     # base image, so this doesn't set QUICKSTART_BASE_IMAGE.
-    if(${OS_DISTRIB_VERSION_ID} MATCHES "7.*")
-      set(DISTRO_BASE_IMAGE "$ENV{IMPALA_REDHAT7_DOCKER_BASE}")
-    elseif(${OS_DISTRIB_VERSION_ID} MATCHES "8.*")
+    if(${OS_DISTRIB_VERSION_ID} MATCHES "8.*")
       set(DISTRO_BASE_IMAGE "$ENV{IMPALA_REDHAT8_DOCKER_BASE}")
     elseif(${OS_DISTRIB_VERSION_ID} MATCHES "9.*")
       set(DISTRO_BASE_IMAGE "$ENV{IMPALA_REDHAT9_DOCKER_BASE}")
+    elseif(${OS_DISTRIB_VERSION_ID} MATCHES "10.*")
+      set(DISTRO_BASE_IMAGE "$ENV{IMPALA_REDHAT10_DOCKER_BASE}")
     endif()
   endif()
   MESSAGE(STATUS "Picked docker base image based on host OS: ${DISTRO_BASE_IMAGE}")

@@ -456,7 +456,7 @@ bootstrap_dependencies() {
     echo "Toolchain bootstrap complete."
   fi
   # Use prebuilt Hadoop native binaries for aarch64
-  if [[ "$(uname -p)" = "aarch64" ]]; then
+  if [[ "$(uname -m)" = "aarch64" ]]; then
     cp $IMPALA_TOOLCHAIN_PACKAGES_HOME/hadoop-client-$IMPALA_HADOOP_CLIENT_VERSION/lib/* \
         $HADOOP_HOME/lib/native/
   fi
@@ -559,7 +559,7 @@ generate_cmake_files() {
   # If user defined CACHELINESIZE_AARCH64 in impala-config-local.sh, then we will use that
   # value, if user did not define it, then we will get the value from OS, if fail, then
   # we will use the default value 64.
-  if [[ "$(uname -p)" = "aarch64" &&  "$(uname -s)" = "Linux" ]]; then
+  if [[ "$(uname -m)" = "aarch64" &&  "$(uname -s)" = "Linux" ]]; then
     local cachelinesize=$(cat /sys/devices/system/cpu/cpu0/cache/index3/coherency_line_size)
     if [[ $cachelinesize -gt 0 ]]; then
       CACHELINESIZE_AARCH64=${CACHELINESIZE_AARCH64-$cachelinesize}

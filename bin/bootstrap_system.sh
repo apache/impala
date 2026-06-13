@@ -68,6 +68,7 @@ set -x
 REDHAT=
 REDHAT8=
 REDHAT9=
+REDHAT10=
 UBUNTU=
 UBUNTU20=
 UBUNTU22=
@@ -76,14 +77,17 @@ IN_DOCKER=
 if [[ -f /etc/redhat-release ]]; then
   REDHAT=true
   echo "Identified redhat system."
-  if grep 'release 9\.' /etc/redhat-release; then
+  if grep 'release 10\.' /etc/redhat-release; then
+    REDHAT10=true
+    echo "Identified redhat10 system."
+  elif grep 'release 9\.' /etc/redhat-release; then
     REDHAT9=true
     echo "Identified redhat9 system."
   elif grep 'release 8\.' /etc/redhat-release; then
     REDHAT8=true
     echo "Identified redhat8 system."
   else
-    echo "This script only supports Redhat releases 8 or 9 (or equivalents)."
+    echo "This script only supports Redhat releases 8, 9, or 10 (or equivalents)."
   fi
 else
   source /etc/lsb-release
@@ -157,9 +161,15 @@ function redhat8 {
     "$@"
   fi
 }
-# Helper function to execute following command only on RedHat8
+# Helper function to execute following command only on RedHat9
 function redhat9 {
   if [[ "$REDHAT9" == true ]]; then
+    "$@"
+  fi
+}
+# Helper function to execute following command only on RedHat10
+function redhat10 {
+  if [[ "$REDHAT10" == true ]]; then
     "$@"
   fi
 }
@@ -176,7 +186,7 @@ function notindocker {
   fi
 }
 
-ARCH_NAME=$(uname -p)
+ARCH_NAME=$(uname -m)
 
 # X permission on home directory is needed for some uses of postgresql (IMPALA-13693)
 chmod o+X ~
@@ -231,17 +241,37 @@ redhat sudo yum install -y file gawk gcc gcc-c++ git krb5-devel krb5-server \
         krb5-workstation libevent-devel libffi-devel make openssl-devel cyrus-sasl \
         cyrus-sasl-gssapi cyrus-sasl-devel cyrus-sasl-plain \
         postgresql postgresql-server rpm-build \
-        wget vim-common nscd cmake zlib-devel \
+        wget vim-common cmake zlib-devel \
         procps psmisc lsof openssh-server \
         net-tools langpacks-en glibc-langpack-en libxml2-devel libxslt-devel \
         java-${REDHAT_JAVA_VERSION}-openjdk-src java-${REDHAT_JAVA_VERSION}-openjdk-devel
+# NSCD was removed in redhat10
+redhat8 sudo yum install -y nscd
+redhat9 sudo yum install -y nscd
+# We need Python >= 3.8, so Redhat 8 needs to manually specify a newer python
 redhat8 sudo yum install -y python38-devel python38-setuptools
 redhat9 sudo yum install -y python3-devel python3-setuptools
+redhat10 sudo yum install -y python3-devel python3-setuptools
 
-redhat sudo alternatives --set java java-${REDHAT_JAVA_VERSION}-openjdk.${ARCH_NAME}
-redhat sudo alternatives --set javac java-${REDHAT_JAVA_VERSION}-openjdk.${ARCH_NAME}
-redhat sudo alternatives --set java_sdk_openjdk java-${REDHAT_JAVA_VERSION}-openjdk.${ARCH_NAME}
-redhat sudo alternatives --set jre_openjdk java-${REDHAT_JAVA_VERSION}-openjdk.${ARCH_NAME}
+if [[ "$REDHAT10" == true ]] ; then
+  # Redhat 10 doesn't automatically create the alternatives family that we rely on
+  # below. Instead, this uses the paths directly.
+  sudo alternatives --set java /usr/lib/jvm/java-${REDHAT_JAVA_VERSION}-openjdk/bin/java
+  sudo alternatives --set javac \
+    /usr/lib/jvm/java-${REDHAT_JAVA_VERSION}-openjdk/bin/javac
+  sudo alternatives --set java_sdk_openjdk \
+    /usr/lib/jvm/java-${REDHAT_JAVA_VERSION}-openjdk
+  sudo alternatives --set jre_openjdk /usr/lib/jvm/java-${REDHAT_JAVA_VERSION}-openjdk
+elif [[ "$REDHAT" == true ]] ; then
+  # Redhat 8 and 9 have alternatives family settings (i.e. aliases that we can use
+  # rather than the path).
+  sudo alternatives --set java java-${REDHAT_JAVA_VERSION}-openjdk.${ARCH_NAME}
+  sudo alternatives --set javac java-${REDHAT_JAVA_VERSION}-openjdk.${ARCH_NAME}
+  sudo alternatives --set java_sdk_openjdk \
+    java-${REDHAT_JAVA_VERSION}-openjdk.${ARCH_NAME}
+  sudo alternatives --set jre_openjdk java-${REDHAT_JAVA_VERSION}-openjdk.${ARCH_NAME}
+fi
+
 redhat8 sudo alternatives --set python3 /usr/bin/python3.8
 
 # update-java-alternatives may not take effect if there is a Java in PATH
@@ -253,12 +283,28 @@ python3 --version
 
 # fuse-devel doesn't exist for Redhat 9
 redhat8 sudo yum install -y fuse-devel curl
-# Redhat9 can have curl-minimal preinstalled, which can conflict with curl.
+# Redhat 9 and 10 can have curl-minimal preinstalled, which can conflict with curl.
 # Adding --allowerasing allows curl to replace curl-minimal.
 redhat9 sudo yum install -y --allowerasing curl
+redhat10 sudo yum install -y --allowerasing curl
 
 # CentOS repos don't contain ccache, so install from EPEL
-redhat sudo yum install -y epel-release
+redhat8 sudo yum install -y epel-release
+redhat9 sudo yum install -y epel-release
+# Redhat 10 needs CRB to be enabled to install epel-release
+if [[ "$REDHAT10" == true ]] ; then
+  # RHEL has different steps from Rocky/Alma
+  if grep "Red Hat Enterprise Linux" /etc/redhat-release ; then
+    # On RHEL, CRB is done through the subscription manager, but some RHEL systems don't
+    # have repositories enabled. For now, just use the direct link.
+    sudo yum install -y \
+      https://dl.fedoraproject.org/pub/epel/epel-release-latest-10.noarch.rpm
+  else
+    sudo dnf -y install dnf-plugins-core
+    sudo dnf config-manager --enable crb
+    sudo dnf -y install epel-release
+  fi
+fi
 redhat sudo yum install -y ccache
 
 # Clean up yum caches
@@ -276,13 +322,11 @@ if [ ! -d "/usr/local/apache-maven-${MVN_VERSION}" ]; then
   # even if a previous version exists there.
   sudo ln -s -f "/usr/local/apache-maven-${MVN_VERSION}/bin/mvn" "/usr/local/bin"
 
-  # reset permissions on redhat8
-  # TODO: figure out why this is necessary for redhat8
+  # reset permissions on redhat
+  # TODO: figure out why this is necessary for redhat
   MAVEN_DIRECTORY="/usr/local/apache-maven-${MVN_VERSION}"
-  redhat8 indocker sudo chmod 0755 ${MAVEN_DIRECTORY}
-  redhat8 indocker sudo chmod 0755 ${MAVEN_DIRECTORY}/{bin,boot}
-  redhat9 indocker sudo chmod 0755 ${MAVEN_DIRECTORY}
-  redhat9 indocker sudo chmod 0755 ${MAVEN_DIRECTORY}/{bin,boot}
+  redhat indocker sudo chmod 0755 ${MAVEN_DIRECTORY}
+  redhat indocker sudo chmod 0755 ${MAVEN_DIRECTORY}/{bin,boot}
 fi
 
 if ! { service --status-all | grep -E '^ \[ \+ \]  ssh$'; }
@@ -418,8 +462,7 @@ echo -e "${USER} - memlock 65536" | sudo tee /etc/security/limits.d/10-memlock.c
 
 # Default on CentOS limits a user to 1024 or 4096 processes (threads) , which isn't
 # enough for minicluster with all of its friends.
-redhat8 echo -e "* soft nproc unlimited" | sudo tee -a /etc/security/limits.conf
-redhat9 echo -e "* soft nproc unlimited" | sudo tee -a /etc/security/limits.conf
+redhat echo -e "* soft nproc unlimited" | sudo tee -a /etc/security/limits.conf
 
 echo ">>> Checking out Impala"
 
