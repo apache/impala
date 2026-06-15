@@ -31,13 +31,13 @@ from tests.hs2.hs2_test_suite import operation_id_to_query_id
 
 AUDIT_LOG_DIR = 'audit_log_dir'
 
-RANGER_IMPALAD_ARGS = ("--server-name=server1 "
+RANGER_IMPALAD_ARGS = ("--server_name=server1 "
                        "--ranger_service_type=hive "
                        "--ranger_app_id=impala "
                        "--authorization_provider=ranger "
                        "--abort_on_failed_audit_event=false "
                        "--audit_event_log_dir={" + AUDIT_LOG_DIR + "}")
-RANGER_CATALOGD_ARGS = ("--server-name=server1 "
+RANGER_CATALOGD_ARGS = ("--server_name=server1 "
                         "--ranger_service_type=hive "
                         "--ranger_app_id=impala "
                         "--authorization_provider=ranger")

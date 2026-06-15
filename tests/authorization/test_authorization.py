@@ -49,10 +49,10 @@ class TestAuthorization(CustomClusterTestSuite):
 
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args(
-    impalad_args="--server-name=server1 --ranger_service_type=hive "
+    impalad_args="--server_name=server1 --ranger_service_type=hive "
                  "--ranger_app_id=impala --authorization_provider=ranger "
                  "--min_privilege_set_for_show_stmts=select",
-    catalogd_args="--server-name=server1 --ranger_service_type=hive "
+    catalogd_args="--server_name=server1 --ranger_service_type=hive "
                   "--ranger_app_id=impala --authorization_provider=ranger")
   def test_ranger_show_iceberg_metadata_tables(self, unique_name):
     unique_db = unique_name + "_db"
@@ -139,49 +139,49 @@ class TestAuthorization(CustomClusterTestSuite):
 
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args(
-    impalad_args="--server-name=server1 --ranger_service_type=hive "
+    impalad_args="--server_name=server1 --ranger_service_type=hive "
                  "--ranger_app_id=impala --authorization_provider=ranger "
                  "--min_privilege_set_for_show_stmts=select",
-    catalogd_args="--server-name=server1 --ranger_service_type=hive "
+    catalogd_args="--server_name=server1 --ranger_service_type=hive "
                   "--ranger_app_id=impala --authorization_provider=ranger")
   def test_ranger_show_stmts_with_select(self, unique_name):
     self._test_ranger_show_stmts_helper(unique_name, ['select'])
 
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args(
-    impalad_args="--server-name=server1 --ranger_service_type=hive "
+    impalad_args="--server_name=server1 --ranger_service_type=hive "
                  "--ranger_app_id=impala --authorization_provider=ranger "
                  "--min_privilege_set_for_show_stmts=select,insert",
-    catalogd_args="--server-name=server1 --ranger_service_type=hive "
+    catalogd_args="--server_name=server1 --ranger_service_type=hive "
                   "--ranger_app_id=impala --authorization_provider=ranger")
   def test_ranger_show_stmts_with_select_insert(self, unique_name):
     self._test_ranger_show_stmts_helper(unique_name, ['select', 'insert'])
 
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args(
-    impalad_args="--server-name=server1 --ranger_service_type=hive "
+    impalad_args="--server_name=server1 --ranger_service_type=hive "
                  "--ranger_app_id=impala --authorization_provider=ranger "
                  "--min_privilege_set_for_show_stmts=any",
-    catalogd_args="--server-name=server1 --ranger_service_type=hive "
+    catalogd_args="--server_name=server1 --ranger_service_type=hive "
                   "--ranger_app_id=impala --authorization_provider=ranger")
   def test_ranger_show_stmts_with_any(self, unique_name):
     self._test_ranger_show_stmts_helper(unique_name, PRIVILEGES)
 
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args(
-    impalad_args="--server-name=server1 --ranger_service_type=hive "
+    impalad_args="--server_name=server1 --ranger_service_type=hive "
                  "--ranger_app_id=impala --authorization_provider=ranger "
                  "--num_check_authorization_threads=%d" % (random.randint(2, 128)),
-    catalogd_args="--server-name=server1 --ranger_service_type=hive "
+    catalogd_args="--server_name=server1 --ranger_service_type=hive "
                   "--ranger_app_id=impala --authorization_provider=ranger")
   def test_num_check_authorization_threads_with_ranger(self, unique_name):
     self._test_ranger_show_stmts_helper(unique_name, PRIVILEGES)
 
   @CustomClusterTestSuite.with_args(
-    impalad_args="--server-name=server1 --ranger_service_type=hive "
+    impalad_args="--server_name=server1 --ranger_service_type=hive "
                  "--ranger_app_id=impala --authorization_provider=ranger "
                  "--use_local_catalog=true",
-    catalogd_args="--server-name=server1 --ranger_service_type=hive "
+    catalogd_args="--server_name=server1 --ranger_service_type=hive "
                   "--ranger_app_id=impala --authorization_provider=ranger "
                   "--catalog_topic_mode=minimal")
   def test_local_catalog_show_dbs_with_transient_db(self, unique_name):

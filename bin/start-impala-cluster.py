@@ -509,7 +509,7 @@ def build_catalogd_arg_list(num_catalogd, remap_ports):
       args.extend(
           ["-state_store_2_port={0}".format(state_store_port + 1)])
     if options.enable_ranger_authz:
-      args.extend(["--server-name=server1", "--ranger_service_type=hive",
+      args.extend(["--server_name=server1", "--ranger_service_type=hive",
                    "--ranger_app_id=impala", "--authorization_provider=ranger"])
     if options.enable_tls:
       args.extend(["--hostname=localhost",
@@ -761,7 +761,7 @@ def build_impalad_arg_lists(cluster_size, num_coordinators, use_exclusive_coordi
       os.environ["USE_CALCITE_PLANNER"] = "true"
 
     if options.enable_ranger_authz:
-      args = ("--server-name=server1 --ranger_service_type=hive --ranger_app_id=impala "
+      args = ("--server_name=server1 --ranger_service_type=hive --ranger_app_id=impala "
               "--authorization_provider=ranger {args}").format(args=args)
 
     if options.enable_tls:

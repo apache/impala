@@ -54,16 +54,16 @@ ERROR_REVOKE = "User doesn't have necessary permission to revoke access"
 RANGER_AUTH = ("admin", "admin")
 RANGER_HOST = "http://localhost:6080"
 REST_HEADERS = {"Content-Type": "application/json", "Accept": "application/json"}
-LEGACY_CATALOG_IMPALAD_ARGS = "--server-name=server1 --ranger_service_type=hive " \
+LEGACY_CATALOG_IMPALAD_ARGS = "--server_name=server1 --ranger_service_type=hive " \
     "--ranger_app_id=impala --authorization_provider=ranger " \
     "--use_local_catalog=false"
-LEGACY_CATALOG_CATALOGD_ARGS = "--server-name=server1 --ranger_service_type=hive " \
+LEGACY_CATALOG_CATALOGD_ARGS = "--server_name=server1 --ranger_service_type=hive " \
     "--ranger_app_id=impala --authorization_provider=ranger " \
     "--catalog_topic_mode=full"
 
-IMPALAD_ARGS = "--server-name=server1 --ranger_service_type=hive " \
+IMPALAD_ARGS = "--server_name=server1 --ranger_service_type=hive " \
     "--ranger_app_id=impala --authorization_provider=ranger --use_local_catalog=true"
-CATALOGD_ARGS = "--server-name=server1 --ranger_service_type=hive " \
+CATALOGD_ARGS = "--server_name=server1 --ranger_service_type=hive " \
     "--ranger_app_id=impala --authorization_provider=ranger --catalog_topic_mode=minimal"
 
 LOG = logging.getLogger('impala_test_suite')

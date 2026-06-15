@@ -116,10 +116,10 @@ class TestKillQuery(CustomClusterTestSuite):
 
 @CustomClusterTestSuite.with_args(
     # Same as IMPALAD_ARGS and CATALOGD_ARGS in tests/authorization/test_ranger.py
-    impalad_args="--server-name=server1 --ranger_service_type=hive "
+    impalad_args="--server_name=server1 --ranger_service_type=hive "
                  "--ranger_app_id=impala --authorization_provider=ranger "
                  "--beeswax_port=21000",
-    catalogd_args="--server-name=server1 --ranger_service_type=hive "
+    catalogd_args="--server_name=server1 --ranger_service_type=hive "
                   "--ranger_app_id=impala --authorization_provider=ranger",
     cluster_size=1)
 class TestKillQueryAuthorization(CustomClusterTestSuite):
