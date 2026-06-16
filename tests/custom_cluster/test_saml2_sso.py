@@ -121,37 +121,48 @@ class TestClientSaml(CustomClusterTestSuite):
       run_impala_shell_cmd(vector, args, expect_success=False)
 
       # test the SAML worflow with different attributes
-      self._test_saml2_browser_workflow("", True)
+      self._test_saml2_browser_workflow("")
+      self._test_saml2_browser_workflow("", manipulate_bearer_token=True)
 
       attributes_xml = TestClientSaml.ATTRIBUTE_STATEMENT.format(group_name="group1")
-      self._test_saml2_browser_workflow(attributes_xml, True)
+      self._test_saml2_browser_workflow(attributes_xml)
 
       attributes_xml = TestClientSaml.ATTRIBUTE_STATEMENT.format(group_name="bad_group")
-      self._test_saml2_browser_workflow(attributes_xml, True)
+      self._test_saml2_browser_workflow(attributes_xml)
 
   @CustomClusterTestSuite.with_args(
       impalad_args=SSO_ARGS_WITH_GROUP_FILTER, cluster_size=1)
   def test_saml2_browser_profile_with_group_filter(self, vector):
       # test the SAML worflow with different attributes
-      self._test_saml2_browser_workflow("", False)
+      self._test_saml2_browser_workflow("", expect_authn_response_failure=True)
 
       attributes_xml = TestClientSaml.ATTRIBUTE_STATEMENT.format(group_name="group1")
-      self._test_saml2_browser_workflow(attributes_xml, True)
+      self._test_saml2_browser_workflow(attributes_xml)
 
       attributes_xml = TestClientSaml.ATTRIBUTE_STATEMENT.format(group_name="bad_group")
-      self._test_saml2_browser_workflow(attributes_xml, False)
+      self._test_saml2_browser_workflow(attributes_xml,
+                                        expect_authn_response_failure=True)
 
-  def _test_saml2_browser_workflow(self, attributes_xml, expect_success):
+  def _test_saml2_browser_workflow(self, attributes_xml,
+                                   expect_authn_response_failure=False,
+                                   manipulate_bearer_token=False):
     """ Sends the 3 SAML releated requests to Impala and parses/validates
         their response.
         'attributes_xml': contains the attributes part of authn response
-        'expect_success': if false, then the workflow is expected to fail when
-                          Impala validates the assertations in authn response """
+        'expect_authn_response_failure': if true, then the workflow is expected to fail
+                          when Impala validates the assertations in authn response
+        'manipulate_bearer_token': if true, then the bearer token sent in the 3rd step is
+                          manipulated to simulate a forged token """
     relay_state, client_id, request_id = self._request_resource()
     bearer_token = self._send_authn_response(request_id, relay_state,
-                                             attributes_xml, expect_success)
-    if not expect_success: return
-    self._request_resource_with_bearer(client_id, bearer_token)
+                                             attributes_xml,
+                                             expect_authn_response_failure)
+    if expect_authn_response_failure: return
+    self._request_resource_with_bearer(client_id, bearer_token,
+                                       manipulate_bearer_token=manipulate_bearer_token)
+    self._request_resource_with_bearer(client_id, bearer_token,
+                                       manipulate_bearer_token=manipulate_bearer_token,
+                                       repeated=True)
 
   def _request_resource(self):
     """ Initial POST request to hs2-http port, response should be redirected
@@ -184,22 +195,35 @@ class TestClientSaml(CustomClusterTestSuite):
     assert root.tag == "{urn:oasis:names:tc:SAML:2.0:protocol}AuthnRequest"
     return root.attrib["ID"]
 
-  def _request_resource_with_bearer(self, client_id, bearer_token):
+  def _request_resource_with_bearer(self, client_id, bearer_token,
+                                    manipulate_bearer_token=False, repeated=False):
     """ Send POST request to hs2-http port again, this time with bearer tokan.
         The response should contain a security cookie if the validation succeeded """
     req = Request("http://localhost:%s" % TestClientSaml.HOST_PORT, " ")
     req.add_header('X-Hive-Client-Identifier', client_id)
+    if manipulate_bearer_token:
+      bearer_token = bearer_token.replace("user1", "user2")
     req.add_header('Authorization', "Bearer " + bearer_token)
     opener = build_opener(NoRedirection)
     response = opener.open(req)
     # saml2_ee_test_mode=true leads to returning 401 unauthorized - otherwise the
     # call would hang if there is no Thrift message.
     assert response.getcode() == 401
-    cookies = response.info()['Set-Cookie']
-    assert cookies.startswith("impala.auth=")
+    headers = response.info()
+    if hasattr(headers, 'getheader'):
+      cookies = headers.getheader('Set-Cookie')
+    else:
+      cookies = headers.get('Set-Cookie')
+    if manipulate_bearer_token:
+      assert not cookies, "Auth should fail with forged bearer token"
+    elif repeated:
+      assert not cookies, "Auth should fail with repeated bearer token"
+    else:
+      assert cookies
+      assert cookies.startswith("impala.auth=")
 
   def _send_authn_response(self, request_id, relay_state,
-                           attributes_xml, expect_success):
+                           attributes_xml, expect_authn_response_failure):
     """ Send an authnresponse to Impala - normally the IDP would do this, but in
         this test we generate it from an xml template.
         Impala should answer with a form that submits to CLIENT_PORT and contains
@@ -210,7 +234,7 @@ class TestClientSaml(CustomClusterTestSuite):
     opener = build_opener(NoRedirection)
     req = Request(TestClientSaml.SP_CALLBACK_URL, body)
     response = opener.open(req)
-    bearer_token = self._parse_xhtml_form(response, expect_success)
+    bearer_token = self._parse_xhtml_form(response, expect_authn_response_failure)
     return bearer_token
 
   @staticmethod
@@ -227,7 +251,7 @@ class TestClientSaml(CustomClusterTestSuite):
                          assertation_id=str(uuid.uuid4()))
 
   @staticmethod
-  def _parse_xhtml_form(response, expect_success):
+  def _parse_xhtml_form(response, expect_authn_response_failure):
     assert response.getcode() == 200
     content = response.read()
     root = ET.fromstring(content)
@@ -243,7 +267,7 @@ class TestClientSaml(CustomClusterTestSuite):
       elif input.attrib["name"] == "message":
         message = input.attrib["value"]
 
-    if expect_success:
+    if not expect_authn_response_failure:
       assert token.startswith("u=user1")
     else:
       assert message == TestClientSaml.ASSERTATION_ERROR_MESSAGE
