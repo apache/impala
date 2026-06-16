@@ -16,6 +16,7 @@
 // under the License.
 
 #include <iostream>
+#include <sstream>
 #include <boost/date_time/posix_time/posix_time.hpp>
 
 #include "common/logging.h"
@@ -40,7 +41,7 @@ DoubleVal ZeroUdf(FunctionContext* context) {
 }
 
 StringVal LogUdf(FunctionContext* context, const StringVal& arg1) {
-  cerr << (arg1.is_null ? "NULL" : string((char*)arg1.ptr, arg1.len)) << endl;
+  cerr << arg1 << endl;
   return arg1;
 }
 
@@ -396,6 +397,49 @@ TEST(UdfTest, TestStringValCopyFrom) {
   // Regression test for IMPALA-13150.
   constexpr uint64_t len64 = (1UL << 40) + 1;
   CheckStringValCopyFromFailsWithLength(len64);
+}
+
+TEST(UdfTest, TestStringValStreamOperator) {
+  std::ostringstream oss;
+
+  StringVal null_val = StringVal::null();
+  oss << null_val;
+  EXPECT_EQ("NULL", oss.str());
+  oss.str("");
+  oss.clear();
+
+  StringVal empty_val("");
+  oss << empty_val;
+  EXPECT_EQ("", oss.str());
+  oss.str("");
+  oss.clear();
+
+  StringVal hello_val("hello");
+  oss << hello_val;
+  EXPECT_EQ("hello", oss.str());
+  oss.str("");
+  oss.clear();
+
+  // Buffer is not null-terminated; only 'len' bytes should be printed.
+  const char buffer[] = {'a', 'b', 'c', 'X', 'Y', 'Z'};
+  StringVal non_null_terminated_val(
+      const_cast<uint8_t*>(reinterpret_cast<const uint8_t*>(buffer)), 3);
+  oss << non_null_terminated_val;
+  EXPECT_EQ("abc", oss.str());
+  oss.str("");
+  oss.clear();
+
+  // Embedded null bytes should be preserved in the output.
+  const char embedded_null[] = {'a', '\0', 'b'};
+  StringVal embedded_null_val(
+      const_cast<uint8_t*>(reinterpret_cast<const uint8_t*>(embedded_null)), 3);
+  oss << embedded_null_val;
+  EXPECT_EQ(std::string(embedded_null, 3), oss.str());
+  oss.str("");
+  oss.clear();
+
+  EXPECT_EQ("NULL", DebugString(null_val));
+  EXPECT_EQ("hello", DebugString(hello_val));
 }
 
 IMPALA_TEST_MAIN();
