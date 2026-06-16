@@ -66,11 +66,6 @@ under the License.
   </dependencies>
 
  <build>
-     <resources>
-       <resource>
-         <directory>${env.IMPALA_HOME}/fe/src/test/resources</directory>
-       </resource>
-     </resources>
      <pluginManagement>
       <plugins>
         <plugin>

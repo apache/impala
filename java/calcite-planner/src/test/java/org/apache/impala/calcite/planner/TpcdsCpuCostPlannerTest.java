@@ -17,8 +17,6 @@
 
 package org.apache.impala.calcite.planner;
 
-import com.google.common.io.Files;
-
 import org.apache.impala.catalog.SideloadTableStats;
 import org.apache.impala.common.ByteUnits;
 import org.apache.impala.common.RuntimeEnv;
@@ -35,8 +33,10 @@ import org.junit.rules.TemporaryFolder;
 
 import java.io.File;
 import java.io.IOException;
-import java.net.URISyntaxException;
+import java.io.InputStream;
+import java.nio.file.Files;
 import java.nio.file.Paths;
+import java.nio.file.StandardCopyOption;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
@@ -103,23 +103,28 @@ public class TpcdsCpuCostPlannerTest extends PlannerTestBase {
   private static TemporaryFolder tempFolder;
 
   /**
-   * Returns a {@link File} for the file on the classpath.
+   * Copies a file from the classpath (e.g. from the impala-frontend tests jar) into the
+   * temporary folder so it is available as a real file on disk.
    */
-  private static File getClasspathFile(String filename) throws URISyntaxException {
-    return new File(
-        TpcdsCpuCostPlannerTest.class.getClassLoader().getResource(filename).toURI());
+  private static File copyClasspathFileToTemp(String filename) throws IOException {
+    File destFile = tempFolder.newFile(filename);
+    try (InputStream in =
+        TpcdsCpuCostPlannerTest.class.getClassLoader().getResourceAsStream(filename)) {
+      if (in == null) {
+        throw new IOException("Resource not found on classpath: " + filename);
+      }
+      Files.copy(in, destFile.toPath(), StandardCopyOption.REPLACE_EXISTING);
+    }
+    return destFile;
   }
 
-  private static void setupAdmissionControl() throws IOException, URISyntaxException {
+  private static void setupAdmissionControl() throws IOException {
     // Start admission control with config file fair-scheduler-3-groups.xml
     // and llama-site-3-groups.xml
     tempFolder = new TemporaryFolder();
     tempFolder.create();
-    File allocationConfFile = tempFolder.newFile(ALLOCATION_FILE);
-    Files.copy(getClasspathFile(ALLOCATION_FILE), allocationConfFile);
-
-    File llamaConfFile = tempFolder.newFile(LLAMA_CONFIG_FILE);
-    Files.copy(getClasspathFile(LLAMA_CONFIG_FILE), llamaConfFile);
+    File allocationConfFile = copyClasspathFileToTemp(ALLOCATION_FILE);
+    File llamaConfFile = copyClasspathFileToTemp(LLAMA_CONFIG_FILE);
     // Intentionally mark isTest = false to cache poolService as a singleton.
     RequestPoolService poolService =
         RequestPoolService.getInstance(allocationConfFile.getAbsolutePath(),
