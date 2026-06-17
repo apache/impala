@@ -65,6 +65,17 @@ public class JdbcDataSourceTest {
       BackendConfig.create(new TBackendGflags());
     }
     origFlags = BackendConfig.INSTANCE.getBackendCfg();
+
+    // Initialize trusted_jar_paths to the same default as start-impala-cluster.py:
+    // FILESYSTEM_PREFIX/test-warehouse/data-sources/,
+    // DEFAULT_FS/test-warehouse/data-sources/
+    String filesystemPrefix = System.getenv("FILESYSTEM_PREFIX");
+    if (filesystemPrefix == null) filesystemPrefix = "";
+    String defaultFs = System.getenv("DEFAULT_FS");
+    if (defaultFs == null) defaultFs = "";
+    BackendConfig.INSTANCE.getBackendCfg().setTrusted_jar_paths(
+        filesystemPrefix + "/test-warehouse/data-sources/,"
+        + defaultFs + "/test-warehouse/data-sources/");
   }
 
   @AfterClass

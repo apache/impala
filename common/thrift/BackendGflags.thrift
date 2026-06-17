@@ -382,4 +382,6 @@ struct TBackendGflags {
   176: required bool avro_schema_url_remote_http_enabled
 
   177: required string avro_schema_url_http_allowed_hosts
+
+  178: required string trusted_jar_paths
 }

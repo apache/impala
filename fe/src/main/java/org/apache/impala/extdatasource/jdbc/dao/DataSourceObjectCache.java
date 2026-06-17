@@ -109,15 +109,21 @@ public class DataSourceObjectCache {
         BasicDataSource dbcpDs = BasicDataSourceFactory.createDataSource(props);
         String driverLocalPath = null;
         if (!Strings.isNullOrEmpty(driverUrl)) {
-          // Copy jdbc driver to local file system.
-          driverLocalPath = FileSystemUtil.copyFileFromUriToLocal(driverUrl);
-          // Create class loader for jdbc driver and set it for the
-          // BasicDataSource object so that the driver class could be loaded
-          // from jar file without searching classpath.
-          URL driverJarUrl = new File(driverLocalPath).toURI().toURL();
-          URLClassLoader driverLoader = URLClassLoader.newInstance(
-              new URL[] { driverJarUrl }, getClass().getClassLoader());
-          dbcpDs.setDriverClassLoader(driverLoader);
+          if (BackendConfig.INSTANCE.isJarPathAllowed(driverUrl)) {
+            // Copy jdbc driver to local file system.
+            driverLocalPath = FileSystemUtil.copyFileFromUriToLocal(driverUrl);
+            // Create class loader for jdbc driver and set it for the
+            // BasicDataSource object so that the driver class could be loaded
+            // from jar file without searching classpath.
+            URL driverJarUrl = new File(driverLocalPath).toURI().toURL();
+            URLClassLoader driverLoader = URLClassLoader.newInstance(
+                new URL[] { driverJarUrl }, getClass().getClassLoader());
+            dbcpDs.setDriverClassLoader(driverLoader);
+          } else {
+            throw new JdbcDatabaseAccessException(String.format("Loading jar '%s' was "
+                + "prevented because its path is not permitted by '--trusted_jar_paths'.",
+                driverUrl));
+          }
         }
         // Cache the datasource (no need to store driver path since it's in classpath)
         entry = new Entry(dbcpDs, driverLocalPath);
@@ -132,6 +138,8 @@ public class DataSourceObjectCache {
       } catch (SQLException e) {
           throw new JdbcDatabaseAccessException(String.format(
               "Unable to fetch jdbc driver jar from location '%s'. ", driverUrl), e);
+      } catch (JdbcDatabaseAccessException e) {
+          throw e;
       } catch (Exception e) {
           // createDataSource() in commons-dbcp 2.9 throws Exception.
           throw new JdbcDatabaseAccessException(

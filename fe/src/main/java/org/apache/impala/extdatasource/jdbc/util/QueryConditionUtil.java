@@ -88,9 +88,14 @@ public class QueryConditionUtil {
       // DECIMAL and TIMESTAMP types of predicates are represented as string.
       if (node.getScalar_type().getType() == TPrimitiveType.DECIMAL) {
         // Check column data type and don't add quotes for decimal string.
+        // Decimal strings are numeric; no quoting or escaping is needed.
         sb.append(String.format("%s", value.string_val));
       } else {
-        sb.append(String.format("'%s'", value.string_val));
+        // Escape any embedded single-quote characters using the standard ANSI SQL
+        // convention (replace ' with '') before wrapping in single quotes. Without
+        // this, a string literal such as "O'Brien" would generate 'O'Brien' in the
+        // downstream SQL, breaking out of the string context (CWE-89).
+        sb.append("'").append(value.string_val.replace("'", "''")).append("'");
       }
     } else if (value.isSetDate_val()) {
       sb.append(String.format("'%s'", dbAccessor_.getDateString(value.date_val)));

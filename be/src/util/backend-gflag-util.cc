@@ -155,6 +155,7 @@ DECLARE_int32(hbo_max_runs_per_key);
 DECLARE_int64(hbo_in_memory_backend_cache_size_bytes);
 DECLARE_int32(unregistration_thread_pool_size);
 DECLARE_string(cte_suggester_class);
+DECLARE_string(trusted_jar_paths);
 
 // HS2 SAML2.0 configuration
 // Defined here because TAG_FLAG caused issues in global-flags.cc
@@ -647,6 +648,7 @@ Status PopulateThriftBackendGflags(TBackendGflags& cfg) {
   cfg.__set_avro_schema_url_remote_http_enabled(
       FLAGS_avro_schema_url_remote_http_enabled);
   cfg.__set_avro_schema_url_http_allowed_hosts(FLAGS_avro_schema_url_http_allowed_hosts);
+  cfg.__set_trusted_jar_paths(FLAGS_trusted_jar_paths);
   return Status::OK();
 }
 
