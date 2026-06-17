@@ -104,6 +104,11 @@ public class DataSourceObjectCache {
 
       LOG.info("Datasource for '{}' was not cached. Loading now.", cacheKey);
       String driverUrl = props.getProperty("driverUrl");
+      if (!BackendConfig.INSTANCE.isJarPathAllowed(driverUrl)) {
+        throw new JdbcDatabaseAccessException(String.format("Loading jar '%s' was "
+            + "prevented because its path is not permitted by '--trusted_jar_paths'.",
+            driverUrl));
+      }
       try {
         BasicDataSource dbcpDs = BasicDataSourceFactory.createDataSource(props);
         // Copy jdbc driver to local file system.

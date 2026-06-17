@@ -49,6 +49,7 @@ import org.apache.impala.extdatasource.thrift.TColumnDesc;
 import org.apache.impala.extdatasource.thrift.TComparisonOp;
 import org.apache.impala.extdatasource.thrift.TPrepareParams;
 import org.apache.impala.extdatasource.thrift.TPrepareResult;
+import org.apache.impala.service.BackendConfig;
 import org.apache.impala.service.FeSupport;
 import org.apache.impala.thrift.TCacheJarResult;
 import org.apache.impala.thrift.TColumnValue;
@@ -203,14 +204,19 @@ public class DataSourceScanNode extends ScanNode {
     // source class in current ClassLoader.
     String localPath = null;
     if (!Strings.isNullOrEmpty(dsLocation)) {
-      LOG.trace("Get the instance from URLClassLoader");
-      try {
-        localPath = FileSystemUtil.copyFileFromUriToLocal(dsLocation);
-      } catch (IOException e) {
-        throw new InternalException(String.format(
-            "Unable to fetch data source jar from location '%s'.", dsLocation));
+      if (BackendConfig.INSTANCE.isJarPathAllowed(dsLocation)) {
+        LOG.trace("Get the instance from URLClassLoader");
+        try {
+          localPath = FileSystemUtil.copyFileFromUriToLocal(dsLocation);
+        } catch (IOException e) {
+          throw new InternalException(String.format(
+              "Unable to fetch data source jar from location '%s'.", dsLocation));
+        }
+        Preconditions.checkNotNull(localPath);
+      } else {
+        throw new InternalException(String.format("Loading jar '%s' was prevented "
+            + "because its path is not permitted by '--trusted_jar_paths'.", dsLocation));
       }
-      Preconditions.checkNotNull(localPath);
     } else {
       LOG.trace("Get the instance of the data source class in current ClassLoader");
     }

@@ -54,6 +54,13 @@ KUDU_MASTER_HOSTS = os.getenv("KUDU_MASTER_HOSTS", "127.0.0.1")
 DEFAULT_IMPALA_MAX_LOG_FILES = os.environ.get("IMPALA_MAX_LOG_FILES", 10)
 INTERNAL_LISTEN_HOST = os.getenv("INTERNAL_LISTEN_HOST", "localhost")
 TARGET_FILESYSTEM = os.getenv("TARGET_FILESYSTEM") or "hdfs"
+FILESYSTEM_PREFIX = os.getenv("FILESYSTEM_PREFIX") or ""
+DEFAULT_FS = os.getenv("DEFAULT_FS") or ""
+
+# Default list of path prefixes from which data source jars may be loaded. Points
+# at the standard test-warehouse location so that existing tests work out of the box.
+DEFAULT_TRUSTED_JAR_PATHS = (FILESYSTEM_PREFIX + "/test-warehouse/data-sources/,"
+                             + DEFAULT_FS + "/test-warehouse/data-sources/")
 
 # Options
 parser = OptionParser()
@@ -198,6 +205,13 @@ parser.add_option("--use_calcite_planner", default="False", type="choice",
                   choices=["true", "True", "false", "False"],
                   help="If true, use the Calcite planner for query optimization "
                   "instead of the Impala planner")
+parser.add_option("--trusted_jar_paths", dest="trusted_jar_paths",
+                  default=DEFAULT_TRUSTED_JAR_PATHS,
+                  help="Comma-separated list of path prefixes from which data source "
+                       "jars may be loaded. Sets --trusted_jar_paths on each impalad and "
+                       "catalogd. Defaults to the test-warehouse data-sources directory "
+                       "under the active FILESYSTEM_PREFIX. Pass an empty string to "
+                       "disable jar loading entirely.")
 
 # For testing: list of comma-separated delays, in milliseconds, that delay impalad catalog
 # replica initialization. The ith delay is applied to the ith impalad.
@@ -540,6 +554,10 @@ def build_impalad_arg_lists(cluster_size, num_coordinators, use_exclusive_coordi
       args = "-disconnected_session_timeout {timeout} {args}".format(
           timeout=DISCONNECTED_SESSION_TIMEOUT,
           args=args)
+
+    if "trusted_jar_paths" not in args and options.trusted_jar_paths:
+      args = "-trusted_jar_paths={trusted_jar_paths} {args}".format(
+          trusted_jar_paths=options.trusted_jar_paths, args=args)
 
     if i - start_idx >= num_coordinators:
       args = "-is_coordinator=false {args}".format(args=args)

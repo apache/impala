@@ -20,6 +20,8 @@ package org.apache.impala.service;
 import static org.apache.hadoop.fs.CommonConfigurationKeysPublic
     .HADOOP_SECURITY_AUTH_TO_LOCAL;
 
+import java.util.Scanner;
+
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.security.authentication.util.KerberosName;
 import org.apache.impala.analysis.SqlScanner;
@@ -43,7 +45,8 @@ public class BackendConfig {
   private long warnCatalogResponseSize_;
   private long warnCatalogResponseDurationMs_;
 
-  private BackendConfig(TBackendGflags cfg) {
+  @VisibleForTesting
+  protected BackendConfig(TBackendGflags cfg) {
     backendCfg_ = cfg;
     warnCatalogResponseSize_ = cfg.warn_catalog_response_size_mb * 1024L * 1024L;
     warnCatalogResponseDurationMs_ = cfg.warn_catalog_response_duration_s * 1000L;
@@ -560,5 +563,22 @@ public class BackendConfig {
 
   public String getAvroSchemaUrlHttpAllowedHosts() {
     return backendCfg_.avro_schema_url_http_allowed_hosts;
+  }
+
+  /**
+   * Returns true if 'path' starts with one of the allowed prefixes configured in
+   * --trusted_jar_paths. An empty allowlist (the default) disables jar
+   * loading from table properties entirely.
+   */
+  public boolean isJarPathAllowed(String path) {
+    String allowlist = backendCfg_.trusted_jar_paths;
+    if (Strings.isNullOrEmpty(allowlist) || Strings.isNullOrEmpty(path)) return false;
+    try (Scanner scanner = new Scanner(allowlist).useDelimiter(",")) {
+      while (scanner.hasNext()) {
+        String prefix = scanner.next().trim();
+        if (!prefix.isEmpty() && path.startsWith(prefix)) return true;
+      }
+    }
+    return false;
   }
 }

@@ -25,6 +25,7 @@ from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
 from tests.common.environ import build_flavor_timeout
 from tests.common.skip import SkipIfApacheHive
 from tests.common.test_dimensions import create_exec_option_dimension
+from tests.util.filesystem_utils import FILESYSTEM_PREFIX
 from time import sleep
 
 
@@ -288,3 +289,64 @@ class TestImpalaExtJdbcTables(CustomClusterTestSuite):
     """Run tests for external jdbc tables in Impala cluster for new predicates"""
     self.run_test_case(
         'QueryTest/impala-ext-jdbc-tables-predicates', vector, use_db=unique_database)
+
+
+class TestJarLoadingAllowlist(CustomClusterTestSuite):
+  """Tests that attempting to load jars outside --trusted_jar_paths skips loading the jar
+  and issues a warning."""
+
+  @classmethod
+  def add_test_dimensions(cls):
+    super(TestJarLoadingAllowlist, cls).add_test_dimensions()
+    cls.ImpalaTestMatrix.add_dimension(create_exec_option_dimension())
+
+  def _create_jdbc_table(self, unique_database, driver_class="com.example.NotADriver"):
+    """Create a minimal JDBC table with driver.url."""
+    self.execute_query("""
+      CREATE EXTERNAL TABLE {db}.jar_allowlist_tbl (id INT)
+      STORED BY JDBC
+      TBLPROPERTIES (
+        "database.type"="POSTGRES",
+        "jdbc.url"="jdbc:postgresql://localhost:5432/functional",
+        "jdbc.driver"="{driver_class}",
+        "driver.url"="{pre}/test-warehouse/data-sources/jdbc-drivers/not-a-jdbc.jar",
+        "dbcp.username"="hiveuser",
+        "dbcp.password"="password",
+        "table"="alltypes")
+    """.format(db=unique_database, pre=FILESYSTEM_PREFIX, driver_class=driver_class))
+
+  @pytest.mark.execute_serially
+  @CustomClusterTestSuite.with_args(
+      impalad_args="--trusted_jar_paths=/trusted/path/",
+      cluster_size=1, disable_log_buffering=True)
+  def test_jar_at_untrusted_path_not_loaded(self, unique_database):
+    """When driver.url is outside the trusted-path allowlist the JDBC jar is not
+    fetched. The query fails and a WARNING is emitted to the impalad log."""
+    self._create_jdbc_table(unique_database)
+    ex = self.execute_query_expect_failure(self.client,
+        "SELECT count(*) FROM {0}.jar_allowlist_tbl".format(unique_database))
+    assert "prevented because its path is not permitted" in str(ex)
+
+  @pytest.mark.execute_serially
+  @CustomClusterTestSuite.with_args(
+      impalad_args="--trusted_jar_paths=",
+      cluster_size=1, disable_log_buffering=True)
+  def test_empty_allowlist_rejects_all_jars(self, unique_database):
+    """An empty --trusted_jar_paths disables jar loading entirely. The query fails and a
+    WARNING is emitted to the impalad log."""
+    self._create_jdbc_table(unique_database)
+    ex = self.execute_query_expect_failure(self.client,
+        "SELECT count(*) FROM {0}.jar_allowlist_tbl".format(unique_database))
+    assert "prevented because its path is not permitted" in str(ex)
+
+  @pytest.mark.execute_serially
+  @CustomClusterTestSuite.with_args(
+      impalad_args="--trusted_jar_paths=",
+      cluster_size=1, disable_log_buffering=True)
+  def test_empty_allowlist_uses_classpath(self, unique_database):
+    """Jar is not loaded, but the driver class is found on the classpath.
+    The query still fails."""
+    self._create_jdbc_table(unique_database, driver_class="org.postgresql.Driver")
+    ex = self.execute_query_expect_failure(self.client,
+        "SELECT count(*) FROM {0}.jar_allowlist_tbl".format(unique_database))
+    assert "prevented because its path is not permitted" in str(ex)

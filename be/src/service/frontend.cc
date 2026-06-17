@@ -109,6 +109,13 @@ DEFINE_int32(dbcp_max_wait_millis_for_conn, -1,
 DEFINE_int32(dbcp_data_source_idle_timeout_s, 300,
     "Timeout value in seconds for idle DBCP DataSource objects in cache. It only takes "
     "effect when query option 'clean_dbcp_ds_cache' is set as false.");
+DEFINE_string(trusted_jar_paths, "",
+    "Comma-separated list of URI/path prefixes that are considered safe locations from "
+    "which Impala may download and load jar files. When a 'driver.url' table property "
+    "for JDBC data source tables, or the LOCATION for external data source tables, "
+    "starts with one of these prefixes the jar is downloaded and loaded. An empty value "
+    "(the default) disables jar loading entirely. Example: "
+    "'hdfs://namenode/trusted/jars/,s3://my-bucket/allowed-jars/'");
 
 Frontend::Frontend() {
   JniMethodDescriptor methods[] = {

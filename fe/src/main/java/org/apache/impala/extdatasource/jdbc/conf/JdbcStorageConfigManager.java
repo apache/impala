@@ -52,7 +52,9 @@ public class JdbcStorageConfigManager {
     String keystore = conf.get(JdbcStorageConfig.DBCP_PASSWORD_KEYSTORE.
         getPropertyName());
     if (countNonNull(passwd, keystore) > 1) {
-      LOGGER.warn("Only one of " + passwd + ", " + keystore + " can be set");
+      LOGGER.warn("Only one of {} and {} can be set",
+          JdbcStorageConfig.DBCP_PASSWORD.getPropertyName(),
+          JdbcStorageConfig.DBCP_PASSWORD_KEYSTORE.getPropertyName());
     }
     if (passwd == null && keystore != null) {
       String key = conf.get(JdbcStorageConfig.DBCP_PASSWORD_KEY.getPropertyName());

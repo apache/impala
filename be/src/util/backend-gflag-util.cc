@@ -132,6 +132,7 @@ DECLARE_int32(dbcp_max_wait_millis_for_conn);
 DECLARE_int32(dbcp_data_source_idle_timeout_s);
 DECLARE_bool(enable_catalogd_ha);
 DECLARE_string(injected_group_members_debug_only);
+DECLARE_string(trusted_jar_paths);
 
 // HS2 SAML2.0 configuration
 // Defined here because TAG_FLAG caused issues in global-flags.cc
@@ -528,6 +529,7 @@ Status PopulateThriftBackendGflags(TBackendGflags& cfg) {
   cfg.__set_avro_schema_url_remote_http_enabled(
       FLAGS_avro_schema_url_remote_http_enabled);
   cfg.__set_avro_schema_url_http_allowed_hosts(FLAGS_avro_schema_url_http_allowed_hosts);
+  cfg.__set_trusted_jar_paths(FLAGS_trusted_jar_paths);
   return Status::OK();
 }
 
