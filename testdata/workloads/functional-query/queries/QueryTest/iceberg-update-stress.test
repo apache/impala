@@ -3,7 +3,7 @@
 CREATE TABLE ice_store_sales
 PARTITIONED BY SPEC (truncate(500, ss_sold_date_sk))
 STORED BY ICEBERG
-TBLPROPERTIES ('format-version'='2')
+TBLPROPERTIES ('format-version'='$FORMAT_VERSION')
 AS SELECT * FROM tpcds_parquet.store_sales;
 select count(*), sum(ss_ticket_number) from ice_store_sales where ss_item_sk % 1999 = 0
 ---- RESULTS

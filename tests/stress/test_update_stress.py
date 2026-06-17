@@ -32,28 +32,32 @@ from tests.conftest import DEFAULT_HIVE_SERVER2
 
 
 # Longer-running UPDATE tests are executed here
-class TestIcebergV2UpdateStress(ImpalaTestSuite):
-  """UPDATE tests against Iceberg V2 tables."""
+class TestIcebergUpdateStress(ImpalaTestSuite):
+  """UPDATE stress tests against Iceberg V2 and V3 tables."""
 
   BATCH_SIZES = [0, 32]
   EXHAUSTIVE_BATCH_SIZES = [0, 1, 11, 32]
 
   @classmethod
   def add_test_dimensions(cls):
-    super(TestIcebergV2UpdateStress, cls).add_test_dimensions()
+    super(TestIcebergUpdateStress, cls).add_test_dimensions()
     cls.ImpalaTestMatrix.add_constraint(
       lambda v: v.get_value('table_format').file_format == 'parquet')
-    batch_sizes = (TestIcebergV2UpdateStress.BATCH_SIZES
+    batch_sizes = (TestIcebergUpdateStress.BATCH_SIZES
         if cls.exploration_strategy() == 'core'
-        else TestIcebergV2UpdateStress.EXHAUSTIVE_BATCH_SIZES)
+        else TestIcebergUpdateStress.EXHAUSTIVE_BATCH_SIZES)
     cls.ImpalaTestMatrix.add_dimension(create_exec_option_dimension(
       batch_sizes=batch_sizes))
 
-  def test_update_stress(self, vector, unique_database):
+  def test_v2_update_stress(self, vector, unique_database):
     self.run_test_case('QueryTest/iceberg-update-stress', vector,
-        unique_database)
+        unique_database, test_file_vars={'$FORMAT_VERSION': '2'})
     if IS_HDFS:
       self._update_stress_hive_tests(unique_database)
+
+  def test_v3_update_stress(self, vector, unique_database):
+    self.run_test_case('QueryTest/iceberg-update-stress', vector,
+        unique_database, test_file_vars={'$FORMAT_VERSION': '3'})
 
   def _update_stress_hive_tests(self, db):
     stmt = """
@@ -110,9 +114,7 @@ class TestIcebergConcurrentUpdateStress(ImpalaTestSuite):
       time.sleep(random.random())
     impalad_client.close()
 
-  @pytest.mark.execute_serially
-  @UniqueDatabase.parametrize(sync_ddl=True)
-  def test_iceberg_updates(self, unique_database):
+  def _run_concurrent_updates(self, unique_database, format_version):
     """Issues UPDATE statements against multiple impalads in a way that some
     invariants must be true when a spectator process inspects the table. E.g.
     the value of a column should be equal to the sum of other columns."""
@@ -121,7 +123,7 @@ class TestIcebergConcurrentUpdateStress(ImpalaTestSuite):
     self.client.execute("""create table {0}
         (total bigint, a bigint, b bigint, c bigint)
         stored as iceberg
-        tblproperties('format-version'='2')""".format(tbl_name,))
+        tblproperties('format-version'='{1}')""".format(tbl_name, format_version))
     self.client.execute(
         "insert into {} values (0, 0, 0, 0)".format(tbl_name))
 
@@ -136,6 +138,16 @@ class TestIcebergConcurrentUpdateStress(ImpalaTestSuite):
     checkers = [Task(self._impala_role_concurrent_checker, tbl_name, target_total)
                 for i in range(0, num_checkers)]
     run_tasks([updater_a, updater_b, updater_c] + checkers)
+
+  @pytest.mark.execute_serially
+  @UniqueDatabase.parametrize(sync_ddl=True)
+  def test_iceberg_v2_updates(self, unique_database):
+    self._run_concurrent_updates(unique_database, format_version=2)
+
+  @pytest.mark.execute_serially
+  @UniqueDatabase.parametrize(sync_ddl=True)
+  def test_iceberg_v3_updates(self, unique_database):
+    self._run_concurrent_updates(unique_database, format_version=3)
 
 
 class TestIcebergConcurrentOperations(ImpalaTestSuite):
@@ -246,18 +258,16 @@ class TestIcebergConcurrentOperations(ImpalaTestSuite):
       time.sleep(random.random())
     impalad_client.close()
 
-  @pytest.mark.execute_serially
-  @UniqueDatabase.parametrize(sync_ddl=True)
-  def test_iceberg_deletes_and_updates(self, unique_database):
+  def _run_deletes_and_updates(self, unique_database, format_version):
     """Issues DELETE and UPDATE statements in parallel in a way that some
     invariants must be true when a spectator process inspects the table."""
 
-    tbl_suffix = "test_concurrent_deletes_and_updates"
+    tbl_suffix = "test_concurrent_deletes_and_updates_v{}".format(format_version)
     tbl_name = unique_database + "." + tbl_suffix
     self.client.set_configuration_option("SYNC_DDL", "true")
     self.client.execute("""create table {0} (id int, j bigint)
         stored as iceberg
-        tblproperties('format-version'='2')""".format(tbl_name,))
+        tblproperties('format-version'='{1}')""".format(tbl_name, format_version))
 
     num_rows = 10
     values = ', '.join("({}, 0)".format(i) for i in range(num_rows))
@@ -276,28 +286,21 @@ class TestIcebergConcurrentOperations(ImpalaTestSuite):
 
     self.check_no_orphan_files(unique_database, tbl_suffix)
 
-  @pytest.mark.execute_serially
-  @UniqueDatabase.parametrize(sync_ddl=True)
-  def test_iceberg_deletes_and_updates_and_optimize(self, unique_database):
+  def _run_deletes_and_updates_and_optimize(self, unique_database, format_version):
     """Issues DELETE and UPDATE statements in parallel in a way that some
     invariants must be true when a spectator process inspects the table.
-    An optimizer thread also invokes OPTMIZE regularly on the table."""
+    An optimizer thread also invokes OPTIMIZE regularly on the table."""
 
-    tbl_suffix = "test_concurrent_write_and_optimize"
+    tbl_suffix = "test_concurrent_write_and_optimize_v{}".format(format_version)
     tbl_name = unique_database + "." + tbl_suffix
     self.client.set_configuration_option("SYNC_DDL", "true")
     self.client.execute("""create table {0} (id int, j bigint)
         stored as iceberg
-        tblproperties('format-version'='2')""".format(tbl_name,))
+        tblproperties('format-version'='{1}')""".format(tbl_name, format_version))
 
     num_rows = 10
-    values_str = ""
-    # Prepare INSERT statement of 'num_rows' records.
-    for i in range(num_rows):
-      values_str += "({}, 0)".format(i)
-      if i != num_rows - 1:
-        values_str += ", "
-    self.client.execute("insert into {} values {}".format(tbl_name, values_str))
+    values = ', '.join("({}, 0)".format(i) for i in range(num_rows))
+    self.client.execute("insert into {} values ({})".format(tbl_name, values))
 
     all_rows_deleted = Value('i', 0)
     deleter = Task(self._impala_role_concurrent_deleter, tbl_name, all_rows_deleted,
@@ -313,6 +316,26 @@ class TestIcebergConcurrentOperations(ImpalaTestSuite):
     assert result.data == ['0']
 
     self.check_no_orphan_files(unique_database, tbl_suffix)
+
+  @pytest.mark.execute_serially
+  @UniqueDatabase.parametrize(sync_ddl=True)
+  def test_iceberg_v2_deletes_and_updates(self, unique_database):
+    self._run_deletes_and_updates(unique_database, format_version=2)
+
+  @pytest.mark.execute_serially
+  @UniqueDatabase.parametrize(sync_ddl=True)
+  def test_iceberg_v2_deletes_and_updates_and_optimize(self, unique_database):
+    self._run_deletes_and_updates_and_optimize(unique_database, format_version=2)
+
+  @pytest.mark.execute_serially
+  @UniqueDatabase.parametrize(sync_ddl=True)
+  def test_iceberg_v3_deletes_and_updates(self, unique_database):
+    self._run_deletes_and_updates(unique_database, format_version=3)
+
+  @pytest.mark.execute_serially
+  @UniqueDatabase.parametrize(sync_ddl=True)
+  def test_iceberg_v3_deletes_and_updates_and_optimize(self, unique_database):
+    self._run_deletes_and_updates_and_optimize(unique_database, format_version=3)
 
   def check_no_orphan_files(self, unique_database, table_name):
     # Check that the uncommitted data and delete files are removed from the file system
@@ -338,7 +361,7 @@ class TestIcebergConcurrentOperations(ImpalaTestSuite):
   @SkipIfFS.hive
   @pytest.mark.execute_serially
   @UniqueDatabase.parametrize(sync_ddl=True)
-  def test_iceberg_impala_deletes_and_hive_updates(self, unique_database):
+  def test_iceberg_v2_impala_deletes_and_hive_updates(self, unique_database):
     """Issues DELETE statements from Impala and UPDATE statements from Hive
     in parallel in a way that some invariants must be true when a spectator process
     inspects the table."""
@@ -367,7 +390,7 @@ class TestIcebergConcurrentOperations(ImpalaTestSuite):
   @SkipIfFS.hive
   @pytest.mark.execute_serially
   @UniqueDatabase.parametrize(sync_ddl=True)
-  def test_iceberg_impala_updates_and_hive_deletes(self, unique_database):
+  def test_iceberg_v2_impala_updates_and_hive_deletes(self, unique_database):
     """Issues DELETE statemes from Hive and UPDATE statements from Impala
     in parallel in a way that some invariants must be true when a spectator
     process inspects the table."""
