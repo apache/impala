@@ -29,6 +29,8 @@ from impala_thrift_gen.hive_metastore.ttypes import (
 # The following requests are missing in Apache Hive 3
 if not (IS_APACHE_HIVE and HIVE_MAJOR_VERSION <= 3):
   from impala_thrift_gen.hive_metastore.ttypes import (
+    CreateDatabaseRequest,
+    DropTableRequest,
     FindNextCompactRequest,
     GetPartitionsByNamesRequest,
     TruncateTableRequest,
@@ -41,6 +43,13 @@ from tests.common.skip import SkipIfApacheHive
 from tests.util.event_processor_utils import EventProcessorUtils
 from tests.util.filesystem_utils import IS_HDFS, IS_OZONE
 
+# For drop_table_req(), unlike HiveMetaStoreClient.java, the Hive Metastore client
+# instantiated via ThriftHiveMetastore.Client(protocol) in impala_test_suite.py does not
+# populate the field of 'catalogName' when constructing a DropTableRequest, so we need to
+# set this argument to a default value as
+# dropTable(Table tbl, boolean deleteData, boolean ignoreUnknownTbl, boolean ifPurge)
+# does after https://github.com/apache/hive/commit/86f6bd4 (HIVE-24445).
+DEFAULT_CATALOG_NAME = "hive"
 
 @SkipIfApacheHive.feature_not_supported
 class TestMetastoreService(CustomClusterTestSuite):
@@ -109,7 +118,8 @@ class TestMetastoreService(CustomClusterTestSuite):
             assert event_id is not None
             assert event_id > 0
             # DDLs
-            catalog_hms_client.create_database(self.__get_test_database(db_name))
+            req = CreateDatabaseRequest(databaseName=db_name)
+            catalog_hms_client.create_database_req(req)
             database = catalog_hms_client.get_database(db_name)
             assert database is not None
             assert db_name == database.name
@@ -182,7 +192,8 @@ class TestMetastoreService(CustomClusterTestSuite):
 
         # Create table in Hive and test this is properly falling back to HMS.
         # Create table via Hive.
-        catalog_hms_client.create_database(self.__get_test_database(db_name))
+        req = CreateDatabaseRequest(databaseName=db_name)
+        catalog_hms_client.create_database_req(req)
         database = catalog_hms_client.get_database(db_name)
         assert database is not None
         assert db_name == database.name
@@ -669,7 +680,9 @@ class TestMetastoreService(CustomClusterTestSuite):
 
             prev_get_table_response = cur_get_table_response
             # drop table
-            catalog_hms_client.drop_table(db_name, new_table_name, True)
+            req = DropTableRequest(catalogName=DEFAULT_CATALOG_NAME, dbName=db_name,
+                tableName=new_table_name, deleteData=True)
+            catalog_hms_client.drop_table_req(req)
             if invalidateCache:
                 # new get_table_req should throw an exception
                 # since the table does not exist in cache as well as in HMS
@@ -776,7 +789,9 @@ class TestMetastoreService(CustomClusterTestSuite):
             assert len(parts_response.partitions) == 1
             # invalidate the table again before dropping it
             self.execute_query_expect_success(self.client, invalidate_tbl_query)
-            catalog_hms_client.drop_table(db_name, tbl_name, True)
+            req = DropTableRequest(catalogName=DEFAULT_CATALOG_NAME, dbName=db_name,
+                tableName=tbl_name, deleteData=True)
+            catalog_hms_client.drop_table_req(req)
             # new get_table_req should throw an exception
             # since the table does not exist in cache as well as in HMS
             expected_exception = None
@@ -865,7 +880,9 @@ class TestMetastoreService(CustomClusterTestSuite):
             skipped_events_count_before = \
                 EventProcessorUtils.get_num_skipped_events()
             # drop table
-            catalog_hms_client.drop_table(db_name, tbl_name, True)
+            req = DropTableRequest(catalogName=DEFAULT_CATALOG_NAME, dbName=db_name,
+                tableName=tbl_name, deleteData=True)
+            catalog_hms_client.drop_table_req(req)
             # immediately create same table again via Impala client
             # before drop_event is processed by event processor
             self.execute_query_expect_success(self.client, create_tbl_query)
@@ -883,7 +900,9 @@ class TestMetastoreService(CustomClusterTestSuite):
                    skipped_events_count_before + 2
 
             # drop table, we will recreate it in test 2
-            catalog_hms_client.drop_table(db_name, tbl_name, True)
+            req = DropTableRequest(catalogName=DEFAULT_CATALOG_NAME, dbName=db_name,
+                tableName=tbl_name, deleteData=True)
+            catalog_hms_client.drop_table_req(req)
             EventProcessorUtils.wait_for_event_processing(self, 20)
 
             # Test scenario 2 - create table and immediately drop it
@@ -899,7 +918,9 @@ class TestMetastoreService(CustomClusterTestSuite):
 
             # Immediately drop the table before CREATE_TABLE
             # event is processed by event processor
-            catalog_hms_client.drop_table(db_name, tbl_name, True)
+            req = DropTableRequest(catalogName=DEFAULT_CATALOG_NAME, dbName=db_name,
+                tableName=tbl_name, deleteData=True)
+            catalog_hms_client.drop_table_req(req)
 
             # wait for event processor to process all events
             EventProcessorUtils.wait_for_event_processing(self, 20)
@@ -1063,7 +1084,9 @@ class TestMetastoreService(CustomClusterTestSuite):
             # If the above call is successful the HMS api
             # update_transaction_statistics is reachable
 
-            catalog_hms_client.drop_table("default", tbl_name, True)
+            req = DropTableRequest(catalogName=DEFAULT_CATALOG_NAME, dbName="default",
+                tableName=tbl_name, deleteData=True)
+            catalog_hms_client.drop_table_req(req)
         finally:
             if catalog_hms_client is not None:
                 catalog_hms_client.shutdown()

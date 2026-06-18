@@ -33,12 +33,12 @@ import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hive.metastore.api.Database;
 import org.apache.hadoop.hive.metastore.api.FieldSchema;
+import org.apache.hadoop.hive.metastore.api.PrincipalType;
 import org.apache.hadoop.hive.metastore.api.InsertEventRequestData;
 import org.apache.hadoop.hive.metastore.api.MetaException;
 import org.apache.hadoop.hive.metastore.api.Partition;
 import org.apache.hadoop.hive.metastore.api.SerDeInfo;
 import org.apache.hadoop.hive.metastore.api.StorageDescriptor;
-import org.apache.hadoop.hive.metastore.api.PrincipalType;
 import org.apache.impala.catalog.MetaStoreClientPool.MetaStoreClient;
 import org.apache.impala.common.FileSystemUtil;
 import org.apache.impala.compat.MetastoreShim;
@@ -49,20 +49,6 @@ import org.apache.thrift.TException;
  * Utils class to create/get objects in HMS
  */
 public class MetastoreApiTestUtils {
-
-  public static Database createHmsDatabaseObject(String catName,
-      String dbName, Map<String, String> params) {
-    Database database = new Database();
-    if (catName != null) database.setCatalogName(catName);
-    database.setName(dbName);
-    database.setDescription("Notification test database");
-    database.setOwnerName("NotificationOwner");
-    database.setOwnerType(PrincipalType.USER);
-    if (params != null && !params.isEmpty()) {
-      database.setParameters(params);
-    }
-    return database;
-  }
 
   public static void addDatabaseParametersInHms(MetaStoreClient msClient, String dbName,
       String key, String val) throws TException {
@@ -130,7 +116,15 @@ public class MetastoreApiTestUtils {
 
   public static void createDatabase(MetaStoreClient msClient, String catName,
       String dbName, Map<String, String> params) throws TException {
-    Database database = createHmsDatabaseObject(catName, dbName, params);
+    Database database = new Database();
+    if (catName != null) database.setCatalogName(catName);
+    database.setName(dbName);
+    database.setDescription("Notification test database");
+    database.setOwnerName("NotificationOwner");
+    database.setOwnerType(PrincipalType.USER);
+    if (params != null && !params.isEmpty()) {
+      database.setParameters(params);
+    }
     msClient.getHiveClient().createDatabase(database);
   }
 

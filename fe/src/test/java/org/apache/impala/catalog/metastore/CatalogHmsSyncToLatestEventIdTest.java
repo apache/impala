@@ -170,8 +170,8 @@ public class CatalogHmsSyncToLatestEventIdTest extends AbstractCatalogMetastoreT
         LOG.info("Executing testCreateDatabase");
         String dbName = "test_create_database";
         try {
-            Database msDb = MetastoreApiTestUtils
-                .createHmsDatabaseObject(null, dbName, null);
+            Database msDb = CatalogHmsAPIHelper
+                .createHmsDatabaseObject(/* catName */ null, dbName, null);
             catalogHmsClient_.createDatabase(msDb);
             Db db = catalog_.getDb(dbName);
             assertTrue(db != null);
@@ -764,8 +764,8 @@ public class CatalogHmsSyncToLatestEventIdTest extends AbstractCatalogMetastoreT
     }
 
     private void createDatabaseInCatalog(String dbName) throws TException {
-        Database msDb = MetastoreApiTestUtils
-            .createHmsDatabaseObject(null, dbName, null);
+        Database msDb = CatalogHmsAPIHelper
+            .createHmsDatabaseObject(/* catName */ null, dbName, null);
         catalogHmsClient_.createDatabase(msDb);
         assertTrue("db " + dbName + " not present in catalogd",
             catalog_.getDb(dbName) != null);

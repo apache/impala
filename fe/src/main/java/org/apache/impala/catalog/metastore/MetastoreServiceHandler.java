@@ -48,6 +48,7 @@ import org.apache.hadoop.hive.metastore.api.AllTableConstraintsRequest;
 import org.apache.hadoop.hive.metastore.api.AllTableConstraintsResponse;
 import org.apache.hadoop.hive.metastore.api.AlreadyExistsException;
 import org.apache.hadoop.hive.metastore.api.AlterCatalogRequest;
+import org.apache.hadoop.hive.metastore.api.AlterDatabaseRequest;
 import org.apache.hadoop.hive.metastore.api.AlterISchemaRequest;
 import org.apache.hadoop.hive.metastore.api.AlterPartitionsRequest;
 import org.apache.hadoop.hive.metastore.api.AlterPartitionsResponse;
@@ -69,6 +70,7 @@ import org.apache.hadoop.hive.metastore.api.CompactionRequest;
 import org.apache.hadoop.hive.metastore.api.CompactionResponse;
 import org.apache.hadoop.hive.metastore.api.ConfigValSecurityException;
 import org.apache.hadoop.hive.metastore.api.CreateCatalogRequest;
+import org.apache.hadoop.hive.metastore.api.CreateDatabaseRequest;
 import org.apache.hadoop.hive.metastore.api.CreateTableRequest;
 import org.apache.hadoop.hive.metastore.api.CreationMetadata;
 import org.apache.hadoop.hive.metastore.api.CurrentNotificationEventId;
@@ -78,7 +80,9 @@ import org.apache.hadoop.hive.metastore.api.DefaultConstraintsResponse;
 import org.apache.hadoop.hive.metastore.api.DropCatalogRequest;
 import org.apache.hadoop.hive.metastore.api.DropConstraintRequest;
 import org.apache.hadoop.hive.metastore.api.DropDatabaseRequest;
+import org.apache.hadoop.hive.metastore.api.DropTableRequest;
 import org.apache.hadoop.hive.metastore.api.DropPackageRequest;
+import org.apache.hadoop.hive.metastore.api.DropPartitionRequest;
 import org.apache.hadoop.hive.metastore.api.DropPartitionsRequest;
 import org.apache.hadoop.hive.metastore.api.DropPartitionsResult;
 import org.apache.hadoop.hive.metastore.api.EnvironmentContext;
@@ -456,11 +460,11 @@ public abstract class MetastoreServiceHandler extends AbstractThriftHiveMetastor
   }
 
   @Override
-  public void create_database(Database database)
+  public void create_database_req(CreateDatabaseRequest req)
       throws AlreadyExistsException, InvalidObjectException, MetaException, TException {
     catalogOpExecutor_.getMetastoreDdlLock().lock();
     try (MetaStoreClient client = catalog_.getMetaStoreClient()) {
-      client.getHiveClient().getThriftClient().create_database(database);
+      client.getHiveClient().getThriftClient().create_database_req(req);
     } finally {
       catalogOpExecutor_.getMetastoreDdlLock().unlock();
     }
@@ -538,10 +542,10 @@ public abstract class MetastoreServiceHandler extends AbstractThriftHiveMetastor
   }
 
   @Override
-  public void alter_database(String dbname, Database database)
+  public void alter_database_req(AlterDatabaseRequest req)
       throws MetaException, NoSuchObjectException, TException {
     try (MetaStoreClient client = catalog_.getMetaStoreClient()) {
-      client.getHiveClient().getThriftClient().alter_database(dbname, database);
+      client.getHiveClient().getThriftClient().alter_database_req(req);
     }
   }
 
@@ -738,22 +742,20 @@ public abstract class MetastoreServiceHandler extends AbstractThriftHiveMetastor
   }
 
   @Override
-  public void drop_table(String dbname, String tblname,
-      boolean deleteData) throws NoSuchObjectException,
+  public void drop_table_req(DropTableRequest req) throws NoSuchObjectException,
       MetaException, TException {
     catalogOpExecutor_.getMetastoreDdlLock().lock();
     long eventId = -1;
     try (MetaStoreClient client = catalog_.getMetaStoreClient()) {
       eventId = getCurrentEventId(client);
       // TODO: Handle NoSuchObjectException
-      client.getHiveClient().getThriftClient().drop_table(dbname,
-              tblname, deleteData);
+      client.getHiveClient().getThriftClient().drop_table_req(req);
       if (!BackendConfig.INSTANCE.invalidateCatalogdHMSCacheOnDDLs() ||
-              !BackendConfig.INSTANCE.enableCatalogdHMSCache()) {
+          !BackendConfig.INSTANCE.enableCatalogdHMSCache()) {
         return;
       }
-      dropTableIfExists(eventId, dbname, tblname,
-              "drop_table");
+      dropTableIfExists(eventId, req.getDbName(), req.getTableName(),
+          "drop_table");
 
     } finally {
       catalogOpExecutor_.getMetastoreDdlLock().unlock();
@@ -1135,13 +1137,12 @@ public abstract class MetastoreServiceHandler extends AbstractThriftHiveMetastor
   }
 
   @Override
-  public boolean drop_partition(String dbname, String tblname, List<String> partVals,
-      boolean deleteData)
+  public boolean drop_partition_req(DropPartitionRequest req)
       throws NoSuchObjectException, MetaException, TException {
     try (MetaStoreClient client = catalog_.getMetaStoreClient()) {
       boolean partitionDropped = client.getHiveClient().getThriftClient()
-              .drop_partition(dbname, tblname, partVals, deleteData);
-      invalidateNonTransactionalTableIfExists(dbname, tblname,
+          .drop_partition_req(req);
+      invalidateNonTransactionalTableIfExists(req.getDbName(), req.getTblName(),
           "drop_partition");
       return partitionDropped;
     }

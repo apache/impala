@@ -46,6 +46,7 @@ import org.apache.hadoop.hive.metastore.PartitionExpressionProxy;
 import org.apache.hadoop.hive.metastore.api.ColumnStatistics;
 import org.apache.hadoop.hive.metastore.api.ColumnStatisticsDesc;
 import org.apache.hadoop.hive.metastore.api.ColumnStatisticsObj;
+import org.apache.hadoop.hive.metastore.api.Database;
 import org.apache.hadoop.hive.metastore.api.FileMetadata;
 import org.apache.hadoop.hive.metastore.api.GetPartitionsByNamesRequest;
 import org.apache.hadoop.hive.metastore.api.GetPartitionsByNamesResult;
@@ -57,6 +58,7 @@ import org.apache.hadoop.hive.metastore.api.ObjectDictionary;
 import org.apache.hadoop.hive.metastore.api.Partition;
 import org.apache.hadoop.hive.metastore.api.PartitionsByExprRequest;
 import org.apache.hadoop.hive.metastore.api.PartitionsByExprResult;
+import org.apache.hadoop.hive.metastore.api.PrincipalType;
 import org.apache.hadoop.hive.metastore.api.Table;
 import org.apache.hadoop.hive.metastore.utils.MetaStoreUtils;
 import org.apache.impala.analysis.TableName;
@@ -613,5 +615,19 @@ public class CatalogHmsAPIHelper {
           numberOfErrorsToLog - errors, numberOfErrorsToLog);
     }
     return errors == 0;
+  }
+
+  public static Database createHmsDatabaseObject(String catName,
+      String dbName, Map<String, String> params) {
+    Database database = new Database();
+    if (catName != null) database.setCatalogName(catName);
+    database.setName(dbName);
+    database.setDescription("Notification test database");
+    database.setOwnerName("NotificationOwner");
+    database.setOwnerType(PrincipalType.USER);
+    if (params != null && !params.isEmpty()) {
+      database.setParameters(params);
+    }
+    return database;
   }
 }
