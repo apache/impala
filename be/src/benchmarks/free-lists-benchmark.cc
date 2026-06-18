@@ -324,6 +324,9 @@ static const int FREE_OP = 1;
 // MallocExtension instance, which may not yet be defined due to constructor order
 static SystemAllocator* allocator = nullptr;
 
+/// Tracker for the mmapped memory used to pass in to Allocate()/Free() calls
+AtomicInt64 mmapped_bytes = 0;
+
 // Simulate doing some work with the buffer.
 void DoWork(uint8_t* data, int64_t len) {
   // Touch all the data in the allocation. This is about the minimum amount of
@@ -341,7 +344,7 @@ void DoAlloc(const BenchmarkParams& params, LockedList* free_list,
     got_buffer = free_list->list.PopFreeBuffer(&buffer);
   }
   if (!got_buffer) {
-    Status status = allocator->Allocate(params.allocation_size, &buffer);
+    Status status = allocator->Allocate(params.allocation_size, &buffer, &mmapped_bytes);
     if (!status.ok()) LOG(FATAL) << "Failed alloc " << status.msg().msg();
   }
   // Do some processing to simulate a vaguely realistic work pattern.
@@ -363,10 +366,12 @@ void DoFree(const BenchmarkParams& params, LockedList* free_list,
         // Discard around 1/4 of the buffers to amortise the cost of sorting.
         vector<BufferHandle> buffers =
             list->GetBuffersToFree(list->Size() - MAX_LIST_ENTRIES * 3 / 4);
-        for (BufferHandle& buffer : buffers) allocator->Free(move(buffer));
+        for (BufferHandle& buffer : buffers) {
+          allocator->Free(move(buffer), &mmapped_bytes);
+        }
       }
     } else {
-      allocator->Free(move(buffers->back()));
+      allocator->Free(move(buffers->back()), &mmapped_bytes);
     }
     buffers->pop_back();
   }
@@ -394,7 +399,7 @@ void FreeListBenchmarkThread(int thread_id, int num_operations,
     ops_done += num_ops;
   }
 
-  for (BufferHandle& buffer : buffers) allocator->Free(move(buffer));
+  for (BufferHandle& buffer : buffers) allocator->Free(move(buffer), &mmapped_bytes);
 }
 
 /// Execute the benchmark with the BenchmarkParams passed via 'data'.
@@ -423,7 +428,7 @@ void FreeListBenchmark(int batch_size, void* data) {
   for (LockedList* free_list : free_lists) {
     vector<BufferHandle> buffers =
         free_list->list.GetBuffersToFree(free_list->list.Size());
-    for (BufferHandle& buffer : buffers) allocator->Free(move(buffer));
+    for (BufferHandle& buffer : buffers) allocator->Free(move(buffer), &mmapped_bytes);
   }
 }
 

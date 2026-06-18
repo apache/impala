@@ -18,9 +18,12 @@
 #ifndef IMPALA_RUNTIME_SYSTEM_ALLOCATOR_H
 #define IMPALA_RUNTIME_SYSTEM_ALLOCATOR_H
 
+#include "common/atomic.h"
 #include "common/status.h"
-
 #include "runtime/bufferpool/buffer-pool.h"
+#include "util/malloc-util.h"
+
+#include <gtest/gtest_prod.h> // for FRIEND_TEST
 
 namespace impala {
 
@@ -34,12 +37,22 @@ class SystemAllocator {
 
   /// Allocate memory for a buffer of 'len' bytes. 'len' must be a power-of-two multiple
   /// of the minimum buffer length.
-  Status Allocate(int64_t len, BufferPool::BufferHandle* buffer) WARN_UNUSED_RESULT;
+  Status Allocate(int64_t len, BufferPool::BufferHandle* buffer,
+      AtomicInt64* mmapped_bytes_counter) WARN_UNUSED_RESULT;
 
   /// Free the memory for a previously-allocated buffer.
-  void Free(BufferPool::BufferHandle&& buffer);
+  void Free(BufferPool::BufferHandle&& buffer, AtomicInt64* mmapped_bytes_counter);
 
  private:
+  FRIEND_TEST(SystemAllocatorTest, BasicPowersOfTwo);
+  // When malloc doesn't support huge pages, we fall back to mmap to get huge
+  // pages for eligible allocations. This function returns true when
+  //  The allocation is eligible for huge pages (multiple of huge page size)
+  //  AND madvise_huge_pages=true
+  //  AND the malloc implementation doesn't support huge pages.
+  // Otherwise, it returns false.
+  bool UsesMMapForHugePageAlloc(int64_t size);
+
   /// Allocate 'len' bytes of memory for a buffer via mmap().
   Status AllocateViaMMap(int64_t len, uint8_t** buffer_mem);
 
@@ -48,9 +61,9 @@ class SystemAllocator {
 
   const int64_t min_buffer_len_;
 
-  // If the malloc implementation natively handles huge pages, then we don't
-  // need to use madvise ourselves.
-  bool madvise_unnecessary_ = false;
+  // The behavior of the system allocator depends on the huge page support
+  // for the malloc implementation.
+  MallocUtil::HugePageSupport malloc_huge_page_support_;
 };
 }
 

@@ -803,10 +803,6 @@ def build_impalad_arg_lists(cluster_size, num_coordinators, use_exclusive_coordi
     if IMPALA_MALLOC_IMPL == "gperftools":
       args = ("--tcmalloc_aggressive_memory_decommit={val} {args}") \
               .format(val=options.tcmalloc_aggressive_decommit, args=args)
-      # Currently, madvise_huge_pages is incompatible with turning off aggressive
-      # decommit.
-      if options.tcmalloc_aggressive_decommit == "false":
-        args = "--madvise_huge_pages=false {args}".format(args=args)
 
     # Appended at the end so they can override previous args.
     if i < len(per_impalad_args):

@@ -132,6 +132,11 @@ class BufferPool::BufferAllocator {
     return system_bytes_limit_ - system_bytes_remaining_.Load();
   }
 
+  /// Return the amount of memory allocated via mmap()
+  int64_t GetMMappedBytes() const {
+    return mmapped_bytes_.Load();
+  }
+
   /// Return the total number of free buffers in the allocator.
   int64_t GetNumFreeBuffers() const;
 
@@ -221,6 +226,10 @@ class BufferPool::BufferAllocator {
   /// allocating new buffers. Must be updated atomically before a new buffer is
   /// allocated or after an existing buffer is freed with the system allocator.
   AtomicInt64 system_bytes_remaining_;
+
+  /// The number of bytes allocated via mmap(), bypassing malloc. This is separate
+  /// from memory allocated by malloc and needs to be counted as used.
+  AtomicInt64 mmapped_bytes_ = 0;
 
   /// The maximum bytes of clean pages that can accumulate across all arenas before
   /// they will be evicted.

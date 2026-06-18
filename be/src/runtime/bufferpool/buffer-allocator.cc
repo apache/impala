@@ -259,6 +259,7 @@ BufferPool::BufferAllocator::~BufferAllocator() {
   // Check for accounting leaks.
   DCHECK_EQ(system_bytes_limit_, system_bytes_remaining_.Load());
   DCHECK_EQ(clean_page_bytes_limit_, clean_page_bytes_remaining_.Load());
+  DCHECK_EQ(0, mmapped_bytes_.Load());
 }
 
 Status BufferPool::BufferAllocator::Allocate(
@@ -360,7 +361,7 @@ Status BufferPool::BufferAllocator::AllocateInternal(
   DCHECK_EQ(delta, len);
   MonotonicStopWatch sys_alloc_sw;
   sys_alloc_sw.Start();
-  Status status = system_allocator_->Allocate(len, buffer);
+  Status status = system_allocator_->Allocate(len, buffer, &mmapped_bytes_);
   if (!status.ok()) {
     system_bytes_remaining_.Add(len);
     return status;
@@ -492,7 +493,7 @@ int64_t BufferPool::BufferAllocator::FreeToSystem(vector<BufferHandle>&& buffers
     bytes_freed += buffer.len();
     // Ensure that the memory is unpoisoned when it's next allocated by the system.
     buffer.Unpoison();
-    system_allocator_->Free(move(buffer));
+    system_allocator_->Free(move(buffer), &mmapped_bytes_);
   }
   return bytes_freed;
 }

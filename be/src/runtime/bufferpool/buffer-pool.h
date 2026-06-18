@@ -282,6 +282,7 @@ class BufferPool : public CacheLineAligned {
   int64_t min_buffer_len() const { return min_buffer_len_; }
   int64_t GetSystemBytesLimit() const;
   int64_t GetSystemBytesAllocated() const;
+  int64_t GetMMappedBytes() const;
 
   /// Return the limit on bytes of clean pages in the pool.
   int64_t GetCleanPageBytesLimit() const;

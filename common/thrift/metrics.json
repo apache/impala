@@ -2923,6 +2923,16 @@
     "key": "buffer-pool.clean-page-bytes"
   },
   {
+    "description": "Total bytes of buffer memory allocated via mmap().",
+    "contexts": [
+      "IMPALAD"
+    ],
+    "label": "Buffer Pool MMapped Bytes.",
+    "units": "BYTES",
+    "kind": "GAUGE",
+    "key": "buffer-pool.mmapped-bytes"
+  },
+  {
     "description": "Total time the buffer pool spent in the system allocator for this arena.",
     "contexts": [
       "IMPALAD"

@@ -33,7 +33,8 @@ DEFINE_bool(mmap_buffers, false,
 
 DEFINE_bool(madvise_huge_pages, true,
     "(Advanced) If true, advise operating system to back large memory buffers with huge "
-    "pages");
+    "pages. When using a malloc that is not compatible with huge pages, this will use "
+    "mmap to get memory eligible for huge pages.");
 
 namespace impala {
 
@@ -43,27 +44,32 @@ static int64_t SMALL_PAGE_SIZE = 4LL * 1024;
 static int64_t HUGE_PAGE_SIZE = 2LL * 1024 * 1024;
 
 SystemAllocator::SystemAllocator(int64_t min_buffer_len)
-  : min_buffer_len_(min_buffer_len) {
+  : min_buffer_len_(min_buffer_len),
+    malloc_huge_page_support_(MallocUtil::GetInstance()->GetHugePageSupport()){
   DCHECK(BitUtil::IsPowerOf2(min_buffer_len));
-  if (FLAGS_madvise_huge_pages) {
-    MallocUtil::HugePageSupport support =
-        MallocUtil::GetInstance()->GetHugePageSupport();
-    if (support == MallocUtil::HugePageSupport::MADVISE_UNNECESSARY) {
-      madvise_unnecessary_ = true;
-    } else {
-      CHECK_EQ(support, MallocUtil::HugePageSupport::MADVISE_COMPATIBLE);
-    }
-  }
 }
 
-Status SystemAllocator::Allocate(int64_t len, BufferPool::BufferHandle* buffer) {
+bool SystemAllocator::UsesMMapForHugePageAlloc(int64_t size) {
+  //  The allocation is eligible for huge pages (multiple of huge page size)
+  //  AND madvise_huge_pages=true
+  //  AND the malloc implementation doesn't support huge pages.
+  bool huge_page_sized = size % HUGE_PAGE_SIZE == 0;
+  return huge_page_sized && FLAGS_madvise_huge_pages &&
+    malloc_huge_page_support_ == MallocUtil::HugePageSupport::MADVISE_INCOMPATIBLE;
+}
+
+Status SystemAllocator::Allocate(int64_t len, BufferPool::BufferHandle* buffer,
+    AtomicInt64* mmapped_bytes_counter) {
   DCHECK_GE(len, min_buffer_len_);
   DCHECK_LE(len, BufferPool::MAX_BUFFER_BYTES);
   DCHECK(BitUtil::IsPowerOf2(len)) << len;
 
   uint8_t* buffer_mem;
-  if (FLAGS_mmap_buffers) {
+  // When malloc doesn't support huge pages, we fall back to mmap to get huge pages
+  // for eligible allocations.
+  if (FLAGS_mmap_buffers || UsesMMapForHugePageAlloc(len)) {
     RETURN_IF_ERROR(AllocateViaMMap(len, &buffer_mem));
+    mmapped_bytes_counter->Add(len);
   } else {
     RETURN_IF_ERROR(AllocateViaMalloc(len, &buffer_mem));
   }
@@ -117,6 +123,7 @@ Status SystemAllocator::AllocateViaMMap(int64_t len, uint8_t** buffer_mem) {
 }
 
 Status SystemAllocator::AllocateViaMalloc(int64_t len, uint8_t** buffer_mem) {
+  DCHECK(!UsesMMapForHugePageAlloc(len));
   bool use_huge_pages = len % HUGE_PAGE_SIZE == 0 && FLAGS_madvise_huge_pages;
   // Allocate, aligned to the page size that we expect to back the memory range.
   // This ensures that it can be backed by a whole pages, rather than parts of pages.
@@ -131,7 +138,8 @@ Status SystemAllocator::AllocateViaMalloc(int64_t len, uint8_t** buffer_mem) {
     return Status(TErrorCode::BUFFER_ALLOCATION_FAILED, len,
         Substitute("posix_memalign() failed to allocate buffer: $0", GetStrErrMsg()));
   }
-  if (use_huge_pages && !madvise_unnecessary_) {
+  if (use_huge_pages &&
+      malloc_huge_page_support_ == MallocUtil::HugePageSupport::MADVISE_COMPATIBLE) {
 #ifdef MADV_HUGEPAGE
     // According to madvise() docs it may return EAGAIN to signal that we should retry.
     do {
@@ -143,13 +151,21 @@ Status SystemAllocator::AllocateViaMalloc(int64_t len, uint8_t** buffer_mem) {
   return Status::OK();
 }
 
-void SystemAllocator::Free(BufferPool::BufferHandle&& buffer) {
-  if (FLAGS_mmap_buffers) {
+void SystemAllocator::Free(BufferPool::BufferHandle&& buffer,
+    AtomicInt64* mmapped_bytes_counter) {
+  // When malloc doesn't support huge pages, Allocate() uses mmap to get huge pages.
+  // Detect whether we need to use munmap to free this buffer.
+  bool mmapped_huge_page = UsesMMapForHugePageAlloc(buffer.len());
+  if (FLAGS_mmap_buffers || mmapped_huge_page) {
     int rc = munmap(buffer.data(), buffer.len());
     DCHECK_EQ(rc, 0) << "Unexpected munmap() error: " << errno;
+    mmapped_bytes_counter->Add(-buffer.len());
   } else {
     bool use_huge_pages = buffer.len() % HUGE_PAGE_SIZE == 0 && FLAGS_madvise_huge_pages;
-    if (use_huge_pages && !madvise_unnecessary_) {
+    if (use_huge_pages &&
+        malloc_huge_page_support_ != MallocUtil::HugePageSupport::MADVISE_UNNECESSARY) {
+      DCHECK_NE(malloc_huge_page_support_,
+          MallocUtil::HugePageSupport::MADVISE_INCOMPATIBLE);
       // Undo the madvise so that is isn't a candidate to be newly backed by huge pages.
       // We depend on TCMalloc's "aggressive decommit" mode decommitting the physical
       // huge pages with madvise(DONTNEED) when we call free(). Otherwise, this huge

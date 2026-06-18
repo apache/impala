@@ -73,6 +73,7 @@ BufferPoolMetric* BufferPoolMetric::FREE_BUFFER_BYTES = nullptr;
 BufferPoolMetric* BufferPoolMetric::CLEAN_PAGES_LIMIT = nullptr;
 BufferPoolMetric* BufferPoolMetric::NUM_CLEAN_PAGES = nullptr;
 BufferPoolMetric* BufferPoolMetric::CLEAN_PAGE_BYTES = nullptr;
+BufferPoolMetric* BufferPoolMetric::MMAPPED_BYTES = nullptr;
 
 Status impala::RegisterMemoryMetrics(MetricGroup* metrics, bool register_jvm_metrics,
     ReservationTracker* global_reservations, BufferPool* buffer_pool) {
@@ -85,10 +86,10 @@ Status impala::RegisterMemoryMetrics(MetricGroup* metrics, bool register_jvm_met
   // Add compound metrics that track totals across malloc and the buffer pool.
   // total-used should track the total physical memory in use.
   vector<ReadOnlyIntGauge*> used_metrics;
-  if (FLAGS_mmap_buffers && global_reservations != nullptr) {
+  if (global_reservations != nullptr) {
     // If we mmap() buffers, the buffers are not allocated via malloc. Ensure they are
     // properly tracked.
-    used_metrics.push_back(BufferPoolMetric::SYSTEM_ALLOCATED);
+    used_metrics.push_back(BufferPoolMetric::MMAPPED_BYTES);
   }
   if (register_jvm_metrics) {
     JvmMemoryMetric::InitMetrics(metrics);
@@ -344,6 +345,9 @@ Status BufferPoolMetric::InitMetrics(MetricGroup* metrics,
   CLEAN_PAGE_BYTES = metrics->RegisterMetric(
       new BufferPoolMetric(MetricDefs::Get("buffer-pool.clean-page-bytes"),
           BufferPoolMetricType::CLEAN_PAGE_BYTES, global_reservations, buffer_pool));
+  MMAPPED_BYTES = metrics->RegisterMetric(
+      new BufferPoolMetric(MetricDefs::Get("buffer-pool.mmapped-bytes"),
+          BufferPoolMetricType::MMAPPED_BYTES, global_reservations, buffer_pool));
   return Status::OK();
 }
 
@@ -385,6 +389,8 @@ int64_t BufferPoolMetric::GetValue() {
       return buffer_pool_->GetNumCleanPages();
     case BufferPoolMetricType::CLEAN_PAGE_BYTES:
       return buffer_pool_->GetCleanPageBytes();
+    case BufferPoolMetricType::MMAPPED_BYTES:
+      return buffer_pool_->GetMMappedBytes();
     default:
       DCHECK(false) << "Unknown BufferPoolMetricType: " << static_cast<int>(type_);
   }

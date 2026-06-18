@@ -208,6 +208,7 @@ class BufferPoolMetric : public IntGauge {
   static BufferPoolMetric* CLEAN_PAGES_LIMIT;
   static BufferPoolMetric* NUM_CLEAN_PAGES;
   static BufferPoolMetric* CLEAN_PAGE_BYTES;
+  static BufferPoolMetric* MMAPPED_BYTES;
 
   int64_t GetValue() override;
 
@@ -230,6 +231,7 @@ class BufferPoolMetric : public IntGauge {
     CLEAN_PAGES_LIMIT, // Limit on number of clean pages in BufferPool.
     NUM_CLEAN_PAGES, // Total number of clean pages in BufferPool.
     CLEAN_PAGE_BYTES, // Total bytes of clean pages in BufferPool.
+    MMAPPED_BYTES, // Total bytes allocated via mmap
   };
 
   BufferPoolMetric(const TMetricDef& def, BufferPoolMetricType type,

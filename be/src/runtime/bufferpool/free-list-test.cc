@@ -48,7 +48,7 @@ class FreeListTest : public ::testing::Test {
       int num_buffers, int64_t buffer_len, vector<BufferHandle>* buffers) {
     for (int i = 0; i < num_buffers; ++i) {
       BufferHandle buffer;
-      ASSERT_OK(allocator_->Allocate(buffer_len, &buffer));
+      ASSERT_OK(allocator_->Allocate(buffer_len, &buffer, &mmapped_bytes_));
       buffers->push_back(move(buffer));
     }
   }
@@ -70,7 +70,7 @@ class FreeListTest : public ::testing::Test {
 
   void FreeBuffers(vector<BufferHandle>&& buffers) {
     for (BufferHandle& buffer : buffers) {
-      allocator_->Free(move(buffer));
+      allocator_->Free(move(buffer), &mmapped_bytes_);
     }
   }
 
@@ -86,6 +86,9 @@ class FreeListTest : public ::testing::Test {
 
   /// The buffer allocator, owned by 'obj_pool_'.
   SystemAllocator* allocator_;
+
+  /// Tracker for the mmapped memory used to pass in to Allocate()/Free() calls
+  AtomicInt64 mmapped_bytes_ = 0;
 };
 
 const int FreeListTest::MIN_BUFFER_LEN;
@@ -156,7 +159,7 @@ TEST_F(FreeListTest, ReturnOrder) {
       for (int i = 0; i < min(LIST_SIZE, num_buffers); ++i) {
         ASSERT_TRUE(list.PopFreeBuffer(&buffer));
         ASSERT_EQ(addrs[i], buffer.data()) << i;
-        allocator_->Free(move(buffer));
+        allocator_->Free(move(buffer), &mmapped_bytes_);
       }
       ASSERT_FALSE(list.PopFreeBuffer(&buffer));
     }

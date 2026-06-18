@@ -295,6 +295,10 @@ int64_t BufferPool::GetSystemBytesAllocated() const {
   return allocator_->GetSystemBytesAllocated();
 }
 
+int64_t BufferPool::GetMMappedBytes() const {
+  return allocator_->GetMMappedBytes();
+}
+
 int64_t BufferPool::GetCleanPageBytesLimit() const {
   return allocator_->GetCleanPageBytesLimit();
 }

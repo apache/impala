@@ -168,6 +168,9 @@ class SystemAllocatorTest : public ::testing::Test {
 
   static const int64_t MIN_BUFFER_LEN = 4 * 1024;
   static const int64_t MAX_BUFFER_LEN = 1024 * 1024 * 1024;
+
+  /// Tracker for the mmapped memory used to pass in to Allocate()/Free() calls
+  AtomicInt64 mmapped_bytes_ = 0;
 };
 
 /// Basic test that checks that we can allocate buffers of the expected power-of-two
@@ -179,10 +182,15 @@ TEST_F(SystemAllocatorTest, BasicPowersOfTwo) {
   for (int iter = 0; iter < 5; ++iter) {
     // Allocate buffers of a mix of sizes.
     vector<BufferHandle> buffers;
+    int64_t expected_mmapped_bytes = 0;
     for (int alloc_iter = 0; alloc_iter < 2; ++alloc_iter) {
       for (int64_t len = MIN_BUFFER_LEN; len <= MAX_BUFFER_LEN; len *= 2) {
         BufferHandle buffer;
-        ASSERT_OK(allocator.Allocate(len, &buffer));
+        ASSERT_OK(allocator.Allocate(len, &buffer, &mmapped_bytes_));
+        if (FLAGS_mmap_buffers || allocator.UsesMMapForHugePageAlloc(len)) {
+          expected_mmapped_bytes += len;
+        }
+        EXPECT_EQ(mmapped_bytes_.Load(), expected_mmapped_bytes);
         ASSERT_TRUE(buffer.is_open());
         // Write a few bytes to the buffer to check it's valid memory.
         buffer.data()[0] = 0;
@@ -193,7 +201,14 @@ TEST_F(SystemAllocatorTest, BasicPowersOfTwo) {
     }
 
     // Free all the buffers.
-    for (BufferHandle& buffer : buffers) allocator.Free(move(buffer));
+    for (BufferHandle& buffer : buffers) {
+      if (FLAGS_mmap_buffers || allocator.UsesMMapForHugePageAlloc(buffer.len())) {
+        expected_mmapped_bytes -= buffer.len();
+      }
+      allocator.Free(move(buffer), &mmapped_bytes_);
+      EXPECT_EQ(mmapped_bytes_.Load(), expected_mmapped_bytes);
+    }
+    EXPECT_EQ(mmapped_bytes_.Load(), 0);
   }
 }
 
@@ -201,7 +216,7 @@ TEST_F(SystemAllocatorTest, BasicPowersOfTwo) {
 TEST_F(SystemAllocatorTest, LargeAllocFailure) {
   SystemAllocator allocator(MIN_BUFFER_LEN);
   BufferHandle buffer;
-  Status status = allocator.Allocate(1LL << 48, &buffer);
+  Status status = allocator.Allocate(1LL << 48, &buffer, &mmapped_bytes_);
   EXPECT_FALSE(status.ok());
   EXPECT_EQ(status.msg().error(), TErrorCode::BUFFER_ALLOCATION_FAILED);
 }
