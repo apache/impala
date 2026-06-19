@@ -457,8 +457,30 @@ bootstrap_dependencies() {
   fi
   # Use prebuilt Hadoop native binaries for aarch64
   if [[ "$(uname -m)" = "aarch64" ]]; then
-    cp $IMPALA_TOOLCHAIN_PACKAGES_HOME/hadoop-client-$IMPALA_HADOOP_CLIENT_VERSION/lib/* \
-        $HADOOP_HOME/lib/native/
+    # It turns out to be tedious to get the minicluster to respect native
+    # libraries outside the HADOOP_HOME's normal location. So, this manipulates
+    # HADOOP_HOME so that its lib directory points to the hadoop-client ARM64
+    # lib directory.
+    ARM_HADOOP_LIB_DIR="${IMPALA_TOOLCHAIN_PACKAGES_HOME}/hadoop-client-${IMPALA_HADOOP_CLIENT_VERSION}/lib"
+    # If ${HADOOP_HOME}/lib is already a symlink pointed at the right place, then
+    # don't do anything. Both locations can contain symlinks (e.g. IMPALA_HOME itself
+    # can contain a symlink), so we need to apply realpath to both locations.
+    if [[ "$(realpath ${HADOOP_HOME}/lib)" != "$(realpath ${ARM_HADOOP_LIB_DIR})" ]]; then
+      echo "Fixing ${HADOOP_HOME}/lib to point to the ARM Hadoop Client binaries"
+      # ${HADOOP_HOME}/lib is not pointed to the right place.
+      # If it is not a symlink, then we need to remove it. Fortunately, this can't
+      # really disrupt anything, because these are x86_64 binaries on an ARM system.
+      if [[ ! -L ${HADOOP_HOME}/lib ]]; then
+        echo "Removing x86_64 Hadoop lib directory"
+        rm -rf ${HADOOP_HOME}/lib
+      fi
+      # If ${HADOOP_HOME}/lib is a symlink (but pointed the wrong place), we can just
+      # update it.
+      echo "Linking ${HADOOP_HOME}/lib to point to ${ARM_HADOOP_LIB_DIR}"
+      ln -sf ${ARM_HADOOP_LIB_DIR} ${HADOOP_HOME}/lib
+      # Confirm that the symlink points where we expect
+      [[ "$(realpath ${HADOOP_HOME}/lib)" == "$(realpath ${ARM_HADOOP_LIB_DIR})" ]]
+    fi
   fi
   if [[ "${USE_APACHE_HIVE_3}" = true ]]; then
     "$IMPALA_HOME/testdata/bin/patch_hive.sh"
