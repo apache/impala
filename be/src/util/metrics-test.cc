@@ -140,24 +140,37 @@ TEST_F(MetricsTest, AtomicHighWaterMarkGauge) {
 }
 
 TEST_F(MetricsTest, SumGauge) {
+  int64_t function_value = 10;
   MetricGroup metrics("SumGauge");
   AddMetricDef("gauge1", TMetricKind::GAUGE, TUnit::NONE);
   AddMetricDef("gauge2", TMetricKind::GAUGE, TUnit::NONE);
+  AddMetricDef("function_gauge", TMetricKind::GAUGE, TUnit::NONE);
   AddMetricDef("sum", TMetricKind::GAUGE, TUnit::NONE);
+  AddMetricDef("negated", TMetricKind::GAUGE, TUnit::NONE);
   IntGauge* gauge1 = metrics.AddGauge("gauge1", 0);
   IntGauge* gauge2 = metrics.AddGauge("gauge2", 0);
+  FunctionGauge* function_gauge =
+      metrics.AddFunctionGauge("function_gauge", [&function_value]() {
+        return function_value;
+      });
 
-  vector<IntGauge*> gauges({gauge1, gauge2});
-  IntGauge* sum_gauge =
+  vector<ReadOnlyIntGauge*> gauges({gauge1, gauge2, function_gauge});
+  SumGauge* sum_gauge =
       metrics.RegisterMetric(new SumGauge(MetricDefs::Get("sum"), gauges));
+  NegatedGauge* negated_gauge = metrics.RegisterMetric(
+      new NegatedGauge(MetricDefs::Get("negated"), function_gauge));
 
-  AssertValue(sum_gauge, 0, "0");
+  AssertValue(sum_gauge, 10, "10");
+  AssertValue(negated_gauge, -10, "-10");
   gauge1->Increment(1);
-  AssertValue(sum_gauge, 1, "1");
+  AssertValue(sum_gauge, 11, "11");
   gauge2->Increment(-1);
-  AssertValue(sum_gauge, 0, "0");
+  AssertValue(sum_gauge, 10, "10");
   gauge2->Increment(100);
-  AssertValue(sum_gauge, 100, "100");
+  AssertValue(sum_gauge, 110, "110");
+  function_value = -5;
+  AssertValue(sum_gauge, 95, "95");
+  AssertValue(negated_gauge, 5, "5");
 }
 
 TEST_F(MetricsTest, PropertyMetrics) {
@@ -268,10 +281,15 @@ TEST_F(MetricsTest, MemMetric) {
   scoped_ptr<vector<uint64_t>> chunk(new vector<uint64_t>(100 * 1024 * 1024));
   EXPECT_GT(bytes_in_use->GetValue(), cur_in_use);
 
-  IntGauge* total_bytes_reserved =
-      metrics.FindMetricForTesting<IntGauge>("tcmalloc.total-bytes-reserved");
+  ReadOnlyIntGauge* total_bytes_reserved =
+      metrics.FindMetricForTesting<ReadOnlyIntGauge>("tcmalloc.total-bytes-reserved");
   ASSERT_TRUE(total_bytes_reserved != NULL);
   ASSERT_GT(total_bytes_reserved->GetValue(), 0);
+
+  ReadOnlyIntGauge* overhead_bytes =
+      metrics.FindMetricForTesting<ReadOnlyIntGauge>("tcmalloc.overhead-bytes");
+  ASSERT_TRUE(overhead_bytes != NULL);
+  ASSERT_GE(overhead_bytes->GetValue(), 0);
 
   IntGauge* pageheap_free_bytes =
       metrics.FindMetricForTesting<IntGauge>("tcmalloc.pageheap-free-bytes");
@@ -937,4 +955,3 @@ TEST_F(MetricsTest, StatsMetricsNullPrometheus) {
   EXPECT_EQ("", stats_val.str());
 }
 }
-

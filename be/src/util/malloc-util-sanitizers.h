@@ -30,9 +30,9 @@
 namespace impala {
 
 /// The sanitizers replace malloc() and track memory usage themselves.
-class SanitizerMallocMetric : public IntGauge {
+class SanitizerMallocMetric : public ReadOnlyIntGauge {
  public:
-  SanitizerMallocMetric(const TMetricDef& def) : IntGauge(def, 0) {}
+  SanitizerMallocMetric(const TMetricDef& def) : ReadOnlyIntGauge(def) {}
 
   static SanitizerMallocMetric* BYTES_ALLOCATED;
 
@@ -69,12 +69,12 @@ class SanitizerMallocUtil : public MallocUtil {
     return Status::OK();
   }
 
-  IntGauge* GetUsedBytesMetric(bool include_overhead) const override {
+  ReadOnlyIntGauge* GetUsedBytesMetric(bool include_overhead) const override {
     DCHECK(SanitizerMallocMetric::BYTES_ALLOCATED != nullptr);
     return SanitizerMallocMetric::BYTES_ALLOCATED;
   }
 
-  IntGauge* GetOverheadBytesMetric() const override {
+  ReadOnlyIntGauge* GetOverheadBytesMetric() const override {
     return nullptr;
   }
 

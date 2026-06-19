@@ -84,7 +84,7 @@ Status impala::RegisterMemoryMetrics(MetricGroup* metrics, bool register_jvm_met
 
   // Add compound metrics that track totals across malloc and the buffer pool.
   // total-used should track the total physical memory in use.
-  vector<IntGauge*> used_metrics;
+  vector<ReadOnlyIntGauge*> used_metrics;
   if (FLAGS_mmap_buffers && global_reservations != nullptr) {
     // If we mmap() buffers, the buffers are not allocated via malloc. Ensure they are
     // properly tracked.

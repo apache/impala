@@ -366,7 +366,7 @@ static bool RejectForAdmissionServiceMemory(
   int64_t mem_limit = AdmissiondEnv::GetInstance()->admission_service_mem_limit();
   if (mem_limit <= 0) return false;
 
-  IntGauge* used_bytes_gauge = MallocUtil::GetInstance()->GetUsedBytesMetric(
+  ReadOnlyIntGauge* used_bytes_gauge = MallocUtil::GetInstance()->GetUsedBytesMetric(
       /*include_overhead*/ false);
   DCHECK(used_bytes_gauge != nullptr);
   int64_t bytes_inuse = used_bytes_gauge->GetValue();

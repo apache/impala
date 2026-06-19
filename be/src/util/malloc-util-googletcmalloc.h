@@ -34,7 +34,7 @@ DECLARE_uint64(googletcmalloc_memory_release_rate_bytes_per_sec);
 namespace impala {
 
 /// Specialised metric which exposes numeric properties from tcmalloc.
-class GoogleTcmallocMetric : public IntGauge {
+class GoogleTcmallocMetric : public ReadOnlyIntGauge {
  public:
   // To help explain the stats, here is some descriptive text output from
   // tcmalloc:
@@ -93,16 +93,7 @@ class GoogleTcmallocMetric : public IntGauge {
 
   /// Derived metric computing the amount of memory (in bytes) used by tcmalloc for
   /// overhead (thread caches, unused memory in page heap, malloc metadata, etc).
-  class OverheadBytesMetric : public IntGauge {
-  public:
-    OverheadBytesMetric(const TMetricDef& def) : IntGauge(def, 0) { }
-
-    int64_t GetValue() override {
-      return PHYSICAL_BYTES_RESERVED->GetValue() - BYTES_IN_USE->GetValue();
-    }
-  };
-
-  static OverheadBytesMetric* OVERHEAD_BYTES;
+  static FunctionGauge* OVERHEAD_BYTES;
 
   static GoogleTcmallocMetric* CreateAndRegister(MetricGroup* metrics,
       const std::string& key, const std::string& tcmalloc_var) {
@@ -124,7 +115,7 @@ class GoogleTcmallocMetric : public IntGauge {
   const std::string tcmalloc_var_;
 
   GoogleTcmallocMetric(const TMetricDef& def, const std::string& tcmalloc_var)
-    : IntGauge(def, 0), tcmalloc_var_(tcmalloc_var) { }
+    : ReadOnlyIntGauge(def), tcmalloc_var_(tcmalloc_var) { }
 };
 
 GoogleTcmallocMetric* GoogleTcmallocMetric::BYTES_IN_USE = nullptr;
@@ -136,7 +127,7 @@ GoogleTcmallocMetric* GoogleTcmallocMetric::CURRENT_TOTAL_THREAD_CACHE_BYTES = n
 GoogleTcmallocMetric* GoogleTcmallocMetric::PHYSICAL_BYTES_RESERVED = nullptr;
 GoogleTcmallocMetric* GoogleTcmallocMetric::PAGEHEAP_UNMAPPED_BYTES = nullptr;
 GoogleTcmallocMetric* GoogleTcmallocMetric::TOTAL_BYTES_RESERVED = nullptr;
-GoogleTcmallocMetric::OverheadBytesMetric* GoogleTcmallocMetric::OVERHEAD_BYTES = nullptr;
+FunctionGauge* GoogleTcmallocMetric::OVERHEAD_BYTES = nullptr;
 
 class GoogleTcmallocMallocUtil : public MallocUtil {
  public:
@@ -275,13 +266,15 @@ class GoogleTcmallocMallocUtil : public MallocUtil {
     // Additional overhead metric (#7 - #1). This is higher than what the /memz output
     // would show, because #7 is calculated differently through the
     // MallocExtension::GetNumericProperty() API.
-    GoogleTcmallocMetric::OVERHEAD_BYTES =
-        tcmalloc_metrics->RegisterMetric(new GoogleTcmallocMetric::OverheadBytesMetric(
-            MetricDefs::Get("tcmalloc.overhead-bytes")));
+    GoogleTcmallocMetric::OVERHEAD_BYTES = tcmalloc_metrics->AddFunctionGauge(
+        "tcmalloc.overhead-bytes", []() {
+          return GoogleTcmallocMetric::PHYSICAL_BYTES_RESERVED->GetValue()
+              - GoogleTcmallocMetric::BYTES_IN_USE->GetValue();
+        });
     return Status::OK();
   }
 
-  IntGauge* GetUsedBytesMetric(bool include_overhead) const override {
+  ReadOnlyIntGauge* GetUsedBytesMetric(bool include_overhead) const override {
     DCHECK(initialized_);
     if (include_overhead) {
       DCHECK(GoogleTcmallocMetric::PHYSICAL_BYTES_RESERVED != nullptr);
@@ -292,7 +285,7 @@ class GoogleTcmallocMallocUtil : public MallocUtil {
     }
   }
 
-  IntGauge* GetOverheadBytesMetric() const override {
+  ReadOnlyIntGauge* GetOverheadBytesMetric() const override {
     DCHECK(initialized_);
     DCHECK(GoogleTcmallocMetric::OVERHEAD_BYTES != nullptr);
     return GoogleTcmallocMetric::OVERHEAD_BYTES;

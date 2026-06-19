@@ -495,7 +495,7 @@ Status ExecEnv::Init() {
   RETURN_IF_ERROR(stream_mgr_->Init(data_svc_->mem_tracker()));
 
   // A MemTracker for malloc overhead
-  IntGauge* overhead_gauge = MallocUtil::GetInstance()->GetOverheadBytesMetric();
+  ReadOnlyIntGauge* overhead_gauge = MallocUtil::GetInstance()->GetOverheadBytesMetric();
   if (overhead_gauge != nullptr) {
     obj_pool_->Add(
         new MemTracker(overhead_gauge, -1, Substitute("$0 Overhead",
@@ -653,7 +653,7 @@ void ExecEnv::InitMemTracker(int64_t bytes_limit) {
       // Also need a MemTracker for unused reservations as a negative value. Unused
       // reservations are counted against queries but not against the process memory
       // consumption. This accounts for that difference.
-      IntGauge* negated_unused_reservation = obj_pool_->Add(new NegatedGauge(
+      NegatedGauge* negated_unused_reservation = obj_pool_->Add(new NegatedGauge(
           MakeTMetricDef("negated_unused_reservation", TMetricKind::GAUGE, TUnit::BYTES),
           BufferPoolMetric::UNUSED_RESERVATION_BYTES));
       obj_pool_->Add(new MemTracker(negated_unused_reservation, -1,

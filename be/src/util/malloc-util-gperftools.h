@@ -56,7 +56,7 @@ namespace impala {
 /// MALLOC: +    149757952 (  142.8 MiB) Bytes released to OS (aka unmapped) (#7)
 /// MALLOC:   ------------
 /// MALLOC: =   3833552896 ( 3656.0 MiB) Virtual address space used (#8)
-class TcmallocMetric : public IntGauge {
+class TcmallocMetric : public ReadOnlyIntGauge {
  public:
   /// #1: Number of bytes allocated by tcmalloc, currently used by the application.
   static TcmallocMetric* BYTES_IN_USE;
@@ -86,28 +86,11 @@ class TcmallocMetric : public IntGauge {
   /// #8: Derived metric computing the amount of virtual memory (in bytes) used by the
   /// process, including all different types of tcmalloc memory including unmapped
   /// virtual memory.
-  class TotalBytesReservedMetric : public IntGauge {
-  public:
-    TotalBytesReservedMetric(const TMetricDef& def) : IntGauge(def, 0) { }
-
-    virtual int64_t GetValue() override {
-      return PHYSICAL_BYTES_RESERVED->GetValue() + PAGEHEAP_UNMAPPED_BYTES->GetValue();
-    }
-  };
-  static TotalBytesReservedMetric* TOTAL_BYTES_RESERVED;
+  static FunctionGauge* TOTAL_BYTES_RESERVED;
 
   /// Derived metric computing the amount of memory (in bytes) used by tcmalloc for
   /// overhead (thread caches, unused memory in page heap, etc).
-  class OverheadBytesMetric : public IntGauge {
-  public:
-    OverheadBytesMetric(const TMetricDef& def) : IntGauge(def, 0) { }
-
-    int64_t GetValue() override {
-      return PHYSICAL_BYTES_RESERVED->GetValue() - BYTES_IN_USE->GetValue();
-    }
-  };
-
-  static OverheadBytesMetric* OVERHEAD_BYTES;
+  static FunctionGauge* OVERHEAD_BYTES;
 
   static TcmallocMetric* CreateAndRegister(MetricGroup* metrics, const std::string& key,
       const std::string& tcmalloc_var) {
@@ -127,7 +110,7 @@ class TcmallocMetric : public IntGauge {
   const std::string tcmalloc_var_;
 
   TcmallocMetric(const TMetricDef& def, const std::string& tcmalloc_var)
-    : IntGauge(def, 0), tcmalloc_var_(tcmalloc_var) { }
+    : ReadOnlyIntGauge(def), tcmalloc_var_(tcmalloc_var) { }
 };
 
 TcmallocMetric* TcmallocMetric::BYTES_IN_USE = nullptr;
@@ -137,8 +120,8 @@ TcmallocMetric* TcmallocMetric::TRANSFER_CACHE_FREE_BYTES = nullptr;
 TcmallocMetric* TcmallocMetric::CURRENT_TOTAL_THREAD_CACHE_BYTES = nullptr;
 TcmallocMetric* TcmallocMetric::PHYSICAL_BYTES_RESERVED = nullptr;
 TcmallocMetric* TcmallocMetric::PAGEHEAP_UNMAPPED_BYTES = nullptr;
-TcmallocMetric::TotalBytesReservedMetric* TcmallocMetric::TOTAL_BYTES_RESERVED = nullptr;
-TcmallocMetric::OverheadBytesMetric* TcmallocMetric::OVERHEAD_BYTES = nullptr;
+FunctionGauge* TcmallocMetric::TOTAL_BYTES_RESERVED = nullptr;
+FunctionGauge* TcmallocMetric::OVERHEAD_BYTES = nullptr;
 
 class GperftoolsMallocUtil : public MallocUtil {
  public:
@@ -283,19 +266,23 @@ class GperftoolsMallocUtil : public MallocUtil {
             "tcmalloc.pageheap-unmapped-bytes", "tcmalloc.pageheap_unmapped_bytes");
 
     /// #8
-    TcmallocMetric::TOTAL_BYTES_RESERVED =
-        tcmalloc_metrics->RegisterMetric(new TcmallocMetric::TotalBytesReservedMetric(
-            MetricDefs::Get("tcmalloc.total-bytes-reserved")));
+    TcmallocMetric::TOTAL_BYTES_RESERVED = tcmalloc_metrics->AddFunctionGauge(
+        "tcmalloc.total-bytes-reserved", []() {
+          return TcmallocMetric::PHYSICAL_BYTES_RESERVED->GetValue()
+              + TcmallocMetric::PAGEHEAP_UNMAPPED_BYTES->GetValue();
+        });
 
     /// Additional overhead metric (#6 - #1)
-    TcmallocMetric::OVERHEAD_BYTES =
-        tcmalloc_metrics->RegisterMetric(new TcmallocMetric::OverheadBytesMetric(
-            MetricDefs::Get("tcmalloc.overhead-bytes")));
+    TcmallocMetric::OVERHEAD_BYTES = tcmalloc_metrics->AddFunctionGauge(
+        "tcmalloc.overhead-bytes", []() {
+          return TcmallocMetric::PHYSICAL_BYTES_RESERVED->GetValue()
+              - TcmallocMetric::BYTES_IN_USE->GetValue();
+        });
 
     return Status::OK();
   }
 
-  IntGauge* GetUsedBytesMetric(bool include_overhead) const override {
+  ReadOnlyIntGauge* GetUsedBytesMetric(bool include_overhead) const override {
     DCHECK(initialized_);
     if (include_overhead) {
       DCHECK(TcmallocMetric::PHYSICAL_BYTES_RESERVED != nullptr);
@@ -306,7 +293,7 @@ class GperftoolsMallocUtil : public MallocUtil {
     }
   }
 
-  IntGauge* GetOverheadBytesMetric() const override {
+  ReadOnlyIntGauge* GetOverheadBytesMetric() const override {
     DCHECK(initialized_);
     DCHECK(TcmallocMetric::OVERHEAD_BYTES != nullptr);
     return TcmallocMetric::OVERHEAD_BYTES;

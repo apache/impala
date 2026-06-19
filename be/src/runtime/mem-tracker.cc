@@ -95,7 +95,7 @@ MemTracker::MemTracker(RuntimeProfile* profile, int64_t byte_limit,
   Init();
 }
 
-MemTracker::MemTracker(IntGauge* consumption_metric, int64_t byte_limit,
+MemTracker::MemTracker(ReadOnlyIntGauge* consumption_metric, int64_t byte_limit,
     const string& label, MemTracker* parent, int64_t extra_bytes_to_gc)
   : limit_(byte_limit),
     soft_limit_(CalcSoftLimit(byte_limit)),

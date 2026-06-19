@@ -51,12 +51,12 @@ namespace impala {
 
     // Get the metric for used memory. This can only be called after initialization.
     // This must be non-null for all malloc implementations.
-    virtual IntGauge* GetUsedBytesMetric(bool include_overhead) const = 0;
+    virtual ReadOnlyIntGauge* GetUsedBytesMetric(bool include_overhead) const = 0;
 
     // Get the metric for the malloc implementation's overhead. This can only be
     // called after initialization. This will return null if the malloc
     // implementation does not have an overhead metric.
-    virtual IntGauge* GetOverheadBytesMetric() const = 0;
+    virtual ReadOnlyIntGauge* GetOverheadBytesMetric() const = 0;
 
     // Get information about the malloc implementation's support for huge pages.
     // MADVISE_COMPATIBLE - It is permissible to use madvise() with MADV_HUGEPAGE

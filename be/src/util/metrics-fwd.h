@@ -23,6 +23,8 @@
 
 #pragma once
 
+#include <cstdint>
+
 #include "gen-cpp/MetricDefs_types.h"
 #include "gen-cpp/MetricDefs_constants.h"
 
@@ -65,6 +67,9 @@ typedef class LockedMetric<std::string,TMetricKind::PROPERTY> StringProperty;
 typedef class LockedMetric<double, TMetricKind::GAUGE> DoubleGauge;
 
 /// We write 'Int' as a placeholder for all integer types.
+/// ReadOnlyIntGauge exposes the common GetValue() interface for computed and mutable
+/// integer gauges without exposing mutation APIs such as SetValue() or Increment().
+typedef class ScalarMetric<int64_t, TMetricKind::GAUGE> ReadOnlyIntGauge;
 typedef class AtomicMetric<TMetricKind::GAUGE> IntGauge;
 typedef class AtomicMetric<TMetricKind::COUNTER> IntCounter;
 

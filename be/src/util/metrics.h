@@ -317,10 +317,10 @@ class AtomicHighWaterMarkGauge : public ScalarMetric<int64_t, TMetricKind::GAUGE
 };
 
 /// Gauge metric that computes the sum of several gauges.
-class SumGauge : public IntGauge {
+class SumGauge : public ReadOnlyIntGauge {
  public:
-  SumGauge(const TMetricDef& metric_def, const std::vector<IntGauge*>& gauges)
-    : IntGauge(metric_def, 0), gauges_(gauges) {}
+  SumGauge(const TMetricDef& metric_def, const std::vector<ReadOnlyIntGauge*>& gauges)
+    : ReadOnlyIntGauge(metric_def), gauges_(gauges) {}
 
   virtual ~SumGauge() {}
 
@@ -334,14 +334,14 @@ class SumGauge : public IntGauge {
 
  private:
   /// The gauges to be summed.
-  std::vector<IntGauge*> gauges_;
+  std::vector<ReadOnlyIntGauge*> gauges_;
 };
 
 /// Gauge metric that negates another gauge.
-class NegatedGauge : public IntGauge {
+class NegatedGauge : public ReadOnlyIntGauge {
  public:
-  NegatedGauge(const TMetricDef& metric_def, IntGauge* gauge)
-    : IntGauge(metric_def, 0), gauge_(gauge) {}
+  NegatedGauge(const TMetricDef& metric_def, ReadOnlyIntGauge* gauge)
+    : ReadOnlyIntGauge(metric_def), gauge_(gauge) {}
 
   virtual ~NegatedGauge() {}
 
@@ -349,7 +349,7 @@ class NegatedGauge : public IntGauge {
 
  private:
   /// The metric to be negated.
-  IntGauge* gauge_;
+  ReadOnlyIntGauge* gauge_;
 };
 
 /// Container for a set of metrics. A MetricGroup owns the memory for every metric

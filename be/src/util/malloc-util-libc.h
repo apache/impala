@@ -30,9 +30,9 @@ namespace impala {
 
 /// Libc doesn't have a simple API for tracking memory use from malloc, so we use
 /// resident set size.
-class LibcMallocMetric : public IntGauge {
+class LibcMallocMetric : public ReadOnlyIntGauge {
  public:
-  LibcMallocMetric(const TMetricDef& def) : IntGauge(def, 0) {}
+  LibcMallocMetric(const TMetricDef& def) : ReadOnlyIntGauge(def) {}
 
   static LibcMallocMetric* RESIDENT_SET_SIZE;
 
@@ -65,12 +65,12 @@ class LibcMallocUtil : public MallocUtil {
     return Status::OK();
   }
 
-  IntGauge* GetUsedBytesMetric(bool include_overhead) const override {
+  ReadOnlyIntGauge* GetUsedBytesMetric(bool include_overhead) const override {
     DCHECK(LibcMallocMetric::RESIDENT_SET_SIZE != nullptr);
     return LibcMallocMetric::RESIDENT_SET_SIZE;
   }
 
-  IntGauge* GetOverheadBytesMetric() const override {
+  ReadOnlyIntGauge* GetOverheadBytesMetric() const override {
     return nullptr;
   }
 
