@@ -44,7 +44,7 @@ mkdir -p impala_jdbc_driver
 cd impala_jdbc_driver
 
 # Download Impala jdbc driver.
-wget "https://downloads.cloudera.com/connectors/${SIMBA_DRIVER_ZIP_FILENAME}.zip"
+wget -nv "https://downloads.cloudera.com/connectors/${SIMBA_DRIVER_ZIP_FILENAME}.zip"
 
 # Use Python modules to unzip zip file since 'unzip' command is not available in some
 # testing environments.

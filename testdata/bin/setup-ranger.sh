@@ -82,22 +82,22 @@ function setup-ranger {
     exit 1
   fi
 
-  wget -O /dev/null --auth-no-challenge --user=admin --password=admin \
+  wget -nv -O /dev/null --auth-no-challenge --user=admin --password=admin \
     --post-file="${RANGER_SETUP_DIR}/impala_user_owner.json" \
     --header="Content-Type:application/json" \
     http://localhost:6080/service/xusers/secure/users
 
-  wget -O /dev/null --auth-no-challenge --user=admin --password=admin \
+  wget -nv -O /dev/null --auth-no-challenge --user=admin --password=admin \
     --post-file="${RANGER_SETUP_DIR}/impala_user_non_owner.json" \
     --header="Content-Type:application/json" \
     http://localhost:6080/service/xusers/secure/users
 
-  wget -O /dev/null --auth-no-challenge --user=admin --password=admin \
+  wget -nv -O /dev/null --auth-no-challenge --user=admin --password=admin \
     --post-file="${RANGER_SETUP_DIR}/impala_user_non_owner_2.json" \
     --header="Content-Type:application/json" \
     http://localhost:6080/service/xusers/secure/users
 
-  wget -O /dev/null --auth-no-challenge --user=admin --password=admin \
+  wget -nv -O /dev/null --auth-no-challenge --user=admin --password=admin \
     --post-file="${RANGER_SETUP_DIR}/impala_service.json" \
     --header="Content-Type:application/json" \
     http://localhost:6080/service/public/v2/api/service

@@ -240,7 +240,7 @@ hadoop fs -mkdir -p ${JDBC_DRIVERS_HDFS_PATH}
 
 # Download and Copy mysql JDBC driver to HDFS
 pushd /tmp
-wget "https://downloads.mysql.com/archives\
+wget -nv "https://downloads.mysql.com/archives\
 /get/p/3/file/mysql-connector-j-8.1.0.tar.gz"
 tar xzf mysql-connector-j-8.1.0.tar.gz
 popd
