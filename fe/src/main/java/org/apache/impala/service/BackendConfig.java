@@ -439,10 +439,6 @@ public class BackendConfig {
     return (float) backendCfg_.scan_range_cost_factor;
   }
 
-  public boolean useJammWeigher() {
-    return backendCfg_.use_jamm_weigher;
-  }
-
   public boolean icebergAllowDatafileInTableLocationOnly() {
     return backendCfg_.iceberg_allow_datafiles_in_table_location_only;
   }

@@ -109,11 +109,6 @@ DEFINE_bool(jvm_automatic_add_opens, true,
     "Adds necessary --add-opens options for core Java modules necessary to correctly "
     "calculate catalog metadata cache object sizes.");
 
-DEFINE_string_hidden(java_weigher, "auto",
-    "Choose between 'jamm' (com.github.jbellis:jamm) and 'sizeof' (org.ehcache:sizeof) "
-    "weighers for determining catalog metadata cache entry size. 'auto' uses 'sizeof' "
-    "for Java 8 - 11, and 'jamm' for Java 15+.");
-
 // Defined by glog. This allows users to specify the log level using a glob. For
 // example -vmodule=*scanner*=3 would enable full logging for scanners. If redaction
 // is enabled, this option won't be allowed because some logging dumps table data
@@ -375,8 +370,8 @@ static Status JavaAddJammAgent() {
   return Status::OK();
 }
 
-// Append add-opens args to JAVA_TOOL_OPTIONS for ehcache and jamm.
-static Status JavaAddOpens(bool useSizeOf) {
+// Append add-opens args to JAVA_TOOL_OPTIONS for jamm.
+static Status JavaAddOpens() {
   if (!FLAGS_jvm_automatic_add_opens) return Status::OK();
 
   stringstream val_out;
@@ -386,53 +381,13 @@ static Status JavaAddOpens(bool useSizeOf) {
   }
 
   for (const string& param : {
-    // Needed for jamm and ehcache (jamm needs it to access lambdas)
+    // Needed for jamm to access lambdas.
     "--add-opens=java.base/java.lang=ALL-UNNAMED",
     "--add-opens=java.base/java.nio=ALL-UNNAMED",
     "--add-opens=java.base/java.util.regex=ALL-UNNAMED",
     "--add-opens=java.base/sun.nio.ch=ALL-UNNAMED"
   }) {
     val_out << " " << param;
-  }
-
-  if (useSizeOf) {
-    for (const string& param : {
-      // Only needed for ehcache
-      "--add-opens=java.base/java.io=ALL-UNNAMED",
-      "--add-opens=java.base/java.lang.invoke=ALL-UNNAMED",
-      "--add-opens=java.base/java.lang.module=ALL-UNNAMED",
-      "--add-opens=java.base/java.lang.ref=ALL-UNNAMED",
-      "--add-opens=java.base/java.lang.reflect=ALL-UNNAMED",
-      "--add-opens=java.base/java.net=ALL-UNNAMED",
-      "--add-opens=java.base/java.nio.charset=ALL-UNNAMED",
-      "--add-opens=java.base/java.nio.file.attribute=ALL-UNNAMED",
-      "--add-opens=java.base/java.security=ALL-UNNAMED",
-      "--add-opens=java.base/java.util.concurrent.locks=ALL-UNNAMED",
-      "--add-opens=java.base/java.util.concurrent=ALL-UNNAMED",
-      "--add-opens=java.base/java.util.jar=ALL-UNNAMED",
-      "--add-opens=java.base/java.util.zip=ALL-UNNAMED",
-      "--add-opens=java.base/java.util=ALL-UNNAMED",
-      "--add-opens=java.base/jdk.internal.loader=ALL-UNNAMED",
-      "--add-opens=java.base/jdk.internal.math=ALL-UNNAMED",
-      "--add-opens=java.base/jdk.internal.module=ALL-UNNAMED",
-      "--add-opens=java.base/jdk.internal.perf=ALL-UNNAMED",
-      "--add-opens=java.base/jdk.internal.platform=ALL-UNNAMED",
-      "--add-opens=java.base/jdk.internal.platform.cgroupv1=ALL-UNNAMED",
-      "--add-opens=java.base/jdk.internal.ref=ALL-UNNAMED",
-      "--add-opens=java.base/jdk.internal.reflect=ALL-UNNAMED",
-      "--add-opens=java.base/jdk.internal.util.jar=ALL-UNNAMED",
-      "--add-opens=java.base/sun.net.www.protocol.jar=ALL-UNNAMED",
-      "--add-opens=java.base/sun.nio.fs=ALL-UNNAMED",
-      "--add-opens=jdk.dynalink/jdk.dynalink.beans=ALL-UNNAMED",
-      "--add-opens=jdk.dynalink/jdk.dynalink.linker.support=ALL-UNNAMED",
-      "--add-opens=jdk.dynalink/jdk.dynalink.linker=ALL-UNNAMED",
-      "--add-opens=jdk.dynalink/jdk.dynalink.support=ALL-UNNAMED",
-      "--add-opens=jdk.dynalink/jdk.dynalink=ALL-UNNAMED",
-      "--add-opens=jdk.management.jfr/jdk.management.jfr=ALL-UNNAMED",
-      "--add-opens=jdk.management/com.sun.management.internal=ALL-UNNAMED"
-    }) {
-      val_out << " " << param;
-    }
   }
 
   if (setenv("JAVA_TOOL_OPTIONS", val_out.str().c_str(), 1) < 0) {
@@ -442,21 +397,11 @@ static Status JavaAddOpens(bool useSizeOf) {
 }
 
 static Status InitializeJavaWeigher() {
-  // This is set up so the default if things go wrong is to continue using ehcache.sizeof.
   int version = GetJavaMajorVersion();
-  if (FLAGS_java_weigher == "auto") {
-    // Update for backend-gflag-util.cc setting use_jamm_weigher.
-    FLAGS_java_weigher = (version >= 15) ? "jamm" : "sizeof";
-  }
-  LOG(INFO) << "Using Java weigher " << FLAGS_java_weigher;
-
-  if (FLAGS_java_weigher == "jamm") {
-    RETURN_IF_ERROR(JavaAddJammAgent());
-  }
-  if (version >= 9) {
-    // add-opens is only supported in Java 9+.
-    RETURN_IF_ERROR(JavaAddOpens(FLAGS_java_weigher != "jamm"));
-  }
+  DCHECK_GE(version, 17) << "Unsupported Java version: " << version;
+  LOG(INFO) << "Using Java weigher jamm";
+  RETURN_IF_ERROR(JavaAddJammAgent());
+  RETURN_IF_ERROR(JavaAddOpens());
   return Status::OK();
 }
 

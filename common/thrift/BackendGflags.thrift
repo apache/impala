@@ -258,8 +258,6 @@ struct TBackendGflags {
 
   113: required double scan_range_cost_factor
 
-  114: required bool use_jamm_weigher
-
   116: required bool enable_skipping_older_events;
 
   117: required bool enable_json_scanner

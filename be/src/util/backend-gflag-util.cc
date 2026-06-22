@@ -109,7 +109,6 @@ DECLARE_bool(pull_table_types_and_comments);
 DECLARE_bool(enable_reload_events);
 DECLARE_string(geospatial_library);
 DECLARE_string(file_metadata_reload_properties);
-DECLARE_string(java_weigher);
 DECLARE_bool(enable_skipping_older_events);
 DECLARE_bool(enable_json_scanner);
 DECLARE_bool(iceberg_allow_datafiles_in_table_location_only);
@@ -546,7 +545,6 @@ Status PopulateThriftBackendGflags(TBackendGflags& cfg) {
   cfg.__set_file_metadata_reload_properties(FLAGS_file_metadata_reload_properties);
   cfg.__set_thrift_rpc_max_message_size(ThriftInternalRpcMaxMessageSize());
   cfg.__set_scan_range_cost_factor(FLAGS_scan_range_cost_factor);
-  cfg.__set_use_jamm_weigher(FLAGS_java_weigher == "jamm");
   cfg.__set_enable_skipping_older_events(FLAGS_enable_skipping_older_events);
   cfg.__set_enable_json_scanner(FLAGS_enable_json_scanner);
   cfg.__set_iceberg_allow_datafiles_in_table_location_only(

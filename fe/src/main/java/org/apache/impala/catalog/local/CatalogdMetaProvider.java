@@ -122,7 +122,6 @@ import org.apache.thrift.TDeserializer;
 import org.apache.thrift.TException;
 import org.apache.thrift.TSerializer;
 import org.apache.thrift.protocol.TBinaryProtocol;
-import org.ehcache.sizeof.SizeOf;
 import org.github.jamm.CannotAccessFieldException;
 import org.github.jamm.MemoryMeter;
 import org.slf4j.Logger;
@@ -400,8 +399,7 @@ public class CatalogdMetaProvider implements MetaProvider {
         .concurrencyLevel(concurrencyLevel)
         .maximumWeight((cacheSizeBytes - 1) / BYTES_PER_WEIGHT_UNIT + 1)
         .expireAfterAccess(expirationSecs, TimeUnit.SECONDS)
-        .weigher(new SizeOfWeigher(
-            BackendConfig.INSTANCE.useJammWeigher(), cacheEntrySize_))
+        .weigher(new SizeOfWeigher(cacheEntrySize_))
         .recordStats()
         .build();
   }
@@ -2465,28 +2463,17 @@ public class CatalogdMetaProvider implements MetaProvider {
         12 * BYTES_PER_WORD + // base cost per entry
         4 * BYTES_PER_WORD;  // for use of 'maximumSize()'
 
-    // Retain Ehcache while Jamm is thoroughly tested. We only expect to make one
-    // CatalogdMetaProvider and thus one SizeOfWeigher.
-    private final SizeOf SIZEOF;
     private final MemoryMeter METER;
 
-    private final boolean useJamm_;
     private final Histogram entrySize_;
 
-    public SizeOfWeigher(boolean useJamm, Histogram entrySize) {
-      if (useJamm) {
-        METER = MemoryMeter.builder().build();
-        SIZEOF = null;
-      } else {
-        SIZEOF = SizeOf.newInstance(BYPASS_FLYWEIGHT, CACHE_SIZES);
-        METER = null;
-      }
-      useJamm_ = useJamm;
+    public SizeOfWeigher(Histogram entrySize) {
+      METER = MemoryMeter.builder().build();
       entrySize_ = entrySize;
     }
 
     public SizeOfWeigher() {
-      this(true, null);
+      this(null);
     }
 
     @Override
@@ -2517,18 +2504,11 @@ public class CatalogdMetaProvider implements MetaProvider {
     long measureSize(Object key, Object value) {
       long size = OVERHEAD_PER_ENTRY;
       try {
-        if (useJamm_) {
-          size += METER.measureDeep(key);
-          size += METER.measureDeep(value);
-        } else {
-          size += SIZEOF.deepSizeOf(key, value);
-        }
+        size += METER.measureDeep(key);
+        size += METER.measureDeep(value);
       } catch (CannotAccessFieldException e) {
         // This may happen if we miss an add-opens call for lambdas in Java 17.
         LOG.warn("Unable to weigh cache entry, additional add-opens needed", e);
-      } catch (UnsupportedOperationException e) {
-        // Thrown by ehcache for lambdas in Java 17.
-        LOG.warn("Unable to weigh cache entry", e);
       }
       return size;
     }
