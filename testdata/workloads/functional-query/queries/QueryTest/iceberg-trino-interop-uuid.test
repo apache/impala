@@ -1,0 +1,274 @@
+# Impala <-> Trino interop over Apache Iceberg V3 tables: UUID column reads.
+#
+# See iceberg-trino-interop-insert.test for the shared setup notes. Trino writes
+# Parquet UUID columns; Impala reads them after INVALIDATE METADATA. Impala
+# cannot INSERT UUID columns yet, so this file only covers the Trino -> Impala
+# direction.
+====
+---- TRINO_QUERY
+# Trino creates a V3 Parquet table with a UUID column and inserts rows.
+CREATE TABLE ti_uuid (id integer, uuid_col uuid, name varchar)
+WITH (format_version=3, format='PARQUET');
+INSERT INTO ti_uuid VALUES
+  (1, UUID '12345678-1234-5678-1234-567812345678', 'alice'),
+  (2, UUID 'abcdefab-cdef-abcd-efab-cdefabcdefab', 'bob'),
+  (3, UUID '00000000-0000-0000-0000-000000000000', 'zeros'),
+  (4, NULL, 'null_uuid'),
+  (5, UUID 'ffffffff-ffff-ffff-ffff-ffffffffffff', 'max')
+====
+---- QUERY
+# Impala reads UUID values Trino wrote into Parquet.
+INVALIDATE METADATA ti_uuid;
+SELECT id, uuid_col, name FROM ti_uuid ORDER BY id;
+---- RESULTS
+1,'12345678-1234-5678-1234-567812345678','alice'
+2,'abcdefab-cdef-abcd-efab-cdefabcdefab','bob'
+3,'00000000-0000-0000-0000-000000000000','zeros'
+4,'NULL','null_uuid'
+5,'ffffffff-ffff-ffff-ffff-ffffffffffff','max'
+---- TYPES
+INT,UUID,STRING
+---- HS2_TYPES
+INT,STRING,STRING
+====
+---- QUERY
+DESCRIBE ti_uuid;
+---- RESULTS: VERIFY_IS_SUBSET
+'uuid_col','uuid','','true'
+---- TYPES
+STRING,STRING,STRING,STRING
+====
+---- QUERY
+DESCRIBE FORMATTED ti_uuid;
+---- RESULTS: VERIFY_IS_SUBSET
+'','format-version      ','3                   '
+---- TYPES
+STRING,STRING,STRING
+====
+---- TRINO_QUERY
+# STRUCT with a UUID field.
+CREATE TABLE ti_uuid_struct (
+  id integer,
+  s row(
+    uuid_col uuid,
+    name varchar
+  )
+)
+WITH (format_version=3, format='PARQUET');
+INSERT INTO ti_uuid_struct VALUES (1, ROW(UUID '12345678-1234-5678-1234-567812345678', 'alice')), (2, NULL);
+====
+---- QUERY
+INVALIDATE METADATA ti_uuid_struct;
+SELECT id, s.uuid_col, s.name FROM ti_uuid_struct ORDER BY id;
+---- RESULTS
+1,'12345678-1234-5678-1234-567812345678','alice'
+2,'NULL','NULL'
+---- TYPES
+INT,UUID,STRING
+---- HS2_TYPES
+INT,STRING,STRING
+====
+---- QUERY
+DESCRIBE ti_uuid_struct;
+---- RESULTS: VERIFY_IS_SUBSET
+'s','struct<\n  uuid_col:uuid,\n  name:string\n>','','true'
+---- TYPES
+STRING,STRING,STRING,STRING
+====
+---- TRINO_QUERY
+# ARRAY<UUID>.
+CREATE TABLE ti_uuid_array (
+  id integer,
+  uuid_arr array(uuid)
+)
+WITH (format_version=3, format='PARQUET');
+INSERT INTO ti_uuid_array VALUES
+  (1, ARRAY[UUID '12345678-1234-5678-1234-567812345678', UUID 'abcdefab-cdef-abcd-efab-cdefabcdefab']),
+  (2, NULL);
+====
+---- QUERY
+INVALIDATE METADATA ti_uuid_array;
+SELECT id, uuid_arr FROM ti_uuid_array ORDER BY id;
+---- RESULTS
+1,'[12345678-1234-5678-1234-567812345678,abcdefab-cdef-abcd-efab-cdefabcdefab]'
+2,'NULL'
+---- TYPES
+INT,STRING
+====
+---- QUERY
+DESCRIBE ti_uuid_array;
+---- RESULTS: VERIFY_IS_SUBSET
+'uuid_arr','array<uuid>','','true'
+---- TYPES
+STRING,STRING,STRING,STRING
+====
+---- TRINO_QUERY
+# MAP<UUID, VARCHAR> with UUID keys.
+CREATE TABLE ti_uuid_map_key (
+  id integer,
+  uuid_map map(uuid, varchar)
+)
+WITH (format_version=3, format='PARQUET');
+INSERT INTO ti_uuid_map_key VALUES
+  (1, MAP(
+    ARRAY[UUID '12345678-1234-5678-1234-567812345678', UUID 'abcdefab-cdef-abcd-efab-cdefabcdefab'],
+    ARRAY['alice', 'bob'])),
+  (2, NULL);
+====
+---- QUERY
+INVALIDATE METADATA ti_uuid_map_key;
+SELECT id, uuid_map FROM ti_uuid_map_key ORDER BY id;
+---- RESULTS
+1,'{12345678-1234-5678-1234-567812345678:"alice",abcdefab-cdef-abcd-efab-cdefabcdefab:"bob"}'
+2,'NULL'
+---- TYPES
+INT,STRING
+====
+---- QUERY
+DESCRIBE ti_uuid_map_key;
+---- RESULTS: VERIFY_IS_SUBSET
+'uuid_map','map<uuid,string>','','true'
+---- TYPES
+STRING,STRING,STRING,STRING
+====
+---- TRINO_QUERY
+# MAP<VARCHAR, UUID> with UUID values.
+CREATE TABLE ti_uuid_map_val (
+  id integer,
+  name_uuid_map map(varchar, uuid)
+)
+WITH (format_version=3, format='PARQUET');
+INSERT INTO ti_uuid_map_val VALUES
+  (1, MAP(
+    ARRAY['alice', 'bob'],
+    ARRAY[UUID '12345678-1234-5678-1234-567812345678', UUID 'abcdefab-cdef-abcd-efab-cdefabcdefab'])),
+  (2, NULL);
+====
+---- QUERY
+INVALIDATE METADATA ti_uuid_map_val;
+SELECT id, name_uuid_map FROM ti_uuid_map_val ORDER BY id;
+---- RESULTS
+1,'{"alice":12345678-1234-5678-1234-567812345678,"bob":abcdefab-cdef-abcd-efab-cdefabcdefab}'
+2,'NULL'
+---- TYPES
+INT,STRING
+====
+---- QUERY
+DESCRIBE ti_uuid_map_val;
+---- RESULTS: VERIFY_IS_SUBSET
+'name_uuid_map','map<string,uuid>','','true'
+---- TYPES
+STRING,STRING,STRING,STRING
+====
+---- TRINO_QUERY
+# ARRAY<STRUCT<uuid_col UUID, name VARCHAR>>.
+CREATE TABLE ti_uuid_array_struct (
+  id integer,
+  entries array(row(uuid_col uuid, name varchar))
+)
+WITH (format_version=3, format='PARQUET');
+INSERT INTO ti_uuid_array_struct VALUES
+  (1, ARRAY[
+    ROW(UUID '12345678-1234-5678-1234-567812345678', 'alice'),
+    ROW(UUID 'abcdefab-cdef-abcd-efab-cdefabcdefab', 'bob')]),
+  (2, NULL);
+====
+---- QUERY
+INVALIDATE METADATA ti_uuid_array_struct;
+SELECT id, entries FROM ti_uuid_array_struct ORDER BY id;
+---- RESULTS
+1,'[{"uuid_col":12345678-1234-5678-1234-567812345678,"name":"alice"},{"uuid_col":abcdefab-cdef-abcd-efab-cdefabcdefab,"name":"bob"}]'
+2,'NULL'
+---- TYPES
+INT,STRING
+====
+---- QUERY
+DESCRIBE ti_uuid_array_struct;
+---- RESULTS: VERIFY_IS_SUBSET
+'entries','array<struct<\n  uuid_col:uuid,\n  name:string\n>>','','true'
+---- TYPES
+STRING,STRING,STRING,STRING
+====
+---- TRINO_QUERY
+# STRUCT with an ARRAY<UUID> field.
+CREATE TABLE ti_uuid_struct_array (
+  id integer,
+  s row(ids array(uuid), label varchar)
+)
+WITH (format_version=3, format='PARQUET');
+INSERT INTO ti_uuid_struct_array VALUES
+  (1, ROW(ARRAY[UUID '12345678-1234-5678-1234-567812345678', UUID 'abcdefab-cdef-abcd-efab-cdefabcdefab'], 'two')),
+  (2, NULL);
+====
+---- QUERY
+INVALIDATE METADATA ti_uuid_struct_array;
+SELECT id, s.label, s.ids FROM ti_uuid_struct_array ORDER BY id;
+---- RESULTS
+1,'two','[12345678-1234-5678-1234-567812345678,abcdefab-cdef-abcd-efab-cdefabcdefab]'
+2,'NULL','NULL'
+---- TYPES
+INT,STRING,STRING
+====
+---- QUERY
+DESCRIBE ti_uuid_struct_array;
+---- RESULTS: VERIFY_IS_SUBSET
+'s','struct<\n  ids:array<uuid>,\n  label:string\n>','','true'
+---- TYPES
+STRING,STRING,STRING,STRING
+====
+---- TRINO_QUERY
+# Mixed Parquet + ORC: start with Parquet so Impala can read before the format change.
+CREATE TABLE ti_uuid_mixed_orc (id integer, uuid_col uuid, name varchar)
+WITH (format_version=3, format='PARQUET');
+INSERT INTO ti_uuid_mixed_orc VALUES (1, UUID '12345678-1234-5678-1234-567812345678', 'parquet');
+====
+---- QUERY
+INVALIDATE METADATA ti_uuid_mixed_orc;
+SELECT id, uuid_col, name FROM ti_uuid_mixed_orc ORDER BY id;
+---- RESULTS
+1,'12345678-1234-5678-1234-567812345678','parquet'
+---- TYPES
+INT,UUID,STRING
+---- HS2_TYPES
+INT,STRING,STRING
+====
+---- TRINO_QUERY
+# Add an ORC data file after changing the write format.
+ALTER TABLE ti_uuid_mixed_orc SET PROPERTIES format='ORC';
+INSERT INTO ti_uuid_mixed_orc VALUES (2, NULL, 'orc');
+====
+---- QUERY
+# Impala must reject the scan once an ORC data file is present.
+INVALIDATE METADATA ti_uuid_mixed_orc;
+SELECT id, uuid_col FROM ti_uuid_mixed_orc ORDER BY id
+---- CATCH
+Reading UUID columns from ORC format is not yet supported
+====
+---- TRINO_QUERY
+# Mixed Parquet + Avro: start with Parquet so Impala can read before the format change.
+CREATE TABLE ti_uuid_mixed_avro (id integer, uuid_col uuid, name varchar)
+WITH (format_version=3, format='PARQUET');
+INSERT INTO ti_uuid_mixed_avro VALUES (1, UUID '12345678-1234-5678-1234-567812345678', 'parquet');
+====
+---- QUERY
+INVALIDATE METADATA ti_uuid_mixed_avro;
+SELECT id, uuid_col, name FROM ti_uuid_mixed_avro ORDER BY id;
+---- RESULTS
+1,'12345678-1234-5678-1234-567812345678','parquet'
+---- TYPES
+INT,UUID,STRING
+---- HS2_TYPES
+INT,STRING,STRING
+====
+---- TRINO_QUERY
+# Add an Avro data file after changing the write format.
+ALTER TABLE ti_uuid_mixed_avro SET PROPERTIES format='AVRO';
+INSERT INTO ti_uuid_mixed_avro VALUES (2, NULL, 'avro');
+====
+---- QUERY
+# Impala must reject the scan once an Avro data file is present.
+INVALIDATE METADATA ti_uuid_mixed_avro;
+SELECT id, uuid_col FROM ti_uuid_mixed_avro ORDER BY id
+---- CATCH
+Reading UUID columns from AVRO format is not yet supported
+====

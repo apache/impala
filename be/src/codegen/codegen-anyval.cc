@@ -80,6 +80,7 @@ llvm::Type* CodegenAnyVal::GetLoweredType(LlvmCodeGen* cg, const ColumnType& typ
     case TYPE_STRING: // { i64, i8* }
     case TYPE_VARCHAR: // { i64, i8* }
     case TYPE_CHAR: // Uses StringVal, so same as STRING/VARCHAR.
+    case TYPE_UUID: // Inline 16-byte slot, StringVal layout.
     case TYPE_FIXED_UDA_INTERMEDIATE: // { i64, i8* }
     case TYPE_ARRAY: // CollectionVal has same memory layout as StringVal.
     case TYPE_MAP: // CollectionVal has same memory layout as StringVal.
@@ -138,6 +139,7 @@ llvm::Type* CodegenAnyVal::GetUnloweredType(LlvmCodeGen* cg, const ColumnType& t
     case TYPE_STRING:
     case TYPE_VARCHAR:
     case TYPE_CHAR:
+    case TYPE_UUID:
     case TYPE_FIXED_UDA_INTERMEDIATE:
       result = cg->GetNamedType(LLVM_STRINGVAL_NAME);
       break;
@@ -253,6 +255,7 @@ llvm::Value* CodegenAnyVal::GetIsNull(const char* name) const {
     case TYPE_STRING:
     case TYPE_VARCHAR:
     case TYPE_CHAR:
+    case TYPE_UUID:
     case TYPE_FIXED_UDA_INTERMEDIATE:
     case TYPE_TIMESTAMP:
     case TYPE_ARRAY:
@@ -306,6 +309,7 @@ void CodegenAnyVal::SetIsNull(llvm::Value* is_null) {
     case TYPE_STRING:
     case TYPE_VARCHAR:
     case TYPE_CHAR:
+    case TYPE_UUID:
     case TYPE_FIXED_UDA_INTERMEDIATE:
     case TYPE_TIMESTAMP:
     case TYPE_ARRAY:
@@ -346,6 +350,8 @@ llvm::Value* CodegenAnyVal::GetVal(const char* name) {
       << "Use GetPtr and GetLen for Varchar";
   DCHECK(type_.type != TYPE_CHAR)
       << "Use GetPtr and GetLen for Char";
+  DCHECK(type_.type != TYPE_UUID)
+      << "Use GetPtr and GetLen for Uuid";
   DCHECK(type_.type != TYPE_FIXED_UDA_INTERMEDIATE)
       << "Use GetPtr and GetLen for FixedUdaIntermediate";
   DCHECK(type_.type != TYPE_TIMESTAMP)
@@ -408,6 +414,7 @@ void CodegenAnyVal::SetVal(llvm::Value* val) {
   DCHECK(type_.type != TYPE_STRING) << "Use SetPtr and SetLen for StringVals";
   DCHECK(type_.type != TYPE_VARCHAR) << "Use SetPtr and SetLen for StringVals";
   DCHECK(type_.type != TYPE_CHAR) << "Use SetPtr and SetLen for StringVals";
+  DCHECK(type_.type != TYPE_UUID) << "Use SetPtr and SetLen for StringVals";
   DCHECK(type_.type != TYPE_FIXED_UDA_INTERMEDIATE)
       << "Use SetPtr and SetLen for FixedUdaIntermediate";
   DCHECK(type_.type != TYPE_TIMESTAMP)
@@ -505,7 +512,8 @@ void CodegenAnyVal::SetVal(double val) {
 
 llvm::Value* CodegenAnyVal::GetPtr() {
   // Set the second pointer value to 'ptr'.
-  DCHECK(type_.IsStringType() || type_.IsCollectionType() || type_.IsStructType());
+  DCHECK(type_.IsStringType() || type_.IsCollectionType()
+      || type_.IsStructType() || type_.IsUuidType());
   llvm::Value* val = builder_->CreateExtractValue(value_, 1, name_);
 #ifdef __aarch64__
   val = builder_->CreateIntToPtr(val, codegen_->ptr_type());
@@ -515,7 +523,8 @@ llvm::Value* CodegenAnyVal::GetPtr() {
 
 llvm::Value* CodegenAnyVal::GetLen() {
   // Get the high bytes of the first value.
-  DCHECK(type_.IsStringType() || type_.IsCollectionType() || type_.IsStructType());
+  DCHECK(type_.IsStringType() || type_.IsCollectionType()
+      || type_.IsStructType() || type_.IsUuidType());
   llvm::Value* v = builder_->CreateExtractValue(value_, 0);
   return GetHighBits(32, v);
 }
@@ -523,7 +532,7 @@ llvm::Value* CodegenAnyVal::GetLen() {
 void CodegenAnyVal::SetPtr(llvm::Value* ptr) {
   // Set the second pointer value to 'ptr'.
   DCHECK(type_.IsStringType() || type_.type == TYPE_FIXED_UDA_INTERMEDIATE
-      || type_.IsCollectionType() || type_.IsStructType());
+      || type_.IsCollectionType() || type_.IsStructType() || type_.IsUuidType());
 #ifdef __aarch64__
   ptr = builder_->CreatePtrToInt(ptr, codegen_->i64_type());
 #endif
@@ -533,7 +542,7 @@ void CodegenAnyVal::SetPtr(llvm::Value* ptr) {
 void CodegenAnyVal::SetLen(llvm::Value* len) {
   // Set the high bytes of the first value to 'len'.
   DCHECK(type_.IsStringType() || type_.type == TYPE_FIXED_UDA_INTERMEDIATE
-      || type_.IsCollectionType() || type_.IsStructType());
+      || type_.IsCollectionType() || type_.IsStructType() || type_.IsUuidType());
   llvm::Value* v = builder_->CreateExtractValue(value_, 0);
   v = SetHighBits(32, len, v);
   value_ = builder_->CreateInsertValue(value_, v, 0, name_);
@@ -713,6 +722,14 @@ llvm::Value* CodegenAnyVal::EqToNativePtr(llvm::Value* native_ptr,
           codegen_->GetFunction(IRFunction::CODEGEN_ANYVAL_STRING_VALUE_EQ, false);
       return builder_->CreateCall(eq_fn,
           llvm::ArrayRef<llvm::Value*>({GetUnloweredPtr(), native_ptr}), "cmp_raw");
+    }
+    case TYPE_UUID: {
+      llvm::Value* slot_ptr = builder_->CreateBitCast(
+          native_ptr, codegen_->ptr_type(), "uuid_slot_ptr");
+      llvm::Function* eq_fn =
+          codegen_->GetFunction(IRFunction::CODEGEN_ANYVAL_UUID_INLINE_BYTES_EQ, false);
+      return builder_->CreateCall(eq_fn,
+          llvm::ArrayRef<llvm::Value*>({GetUnloweredPtr(), slot_ptr}), "cmp_raw");
     }
     case TYPE_TIMESTAMP: {
       llvm::Function* eq_fn =
@@ -954,7 +971,7 @@ CodegenAnyVal CodegenAnyVal::CreateFromReadWriteInfo(
   // 'read_write_info.non_null_block'. This variable will be set to the appropriate block.
   llvm::BasicBlock* non_null_incoming_block = read_write_info.non_null_block();
   if (type.IsStringType() || type.type == TYPE_FIXED_UDA_INTERMEDIATE
-      || type.IsCollectionType() || type.IsStructType()) {
+      || type.IsCollectionType() || type.IsStructType() || type.IsUuidType()) {
     llvm::Value* ptr = nullptr;
     llvm::Value* len = nullptr;
 
@@ -1037,7 +1054,7 @@ CodegenAnyValReadWriteInfo CodegenAnyVal::ToReadWriteInfo() {
   builder_->SetInsertPoint(non_null_block);
   if (type_.IsStructType()) {
     StructToReadWriteInfo(&res, GetPtr());
-  } else if (type_.IsStringType() || type_.IsCollectionType()) {
+  } else if (type_.IsStringType() || type_.IsCollectionType() || type_.IsUuidType()) {
     res.SetPtrAndLen(GetPtr(), GetLen());
   } else if (type_.type == TYPE_TIMESTAMP) {
     res.SetTimeAndDate(GetTimeOfDay(), GetDate());
@@ -1065,13 +1082,15 @@ void CodegenAnyVal::StructChildToReadWriteInfo(
   // 'AnyVal's). As this code deals with values in 'AnyVal's, for BOOLEANS we use i8,
   // which is the LLVM type corresponding to 'bool', and for other types we use the slot
   // type.
-  llvm::Type* child_type = type.type == TYPE_BOOLEAN || type.type == TYPE_CHAR ?
+  llvm::Type* child_type = type.type == TYPE_BOOLEAN
+      || type.type == TYPE_CHAR || type.type == TYPE_UUID ?
     codegen->i8_type() : slot_type;
   llvm::Value* cast_child_ptr = builder->CreateBitCast(child_ptr,
       child_type->getPointerTo(), "cast_child_ptr");
 
   switch (type.type) {
-    case TYPE_CHAR: {
+    case TYPE_CHAR:
+    case TYPE_UUID: {
       llvm::Value* len = codegen->GetI32Constant(type.len);
       read_write_info->SetPtrAndLen(cast_child_ptr, len);
       break;

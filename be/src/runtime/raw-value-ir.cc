@@ -93,6 +93,8 @@ int IR_ALWAYS_INLINE RawValue::Compare(
       int64_t l2 = StringValue::UnpaddedCharLength(v2ptr, type.len);
       return StringCompare(v1ptr, l1, v2ptr, l2, std::min(l1, l2));
     }
+    case TYPE_UUID:
+      return memcmp(v1, v2, type.len);
     case TYPE_DECIMAL:
       switch (type.GetByteSize()) {
         case 4:
@@ -123,6 +125,7 @@ uint32_t IR_ALWAYS_INLINE RawValue::GetHashValue(
 
   switch (type.type) {
     case TYPE_CHAR:
+    case TYPE_UUID:
     case TYPE_STRING:
     case TYPE_VARCHAR:
       return RawValue::GetHashValueNonNull<impala::StringValue>(
@@ -181,6 +184,7 @@ uint64_t IR_ALWAYS_INLINE RawValue::GetHashValueFastHash(const void* v,
   }
   switch (type.type) {
     case TYPE_CHAR:
+    case TYPE_UUID:
     case TYPE_STRING:
     case TYPE_VARCHAR:
       return RawValue::GetHashValueFastHashNonNull<impala::StringValue>(

@@ -36,6 +36,7 @@
 #include "runtime/types.h"
 #include "udf/udf-internal.h"
 #include "util/bit-util.h"
+#include "util/uuid-util.h"
 #include "util/variant-util.h"
 
 #include <gutil/strings/substitute.h>
@@ -121,6 +122,7 @@ void impala::TColumnValueToHS2TColumn(const TColumnValue& col_val,
     case TPrimitiveType::TIMESTAMP:
     case TPrimitiveType::DATE:
     case TPrimitiveType::STRING:
+    case TPrimitiveType::UUID:
     case TPrimitiveType::CHAR:
     case TPrimitiveType::VARCHAR:
     case TPrimitiveType::DECIMAL:
@@ -343,6 +345,24 @@ static void CharExprValuesToHS2TColumn(ScalarExprEvaluator* expr_eval,
   }
 }
 
+// Implementation for UUID: format 16 raw bytes as canonical string.
+static void UuidExprValuesToHS2TColumn(ScalarExprEvaluator* expr_eval, RowBatch* batch,
+    int start_idx, int num_rows, uint32_t output_row_idx,
+    apache::hive::service::cli::thrift::TColumn* column) {
+  FOREACH_ROW_LIMIT(batch, start_idx, num_rows, it) {
+    StringVal val = expr_eval->GetStringVal(it.Get());
+    if (val.is_null) {
+      column->stringVal.values.emplace_back();
+    } else {
+      char uuid_str[UUID_STRING_LEN];
+      UuidBytesToString(val.ptr, uuid_str);
+      column->stringVal.values.emplace_back(uuid_str, UUID_STRING_LEN);
+    }
+    SetNullBit(output_row_idx, val.is_null, &column->stringVal.nulls);
+    ++output_row_idx;
+  }
+}
+
 static void DecimalExprValuesToHS2TColumn(ScalarExprEvaluator* expr_eval,
     const TColumnType& type, RowBatch* batch, int start_idx, int num_rows,
     uint32_t output_row_idx, apache::hive::service::cli::thrift::TColumn* column) {
@@ -559,6 +579,11 @@ void impala::ExprValuesToHS2TColumn(ScalarExprEvaluator* expr_eval,
       StringExprValuesToHS2TColumn(
           expr_eval, batch, start_idx, num_rows, output_row_idx, column);
       return;
+    case TPrimitiveType::UUID:
+      ReserveSpace(expected_result_count, &column->stringVal);
+      UuidExprValuesToHS2TColumn(
+          expr_eval, batch, start_idx, num_rows, output_row_idx, column);
+      return;
     case TPrimitiveType::BINARY:
       ReserveSpace(expected_result_count, &column->binaryVal);
       BinaryExprValuesToHS2TColumn(
@@ -622,6 +647,7 @@ void impala::TColumnValueToHS2TColumnValue(const TColumnValue& col_val,
       break;
     case TPrimitiveType::DECIMAL:
     case TPrimitiveType::STRING:
+    case TPrimitiveType::UUID:
     case TPrimitiveType::TIMESTAMP:
     case TPrimitiveType::DATE:
     case TPrimitiveType::VARCHAR:
@@ -702,6 +728,15 @@ void impala::ExprValueToHS2TColumnValue(const void* value, const TColumnType& ty
       if (not_null) {
         const StringValue* string_val = reinterpret_cast<const StringValue*>(value);
         hs2_col_val->stringVal.value.assign(string_val->Ptr(), string_val->Len());
+      }
+      break;
+    case TPrimitiveType::UUID:
+      hs2_col_val->__isset.stringVal = true;
+      hs2_col_val->stringVal.__isset.value = not_null;
+      if (not_null) {
+        char uuid_str[UUID_STRING_LEN];
+        UuidBytesToString(reinterpret_cast<const uint8_t*>(value), uuid_str);
+        hs2_col_val->stringVal.value.assign(uuid_str, UUID_STRING_LEN);
       }
       break;
     case TPrimitiveType::CHAR:
@@ -985,6 +1020,7 @@ thrift::TTypeEntry impala::ColumnToHs2Type(
           ? thrift::TTypeId::CHAR_TYPE : thrift::TTypeId::VARCHAR_TYPE);
       break;
     }
+    case TYPE_UUID:
     case TYPE_STRUCT:
     case TYPE_ARRAY:
     case TYPE_MAP:

@@ -1,0 +1,204 @@
+====
+---- QUERY
+# Iceberg UUID Parquet read-path tests.
+# Casts, predicates, and aggregates are not yet supported.
+DESCRIBE iceberg_uuid_test
+---- RESULTS: VERIFY_IS_SUBSET
+'id','int','','true'
+'uuid_col','uuid','','true'
+'name','string','','true'
+---- TYPES
+STRING,STRING,STRING,STRING
+====
+---- QUERY
+# DESCRIBE FORMATTED reports Iceberg table properties.
+DESCRIBE FORMATTED iceberg_uuid_test
+---- RESULTS: VERIFY_IS_SUBSET
+'','format-version      ','3                   '
+'','write.format.default','parquet             '
+---- TYPES
+STRING,STRING,STRING
+====
+---- QUERY
+# Basic SELECT from Parquet Iceberg table with UUID column.
+SELECT id, uuid_col, name FROM iceberg_uuid_test ORDER BY id
+---- RESULTS
+1,'12345678-1234-5678-1234-567812345678','alice'
+2,'abcdefab-cdef-abcd-efab-cdefabcdefab','bob'
+3,'00000000-0000-0000-0000-000000000000','zeros'
+4,'NULL','null_uuid'
+5,'ffffffff-ffff-ffff-ffff-ffffffffffff','max'
+---- TYPES
+INT,UUID,STRING
+---- HS2_TYPES
+INT,STRING,STRING
+====
+---- QUERY
+# SHOW CREATE TABLE includes UUID column type.
+SHOW CREATE TABLE iceberg_uuid_test
+---- RESULTS: VERIFY_IS_SUBSET
+row_regex: .*uuid_col UUID
+---- TYPES
+STRING
+====
+---- QUERY
+# INSERT into Iceberg table with UUID column is blocked.
+INSERT INTO iceberg_uuid_test VALUES (10, '11111111-1111-1111-1111-111111111111', 'test')
+---- CATCH
+Impala does not support writing UUID columns
+====
+---- QUERY
+# CTAS with UUID column is blocked (write path not supported).
+CREATE TABLE uuid_ctas
+STORED AS ICEBERG
+AS SELECT * FROM iceberg_uuid_test
+---- CATCH
+Impala does not support writing UUID columns
+====
+---- QUERY
+# ORC format is not yet supported for UUID column reads.
+SELECT id, uuid_col FROM iceberg_uuid_test_orc
+---- CATCH
+Reading UUID columns from ORC format is not yet supported
+====
+---- QUERY
+# Avro format is not yet supported for UUID column reads.
+SELECT id, uuid_col FROM iceberg_uuid_test_avro
+---- CATCH
+Reading UUID columns from AVRO format is not yet supported
+====
+---- QUERY
+# Equality predicates are not yet supported on UUID columns.
+SELECT id FROM iceberg_uuid_test WHERE uuid_col = '12345678-1234-5678-1234-567812345678'
+---- CATCH
+operands of type UUID and STRING are not comparable
+====
+---- QUERY
+# IN predicates are not yet supported on UUID columns.
+SELECT id FROM iceberg_uuid_test
+WHERE uuid_col IN ('12345678-1234-5678-1234-567812345678', 'abcdefab-cdef-abcd-efab-cdefabcdefab')
+---- CATCH
+Incompatible return types 'UUID' and 'STRING'
+====
+---- QUERY
+# LIKE predicates are not yet supported on UUID columns.
+SELECT id FROM iceberg_uuid_test WHERE uuid_col LIKE 'ffffffff%'
+---- CATCH
+left operand of LIKE must be of type STRING
+====
+---- QUERY
+# Explicit CAST from UUID to STRING is not yet supported.
+SELECT CAST(uuid_col AS STRING) FROM iceberg_uuid_test WHERE id = 1
+---- CATCH
+Invalid type cast of uuid_col from UUID to STRING
+====
+---- QUERY
+# CAST from STRING literal to UUID is not yet supported.
+SELECT CAST('12345678-1234-5678-1234-567812345678' AS UUID)
+---- CATCH
+Invalid type cast of '12345678-1234-5678-1234-567812345678' from STRING to UUID
+====
+---- QUERY
+# UUID cannot be cast to non-string types.
+SELECT CAST(uuid_col AS INT) FROM iceberg_uuid_test WHERE id = 1
+---- CATCH
+Invalid type cast of uuid_col from UUID to INT
+====
+---- QUERY
+# MIN() is not yet supported on UUID columns.
+SELECT MIN(uuid_col) FROM iceberg_uuid_test
+---- CATCH
+No matching function with signature: min(UUID)
+====
+---- QUERY
+# MAX() is not yet supported on UUID columns.
+SELECT MAX(uuid_col) FROM iceberg_uuid_test
+---- CATCH
+No matching function with signature: max(UUID)
+====
+---- QUERY
+# COUNT(uuid_col) is not yet supported on UUID columns.
+SELECT COUNT(uuid_col) FROM iceberg_uuid_test
+---- CATCH
+No matching function with signature: count(UUID)
+====
+---- QUERY
+# COUNT(*) works on tables with UUID columns (doesn't require aggregate on UUID).
+SELECT COUNT(*) FROM iceberg_uuid_test
+---- RESULTS
+5
+---- TYPES
+BIGINT
+====
+---- QUERY
+# AVG() is not supported on UUID columns.
+SELECT AVG(uuid_col) FROM iceberg_uuid_test
+---- CATCH
+AVG requires a numeric or timestamp parameter
+====
+---- QUERY
+# SUM() is not supported on UUID columns.
+SELECT SUM(uuid_col) FROM iceberg_uuid_test
+---- CATCH
+SUM requires a numeric parameter: sum(uuid_col)
+====
+---- QUERY
+# ORDER BY on UUID column.
+SELECT uuid_col FROM iceberg_uuid_test ORDER BY uuid_col
+---- RESULTS
+'00000000-0000-0000-0000-000000000000'
+'12345678-1234-5678-1234-567812345678'
+'abcdefab-cdef-abcd-efab-cdefabcdefab'
+'ffffffff-ffff-ffff-ffff-ffffffffffff'
+'NULL'
+---- TYPES
+UUID
+---- HS2_TYPES
+STRING
+====
+---- QUERY
+# SELECT DISTINCT on UUID column.
+SELECT DISTINCT uuid_col FROM iceberg_uuid_test ORDER BY uuid_col
+---- RESULTS
+'00000000-0000-0000-0000-000000000000'
+'12345678-1234-5678-1234-567812345678'
+'abcdefab-cdef-abcd-efab-cdefabcdefab'
+'ffffffff-ffff-ffff-ffff-ffffffffffff'
+'NULL'
+---- TYPES
+UUID
+---- HS2_TYPES
+STRING
+====
+---- QUERY
+# GROUP BY on UUID column.
+SELECT uuid_col, COUNT(*) FROM iceberg_uuid_test GROUP BY uuid_col ORDER BY uuid_col
+---- RESULTS
+'00000000-0000-0000-0000-000000000000',1
+'12345678-1234-5678-1234-567812345678',1
+'abcdefab-cdef-abcd-efab-cdefabcdefab',1
+'ffffffff-ffff-ffff-ffff-ffffffffffff',1
+'NULL',1
+---- TYPES
+UUID,BIGINT
+---- HS2_TYPES
+STRING,BIGINT
+====
+---- QUERY
+# HAVING with a non-boolean UUID expression is rejected at analysis time.
+SELECT uuid_col FROM iceberg_uuid_test GROUP BY uuid_col HAVING uuid_col
+---- CATCH
+HAVING clause 'uuid_col' requires return type 'BOOLEAN'. Actual type is 'UUID'.
+====
+---- QUERY
+# IS NULL is not yet supported on UUID columns (no is_null_pred builtin).
+SELECT id FROM iceberg_uuid_test WHERE uuid_col IS NULL
+---- CATCH
+No matching function with signature: is_null_pred(UUID).
+====
+---- QUERY
+# IS NOT NULL is not yet supported on UUID columns (no is_not_null_pred builtin).
+SELECT id FROM iceberg_uuid_test WHERE uuid_col IS NOT NULL
+---- CATCH
+No matching function with signature: is_not_null_pred(UUID).
+====

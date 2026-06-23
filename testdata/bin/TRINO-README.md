@@ -48,8 +48,8 @@ There are two custom cluster interop suites, both driving Trino through the
 containerized Trino CLI (so no extra Python dependency is required):
 
 * `tests/custom_cluster/test_iceberg_trino_interop.py` exercises interop over
-  Iceberg V3 tables (INSERT, deletion-vector DELETE/UPDATE/MERGE, and column
-  default values) via Trino's `iceberg` catalog.
+  Iceberg V3 tables (INSERT, deletion-vector DELETE/UPDATE/MERGE, column
+  default values, and UUID Parquet reads) via Trino's `iceberg` catalog.
 * `tests/custom_cluster/test_trino_interop.py` is a minimal suite over legacy
   (non-Iceberg) Hive tables via Trino's `hive` catalog: Trino reads tables Impala
   exposes (including the standard `functional` database), and Impala reads a

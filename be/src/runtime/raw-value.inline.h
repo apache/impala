@@ -135,6 +135,8 @@ inline bool RawValue::Eq(const void* v1, const void* v2, const ColumnType& type)
       int64_t l2 = StringValue::UnpaddedCharLength(v2ptr, type.len);
       return StringCompare(v1ptr, l1, v2ptr, l2, std::min(l1, l2)) == 0;
     }
+    case TYPE_UUID:
+      return memcmp(v1, v2, type.len) == 0;
     case TYPE_DECIMAL:
       switch (type.GetByteSize()) {
         case 4:
@@ -218,8 +220,8 @@ template<>
 inline uint32_t RawValue::GetHashValueNonNull<impala::StringValue>(
     const impala::StringValue* v,const ColumnType& type, uint32_t seed) {
   DCHECK(v != NULL);
-  if (type.type == TYPE_CHAR) {
-    // This is a inlined CHAR(n) slot.
+  if (type.type == TYPE_CHAR || type.type == TYPE_UUID) {
+    // This is an inlined CHAR(n) or UUID slot.
     // TODO: this is a bit wonky since it's not really a StringValue*. Handle CHAR(n)
     // in a separate function.
     return HashUtil::MurmurHash2_64(v, type.len, seed);
@@ -343,8 +345,8 @@ template <>
 inline uint64_t RawValue::GetHashValueFastHashNonNull<impala::StringValue>(
     const impala::StringValue* v, const ColumnType& type, uint64_t seed) {
   DCHECK(v != NULL);
-  if (type.type == TYPE_CHAR) {
-    // This is a inlined CHAR(n) slot.
+  if (type.type == TYPE_CHAR || type.type == TYPE_UUID) {
+    // This is an inlined CHAR(n) or UUID slot.
     // TODO: this is a bit wonky since it's not really a StringValue*. Handle CHAR(n)
     // in a separate function.
     return HashUtil::FastHash64(v, type.len, seed);

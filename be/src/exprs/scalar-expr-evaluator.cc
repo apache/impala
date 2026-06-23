@@ -325,7 +325,8 @@ void* ScalarExprEvaluator::GetValue(const ScalarExpr& expr, const TupleRow* row)
       return &result_.string_val;
     }
     case TYPE_CHAR:
-    case TYPE_FIXED_UDA_INTERMEDIATE: {
+    case TYPE_FIXED_UDA_INTERMEDIATE:
+    case TYPE_UUID: {
       impala_udf::StringVal v = expr.GetStringVal(this, row);
       if (v.is_null) return nullptr;
       result_.string_val.Assign(reinterpret_cast<char*>(v.ptr), v.len);

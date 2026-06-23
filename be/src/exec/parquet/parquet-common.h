@@ -28,6 +28,7 @@
 #include "runtime/date-value.h"
 #include "runtime/decimal-value.h"
 #include "runtime/string-value.h"
+#include "runtime/uuid-value.h"
 #include "runtime/timestamp-value.inline.h"
 #include "util/bit-util.h"
 #include "util/decimal-util.h"
@@ -582,6 +583,23 @@ inline int ParquetPlainEncoder::Decode<StringValue, parquet::Type::BYTE_ARRAY>(
 
   // we still read byte_size bytes, even if we truncate and/or smallify
   return byte_size;
+}
+
+/// Decodes a FIXED_LEN_BYTE_ARRAY value into UuidValue by copying raw bytes.
+template <>
+inline int ParquetPlainEncoder::Decode<UuidValue, parquet::Type::FIXED_LEN_BYTE_ARRAY>(
+    const uint8_t* buffer, const uint8_t* buffer_end, int fixed_len_size, UuidValue* v) {
+  if (UNLIKELY(buffer_end - buffer < fixed_len_size)) return -1;
+  v->Assign(buffer, fixed_len_size);
+  return fixed_len_size;
+}
+
+template <>
+inline void ParquetPlainEncoder::
+DecodeNoBoundsCheck<UuidValue, parquet::Type::FIXED_LEN_BYTE_ARRAY>(
+    const uint8_t* buffer, const uint8_t* buffer_end, int fixed_len_size, UuidValue* v) {
+  DCHECK_GE(buffer_end - buffer, fixed_len_size);
+  v->Assign(buffer, fixed_len_size);
 }
 
 /// Write decimals as big endian (byte comparable) to benefit from common prefixes.

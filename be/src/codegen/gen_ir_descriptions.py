@@ -80,6 +80,8 @@ ir_functions = [
    "_Z14TimestampValEqRKN10impala_udf12TimestampValES2_"],
   ["CODEGEN_ANYVAL_TIMESTAMP_VALUE_EQ",
    "_Z16TimestampValueEqRKN10impala_udf12TimestampValERKN6impala14TimestampValueE"],
+  ["CODEGEN_ANYVAL_UUID_INLINE_BYTES_EQ",
+   "_Z17UuidInlineBytesEqRKN10impala_udf9StringValEPKh"],
   ["HASH_CRC", "IrCrcHash"],
   ["HASH_MURMUR", "IrMurmurHash"],
   ["PHJ_PROCESS_BUILD_BATCH",

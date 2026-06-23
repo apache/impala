@@ -875,8 +875,8 @@ Status HashTableCtx::CodegenEvalRow(LlvmCodeGen* codegen, bool build_row,
   const ScalarExprsResultsRowLayout& result_row_layout =
       config.build_exprs_results_row_layout;
   for (int i = 0; i < exprs.size(); ++i) {
-    // Disable codegen for CHAR
-    if (exprs[i]->type().type == TYPE_CHAR) {
+    // Disable codegen for CHAR and UUID
+    if (exprs[i]->type().type == TYPE_CHAR || exprs[i]->type().type == TYPE_UUID) {
       return Status("HashTableCtx::CodegenEvalRow(): CHAR NYI");
     }
   }
@@ -1029,8 +1029,8 @@ Status HashTableCtx::CodegenHashRow(LlvmCodeGen* codegen, bool use_murmur,
   const ScalarExprsResultsRowLayout& result_row_layout =
       config.build_exprs_results_row_layout;
   for (int i = 0; i < exprs.size(); ++i) {
-    // Disable codegen for CHAR
-    if (exprs[i]->type().type == TYPE_CHAR) {
+    // Disable codegen for CHAR and UUID
+    if (exprs[i]->type().type == TYPE_CHAR || exprs[i]->type().type == TYPE_UUID) {
       return Status("HashTableCtx::CodegenHashRow(): CHAR NYI");
     }
   }
@@ -1244,8 +1244,8 @@ Status HashTableCtx::CodegenEquals(LlvmCodeGen* codegen, bool inclusive_equality
     const HashTableConfig& config, llvm::Function** fn) {
   const std::vector<ScalarExpr*>& exprs = config.build_exprs;
   for (int i = 0; i < exprs.size(); ++i) {
-    // Disable codegen for CHAR
-    if (exprs[i]->type().type == TYPE_CHAR) {
+    // Disable codegen for CHAR and UUID
+    if (exprs[i]->type().type == TYPE_CHAR || exprs[i]->type().type == TYPE_UUID) {
       return Status("HashTableCtx::CodegenEquals(): CHAR NYI");
     }
   }

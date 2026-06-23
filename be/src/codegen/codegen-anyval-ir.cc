@@ -19,6 +19,7 @@
 #include "runtime/string-value.inline.h"
 #include "runtime/timestamp-value.h"
 #include "udf/udf.h"
+#include "util/uuid-util.h"
 
 using namespace impala;
 using namespace impala_udf;
@@ -45,6 +46,10 @@ bool StringValueEq(const StringVal& x, const StringValue& y) {
 bool TimestampValueEq(const TimestampVal& x, const TimestampValue& y) {
   TimestampValue tv = TimestampValue::FromTimestampVal(x);
   return tv == y;
+}
+
+bool UuidInlineBytesEq(const StringVal& x, const uint8_t* slot_bytes) {
+  return !x.is_null && memcmp(x.ptr, slot_bytes, UUID_BYTE_LEN) == 0;
 }
 
 #else

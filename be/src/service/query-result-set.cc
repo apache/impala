@@ -468,6 +468,7 @@ int HS2ColumnarResultSet::AddRows(
       case TPrimitiveType::DATE:
       case TPrimitiveType::DECIMAL:
       case TPrimitiveType::STRING:
+      case TPrimitiveType::UUID:
       case TPrimitiveType::VARCHAR:
       case TPrimitiveType::CHAR:
         StitchNulls(num_rows_, rows_added, start_idx, from->stringVal.nulls,
@@ -546,6 +547,7 @@ void HS2ColumnarResultSet::InitColumns() {
         case TPrimitiveType::VARCHAR:
         case TPrimitiveType::CHAR:
         case TPrimitiveType::STRING:
+        case TPrimitiveType::UUID:
           col_output.__isset.stringVal = true;
           break;
         case TPrimitiveType::BINARY:

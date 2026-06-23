@@ -20,6 +20,7 @@
 
 #include <string>
 #include <type_traits>
+#include <vector>
 
 #include "exec/hdfs-table-writer.h"
 #include "exec/parquet/parquet-common.h"
@@ -375,6 +376,17 @@ private:
   bool DecodeTimestamp(const std::string& stat_value,
       ColumnStatsReader::StatsField stats_field,
       TimestampValue* slot) const;
+
+  /// Decodes Iceberg UUID statistics (16 raw bytes) directly into the inline slot.
+  bool DecodeUuid(const std::string& encoded_value, void* slot) const;
+
+  /// Batch version of DecodeUuid(). Returns the number of decoded values, or -1 on error.
+  int64_t DecodeUuidBatch(const vector<std::string>& encoded_values, int64_t start_idx,
+      int64_t end_idx, void* slot) const;
+
+  bool IsUuidColumn() const {
+    return element_.__isset.logicalType && element_.logicalType.__isset.UUID;
+  }
 
   const parquet::ColumnChunk& col_chunk_;
   const ColumnType& col_type_;

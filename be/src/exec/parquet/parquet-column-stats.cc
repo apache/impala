@@ -157,6 +157,9 @@ bool ColumnStatsReader::ReadFromString(StatsField stats_field,
     case TYPE_VARCHAR:
       return ColumnStats<StringValue>::DecodePlainValue(encoded_value, slot,
           element_.type);
+    case TYPE_UUID:
+      if (IsUuidColumn()) return DecodeUuid(encoded_value, slot);
+      return false;
     case TYPE_CHAR:
       /// We don't read statistics for CHAR columns, since CHAR support is broken in
       /// Impala (IMPALA-1652).
@@ -235,6 +238,12 @@ bool ColumnStatsReader::ReadFromStringsBatch(StatsField stats_field,
       num_decoded = DecodeBatchOneBoundsCheck<StringValue>(encoded_values,
           start_idx, end_idx, fixed_len_size, (StringValue*)slot, element_.type);
       break;
+    case TYPE_UUID:
+      if (IsUuidColumn()) {
+        num_decoded = DecodeUuidBatch(encoded_values, start_idx, end_idx, slot);
+        break;
+      }
+      return false;
     case TYPE_CHAR:
       /// We don't read statistics for CHAR columns, since CHAR support is broken in
       /// Impala (IMPALA-1652).
@@ -364,6 +373,30 @@ bool ColumnStatsReader::DecodeDecimal(const std::string& stat_value,
   // use the converted values anyways.
   // No need for an extra buffer, we can do the conversion in-place.
   return data_converter.ConvertSlot(slot, slot);
+}
+
+bool ColumnStatsReader::DecodeUuid(const std::string& encoded_value,
+    void* slot) const {
+  if (encoded_value.size() != col_type_.len) return false;
+  memcpy(slot, encoded_value.data(), col_type_.len);
+  return true;
+}
+
+int64_t ColumnStatsReader::DecodeUuidBatch(const vector<string>& encoded_values,
+    int64_t start_idx, int64_t end_idx, void* slot) const {
+  if (start_idx < 0 || end_idx < start_idx
+      || static_cast<size_t>(end_idx) >= encoded_values.size()) {
+    return -1;
+  }
+
+  int64_t count = end_idx - start_idx + 1;
+  uint8_t* out = reinterpret_cast<uint8_t*>(slot);
+  for (int64_t i = 0; i < count; ++i) {
+    const string& val = encoded_values[start_idx + i];
+    if (val.size() != col_type_.len) return -1;
+    memcpy(out + i * col_type_.len, val.data(), col_type_.len);
+  }
+  return count;
 }
 
 bool ColumnStatsReader::DecodeTimestamp(const std::string& stat_value,

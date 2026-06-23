@@ -60,7 +60,7 @@ public class ColumnStats {
       PrimitiveType.DATE, PrimitiveType.DOUBLE, PrimitiveType.FLOAT,
       PrimitiveType.INT, PrimitiveType.SMALLINT, PrimitiveType.CHAR,
       PrimitiveType.VARCHAR, PrimitiveType.STRING, PrimitiveType.TIMESTAMP,
-      PrimitiveType.TINYINT, PrimitiveType.DECIMAL);
+      PrimitiveType.TINYINT, PrimitiveType.DECIMAL, PrimitiveType.UUID);
 
   private final static Logger LOG = LoggerFactory.getLogger(ColumnStats.class);
 
@@ -645,7 +645,9 @@ public class ColumnStats {
         }
         break;
       case CHAR:
-        // Ignore CHAR length stats, since it is fixed length internally.
+      case UUID:
+        // Ignore CHAR and UUID length stats, since they are fixed length
+        // types internally.
         isCompatible = statsData.isSetStringStats();
         if (isCompatible) {
           StringColumnStatsData stringStats = statsData.getStringStats();
@@ -916,6 +918,7 @@ public class ColumnStats {
       case CHAR:
       case VARCHAR:
       case STRING:
+      case UUID:
         colStatsData.setStringStats(
             new StringColumnStatsData(maxStrLen, avgStrLen, numNulls, ndv));
         break;

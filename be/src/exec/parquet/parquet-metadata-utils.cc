@@ -32,6 +32,7 @@
 #include "exec/parquet/parquet-column-stats.h"
 #include "exec/parquet/parquet-common.h"
 #include "runtime/runtime-state.h"
+#include "runtime/uuid-value.h"
 #include "util/debug-util.h"
 #include "util/ubsan.h"
 
@@ -58,6 +59,7 @@ const map<PrimitiveType, set<parquet::Type::type>> SUPPORTED_PHYSICAL_TYPES = {
         parquet::Type::DOUBLE}},
     {PrimitiveType::TYPE_TIMESTAMP, {parquet::Type::INT96, parquet::Type::INT64}},
     {PrimitiveType::TYPE_STRING, {parquet::Type::BYTE_ARRAY}},
+    {PrimitiveType::TYPE_UUID, {parquet::Type::FIXED_LEN_BYTE_ARRAY}},
     {PrimitiveType::TYPE_DATE, {parquet::Type::INT32}},
     {PrimitiveType::TYPE_DATETIME, {parquet::Type::BYTE_ARRAY}},
     {PrimitiveType::TYPE_BINARY, {parquet::Type::BYTE_ARRAY}},
@@ -414,6 +416,21 @@ Status ParquetMetadataUtils::ValidateColumn(const char* filename,
       ErrorMsg msg(TErrorCode::PARQUET_BAD_CONVERTED_TYPE, filename,
           schema_element.name);
       RETURN_IF_ERROR(state->LogOrReturnError(msg));
+    }
+  } else if (slot_desc->type().type == TYPE_UUID) {
+    if (!schema_element.__isset.type_length) {
+      return Status(Substitute("File '$0' column '$1' does not have type_length set.",
+          filename, schema_element.name));
+    }
+    if (schema_element.type_length != UuidValue::BYTE_SIZE) {
+      return Status(Substitute("File '$0' column '$1' has invalid UUID type length: $2. "
+          "Expected $3.", filename, schema_element.name, schema_element.type_length,
+          UuidValue::BYTE_SIZE));
+    }
+    if (!schema_element.__isset.logicalType
+        || !schema_element.logicalType.__isset.UUID) {
+      return Status(Substitute("File '$0' column '$1' is missing UUID logical type "
+          "annotation.", filename, schema_element.name));
     }
   } else if (IsScaleSet(schema_element) || IsPrecisionSet(schema_element)
       || is_converted_type_decimal) {

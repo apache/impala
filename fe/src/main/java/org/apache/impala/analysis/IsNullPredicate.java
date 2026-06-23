@@ -145,6 +145,11 @@ public class IsNullPredicate extends Predicate {
       fn_ = getBuiltinFunction(
           analyzer, IS_NULL, collectChildReturnTypes(), CompareMode.IS_IDENTICAL);
     }
+    if (fn_ == null) {
+      String fnName = isNotNull_ ? IS_NOT_NULL : IS_NULL;
+      throw new AnalysisException(String.format("No matching function with " +
+          "signature: %s(%s).", fnName, getChild(0).getType().toSql()));
+    }
 
     // determine selectivity
     computeSelectivity();

@@ -27,6 +27,7 @@
 #include "runtime/tuple.h"
 #include "udf/udf-internal.h"
 #include "util/ubsan.h"
+#include "util/uuid-util.h"
 
 #include "common/names.h"
 
@@ -80,6 +81,7 @@ void RawValue::PrintValueAsBytes(const void* value, const ColumnType& type,
       stream->write(chars, TimestampValue::Size());
       break;
     case TYPE_CHAR:
+    case TYPE_UUID:
       stream->write(chars, type.len);
       break;
     case TYPE_DECIMAL:
@@ -115,6 +117,11 @@ void RawValue::PrintValue(const void* value, const ColumnType& type, int scale,
       return;
     case TYPE_CHAR:
       *str = string(reinterpret_cast<const char*>(value), type.len);
+      return;
+    case TYPE_UUID:
+      char uuid_str[UUID_STRING_LEN];
+      UuidBytesToString(reinterpret_cast<const uint8_t*>(value), uuid_str);
+      *str = string(uuid_str, UUID_STRING_LEN);
       return;
     case TYPE_TIMESTAMP:
       *str = reinterpret_cast<const TimestampValue*>(value)->ToString();
@@ -189,6 +196,9 @@ void RawValue::WriteNonNullPrimitive(const void* value, void* dst, const ColumnT
     }
     case TYPE_CHAR:
       DCHECK_EQ(type.type, TYPE_CHAR);
+      memcpy(dst, value, type.len);
+      break;
+    case TYPE_UUID:
       memcpy(dst, value, type.len);
       break;
     case TYPE_DECIMAL:
@@ -533,6 +543,18 @@ void RawValue::PrintValue(
         stream->write(reinterpret_cast<const char*>(value), type.len);
       }
       break;
+    case TYPE_UUID: {
+      char uuid_str[UUID_STRING_LEN];
+      UuidBytesToString(reinterpret_cast<const uint8_t*>(value), uuid_str);
+      if (quote_val) {
+        *stream << "\"";
+        stream->write(uuid_str, UUID_STRING_LEN);
+        *stream << "\"";
+      } else {
+        stream->write(uuid_str, UUID_STRING_LEN);
+      }
+      break;
+    }
     case TYPE_DECIMAL:
       switch (type.GetByteSize()) {
         case 4:

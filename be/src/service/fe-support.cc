@@ -149,6 +149,11 @@ static void SetTColumnValue(
       col_val->binary_val.swap(tmp);
       col_val->__isset.binary_val = true;
       break;
+    case TYPE_UUID:
+      // string_val holds the canonical UUID text for the FE to read back.
+      RawValue::PrintValue(value, type, -1, &col_val->string_val);
+      col_val->__isset.string_val = true;
+      break;
     case TYPE_TIMESTAMP: {
       const uint8_t* uint8_val = reinterpret_cast<const uint8_t*>(value);
       col_val->binary_val.assign(uint8_val, uint8_val + type.GetSlotSize());

@@ -3508,19 +3508,4 @@ public class AnalyzeExprsTest extends AnalyzerTest {
             + "(type: DECIMAL(9,0)) is not compatible with column "
             + "'string_col' (type: STRING)");
   }
-
-  /**
-   * UUID column reads are blocked until read support is implemented.
-   */
-  @Test
-  public void TestUuidReadNotSupported() {
-    final String uuidSubquery = "(select cast(null as uuid) u) t";
-
-    AnalysisError("select u from " + uuidSubquery,
-        "Reading UUID columns is not yet supported.");
-    AnalysisError("select u from " + uuidSubquery + " where u is null",
-        "Reading UUID columns is not yet supported.");
-    AnalysisError("select count(u) from " + uuidSubquery,
-        "Reading UUID columns is not yet supported.");
-  }
 }

@@ -33,6 +33,7 @@
 #include "runtime/scoped-buffer.h"
 #include "runtime/string-value.inline.h"
 #include "runtime/tuple.h"
+#include "runtime/uuid-value.h"
 #include "util/debug-util.h"
 #include "util/dict-encoding.h"
 #include "util/rle-encoding.h"
@@ -293,7 +294,7 @@ ScalarColumnReader<InternalType, PARQUET_TYPE, MATERIALIZED>::ScalarColumnReader
   }
 
   DCHECK(slot_desc_ != nullptr);
-  if (slot_desc_->type().type == TYPE_DECIMAL
+  if ((slot_desc_->type().type == TYPE_DECIMAL || slot_desc_->type().type == TYPE_UUID)
       && PARQUET_TYPE == parquet::Type::FIXED_LEN_BYTE_ARRAY) {
     fixed_len_size_ = node.element->type_length;
   } else if (slot_desc_->type().type == TYPE_VARCHAR) {
@@ -322,16 +323,15 @@ struct IsDecimalValue {
 template <typename InternalType, parquet::Type::type PARQUET_TYPE, bool MATERIALIZED>
 inline bool ScalarColumnReader<InternalType, PARQUET_TYPE, MATERIALIZED>
 ::NeedsConversionInline() const {
-  //TODO: use constexpr ifs when we switch to C++17.
-  if /* constexpr */ (MATERIALIZED) {
-    if /* constexpr */ (IsDecimalValue<InternalType>::value) {
+  if constexpr (MATERIALIZED) {
+    if constexpr (IsDecimalValue<InternalType>::value) {
       return data_converter_.NeedsConversion();
     }
-    if /* constexpr */ (std::is_same<InternalType, TimestampValue>::value) {
+    if constexpr (std::is_same<InternalType, TimestampValue>::value) {
       return data_converter_.NeedsConversion();
     }
-    if /* constexpr */ (std::is_same<InternalType, StringValue>::value &&
-                        PARQUET_TYPE == parquet::Type::BYTE_ARRAY) {
+    if constexpr (std::is_same<InternalType, StringValue>::value &&
+                  PARQUET_TYPE == parquet::Type::BYTE_ARRAY) {
       return data_converter_.NeedsConversion();
     }
   }
@@ -1902,6 +1902,10 @@ ParquetColumnReader* ParquetColumnReader::Create(const SchemaNode& node,
       case TYPE_DATE:
         return new ScalarColumnReader<DateValue, parquet::Type::INT32, true>(parent, node,
             slot_desc);
+      case TYPE_UUID:
+        DCHECK_EQ(node.element->type, parquet::Type::FIXED_LEN_BYTE_ARRAY);
+        return new ScalarColumnReader<UuidValue, parquet::Type::FIXED_LEN_BYTE_ARRAY,
+            true>(parent, node, slot_desc);
       case TYPE_STRING:
       case TYPE_VARCHAR:
       case TYPE_CHAR:

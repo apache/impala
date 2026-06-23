@@ -1516,6 +1516,11 @@ public class IcebergUtil {
                 "with type: %s", iceTable.getFullName(), c.getName(),
             c.getType().toSql()));
       }
+      if (c.getType().isUuid()) {
+        throw new AnalysisException(String.format("Impala does not support writing " +
+                "UUID columns. Table '%s' has column '%s' with type: %s",
+            iceTable.getFullName(), c.getName(), c.getType().toSql()));
+      }
     }
     if (iceTable.getIcebergFileFormat() != TIcebergFileFormat.PARQUET) {
       throw new AnalysisException(String.format("Impala can only write Parquet data " +
@@ -1548,6 +1553,12 @@ public class IcebergUtil {
       if (colType.isBinary()) {
         throw new AnalysisException(
             "Iceberg write-default values for BINARY/FIXED types are not supported. " +
+            "Please specify value for column '" + column.getName() + "' explicitly.");
+      }
+      // Reject UUID
+      if (colType.isUuid()) {
+        throw new AnalysisException(
+            "Iceberg write-default values for UUID types are not supported. " +
             "Please specify value for column '" + column.getName() + "' explicitly.");
       }
 

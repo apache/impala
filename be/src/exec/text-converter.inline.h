@@ -34,6 +34,7 @@
 #include "runtime/mem-pool.h"
 #include "runtime/string-value.inline.h"
 #include "exprs/string-functions.h"
+#include "util/uuid-util.h"
 
 namespace impala {
 
@@ -131,6 +132,12 @@ inline bool TextConverter::WriteSlot(const SlotDescriptor* slot_desc, Tuple* tup
       }
       break;
     }
+    case TYPE_UUID:
+      if (!ParseCanonicalUuidStringToBytes(data, len,
+          reinterpret_cast<uint8_t*>(slot))) {
+        parse_result = StringParser::PARSE_FAILURE;
+      }
+      break;
     case TYPE_BOOLEAN:
       *reinterpret_cast<bool*>(slot) =
         StringParser::StringToBool(data, len, &parse_result);

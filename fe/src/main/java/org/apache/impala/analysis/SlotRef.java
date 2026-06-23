@@ -172,9 +172,6 @@ public class SlotRef extends Expr {
       // HMS string.
       throw new UnsupportedFeatureException("Unsupported type in '" + toSql() + "'.");
     }
-    if (type_.isUuid()) {
-      throw new AnalysisException("Reading UUID columns is not yet supported.");
-    }
     // Register columns of a catalog table for column masking.
     if (!resolvedPath_.getMatchedTypes().isEmpty()) {
       analyzer.registerColumnForMasking(desc_);

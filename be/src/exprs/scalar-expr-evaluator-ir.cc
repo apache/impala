@@ -79,7 +79,8 @@ IR_ALWAYS_INLINE void* ScalarExprEvaluator::StoreResult(const AnyVal& val,
       return &result_.string_val;
     }
     case TYPE_CHAR:
-    case TYPE_FIXED_UDA_INTERMEDIATE: {
+    case TYPE_FIXED_UDA_INTERMEDIATE:
+    case TYPE_UUID: {
       const StringVal& v = reinterpret_cast<const StringVal&>(val);
       result_.string_val.Assign(reinterpret_cast<char*>(v.ptr), v.len);
       return result_.string_val.Ptr();

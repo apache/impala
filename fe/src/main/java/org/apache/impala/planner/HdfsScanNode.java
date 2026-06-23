@@ -55,6 +55,7 @@ import org.apache.impala.catalog.Column;
 import org.apache.impala.catalog.ColumnStats;
 import org.apache.impala.catalog.FeFsPartition;
 import org.apache.impala.catalog.FeFsTable;
+import org.apache.impala.catalog.FeIcebergTable;
 import org.apache.impala.catalog.FeTable;
 import org.apache.impala.catalog.FileBlock;
 import org.apache.impala.catalog.FileDescriptor;
@@ -469,6 +470,7 @@ public class HdfsScanNode extends ScanNode {
     conjuncts_ = orderConjunctsByCost(conjuncts_);
     checkSamplingAndCountStar(analyzer);
     checkForSupportedFileFormats();
+    checkUuidReadSupported();
 
     assignCollectionConjuncts(analyzer);
 
@@ -663,6 +665,26 @@ public class HdfsScanNode extends ScanNode {
           firstComplexTypedCol.getName(), firstComplexTypedCol.getType().toSql(),
           errSuffix));
     }
+  }
+
+  /**
+   * Validates that Iceberg tables with UUID columns can be read from the file formats
+   * present in this scan. TODO: Remove when ORC/Avro UUID read support is added.
+   */
+  private void checkUuidReadSupported() throws ImpalaException {
+    FeTable table = desc_.getTable();
+    if (!(table instanceof FeIcebergTable)) return;
+
+    boolean readsUuid = false;
+    for (SlotDescriptor slot : desc_.getSlots()) {
+      if (slot.isMaterialized() && slot.getType().containsUuid()) {
+        readsUuid = true;
+        break;
+      }
+    }
+    if (!readsUuid) return;
+
+    ((FeIcebergTable) table).validateUuidReadSupported(fileFormats_);
   }
 
   /**

@@ -1011,6 +1011,26 @@ Impala> insert into iceberg_v2_partitioned_position_deletes select * from functi
 Hive> delete from iceberg_v2_partitioned_position_deletes where id % 2 = 1;
 ORC table is similarly created.
 
+iceberg_test/iceberg_uuid/iceberg_uuid_test:
+Iceberg V3 Parquet table for UUID read-path tests.
+Generated using the Iceberg Java API (version 1.10.2).
+  1. Initial table: columns id (int), name (string)
+  2. Schema evolution: ADD uuid_col UUID with initial-default
+     12345678-1234-5678-1234-567812345678
+  3. Appended rows id=1..5 with explicit uuid_col values (including SQL NULL for id=4)
+UUID values are stored as FIXED_LEN_BYTE_ARRAY(16) with the annotation logicalType.UUID.
+
+iceberg_test/iceberg_uuid/iceberg_uuid_test_orc:
+Same logical row data as iceberg_uuid_test, ORC format (format v2, unpartitioned).
+Generated using the Iceberg Java API.
+UUID values are stored as ORC BINARY with the iceberg.binary-type=UUID property.
+Used to verify ORC UUID reads are rejected until a later patch.
+
+iceberg_test/iceberg_uuid/iceberg_uuid_test_avro:
+Same logical row data as iceberg_uuid_test, Avro format (format v2, unpartitioned).
+Generated using the Iceberg Java API.
+UUID values are stored as Avro fixed(16) with logicalType=uuid.
+Used to verify Avro UUID reads are rejected until a later patch.
 
 iceberg_v2_positional_delete_all_rows:
 iceberg_v2_positional_delete_all_rows_orc:

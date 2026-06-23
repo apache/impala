@@ -44,7 +44,7 @@ from tests.common.skip import SkipIf
 @CustomClusterTestSuite.with_args(cluster_size=3, run_trino=True)
 class TestIcebergTrinoInterop(CustomClusterTestSuite):
   """Impala <-> Trino interop tests for Iceberg V3 (INSERT, deletion-vector
-  DELETE/UPDATE/MERGE, column default values)."""
+  DELETE/UPDATE/MERGE, column default values, UUID reads)."""
 
   @pytest.mark.execute_serially
   def test_insert(self, vector, unique_database):
@@ -64,4 +64,10 @@ class TestIcebergTrinoInterop(CustomClusterTestSuite):
     """Iceberg V3 column default values written by one engine and read by the
     other."""
     self.run_test_case('QueryTest/iceberg-trino-interop-default-values', vector,
+                       use_db=unique_database)
+
+  @pytest.mark.execute_serially
+  def test_uuid_read(self, vector, unique_database):
+    """Trino writes Iceberg Parquet UUID columns. Impala reads them back."""
+    self.run_test_case('QueryTest/iceberg-trino-interop-uuid', vector,
                        use_db=unique_database)

@@ -84,6 +84,18 @@ class TestIcebergTable(IcebergTestSuite):
   def test_iceberg_binary_type(self, vector, unique_database):
     self.run_test_case('QueryTest/iceberg-binary-type', vector, use_db=unique_database)
 
+  def test_iceberg_uuid_type(self, vector, unique_database):
+    create_iceberg_table_from_directory(self.client, unique_database,
+        "iceberg_uuid_test", "parquet",
+        table_location="${IMPALA_HOME}/testdata/data/iceberg_test/iceberg_uuid")
+    create_iceberg_table_from_directory(self.client, unique_database,
+        "iceberg_uuid_test_orc", "orc",
+        table_location="${IMPALA_HOME}/testdata/data/iceberg_test/iceberg_uuid")
+    create_iceberg_table_from_directory(self.client, unique_database,
+        "iceberg_uuid_test_avro", "avro",
+        table_location="${IMPALA_HOME}/testdata/data/iceberg_test/iceberg_uuid")
+    self.run_test_case('QueryTest/iceberg-uuid-type', vector, use_db=unique_database)
+
   def test_external_iceberg_tables(self, vector, unique_database):
     self.run_test_case('QueryTest/iceberg-external', vector, unique_database)
 
