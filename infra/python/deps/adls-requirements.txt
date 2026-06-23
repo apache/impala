@@ -21,7 +21,7 @@
 
 pycparser == 2.23
 cffi==2.0.0
-cryptography==46.0.7
+cryptography==48.0.1
   maturin==1.13.3
     setuptools-rust==1.12.1
       semantic_version==2.10.0
