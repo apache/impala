@@ -92,9 +92,7 @@ class TestIcebergConcurrentMergeStress(ImpalaTestSuite):
       time.sleep(random.random())
     impalad_client.close()
 
-  @pytest.mark.execute_serially
-  @UniqueDatabase.parametrize(sync_ddl=True)
-  def test_iceberg_merge_updates(self, unique_database):
+  def _run_merge_updates_test(self, unique_database, format_version):
     """Issues MERGE statements with UPDATE and INSERT clause against multiple
     impalads in a way that some invariants must be true when a spectator
     process inspects the table. E.g. the value of a column should be equal
@@ -104,7 +102,7 @@ class TestIcebergConcurrentMergeStress(ImpalaTestSuite):
     self.client.execute("""create table {0}
         (total bigint, a bigint, b bigint, c bigint)
         stored as iceberg
-        tblproperties('format-version'='2')""".format(tbl_name,))
+        tblproperties('format-version'='{1}')""".format(tbl_name, format_version))
     self.client.execute(
         "insert into {} values (0, 0, 0, 0)".format(tbl_name))
 
@@ -119,3 +117,13 @@ class TestIcebergConcurrentMergeStress(ImpalaTestSuite):
     checkers = [Task(self._impala_role_concurrent_checker, tbl_name, target_total)
                 for i in range(0, num_checkers)]
     run_tasks([writer_a, updater_b, updater_c] + checkers)
+
+  @pytest.mark.execute_serially
+  @UniqueDatabase.parametrize(sync_ddl=True)
+  def test_iceberg_v2_merge_updates(self, unique_database):
+    self._run_merge_updates_test(unique_database, 2)
+
+  @pytest.mark.execute_serially
+  @UniqueDatabase.parametrize(sync_ddl=True)
+  def test_iceberg_v3_merge_updates(self, unique_database):
+    self._run_merge_updates_test(unique_database, 3)
