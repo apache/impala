@@ -296,11 +296,13 @@ def parse_test_file_text(text, valid_section_names, skip_unknown_sections=True):
       # table format. RUNTIME_PROFILE sections with a comment are only evaluated for the
       # specified format. If there is a RUNTIME_PROFILE section without a comment, it is
       # evaluated for all formats that don't have a commented section for this query.
-      if subsection_name == 'RUNTIME_PROFILE':
+      if subsection_name == 'RUNTIME_PROFILE' or \
+          subsection_name == 'CALCITE_PLANNER_RUNTIME_PROFILE':
         if subsection_comment:
           table_formats = parse_runtime_profile_table_formats(subsection_comment)
           for table_format in table_formats:
-            subsection_name_for_format = 'RUNTIME_PROFILE_%s' % table_format
+            subsection_name_for_format = \
+                '%s_%s' % (subsection_name, table_format)
             parsed_sections[subsection_name_for_format] = subsection_str
           continue
 

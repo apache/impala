@@ -127,6 +127,17 @@ public interface FeTable {
   List<Column> getColumnsInHiveOrder();
 
   /**
+   * @return an Iterable for a list of the columns used when a select * is called. This
+   * will also be in "hive" order by default. Hidden columns are not output with
+   * select *.
+   */
+  default Iterable<Column> getStarColumns() {
+    return getColumnsInHiveOrder().stream()
+        .filter(c -> !c.isHidden())
+        ::iterator;
+  }
+
+  /**
    * @return a list of the column names ordered by position.
    */
   List<String> getColumnNames();

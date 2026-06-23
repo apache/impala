@@ -48,6 +48,9 @@ public class UnsupportedChecker {
   private static Pattern FILE_POSITION = Pattern.compile(".*\\bfile__position\\b.*",
       Pattern.CASE_INSENSITIVE);
 
+  private static Pattern AUTO_INCREMENTING_ID =
+      Pattern.compile(".*\\bauto_incrementing_id\\b.*", Pattern.CASE_INSENSITIVE);
+
   private static Pattern TABLE_NOT_FOUND =
       Pattern.compile(".*\\bTable '(.*)' not found\\b.*", Pattern.CASE_INSENSITIVE);
 
@@ -65,6 +68,9 @@ public class UnsupportedChecker {
     }
     if (INPUT_FILE_NAME.matcher(s).matches() || FILE_POSITION.matcher(s).matches()) {
       throw new UnsupportedFeatureException("Virtual columns not supported.");
+    }
+    if (AUTO_INCREMENTING_ID.matcher(s).matches()) {
+      throw new UnsupportedFeatureException("auto_incrementing_id not supported.");
     }
   }
 

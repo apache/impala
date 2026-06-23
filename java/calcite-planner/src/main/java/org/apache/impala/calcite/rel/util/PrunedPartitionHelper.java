@@ -25,6 +25,7 @@ import org.apache.impala.analysis.TupleDescriptor;
 import org.apache.impala.calcite.schema.CalciteTable;
 import org.apache.impala.calcite.schema.CalciteIcebergTable;
 import org.apache.impala.catalog.FeFsPartition;
+import org.apache.impala.catalog.FeKuduTable;
 import org.apache.impala.common.ImpalaException;
 import org.apache.impala.common.Pair;
 import org.apache.impala.planner.HdfsPartitionPruner;
@@ -44,6 +45,12 @@ public class PrunedPartitionHelper {
   private final List<Expr> partitionedConjuncts_;
 
   private final List<Expr> nonPartitionedConjuncts_;
+
+  public PrunedPartitionHelper(ExprConjunctsConverter converter) {
+    prunedPartitions_ = new ArrayList<>();
+    partitionedConjuncts_ = new ArrayList<>();
+    nonPartitionedConjuncts_ = converter.getImpalaConjuncts();
+  }
 
   public PrunedPartitionHelper(CalciteTable table,
       ExprConjunctsConverter converter, TupleDescriptor tupleDesc,
@@ -93,5 +100,18 @@ public class PrunedPartitionHelper {
 
   public List<Expr> getNonPartitionedConjuncts() {
     return nonPartitionedConjuncts_;
+  }
+
+  public static PrunedPartitionHelper create(CalciteTable table,
+      ExprConjunctsConverter converter, TupleDescriptor tupleDesc,
+      RexBuilder rexBuilder,
+      Analyzer analyzer) throws ImpalaException {
+    if ((table.getFeTable() instanceof FeKuduTable)) {
+      // Kudu tables don't use the PrunedPartition class. The conjuncts don't
+      // need to be split up into partitioned and non-partitioned conjuncts, so
+      // a simpler constructor is used.
+      return new PrunedPartitionHelper(converter);
+    }
+    return new PrunedPartitionHelper(table, converter, tupleDesc, rexBuilder, analyzer);
   }
 }

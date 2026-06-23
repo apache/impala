@@ -50,7 +50,7 @@ public class CalciteIcebergTable extends CalciteTable {
   }
 
   public FeIcebergTable getFeIcebergTable() {
-    return (FeIcebergTable) getFeFsTable();
+    return (FeIcebergTable) getFeTable();
   }
 
   @Override

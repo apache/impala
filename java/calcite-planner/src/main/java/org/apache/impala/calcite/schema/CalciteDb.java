@@ -31,6 +31,7 @@ import org.apache.impala.catalog.FeIcebergTable;
 import org.apache.impala.catalog.FeTable;
 import org.apache.impala.catalog.FeView;
 import org.apache.impala.catalog.HdfsTable;
+import org.apache.impala.catalog.FeKuduTable;
 import org.apache.impala.catalog.local.LocalFsTable;
 import org.apache.impala.common.ImpalaException;
 import org.apache.impala.common.UnsupportedFeatureException;
@@ -60,31 +61,36 @@ public class CalciteDb extends AbstractSchema {
       this.reader_ = reader;
     }
 
-    public Builder addTable(String tableName, FeTable table,
+    public Builder addTable(String tableName, FeTable feTable,
         Analyzer analyzer) throws ImpalaException {
       if (tableMap_.containsKey(tableName)) return this;
 
-      if (table instanceof LocalFsTable || table instanceof HdfsTable) {
-        tableMap_.put(
-            tableName.toLowerCase(), new CalciteTable(table, reader_, analyzer));
-        return this;
+      Table table = createCalciteTable(feTable, analyzer);
+
+      if (table == null) {
+        throw new UnsupportedFeatureException("Table " + feTable.getFullName()
+            + " has unsupported type " + table.getClass().getSimpleName() + ".");
+      }
+      tableMap_.put(tableName.toLowerCase(), table);
+      return this;
+    }
+
+    private Table createCalciteTable(FeTable feTable, Analyzer analyzer)
+        throws ImpalaException {
+      if (feTable instanceof FeView) {
+        return createViewTable(feTable);
       }
 
-      if (table instanceof FeIcebergTable) {
-        tableMap_.put(tableName.toLowerCase(),
-            new CalciteIcebergTable((FeIcebergTable) table, reader_, analyzer));
-        return this;
+      if (feTable instanceof LocalFsTable || feTable instanceof HdfsTable ||
+          feTable instanceof FeKuduTable) {
+        return new CalciteTable(feTable, reader_, analyzer);
       }
 
-      if (table instanceof FeView) {
-        tableMap_.put(tableName.toLowerCase(), createViewTable(table));
-        return this;
+      if (feTable instanceof FeIcebergTable) {
+        return new CalciteIcebergTable((FeIcebergTable) feTable, reader_, analyzer);
       }
 
-      throw new UnsupportedFeatureException("Table " + table.getFullName()
-          + " has unsupported type " + table.getClass().getSimpleName()
-          + ". The Calcite planner only supports "
-          + "HdfsTable's and FeView's.");
+      return null;
     }
 
     private static ViewTable createViewTable(FeTable feTable) throws ImpalaException {

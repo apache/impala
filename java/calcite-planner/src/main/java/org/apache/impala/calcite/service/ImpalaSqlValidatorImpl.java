@@ -48,8 +48,8 @@ import org.apache.impala.calcite.schema.CalciteTable;
 import org.apache.impala.calcite.schema.ImpalaViewTable;
 import org.apache.impala.calcite.type.ImpalaTypeConverter;
 import org.apache.impala.catalog.BuiltinsDb;
+import org.apache.impala.catalog.FeTable;
 import org.apache.impala.catalog.FeView;
-import org.apache.impala.catalog.FeFsTable;
 import org.apache.impala.catalog.Type;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -135,7 +135,7 @@ public class ImpalaSqlValidatorImpl extends SqlValidatorImpl {
       SqlValidatorTable validatorTable = fromNs.getTable();
 
       if (validatorTable instanceof CalciteTable) {
-        FeFsTable feFsTable = ((CalciteTable) validatorTable).getFeFsTable();
+        FeTable feFsTable = ((CalciteTable) validatorTable).getFeTable();
         this.analyzer_.registerPrivReq(
             builder -> builder.allOf(Privilege.SELECT)
                 .onColumn(feFsTable.getDb().getName(),

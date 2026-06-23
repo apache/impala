@@ -1080,7 +1080,13 @@ class ImpalaTestSuite(BaseTestSuite):
               .replace(INTERNAL_LISTEN_IP, '$INTERNAL_LISTEN_IP')
 
         rt_profile_info = None
-        if 'RUNTIME_PROFILE_%s' % table_format_info.file_format in test_section:
+        if IS_CALCITE_PLANNER and 'CALCITE_PLANNER_RUNTIME_PROFILE_%s' \
+            % table_format_info.file_format in test_section:
+          # If this table format has a RUNTIME_PROFILE section specifically for it,
+          # evaluate that section and ignore any general RUNTIME_PROFILE sections.
+          rt_profile_info = 'CALCITE_PLANNER_RUNTIME_PROFILE_%s' \
+              % table_format_info.file_format
+        elif 'RUNTIME_PROFILE_%s' % table_format_info.file_format in test_section:
           # If this table format has a RUNTIME_PROFILE section specifically for it,
           # evaluate that section and ignore any general RUNTIME_PROFILE sections.
           rt_profile_info = 'RUNTIME_PROFILE_%s' % table_format_info.file_format

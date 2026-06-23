@@ -79,6 +79,20 @@ public interface FeKuduTable extends FeTable {
   List<KuduPartitionParam> getPartitionBy();
 
   /**
+   * @return an Iterable for a list of the columns used when a select * is called. This
+   * will also be in "hive" order by default. For Kudu, auto_incrementing columns
+   * and hidden columns are not output with select *.
+   */
+  @Override
+  default Iterable<Column> getStarColumns() {
+    return getColumnsInHiveOrder().stream()
+        .map(c -> (KuduColumn)c)
+        .filter(c -> !c.isHidden() && !c.isAutoIncrementing())
+        .map(c -> (Column)c)
+        ::iterator;
+  }
+
+  /**
    * Utility functions for acting on FeKuduTable.
    *
    * When we fully move to Java 8, these can become default methods of the
