@@ -44,7 +44,7 @@ under the License.
 
     <ul>
       <li>
-        <xref keyref="delete"/>. Works for Kudu tables only.
+        <xref keyref="delete"/>. Works for Kudu and Iceberg tables.
       </li>
 
       <li>
@@ -56,11 +56,15 @@ under the License.
       </li>
 
       <li>
-        <xref keyref="update"/>. Works for Kudu tables only.
+        <xref keyref="update"/>. Works for Kudu and Iceberg tables.
       </li>
 
       <li>
         <xref keyref="upsert"/>. Works for Kudu tables only.
+      </li>
+
+      <li>
+        <xref keyref="merge"/>. Works for Iceberg tables only.
       </li>
     </ul>
 
@@ -80,8 +84,10 @@ under the License.
     </p>
 
     <p>
-      In <keyword keyref="impala28_full"/> and higher, Impala does support the <codeph>UPDATE</codeph>, <codeph>DELETE</codeph>,
-      and <codeph>UPSERT</codeph> statements for Kudu tables.
+      In <keyword keyref="impala28_full"/> and higher, Impala supports the <codeph>UPDATE</codeph>, <codeph>DELETE</codeph>, 
+      and <codeph>UPSERT</codeph> statements for Kudu tables. For Iceberg V2 tables, Impala supports the <codeph>DELETE</codeph> 
+      statement starting in <keyword keyref="impala43"/>, the <codeph>UPDATE</codeph> statement starting in <keyword keyref="impala44"/>, 
+      and the <codeph>MERGE</codeph> statement starting in <keyword keyref="impala45"/>.
       For HDFS or S3 tables, to simulate the effects of an <codeph>UPDATE</codeph> or <codeph>DELETE</codeph> statement
       in other database systems, typically you use <codeph>INSERT</codeph> or <codeph>CREATE TABLE AS SELECT</codeph> to copy data
       from one table to another, filtering out or changing the appropriate rows during the copy operation.

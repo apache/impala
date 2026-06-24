@@ -10876,6 +10876,7 @@ under the License.
   <keydef href="topics/impala_truncate_table.xml" keys="truncate_table"/>
   <keydef href="topics/impala_update.xml" keys="update"/>
   <keydef href="topics/impala_upsert.xml" keys="upsert"/>
+  <keydef href="topics/impala_merge.xml" keys="merge"/>
   <keydef href="topics/impala_use.xml" keys="use"/>
   <keydef href="topics/impala_functions.xml" keys="builtins"/>
   <keydef href="topics/impala_math_functions.xml" keys="math_functions"/>

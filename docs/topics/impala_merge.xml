@@ -20,7 +20,7 @@ under the License.
 <!DOCTYPE concept PUBLIC "-//OASIS//DTD DITA Concept//EN" "concept.dtd">
 <concept id="merge">
 
-  <title>MERGE Statement</title>
+  <title>MERGE Statement (<keyword keyref="impala45"/> or higher only)</title>
   <titlealts audience="PDF"><navtitle>MERGE</navtitle></titlealts>
   <prolog>
     <metadata>
