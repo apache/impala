@@ -376,4 +376,10 @@ struct TBackendGflags {
   173: required i32 unregistration_thread_pool_size
 
   174: required string cte_suggester_class
+
+  175: required string avro_schema_url_allowed_schemes
+
+  176: required bool avro_schema_url_remote_http_enabled
+
+  177: required string avro_schema_url_http_allowed_hosts
 }

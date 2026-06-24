@@ -313,6 +313,22 @@ DEFINE_int32(max_stmt_metadata_loader_threads, 8,
     "Maximum number of threads to use for loading table metadata during query "
     "compilation.");
 
+DEFINE_string(avro_schema_url_allowed_schemes,
+    "hdfs,s3a,abfs,abfss,gs,o3fs,ofs",
+    "Comma-separated list of URI schemes permitted for avro.schema.url when loading "
+    "schemas from a remote location. HTTP is never allowed via this setting. A URI with "
+    "no scheme is resolved against the default filesystem.");
+
+DEFINE_bool(avro_schema_url_remote_http_enabled, false,
+    "Whether to allow avro.schema.url values that use http. When enabled, the host must "
+    "also appear in avro_schema_url_http_allowed_hosts. Disabled by default to prevent "
+    "server-side request forgery.");
+
+DEFINE_string(avro_schema_url_http_allowed_hosts, "",
+    "Comma-separated list of hosts permitted for avro.schema.url when "
+    "avro_schema_url_remote_http_enabled is true. HTTP schema fetch is rejected when "
+    "this list is empty.");
+
 // These coefficients have not been determined empirically. The write coefficient
 // matches the coefficient for a broadcast sender in DataStreamSink. The read
 // coefficient matches the coefficient for an exchange receiver in ExchandeNode.
@@ -627,6 +643,10 @@ Status PopulateThriftBackendGflags(TBackendGflags& cfg) {
       FLAGS_hbo_in_memory_backend_cache_size_bytes);
   cfg.__set_unregistration_thread_pool_size(FLAGS_unregistration_thread_pool_size);
   cfg.__set_cte_suggester_class(FLAGS_cte_suggester_class);
+  cfg.__set_avro_schema_url_allowed_schemes(FLAGS_avro_schema_url_allowed_schemes);
+  cfg.__set_avro_schema_url_remote_http_enabled(
+      FLAGS_avro_schema_url_remote_http_enabled);
+  cfg.__set_avro_schema_url_http_allowed_hosts(FLAGS_avro_schema_url_http_allowed_hosts);
   return Status::OK();
 }
 
