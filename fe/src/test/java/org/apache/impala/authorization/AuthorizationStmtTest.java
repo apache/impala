@@ -3572,6 +3572,9 @@ public class AuthorizationStmtTest extends AuthorizationTestBase {
       authorize("drop table functional_kudu.alltypes")
           .error(dropError("functional_kudu.alltypes"), onServer(TPrivilegeLevel.ALL));
 
+      // The following tests depend on allow_catalog_cache_op_from_masked_users=false.
+      BackendConfig.INSTANCE.setAllowCatalogCacheOpFromMaskedUsers(false);
+
       // Block REFRESH even given SERVER ALL privilege
       authorize("refresh functional.alltypes")
           .error(refreshError("functional.alltypes"), onServer(TPrivilegeLevel.ALL));
@@ -3613,6 +3616,7 @@ public class AuthorizationStmtTest extends AuthorizationTestBase {
       deleteRangerPolicy("alltypessmall_id_unmask");
       deleteRangerPolicy("alltypes_sint_mask");
       deleteRangerPolicy("mv1_alltypes_jointbl_c2_mask");
+      BackendConfig.INSTANCE.setAllowCatalogCacheOpFromMaskedUsers(true);
     }
   }
 

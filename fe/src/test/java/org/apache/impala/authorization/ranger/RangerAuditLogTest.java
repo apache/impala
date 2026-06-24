@@ -26,6 +26,7 @@ import org.apache.impala.authorization.AuthorizationPolicy;
 import org.apache.impala.authorization.AuthorizationProvider;
 import org.apache.impala.authorization.AuthorizationTestBase;
 import org.apache.impala.common.ImpalaException;
+import org.apache.impala.service.BackendConfig;
 import org.apache.impala.service.FeSupport;
 import org.apache.impala.thrift.TPrivilege;
 import org.apache.impala.thrift.TPrivilegeLevel;
@@ -745,6 +746,9 @@ public class RangerAuditLogTest extends AuthorizationTestBase {
       },"with iv as (select id, bool_col, string_col from functional.alltypestiny) " +
           "select * from iv", onTable("functional", "alltypestiny"));
 
+      // The following tests depend on allow_catalog_cache_op_from_masked_users=false.
+      BackendConfig.INSTANCE.setAllowCatalogCacheOpFromMaskedUsers(false);
+
       // Updates on metadata fails by column-masking policies.
       authzError(events -> {
         assertEquals(1, events.size());
@@ -807,6 +811,7 @@ public class RangerAuditLogTest extends AuthorizationTestBase {
         String policyName = policyNames[i];
         deleteRangerPolicy(policyName);
       }
+      BackendConfig.INSTANCE.setAllowCatalogCacheOpFromMaskedUsers(true);
     }
   }
 
@@ -960,6 +965,9 @@ public class RangerAuditLogTest extends AuthorizationTestBase {
             events.get(0));
       },"select * from functional.alltypestiny", onTable("functional", "alltypestiny"));
 
+      // The following tests depend on allow_catalog_cache_op_from_masked_users=false.
+      BackendConfig.INSTANCE.setAllowCatalogCacheOpFromMaskedUsers(false);
+
       // Updates on metadata fails by row-filtering policies.
       authzError(events -> {
         assertEquals(1, events.size());
@@ -1026,6 +1034,7 @@ public class RangerAuditLogTest extends AuthorizationTestBase {
           // ignore this to expose the original error.
         }
       }
+      BackendConfig.INSTANCE.setAllowCatalogCacheOpFromMaskedUsers(true);
     }
   }
 

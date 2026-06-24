@@ -480,6 +480,10 @@ public class BackendConfig {
     return backendCfg_.allow_catalog_cache_op_from_masked_users;
   }
 
+  public void setAllowCatalogCacheOpFromMaskedUsers(boolean isEnabled) {
+    backendCfg_.allow_catalog_cache_op_from_masked_users = isEnabled;
+  }
+
   public String debugActions() { return backendCfg_.debug_actions; }
 
   public void setDebugActions(String debugActions) {
