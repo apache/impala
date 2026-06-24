@@ -549,4 +549,16 @@ public class BackendConfig {
   public String getInjectedGroupMembersDebugOnly() {
     return backendCfg_.injected_group_members_debug_only;
   }
+
+  public String getAvroSchemaUrlAllowedSchemes() {
+    return backendCfg_.avro_schema_url_allowed_schemes;
+  }
+
+  public boolean isAvroSchemaUrlRemoteHttpEnabled() {
+    return backendCfg_.avro_schema_url_remote_http_enabled;
+  }
+
+  public String getAvroSchemaUrlHttpAllowedHosts() {
+    return backendCfg_.avro_schema_url_http_allowed_hosts;
+  }
 }

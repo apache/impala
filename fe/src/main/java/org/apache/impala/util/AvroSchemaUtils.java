@@ -19,8 +19,11 @@ package org.apache.impala.util;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.net.HttpURLConnection;
 import java.net.URL;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 
@@ -122,7 +125,7 @@ public abstract class AvroSchemaUtils {
   /**
    * Gets an Avro table's JSON schema from the list of given table property search
    * locations. The schema may be specified as a string literal or provided as a
-   * Hadoop FileSystem or http URL that points to the schema. Apart from ensuring
+   * Hadoop FileSystem or http(s) URL that points to the schema. Apart from ensuring
    * that the JSON schema is not SCHEMA_NONE, this function does not perform any
    * additional validation on the returned string (e.g., it may not be a valid
    * schema). Returns the Avro schema or null if none was specified in the search
@@ -155,13 +158,57 @@ public abstract class AvroSchemaUtils {
       return null;
     }
     try {
-      // TODO: Add support for https:// here.
-      if (url.toLowerCase().startsWith("http://")) {
-        try (InputStream in = new URL(url).openStream()) {
-          return IOUtils.toString(in);
+      Path path = new Path(url);
+      String scheme = path.toUri().getScheme();
+      if (scheme != null && Arrays.asList("http", "https").contains(scheme)) {
+        if (!BackendConfig.INSTANCE.isAvroSchemaUrlRemoteHttpEnabled()) {
+          throw new AnalysisException("avro.schema.url does not permit HTTP(S). Set " +
+              "--avro_schema_url_remote_http_enabled=true to enable.");
+        }
+        String allowedHosts = BackendConfig.INSTANCE.getAvroSchemaUrlHttpAllowedHosts();
+        if (allowedHosts.isEmpty()) {
+          throw new AnalysisException("avro.schema.url HTTP(S) fetching requires " +
+              "--avro_schema_url_http_allowed_hosts to be set.");
+        }
+        String host = new URL(url).getHost();
+        if (host == null || host.isEmpty()) {
+          throw new AnalysisException("avro.schema.url HTTP(S) fetching requires a " +
+              "valid host in the URL.");
+        }
+        List<String> allowed = Arrays.asList(allowedHosts.toLowerCase().split(","));
+        if (!allowed.contains(host.toLowerCase())) {
+          throw new AnalysisException(String.format(
+              "Host '%s' is not permitted for avro.schema.url HTTP(S) fetching. " +
+              "Allowed hosts: %s", host, allowedHosts));
+        }
+        // HTTPS returns a HttpsURLConnection, which extends HttpURLConnection.
+        HttpURLConnection conn =
+            (HttpURLConnection) new URL(url).openConnection();
+        // Disable redirect following to prevent SSRF: a redirect from an
+        // allowlisted host to an internal host would otherwise bypass the
+        // allowlist check above.
+        conn.setInstanceFollowRedirects(false);
+        conn.setConnectTimeout(30_000);
+        conn.setReadTimeout(120_000);
+        int responseCode = conn.getResponseCode();
+        if (responseCode >= 300 && responseCode < 400) {
+          throw new AnalysisException(String.format(
+              "avro.schema.url HTTP(S) redirect is not permitted (host '%s' returned " +
+              "status %d). Redirects are disabled to prevent server-side request " +
+              "forgery.", host, responseCode));
+        }
+        try (InputStream in = conn.getInputStream()) {
+          return IOUtils.toString(in, StandardCharsets.UTF_8);
         }
       } else {
-        return FileSystemUtil.readFile(new Path(url));
+        String allowedSchemes = BackendConfig.INSTANCE.getAvroSchemaUrlAllowedSchemes();
+        List<String> allowed = Arrays.asList(allowedSchemes.toLowerCase().split(","));
+        if (scheme != null && !allowed.contains(scheme.toLowerCase())) {
+          throw new AnalysisException(String.format(
+              "URI scheme '%s' is not permitted for avro.schema.url. " +
+              "Allowed schemes: %s", scheme, allowedSchemes));
+        }
+        return FileSystemUtil.readFile(path);
       }
     } catch (IOException ioe) {
       throw new AnalysisException("Unable to read schema from given path: " + url, ioe);

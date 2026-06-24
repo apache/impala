@@ -316,4 +316,10 @@ struct TBackendGflags {
   142: required bool enable_reading_puffin_stats
 
   143: required string injected_group_members_debug_only
+
+  174: required string avro_schema_url_allowed_schemes
+
+  175: required bool avro_schema_url_remote_http_enabled
+
+  176: required string avro_schema_url_http_allowed_hosts
 }

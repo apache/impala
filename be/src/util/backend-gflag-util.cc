@@ -281,6 +281,22 @@ DEFINE_int64_hidden(data_stream_sender_buffer_size_used_by_planner, -1,
     "With default -1 the planner uses the old logic that is different"
     "than how the backend actually works (see IMPALA-12594)");
 
+DEFINE_string(avro_schema_url_allowed_schemes,
+    "hdfs,s3a,abfs,abfss,gs,o3fs,ofs",
+    "Comma-separated list of URI schemes permitted for avro.schema.url when loading "
+    "schemas from a remote location. HTTP is never allowed via this setting. A URI with "
+    "no scheme is resolved against the default filesystem.");
+
+DEFINE_bool(avro_schema_url_remote_http_enabled, false,
+    "Whether to allow avro.schema.url values that use http. When enabled, the host must "
+    "also appear in avro_schema_url_http_allowed_hosts. Disabled by default to prevent "
+    "server-side request forgery.");
+
+DEFINE_string(avro_schema_url_http_allowed_hosts, "",
+    "Comma-separated list of hosts permitted for avro.schema.url when "
+    "avro_schema_url_remote_http_enabled is true. HTTP schema fetch is rejected when "
+    "this list is empty.");
+
 using strings::Substitute;
 
 namespace impala {
@@ -508,6 +524,10 @@ Status PopulateThriftBackendGflags(TBackendGflags& cfg) {
   cfg.__set_is_release_build(false);
 #endif
   cfg.__set_enable_catalogd_ha(FLAGS_enable_catalogd_ha);
+  cfg.__set_avro_schema_url_allowed_schemes(FLAGS_avro_schema_url_allowed_schemes);
+  cfg.__set_avro_schema_url_remote_http_enabled(
+      FLAGS_avro_schema_url_remote_http_enabled);
+  cfg.__set_avro_schema_url_http_allowed_hosts(FLAGS_avro_schema_url_http_allowed_hosts);
   return Status::OK();
 }
 

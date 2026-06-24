@@ -230,45 +230,49 @@ class TestAvroSchemaUrlAuthz(CustomClusterTestSuite):
   def test_http_url_create_table_denied_without_uri_privilege(self, unique_name):
     """CREATE TABLE with an HTTP avro.schema.url fails when the user has no URI ALL."""
     db = unique_name + "_db"
-    http_url = "http://example.com/schema.json"
+    http_urls = ["http://example.com/schema.json", "https://example.com/schema.json"]
     admin_client = self.create_impala_client()
     try:
       self._setup_db(admin_client, db)
-      result = self.execute_query_expect_failure(
-          self.client,
-          "create table {db}.t stored as avro tblproperties "
-          "('avro.schema.url'='{url}')".format(db=db, url=http_url),
-          user=OWNER_USER)
-      assert AUTHZ_ERROR in str(result)
+      for http_url in http_urls:
+        result = self.execute_query_expect_failure(
+            self.client,
+            "create table {db}.t stored as avro tblproperties "
+            "('avro.schema.url'='{url}')".format(db=db, url=http_url),
+            user=OWNER_USER)
+        assert AUTHZ_ERROR in str(result)
     finally:
       self._teardown_db(admin_client, db)
 
   def test_http_url_create_table_allowed_with_uri_privilege(self, unique_name):
     """CREATE TABLE with an HTTP avro.schema.url succeeds when the user holds URI ALL."""
     db = unique_name + "_db"
-    http_url = "http://example.com/schema.json"
+    http_urls = ["http://example.com/schema.json", "https://example.com/schema.json"]
     admin_client = self.create_impala_client()
     try:
       self._setup_db(admin_client, db)
-      admin_client.execute("grant all on uri '{url}' to user {user}"
-                           .format(url=http_url, user=OWNER_USER), user=ADMIN)
+      for http_url in http_urls:
+        admin_client.execute("grant all on uri '{url}' to user {user}"
+                             .format(url=http_url, user=OWNER_USER), user=ADMIN)
       admin_client.execute("refresh authorization", user=ADMIN)
       # The URI privilege check passes during analysis; the HTTP fetch itself may
       # fail at execution time, but that is outside the scope of this test.
       # We only verify that no AuthorizationException is raised.
       try:
-        self.execute_query_expect_success(
-            self.client,
-            "create table {db}.t stored as avro tblproperties "
-            "('avro.schema.url'='{url}')".format(db=db, url=http_url),
-            query_options={'sync_ddl': 1},
-            user=OWNER_USER)
+        for http_url in http_urls:
+          self.execute_query_expect_success(
+              self.client,
+              "create table {db}.t stored as avro tblproperties "
+              "('avro.schema.url'='{url}')".format(db=db, url=http_url),
+              query_options={'sync_ddl': 1},
+              user=OWNER_USER)
       except Exception as e:
         assert AUTHZ_ERROR not in str(e), \
             "Got unexpected AuthorizationException: {0}".format(e)
     finally:
-      admin_client.execute("revoke all on uri '{url}' from user {user}"
-                           .format(url=http_url, user=OWNER_USER), user=ADMIN)
+      for http_url in http_urls:
+        admin_client.execute("revoke all on uri '{url}' from user {user}"
+                             .format(url=http_url, user=OWNER_USER), user=ADMIN)
       self._teardown_db(admin_client, db)
 
   # ---------------------------------------------------------------------------
