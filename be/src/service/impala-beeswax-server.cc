@@ -331,15 +331,56 @@ beeswax::QueryState::type ImpalaServer::get_state(
   // query completion.polling
   query_handle->WaitForCompletionExecState();
 
+  // Since the GetActiveQueryHandle() above, the query may have failed and started
+  // a retry. We don't want to return the status of the failed query, so this needs
+  // to detect the retry and get a new handle. Long polling always hits this,
+  // because WaitForCompletionExecState() is waiting for a terminal state on the
+  // current handle.
+  beeswax::QueryState::type query_state = beeswax::QueryState::EXCEPTION;
+  bool success = get_state_helper(query_handle, &query_state);
+  if (!success) {
+    status = GetActiveQueryHandle(query_id, &query_handle);
+    // GetActiveQueryHandle may return the query's status from being cancelled. If not an
+    // invalid query handle, we can assume that error statuses reflect a query in the
+    // EXCEPTION state.
+    if (!status.ok() && status.code() != TErrorCode::INVALID_QUERY_HANDLE) {
+      return beeswax::QueryState::EXCEPTION;
+    }
+    RAISE_IF_ERROR(status, SQLSTATE_GENERAL_ERROR);
+
+    success = get_state_helper(query_handle, &query_state);
+    DCHECK(success);
+  }
+  return query_state;
+}
+
+// Helper function for get_state() that tries to fill in the 'query_state_out'
+// based on the provided query handle. This returns false if the query is being
+// retried, because that means there is a newer query handle that takes precedence.
+// In that case, the caller should get the current active query handle and retry.
+// In all other cases, this fills in 'query_state_out' and returns true.
+bool ImpalaServer::get_state_helper(QueryHandle& query_handle,
+    beeswax::QueryState::type* query_state_out) {
   // Take the lock to ensure that if the client sees a query_state == EXCEPTION, it is
   // guaranteed to see the error query_status.
   lock_guard<mutex> l(*query_handle->lock());
   beeswax::QueryState::type query_state = query_handle->BeeswaxQueryState();
+  ClientRequestState::RetryState retry_state = query_handle->retry_state();
+  // Check whether the query failed and was retried.
+  if (query_state == beeswax::QueryState::EXCEPTION &&
+      (retry_state == ClientRequestState::RetryState::RETRYING ||
+       retry_state == ClientRequestState::RetryState::RETRIED)) {
+    // We should not use the state from a query that is being retried, so bail out.
+    // The caller should get the new active query handle and try again.
+    return false;
+  }
+
   DCHECK_EQ(query_state == beeswax::QueryState::EXCEPTION
-          || query_handle->retry_state() == ClientRequestState::RetryState::RETRYING
-          || query_handle->retry_state() == ClientRequestState::RetryState::RETRIED,
+      || query_handle->retry_state() == ClientRequestState::RetryState::RETRYING
+      || query_handle->retry_state() == ClientRequestState::RetryState::RETRIED,
       !query_handle->query_status().ok());
-  return query_state;
+  *query_state_out = query_state;
+  return true;
 }
 
 void ImpalaServer::echo(string& echo_string, const string& input_string) {

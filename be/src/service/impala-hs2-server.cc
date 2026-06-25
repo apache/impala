@@ -923,23 +923,60 @@ void ImpalaServer::GetOperationStatus(TGetOperationStatusResp& return_val,
   // query completion.polling
   query_handle->WaitForCompletionExecState();
 
-  {
-    lock_guard<mutex> l(*query_handle->lock());
-    TOperationState::type operation_state = query_handle->TOperationState();
-    return_val.__set_operationState(operation_state);
-    if (operation_state == TOperationState::ERROR_STATE) {
-      DCHECK(!query_handle->query_status().ok());
-      return_val.__set_errorMessage(Substitute(QUERY_ERROR_FORMAT,
-          PrintId(query_id), query_handle->query_status().GetDetail()));
-      return_val.__set_sqlState(SQLSTATE_GENERAL_ERROR);
-    } else {
-      ClientRequestState::RetryState retry_state = query_handle->retry_state();
-      if (retry_state != ClientRequestState::RetryState::RETRYING
-          && retry_state != ClientRequestState::RetryState::RETRIED) {
-        DCHECK(query_handle->query_status().ok());
-      }
+  // Since the GetActiveQueryHandle() above, the query may have failed and started
+  // a retry. We don't want to return the status of the failed query, so this needs
+  // to detect the retry and get a new handle. Long polling always hits this,
+  // because WaitForCompletionExecState() is waiting for a terminal state on the
+  // current handle.
+  bool success = GetOperationStatusHelper(query_handle, query_id, return_val);
+  if (!success) {
+    // The query was retried, so get the new active handle
+    status = GetActiveQueryHandle(query_id, &query_handle);
+    if (!status.ok()) {
+      // This shouldn't happen, but we need to handle the error.
+      return_val.__set_operationState(TOperationState::ERROR_STATE);
+      HS2_RETURN_ERROR(return_val, status.GetDetail(), SQLSTATE_GENERAL_ERROR);
+    }
+    // Queries are only retried once, so this must succeed
+    success = GetOperationStatusHelper(query_handle, query_id, return_val);
+    DCHECK(success);
+  }
+}
+
+// Helper function for GetOperationStatus() that tries to fill in the operation state
+// based on the provided query handle. This returns false if the query is being
+// retried, because that means there is a newer query handle that takes precedence.
+// In that case, the caller should get the current active query handle and retry.
+// In all other cases, this fills in the response and returns true.
+bool ImpalaServer::GetOperationStatusHelper(QueryHandle& query_handle,
+    const TUniqueId& query_id, TGetOperationStatusResp& return_val) {
+  lock_guard<mutex> l(*query_handle->lock());
+  TOperationState::type operation_state = query_handle->TOperationState();
+  ClientRequestState::RetryState retry_state = query_handle->retry_state();
+  // Check whether the query failed and was retried.
+  if (operation_state == TOperationState::ERROR_STATE &&
+      (retry_state == ClientRequestState::RetryState::RETRYING ||
+       retry_state == ClientRequestState::RetryState::RETRIED)) {
+    // We should not use the operation state from a query that is being retried,
+    // so bail out. The caller should get the new active query handle and try
+    // again.
+    return false;
+  }
+
+  return_val.__set_operationState(operation_state);
+  if (operation_state == TOperationState::ERROR_STATE) {
+    DCHECK(!query_handle->query_status().ok());
+    return_val.__set_errorMessage(Substitute(QUERY_ERROR_FORMAT,
+        PrintId(query_id), query_handle->query_status().GetDetail()));
+    return_val.__set_sqlState(SQLSTATE_GENERAL_ERROR);
+  } else {
+    ClientRequestState::RetryState retry_state = query_handle->retry_state();
+    if (retry_state != ClientRequestState::RetryState::RETRYING
+        && retry_state != ClientRequestState::RetryState::RETRIED) {
+      DCHECK(query_handle->query_status().ok());
     }
   }
+  return true;
 }
 
 void ImpalaServer::CancelOperation(TCancelOperationResp& return_val,

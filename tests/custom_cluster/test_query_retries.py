@@ -38,6 +38,7 @@ from tests.common.impala_connection import (
 )
 from tests.common.impala_test_suite import ImpalaTestSuite, LOG
 from tests.common.skip import (
+    SkipIf,
     SkipIfBuildType,
     SkipIfEC,
     SkipIfFS,
@@ -1022,6 +1023,73 @@ class TestQueryRetries(CustomClusterTestSuite):
         'impala-server.resultset-cache.total-num-rows', 1, timeout=60)
     self.hs2_client.close_query(handle)
 
+  @pytest.mark.execute_serially
+  @CustomClusterTestSuite.with_args(
+      statestored_args="-statestore_heartbeat_frequency_ms=60000",
+      force_restart=True)
+  def test_retry_query_hs2_long_polling(self):
+    """Test query retries on HS2 with long polling enabled. Enable the results set
+    cache as well and test that query retries work with the results cache."""
+    self.cluster.impalads[1].kill()
+    query = self._count_query
+    self.hs2_client.set_configuration(
+        {'retry_failed_queries': 'true', 'long_polling_time_ms': '1000'})
+    self.hs2_client.set_configuration_option('impala.resultset.cache.size', '1024')
+    handle = self.hs2_client.execute_async(query)
+    self.hs2_client.wait_for_impala_state(handle, FINISHED, 60)
+
+    results = self.hs2_client.fetch(query, handle)
+    assert results.success
+    assert len(results.data) == 1
+    assert results.data[0] == self._count_query_result
+
+    # Validate the live exec summary.
+    retried_query_id = \
+        self.__get_retried_query_id_from_summary(handle, use_hs2_client=True)
+    assert retried_query_id is not None
+
+    # Validate the state of the runtime profiles.
+    retried_runtime_profile = self.hs2_client.get_runtime_profile(handle,
+        TRuntimeProfileFormat.STRING)
+    self.__validate_runtime_profiles(
+        retried_runtime_profile, self.hs2_client.handle_id(handle), retried_query_id)
+    self.__validate_client_log(handle, retried_query_id, use_hs2_client=True)
+    self.impalad_test_service.wait_for_metric_value(
+        'impala-server.resultset-cache.total-num-rows', 1, timeout=60)
+    self.hs2_client.close_query(handle)
+
+  @pytest.mark.execute_serially
+  @SkipIf.no_beeswax
+  @CustomClusterTestSuite.with_args(
+      statestored_args="-statestore_heartbeat_frequency_ms=60000",
+      force_restart=True)
+  def test_retry_query_beeswax_long_polling(self):
+    """Test query retries on Beeswax with long polling enabled."""
+    self.cluster.impalads[1].kill()
+    query = self._count_query
+    self.beeswax_client.set_configuration(
+        {'retry_failed_queries': 'true', 'long_polling_time_ms': '1000'})
+    handle = self.beeswax_client.execute_async(query)
+    self.beeswax_client.wait_for_impala_state(handle, FINISHED, 60)
+
+    results = self.beeswax_client.fetch(query, handle)
+    assert results.success
+    assert len(results.data) == 1
+    assert results.data[0] == self._count_query_result
+
+    # Validate the live exec summary.
+    retried_query_id = \
+        self.__get_retried_query_id_from_summary(handle, use_hs2_client=False)
+    assert retried_query_id is not None
+
+    # Validate the state of the runtime profiles.
+    retried_runtime_profile = self.beeswax_client.get_runtime_profile(handle,
+        TRuntimeProfileFormat.STRING)
+    self.__validate_runtime_profiles(
+        retried_runtime_profile, self.beeswax_client.handle_id(handle), retried_query_id)
+    self.__validate_client_log(handle, retried_query_id, use_hs2_client=False)
+    self.beeswax_client.close_query(handle)
+
   def __validate_runtime_profiles_from_service(self, impalad_service, query_id):
     """Wrapper around '__validate_runtime_profiles' that first fetches the retried profile
     from the web ui."""
@@ -1180,12 +1248,12 @@ class TestQueryRetries(CustomClusterTestSuite):
     assert not ("host={0}:{1}".format(impalad.hostname,
         impalad.service.krpc_port) in profile), profile
 
-  def __validate_client_log(self, handle, retried_query_id, use_hs2_client=False):
+  def __validate_client_log(self, handle, retried_query_id, use_hs2_client=True):
     """Validate the GetLog result contains query retry information"""
     if use_hs2_client:
       client_log = self.hs2_client.get_log(handle)
     else:
-      client_log = self.client.get_log(handle)
+      client_log = self.beeswax_client.get_log(handle)
     assert "Original query failed:" in client_log
     query_id_search = re.search("Query has been retried using query id: (.*)\n",
                                 client_log)
@@ -1193,11 +1261,11 @@ class TestQueryRetries(CustomClusterTestSuite):
       "Invalid client log, has no retried query id. Log=%s" % client_log
     assert query_id_search.group(1) == retried_query_id
 
-  def __get_retried_query_id_from_summary(self, handle, use_hs2_client=False):
+  def __get_retried_query_id_from_summary(self, handle, use_hs2_client=True):
     if use_hs2_client:
       summary = self.hs2_client.get_exec_summary(handle)
     else:
-      summary = self.client.get_exec_summary(handle)
+      summary = self.beeswax_client.get_exec_summary(handle)
     if summary.error_logs:
       for log in summary.error_logs:
         query_id_search = re.search("Retrying query using query id: (.*)", log)

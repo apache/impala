@@ -243,6 +243,9 @@ class ImpalaServer : public ImpalaServiceIf,
       const beeswax::QueryHandle& beeswax_handle);
   virtual void close(const beeswax::QueryHandle& beeswax_handle);
   virtual beeswax::QueryState::type get_state(const beeswax::QueryHandle& beeswax_handle);
+  // Helper function for get_state() to handle query retries
+  bool get_state_helper(QueryHandle& query_handle,
+      beeswax::QueryState::type* query_state);
   virtual void echo(std::string& echo_string, const std::string& input_string);
   virtual void clean(const beeswax::LogContextId& log_context);
   virtual void get_log(std::string& log, const beeswax::LogContextId& context);
@@ -326,6 +329,9 @@ class ImpalaServer : public ImpalaServiceIf,
   virtual void GetOperationStatus(
       apache::hive::service::cli::thrift::TGetOperationStatusResp& return_val,
       const apache::hive::service::cli::thrift::TGetOperationStatusReq& request);
+  // Helper function for GetOperationStatus to handle query retries
+  bool GetOperationStatusHelper(QueryHandle& query_handle, const TUniqueId& query_id,
+      apache::hive::service::cli::thrift::TGetOperationStatusResp& return_val);
   virtual void CancelOperation(
       apache::hive::service::cli::thrift::TCancelOperationResp& return_val,
       const apache::hive::service::cli::thrift::TCancelOperationReq& request);
