@@ -18,6 +18,9 @@
 // The functions in this file are specifically not cross-compiled to IR because there
 // is no signifcant performance benefit to be gained.
 
+#include <set>
+
+#include <boost/algorithm/string/predicate.hpp>
 #include <boost/algorithm/string/trim.hpp>
 
 #include "exprs/ai-functions.inline.h"
@@ -84,6 +87,39 @@ static const char* OPEN_AI_RESPONSE_FIELD_CHOICES = "choices";
 static const char* OPEN_AI_RESPONSE_FIELD_MESSAGE = "message";
 static const char* OPEN_AI_RESPONSE_FIELD_CONTENT = "content";
 
+// Helper to extract the hostname from a URL. Returns empty string if invalid.
+static string_view ExtractHost(const string_view& endpoint) {
+  string_view prefix = AI_API_ENDPOINT_PREFIX;
+  if (endpoint.length() < prefix.length() ||
+      strncasecmp(endpoint.data(), prefix.data(), prefix.length()) != 0) {
+    return {};
+  }
+  string_view without_prefix = endpoint.substr(prefix.length());
+  // Truncate the string at the first standard URL delimiter ('/', '?', '#',
+  // or ':'). This extracts the raw host name, ensuring that any trailing
+  // paths are ignored.
+  size_t host_end = without_prefix.find_first_of("/?:#");
+  if (host_end == string_view::npos) {
+    return without_prefix;
+  }
+  return without_prefix.substr(0, host_end);
+}
+
+// Helper to strictly validate a host against a target domain.
+bool IsHostMatch(const string_view& host, const string_view& target_domain) {
+  if (host.length() == target_domain.length()) {
+    return strncasecmp(host.data(), target_domain.data(), target_domain.length()) == 0;
+  } else if (host.length() > target_domain.length() + 1) {
+    // Allow subdomains by checking for a preceding dot.
+    // Length +1 ensures there is at least one character before the dot
+    // (e.g., 'a.domain.com').
+    if (host[host.length() - target_domain.length() - 1] == '.') {
+      return boost::algorithm::iends_with(host, target_domain);
+    }
+  }
+  return false;
+}
+
 /**
  * Singleton class for managing the additional AI platforms endpoints.
  * The additional platforms are loaded and parsed once to optimize for efficiency.
@@ -100,11 +136,11 @@ class AIAdditionalPlatforms {
   AIAdditionalPlatforms(const AIAdditionalPlatforms&) = delete;
   AIAdditionalPlatforms& operator=(const AIAdditionalPlatforms&) = delete;
 
-  // Check if the endpoint matches any of the additional platforms.
-  bool IsGeneralSite(const string_view& endpoint) const {
+  // Check if the extracted host matches any of the additional platforms.
+  bool IsGeneralSite(const string_view& host) const {
     return any_of(additional_platforms.begin(), additional_platforms.end(),
-        [&endpoint](const string& site) {
-          return gstrncasestr(endpoint.data(), site.c_str(), endpoint.size()) != nullptr;
+        [&host](const string& site) {
+          return IsHostMatch(host, site);
         });
   }
 
@@ -144,34 +180,33 @@ class AIAdditionalPlatforms {
 bool AiFunctions::is_api_endpoint_valid(const string_view& endpoint) {
   // Simple validation for endpoint. It should start with https://
   return (strncaseprefix(endpoint.data(), endpoint.size(), AI_API_ENDPOINT_PREFIX,
-              sizeof(AI_API_ENDPOINT_PREFIX))
+              strlen(AI_API_ENDPOINT_PREFIX))
       != nullptr);
 }
 
 bool AiFunctions::is_api_endpoint_supported(const string_view& endpoint) {
-  // Only OpenAI or configured general endpoints are supported.
-  return (
-      gstrncasestr(endpoint.data(), OPEN_AI_AZURE_ENDPOINT, endpoint.size()) != nullptr
-      || gstrncasestr(endpoint.data(), OPEN_AI_PUBLIC_ENDPOINT, endpoint.size())
-          != nullptr
-      || AIAdditionalPlatforms::GetInstance().IsGeneralSite(endpoint));
+  return GetAiPlatformFromEndpoint(endpoint, false)
+      != AiFunctions::AI_PLATFORM::UNSUPPORTED;
 }
 
 AiFunctions::AI_PLATFORM AiFunctions::GetAiPlatformFromEndpoint(
     const string_view& endpoint, bool dry_run) {
   if (UNLIKELY(dry_run)) AIAdditionalPlatforms::GetInstance().Reset();
 
-  // Only OpenAI or configured general endpoints are supported.
-  if (gstrncasestr(endpoint.data(), OPEN_AI_PUBLIC_ENDPOINT, endpoint.size())
-      != nullptr) {
+  // Validate the canonical host.
+  string_view host = ExtractHost(endpoint);
+  if (host.empty()) return AiFunctions::AI_PLATFORM::UNSUPPORTED;
+
+  if (IsHostMatch(host, OPEN_AI_PUBLIC_ENDPOINT)) {
     return AiFunctions::AI_PLATFORM::OPEN_AI;
   }
-  if (gstrncasestr(endpoint.data(), OPEN_AI_AZURE_ENDPOINT, endpoint.size()) != nullptr) {
+  if (IsHostMatch(host, OPEN_AI_AZURE_ENDPOINT)) {
     return AiFunctions::AI_PLATFORM::AZURE_OPEN_AI;
   }
-  if (AIAdditionalPlatforms::GetInstance().IsGeneralSite(endpoint)) {
+  if (AIAdditionalPlatforms::GetInstance().IsGeneralSite(host)) {
     return AI_PLATFORM::GENERAL;
   }
+
   return AiFunctions::AI_PLATFORM::UNSUPPORTED;
 }
 
@@ -233,6 +268,7 @@ StringVal AiFunctions::AiGenerateTextHelper(FunctionContext* ctx,
       return StringVal(AI_GENERATE_TXT_INVALID_PROTOCOL_ERROR.c_str());
     }
   }
+
   AI_PLATFORM platform = GetAiPlatformFromEndpoint(endpoint_sv);
   switch(platform) {
     case AI_PLATFORM::OPEN_AI:
@@ -247,7 +283,7 @@ StringVal AiFunctions::AiGenerateTextHelper(FunctionContext* ctx,
           prompt, model, auth_credential, platform_params, impala_options, false);
     default:
       if (fastpath) {
-        DCHECK(false) << "Default endpoint " << FLAGS_ai_endpoint << "must be supported";
+        DCHECK(false) << "Default endpoint " << FLAGS_ai_endpoint << " must be supported";
       }
       LOG(ERROR) << "AI Generate Text: \nunsupported endpoint: " << endpoint_sv;
       return StringVal(AI_GENERATE_TXT_UNSUPPORTED_ENDPOINT_ERROR.c_str());

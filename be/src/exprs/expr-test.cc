@@ -11313,6 +11313,20 @@ TEST_P(ExprTest, AiFunctionsTest) {
   EXPECT_EQ(AiFunctions::AI_PLATFORM::UNSUPPORTED,
       AiFunctions::GetAiPlatformFromEndpoint("https://qwerty.com"));
 
+  // Test Malicious Endpoint Rejection
+  // Keyword hidden in the path
+  EXPECT_EQ(AiFunctions::AI_PLATFORM::UNSUPPORTED,
+      AiFunctions::GetAiPlatformFromEndpoint("https://fake.com/api.openai.com"));
+  // Keyword hidden in the query parameters
+  EXPECT_EQ(AiFunctions::AI_PLATFORM::UNSUPPORTED,
+      AiFunctions::GetAiPlatformFromEndpoint("https://fake.com/?url=openai.azure.com"));
+  // Spoofed Top-Level Domain (TLD) / suffix extension
+  EXPECT_EQ(AiFunctions::AI_PLATFORM::UNSUPPORTED,
+      AiFunctions::GetAiPlatformFromEndpoint("https://api.openai.com.fake.com/v1/chat"));
+  // Prefix extension bypassing exact dot notation (e.g., fake-api instead of .api)
+  EXPECT_EQ(AiFunctions::AI_PLATFORM::UNSUPPORTED,
+      AiFunctions::GetAiPlatformFromEndpoint("https://fake-api.openai.com/v1/chat"));
+
   // Test fastpath
   StringVal result =
       AiFunctions::AiGenerateTextInternal<true, AiFunctions::AI_PLATFORM::OPEN_AI>(ctx,
@@ -11591,6 +11605,13 @@ TEST_P(ExprTest, AiFunctionsTestAdditionalSites) {
   EXPECT_EQ(
       AiFunctions::GetAiPlatformFromEndpoint("https://AI-API.COM/v1/generate", true),
       AiFunctions::AI_PLATFORM::GENERAL);
+
+  // Test for supported/unsupported endpoints.
+  EXPECT_EQ(
+      AiFunctions::is_api_endpoint_supported("https://fake.com/ai-api.com"), false);
+  EXPECT_EQ(
+      AiFunctions::is_api_endpoint_supported("https://another-ai.org.fake.com"), false);
+
 }
 
 } // namespace impala
