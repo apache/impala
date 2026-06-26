@@ -695,10 +695,13 @@ public class IcebergContentFileStore {
     ret.hasParquet_ = tFileStore.isSetHas_parquet() ? tFileStore.isHas_parquet() : false;
     ret.missingFiles_ = tFileStore.isSetMissing_files() ?
         new HashSet<>(tFileStore.getMissing_files()) : Collections.emptySet();
+    // Call copyBinary to avoid referencing the whole transport buffer in ByteBuffers.
     ret.partitionList_ = tFileStore.isSetPartitions() ?
-        tFileStore.getPartitions() : new ArrayList<>();
-    ret.partitionMap_ = tFileStore.isSetPartitions() ?
-        convertPartitionListToMap(tFileStore.getPartitions()) : new HashMap<>();
+        tFileStore.getPartitions().stream()
+            .map(org.apache.thrift.TBaseHelper::copyBinary)
+            .collect(Collectors.toList())
+        : new ArrayList<>();
+    ret.partitionMap_ = convertPartitionListToMap(ret.partitionList_);
     return ret;
   }
 
@@ -720,7 +723,7 @@ public class IcebergContentFileStore {
     Preconditions.checkState(partitionList != null);
     ImmutableMap.Builder<ByteBuffer, Integer> builder = ImmutableMap.builder();
     for (int i = 0; i < partitionList.size(); ++i) {
-      builder.put(org.apache.thrift.TBaseHelper.copyBinary(partitionList.get(i)), i);
+      builder.put(partitionList.get(i), i);
     }
     return builder.build();
   }
