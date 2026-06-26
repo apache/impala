@@ -126,6 +126,14 @@ abstract public class ScanNode extends PlanNode {
 
   public TupleDescriptor getTupleDesc() { return desc_; }
 
+  public String getScanTableName() {
+    if (desc_.getPath() == null || desc_.getPath().getRawPath().isEmpty()) {
+      return desc_.getTable().getFullName();
+    }
+    // Returns the qualified path including collection column names.
+    return desc_.getPath().toString();
+  }
+
   @Override
   protected boolean shouldPickUpZippingUnnestConjuncts() { return true; }
 

@@ -21,6 +21,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.EnumMap;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -29,6 +30,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.Stack;
+import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 
 import org.apache.impala.analysis.Analyzer;
 import org.apache.impala.analysis.BinaryPredicate;
@@ -1026,6 +1029,38 @@ abstract public class PlanNode extends TreeNode<PlanNode> {
    */
   public boolean isCardinalityPreserving() { return false; }
 
+  record HboKeyedNode(String key, int originalIndex, PlanNode node) {}
+
+  /**
+   * Returns children_ sorted by their concatenated and sorted scan table names.
+   * The sort is stable so two children with the same names preserve their original order
+   * in the query. Another query that flips their order will have a different HBO key
+   * string, which misses the HBO stats. Such cases are rare in practice, so we don't
+   * optimize them for simplicity. The returned list is cached and reused since the order
+   * depends only on table names, which are fixed after tree construction.
+   */
+  protected List<PlanNode> getHboOrderedOperands() {
+    if (hboOrderedOperands_ == null) {
+      hboOrderedOperands_ = IntStream.range(0, children_.size())
+          .mapToObj(i -> {
+            PlanNode node = children_.get(i);
+            List<ScanNode> scans = new ArrayList<>();
+            node.collect(ScanNode.class, scans);
+            String key = scans.stream()
+                .map(ScanNode::getScanTableName)
+                .sorted()
+                .collect(Collectors.joining(","));
+            return new HboKeyedNode(key, i, node);
+          })
+          .sorted(Comparator.comparing(HboKeyedNode::key)
+              .thenComparingInt(HboKeyedNode::originalIndex))
+          .map(HboKeyedNode::node)
+          .collect(Collectors.toList());
+    }
+    return hboOrderedOperands_;
+  }
+  private List<PlanNode> hboOrderedOperands_;
+
   /**
    * Generates an HBO key string for this node, or null if HBO is not supported.
    * This key string represents the logical characteristics that identify similar
@@ -1069,9 +1104,6 @@ abstract public class PlanNode extends TreeNode<PlanNode> {
     if (hashKeys.isEmpty()) return;
     TPlanNodeRun currRun = new TPlanNodeRun();
     appendScanInputStats(currRun);
-    if (!currRun.isSetScan_input_stats() || currRun.getScan_input_stats().isEmpty()) {
-      return;
-    }
     Long hboCardinality = HistoricalStats.INSTANCE.getPlanNodeOutputRows(
         hashKeys, getDisplayLabel(), currRun);
     if (hboCardinality != null) {
@@ -1122,7 +1154,6 @@ abstract public class PlanNode extends TreeNode<PlanNode> {
     } else {
       msg.setHbo_hash_keys(generateAllHboHashKeys());
     }
-    return;
   }
 
   /**

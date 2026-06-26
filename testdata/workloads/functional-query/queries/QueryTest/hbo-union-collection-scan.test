@@ -1,0 +1,49 @@
+====
+---- QUERY
+# EXPLAIN the same query ran in test_hbo.py
+EXPLAIN select id from functional_parquet.complextypes_arrays where id > 10
+union all
+select item from functional_parquet.complextypes_arrays.arr1 where item > 10
+---- PLAN
+PLAN-ROOT SINK
+|
+03:EXCHANGE [UNPARTITIONED]
+|
+00:UNION
+|  pass-through-operands: all
+|  row-size=4B cardinality=2 (from HBO)
+|
+|--02:SCAN HDFS [functional_parquet.complextypes_arrays.arr1]
+|     HDFS partitions=1/1 files=1 size=1.06KB
+|     predicates: item > 10
+|     row-size=4B cardinality=1 (from HBO)
+|
+01:SCAN HDFS [functional_parquet.complextypes_arrays]
+   HDFS partitions=1/1 files=1 size=1.06KB
+   predicates: id > 10
+   row-size=4B cardinality=1 (from HBO)
+====
+---- QUERY
+# Flip the operands. The UnionNode should still hit HBO stats.
+EXPLAIN select item from functional_parquet.complextypes_arrays.arr1 where item > 10
+union all
+select id from functional_parquet.complextypes_arrays where id > 10
+---- PLAN
+PLAN-ROOT SINK
+|
+03:EXCHANGE [UNPARTITIONED]
+|
+00:UNION
+|  pass-through-operands: all
+|  row-size=4B cardinality=2 (from HBO)
+|
+|--02:SCAN HDFS [functional_parquet.complextypes_arrays]
+|     HDFS partitions=1/1 files=1 size=1.06KB
+|     predicates: id > 10
+|     row-size=4B cardinality=1 (from HBO)
+|
+01:SCAN HDFS [functional_parquet.complextypes_arrays.arr1]
+   HDFS partitions=1/1 files=1 size=1.06KB
+   predicates: item > 10
+   row-size=4B cardinality=1 (from HBO)
+====

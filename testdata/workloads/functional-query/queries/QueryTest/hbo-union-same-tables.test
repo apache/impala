@@ -1,0 +1,55 @@
+====
+---- QUERY
+# EXPLAIN the same query ran in test_hbo.py
+EXPLAIN select id from functional.alltypes
+where year = 2009 and int_col = 1 and string_col != 'test_union_same_tables'
+union all
+select id from functional.alltypes
+where year = 2019 and int_col = -1 and string_col != 'test_union_same_tables'
+---- PLAN
+PLAN-ROOT SINK
+|
+03:EXCHANGE [UNPARTITIONED]
+|
+00:UNION
+|  row-size=4B cardinality=365 (from HBO)
+|
+|--02:SCAN HDFS [functional.alltypes]
+|     partition predicates: `year` = 2019
+|     partitions=0/24 files=0 size=0B
+|     predicates: int_col = -1, string_col != 'test_union_same_tables'
+|     row-size=21B cardinality=0
+|
+01:SCAN HDFS [functional.alltypes]
+   partition predicates: `year` = 2009
+   HDFS partitions=12/24 files=12 size=238.68KB
+   predicates: int_col = 1, string_col != 'test_union_same_tables'
+   row-size=21B cardinality=365 (from HBO)
+====
+---- QUERY
+# Swap the row predicates. The UnionNode shouldn't hit HBO stats.
+EXPLAIN select id from functional.alltypes
+where year = 2009 and int_col = -1 and string_col != 'test_union_same_tables'
+union all
+select id from functional.alltypes
+where year = 2019 and int_col = 1 and string_col != 'test_union_same_tables'
+---- PLAN
+PLAN-ROOT SINK
+|
+03:EXCHANGE [UNPARTITIONED]
+|
+00:UNION
+|  row-size=4B cardinality=346
+|
+|--02:SCAN HDFS [functional.alltypes]
+|     partition predicates: `year` = 2019
+|     partitions=0/24 files=0 size=0B
+|     predicates: int_col = 1, string_col != 'test_union_same_tables'
+|     row-size=21B cardinality=0
+|
+01:SCAN HDFS [functional.alltypes]
+   partition predicates: `year` = 2009
+   HDFS partitions=12/24 files=12 size=238.68KB
+   predicates: int_col = -1, string_col != 'test_union_same_tables'
+   row-size=21B cardinality=346
+====

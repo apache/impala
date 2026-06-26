@@ -21,6 +21,7 @@ import java.util.List;
 import java.util.Map;
 
 import org.apache.impala.planner.CanonicalizationStrategy;
+import org.apache.impala.thrift.TCanonicalizationStrategy;
 import org.apache.impala.thrift.THboStatsType;
 import org.apache.impala.thrift.THistoricalStatsUpdate;
 import org.apache.impala.thrift.TPlanNodeRun;
@@ -56,81 +57,67 @@ public class HistoricalStats {
     cacheBackend_ = new InMemoryCacheBackend(concurrencyLevel, cacheSizeBytes);
   }
 
-  private boolean catalogVersionMatches(TPlanNodeRun a, TPlanNodeRun b) {
-    if (!a.isSetScan_input_stats() || !b.isSetScan_input_stats()) {
-      return false;
+  private boolean exceedsThreshold(long curr, long hist) {
+    return curr < hist * (1 - similarityThreshold_)
+        || curr > hist * (1 + similarityThreshold_);
+  }
+
+  /**
+   * Returns true if {@code currRun} and {@code histRun} are similar enough to share HBO
+   * stats. Each scan-node input is compared independently:
+   *   - If both inputs have valid input_rows (>= 0), compare row counts.
+   *   - Otherwise (either input_rows is missing):
+   *       - For EXPR_REWRITE, an exact catalog version match makes the pair similar;
+   *         if catalog versions differ, compare input file sizes.
+   *       - For other strategies, catalog version is not a reliable signal, so compare
+   *         input file sizes only.
+   * A run matches only if every scan-node pair matches. Note that the hash key matching
+   * already ensures table names and conjuncts are matched.
+   */
+  private boolean scanInputStatsMatch(TPlanNodeRun currRun, TPlanNodeRun histRun,
+      CanonicalizationStrategy strategy) {
+    List<TScanInputStats> currStats = currRun.getScan_input_stats();
+    List<TScanInputStats> histStats = histRun.getScan_input_stats();
+    // UnionNode with only constant operands and its ancestor nodes have no scans.
+    if (!currRun.isSetScan_input_stats() || currStats.isEmpty()) {
+      return !histRun.isSetScan_input_stats() || histStats.isEmpty();
     }
-    if (a.getScan_input_stats().size() != b.getScan_input_stats().size()) {
-      return false;
-    }
-    for (int i = 0; i < a.getScan_input_stats().size(); i++) {
-      TScanInputStats sa = a.getScan_input_stats().get(i);
-      TScanInputStats sb = b.getScan_input_stats().get(i);
-      if (!(sa.isSetCatalog_version() && sb.isSetCatalog_version()
-          && sa.getCatalog_version() == sb.getCatalog_version())) {
-        return false;
+    if (currStats.size() != histStats.size()) return false;
+    for (int i = 0; i < currStats.size(); i++) {
+      TScanInputStats sc = currStats.get(i);
+      TScanInputStats sh = histStats.get(i);
+      long currRows = sc.getInput_rows();
+      long histRows = sh.getInput_rows();
+      if (currRows >= 0 && histRows >= 0) {
+        if (exceedsThreshold(currRows, histRows)) return false;
+      } else {
+        // At least one side is missing input_rows. For EXPR_REWRITE, compare the catalog
+        // versions first. Note that for other more aggressive strategies it's unsafe to
+        // depend on catalog versions. E.g. IGNORE_PARTITION_CONSTANTS maps "year=2009"
+        // and "year=2019" to the same partition predicate "year=<CONST>". But "year=2019"
+        // picks no files in the functional.alltypes table. We should depend on the total
+        // input file size for such cases.
+        if (strategy == CanonicalizationStrategy.EXPR_REWRITE
+            && sc.isSetCatalog_version() && sh.isSetCatalog_version()
+            && sc.getCatalog_version() == sh.getCatalog_version()) {
+          continue;
+        }
+        // In the future input_file_size could be unset, e.g. for KuduScanNode.
+        // Currently we just support HdfsScanNode so these should be set.
+        Preconditions.checkState(sc.isSetInput_file_size());
+        Preconditions.checkState(sh.isSetInput_file_size());
+        if (exceedsThreshold(sc.getInput_file_size(), sh.getInput_file_size())) {
+          return false;
+        }
       }
     }
     return true;
   }
 
-  private boolean scanInputSizeMatches(TPlanNodeRun a, TPlanNodeRun b) {
-    if (!a.isSetScan_input_stats() || !b.isSetScan_input_stats()) {
-      return false;
-    }
-    if (a.getScan_input_stats().isEmpty() || b.getScan_input_stats().isEmpty()) {
-      return false;
-    }
-    TScanInputStats sa = a.getScan_input_stats().get(0);
-    TScanInputStats sb = b.getScan_input_stats().get(0);
-    if (!sa.isSetInput_file_size() || !sb.isSetInput_file_size()) return false;
-    long x = sa.getInput_file_size();
-    long y = sb.getInput_file_size();
-    if (x == 0) return y == 0;
-    return Math.abs(x - y) / (double)x < similarityThreshold_;
-  }
-
-  private int getSimilarRunIndexWithoutStats(List<TPlanNodeRun> runs,
-      TPlanNodeRun currRun) {
-    if (currRun.isSetScan_input_stats()) {
-      for (TScanInputStats s : currRun.getScan_input_stats()) {
-        Preconditions.checkState(s.isSetInput_rows(),
-            "exactMatch is only used when missing numRows but input_rows unset");
-        Preconditions.checkState(s.getInput_rows() < 0,
-            "exactMatch is only used when missing numRows but got %s", s.getInput_rows());
-      }
-    }
-    // For exact match, first find a run with the exact catalog version. If missing,
-    // find a run with the similar scan input size. Note that the hash key matching
-    // already ensures conjuncts are the same.
-    int sizeMatchIndex = -1;
+  private int getSimilarRunIndex(List<TPlanNodeRun> runs, TPlanNodeRun currRun,
+      CanonicalizationStrategy strategy) {
     for (int i = 0; i < runs.size(); i++) {
-      TPlanNodeRun run = runs.get(i);
-      if (catalogVersionMatches(run, currRun)) return i;
-      if (scanInputSizeMatches(run, currRun)) sizeMatchIndex = i;
-    }
-    return sizeMatchIndex;
-  }
-
-  private int getSimilarRunIndexWithNumRows(List<TPlanNodeRun> runs,
-      TPlanNodeRun currRun) {
-    Preconditions.checkState(currRun.isSetScan_input_stats()
-        && !currRun.getScan_input_stats().isEmpty());
-    for (int i = 0; i < runs.size(); i++) {
-      TPlanNodeRun run = runs.get(i);
-      // Currently HBO only supports HdfsScanNode which just has one table thus only one
-      // scan_input_stat. We just need to compare the first one.
-      Preconditions.checkState(run.isSetScan_input_stats()
-          && !run.getScan_input_stats().isEmpty());
-      long curr = currRun.getScan_input_stats().get(0).getInput_rows();
-      long historical = run.getScan_input_stats().get(0).getInput_rows();
-      if (curr == 0) {
-        if (historical == 0) {
-          return i;
-        }
-      } else if (Math.abs(historical - curr) / (double)curr < similarityThreshold_) {
-        return i;
-      }
+      if (scanInputStatsMatch(currRun, runs.get(i), strategy)) return i;
     }
     return -1;
   }
@@ -145,7 +132,11 @@ public class HistoricalStats {
     TPlanNodeRun currRun = runWithKeys.run;
     THboStatsType statsType = runWithKeys.stats_type;
     // TODO: handle races from concurrent writers.
-    for (String hashKey : runWithKeys.hash_keys.values()) {
+    for (Map.Entry<TCanonicalizationStrategy, String> entry :
+        runWithKeys.hash_keys.entrySet()) {
+      CanonicalizationStrategy strategy =
+          CanonicalizationStrategy.fromThrift(entry.getKey());
+      String hashKey = entry.getValue();
       @SuppressWarnings("unchecked")
       HistoricalStatsValue<TPlanNodeRun> statsValue =
           (HistoricalStatsValue<TPlanNodeRun>) cacheBackend_.getIfPresent(
@@ -154,7 +145,7 @@ public class HistoricalStats {
         cacheBackend_.put(statsType, hashKey, new HistoricalStatsValue<>(currRun));
       } else {
         List<TPlanNodeRun> runs = statsValue.getRuns();
-        int similarRunIndex = getSimilarRunIndexWithNumRows(runs, currRun);
+        int similarRunIndex = getSimilarRunIndex(runs, currRun, strategy);
         if (similarRunIndex >= 0) {
           // Remove the similar one since we are adding a newer run.
           runs.remove(similarRunIndex);
@@ -176,49 +167,38 @@ public class HistoricalStats {
    * in order from most accurate to most aggressive canonicalization strategy.
    * Returns the first match found, or null if no match exists.
    *
-   * @param hashKeys HBO hash strings keyed by canonicalization strategy
-   * @return Number of rows from matched historical run, or null if no match
+   * @param hashKeys HBO hash strings keyed by canonicalization strategy.
+   * @param node display string for the PlanNode. Only used in logging.
+   * @param currRun scan input stats for the current run.
+   * @return Number of rows from matched historical run, or null if no match.
    */
   public Long getPlanNodeOutputRows(Map<CanonicalizationStrategy, String> hashKeys,
-      String tblName, TPlanNodeRun currRun) {
-    Preconditions.checkNotNull(currRun.getScan_input_stats());
-    Preconditions.checkArgument(!currRun.getScan_input_stats().isEmpty());
-    boolean missingStats = currRun.getScan_input_stats().stream()
-        .anyMatch(s -> s.getInput_rows() < 0);
+      String node, TPlanNodeRun currRun) {
     for (CanonicalizationStrategy strategy : CanonicalizationStrategy.values()) {
       String hashKey = hashKeys.get(strategy);
       if (hashKey == null) continue;
-      // If scanInputRows is unknown, only allow exact match, i.e. EXPR_REWRITE strategy
-      // with catalog version match.
-      if (missingStats && strategy != CanonicalizationStrategy.EXPR_REWRITE) break;
       @SuppressWarnings("unchecked")
       HistoricalStatsValue<TPlanNodeRun> statsValue =
           (HistoricalStatsValue<TPlanNodeRun>) cacheBackend_.getIfPresent(
               THboStatsType.CARDINALITY, hashKey);
       if (statsValue != null) {
         List<TPlanNodeRun> runs = statsValue.getRuns();
-        int similarRunIndex;
-        if (missingStats && strategy == CanonicalizationStrategy.EXPR_REWRITE) {
-          similarRunIndex = getSimilarRunIndexWithoutStats(runs, currRun);
-        } else {
-          similarRunIndex = getSimilarRunIndexWithNumRows(runs, currRun);
-        }
+        int similarRunIndex = getSimilarRunIndex(runs, currRun, strategy);
         if (similarRunIndex >= 0) {
-          // TODO: Consider moving this to the tail.
           LOG.debug("HBO cache hit for {} using strategy {} (key: {}, currRun: {}):"
                   + "cardinality={}",
-              tblName, strategy, hashKey, currRun,
+              node, strategy, hashKey, currRun,
               runs.get(similarRunIndex).getNum_rows());
           return runs.get(similarRunIndex).getNum_rows();
         } else {
           LOG.debug("HBO cache miss for {} using strategy {} (key: {}, "
                   + "scanInputRows: {}). No similar run",
-              tblName, strategy, hashKey, currRun);
+              node, strategy, hashKey, currRun);
         }
       } else {
         LOG.debug("HBO cache miss for {} using strategy {} (key: {}, scanInputRows:"
                 + " {}). Hash key not found",
-            tblName, strategy, hashKey, currRun);
+            node, strategy, hashKey, currRun);
       }
     }
     return null;

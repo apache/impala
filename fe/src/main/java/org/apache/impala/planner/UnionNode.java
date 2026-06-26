@@ -31,7 +31,9 @@ import org.apache.impala.common.ThriftSerializationCtx;
 import org.apache.impala.thrift.TExecNodePhase;
 import org.apache.impala.thrift.TExplainLevel;
 import org.apache.impala.thrift.TExpr;
+import org.apache.impala.thrift.THboStatsType;
 import org.apache.impala.thrift.TPlanNode;
+import org.apache.impala.thrift.TPlanNodeRun;
 import org.apache.impala.thrift.TPlanNodeType;
 import org.apache.impala.thrift.TQueryOptions;
 import org.apache.impala.thrift.TUnionNode;
@@ -155,6 +157,10 @@ public class UnionNode extends PlanNode {
       numInstances_ = 1;
     }
     cardinality_ = capCardinalityAtLimit(cardinality_);
+    // Don't need HBO stats if there are only constant operands.
+    if (!children_.isEmpty()) {
+      tryUpdateCardinalityFromHbo(analyzer);
+    }
     if (LOG.isTraceEnabled()) {
       LOG.trace("stats Union: cardinality=" + Long.toString(cardinality_));
     }
@@ -355,6 +361,62 @@ public class UnionNode extends PlanNode {
     Preconditions.checkState(false, "Unexpected use of old toThrift() signature.");
   }
 
+  /**
+   * Generates an HBO key string for this union node. Returns null if any child node
+   * doesn't support HBO.
+   * TODO: consider passthrough children in the key for tracking memory usage.
+   */
+  @Override
+  public String generateHboKeyString(THboStatsType statsType,
+      CanonicalizationStrategy strategy) {
+    StringBuilder sb = new StringBuilder(statsType.name()).append(":UnionNode:");
+    if (limit_ > 0) sb.append("limit:").append(limit_).append("|");
+    if (!constExprLists_.isEmpty() && !addConstOpsToHboKeyString(sb)) return null;
+    sb.append("operands:[");
+    boolean first = true;
+    for (PlanNode operand : getHboOrderedOperands()) {
+      String childKey = operand.generateHboKeyString(statsType, strategy);
+      if (childKey == null) return null;
+      if (!first) sb.append(",");
+      sb.append(childKey);
+      first = false;
+    }
+    sb.append("]");
+    return sb.toString();
+  }
+
+  private boolean addConstOpsToHboKeyString(StringBuilder sb) {
+    sb.append("constRows:[");
+    for (int i = 0; i < constExprLists_.size(); i++) {
+      List<Expr> row = constExprLists_.get(i);
+      if (i > 0) sb.append(",");
+
+      sb.append("(");
+      for (int j = 0; j < row.size(); j++) {
+        Expr c = row.get(j);
+        if (!c.isConstant()) {
+          LOG.info("HBO not supported for {} due to nondeterministic expr: {}",
+              getDisplayLabel(), c.toSql());
+          return false;
+        }
+
+        if (j > 0) sb.append(",");
+        sb.append(ExprCanonicalizer.canonicalizeConstExpr(c));
+      }
+      sb.append(")");
+    }
+    sb.append("]|");
+    return true;
+  }
+
+  @Override
+  public void appendScanInputStats(TPlanNodeRun execStats) {
+    // Iterate in the same order as generateHboKeyString()
+    for (PlanNode operand : getHboOrderedOperands()) {
+      operand.appendScanInputStats(execStats);
+    }
+  }
+
   @Override
   protected void toThrift(TPlanNode msg, ThriftSerializationCtx serialCtx) {
     Preconditions.checkState(materializedResultExprLists_.size() == children_.size());
@@ -370,6 +432,10 @@ public class UnionNode extends PlanNode {
     msg.union_node = new TUnionNode(
         tupleId_.asInt(), texprLists, constTexprLists, firstMaterializedChildIdx_);
     msg.node_type = TPlanNodeType.UNION_NODE;
+    // Don't need to write HBO stats if there are only constant operands.
+    if (!children_.isEmpty()) {
+      populateHboThriftFields(msg, serialCtx);
+    }
   }
 
   @Override

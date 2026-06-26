@@ -842,6 +842,7 @@ public class AggregationNode extends PlanNode implements SpillableOperator {
         .append("|groupingSet:")
         .append(multiAggInfo_.getIsGroupingSet())
         .append("|");
+    if (limit_ > 0) sb.append("limit:").append(limit_).append("|");
 
     List<String> aggClassStrings = new ArrayList<>(aggInfos_.size());
     for (AggregateInfo aggInfo : aggInfos_) {

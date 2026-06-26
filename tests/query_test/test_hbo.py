@@ -262,3 +262,39 @@ class TestHBO(ImpalaTestSuite):
         where year = 2009 and string_col != 'test_grouping_set'
         group by rollup(int_col, string_col, bigint_col)""")
     self._run_hbo_explains('QueryTest/hbo-grouping-set')
+
+  def test_union_cardinality(self):
+    self.client.set_configuration(QUERY_OPTIONS)
+    self.execute_query("""
+        select id from functional.alltypes
+        where year = 2009 and int_col = 1 and string_col != 'test_union'
+        union
+        select id from functional.alltypestiny
+        where int_col = 0 and string_col != 'test_union'""")
+    self._run_hbo_explains('QueryTest/hbo-union')
+
+  def test_union_same_tables(self):
+    self.client.set_configuration(QUERY_OPTIONS)
+    self.execute_query("""
+        select id from functional.alltypes
+        where year = 2009 and int_col = 1 and string_col != 'test_union_same_tables'
+        union all
+        select id from functional.alltypes
+        where year = 2019 and int_col = -1 and string_col != 'test_union_same_tables'
+        """)
+    self._run_hbo_explains('QueryTest/hbo-union-same-tables')
+
+  def test_const_only_union(self):
+    """Verify that UNION with only const operands are not tracked in HBO."""
+    self.client.set_configuration(QUERY_OPTIONS)
+    self.execute_query("select 1 union select 2")
+    self._run_hbo_explains('QueryTest/hbo-union-consts')
+
+  def test_union_collection_scan(self):
+    self.client.set_configuration(QUERY_OPTIONS)
+    self.execute_query("""
+        select id from functional_parquet.complextypes_arrays where id > 10
+        union all
+        select item from functional_parquet.complextypes_arrays.arr1 where item > 10
+        """)
+    self._run_hbo_explains('QueryTest/hbo-union-collection-scan')

@@ -30,9 +30,11 @@ import org.apache.impala.analysis.TupleDescriptor;
 import org.apache.impala.catalog.Type;
 import org.apache.impala.common.FrontendTestBase;
 import org.apache.impala.common.ImpalaException;
+import org.apache.impala.common.ThriftSerializationCtx;
 import org.apache.impala.service.Frontend.PlanCtx;
 import org.apache.impala.testutil.TestUtils;
 import org.apache.impala.thrift.THboStatsType;
+import org.apache.impala.thrift.TPlanNode;
 import org.apache.impala.thrift.TQueryCtx;
 import org.apache.impala.thrift.TQueryOptions;
 import org.junit.Test;
@@ -42,7 +44,10 @@ import org.slf4j.LoggerFactory;
 import com.google.common.collect.Lists;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotEquals;
+import static org.junit.Assert.assertNull;
+import static org.junit.Assert.assertTrue;
 
 /**
  * Unit tests for HBO key string generation. Verifies the raw key strings (before hashing)
@@ -65,7 +70,11 @@ public class HboKeyStringTest extends FrontendTestBase {
   }
 
   private List<PlanFragment> planFragments(String query) throws ImpalaException {
-    TQueryOptions options = new TQueryOptions();
+    return planFragments(query, new TQueryOptions());
+  }
+
+  private List<PlanFragment> planFragments(String query, TQueryOptions options)
+      throws ImpalaException {
     options.setUse_hbo_stats(true);
     options.setStore_hbo_stats(true);
     TQueryCtx queryCtx = TestUtils.createQueryContext(options);
@@ -354,5 +363,182 @@ public class HboKeyStringTest extends FrontendTestBase {
     assertEquals("`name`one`", substituted.toSql(ToSqlOptions.FOR_HBO));
     // The unsubstituted source column (rawPath_ set) renders identically.
     assertEquals("`name`one`", sourceCol.toSql(ToSqlOptions.FOR_HBO));
+  }
+
+  @Test
+  public void testAggregationNodeLimit() throws ImpalaException {
+    String query = "select distinct id from functional.alltypestiny limit 2";
+    Map<Integer, PlanNode> nodes = collectPlanNodesInDistributedPlan(query);
+    PlanNode aggNode = nodes.get(1);
+    assertEquals("CARDINALITY:AggregationNode:FIRST|preagg:false|groupingSet:false|"
+        + "limit:2|AggClasses:[0:GROUP:id]|CHILD:["
+        + "CARDINALITY:ScanNode:functional.alltypestiny|]",
+        aggNode.generateHboKeyString(
+            THboStatsType.CARDINALITY, CanonicalizationStrategy.EXPR_REWRITE));
+  }
+
+  private UnionNode singleUnion(String query) throws ImpalaException {
+    return singleUnion(query, new TQueryOptions());
+  }
+
+  private UnionNode singleUnion(String query, TQueryOptions options)
+      throws ImpalaException {
+    List<PlanFragment> frags = planFragments(query, options);
+    Map<Integer, PlanNode> nodes = new HashMap<>();
+    collectAllNodes(frags.get(0).getPlanRoot(), nodes);
+    int count = 0;
+    UnionNode union = null;
+    for (PlanNode n : nodes.values()) {
+      if (n instanceof UnionNode) {
+        union = (UnionNode) n;
+        count++;
+      }
+    }
+    assertEquals("Expected exactly one UnionNode for query: " + query, 1, count);
+    return union;
+  }
+
+  @Test
+  public void testUnionNodeKeys() throws ImpalaException {
+    // UNION ALL output cardinality is the sum of the branch cardinalities, which is
+    // independent of the branch order. The HBO key sorts the operands so two unions
+    // whose branches are written in swapped order produce the same key.
+    String q1 = "select id from functional.alltypes where year = 2009 and int_col = 0 "
+        + "union all "
+        + "select id from functional.alltypestiny where int_col = 0";
+    String q2 = "select id from functional.alltypestiny where int_col = 0 "
+        + "union all "
+        + "select id from functional.alltypes where year = 2009 and int_col = 0";
+
+    UnionNode union1 = singleUnion(q1);
+    UnionNode union2 = singleUnion(q2);
+
+    // Operands are sorted by base scan table name, so alltypes comes first.
+    String scanAllER =
+        "CARDINALITY:ScanNode:functional.alltypes|`year` = 2009|int_col = 0|";
+    String scanTinyER = "CARDINALITY:ScanNode:functional.alltypestiny|int_col = 0|";
+    String expectedER = "CARDINALITY:UnionNode:operands:["
+        + scanAllER + "," + scanTinyER + "]";
+    assertEquals(expectedER, union1.generateHboKeyString(
+        THboStatsType.CARDINALITY, CanonicalizationStrategy.EXPR_REWRITE));
+    assertEquals(expectedER, union2.generateHboKeyString(
+        THboStatsType.CARDINALITY, CanonicalizationStrategy.EXPR_REWRITE));
+
+    String scanAllIPC =
+        "CARDINALITY:ScanNode:functional.alltypes|`year`=<CONST>|int_col = 0|";
+    String expectedIPC = "CARDINALITY:UnionNode:operands:["
+        + scanAllIPC + "," + scanTinyER + "]";
+    assertEquals(expectedIPC, union1.generateHboKeyString(
+        THboStatsType.CARDINALITY,
+        CanonicalizationStrategy.IGNORE_PARTITION_CONSTANTS));
+
+    // Both branch orders hash identically for every strategy.
+    for (CanonicalizationStrategy strategy : CanonicalizationStrategy.values()) {
+      assertEquals("Union branch order must not affect the key for " + strategy,
+          union1.generateHboKeyString(THboStatsType.CARDINALITY, strategy),
+          union2.generateHboKeyString(THboStatsType.CARDINALITY, strategy));
+    }
+  }
+
+  @Test
+  public void testUnionWithConstOperands() throws ImpalaException {
+    // Constant select branches are tracked as constOps in the key and do not add
+    // operands.
+    String query = "select id, string_col from functional.alltypes "
+        + "where year = 2009 and int_col = 0 "
+        + "union all select 1, '1' "
+        + "union all select 2, '2'";
+    PlanNode union = singleUnion(query);
+    String scanAllER =
+        "CARDINALITY:ScanNode:functional.alltypes|`year` = 2009|int_col = 0|";
+    String expectedER = "CARDINALITY:UnionNode:"
+        + "constRows:[(INT:1,STRING:'1'),(INT:2,STRING:'2')]|operands:["
+        + scanAllER + "]";
+    assertEquals(expectedER, union.generateHboKeyString(
+        THboStatsType.CARDINALITY, CanonicalizationStrategy.EXPR_REWRITE));
+
+    // Test const-only union
+    Map<Integer, PlanNode> nodes = collectPlanNodesInDistributedPlan(
+        "select 1 union select 2");
+    union = nodes.get(0);
+    PlanNode agg = nodes.get(1);
+    TQueryOptions queryOptions = new TQueryOptions();
+    queryOptions.setStore_hbo_stats(true);
+    ThriftSerializationCtx serialCtx = new ThriftSerializationCtx(queryOptions);
+    // HBO fields of the PlanNode shouldn't be populated for const-only UnionNode.
+    TPlanNode msg = new TPlanNode();
+    union.toThrift(msg, serialCtx);
+    assertFalse(msg.isSetHbo_hash_keys());
+    assertFalse(msg.isSetExec_stats());
+    // HBO still tracks AggregationNode on const-only UnionNode.
+    msg = new TPlanNode();
+    agg.toThrift(msg, serialCtx);
+    assertTrue(msg.isSetHbo_hash_keys());
+    assertTrue(msg.isSetExec_stats());
+    assertEquals(0, msg.getExec_stats().getScan_input_statsSize());
+    assertEquals("CARDINALITY:AggregationNode:FIRST|preagg:false|groupingSet:false|"
+        + "AggClasses:[0:GROUP:1]|CHILD:[CARDINALITY:UnionNode:constRows:"
+        + "[(INT:1),(INT:2)]|operands:[]]",
+        agg.generateHboKeyString(
+            THboStatsType.CARDINALITY, CanonicalizationStrategy.EXPR_REWRITE));
+  }
+
+  @Test
+  public void testUnionWithNondeterministicConst() throws ImpalaException {
+    // A non-deterministic const operand (rand()) cannot be matched against historical
+    // runs, so the whole UnionNode is skipped for HBO.
+    String query = "select rand() union all select id from functional.alltypes";
+    UnionNode union = singleUnion(query);
+    for (CanonicalizationStrategy strategy : CanonicalizationStrategy.values()) {
+      assertNull(union.generateHboKeyString(THboStatsType.CARDINALITY, strategy));
+    }
+    // toThrift must not populate HBO fields for a skipped UnionNode.
+    TQueryOptions queryOptions = new TQueryOptions();
+    queryOptions.setStore_hbo_stats(true);
+    ThriftSerializationCtx serialCtx = new ThriftSerializationCtx(queryOptions);
+    TPlanNode msg = new TPlanNode();
+    union.toThrift(msg, serialCtx);
+    assertFalse(msg.isSetHbo_hash_keys());
+    assertFalse(msg.isSetExec_stats());
+  }
+
+  @Test
+  public void testUnionWithNonLiteralConst() throws ImpalaException {
+    // With expr rewrites disabled, "1 + 1" is not folded to a literal, but it is still
+    // a deterministic constant, so it is tracked in the key via its SQL form.
+    TQueryOptions options = new TQueryOptions();
+    options.setEnable_expr_rewrites(false);
+    String query = "select 1 + 1 union all select id from functional.alltypes";
+    UnionNode union = singleUnion(query, options);
+    String expectedER = "CARDINALITY:UnionNode:constRows:[(1 + 1)]|operands:["
+        + "CARDINALITY:ScanNode:functional.alltypes|]";
+    assertEquals(expectedER, union.generateHboKeyString(
+        THboStatsType.CARDINALITY, CanonicalizationStrategy.EXPR_REWRITE));
+  }
+
+  @Test
+  public void testUnionNodeLimit() throws ImpalaException {
+    String q = "select id from functional.alltypestiny union all values(9),(10) limit 1";
+    Map<Integer, PlanNode> nodes = collectPlanNodesInDistributedPlan(q);
+    String scanKey = "CARDINALITY:ScanNode:functional.alltypestiny|";
+    String innerUnionKey = "CARDINALITY:UnionNode:limit:1|"
+        + "constRows:[(INT:9),(INT:10)]|operands:[]";
+    String outerUnionKey = "CARDINALITY:UnionNode:operands:["
+        + innerUnionKey + "," + scanKey + "]";
+    UnionNode innerUnion = (UnionNode) nodes.get(2);
+    UnionNode outerUnion = (UnionNode) nodes.get(0);
+    assertEquals(innerUnionKey, innerUnion.generateHboKeyString(
+        THboStatsType.CARDINALITY, CanonicalizationStrategy.EXPR_REWRITE));
+    assertEquals(outerUnionKey, outerUnion.generateHboKeyString(
+        THboStatsType.CARDINALITY, CanonicalizationStrategy.EXPR_REWRITE));
+
+    q = "select * from ("
+        + "select id from functional.alltypestiny union all values(9),(10)"
+        + ") t limit 1";
+    UnionNode union = singleUnion(q);
+    String unionKey = "CARDINALITY:UnionNode:limit:1|"
+        + "constRows:[(INT:9),(INT:10)]|operands:[" + scanKey + "]";
+    assertEquals(unionKey, union.generateHboKeyString(
+        THboStatsType.CARDINALITY, CanonicalizationStrategy.EXPR_REWRITE));
   }
 }

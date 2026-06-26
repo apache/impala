@@ -73,4 +73,15 @@ public enum CanonicalizationStrategy {
         throw new IllegalStateException("Unknown strategy: " + this);
     }
   }
+
+  public static CanonicalizationStrategy fromThrift(TCanonicalizationStrategy t) {
+    switch (t) {
+      case EXPR_REWRITE:
+        return EXPR_REWRITE;
+      case IGNORE_PARTITION_CONSTANTS:
+        return IGNORE_PARTITION_CONSTANTS;
+      default:
+        throw new IllegalStateException("Unknown strategy: " + t);
+    }
+  }
 }

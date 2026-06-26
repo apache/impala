@@ -1,0 +1,118 @@
+====
+---- QUERY
+# EXPLAIN the same query ran in test_hbo.py. All nodes should hit HBO stats.
+EXPLAIN select id from functional.alltypes
+where year = 2009 and int_col = 1 and string_col != 'test_union'
+union
+select id from functional.alltypestiny
+where int_col = 0 and string_col != 'test_union'
+---- PLAN
+PLAN-ROOT SINK
+|
+06:EXCHANGE [UNPARTITIONED]
+|
+05:AGGREGATE [FINALIZE]
+|  group by: id
+|  row-size=4B cardinality=369 (from HBO)
+|
+04:EXCHANGE [HASH(id)]
+|
+03:AGGREGATE [STREAMING]
+|  group by: id
+|  row-size=4B cardinality=369 (from HBO)
+|
+00:UNION
+|  row-size=4B cardinality=369 (from HBO)
+|
+|--02:SCAN HDFS [functional.alltypestiny]
+|     HDFS partitions=4/4 files=4 size=460B
+|     predicates: int_col = 0, string_col != 'test_union'
+|     row-size=21B cardinality=4 (from HBO)
+|
+01:SCAN HDFS [functional.alltypes]
+   partition predicates: `year` = 2009
+   HDFS partitions=12/24 files=12 size=238.68KB
+   predicates: int_col = 1, string_col != 'test_union'
+   row-size=21B cardinality=365 (from HBO)
+====
+---- QUERY
+# EXPLAIN the same query but using UNION ALL. The UnionNode should still hit HBO stats.
+EXPLAIN select id from functional.alltypes
+where year = 2009 and int_col = 1 and string_col != 'test_union'
+union all
+select id from functional.alltypestiny
+where int_col = 0 and string_col != 'test_union'
+---- PLAN
+PLAN-ROOT SINK
+|
+03:EXCHANGE [UNPARTITIONED]
+|
+00:UNION
+|  row-size=4B cardinality=369 (from HBO)
+|
+|--02:SCAN HDFS [functional.alltypestiny]
+|     HDFS partitions=4/4 files=4 size=460B
+|     predicates: int_col = 0, string_col != 'test_union'
+|     row-size=21B cardinality=4 (from HBO)
+|
+01:SCAN HDFS [functional.alltypes]
+   partition predicates: `year` = 2009
+   HDFS partitions=12/24 files=12 size=238.68KB
+   predicates: int_col = 1, string_col != 'test_union'
+   row-size=21B cardinality=365 (from HBO)
+====
+---- QUERY
+# Same union with the branches written in swapped order.
+EXPLAIN select id from functional.alltypestiny
+where int_col = 0 and string_col != 'test_union'
+union all
+select id from functional.alltypes
+where year = 2009 and int_col = 1 and string_col != 'test_union'
+---- PLAN
+PLAN-ROOT SINK
+|
+03:EXCHANGE [UNPARTITIONED]
+|
+00:UNION
+|  row-size=4B cardinality=369 (from HBO)
+|
+|--02:SCAN HDFS [functional.alltypes]
+|     partition predicates: `year` = 2009
+|     HDFS partitions=12/24 files=12 size=238.68KB
+|     predicates: int_col = 1, string_col != 'test_union'
+|     row-size=21B cardinality=365 (from HBO)
+|
+01:SCAN HDFS [functional.alltypestiny]
+   HDFS partitions=4/4 files=4 size=460B
+   predicates: int_col = 0, string_col != 'test_union'
+   row-size=21B cardinality=4 (from HBO)
+====
+---- QUERY
+# Change the alltypes operand (the 2nd operand after sorted by HBO key string) to select
+# 0 partitions thus has a different numInputRows. The HBO key strings of UnionNode matches
+# in IGNORE_PARTITION_CONSTANTS strategy but the historical runs matching should
+# distinguish them based on numInputRows.
+EXPLAIN select id from functional.alltypes
+where year = 2019 and int_col = 1 and string_col != 'test_union'
+union all
+select id from functional.alltypestiny
+where int_col = 0 and string_col != 'test_union'
+---- PLAN
+PLAN-ROOT SINK
+|
+03:EXCHANGE [UNPARTITIONED]
+|
+00:UNION
+|  row-size=4B cardinality=4
+|
+|--02:SCAN HDFS [functional.alltypestiny]
+|     HDFS partitions=4/4 files=4 size=460B
+|     predicates: int_col = 0, string_col != 'test_union'
+|     row-size=21B cardinality=4 (from HBO)
+|
+01:SCAN HDFS [functional.alltypes]
+   partition predicates: `year` = 2019
+   partitions=0/24 files=0 size=0B
+   predicates: int_col = 1, string_col != 'test_union'
+   row-size=21B cardinality=0
+====

@@ -24,6 +24,7 @@ import java.util.List;
 import org.apache.impala.analysis.BinaryPredicate;
 import org.apache.impala.analysis.Expr;
 import org.apache.impala.analysis.InPredicate;
+import org.apache.impala.analysis.LiteralExpr;
 import org.apache.impala.analysis.SlotRef;
 import org.apache.impala.analysis.ToSqlOptions;
 import org.apache.impala.catalog.FeTable;
@@ -44,6 +45,17 @@ public class ExprCanonicalizer {
 
   // Placeholder string used when removing constants from predicates
   private static final String CONST = "<CONST>";
+
+  public static String canonicalizeConstExpr(Expr e) {
+    if (e instanceof LiteralExpr) {
+      // Use "INT" for all integer types to avoid implicit cast by the analyzer
+      String type = e.getType().isIntegerType() ? "INT" : e.getType().toString();
+      return type + ":" + e.toSql();
+    }
+    // TODO: consider evaluating the constant exprs, e.g. "1+1", if the performance
+    // impact is negligible.
+    return e.toSql(ToSqlOptions.FOR_HBO);
+  }
 
   /**
    * Canonicalizes a list of expressions according to the specified strategy.

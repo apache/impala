@@ -1,0 +1,26 @@
+====
+---- QUERY
+# EXPLAIN the same query ran in test_hbo.py. Only ancestors nodes of const-union
+# will be tracked in HBO.
+EXPLAIN select 1 union select 2
+---- PLAN
+PLAN-ROOT SINK
+|
+01:AGGREGATE [FINALIZE]
+|  group by: 1
+|  row-size=1B cardinality=2 (from HBO)
+|
+00:UNION
+   constant-operands=2
+   row-size=1B cardinality=2
+====
+---- QUERY
+# Test UNION ALL
+EXPLAIN select 1 union all select 2
+---- PLAN
+PLAN-ROOT SINK
+|
+00:UNION
+   constant-operands=2
+   row-size=1B cardinality=2
+====
