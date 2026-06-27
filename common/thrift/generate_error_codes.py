@@ -501,7 +501,10 @@ error_codes = (
   ("TUPLE_CACHE_OUTSTANDING_WRITE_LIMIT_EXCEEDED", 163, "Outstanding tuple cache writes "
    "exceeded the limit ($0 bytes)"),
 
-  ("CHARSET_CONVERSION_ERROR", 164, "Error during buffer conversion: $0")
+  ("CHARSET_CONVERSION_ERROR", 164, "Error during buffer conversion: $0"),
+
+  ("CATALOG_IN_STANDBY_MODE", 165, "Request for Catalog service is rejected since "
+   "catalogd $0 is in standby mode")
 )
 
 import sys

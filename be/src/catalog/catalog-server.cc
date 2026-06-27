@@ -835,9 +835,7 @@ Status CatalogServer::WaitPendingMetadataResetStarts(const string& server_addres
   while (true) {
     // Return error if this catalogd is not active.
     if (!is_active_.Load()) {
-      return Status(Substitute("Request for Catalog service is rejected since "
-                               "catalogd $0 is in standby mode",
-          server_address));
+      return Status::Expected(TErrorCode::CATALOG_IN_STANDBY_MODE, server_address);
     }
 
     // Early return if first reset has completed.

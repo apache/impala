@@ -493,7 +493,14 @@ public class CatalogdMetaProvider implements MetaProvider {
     resp = new TGetPartialCatalogObjectResponse();
     new TDeserializer().deserialize(resp, ret);
     if (resp.isSetStatus() && resp.status.status_code != TErrorCode.OK) {
-      throw new TException(String.join("\n", resp.status.error_msgs));
+      String errorMsg = String.join("\n", resp.status.error_msgs);
+      if (resp.status.status_code == TErrorCode.CATALOG_IN_STANDBY_MODE) {
+        LOG.warn("Catalogd is in standby mode. Triggering metadata fetch retry.");
+        throw new InconsistentMetadataFetchException(
+            CatalogLookupStatus.CATALOG_SERVICE_CHANGED,
+            "Catalogd is in standby mode: " + errorMsg);
+      }
+      throw new TException(errorMsg);
     }
     if (resp.isSetCatalog_service_id()
         && witnessCatalogServiceId(resp.getCatalog_service_id())) {

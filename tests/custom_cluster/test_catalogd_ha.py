@@ -19,6 +19,7 @@ import json
 import logging
 import re
 import requests
+import threading
 import time
 
 from tests.common.custom_cluster_test_suite import CustomClusterTestSuite, IMPALA_HOME
@@ -823,3 +824,39 @@ class TestCatalogdHA(CustomClusterTestSuite):
       else:
         page = requests.get(self.CATALOG_HA_INFO_URL.format(port))
         assert page.status_code == requests.codes.not_found
+
+  @CustomClusterTestSuite.with_args(
+    statestored_args=SS_AUTO_FAILOVER_ARGS,
+    catalogd_args="--catalogd_ha_reset_metadata_on_failover=false "
+                  "--enable_reload_events=true",
+    impalad_args="--use_local_catalog=true --local_catalog_max_fetch_retries=10",
+    start_args="--enable_catalogd_ha",
+    disable_log_buffering=True)
+  def test_standby_retry_during_failover(self):
+    """Tests that a query retries when it encounters a standby mode rejection
+    during an HA failover, instead of failing."""
+    active_catalogd, standby_catalogd = self.__get_catalogds()
+    query_error = []
+
+    def run_query():
+      with self.create_impala_client() as client:
+        try:
+          self.execute_query_unchecked(client, "refresh functional.alltypes")
+        except Exception as e:
+          query_error.append(str(e))
+
+    active_catalogd.kill()
+    t = threading.Thread(target=run_query)
+    t.start()
+    active_catalogd.wait_for_exit()
+    # Wait until the standby catalog becomes active.
+    standby_catalogd.service.wait_for_metric_value('catalog-server.active-status',
+                                               expected_value=True,
+                                               timeout=30)
+    # Restart the killed catalogd.
+    active_catalogd.start(wait_until_ready=True)
+    # Wait for the query to finish.
+    t.join(timeout=30)
+    # Verify the behavior.
+    if query_error:
+      assert False, "Query failed unexpectedly: " + query_error[0]
