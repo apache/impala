@@ -91,6 +91,42 @@ NULL,'NULL','NULL','NULL'
 INT,STRING,STRING,STRING
 ====
 ---- QUERY
+# IMPALA-15126: Expanding a struct that contains a nested collection via STRUCT.* on a
+# column-masked table used to throw a NullPointerException. EXPAND_COMPLEX_TYPES is set
+# explicitly so the regression is covered regardless of the option's default.
+set EXPAND_COMPLEX_TYPES=1;
+select id, nested_struct.* from complextypestbl
+---- RESULTS
+800,-1,'[-1]','{"d":[[{"e":-1,"f":"nonnullable"}]]}','{}'
+100,1,'[1]','{"d":[[{"e":10,"f":"aaa"},{"e":-10,"f":"bbb"}],[{"e":11,"f":"c"}]]}','{"foo":{"h":{"i":[1.1]}}}'
+200,NULL,'[null]','{"d":[[{"e":null,"f":null},{"e":10,"f":"aaa"},{"e":null,"f":null},{"e":-10,"f":"bbb"},{"e":null,"f":null}],[{"e":11,"f":"c"},null],[],null]}','{"g1":{"h":{"i":[2.2,null]}},"g2":{"h":{"i":[]}},"g3":null,"g4":{"h":{"i":null}},"g5":{"h":null}}'
+300,NULL,'NULL','{"d":[]}','{}'
+400,NULL,'NULL','{"d":null}','NULL'
+500,NULL,'NULL','NULL','{"foo":{"h":{"i":[2.2,3.3]}}}'
+600,NULL,'NULL','NULL','NULL'
+700,7,'[2,3,null]','{"d":[[],[null],null]}','NULL'
+---- TYPES
+BIGINT, INT, STRING, STRING, STRING
+====
+---- QUERY
+# IMPALA-15126: SELECT * on a column-masked table whose struct columns contain nested
+# collections. The scalar 'id' mask still applies (100*id); masks on complex columns are
+# no-ops, so the complex columns are returned unmasked.
+set EXPAND_COMPLEX_TYPES=1;
+select * from complextypestbl
+---- RESULTS
+100,'[1,2,3]','[[1,2],[3,4]]','{"k1":1,"k2":100}','[{"k1":1}]','{"a":1,"b":[1],"c":{"d":[[{"e":10,"f":"aaa"},{"e":-10,"f":"bbb"}],[{"e":11,"f":"c"}]]},"g":{"foo":{"h":{"i":[1.1]}}}}'
+200,'[null,1,2,null,3,null]','[[null,1,2,null],[3,null,4],[],null]','{"k1":2,"k2":null}','[{"k3":null,"k1":1},null,{}]','{"a":null,"b":[null],"c":{"d":[[{"e":null,"f":null},{"e":10,"f":"aaa"},{"e":null,"f":null},{"e":-10,"f":"bbb"},{"e":null,"f":null}],[{"e":11,"f":"c"},null],[],null]},"g":{"g1":{"h":{"i":[2.2,null]}},"g2":{"h":{"i":[]}},"g3":null,"g4":{"h":{"i":null}},"g5":{"h":null}}}'
+300,'[]','[null]','{}','[null,null]','{"a":null,"b":null,"c":{"d":[]},"g":{}}'
+400,'NULL','[]','{}','[]','{"a":null,"b":null,"c":{"d":null},"g":null}'
+500,'NULL','NULL','{}','NULL','{"a":null,"b":null,"c":null,"g":{"foo":{"h":{"i":[2.2,3.3]}}}}'
+600,'NULL','NULL','NULL','NULL','NULL'
+700,'NULL','[null,[5,6]]','{"k1":null,"k3":null}','NULL','{"a":7,"b":[2,3,null],"c":{"d":[[],[null],null]},"g":null}'
+800,'[-1]','[[-1,-2],[]]','{"k1":-1}','[{},{"k1":1},{},{}]','{"a":-1,"b":[-1],"c":{"d":[[{"e":-1,"f":"nonnullable"}]]},"g":{}}'
+---- TYPES
+BIGINT, STRING, STRING, STRING, STRING, STRING
+====
+---- QUERY
 # Test resolving explicit STAR path on a nested struct column inside array
 select id, nested_arr.item.*
 from complextypestbl t,

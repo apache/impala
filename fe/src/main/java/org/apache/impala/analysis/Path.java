@@ -652,6 +652,18 @@ public class Path {
   public static Path createRelPath(Path rootPath, String... fieldNames) {
     Preconditions.checkState(rootPath.isResolved());
     Path result = new Path(rootPath, Arrays.asList(fieldNames));
+    // Propagate the table-masking marker (column masking). Without this, a collection
+    // reached through this relative path - e.g. via '*'/STRUCT.* expansion, possibly
+    // nested in structs - would root at the underlying table's tuple, which is only
+    // registered inside the table-masking view's analyzer. CollectionTableRef.analyze()
+    // -> Analyzer.findAnalyzer() would then return null and hit a NullPointerException
+    // (IMPALA-15126). Rooting at the pre-masking path keeps it in the current block.
+    if (rootPath.isMaskedPath()) {
+      Path relPathBeforeMasking =
+          new Path(rootPath.getPathBeforeMasking(), Arrays.asList(fieldNames));
+      Preconditions.checkState(relPathBeforeMasking.resolve());
+      result.setPathBeforeMasking(relPathBeforeMasking);
+    }
     return result;
   }
 }

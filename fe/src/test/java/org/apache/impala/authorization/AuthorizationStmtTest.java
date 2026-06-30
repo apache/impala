@@ -3337,6 +3337,38 @@ public class AuthorizationStmtTest extends AuthorizationTestBase {
     }
   }
 
+  /**
+   * IMPALA-15126: Expanding a struct that contains a nested collection (via STRUCT.*
+   * or SELECT * with EXPAND_COMPLEX_TYPES=true) on a table that has a column-masking
+   * policy used to throw a NullPointerException during analysis. The collection nested
+   * in the struct was rooted at the underlying table's tuple, which is only registered
+   * inside the table-masking view, so Analyzer.findAnalyzer() returned null.
+   */
+  @Test
+  public void testColumnMaskingStructWithNestedCollection() throws ImpalaException {
+    String policyName = "complextypestbl_id_mask";
+    // EXPAND_COMPLEX_TYPES makes '*' / 'struct.*' include complex-typed fields.
+    AnalysisContext ctx = createAnalysisCtx(authzFactory_, user_.getName());
+    ctx.getQueryOptions().setExpand_complex_types(true);
+    try {
+      // A mask on a scalar column wraps the table in a table-masking view.
+      createColumnMaskingPolicy(policyName, "functional_parquet", "complextypestbl",
+          "id", user_.getShortName(), "CUSTOM", "100 * {col}");
+      rangerImpalaPlugin_.refreshPoliciesAndTags();
+
+      // 'nested_struct' contains nested collections; expanding it via STRUCT.* used to
+      // hit a NullPointerException under masking.
+      authorize(ctx,
+          "select id, nested_struct.* from functional_parquet.complextypestbl")
+          .ok(onServer(TPrivilegeLevel.ALL));
+      // The same struct is expanded by SELECT * when EXPAND_COMPLEX_TYPES=true.
+      authorize(ctx, "select * from functional_parquet.complextypestbl")
+          .ok(onServer(TPrivilegeLevel.ALL));
+    } finally {
+      deleteRangerPolicy(policyName);
+    }
+  }
+
   private void createRowFilteringPolicy(String policyName, String dbName, String tblName,
       String user, String rowFilter) {
     String json = String.format("{\n" +
