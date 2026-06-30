@@ -867,9 +867,9 @@ public class SelectStmt extends QueryStmt {
 
     /**
      * Expand "*" select list item, ignoring semi-joined tables because those are
-     * currently illegal in any select list (even for inline views, etc.). Also ignores
-     * complex-typed fields for backwards compatibility unless EXPAND_COMPLEX_TYPES is set
-     * to true.
+     * currently illegal in any select list (even for inline views, etc.). Complex-typed
+     * fields are included unless EXPAND_COMPLEX_TYPES is set to false (it defaults to
+     * true); see addStarExpandedPath().
      */
     private void expandStar(SelectListItem selectListItem) throws AnalysisException {
       if (fromClause_.isEmpty()) {
@@ -888,8 +888,9 @@ public class SelectStmt extends QueryStmt {
     }
 
     /**
-     * Expand "path.*" from a resolved path, ignoring complex-typed fields for backwards
-     * compatibility unless EXPAND_COMPLEX_TYPES is set to true.
+     * Expand "path.*" from a resolved path. Complex-typed fields are included unless
+     * EXPAND_COMPLEX_TYPES is set to false (it defaults to true);
+     * see addStarExpandedPath().
      */
     private void expandStar(SelectListItem selectListItem, Path resolvedPath)
         throws AnalysisException {

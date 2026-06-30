@@ -949,8 +949,11 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
     AnalysisError("select t.a.a.a.* from a.a t",
         "Cannot expand star in 't.a.a.a.*' because path 't.a.a.a' " +
         "resolved to type 'INT'.");
-    // Not ambiguous, but expands to an empty select list.
-    AnalysisError("select t.* from a.a t",
+    // Not ambiguous, but expands to an empty select list when complex types are not
+    // expanded into '*'. EXPAND_COMPLEX_TYPES defaults to true, so set it to false here.
+    AnalysisContext ctxNoExpand = createAnalysisCtx();
+    ctxNoExpand.getQueryOptions().setExpand_complex_types(false);
+    AnalysisError("select t.* from a.a t", ctxNoExpand,
         "The star exprs expanded to an empty select list because the referenced " +
         "tables only have complex-typed columns.");
 
@@ -1102,27 +1105,38 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
   }
 
   /**
+   * Test that '*' skips complex-typed columns when EXPAND_COMPLEX_TYPES is disabled.
+   */
+  @Test
+  public void TestDisableExpandComplexTypes() {
+    // The following cases exercise the behavior where '*' skips complex-typed columns,
+    // which requires EXPAND_COMPLEX_TYPES to be disabled (it defaults to true).
+    AnalysisContext ctxNoExpand = createAnalysisCtx();
+    ctxNoExpand.getQueryOptions().setExpand_complex_types(false);
+    // Star only expands to the scalar-typed fields.
+    AnalyzesOk("select * from functional.allcomplextypes " +
+        "cross join functional_parquet.alltypes", ctxNoExpand);
+    AnalyzesOk("select complex_struct_col.* from functional.allcomplextypes",
+        ctxNoExpand);
+    // The result exprs could be empty after star expansion.
+    addTestTable("create table only_complex_types " +
+        "(a array<int>, b struct<x:int, y:int>, c map<string, int>)");
+    AnalysisError("select * from only_complex_types", ctxNoExpand,
+        "The star exprs expanded to an empty select list because the referenced " +
+        "tables only have complex-typed columns.");
+    AnalysisError("select a.* from only_complex_types a, " +
+        "functional.allcomplextypes b", ctxNoExpand,
+        "The star exprs expanded to an empty select list because the referenced " +
+        "tables only have complex-typed columns.");
+    // Empty star expansion, but non empty result exprs.
+    AnalyzesOk("select 1, * from only_complex_types", ctxNoExpand);
+  }
+
+  /**
    * Test that complex types are supported in the select list.
    */
   @Test
   public void TestComplexTypesInSelectList() {
-    // Star only expands to the scalar-typed fields.
-    AnalyzesOk("select * from functional.allcomplextypes " +
-        "cross join functional_parquet.alltypes");
-    AnalyzesOk("select complex_struct_col.* from functional.allcomplextypes");
-    // The result exprs could be empty after star expansion.
-    addTestTable("create table only_complex_types " +
-        "(a array<int>, b struct<x:int, y:int>, c map<string, int>)");
-    AnalysisError("select * from only_complex_types",
-        "The star exprs expanded to an empty select list because the referenced " +
-        "tables only have complex-typed columns.");
-    AnalysisError("select a.* from only_complex_types a, " +
-        "functional.allcomplextypes b",
-        "The star exprs expanded to an empty select list because the referenced " +
-        "tables only have complex-typed columns.");
-    // Empty star expansion, but non empty result exprs.
-    AnalyzesOk("select 1, * from only_complex_types");
-
     // Struct in select list.
     AnalysisContext ctx = createAnalysisCtx();
     AnalyzesOk("select alltypes from functional_orc_def.complextypes_structs", ctx);
@@ -1175,9 +1189,8 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
     AnalyzesOk("select binary_key_col from functional_parquet.binary_in_complex_types");
     AnalyzesOk("select binary_value_col from functional_parquet.binary_in_complex_types");
 
-    //Make complex types available in star queries
-    ctx.getQueryOptions().setExpand_complex_types(true);
-
+    // Complex types are available in star queries because EXPAND_COMPLEX_TYPES
+    // defaults to true.
     AnalyzesOk("select * from functional_parquet.complextypes_structs",ctx);
     AnalyzesOk("select * from functional_parquet.complextypes_nested_structs",ctx);
     AnalyzesOk("select * from functional_parquet.complextypes_maps_view",ctx);
@@ -4784,8 +4797,14 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
         "Unable to INSERT into target table (functional.allcomplextypes) because the " +
         "column 'int_array_col' has a complex type 'ARRAY<INT>' and Impala doesn't " +
         "support inserting into tables containing complex type columns");
+    // EXPAND_COMPLEX_TYPES defaults to true; disable it so that 'select *' does not
+    // expand the complex-typed columns of the (text-format) source table, which would
+    // otherwise fail with "Querying STRUCT is only supported for ORC and Parquet file
+    // formats" before the target-table complex-column check runs.
+    AnalysisContext ctxNoExpand = createAnalysisCtx();
+    ctxNoExpand.getQueryOptions().setExpand_complex_types(false);
     AnalysisError("insert " + qualifier + " table functional.allcomplextypes " +
-        "select * from functional.allcomplextypes",
+        "select * from functional.allcomplextypes", ctxNoExpand,
         "Unable to INSERT into target table (functional.allcomplextypes) because the " +
         "column 'int_array_col' has a complex type 'ARRAY<INT>' and Impala doesn't " +
         "support inserting into tables containing complex type columns");

@@ -5,6 +5,7 @@
 # mem_limit is tuned for a 3-node HDFS minicluster.
 set num_scanner_threads=1;
 set mem_limit=1g;
+set expand_complex_types=false;
 select *
 from customer c, c.c_orders o, o.o_lineitems
 order by l_partkey desc, l_suppkey desc, l_linenumber desc, c_custkey
@@ -24,6 +25,7 @@ bigint,string,string,smallint,string,decimal,string,string,bigint,string,decimal
 # mem_limit is tuned for a 3-node HDFS minicluster.
 set num_scanner_threads=1;
 set mem_limit=500m;
+set expand_complex_types=false;
 select *
 from customer c, c.c_orders o, o.o_lineitems
 where c_phone='20-968-632-1388' and l_partkey = 127499

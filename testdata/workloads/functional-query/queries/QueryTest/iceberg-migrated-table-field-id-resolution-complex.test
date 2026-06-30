@@ -35,6 +35,7 @@ select teststeps.step_description, teststeps.step_number from array_struct_table
 STRING, INT
 ====
 ---- QUERY
+set expand_complex_types=false;
 select * from array_struct_table_test;
 ---- RESULTS
 1,'Test 1','2024-08-26'
@@ -66,6 +67,7 @@ select teststeps.step_description, teststeps.step_number from array_struct_table
 STRING, INT
 ====
 ---- QUERY
+set expand_complex_types=false;
 select * from array_struct_table_test;
 ---- RESULTS
 1,'Test 1','2024-08-26'
@@ -111,6 +113,7 @@ select m.result_date, teststeps.step_description, teststeps.step_number from arr
 STRING, STRING, INT
 ====
 ---- QUERY
+set expand_complex_types=false;
 select * from array_struct_table_test;
 ---- RESULTS
 3,'Test 3','2024-08-27'
@@ -145,6 +148,7 @@ select teststeps.step_description, teststeps.step_number from array_struct_table
 STRING, INT
 ====
 ---- QUERY
+set expand_complex_types=false;
 select * from array_struct_table_test_orc;
 ---- RESULTS
 1,'Test 1','2024-08-26'
@@ -176,6 +180,7 @@ select teststeps.step_description, teststeps.step_number from array_struct_table
 STRING, INT
 ====
 ---- QUERY
+set expand_complex_types=false;
 select * from array_struct_table_test_orc;
 ---- RESULTS
 1,'Test 1','2024-08-26'
@@ -221,6 +226,7 @@ select m.result_date, teststeps.step_description, teststeps.step_number from arr
 STRING, STRING, INT
 ====
 ---- QUERY
+set expand_complex_types=false;
 select * from array_struct_table_test_orc;
 ---- RESULTS
 4,'Test 4','2024-08-27'
@@ -275,6 +281,7 @@ select teststeps.step_description, teststeps.step_number from all_part_cols_stor
 STRING, INT
 ====
 ---- QUERY
+set expand_complex_types=false;
 select * from all_part_cols_stored_parquet;
 ---- RESULTS
 1,'Test 1','2024-08-26'
@@ -308,6 +315,7 @@ select teststeps.step_description, teststeps.step_number from all_part_cols_stor
 STRING, INT
 ====
 ---- QUERY
+set expand_complex_types=false;
 select * from all_part_cols_stored_orc;
 ---- RESULTS
 1,'Test 1','2024-08-26'

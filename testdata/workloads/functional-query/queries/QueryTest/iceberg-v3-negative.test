@@ -57,6 +57,7 @@ Default values are not supported for TIMESTAMPTZ types
 ====
 ---- QUERY
 # SELECT * materializes ts_tz, so timestamptz default rejection applies.
+set expand_complex_types=false;
 SELECT * FROM test_complex_default;
 ---- CATCH
 Default values are not supported for TIMESTAMPTZ types

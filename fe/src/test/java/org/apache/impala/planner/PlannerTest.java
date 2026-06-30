@@ -387,6 +387,9 @@ public class PlannerTest extends PlannerTestBase {
   public void testNestedCollections() {
     TQueryOptions options = new TQueryOptions();
     options.setMinmax_filter_sorted_columns(false);
+    // This file's golden plans predate EXPAND_COMPLEX_TYPES defaulting to true; keep '*'
+    // skipping complex columns so the expected row sizes/output exprs stay valid.
+    options.setExpand_complex_types(false);
     runPlannerTestFile("nested-collections", options);
   }
 
@@ -576,7 +579,11 @@ public class PlannerTest extends PlannerTestBase {
 
   @Test
   public void testLineage() {
-    runPlannerTestFile("lineage");
+    // This file's golden lineage predates EXPAND_COMPLEX_TYPES defaulting to true;
+    // keep '*' skipping complex columns so the expected lineage graph stays valid.
+    TQueryOptions options = defaultQueryOptions();
+    options.setExpand_complex_types(false);
+    runPlannerTestFile("lineage", options);
   }
 
   @Test
@@ -801,6 +808,9 @@ public class PlannerTest extends PlannerTestBase {
     options.setMt_dop(3);
     options.setDisable_hdfs_num_rows_estimate(true);
     options.setExplain_level(TExplainLevel.EXTENDED);
+    // This file's golden plans predate EXPAND_COMPLEX_TYPES defaulting to true; keep '*'
+    // skipping complex columns so the expected output exprs stay valid.
+    options.setExpand_complex_types(false);
     runPlannerTestFile("mt-dop-validation", options);
   }
 
@@ -965,6 +975,9 @@ public class PlannerTest extends PlannerTestBase {
     options.setMinmax_filter_threshold(0.0);
     // Required so that output doesn't vary by whether parquet tables are used or not.
     options.setDisable_hdfs_num_rows_estimate(true);
+    // These files' golden plans predate EXPAND_COMPLEX_TYPES defaulting to true; keep '*'
+    // skipping complex columns so the expected resources/output exprs stay valid.
+    options.setExpand_complex_types(false);
     runPlannerTestFile(testFile, options,
         ImmutableSet.of(PlannerTestOption.EXTENDED_EXPLAIN,
             PlannerTestOption.INCLUDE_EXPLAIN_HEADER,

@@ -346,8 +346,8 @@ public class AnalyzerTest extends FrontendTestBase {
     AnalyzesOk(
         "select id, input__file__name from functional_parquet.iceberg_partitioned");
     AnalyzesOk(
-            "select input__file__name, * from functional_parquet.complextypestbl c, " +
-            "c.int_array");
+        "select input__file__name, * from functional_parquet.complextypestbl c, " +
+        "c.int_array arr");
     AnalyzesOk(
         "select c.input__file__name, c.int_array.* " +
         "from functional_parquet.complextypestbl c, c.int_array");

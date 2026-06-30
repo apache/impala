@@ -415,6 +415,9 @@ STRING,STRING
 ====
 ---- QUERY
 # Checks that "SELECT nested_struct.* ..." omits the nested structs from the output.
+# This behaviour requires EXPAND_COMPLEX_TYPES=false (its default is true), otherwise
+# 'outer_struct.*' would also expand the nested struct fields.
+set expand_complex_types=false;
 select id, outer_struct.* from complextypes_nested_structs;
 ---- RESULTS
 1,'somestr1'

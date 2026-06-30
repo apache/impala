@@ -656,7 +656,7 @@ struct TQueryOptions {
   147: optional TSchemaResolutionStrategy orc_schema_resolution = 0;
 
   // See comment in ImpalaService.thrift
-  148: optional bool expand_complex_types = false;
+  148: optional bool expand_complex_types = true;
 
   149: optional string fallback_db_for_functions;
 

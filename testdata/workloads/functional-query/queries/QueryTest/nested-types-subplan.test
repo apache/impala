@@ -111,6 +111,10 @@ bigint,string,bigint,string
 ====
 ---- QUERY
 # Union inside a subplan.
+# EXPAND_COMPLEX_TYPES defaults to true; set it to false here because 'select *' on the
+# c_orders collection would otherwise expand the nested o_lineitems array and set
+# operations don't support STRUCT-typed columns.
+set expand_complex_types=false;
 select c_custkey, c_mktsegment, o_orderkey, o_orderdate
 from customer c,
   (select * from c.c_orders where o_orderkey % 2 = 0

@@ -50,6 +50,26 @@ under the License.
     </p>
     <p outputclass="toc inpage"/>
   </conbody>
+  <concept id="incompatible_changes_500x">
+    <title>Incompatible Changes Introduced in Impala 5.0.x</title>
+    <conbody>
+      <p>
+        <ul>
+          <li>The default value of the <codeph>EXPAND_COMPLEX_TYPES</codeph> query option
+            changed from <codeph>FALSE</codeph> to <codeph>TRUE</codeph>.<p>As a result,
+              <codeph>SELECT *</codeph> queries on tables that contain complex-typed
+              (<codeph>ARRAY</codeph>, <codeph>MAP</codeph>, or <codeph>STRUCT</codeph>)
+              columns now return those columns by default, instead of skipping them.</p><p>If
+              a table has a complex column whose type is not supported in the select list
+              (for example a <codeph>STRUCT</codeph> nested inside a collection), a
+              <codeph>SELECT *</codeph> that previously succeeded by skipping the column now
+              fails with an analysis error.</p><p>To restore the previous behavior, set the
+                <codeph>EXPAND_COMPLEX_TYPES</codeph> query option to <codeph>false</codeph>.
+              See <xref href="impala_expand_complex_types.xml"/>.</p></li>
+        </ul>
+      </p>
+    </conbody>
+  </concept>
   <concept id="incompatible_changes_400x">
     <title>Incompatible Changes Introduced in Impala 4.0.x</title>
     <conbody>

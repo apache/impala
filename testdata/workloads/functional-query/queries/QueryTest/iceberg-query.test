@@ -519,7 +519,7 @@ string, string, string
 SELECT * FROM iceberg_uppercase_col;
 ---- RESULTS
 ---- TYPES
-STRING
+STRING,STRING
 ====
 ---- QUERY
 SET TIMEZONE='UTC';

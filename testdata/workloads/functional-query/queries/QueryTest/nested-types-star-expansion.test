@@ -10,6 +10,7 @@ INT, STRING, STRING
 ====
 ---- QUERY
 # Expanding star on table with array type, and an additional scalar field, without EXPAND_COMPLEX_TYPES
+set EXPAND_COMPLEX_TYPES=false;
 select id, * from complextypes_arrays where id = 2
 ---- RESULTS
 2,2
@@ -55,6 +56,7 @@ BIGINT, BIGINT, STRING, STRING, BIGINT, STRING, STRING
 ====
 ---- QUERY
 # Expanding star on views with array type, and an additional scalar field, without EXPAND_COMPLEX_TYPES
+set EXPAND_COMPLEX_TYPES=false;
 select v1.id, *
 from complextypes_arrays_only_view v1, complextypes_arrays_only_view v2
 where v1.id = v2.id and v1.id = 7
@@ -123,6 +125,7 @@ INT, STRING, STRING, STRING, STRING, INT, STRING, STRING
 ====
 ---- QUERY
 # Expanding star on tables with array and struct type, without EXPAND_COMPLEX_TYPES
+set EXPAND_COMPLEX_TYPES=false;
 select a.*, s.*
 from complextypes_arrays a, complextypes_structs s
 where a.id = s.id and a.id = 6
@@ -154,6 +157,7 @@ INT, STRING, STRING, STRING, STRING, INT, STRING, STRING, BIGINT, STRING, STRING
 ====
 ---- QUERY
 # Expanding struct, map and array as separate aliases, without EXPAND_COMPLEX_TYPES
+set EXPAND_COMPLEX_TYPES=false;
 select s.*, a.*, m.*
 from complextypes_structs s, complextypes_arrays a, complextypes_maps_view m
 where s.id = a.id and s.id = m.id and s.id = 3

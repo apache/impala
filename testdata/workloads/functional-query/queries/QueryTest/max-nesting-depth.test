@@ -14,6 +14,9 @@ int
 ====
 ---- QUERY
 # Test absolute table ref executed with a single scan.
+# EXPAND_COMPLEX_TYPES defaults to true; set it to false so that 'select *' returns the
+# deeply nested scalar item instead of expanding the complex-typed columns.
+set expand_complex_types=false;
 select * from $DATABASE.int_array_tbl.f.
   item.item.item.item.item.item.item.item.item.item.
   item.item.item.item.item.item.item.item.item.item.
@@ -32,6 +35,9 @@ int
 ====
 ---- QUERY
 # Test relative ref executed with deeply nested subplans.
+# EXPAND_COMPLEX_TYPES defaults to true; set it to false so that 'select *' returns the
+# deeply nested scalar item instead of expanding the complex-typed columns.
+set expand_complex_types=false;
 select * from $DATABASE.int_array_tbl.f t0,
   t0.item t1, t1.item t2, t2.item t3, t3.item t4, t4.item t5,
   t5.item t6, t6.item t7, t7.item t8, t8.item t9, t9.item t10,
@@ -60,6 +66,9 @@ int
 ====
 ---- QUERY
 # Test absolute table ref executed with a single scan.
+# EXPAND_COMPLEX_TYPES defaults to true; set it to false so that 'select *' returns the
+# deeply nested scalar item instead of expanding the complex-typed columns.
+set expand_complex_types=false;
 select * from $DATABASE.struct_array_tbl.f.
   f0.f0.f0.f0.f0.f0.f0.f0.f0.f0.f0.f0.f0.f0.f0.f0.f0.f0.f0.f0.
   f0.f0.f0.f0.f0.f0.f0.f0.f0.f0.f0.f0.f0.f0.f0.f0.f0.f0.f0.f0.
@@ -71,6 +80,9 @@ int
 ====
 ---- QUERY
 # Test relative ref executed with deeply nested subplans.
+# EXPAND_COMPLEX_TYPES defaults to true; set it to false so that 'select *' returns the
+# deeply nested scalar item instead of expanding the complex-typed columns.
+set expand_complex_types=false;
 select * from $DATABASE.struct_array_tbl.f t0,
   t0.f0 t1, t1.f0 t2, t2.f0 t3, t3.f0 t4, t4.f0 t5,
   t5.f0 t6, t6.f0 t7, t7.f0 t8, t8.f0 t9, t9.f0 t10,

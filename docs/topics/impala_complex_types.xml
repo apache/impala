@@ -1033,27 +1033,26 @@ STORED AS PARQUET;
           </p>
 
           <p>
-            Because of backward compatibility with earlier versions of Impala that did not support
-            complex types in the result set, queries using <codeph>SELECT *</codeph> skip complex
-            types by default. To include complex types in <codeph>SELECT *</codeph> queries, set the
-            EXPAND_COMPLEX_TYPES query option to true (see the
+            Queries using <codeph>SELECT *</codeph> include complex types in the result set by
+            default. To skip complex types in <codeph>SELECT *</codeph> queries (restoring the
+            behavior of earlier versions of Impala that did not support complex types in the result
+            set), set the EXPAND_COMPLEX_TYPES query option to false (see the
             <xref href="impala_expand_complex_types.xml"/>).
           </p>
 
           <p>
-            The following example shows how referring directly to a column with a complex type where
-            a struct is embedded in a collection (an array) returns an error, while
-            <codeph>SELECT *</codeph> on the same table succeeds, but only retrieves the scalar
-            columns. Note that if EXPAND_COMPLEX_TYPES is true, the <codeph>SELECT *</codeph> query
-            also fails with the same error.
+            The following example shows how the <codeph>EXPAND_COMPLEX_TYPES</codeph> query option
+            affects <codeph>SELECT *</codeph>. Complex-typed columns can appear in a query result,
+            but Impala cannot write them into another table. Because
+            <codeph>EXPAND_COMPLEX_TYPES</codeph> defaults to true, <codeph>SELECT *</codeph>
+            includes the complex <codeph>c_orders</codeph> column, so a <codeph>CREATE TABLE ... AS
+            SELECT *</codeph> fails. Setting the option to false makes <codeph>SELECT *</codeph> skip
+            complex columns, so the statement copies only the scalar columns.
           </p>
 
           <note conref="../shared/impala_common.xml#common/complex_type_schema_pointer"/>
 
-<codeblock><![CDATA[SELECT c_orders FROM customer LIMIT 1;
-ERROR: AnalysisException: STRUCT type inside collection types is not supported.
-
--- Original column has several scalar and one complex column.
+<codeblock><![CDATA[-- The customer table has several scalar columns and one complex column, c_orders.
 DESCRIBE customer;
 +--------------+------------------------------------+
 | name         | type                               |
@@ -1069,7 +1068,14 @@ DESCRIBE customer;
 |              | >>                                 |
 +--------------+------------------------------------+
 
--- When we SELECT * from that table, only the scalar columns come back in the result set.
+-- EXPAND_COMPLEX_TYPES defaults to true, so SELECT * includes the c_orders complex column.
+-- Impala cannot store a complex-typed column in a table, so CREATE TABLE AS SELECT * fails.
+CREATE TABLE select_star_customer STORED AS PARQUET AS SELECT * FROM customer;
+ERROR: AnalysisException: Unable to INSERT into target table (default.select_star_customer) because the column 'c_orders' has a complex type 'ARRAY<STRUCT<...>>' and Impala doesn't support inserting into tables containing complex type columns
+
+-- Setting EXPAND_COMPLEX_TYPES to false makes SELECT * skip complex columns, so only the
+-- scalar columns are copied.
+SET EXPAND_COMPLEX_TYPES=false;
 CREATE TABLE select_star_customer STORED AS PARQUET AS SELECT * FROM customer;
 +------------------------+
 | summary                |

@@ -38,10 +38,10 @@ under the License.
    <indexterm audience="hidden">EXPAND_COMPLEX_TYPES Query Option</indexterm> Older versions of
    Impala did not support complex types in the select list, and therefore a <codeph>SELECT
    *</codeph> statement only expanded to primitive types even when the table contained complex-typed
-   columns. Support for complex types in the select list has since been added, but for backward
-   compatibility the behaviour that <q>*</q> expressions skip complex types has been kept as the
-   default. If the EXPAND_COMPLEX_TYPES query option is set to true, <q>*</q> expressions will
-   include complex types as well.
+   columns. Support for complex types in the select list has since been added, and <q>*</q>
+   expressions now include complex types by default. If the EXPAND_COMPLEX_TYPES query option is set
+   to false, <q>*</q> expressions skip complex types, restoring the behaviour of earlier Impala
+   versions.
   </p>
 
   <p>
@@ -50,7 +50,7 @@ under the License.
   </p>
 
   <p><b>Type:</b>BOOLEAN</p>
-  <p><b>Default:</b>FALSE</p>
+  <p><b>Default:</b>TRUE</p>
   <p><b>Added in:</b>Impala 4.2</p>
   <p conref="../shared/impala_common.xml#common/related_info"/>
   <p>

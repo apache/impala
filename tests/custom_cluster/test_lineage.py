@@ -240,6 +240,10 @@ class TestLineage(CustomClusterTestSuite):
       impalad_args="--lineage_event_log_dir={" + LINEAGE + "}",
       tmp_dir_placeholders=[LINEAGE])
   def test_lineage_output(self, vector):
+    # The expected lineage graphs in lineage.test predate EXPAND_COMPLEX_TYPES defaulting
+    # to true. Keep '*' skipping complex-typed columns so the graphs stay valid (and so
+    # queries selecting '*' from text-format tables with complex columns don't error).
+    vector.get_value('exec_option')['expand_complex_types'] = 'false'
     try:
       self.run_test_case('QueryTest/lineage', vector)
     finally:

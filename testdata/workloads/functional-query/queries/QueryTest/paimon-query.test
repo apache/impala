@@ -137,6 +137,10 @@ select * from functional_parquet.paimon_decimal_tbl where d3 >= 123.45678900 and
 DECIMAL,DECIMAL,DECIMAL,DECIMAL,DECIMAL
 ====
 ---- QUERY
+# EXPAND_COMPLEX_TYPES defaults to true; set it to false here because 'select *' would
+# otherwise expand the struct_val column, which the Paimon scanner does not support
+# querying (see the STRUCT cases below).
+set expand_complex_types=false;
 SELECT * FROM functional_parquet.alltypes_structs_paimon WHERE year=2009 AND month=1 AND id > 300
 ---- RESULTS
 301,2009,1

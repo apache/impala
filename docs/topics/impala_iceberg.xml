@@ -1069,7 +1069,7 @@ DESCRIBE functional_parquet.iceberg_alltypes_part.history;
         tables: for <codeph>SELECT *</codeph> expressions from metadata tables, complex
         types will always be included, and for <codeph>SELECT *</codeph> expressions from
         regular tables, complex types will be included if and only if
-        <codeph>EXPAND_COMPLEX_TYPES</codeph> is true.
+        <codeph>EXPAND_COMPLEX_TYPES</codeph> is true (which is the default).
       </p>
       <p>
         Note that unnesting collections from metadata tables is not supported.

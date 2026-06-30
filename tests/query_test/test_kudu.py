@@ -2014,8 +2014,12 @@ class TestKuduArray(KuduTestSuite):
           "{0}.array_{1}".format(table_name, self._get_name_from_type(item_type))
           for item_type in types
       ])
+      # EXPAND_COMPLEX_TYPES defaults to true; disable it so that 'SELECT *' does not also
+      # expand the table's ARRAY columns. Only the UNNEST-ed items are expected here.
+      no_expand_options = dict(query_options)
+      no_expand_options["expand_complex_types"] = "false"
       result = self.execute_query("SELECT * FROM {1}.{2}, UNNEST({0})".format(
-          columns, db, table_name), query_options=query_options)
+          columns, db, table_name), query_options=no_expand_options)
     for i, result_column in enumerate(zip(*result.tuples())):
       if i == 0:
         assert result_column == self.EXPECTED_ID_UNNESTED

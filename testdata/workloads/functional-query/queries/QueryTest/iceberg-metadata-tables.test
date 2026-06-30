@@ -1175,6 +1175,7 @@ INT,STRING,STRING,INT,BIGINT,BIGINT,STRING,STRING,STRING,STRING,STRING,STRING,BI
 ---- QUERY
 # Join a metadata table with a random other table that has complex columns and check that
 # only the metadata table's complex columns are added to the result set.
+set expand_complex_types=false;
 select * from functional_parquet.iceberg_query_metadata.`entries` ent
   join functional_parquet.complextypes_arrays ca on ent.sequence_number = ca.id
   where ca.id = 1;

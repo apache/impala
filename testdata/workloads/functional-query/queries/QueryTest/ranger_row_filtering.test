@@ -560,6 +560,9 @@ BIGINT
 ====
 ---- QUERY
 # Row-filtering policy keeps rows with "nested_struct.a is not NULL"
+# EXPAND_COMPLEX_TYPES defaults to true; set it to false here so that 'nested_struct.*'
+# expands only the scalar field 'a' and the test stays focused on row filtering.
+set expand_complex_types=false;
 select id, nested_struct.* from functional_parquet.complextypestbl
 ---- RESULTS
 1,1
