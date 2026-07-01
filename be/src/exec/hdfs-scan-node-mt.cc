@@ -91,7 +91,7 @@ Status HdfsScanNodeMt::GetNext(RuntimeState* state, RowBatch* row_batch, bool* e
     scanner_ctx_.reset(new ScannerContext(runtime_state_, this, buffer_pool_client(),
         scanner_reservation, partition, filter_ctxs(), expr_results_pool()));
     scanner_ctx_->AddStream(scan_range_, scanner_reservation);
-    Status status = CreateAndOpenScanner(partition, scanner_ctx_.get(), &scanner_);
+    Status status = CreateAndOpenScanner(scanner_ctx_.get(), &scanner_);
     if (!status.ok()) {
       DCHECK(scanner_ == NULL);
       // Avoid leaking unread buffers in the scan range.
@@ -129,9 +129,9 @@ Status HdfsScanNodeMt::GetNext(RuntimeState* state, RowBatch* row_batch, bool* e
   return Status::OK();
 }
 
-Status HdfsScanNodeMt::CreateAndOpenScanner(HdfsPartitionDescriptor* partition,
+Status HdfsScanNodeMt::CreateAndOpenScanner(
     ScannerContext* context, scoped_ptr<HdfsScanner>* scanner) {
-  Status status = CreateAndOpenScannerHelper(partition, context, scanner);
+  Status status = CreateAndOpenScannerHelper(context, scanner);
   if (!status.ok() && scanner->get() != nullptr) {
     scanner->get()->Close(nullptr);
     scanner->reset();

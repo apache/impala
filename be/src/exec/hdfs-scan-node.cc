@@ -483,7 +483,7 @@ void HdfsScanNode::ProcessSplit(const vector<FilterContext>& filter_ctxs,
       *scanner_thread_reservation, partition, filter_ctxs, expr_results_pool);
   context.AddStream(scan_range, *scanner_thread_reservation);
   scoped_ptr<HdfsScanner> scanner;
-  Status status = CreateAndOpenScannerHelper(partition, &context, &scanner);
+  Status status = CreateAndOpenScannerHelper(&context, &scanner);
   if (!status.ok()) {
     // If preparation fails, avoid leaking unread buffers in the scan_range.
     scan_range->Cancel(status);

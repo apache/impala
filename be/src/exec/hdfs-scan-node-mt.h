@@ -60,9 +60,9 @@ class HdfsScanNodeMt : public HdfsScanNodeBase {
   Status GetNextScanRangeToRead(io::ScanRange** scan_range, bool* needs_buffers) override;
 
  private:
-  /// Create and open new scanner for this partition type.
+  /// Create and open new scanner for this file type.
   /// If the scanner is successfully created and opened, it is returned in 'scanner'.
-  Status CreateAndOpenScanner(HdfsPartitionDescriptor* partition,
+  Status CreateAndOpenScanner(
       ScannerContext* context, boost::scoped_ptr<HdfsScanner>* scanner);
 
   /// Current scan range and corresponding scanner.
