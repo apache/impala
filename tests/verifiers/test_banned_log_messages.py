@@ -29,8 +29,11 @@ class TestBannedLogMessages(BaseTestSuite):
   This test suite should be run after all the tests have been run.
   """
 
-  def assert_message_absent(self, message, log_dir=os.environ["IMPALA_LOGS_DIR"]):
-    for root, _, files in os.walk(log_dir):
+  def assert_message_absent(self, message, log_dir=os.environ["IMPALA_LOGS_DIR"],
+                             skip_subdirs=None):
+    for root, dirs, files in os.walk(log_dir):
+      if skip_subdirs:
+        dirs[:] = [d for d in dirs if d not in skip_subdirs]
       for file in files:
         log_file_path = os.path.join(root, file)
         returncode = subprocess.call(['grep', message, log_file_path])
@@ -47,4 +50,8 @@ class TestBannedLogMessages(BaseTestSuite):
   def test_no_tuniqueid(self):
     """Test that cluster logs do not contain TUniqueId. They should instead print
     IDs with the format 8a4673c8fbe83a74:309751e900000000."""
-    self.assert_message_absent('[^a-zA-Z]TUniqueId(')
+    # Skip 'coverage' dirs (gcovr C++ HTML and Jacoco Java HTML reports render
+    # source code containing TUniqueId) and 'results' dirs (pytest JUnit XML files
+    # may capture TUniqueId.__repr__() from test failure tracebacks).
+    self.assert_message_absent('[^a-zA-Z]TUniqueId(',
+        skip_subdirs={'coverage', 'results'})
