@@ -3175,19 +3175,18 @@ class TestRangerLocalCatalog(TestRanger):
       self.run_test_case("QueryTest/ranger_column_masking", vector,
                          test_file_vars={'$UNIQUE_DB': unique_database})
       # Add a policy on a primitive column of a table which contains nested columns.
+      # Masks on top-level complex-typed columns are rejected since IMPALA-15130; that is
+      # covered separately by AuthorizationStmtTest.testColumnMaskingOnComplexColumn().
       for db in ['functional_parquet', 'functional_orc_def']:
         TestRanger._add_column_masking_policy(
           unique_name + str(policy_cnt), user, db, "complextypestbl",
           "id", "CUSTOM", "100 * {col}")
         policy_cnt += 1
-        # Add policies on a nested column though they won't be recognized (same as Hive).
+        # A mask on a nested struct field is not recognized (same as Hive), so the column
+        # is returned unmasked. Keep it here to exercise that path end-to-end.
         TestRanger._add_column_masking_policy(
           unique_name + str(policy_cnt), user, db, "complextypestbl",
           "nested_struct.a", "CUSTOM", "100 * {col}")
-        policy_cnt += 1
-        TestRanger._add_column_masking_policy(
-          unique_name + str(policy_cnt), user, db, "complextypestbl",
-          "int_array", "MASK_NULL")
         policy_cnt += 1
         self.execute_query_expect_success(admin_client, "refresh authorization")
         self.run_test_case("QueryTest/ranger_column_masking_complex_types", vector,
@@ -3932,7 +3931,9 @@ class TestRangerColumnMaskingComplexTypesInSelectList(CustomClusterTestSuite):
     admin_client = self.create_impala_client(user=ADMIN)
     policy_cnt = 0
     try:
-      # Add a policy on a primitive column of a table which contains nested columns.
+      # Scalar-column masks (str, id) are applied normally. Masks on complex-typed
+      # columns (tiny_struct, int_array_array, int_map_array) are rejected now
+      # (IMPALA-15130); the .test file selects those columns and expects an error.
       TestRanger._add_column_masking_policy(
           unique_name + str(policy_cnt), user, "functional_orc_def",
           "complextypes_structs", "str", "MASK_NULL")
@@ -3951,7 +3952,7 @@ class TestRangerColumnMaskingComplexTypesInSelectList(CustomClusterTestSuite):
       policy_cnt += 1
       TestRanger._add_column_masking_policy(
           unique_name + str(policy_cnt), user, "functional_orc_def",
-          "complextypestbl", "int_array_map", "MASK_NULL")
+          "complextypestbl", "int_map_array", "MASK_NULL")
       policy_cnt += 1
       self.execute_query_expect_success(admin_client, "refresh authorization")
       self.run_test_case("QueryTest/ranger_column_masking_struct_in_select_list", vector,

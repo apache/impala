@@ -16,6 +16,13 @@ select id, str, alltypes from functional_orc_def.complextypes_structs
 INT,STRING,STRING
 ====
 ---- QUERY
+# A column mask on a top-level STRUCT column ('tiny_struct') is rejected too: the same
+# scalar-mask limitation applies to any complex type (IMPALA-15130).
+select id, tiny_struct from functional_orc_def.complextypes_structs
+---- CATCH
+Column masking is not supported for complex type column 'functional_orc_def.complextypes_structs.tiny_struct'
+====
+---- QUERY
 select id, int_array from functional_orc_def.complextypestbl
 ---- RESULTS
 NULL,'[1,2,3]'
@@ -30,20 +37,12 @@ NULL,'[-1]'
 bigint,string
 ====
 ---- QUERY
-# There is a column mask added for int_array_array, but it is ignored.
-# It is not clear whether we should support this (RANGER-3525).
+# A column mask on the complex column 'int_array_array' cannot be applied: a scalar mask
+# transform cannot express a masked ARRAY value, so the query is rejected (IMPALA-15130)
+# rather than silently returning the column unmasked.
 select id, int_array_array from functional_orc_def.complextypestbl
----- RESULTS
-NULL,'[[-1,-2],[]]'
-NULL,'[[1,2],[3,4]]'
-NULL,'[[null,1,2,null],[3,null,4],[],null]'
-NULL,'[null]'
-NULL,'[]'
-NULL,'NULL'
-NULL,'NULL'
-NULL,'[null,[5,6]]'
----- TYPES
-bigint,string
+---- CATCH
+Column masking is not supported for complex type column 'functional_orc_def.complextypestbl.int_array_array'
 ====
 ---- QUERY
 select id, int_map from functional_orc_def.complextypestbl
@@ -60,18 +59,8 @@ NULL,'{"k1":null,"k3":null}'
 bigint,string
 ====
 ---- QUERY
-# There is a column mask added for int_map_array, but it is ignored.
-# It is not clear whether we should support this (RANGER-3525).
+# Likewise, a column mask on the complex column 'int_map_array' is rejected.
 select id, int_map_array from functional_orc_def.complextypestbl
----- RESULTS
-NULL,'[{},{"k1":1},{},{}]'
-NULL,'[{"k1":1}]'
-NULL,'[{"k3":null,"k1":1},null,{}]'
-NULL,'[null,null]'
-NULL,'[]'
-NULL,'NULL'
-NULL,'NULL'
-NULL,'NULL'
----- TYPES
-bigint,string
+---- CATCH
+Column masking is not supported for complex type column 'functional_orc_def.complextypestbl.int_map_array'
 ====

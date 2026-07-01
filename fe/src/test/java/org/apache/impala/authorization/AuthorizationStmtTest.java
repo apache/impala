@@ -55,6 +55,7 @@ import java.util.Set;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.fail;
 
 /**
  * This class contains authorization tests for SQL statements.
@@ -3366,6 +3367,68 @@ public class AuthorizationStmtTest extends AuthorizationTestBase {
           .ok(onServer(TPrivilegeLevel.ALL));
     } finally {
       deleteRangerPolicy(policyName);
+    }
+  }
+
+  /**
+   * IMPALA-15130: A column-masking policy on a top-level complex-typed column
+   * (ARRAY/MAP/STRUCT) cannot be applied, so Impala must reject the query
+   * rather than silently returning the column unmasked. A policy on a nested struct
+   * field is ignored instead (parity with Hive, which only considers top-level columns).
+   */
+  @Test
+  public void testColumnMaskingOnComplexColumn() throws ImpalaException {
+    String arrPolicy = "complextypestbl_int_array_mask";
+    String mapPolicy = "complextypestbl_int_map_mask";
+    String structPolicy = "complextypestbl_nested_struct_mask";
+    String nestedPolicy = "complextypestbl_nested_field_mask";
+    AnalysisContext ctx = createAnalysisCtx(authzFactory_, user_.getName());
+    try {
+      // A mask on a top-level complex column is rejected regardless of the complex kind:
+      // an ARRAY column ...
+      expectComplexColumnMaskRejected(ctx, arrPolicy, "functional_parquet", "int_array",
+          "select int_array from functional_parquet.complextypestbl");
+      // ... a MAP column ...
+      expectComplexColumnMaskRejected(ctx, mapPolicy, "functional_parquet", "int_map",
+          "select int_map from functional_parquet.complextypestbl");
+      // ... and a STRUCT column (functional_orc_def supports reading structs directly).
+      expectComplexColumnMaskRejected(ctx, structPolicy, "functional_orc_def",
+          "nested_struct",
+          "select nested_struct from functional_orc_def.complextypestbl");
+
+      // A mask on a nested struct field is ignored (parity with Hive), so the query still
+      // analyzes.
+      createColumnMaskingPolicy(nestedPolicy, "functional_parquet", "complextypestbl",
+          "nested_struct.a", user_.getShortName(), "CUSTOM", "100 * {col}");
+      rangerImpalaPlugin_.refreshPoliciesAndTags();
+      authorize(ctx, "select id, nested_struct.a from functional_parquet.complextypestbl")
+          .ok(onServer(TPrivilegeLevel.ALL));
+    } finally {
+      try { deleteRangerPolicy(arrPolicy); } catch (Exception e) { /* may not exist */ }
+      try { deleteRangerPolicy(mapPolicy); } catch (Exception e) { /* ditto */ }
+      try { deleteRangerPolicy(structPolicy); } catch (Exception e) { /* ditto */ }
+      try { deleteRangerPolicy(nestedPolicy); } catch (Exception e) { /* ditto */ }
+    }
+  }
+
+  /**
+   * Adds a MASK_NULL policy on the given top-level complex column of 'complextypestbl'
+   * and asserts that a query referencing it is rejected during analysis. The mask is
+   * applied while building the table-masking view, so it surfaces as an AnalysisException
+   * before authorization is evaluated.
+   */
+  private void expectComplexColumnMaskRejected(AnalysisContext ctx, String policyName,
+      String db, String col, String query) throws ImpalaException {
+    createColumnMaskingPolicy(policyName, db, "complextypestbl", col,
+        user_.getShortName(), "MASK_NULL", /*maskExpr*/ null);
+    rangerImpalaPlugin_.refreshPoliciesAndTags();
+    String err = "Column masking is not supported for complex type column '" + db
+        + ".complextypestbl." + col + "'";
+    try {
+      authorize(ctx, query).error(err, onServer(TPrivilegeLevel.ALL));
+      fail("Expected masking on a complex column to be rejected");
+    } catch (AnalysisException e) {
+      assertTrue(e.getMessage(), e.getMessage().startsWith(err));
     }
   }
 

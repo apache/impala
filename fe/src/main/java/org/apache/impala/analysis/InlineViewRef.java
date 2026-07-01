@@ -174,9 +174,6 @@ public class InlineViewRef extends TableRef {
       boolean isHidden = col.isVirtual();
       items.add(new SelectListItem(maskExpr, /*alias*/ col.getName(), isHidden));
     }
-    if (tableMask.hasComplexColumnMask()) {
-      throw new AnalysisException("Column masking is not supported for complex types");
-    }
     if (columns.isEmpty()) {
       // No columns so use "SELECT 1 FROM tbl" to make a valid statement.
       items.add(new SelectListItem(NumericLiteral.create(1), /*alias*/null));

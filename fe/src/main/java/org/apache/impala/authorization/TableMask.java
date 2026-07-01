@@ -47,8 +47,6 @@ public class TableMask {
   private final List<String> requiredColumnNames_;
   private final User user_;
 
-  private boolean hasComplexColumnMask_;
-
   public TableMask(AuthorizationChecker authzChecker, String dbName, String tableName,
       List<Column> requiredColumns, User user) {
     this.authChecker_ = Preconditions.checkNotNull(authzChecker);
@@ -61,7 +59,6 @@ public class TableMask {
   }
 
   public List<Column> getRequiredColumns() { return requiredColumns_; }
-  public boolean hasComplexColumnMask () { return hasComplexColumnMask_; }
 
   /**
    * Returns whether the table/view has column masking or row filtering policies.
@@ -90,12 +87,22 @@ public class TableMask {
     if (maskedValue == null || maskedValue.equals(colName)) {  // Don't need masking.
       return null;
     }
-    if (colType.isComplexType() || colName.contains(".")) {
-      // Ignore column masks on complex types or their children.
+    if (colName.contains(".")) {
+      // Ignore column masks on nested fields of a complex column. Hive only considers
+      // top-level columns for masking, so such policies are not recognized there either;
+      // keep that parity here rather than erroring.
       // TODO: RANGER-3525: Clarify handling of column masks on nested types
-      LOG.warn("Ignoring column mask on complex type {}.{}: {} => {}",
+      LOG.warn("Ignoring column mask on nested field {}.{}: {} => {}",
           dbName_, tableName_, colName, maskedValue);
       return null;
+    }
+    if (colType.isComplexType()) {
+      // A column-masking policy on a top-level complex-typed column cannot be applied:
+      // the mask transforms are scalar and there is no way to express a masked
+      // ARRAY/MAP/STRUCT value.
+      throw new AnalysisException(String.format(
+          "Column masking is not supported for complex type column '%s.%s.%s' (%s)",
+          dbName_, tableName_, colName, colType.toSql()));
     }
     SelectStmt maskStmt = (SelectStmt) Parser.parse(
         String.format("SELECT CAST(%s AS %s)", maskedValue, colType));
