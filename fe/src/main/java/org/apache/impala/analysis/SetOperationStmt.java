@@ -374,9 +374,6 @@ public class SetOperationStmt extends QueryStmt {
     // Create tuple descriptor materialized by this UnionStmt, its resultExprs, and
     // its sortInfo if necessary.
     createMetadata(analyzer);
-    // Block a top-level set operation from returning GEOMETRY to the client (e.g. a
-    // top-level UNION ALL of geometries); geometry may still flow through nested set ops.
-    checkGeometryNotInResult(analyzer);
     createSortInfo(analyzer);
 
     // Create unnested operands' smaps.

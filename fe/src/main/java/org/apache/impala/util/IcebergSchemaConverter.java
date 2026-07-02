@@ -98,6 +98,17 @@ public class IcebergSchemaConverter {
         return Type.BINARY;
       case UUID:
         return Type.UUID;
+      case GEOMETRY: {
+        // crs() never returns null, it falls back to DEFAULT_CRS. The CRS name is not
+        // guaranteed to be normalized (Types.GeometryType.equals() only ignores case
+        // since Iceberg 1.12.0), so compare it case-insensitively.
+        String crs = ((Types.GeometryType) t).crs();
+        if (!crs.equalsIgnoreCase(Types.GeometryType.DEFAULT_CRS)) {
+          throw new ImpalaRuntimeException("Unsupported geometry CRS: " + crs +
+              ". Only the default CRS (OGC:CRS84) is supported.");
+        }
+        return Type.GEOMETRY;
+      }
       case TIMESTAMP:
         return Type.TIMESTAMP;
       case DECIMAL:
@@ -141,7 +152,8 @@ public class IcebergSchemaConverter {
     for (Types.NestedField column : schema.columns()) {
       Type colType = toImpalaType(column.type());
       // toHiveMetastoreType() maps HMS-incompatible types (UUID -> string, VARIANT ->
-      // struct<..>); Impala keeps the real Iceberg type from the metadata.
+      // struct<..>, GEOMETRY -> binary); Impala keeps the real Iceberg type from the
+      // metadata.
       ret.add(new FieldSchema(column.name().toLowerCase(), colType.toHiveMetastoreType(),
           column.doc()));
     }
@@ -236,7 +248,7 @@ public class IcebergSchemaConverter {
           "Iceberg DDL default values for TIMESTAMP type are not supported; "
           + "only DATE is supported among temporal types.");
     }
-    if (impalaType.isBinary()) {
+    if (impalaType.isBinary() || impalaType.isGeometry()) {
       throw new AnalysisException(String.format(
           "Default values are not supported for type: %s", impalaType.toSql()));
     }
@@ -373,6 +385,8 @@ public class IcebergSchemaConverter {
           return Types.BinaryType.get();
         case UUID:
           return Types.UUIDType.get();
+        case GEOMETRY:
+          return Types.GeometryType.crs84();
         case TIMESTAMP:
           // Impala TIMESTAMP has timestamp without time zone semantics.
           return Types.TimestampType.withoutZone();

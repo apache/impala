@@ -53,7 +53,8 @@ from tests.common.test_result_verifier import error_msg_startswith
 from tests.shell.util import run_impala_shell_cmd
 from tests.util.filesystem_utils import FILESYSTEM_PREFIX, get_fs_path, IS_HDFS, WAREHOUSE
 from tests.util.get_parquet_metadata import get_parquet_metadata
-from tests.util.iceberg_util import cast_ts, get_snapshots, IcebergCatalogs, quote
+from tests.util.iceberg_util import (cast_ts, get_latest_metadata_path,
+    get_snapshots, IcebergCatalogs, quote)
 from tests.util.parse_util import bytes_to_str
 
 LOG = logging.getLogger(__name__)
@@ -1034,14 +1035,7 @@ class TestIcebergTable(IcebergTestSuite):
     return datafiles
 
   def get_latest_metadata_path(self, database_name, table_name):
-    describe = 'describe extended %s.%s ' % (database_name, table_name)
-    output = self.client.execute(describe)
-    metadata_location = [s for s in output.data if s.startswith('\tmetadata_location')]
-    assert len(metadata_location) == 1
-    metadata_location_split = metadata_location[0].split('\t')
-    assert len(metadata_location_split) == 3
-    metadata_path = metadata_location_split[2]
-    return metadata_path
+    return get_latest_metadata_path(self.client, database_name, table_name)
 
   # Get the current partition spec as JSON from the latest metadata file
   def get_current_partition_spec(self, database_name, table_name):

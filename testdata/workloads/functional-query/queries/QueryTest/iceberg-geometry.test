@@ -1,0 +1,452 @@
+====
+---- QUERY
+# Create an Iceberg table with a GEOMETRY column.
+CREATE TABLE iceberg_geom_tbl (
+  id INT,
+  name STRING,
+  geom GEOMETRY
+) STORED AS ICEBERG
+TBLPROPERTIES('format-version'='3')
+---- RESULTS
+'Table has been created.'
+====
+---- QUERY
+DESCRIBE iceberg_geom_tbl
+---- RESULTS
+'id','int','','true'
+'name','string','','true'
+'geom','geometry','','true'
+---- TYPES
+STRING,STRING,STRING,STRING
+====
+---- QUERY
+DESCRIBE FORMATTED iceberg_geom_tbl
+---- RESULTS: VERIFY_IS_SUBSET
+'','format-version      ','3                   '
+---- TYPES
+STRING,STRING,STRING
+====
+---- QUERY
+# Insert geometry values using ST_Point.
+INSERT INTO iceberg_geom_tbl VALUES
+  (1, 'point_a', ST_Point(1.0, 2.0)),
+  (2, 'point_b', ST_Point(3.0, 4.0)),
+  (3, 'null_geom', NULL)
+---- RUNTIME_PROFILE
+NumModifiedRows: 3
+====
+---- QUERY
+# Verify round-trip via ST_X and ST_Y.
+SELECT id, ST_X(geom), ST_Y(geom) FROM iceberg_geom_tbl ORDER BY id
+---- TYPES
+INT, DOUBLE, DOUBLE
+---- RESULTS
+1,1.0,2.0
+2,3.0,4.0
+3,NULL,NULL
+====
+---- QUERY
+# Verify ST_AsText on stored geometry.
+SELECT id, ST_AsText(geom) FROM iceberg_geom_tbl WHERE id <= 2 ORDER BY id
+---- TYPES
+INT, STRING
+---- RESULTS
+1,'POINT (1 2)'
+2,'POINT (3 4)'
+====
+---- QUERY
+# Verify ST_GeometryType on stored geometry.
+SELECT id, ST_GeometryType(geom) FROM iceberg_geom_tbl WHERE id <= 2 ORDER BY id
+---- TYPES
+INT, STRING
+---- RESULTS
+1,'ST_POINT'
+2,'ST_POINT'
+====
+---- QUERY
+# Insert more complex geometry using ST_Linestring and ST_Polygon.
+INSERT INTO iceberg_geom_tbl VALUES
+  (4, 'line', ST_Linestring(0, 0, 10, 10)),
+  (5, 'polygon', ST_Polygon('polygon ((0 0, 10 0, 10 10, 0 10, 0 0))'))
+---- RUNTIME_PROFILE
+NumModifiedRows: 2
+====
+---- QUERY
+SELECT id, ST_GeometryType(geom) FROM iceberg_geom_tbl WHERE id >= 4 ORDER BY id
+---- TYPES
+INT, STRING
+---- RESULTS
+4,'ST_LINESTRING'
+5,'ST_POLYGON'
+====
+---- QUERY
+# ALTER TABLE: add another GEOMETRY column.
+ALTER TABLE iceberg_geom_tbl ADD COLUMNS (geom2 GEOMETRY)
+---- RESULTS
+'Column(s) have been added.'
+====
+---- QUERY
+DESCRIBE iceberg_geom_tbl
+---- RESULTS
+'id','int','','true'
+'name','string','','true'
+'geom','geometry','','true'
+'geom2','geometry','','true'
+---- TYPES
+STRING,STRING,STRING,STRING
+====
+---- QUERY
+# Insert with the new column.
+INSERT INTO iceberg_geom_tbl (id, name, geom, geom2)
+  VALUES (6, 'two_geoms', ST_Point(5.0, 6.0), ST_Point(7.0, 8.0))
+---- RUNTIME_PROFILE
+NumModifiedRows: 1
+====
+---- QUERY
+SELECT id, ST_X(geom), ST_X(geom2) FROM iceberg_geom_tbl WHERE id = 6
+---- TYPES
+INT, DOUBLE, DOUBLE
+---- RESULTS
+6,5.0,7.0
+====
+---- QUERY
+# Rows inserted before the new column have NULL for geom2.
+SELECT id, ST_X(geom2) FROM iceberg_geom_tbl WHERE id = 1
+---- TYPES
+INT, DOUBLE
+---- RESULTS
+1,NULL
+====
+---- QUERY
+# ALTER TABLE: drop the second GEOMETRY column.
+ALTER TABLE iceberg_geom_tbl DROP COLUMN geom2
+---- RESULTS
+'Column has been dropped.'
+====
+---- QUERY
+DESCRIBE iceberg_geom_tbl
+---- RESULTS
+'id','int','','true'
+'name','string','','true'
+'geom','geometry','','true'
+---- TYPES
+STRING,STRING,STRING,STRING
+====
+---- QUERY
+# Verify data is still readable after dropping the column.
+SELECT id, ST_X(geom) FROM iceberg_geom_tbl WHERE id <= 2 ORDER BY id
+---- TYPES
+INT, DOUBLE
+---- RESULTS
+1,1.0
+2,3.0
+====
+---- QUERY
+CREATE TABLE iceberg_geom_ctas STORED AS ICEBERG TBLPROPERTIES('format-version'='3')
+  AS SELECT id, geom FROM iceberg_geom_tbl WHERE id <= 2;
+SELECT id, ST_AsText(geom) FROM iceberg_geom_ctas ORDER BY id;
+---- TYPES
+INT, STRING
+---- RESULTS
+1,'POINT (1 2)'
+2,'POINT (3 4)'
+====
+---- QUERY
+# COMPUTE STATS treats GEOMETRY like BINARY: no NDV (-1), but null count and byte size
+# are collected. The size is the real WKB byte length via bytes() (a 2D point is 21
+# bytes). The statement succeeds -- GEOMETRY column stats are stored to HMS as BINARY.
+compute stats iceberg_geom_ctas
+---- RESULTS
+'Updated 1 partition(s) and 2 column(s).'
+====
+---- QUERY
+show column stats iceberg_geom_ctas
+---- LABELS
+COLUMN, TYPE, #DISTINCT VALUES, #NULLS, MAX SIZE, AVG SIZE, #TRUES, #FALSES
+---- RESULTS
+'id','INT',2,0,4,4,-1,-1
+'geom','GEOMETRY',-1,0,21,21,-1,-1
+---- TYPES
+STRING, STRING, BIGINT, BIGINT, BIGINT, DOUBLE, BIGINT, BIGINT
+====
+---- QUERY
+# A view can expose a GEOMETRY column: it is stored as BINARY in HMS, but Impala
+# recomputes the real type from the view query when the view is used, so geometry
+# functions work through the view.
+CREATE VIEW iceberg_geom_view AS SELECT id, geom FROM iceberg_geom_ctas;
+SELECT id, ST_AsText(geom), ST_GeometryType(geom) FROM iceberg_geom_view ORDER BY id;
+---- TYPES
+INT, STRING, STRING
+---- RESULTS
+1,'POINT (1 2)','ST_POINT'
+2,'POINT (3 4)','ST_POINT'
+====
+---- QUERY
+# IMPALA-15162: SHOW CREATE TABLE shows the GEOMETRY column type.
+SHOW CREATE TABLE iceberg_geom_tbl
+---- RESULTS: VERIFY_IS_SUBSET
+row_regex: .*geom GEOMETRY.*
+---- TYPES
+STRING
+====
+---- QUERY
+# Impala does not write value statistics for a GEOMETRY column (IMPALA-15163).
+# The data file's lower_bounds/upper_bounds maps therefore only the non-geometry column
+# (field id 1 = 'id').
+SELECT lower_bounds, upper_bounds FROM $DATABASE.iceberg_geom_ctas.`files`
+---- TYPES
+STRING,STRING
+---- RESULTS
+'{1:"AQAAAA=="}','{1:"AgAAAA=="}'
+====
+---- QUERY
+# The metadata table is queryable for a table with a GEOMETRY column: readable_metrics
+# of a non-geometry column resolves and carries real bounds.
+SELECT readable_metrics.id FROM $DATABASE.iceberg_geom_ctas.entries
+---- TYPES
+STRING
+---- RESULTS
+row_regex:.*"lower_bound":1.*"upper_bound":2.*
+====
+---- QUERY
+# IMPALA-15244: selecting a value that contains a nested GEOMETRY (here readable_metrics,
+# whose per-column bounds include the GEOMETRY column) is rejected.
+SELECT readable_metrics FROM $DATABASE.iceberg_geom_ctas.entries
+---- CATCH
+GEOMETRY nested in a complex type is not allowed in the select list of a top-level query
+====
+---- QUERY
+# GEOMETRY nested inside any complex type (ARRAY/MAP/STRUCT, also combined) is supported
+# on Iceberg v3 tables. Impala cannot construct nested values, so such a table is written
+# by other engines (see the Trino interop test); it can be created and read here.
+CREATE TABLE iceberg_nested_geom (
+  id INT,
+  arr ARRAY<GEOMETRY>,
+  m MAP<INT,GEOMETRY>,
+  s STRUCT<g:GEOMETRY,name:STRING>,
+  arr_of_struct ARRAY<STRUCT<g:GEOMETRY>>
+) STORED AS ICEBERG TBLPROPERTIES('format-version'='3')
+---- RESULTS
+'Table has been created.'
+====
+---- QUERY
+DESCRIBE iceberg_nested_geom
+---- RESULTS
+'id','int','','true'
+'arr','array<geometry>','','true'
+'m','map<int,geometry>','','true'
+'s','struct<\n  g:geometry,\n  name:string\n>','','true'
+'arr_of_struct','array<struct<\n  g:geometry\n>>','','true'
+---- TYPES
+STRING,STRING,STRING,STRING
+====
+---- QUERY
+SHOW CREATE TABLE iceberg_nested_geom
+---- RESULTS: VERIFY_IS_SUBSET
+row_regex: .*id INT.*
+row_regex: .*arr ARRAY<GEOMETRY>.*
+row_regex: .*m MAP<INT.GEOMETRY>.*
+row_regex: .*s STRUCT<g:GEOMETRY.name:STRING>.*
+row_regex: .*arr_of_struct ARRAY<STRUCT<g:GEOMETRY>>.*
+---- TYPES
+STRING
+====
+---- QUERY
+# Nested GEOMETRY can also be added via ALTER TABLE ADD COLUMNS.
+ALTER TABLE iceberg_geom_tbl ADD COLUMNS (arr ARRAY<GEOMETRY>)
+---- RESULTS
+'Column(s) have been added.'
+====
+---- QUERY
+# A GEOMETRY nested in a complex type can be extracted and converted; non-geometry
+# fields of such a complex value can be read directly. The table has no rows (Impala
+# cannot write nested values), so this only has to analyze and execute cleanly.
+SELECT id, s.name, ST_AsText(s.g) FROM iceberg_nested_geom
+---- TYPES
+INT, STRING, STRING
+---- RESULTS
+====
+---- QUERY
+# Selecting a complex value that contains a nested GEOMETRY is rejected (IMPALA-15244),
+# for every complex type.
+SELECT arr FROM iceberg_nested_geom
+---- CATCH
+GEOMETRY nested in a complex type is not allowed in the select list of a top-level query
+====
+---- QUERY
+SELECT m FROM iceberg_nested_geom
+---- CATCH
+GEOMETRY nested in a complex type is not allowed in the select list of a top-level query
+====
+---- QUERY
+SELECT s FROM iceberg_nested_geom
+---- CATCH
+GEOMETRY nested in a complex type is not allowed in the select list of a top-level query
+====
+---- QUERY
+SELECT arr_of_struct FROM iceberg_nested_geom
+---- CATCH
+GEOMETRY nested in a complex type is not allowed in the select list of a top-level query
+====
+---- QUERY
+SELECT * FROM iceberg_nested_geom
+---- CATCH
+GEOMETRY nested in a complex type is not allowed in the select list of a top-level query
+====
+---- QUERY
+# Changing an existing column's type to/from GEOMETRY is not a valid Iceberg
+# schema evolution, so the Iceberg API rejects it.
+ALTER TABLE iceberg_geom_tbl CHANGE COLUMN name name GEOMETRY
+---- CATCH
+Cannot change column type: name: string -> geometry
+====
+---- QUERY
+ALTER TABLE iceberg_geom_tbl CHANGE COLUMN geom geom STRING
+---- CATCH
+Cannot change column type: geom: geometry -> string
+====
+---- QUERY
+CREATE TABLE iceberg_geom_alter (id INT, geom GEOMETRY) STORED AS ICEBERG
+TBLPROPERTIES('format-version'='3')
+---- RESULTS
+'Table has been created.'
+====
+---- QUERY
+INSERT INTO iceberg_geom_alter VALUES (1, ST_Point(1.0, 2.0))
+---- RUNTIME_PROFILE
+NumModifiedRows: 1
+====
+---- QUERY
+ALTER TABLE iceberg_geom_alter CHANGE COLUMN geom geom_renamed GEOMETRY;
+DESCRIBE iceberg_geom_alter
+---- RESULTS
+'id','int','','true'
+'geom_renamed','geometry','','true'
+---- TYPES
+STRING,STRING,STRING,STRING
+====
+---- QUERY
+SELECT id, ST_AsText(geom_renamed) FROM iceberg_geom_alter
+---- TYPES
+INT, STRING
+---- RESULTS
+1,'POINT (1 2)'
+====
+---- QUERY
+ALTER TABLE iceberg_geom_alter CHANGE COLUMN geom_renamed geom_renamed GEOMETRY
+    COMMENT 'the geom';
+DESCRIBE iceberg_geom_alter
+---- RESULTS
+'id','int','','true'
+'geom_renamed','geometry','the geom','true'
+---- TYPES
+STRING,STRING,STRING,STRING
+====
+---- QUERY
+# GEOMETRY cannot be used as an identity partition column (Iceberg's identity
+# transform rejects it).
+CREATE TABLE iceberg_geom_part (id INT, geom GEOMETRY)
+PARTITIONED BY SPEC (identity(geom))
+STORED AS ICEBERG TBLPROPERTIES('format-version'='3')
+---- CATCH
+Invalid source type geometry for transform: identity
+====
+---- QUERY
+# Row-level DML works on a table with a GEOMETRY column. UPDATE, MERGE and
+# OPTIMIZE rewrite whole rows, so the query they generate for themselves selects every
+# column of the target table, GEOMETRY included.
+CREATE TABLE iceberg_geom_dml (id INT, s STRING, geom GEOMETRY)
+STORED AS ICEBERG TBLPROPERTIES('format-version'='3')
+---- RESULTS
+'Table has been created.'
+====
+---- QUERY
+INSERT INTO iceberg_geom_dml VALUES
+  (1, 'a', ST_Point(1.0, 2.0)),
+  (2, 'b', ST_Point(3.0, 4.0)),
+  (3, 'c', ST_Point(5.0, 6.0))
+---- RUNTIME_PROFILE
+NumModifiedRows: 3
+====
+---- QUERY
+# UPDATE of a non-geometry column: the untouched GEOMETRY values are rewritten unchanged.
+UPDATE iceberg_geom_dml SET s = 'updated' WHERE id = 1;
+SELECT id, s, ST_AsText(geom) FROM iceberg_geom_dml
+---- TYPES
+INT, STRING, STRING
+---- RESULTS
+1,'updated','POINT (1 2)'
+2,'b','POINT (3 4)'
+3,'c','POINT (5 6)'
+====
+---- QUERY
+# UPDATE of the GEOMETRY column itself.
+UPDATE iceberg_geom_dml SET geom = ST_Point(9.0, 9.0) WHERE id = 2;
+SELECT id, ST_AsText(geom) FROM iceberg_geom_dml
+---- TYPES
+INT, STRING
+---- RESULTS
+1,'POINT (1 2)'
+2,'POINT (9 9)'
+3,'POINT (5 6)'
+====
+---- QUERY
+# DELETE filtered on a non-geometry column.
+DELETE FROM iceberg_geom_dml WHERE id = 3;
+SELECT id, ST_AsText(geom) FROM iceberg_geom_dml
+---- TYPES
+INT, STRING
+---- RESULTS
+1,'POINT (1 2)'
+2,'POINT (9 9)'
+====
+---- QUERY
+# MERGE with an UPDATE case that rewrites the GEOMETRY column and an INSERT case that
+# adds a new geometry value.
+MERGE INTO iceberg_geom_dml AS t
+USING (SELECT 2 AS id UNION ALL SELECT 4 AS id) AS s ON t.id = s.id
+WHEN MATCHED THEN UPDATE SET geom = ST_Point(0.0, 0.0)
+WHEN NOT MATCHED THEN INSERT VALUES (s.id, 'merged', ST_Point(7.0, 7.0));
+SELECT id, s, ST_AsText(geom) FROM iceberg_geom_dml
+---- TYPES
+INT, STRING, STRING
+---- RESULTS
+1,'updated','POINT (1 2)'
+2,'b','POINT (0 0)'
+4,'merged','POINT (7 7)'
+====
+---- QUERY
+# OPTIMIZE merges the data and delete files the statements above produced.
+OPTIMIZE TABLE iceberg_geom_dml;
+SELECT id, s, ST_AsText(geom) FROM iceberg_geom_dml
+---- TYPES
+INT, STRING, STRING
+---- RESULTS
+1,'updated','POINT (1 2)'
+2,'b','POINT (0 0)'
+4,'merged','POINT (7 7)'
+====
+---- QUERY
+# UPDATE filtered on the GEOMETRY column: the predicate reads the geometry values, so it
+# is evaluated over a column the generated query also has to write back.
+UPDATE iceberg_geom_dml SET s = 'inside'
+WHERE ST_Within(geom, ST_Polygon('polygon ((-1 -1, 5 -1, 5 5, -1 5, -1 -1))'));
+SELECT id, s, ST_AsText(geom) FROM iceberg_geom_dml
+---- TYPES
+INT, STRING, STRING
+---- RESULTS
+1,'inside','POINT (1 2)'
+2,'inside','POINT (0 0)'
+4,'merged','POINT (7 7)'
+====
+---- QUERY
+# DELETE filtered on the GEOMETRY column.
+DELETE FROM iceberg_geom_dml
+WHERE ST_Within(geom, ST_Polygon('polygon ((-1 -1, 1 -1, 1 1, -1 1, -1 -1))'));
+SELECT id, s, ST_AsText(geom) FROM iceberg_geom_dml
+---- TYPES
+INT, STRING, STRING
+---- RESULTS
+1,'inside','POINT (1 2)'
+4,'merged','POINT (7 7)'
+====

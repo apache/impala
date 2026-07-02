@@ -716,15 +716,16 @@ public class AnalyzeDDLTest extends FrontendTestBase {
         "ALTER TABLE not allowed on PAIMON table: " +
             "functional_parquet.paimon_partitioned");
 
-    // Geometry type is not supported yet in tables, including nested in a complex type.
+    // GEOMETRY is only supported for Iceberg tables (see TestGeometryIcebergColumns);
+    // it is rejected on a non-Iceberg table.
     AnalysisError("alter table functional.alltypes add columns (geometry_col geometry)",
-        "Type 'GEOMETRY' is not yet supported for table columns: geometry_col");
+        "GEOMETRY is only supported for Iceberg tables with format version 3 or higher");
     AnalysisError(
         "alter table functional.alltypes add columns (geometry_col array<geometry>)",
-        "Type 'ARRAY<GEOMETRY>' is not yet supported for table columns: geometry_col");
+        "GEOMETRY is only supported for Iceberg tables with format version 3 or higher");
     AnalysisError("alter table functional.alltypes add columns " +
         "(geometry_col struct<f:geometry>)",
-        "Type 'STRUCT<f:GEOMETRY>' is not yet supported for table columns: geometry_col");
+        "GEOMETRY is only supported for Iceberg tables with format version 3 or higher");
   }
 
   @Test
@@ -791,13 +792,14 @@ public class AnalyzeDDLTest extends FrontendTestBase {
         "ALTER TABLE not allowed on PAIMON table: " +
             "functional_parquet.paimon_partitioned");
 
-    // Geometry type not supported yet in tables, including nested in a complex type.
+    // REPLACE COLUMNS is not supported on Iceberg tables (the only tables that allow
+    // GEOMETRY), so GEOMETRY is always rejected here, including nested in a complex type.
     AnalysisError("alter table functional.alltypes replace columns " +
         "(geometry_col geometry)",
-        "Type 'GEOMETRY' is not yet supported for table columns: geometry_col");
+        "GEOMETRY is only supported for Iceberg tables with format version 3 or higher");
     AnalysisError("alter table functional.alltypes replace columns " +
         "(geometry_col map<int, geometry>)",
-        "Type 'MAP<INT,GEOMETRY>' is not yet supported for table columns: geometry_col");
+        "GEOMETRY is only supported for Iceberg tables with format version 3 or higher");
   }
 
   @Test
@@ -905,10 +907,10 @@ public class AnalyzeDDLTest extends FrontendTestBase {
 
     // Geometry type is not supported yet in tables, including nested in a complex type.
     AnalysisError("alter table functional.alltypes change column int_col g geometry",
-        "Type 'GEOMETRY' is not yet supported for table columns: g");
+        "GEOMETRY is only supported for Iceberg tables with format version 3 or higher");
     AnalysisError(
         "alter table functional.alltypes change column int_col g array<geometry>",
-        "Type 'ARRAY<GEOMETRY>' is not yet supported for table columns: g");
+        "GEOMETRY is only supported for Iceberg tables with format version 3 or higher");
   }
 
   @Test
@@ -3428,7 +3430,8 @@ public class AnalyzeDDLTest extends FrontendTestBase {
       if (t.isUuid()) {
         errorMsg = "UUID type is only supported for Iceberg tables";
       } else if (t.isGeometry()) {
-        errorMsg = "Type 'GEOMETRY' is not yet supported for table columns: x";
+        errorMsg = "GEOMETRY is only supported for Iceberg tables with format "
+            + "version 3 or higher";
       } else {
         errorMsg =
             "Tables produced by an external data source do not support the column type: "
@@ -4397,28 +4400,28 @@ public class AnalyzeDDLTest extends FrontendTestBase {
     TypeDefsAnalyzeOk("DATE");
     TypeDefsAnalyzeOk("BINARY");
 
-    // GEOMETRY type is not yet supported for table columns.
+    // GEOMETRY is not supported for non-Iceberg table columns (or as a partition column).
     AnalysisError("create table new_table (g geometry)",
-        "Type 'GEOMETRY' is not yet supported for table columns: g");
+        "GEOMETRY is only supported for Iceberg tables with format version 3 or higher");
     AnalysisError("create table new_table (i int, g geometry)",
-        "Type 'GEOMETRY' is not yet supported for table columns: g");
+        "GEOMETRY is only supported for Iceberg tables with format version 3 or higher");
     AnalysisError("create table new_table (i int) PARTITIONED BY (g geometry)",
         "Type 'GEOMETRY' is not supported as partition-column type in column: g");
-    // GEOMETRY nested in a complex type is also rejected.
+    // GEOMETRY nested in a complex type is also rejected on a non-Iceberg table.
     AnalysisError("create table new_table (g array<geometry>)",
-        "Type 'ARRAY<GEOMETRY>' is not yet supported for table columns: g");
+        "GEOMETRY is only supported for Iceberg tables with format version 3 or higher");
     AnalysisError("create table new_table (g map<int, geometry>)",
-        "Type 'MAP<INT,GEOMETRY>' is not yet supported for table columns: g");
+        "GEOMETRY is only supported for Iceberg tables with format version 3 or higher");
     AnalysisError("create table new_table (g struct<f:geometry>)",
-        "Type 'STRUCT<f:GEOMETRY>' is not yet supported for table columns: g");
+        "GEOMETRY is only supported for Iceberg tables with format version 3 or higher");
+    AnalysisError("create table new_table (g geometry) stored as iceberg "
+        + "tblproperties('format-version'='2')",
+        "GEOMETRY is only supported for Iceberg tables with format version 3 or higher");
 
-    // Currently GEOMETRY column produced indirectly via CTAS is rejected at analysis,
-    // like an explicit GEOMETRY column.
-    // TODO: IMPALA-15162 will add GEOMETRY column support (Iceberg/Parquet). Once tables
-    // have GEOMETRY columns, revisit this: CTAS producing GEOMETRY should then be
-    // allowed.
+    // CTAS producing a GEOMETRY column into a non-Iceberg table is rejected, like an
+    // explicit non-Iceberg GEOMETRY column.
     AnalysisError("create table new_table as select cast(NULL as geometry) as g",
-        "Type 'GEOMETRY' is not yet supported for table columns: g");
+        "GEOMETRY is only supported for Iceberg tables with format version 3 or higher");
     AnalyzesOk("create view new_view as select cast(NULL as geometry) as g");
 
     // Test decimal.
@@ -4486,6 +4489,53 @@ public class AnalyzeDDLTest extends FrontendTestBase {
   private String genTypeSql(int depth, String prefix, String middle, String suffix) {
     return StringUtils.repeat(prefix, depth - 1) +
         middle + StringUtils.repeat(suffix, depth - 1);
+  }
+
+  /**
+   * GEOMETRY columns are only allowed for Iceberg tables with format-version >= 3 (see
+   * TableDef / AlterTableAddColsStmt). The active geospatial library affects only the
+   * serialization format, not whether the column may be declared, so it is not toggled
+   * here.
+   */
+  @Test
+  public void TestGeometryIcebergColumns() {
+    // Explicit GEOMETRY column: allowed for an Iceberg v3 table.
+    AnalyzesOk("create table geom_ice (id int, g geometry) stored as iceberg "
+        + "tblproperties('format-version'='3')");
+    // Nested GEOMETRY is allowed on an Iceberg v3 table.
+    AnalyzesOk("create table geom_ice_nested (id int, arr array<geometry>, "
+        + "s struct<g:geometry,name:string>, m map<int,geometry>) stored as iceberg "
+        + "tblproperties('format-version'='3')");
+    // Nested GEOMETRY still requires format-version >= 3.
+    AnalysisError("create table geom_ice_nested (id int, arr array<geometry>) "
+        + "stored as iceberg tblproperties('format-version'='2')",
+        "GEOMETRY is only supported for Iceberg tables with format version 3 or higher");
+    // Nested GEOMETRY is rejected on a non-Iceberg table.
+    AnalysisError("create table geom_plain_nested (id int, arr array<geometry>)",
+        "GEOMETRY is only supported for Iceberg tables with format version 3 or higher");
+    // CTAS producing a GEOMETRY column into an Iceberg v3 table is likewise allowed
+    // (CTAS reuses the same CreateTableStmt/TableDef column check).
+    AnalyzesOk("create table geom_ice_ctas stored as iceberg "
+        + "tblproperties('format-version'='3') as select cast(NULL as geometry) as g");
+    // GEOMETRY requires Iceberg format-version >= 3 (both explicit and via CTAS).
+    AnalysisError("create table geom_ice (id int, g geometry) stored as iceberg "
+        + "tblproperties('format-version'='2')",
+        "GEOMETRY is only supported for Iceberg tables with format version 3 or higher");
+    AnalysisError("create table geom_ice_ctas stored as iceberg "
+        + "tblproperties('format-version'='2') as select cast(NULL as geometry) as g",
+        "GEOMETRY is only supported for Iceberg tables with format version 3 or higher");
+    // Non-Iceberg GEOMETRY columns are rejected.
+    AnalysisError("create table geom_plain (id int, g geometry)",
+        "GEOMETRY is only supported for Iceberg tables with format version 3 or higher");
+    AnalysisError("create table geom_plain_ctas as select cast(NULL as geometry) as g",
+        "GEOMETRY is only supported for Iceberg tables with format version 3 or higher");
+    // ALTER TABLE ADD COLUMNS applies the same check: GEOMETRY is rejected on a
+    // non-Iceberg table.
+    AnalysisError("alter table functional.alltypes add columns (g geometry)",
+        "GEOMETRY is only supported for Iceberg tables with format version 3 or higher");
+    AnalysisError("alter table functional_parquet.iceberg_non_partitioned "
+        + "add columns (g geometry)",
+        "GEOMETRY is only supported for Iceberg tables with format version 3 or higher");
   }
 
   @Test

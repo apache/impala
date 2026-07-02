@@ -580,6 +580,30 @@ public class AnalysisContext {
     }
 
     /**
+     * Checks that the types of the statement's result exprs may be returned to the
+     * client.
+     *
+     * GEOMETRY has no defined client serialization yet (the WKT-vs-WKB decision is
+     * deferred, see IMPALA-15244), so it must be converted (e.g. with ST_AsText) before
+     * being returned. The same applies to GEOMETRY nested in a complex type, whose JSON
+     * serialization is not defined either.
+     */
+    private void checkResultTypes() throws AnalysisException {
+      for (Expr expr : stmt_.getResultExprs()) {
+        Type type = expr.getType();
+        if (type.isGeometry()) {
+          throw new AnalysisException("GEOMETRY is not allowed in the select list of a "
+              + "top-level query; wrap it in a function such as ST_AsText(). Expr: '"
+              + expr.toSql() + "'.");
+        }
+        if (type.containsGeometry()) {
+          throw new AnalysisException("GEOMETRY nested in a complex type is not allowed "
+              + "in the select list of a top-level query. Expr: '" + expr.toSql() + "'.");
+        }
+      }
+    }
+
+    /**
      * Analyzes the statement set in 'analysisResult_' with a new Analyzer based on the
      * given loaded tables. Performs expr and subquery rewrites which require re-analyzing
      * the transformed statement.
@@ -588,6 +612,8 @@ public class AnalysisContext {
     public AnalysisResult analyze() {
       try {
         stmt_.analyze(analyzer_);
+        // Only a QueryStmt returns its result exprs to the client.
+        if (stmt_ instanceof QueryStmt) checkResultTypes();
         // Enforce the statement expression limit at the end of analysis so that there is
         // an accurate count of the total number of expressions. The first analyze() call
         // is not very expensive (~seconds) even for large statements. The limit on the

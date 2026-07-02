@@ -74,6 +74,18 @@ def parse_timestamp(ts_string):
     return datetime.datetime.strptime(ts_string, '%Y-%m-%d %H:%M:%S')
 
 
+def get_latest_metadata_path(impalad_client, database_name, table_name):
+  """Returns the path of the table's current Iceberg metadata JSON file, i.e. the
+  'metadata_location' recorded in HMS."""
+  describe = 'describe extended %s.%s ' % (database_name, table_name)
+  output = impalad_client.execute(describe)
+  metadata_location = [s for s in output.data if s.startswith('\tmetadata_location')]
+  assert len(metadata_location) == 1, output.data
+  metadata_location_split = metadata_location[0].split('\t')
+  assert len(metadata_location_split) == 3, metadata_location[0]
+  return metadata_location_split[2]
+
+
 def quote(s):
   return "'{0}'".format(s)
 

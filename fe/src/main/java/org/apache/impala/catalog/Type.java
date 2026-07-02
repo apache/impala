@@ -197,11 +197,9 @@ public abstract class Type {
     if (isUuid()) {
       return "string";
     }
-    // HMS does not know GEOMETRY and rejects it as a column type, so store it as BINARY
-    // (its HMS representation). Impala recomputes the real type when it re-analyzes the
-    // view definition, so a view can expose a GEOMETRY column; this only changes what
-    // HMS and other engines see. (Non-Iceberg base tables reject GEOMETRY columns at
-    // analysis, so this is reached only for views.)
+    // HMS does not know GEOMETRY and rejects it as a column type, so store it as BINARY.
+    // This is what HMS and other engines see for Iceberg tables, column stats and views.
+    // Impala recomputes the real type from the Iceberg schema or the view definition.
     if (isGeometry()) {
       return "binary";
     }

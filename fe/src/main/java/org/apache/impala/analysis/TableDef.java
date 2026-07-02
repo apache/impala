@@ -36,6 +36,7 @@ import org.apache.impala.catalog.Column;
 import org.apache.impala.catalog.FeFsTable;
 import org.apache.impala.catalog.FeTable;
 import org.apache.impala.catalog.HdfsStorageDescriptor;
+import org.apache.impala.catalog.IcebergTable;
 import org.apache.impala.catalog.RowFormat;
 import org.apache.impala.catalog.Type;
 import org.apache.impala.common.AnalysisException;
@@ -57,6 +58,7 @@ import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
+import com.google.common.primitives.Ints;
 
 /**
  * Represents the table parameters in a CREATE TABLE statement. These parameters
@@ -461,14 +463,13 @@ class TableDef {
    */
   private void analyzeColumnDefs(Analyzer analyzer) throws AnalysisException {
     Set<String> colNames = new HashSet<>();
+    String fmtVer = getTblProperties().get(IcebergTable.FORMAT_VERSION);
+    Integer formatVersion = (fmtVer != null && !fmtVer.trim().isEmpty())
+        ? Ints.tryParse(fmtVer.trim()) : null;
     for (ColumnDef colDef: columnDefs_) {
       colDef.analyze(analyzer);
-      // TODO(IMPALA-15350): unify table+type support checks
-      if (colDef.getType().containsGeometry()) {
-        throw new AnalysisException(String.format(
-            "Type '%s' is not yet supported for table columns: %s",
-            colDef.getType().toSql(), colDef.getColName()));
-      }
+      ColumnDef.analyzeGeometryColumnSupport(colDef.getType(), colDef.getColName(),
+          isIcebergTable(), formatVersion);
       if (!colNames.add(colDef.getColName().toLowerCase())) {
         throw new AnalysisException("Duplicate column name: " + colDef.getColName());
       }

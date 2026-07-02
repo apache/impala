@@ -262,8 +262,10 @@ public class ComputeStatsStmt extends StatementBase implements SingleTableStmt {
 
       String colRefSql = ToSqlUtils.getIdentSql(c.getName());
 
-      if (c.getType().isBinary()) {
-        // NDV is not calculated for BINARY columns (similarly to Hive).
+      // GEOMETRY is treated like BINARY here: no NDV (its byte size is computed with
+      // bytes() further below).
+      if (c.getType().isBinary() || c.getType().isGeometry()) {
+        // NDV is not calculated for BINARY/GEOMETRY columns (similarly to Hive).
         columnStatsSelectList.add("NULL AS " + colRefSql);
       } else {
         // NDV approximation function. Add explicit alias for later identification when
@@ -288,6 +290,12 @@ public class ComputeStatsStmt extends StatementBase implements SingleTableStmt {
       if (type.isStringType()) {
         columnStatsSelectList.add("MAX(length(" + colRefSql + "))");
         columnStatsSelectList.add("AVG(length(" + colRefSql + "))");
+      } else if (type.isGeometry()) {
+        // GEOMETRY uses bytes() for the real (WKB) byte size; length() is avoided
+        // because it means *spatial* length for geometry (cf. PostGIS ST_Length vs
+        // ST_MemSize).
+        columnStatsSelectList.add("MAX(bytes(" + colRefSql + "))");
+        columnStatsSelectList.add("AVG(bytes(" + colRefSql + "))");
       } else {
         // For non-STRING columns we use the fixed size of the type.
         // We store the same information for all types to avoid having to

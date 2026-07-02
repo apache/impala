@@ -2269,8 +2269,12 @@ public class CatalogOpExecutor {
             entry.getValue().getHigh_value() != null ?
             entry.getValue().getHigh_value().toString() : -1));
       }
+      // Report the HMS type: HMS does not know GEOMETRY and rejects "geometry" as a
+      // column type for stats (InvalidObjectException), so toHiveMetastoreType() maps it
+      // to BINARY, which is also how the column is stored in HMS. The payload is already
+      // BinaryColumnStatsData (see ColumnStats.createHiveColStatsData).
       ColumnStatisticsObj colStatsObj = new ColumnStatisticsObj(colName,
-          tableCol.getType().toString().toLowerCase(), colStatsData);
+          tableCol.getType().toHiveMetastoreType(), colStatsData);
       colStats.addToStatsObj(colStatsObj);
     }
     return colStats;

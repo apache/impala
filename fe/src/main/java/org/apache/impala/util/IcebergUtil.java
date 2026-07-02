@@ -1920,6 +1920,12 @@ public class IcebergUtil {
             "Iceberg write-default values for UUID types are not supported. " +
             "Please specify value for column '" + column.getName() + "' explicitly.");
       }
+      // Reject GEOMETRY
+      if (colType.isGeometry()) {
+        throw new AnalysisException(
+            "Iceberg write-default values for GEOMETRY types are not supported. " +
+            "Please specify value for column '" + column.getName() + "' explicitly.");
+      }
 
       try {
         return LiteralExpr.createFromUnescapedStr(writeDefault, colType);

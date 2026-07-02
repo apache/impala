@@ -674,8 +674,6 @@ public class SelectStmt extends QueryStmt {
               "cannot combine SELECT DISTINCT with analytic functions");
         }
       }
-
-      checkGeometryNotInResult(analyzer_);
     }
 
     private void analyzeWhereClause() throws AnalysisException {

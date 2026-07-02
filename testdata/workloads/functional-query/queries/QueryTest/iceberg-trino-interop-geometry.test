@@ -1,0 +1,133 @@
+# Impala <-> Trino interop over Apache Iceberg V3 tables: GEOMETRY columns.
+#
+# Both engines map the Iceberg V3 'geometry' logical type to a native geometry
+# type (Impala GEOMETRY, Trino Geometry), so a GEOMETRY column written by one is
+# read back by the other. Both engines write default OGC:CRS84 to CRS parameter.
+====
+---- QUERY
+CREATE TABLE it_geom (id INT, g GEOMETRY) STORED BY ICEBERG
+TBLPROPERTIES('format-version'='3');
+INSERT INTO it_geom VALUES
+  (1, ST_GeomFromText('POINT (1 2)')),
+  (2, ST_GeomFromText('LINESTRING (0 0, 5 10, 10 0)')),
+  (3, ST_GeomFromText('POLYGON ((0 0, 10 0, 10 10, 0 10, 0 0), (2 2, 2 4, 4 4, 4 2, 2 2))')),
+  (4, ST_GeomFromText('MULTIPOINT ((1 1), (2 2), (3 3))')),
+  (5, ST_GeomFromText('MULTILINESTRING ((0 0, 1 1), (2 2, 3 3))')),
+  (6, ST_GeomFromText('MULTIPOLYGON (((0 0, 10 0, 10 10, 0 10, 0 0), (2 2, 2 4, 4 4, 4 2, 2 2)), ((20 20, 30 20, 30 30, 20 30, 20 20)))'));
+---- RUNTIME_PROFILE
+NumModifiedRows: 6
+====
+---- QUERY
+# Impala self-check: all six types round-trip through the GEOMETRY column.
+SELECT id, ST_GeometryType(g), ST_AsText(g) FROM it_geom ORDER BY id;
+---- TYPES
+INT, STRING, STRING
+---- RESULTS
+1,'ST_POINT','POINT (1 2)'
+2,'ST_LINESTRING','LINESTRING (0 0, 5 10, 10 0)'
+3,'ST_POLYGON','POLYGON ((0 0, 10 0, 10 10, 0 10, 0 0), (2 2, 2 4, 4 4, 4 2, 2 2))'
+4,'ST_MULTIPOINT','MULTIPOINT ((1 1), (2 2), (3 3))'
+5,'ST_MULTILINESTRING','MULTILINESTRING ((0 0, 1 1), (2 2, 3 3))'
+6,'ST_MULTIPOLYGON','MULTIPOLYGON (((0 0, 10 0, 10 10, 0 10, 0 0), (2 2, 2 4, 4 4, 4 2, 2 2)), ((20 20, 30 20, 30 30, 20 30, 20 20)))'
+====
+---- TRINO_QUERY
+# Trino resolves the Iceberg 'geometry' logical type Impala wrote to its own
+# native Geometry type.
+DESCRIBE it_geom
+---- RESULTS: VERIFY_IS_SUBSET
+'g','Geometry','',''
+---- TYPES
+STRING,STRING,STRING,STRING
+====
+---- TRINO_QUERY
+# Trino reads back all six geometry types Impala wrote.
+SELECT id, ST_GeometryType(g), ST_AsText(g) FROM it_geom ORDER BY id
+---- RESULTS
+1,'ST_Point','POINT (1 2)'
+2,'ST_LineString','LINESTRING (0 0, 5 10, 10 0)'
+3,'ST_Polygon','POLYGON ((0 0, 10 0, 10 10, 0 10, 0 0), (2 2, 2 4, 4 4, 4 2, 2 2))'
+4,'ST_MultiPoint','MULTIPOINT ((1 1), (2 2), (3 3))'
+5,'ST_MultiLineString','MULTILINESTRING ((0 0, 1 1), (2 2, 3 3))'
+6,'ST_MultiPolygon','MULTIPOLYGON (((0 0, 10 0, 10 10, 0 10, 0 0), (2 2, 2 4, 4 4, 4 2, 2 2)), ((20 20, 30 20, 30 30, 20 30, 20 20)))'
+---- TYPES
+INT, STRING, STRING
+====
+---- TRINO_QUERY
+# The reverse direction: Trino writes its own format-version=3 table, inserting the
+# same six WKB types from the same WKT literals Impala used above.
+CREATE TABLE ti_geom (id integer, g Geometry) WITH (format_version=3);
+INSERT INTO ti_geom VALUES
+  (1, ST_GeometryFromText('POINT (1 2)')),
+  (2, ST_GeometryFromText('LINESTRING (0 0, 5 10, 10 0)')),
+  (3, ST_GeometryFromText('POLYGON ((0 0, 10 0, 10 10, 0 10, 0 0), (2 2, 2 4, 4 4, 4 2, 2 2))')),
+  (4, ST_GeometryFromText('MULTIPOINT ((1 1), (2 2), (3 3))')),
+  (5, ST_GeometryFromText('MULTILINESTRING ((0 0, 1 1), (2 2, 3 3))')),
+  (6, ST_GeometryFromText('MULTIPOLYGON (((0 0, 10 0, 10 10, 0 10, 0 0), (2 2, 2 4, 4 4, 4 2, 2 2)), ((20 20, 30 20, 30 30, 20 30, 20 20)))'))
+====
+---- QUERY
+# Impala reads all six geometry types Trino wrote.
+INVALIDATE METADATA ti_geom;
+SELECT id, ST_GeometryType(g), ST_AsText(g) FROM ti_geom ORDER BY id;
+---- TYPES
+INT, STRING, STRING
+---- RESULTS
+1,'ST_POINT','POINT (1 2)'
+2,'ST_LINESTRING','LINESTRING (0 0, 5 10, 10 0)'
+3,'ST_POLYGON','POLYGON ((0 0, 10 0, 10 10, 0 10, 0 0), (2 2, 2 4, 4 4, 4 2, 2 2))'
+4,'ST_MULTIPOINT','MULTIPOINT ((1 1), (2 2), (3 3))'
+5,'ST_MULTILINESTRING','MULTILINESTRING ((0 0, 1 1), (2 2, 3 3))'
+6,'ST_MULTIPOLYGON','MULTIPOLYGON (((0 0, 10 0, 10 10, 0 10, 0 0), (2 2, 2 4, 4 4, 4 2, 2 2)), ((20 20, 30 20, 30 30, 20 30, 20 20)))'
+====
+---- TRINO_QUERY
+# Trino writes GEOMETRY nested inside a complex type: an ARRAY, a MAP and a STRUCT (row).
+# Iceberg V3 supports nested geometry, and Impala reads it back (Impala cannot construct
+# nested values itself, so a writer like Trino is used to produce the data).
+CREATE TABLE it_geom_nested (
+  id integer,
+  arr array(Geometry),
+  m map(integer, Geometry),
+  s row(g Geometry, name varchar))
+WITH (format_version=3);
+INSERT INTO it_geom_nested VALUES
+  (1, array[ST_GeometryFromText('POINT (1 2)'), ST_GeometryFromText('POINT (3 4)')],
+      MAP(ARRAY[10], ARRAY[ST_GeometryFromText('POINT (8 9)')]),
+      CAST(row(ST_GeometryFromText('POINT (5 6)'), 'a') AS row(g Geometry, name varchar)))
+====
+---- QUERY
+# Impala maps every nested type Trino wrote: array<geometry>, map<int,geometry> and a
+# struct with a geometry field.
+INVALIDATE METADATA it_geom_nested;
+DESCRIBE it_geom_nested;
+---- RESULTS: VERIFY_IS_SUBSET
+'arr','array<geometry>','','true'
+'m','map<int,geometry>','','true'
+'s','struct<\n  g:geometry,\n  name:string\n>','','true'
+---- TYPES
+STRING,STRING,STRING,STRING
+====
+---- QUERY
+# The nested STRUCT geometry field round-trips (extract + convert with ST_AsText).
+SELECT id, ST_AsText(s.g), s.name FROM it_geom_nested;
+---- TYPES
+INT, STRING, STRING
+---- RESULTS
+1,'POINT (5 6)','a'
+====
+---- QUERY
+# The ARRAY-of-GEOMETRY elements round-trip via unnest.
+SELECT t.id, ST_AsText(a.item) FROM it_geom_nested t, t.arr a ORDER BY ST_AsText(a.item);
+---- TYPES
+INT, STRING
+---- RESULTS
+1,'POINT (1 2)'
+1,'POINT (3 4)'
+====
+---- QUERY
+# The MAP-of-GEOMETRY entries round-trip too: the key is read directly, the geometry
+# value is converted.
+SELECT t.id, m.key, ST_AsText(m.value) FROM it_geom_nested t, t.m m;
+---- TYPES
+INT, INT, STRING
+---- RESULTS
+1,10,'POINT (8 9)'
+====

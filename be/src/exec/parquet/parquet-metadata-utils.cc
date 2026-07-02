@@ -444,6 +444,23 @@ Status ParquetMetadataUtils::ValidateColumn(const char* filename,
         slot_desc->type().DebugString());
     RETURN_IF_ERROR(state->LogOrReturnError(msg));
   }
+
+  // A GEOMETRY slot requires the GEOMETRY logical type annotation, e.g. a GEOGRAPHY or
+  // UTF8 annotated column is not read as GEOMETRY. The CRS must be unset or "OGC:CRS84".
+  if (slot_desc->type().IsGeometryType()) {
+    if (!schema_element.__isset.logicalType
+        || !schema_element.logicalType.__isset.GEOMETRY) {
+      return Status(Substitute("File '$0' column '$1' is missing GEOMETRY logical type "
+          "annotation.", filename, schema_element.name));
+    }
+    const auto& geom = schema_element.logicalType.GEOMETRY;
+    // Iceberg treats the default CRS name case-insensitively.
+    if (geom.__isset.crs && !geom.crs.empty() && !boost::iequals(geom.crs, "OGC:CRS84")) {
+      return Status(Substitute("File '$0' column '$1' has unsupported geometry CRS: "
+          "'$2'. Only the default CRS (OGC:CRS84) is supported.",
+          filename, schema_element.name, geom.crs));
+    }
+  }
   return Status::OK();
 }
 
@@ -475,7 +492,15 @@ void ParquetMetadataUtils::FillSchemaElement(const ColumnType& col_type,
       // Since Impala 5.0 (IMPALA-12675), STRING is annotated with the UTF-8 logical type
       // by default (controlled by PARQUET_ANNOTATE_STRINGS_UTF8, on unless overridden).
       // BINARY (a STRING subtype) is never annotated.
-      if (string_utf8 && !col_type.IsBinaryType()) {
+      // GEOMETRY type is annotated as "OGC:CRS84" (default in Parquet), other CRS are
+      // not yet supported (IMPALA-15169).
+      if (col_type.IsGeometryType()) {
+        parquet::GeometryType geom_type;
+        geom_type.__set_crs("OGC:CRS84");
+        parquet::LogicalType logical_type;
+        logical_type.__set_GEOMETRY(geom_type);
+        col_schema->__set_logicalType(logical_type);
+      } else if (string_utf8 && !col_type.IsBinaryType()) {
         SetUtf8ConvertedAndLogicalType(col_schema);
       }
       break;

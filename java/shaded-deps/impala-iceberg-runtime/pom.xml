@@ -130,7 +130,80 @@ under the License.
       <artifactId>httpcore5</artifactId>
       <version>${httpcore5.version}</version>
     </dependency>
+    <!-- Provided-scope dependencies needed to compile the patched HiveSchemaUtil
+         which adds GEOMETRY/GEOGRAPHY support. Not included in the shaded jar.
+         The Hive metastore API it also needs comes from a Hive version dependent
+         artifact, see the hive-major-version-* profiles below. -->
+    <dependency>
+      <groupId>org.apache.impala</groupId>
+      <artifactId>impala-minimal-hive-exec</artifactId>
+      <version>${project.version}</version>
+      <scope>provided</scope>
+    </dependency>
+    <!-- FieldSchema implements org.apache.thrift.TBase, so javac needs libthrift on
+         the classpath to read it. -->
+    <dependency>
+      <groupId>org.apache.thrift</groupId>
+      <artifactId>libthrift</artifactId>
+      <scope>provided</scope>
+    </dependency>
   </dependencies>
+
+  <!-- The patched HiveSchemaUtil needs the Hive metastore API (FieldSchema), which
+       lives in a different artifact for each Hive major version. Only the jar itself
+       is needed to compile, so all transitive dependencies are excluded - Hive 2's
+       hive-metastore otherwise pulls in jdk.tools (tools.jar), which does not exist
+       in modern JDKs. These are not included in the shaded jar. -->
+  <profiles>
+    <profile>
+      <id>hive-major-version-3</id>
+      <activation>
+        <property>
+          <name>env.IMPALA_HIVE_MAJOR_VERSION</name>
+          <value>3</value>
+        </property>
+      </activation>
+      <dependencies>
+        <dependency>
+          <groupId>org.apache.hive</groupId>
+          <artifactId>hive-standalone-metastore</artifactId>
+          <version>${hive.version}</version>
+          <scope>provided</scope>
+          <exclusions>
+            <exclusion>
+              <groupId>*</groupId>
+              <artifactId>*</artifactId>
+            </exclusion>
+          </exclusions>
+        </dependency>
+      </dependencies>
+    </profile>
+
+    <profile>
+      <id>hive-major-version-2</id>
+      <activation>
+        <property>
+          <name>env.IMPALA_HIVE_MAJOR_VERSION</name>
+          <value>2</value>
+        </property>
+      </activation>
+      <dependencies>
+        <!-- Hive 2 has no standalone metastore, the API is in hive-metastore. -->
+        <dependency>
+          <groupId>org.apache.hive</groupId>
+          <artifactId>hive-metastore</artifactId>
+          <version>${hive.version}</version>
+          <scope>provided</scope>
+          <exclusions>
+            <exclusion>
+              <groupId>*</groupId>
+              <artifactId>*</artifactId>
+            </exclusion>
+          </exclusions>
+        </dependency>
+      </dependencies>
+    </profile>
+  </profiles>
 
   <build>
     <plugins>
@@ -166,6 +239,18 @@ under the License.
                   <shadedPattern>impala.shaded.iceberg.parquet.shaded</shadedPattern>
                 </relocation>
               </relocations>
+              <filters>
+                <!-- The project ships a patched copy of HiveSchemaUtil (adds
+                     GEOMETRY/GEOGRAPHY support). Exclude Iceberg's own copy from the
+                     shaded jar. -->
+                <filter>
+                  <artifact>org.apache.iceberg:iceberg-hive-metastore</artifact>
+                  <excludes>
+                    <exclude>org/apache/iceberg/hive/HiveSchemaUtil.class</exclude>
+                    <exclude>org/apache/iceberg/hive/HiveSchemaUtil$*.class</exclude>
+                  </excludes>
+                </filter>
+              </filters>
               <transformers>
                 <transformer implementation="org.apache.maven.plugins.shade.resource.ServicesResourceTransformer"/>
               </transformers>

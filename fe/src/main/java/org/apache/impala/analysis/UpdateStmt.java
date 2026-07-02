@@ -175,6 +175,11 @@ public class UpdateStmt extends ModifyStmt {
     if (assignment.second.contains(Expr.IS_UDF_PREDICATE)) {
       return null;
     }
+    // Skip the optimization for a type that does not support DISTINCT_FROM
+    // (e.g. GEOMETRY: IMPALA-15457).
+    if (!assignment.first.getType().supportsComparison()) {
+      return null;
+    }
     return new BinaryPredicate(BinaryPredicate.Operator.DISTINCT_FROM,
             assignment.first.clone(), assignment.second.clone());
   }

@@ -28,6 +28,7 @@ import java.util.Objects;
 
 import org.apache.commons.lang3.builder.EqualsBuilder;
 import org.apache.hadoop.hive.metastore.api.FieldSchema;
+import org.apache.impala.catalog.IcebergTable;
 import org.apache.impala.catalog.Type;
 import org.apache.impala.catalog.TypeCompatibility;
 import org.apache.impala.common.AnalysisException;
@@ -274,6 +275,21 @@ public class ColumnDef {
           "Comment of column '%s' exceeds maximum length of %d characters:\n" +
           "%s has %d characters.", colName_, MetaStoreUtil.CREATE_MAX_COMMENT_LENGTH,
           comment_, comment_.length()));
+    }
+  }
+
+  /**
+   * Validates that a GEOMETRY column is allowed. GEOMETRY (top-level or nested)
+   * is only supported for Iceberg tables with format version >= 3.
+   */
+  public static void analyzeGeometryColumnSupport(Type type, String colName,
+      boolean isIcebergTable, Integer formatVersion) throws AnalysisException {
+    if (!type.containsGeometry()) return;
+    if (!isIcebergTable || formatVersion == null
+        || formatVersion < IcebergTable.ICEBERG_FORMAT_V3) {
+      throw new AnalysisException(String.format(
+          "GEOMETRY is only supported for Iceberg tables with format version %d or "
+          + "higher: %s", IcebergTable.ICEBERG_FORMAT_V3, colName));
     }
   }
 

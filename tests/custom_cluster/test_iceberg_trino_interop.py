@@ -71,3 +71,11 @@ class TestIcebergTrinoInterop(CustomClusterTestSuite):
     """Trino writes Iceberg Parquet and ORC UUID columns. Impala reads them back."""
     self.run_test_case('QueryTest/iceberg-trino-interop-uuid', vector,
                        use_db=unique_database)
+
+  @pytest.mark.execute_serially
+  def test_geometry(self, vector, unique_database):
+    """GEOMETRY round-trips both ways over Iceberg V3: Impala writes all six WKB
+    geometry types and Trino reads them back (mapping the Iceberg geometry type to
+    its native Geometry type), and a table Trino writes is read back by Impala."""
+    self.run_test_case('QueryTest/iceberg-trino-interop-geometry', vector,
+                       use_db=unique_database)

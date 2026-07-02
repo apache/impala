@@ -60,7 +60,8 @@ public class ColumnStats {
       PrimitiveType.DATE, PrimitiveType.DOUBLE, PrimitiveType.FLOAT,
       PrimitiveType.INT, PrimitiveType.SMALLINT, PrimitiveType.CHAR,
       PrimitiveType.VARCHAR, PrimitiveType.STRING, PrimitiveType.TIMESTAMP,
-      PrimitiveType.TINYINT, PrimitiveType.DECIMAL, PrimitiveType.UUID);
+      PrimitiveType.TINYINT, PrimitiveType.DECIMAL, PrimitiveType.UUID,
+      PrimitiveType.GEOMETRY);
 
   private final static Logger LOG = LoggerFactory.getLogger(ColumnStats.class);
 
@@ -686,6 +687,9 @@ public class ColumnStats {
           }
         }
         break;
+      // GEOMETRY is byte-array-backed like BINARY, so it uses the same stats
+      // representation (no NDV; null count + byte size).
+      case GEOMETRY:
       case BINARY:
         isCompatible = statsData.isSetBinaryStats();
         if (isCompatible) {
@@ -931,8 +935,9 @@ public class ColumnStats {
         colStatsData.setStringStats(
             new StringColumnStatsData(maxStrLen, avgStrLen, numNulls, ndv));
         break;
+      case GEOMETRY:
       case BINARY:
-        // No NDV is stored for BINARY.
+        // No NDV is stored for BINARY/GEOMETRY.
         colStatsData.setBinaryStats(
             new BinaryColumnStatsData(maxStrLen, avgStrLen, numNulls));
         break;
@@ -1035,7 +1040,8 @@ public class ColumnStats {
    * Returns whether the given type supports NDV stats.
    */
   public static boolean supportsNdv(Type colType) {
-    return isSupportedColType(colType) && !colType.isBoolean() && !colType.isBinary();
+    return isSupportedColType(colType) && !colType.isBoolean() && !colType.isBinary()
+        && !colType.isGeometry();
   }
 
   public void update(Type colType, TColumnStats stats) {

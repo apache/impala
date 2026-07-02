@@ -187,6 +187,15 @@ class HdfsParquetTableWriter::BaseColumnWriter {
   // 'meta_data'.
   void EncodeRowGroupStats(parquet::ColumnMetaData* meta_data) {
     DCHECK(row_group_stats_base_ != nullptr);
+    // TODO(IMPALA-15163): collect the geospatial bounding box for GEOMETRY columns. Until
+    // then no min/max are written (byte-wise WKB ordering has no spatial meaning); only
+    // null_count is recorded.
+    if (type().IsGeometryType()) {
+      parquet::Statistics stats;
+      stats.__set_null_count(row_group_stats_base_->NullCount());
+      meta_data->__set_statistics(stats);
+      return;
+    }
     if (row_group_stats_base_->BytesNeeded() <= MAX_COLUMN_STATS_SIZE) {
       row_group_stats_base_->EncodeToThrift(&meta_data->statistics);
       meta_data->__isset.statistics = true;
@@ -216,7 +225,10 @@ class HdfsParquetTableWriter::BaseColumnWriter {
     table_sink_mem_tracker_->Release(page_index_memory_consumption_);
     page_index_memory_consumption_ = 0;
     column_index_.null_counts.clear();
-    valid_column_index_ = true;
+    collect_min_max_ = !type().IsGeometryType();
+    // The ColumnIndex stores per-page min/max, so it is only written when min/max are
+    // collected. It can still be disabled later (e.g. NaN floats, or on truncation).
+    valid_column_index_ = collect_min_max_;
     write_page_index_ = parent_->state_->query_options().parquet_write_page_index;
   }
 
@@ -274,7 +286,8 @@ class HdfsParquetTableWriter::BaseColumnWriter {
   Status AddPageStatsToColumnIndex() {
     // Invalid column indexes are not written. Pages that only have NaN and null values
     // have no min and max values, but they are not null pages. They don't get here,
-    // because NaNs make the column index invalid (IMPALA-8498).
+    // because NaNs make the column index invalid (IMPALA-8498). 'valid_column_index_' is
+    // also false when min/max are not collected (e.g. GEOMETRY).
     if (!write_page_index_ || !valid_column_index_) return Status::OK();
     parquet::Statistics page_stats;
     page_stats_base_->EncodeToThrift(&page_stats);
@@ -349,7 +362,8 @@ class HdfsParquetTableWriter::BaseColumnWriter {
   // as text, and BINARY is never annotated as UTF-8 (see FillSchemaElement), so both are
   // excluded.
   bool ShouldValidateUtf8() const {
-    return parent_->string_utf8_ && type().type == TYPE_STRING && !type().IsBinaryType();
+    return parent_->string_utf8_ && type().type == TYPE_STRING
+        && type().IsPlainStringType();
   }
 
   // Validates that 'value' (a non-null StringValue) is valid UTF-8, returning
@@ -459,6 +473,11 @@ class HdfsParquetTableWriter::BaseColumnWriter {
   // Memory consumption of the min/max values in the page index.
   int64_t page_index_memory_consumption_ = 0;
 
+  // Whether to collect min/max value statistics for this column. False for GEOMETRY,
+  // whose byte-wise WKB min/max have no spatial meaning.
+  // TODO(IMPALA-15163): collect a geospatial bounding box for GEOMETRY instead.
+  bool collect_min_max_ = true;
+
   // Only write ColumnIndex when 'valid_column_index_' is true. We always need to write
   // the OffsetIndex though.
   bool valid_column_index_ = true;
@@ -515,7 +534,6 @@ class HdfsParquetTableWriter::ColumnWriter :
 
   void Reset() override {
     BaseColumnWriter::Reset();
-    valid_column_index_ = true;
     // Default to dictionary encoding.  If the cardinality ends up being too high,
     // it will fall back to plain.
     current_encoding_ = DataPageDictionaryEncoding();
@@ -590,7 +608,7 @@ class HdfsParquetTableWriter::ColumnWriter :
       valid_column_index_ = false;
     }
 
-    page_stats_->Update(*val);
+    if (collect_min_max_) page_stats_->Update(*val);
     UpdateParquetBloomFilterIfNeeded(val);
 
     return true;
