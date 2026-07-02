@@ -19,6 +19,7 @@ package org.apache.impala.catalog;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.function.Predicate;
 
 import org.apache.impala.analysis.CollectionStructType;
 import org.apache.impala.analysis.CreateTableStmt;
@@ -64,6 +65,7 @@ public abstract class Type {
   public static final ScalarType STRING = new ScalarType(PrimitiveType.STRING);
   public static final ScalarType BINARY = new ScalarType(PrimitiveType.BINARY);
   public static final ScalarType UUID = new ScalarType(PrimitiveType.UUID);
+  public static final ScalarType GEOMETRY = new ScalarType(PrimitiveType.GEOMETRY);
   public static final ScalarType TIMESTAMP = new ScalarType(PrimitiveType.TIMESTAMP);
   public static final ScalarType DATE = new ScalarType(PrimitiveType.DATE);
   public static final ScalarType DATETIME = new ScalarType(PrimitiveType.DATETIME);
@@ -116,6 +118,7 @@ public abstract class Type {
     supportedTypes.add(DATE);
     supportedTypes.add(BINARY);
     supportedTypes.add(UUID);
+    supportedTypes.add(GEOMETRY);
 
     unsupportedTypes = new ArrayList<>();
     unsupportedTypes.add(DATETIME);
@@ -157,6 +160,7 @@ public abstract class Type {
       case VARCHAR: return VARCHAR;
       case BINARY: return BINARY;
       case UUID: return UUID;
+      case GEOMETRY: return GEOMETRY;
       case DECIMAL: return DECIMAL;
       case CHAR: return CHAR;
       case FIXED_UDA_INTERMEDIATE: return FIXED_UDA_INTERMEDIATE;
@@ -179,6 +183,14 @@ public abstract class Type {
   public String toHiveMetastoreType() {
     if (isUuid()) {
       return "string";
+    }
+    // HMS does not know GEOMETRY and rejects it as a column type, so store it as BINARY
+    // (its HMS representation). Impala recomputes the real type when it re-analyzes the
+    // view definition, so a view can expose a GEOMETRY column; this only changes what
+    // HMS and other engines see. (Non-Iceberg base tables reject GEOMETRY columns at
+    // analysis, so this is reached only for views.)
+    if (isGeometry()) {
+      return "binary";
     }
     return toSql().toLowerCase();
   }
@@ -213,7 +225,10 @@ public abstract class Type {
   public boolean isString() { return isScalarType(PrimitiveType.STRING); }
   public boolean isBinary() { return isScalarType(PrimitiveType.BINARY); }
   public boolean isUuid() { return isScalarType(PrimitiveType.UUID); }
-  public boolean isVarLenStringType() { return isVarchar() || isString() || isBinary(); }
+  public boolean isGeometry() { return isScalarType(PrimitiveType.GEOMETRY); }
+  public boolean isVarLenStringType() {
+    return isVarchar() || isString() || isBinary() || isGeometry();
+  }
   public boolean isWildcardDecimal() { return false; }
   public boolean isWildcardVarchar() { return false; }
   public boolean isWildcardChar() { return false; }
@@ -276,11 +291,11 @@ public abstract class Type {
   /**
    * Whether values of this type can be compared and ordered: usable with the comparison
    * operators (=, !=, <, >, ...), IN, as an equi-join key, and in ORDER BY / GROUP BY /
-   * SELECT DISTINCT / DISTINCT aggregate parameters. Complex types and VARIANT are the
-   * only types that are not comparable, by design.
+   * SELECT DISTINCT / DISTINCT aggregate parameters. Complex types, VARIANT and GEOMETRY
+   * are the only types that are not comparable, by design.
    */
   public boolean supportsComparison() {
-    return !isComplexOrVariantType();
+    return !isComplexOrVariantType() && !isGeometry();
   }
 
   /**
@@ -302,16 +317,26 @@ public abstract class Type {
    * VARIANT column is supported (nested VARIANTS are tracked in IMPALA-15052).
    */
   public static boolean containsVariant(Type t) {
-    if (t.isVariantType()) return true;
-    if (t.isArrayType()) return containsVariant(((ArrayType) t).getItemType());
-    if (t.isMapType()) {
-      MapType mapType = (MapType) t;
-      return containsVariant(mapType.getKeyType())
-          || containsVariant(mapType.getValueType());
+    return t.containsType(Type::isVariantType);
+  }
+
+  /**
+   * Returns true if 'predicate' holds for this type or (recursively) for a type nested
+   * inside it via an ARRAY item, MAP key/value or STRUCT field.
+   */
+  public boolean containsType(Predicate<Type> predicate) {
+    if (predicate.test(this)) return true;
+    if (isArrayType()) {
+      return ((ArrayType) this).getItemType().containsType(predicate);
     }
-    if (t.isStructType()) {
-      for (StructField field : ((StructType) t).getFields()) {
-        if (containsVariant(field.getType())) return true;
+    if (isMapType()) {
+      MapType mapType = (MapType) this;
+      return mapType.getKeyType().containsType(predicate)
+          || mapType.getValueType().containsType(predicate);
+    }
+    if (isStructType()) {
+      for (StructField field : ((StructType) this).getFields()) {
+        if (field.getType().containsType(predicate)) return true;
       }
     }
     return false;
@@ -328,18 +353,7 @@ public abstract class Type {
    *    ARRAY<STRUCT<i: INT>>.
    */
   public boolean containsStruct() {
-    if (isStructType()) return true;
-
-    if (isArrayType()) {
-      ArrayType arrayType = (ArrayType) this;
-      return arrayType.getItemType().containsStruct();
-    } else if (isMapType()) {
-      MapType mapType = (MapType) this;
-      return mapType.getKeyType().containsStruct() ||
-          mapType.getValueType().containsStruct();
-    }
-
-    return false;
+    return containsType(Type::isStructType);
   }
 
 
@@ -349,35 +363,21 @@ public abstract class Type {
    *  - contains a collection type (recursively).
    */
   public boolean containsCollection() {
-    if (isCollectionType()) return true;
-    if (isStructType()) {
-      for (StructField field : ((StructType) this).getFields()) {
-        Type fieldType = field.getType();
-        if (fieldType.containsCollection()) return true;
-      }
-    }
-    return false;
+    return containsType(Type::isCollectionType);
   }
 
   /**
    * Returns true if this type is UUID or contains a UUID type (recursively).
    */
   public boolean containsUuid() {
-    if (isUuid()) return true;
-    if (isArrayType()) {
-      return ((ArrayType) this).getItemType().containsUuid();
-    }
-    if (isMapType()) {
-      MapType mapType = (MapType) this;
-      return mapType.getKeyType().containsUuid() ||
-          mapType.getValueType().containsUuid();
-    }
-    if (isStructType()) {
-      for (StructField field : ((StructType) this).getFields()) {
-        if (field.getType().containsUuid()) return true;
-      }
-    }
-    return false;
+    return containsType(Type::isUuid);
+  }
+
+  /**
+   * Returns true if this type is GEOMETRY or contains a GEOMETRY type (recursively).
+   */
+  public boolean containsGeometry() {
+    return containsType(Type::isGeometry);
   }
 
   /**
@@ -685,6 +685,7 @@ public abstract class Type {
     switch (t.getPrimitiveType()) {
       case STRING:
       case BINARY:
+      case GEOMETRY:
         return Integer.MAX_VALUE;
       case UUID:
         return 36;
@@ -821,6 +822,7 @@ public abstract class Type {
       case VARCHAR: return java.sql.Types.VARCHAR;
       case BINARY: return java.sql.Types.BINARY;
       case UUID: return java.sql.Types.VARCHAR;
+      case GEOMETRY: return java.sql.Types.BINARY;
       case DECIMAL: return java.sql.Types.DECIMAL;
       case FIXED_UDA_INTERMEDIATE: return java.sql.Types.BINARY;
       default:
@@ -870,6 +872,7 @@ public abstract class Type {
     defaultCompatibilityRules.add(new DiagonalCompatibility());
     defaultCompatibilityRules.add(new BinaryCompatibility());
     defaultCompatibilityRules.add(new UuidCompatibility());
+    defaultCompatibilityRules.add(new GeometryCompatibility());
     defaultCompatibilityRules.add(new FixedUdaCompatibility());
     defaultCompatibilityRules.add(new DefaultCompatibility());
     defaultCompatibilityRules.add(new CheckEmptyCompatibility());

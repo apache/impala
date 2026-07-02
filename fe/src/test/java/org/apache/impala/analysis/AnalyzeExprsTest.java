@@ -330,6 +330,17 @@ public class AnalyzeExprsTest extends AnalyzerTest {
               " are not comparable:");
         }
       }
+
+      // GEOMETRY does not support any comparison operators.
+      AnalysisError("select st_point(1, 1) "
+          + operator + " st_point(2, 2)",
+          "operands of type GEOMETRY and GEOMETRY are not comparable:");
+      AnalysisError("select st_point(1, 1) "
+          + operator + " cast(NULL as string)",
+          "operands of type GEOMETRY and STRING are not comparable:");
+      AnalysisError("select cast(NULL as int) "
+          + operator + " st_point(1, 1)",
+          "operands of type INT and GEOMETRY are not comparable:");
     }
 
     // invalid casts
@@ -360,7 +371,6 @@ public class AnalyzeExprsTest extends AnalyzerTest {
     // "operands are not comparable: datetime_col = 1.0");
   }
 
-
   @Test
   public void TestDecimalCasts() throws AnalysisException {
     AnalyzesOk("select cast(1.1 as boolean)");
@@ -382,7 +392,8 @@ public class AnalyzeExprsTest extends AnalyzerTest {
           || type.getPrimitiveType() == PrimitiveType.VARCHAR
           || type.getPrimitiveType() == PrimitiveType.CHAR
           || type.getPrimitiveType() == PrimitiveType.BINARY
-          || type.getPrimitiveType() == PrimitiveType.UUID) {
+          || type.getPrimitiveType() == PrimitiveType.UUID
+          || type.getPrimitiveType() == PrimitiveType.GEOMETRY) {
         continue;
       }
       AnalyzesOk("select cast(1.1 as " + type + ")");
@@ -550,6 +561,8 @@ public class AnalyzeExprsTest extends AnalyzerTest {
     for (Type type: Type.getSupportedTypes()) {
        // Cannot cast to NULL_TYPE
       if (type.isNull()) continue;
+      // GEOMETRY cannot be returned from a top-level query (TODO: IMPALA-15244).
+      if (type.isGeometry()) continue;
       if (type.isDecimal()) type = Type.DEFAULT_DECIMAL;
       if (type.getPrimitiveType() == PrimitiveType.VARCHAR) {
         type = ScalarType.createVarcharType(1);
@@ -938,6 +951,16 @@ public class AnalyzeExprsTest extends AnalyzerTest {
                "last_value(tinyint_col ignore nulls) over (order by id)" +
                "from functional.alltypesagg a " +
                "where exists (select 1 from functional.alltypes b where a.id = b.id)");
+    // first_value/last_value/lag/lead are pass-through, so they work over BINARY and
+    // GEOMETRY (both StringVal-backed, reusing STRING's analytic symbols).
+    AnalyzesOk("select first_value(cast('a' as binary)) over (order by id) "
+        + "from functional.alltypes");
+    AnalyzesOk("select last_value(cast('a' as binary)) over (order by id) "
+        + "from functional.alltypes");
+    AnalyzesOk("select st_astext(first_value(st_point(id, id)) over (order by id)) "
+        + "from functional.alltypes");
+    AnalyzesOk("select st_astext(lag(st_point(id, id)) over (order by id)) "
+        + "from functional.alltypes");
 
     // last_value/first_value without using order by
     AnalyzesOk("select first_value(tinyint_col) over () from functional.alltypesagg");
@@ -2016,11 +2039,22 @@ public class AnalyzeExprsTest extends AnalyzerTest {
     AnalysisError("select nullif(1,2,3)", "default.nullif() unknown");
     AnalysisError("select nullif('x', 1)",
         "operands of type STRING and TINYINT are not comparable: 'x' IS DISTINCT FROM 1");
+    // nullif() is rewritten to a comparison, which GEOMETRY does not support.
+    AnalysisError("select nullif(st_point(1, 1), st_point(2, 2))",
+        "operands of type GEOMETRY and GEOMETRY are not comparable:");
 
     // Check limited function support for BINARY.
     AnalyzesOk("select length(cast('a' as binary))");
     AnalysisError("select lower(cast('a' as binary))",
         "No matching function with signature: lower(BINARY).");
+
+    // GEOMETRY type: no casts to/from GEOMETRY are supported.
+    AnalysisError("select cast('hello' as geometry)",
+        "Invalid type cast of 'hello' from STRING to GEOMETRY");
+    AnalysisError("select cast(cast('a' as binary) as geometry)",
+        "Invalid type cast of CAST('a' AS BINARY) from BINARY to GEOMETRY");
+    AnalysisError("select cast(1 as geometry)",
+        "Invalid type cast of 1 from TINYINT to GEOMETRY");
   }
 
   @Test
@@ -2302,6 +2336,52 @@ public class AnalyzeExprsTest extends AnalyzerTest {
     // No matching signature.
     AnalysisError("select isnull(1, int_array_col) from functional.allcomplextypes",
         "No matching function with signature: isnull(TINYINT, ARRAY<INT>).");
+  }
+
+  @Test
+  public void TestGeometryFunctions() throws AnalysisException {
+    // Currently top-level query cannot return GEOMETRY (IMPALA-15244), all
+    // results are wrapped, e.g. in st_astext().
+    AnalyzesOk("select st_astext(st_point(1.0, 2.0))");
+    AnalyzesOk("select st_x(st_point(1.0, 2.0)), st_y(st_point(1.0, 2.0))");
+    AnalyzesOk("select bytes(st_point(1.0, 2.0))");
+    AnalyzesOk("select st_astext(st_linestring(0, 0, 10, 10))");
+
+    // No comparison operators.
+    AnalysisError("select st_point(1.0, 2.0) = st_point(3.0, 4.0)",
+        "operands of type GEOMETRY and GEOMETRY are not comparable:");
+    // Not usable in SELECT DISTINCT (must hash/compare).
+    AnalysisError("select distinct st_point(1.0, 2.0) from functional.alltypes",
+        "SELECT DISTINCT expression 'st_point(1.0, 2.0)' with type 'GEOMETRY' is not "
+            + "supported.");
+    // Not usable as a DISTINCT aggregate parameter.
+    AnalysisError("select count(distinct st_point(1.0, 2.0)) from functional.alltypes",
+        "DISTINCT aggregate parameter 'st_point(1.0, 2.0)' with type 'GEOMETRY' is not "
+            + "supported.");
+    // UNION ALL of geometry is allowed, UNION DISTINCT is rejected.
+    AnalyzesOk("select st_astext(g) from "
+        + "(select st_point(1.0, 2.0) g union all select st_point(3.0, 4.0)) t");
+    AnalysisError("select st_point(1.0, 2.0) union select st_point(3.0, 4.0)",
+        "UNION, EXCEPT and INTERSECT with type 'GEOMETRY' is not supported.");
+
+    // GEOMETRY may not be returned to the client from a top-level query (IMPALA-15244),
+    // but it may still flow through inline views / subqueries.
+    AnalysisError("select st_point(1.0, 2.0)",
+        "GEOMETRY is not allowed in the select list of a top-level query");
+    AnalysisError("select cast(NULL as geometry)",
+        "GEOMETRY is not allowed in the select list of a top-level query");
+    AnalysisError("select st_point(1.0, 2.0) union all select st_point(3.0, 4.0)",
+        "GEOMETRY is not allowed in the select list of a top-level query");
+    AnalyzesOk("select st_astext(g) from (select st_point(1.0, 2.0) g) t");
+
+
+    // GEOMETRY works through the conditional functions.
+    AnalyzesOk("select st_astext(coalesce(st_point(1, 1), st_point(2, 2)))");
+    AnalyzesOk("select st_astext(if(true, st_point(1, 1), st_point(2, 2)))");
+    AnalyzesOk("select st_astext(isnull(st_point(1, 1), st_point(2, 2)))");
+    AnalyzesOk("select st_astext(nvl(st_point(1, 1), st_point(2, 2)))");
+    AnalyzesOk("select st_astext(ifnull(st_point(1, 1), st_point(2, 2)))");
+    AnalyzesOk("select st_astext(nvl2(now(), st_point(1, 1), st_point(2, 2)))");
   }
 
   @Test

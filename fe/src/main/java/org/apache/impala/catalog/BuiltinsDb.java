@@ -37,7 +37,7 @@ import org.apache.impala.builtins.ScalarBuiltins;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
 import com.google.common.base.Preconditions;
-import org.apache.impala.compat.HiveEsriGeospatialBuiltins;
+import org.apache.impala.compat.GeospatialBuiltins;
 import org.apache.impala.service.BackendConfig;
 import org.apache.impala.thrift.TGeospatialLibrary;
 
@@ -116,7 +116,7 @@ public class BuiltinsDb extends Db {
 
     TGeospatialLibrary geoLib = BackendConfig.INSTANCE.getGeospatialLibrary();
     if (!geoLib.equals(TGeospatialLibrary.NONE)) {
-      HiveEsriGeospatialBuiltins.initBuiltins(this);
+      GeospatialBuiltins.initBuiltins(this);
     }
   }
 
@@ -1015,6 +1015,9 @@ public class BuiltinsDb extends Db {
           prefix + "11CountRemoveEPN10impala_udf15FunctionContextERKNS1_6AnyValEPNS1_9BigIntValE",
           null, false, true, true));
 
+      // Min/max are not meaningful without < and = operator.
+      if (!t.supportsComparison()) continue;
+
       // Min
       String minMaxInit = t.isStringType() ? initNullString : initNull;
       String minMaxSerializeOrFinalize = t.isStringType() ?
@@ -1039,9 +1042,9 @@ public class BuiltinsDb extends Db {
       if (t.isNull()) continue; // NULL is handled through type promotion.
       if (t.isScalarType(PrimitiveType.CHAR)) continue; // promoted to STRING
       if (t.isScalarType(PrimitiveType.VARCHAR)) continue; // promoted to STRING
-      if (t.isBinary()) continue; // Only supported for count/min/max
-      // TODO: Add UUID builtin support.
-      if (t.isUuid()) continue;
+      // BINARY supports only count/min/max; types that don't support < / = can't support
+      // sample/appx_median or other analytic aggregates below.
+      if (t.isBinary() || !t.supportsComparison()) continue;
 
       // Sample
       db.addBuiltin(AggregateFunction.createBuiltin(db, "sample",
@@ -1701,66 +1704,72 @@ public class BuiltinsDb extends Db {
       if (t.isNull()) continue; // NULL is handled through type promotion.
       if (t.isScalarType(PrimitiveType.CHAR)) continue; // promoted to STRING
       if (t.isScalarType(PrimitiveType.VARCHAR)) continue; // promoted to STRING
-      // BINARY is not supported for analytic functions.
-      if (t.isBinary()) continue;
       // TODO: Add UUID builtin support.
       if (t.isUuid()) continue;
+      // first_value/last_value/lag/lead just copy a value through (no comparison), so
+      // BINARY and GEOMETRY are supported. Both are StringVal-backed in the BE, so they
+      // reuse STRING's analytic symbols and its StringVal init/get/serialize handling.
+      Type symbolType = (t.isBinary() || t.isGeometry()) ? Type.STRING : t;
+      boolean isStringVal = symbolType == Type.STRING;
+      String init = isStringVal ? initNullString : initNull;
+      String getValueSymbol = isStringVal ? stringValGetValue : null;
+      String serializeSymbol = isStringVal ? stringValSerializeOrFinalize : null;
       db.addBuiltin(AggregateFunction.createAnalyticBuiltin(
           db, "first_value", Lists.newArrayList(t), t, t,
-          t.isStringType() ? initNullString : initNull,
-          prefix + FIRST_VALUE_UPDATE_SYMBOL.get(t),
+          isStringVal ? initNullString : initNull,
+          prefix + FIRST_VALUE_UPDATE_SYMBOL.get(symbolType),
           null,
-          t == Type.STRING ? stringValGetValue : null,
-          t == Type.STRING ? stringValSerializeOrFinalize : null));
+          getValueSymbol,
+          serializeSymbol));
       // Implements FIRST_VALUE for some windows that require rewrites during planning.
       db.addBuiltin(AggregateFunction.createAnalyticBuiltin(
           db, "first_value_rewrite", Lists.newArrayList(t, Type.BIGINT), t, t,
-          t.isStringType() ? initNullString : initNull,
-          prefix + FIRST_VALUE_REWRITE_UPDATE_SYMBOL.get(t),
+          isStringVal ? initNullString : initNull,
+          prefix + FIRST_VALUE_REWRITE_UPDATE_SYMBOL.get(symbolType),
           null,
-          t == Type.STRING ? stringValGetValue : null,
-          t == Type.STRING ? stringValSerializeOrFinalize : null,
+          getValueSymbol,
+          serializeSymbol,
           false));
       db.addBuiltin(AggregateFunction.createAnalyticBuiltin(
           db, "first_value_ignore_nulls", Lists.newArrayList(t), t, t,
-          t.isStringType() ? initNullString : initNull,
-          prefix + FIRST_VALUE_IGNORE_NULLS_UPDATE_SYMBOL.get(t),
+          isStringVal ? initNullString : initNull,
+          prefix + FIRST_VALUE_IGNORE_NULLS_UPDATE_SYMBOL.get(symbolType),
           null,
-          t == Type.STRING ? stringValGetValue : null,
-          t == Type.STRING ? stringValSerializeOrFinalize : null,
+          getValueSymbol,
+          serializeSymbol,
           false));
 
       db.addBuiltin(AggregateFunction.createAnalyticBuiltin(
           db, "last_value", Lists.newArrayList(t), t, t,
-          t.isStringType() ? initNullString : initNull,
-          prefix + UPDATE_VAL_SYMBOL.get(t),
-          prefix + LAST_VALUE_REMOVE_SYMBOL.get(t),
-          t == Type.STRING ? stringValGetValue : null,
-          t == Type.STRING ? stringValSerializeOrFinalize : null));
+          isStringVal ? initNullString : initNull,
+          prefix + UPDATE_VAL_SYMBOL.get(symbolType),
+          prefix + LAST_VALUE_REMOVE_SYMBOL.get(symbolType),
+          getValueSymbol,
+          serializeSymbol));
 
       db.addBuiltin(AggregateFunction.createAnalyticBuiltin(
           db, "last_value_ignore_nulls", Lists.newArrayList(t), t, Type.STRING,
-          prefix + LAST_VALUE_IGNORE_NULLS_INIT_SYMBOL.get(t),
-          prefix + LAST_VALUE_IGNORE_NULLS_UPDATE_SYMBOL.get(t),
-          prefix + LAST_VALUE_IGNORE_NULLS_REMOVE_SYMBOL.get(t),
-          prefix + LAST_VALUE_IGNORE_NULLS_GET_VALUE_SYMBOL.get(t),
-          prefix + LAST_VALUE_IGNORE_NULLS_FINALIZE_SYMBOL.get(t),
+          prefix + LAST_VALUE_IGNORE_NULLS_INIT_SYMBOL.get(symbolType),
+          prefix + LAST_VALUE_IGNORE_NULLS_UPDATE_SYMBOL.get(symbolType),
+          prefix + LAST_VALUE_IGNORE_NULLS_REMOVE_SYMBOL.get(symbolType),
+          prefix + LAST_VALUE_IGNORE_NULLS_GET_VALUE_SYMBOL.get(symbolType),
+          prefix + LAST_VALUE_IGNORE_NULLS_FINALIZE_SYMBOL.get(symbolType),
           false));
 
       db.addBuiltin(AggregateFunction.createAnalyticBuiltin(
           db, "lag", Lists.newArrayList(t, Type.BIGINT, t), t, t,
-          prefix + OFFSET_FN_INIT_SYMBOL.get(t),
-          prefix + OFFSET_FN_UPDATE_SYMBOL.get(t),
+          prefix + OFFSET_FN_INIT_SYMBOL.get(symbolType),
+          prefix + OFFSET_FN_UPDATE_SYMBOL.get(symbolType),
           null,
-          t == Type.STRING ? stringValGetValue : null,
-          t == Type.STRING ? stringValSerializeOrFinalize : null));
+          getValueSymbol,
+          serializeSymbol));
       db.addBuiltin(AggregateFunction.createAnalyticBuiltin(
           db, "lead", Lists.newArrayList(t, Type.BIGINT, t), t, t,
-          prefix + OFFSET_FN_INIT_SYMBOL.get(t),
-          prefix + OFFSET_FN_UPDATE_SYMBOL.get(t),
+          prefix + OFFSET_FN_INIT_SYMBOL.get(symbolType),
+          prefix + OFFSET_FN_UPDATE_SYMBOL.get(symbolType),
           null,
-          t == Type.STRING ? stringValGetValue : null,
-          t == Type.STRING ? stringValSerializeOrFinalize : null));
+          getValueSymbol,
+          serializeSymbol));
 
       // lead() and lag() the default offset and the default value should be
       // rewritten to call the overrides that take all parameters.

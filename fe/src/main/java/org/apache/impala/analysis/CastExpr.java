@@ -210,6 +210,10 @@ public class CastExpr extends Expr {
         if (toType.isBinary() && !fromType.isString()) {
           continue;
         }
+        // No casts to/from GEOMETRY.
+        if (fromType.isGeometry() || toType.isGeometry()) {
+          continue;
+        }
         // Disable no-op casts
         if (fromType.equals(toType) && !fromType.isDecimal()) continue;
 

@@ -377,13 +377,13 @@ SELECT DISTINCT expression 'v' with type 'VARIANT' is not supported.
 # UNION (DISTINCT) of a variant.
 SELECT v FROM functional_parquet.trino_variant UNION SELECT v FROM functional_parquet.trino_variant;
 ---- CATCH
-UNION, EXCEPT and INTERSECT are not supported for VARIANT type.
+UNION, EXCEPT and INTERSECT with type 'VARIANT' is not supported.
 ====
 ---- QUERY
 # INTERSECT of a variant.
 SELECT v FROM functional_parquet.trino_variant INTERSECT SELECT v FROM functional_parquet.trino_variant;
 ---- CATCH
-UNION, EXCEPT and INTERSECT are not supported for VARIANT type.
+UNION, EXCEPT and INTERSECT with type 'VARIANT' is not supported.
 ====
 ---- QUERY
 # CASE producing a variant.

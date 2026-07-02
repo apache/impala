@@ -19,7 +19,7 @@ package org.apache.impala.compat;
 
 import org.apache.impala.catalog.Db;
 
-public class HiveEsriGeospatialBuiltins {
+public class GeospatialBuiltins {
   /**
    * Apache Hive 3 does not include geospatial functions
    */

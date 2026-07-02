@@ -101,6 +101,7 @@ public enum JavaUdfDataType {
       case DOUBLE: return JavaUdfDataType.DOUBLE_WRITABLE;
       case STRING: return JavaUdfDataType.TEXT;
       case BINARY: return JavaUdfDataType.BYTES_WRITABLE;
+      case GEOMETRY: return JavaUdfDataType.BYTES_WRITABLE;
       default: return null;
     }
   }
@@ -182,8 +183,8 @@ public enum JavaUdfDataType {
     }
 
     // While BYTES_WRITABLE and BYTE_ARRAY maps to STRING to keep compatibility,
-    // BINARY is also accepted (IMPALA-11340).
-    if (t.isBinary()) return true;
+    // BINARY and GEOMETRY are also accepted (IMPALA-11340).
+    if (t.isBinary() || t.isGeometry()) return true;
 
     for (JavaUdfDataType javaType : JavaUdfDataType.values()) {
       if (javaType.getPrimitiveType() == t.getPrimitiveType().toThrift()) {
@@ -195,9 +196,9 @@ public enum JavaUdfDataType {
 
   public boolean isCompatibleWith(TPrimitiveType t) {
     if (t == getPrimitiveType()) return true;
-    if (t == TPrimitiveType.BINARY) {
+    if (t == TPrimitiveType.BINARY || t == TPrimitiveType.GEOMETRY) {
       // While BYTES_WRITABLE and BYTE_ARRAY maps to STRING to keep compatibility,
-      // BINARY is also accepted (IMPALA-11340).
+      // BINARY and GEOMETRY are also accepted (IMPALA-11340).
       if (this == BYTE_ARRAY || this == BYTES_WRITABLE) return true;
     }
     return false;

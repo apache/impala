@@ -150,6 +150,12 @@ public class AlterTableAlterColStmt extends AlterTableStmt {
     isAlterColumnOptionsStmt_ = alterColumnSetStmt;
     // Check that the new column def's name is valid.
     newColDef_.analyze(analyzer);
+    // TODO(IMPALA-15350): unify table+type support checks
+    if (newColDef_.getType().containsGeometry()) {
+      throw new AnalysisException(String.format(
+          "Type '%s' is not yet supported for table columns: %s",
+          newColDef_.getType().toSql(), newColDef_.getColName()));
+    }
     if (!(t instanceof FeIcebergTable) && newColDef_.getType().containsUuid()) {
       throw new AnalysisException(
           "UUID type is only supported for Iceberg tables.");

@@ -3680,6 +3680,7 @@ public class ParserTest extends FrontendTestBase {
     TypeDefsParseOk("CHAR(1)", "CHAR(20)");
     TypeDefsParseOk("VARCHAR(1)", "VARCHAR(20)");
     TypeDefsParseOk("BINARY");
+    TypeDefsParseOk("GEOMETRY");
     TypeDefsParseOk("DECIMAL");
     TypeDefsParseOk("TIMESTAMP");
     TypeDefsParseOk("DATE");
@@ -4693,7 +4694,8 @@ public class ParserTest extends FrontendTestBase {
   public void TestUnreservedKeywords() {
     // Test if "unreserved keywords" can be used as identifiers, such as table names and
     // column names.
-    final String[] unreservedKeywords = { "DEFAULT", "KILL", "QUERY", "VARIANT" };
+    final String[] unreservedKeywords =
+        { "DEFAULT", "KILL", "QUERY", "VARIANT", "GEOMETRY"};
     for (String keyword : unreservedKeywords) {
       ParsesOk(String.format("CREATE TABLE %s (%s INT);", keyword, keyword));
     }

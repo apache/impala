@@ -682,6 +682,16 @@ public class AnalyzeDDLTest extends FrontendTestBase {
     AnalysisError(paimon_partitioned + " add columns(new_col int not null)",
         "ALTER TABLE not allowed on PAIMON table: " +
             "functional_parquet.paimon_partitioned");
+
+    // Geometry type is not supported yet in tables, including nested in a complex type.
+    AnalysisError("alter table functional.alltypes add columns (geometry_col geometry)",
+        "Type 'GEOMETRY' is not yet supported for table columns: geometry_col");
+    AnalysisError(
+        "alter table functional.alltypes add columns (geometry_col array<geometry>)",
+        "Type 'ARRAY<GEOMETRY>' is not yet supported for table columns: geometry_col");
+    AnalysisError("alter table functional.alltypes add columns " +
+        "(geometry_col struct<f:geometry>)",
+        "Type 'STRUCT<f:GEOMETRY>' is not yet supported for table columns: geometry_col");
   }
 
   @Test
@@ -747,6 +757,14 @@ public class AnalyzeDDLTest extends FrontendTestBase {
     AnalysisError(paimon_partitioned + " replace columns (i int)",
         "ALTER TABLE not allowed on PAIMON table: " +
             "functional_parquet.paimon_partitioned");
+
+    // Geometry type not supported yet in tables, including nested in a complex type.
+    AnalysisError("alter table functional.alltypes replace columns " +
+        "(geometry_col geometry)",
+        "Type 'GEOMETRY' is not yet supported for table columns: geometry_col");
+    AnalysisError("alter table functional.alltypes replace columns " +
+        "(geometry_col map<int, geometry>)",
+        "Type 'MAP<INT,GEOMETRY>' is not yet supported for table columns: geometry_col");
   }
 
   @Test
@@ -851,6 +869,13 @@ public class AnalyzeDDLTest extends FrontendTestBase {
     AnalysisError(paimon_partitioned + " change column userid user_id bigint",
         "ALTER TABLE not allowed on PAIMON table: " +
             "functional_parquet.paimon_partitioned");
+
+    // Geometry type is not supported yet in tables, including nested in a complex type.
+    AnalysisError("alter table functional.alltypes change column int_col g geometry",
+        "Type 'GEOMETRY' is not yet supported for table columns: g");
+    AnalysisError(
+        "alter table functional.alltypes change column int_col g array<geometry>",
+        "Type 'ARRAY<GEOMETRY>' is not yet supported for table columns: g");
   }
 
   @Test
@@ -1375,7 +1400,7 @@ public class AnalyzeDDLTest extends FrontendTestBase {
 
     // Test updating stats on all scalar types.
     for (Type t: Type.getSupportedTypes()) {
-      if (t.isNull() || t.isUuid()) continue;
+      if (t.isNull() || t.isUuid() || t.isGeometry()) continue;
       Preconditions.checkState(t.isScalarType());
       String typeStr = t.getPrimitiveType().toString();
       if (t.getPrimitiveType() == PrimitiveType.CHAR ||
@@ -3353,7 +3378,6 @@ public class AnalyzeDDLTest extends FrontendTestBase {
     AnalysisError("CREATE TABLE DataSrcTable1 (x int) PRODUCED BY DATA SOURCE " +
         "not_a_data_src(\"\")", "Data source does not exist");
     for (Type t: Type.getSupportedTypes()) {
-      if (t.isUuid()) continue;  // UUID is only supported for Iceberg tables.
       PrimitiveType type = t.getPrimitiveType();
       if (DataSourceTable.isSupportedPrimitiveType(type) || t.isNull()) continue;
       String typeSpec = type.name();
@@ -3361,10 +3385,18 @@ public class AnalyzeDDLTest extends FrontendTestBase {
           type == PrimitiveType.VARCHAR) {
         typeSpec += "(10)";
       }
+      String errorMsg;
+      if (t.isUuid()) {
+        errorMsg = "UUID type is only supported for Iceberg tables";
+      } else if (t.isGeometry()) {
+        errorMsg = "Type 'GEOMETRY' is not yet supported for table columns: x";
+      } else {
+        errorMsg =
+            "Tables produced by an external data source do not support the column type: "
+            + type.name();
+      }
       AnalysisError("CREATE TABLE DataSrcTable1 (x " + typeSpec + ") PRODUCED " +
-          "BY DATA SOURCE " + DATA_SOURCE_NAME,
-          "Tables produced by an external data source do not support the column type: " +
-          type.name());
+          "BY DATA SOURCE " + DATA_SOURCE_NAME, errorMsg);
     }
 
     // Tables with sort columns
@@ -4325,6 +4357,30 @@ public class AnalyzeDDLTest extends FrontendTestBase {
     TypeDefsAnalyzeOk("TIMESTAMP");
     TypeDefsAnalyzeOk("DATE");
     TypeDefsAnalyzeOk("BINARY");
+
+    // GEOMETRY type is not yet supported for table columns.
+    AnalysisError("create table new_table (g geometry)",
+        "Type 'GEOMETRY' is not yet supported for table columns: g");
+    AnalysisError("create table new_table (i int, g geometry)",
+        "Type 'GEOMETRY' is not yet supported for table columns: g");
+    AnalysisError("create table new_table (i int) PARTITIONED BY (g geometry)",
+        "Type 'GEOMETRY' is not supported as partition-column type in column: g");
+    // GEOMETRY nested in a complex type is also rejected.
+    AnalysisError("create table new_table (g array<geometry>)",
+        "Type 'ARRAY<GEOMETRY>' is not yet supported for table columns: g");
+    AnalysisError("create table new_table (g map<int, geometry>)",
+        "Type 'MAP<INT,GEOMETRY>' is not yet supported for table columns: g");
+    AnalysisError("create table new_table (g struct<f:geometry>)",
+        "Type 'STRUCT<f:GEOMETRY>' is not yet supported for table columns: g");
+
+    // Currently GEOMETRY column produced indirectly via CTAS is rejected at analysis,
+    // like an explicit GEOMETRY column.
+    // TODO: IMPALA-15162 will add GEOMETRY column support (Iceberg/Parquet). Once tables
+    // have GEOMETRY columns, revisit this: CTAS producing GEOMETRY should then be
+    // allowed.
+    AnalysisError("create table new_table as select cast(NULL as geometry) as g",
+        "Type 'GEOMETRY' is not yet supported for table columns: g");
+    AnalyzesOk("create view new_view as select cast(NULL as geometry) as g");
 
     // Test decimal.
     TypeDefsAnalyzeOk("DECIMAL");

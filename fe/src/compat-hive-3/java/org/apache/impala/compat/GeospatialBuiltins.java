@@ -43,7 +43,9 @@ import org.apache.impala.catalog.Function;
 import org.apache.impala.catalog.ScalarFunction;
 import org.apache.impala.catalog.Type;
 import org.apache.impala.hive.executor.BinaryToBinaryHiveLegacyFunctionExtractor;
+import org.apache.impala.hive.executor.BinaryToGeometryHiveLegacyFunctionExtractor;
 import org.apache.impala.hive.executor.HiveJavaFunction;
+import org.apache.impala.hive.executor.HiveLegacyFunctionExtractor;
 import org.apache.impala.hive.executor.HiveLegacyJavaFunction;
 import org.apache.impala.service.BackendConfig;
 
@@ -52,13 +54,8 @@ import com.google.common.base.Preconditions;
 import org.apache.impala.analysis.FunctionName;
 import org.apache.impala.thrift.TFunctionBinaryType;
 import org.apache.impala.thrift.TGeospatialLibrary;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
-public class HiveEsriGeospatialBuiltins {
-  private final static Logger LOG = LoggerFactory.getLogger(
-      HiveEsriGeospatialBuiltins.class);
-
+public class GeospatialBuiltins {
   /**
    * Initializes Hive's ESRI geospatial UDFs as builtins.
    */
@@ -74,32 +71,42 @@ public class HiveEsriGeospatialBuiltins {
     // Native C++ functions only work with ESRI Shape format, not WKB.
     boolean addNatives = lib.equals(TGeospatialLibrary.HIVE_ESRI);
     boolean isWkb = lib.equals(TGeospatialLibrary.WKB_EXPERIMENTAL);
-    addLegacyUDFs(db, addNatives);
+    addLegacyUDFs(db, addNatives, isWkb);
     addGenericUDFs(db, isWkb);
-    addVarargsUDFs(db);
-    if(addNatives) {
+    addVarargsUDFs(db, isWkb);
+    if (addNatives) {
       addNatives(db);
     }
   }
 
-  private static void addLegacyUDFs(Db db, boolean addNatives) {
-    List<UDF> legacyUDFs = new ArrayList<>(Arrays.asList(new ST_Area(), new ST_AsBinary(),
-        new ST_AsGeoJson(), new ST_AsJson(), new ST_AsShape(), new ST_AsText(),
+  private static void addLegacyUDFs(Db db, boolean addNatives, boolean isWkb) {
+    // Functions that take raw bytes and produce geometry (BINARY -> GEOMETRY in WKB
+    // mode).
+    List<UDF> binaryInputConstructors = Arrays.asList(
+        new ST_GeomFromWKB(), new ST_GeomFromShape(),
+        new ST_PointFromWKB(), new ST_LineFromWKB(),
+        new ST_MLineFromWKB(), new ST_MPointFromWKB(),
+        new ST_MPolyFromWKB(), new ST_PolyFromWKB());
+
+    // Functions that serialize geometry to raw bytes (GEOMETRY -> BINARY in WKB mode).
+    List<UDF> serializers = Arrays.asList(new ST_AsBinary(), new ST_AsShape());
+
+    // All other functions: geometry in/out or geometry in/scalar out.
+    List<UDF> legacyUDFs = new ArrayList<>(Arrays.asList(new ST_Area(),
+        new ST_AsGeoJson(), new ST_AsJson(), new ST_AsText(),
         new ST_Boundary(), new ST_Buffer(), new ST_Centroid(), new ST_CoordDim(),
         new ST_Difference(), new ST_Dimension(), new ST_Distance(),
         new ST_DistanceSphere(), new ST_EndPoint(),
         new ST_Envelope(), new ST_ExteriorRing(),
         new ST_GeodesicLengthWGS84(), new ST_GeomCollection(), new ST_GeometryN(),
-        new ST_GeomFromShape(), new ST_GeomFromText(),
-        new ST_GeomFromWKB(), new ST_InteriorRingN(), new ST_Intersection(),
+        new ST_GeomFromText(), new ST_InteriorRingN(), new ST_Intersection(),
         new ST_Is3D(), new ST_IsClosed(), new ST_IsEmpty(), new ST_IsMeasured(),
-        new ST_IsRing(), new ST_IsSimple(), new ST_Length(), new ST_LineFromWKB(),
+        new ST_IsRing(), new ST_IsSimple(), new ST_Length(),
         new ST_M(), new ST_MaxM(), new ST_MaxZ(),
-        new ST_MinM(), new ST_MinZ(), new ST_MLineFromWKB(),
-        new ST_MPointFromWKB(), new ST_MPolyFromWKB(), new ST_NumGeometries(),
+        new ST_MinM(), new ST_MinZ(), new ST_NumGeometries(),
         new ST_NumInteriorRing(), new ST_NumPoints(),
-        new ST_PointFromWKB(), new ST_PointN(), new ST_PolyFromWKB(),
-        new ST_Relate(),  new ST_StartPoint(), new ST_SymmetricDiff(),
+        new ST_PointN(),
+        new ST_Relate(), new ST_StartPoint(), new ST_SymmetricDiff(),
         new ST_Z()));
 
     List<UDF> legacyUDFsWithNativeImplementation = Arrays.asList(
@@ -113,37 +120,72 @@ public class HiveEsriGeospatialBuiltins {
       legacyUDFs.addAll(legacyUDFsWithNativeImplementation);
     }
 
+    HiveLegacyFunctionExtractor extractor = isWkb
+        ? new BinaryToGeometryHiveLegacyFunctionExtractor()
+        : new BinaryToBinaryHiveLegacyFunctionExtractor();
+
     for (UDF udf : legacyUDFs) {
-      for (Function fn : extractFromLegacyHiveBuiltin(udf, db.getName())) {
+      for (Function fn : extractFromLegacyHiveBuiltin(udf, db.getName(), extractor)) {
         db.addBuiltin(fn);
       }
     }
+
+    if (isWkb) {
+      // Binary-input constructors: BINARY param, GEOMETRY return.
+      for (UDF udf : binaryInputConstructors) {
+        String fnName = udf.getClass().getSimpleName().toLowerCase();
+        db.addBuiltin(
+            createScalarFunction(udf.getClass(), fnName, Type.GEOMETRY,
+                new Type[]{Type.BINARY}));
+      }
+      // Serializers: GEOMETRY param, BINARY return.
+      for (UDF udf : serializers) {
+        String fnName = udf.getClass().getSimpleName().toLowerCase();
+        db.addBuiltin(
+            createScalarFunction(udf.getClass(), fnName, Type.BINARY,
+                new Type[]{Type.GEOMETRY}));
+      }
+    } else {
+      // In non-WKB mode, register all with the standard extractor.
+      for (UDF udf : binaryInputConstructors) {
+        for (Function fn : extractFromLegacyHiveBuiltin(udf, db.getName(), extractor)) {
+          db.addBuiltin(fn);
+        }
+      }
+      for (UDF udf : serializers) {
+        for (Function fn : extractFromLegacyHiveBuiltin(udf, db.getName(), extractor)) {
+          db.addBuiltin(fn);
+        }
+      }
+    }
+
     // st_point is a special case as it has both Java and native overloads
-    addJavaStPoint(db, addNatives);
+    addJavaStPoint(db, addNatives, isWkb);
   }
 
   private static void addGenericUDFs(Db db, boolean isWkb) {
     List<ScalarFunction> genericUDFs = new ArrayList<>();
+    Type geomType = isWkb ? Type.GEOMETRY : Type.BINARY;
 
     List<Set<Type>> stBinArguments =
         ImmutableList.of(ImmutableSet.of(Type.DOUBLE, Type.BIGINT),
-            ImmutableSet.of(Type.STRING, Type.BINARY));
+            ImmutableSet.of(Type.STRING, geomType));
     List<Set<Type>> stBinEnvelopeArguments =
         ImmutableList.of(ImmutableSet.of(Type.DOUBLE, Type.BIGINT),
-            ImmutableSet.of(Type.STRING, Type.BINARY, Type.BIGINT));
+            ImmutableSet.of(Type.STRING, geomType, Type.BIGINT));
 
     genericUDFs.addAll(
         createMappedGenericUDFs(stBinArguments, Type.BIGINT, ST_Bin.class));
     genericUDFs.addAll(createMappedGenericUDFs(
-        stBinEnvelopeArguments, Type.BINARY, ST_BinEnvelope.class));
+        stBinEnvelopeArguments, geomType, ST_BinEnvelope.class));
     genericUDFs.add(createScalarFunction(
-        ST_GeomFromGeoJson.class, Type.BINARY, new Type[] {Type.STRING}));
+        ST_GeomFromGeoJson.class, geomType, new Type[] {Type.STRING}));
     genericUDFs.add(createScalarFunction(
-        ST_GeomFromJson.class, Type.BINARY, new Type[] {Type.STRING}));
+        ST_GeomFromJson.class, geomType, new Type[] {Type.STRING}));
     genericUDFs.add(createScalarFunction(
-        ST_MultiPolygon.class, Type.BINARY, new Type[] {Type.STRING}));
+        ST_MultiPolygon.class, geomType, new Type[] {Type.STRING}));
     genericUDFs.add(createScalarFunction(
-        ST_MultiLineString.class, Type.BINARY, new Type[] {Type.STRING}));
+        ST_MultiLineString.class, geomType, new Type[] {Type.STRING}));
 
     createRelationalGenericUDFs(genericUDFs, isWkb);
 
@@ -159,7 +201,7 @@ public class HiveEsriGeospatialBuiltins {
         new ST_Touches(), new ST_Within());
 
     List<Set<Type>> relationalUDFArguments = isWkb
-        ? ImmutableList.of(ImmutableSet.of(Type.BINARY), ImmutableSet.of(Type.BINARY))
+        ? ImmutableList.of(ImmutableSet.of(Type.GEOMETRY), ImmutableSet.of(Type.GEOMETRY))
         : ImmutableList.of(ImmutableSet.of(Type.STRING, Type.BINARY),
             ImmutableSet.of(Type.STRING, Type.BINARY));
 
@@ -169,51 +211,62 @@ public class HiveEsriGeospatialBuiltins {
     }
   }
 
-  private static void addVarargsUDFs(Db db) {
+  private static void addVarargsUDFs(Db db, boolean isWkb) {
+    HiveLegacyFunctionExtractor extractor = isWkb
+        ? new BinaryToGeometryHiveLegacyFunctionExtractor()
+        : new BinaryToBinaryHiveLegacyFunctionExtractor();
+
     List<ScalarFunction> varargsUDFs = new ArrayList<>();
     varargsUDFs.addAll(
-        extractFunctions(ST_Union_Wrapper.class, ST_Union.class, db.getName()));
+        extractFunctions(ST_Union_Wrapper.class, ST_Union.class, db.getName(),
+            extractor));
     varargsUDFs.addAll(
-        extractFunctions(ST_Polygon_Wrapper.class, ST_Polygon.class, db.getName()));
+        extractFunctions(ST_Polygon_Wrapper.class, ST_Polygon.class, db.getName(),
+            extractor));
     varargsUDFs.addAll(
-        extractFunctions(ST_LineString_Wrapper.class, ST_LineString.class, db.getName()));
+        extractFunctions(ST_LineString_Wrapper.class, ST_LineString.class, db.getName(),
+            extractor));
     varargsUDFs.addAll(
-        extractFunctions(ST_MultiPoint_Wrapper.class, ST_MultiPoint.class, db.getName()));
+        extractFunctions(ST_MultiPoint_Wrapper.class, ST_MultiPoint.class, db.getName(),
+            extractor));
     varargsUDFs.addAll(
-        extractFunctions(ST_ConvexHull_Wrapper.class, ST_ConvexHull.class, db.getName()));
+        extractFunctions(ST_ConvexHull_Wrapper.class, ST_ConvexHull.class, db.getName(),
+            extractor));
 
     for (ScalarFunction function : varargsUDFs) {
       db.addBuiltin(function);
     }
   }
 
-  private static void addJavaStPoint(Db db, boolean addNatives) {
+  private static void addJavaStPoint(Db db, boolean addNatives, boolean isWkb) {
     // Create only specific overloads for st_point and st_pointz.
     // Unlike Hive, overloads with more dimensions are not added to avoid conflict with
     // PostGis's optional "integer srid=unknown" argument, which is implicitly castable
     // from double. See HIVE-29395 for details.
     // There is no ST_PointM and ST_PointZM at the moment so points with M dimension can
     // be created only with the WKT constructor.
+    Type geomType = isWkb ? Type.GEOMETRY : Type.BINARY;
     if (!addNatives) {
       Type[] args2d = {Type.DOUBLE, Type.DOUBLE};
       db.addBuiltin(
-          createScalarFunction(ST_Point.class, "st_point", Type.BINARY, args2d));
+          createScalarFunction(ST_Point.class, "st_point", geomType, args2d));
     }
     Type[] args3d = {Type.DOUBLE, Type.DOUBLE, Type.DOUBLE};
     db.addBuiltin(
-        createScalarFunction(ST_PointZ.class, "st_pointz", Type.BINARY, args3d));
+        createScalarFunction(ST_PointZ.class, "st_pointz", geomType, args3d));
     Type[] argsWkt = {Type.STRING};
     db.addBuiltin(
-        createScalarFunction(ST_Point.class, "st_point", Type.BINARY, argsWkt));
+        createScalarFunction(ST_Point.class, "st_point", geomType, argsWkt));
   }
 
   private static List<ScalarFunction> extractFromLegacyHiveBuiltin(
-      UDF udf, String dbName) {
-    return extractFunctions(udf.getClass(), udf.getClass(), dbName);
+      UDF udf, String dbName, HiveLegacyFunctionExtractor extractor) {
+    return extractFunctions(udf.getClass(), udf.getClass(), dbName, extractor);
   }
 
   private static List<ScalarFunction> extractFunctions(
-      Class<?> udfClass, Class<?> signatureClass, String dbName) {
+      Class<?> udfClass, Class<?> signatureClass, String dbName,
+      HiveLegacyFunctionExtractor extractor) {
     // The function has the same name as the signature class name
     String fnName = signatureClass.getSimpleName().toLowerCase();
     // The symbol name is coming from the UDF class which contains the functions
@@ -222,7 +275,7 @@ public class HiveEsriGeospatialBuiltins {
         HiveJavaFunction.createHiveFunction(fnName, dbName, symbolName, null);
     try {
       return new HiveLegacyJavaFunction(udfClass, hiveFunction, null, null)
-          .extract(new BinaryToBinaryHiveLegacyFunctionExtractor());
+          .extract(extractor);
     } catch (CatalogException ex) {
       // It is a fatal error if we fail to load a builtin function.
       Preconditions.checkState(false, ex.getMessage());

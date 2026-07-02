@@ -87,6 +87,12 @@ public class AlterTableAddColsStmt extends AlterTableStmt {
     while (iterator.hasNext()){
       ColumnDef c = iterator.next();
       c.analyze(analyzer);
+      // TODO(IMPALA-15350): unify table+type support checks
+      if (c.getType().containsGeometry()) {
+        throw new AnalysisException(String.format(
+            "Type '%s' is not yet supported for table columns: %s",
+            c.getType().toSql(), c.getColName()));
+      }
       String colName = c.getColName().toLowerCase();
       if (existingPartitionKeys.contains(colName)) {
         throw new AnalysisException(

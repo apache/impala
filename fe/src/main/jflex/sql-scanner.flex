@@ -152,6 +152,7 @@ import org.apache.impala.thrift.TReservedWordsVersion;
     keywordMap.put("full", SqlParserSymbols.KW_FULL);
     keywordMap.put("function", SqlParserSymbols.KW_FUNCTION);
     keywordMap.put("functions", SqlParserSymbols.KW_FUNCTIONS);
+    keywordMap.put("geometry", SqlParserSymbols.KW_GEOMETRY);
     keywordMap.put("grant", SqlParserSymbols.KW_GRANT);
     keywordMap.put("group", SqlParserSymbols.KW_GROUP);
     keywordMap.put("grouping", Integer.valueOf(SqlParserSymbols.KW_GROUPING));
@@ -430,7 +431,7 @@ import org.apache.impala.thrift.TReservedWordsVersion;
         "begin", "call", "check", "classifier", "close", "identity", "language",
         "localtime", "member", "module", "new", "nullif", "old", "open", "parameter",
         "period", "result", "return", "rollback", "sql", "start", "system", "time",
-        "user", "value"
+        "user", "value", "geometry"
     }));
   }
 

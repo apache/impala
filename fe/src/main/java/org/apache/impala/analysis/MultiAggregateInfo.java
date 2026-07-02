@@ -259,8 +259,8 @@ public class MultiAggregateInfo {
       } else if (aggExpr.isDistinct()) {
         List<Expr> children = AggregateFunction.getCanonicalDistinctAggChildren(aggExpr);
 
-        // Non-comparable types (complex and VARIANT) are not supported as DISTINCT
-        // parameters of aggregate functions.
+        // Non-comparable types (complex, VARIANT and GEOMETRY) are not supported as
+        // DISTINCT parameters of aggregate functions.
         checkComparableDistinctParams(children);
 
         int groupIdx = distinctExprs.indexOf(children);

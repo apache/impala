@@ -22,15 +22,15 @@ from tests.common.test_dimensions import create_single_exec_option_dimension
 
 @SkipIfApacheHive.feature_not_supported
 class TestGeospatialFuctions(ImpalaTestSuite):
-  """Tests the geospatial builtin functions"""
+  """Tests the geospatial builtin functions in the default WKB_EXPERIMENTAL mode."""
 
   @classmethod
   def add_test_dimensions(cls):
     super(TestGeospatialFuctions, cls).add_test_dimensions()
     cls.ImpalaTestMatrix.add_dimension(create_single_exec_option_dimension())
-    # Tests do not use tables at the moment, skip other fileformats than Parquet.
+    # Currently only a text table has geospatial data, skip other fileformats.
     cls.ImpalaTestMatrix.add_constraint(lambda v:
-        v.get_value('table_format').file_format == 'parquet')
+        v.get_value('table_format').file_format == 'text')
 
   def test_esri_geospatial_functions(self, vector):
     # tests generated from
@@ -41,18 +41,6 @@ class TestGeospatialFuctions(ImpalaTestSuite):
     # manually added tests
     self.run_test_case('QueryTest/geospatial-esri-extra', vector)
 
-  def test_esri_specific_overloads(self, vector):
-    # HIVE_ESRI-only overloads that are planned to be dropped in future.
-    self.run_test_case('QueryTest/geospatial-esri-specific-overloads', vector)
-
-  def test_esri_srid(self, vector):
-    # SRID-dependent tests
-    self.run_test_case('QueryTest/geospatial-esri-srid', vector)
-
-  def test_esri_high_dimension(self, vector):
-    # 3D/4D geometry tests (ST_Z, ST_M, ST_Is3D, etc.)
-    self.run_test_case('QueryTest/geospatial-esri-high-dimension', vector)
-
   def test_wkb_serialization(self, vector):
     # WKB serialization round-trip and error cases
     self.run_test_case('QueryTest/geospatial-wkb-serialization', vector)
@@ -60,7 +48,6 @@ class TestGeospatialFuctions(ImpalaTestSuite):
   def test_relations_table(self, vector):
     self.run_test_case('QueryTest/geospatial-relations-table', vector)
 
-  def test_esri_geospatial_planner(self, vector):
-    # These tests are not among planner tests because with default flags
-    # geospatial builtin functions are not loaded.
-    self.run_test_case('QueryTest/geospatial-esri-planner', vector)
+  def test_geometry_type(self, vector, unique_database):
+    # tests for GEOMETRY type specific behavior
+    self.run_test_case('QueryTest/geometry-type', vector, use_db=unique_database)

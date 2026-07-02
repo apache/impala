@@ -8718,6 +8718,12 @@ TEST_P(ExprTest, ConditionalFunctions) {
   TestStringValue("if(FALSE, 'abc', 'defgh')", "defgh");
   TestStringValue("if(TRUE, cast('a' as binary), cast('b' as binary))", "a");
   TestStringValue("if(FALSE, cast('a' as binary), cast('b' as binary))", "b");
+  // if() passes a GEOMETRY operand through (NULL stays NULL). Wrapped in the native
+  // bytes() because a top-level query may not return GEOMETRY. NULL is because
+  // geospatial constructors are currently Java UDFs and not usable in this backend
+  // tests.
+  TestIsNull("bytes(if(TRUE, cast(NULL as geometry), cast(NULL as geometry)))",
+      ColumnType(TYPE_INT));
 
   TimestampValue then_val = TimestampValue::FromUnixTime(1293872461, UTCPTR);
   TimestampValue else_val = TimestampValue::FromUnixTime(929387245, UTCPTR);
@@ -8744,6 +8750,8 @@ TEST_P(ExprTest, ConditionalFunctions) {
   TestStringValue(
       "nvl2(cast('' as binary), cast('a' as binary), cast('b' as binary))", "a");
   TestStringValue("nvl2(NULL, cast('a' as binary), cast('b' as binary))", "b");
+  TestIsNull("bytes(nvl2(now(), cast(NULL as geometry), cast(NULL as geometry)))",
+      ColumnType(TYPE_INT));
   TimestampValue first_val = TimestampValue::FromUnixTime(1293872461, UTCPTR);
   TimestampValue second_val = TimestampValue::FromUnixTime(929387245, UTCPTR);
   TestTimestampValue("nvl2(FALSE, cast('2011-01-01 09:01:01' as timestamp), "
@@ -8851,6 +8859,8 @@ TEST_P(ExprTest, ConditionalFunctions) {
   TestStringValue("coalesce(NULL, cast('a' as binary), NULL)", "a");
   TestStringValue("coalesce(cast('a' as binary), NULL, cast('b' as binary), NULL)", "a");
   TestStringValue("coalesce(NULL, NULL, NULL, cast('a' as binary), NULL, NULL)", "a");
+  TestIsNull("bytes(coalesce(cast(NULL as geometry), cast(NULL as geometry)))",
+      ColumnType(TYPE_INT));
   TimestampValue ats = TimestampValue::FromUnixTime(1293872461, UTCPTR);
   TimestampValue bts = TimestampValue::FromUnixTime(929387245, UTCPTR);
   TestTimestampValue("coalesce(cast('2011-01-01 09:01:01' as timestamp))", ats);

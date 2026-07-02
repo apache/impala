@@ -159,7 +159,7 @@ public class JniFrontend {
 
     // Initialize the geo serialization format on all impalads (coordinator and
     // executor). On executor-only impalads the Java Frontend is not instantiated
-    // so BuiltinsDb/HiveEsriGeospatialBuiltins.initBuiltins() never runs, but
+    // so BuiltinsDb/GeospatialBuiltins.initBuiltins() never runs, but
     // Hive geo UDFs still execute via HiveUdfCall and therefore require the
     // correct GeometryUtils.format to deserialize geometry values.
     TGeospatialLibrary geoLib = BackendConfig.INSTANCE.getGeospatialLibrary();

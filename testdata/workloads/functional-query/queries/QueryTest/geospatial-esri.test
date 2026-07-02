@@ -2452,11 +2452,12 @@ AnalysisException: No matching function with signature: st_convexhull(TINYINT)
 # Wrapper only generates overloads for 1-8 arguments
 select ST_ConvexHull(ST_Point(0,0), ST_Point(1,1), ST_Point(2,2), ST_Point(3,3), ST_Point(4,4), ST_Point(5,5), ST_Point(6,6), ST_Point(7,7), ST_Point(8,8));
 ---- CATCH
-AnalysisException: No matching function with signature: st_convexhull(BINARY, BINARY, BINARY, BINARY, BINARY, BINARY, BINARY, BINARY, BINARY)
+AnalysisException: No matching function with signature: st_convexhull(
 ====
 ---- QUERY
-# NULL Handling
-select ST_ConvexHull(NULL);
+# NULL Handling. Wrapped in ST_AsText because a top-level query may not return GEOMETRY
+# (WKB mode; see IMPALA-15244); ST_AsText(NULL) is NULL in both modes.
+select ST_AsText(ST_ConvexHull(NULL));
 ---- RESULTS
 'NULL'
 ====

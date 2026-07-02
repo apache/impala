@@ -169,17 +169,17 @@ STRING
 ====
 ---- QUERY
 # Other types than LINESTRING return NULL.
-select ST_StartPoint(ST_Point(1, 2));
+select ST_AsText(ST_StartPoint(ST_Point(1, 2)));
 ---- TYPES
-BINARY
+STRING
 ---- RESULTS
 'NULL'
 ====
 ---- QUERY
 # Other types than LINESTRING return NULL.
-select ST_EndPoint(ST_Point(1, 2));
+select ST_AsText(ST_EndPoint(ST_Point(1, 2)));
 ---- TYPES
-BINARY
+STRING
 ---- RESULTS
 'NULL'
 ====

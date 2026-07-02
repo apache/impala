@@ -100,6 +100,7 @@ public abstract class LiteralExpr extends Expr implements Comparable<LiteralExpr
         e = new StringLiteral(value, type, needsUnescaping);
         break;
       case BINARY:
+      case GEOMETRY:
         e = new StringLiteral(value, type, false);
         break;
       case DATE:
@@ -266,6 +267,7 @@ public abstract class LiteralExpr extends Expr implements Comparable<LiteralExpr
       case VARCHAR:
       case CHAR:
       case BINARY:
+      case GEOMETRY:
         if (val.isSetBinary_val()) {
           byte[] bytes = new byte[val.binary_val.remaining()];
           val.binary_val.get(bytes);

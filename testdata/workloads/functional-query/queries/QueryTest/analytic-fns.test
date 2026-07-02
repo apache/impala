@@ -2446,3 +2446,35 @@ INT, BIGINT
 70,9
 75,10
 ====
+---- QUERY
+# BINARY is supported in analytic functions (first_value/last_value/lag/lead): they pass
+# a value through and BINARY reuses STRING's StringVal analytic implementation. Compared
+# to binary literals (rather than selected raw) to keep the result printable.
+select id,
+       first_value(binary_col) over (order by id) = cast('binary1' as binary),
+       lag(binary_col) over (order by id) is null,
+       last_value(binary_col) over (order by id) = cast('binary2' as binary)
+from functional.binary_tbl where id in (1, 2) order by id
+---- RESULTS
+1,true,true,false
+2,true,false,true
+---- TYPES
+INT,BOOLEAN,BOOLEAN,BOOLEAN
+====
+---- QUERY
+# Analytic functions (first_value/last_value/lag/lead) work over GEOMETRY: they just
+# pass a value through, and GEOMETRY reuses STRING's StringVal analytic implementation.
+# The GEOMETRY results are wrapped in ST_AsText because a top-level query may not return
+# GEOMETRY (see IMPALA-15244).
+select id,
+       ST_AsText(first_value(ST_Point(id, id)) over (order by id)),
+       ST_AsText(last_value(ST_Point(id, id)) over (order by id)),
+       ST_AsText(lag(ST_Point(id, id)) over (order by id))
+from functional.alltypes where id <= 2 order by id
+---- RESULTS
+0,'POINT (0 0)','POINT (0 0)','NULL'
+1,'POINT (0 0)','POINT (1 1)','POINT (0 0)'
+2,'POINT (0 0)','POINT (2 2)','POINT (1 1)'
+---- TYPES
+INT,STRING,STRING,STRING
+====

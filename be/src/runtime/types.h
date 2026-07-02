@@ -62,9 +62,9 @@ enum PrimitiveType {
 
 PrimitiveType ThriftToType(TPrimitiveType::type ttype);
 
-// Subtype of a TYPE_STRING byte array. BINARY is represented as TYPE_STRING in
-// the backend; this field distinguishes it from a plain STRING.
-enum class StringValSubtype : uint8_t { STRING, BINARY };
+// Subtype of a TYPE_STRING byte array. BINARY and GEOMETRY are represented as
+// TYPE_STRING in the backend; this field distinguishes them from a plain STRING.
+enum class StringValSubtype : uint8_t { STRING, BINARY, GEOMETRY };
 
 TPrimitiveType::type ToThrift(PrimitiveType ptype,
     StringValSubtype subtype = StringValSubtype::STRING);
@@ -166,6 +166,12 @@ struct ColumnType {
     return ret;
   }
 
+  static ColumnType CreateGeometryType() {
+    ColumnType ret(TYPE_STRING);
+    ret.string_val_subtype_ = StringValSubtype::GEOMETRY;
+    return ret;
+  }
+
   static bool ValidateDecimalParams(int precision, int scale) {
     return precision >= 1 && precision <= MAX_PRECISION && scale >= 0
         && scale <= MAX_SCALE && scale <= precision;
@@ -258,6 +264,10 @@ struct ColumnType {
 
   inline bool IsUuidType() const { return type == TYPE_UUID; }
 
+  inline bool IsGeometryType() const {
+    return string_val_subtype_ == StringValSubtype::GEOMETRY;
+  }
+
   inline bool IsComplexType() const {
     return type == TYPE_STRUCT || type == TYPE_ARRAY || type == TYPE_MAP
         || type == TYPE_VARIANT;
@@ -302,7 +312,7 @@ struct ColumnType {
   ColumnType(const std::vector<TTypeNode>& types, int* idx);
 
  private:
-  // Differentiates between STRING and BINARY. As STRING is just a byte array in Impala
+  // Differentiates between STRING, BINARY  and GEOMETRY. As STRING is just a byte array
   // (no UTF-8 encoding), the two types are practically the same in the backend - only
   // some code parts, e.g. file format readers/writers differentiate between the two.
   // Instead of PrimitiveType::TYPE_BINARY, TYPE_STRING is used for the BINARY type to

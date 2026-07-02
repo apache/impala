@@ -34,7 +34,7 @@ import java.nio.ByteOrder;
 public class GeometryUtils {
 
   // Selects the serialization format for all ESRI UDFs in this JVM. Assumed to
-  // be set once at startup by HiveEsriGeospatialBuiltins.initBuiltins (which
+  // be set once at startup by GeospatialBuiltins.initBuiltins (which
   // runs per frontend JVM before any UDF executes) and not changed afterwards.
   public enum SerializationFormat { ESRI_SHAPE, WKB }
   private static volatile SerializationFormat format = SerializationFormat.ESRI_SHAPE;

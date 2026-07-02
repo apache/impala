@@ -179,7 +179,8 @@ public class HiveGenericJavaFunction implements HiveJavaFunction {
   }
 
   private ConstantObjectInspector getConstInspector(Type t, Object constObj) {
-    PrimitiveTypeInfo pt = TypeInfoFactory.getPrimitiveTypeInfo(t.toSql().toLowerCase());
+    String typeName = t.toHiveMetastoreType();
+    PrimitiveTypeInfo pt = TypeInfoFactory.getPrimitiveTypeInfo(typeName);
     return PrimitiveObjectInspectorFactory.getPrimitiveWritableConstantObjectInspector(
         pt, constObj);
   }
@@ -203,6 +204,7 @@ public class HiveGenericJavaFunction implements HiveJavaFunction {
       case STRING:
         return PrimitiveCategory.STRING;
       case BINARY:
+      case GEOMETRY:
         return PrimitiveCategory.BINARY;
       default:
         throw new CatalogException("Unsupported type: " + t);

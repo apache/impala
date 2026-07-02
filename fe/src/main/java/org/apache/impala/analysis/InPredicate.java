@@ -55,6 +55,7 @@ public class InPredicate extends Predicate {
       // cast up to strings; meaning that "in" comparisons will not have CHAR comparison
       // semantics.
       if (t.getPrimitiveType() == PrimitiveType.CHAR) continue;
+      if (!t.supportsComparison()) continue;
 
       String typeString = t.getPrimitiveType().toString().toLowerCase();
       if (t.isVarchar() || t.isBinary() || t.isUuid()) typeString = "string";

@@ -83,6 +83,12 @@ public class AlterTableReplaceColsStmt extends AlterTableStmt {
     Set<String> colNames = new HashSet<>();
     for (ColumnDef c: columnDefs_) {
       c.analyze(analyzer);
+      // TODO(IMPALA-15350): unify table+type support checks
+      if (c.getType().containsGeometry()) {
+        throw new AnalysisException(String.format(
+            "Type '%s' is not yet supported for table columns: %s",
+            c.getType().toSql(), c.getColName()));
+      }
       if (!(t instanceof FeIcebergTable) && c.getType().containsUuid()) {
         throw new AnalysisException(
             "UUID type is only supported for Iceberg tables.");

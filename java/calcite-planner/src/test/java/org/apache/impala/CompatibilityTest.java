@@ -56,6 +56,10 @@ public class CompatibilityTest {
         if (fromPType == PrimitiveType.UUID || toPType == PrimitiveType.UUID) {
           continue;
         }
+        // GEOMETRY is not yet supported in Calcite.
+        if (fromPType == PrimitiveType.GEOMETRY || toPType == PrimitiveType.GEOMETRY) {
+          continue;
+        }
         if (fromPType == PrimitiveType.FLOAT && toPType == PrimitiveType.DECIMAL) {
           continue;
         }

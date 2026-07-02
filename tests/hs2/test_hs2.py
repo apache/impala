@@ -1289,7 +1289,7 @@ class TestHS2(HS2TestSuite):
     results = fetch_results_resp.results
     types = ['BOOLEAN', 'TINYINT', 'SMALLINT', 'INT', 'BIGINT', 'FLOAT', 'DOUBLE', 'DATE',
              'TIMESTAMP', 'STRING', 'VARCHAR', 'DECIMAL', 'CHAR', 'ARRAY', 'MAP',
-             'STRUCT', 'BINARY', 'UUID']
+             'STRUCT', 'BINARY', 'UUID', 'GEOMETRY']
     assert self.get_num_rows(results) == len(types)
     # Validate that each type description (result row) has the required 18 fields as
     # described in the DatabaseMetaData.getTypeInfo() documentation.

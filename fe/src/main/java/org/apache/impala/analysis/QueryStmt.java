@@ -350,6 +350,24 @@ public abstract class QueryStmt extends StatementBase {
   }
 
   /**
+   * Blocks GEOMETRY from the client-facing result of a top-level query. GEOMETRY has no
+   * defined client serialization yet (the WKT-vs-WKB decision is deferred); adding client
+   * support is tracked in IMPALA-15244. Until then it must be converted (e.g. via
+   * ST_AsText) before being returned. Only enforced at the root analyzer, so GEOMETRY may
+   * still flow through inline views, CREATE VIEW definitions and subqueries.
+   */
+  protected void checkGeometryNotInResult(Analyzer analyzer) throws AnalysisException {
+    if (!analyzer.isRootAnalyzer()) return;
+    for (Expr expr: resultExprs_) {
+      if (expr.getType().isGeometry()) {
+        throw new AnalysisException("GEOMETRY is not allowed in the select list of a "
+            + "top-level query; wrap it in a function such as ST_AsText(). Expr: '"
+            + expr.toSql() + "'.");
+      }
+    }
+  }
+
+  /**
    * Substitutes top-level ordinals and aliases. Does not substitute ordinals and
    * aliases in subexpressions.
    * Modifies the 'exprs' list in-place.

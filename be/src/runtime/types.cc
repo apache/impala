@@ -58,6 +58,8 @@ ColumnType::ColumnType(const std::vector<TTypeNode>& types, int* idx)
       } else if (type == TYPE_STRING) {
         if (scalar_type.type == TPrimitiveType::BINARY) {
           string_val_subtype_ = StringValSubtype::BINARY;
+        } else if (scalar_type.type == TPrimitiveType::GEOMETRY) {
+          string_val_subtype_ = StringValSubtype::GEOMETRY;
         }
       } else if (type == TYPE_DECIMAL) {
         DCHECK(scalar_type.__isset.precision);
@@ -136,9 +138,10 @@ PrimitiveType ThriftToType(TPrimitiveType::type ttype) {
     case TPrimitiveType::TIMESTAMP: return TYPE_TIMESTAMP;
     case TPrimitiveType::STRING: return TYPE_STRING;
     case TPrimitiveType::VARCHAR: return TYPE_VARCHAR;
-    // BINARY is generally handled the same way as STRING by the backend.
+    // BINARY and GEOMETRY are generally handled the same way as STRING by the backend.
     case TPrimitiveType::BINARY: return TYPE_STRING;
     case TPrimitiveType::UUID: return TYPE_UUID;
+    case TPrimitiveType::GEOMETRY: return TYPE_STRING;
     case TPrimitiveType::DECIMAL: return TYPE_DECIMAL;
     case TPrimitiveType::CHAR: return TYPE_CHAR;
     case TPrimitiveType::FIXED_UDA_INTERMEDIATE: return TYPE_FIXED_UDA_INTERMEDIATE;
@@ -163,8 +166,9 @@ TPrimitiveType::type ToThrift(PrimitiveType ptype, StringValSubtype subtype) {
     case TYPE_TIMESTAMP: return TPrimitiveType::TIMESTAMP;
     case TYPE_STRING:
       switch (subtype) {
-        case StringValSubtype::BINARY: return TPrimitiveType::BINARY;
         case StringValSubtype::STRING: return TPrimitiveType::STRING;
+        case StringValSubtype::BINARY: return TPrimitiveType::BINARY;
+        case StringValSubtype::GEOMETRY: return TPrimitiveType::GEOMETRY;
         default:
           DCHECK(false) << "Unexpected string subtype" << subtype;
           return TPrimitiveType::INVALID_TYPE;
@@ -237,14 +241,13 @@ string TypeToOdbcString(const TColumnType& type) {
     case TYPE_DATETIME: return "datetime";
     case TYPE_TIMESTAMP: return "timestamp";
     case TYPE_STRING:
-      if (col_type == TPrimitiveType::BINARY) {
-        return "binary";
-      } else {
-        return "string";
+      switch (col_type) {
+        case TPrimitiveType::GEOMETRY: return "geometry";
+        case TPrimitiveType::BINARY: return "binary";
+        default: return "string";
       }
     case TYPE_UUID: return "uuid";
     case TYPE_VARCHAR: return "string";
-
     case TYPE_DECIMAL: return "decimal";
     case TYPE_CHAR: return "char";
     case TYPE_STRUCT: return "struct";
@@ -314,8 +317,9 @@ string ColumnType::DebugString() const {
   switch (type) {
     case TYPE_STRING:
       switch (string_val_subtype_) {
-        case StringValSubtype::BINARY: return "BINARY";
         case StringValSubtype::STRING: return "STRING";
+        case StringValSubtype::BINARY: return "BINARY";
+        case StringValSubtype::GEOMETRY: return "GEOMETRY";
         default:
           DCHECK(false) << "Unexpected string subtype" << string_val_subtype_;
           return "";

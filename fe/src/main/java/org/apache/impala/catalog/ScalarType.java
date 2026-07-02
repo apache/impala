@@ -86,6 +86,7 @@ public class ScalarType extends Type {
       case VARCHAR: return createVarcharType();
       case BINARY: return BINARY;
       case UUID: return UUID;
+      case GEOMETRY: return GEOMETRY;
       case TIMESTAMP: return TIMESTAMP;
       case DATE: return DATE;
       case DATETIME: return DATETIME;
@@ -334,6 +335,7 @@ public class ScalarType extends Type {
       case BINARY:
       // UUID is only supported in Iceberg tables; HMS partition columns don't support it.
       case UUID:
+      case GEOMETRY:
         return false;
       default:
         return true;

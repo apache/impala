@@ -1,0 +1,46 @@
+====
+---- QUERY
+# bytes() returns the WKB byte length of a GEOMETRY (a 2D point is 21 bytes, a
+# two-point line 41), or NULL for a NULL geometry.
+select bytes(ST_Point(1.0, 2.0)), bytes(ST_LineString(0, 0, 10, 10)),
+       bytes(cast(NULL as geometry))
+---- RESULTS
+21,41,NULL
+---- TYPES
+INT,INT,INT
+====
+---- QUERY
+# A view can expose a GEOMETRY column: it is stored as BINARY in HMS, but Impala
+# recomputes the real type from the view query when the view is used, so geometry
+# functions work through the view.
+create view geom_view as select ST_Point(1.0, 2.0) as g
+---- RESULTS
+'View has been created.'
+====
+---- QUERY
+# The type is shown as BINARY in DESCRIBE, as it is not computed based on the
+# actual query.
+describe geom_view;
+---- TYPES
+STRING,STRING,STRING
+---- RESULTS
+'g','binary',''
+====
+---- QUERY
+select ST_AsText(g), bytes(g) from geom_view
+---- RESULTS
+'POINT (1 2)',21
+---- TYPES
+STRING,INT
+====
+---- QUERY
+# Test inline views and union all.
+with v1 as (select * from geom_view)
+select ST_AsText(g), bytes(g)
+  from (select * from v1 union all select * from geom_view) v2
+---- RESULTS
+'POINT (1 2)',21
+'POINT (1 2)',21
+---- TYPES
+STRING,INT
+====

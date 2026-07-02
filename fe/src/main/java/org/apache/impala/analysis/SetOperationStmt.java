@@ -360,13 +360,13 @@ public class SetOperationStmt extends QueryStmt {
     if (!hasOnlyUnionAllOps()) {
       for (Expr expr: widestExprs_) {
         // UNION/INTERSECT/EXCEPT (DISTINCT) must hash/compare result columns, which is
-        // not supported for non-comparable types (collections and VARIANT). Reject with
-        // a clear error rather than letting it reach (and crash) the backend. Note UNION
-        // ALL does not compare, so it stays allowed; STRUCTs are rejected earlier by
-        // castToSetOpCompatibleTypes.
+        // not supported for non-comparable types (collections, VARIANT and GEOMETRY).
+        // Reject with a clear error rather than letting it reach (and crash) the backend.
+        // Note UNION ALL does not compare, so it stays allowed; STRUCTs are rejected
+        // earlier by castToSetOpCompatibleTypes.
         if (!expr.getType().supportsComparison()) {
-          throw new AnalysisException("UNION, EXCEPT and INTERSECT are not supported "
-              + "for " + expr.getType().toSql() + " type.");
+          throw new AnalysisException("UNION, EXCEPT and INTERSECT with type '"
+              + expr.getType().toSql() + "' is not supported.");
         }
       }
     }
@@ -374,6 +374,9 @@ public class SetOperationStmt extends QueryStmt {
     // Create tuple descriptor materialized by this UnionStmt, its resultExprs, and
     // its sortInfo if necessary.
     createMetadata(analyzer);
+    // Block a top-level set operation from returning GEOMETRY to the client (e.g. a
+    // top-level UNION ALL of geometries); geometry may still flow through nested set ops.
+    checkGeometryNotInResult(analyzer);
     createSortInfo(analyzer);
 
     // Create unnested operands' smaps.

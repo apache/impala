@@ -1385,6 +1385,11 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
     AnalysisError("select id from (select id+2 from functional_hbase.alltypessmall) a",
         "Could not resolve column/field reference: 'id'");
     AnalyzesOk("select a.* from (select id+2 from functional_hbase.alltypessmall) a");
+    AnalyzesOk("select st_astext(g) from " +
+        "(select st_point(double_col, double_col) as g from functional.alltypes) v");
+    AnalysisError("select g from " +
+        "(select st_point(double_col, double_col) as g from functional.alltypes) v",
+        "GEOMETRY is not allowed in the select list of a top-level query");
 
     // join test
     AnalyzesOk("select * from (select id+2 id from functional_hbase.alltypessmall) a " +
@@ -2487,6 +2492,46 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
     AnalysisError("select ndv(binary_col) from functional.binary_tbl",
         "No matching function with signature: ndv(BINARY).");
 
+    // Geometry.
+    // GEOMETRY is not comparable so the only aggregate it supports is count().
+    AnalyzesOk("select count(st_point(double_col, double_col)) from functional.alltypes");
+    AnalysisError("select sum(st_point(double_col, double_col)) from functional.alltypes",
+        "SUM requires a numeric parameter");
+    AnalysisError("select avg(st_point(double_col, double_col)) from functional.alltypes",
+        "AVG requires a numeric or timestamp parameter");
+    AnalysisError("select ndv(st_point(double_col, double_col)) from functional.alltypes",
+        "No matching function with signature: ndv(GEOMETRY).");
+    AnalysisError("select min(st_point(double_col, double_col)) from functional.alltypes",
+        "No matching function with signature: min(GEOMETRY).");
+    AnalysisError("select max(st_point(double_col, double_col)) from functional.alltypes",
+        "No matching function with signature: max(GEOMETRY).");
+    AnalysisError(
+        "select sample(st_point(double_col, double_col)) from functional.alltypes",
+        "No matching function with signature: sample(GEOMETRY).");
+    AnalysisError(
+        "select appx_median(st_point(double_col, double_col)) from functional.alltypes",
+        "No matching function with signature: appx_median(GEOMETRY).");
+    // GEOMETRY is not comparable, so SELECT DISTINCT and DISTINCT aggregate params are
+    // rejected.
+    AnalysisError(
+        "select distinct st_point(double_col, double_col) from functional.alltypes",
+        "SELECT DISTINCT expression 'st_point(double_col, double_col)' with type "
+            + "'GEOMETRY' is not supported.");
+    AnalysisError(
+        "select count(distinct st_point(double_col, double_col)) "
+            + "from functional.alltypes",
+        "DISTINCT aggregate parameter 'st_point(double_col, double_col)' with type "
+            + "'GEOMETRY' is not supported.");
+    // GEOMETRY cannot be used in GROUP BY or ORDER BY (no comparison/ordering).
+    AnalysisError(
+        "select count(*) from functional.alltypes "
+            + "group by st_point(double_col, double_col)",
+        "GROUP BY expression 'st_point(double_col, double_col)' with type 'GEOMETRY' "
+            + "is not supported.");
+    AnalysisError(
+        "select 1 from functional.alltypes order by st_point(1, 1)",
+        "ORDER BY expression 'st_point(1, 1)' with type 'GEOMETRY' is not supported.");
+
     // Test select stmt avg smap.
     AnalyzesOk("select cast(avg(c1) as decimal(10,4)) as c from " +
         "functional.decimal_tiny group by c3 having cast(avg(c1) as " +
@@ -3562,6 +3607,20 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
         "union select smallint_col, bool_col from functional.alltypes",
         "Incompatible return types 'STRING' and 'BOOLEAN' of " +
             "exprs 'string_col' and 'bool_col'.");
+    // GEOMETRY unifies only with itself; unifying with any other type fails. UNION ALL of
+    // geometry is allowed at the set-op level, but the result must be wrapped because a
+    // top-level query cannot return GEOMETRY (see TestGeometryFunctions, IMPALA-15244).
+    AnalyzesOk("select st_astext(g) from "
+        + "(select st_point(1, 1) g union all select st_point(2, 2)) t");
+    AnalysisError(
+        "select st_point(1, 1) union all select st_point(2, 2)",
+        "GEOMETRY is not allowed in the select list of a top-level query");
+    AnalysisError("select st_point(1, 1) union all select cast(NULL as string)",
+        "Incompatible return types 'GEOMETRY' and 'STRING'");
+    // UNION ALL of geometry is allowed (no compare), but UNION/INTERSECT/EXCEPT
+    // (DISTINCT) must hash/compare the columns, which GEOMETRY does not support.
+    AnalysisError("select cast(NULL as geometry) union select cast(NULL as geometry)",
+        "UNION, EXCEPT and INTERSECT with type 'GEOMETRY' is not supported.");
     // Invalid ordinal in order by.
     AnalysisError("(select int_col from functional.alltypes) " +
         "union (select int_col from functional.alltypessmall) order by 2",

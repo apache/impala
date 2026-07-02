@@ -66,6 +66,7 @@ Status WriteKuduValue(int col, const ColumnType& col_type, const void* value,
       break;
     }
     case TYPE_STRING: {
+      DCHECK(col_type.IsPlainStringType() || col_type.IsBinaryType());
       const StringValue* sv = reinterpret_cast<const StringValue*>(value);
       kudu::Slice slice(reinterpret_cast<uint8_t*>(sv->Ptr()), sv->Len());
       switch (col_type.StringSubtype()) {

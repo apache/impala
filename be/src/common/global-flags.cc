@@ -487,7 +487,7 @@ static const string geo_lib_help_msg =
     "geospatial functions should be included as builtins. Possible values: [\""
     + geo_lib_none + "\", \"" + geo_lib_hive_esri + "\", \"" + geo_lib_wkb + "\"]";
 
-DEFINE_string(geospatial_library, geo_lib_none, geo_lib_help_msg.c_str());
+DEFINE_string(geospatial_library, geo_lib_wkb, geo_lib_help_msg.c_str());
 
 // ++========================++
 // || Startup flag graveyard ||
