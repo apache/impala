@@ -455,3 +455,7 @@ table_name:alltypes_structs_paimon, constraint:restrict_to, table_format:parquet
 
 table_name:alltypes_nonpartitioned, constraint:restrict_to, table_format:text/none/none
 table_name:alltypes_nonpartitioned, constraint:restrict_to, table_format:parquet/none/none
+
+# Geospatial relation test table - text (WKT) only
+table_name:geom_relations_wkt, constraint:restrict_to, table_format:text/none/none
+table_name:geom_relations, constraint:restrict_to, table_format:text/none/none

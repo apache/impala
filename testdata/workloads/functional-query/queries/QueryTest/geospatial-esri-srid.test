@@ -85,3 +85,25 @@ select ST_AsGeoJson(ST_GeomFromJson('{"x":1.2,"y":2.4,"spatialReference":{"wkid"
 ---- RESULTS
 '{"type":"Point","coordinates":[1.2,2.4],"crs":null}'
 ====
+---- QUERY
+# ST_SRID - get spatial reference ID
+select ST_SRID(ST_SetSRID(ST_Point(1, 2), 4326));
+---- TYPES
+INT
+---- RESULTS
+4326
+====
+---- QUERY
+select ST_SRID(ST_GeomFromText('POINT (1 2)', 4326));
+---- TYPES
+INT
+---- RESULTS
+4326
+====
+---- QUERY
+select ST_SRID(ST_Point(1, 2));
+---- TYPES
+INT
+---- RESULTS
+0
+====

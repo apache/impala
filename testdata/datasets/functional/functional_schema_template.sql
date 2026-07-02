@@ -5003,4 +5003,54 @@ LOCATION '/test-warehouse/paimon_test/paimon_catalog/warehouse/functional.db/all
 ---- DEPENDENT_LOAD
 `hadoop fs -mkdir -p /test-warehouse/paimon_test/paimon_catalog/warehouse/functional.db && \
 hadoop fs -put -f ${IMPALA_HOME}/testdata/data/paimon_test/paimon_catalog/warehouse/functional.db/alltypes_structs_paimon /test-warehouse/paimon_test/paimon_catalog/warehouse/functional.db
+====
+---- DATASET
+functional
+---- BASE_TABLE_NAME
+geom_relations_wkt
+---- COLUMNS
+id STRING
+relation STRING
+point1 STRING
+point2 STRING
+linestring1 STRING
+linestring2 STRING
+polygon1 STRING
+polygon2 STRING
+multipoint1 STRING
+multipoint2 STRING
+multilinestring1 STRING
+multilinestring2 STRING
+multipolygon1 STRING
+multipolygon2 STRING
+---- ROW_FORMAT
+delimited fields terminated by '\t'
+---- LOAD
+LOAD DATA LOCAL INPATH '{impala_home}/testdata/data/geom_relations_wkt/data.csv' OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name};
+---- DEPENDENT_LOAD
+INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name} SELECT * FROM functional.{table_name};
+====
+---- DATASET
+functional
+---- BASE_TABLE_NAME
+geom_relations
+---- CREATE
+CREATE VIEW IF NOT EXISTS {db_name}{db_suffix}.{table_name} AS
+SELECT
+  id,
+  relation,
+  st_GeomFromText(point1) AS point1,
+  st_GeomFromText(point2) AS point2,
+  st_GeomFromText(linestring1) AS linestring1,
+  st_GeomFromText(linestring2) AS linestring2,
+  st_GeomFromText(polygon1) AS polygon1,
+  st_GeomFromText(polygon2) AS polygon2,
+  st_GeomFromText(multipoint1) AS multipoint1,
+  st_GeomFromText(multipoint2) AS multipoint2,
+  st_GeomFromText(multilinestring1) AS multilinestring1,
+  st_GeomFromText(multilinestring2) AS multilinestring2,
+  st_GeomFromText(multipolygon1) AS multipolygon1,
+  st_GeomFromText(multipolygon2) AS multipolygon2
+FROM {db_name}{db_suffix}.geom_relations_wkt;
+---- LOAD
 

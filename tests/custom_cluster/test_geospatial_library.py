@@ -25,19 +25,18 @@ ST_X_SIGNATURE_BUILTIN = "DOUBLE\tst_x(BINARY)\tBUILTIN\ttrue"
 SHOW_FUNCTIONS = "show functions in _impala_builtins"
 
 
+@SkipIfApacheHive.feature_not_supported
 class TestGeospatialLibrary(CustomClusterTestSuite):
   """Tests the geospatial_library backend flag"""
 
   @CustomClusterTestSuite.with_args(start_args='--geospatial_library=NONE')
-  @SkipIfApacheHive.feature_not_supported
-  @pytest.mark.execute_serially
   def test_disabled(self):
     result = self.execute_query(SHOW_FUNCTIONS)
     assert ST_POINT_SIGNATURE not in result.data
     assert ST_X_SIGNATURE_BUILTIN not in result.data
 
-  @SkipIfApacheHive.feature_not_supported
   @pytest.mark.execute_serially
+  @CustomClusterTestSuite.with_args(start_args='--geospatial_library=HIVE_ESRI')
   def test_enabled(self):
     result = self.execute_query(SHOW_FUNCTIONS)
     assert ST_POINT_SIGNATURE in result.data
@@ -47,12 +46,23 @@ class TestGeospatialLibrary(CustomClusterTestSuite):
   # ESRI test files are intentionally excluded.
   @CustomClusterTestSuite.with_args(
       start_args='--geospatial_library=WKB_EXPERIMENTAL')
-  @SkipIfApacheHive.feature_not_supported
   def test_wkb_experimental_esri(self, vector):
     self.run_test_case('QueryTest/geospatial-esri', vector)
 
   @CustomClusterTestSuite.with_args(
       start_args='--geospatial_library=WKB_EXPERIMENTAL')
-  @SkipIfApacheHive.feature_not_supported
   def test_wkb_experimental_extra(self, vector):
     self.run_test_case('QueryTest/geospatial-esri-extra', vector)
+
+  @CustomClusterTestSuite.with_args(
+      start_args='--geospatial_library=WKB_EXPERIMENTAL')
+  def test_wkb_experimental_serialization(self, vector):
+    # WKB is the inter-function serialization format in this mode, so this exercises
+    # the WKB round-trip / malformed-input handling of the WKB serialization path.
+    self.run_test_case('QueryTest/geospatial-wkb-serialization', vector)
+
+  @CustomClusterTestSuite.with_args(
+      start_args='--geospatial_library=WKB_EXPERIMENTAL')
+  @pytest.mark.execute_serially
+  def test_relations_table(self, vector):
+    self.run_test_case('QueryTest/geospatial-relations-table', vector)

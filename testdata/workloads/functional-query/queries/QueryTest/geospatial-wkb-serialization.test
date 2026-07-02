@@ -1,0 +1,177 @@
+# Some tests are based on ClickHouse's WKB geospatial test suite:
+# https://github.com/ClickHouse/ClickHouse/blob/c017cc7907535287f232c2de4754470d453ea219/tests/queries/0_stateless/03458_wkb_function.sql
+====
+---- QUERY
+# WKB round-trip: Point
+select ST_AsText(ST_GeomFromWKB(ST_AsBinary(ST_Point(1.5, 2.5))));
+---- RESULTS
+'POINT (1.5 2.5)'
+====
+---- QUERY
+# WKB round-trip: Point with high-precision coordinates
+# Java uses 16 significant digits, DoubleToBuffer uses 17 for this value.
+select ST_AsText(ST_GeomFromWKB(ST_AsBinary(ST_Point(1.123456789012345, -2.987654321098765))))
+  in ('POINT (1.123456789012345 -2.9876543210987649)',
+      'POINT (1.123456789012345 -2.987654321098765)');
+---- RESULTS
+true
+====
+---- QUERY
+# WKB round-trip: LineString
+select ST_AsText(ST_GeomFromWKB(ST_AsBinary(ST_LineString(0,0, 1,1, 2,0))));
+---- RESULTS
+'LINESTRING (0 0, 1 1, 2 0)'
+====
+---- QUERY
+# WKB round-trip: Polygon (simple triangle)
+select ST_AsText(ST_GeomFromWKB(ST_AsBinary(ST_Polygon(0,0, 10,0, 10,10, 0,0))));
+---- RESULTS
+'POLYGON ((0 0, 10 0, 10 10, 0 0))'
+====
+---- QUERY
+# WKB round-trip: Polygon with hole
+select ST_AsText(ST_GeomFromWKB(ST_AsBinary(ST_GeomFromText('polygon ((0 0, 0 10, 10 10, 10 0, 0 0), (2 2, 2 4, 4 4, 4 2, 2 2))'))));
+---- RESULTS
+'POLYGON ((0 0, 10 0, 10 10, 0 10, 0 0), (2 2, 2 4, 4 4, 4 2, 2 2))'
+====
+---- QUERY
+# WKB round-trip: MultiPoint
+select ST_AsText(ST_GeomFromWKB(ST_AsBinary(ST_GeomFromText('multipoint ((0 0), (1 1), (2 2))'))));
+---- RESULTS
+'MULTIPOINT ((0 0), (1 1), (2 2))'
+====
+---- QUERY
+# WKB round-trip: MultiLineString
+select ST_AsText(ST_GeomFromWKB(ST_AsBinary(ST_GeomFromText('multilinestring ((0 0, 1 1), (2 2, 3 3, 4 4))'))));
+---- RESULTS
+'MULTILINESTRING ((0 0, 1 1), (2 2, 3 3, 4 4))'
+====
+---- QUERY
+# WKB round-trip: MultiPolygon
+select ST_AsText(ST_GeomFromWKB(ST_AsBinary(ST_GeomFromText('multipolygon (((0 0, 1 0, 1 1, 0 0)), ((2 2, 3 2, 3 3, 2 2)))'))));
+---- RESULTS
+'MULTIPOLYGON (((0 0, 1 0, 1 1, 0 0)), ((2 2, 3 2, 3 3, 2 2)))'
+====
+---- QUERY
+# WKB from literal hex: valid Point (0, 0) — LE, type=1, x=0.0, y=0.0
+select ST_AsText(ST_GeomFromWKB(cast(unhex('010100000000000000000000000000000000000000') as binary)));
+---- RESULTS
+'POINT (0 0)'
+====
+---- QUERY
+# WKB from literal hex: Point (1.0, 2.0) — LE, type=1
+select ST_AsText(ST_GeomFromWKB(cast(unhex('0101000000000000000000F03F0000000000000040') as binary)));
+---- RESULTS
+'POINT (1 2)'
+====
+---- QUERY
+# WKB from literal hex: LineString with 2 points (0,0) (1,1)
+select ST_AsText(ST_GeomFromWKB(cast(unhex('01020000000200000000000000000000000000000000000000000000000000F03F000000000000F03F') as binary)));
+---- RESULTS
+'LINESTRING (0 0, 1 1)'
+====
+---- QUERY
+# WKB from literal hex: Polygon triangle (0,0)(1,0)(0,1)(0,0)
+select ST_AsText(ST_GeomFromWKB(cast(unhex('0103000000010000000400000000000000000000000000000000000000000000000000F03F00000000000000000000000000000000000000000000F03F00000000000000000000000000000000') as binary)));
+---- RESULTS
+'POLYGON ((0 0, 1 0, 0 1, 0 0))'
+====
+---- QUERY
+# WKB from literal hex: big-endian Point (1.0, 2.0)
+select ST_AsText(ST_GeomFromWKB(cast(unhex('00000000013FF00000000000004000000000000000') as binary)));
+---- RESULTS
+'POINT (1 2)'
+====
+---- QUERY
+# WKB from literal hex: big-endian LineString (0,0)(1,1)
+select ST_AsText(ST_GeomFromWKB(cast(unhex('000000000200000002000000000000000000000000000000003FF00000000000003FF0000000000000') as binary)));
+---- RESULTS
+'LINESTRING (0 0, 1 1)'
+====
+---- QUERY
+# WKB error: empty input
+select ST_GeometryType(ST_GeomFromWKB(cast(unhex('') as binary)));
+---- RESULTS
+'NULL'
+====
+---- QUERY
+# WKB error: too short (only 4 bytes, need at least 5 for header)
+select ST_GeometryType(ST_GeomFromWKB(cast(unhex('01010000') as binary)));
+---- RESULTS
+'NULL'
+====
+---- QUERY
+# WKB error: unknown geometry type (99)
+select ST_GeometryType(ST_GeomFromWKB(cast(unhex('016300000000000000000000000000000000000000') as binary)));
+---- RESULTS
+'NULL'
+====
+---- QUERY
+# WKB error: Point too short (header + only x, missing y)
+select ST_GeometryType(ST_GeomFromWKB(cast(unhex('01010000000000000000000000') as binary)));
+---- RESULTS
+'NULL'
+====
+---- QUERY
+# WKB error: LineString truncated (claims 2 points but data has only 1)
+select ST_GeometryType(ST_GeomFromWKB(cast(unhex('0102000000020000000000000000000000000000000000F03F') as binary)));
+---- RESULTS
+'NULL'
+====
+---- QUERY
+# WKB error: Polygon truncated (claims 1 ring with 4 points, only 2 present)
+select ST_GeometryType(ST_GeomFromWKB(cast(unhex('0103000000010000000400000000000000000000000000000000000000000000000000F03F000000000000F03F') as binary)));
+---- RESULTS
+'NULL'
+====
+---- QUERY
+# WKB error: MultiPolygon with truncated sub-polygon
+select ST_GeometryType(ST_GeomFromWKB(cast(unhex('0106000000010000000103000000010000000400000000000000000000000000000000000000') as binary)));
+---- RESULTS
+'NULL'
+====
+---- QUERY
+# WKB error: NULL input
+select ST_GeometryType(ST_GeomFromWKB(NULL));
+---- RESULTS
+'NULL'
+====
+---- QUERY
+# WKB/WKT round-trip: negative coordinates
+select ST_AsText(ST_GeomFromWKB(ST_AsBinary(ST_Point(-179.5, -89.5))));
+---- RESULTS
+'POINT (-179.5 -89.5)'
+====
+---- QUERY
+# WKB/WKT round-trip: zero-area polygon (degenerate, OGC-invalid)
+# ESRI rejects this as invalid (NULL), boost accepts it. Both are valid behaviors.
+select coalesce(ST_AsText(ST_GeomFromWKB(ST_AsBinary(ST_GeomFromText('polygon ((0 0, 1 0, 1 0, 0 0))')))), 'NULL')
+  in ('POLYGON ((0 0, 1 0, 1 0, 0 0))', 'NULL');
+---- RESULTS
+true
+====
+---- QUERY
+# WKB round-trip: large coordinate values (verify via ST_X/ST_Y to avoid formatting differences)
+select ST_X(ST_GeomFromWKB(ST_AsBinary(ST_Point(1e15, -1e15)))),
+       ST_Y(ST_GeomFromWKB(ST_AsBinary(ST_Point(1e15, -1e15))));
+---- TYPES
+double, double
+---- RESULTS
+1000000000000000,-1000000000000000
+====
+---- QUERY
+# WKB round-trip: very small coordinate values
+select ST_X(ST_GeomFromWKB(ST_AsBinary(ST_Point(1e-10, 2e-10)))),
+       ST_Y(ST_GeomFromWKB(ST_AsBinary(ST_Point(1e-10, 2e-10))));
+---- TYPES
+double, double
+---- RESULTS
+1e-10,2e-10
+====
+---- QUERY
+# ST_AsText round-trip: MultiPolygon with holes
+select ST_AsText(ST_GeomFromWKB(ST_AsBinary(ST_GeomFromText(
+  'multipolygon (((0 0, 10 0, 10 10, 0 10, 0 0), (2 2, 2 4, 4 4, 4 2, 2 2)), ((20 20, 30 20, 30 30, 20 20)))'))));
+---- RESULTS
+'MULTIPOLYGON (((0 0, 10 0, 10 10, 0 10, 0 0), (2 2, 2 4, 4 4, 4 2, 2 2)), ((20 20, 30 20, 30 30, 20 20)))'
+====

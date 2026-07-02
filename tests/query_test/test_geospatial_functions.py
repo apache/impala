@@ -53,6 +53,13 @@ class TestGeospatialFuctions(ImpalaTestSuite):
     # 3D/4D geometry tests (ST_Z, ST_M, ST_Is3D, etc.)
     self.run_test_case('QueryTest/geospatial-esri-high-dimension', vector)
 
+  def test_wkb_serialization(self, vector):
+    # WKB serialization round-trip and error cases
+    self.run_test_case('QueryTest/geospatial-wkb-serialization', vector)
+
+  def test_relations_table(self, vector):
+    self.run_test_case('QueryTest/geospatial-relations-table', vector)
+
   def test_esri_geospatial_planner(self, vector):
     # These tests are not among planner tests because with default flags
     # geospatial builtin functions are not loaded.

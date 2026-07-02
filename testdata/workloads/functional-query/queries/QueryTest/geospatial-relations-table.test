@@ -1,0 +1,847 @@
+====
+---- QUERY
+-- contains: point1 vs all type2 columns
+SELECT
+  st_Contains(point1, point2),
+  st_Contains(point1, linestring2),
+  st_Contains(point1, polygon2),
+  st_Contains(point1, multipoint2),
+  st_Contains(point1, multilinestring2),
+  st_Contains(point1, multipolygon2)
+FROM functional.geom_relations WHERE id = 'contains';
+---- TYPES
+BOOLEAN,BOOLEAN,BOOLEAN,BOOLEAN,BOOLEAN,BOOLEAN
+---- RESULTS
+true,false,false,true,false,false
+====
+---- QUERY
+-- contains: linestring1 vs all type2 columns
+SELECT
+  st_Contains(linestring1, point2),
+  st_Contains(linestring1, linestring2),
+  st_Contains(linestring1, polygon2),
+  st_Contains(linestring1, multipoint2),
+  st_Contains(linestring1, multilinestring2),
+  st_Contains(linestring1, multipolygon2)
+FROM functional.geom_relations WHERE id = 'contains';
+---- TYPES
+BOOLEAN,BOOLEAN,BOOLEAN,BOOLEAN,BOOLEAN,BOOLEAN
+---- RESULTS
+true,true,false,true,true,false
+====
+---- QUERY
+-- contains: polygon1 vs all type2 columns
+SELECT
+  st_Contains(polygon1, point2),
+  st_Contains(polygon1, linestring2),
+  st_Contains(polygon1, polygon2),
+  st_Contains(polygon1, multipoint2),
+  st_Contains(polygon1, multilinestring2),
+  st_Contains(polygon1, multipolygon2)
+FROM functional.geom_relations WHERE id = 'contains';
+---- TYPES
+BOOLEAN,BOOLEAN,BOOLEAN,BOOLEAN,BOOLEAN,BOOLEAN
+---- RESULTS
+true,true,true,true,true,true
+====
+---- QUERY
+-- contains: multipoint1 vs all type2 columns
+SELECT
+  st_Contains(multipoint1, point2),
+  st_Contains(multipoint1, linestring2),
+  st_Contains(multipoint1, polygon2),
+  st_Contains(multipoint1, multipoint2),
+  st_Contains(multipoint1, multilinestring2),
+  st_Contains(multipoint1, multipolygon2)
+FROM functional.geom_relations WHERE id = 'contains';
+---- TYPES
+BOOLEAN,BOOLEAN,BOOLEAN,BOOLEAN,BOOLEAN,BOOLEAN
+---- RESULTS
+true,false,false,true,false,false
+====
+---- QUERY
+-- contains: multilinestring1 vs all type2 columns
+SELECT
+  st_Contains(multilinestring1, point2),
+  st_Contains(multilinestring1, linestring2),
+  st_Contains(multilinestring1, polygon2),
+  st_Contains(multilinestring1, multipoint2),
+  st_Contains(multilinestring1, multilinestring2),
+  st_Contains(multilinestring1, multipolygon2)
+FROM functional.geom_relations WHERE id = 'contains';
+---- TYPES
+BOOLEAN,BOOLEAN,BOOLEAN,BOOLEAN,BOOLEAN,BOOLEAN
+---- RESULTS
+true,true,false,true,true,false
+====
+---- QUERY
+-- contains: multipolygon1 vs all type2 columns
+SELECT
+  st_Contains(multipolygon1, point2),
+  st_Contains(multipolygon1, linestring2),
+  st_Contains(multipolygon1, polygon2),
+  st_Contains(multipolygon1, multipoint2),
+  st_Contains(multipolygon1, multilinestring2),
+  st_Contains(multipolygon1, multipolygon2)
+FROM functional.geom_relations WHERE id = 'contains';
+---- TYPES
+BOOLEAN,BOOLEAN,BOOLEAN,BOOLEAN,BOOLEAN,BOOLEAN
+---- RESULTS
+true,true,true,true,true,true
+====
+---- QUERY
+-- contains reversed: point2 vs all type1 columns
+SELECT
+  st_Contains(point2, point1),
+  st_Contains(point2, linestring1),
+  st_Contains(point2, polygon1),
+  st_Contains(point2, multipoint1),
+  st_Contains(point2, multilinestring1),
+  st_Contains(point2, multipolygon1)
+FROM functional.geom_relations WHERE id = 'contains';
+---- TYPES
+BOOLEAN,BOOLEAN,BOOLEAN,BOOLEAN,BOOLEAN,BOOLEAN
+---- RESULTS
+true,false,false,false,false,false
+====
+---- QUERY
+-- contains reversed: linestring2 vs all type1 columns
+SELECT
+  st_Contains(linestring2, point1),
+  st_Contains(linestring2, linestring1),
+  st_Contains(linestring2, polygon1),
+  st_Contains(linestring2, multipoint1),
+  st_Contains(linestring2, multilinestring1),
+  st_Contains(linestring2, multipolygon1)
+FROM functional.geom_relations WHERE id = 'contains';
+---- TYPES
+BOOLEAN,BOOLEAN,BOOLEAN,BOOLEAN,BOOLEAN,BOOLEAN
+---- RESULTS
+true,false,false,false,false,false
+====
+---- QUERY
+-- contains reversed: polygon2 vs all type1 columns
+SELECT
+  st_Contains(polygon2, point1),
+  st_Contains(polygon2, linestring1),
+  st_Contains(polygon2, polygon1),
+  st_Contains(polygon2, multipoint1),
+  st_Contains(polygon2, multilinestring1),
+  st_Contains(polygon2, multipolygon1)
+FROM functional.geom_relations WHERE id = 'contains';
+---- TYPES
+BOOLEAN,BOOLEAN,BOOLEAN,BOOLEAN,BOOLEAN,BOOLEAN
+---- RESULTS
+true,false,false,true,false,false
+====
+---- QUERY
+-- contains reversed: multipoint2 vs all type1 columns
+SELECT
+  st_Contains(multipoint2, point1),
+  st_Contains(multipoint2, linestring1),
+  st_Contains(multipoint2, polygon1),
+  st_Contains(multipoint2, multipoint1),
+  st_Contains(multipoint2, multilinestring1),
+  st_Contains(multipoint2, multipolygon1)
+FROM functional.geom_relations WHERE id = 'contains';
+---- TYPES
+BOOLEAN,BOOLEAN,BOOLEAN,BOOLEAN,BOOLEAN,BOOLEAN
+---- RESULTS
+true,false,false,false,false,false
+====
+---- QUERY
+-- contains reversed: multilinestring2 vs all type1 columns
+SELECT
+  st_Contains(multilinestring2, point1),
+  st_Contains(multilinestring2, linestring1),
+  st_Contains(multilinestring2, polygon1),
+  st_Contains(multilinestring2, multipoint1),
+  st_Contains(multilinestring2, multilinestring1),
+  st_Contains(multilinestring2, multipolygon1)
+FROM functional.geom_relations WHERE id = 'contains';
+---- TYPES
+BOOLEAN,BOOLEAN,BOOLEAN,BOOLEAN,BOOLEAN,BOOLEAN
+---- RESULTS
+true,false,false,false,false,false
+====
+---- QUERY
+-- contains reversed: multipolygon2 vs all type1 columns
+SELECT
+  st_Contains(multipolygon2, point1),
+  st_Contains(multipolygon2, linestring1),
+  st_Contains(multipolygon2, polygon1),
+  st_Contains(multipolygon2, multipoint1),
+  st_Contains(multipolygon2, multilinestring1),
+  st_Contains(multipolygon2, multipolygon1)
+FROM functional.geom_relations WHERE id = 'contains';
+---- TYPES
+BOOLEAN,BOOLEAN,BOOLEAN,BOOLEAN,BOOLEAN,BOOLEAN
+---- RESULTS
+true,false,false,true,false,false
+====
+---- QUERY
+-- touches: linestring1 vs all non-NULL type2 columns (symmetric)
+SELECT
+  st_Touches(linestring1, linestring2),
+  st_Touches(linestring1, polygon2),
+  st_Touches(linestring1, multilinestring2),
+  st_Touches(linestring1, multipolygon2)
+FROM functional.geom_relations WHERE id = 'touches';
+---- TYPES
+BOOLEAN,BOOLEAN,BOOLEAN,BOOLEAN
+---- RESULTS
+true,true,true,true
+====
+---- QUERY
+-- touches: polygon1 vs all non-NULL type2 columns
+SELECT
+  st_Touches(polygon1, linestring2),
+  st_Touches(polygon1, polygon2),
+  st_Touches(polygon1, multilinestring2),
+  st_Touches(polygon1, multipolygon2)
+FROM functional.geom_relations WHERE id = 'touches';
+---- TYPES
+BOOLEAN,BOOLEAN,BOOLEAN,BOOLEAN
+---- RESULTS
+true,true,true,true
+====
+---- QUERY
+-- touches: multilinestring1 vs all non-NULL type2 columns
+SELECT
+  st_Touches(multilinestring1, linestring2),
+  st_Touches(multilinestring1, polygon2),
+  st_Touches(multilinestring1, multilinestring2),
+  st_Touches(multilinestring1, multipolygon2)
+FROM functional.geom_relations WHERE id = 'touches';
+---- TYPES
+BOOLEAN,BOOLEAN,BOOLEAN,BOOLEAN
+---- RESULTS
+true,true,true,true
+====
+---- QUERY
+-- touches: multipolygon1 vs all non-NULL type2 columns
+SELECT
+  st_Touches(multipolygon1, linestring2),
+  st_Touches(multipolygon1, polygon2),
+  st_Touches(multipolygon1, multilinestring2),
+  st_Touches(multipolygon1, multipolygon2)
+FROM functional.geom_relations WHERE id = 'touches';
+---- TYPES
+BOOLEAN,BOOLEAN,BOOLEAN,BOOLEAN
+---- RESULTS
+true,true,true,true
+====
+---- QUERY
+-- touches reversed: type2 vs all type1 (symmetric, should match)
+SELECT
+  st_Touches(linestring2, linestring1),
+  st_Touches(linestring2, polygon1),
+  st_Touches(linestring2, multilinestring1),
+  st_Touches(linestring2, multipolygon1)
+FROM functional.geom_relations WHERE id = 'touches';
+---- TYPES
+BOOLEAN,BOOLEAN,BOOLEAN,BOOLEAN
+---- RESULTS
+true,true,true,true
+====
+---- QUERY
+-- touches reversed: polygon2 vs all type1
+SELECT
+  st_Touches(polygon2, linestring1),
+  st_Touches(polygon2, polygon1),
+  st_Touches(polygon2, multilinestring1),
+  st_Touches(polygon2, multipolygon1)
+FROM functional.geom_relations WHERE id = 'touches';
+---- TYPES
+BOOLEAN,BOOLEAN,BOOLEAN,BOOLEAN
+---- RESULTS
+true,true,true,true
+====
+---- QUERY
+-- intersects: all type1 vs all type2 (all pass through (5,5), all true)
+SELECT
+  st_Intersects(point1, point2),
+  st_Intersects(point1, linestring2),
+  st_Intersects(point1, polygon2),
+  st_Intersects(point1, multipoint2),
+  st_Intersects(point1, multilinestring2),
+  st_Intersects(point1, multipolygon2)
+FROM functional.geom_relations WHERE id = 'intersects';
+---- TYPES
+BOOLEAN,BOOLEAN,BOOLEAN,BOOLEAN,BOOLEAN,BOOLEAN
+---- RESULTS
+true,true,true,true,true,true
+====
+---- QUERY
+-- intersects: linestring1 vs all type2
+SELECT
+  st_Intersects(linestring1, point2),
+  st_Intersects(linestring1, linestring2),
+  st_Intersects(linestring1, polygon2),
+  st_Intersects(linestring1, multipoint2),
+  st_Intersects(linestring1, multilinestring2),
+  st_Intersects(linestring1, multipolygon2)
+FROM functional.geom_relations WHERE id = 'intersects';
+---- TYPES
+BOOLEAN,BOOLEAN,BOOLEAN,BOOLEAN,BOOLEAN,BOOLEAN
+---- RESULTS
+true,true,true,true,true,true
+====
+---- QUERY
+-- intersects: polygon1 vs all type2
+SELECT
+  st_Intersects(polygon1, point2),
+  st_Intersects(polygon1, linestring2),
+  st_Intersects(polygon1, polygon2),
+  st_Intersects(polygon1, multipoint2),
+  st_Intersects(polygon1, multilinestring2),
+  st_Intersects(polygon1, multipolygon2)
+FROM functional.geom_relations WHERE id = 'intersects';
+---- TYPES
+BOOLEAN,BOOLEAN,BOOLEAN,BOOLEAN,BOOLEAN,BOOLEAN
+---- RESULTS
+true,true,true,true,true,true
+====
+---- QUERY
+-- intersects: multipoint1 vs all type2
+SELECT
+  st_Intersects(multipoint1, point2),
+  st_Intersects(multipoint1, linestring2),
+  st_Intersects(multipoint1, polygon2),
+  st_Intersects(multipoint1, multipoint2),
+  st_Intersects(multipoint1, multilinestring2),
+  st_Intersects(multipoint1, multipolygon2)
+FROM functional.geom_relations WHERE id = 'intersects';
+---- TYPES
+BOOLEAN,BOOLEAN,BOOLEAN,BOOLEAN,BOOLEAN,BOOLEAN
+---- RESULTS
+true,true,true,true,true,true
+====
+---- QUERY
+-- intersects: multilinestring1 vs all type2
+SELECT
+  st_Intersects(multilinestring1, point2),
+  st_Intersects(multilinestring1, linestring2),
+  st_Intersects(multilinestring1, polygon2),
+  st_Intersects(multilinestring1, multipoint2),
+  st_Intersects(multilinestring1, multilinestring2),
+  st_Intersects(multilinestring1, multipolygon2)
+FROM functional.geom_relations WHERE id = 'intersects';
+---- TYPES
+BOOLEAN,BOOLEAN,BOOLEAN,BOOLEAN,BOOLEAN,BOOLEAN
+---- RESULTS
+true,true,true,true,true,true
+====
+---- QUERY
+-- intersects: multipolygon1 vs all type2
+SELECT
+  st_Intersects(multipolygon1, point2),
+  st_Intersects(multipolygon1, linestring2),
+  st_Intersects(multipolygon1, polygon2),
+  st_Intersects(multipolygon1, multipoint2),
+  st_Intersects(multipolygon1, multilinestring2),
+  st_Intersects(multipolygon1, multipolygon2)
+FROM functional.geom_relations WHERE id = 'intersects';
+---- TYPES
+BOOLEAN,BOOLEAN,BOOLEAN,BOOLEAN,BOOLEAN,BOOLEAN
+---- RESULTS
+true,true,true,true,true,true
+====
+---- QUERY
+-- crosses: linestring1 vs all non-NULL type2 (lines cross lines and polygons)
+SELECT
+  st_Crosses(linestring1, linestring2),
+  st_Crosses(linestring1, polygon2),
+  st_Crosses(linestring1, multilinestring2),
+  st_Crosses(linestring1, multipolygon2)
+FROM functional.geom_relations WHERE id = 'crosses';
+---- TYPES
+BOOLEAN,BOOLEAN,BOOLEAN,BOOLEAN
+---- RESULTS
+true,true,true,true
+====
+---- QUERY
+-- crosses: polygon1 vs all non-NULL type2 (area crosses lines, not areas)
+SELECT
+  st_Crosses(polygon1, linestring2),
+  st_Crosses(polygon1, polygon2),
+  st_Crosses(polygon1, multilinestring2),
+  st_Crosses(polygon1, multipolygon2)
+FROM functional.geom_relations WHERE id = 'crosses';
+---- TYPES
+BOOLEAN,BOOLEAN,BOOLEAN,BOOLEAN
+---- RESULTS
+true,false,true,false
+====
+---- QUERY
+-- crosses: multilinestring1 vs all non-NULL type2
+SELECT
+  st_Crosses(multilinestring1, linestring2),
+  st_Crosses(multilinestring1, polygon2),
+  st_Crosses(multilinestring1, multilinestring2),
+  st_Crosses(multilinestring1, multipolygon2)
+FROM functional.geom_relations WHERE id = 'crosses';
+---- TYPES
+BOOLEAN,BOOLEAN,BOOLEAN,BOOLEAN
+---- RESULTS
+true,true,true,true
+====
+---- QUERY
+-- crosses: multipolygon1 vs all non-NULL type2 (area crosses lines, not areas)
+SELECT
+  st_Crosses(multipolygon1, linestring2),
+  st_Crosses(multipolygon1, polygon2),
+  st_Crosses(multipolygon1, multilinestring2),
+  st_Crosses(multipolygon1, multipolygon2)
+FROM functional.geom_relations WHERE id = 'crosses';
+---- TYPES
+BOOLEAN,BOOLEAN,BOOLEAN,BOOLEAN
+---- RESULTS
+true,false,true,false
+====
+---- QUERY
+-- crosses reversed: type2 vs type1 (symmetric)
+SELECT
+  st_Crosses(linestring2, linestring1),
+  st_Crosses(linestring2, polygon1),
+  st_Crosses(linestring2, multilinestring1),
+  st_Crosses(linestring2, multipolygon1)
+FROM functional.geom_relations WHERE id = 'crosses';
+---- TYPES
+BOOLEAN,BOOLEAN,BOOLEAN,BOOLEAN
+---- RESULTS
+true,true,true,true
+====
+---- QUERY
+-- overlaps: linestring1 vs all non-NULL type2 (same-dim=true, cross-dim=false)
+SELECT
+  st_Overlaps(linestring1, linestring2),
+  st_Overlaps(linestring1, polygon2),
+  st_Overlaps(linestring1, multipoint2),
+  st_Overlaps(linestring1, multilinestring2),
+  st_Overlaps(linestring1, multipolygon2)
+FROM functional.geom_relations WHERE id = 'overlaps';
+---- TYPES
+BOOLEAN,BOOLEAN,BOOLEAN,BOOLEAN,BOOLEAN
+---- RESULTS
+true,false,false,true,false
+====
+---- QUERY
+-- overlaps: polygon1 vs all non-NULL type2
+SELECT
+  st_Overlaps(polygon1, linestring2),
+  st_Overlaps(polygon1, polygon2),
+  st_Overlaps(polygon1, multipoint2),
+  st_Overlaps(polygon1, multilinestring2),
+  st_Overlaps(polygon1, multipolygon2)
+FROM functional.geom_relations WHERE id = 'overlaps';
+---- TYPES
+BOOLEAN,BOOLEAN,BOOLEAN,BOOLEAN,BOOLEAN
+---- RESULTS
+false,true,false,false,true
+====
+---- QUERY
+-- overlaps: multipoint1 vs all non-NULL type2
+SELECT
+  st_Overlaps(multipoint1, linestring2),
+  st_Overlaps(multipoint1, polygon2),
+  st_Overlaps(multipoint1, multipoint2),
+  st_Overlaps(multipoint1, multilinestring2),
+  st_Overlaps(multipoint1, multipolygon2)
+FROM functional.geom_relations WHERE id = 'overlaps';
+---- TYPES
+BOOLEAN,BOOLEAN,BOOLEAN,BOOLEAN,BOOLEAN
+---- RESULTS
+false,false,true,false,false
+====
+---- QUERY
+-- overlaps: multilinestring1 vs all non-NULL type2
+SELECT
+  st_Overlaps(multilinestring1, linestring2),
+  st_Overlaps(multilinestring1, polygon2),
+  st_Overlaps(multilinestring1, multipoint2),
+  st_Overlaps(multilinestring1, multilinestring2),
+  st_Overlaps(multilinestring1, multipolygon2)
+FROM functional.geom_relations WHERE id = 'overlaps';
+---- TYPES
+BOOLEAN,BOOLEAN,BOOLEAN,BOOLEAN,BOOLEAN
+---- RESULTS
+true,false,false,true,false
+====
+---- QUERY
+-- overlaps: multipolygon1 vs all non-NULL type2
+SELECT
+  st_Overlaps(multipolygon1, linestring2),
+  st_Overlaps(multipolygon1, polygon2),
+  st_Overlaps(multipolygon1, multipoint2),
+  st_Overlaps(multipolygon1, multilinestring2),
+  st_Overlaps(multipolygon1, multipolygon2)
+FROM functional.geom_relations WHERE id = 'overlaps';
+---- TYPES
+BOOLEAN,BOOLEAN,BOOLEAN,BOOLEAN,BOOLEAN
+---- RESULTS
+false,true,false,false,true
+====
+---- QUERY
+-- overlaps reversed: type2 vs type1 (symmetric, should match)
+SELECT
+  st_Overlaps(linestring2, linestring1),
+  st_Overlaps(polygon2, polygon1),
+  st_Overlaps(multipoint2, multipoint1),
+  st_Overlaps(multilinestring2, multilinestring1),
+  st_Overlaps(multipolygon2, multipolygon1)
+FROM functional.geom_relations WHERE id = 'overlaps';
+---- TYPES
+BOOLEAN,BOOLEAN,BOOLEAN,BOOLEAN,BOOLEAN
+---- RESULTS
+true,true,true,true,true
+====
+---- QUERY
+-- equals: same-type pairs (all true)
+SELECT
+  st_Equals(point1, point2),
+  st_Equals(linestring1, linestring2),
+  st_Equals(polygon1, polygon2),
+  st_Equals(multipoint1, multipoint2),
+  st_Equals(multilinestring1, multilinestring2),
+  st_Equals(multipolygon1, multipolygon2)
+FROM functional.geom_relations WHERE id = 'equals';
+---- TYPES
+BOOLEAN,BOOLEAN,BOOLEAN,BOOLEAN,BOOLEAN,BOOLEAN
+---- RESULTS
+true,true,true,true,true,true
+====
+---- QUERY
+-- equals: point1 vs single-component multi types (same point set)
+SELECT
+  st_Equals(point1, multipoint2),
+  st_Equals(multipoint1, point2)
+FROM functional.geom_relations WHERE id = 'equals';
+---- TYPES
+BOOLEAN,BOOLEAN
+---- RESULTS
+true,true
+====
+---- QUERY
+-- equals: linestring1 vs multilinestring (same point set)
+SELECT
+  st_Equals(linestring1, multilinestring2),
+  st_Equals(multilinestring1, linestring2)
+FROM functional.geom_relations WHERE id = 'equals';
+---- TYPES
+BOOLEAN,BOOLEAN
+---- RESULTS
+true,true
+====
+---- QUERY
+-- equals: polygon1 vs multipolygon (same point set)
+SELECT
+  st_Equals(polygon1, multipolygon2),
+  st_Equals(multipolygon1, polygon2)
+FROM functional.geom_relations WHERE id = 'equals';
+---- TYPES
+BOOLEAN,BOOLEAN
+---- RESULTS
+true,true
+====
+---- QUERY
+-- equals: cross-dimension pairs (all false)
+SELECT
+  st_Equals(point1, linestring2),
+  st_Equals(point1, polygon2),
+  st_Equals(linestring1, polygon2),
+  st_Equals(linestring1, multipoint2),
+  st_Equals(polygon1, point2),
+  st_Equals(polygon1, multilinestring2)
+FROM functional.geom_relations WHERE id = 'equals';
+---- TYPES
+BOOLEAN,BOOLEAN,BOOLEAN,BOOLEAN,BOOLEAN,BOOLEAN
+---- RESULTS
+false,false,false,false,false,false
+====
+---- QUERY
+-- disjoint_near: all non-NULL cross-type pairs are disjoint (st_Intersects=false)
+SELECT
+  st_Intersects(linestring1, polygon2),
+  st_Intersects(linestring1, multipoint2),
+  st_Intersects(linestring1, multilinestring2),
+  st_Intersects(linestring1, multipolygon2),
+  st_Intersects(polygon1, linestring2),
+  st_Intersects(polygon1, multipoint2)
+FROM functional.geom_relations WHERE id = 'disjoint_near';
+---- TYPES
+BOOLEAN,BOOLEAN,BOOLEAN,BOOLEAN,BOOLEAN,BOOLEAN
+---- RESULTS
+false,false,false,false,false,false
+====
+---- QUERY
+-- disjoint_near: more cross-type pairs
+SELECT
+  st_Intersects(polygon1, multilinestring2),
+  st_Intersects(polygon1, multipolygon2),
+  st_Intersects(multipoint1, linestring2),
+  st_Intersects(multipoint1, polygon2),
+  st_Intersects(multipoint1, multipoint2),
+  st_Intersects(multipoint1, multipolygon2)
+FROM functional.geom_relations WHERE id = 'disjoint_near';
+---- TYPES
+BOOLEAN,BOOLEAN,BOOLEAN,BOOLEAN,BOOLEAN,BOOLEAN
+---- RESULTS
+false,false,false,false,false,false
+====
+---- QUERY
+-- disjoint_near: same-type pairs also disjoint
+SELECT
+  st_Intersects(linestring1, linestring2),
+  st_Intersects(polygon1, polygon2),
+  st_Intersects(multipoint1, multipoint2),
+  st_Intersects(multilinestring1, multilinestring2),
+  st_Intersects(multipolygon1, multipolygon2)
+FROM functional.geom_relations WHERE id = 'disjoint_near';
+---- TYPES
+BOOLEAN,BOOLEAN,BOOLEAN,BOOLEAN,BOOLEAN
+---- RESULTS
+false,false,false,false,false
+====
+---- QUERY
+-- disjoint_far: all cross-type pairs disjoint
+SELECT
+  st_Intersects(point1, linestring2),
+  st_Intersects(point1, polygon2),
+  st_Intersects(point1, multipoint2),
+  st_Intersects(linestring1, point2),
+  st_Intersects(linestring1, polygon2),
+  st_Intersects(linestring1, multipolygon2)
+FROM functional.geom_relations WHERE id = 'disjoint_far';
+---- TYPES
+BOOLEAN,BOOLEAN,BOOLEAN,BOOLEAN,BOOLEAN,BOOLEAN
+---- RESULTS
+false,false,false,false,false,false
+====
+---- QUERY
+-- disjoint_far: all same-type pairs disjoint
+SELECT
+  st_Intersects(point1, point2),
+  st_Intersects(linestring1, linestring2),
+  st_Intersects(polygon1, polygon2),
+  st_Intersects(multipoint1, multipoint2),
+  st_Intersects(multilinestring1, multilinestring2),
+  st_Intersects(multipolygon1, multipolygon2)
+FROM functional.geom_relations WHERE id = 'disjoint_far';
+---- TYPES
+BOOLEAN,BOOLEAN,BOOLEAN,BOOLEAN,BOOLEAN,BOOLEAN
+---- RESULTS
+false,false,false,false,false,false
+====
+---- QUERY
+-- disjoint_far reversed: type2 vs type1 (symmetric)
+SELECT
+  st_Intersects(polygon2, point1),
+  st_Intersects(polygon2, linestring1),
+  st_Intersects(polygon2, multipoint1),
+  st_Intersects(multipolygon2, polygon1),
+  st_Intersects(multipolygon2, multilinestring1),
+  st_Intersects(multipolygon2, multipolygon1)
+FROM functional.geom_relations WHERE id = 'disjoint_far';
+---- TYPES
+BOOLEAN,BOOLEAN,BOOLEAN,BOOLEAN,BOOLEAN,BOOLEAN
+---- RESULTS
+false,false,false,false,false,false
+====
+---- QUERY
+-- constant LHS: polygon literal contains table column geometries (exercises PrepareLhs)
+SELECT
+  st_Contains(st_GeomFromText('POLYGON((0 0, 10 0, 10 10, 0 10, 0 0))'),
+              point2),
+  st_Contains(st_GeomFromText('POLYGON((0 0, 10 0, 10 10, 0 10, 0 0))'),
+              linestring2),
+  st_Contains(st_GeomFromText('POLYGON((0 0, 10 0, 10 10, 0 10, 0 0))'),
+              polygon2),
+  st_Contains(st_GeomFromText('POLYGON((0 0, 10 0, 10 10, 0 10, 0 0))'),
+              multipoint2),
+  st_Contains(st_GeomFromText('POLYGON((0 0, 10 0, 10 10, 0 10, 0 0))'),
+              multilinestring2),
+  st_Contains(st_GeomFromText('POLYGON((0 0, 10 0, 10 10, 0 10, 0 0))'),
+              multipolygon2)
+FROM functional.geom_relations WHERE id = 'contains';
+---- TYPES
+BOOLEAN,BOOLEAN,BOOLEAN,BOOLEAN,BOOLEAN,BOOLEAN
+---- RESULTS
+true,true,true,true,true,true
+====
+---- QUERY
+-- constant RHS: table column geometries contain point literal (exercises PrepareRhs)
+SELECT
+  st_Contains(point1,
+              st_GeomFromText('POINT(5 5)')),
+  st_Contains(linestring1,
+              st_GeomFromText('POINT(5 5)')),
+  st_Contains(polygon1,
+              st_GeomFromText('POINT(5 5)')),
+  st_Contains(multipoint1,
+              st_GeomFromText('POINT(5 5)')),
+  st_Contains(multilinestring1,
+              st_GeomFromText('POINT(5 5)')),
+  st_Contains(multipolygon1,
+              st_GeomFromText('POINT(5 5)'))
+FROM functional.geom_relations WHERE id = 'contains';
+---- TYPES
+BOOLEAN,BOOLEAN,BOOLEAN,BOOLEAN,BOOLEAN,BOOLEAN
+---- RESULTS
+true,true,true,true,true,true
+====
+---- QUERY
+-- constant RHS: table column geometries contain multipoint literal
+SELECT
+  st_Contains(polygon1,
+              st_GeomFromText('MULTIPOINT((5 5))')),
+  st_Contains(multipoint1,
+              st_GeomFromText('MULTIPOINT((5 5))')),
+  st_Contains(multipolygon1,
+              st_GeomFromText('MULTIPOINT((5 5))'))
+FROM functional.geom_relations WHERE id = 'contains';
+---- TYPES
+BOOLEAN,BOOLEAN,BOOLEAN
+---- RESULTS
+true,true,true
+====
+---- QUERY
+-- constant LHS: within with constant polygon (exercises PrepareLhs)
+SELECT
+  st_Within(st_GeomFromText('POINT(5 5)'),
+            polygon1),
+  st_Within(st_GeomFromText('POINT(5 5)'),
+            multipolygon1)
+FROM functional.geom_relations WHERE id = 'contains';
+---- TYPES
+BOOLEAN,BOOLEAN
+---- RESULTS
+true,true
+====
+---- QUERY
+-- constant RHS: within with constant polygon (exercises PrepareRhs)
+SELECT
+  st_Within(point2,
+            st_GeomFromText('POLYGON((0 0, 10 0, 10 10, 0 10, 0 0))')),
+  st_Within(linestring2,
+            st_GeomFromText('POLYGON((0 0, 10 0, 10 10, 0 10, 0 0))')),
+  st_Within(polygon2,
+            st_GeomFromText('POLYGON((0 0, 10 0, 10 10, 0 10, 0 0))')),
+  st_Within(multipoint2,
+            st_GeomFromText('POLYGON((0 0, 10 0, 10 10, 0 10, 0 0))')),
+  st_Within(multilinestring2,
+            st_GeomFromText('POLYGON((0 0, 10 0, 10 10, 0 10, 0 0))')),
+  st_Within(multipolygon2,
+            st_GeomFromText('POLYGON((0 0, 10 0, 10 10, 0 10, 0 0))'))
+FROM functional.geom_relations WHERE id = 'contains';
+---- TYPES
+BOOLEAN,BOOLEAN,BOOLEAN,BOOLEAN,BOOLEAN,BOOLEAN
+---- RESULTS
+true,true,true,true,true,true
+====
+---- QUERY
+-- constant LHS: intersects with constant point (exercises PrepareLhs)
+SELECT
+  st_Intersects(st_GeomFromText('POINT(5 5)'),
+                point2),
+  st_Intersects(st_GeomFromText('POINT(5 5)'),
+                linestring2),
+  st_Intersects(st_GeomFromText('POINT(5 5)'),
+                polygon2),
+  st_Intersects(st_GeomFromText('POINT(5 5)'),
+                multipoint2),
+  st_Intersects(st_GeomFromText('POINT(5 5)'),
+                multilinestring2),
+  st_Intersects(st_GeomFromText('POINT(5 5)'),
+                multipolygon2)
+FROM functional.geom_relations WHERE id = 'intersects';
+---- TYPES
+BOOLEAN,BOOLEAN,BOOLEAN,BOOLEAN,BOOLEAN,BOOLEAN
+---- RESULTS
+true,true,true,true,true,true
+====
+---- QUERY
+-- constant RHS: intersects with constant point (exercises PrepareRhs)
+SELECT
+  st_Intersects(point1,
+                st_GeomFromText('POINT(5 5)')),
+  st_Intersects(linestring1,
+                st_GeomFromText('POINT(5 5)')),
+  st_Intersects(polygon1,
+                st_GeomFromText('POINT(5 5)')),
+  st_Intersects(multipoint1,
+                st_GeomFromText('POINT(5 5)')),
+  st_Intersects(multilinestring1,
+                st_GeomFromText('POINT(5 5)')),
+  st_Intersects(multipolygon1,
+                st_GeomFromText('POINT(5 5)'))
+FROM functional.geom_relations WHERE id = 'intersects';
+---- TYPES
+BOOLEAN,BOOLEAN,BOOLEAN,BOOLEAN,BOOLEAN,BOOLEAN
+---- RESULTS
+true,true,true,true,true,true
+====
+---- QUERY
+-- constant LHS: crosses with constant linestring (exercises PrepareLhs)
+SELECT
+  st_Crosses(st_GeomFromText('LINESTRING(0 5, 10 5)'),
+             linestring2),
+  st_Crosses(st_GeomFromText('LINESTRING(0 5, 10 5)'),
+             polygon2),
+  st_Crosses(st_GeomFromText('LINESTRING(0 5, 10 5)'),
+             multilinestring2),
+  st_Crosses(st_GeomFromText('LINESTRING(0 5, 10 5)'),
+             multipolygon2)
+FROM functional.geom_relations WHERE id = 'crosses';
+---- TYPES
+BOOLEAN,BOOLEAN,BOOLEAN,BOOLEAN
+---- RESULTS
+true,true,true,true
+====
+---- QUERY
+-- constant RHS: crosses with constant linestring (exercises PrepareRhs)
+SELECT
+  st_Crosses(linestring1,
+             st_GeomFromText('LINESTRING(5 0, 5 10)')),
+  st_Crosses(polygon1,
+             st_GeomFromText('LINESTRING(5 0, 5 10)')),
+  st_Crosses(multilinestring1,
+             st_GeomFromText('LINESTRING(5 0, 5 10)')),
+  st_Crosses(multipolygon1,
+             st_GeomFromText('LINESTRING(5 0, 5 10)'))
+FROM functional.geom_relations WHERE id = 'crosses';
+---- TYPES
+BOOLEAN,BOOLEAN,BOOLEAN,BOOLEAN
+---- RESULTS
+true,true,true,true
+====
+---- QUERY
+-- constant LHS false case: disjoint polygon does not intersect table geometries
+SELECT
+  st_Intersects(st_GeomFromText('POLYGON((50 50, 51 50, 51 51, 50 51, 50 50))'),
+                point2),
+  st_Intersects(st_GeomFromText('POLYGON((50 50, 51 50, 51 51, 50 51, 50 50))'),
+                linestring2),
+  st_Intersects(st_GeomFromText('POLYGON((50 50, 51 50, 51 51, 50 51, 50 50))'),
+                polygon2),
+  st_Intersects(st_GeomFromText('POLYGON((50 50, 51 50, 51 51, 50 51, 50 50))'),
+                multipolygon2)
+FROM functional.geom_relations WHERE id = 'contains';
+---- TYPES
+BOOLEAN,BOOLEAN,BOOLEAN,BOOLEAN
+---- RESULTS
+false,false,false,false
+====
+---- QUERY
+-- constant RHS false case: table geometries do not contain distant point
+SELECT
+  st_Contains(polygon1,
+              st_GeomFromText('POINT(50 50)')),
+  st_Contains(multipolygon1,
+              st_GeomFromText('POINT(50 50)'))
+FROM functional.geom_relations WHERE id = 'contains';
+---- TYPES
+BOOLEAN,BOOLEAN
+---- RESULTS
+false,false
+====
