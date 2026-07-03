@@ -1,0 +1,38 @@
+# Impala <-> Trino interop over Apache Iceberg V3 tables: column default values.
+#
+# See iceberg-trino-interop-insert.test for the shared setup notes. Iceberg V3
+# column defaults (write-default) are materialized into the data files on insert,
+# so a row inserted without the defaulted column is read back with the default by
+# the other engine.
+====
+---- TRINO_QUERY
+# Trino creates a V3 table with a column default; one row omits the column.
+CREATE TABLE ti_default (i integer, s varchar DEFAULT 'trino_dflt')
+WITH (format_version=3);
+INSERT INTO ti_default (i) VALUES (1);
+INSERT INTO ti_default VALUES (2, 'explicit')
+====
+---- QUERY
+# Impala reads the default written by Trino for the omitted column.
+INVALIDATE METADATA ti_default;
+SELECT * FROM ti_default ORDER BY i;
+---- RESULTS
+1,'trino_dflt'
+2,'explicit'
+---- TYPES
+INT,STRING
+====
+---- QUERY
+# Impala creates a V3 table with a column default; one row omits the column.
+CREATE TABLE it_default (i INT, s STRING DEFAULT 'impala_dflt') STORED BY ICEBERG
+TBLPROPERTIES('format-version'='3');
+INSERT INTO it_default (i) VALUES (1);
+INSERT INTO it_default VALUES (2, 'explicit');
+====
+---- TRINO_QUERY
+# Trino reads the default written by Impala for the omitted column.
+SELECT * FROM it_default ORDER BY i
+---- RESULTS
+1,'impala_dflt'
+2,'explicit'
+====

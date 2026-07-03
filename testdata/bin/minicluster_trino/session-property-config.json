@@ -1,0 +1,7 @@
+[
+  {
+    "sessionProperties": {
+      "iceberg.parquet_writer_delta_length_byte_array_encoding_enabled": "false"
+    }
+  }
+]

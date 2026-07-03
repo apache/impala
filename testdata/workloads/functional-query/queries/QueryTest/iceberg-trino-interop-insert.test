@@ -1,0 +1,68 @@
+# Impala <-> Trino interop over Apache Iceberg V3 tables: INSERT / SELECT.
+#
+# Trino runs in the 'impala-minicluster-trino' container and shares Impala's HMS
+# and HDFS (see testdata/bin/TRINO-README.md), so Iceberg tables created by one
+# engine are visible to the other. Impala must INVALIDATE/REFRESH its metadata
+# after Trino writes; Trino reads Impala's writes without an explicit refresh.
+# TRINO_QUERY sections run against Trino ('iceberg' catalog, current database as
+# the schema); RESULTS holds the expected Trino output.
+====
+---- TRINO_QUERY
+# Trino creates a format-version=3 table and inserts rows.
+CREATE TABLE ti_insert (i integer, s varchar) WITH (format_version=3);
+INSERT INTO ti_insert VALUES (1, 'a'), (2, 'b'), (3, 'c')
+====
+---- QUERY
+# Impala picks up the new table after INVALIDATE and reads Trino's rows.
+INVALIDATE METADATA ti_insert;
+SELECT * FROM ti_insert ORDER BY i;
+---- RESULTS
+1,'a'
+2,'b'
+3,'c'
+---- TYPES
+INT,STRING
+====
+---- QUERY
+# The table Trino created is reported as format-version 3 by Impala.
+DESCRIBE FORMATTED ti_insert;
+---- RESULTS: VERIFY_IS_SUBSET
+'','format-version      ','3                   '
+---- TYPES
+STRING,STRING,STRING
+====
+---- QUERY
+# Impala creates its own format-version=3 table and inserts rows.
+CREATE TABLE it_insert (i INT, s STRING) STORED BY ICEBERG
+TBLPROPERTIES('format-version'='3');
+INSERT INTO it_insert VALUES (10, 'x'), (20, 'y'), (30, 'z');
+====
+---- TRINO_QUERY
+# Trino reads the rows Impala wrote (no refresh needed on the Trino side).
+SELECT * FROM it_insert ORDER BY i
+---- RESULTS
+10,'x'
+20,'y'
+30,'z'
+====
+---- TRINO_QUERY
+# VERIFY_IS_EQUAL_SORTED ignores row order even when the query has an ORDER BY: Trino
+# returns the rows descending, but we list them ascending and the check still passes.
+# With the default verifier the ORDER BY would make row order significant and this would
+# fail, so this exercises the SORTED override (order_matters forced to False).
+SELECT * FROM it_insert ORDER BY i DESC
+---- RESULTS: VERIFY_IS_EQUAL_SORTED
+10,'x'
+20,'y'
+30,'z'
+====
+---- TRINO_QUERY
+# VERIFY_IS_EQUAL forces a position-by-position comparison (order_matters=True), so the
+# expected rows must match the exact order Trino returned them -- here the ORDER BY i DESC
+# ordering. This exercises the VERIFY_IS_EQUAL branch and asserts the ordering itself.
+SELECT * FROM it_insert ORDER BY i DESC
+---- RESULTS: VERIFY_IS_EQUAL
+30,'z'
+20,'y'
+10,'x'
+====

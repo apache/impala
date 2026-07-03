@@ -511,6 +511,47 @@ def verify_raw_results(test_section, exec_result, vector, result_section,
     else:
       raise
 
+
+def verify_trino_results(test_section, trino_result, result_section='RESULTS',
+                         update_section=False):
+  """Verify the result of a TRINO_QUERY against a RESULTS section.
+
+  'trino_result' is a TrinoQueryResult (see tests/common/trino_cluster.py) whose
+  'data' rows are already formatted in the Impala RESULTS textual convention
+  (strings single-quoted, numbers/booleans bare, SQL NULL as bare NULL). Because
+  Trino's SQL type names differ from Impala's, every column is compared as an
+  opaque STRING (i.e. exact textual match); we do not cross-check column types.
+  The verifier is chosen from an optional 'VERIFY_*' comment on the section, and
+  ordering follows the presence of an ORDER BY in the Trino query (as for RESULTS).
+  """
+  assert result_section in test_section
+  expected_results_list = split_section_lines(
+      remove_comments(test_section[result_section]))
+  actual_results_list = trino_result.data
+  labels = trino_result.column_labels or ['DUMMY_LABEL']
+  # Treat all columns as STRING so comparison is an exact textual match on both
+  # sides. The number of columns must be consistent, so size types to the labels.
+  column_types = ['STRING'] * max(len(labels), 1)
+
+  verifier = test_section.get('VERIFIER')
+  assert verifier in VERIFIER_MAP.keys(), "Unknown verifier: " + str(verifier)
+  order_matters = contains_order_by(trino_result.query)
+  if verifier and verifier.upper() == 'VERIFY_IS_EQUAL':
+    order_matters = True
+  if verifier and verifier.upper() == 'VERIFY_IS_EQUAL_SORTED':
+    order_matters = False
+
+  expected = QueryTestResult(expected_results_list, column_types, labels, order_matters)
+  actual = QueryTestResult(actual_results_list, column_types, labels, order_matters)
+  try:
+    VERIFIER_MAP[verifier](expected, actual)
+  except AssertionError:
+    if update_section:
+      test_section[result_section] = join_section_lines(actual.result_list)
+    else:
+      raise
+
+
 def contains_order_by(query):
   """Returns true of the query contains an 'order by' clause"""
   return re.search( r'order\s+by\b', query, re.M|re.I) is not None

@@ -33,6 +33,7 @@ from subprocess import check_call
 from tests.common.file_utils import cleanup_tmp_test_dir, make_tmp_test_dir
 from tests.common.impala_test_suite import ImpalaTestSuite
 from tests.common.impala_cluster import ImpalaCluster
+from tests.common.trino_cluster import TrinoCluster
 from tests.util.filesystem_utils import IS_LOCAL
 from tests.util.workload_management import QUERY_TBL_LOG_NAME, QUERY_TBL_LIVE_NAME
 from time import sleep, time
@@ -80,6 +81,9 @@ DISABLE_LOG_BUFFERING = 'disable_log_buffering'
 LOG_SYMLINKS = 'log_symlinks'
 WORKLOAD_MGMT = 'workload_mgmt'
 FORCE_RESTART = 'force_restart'
+# If True, start the Trino Docker container (for Impala <-> Trino interop tests)
+# before the Impala cluster and stop it on teardown. See tests/common/trino_cluster.py.
+RUN_TRINO = 'run_trino'
 
 # Args that accept additional formatting to supply temporary dir path.
 ACCEPT_FORMATTING = set([IMPALAD_ARGS, CATALOGD_ARGS, IMPALA_LOG_DIR])
@@ -114,6 +118,10 @@ class CustomClusterTestSuite(ImpalaTestSuite):
 
   # Args for cluster startup/teardown when sharing a single cluster for the entire class.
   SHARED_CLUSTER_ARGS = {}
+
+  # Set to the TrinoCluster instance when a test requests run_trino=True; used to stop
+  # the container on teardown. Left None otherwise.
+  trino = None
 
   # The currently executing test method. setup_method() populates this and tear_method()
   # clears it. This is used to set the log directory location when a test manually
@@ -167,7 +175,7 @@ class CustomClusterTestSuite(ImpalaTestSuite):
       tmp_dir_placeholders=[],
       expect_startup_fail=False, disable_log_buffering=False, log_symlinks=False,
       workload_mgmt=False, force_restart=False, custom_core_site_dir=None,
-      admissiond_args=None):
+      admissiond_args=None, run_trino=False):
     """Records arguments to be passed to a cluster by adding them to the decorated
     method's func_dict"""
     args = dict()
@@ -219,6 +227,8 @@ class CustomClusterTestSuite(ImpalaTestSuite):
       args[FORCE_RESTART] = True
     if admissiond_args is not None:
       args[ADMISSIOND_ARGS] = admissiond_args
+    if run_trino:
+      args[RUN_TRINO] = True
 
     def merge_args(args_first, args_last):
       result = args_first.copy()
@@ -289,7 +299,41 @@ class CustomClusterTestSuite(ImpalaTestSuite):
     return self.CURRENT_TEST_METHOD_NAME
 
   @classmethod
+  def _start_trino(cls):
+    """Start (or attach to) the Trino Docker container used by the Impala <-> Trino
+    interop tests. start() is idempotent (an already-running container is left as-is).
+    TrinoUnavailable is allowed to propagate so an unavailable Trino/Docker fails the
+    test rather than skipping silently; gate the test with the appropriate SkipIf
+    decorator instead."""
+    cls.trino = TrinoCluster()
+    cls.trino.start()
+
+  @classmethod
+  def _stop_trino(cls):
+    """Stop the Trino container iff this class started it, so we do not disturb a
+    container a developer already had running."""
+    trino = getattr(cls, 'trino', None)
+    if trino is not None and trino.started_by_us:
+      trino.stop()
+    cls.trino = None
+
+  @classmethod
   def cluster_setup(cls, args):
+    # Optionally bring up Trino before the (heavier) Impala cluster so that a
+    # Trino/Docker problem surfaces quickly. If anything below fails after Trino
+    # started, stop it here: pytest does not call teardown_class/teardown_method when
+    # setup raises, so this is the only place that can avoid leaking the container.
+    if args.get(RUN_TRINO, False):
+      cls._start_trino()
+    try:
+      cls._impala_cluster_setup(args)
+    except Exception:
+      if args.get(RUN_TRINO, False):
+        cls._stop_trino()
+      raise
+
+  @classmethod
+  def _impala_cluster_setup(cls, args):
     cluster_args = list()
     disable_log_buffering = args.get(DISABLE_LOG_BUFFERING, False)
     cls._warn_assert_log = not disable_log_buffering
@@ -424,6 +468,16 @@ class CustomClusterTestSuite(ImpalaTestSuite):
 
   @classmethod
   def cluster_teardown(cls, name, args):
+    try:
+      cls._impala_cluster_teardown(name, args)
+    finally:
+      # Always stop Trino (if this class started it) even if the Impala teardown
+      # above raised, so the container is not leaked.
+      if args.get(RUN_TRINO, False):
+        cls._stop_trino()
+
+  @classmethod
+  def _impala_cluster_teardown(cls, name, args):
     if args.get(WORKLOAD_MGMT, False):
       cls.close_impala_clients()
       cls.cluster.graceful_shutdown_impalads()

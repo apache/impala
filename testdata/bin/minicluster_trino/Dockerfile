@@ -15,8 +15,9 @@
 # specific language governing permissions and limitations
 # under the License.
 
-# Use an official Trino image as the base
-FROM trinodb/trino:latest
+# Use an official Trino image as the base. Pin to a specific version rather than
+# 'latest' so the interop tests are reproducible and not broken by Trino releases.
+FROM trinodb/trino:482
 
 # Use the developer username, so Trino will have write access to HDFS
 ARG USERNAME
@@ -29,6 +30,12 @@ RUN \
 
 COPY hive-site.xml core-site.xml hdfs-site.xml /etc/
 COPY iceberg_lakekeeper.properties iceberg_rest.properties iceberg.properties hive.properties /etc/trino/catalog/
+
+# Apply default session properties server-side via the file session property
+# manager. Used to disable the DELTA_LENGTH_BYTE_ARRAY Parquet encoding for the
+# Iceberg catalog, which Impala cannot read for string/binary columns yet (Trino
+# 482 defaults it on). Trino auto-loads etc/session-property-config.properties.
+COPY session-property-config.properties session-property-config.json /etc/trino/
 
 # Expose the Trino port
 EXPOSE 9091

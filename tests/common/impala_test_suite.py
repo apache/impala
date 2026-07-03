@@ -67,7 +67,9 @@ from tests.common.test_result_verifier import (
     try_compile_regex,
     verify_lineage,
     verify_raw_results,
-    verify_runtime_profile)
+    verify_runtime_profile,
+    verify_trino_results)
+from tests.common.trino_cluster import TrinoCluster, TrinoQueryResult
 from tests.common.test_vector import (
   EXEC_OPTION, PROTOCOL, TABLE_FORMAT, VECTOR,
   BEESWAX, HS2, HS2_HTTP,
@@ -941,6 +943,27 @@ class ImpalaTestSuite(BaseTestSuite):
       finally:
         h.close()
 
+    def __exec_in_trino(query, user=None):
+      """
+      Helper to execute a query block in Trino via the containerized Trino CLI.
+      Statements run in the 'iceberg' catalog under the current 'use_db' schema
+      (so table names resolve like the Impala QUERY sections). Only the final
+      statement's result is returned, mirroring __exec_in_hive. A failed statement
+      raises RuntimeError so CATCH sections behave the same as for Impala/Hive.
+      """
+      trino = TrinoCluster()
+      schema = use_db or 'default'
+      result = None
+      for stmt in query.split(';'):
+        if not stmt.strip():
+          continue
+        stdout, stderr, rc = trino.run_query(stmt, schema=schema, user=user)
+        result = TrinoQueryResult(stmt, stdout, stderr, rc)
+        if not result.success:
+          raise RuntimeError(
+              "Trino query failed:\n{0}\n{1}".format(stmt, stderr))
+      return result
+
     sections = self.load_query_test_file(self.get_workload(), test_file_name,
         encoding=encoding)
     # Assumes that it is same across all the coordinators.
@@ -976,9 +999,12 @@ class ImpalaTestSuite(BaseTestSuite):
         elif 'HIVE_QUERY' in test_section:
           query_section = test_section['HIVE_QUERY']
           exec_fn = __exec_in_hive
+        elif 'TRINO_QUERY' in test_section:
+          query_section = test_section['TRINO_QUERY']
+          exec_fn = __exec_in_trino
         else:
           assert 0, ('Error in test file {}. Test cases require a '
-              '-- QUERY or HIVE_QUERY section.\n{}').format(
+              '-- QUERY, HIVE_QUERY or TRINO_QUERY section.\n{}').format(
                   test_file_name, pprint.pformat(test_section))
 
         # TODO: support running query tests against different scale factors
@@ -1028,8 +1054,16 @@ class ImpalaTestSuite(BaseTestSuite):
           assert 'DML_RESULTS' not in test_section
           test_section[results_section_name] = self.__do_replacements(
               test_section[results_section_name], use_db=use_db, extra=test_file_vars)
-          self.__verify_results_and_errors(vector, test_section, results_section_name,
-              result, use_db)
+          if 'TRINO_QUERY' in test_section:
+            # Verify the rows returned by a TRINO_QUERY against the expected results.
+            # Trino's result type differs from Impala/Hive, so it uses a dedicated
+            # verifier that compares every column as an opaque string.
+            verify_trino_results(test_section, result,
+                result_section=results_section_name,
+                update_section=self.pytest_config().option.update_results)
+          else:
+            self.__verify_results_and_errors(vector, test_section, results_section_name,
+                result, use_db)
         else:
           # TODO: Can't validate errors without expected results for now.
           assert 'ERRORS' not in test_section,\
@@ -1044,6 +1078,7 @@ class ImpalaTestSuite(BaseTestSuite):
               .replace(IMPALA_HOME, '$IMPALA_HOME') \
               .replace(INTERNAL_LISTEN_HOST, '$INTERNAL_LISTEN_HOST') \
               .replace(INTERNAL_LISTEN_IP, '$INTERNAL_LISTEN_IP')
+
         rt_profile_info = None
         if 'RUNTIME_PROFILE_%s' % table_format_info.file_format in test_section:
           # If this table format has a RUNTIME_PROFILE section specifically for it,
@@ -1476,6 +1511,18 @@ class ImpalaTestSuite(BaseTestSuite):
     LOG.info("-- executing in HiveServer2\n\n" + stmt + "\n")
     url = 'jdbc:hive2://' + cls.pytest_config().option.hive_server2
     return cls.run_stmt_in_beeline(url, username, stmt)
+
+  @classmethod
+  def run_stmt_in_trino(cls, stmt, schema='default', catalog='iceberg'):
+    """Run a statement in Trino via the containerized Trino CLI, returning raw
+    stdout on success and raising RuntimeError(stderr) on failure. Mirrors
+    run_stmt_in_hive for tests that want to drive Trino directly (the .test-file
+    driven path uses the TRINO_QUERY section instead)."""
+    LOG.info("-- executing in Trino\n\n" + stmt + "\n")
+    stdout, stderr, rc = TrinoCluster().run_query(stmt, catalog=catalog, schema=schema)
+    if rc != 0:
+      raise RuntimeError(stderr)
+    return stdout
 
   @classmethod
   def run_stmt_in_beeline(cls, url, username, stmt):

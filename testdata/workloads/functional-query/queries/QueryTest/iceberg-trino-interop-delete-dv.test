@@ -1,0 +1,100 @@
+# Impala <-> Trino interop over Apache Iceberg V3 tables: row-level DELETE /
+# UPDATE / MERGE, which both engines materialize as Puffin deletion vectors.
+#
+# See iceberg-trino-interop-insert.test for the shared setup notes. The
+# "<table>$files" metadata queries assert that the row-level deletes were written
+# as deletion vectors (Puffin blobs, content=1) rather than copy-on-write rewrites.
+====
+---- TRINO_QUERY
+# Trino writes a V3 table, then DELETE + UPDATE produce deletion vectors.
+CREATE TABLE ti_dml (i integer, s varchar) WITH (format_version=3);
+INSERT INTO ti_dml VALUES (1, 'a'), (2, 'b'), (3, 'c'), (4, 'd')
+====
+---- TRINO_QUERY
+DELETE FROM ti_dml WHERE i = 2
+====
+---- TRINO_QUERY
+UPDATE ti_dml SET s = 'C' WHERE i = 3
+====
+---- QUERY
+# Impala reads the surviving/updated rows produced via deletion vectors.
+INVALIDATE METADATA ti_dml;
+SELECT * FROM ti_dml ORDER BY i;
+---- RESULTS
+1,'a'
+3,'C'
+4,'d'
+---- TYPES
+INT,STRING
+====
+---- TRINO_QUERY
+# Trino's row-level DML was materialized as Puffin deletion vectors.
+SELECT DISTINCT file_format FROM "ti_dml$files" WHERE content = 1
+---- RESULTS
+'PUFFIN'
+====
+---- TRINO_QUERY
+# Trino MERGE (update matched + insert not-matched) into a V3 table.
+CREATE TABLE ti_merge (i integer, s varchar) WITH (format_version=3);
+INSERT INTO ti_merge VALUES (1, 'a'), (2, 'b')
+====
+---- TRINO_QUERY
+CREATE TABLE ti_merge_src (i integer, s varchar) WITH (format_version=3);
+INSERT INTO ti_merge_src VALUES (2, 'B2'), (3, 'C3')
+====
+---- TRINO_QUERY
+MERGE INTO ti_merge t USING ti_merge_src s ON t.i = s.i
+  WHEN MATCHED THEN UPDATE SET s = s.s
+  WHEN NOT MATCHED THEN INSERT VALUES (s.i, s.s)
+====
+---- QUERY
+INVALIDATE METADATA ti_merge;
+SELECT * FROM ti_merge ORDER BY i;
+---- RESULTS
+1,'a'
+2,'B2'
+3,'C3'
+---- TYPES
+INT,STRING
+====
+---- QUERY
+# Impala writes a V3 table, then DELETE + UPDATE produce deletion vectors.
+CREATE TABLE it_dml (i INT, s STRING) STORED BY ICEBERG
+TBLPROPERTIES('format-version'='3');
+INSERT INTO it_dml VALUES (10, 'x'), (20, 'y'), (30, 'z'), (40, 'w');
+DELETE FROM it_dml WHERE i = 20;
+UPDATE it_dml SET s = 'Z' WHERE i = 30;
+====
+---- TRINO_QUERY
+# Trino reads the rows produced by Impala's deletion-vector DML.
+SELECT * FROM it_dml ORDER BY i
+---- RESULTS
+10,'x'
+30,'Z'
+40,'w'
+====
+---- TRINO_QUERY
+# Impala's row-level delete is a Puffin deletion vector too.
+SELECT DISTINCT file_format FROM "it_dml$files" WHERE content = 1
+---- RESULTS
+'PUFFIN'
+====
+---- QUERY
+# Impala MERGE (update matched + insert not-matched) into a V3 table.
+CREATE TABLE it_merge (i INT, s STRING) STORED BY ICEBERG
+TBLPROPERTIES('format-version'='3');
+INSERT INTO it_merge VALUES (1, 'a'), (2, 'b');
+CREATE TABLE it_merge_src (i INT, s STRING) STORED BY ICEBERG
+TBLPROPERTIES('format-version'='3');
+INSERT INTO it_merge_src VALUES (2, 'B2'), (3, 'C3');
+MERGE INTO it_merge t USING it_merge_src s ON t.i = s.i
+  WHEN MATCHED THEN UPDATE SET s = s.s
+  WHEN NOT MATCHED THEN INSERT VALUES (s.i, s.s);
+====
+---- TRINO_QUERY
+SELECT * FROM it_merge ORDER BY i
+---- RESULTS
+1,'a'
+2,'B2'
+3,'C3'
+====
