@@ -145,23 +145,8 @@ public class HiveGeometryOIHelper {
     }
   }
 
-  private BytesWritable last = null;
-
-  // always assume bytes are reused until we determine they aren't
-  private boolean bytesReused = true;
-
   private OGCGeometry getGeometryFromBytes(BytesWritable writable) {
-
-    if (bytesReused) {
-      if (last != null && last != writable) {
-        // this assumes that the source of these bytes will either always
-        // reuse the bytes or never reuse the bytes.
-        bytesReused = false;
-      }
-      last = writable;
-    }
-
-    return GeometryUtils.geometryFromEsriShape(writable, bytesReused);
+    return GeometryUtils.geometryFromEsriShape(writable);
   }
 
   @Override

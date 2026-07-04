@@ -24,8 +24,6 @@ import com.esri.core.geometry.OperatorImportFromESRIShape;
 import com.esri.core.geometry.Polygon;
 import com.esri.core.geometry.SpatialReference;
 import com.esri.core.geometry.ogc.OGCGeometry;
-import com.google.common.cache.Cache;
-import com.google.common.cache.CacheBuilder;
 import org.apache.hadoop.hive.serde2.objectinspector.primitive.PrimitiveObjectInspectorFactory;
 import org.apache.hadoop.hive.serde2.objectinspector.primitive.WritableBinaryObjectInspector;
 import org.apache.hadoop.io.BytesWritable;
@@ -34,6 +32,14 @@ import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 
 public class GeometryUtils {
+
+  // Selects the serialization format for all ESRI UDFs in this JVM. Assumed to
+  // be set once at startup by HiveEsriGeospatialBuiltins.initBuiltins (which
+  // runs per frontend JVM before any UDF executes) and not changed afterwards.
+  public enum SerializationFormat { ESRI_SHAPE, WKB }
+  private static volatile SerializationFormat format = SerializationFormat.ESRI_SHAPE;
+  public static void setFormat(SerializationFormat f) { format = f; }
+  public static SerializationFormat getFormat() { return format; }
 
   private static final int SIZE_WKID = 4;
   private static final int SIZE_TYPE = 1;
@@ -67,22 +73,31 @@ public class GeometryUtils {
   public static final WritableBinaryObjectInspector geometryTransportObjectInspector =
       PrimitiveObjectInspectorFactory.writableBinaryObjectInspector;
 
-  private static final Cache<BytesWritable, OGCGeometry> geometryCache = CacheBuilder.newBuilder().weakKeys().build();
-
   /**
    * @param geomref1
    * @param geomref2
    * @return return true if both geometries are in the same spatial reference
    */
   public static boolean compareSpatialReferences(BytesWritable geomref1, BytesWritable geomref2) {
+    if (format == SerializationFormat.WKB) return true;
     return getWKID(geomref1) == getWKID(geomref2);
   }
 
   public static BytesWritable geometryToEsriShapeBytesWritable(MapGeometry mapGeometry) {
+    if (format == SerializationFormat.WKB) {
+      OGCGeometry ogc = OGCGeometry.createFromEsriGeometry(
+          mapGeometry.getGeometry(), mapGeometry.getSpatialReference());
+      return serializeWkb(ogc);
+    }
     return serialize(mapGeometry);
   }
 
   public static BytesWritable geometryToEsriShapeBytesWritable(Geometry geometry, int wkid, OGCType type) {
+    if (format == SerializationFormat.WKB) {
+      SpatialReference sr = (wkid != WKID_UNKNOWN) ? SpatialReference.create(wkid) : null;
+      OGCGeometry ogc = OGCGeometry.createFromEsriGeometry(geometry, sr);
+      return serializeWkb(ogc);
+    }
     return serialize(geometry, wkid, type);
   }
 
@@ -91,36 +106,21 @@ public class GeometryUtils {
   }
 
   public static OGCGeometry geometryFromEsriShape(BytesWritable geomref) {
-    // always assume bytes are recycled and can't be cached by using
-    // geomref.getBytes() as the key
-    return geometryFromEsriShape(geomref, true);
-  }
-
-  public static OGCGeometry geometryFromEsriShape(BytesWritable geomref, boolean bytesRecycled) {
 
     if (geomref == null) {
       return null;
     }
 
-    // this geomref might actually be a LazyGeometryBytesWritable which
+    // this geomref might actually be a CachedGeometryBytesWritable which
     // means we don't need to deserialize from bytes
     if (geomref instanceof CachedGeometryBytesWritable) {
       return ((CachedGeometryBytesWritable) geomref).getGeometry();
     }
 
-    // if geomref bytes are recycled, we can't use the cache because every
-    // key in the cache will be the same byte array
-    if (!bytesRecycled) {
-      // check for a cache hit to previously created geometries
-      OGCGeometry cachedGeom = geometryCache.getIfPresent(geomref);
-
-      if (cachedGeom != null) {
-        return cachedGeom;
-      }
+    if (format == SerializationFormat.WKB) {
+      return deserializeWkb(geomref);
     }
 
-    // not in cache or instance of CachedGeometryBytesWritable. now
-    // need to create the geometry from its bytes
     int wkid = getWKID(geomref);
     ByteBuffer shapeBuffer = getShapeByteBuffer(geomref);
 
@@ -137,14 +137,7 @@ public class GeometryUtils {
         }
 
         Geometry esriGeom = OperatorImportFromESRIShape.local().execute(0, Geometry.Type.Unknown, shapeBuffer);
-        OGCGeometry createdGeom = OGCGeometry.createFromEsriGeometry(esriGeom, spatialReference);
-
-        if (!bytesRecycled) {
-          // only add bytes to cache if we know they aren't being recycled
-          geometryCache.put(geomref, createdGeom);
-        }
-
-        return createdGeom;
+        return OGCGeometry.createFromEsriGeometry(esriGeom, spatialReference);
       }
     }
   }
@@ -156,6 +149,9 @@ public class GeometryUtils {
    * @return OGCType set in the 5th byte of the hive geometry bytes
    */
   public static OGCType getType(BytesWritable geomref) {
+    if (format == SerializationFormat.WKB) {
+      return getTypeFromWkb(geomref);
+    }
     // SIZE_WKID is the offset to the byte that stores the type information
     return OGCTypeLookup[geomref.getBytes()[SIZE_WKID]];
   }
@@ -176,6 +172,7 @@ public class GeometryUtils {
    * @return WKID set in the first 4 bytes of the hive geometry bytes
    */
   public static int getWKID(BytesWritable geomref) {
+    if (format == SerializationFormat.WKB) return WKID_UNKNOWN;
     ByteBuffer bb = ByteBuffer.wrap(geomref.getBytes());
     return bb.getInt(0);
   }
@@ -187,6 +184,7 @@ public class GeometryUtils {
    * @param wkid
    */
   public static void setWKID(BytesWritable geomref, int wkid) {
+    if (format == SerializationFormat.WKB) return;
     ByteBuffer bb = ByteBuffer.allocate(4);
     bb.putInt(wkid);
     System.arraycopy(bb.array(), 0, geomref.getBytes(), 0, SIZE_WKID);
@@ -310,12 +308,57 @@ public class GeometryUtils {
     return ret;
   }
 
+  // --- WKB support methods ---
+
+  private static OGCGeometry deserializeWkb(BytesWritable geomref) {
+    byte[] bytes = geomref.getBytes();
+    int len = geomref.getLength();
+    if (len < 5) return null;
+
+    ByteBuffer wkbBuffer = ByteBuffer.wrap(bytes, 0, len);
+    return OGCGeometry.fromBinary(wkbBuffer);
+  }
+
+  private static BytesWritable serializeWkb(OGCGeometry ogcGeometry) {
+    if (ogcGeometry == null) return null;
+    ByteBuffer wkb = ogcGeometry.asBinary();
+    byte[] bytes = new byte[wkb.remaining()];
+    wkb.get(bytes);
+    return new BytesWritable(bytes);
+  }
+
+  private static OGCType getTypeFromWkb(BytesWritable geomref) {
+    byte[] bytes = geomref.getBytes();
+    int len = geomref.getLength();
+    if (len < 5) return OGCType.UNKNOWN;
+    ByteOrder order = (bytes[0] == 1) ? ByteOrder.LITTLE_ENDIAN : ByteOrder.BIG_ENDIAN;
+    int wkbType = ByteBuffer.wrap(bytes, 1, 4).order(order).getInt();
+    // 2D only: ISO-WKB would mark with Z/M/ZM offsets (1000/2000/3000). This does
+    // not handle PostGIS-style EWKB high-bit flags; revisit if >2D lands (IMPALA-15168).
+    // Currently WKB mode is designed to use Parquet/Iceberg geometries without
+    // modifications, but in the future it may be useful to alter the internal format
+    // e.g using EWKB.
+    switch (wkbType) {
+      case 1: return OGCType.ST_POINT;
+      case 2: return OGCType.ST_LINESTRING;
+      case 3: return OGCType.ST_POLYGON;
+      case 4: return OGCType.ST_MULTIPOINT;
+      case 5: return OGCType.ST_MULTILINESTRING;
+      case 6: return OGCType.ST_MULTIPOLYGON;
+      default: return OGCType.UNKNOWN;
+    }
+  }
+
   public static class CachedGeometryBytesWritable extends BytesWritable {
     OGCGeometry cachedGeom;
 
     public CachedGeometryBytesWritable(OGCGeometry geom) {
       cachedGeom = geom;
-      super.set(serialize(cachedGeom));
+      if (format == SerializationFormat.WKB) {
+        super.set(serializeWkb(cachedGeom));
+      } else {
+        super.set(serialize(cachedGeom));
+      }
     }
 
     public OGCGeometry getGeometry() {

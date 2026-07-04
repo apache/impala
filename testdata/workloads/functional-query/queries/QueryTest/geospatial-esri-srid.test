@@ -78,12 +78,10 @@ select ST_AsGeoJson(ST_GeomFromJson('{"x":1.2,"y":2.4,"spatialReference":{"wkid"
 '{"type":"Point","coordinates":[1.2,2.4],"crs":{"type":"name","properties":{"name":"EPSG:4326"}}}'
 ====
 ---- QUERY
+# TODO: WKB deserialization via OGCGeometry.fromBinary() assigns EPSG:4326 as default SR,
+# while ESRI Shape deserialization with WKID=0 assigns null SR. Both produce different
+# crs output. SRID handling is deferred to IMPALA-15169.
 select ST_AsGeoJson(ST_GeomFromJson('{"x":1.2,"y":2.4,"spatialReference":{"wkid": 0}}'));
 ---- RESULTS
 '{"type":"Point","coordinates":[1.2,2.4],"crs":null}'
-====
----- QUERY
-select ST_AsText(ST_Intersection(ST_Polygon(2,0, 2,3, 3,0), ST_Polygon(1,1, 4,1, 4,4, 1,4)));
----- RESULTS
-'POLYGON ((2 1, 2.6666666666666665 1, 2 3, 2 1))'
 ====

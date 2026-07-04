@@ -42,6 +42,8 @@ import org.apache.impala.authorization.ImpalaInternalAdminUser;
 import org.apache.impala.authorization.ranger.RangerUtil;
 import org.apache.impala.authorization.User;
 import org.apache.impala.catalog.FeDataSource;
+import org.apache.impala.hive.geospatial.esri.GeometryUtils;
+import org.apache.impala.thrift.TGeospatialLibrary;
 import org.apache.impala.catalog.FeTable;
 import org.apache.impala.catalog.Function;
 import org.apache.impala.common.UserCancelledException;
@@ -152,6 +154,18 @@ public class JniFrontend {
     JniUtil.deserializeThrift(protocolFactory_, cfg, thriftBackendConfig);
 
     BackendConfig.create(cfg);
+
+    // Initialize the geo serialization format on all impalads (coordinator and
+    // executor). On executor-only impalads the Java Frontend is not instantiated
+    // so BuiltinsDb/HiveEsriGeospatialBuiltins.initBuiltins() never runs, but
+    // Hive geo UDFs still execute via HiveUdfCall and therefore require the
+    // correct GeometryUtils.format to deserialize geometry values.
+    TGeospatialLibrary geoLib = BackendConfig.INSTANCE.getGeospatialLibrary();
+    if (!geoLib.equals(TGeospatialLibrary.NONE)) {
+      GeometryUtils.setFormat(geoLib.equals(TGeospatialLibrary.WKB_EXPERIMENTAL)
+          ? GeometryUtils.SerializationFormat.WKB
+          : GeometryUtils.SerializationFormat.ESRI_SHAPE);
+    }
 
     GlogAppender.Install(TLogLevel.values()[cfg.impala_log_lvl],
         TLogLevel.values()[cfg.non_impala_java_vlog]);

@@ -485,11 +485,12 @@ DEFINE_int32(state_store_ha_port, 24020,
 // TGeospatialLibrary's values are mapped here as constants
 static const string geo_lib_none = "NONE";
 static const string geo_lib_hive_esri = "HIVE_ESRI";
+static const string geo_lib_wkb = "WKB_EXPERIMENTAL";
 
 static const string geo_lib_help_msg =
     "Specifies which implementation of "
     "geospatial functions should be included as builtins. Possible values: [\""
-    + geo_lib_none + "\", \"" + geo_lib_hive_esri + "\"]";
+    + geo_lib_none + "\", \"" + geo_lib_hive_esri + "\", \"" + geo_lib_wkb + "\"]";
 
 DEFINE_string(geospatial_library, geo_lib_none, geo_lib_help_msg.c_str());
 

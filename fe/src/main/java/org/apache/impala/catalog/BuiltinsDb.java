@@ -114,8 +114,8 @@ public class BuiltinsDb extends Db {
     LikePredicate.initBuiltins(this);
     ScalarBuiltins.initBuiltins(this);
 
-    if (BackendConfig.INSTANCE.getGeospatialLibrary().equals(
-            TGeospatialLibrary.HIVE_ESRI)) {
+    TGeospatialLibrary geoLib = BackendConfig.INSTANCE.getGeospatialLibrary();
+    if (!geoLib.equals(TGeospatialLibrary.NONE)) {
       HiveEsriGeospatialBuiltins.initBuiltins(this);
     }
   }

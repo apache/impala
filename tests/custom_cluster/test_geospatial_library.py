@@ -42,3 +42,17 @@ class TestGeospatialLibrary(CustomClusterTestSuite):
     result = self.execute_query(SHOW_FUNCTIONS)
     assert ST_POINT_SIGNATURE in result.data
     assert ST_X_SIGNATURE_BUILTIN in result.data
+
+  # Only geospatial-esri and geospatial-esri-extra run under WKB mode. The other
+  # ESRI test files are intentionally excluded.
+  @CustomClusterTestSuite.with_args(
+      start_args='--geospatial_library=WKB_EXPERIMENTAL')
+  @SkipIfApacheHive.feature_not_supported
+  def test_wkb_experimental_esri(self, vector):
+    self.run_test_case('QueryTest/geospatial-esri', vector)
+
+  @CustomClusterTestSuite.with_args(
+      start_args='--geospatial_library=WKB_EXPERIMENTAL')
+  @SkipIfApacheHive.feature_not_supported
+  def test_wkb_experimental_extra(self, vector):
+    self.run_test_case('QueryTest/geospatial-esri-extra', vector)

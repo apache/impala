@@ -64,13 +64,18 @@ public class HiveEsriGeospatialBuiltins {
    */
   public static void initBuiltins(Db db) {
     TGeospatialLibrary lib = BackendConfig.INSTANCE.getGeospatialLibrary();
-    // Currently all native functions are expected to be 100% compatible with the Java
-    // version. This is not true for the full function set of
-    // https://gerrit.cloudera.org/#/c/20602/ , which sets based on a flag to allow
-    // full compatibility with Hive.
-    boolean addNatives = true;
+
+    // Set the serialization format on both branches so it is self-correcting
+    // even if initBuiltins were ever re-run with a different library.
+    GeometryUtils.setFormat(lib.equals(TGeospatialLibrary.WKB_EXPERIMENTAL)
+        ? GeometryUtils.SerializationFormat.WKB
+        : GeometryUtils.SerializationFormat.ESRI_SHAPE);
+
+    // Native C++ functions only work with ESRI Shape format, not WKB.
+    boolean addNatives = lib.equals(TGeospatialLibrary.HIVE_ESRI);
+    boolean isWkb = lib.equals(TGeospatialLibrary.WKB_EXPERIMENTAL);
     addLegacyUDFs(db, addNatives);
-    addGenericUDFs(db);
+    addGenericUDFs(db, isWkb);
     addVarargsUDFs(db);
     if(addNatives) {
       addNatives(db);
@@ -78,7 +83,7 @@ public class HiveEsriGeospatialBuiltins {
   }
 
   private static void addLegacyUDFs(Db db, boolean addNatives) {
-    List<UDF> legacyUDFs = Arrays.asList(new ST_Area(), new ST_AsBinary(),
+    List<UDF> legacyUDFs = new ArrayList<>(Arrays.asList(new ST_Area(), new ST_AsBinary(),
         new ST_AsGeoJson(), new ST_AsJson(), new ST_AsShape(), new ST_AsText(),
         new ST_Boundary(), new ST_Buffer(), new ST_Centroid(), new ST_CoordDim(),
         new ST_Difference(), new ST_Dimension(), new ST_Distance(),
@@ -95,7 +100,7 @@ public class HiveEsriGeospatialBuiltins {
         new ST_NumInteriorRing(), new ST_NumPoints(),
         new ST_PointFromWKB(), new ST_PointN(), new ST_PolyFromWKB(),
         new ST_Relate(),  new ST_StartPoint(), new ST_SymmetricDiff(),
-        new ST_Z());
+        new ST_Z()));
 
     List<UDF> legacyUDFsWithNativeImplementation = Arrays.asList(
         new ST_EnvIntersects(), new ST_GeometryType(),
@@ -117,7 +122,7 @@ public class HiveEsriGeospatialBuiltins {
     addJavaStPoint(db, addNatives);
   }
 
-  private static void addGenericUDFs(Db db) {
+  private static void addGenericUDFs(Db db, boolean isWkb) {
     List<ScalarFunction> genericUDFs = new ArrayList<>();
 
     List<Set<Type>> stBinArguments =
@@ -140,20 +145,22 @@ public class HiveEsriGeospatialBuiltins {
     genericUDFs.add(createScalarFunction(
         ST_MultiLineString.class, Type.BINARY, new Type[] {Type.STRING}));
 
-    createRelationalGenericUDFs(genericUDFs);
+    createRelationalGenericUDFs(genericUDFs, isWkb);
 
     for (ScalarFunction function : genericUDFs) {
       db.addBuiltin(function);
     }
   }
 
-  private static void createRelationalGenericUDFs(List<ScalarFunction> genericUDFs) {
+  private static void createRelationalGenericUDFs(
+      List<ScalarFunction> genericUDFs, boolean isWkb) {
     List<GenericUDF> relationalUDFs = Arrays.asList(new ST_Contains(), new ST_Crosses(),
         new ST_Disjoint(), new ST_Equals(), new ST_Intersects(), new ST_Overlaps(),
         new ST_Touches(), new ST_Within());
 
-    List<Set<Type>> relationalUDFArguments =
-        ImmutableList.of(ImmutableSet.of(Type.STRING, Type.BINARY),
+    List<Set<Type>> relationalUDFArguments = isWkb
+        ? ImmutableList.of(ImmutableSet.of(Type.BINARY), ImmutableSet.of(Type.BINARY))
+        : ImmutableList.of(ImmutableSet.of(Type.STRING, Type.BINARY),
             ImmutableSet.of(Type.STRING, Type.BINARY));
 
     for (GenericUDF relationalUDF : relationalUDFs) {
