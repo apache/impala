@@ -58,7 +58,6 @@ under the License.
     <thrift.version>${env.IMPALA_THRIFT_POM_VERSION}</thrift.version>
     <impala.extdatasrc.api.version>${project.version}</impala.extdatasrc.api.version>
     <impala.query.event.hook.api.version>${project.version}</impala.query.event.hook.api.version>
-    <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     <kudu.version>${env.IMPALA_KUDU_VERSION}</kudu.version>
     <slf4j.version>${env.IMPALA_SLF4J_VERSION}</slf4j.version>
     <commons-lang3.version>${env.IMPALA_COMMONS_LANG3_VERSION}</commons-lang3.version>
@@ -75,7 +74,6 @@ under the License.
     <derby.version>${env.IMPALA_DERBY_VERSION}</derby.version>
     <jackson.version>${env.IMPALA_JACKSON_VERSION}</jackson.version>
     <jackson-databind.version>${env.IMPALA_JACKSON_DATABIND_VERSION}</jackson-databind.version>
-    <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     <iceberg.version>${env.IMPALA_ICEBERG_VERSION}</iceberg.version>
     <pac4j.version>${env.IMPALA_PAC4J_VERSION}</pac4j.version>
     <!-- xmlsec, bcprov-jdk18on, springframework, and velocity-engine-core are not used by
@@ -91,9 +89,11 @@ under the License.
     <dropwizard-metrics.version>${env.IMPALA_DROPWIZARD_METRICS_VERSION}</dropwizard-metrics.version>
     <aircompressor.version>${env.IMPALA_AIRCOMPRESSOR_VERSION}</aircompressor.version>
     <datasketches.version>${env.IMPALA_DATASKETCHES_VERSION}</datasketches.version>
+    <esri-geometry-api.version>${env.IMPALA_ESRI_GEOMETRY_API_VERSION}</esri-geometry-api.version>
     <!-- Informs maven-compiler-plugin to build for specified target. -->
     <maven.compiler.source>17</maven.compiler.source>
     <maven.compiler.target>${env.IMPALA_JAVA_TARGET}</maven.compiler.target>
+    <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
   </properties>
 
   <repositories>
@@ -529,6 +529,11 @@ under the License.
         <version>${junit.version}</version>
         <scope>test</scope>
       </dependency>
+      <dependency>
+        <groupId>com.esri.geometry</groupId>
+        <artifactId>esri-geometry-api</artifactId>
+        <version>${esri-geometry-api.version}</version>
+      </dependency>
     </dependencies>
   </dependencyManagement>
 
@@ -615,6 +620,7 @@ under the License.
     <module>shaded-deps/impala-iceberg-runtime</module>
     <module>shaded-deps/s3a-aws-sdk</module>
     <module>TableFlattener</module>
+    <module>hive-geospatial-functions</module>
     <module>test-hive-udfs</module>
     <module>test-corrupt-hive-udfs</module>
     <module>yarn-extras</module>

@@ -2342,31 +2342,32 @@ select ST_AsText(ST_ConvexHull(ST_GeomFromText('multipoint ((0 0), (1 1), (2 2),
 'NULL'
 ====
 ---- QUERY
-# ESRI wraps result in MULTIPOLYGON even for simple polygons
+# st_convexhull returns POLYGON since HIVE-29323 instead of MULTIPOLYGON.
 select ST_AsText(ST_ConvexHull(ST_GeomFromText('multipoint ((0 0), (1 0), (1 1), (0 1))')));
 ---- RESULTS
-'MULTIPOLYGON (((0 0, 1 0, 1 1, 0 1, 0 0)))'
+'POLYGON ((0 0, 1 0, 1 1, 0 1, 0 0))'
 ====
 ---- QUERY
 # Interior point (1,1) does not affect the convex hull boundary
 select ST_AsText(ST_ConvexHull(ST_GeomFromText('multipoint ((0 0), (2 0), (2 2), (0 2), (1 1))')));
 ---- RESULTS
-'MULTIPOLYGON (((0 0, 2 0, 2 2, 0 2, 0 0)))'
+'POLYGON ((0 0, 2 0, 2 2, 0 2, 0 0))'
 ====
 ---- QUERY
 # Convex hull "wraps" around the concave parts to form smallest convex shape
 select ST_AsText(ST_ConvexHull(ST_GeomFromText('polygon ((0 0, 3 0, 3 2, 5 2, 5 5, 2 5, 2 3, 0 3, 0 0))')));
 ---- RESULTS
-'MULTIPOLYGON (((0 0, 3 0, 5 2, 5 5, 2 5, 0 3, 0 0)))'
+'POLYGON ((0 0, 3 0, 5 2, 5 5, 2 5, 0 3, 0 0))'
 ====
 ---- QUERY
 # Convex hull forms polygon encompassing all line vertices
 select ST_AsText(ST_ConvexHull(ST_GeomFromText('linestring (0 0, 1 1, 2 0, 3 1, 4 0)')));
 ---- RESULTS
-'MULTIPOLYGON (((0 0, 4 0, 3 1, 1 1, 0 0)))'
+'POLYGON ((0 0, 4 0, 3 1, 1 1, 0 0))'
 ====
 ---- QUERY
-# ESRI returns MULTIPOLYGON EMPTY for empty input
+# ESRI returns MULTIPOLYGON EMPTY for empty input.
+# TODO: undestand this inconsistency
 select ST_AsText(ST_ConvexHull(ST_GeomFromText('point empty')));
 ---- RESULTS
 'MULTIPOLYGON EMPTY'
@@ -2382,20 +2383,20 @@ select ST_AsText(ST_ConvexHull(ST_Point(0, 0), ST_Point(3, 4)));
 # Three non-collinear points (forms a triangle)
 select ST_AsText(ST_ConvexHull(ST_Point(0, 0), ST_Point(4, 0), ST_Point(2, 3)));
 ---- RESULTS
-'MULTIPOLYGON (((0 0, 4 0, 2 3, 0 0)))'
+'POLYGON ((0 0, 4 0, 2 3, 0 0))'
 ====
 ---- QUERY
 # Four points (forms a square)
 select ST_AsText(ST_ConvexHull(ST_Point(0, 0), ST_Point(2, 0), ST_Point(2, 2), ST_Point(0, 2)));
 ---- RESULTS
-'MULTIPOLYGON (((0 0, 2 0, 2 2, 0 2, 0 0)))'
+'POLYGON ((0 0, 2 0, 2 2, 0 2, 0 0))'
 ====
 ---- QUERY
 # Five points with one interior point
 # Point (2,2) is inside the square formed by the other four points
 select ST_AsText(ST_ConvexHull(ST_Point(0, 0), ST_Point(4, 0), ST_Point(4, 4), ST_Point(0, 4), ST_Point(2, 2)));
 ---- RESULTS
-'MULTIPOLYGON (((0 0, 4 0, 4 4, 0 4, 0 0)))'
+'POLYGON ((0 0, 4 0, 4 4, 0 4, 0 0))'
 ====
 ---- QUERY
 # Six arguments with mixed geometry types
@@ -2403,20 +2404,20 @@ select ST_AsText(ST_ConvexHull(ST_Point(0, 0), ST_Point(4, 0), ST_Point(4, 4), S
 # Note: Point (6,3) creates an additional vertex in the convex hull
 select ST_AsText(ST_ConvexHull(ST_Point(0, 0), ST_Point(5, 0), ST_Point(5, 5), ST_Point(0, 5), ST_LineString(1, 1, 4, 4), ST_Point(6, 3)));
 ---- RESULTS
-'MULTIPOLYGON (((0 0, 5 0, 6 3, 5 5, 0 5, 0 0)))'
+'POLYGON ((0 0, 5 0, 6 3, 5 5, 0 5, 0 0))'
 ====
 ---- QUERY
 # Seven points with one interior point
 select ST_AsText(ST_ConvexHull(ST_Point(0, 0), ST_Point(1, 0), ST_Point(2, 1), ST_Point(3, 0), ST_Point(3, 3), ST_Point(0, 3), ST_Point(1.5, 1.5)));
 ---- RESULTS
-'MULTIPOLYGON (((0 0, 3 0, 3 3, 0 3, 0 0)))'
+'POLYGON ((0 0, 3 0, 3 3, 0 3, 0 0))'
 ====
 ---- QUERY
 # Eight arguments (maximum supported by wrapper)
 # Tests upper bound of generated wrapper methods
 select ST_AsText(ST_ConvexHull(ST_Point(0, 0), ST_Point(2, 0), ST_Point(4, 0), ST_Point(4, 2), ST_Point(4, 4), ST_Point(2, 4), ST_Point(0, 4), ST_Point(0, 2)));
 ---- RESULTS
-'MULTIPOLYGON (((0 0, 4 0, 4 4, 0 4, 0 0)))'
+'POLYGON ((0 0, 4 0, 4 4, 0 4, 0 0))'
 ====
 ---- QUERY
 # No arguments provided (should fail)

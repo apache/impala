@@ -73,6 +73,7 @@ EXCLUDE_FILE_PATTERNS = [
     re.compile(r".*/codegen/gen_ir_descriptions.py"),  # Many long strings.
     re.compile(r".*shell/ext-py/.*"),  # Third-party code.
     re.compile(r".*be/src/thirdparty/.*"),  # Third-party code.
+    re.compile(r".*java/hive-geospatial-functions/.*"),  # Code copied from Hive.
     re.compile(r".*/.*\.xml\.py")  # Long lines in config template files.
 ]
 
@@ -136,7 +137,7 @@ JAVA_STAR_IMPORT_TEST_PATH_RE = re.compile(
 
 # Existing star imports in non-test production code (import body after "import ").
 JAVA_STAR_IMPORT_ALLOW_LIST = frozenset({
-    "org.apache.hadoop.hive.ql.udf.esri.*",
+    "org.apache.impala.hive.geospatial.esri.*",
     "org.apache.parquet.schema.LogicalTypeAnnotation.*",
     "org.apache.thrift.server.AbstractNonblockingServer.*",
 })

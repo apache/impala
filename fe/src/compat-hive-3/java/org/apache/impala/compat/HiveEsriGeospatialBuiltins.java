@@ -28,7 +28,7 @@ import java.util.Collections;
 import java.util.Set;
 import java.util.stream.Collectors;
 import org.apache.hadoop.hive.ql.exec.UDF;
-import org.apache.hadoop.hive.ql.udf.esri.*;
+import org.apache.impala.hive.geospatial.esri.*;
 import org.apache.hadoop.hive.ql.udf.generic.GenericUDF;
 
 import org.apache.impala.builtins.ST_ConvexHull_Wrapper;
@@ -81,7 +81,8 @@ public class HiveEsriGeospatialBuiltins {
     List<UDF> legacyUDFs = Arrays.asList(new ST_Area(), new ST_AsBinary(),
         new ST_AsGeoJson(), new ST_AsJson(), new ST_AsShape(), new ST_AsText(),
         new ST_Boundary(), new ST_Buffer(), new ST_Centroid(), new ST_CoordDim(),
-        new ST_Difference(), new ST_Dimension(), new ST_Distance(), new ST_EndPoint(),
+        new ST_Difference(), new ST_Dimension(), new ST_Distance(),
+        new ST_DistanceSphere(), new ST_EndPoint(),
         new ST_Envelope(), new ST_ExteriorRing(),
         new ST_GeodesicLengthWGS84(), new ST_GeomCollection(), new ST_GeometryN(),
         new ST_GeomFromShape(), new ST_GeomFromText(),

@@ -50,7 +50,7 @@ LICENSE = """
 
 ARGUMENT_EXCEPTION = "UDFArgumentException"
 ARGUMENT_LENGTH_EXCEPTION = "UDFArgumentLengthException"
-UDF_PACKAGE = "org.apache.hadoop.hive.ql.udf.esri"
+UDF_PACKAGE = "org.apache.impala.hive.geospatial.esri"
 DOUBLE_TYPE = "org.apache.hadoop.hive.serde2.io.DoubleWritable"
 BYTE_TYPE = "org.apache.hadoop.io.BytesWritable"
 

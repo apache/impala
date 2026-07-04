@@ -33,10 +33,6 @@ under the License.
 
   <name>test-corrupt-hive-udfs</name>
 
-  <properties>
-    <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-  </properties>
-
  <build>
     <plugins>
       <plugin>

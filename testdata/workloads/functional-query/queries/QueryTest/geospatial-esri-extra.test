@@ -152,3 +152,18 @@ STRING
 ---- RESULTS
 'POLYGON ((1 1, 2 1, 2 2, 1 2, 1 1))'
 ====
+---- QUERY
+# ST_DistanceSphere - great circle distance between points in meters
+select cast(ST_DistanceSphere(ST_Point(0, 0), ST_Point(0, 1)) as bigint);
+---- TYPES
+BIGINT
+---- RESULTS
+111195
+====
+---- QUERY
+select cast(ST_DistanceSphere(ST_Point(113.914603, 22.308919), ST_Point(151.177222, -33.946111)) as bigint);
+---- TYPES
+BIGINT
+---- RESULTS
+7393893
+====
