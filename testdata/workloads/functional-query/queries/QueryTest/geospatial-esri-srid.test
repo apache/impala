@@ -1,0 +1,89 @@
+====
+---- QUERY
+select ST_GeodesicLengthWGS84(ST_GeomFromText('MultiLineString((0 80, 0.03 80.04))', 4326));
+---- TYPES
+DOUBLE
+---- RESULTS
+4503.988488226892
+====
+---- QUERY
+select ST_GeodesicLengthWGS84(ST_GeomFromText('LineString(0 0, 0.03 0.04)', 4326));
+---- TYPES
+DOUBLE
+---- RESULTS
+5542.156362735362
+====
+---- QUERY
+select ST_GeodesicLengthWGS84(ST_GeomFromText('MultiLineString((0 0, 0.03 0.04))', 4326));
+---- TYPES
+DOUBLE
+---- RESULTS
+5542.156362735362
+====
+---- QUERY
+select ST_GeodesicLengthWGS84(ST_GeomFromText('MultiLineString((0 80, 0.03 80.04))', 4326));
+---- TYPES
+DOUBLE
+---- RESULTS
+4503.988488226892
+====
+---- QUERY
+select ST_GeodesicLengthWGS84(ST_SetSRID(ST_LineString(0,80, 0.03, 80.04), 4326));
+---- TYPES
+DOUBLE
+---- RESULTS
+4503.988488226892
+====
+---- QUERY
+select ST_GeodesicLengthWGS84(ST_SetSRID(ST_GeomFromText('MultiLineString((0 80, 0.03 80.04))'), 4326));
+---- TYPES
+DOUBLE
+---- RESULTS
+4503.988488226892
+====
+---- QUERY
+select ST_GeodesicLengthWGS84(ST_SetSRID(ST_LineString(179.98,-80, -179.98, -80.03), 4326));
+---- TYPES
+DOUBLE
+---- RESULTS
+3438.190416575652
+====
+---- QUERY
+select ST_GeodesicLengthWGS84(ST_SetSRID(ST_LineString(179.98,80, -179.98, 80.03), 4326));
+---- TYPES
+DOUBLE
+---- RESULTS
+3438.190416575652
+====
+---- QUERY
+select ST_GeodesicLengthWGS84(ST_SetSRID(ST_LineString(179.98,-0.01, -179.98, 0.02), 4326));
+---- TYPES
+DOUBLE
+---- RESULTS
+5552.589421311623
+====
+---- QUERY
+select ST_AsJson(ST_GeomFromGeoJson('{"type":"Point", "coordinates":[1.2, 2.4]}'));
+---- RESULTS
+'{"x":1.2,"y":2.4,"spatialReference":{"wkid":4326}}'
+====
+---- QUERY
+select ST_AsJson(ST_GeomFromJson('{"x":1.2,"y":2.4,"spatialReference":{"wkid":4326}}'));
+---- RESULTS
+'{"x":1.2,"y":2.4,"spatialReference":{"wkid":4326}}'
+====
+---- QUERY
+select ST_AsGeoJson(ST_GeomFromJson('{"x":1.2,"y":2.4,"spatialReference":{"wkid":4326}}'));
+---- RESULTS
+'{"type":"Point","coordinates":[1.2,2.4],"crs":{"type":"name","properties":{"name":"EPSG:4326"}}}'
+====
+---- QUERY
+select ST_AsGeoJson(ST_GeomFromJson('{"x":1.2,"y":2.4,"spatialReference":{"wkid": 0}}'));
+---- RESULTS
+'{"type":"Point","coordinates":[1.2,2.4],"crs":null}'
+====
+---- QUERY
+select ST_AsText(ST_Intersection(ST_Polygon(2,0, 2,3, 3,0), ST_Polygon(1,1, 4,1, 4,4, 1,4)));
+---- RESULTS
+'POLYGON ((2 1, 2.6666666666666665 1, 2 3, 2 1))'
+====

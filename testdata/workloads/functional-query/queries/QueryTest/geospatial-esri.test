@@ -24,11 +24,6 @@ select ST_GeometryType(ST_Point('point (10.02 20.01)'));
 'ST_POINT'
 ====
 ---- QUERY
-select ST_GeometryType(ST_Point('point z (10.02 20.01 2)'));
----- RESULTS
-'ST_POINT'
-====
----- QUERY
 select ST_GeometryType(ST_MultiPoint('multipoint ((1 2))'));
 ---- RESULTS
 'ST_MULTIPOINT'
@@ -40,11 +35,6 @@ select ST_GeometryType(ST_Linestring(10,10, 20,20));
 ====
 ---- QUERY
 select ST_GeometryType(ST_Linestring('linestring (10 10, 20 20)'));
----- RESULTS
-'ST_LINESTRING'
-====
----- QUERY
-select ST_GeometryType(ST_Linestring('linestring z (10 10 2, 20 20 4)'));
 ---- RESULTS
 'ST_LINESTRING'
 ====
@@ -394,34 +384,6 @@ DOUBLE
 24.0
 ====
 ---- QUERY
-select ST_GeodesicLengthWGS84(ST_GeomFromText('MultiLineString((0 80, 0.03 80.04))', 4326));
----- TYPES
-DOUBLE
----- RESULTS
-4503.988488226892
-====
----- QUERY
-select ST_GeodesicLengthWGS84(ST_GeomFromText('LineString(0 0, 0.03 0.04)', 4326));
----- TYPES
-DOUBLE
----- RESULTS
-5542.156362735362
-====
----- QUERY
-select ST_GeodesicLengthWGS84(ST_GeomFromText('MultiLineString((0 0, 0.03 0.04))', 4326));
----- TYPES
-DOUBLE
----- RESULTS
-5542.156362735362
-====
----- QUERY
-select ST_GeodesicLengthWGS84(ST_GeomFromText('MultiLineString((0 80, 0.03 80.04))', 4326));
----- TYPES
-DOUBLE
----- RESULTS
-4503.988488226892
-====
----- QUERY
 select ST_IsClosed(ST_LineString(0.,0., 3.,4.));
 ---- TYPES
 BOOLEAN
@@ -457,291 +419,12 @@ BOOLEAN
 true
 ====
 ---- QUERY
-select ST_Is3D(ST_Point(0., 3.));
----- TYPES
-BOOLEAN
----- RESULTS
-false
-====
----- QUERY
-select ST_Is3D(ST_PointZ(0., 3., 1));
----- TYPES
-BOOLEAN
----- RESULTS
-true
-====
----- QUERY
-select ST_Is3D(ST_Point('pointzm (0. 3. 1. 2.)'));
----- TYPES
-BOOLEAN
----- RESULTS
-true
-====
----- QUERY
-select ST_Is3D(ST_LineString(0.,0., 3.,4., 0.,4., 0.,0.));
----- TYPES
-BOOLEAN
----- RESULTS
-false
-====
----- QUERY
-select ST_Is3D(ST_Polygon(1, 1, 1, 4, 4, 4, 4, 1));
----- TYPES
-BOOLEAN
----- RESULTS
-false
-====
----- QUERY
-select ST_Is3D(ST_GeomFromText('linestring z (10 10 2, 20 20 4)'));
----- TYPES
-BOOLEAN
----- RESULTS
-true
-====
----- QUERY
-select ST_Z(ST_PointZ(0., 3., 1));
----- TYPES
-DOUBLE
----- RESULTS
-1.0
-====
----- QUERY
-select ST_Z(ST_Point('pointzm (0. 3. 1. 2.)'));
----- TYPES
-DOUBLE
----- RESULTS
-1.0
-====
----- QUERY
-select ST_Z(ST_GeomFromText('linestring z (10 10 2, 20 20 4)'));
----- RESULTS
-NULL
-====
----- QUERY
-select ST_MinZ(ST_PointZ(0., 3., 1));
----- TYPES
-DOUBLE
----- RESULTS
-1.0
-====
----- QUERY
-select ST_MinZ(ST_GeomFromText('linestring z (10 10 2, 20 20 4)'));
----- TYPES
-DOUBLE
----- RESULTS
-2.0
-====
----- QUERY
-select ST_MinZ(ST_MultiPoint('multipoint z((0 0 1), (2 2 3))'));
----- TYPES
-DOUBLE
----- RESULTS
-1.0
-====
----- QUERY
-select ST_MinZ(ST_GeomFromText('polygon z ((0 0 2, 8 0 4, 0 8 3, 0 0 2))'));
----- TYPES
-DOUBLE
----- RESULTS
-2.0
-====
----- QUERY
-select ST_MaxZ(ST_PointZ(0., 3., 1));
----- TYPES
-DOUBLE
----- RESULTS
-1.0
-====
----- QUERY
-select ST_MaxZ(ST_GeomFromText('linestring z (10 10 2, 20 20 4)'));
----- TYPES
-DOUBLE
----- RESULTS
-4.0
-====
----- QUERY
-select ST_MaxZ(ST_GeomFromText('polygon z ((0 0 2, 8 0 4, 0 8 3, 0 0 2))'));
----- TYPES
-DOUBLE
----- RESULTS
-4.0
-====
----- QUERY
-select ST_MaxZ(ST_MultiPoint('multipoint z((0 0 1), (2 2 3))'));
----- TYPES
-DOUBLE
----- RESULTS
-3.0
-====
----- QUERY
-select ST_IsMeasured(ST_Point(0., 3.));
----- TYPES
-BOOLEAN
----- RESULTS
-false
-====
----- QUERY
-select ST_IsMeasured(ST_Point('point m(0. 3. 1)'));
----- TYPES
-BOOLEAN
----- RESULTS
-true
-====
----- QUERY
-select ST_IsMeasured(ST_Point('pointzm (0. 3. 1. 2.)'));
----- TYPES
-BOOLEAN
----- RESULTS
-true
-====
----- QUERY
-select ST_IsMeasured(ST_LineString(0.,0., 3.,4., 0.,4., 0.,0.));
----- TYPES
-BOOLEAN
----- RESULTS
-false
-====
----- QUERY
-select ST_IsMeasured(ST_Polygon(1, 1, 1, 4, 4, 4, 4, 1));
----- TYPES
-BOOLEAN
----- RESULTS
-false
-====
----- QUERY
-select ST_IsMeasured(ST_GeomFromText('linestring m (10 10 2, 20 20 4)'));
----- TYPES
-BOOLEAN
----- RESULTS
-true
-====
----- QUERY
-select ST_M(ST_Point('point m(0. 3. 1)'));
----- TYPES
-DOUBLE
----- RESULTS
-1.0
-====
----- QUERY
-select ST_M(ST_Point('pointzm (0. 3. 1. 2.)'));
----- TYPES
-DOUBLE
----- RESULTS
-2.0
-====
----- QUERY
-select ST_M(ST_GeomFromText('linestring m (10 10 2, 20 20 4)'));
----- RESULTS
-NULL
-====
----- QUERY
-select ST_MinM(ST_Point('point m(0. 3. 1)'));
----- TYPES
-DOUBLE
----- RESULTS
-1.0
-====
----- QUERY
-select ST_MinM(ST_GeomFromText('linestring m (10 10 2, 20 20 4)'));
----- TYPES
-DOUBLE
----- RESULTS
-2.0
-====
----- QUERY
-select ST_MinM(ST_GeomFromText('polygon m ((0 0 5, 8 0 4, 0 8 3, 0 0 5))'));
----- TYPES
-DOUBLE
----- RESULTS
-3.0
-====
----- QUERY
-select ST_MinM(ST_MultiPoint('multipoint m((0 0 1), (2 2 3))'));
----- TYPES
-DOUBLE
----- RESULTS
-1.0
-====
----- QUERY
-select ST_MaxM(ST_Point('point m(0. 3. 1)'));
----- TYPES
-DOUBLE
----- RESULTS
-1.0
-====
----- QUERY
-select ST_MaxM(ST_GeomFromText('linestring m (10 10 2, 20 20 4)'));
----- TYPES
-DOUBLE
----- RESULTS
-4.0
-====
----- QUERY
-select ST_MaxM(ST_GeomFromText('polygon m ((0 0 5, 8 0 4, 0 8 3, 0 0 5))'));
----- TYPES
-DOUBLE
----- RESULTS
-5.0
-====
----- QUERY
-select ST_MaxM(ST_MultiPoint('multipoint m((0 0 1), (2 2 3))'));
----- TYPES
-DOUBLE
----- RESULTS
-3.0
-====
----- QUERY
-select ST_CoordDim(ST_Point(0., 3.));
----- RESULTS
-2
-====
----- QUERY
-select ST_CoordDim(ST_PointZ(0., 3., 1));
----- RESULTS
-3
-====
----- QUERY
-select ST_CoordDim(ST_Point('point m(0. 3. 1)'));
----- RESULTS
-3
-====
----- QUERY
-select ST_CoordDim(ST_Point('pointzm (0. 3. 1. 2.)'));
----- RESULTS
-4
-====
----- QUERY
-select ST_CoordDim(ST_LineString(0.,0., 3.,4., 0.,4., 0.,0.));
----- RESULTS
-2
-====
----- QUERY
-select ST_CoordDim(ST_Polygon(1, 1, 1, 4, 4, 4, 4, 1));
----- RESULTS
-2
-====
----- QUERY
-select ST_CoordDim(ST_GeomFromText('linestring z (10 10 2, 20 20 4)'));
----- RESULTS
-3
-====
----- QUERY
-select ST_CoordDim(ST_GeomFromText('linestring m (10 10 2, 20 20 4)'));
----- RESULTS
-3
-====
----- QUERY
 select ST_NumPoints(ST_Point('point empty'));
 ---- RESULTS
 0
 ====
 ---- QUERY
 select ST_NumPoints(ST_Point(0., 3.));
----- RESULTS
-1
-====
----- QUERY
-select ST_NumPoints(ST_PointZ(0., 3., 1));
 ---- RESULTS
 1
 ====
@@ -2204,13 +1887,6 @@ BOOLEAN, BOOLEAN
 true,false
 ====
 ---- QUERY
-select ST_CoordDim(ST_Point(0., 3.)), ST_CoordDim(ST_PointZ(0., 3., 1));
----- TYPES
-INT, INT
----- RESULTS
-2,3
-====
----- QUERY
 select ST_Crosses(st_linestring(2,0, 2,3), ST_Polygon(1,1, 1,4, 4,4, 4,1)), ST_Crosses(st_linestring(8,7, 7,8), ST_Polygon(1,1, 1,4, 4,4, 4,1));
 ---- TYPES
 BOOLEAN, BOOLEAN
@@ -2251,13 +1927,6 @@ select ST_Intersects(st_point(1,1), ST_Point(1,1)), ST_Intersects(st_point(2,0),
 BOOLEAN, BOOLEAN
 ---- RESULTS
 true,false
-====
----- QUERY
-select ST_Is3D(ST_Point(0., 3.)), ST_Is3D(ST_PointZ(0., 3., 1));
----- TYPES
-BOOLEAN, BOOLEAN
----- RESULTS
-false,true
 ====
 ---- QUERY
 select ST_Overlaps(st_polygon(2,0, 2,3, 3,0), ST_Polygon(1,1, 1,4, 4,4, 4,1)), ST_Overlaps(st_polygon(2,0, 2,1, 3,1), ST_Polygon(1,1, 1,4, 4,4, 4,1));
@@ -2393,11 +2062,6 @@ select ST_AsText(ST_Intersection(ST_Polygon(1,1, 1,4, 4,4, 4,1), ST_LineString(1
 select ST_AsText(ST_Intersection(ST_Polygon(1,1, 1,4, 4,4, 4,1), ST_LineString(1,3, 1,4, 0,4)));
 ---- RESULTS
 'LINESTRING (1 3, 1 4)'
-====
----- QUERY
-select ST_AsText(ST_Intersection(ST_Polygon(2,0, 2,3, 3,0), ST_Polygon(1,1, 4,1, 4,4, 1,4)));
----- RESULTS
-'POLYGON ((2 1, 2.6666666666666665 1, 2 3, 2 1))'
 ====
 ---- QUERY
 select ST_AsText(ST_Intersection(ST_Polygon(1,0, 3,0, 1,2), ST_Polygon(0,1, 2,1, 0,3)));
@@ -2542,34 +2206,14 @@ select ST_AsText(ST_GeomFromGeoJson('{"type":"Point", "coordinates":[1.2, 2.4]}'
 'POINT (1.2 2.4)'
 ====
 ---- QUERY
-select ST_AsJson(ST_GeomFromGeoJson('{"type":"Point", "coordinates":[1.2, 2.4]}'));
----- RESULTS
-'{"x":1.2,"y":2.4,"spatialReference":{"wkid":4326}}'
-====
----- QUERY
 select ST_AsText(ST_GeomFromGeoJson('{"type":"LineString", "coordinates":[[1,2], [3,4]]}'));
 ---- RESULTS
 'LINESTRING (1 2, 3 4)'
 ====
 ---- QUERY
-select ST_AsJson(ST_GeomFromJson('{"x":1.2,"y":2.4,"spatialReference":{"wkid":4326}}'));
----- RESULTS
-'{"x":1.2,"y":2.4,"spatialReference":{"wkid":4326}}'
-====
----- QUERY
 select ST_AsJson(ST_GeomFromJson('{"x":1.2,"y":2.4,"spatialReference":{"wkid": 0}}'));
 ---- RESULTS
 '{"x":1.2,"y":2.4}'
-====
----- QUERY
-select ST_AsGeoJson(ST_GeomFromJson('{"x":1.2,"y":2.4,"spatialReference":{"wkid":4326}}'));
----- RESULTS
-'{"type":"Point","coordinates":[1.2,2.4],"crs":{"type":"name","properties":{"name":"EPSG:4326"}}}'
-====
----- QUERY
-select ST_AsGeoJson(ST_GeomFromJson('{"x":1.2,"y":2.4,"spatialReference":{"wkid": 0}}'));
----- RESULTS
-'{"type":"Point","coordinates":[1.2,2.4],"crs":null}'
 ====
 ---- QUERY
 select ST_AsText(ST_GeomFromGeoJson(ST_AsGeoJson(ST_Point(1.2, 2.4))));
@@ -2676,41 +2320,6 @@ select ST_AsText(ST_InteriorRingN(ST_Polygon('polygon ((0 0, 8 0, 0 8, 0 0), (1 
 ---- RESULTS
 'LINESTRING (1 1, 1 5, 5 1, 1 1)'
 =====
----- QUERY
-select ST_GeodesicLengthWGS84(ST_SetSRID(ST_LineString(0,80, 0.03, 80.04), 4326));
----- TYPES
-DOUBLE
----- RESULTS
-4503.988488226892
-====
----- QUERY
-select ST_GeodesicLengthWGS84(ST_SetSRID(ST_GeomFromText('MultiLineString((0 80, 0.03 80.04))'), 4326));
----- TYPES
-DOUBLE
----- RESULTS
-4503.988488226892
-====
----- QUERY
-select ST_GeodesicLengthWGS84(ST_SetSRID(ST_LineString(179.98,-80, -179.98, -80.03), 4326));
----- TYPES
-DOUBLE
----- RESULTS
-3438.190416575652
-====
----- QUERY
-select ST_GeodesicLengthWGS84(ST_SetSRID(ST_LineString(179.98,80, -179.98, 80.03), 4326));
----- TYPES
-DOUBLE
----- RESULTS
-3438.190416575652
-====
----- QUERY
-select ST_GeodesicLengthWGS84(ST_SetSRID(ST_LineString(179.98,-0.01, -179.98, 0.02), 4326));
----- TYPES
-DOUBLE
----- RESULTS
-5552.589421311623
-====
 ---- QUERY
 select ST_AsText(ST_SetSRID(ST_GeomFromText('MultiLineString((0 80, 0.03 80.04))'), 4326));
 ---- RESULTS

@@ -1,0 +1,304 @@
+====
+---- QUERY
+select ST_GeometryType(ST_Point('point z (10.02 20.01 2)'));
+---- RESULTS
+'ST_POINT'
+====
+---- QUERY
+select ST_Is3D(ST_Point(0., 3.));
+---- TYPES
+BOOLEAN
+---- RESULTS
+false
+====
+---- QUERY
+select ST_Is3D(ST_PointZ(0., 3., 1));
+---- TYPES
+BOOLEAN
+---- RESULTS
+true
+====
+---- QUERY
+select ST_Is3D(ST_Point('pointzm (0. 3. 1. 2.)'));
+---- TYPES
+BOOLEAN
+---- RESULTS
+true
+====
+---- QUERY
+select ST_Is3D(ST_LineString(0.,0., 3.,4., 0.,4., 0.,0.));
+---- TYPES
+BOOLEAN
+---- RESULTS
+false
+====
+---- QUERY
+select ST_Is3D(ST_Polygon(1, 1, 1, 4, 4, 4, 4, 1));
+---- TYPES
+BOOLEAN
+---- RESULTS
+false
+====
+---- QUERY
+select ST_Is3D(ST_GeomFromText('linestring z (10 10 2, 20 20 4)'));
+---- TYPES
+BOOLEAN
+---- RESULTS
+true
+====
+---- QUERY
+select ST_Z(ST_PointZ(0., 3., 1));
+---- TYPES
+DOUBLE
+---- RESULTS
+1.0
+====
+---- QUERY
+select ST_Z(ST_Point('pointzm (0. 3. 1. 2.)'));
+---- TYPES
+DOUBLE
+---- RESULTS
+1.0
+====
+---- QUERY
+select ST_Z(ST_GeomFromText('linestring z (10 10 2, 20 20 4)'));
+---- RESULTS
+NULL
+====
+---- QUERY
+select ST_MinZ(ST_PointZ(0., 3., 1));
+---- TYPES
+DOUBLE
+---- RESULTS
+1.0
+====
+---- QUERY
+select ST_MinZ(ST_GeomFromText('linestring z (10 10 2, 20 20 4)'));
+---- TYPES
+DOUBLE
+---- RESULTS
+2.0
+====
+---- QUERY
+select ST_MinZ(ST_MultiPoint('multipoint z((0 0 1), (2 2 3))'));
+---- TYPES
+DOUBLE
+---- RESULTS
+1.0
+====
+---- QUERY
+select ST_MinZ(ST_GeomFromText('polygon z ((0 0 2, 8 0 4, 0 8 3, 0 0 2))'));
+---- TYPES
+DOUBLE
+---- RESULTS
+2.0
+====
+---- QUERY
+select ST_MaxZ(ST_PointZ(0., 3., 1));
+---- TYPES
+DOUBLE
+---- RESULTS
+1.0
+====
+---- QUERY
+select ST_MaxZ(ST_GeomFromText('linestring z (10 10 2, 20 20 4)'));
+---- TYPES
+DOUBLE
+---- RESULTS
+4.0
+====
+---- QUERY
+select ST_MaxZ(ST_GeomFromText('polygon z ((0 0 2, 8 0 4, 0 8 3, 0 0 2))'));
+---- TYPES
+DOUBLE
+---- RESULTS
+4.0
+====
+---- QUERY
+select ST_MaxZ(ST_MultiPoint('multipoint z((0 0 1), (2 2 3))'));
+---- TYPES
+DOUBLE
+---- RESULTS
+3.0
+====
+---- QUERY
+select ST_IsMeasured(ST_Point(0., 3.));
+---- TYPES
+BOOLEAN
+---- RESULTS
+false
+====
+---- QUERY
+select ST_IsMeasured(ST_Point('point m(0. 3. 1)'));
+---- TYPES
+BOOLEAN
+---- RESULTS
+true
+====
+---- QUERY
+select ST_IsMeasured(ST_Point('pointzm (0. 3. 1. 2.)'));
+---- TYPES
+BOOLEAN
+---- RESULTS
+true
+====
+---- QUERY
+select ST_IsMeasured(ST_LineString(0.,0., 3.,4., 0.,4., 0.,0.));
+---- TYPES
+BOOLEAN
+---- RESULTS
+false
+====
+---- QUERY
+select ST_IsMeasured(ST_Polygon(1, 1, 1, 4, 4, 4, 4, 1));
+---- TYPES
+BOOLEAN
+---- RESULTS
+false
+====
+---- QUERY
+select ST_IsMeasured(ST_GeomFromText('linestring m (10 10 2, 20 20 4)'));
+---- TYPES
+BOOLEAN
+---- RESULTS
+true
+====
+---- QUERY
+select ST_M(ST_Point('point m(0. 3. 1)'));
+---- TYPES
+DOUBLE
+---- RESULTS
+1.0
+====
+---- QUERY
+select ST_M(ST_Point('pointzm (0. 3. 1. 2.)'));
+---- TYPES
+DOUBLE
+---- RESULTS
+2.0
+====
+---- QUERY
+select ST_M(ST_GeomFromText('linestring m (10 10 2, 20 20 4)'));
+---- RESULTS
+NULL
+====
+---- QUERY
+select ST_MinM(ST_Point('point m(0. 3. 1)'));
+---- TYPES
+DOUBLE
+---- RESULTS
+1.0
+====
+---- QUERY
+select ST_MinM(ST_GeomFromText('linestring m (10 10 2, 20 20 4)'));
+---- TYPES
+DOUBLE
+---- RESULTS
+2.0
+====
+---- QUERY
+select ST_MinM(ST_GeomFromText('polygon m ((0 0 5, 8 0 4, 0 8 3, 0 0 5))'));
+---- TYPES
+DOUBLE
+---- RESULTS
+3.0
+====
+---- QUERY
+select ST_MinM(ST_MultiPoint('multipoint m((0 0 1), (2 2 3))'));
+---- TYPES
+DOUBLE
+---- RESULTS
+1.0
+====
+---- QUERY
+select ST_MaxM(ST_Point('point m(0. 3. 1)'));
+---- TYPES
+DOUBLE
+---- RESULTS
+1.0
+====
+---- QUERY
+select ST_MaxM(ST_GeomFromText('linestring m (10 10 2, 20 20 4)'));
+---- TYPES
+DOUBLE
+---- RESULTS
+4.0
+====
+---- QUERY
+select ST_MaxM(ST_GeomFromText('polygon m ((0 0 5, 8 0 4, 0 8 3, 0 0 5))'));
+---- TYPES
+DOUBLE
+---- RESULTS
+5.0
+====
+---- QUERY
+select ST_MaxM(ST_MultiPoint('multipoint m((0 0 1), (2 2 3))'));
+---- TYPES
+DOUBLE
+---- RESULTS
+3.0
+====
+---- QUERY
+select ST_CoordDim(ST_Point(0., 3.));
+---- RESULTS
+2
+====
+---- QUERY
+select ST_CoordDim(ST_PointZ(0., 3., 1));
+---- RESULTS
+3
+====
+---- QUERY
+select ST_CoordDim(ST_Point('point m(0. 3. 1)'));
+---- RESULTS
+3
+====
+---- QUERY
+select ST_CoordDim(ST_Point('pointzm (0. 3. 1. 2.)'));
+---- RESULTS
+4
+====
+---- QUERY
+select ST_CoordDim(ST_LineString(0.,0., 3.,4., 0.,4., 0.,0.));
+---- RESULTS
+2
+====
+---- QUERY
+select ST_CoordDim(ST_Polygon(1, 1, 1, 4, 4, 4, 4, 1));
+---- RESULTS
+2
+====
+---- QUERY
+select ST_CoordDim(ST_GeomFromText('linestring z (10 10 2, 20 20 4)'));
+---- RESULTS
+3
+====
+---- QUERY
+select ST_CoordDim(ST_GeomFromText('linestring m (10 10 2, 20 20 4)'));
+---- RESULTS
+3
+====
+---- QUERY
+select ST_NumPoints(ST_PointZ(0., 3., 1));
+---- RESULTS
+1
+====
+---- QUERY
+select ST_GeometryType(ST_Linestring('linestring z (10 10 2, 20 20 4)'));
+---- RESULTS
+'ST_LINESTRING'
+====
+---- QUERY
+select ST_CoordDim(ST_Point(0., 3.)), ST_CoordDim(ST_PointZ(0., 3., 1));
+---- TYPES
+INT, INT
+---- RESULTS
+2,3
+====
+---- QUERY
+select ST_Is3D(ST_Point(0., 3.)), ST_Is3D(ST_PointZ(0., 3., 1));
+---- TYPES
+BOOLEAN, BOOLEAN
+---- RESULTS
+false,true
+====

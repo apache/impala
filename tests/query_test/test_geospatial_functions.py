@@ -20,6 +20,7 @@ from tests.common.skip import SkipIfApacheHive
 from tests.common.test_dimensions import create_single_exec_option_dimension
 
 
+@SkipIfApacheHive.feature_not_supported
 class TestGeospatialFuctions(ImpalaTestSuite):
   """Tests the geospatial builtin functions"""
 
@@ -31,15 +32,27 @@ class TestGeospatialFuctions(ImpalaTestSuite):
     cls.ImpalaTestMatrix.add_constraint(lambda v:
         v.get_value('table_format').file_format == 'parquet')
 
-  @SkipIfApacheHive.feature_not_supported
   def test_esri_geospatial_functions(self, vector):
     # tests generated from
     # https://github.com/Esri/spatial-framework-for-hadoop/tree/master/hive/test
     self.run_test_case('QueryTest/geospatial-esri', vector)
-    # manual tests added
+
+  def test_esri_geospatial_functions_extra(self, vector):
+    # manually added tests
     self.run_test_case('QueryTest/geospatial-esri-extra', vector)
 
-  @SkipIfApacheHive.feature_not_supported
+  def test_esri_specific_overloads(self, vector):
+    # HIVE_ESRI-only overloads that are planned to be dropped in future.
+    self.run_test_case('QueryTest/geospatial-esri-specific-overloads', vector)
+
+  def test_esri_srid(self, vector):
+    # SRID-dependent tests
+    self.run_test_case('QueryTest/geospatial-esri-srid', vector)
+
+  def test_esri_high_dimension(self, vector):
+    # 3D/4D geometry tests (ST_Z, ST_M, ST_Is3D, etc.)
+    self.run_test_case('QueryTest/geospatial-esri-high-dimension', vector)
+
   def test_esri_geospatial_planner(self, vector):
     # These tests are not among planner tests because with default flags
     # geospatial builtin functions are not loaded.
