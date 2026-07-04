@@ -17,6 +17,8 @@
 
 #pragma once
 
+#include <array>
+
 #include "udf/udf.h"
 #include "util/bit-util.h"
 
@@ -26,6 +28,9 @@ using impala_udf::FunctionContext;
 using impala_udf::StringVal;
 
 // see https://github.com/Esri/spatial-framework-for-hadoop/blob/v2.2.0/hive/src/main/java/com/esri/hadoop/hive/GeometryUtils.java#L21
+// Note: GEOMETRYCOLLECTION (OGC type 7) is not supported by either the Java (ESRI)
+// or C++ code paths. The ESRI library's ST_GeomCollection only accepts homogeneous
+// multi-part geometries, not true heterogeneous collections.
 enum OGCType {
     UNKNOWN = 0,
     ST_POINT = 1,
@@ -46,4 +51,4 @@ constexpr std::array<const char*, ST_MULTIPOLYGON + 1> OGCTypeToStr = {{
     "ST_MULTIPOLYGON"
 }};
 
-} // namespace impala
+} // namespace impala::geo

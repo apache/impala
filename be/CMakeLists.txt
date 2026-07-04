@@ -620,6 +620,7 @@ set (UNIFIED_TEST_LIBS
   ExecJsonTests
   ExecParquetTests
   ExprsTests
+  ExprsGeoTests
   GUtilTests
   IoTests
   OtelTests

@@ -23,6 +23,7 @@ set(EXECUTABLE_OUTPUT_PATH "${BUILD_OUTPUT_ROOT_DIRECTORY}/exprs/geo")
 
 add_library(ExprsGeoIr
   geospatial-functions-ir.cc
+  wkb-serialization.cc
 )
 add_dependencies(ExprsGeoIr gen-deps)
 
@@ -30,4 +31,9 @@ if (BUILD_WITH_NO_TESTS)
   return()
 endif()
 
-# Add tests here.
+add_library(ExprsGeoTests STATIC
+  wkb-serialization-test.cc
+)
+add_dependencies(ExprsGeoTests gen-deps)
+
+ADD_UNIFIED_BE_LSAN_TEST(wkb-serialization-test "WkbMalformedTest.*:WkbRoundTripTest.*")
