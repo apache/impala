@@ -1082,13 +1082,13 @@ class TestShowCreateTable(KuduTestSuite):
       # TODO we should move these tests to a query.test file so that we can have better
       # way to compare the output against different hive versions
       assert output.startswith("CREATE EXTERNAL TABLE")
-      assert "'external.table.purge'='TRUE', " in output
+      assert "'external.table.purge'='TRUE',\n" in output
       # We have made sure that the output starts with CREATE EXTERNAL TABLE, now we can
       # change it to "CREATE TABLE" to make it easier to compare rest of the str
       output = output.replace("CREATE EXTERNAL TABLE", "CREATE TABLE")
       # We should also remove the additional tbl property external.table.purge so that we
       # can compare the rest of output
-      output = output.replace("'external.table.purge'='TRUE', ", "")
+      output = output.replace("  'external.table.purge'='TRUE',\n", "")
     assert output == \
         textwrap.dedent(show_create_sql.format(**format_args)).strip()
 
@@ -1107,8 +1107,10 @@ class TestShowCreateTable(KuduTestSuite):
       )
       PARTITION BY HASH (c) PARTITIONS 3
       STORED AS KUDU
-      TBLPROPERTIES ('TRANSLATED_TO_EXTERNAL'='TRUE', """
-      """'kudu.master_addresses'='{kudu_addr}')""")
+      TBLPROPERTIES (
+        'TRANSLATED_TO_EXTERNAL'='TRUE',
+        'kudu.master_addresses'='{kudu_addr}'
+      )""")
     self.assert_show_create_equals(
       unique_database,
       """
@@ -1124,8 +1126,10 @@ class TestShowCreateTable(KuduTestSuite):
       )
       PARTITION BY HASH (c) PARTITIONS 3, RANGE (c) (...)
       STORED AS KUDU
-      TBLPROPERTIES ('TRANSLATED_TO_EXTERNAL'='TRUE', """
-      """'kudu.master_addresses'='{kudu_addr}')""")
+      TBLPROPERTIES (
+        'TRANSLATED_TO_EXTERNAL'='TRUE',
+        'kudu.master_addresses'='{kudu_addr}'
+      )""")
     self.assert_show_create_equals(
       unique_database,
       """
@@ -1138,8 +1142,10 @@ class TestShowCreateTable(KuduTestSuite):
       )
       PARTITION BY HASH (c) PARTITIONS 3
       STORED AS KUDU
-      TBLPROPERTIES ('TRANSLATED_TO_EXTERNAL'='TRUE', """
-      """'kudu.master_addresses'='{kudu_addr}')""")
+      TBLPROPERTIES (
+        'TRANSLATED_TO_EXTERNAL'='TRUE',
+        'kudu.master_addresses'='{kudu_addr}'
+      )""")
     self.assert_show_create_equals(
       unique_database,
       """
@@ -1155,8 +1161,10 @@ class TestShowCreateTable(KuduTestSuite):
       )
       PARTITION BY HASH (c) PARTITIONS 3, HASH (d) PARTITIONS 3, RANGE (c, d) (...)
       STORED AS KUDU
-      TBLPROPERTIES ('TRANSLATED_TO_EXTERNAL'='TRUE', """
-      """'kudu.master_addresses'='{kudu_addr}')""")
+      TBLPROPERTIES (
+        'TRANSLATED_TO_EXTERNAL'='TRUE',
+        'kudu.master_addresses'='{kudu_addr}'
+      )""")
     self.assert_show_create_equals(
       unique_database,
       """
@@ -1173,8 +1181,10 @@ class TestShowCreateTable(KuduTestSuite):
       )
       PARTITION BY RANGE (c) (...)
       STORED AS KUDU
-      TBLPROPERTIES ('TRANSLATED_TO_EXTERNAL'='TRUE', """
-      """'kudu.master_addresses'='{kudu_addr}')""")
+      TBLPROPERTIES (
+        'TRANSLATED_TO_EXTERNAL'='TRUE',
+        'kudu.master_addresses'='{kudu_addr}'
+      )""")
     self.assert_show_create_equals(
       unique_database,
       """
@@ -1185,8 +1195,10 @@ class TestShowCreateTable(KuduTestSuite):
         PRIMARY KEY (c)
       )
       STORED AS KUDU
-      TBLPROPERTIES ('TRANSLATED_TO_EXTERNAL'='TRUE', """
-      """'kudu.master_addresses'='{kudu_addr}')""")
+      TBLPROPERTIES (
+        'TRANSLATED_TO_EXTERNAL'='TRUE',
+        'kudu.master_addresses'='{kudu_addr}'
+      )""")
     self.assert_show_create_equals(
       unique_database,
       """
@@ -1197,8 +1209,10 @@ class TestShowCreateTable(KuduTestSuite):
         PRIMARY KEY (c)
       )
       STORED AS KUDU
-      TBLPROPERTIES ('TRANSLATED_TO_EXTERNAL'='TRUE', """
-      """'kudu.master_addresses'='{kudu_addr}')""",
+      TBLPROPERTIES (
+        'TRANSLATED_TO_EXTERNAL'='TRUE',
+        'kudu.master_addresses'='{kudu_addr}'
+      )""",
       extra_args={'p': self.column_properties})
 
   @SkipIfKudu.hms_integration_enabled()
@@ -1222,8 +1236,10 @@ class TestShowCreateTable(KuduTestSuite):
       )
       PARTITION BY HASH (c) PARTITIONS 3
       STORED AS KUDU
-      TBLPROPERTIES ('TRANSLATED_TO_EXTERNAL'='TRUE', """
-      """'kudu.master_addresses'='{kudu_addr}')""")
+      TBLPROPERTIES (
+        'TRANSLATED_TO_EXTERNAL'='TRUE',
+        'kudu.master_addresses'='{kudu_addr}'
+      )""")
     self.assert_show_create_equals(
       unique_database,
       create_sql_fmt, show_create_sql_fmt,
@@ -1270,7 +1286,10 @@ class TestShowCreateTable(KuduTestSuite):
         """
         CREATE EXTERNAL TABLE {db}.{table}
         STORED AS KUDU
-        TBLPROPERTIES ('kudu.master_addresses'='{kudu_addr}', {kudu_table})""",
+        TBLPROPERTIES (
+          'kudu.master_addresses'='{kudu_addr}',
+          {kudu_table}
+        )""",
         do_exact_match=True,
         extra_args={
           "props": table_name_prop,
@@ -1297,8 +1316,10 @@ class TestShowCreateTable(KuduTestSuite):
       )
       PARTITION BY HASH (c) PARTITIONS 3
       STORED AS KUDU
-      TBLPROPERTIES ('TRANSLATED_TO_EXTERNAL'='TRUE', """
-      """'kudu.master_addresses'='{kudu_addr}')""")
+      TBLPROPERTIES (
+        'TRANSLATED_TO_EXTERNAL'='TRUE',
+        'kudu.master_addresses'='{kudu_addr}'
+      )""")
 
   def test_synchronized_kudu_table_with_show_create(self, unique_database):
     # in this case we do exact match with the provided input since this is specifically
@@ -1321,8 +1342,10 @@ class TestShowCreateTable(KuduTestSuite):
       )
       PARTITION BY HASH (id) PARTITIONS 16
       STORED AS KUDU
-      TBLPROPERTIES ('external.table.purge'='true', """
-      """'kudu.master_addresses'='{kudu_addr}')""",
+      TBLPROPERTIES (
+        'external.table.purge'='true',
+        'kudu.master_addresses'='{kudu_addr}'
+      )""",
       do_exact_match=True)
 
     self.assert_show_create_equals(
@@ -1342,8 +1365,10 @@ class TestShowCreateTable(KuduTestSuite):
       )
       PARTITION BY HASH (id) PARTITIONS 16
       STORED AS KUDU
-      TBLPROPERTIES ('external.table.purge'='true', """
-      """'kudu.master_addresses'='{kudu_addr}')""",
+      TBLPROPERTIES (
+        'external.table.purge'='true',
+        'kudu.master_addresses'='{kudu_addr}'
+      )""",
       do_exact_match=True)
 
 

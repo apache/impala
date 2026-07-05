@@ -1099,7 +1099,7 @@ public class ToSqlUtils {
           // properly escaped.
           StringEscapeUtils.escapeJava(entry.getValue())));
     }
-    return "(" + Joiner.on(", ").join(properties) + ")";
+    return "(\n  " + Joiner.on(",\n  ").join(properties) + "\n)";
   }
 
   /**

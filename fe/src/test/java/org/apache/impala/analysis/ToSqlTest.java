@@ -360,8 +360,8 @@ public class ToSqlTest extends FrontendTestBase {
         "default",
         String.format("CREATE TABLE default.p ( a BIGINT PRIMARY KEY, b TIMESTAMP " +
         "DEFAULT '1987-05-19' ) PARTITION BY HASH (a) PARTITIONS 3 " +
-        "STORED AS KUDU TBLPROPERTIES ('kudu.master_addresses'='%s', " +
-        "'storage_handler'='org.apache.hadoop.hive.kudu.KuduStorageHandler')",
+        "STORED AS KUDU TBLPROPERTIES ( 'kudu.master_addresses'='%s', " +
+        "'storage_handler'='org.apache.hadoop.hive.kudu.KuduStorageHandler' )",
         kuduMasters),
         true);
 
@@ -387,8 +387,8 @@ public class ToSqlTest extends FrontendTestBase {
         "default",
         "CREATE TABLE default.test_create_managed_paimon_table ("
         + " user_id BIGINT, item_id BIGINT, behavior STRING )"
-        + " STORED AS PAIMON TBLPROPERTIES ('deletion-vectors.enabled'='true', "
-        + "'storage_handler'='org.apache.paimon.hive.PaimonStorageHandler')",
+        + " STORED AS PAIMON TBLPROPERTIES ( 'deletion-vectors.enabled'='true', "
+        + "'storage_handler'='org.apache.paimon.hive.PaimonStorageHandler' )",
        true);
 
       testToSql("CREATE TABLE  test_create_managed_part_paimon_table ("
@@ -397,8 +397,8 @@ public class ToSqlTest extends FrontendTestBase {
         "CREATE TABLE default.test_create_managed_part_paimon_table ("
         + " user_id BIGINT, item_id BIGINT, behavior STRING ) "
         + "PARTITIONED BY ( dt STRING, hh STRING ) STORED AS PAIMON "
-        + "TBLPROPERTIES ('deletion-vectors.enabled'='true', "
-        + "'storage_handler'='org.apache.paimon.hive.PaimonStorageHandler')",
+        + "TBLPROPERTIES ( 'deletion-vectors.enabled'='true', "
+        + "'storage_handler'='org.apache.paimon.hive.PaimonStorageHandler' )",
             true);
 
     testToSql("CREATE TABLE test_create_managed_part_pk_paimon_table ("
@@ -408,9 +408,9 @@ public class ToSqlTest extends FrontendTestBase {
         "CREATE TABLE default.test_create_managed_part_pk_paimon_table ( "
         + "user_id BIGINT, item_id BIGINT, behavior STRING ) "
         + "PARTITIONED BY ( dt STRING, hh STRING ) "
-        + "STORED AS PAIMON TBLPROPERTIES ('deletion-vectors.enabled'='true',"
+        + "STORED AS PAIMON TBLPROPERTIES ( 'deletion-vectors.enabled'='true',"
         + " 'primary-key'='user_id', "
-        + "'storage_handler'='org.apache.paimon.hive.PaimonStorageHandler')",
+        + "'storage_handler'='org.apache.paimon.hive.PaimonStorageHandler' )",
       true);
 
     testToSql("CREATE TABLE test_create_managed_bucket_paimon_table ("
@@ -419,9 +419,9 @@ public class ToSqlTest extends FrontendTestBase {
         "CREATE TABLE default.test_create_managed_bucket_paimon_table ("
         + " user_id BIGINT, item_id BIGINT, behavior STRING ) "
         + "STORED AS PAIMON TBLPROPERTIES "
-        + "('bucket'='4', 'bucket-key'='behavior', "
+        + "( 'bucket'='4', 'bucket-key'='behavior', "
         + "'deletion-vectors.enabled'='true', "
-        + "'storage_handler'='org.apache.paimon.hive.PaimonStorageHandler')",
+        + "'storage_handler'='org.apache.paimon.hive.PaimonStorageHandler' )",
         true);
   }
 
@@ -468,9 +468,11 @@ public class ToSqlTest extends FrontendTestBase {
         "default",
         String.format("CREATE TABLE default.p PRIMARY KEY (a, b) " +
         "PARTITION BY HASH (a) PARTITIONS 3, RANGE (b) (PARTITION VALUE = 1) " +
-        "STORED AS KUDU TBLPROPERTIES ('kudu.master_addresses'='%s', " +
-        "'storage_handler'='org.apache.hadoop.hive.kudu.KuduStorageHandler') AS SELECT " +
-        "int_col a, bigint_col b FROM functional.alltypes", kuduMasters), true);
+        "STORED AS KUDU TBLPROPERTIES ( 'kudu.master_addresses'='%s', " +
+        "'storage_handler'='org.apache.hadoop." +
+        "hive.kudu.KuduStorageHandler' ) " +
+        "AS SELECT int_col a, bigint_col b " +
+        "FROM functional.alltypes", kuduMasters), true);
   }
 
   @Test
@@ -571,7 +573,7 @@ public class ToSqlTest extends FrontendTestBase {
       "create view test_properties tblproperties ('a'='aa', 'b'='bb') as " +
       "select int_col, string_col from functional.alltypes",
       "default",
-      "CREATE VIEW test_properties TBLPROPERTIES ('a'='aa', 'b'='bb') AS " +
+      "CREATE VIEW test_properties TBLPROPERTIES (\n  'a'='aa',\n  'b'='bb'\n) AS " +
       "SELECT int_col, string_col FROM functional.alltypes");
   }
 
@@ -606,7 +608,7 @@ public class ToSqlTest extends FrontendTestBase {
         "INNER JOIN functional.alltypessmall y ON (x.id = y.id) GROUP BY x.bigint_col");
     testToSql("alter view functional.alltypes_view set tblproperties ('a'='b')",
         "functional",
-        "ALTER VIEW functional.alltypes_view SET TBLPROPERTIES ('a'='b')");
+        "ALTER VIEW functional.alltypes_view SET TBLPROPERTIES (\n  'a'='b'\n)");
     testToSql("alter view functional.alltypes_view unset tblproperties ('a', 'c')",
         "functional",
         "ALTER VIEW functional.alltypes_view UNSET TBLPROPERTIES ('a', 'c')");

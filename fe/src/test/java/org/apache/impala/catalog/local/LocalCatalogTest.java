@@ -65,6 +65,7 @@ import com.google.common.base.Joiner;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
 
+
 public class LocalCatalogTest {
   private CatalogdMetaProvider provider_;
   private LocalCatalog catalog_;
@@ -444,10 +445,17 @@ public class LocalCatalogTest {
         "  year INT\n" +
         ")\n" +
         "STORED BY 'org.apache.hadoop.hive.hbase.HBaseStorageHandler'\n" +
-        "WITH SERDEPROPERTIES ('hbase.columns.mapping'=':key,d:bool_col,d:tinyint_col," +
+        "WITH SERDEPROPERTIES (\n" +
+        "  'hbase.columns.mapping'=':key,d:bool_col,d:tinyint_col," +
         "d:smallint_col,d:int_col,d:bigint_col,d:float_col,d:double_col," +
-        "d:date_string_col,d:string_col,d:timestamp_col,d:year,d:month', " +
-        "'serialization.format'='1')"
+        "d:date_string_col,d:string_col,d:timestamp_col,d:year,d:month',\n" +
+        "  'serialization.format'='1'\n" +
+        ")\n" +
+        "TBLPROPERTIES (\n" +
+        "  'bucketing_version'='2',\n" +
+        "  'hbase.table.name'='functional_hbase.alltypes',\n" +
+        "  'storage_handler'='org.apache.hadoop.hive.hbase.HBaseStorageHandler'\n" +
+        ")"
     ));
 
     t = (LocalHbaseTable) catalog_.getTable("functional_hbase", "date_tbl");
@@ -458,8 +466,15 @@ public class LocalCatalogTest {
         "  date_part DATE\n" +
         ")\n" +
         "STORED BY 'org.apache.hadoop.hive.hbase.HBaseStorageHandler'\n" +
-        "WITH SERDEPROPERTIES ('hbase.columns.mapping'=':key,d:date_col,d:date_part', " +
-        "'serialization.format'='1')"
+        "WITH SERDEPROPERTIES (\n" +
+        "  'hbase.columns.mapping'=':key,d:date_col,d:date_part',\n" +
+        "  'serialization.format'='1'\n" +
+        ")\n" +
+        "TBLPROPERTIES (\n" +
+        "  'bucketing_version'='2',\n" +
+        "  'hbase.table.name'='functional_hbase.date_tbl',\n" +
+        "  'storage_handler'='org.apache.hadoop.hive.hbase.HBaseStorageHandler'\n" +
+        ")"
     ));
 
     t = (LocalHbaseTable) catalog_.getTable("functional_hbase", "binary_tbl");
@@ -470,9 +485,15 @@ public class LocalCatalogTest {
         "  string_col STRING\n" +
         ")\n" +
         "STORED BY 'org.apache.hadoop.hive.hbase.HBaseStorageHandler'\n" +
-        "WITH SERDEPROPERTIES (" +
-        "'hbase.columns.mapping'=':key,d:string_col,d:binary_col', " +
-        "'serialization.format'='1')"
+       "WITH SERDEPROPERTIES (\n" +
+       "  'hbase.columns.mapping'=':key,d:string_col,d:binary_col',\n" +
+       "  'serialization.format'='1'\n" +
+       ")\n" +
+       "TBLPROPERTIES (\n" +
+       "  'bucketing_version'='2',\n" +
+       "  'hbase.table.name'='functional_hbase.binary_tbl',\n" +
+       "  'storage_handler'='org.apache.hadoop.hive.hbase.HBaseStorageHandler'\n" +
+       ")"
     ));
   }
 

@@ -109,22 +109,22 @@ class TestWorkloadManagementInitBase(CustomClusterTestSuite):
 
     res = self.client.execute("show create table {}".format(tbl_name))
     assert res.success
-
+    # Join lines into full DDL string in case res.data is split per line or multiline
+    full_ddl = "\n".join(res.data) if isinstance(res.data, list) else str(res.data)
     if should_exist:
-      found = False
-      for line in res.data:
-        if re.search(r"TBLPROPERTIES.*?'{}'='{}'".format(expected_key, expected_val),
-            line):
-          found = True
-          break
-
-      assert found, "did not find expected table prop '{}' with value '{}' on table " \
-          "'{}'".format(expected_key, expected_val, tbl_name)
+      # Search for 'key'='value' with optional whitespace around '='
+      pattern = r"'{}'\s*=\s*'{}'".format(
+        re.escape(expected_key),
+        re.escape(expected_val))
+      found = bool(re.search(pattern, full_ddl))
+      assert found, (
+        "did not find expected table prop '{}' with value '{}' on table '{}'".format(
+          expected_key, expected_val, tbl_name))
     else:
-      for line in res.data:
-        if re.search(r"TBLPROPERTIES.*?'{}'".format(expected_key), line):
-          assert False, "found table pop '{}' on table '{}' but this property should " \
-              "not exist"
+      pattern = r"'{}'\s*=".format(re.escape(expected_key))
+      assert not re.search(pattern, full_ddl), \
+        "found table prop '{}' on table '{}' but this property should not exist".format(
+          expected_key, tbl_name)
 
   def assert_catalogd_all_tables(self, line_regex, level="INFO"):
     """Asserts a given regex is found in the catalog log file for each workload management
