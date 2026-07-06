@@ -20,6 +20,7 @@
 #include <boost/bind.hpp>
 #include <gutil/strings/substitute.h>
 
+#include "codegen/llvm-codegen.h"
 #include "runtime/bufferpool/reservation-tracker.h"
 #include "runtime/collection-value.h"
 #include "runtime/descriptors.h"
@@ -49,6 +50,8 @@ using namespace strings;
 
 using BufferHandle = BufferPool::BufferHandle;
 using FlushMode = RowBatch::FlushMode;
+
+const char* BufferedTupleStream::LLVM_CLASS_NAME = "class.impala::BufferedTupleStream";
 
 constexpr int64_t BufferedTupleStream::MAX_PAGE_ITER_DEBUG;
 
@@ -995,6 +998,225 @@ int64_t BufferedTupleStream::ComputeRowSize(TupleRow* row)
   return size;
 }
 
+// Codegen for tuple row deepcopy. Example for row containing a single non-nullable tuple
+// with (int, string):
+//
+// define i1 @DeepCopy(%"class.impala::BufferedTupleStream"* %this_ptr,
+//    %"class.impala::TupleRow"* %row, i8** %data, i8* %data_end) {
+// entry:
+//   %data_start = load i8*, i8** %data
+//   %result = call i1
+//       @_ZN6impala19BufferedTupleStream17CopyTupleFixedLenEPNS_8TupleRowEiiPPaPKab
+//       (%"class.impala::TupleRow"* %row, i32 0, i32 17, i8** %data, i8* %data_end,
+//       i1 false)
+//   br i1 %result, label %continue, label %return
+//
+// return:                                           ; preds = %continue, %entry
+//   store i8* %data_start, i8** %data
+//   ret i1 false
+//
+// continue:                                         ; preds = %entry
+//   %tuple = call %"class.impala::Tuple"* @_ZNK6impala8TupleRow10GetTupleIREi
+//       (%"class.impala::TupleRow"* %row, i32 0)
+//   %result1 = call i1
+//       @_ZN6impala19BufferedTupleStream10CopyStringEPKNS_5TupleEihiPPhPKh
+//       (%"class.impala::Tuple"* %tuple, i32 16, i8 1, i32 0, i8** %data, i8* %data_end)
+//   br i1 %result1, label %continue2, label %return
+//
+// continue2:                                        ; preds = %continue
+//   ret i1 true
+// }
+Status BufferedTupleStream::CodegenDeepCopy(LlvmCodeGen* codegen,
+    const RowDescriptor* desc, llvm::Function** fn) {
+  DCHECK(desc != nullptr);
+
+  llvm::PointerType* this_ptr_type = codegen->GetStructPtrType<BufferedTupleStream>();
+  llvm::PointerType* tuple_row_ptr_type = codegen->GetStructPtrType<TupleRow>();
+  llvm::PointerType* tuple_ptr_type = codegen->GetStructPtrType<Tuple>();
+
+  LlvmCodeGen::FnPrototype prototype(codegen, "DeepCopy", codegen->bool_type());
+  prototype.AddArgument(LlvmCodeGen::NamedVariable("this_ptr", this_ptr_type));
+  prototype.AddArgument(LlvmCodeGen::NamedVariable("row", tuple_row_ptr_type));
+  prototype.AddArgument(LlvmCodeGen::NamedVariable("data", codegen->GetPtrType(
+      codegen->ptr_type())));
+  prototype.AddArgument(LlvmCodeGen::NamedVariable("data_end", codegen->ptr_type()));
+
+  llvm::LLVMContext& context = codegen->context();
+  LlvmBuilder builder(context);
+  llvm::Value* args[4];
+  *fn = prototype.GeneratePrototype(&builder, args);
+  llvm::Value* this_arg = args[0];
+  llvm::Value* row_arg = args[1];
+  llvm::Value* data_arg = args[2];
+  llvm::Value* data_end_arg = args[3];
+
+  bool has_nullable_tuple = desc->IsAnyTupleNullable();
+
+  llvm::BasicBlock* return_block = llvm::BasicBlock::Create(context, "return", *fn);
+
+  // uint8_t* data_start = *data;
+  llvm::Value* data_start = builder.CreateLoad(data_arg, "data_start");
+
+  if (has_nullable_tuple) {
+    // bool result = CopyTupleNullIndicators(row, num_tuples, data, data_end);
+    llvm::Value* num_tuples = codegen->GetI32Constant(desc->tuple_descriptors().size());
+    llvm::Value* result = codegen->CodegenCallFunction(&builder,
+        IRFunction::BUFFERED_TUPLE_STREAM_COPY_TUPLE_NULL_INDICATORS,
+        {row_arg, num_tuples, data_arg, data_end_arg}, "result");
+    // if (!result) return false;
+    llvm::BasicBlock* continue_block = llvm::BasicBlock::Create(context, "continue", *fn);
+    builder.CreateCondBr(result, continue_block, return_block);
+
+    builder.SetInsertPoint(continue_block);
+  }
+
+  // Copy fixed sized tuple data
+  for (int i = 0; i < desc->tuple_descriptors().size(); ++i) {
+    // bool result = CopyTupleFixedLen(row, tuple_idx, tuple_size, data, data_end);
+    const TupleDescriptor* tuple_desc = desc->tuple_descriptors()[i];
+    llvm::Value* nullable_tuple = desc->TupleIsNullable(i) ?
+        codegen->true_value() : codegen->false_value();
+    llvm::Value* tuple_idx = codegen->GetI32Constant(i);
+    llvm::Value* tuple_size = codegen->GetI32Constant(tuple_desc->byte_size());
+    llvm::Value* result = codegen->CodegenCallFunction(&builder,
+        IRFunction::BUFFERED_TUPLE_STREAM_COPY_FIXED_LEN,
+        {row_arg, tuple_idx, tuple_size, data_arg, data_end_arg, nullable_tuple},
+        "result");
+
+    // if (!result) return false;
+    llvm::BasicBlock* continue_block = llvm::BasicBlock::Create(context, "continue", *fn);
+    builder.CreateCondBr(result, continue_block, return_block);
+
+    builder.SetInsertPoint(continue_block);
+  }
+
+  // Copy strings
+  for (int i = 0; i < desc->tuple_descriptors().size(); ++i) {
+    const TupleDescriptor* tuple_desc = desc->tuple_descriptors()[i];
+
+    if (tuple_desc->string_slots().size() == 0) continue;
+
+    llvm::Value* tuple_idx = codegen->GetI32Constant(i);
+    llvm::Value* tuple = codegen->CodegenCallFunction(&builder,
+        IRFunction::TUPLE_ROW_GET_TUPLE, {row_arg, tuple_idx}, "tuple");
+
+    llvm::BasicBlock* continue_block = nullptr;
+    if (has_nullable_tuple) {
+      // Skipping processing the tuple if it is null.
+      // if (tuple == nullptr) continue;
+      continue_block = llvm::BasicBlock::Create(context, "continue", *fn);
+
+      llvm::Value* null_ptr = llvm::ConstantPointerNull::get(tuple_ptr_type);
+      llvm::Value* is_null = builder.CreateICmpEQ(tuple, null_ptr, "is_null");
+
+      llvm::BasicBlock* process_tuple_block = llvm::BasicBlock::Create(context,
+         "process_tuple", *fn);
+      builder.CreateCondBr(is_null, continue_block, process_tuple_block);
+      builder.SetInsertPoint(process_tuple_block);
+    }
+
+    for (SlotDescriptor* slot_desc : tuple_desc->string_slots()) {
+      // bool result = BufferedTupleStream::CopyString(tuple, null_byte_offset,
+      //     null_bit_mask, tuple_offset, data, data_end);
+
+      llvm::Value* null_byte_offset = codegen->GetI32Constant(
+          slot_desc->null_indicator_offset().byte_offset);
+      llvm::Value* null_bit_mask = codegen->GetI8Constant(
+          slot_desc->null_indicator_offset().bit_mask);
+
+      llvm::Value* tuple_offset = codegen->GetI32Constant(slot_desc->tuple_offset());
+
+      llvm::Value* result = codegen->CodegenCallFunction(&builder,
+          IRFunction::BUFFERED_TUPLE_STREAM_COPY_STRING,
+          {tuple, null_byte_offset, null_bit_mask, tuple_offset, data_arg, data_end_arg},
+          "result");
+
+      // if (!result) return false;
+      llvm::BasicBlock* continue_block =
+          llvm::BasicBlock::Create(context, "continue", *fn);
+      builder.CreateCondBr(result, continue_block, return_block);
+
+      builder.SetInsertPoint(continue_block);
+    }
+
+    if (has_nullable_tuple) {
+      builder.CreateBr(continue_block);
+      builder.SetInsertPoint(continue_block);
+    }
+  }
+
+  // Copy collections
+  // If there is at least one collection type, DeepCopyCollection function is called.
+  // TODO: Consider proper codegen for collections
+  bool has_collections = false;
+  for (int i = 0; i < desc->tuple_descriptors().size(); ++i) {
+    const TupleDescriptor* tuple_desc = desc->tuple_descriptors()[i];
+
+    if (tuple_desc->collection_slots().size() > 0) {
+      has_collections = true;
+      break;
+    }
+  }
+
+  if (has_collections) {
+    // bool result = DeepCopyCollections(row, data, data_end);
+    llvm::Value* result = codegen->CodegenCallFunction(&builder,
+        has_nullable_tuple ?
+            IRFunction::BUFFERED_TUPLE_STREAM_DEEP_COPY_COLLECTIONS_NULLABLE :
+            IRFunction::BUFFERED_TUPLE_STREAM_DEEP_COPY_COLLECTIONS_NO_NULLABLE,
+       {this_arg, row_arg, data_arg, data_end_arg}, "result");
+
+    // if (!result) return false;
+    llvm::BasicBlock* continue_block = llvm::BasicBlock::Create(context, "continue", *fn);
+    builder.CreateCondBr(result, continue_block, return_block);
+
+    builder.SetInsertPoint(continue_block);
+  }
+
+  // return true;
+  builder.CreateRet(codegen->true_value());
+
+  // Branch in case data doesn't fit:
+  // *data = data_start;
+  // return false;
+  builder.SetInsertPoint(return_block);
+  builder.CreateStore(data_start, data_arg);
+  builder.CreateRet(codegen->false_value());
+
+  *fn = codegen->FinalizeFunction(*fn);
+  if (*fn == nullptr) {
+    return Status(
+        "Codegen'd BufferedTupleStream::CodegenDeepCopy() function failed verification, "
+        "see log");
+  }
+
+  return Status::OK();
+}
+
+Status BufferedTupleStream::CodegenAddRow(LlvmCodeGen* codegen, const RowDescriptor* desc,
+    llvm::Function** fn) {
+  DCHECK(desc != nullptr);
+
+  llvm::Function* deep_copy_fn = nullptr;
+  RETURN_IF_ERROR(CodegenDeepCopy(codegen, desc, &deep_copy_fn));
+
+  llvm::Function* add_row_fn =
+      codegen->GetFunction(IRFunction::BUFFERED_TUPLE_STREAM_ADD_ROW, true);
+  DCHECK(add_row_fn != nullptr);
+
+  int replaced = codegen->ReplaceCallSites(add_row_fn, deep_copy_fn, "DeepCopy");
+  DCHECK_REPLACE_COUNT(replaced, 1);
+
+  *fn = codegen->FinalizeFunction(add_row_fn);
+  if (*fn == nullptr) {
+    return Status(
+        "Codegen'd BufferedTupleStream::CodegenAddRow() function failed verification, "
+        "see log");
+  }
+
+  return Status::OK();
+}
+
 bool BufferedTupleStream::AddRowSlow(TupleRow* row, Status* status) noexcept {
   // Use AddRowCustom*() to do the work of advancing the page.
   int64_t row_size = ComputeRowSize(row);
@@ -1033,26 +1255,12 @@ void BufferedTupleStream::AddLargeRowCustomEnd(int64_t size) noexcept {
   CHECK_CONSISTENCY_FAST(read_it_);
 }
 
-bool BufferedTupleStream::AddRow(TupleRow* row, Status* status) noexcept {
-  DCHECK(!closed_);
-  DCHECK(has_write_iterator());
-  if (UNLIKELY(write_page_ == nullptr || !DeepCopy(row, &write_ptr_, write_end_ptr_))) {
-    return AddRowSlow(row, status);
-  }
-  DCHECK_LT(num_rows_, INT64_MAX);
-  DCHECK_LT(write_page_->num_rows, INT64_MAX);
-  ++num_rows_;
-  ++write_page_->num_rows;
-  return true;
-}
-
-bool BufferedTupleStream::DeepCopy(
+bool IR_NO_INLINE BufferedTupleStream::DeepCopy(
     TupleRow* row, uint8_t** data, const uint8_t* data_end) noexcept {
   return has_nullable_tuple_ ? DeepCopyInternal<true>(row, data, data_end) :
                                DeepCopyInternal<false>(row, data, data_end);
 }
 
-// TODO: consider codegening this.
 // TODO: in case of duplicate tuples, this can redundantly serialize data.
 template <bool HAS_NULLABLE_TUPLE>
 bool BufferedTupleStream::DeepCopyInternal(
@@ -1062,36 +1270,22 @@ bool BufferedTupleStream::DeepCopyInternal(
   // Copy the not NULL fixed len tuples. For the NULL tuples just update the NULL tuple
   // indicator.
   if (HAS_NULLABLE_TUPLE) {
-    int null_indicator_bytes = NullIndicatorBytesPerRow();
-    if (UNLIKELY(pos + null_indicator_bytes > data_end)) return false;
-    uint8_t* null_indicators = pos;
-    pos += NullIndicatorBytesPerRow();
-    memset(null_indicators, 0, null_indicator_bytes);
-    for (int i = 0; i < tuples_per_row; ++i) {
-      uint8_t* null_word = null_indicators + (i >> 3);
-      const uint32_t null_pos = i & 7;
-      const int tuple_size = fixed_tuple_sizes_[i];
-      Tuple* t = row->GetTuple(i);
-      const uint8_t mask = 1 << (7 - null_pos);
-      if (t != nullptr) {
-        if (UNLIKELY(pos + tuple_size > data_end)) return false;
-        memcpy(pos, t, tuple_size);
-        pos += tuple_size;
-      } else {
-        *null_word |= mask;
-      }
+    if (UNLIKELY(!CopyTupleNullIndicators(row, tuples_per_row, &pos,
+        data_end))) {
+      return false;
     }
-  } else {
-    // If we know that there are no nullable tuples no need to set the nullability flags.
-    for (int i = 0; i < tuples_per_row; ++i) {
-      const int tuple_size = fixed_tuple_sizes_[i];
-      if (UNLIKELY(pos + tuple_size > data_end)) return false;
-      Tuple* t = row->GetTuple(i);
+  }
+
+  for (int i = 0; i < tuples_per_row; ++i) {
+    const int tuple_size = fixed_tuple_sizes_[i];
+    if (!HAS_NULLABLE_TUPLE) {
       // TODO: Once IMPALA-1306 (Avoid passing empty tuples of non-materialized slots)
-      // is delivered, the check below should become DCHECK(t != nullptr).
-      DCHECK(t != nullptr || tuple_size == 0);
-      memcpy(pos, t, tuple_size);
-      pos += tuple_size;
+      // is delivered, the check below should become DCHECK(row->GetTuple(i) != nullptr).
+      DCHECK(row->GetTuple(i) != nullptr || tuple_size == 0);
+    }
+    if (UNLIKELY(!CopyTupleFixedLen(row, i, tuple_size, &pos, data_end,
+        HAS_NULLABLE_TUPLE))) {
+      return false;
     }
   }
 
@@ -1101,34 +1295,42 @@ bool BufferedTupleStream::DeepCopyInternal(
   for (int i = 0; i < inlined_string_slots_.size(); ++i) {
     const Tuple* tuple = row->GetTuple(inlined_string_slots_[i].first);
     if (HAS_NULLABLE_TUPLE && tuple == nullptr) continue;
-    if (UNLIKELY(!CopyStrings(tuple, inlined_string_slots_[i].second, &pos, data_end)))
+    if (UNLIKELY(!CopyStrings(tuple, inlined_string_slots_[i].second, &pos, data_end))) {
       return false;
+    }
   }
 
+  if (UNLIKELY(!DeepCopyCollections<HAS_NULLABLE_TUPLE>(row, &pos, data_end))) {
+    return false;
+  }
+
+  *data = pos;
+  return true;
+}
+
+template <bool HAS_NULLABLE_TUPLE>
+bool BufferedTupleStream::DeepCopyCollections(TupleRow* row, uint8_t** data,
+  const uint8_t* data_end) noexcept {
   // Copy inlined collection slots. We copy collection data in a well-defined order so
   // we do not need to convert pointers to offsets on the write path.
   for (int i = 0; i < inlined_coll_slots_.size(); ++i) {
     const Tuple* tuple = row->GetTuple(inlined_coll_slots_[i].first);
     if (HAS_NULLABLE_TUPLE && tuple == nullptr) continue;
-    if (UNLIKELY(!CopyCollections(tuple, inlined_coll_slots_[i].second, &pos, data_end)))
+    if (UNLIKELY(!CopyCollections(tuple, inlined_coll_slots_[i].second, data,
+        data_end))) {
       return false;
+    }
   }
-  *data = pos;
+
   return true;
 }
 
 bool BufferedTupleStream::CopyStrings(const Tuple* tuple,
     const vector<SlotDescriptor*>& string_slots, uint8_t** data, const uint8_t* data_end) {
   for (const SlotDescriptor* slot_desc : string_slots) {
-    if (tuple->IsNull(slot_desc->null_indicator_offset())) continue;
-    const StringValue* sv = tuple->GetStringSlot(slot_desc->tuple_offset());
-    if (LIKELY(sv->Len() > 0) && !sv->IsSmall()) {
-      StringValue::SimpleString s = sv->ToSimpleString();
-      if (UNLIKELY(*data + s.len > data_end)) return false;
-
-      memcpy(*data, s.ptr, s.len);
-      *data += s.len;
-    }
+    if (UNLIKELY(!CopyString(tuple, slot_desc->null_indicator_offset().byte_offset,
+        slot_desc->null_indicator_offset().bit_mask, slot_desc->tuple_offset(), data,
+        data_end))) return false;
   }
   return true;
 }
@@ -1153,8 +1355,8 @@ bool BufferedTupleStream::CopyCollections(const Tuple* tuple,
         if (UNLIKELY(!CopyStrings(item, item_desc.string_slots(), data, data_end))) {
           return false;
         }
-        if (UNLIKELY(
-                !CopyCollections(item, item_desc.collection_slots(), data, data_end))) {
+        if (UNLIKELY(!CopyCollections(item, item_desc.collection_slots(), data,
+            data_end))) {
           return false;
         }
         coll_data += item_desc.byte_size();

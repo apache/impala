@@ -35,6 +35,8 @@ class TupleRow {
     return tuples_[tuple_idx];
   }
 
+  Tuple* GetTupleIR(int tuple_idx) const;
+
   void ALWAYS_INLINE SetTuple(int tuple_idx, Tuple* tuple) {
     tuples_[tuple_idx] = tuple;
   }

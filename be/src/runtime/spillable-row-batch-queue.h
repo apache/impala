@@ -19,7 +19,7 @@
 
 #include <queue>
 
-#include "runtime/buffered-tuple-stream.h"
+#include "runtime/buffered-tuple-stream.inline.h"
 #include "runtime/reservation-manager.h"
 #include "runtime/row-batch.h"
 

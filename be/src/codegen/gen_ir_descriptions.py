@@ -255,6 +255,15 @@ ir_functions = [
   ["STRING_VALUE_UNSAFE_ASSIGN", "_ZN6impala11StringValue14IrUnsafeAssignEPci"],
   ["STRING_VALUE_CLEAR", "_ZN6impala11StringValue7IrClearEv"],
 
+  ["BUFFERED_TUPLE_STREAM_COPY_STRING", "_ZN6impala19BufferedTupleStream10CopyStringEPKNS_5TupleEihiPPhPKh"],
+  ["BUFFERED_TUPLE_STREAM_COPY_FIXED_LEN", "_ZN6impala19BufferedTupleStream17CopyTupleFixedLenEPNS_8TupleRowEiiPPhPKhb"],
+  ["BUFFERED_TUPLE_STREAM_COPY_TUPLE_NULL_INDICATORS", "_ZN6impala19BufferedTupleStream23CopyTupleNullIndicatorsEPNS_8TupleRowEiPPhPKh"],
+  ["BUFFERED_TUPLE_STREAM_DEEP_COPY_COLLECTIONS_NO_NULLABLE", "_ZN6impala19BufferedTupleStream19DeepCopyCollectionsILb0EEEbPNS_8TupleRowEPPhPKh"],
+  ["BUFFERED_TUPLE_STREAM_DEEP_COPY_COLLECTIONS_NULLABLE", "_ZN6impala19BufferedTupleStream19DeepCopyCollectionsILb1EEEbPNS_8TupleRowEPPhPKh"],
+  ["BUFFERED_TUPLE_STREAM_ADD_ROW", "_ZN6impala19BufferedTupleStream6AddRowEPNS_8TupleRowEPNS_6StatusE"],
+
+  ["TUPLE_ROW_GET_TUPLE", "_ZNK6impala8TupleRow10GetTupleIREi"],
+
   ["BOOL_MIN_MAX_FILTER_ALWAYSTRUE", "_ZNK6impala16BoolMinMaxFilter10AlwaysTrueEv"],
   ["TINYINT_MIN_MAX_FILTER_ALWAYSTRUE", "_ZNK6impala19TinyIntMinMaxFilter10AlwaysTrueEv"],
   ["SMALLINT_MIN_MAX_FILTER_ALWAYSTRUE", "_ZNK6impala20SmallIntMinMaxFilter10AlwaysTrueEv"],

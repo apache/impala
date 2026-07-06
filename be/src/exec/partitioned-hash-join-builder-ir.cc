@@ -16,6 +16,7 @@
 // under the License.
 
 #include "exec/partitioned-hash-join-builder.h"
+#include "exec/partitioned-hash-join-builder.inline.h"
 
 #include "common/compiler-util.h"
 #include "common/logging.h"
@@ -34,13 +35,6 @@ class TupleRow;
 }
 
 using namespace impala;
-
-inline bool PhjBuilder::AppendRow(
-    BufferedTupleStream* stream, TupleRow* row, Status* status) {
-  if (LIKELY(stream->AddRow(row, status))) return true;
-  if (UNLIKELY(!status->ok())) return false;
-  return AppendRowStreamFull(stream, row, status);
-}
 
 Status PhjBuilder::ProcessBuildBatch(
     RowBatch* build_batch, HashTableCtx* ctx, bool build_filters, bool is_null_aware) {

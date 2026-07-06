@@ -212,6 +212,8 @@ class BufferedTupleStream {
   /// A pointer to the start of a flattened TupleRow in the stream.
   typedef uint8_t* FlatRowPtr;
 
+  friend class StreamCodegenTest;
+
   /// row_desc: description of rows stored in the stream. This is the desc for rows
   /// that are added and the rows being returned.
   /// page_len: the size of pages to use in the stream
@@ -289,7 +291,7 @@ class BufferedTupleStream {
   ///
   /// BufferedTupleStream will do a deep copy of the memory in the row. After AddRow()
   /// returns an error, it should not be called again.
-  bool AddRow(TupleRow* row, Status* status) noexcept;
+  IR_NO_INLINE bool AddRow(TupleRow* row, Status* status) noexcept;
 
   /// Allocates space to store a row of 'size' bytes (including fixed and variable length
   /// data). If successful, returns a pointer to the allocated row. The caller then must
@@ -416,6 +418,14 @@ class BufferedTupleStream {
   bool has_write_iterator() const { return has_write_iterator_; }
 
   std::string DebugString() const;
+
+  static const char* LLVM_CLASS_NAME;
+
+  static Status CodegenDeepCopy(LlvmCodeGen* codegen, const RowDescriptor* desc,
+      llvm::Function** fn);
+
+  static Status CodegenAddRow(LlvmCodeGen* codegen, const RowDescriptor* desc,
+      llvm::Function** fn);
 
   static constexpr int64_t MAX_PAGE_ITER_DEBUG = 100;
 
@@ -703,11 +713,25 @@ class BufferedTupleStream {
   /// Copies 'row' into the buffer starting at *data and ending at the byte before
   /// 'data_end'. On success, returns true and updates *data to point after the last
   /// byte written. Returns false if there is not enough space in the buffer provided.
-  bool DeepCopy(TupleRow* row, uint8_t** data, const uint8_t* data_end) noexcept;
+  bool IR_NO_INLINE DeepCopy(TupleRow* row, uint8_t** data, const uint8_t* data_end)
+      noexcept;
+
+  template <bool HAS_NULLABLE_TUPLE>
+  bool IR_ALWAYS_INLINE DeepCopyCollections(TupleRow* row, uint8_t** data,
+      const uint8_t* data_end) noexcept;
 
   /// Templated implementation of DeepCopy().
   template <bool HAS_NULLABLE_TUPLE>
   bool DeepCopyInternal(TupleRow* row, uint8_t** data, const uint8_t* data_end) noexcept;
+
+  static bool IR_ALWAYS_INLINE CopyString(const Tuple *tuple, int null_byte_offset,
+      uint8_t null_bit_mask, int tuple_offset, uint8_t** data, const uint8_t* data_end);
+
+  static bool IR_ALWAYS_INLINE CopyTupleNullIndicators(TupleRow* row, int num_tuples,
+      uint8_t** data, const uint8_t* data_end);
+
+  static bool IR_ALWAYS_INLINE CopyTupleFixedLen(TupleRow* row, int tuple_idx,
+      int tuple_size, uint8_t** data, const uint8_t* data_end, bool check_null_tuple);
 
   /// Helper function to copy strings in string_slots from tuple into *data.
   /// Updates *data to the end of the string data added. Returns false if the data

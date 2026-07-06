@@ -34,6 +34,8 @@ add_library(RuntimeIr
   sorter-ir.cc
   sorted-run-merger-ir.cc
   string-value-ir.cc
+  buffered-tuple-stream-ir.cc
+  tuple-row-ir.cc
   tuple-ir.cc
 )
 add_dependencies(RuntimeIr gen-deps)

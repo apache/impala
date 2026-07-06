@@ -1338,6 +1338,9 @@ void PhjBuilderConfig::Codegen(FragmentState* state) {
   llvm::Function* murmur_hash_fn;
   codegen_status.MergeStatus(
       HashTableCtx::CodegenHashRow(codegen, true, *hash_table_config_, &murmur_hash_fn));
+  llvm::Function* add_row_fn;
+  codegen_status.MergeStatus(
+      BufferedTupleStream::CodegenAddRow(codegen, input_row_desc_, &add_row_fn));
 
   // Codegen for evaluating build rows
   llvm::Function* eval_build_row_fn;
@@ -1351,7 +1354,8 @@ void PhjBuilderConfig::Codegen(FragmentState* state) {
   if (codegen_status.ok()) {
     TPrefetchMode::type prefetch_mode = state->query_options().prefetch_mode;
     build_codegen_status = CodegenProcessBuildBatch(
-        codegen, hash_fn, murmur_hash_fn, eval_build_row_fn, insert_filters_fn);
+        codegen, hash_fn, murmur_hash_fn, eval_build_row_fn, insert_filters_fn,
+        add_row_fn);
     insert_codegen_status = CodegenInsertBatch(
         codegen, hash_fn, murmur_hash_fn, eval_build_row_fn, prefetch_mode);
   } else {
@@ -1390,7 +1394,7 @@ void PhjBuilder::UnregisterThreadFromBarrier() const {
 
 Status PhjBuilderConfig::CodegenProcessBuildBatch(LlvmCodeGen* codegen,
     llvm::Function* hash_fn, llvm::Function* murmur_hash_fn, llvm::Function* eval_row_fn,
-    llvm::Function* insert_filters_fn) {
+    llvm::Function* insert_filters_fn, llvm::Function* add_row_fn) {
   llvm::Function* process_build_batch_fn =
       codegen->GetFunction(IRFunction::PHJ_PROCESS_BUILD_BATCH, true);
   DCHECK(process_build_batch_fn != nullptr);
@@ -1445,6 +1449,14 @@ Status PhjBuilderConfig::CodegenProcessBuildBatch(LlvmCodeGen* codegen,
   // return value.
   llvm::Value* build_filter_arg = codegen->GetArgument(process_build_batch_fn, 4);
   build_filter_arg->replaceAllUsesWith(codegen->false_value());
+
+  // Replace BufferedTupleStream::AddRow with codegen'd version
+  replaced = codegen->ReplaceCallSites(process_build_batch_fn_level0, add_row_fn,
+      "BufferedTupleStream6AddRow");
+  DCHECK_REPLACE_COUNT(replaced, 2);
+  replaced = codegen->ReplaceCallSites(process_build_batch_fn, add_row_fn,
+      "BufferedTupleStream6AddRow");
+  DCHECK_REPLACE_COUNT(replaced, 2);
 
   // Finalize ProcessBuildBatch functions
   process_build_batch_fn = codegen->FinalizeFunction(process_build_batch_fn);

@@ -147,7 +147,7 @@ class PhjBuilderConfig : public JoinBuilderConfig {
   /// Returns non-OK status if codegen was not possible.
   Status CodegenProcessBuildBatch(LlvmCodeGen* codegen, llvm::Function* hash_fn,
       llvm::Function* murmur_hash_fn, llvm::Function* eval_row_fn,
-      llvm::Function* insert_filters_fn);
+      llvm::Function* insert_filters_fn, llvm::Function* add_row_fn);
 
   /// Codegen inserting batches into a partition's hash table. Identical signature to
   /// Partition::InsertBatch(). Returns non-OK if codegen was not possible.
@@ -615,7 +615,7 @@ class PhjBuilder : public JoinBuilder {
   /// and sets 'status' if it was unable to append the row, even after spilling
   /// partitions. This odd return convention is used to avoid emitting unnecessary code
   /// for ~Status in perf-critical code.
-  bool AppendRow(
+  IR_ALWAYS_INLINE bool AppendRow(
       BufferedTupleStream* stream, TupleRow* row, Status* status) WARN_UNUSED_RESULT;
 
   /// Slow path for AppendRow() above. It is called when the stream has failed to append
