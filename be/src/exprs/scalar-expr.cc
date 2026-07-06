@@ -217,7 +217,9 @@ Status ScalarExpr::OpenEvaluator(FunctionContext::FunctionStateScope scope,
     RuntimeState* state, ScalarExprEvaluator* eval) const {
   for (int i = 0; i < children_.size(); ++i) {
     ScalarExprEvaluator* child_eval = eval;
-    if (type_.IsStructType() || type_.IsVariantType()) {
+    // Only STRUCT routes children through separate child evaluators (see
+    // ScalarExprEvaluator::Create). VARIANT children are opened on the same evaluator.
+    if (type_.IsStructType()) {
       DCHECK_EQ(children_.size(), eval->GetChildEvaluators().size());
       child_eval = eval->GetChildEvaluators()[i];
     }
@@ -333,8 +335,19 @@ bool ScalarExpr::ShouldCodegen(const FragmentState* state) const {
   // 3. there is an optimization hint to disable codegen and the expr can be interpreted.
   // 4. Optimizer decided to disable codegen. Example: const expressions in VALUES()
   //    which are evaluated only once.
+  // 5. The expression produces or consumes a VARIANT value. Codegen for VARIANT is not
+  //    implemented, so it must use the interpreted path.
   return state != nullptr && !state->CodegenDisabledByQueryOption()
-      && !((state->CodegenHasDisableHint() || is_codegen_disabled_) && IsInterpretable());
+      && !((state->CodegenHasDisableHint() || is_codegen_disabled_) && IsInterpretable())
+      && !InvolvesVariantType();
+}
+
+bool ScalarExpr::InvolvesVariantType() const {
+  if (type_.IsVariantType()) return true;
+  for (const ScalarExpr* child : children_) {
+    if (child->InvolvesVariantType()) return true;
+  }
+  return false;
 }
 
 int ScalarExpr::GetSlotIds(vector<SlotId>* slot_ids) const {
@@ -397,6 +410,7 @@ SCALAR_EXPR_GET_VAL_INTERPRETED(DecimalVal);
 SCALAR_EXPR_GET_VAL_INTERPRETED(DateVal);
 SCALAR_EXPR_GET_VAL_INTERPRETED(CollectionVal);
 SCALAR_EXPR_GET_VAL_INTERPRETED(StructVal);
+SCALAR_EXPR_GET_VAL_INTERPRETED(VariantVal);
 
 string ScalarExpr::DebugString(const string& expr_name) const {
   stringstream out;

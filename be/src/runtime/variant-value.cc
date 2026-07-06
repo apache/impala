@@ -19,6 +19,7 @@
 
 #include <cstdio>
 #include <cstring>
+#include <limits>
 
 #include <rapidjson/stringbuffer.h>
 #include <rapidjson/writer.h>
@@ -394,7 +395,7 @@ bool VariantValue::GetArrayElement(uint32_t index, VariantValue* result) const {
 
 // --- Path navigation ---
 
-bool VariantValue::NavigatePath(const string& path,
+bool VariantValue::NavigatePath(std::string_view path,
     VariantValue* result) const {
   *result = *this;
   if (path == "$") return true;
@@ -419,15 +420,17 @@ bool VariantValue::NavigatePath(const string& path,
       ++p;
       // Require at least one digit.
       const char* digits_start = p;
-      int index = 0;
+      uint64_t index = 0;
       while (p < end && *p >= '0' && *p <= '9') {
         index = index * 10 + (*p - '0');
+        // An array holds at most UINT32_MAX elements.
+        if (index > std::numeric_limits<uint32_t>::max()) return false;
         ++p;
       }
       if (p == digits_start) return false;
       if (p >= end || *p != ']') return false;
       ++p;  // skip ']'
-      if (!result->GetArrayElement(index, result)) return false;
+      if (!result->GetArrayElement(static_cast<uint32_t>(index), result)) return false;
       if (p < end && *p == '.') ++p;
     } else {
       const char* seg_start = p;

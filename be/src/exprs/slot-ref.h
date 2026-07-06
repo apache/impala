@@ -83,6 +83,8 @@ class SlotRef : public ScalarExpr {
       ScalarExprEvaluator*, const TupleRow*) const override;
   virtual StructVal GetStructValInterpreted(
       ScalarExprEvaluator*, const TupleRow*) const override;
+  virtual VariantVal GetVariantValInterpreted(
+      ScalarExprEvaluator*, const TupleRow*) const override;
 
  private:
   CodegenAnyVal CodegenValue(LlvmCodeGen* codegen, LlvmBuilder* builder,

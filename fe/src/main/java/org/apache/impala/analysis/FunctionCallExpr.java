@@ -728,6 +728,10 @@ public class FunctionCallExpr extends Expr {
       children_.set(1, samplePerc.uncheckedCastTo(Type.DOUBLE));
     }
 
+    // variant_get(v, path) / try_variant_get(v, path) and their typed 3-arg forms. The
+    // 3-arg form resolves to a per-type internal builtin and completes analysis here.
+    if (analyzeVariantGet(analyzer, db)) return;
+
     Type[] argTypes = collectChildReturnTypes();
     Function searchDesc = new Function(fnName_, argTypes, Type.INVALID, false);
     fn_ = db.getFunction(searchDesc, Function.CompareMode.IS_NONSTRICT_SUPERTYPE_OF);
@@ -813,10 +817,7 @@ public class FunctionCallExpr extends Expr {
       }
     }
 
-    if (params_.isIgnoreNulls() && !isAnalyticFnCall_) {
-      throw new AnalysisException("Function " + fnName_.getFunction().toUpperCase()
-          + " does not accept the keyword IGNORE NULLS.");
-    }
+    if (params_.isIgnoreNulls() && !isAnalyticFnCall_) throw ignoreNullsNotAccepted();
 
     if (isScalarFunction()) validateScalarFnParams(params_);
     if (fn_ instanceof AggregateFunction
@@ -839,6 +840,136 @@ public class FunctionCallExpr extends Expr {
     if (type_.isWildcardChar() || type_.isWildcardVarchar()) {
       type_ = ScalarType.STRING;
     }
+  }
+
+  /**
+   * Special-cases variant_get() / try_variant_get() analysis. Guards on isBuiltin() so a
+   * user-defined function that shares the name in another database is not caught.
+   * Returns true only for the typed 3-arg form (VARIANT, path, type), which resolves to a
+   * per-type internal builtin and completes analysis so the caller returns immediately.
+   * Returns false for any other function and for the 2-arg form (VARIANT, path), whose
+   * arguments are validated here but which resolves through the normal builtin lookup in
+   * analyzeImpl().
+   */
+  private boolean analyzeVariantGet(Analyzer analyzer, FeDb db)
+      throws AnalysisException {
+    final String vgFn = fnName_.getFunction().toLowerCase();
+    final boolean isVariantGet = fnName_.isBuiltin()
+        && (vgFn.equals("variant_get") || vgFn.equals("try_variant_get"));
+    if (!isVariantGet || children_.size() < 2) return false;
+    validateVariantGetArgs();
+    // The 2-arg form resolves through the normal builtin lookup in analyzeImpl().
+    if (children_.size() != 3) return false;
+    resolveTypedVariantGet(analyzer, db, vgFn);
+    return true;
+  }
+
+  /**
+   * Validates arguments common to every variant_get() form: the first argument must be
+   * a VARIANT, and a constant path must be a syntactically valid '$'-rooted JSONPath. The
+   * VARIANT is checked before the path so a non-VARIANT input reports the more relevant
+   * error; this also covers the 2-arg form, which would otherwise fall through to a
+   * generic "function not found". A non-literal path is parsed and validated at runtime.
+   */
+  private void validateVariantGetArgs() throws AnalysisException {
+    if (!children_.get(0).getType().isVariantType()) {
+      throw new AnalysisException(fnName_.getFunction()
+          + "() first argument must be VARIANT: " + children_.get(0).toSql());
+    }
+    if (children_.get(1) instanceof StringLiteral pathLiteral) {
+      // getStringValue() returns null for a non-UTF8 binary literal.
+      String path = pathLiteral.getStringValue();
+      if (path == null || !path.startsWith("$")) {
+        throw new AnalysisException(
+            fnName_.getFunction() + "() path must start with '$': '" + path + "'");
+      }
+      validateConstantPathSyntax(path);
+    }
+  }
+
+  /**
+   * Rejects a malformed constant JSONPath at analysis time, turning what would be a
+   * silent runtime NULL into a compile-time error. Grammar: '$' root, then zero or more
+   * '.field' member accesses and '[index]' subscripts: a field is always introduced by
+   * '.', a subscript never follows '.', and a trailing '.' is disallowed. A field name is
+   * any non-empty run without '.' or '['. Valid: "$" (identity), "$.a", "$[0]",
+   * "$.a[0].b[1]".
+   */
+  private void validateConstantPathSyntax(String path) throws AnalysisException {
+    if (path.equals("$")) return; // identity; leading '$' guaranteed by the caller
+    int p = 1; // skip the leading '$'
+    final int n = path.length();
+    while (p < n) {
+      if (path.charAt(p) == '.') {
+        // '.field': a non-empty field name, i.e. a run with no '.' or '['.
+        int start = ++p;
+        while (p < n && path.charAt(p) != '.' && path.charAt(p) != '[') p++;
+        if (p == start) throw malformedPath(path); // e.g. "$.", "$..", trailing '.'
+      } else if (path.charAt(p) == '[') {
+        // '[index]': one or more digits terminated by ']'.
+        int start = ++p;
+        while (p < n && path.charAt(p) >= '0' && path.charAt(p) <= '9') p++;
+        if (p == start) throw malformedPath(path); // e.g. "$[abc]", "$[]"
+        if (p >= n || path.charAt(p) != ']') throw malformedPath(path); // e.g. "$[1"
+        p++; // skip ']'
+      } else {
+        // A field must be introduced by '.', e.g. "$age", "$[0]field".
+        throw malformedPath(path);
+      }
+    }
+  }
+
+  private AnalysisException malformedPath(String path) {
+    return new AnalysisException(
+        fnName_.getFunction() + "() malformed path: '" + path + "'");
+  }
+
+  /**
+   * Resolves the typed 3-arg form (VARIANT, path, type) and completes its analysis. The
+   * return type is selected from the literal type tag: because the catalog cannot hold
+   * multiple (VARIANT,STRING,STRING) overloads that differ only by return type, each maps
+   * to a distinct internal builtin (variant_get_<type> / try_variant_get_<type>). fnName_
+   * stays variant_get for toSql().
+   */
+  private void resolveTypedVariantGet(Analyzer analyzer, FeDb db, String vgFn)
+      throws AnalysisException {
+    if (!(children_.get(2) instanceof StringLiteral typeLiteral)) {
+      throw new AnalysisException("Third argument of " + fnName_.getFunction()
+          + "() must be a string literal type name: " + children_.get(2).toSql());
+    }
+    // getStringValue() returns null for a non-UTF8 binary literal; treat as unsupported.
+    String rawTag = typeLiteral.getStringValue();
+    String typeTag = rawTag == null ? "" : rawTag.toLowerCase();
+    switch (typeTag) {
+      case "boolean": case "tinyint": case "smallint": case "int": case "bigint":
+      case "float": case "double": case "string": case "date":
+        break;
+      default:
+        throw new AnalysisException(fnName_.getFunction()
+            + "() unsupported target type '" + typeTag + "'. Supported types: boolean, "
+            + "tinyint, smallint, int, bigint, float, double, string, date.");
+    }
+    // variant_get is a scalar function; reject the aggregate-only param decorations that
+    // the shared tail in analyzeImpl() would validate (this path returns early).
+    if (params_.isIgnoreNulls()) throw ignoreNullsNotAccepted();
+    validateScalarFnParams(params_);
+    String internalName = vgFn + "_" + typeTag; // e.g. variant_get_bigint
+    Type[] vgArgTypes = collectChildReturnTypes();
+    Function vgSearchDesc = new Function(
+        new FunctionName(db.getName(), internalName), vgArgTypes, Type.INVALID, false);
+    fn_ = db.getFunction(vgSearchDesc, Function.CompareMode.IS_NONSTRICT_SUPERTYPE_OF);
+    if (fn_ == null) throw new AnalysisException(getFunctionNotFoundError(vgArgTypes));
+    castForFunctionCall(false, analyzer.getRegularCompatibilityLevel());
+    type_ = fn_.getReturnType();
+  }
+
+  /**
+   * Builds the exception thrown when IGNORE NULLS decorates a function that does not
+   * accept it. Shared by analyzeImpl() and the variant_get() path.
+   */
+  private AnalysisException ignoreNullsNotAccepted() {
+    return new AnalysisException("Function " + fnName_.getFunction().toUpperCase()
+        + " does not accept the keyword IGNORE NULLS.");
   }
 
   @Override

@@ -22,16 +22,9 @@
 #include <string>
 
 #include "common/status.h"
-#include "runtime/string-value.h"
-#include "udf/udf.h"
+#include "udf/udf-internal.h"
 
 namespace impala {
-
-// Non-owning view over a materialized VARIANT slot.
-struct VariantSlot {
-  StringValue metadata;
-  StringValue value;
-};
 
 // Converts a variant (metadata + value blobs) to a JSON string.
 Status VariantToJson(const uint8_t* metadata_data, uint32_t metadata_len,
@@ -44,11 +37,12 @@ Status VariantToJson(impala_udf::FunctionContext* ctx,
     const uint8_t* value_data, uint32_t value_len,
     impala_udf::StringVal* result);
 
-/// Converts a materialized variant slot to a JSON string. 'slot' must not be null.
-Status VariantSlotToJson(const VariantSlot* slot, std::string* json_out);
+/// Converts a first-class VariantVal (the value produced by evaluating a VARIANT
+/// expression) to JSON. Caller must ensure 'v' is non-null.
+Status VariantValToJson(const impala_udf::VariantVal& v, std::string* json_out);
 
 /// Same as above, but writes the JSON directly into 'out'. On a decode failure 'out' is
-/// left untouched, so callers can fall back to emitting a JSON null.
-Status VariantSlotToJson(const VariantSlot* slot, std::ostream* out);
+/// left untouched, so no partial JSON is emitted.
+Status VariantValToJson(const impala_udf::VariantVal& v, std::ostream* out);
 
 }  // namespace impala

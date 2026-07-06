@@ -103,6 +103,12 @@ CollectionVal NullLiteral::GetCollectionValInterpreted(
   return CollectionVal::null();
 }
 
+VariantVal NullLiteral::GetVariantValInterpreted(
+    ScalarExprEvaluator* eval, const TupleRow* row) const {
+  DCHECK(type_.IsVariantType());
+  return VariantVal::null();
+}
+
 // Generated IR for a bigint NULL literal:
 //
 // define { i8, i64 } @NullLiteral(

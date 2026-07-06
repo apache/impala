@@ -59,6 +59,8 @@ class NullLiteral: public ScalarExpr {
   GENERATE_GET_VAL_INTERPRETED_OVERRIDES_FOR_ALL_SCALAR_TYPES
   virtual CollectionVal GetCollectionValInterpreted(
       ScalarExprEvaluator*, const TupleRow*) const override;
+  virtual VariantVal GetVariantValInterpreted(
+      ScalarExprEvaluator*, const TupleRow*) const override;
 };
 
 }

@@ -44,6 +44,7 @@ struct ExprValue {
   Decimal16Value decimal16_val;
   CollectionValue collection_val;
   impala_udf::StructVal struct_val;
+  impala_udf::VariantVal variant_val;
   DateValue date_val;
 
   ExprValue()
@@ -61,6 +62,7 @@ struct ExprValue {
       decimal16_val(),
       collection_val(),
       struct_val(),
+      variant_val(),
       date_val(0) {
   }
 

@@ -1107,6 +1107,16 @@ visible_functions = [
       '_ZN6impala21DataSketchesFunctions16DsKllCDFAsStringEPN10impala_udf15FunctionContextERKNS1_9StringValEiPKNS1_8FloatValE'],
   [['ds_kll_stringify'], 'STRING', ['STRING'],
       '_ZN6impala21DataSketchesFunctions14DsKllStringifyEPN10impala_udf15FunctionContextERKNS1_9StringValE'],
+
+  # variant_get / try_variant_get: 2-arg form returns a VARIANT sub-value at 'path'.
+  # Returning VARIANT enables chaining, e.g. variant_get(variant_get(v,'$.a'),'$.b').
+  [['variant_get'], 'VARIANT', ['VARIANT', 'STRING'],
+      'impala::VariantFunctions::VariantGet'],
+  [['try_variant_get'], 'VARIANT', ['VARIANT', 'STRING'],
+      'impala::VariantFunctions::TryVariantGet'],
+  # Renders a VARIANT value as a JSON string.
+  [['variant_to_json'], 'STRING', ['VARIANT'],
+      'impala::VariantFunctions::VariantToJson'],
 ]
 
 invisible_functions = [
@@ -1189,4 +1199,45 @@ invisible_functions = [
       '_ZN6impala16IcebergFunctions24BucketPartitionTransformEPN10impala_udf15FunctionContextERKNS1_7DateValERKNS1_6IntValE'],
   [['iceberg_bucket_transform'], 'INT', ['TIMESTAMP', 'INT'],
       '_ZN6impala16IcebergFunctions24BucketPartitionTransformEPN10impala_udf15FunctionContextERKNS1_12TimestampValERKNS1_6IntValE'],
+
+  # Typed 3-arg variant_get, registered under internal names. The public spelling is
+  # variant_get(v, path, 'type') / try_variant_get(...); FunctionCallExpr chooses the
+  # return type from the literal type tag and resolves the matching internal overload.
+  [['variant_get_boolean'], 'BOOLEAN', ['VARIANT', 'STRING', 'STRING'],
+      'impala::VariantFunctions::VariantGetBoolean'],
+  [['variant_get_tinyint'], 'TINYINT', ['VARIANT', 'STRING', 'STRING'],
+      'impala::VariantFunctions::VariantGetTinyInt'],
+  [['variant_get_smallint'], 'SMALLINT', ['VARIANT', 'STRING', 'STRING'],
+      'impala::VariantFunctions::VariantGetSmallInt'],
+  [['variant_get_int'], 'INT', ['VARIANT', 'STRING', 'STRING'],
+      'impala::VariantFunctions::VariantGetInt'],
+  [['variant_get_bigint'], 'BIGINT', ['VARIANT', 'STRING', 'STRING'],
+      'impala::VariantFunctions::VariantGetBigInt'],
+  [['variant_get_float'], 'FLOAT', ['VARIANT', 'STRING', 'STRING'],
+      'impala::VariantFunctions::VariantGetFloat'],
+  [['variant_get_double'], 'DOUBLE', ['VARIANT', 'STRING', 'STRING'],
+      'impala::VariantFunctions::VariantGetDouble'],
+  [['variant_get_string'], 'STRING', ['VARIANT', 'STRING', 'STRING'],
+      'impala::VariantFunctions::VariantGetString'],
+  [['variant_get_date'], 'DATE', ['VARIANT', 'STRING', 'STRING'],
+      'impala::VariantFunctions::VariantGetDate'],
+
+  [['try_variant_get_boolean'], 'BOOLEAN', ['VARIANT', 'STRING', 'STRING'],
+      'impala::VariantFunctions::TryVariantGetBoolean'],
+  [['try_variant_get_tinyint'], 'TINYINT', ['VARIANT', 'STRING', 'STRING'],
+      'impala::VariantFunctions::TryVariantGetTinyInt'],
+  [['try_variant_get_smallint'], 'SMALLINT', ['VARIANT', 'STRING', 'STRING'],
+      'impala::VariantFunctions::TryVariantGetSmallInt'],
+  [['try_variant_get_int'], 'INT', ['VARIANT', 'STRING', 'STRING'],
+      'impala::VariantFunctions::TryVariantGetInt'],
+  [['try_variant_get_bigint'], 'BIGINT', ['VARIANT', 'STRING', 'STRING'],
+      'impala::VariantFunctions::TryVariantGetBigInt'],
+  [['try_variant_get_float'], 'FLOAT', ['VARIANT', 'STRING', 'STRING'],
+      'impala::VariantFunctions::TryVariantGetFloat'],
+  [['try_variant_get_double'], 'DOUBLE', ['VARIANT', 'STRING', 'STRING'],
+      'impala::VariantFunctions::TryVariantGetDouble'],
+  [['try_variant_get_string'], 'STRING', ['VARIANT', 'STRING', 'STRING'],
+      'impala::VariantFunctions::TryVariantGetString'],
+  [['try_variant_get_date'], 'DATE', ['VARIANT', 'STRING', 'STRING'],
+      'impala::VariantFunctions::TryVariantGetDate'],
 ]

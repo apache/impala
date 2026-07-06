@@ -42,6 +42,7 @@ using impala_udf::StringVal;
 using impala_udf::DecimalVal;
 using impala_udf::CollectionVal;
 using impala_udf::StructVal;
+using impala_udf::VariantVal;
 using impala_udf::DateVal;
 
 class MemPool;
@@ -163,6 +164,11 @@ class ScalarExprEvaluator {
   StringVal GetStringVal(const TupleRow* row);
   CollectionVal GetCollectionVal(const TupleRow* row);
   StructVal GetStructVal(const TupleRow* row);
+  // VARIANT is a first-class expression type: any expression (a scan SlotRef or a
+  // function such as variant_get()) produces a VariantVal, obtained through this
+  // method rather than from a raw slot. See VariantVal (udf-internal.h) for its
+  // two-blob layout.
+  VariantVal GetVariantVal(const TupleRow* row);
   TimestampVal GetTimestampVal(const TupleRow* row);
   DecimalVal GetDecimalVal(const TupleRow* row);
   DateVal GetDateVal(const TupleRow* row);

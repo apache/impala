@@ -138,6 +138,7 @@ static void AppendAnyValType(int namespace_id, const ColumnType& type, stringstr
     CASE_TYPE_APPEND_MANGLED_TOKEN(TYPE_UUID, StringVal)
     CASE_TYPE_APPEND_MANGLED_TOKEN(TYPE_TIMESTAMP, TimestampVal)
     CASE_TYPE_APPEND_MANGLED_TOKEN(TYPE_DECIMAL, DecimalVal)
+    CASE_TYPE_APPEND_MANGLED_TOKEN(TYPE_VARIANT, VariantVal)
 
     default:
       DCHECK(false) << "NYI: " << type.DebugString();

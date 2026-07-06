@@ -2576,6 +2576,12 @@ class TestIcebergV3Table(IcebergTestSuite):
     assert '[1,2,3]' in result.stdout, result.stdout
     assert '{"age":30,"name":"Alice"}' in result.stdout, result.stdout
 
+  def test_v3_variant_get(self, vector, unique_database):
+    """Test the variant_get()/try_variant_get() builtins over Iceberg V3 VARIANT."""
+    self.load_table(unique_database, "trino_variant")
+    self.run_test_case('QueryTest/iceberg-v3-variant-get', vector, unique_database)
+
+
   def test_v3_default_values(self, vector, unique_database):
     """Test Iceberg V3 initial-default and write-default values."""
     self.load_table(unique_database, "iceberg_v3_default_value")

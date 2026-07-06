@@ -134,7 +134,7 @@ string SlotRef::DebugString() const {
 }
 
 void SlotRef::AssignFnCtxIdx(int* next_fn_ctx_idx) {
-  if (!type_.IsStructType() && !type_.IsVariantType()) {
+  if (!type_.IsStructType()) {
     ScalarExpr::AssignFnCtxIdx(next_fn_ctx_idx);
     return;
   }
@@ -581,6 +581,21 @@ StructVal SlotRef::GetStructValInterpreted(
     struct_val.addChild(child_val, i);
   }
   return struct_val;
+}
+
+VariantVal SlotRef::GetVariantValInterpreted(
+    ScalarExprEvaluator* eval, const TupleRow* row) const {
+  DCHECK(type_.IsVariantType());
+  Tuple* t = row->GetTuple(tuple_idx_);
+  if (t == nullptr || t->IsNull(null_indicator_offset_)) return VariantVal::null();
+  const uint8_t* slot = reinterpret_cast<const uint8_t*>(t->GetSlot(slot_offset_));
+  const StringValue* meta_sv = reinterpret_cast<const StringValue*>(slot);
+  const StringValue* val_sv =
+      reinterpret_cast<const StringValue*>(slot + sizeof(StringValue));
+  VariantVal result;
+  meta_sv->ToStringVal(&result.metadata);
+  val_sv->ToStringVal(&result.value);
+  return result;
 }
 
 const TupleDescriptor* SlotRef::GetCollectionTupleDesc() const {

@@ -1,0 +1,604 @@
+====
+---- QUERY
+# 2-arg variant_get returns a VARIANT sub-value, rendered as JSON. Object field access.
+SELECT id, variant_get(v, '$.name'), variant_get(v, '$.age')
+FROM trino_variant WHERE id = 31;
+---- RESULTS
+31,'"Alice"','30'
+---- TYPES
+INT, STRING, STRING
+====
+---- QUERY
+# $ returns the whole variant unchanged.
+SELECT variant_get(v, '$') FROM trino_variant WHERE id = 31;
+---- RESULTS
+'{"age":30,"name":"Alice"}'
+---- TYPES
+STRING
+====
+---- QUERY
+# Nested object path and array index into a sub-object.
+SELECT variant_get(v, '$.context'),
+       variant_get(v, '$.context.page'),
+       variant_get(v, '$.int_array[0]')
+FROM trino_variant WHERE id = 35;
+---- RESULTS
+'{"page":"home","retries":3}','"home"','1'
+---- TYPES
+STRING, STRING, STRING
+====
+---- QUERY
+# Array element access on an array-rooted variant.
+SELECT variant_get(v, '$[0]'), variant_get(v, '$[2]')
+FROM trino_variant WHERE id = 24;
+---- RESULTS
+'1','3'
+---- TYPES
+STRING, STRING
+====
+---- QUERY
+# An out-of-range array index yields SQL NULL. This includes indices that don't fit in
+# 32 bits, which must not wrap around to a valid index (2^32 + 1 would wrap to 1).
+SELECT variant_get(v, '$[3]'), variant_get(v, '$[4294967297]'),
+       variant_get(v, '$[100000000000000000000]'),
+       variant_get(v, '$[4294967297]', 'int'),
+       variant_get(v, '$[000000000000000000001]')
+FROM trino_variant WHERE id = 24;
+---- RESULTS
+'NULL','NULL','NULL',NULL,'2'
+---- TYPES
+STRING, STRING, STRING, INT, STRING
+====
+---- QUERY
+# Chaining: the outer variant_get consumes a VARIANT produced by the inner one
+# (the key payoff of first-class VARIANT expressions).
+SELECT variant_get(variant_get(v, '$.context'), '$.retries')
+FROM trino_variant WHERE id = 35;
+---- RESULTS
+'3'
+---- TYPES
+STRING
+====
+---- QUERY
+# Path not found -> SQL NULL (no error).
+SELECT variant_get(v, '$.does_not_exist') FROM trino_variant WHERE id = 31;
+---- RESULTS
+'NULL'
+---- TYPES
+STRING
+====
+---- QUERY
+# NULL variant input -> SQL NULL.
+SELECT variant_get(v, '$.anything') FROM trino_variant WHERE id = 0;
+---- RESULTS
+'NULL'
+---- TYPES
+STRING
+====
+---- QUERY
+# 3-arg typed extraction: integer.
+SELECT variant_get(v, '$.age', 'int') FROM trino_variant WHERE id = 31;
+---- RESULTS
+30
+---- TYPES
+INT
+====
+---- QUERY
+# 3-arg typed extraction: string (raw value, no JSON quoting).
+SELECT variant_get(v, '$.name', 'string') FROM trino_variant WHERE id = 31;
+---- RESULTS
+'Alice'
+---- TYPES
+STRING
+====
+---- QUERY
+# 3-arg typed extraction: boolean, on a boolean-rooted variant.
+SELECT variant_get(v, '$', 'boolean') FROM trino_variant WHERE id = 2;
+---- RESULTS
+true
+---- TYPES
+BOOLEAN
+====
+---- QUERY
+# 3-arg typed extraction: double.
+SELECT variant_get(v, '$', 'double') FROM trino_variant WHERE id = 13;
+---- RESULTS
+14.3
+---- TYPES
+DOUBLE
+====
+---- QUERY
+# 3-arg typed extraction: date.
+SELECT variant_get(v, '$', 'date') FROM trino_variant WHERE id = 55;
+---- RESULTS
+2024-11-07
+---- TYPES
+DATE
+====
+---- QUERY
+# 3-arg bigint from a widened int64 value.
+SELECT variant_get(v, '$', 'bigint') FROM trino_variant WHERE id = 12;
+---- RESULTS
+10000000000
+---- TYPES
+BIGINT
+====
+---- QUERY
+# Strict variant_get raises an error when the value is not convertible to the type.
+SELECT variant_get(v, '$.name', 'int') FROM trino_variant WHERE id = 31;
+---- CATCH
+not convertible to an integer type
+====
+---- QUERY
+# try_variant_get returns NULL instead of erroring on a type mismatch.
+SELECT try_variant_get(v, '$.name', 'int') FROM trino_variant WHERE id = 31;
+---- RESULTS
+NULL
+---- TYPES
+INT
+====
+---- QUERY
+# variant_to_json renders a first-class VARIANT (here the result of variant_get) as JSON.
+SELECT variant_to_json(variant_get(v, '$.context')) FROM trino_variant WHERE id = 35;
+---- RESULTS
+'{"page":"home","retries":3}'
+---- TYPES
+STRING
+====
+---- QUERY
+# ==========================================================================
+# variant_get() typed (3-arg) extraction used in WHERE / GROUP BY / ORDER BY /
+# HAVING / JOIN / DISTINCT / CASE / aggregates.
+#
+# Key semantics these tests rely on:
+#  * A missing object field (or navigating a field on a non-object) yields SQL NULL,
+#    never an error -- so strict variant_get() on an object field is safe to apply to
+#    the whole table: rows lacking the field are simply filtered out / grouped as NULL.
+#  * A type mismatch (e.g. asking 'int' of a boolean) raises an error under strict
+#    variant_get() but yields SQL NULL under try_variant_get(). Whole-table scalar
+#    extraction over the heterogeneous rows therefore uses try_variant_get().
+# Object-field values in the dataset: $.age (int)=30 in id 31,32; $.name (string)=
+# 'Alice' in id 31,32; $.active (boolean)=true in id 32; $.retries (int)=3 in id 33.
+# ==========================================================================
+# WHERE: equality on a string field extraction. Safe with strict variant_get -- rows
+# without $.name yield NULL (NULL = 'Alice' is false), rows with it are always strings.
+SELECT id, variant_get(v, '$.name', 'string') AS name
+FROM trino_variant
+WHERE variant_get(v, '$.name', 'string') = 'Alice'
+ORDER BY id;
+---- RESULTS
+31,'Alice'
+32,'Alice'
+---- TYPES
+INT, STRING
+====
+---- QUERY
+# WHERE: numeric comparison on an int field extraction.
+SELECT id FROM trino_variant
+WHERE variant_get(v, '$.age', 'int') > 25
+ORDER BY id;
+---- RESULTS
+31
+32
+====
+---- QUERY
+# WHERE: a boolean field extraction used directly as the predicate.
+SELECT id FROM trino_variant
+WHERE variant_get(v, '$.active', 'boolean')
+ORDER BY id;
+---- RESULTS
+32
+====
+---- QUERY
+# WHERE: IS NULL matches every row where the path is absent (53 of 55 rows lack $.age).
+SELECT count(*) FROM trino_variant
+WHERE variant_get(v, '$.age', 'int') IS NULL;
+---- RESULTS
+53
+---- TYPES
+BIGINT
+====
+---- QUERY
+# WHERE: IS NOT NULL selects only the rows that actually carry the field.
+SELECT id FROM trino_variant
+WHERE variant_get(v, '$.name', 'string') IS NOT NULL
+ORDER BY id;
+---- RESULTS
+31
+32
+====
+---- QUERY
+# WHERE: try_variant_get over heterogeneous whole-table scalars. Non-integer rows
+# (booleans, doubles, strings, arrays, objects, dates below the threshold) coerce to
+# NULL rather than erroring, so the predicate simply keeps the two large integers.
+SELECT id, try_variant_get(v, '$', 'bigint') AS n
+FROM trino_variant
+WHERE try_variant_get(v, '$', 'bigint') > 50000
+ORDER BY id;
+---- RESULTS
+9,100000
+12,10000000000
+---- TYPES
+INT, BIGINT
+====
+---- QUERY
+# WHERE: strict typed extraction chained on the VARIANT produced by an inner 2-arg
+# variant_get (first-class VARIANT flowing as a function argument). Only id 35 has a
+# $.context object; every other row yields a NULL VARIANT there, so the outer extraction
+# is only ever applied to the integer 3.
+SELECT id FROM trino_variant
+WHERE variant_get(variant_get(v, '$.context'), '$.retries', 'int') = 3
+ORDER BY id;
+---- RESULTS
+35
+====
+---- QUERY
+# GROUP BY: a typed scalar extraction is a legal grouping expression (unlike a bare
+# VARIANT). Whole-table boolean extraction yields true (1 row), false (1 row), and NULL
+# (the remaining 53 non-boolean rows).
+SELECT try_variant_get(v, '$', 'boolean') AS b, count(*) AS c
+FROM trino_variant
+GROUP BY b
+ORDER BY b NULLS LAST;
+---- RESULTS
+false,1
+true,1
+NULL,53
+---- TYPES
+BOOLEAN, BIGINT
+====
+---- QUERY
+# GROUP BY on a string field extraction, filtered to the rows that carry it.
+SELECT variant_get(v, '$.name', 'string') AS name, count(*) AS c
+FROM trino_variant
+WHERE variant_get(v, '$.name', 'string') IS NOT NULL
+GROUP BY name
+ORDER BY name;
+---- RESULTS
+'Alice',2
+---- TYPES
+STRING, BIGINT
+====
+---- QUERY
+# GROUP BY + HAVING on an int field extraction. The two id 31/32 rows share age=30
+# (count 2); the NULL group of the other 53 rows is excluded by HAVING.
+SELECT variant_get(v, '$.age', 'int') AS age, count(*) AS c
+FROM trino_variant
+GROUP BY age
+HAVING count(*) = 2
+ORDER BY age;
+---- RESULTS
+30,2
+---- TYPES
+INT, BIGINT
+====
+---- QUERY
+# ORDER BY on a typed integer extraction (ascending). The nine scalar-integer rows are
+# selected by their descr and coerced to BIGINT so the widened int64 (id 12) fits.
+SELECT id, try_variant_get(v, '$', 'bigint') AS n
+FROM trino_variant
+WHERE descr LIKE 'int%'
+ORDER BY n;
+---- RESULTS
+11,-12345
+8,-1234
+6,-34
+5,34
+4,42
+7,1000
+10,12345
+9,100000
+12,10000000000
+---- TYPES
+INT, BIGINT
+====
+---- QUERY
+# ORDER BY ... DESC with LIMIT (top-N) over a typed extraction.
+SELECT id, try_variant_get(v, '$', 'bigint') AS n
+FROM trino_variant
+WHERE descr LIKE 'int%'
+ORDER BY n DESC
+LIMIT 3;
+---- RESULTS
+12,10000000000
+9,100000
+10,12345
+---- TYPES
+INT, BIGINT
+====
+---- QUERY
+# ORDER BY on a string extraction. Comparison is bytewise, so the capitalized "Alice"
+# (0x41) sorts before the lowercase words.
+SELECT id, variant_get(v, '$', 'string') AS s
+FROM trino_variant
+WHERE descr LIKE 'str %'
+ORDER BY s;
+---- RESULTS
+20,'Alice'
+17,'context'
+15,'hello'
+18,'home'
+21,'iceberg'
+16,'impala'
+19,'mobile'
+---- TYPES
+INT, STRING
+====
+---- QUERY
+# DISTINCT on a typed scalar extraction is allowed (contrast with DISTINCT on a bare
+# VARIANT, which is rejected -- see the negative cases below). DISTINCT keeps one NULL.
+SELECT DISTINCT try_variant_get(v, '$', 'boolean') AS b
+FROM trino_variant
+ORDER BY b NULLS LAST;
+---- RESULTS
+false
+true
+NULL
+---- TYPES
+BOOLEAN
+====
+---- QUERY
+# count(DISTINCT ...) over a typed extraction ignores NULLs -> 2 distinct booleans.
+SELECT count(DISTINCT try_variant_get(v, '$', 'boolean')) AS c
+FROM trino_variant;
+---- RESULTS
+2
+---- TYPES
+BIGINT
+====
+---- QUERY
+# NULL semantics under aggregation: count(*) counts every row, but count(expr) skips the
+# rows where the extraction is NULL (path absent).
+SELECT count(*) AS total,
+       count(variant_get(v, '$.name', 'string')) AS names,
+       count(variant_get(v, '$.age', 'int')) AS ages
+FROM trino_variant;
+---- RESULTS
+55,2,2
+---- TYPES
+BIGINT, BIGINT, BIGINT
+====
+---- QUERY
+# sum/min/max over a typed extraction across the nine integer rows.
+SELECT sum(try_variant_get(v, '$', 'bigint')) AS s,
+       min(try_variant_get(v, '$', 'bigint')) AS mn,
+       max(try_variant_get(v, '$', 'bigint')) AS mx
+FROM trino_variant
+WHERE descr LIKE 'int%';
+---- RESULTS
+10000099808,-12345,10000000000
+---- TYPES
+BIGINT, BIGINT, BIGINT
+====
+---- QUERY
+# JOIN on a typed extraction used as the equi-join key. Only id 31/32 have a non-NULL
+# $.name ('Alice'), and NULL keys never match, so the join is the 2x2 cross of {31,32}.
+SELECT a.id, b.id
+FROM trino_variant a
+JOIN trino_variant b
+  ON variant_get(a.v, '$.name', 'string') = variant_get(b.v, '$.name', 'string')
+ORDER BY a.id, b.id;
+---- RESULTS
+31,31
+31,32
+32,31
+32,32
+---- TYPES
+INT, INT
+====
+---- QUERY
+# CASE over a typed extraction (allowed because the branch value is a scalar, not a bare
+# VARIANT -- contrast with the CASE-producing-VARIANT negative case below).
+SELECT id,
+       CASE WHEN variant_get(v, '$.age', 'int') >= 30 THEN 'adult' ELSE 'minor' END AS cat
+FROM trino_variant
+WHERE variant_get(v, '$.age', 'int') IS NOT NULL
+ORDER BY id;
+---- RESULTS
+31,'adult'
+32,'adult'
+---- TYPES
+INT, STRING
+====
+---- QUERY
+# ==========================================================================
+# Negative cases: the 2-arg variant_get() returns a bare VARIANT, which is not a
+# comparable type and therefore remains disallowed in ORDER BY / GROUP BY /
+# SELECT DISTINCT, just like a raw VARIANT column. These confirm the typed 3-arg escape
+# hatch above does NOT relax those restrictions for VARIANT-valued expressions.
+# ==========================================================================
+# ORDER BY a VARIANT-valued expression.
+SELECT id FROM trino_variant ORDER BY variant_get(v, '$');
+---- CATCH
+ORDER BY expression 'variant_get(v, '$')' with type 'VARIANT' is not supported.
+====
+---- QUERY
+# GROUP BY a VARIANT-valued expression.
+SELECT count(*) FROM trino_variant GROUP BY variant_get(v, '$');
+---- CATCH
+GROUP BY expression 'variant_get(v, '$')' with type 'VARIANT' is not supported.
+====
+---- QUERY
+# SELECT DISTINCT on a VARIANT-valued expression.
+SELECT DISTINCT variant_get(v, '$.context') FROM trino_variant;
+---- CATCH
+SELECT DISTINCT expression 'variant_get(v, '$.context')' with type 'VARIANT' is not supported.
+====
+---- QUERY
+# Unsupported target type tag in the 3-arg form.
+SELECT variant_get(v, '$.age', 'decimal') FROM trino_variant;
+---- CATCH
+unsupported target type 'decimal'
+====
+---- QUERY
+# Constant path must be '$'-rooted.
+SELECT variant_get(v, 'age') FROM trino_variant;
+---- CATCH
+path must start with '$'
+====
+---- QUERY
+# A '$' must be followed by '.' or '['
+SELECT variant_get(v, '$age') FROM trino_variant;
+---- CATCH
+malformed path: '$age'
+====
+---- QUERY
+# The prefix must be followed by at least one segment.
+SELECT variant_get(v, '$.') FROM trino_variant;
+---- CATCH
+malformed path: '$.'
+====
+---- QUERY
+# An array subscript must contain digits.
+SELECT variant_get(v, '$[abc]') FROM trino_variant;
+---- CATCH
+malformed path: '$[abc]'
+====
+---- QUERY
+# An array subscript must be terminated by ']'.
+SELECT variant_get(v, '$[1', 'int') FROM trino_variant;
+---- CATCH
+malformed path: '$[1'
+====
+---- QUERY
+# Trailing '.' is rejected.
+SELECT variant_get(v, '$.age.') FROM trino_variant;
+---- CATCH
+malformed path: '$.age.'
+====
+---- QUERY
+# A '.' before an array subscript is rejected;
+SELECT variant_get(v, '$.[0]') FROM trino_variant;
+---- CATCH
+malformed path: '$.[0]'
+====
+---- QUERY
+# A trailing '.' after a subscript is rejected too.
+SELECT variant_get(v, '$[0].') FROM trino_variant;
+---- CATCH
+malformed path: '$[0].'
+====
+---- QUERY
+# A field must be introduced by '.'.
+SELECT try_variant_get(v, '$[0]field') FROM trino_variant;
+---- CATCH
+malformed path: '$[0]field'
+====
+---- QUERY
+# 3-arg form requires a VARIANT first argument.
+SELECT variant_get(id, '$', 'int') FROM trino_variant;
+---- CATCH
+first argument must be VARIANT
+====
+---- QUERY
+# 2-arg form also requires a VARIANT first argument (previously fell through to a generic
+# "function not found").
+SELECT variant_get(id, '$') FROM trino_variant;
+---- CATCH
+first argument must be VARIANT
+====
+---- QUERY
+# 3-arg typed extraction: tinyint (widened from an int8 value).
+SELECT variant_get(v, '$', 'tinyint') FROM trino_variant WHERE id = 5;
+---- RESULTS
+34
+---- TYPES
+TINYINT
+====
+---- QUERY
+# 3-arg typed extraction: smallint (from an int16 value).
+SELECT variant_get(v, '$', 'smallint') FROM trino_variant WHERE id = 7;
+---- RESULTS
+1000
+---- TYPES
+SMALLINT
+====
+---- QUERY
+# 3-arg typed extraction: float widened from an integer value (whole number so the text
+# rendering is exact).
+SELECT variant_get(v, '$', 'float') FROM trino_variant WHERE id = 5;
+---- RESULTS
+34
+---- TYPES
+FLOAT
+====
+---- QUERY
+# Strict narrowing overflow: 100000 does not fit TINYINT.
+SELECT variant_get(v, '$', 'tinyint') FROM trino_variant WHERE id = 9;
+---- CATCH
+out of range
+====
+---- QUERY
+# try_variant_get returns NULL instead of erroring on a narrowing overflow.
+SELECT try_variant_get(v, '$', 'tinyint') FROM trino_variant WHERE id = 9;
+---- RESULTS
+NULL
+---- TYPES
+TINYINT
+====
+---- QUERY
+# A bare integer is NOT coerced to a DATE: strict variant_get raises a type error.
+SELECT variant_get(v, '$', 'date') FROM trino_variant WHERE id = 9;
+---- CATCH
+not convertible to DATE
+====
+---- QUERY
+# ...and try_variant_get yields NULL for the same non-coercible integer.
+SELECT try_variant_get(v, '$', 'date') FROM trino_variant WHERE id = 9;
+---- RESULTS
+NULL
+---- TYPES
+DATE
+====
+---- QUERY
+# try_variant_get (2-arg) on a missing path returns a NULL VARIANT, rendered as 'NULL'.
+SELECT try_variant_get(v, '$.does_not_exist') FROM trino_variant WHERE id = 31;
+---- RESULTS
+'NULL'
+---- TYPES
+STRING
+====
+---- QUERY
+# variant_to_json rendered directly over a VARIANT column value.
+SELECT variant_to_json(v) FROM trino_variant WHERE id = 31;
+---- RESULTS
+'{"age":30,"name":"Alice"}'
+---- TYPES
+STRING
+====
+---- QUERY
+# id 58 is TIME: unrenderable types fail to coerce instead of returning a placeholder.
+SELECT variant_get(v, '$', 'string') FROM trino_variant WHERE id = 58;
+---- CATCH
+not convertible to STRING
+====
+---- QUERY
+# try_variant_get yields NULL instead of erroring.
+SELECT try_variant_get(v, '$', 'string') FROM trino_variant WHERE id = 58;
+---- RESULTS
+'NULL'
+---- TYPES
+STRING
+====
+---- QUERY
+# Same for a TIMESTAMPTZ value (id 61).
+SELECT variant_get(v, '$', 'string') FROM trino_variant WHERE id = 61;
+---- CATCH
+not convertible to STRING
+====
+---- QUERY
+# Same for a UUID value (id 62).
+SELECT try_variant_get(v, '$', 'string') FROM trino_variant WHERE id = 62;
+---- RESULTS
+'NULL'
+---- TYPES
+STRING
+====
+---- QUERY
+# A renderable timestamp (id 59) still works, so only unrenderable types are rejected.
+SELECT variant_get(v, '$', 'string') FROM trino_variant WHERE id = 59;
+---- RESULTS
+'2024-11-07 12:33:54.123456000'
+---- TYPES
+STRING
+====

@@ -238,7 +238,24 @@ Status QueryResultSet::PrintComplexValue(ScalarExprEvaluator* expr_eval,
     bool stringify_map_keys) {
   DCHECK(type.IsComplexType());
   const ScalarExpr& scalar_expr = expr_eval->root();
-  // Currently scalar_expr can be only a slot ref as no functions return complex types.
+
+  if (type.IsVariantType()) {
+    // Handle VARIANT before the SlotRef-only assumption relied on by the
+    // STRUCT/collection branches below; GetVariantVal() works for any VARIANT-typed
+    // expression.
+    impala_udf::VariantVal v = expr_eval->GetVariantVal(row);
+    if (v.is_null) {
+      (*stream) << RawValue::NullLiteral(/*top-level*/ true);
+      return Status::OK();
+    }
+    // Write JSON straight into 'stream'. On a decode failure 'stream' is left untouched
+    // (no partial JSON leaks) and the error is propagated to fail the query, rather than
+    // silently substituting a wrong value that would misrepresent corrupt data as real.
+    return VariantValToJson(v, stream);
+  }
+
+  // Currently scalar_expr can be only a slot ref as no (non-VARIANT) functions return
+  // complex types.
   DCHECK(scalar_expr.IsSlotRef());
   void* value = expr_eval->GetValue(row);
 
@@ -259,12 +276,6 @@ Status QueryResultSet::PrintComplexValue(ScalarExprEvaluator* expr_eval,
         complex_value_writer(&writer, stringify_map_keys);
     complex_value_writer.CollectionValueToJSON(*collection_val, type.type,
             item_tuple_desc);
-  } else if (type.IsVariantType()) {
-    // Write JSON straight into 'stream'. On a decode failure 'stream' is left untouched
-    // (no partial JSON leaks) and the error is propagated to fail the query, rather than
-    // silently substituting a wrong value that would misrepresent corrupt data as real.
-    RETURN_IF_ERROR(
-        VariantSlotToJson(reinterpret_cast<const VariantSlot*>(value), stream));
   } else {
     DCHECK(type.IsStructType());
     const StructVal* struct_val = static_cast<const StructVal*>(value);

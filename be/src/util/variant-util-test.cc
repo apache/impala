@@ -297,6 +297,19 @@ TEST(VariantUtilTest, PathNavigation) {
 
   EXPECT_FALSE(root.NavigatePath("$.data.unknown", &result));
   EXPECT_FALSE(root.NavigatePath("$.data.items[100]", &result));
+
+  // UINT32_MAX is always out of range, as an array has at most UINT32_MAX elements.
+  EXPECT_FALSE(root.NavigatePath("$.data.items[4294967295]", &result));
+  // Larger indices never resolve and must not overflow. 2^32 and 2^32 + 1 would wrap
+  // around to the valid indices 0 and 1 in a 32-bit accumulator.
+  EXPECT_FALSE(root.NavigatePath("$.data.items[4294967296]", &result));
+  EXPECT_FALSE(root.NavigatePath("$.data.items[4294967297]", &result));
+  EXPECT_FALSE(root.NavigatePath("$.data.items[100000000000000000000]", &result));
+  EXPECT_FALSE(root.NavigatePath("$.data.items[18446744073709551617]", &result));
+  // A long index with leading zeros is still a small index.
+  EXPECT_TRUE(root.NavigatePath("$.data.items[000000000000000000000001]", &result));
+  EXPECT_TRUE(result.GetInt32(&nav_int));
+  EXPECT_EQ(20, nav_int);
 }
 
 TEST(VariantUtilTest, PathNavigationInvalidPaths) {

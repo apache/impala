@@ -129,6 +129,11 @@ IR_ALWAYS_INLINE void* ScalarExprEvaluator::StoreResult(const AnyVal& val,
       result_.struct_val = v;
       return &result_.struct_val;
     }
+    case TYPE_VARIANT: {
+      const VariantVal& v = reinterpret_cast<const VariantVal&>(val);
+      result_.variant_val = v;
+      return &result_.variant_val;
+    }
     default:
       DCHECK(false) << "Type not implemented: " << type;
       return nullptr;

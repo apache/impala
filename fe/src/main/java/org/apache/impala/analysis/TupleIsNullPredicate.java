@@ -176,11 +176,11 @@ public class TupleIsNullPredicate extends Predicate {
     Preconditions.checkNotNull(expr);
 
     if (expr.getType().isComplexOrVariantType()) {
-      // Currently the only Expr supported for complex/variant types is SlotRef, which
-      // does not need NULL wrapping. Without the VARIANT case here a variant expr (e.g.
+      // Complex/variant exprs never need NULL wrapping. A VARIANT expr can now be a
+      // SlotRef (scan pass-through) or a function result (e.g. variant_get()), so we no
+      // longer assert SlotRef-only here. Without this early return a variant expr (e.g.
       // through an outer-join inline view) would fall through to IsNullPredicate analysis
       // below, which rejects variant types and throws (swallowed by analyzeNoThrow).
-      Preconditions.checkState(expr instanceof SlotRef);
       return false;
     }
 

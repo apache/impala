@@ -3405,6 +3405,50 @@ public class AnalyzeExprsTest extends AnalyzerTest {
         "VARIANT type is not supported as a column type.");
   }
 
+  @Test
+  public void TestVariantGet() throws AnalysisException {
+    final String tbl = " from functional_parquet.trino_variant";
+    // Syntactically valid constant paths.
+    for (String path : new String[] {"$", "$.age", "$.context.page", "$[0]", "$.arr[0]",
+        "$[0].field", "$[0][1]", "$.a[0].b[1]", "$.does_not_exist"}) {
+      AnalyzesOk("select variant_get(v, '" + path + "')" + tbl);
+    }
+    AnalyzesOk("select try_variant_get(v, '$.age')" + tbl);
+    // The typed 3-arg form validates the path the same way.
+    AnalyzesOk("select variant_get(v, '$.age', 'int')" + tbl);
+    AnalyzesOk("select try_variant_get(v, '$[0]', 'string')" + tbl);
+    // A non-literal path is validated at runtime, not analysis time, so it analyzes OK.
+    AnalyzesOk("select variant_get(v, descr)" + tbl);
+
+    // Malformed constant paths are rejected at analysis time.
+    for (String path : new String[] {"$age", "$.", "$..", "$[abc]", "$[]", "$[1",
+        "$.age.", "$.[0]", "$[0].", "$[0]field"}) {
+      AnalysisError("select variant_get(v, '" + path + "')" + tbl,
+          "variant_get() malformed path: '" + path + "'");
+      AnalysisError("select try_variant_get(v, '" + path + "')" + tbl,
+          "try_variant_get() malformed path: '" + path + "'");
+    }
+    // The malformed-path check also fires for the typed 3-arg form.
+    AnalysisError("select variant_get(v, '$[1', 'int')" + tbl,
+        "variant_get() malformed path: '$[1'");
+
+    // Path must be '$'-rooted.
+    AnalysisError("select variant_get(v, 'age')" + tbl,
+        "variant_get() path must start with '$'");
+    AnalysisError("select variant_get(v, '')" + tbl,
+        "variant_get() path must start with '$'");
+
+    // The first argument must be a VARIANT.
+    AnalysisError("select variant_get(id, '$')" + tbl,
+        "variant_get() first argument must be VARIANT");
+    AnalysisError("select variant_get(id, '$', 'int')" + tbl,
+        "variant_get() first argument must be VARIANT");
+
+    // An unsupported target type tag in the 3-arg form is rejected.
+    AnalysisError("select variant_get(v, '$', 'decimal')" + tbl,
+        "variant_get() unsupported target type 'decimal'");
+  }
+
   private void RunCastFormatTestOnType(String type) {
     String to_timestamp_cast = "cast('05-01-2017' as " + type + ")";
     AnalysisError(

@@ -42,6 +42,7 @@ using impala_udf::TimestampVal;
 using impala_udf::StringVal;
 using impala_udf::DecimalVal;
 using impala_udf::DateVal;
+using impala_udf::VariantVal;
 
 class ObjectPool;
 
@@ -204,6 +205,7 @@ class AnyValUtil {
       case TYPE_TIMESTAMP: return sizeof(TimestampVal);
       case TYPE_DECIMAL: return sizeof(DecimalVal);
       case TYPE_DATE: return sizeof(DateVal);
+      case TYPE_VARIANT: return sizeof(VariantVal);
       default:
         DCHECK(false) << t;
         return 0;
@@ -229,6 +231,7 @@ class AnyValUtil {
       case TYPE_TIMESTAMP: return alignof(TimestampVal);
       case TYPE_DECIMAL: return alignof(DecimalVal);
       case TYPE_DATE: return alignof(DateVal);
+      case TYPE_VARIANT: return alignof(VariantVal);
       default:
         DCHECK(false) << t;
         return 0;
@@ -340,9 +343,31 @@ class AnyValUtil {
         *reinterpret_cast<DateVal*>(dst) =
             reinterpret_cast<const DateValue*>(slot)->ToDateVal();
         return;
+      case TYPE_VARIANT:
+        // A raw VARIANT slot is never converted here; VARIANT expression values are
+        // staged through SetAnyValFromEvalResult() instead.
+        DCHECK(false) << "VARIANT must use SetAnyValFromEvalResult(), not SetAnyVal()";
+        return;
       default:
         DCHECK(false) << "NYI: " << type;
     }
+  }
+
+  /// Like SetAnyVal(), but for VARIANT: GetValue() returns a VariantVal already in ABI
+  /// form (&result_.variant_val), so it is copied directly rather than converted from a
+  /// raw slot. A null 'val' yields a null 'dst'.
+  static void SetAnyValFromEvalResult(
+      const void* val, const ColumnType& type, AnyVal* dst) {
+    if (type.type == TYPE_VARIANT) {
+      if (val == nullptr) {
+        dst->is_null = true;
+        return;
+      }
+      dst->is_null = false;
+      *reinterpret_cast<VariantVal*>(dst) = *reinterpret_cast<const VariantVal*>(val);
+      return;
+    }
+    SetAnyVal(val, type, dst);
   }
 
  private:

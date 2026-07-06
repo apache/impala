@@ -89,6 +89,10 @@ class ScalarFnCall : public ScalarExpr {
   virtual bool IsInterpretable() const override;
 
   GENERATE_GET_VAL_INTERPRETED_OVERRIDES_FOR_ALL_SCALAR_TYPES
+  /// variant_get() and other VARIANT-returning builtins evaluate through the normal
+  /// scalar-function interpreted path, so ScalarFnCall must provide this override too.
+  virtual VariantVal GetVariantValInterpreted(
+      ScalarExprEvaluator*, const TupleRow*) const override;
 
  private:
   /// If this function has var args, children()[vararg_start_idx_] is the first vararg

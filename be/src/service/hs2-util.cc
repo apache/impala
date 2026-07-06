@@ -432,13 +432,13 @@ static void VariantExprValuesToHS2TColumn(ScalarExprEvaluator* expr_eval,
     apache::hive::service::cli::thrift::TColumn* column, Status* out_status) {
   string json;
   FOREACH_ROW_LIMIT(batch, start_idx, num_rows, it) {
-    void* value = expr_eval->GetValue(it.Get());
-    if (value == nullptr) {
+    // A VARIANT always reaches us as a VariantVal via GetVariantVal(), never a raw slot.
+    impala_udf::VariantVal v = expr_eval->GetVariantVal(it.Get());
+    if (v.is_null) {
       column->stringVal.values.emplace_back();
       SetNullBit(output_row_idx, true, &column->stringVal.nulls);
     } else {
-      Status status = impala::VariantSlotToJson(
-          reinterpret_cast<const impala::VariantSlot*>(value), &json);
+      Status status = impala::VariantValToJson(v, &json);
       if (!status.ok()) {
         // Decoding a materialized variant slot should not fail for a well-formed file; a
         // failure indicates corruption. Fail the query rather than silently substituting

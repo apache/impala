@@ -521,6 +521,9 @@ public class Function extends CatalogObjectImpl {
   }
 
   public static String getUdfType(Type t) {
+    // VARIANT is a structural type, not a PrimitiveType, so it is handled before the
+    // switch below. It is marshaled across the UDF boundary as a VariantVal.
+    if (t.isVariantType()) return "VariantVal";
     switch (t.getPrimitiveType()) {
     case BOOLEAN:
       return "BooleanVal";

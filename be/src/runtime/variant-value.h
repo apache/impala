@@ -196,7 +196,7 @@ class VariantValue {
 
   // Navigate a dotted path like "field.nested[0].value".
   // Returns false if the path cannot be resolved.
-  [[nodiscard]] bool NavigatePath(const std::string& path, VariantValue* result) const;
+  [[nodiscard]] bool NavigatePath(std::string_view path, VariantValue* result) const;
 
   // Serialize this variant value to JSON string.
   Status ToJson(std::string* json_out) const;

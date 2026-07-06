@@ -316,7 +316,10 @@ void AggFnEvaluator::Update(const TupleRow* row, Tuple* dst, void* fn) {
   for (int i = 0; i < input_evals_.size(); ++i) {
     void* src_slot = input_evals_[i]->GetValue(row);
     DCHECK(&input_evals_[i]->root() == agg_fn_.GetChild(i));
-    AnyValUtil::SetAnyVal(src_slot, agg_fn_.GetChild(i)->type(), staging_input_vals_[i]);
+    // 'src_slot' is a GetValue() result, so it must be staged through the eval-result
+    // path (VARIANT-safe), not the raw-slot SetAnyVal used for tuple slots above.
+    AnyValUtil::SetAnyValFromEvalResult(
+        src_slot, agg_fn_.GetChild(i)->type(), staging_input_vals_[i]);
   }
 
   // TODO: this part is not so good and not scalable. It can be replaced with

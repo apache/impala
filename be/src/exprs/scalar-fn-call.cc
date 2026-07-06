@@ -454,7 +454,7 @@ void ScalarFnCall::EvaluateNonConstantChildren(
   FunctionContext* fn_ctx = eval->fn_context(fn_ctx_idx_);
   for (pair<ScalarExpr*, AnyVal*> child : fn_ctx->impl()->non_constant_args()) {
     void* val = eval->GetValue(*(child.first), row);
-    AnyValUtil::SetAnyVal(val, child.first->type(), child.second);
+    AnyValUtil::SetAnyValFromEvalResult(val, child.first->type(), child.second);
   }
 }
 
@@ -559,6 +559,7 @@ GET_VAL_INTERPRETED(StringVal,
 GET_VAL_INTERPRETED(TimestampVal, type_.type == PrimitiveType::TYPE_TIMESTAMP);
 GET_VAL_INTERPRETED(DecimalVal, type_.type == PrimitiveType::TYPE_DECIMAL);
 GET_VAL_INTERPRETED(DateVal, type_.type == PrimitiveType::TYPE_DATE);
+GET_VAL_INTERPRETED(VariantVal, type_.IsVariantType());
 #pragma pop_macro("GET_VAL_INTERPRETED")
 
 string ScalarFnCall::DebugString() const {

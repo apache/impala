@@ -316,25 +316,32 @@ void RawValue::WriteVariant(const void* value, Tuple* tuple,
   DCHECK(value != nullptr && tuple != nullptr && slot_desc != nullptr);
   DCHECK(slot_desc->type().IsVariantType());
   DCHECK(slot_desc->children_tuple_descriptor() != nullptr);
-  // Unlike a struct, a variant value is not a StructVal: 'value' points at the 24-byte
-  // variant slot in the source tuple (two adjacent StringValues: metadata + value). Child
-  // slot offsets are absolute in the master tuple (same as struct children), so each
-  // child's position within 'value' is child->tuple_offset() - slot_desc->tuple_offset()
-  // (0 for metadata, sizeof(StringValue) for value).
-  // TODO(variant_get): this assumes the source is always a materialized scan slot. When
-  // VARIANT becomes a first-class expression type (a VariantVal ABI, letting functions
-  // such as variant_get() produce VARIANT), this must also handle a VariantVal source.
+  // 'value' points at a VariantVal (the 'metadata' and 'value' StringVals).
+  //
+  // A variant's two child slots (both var-len BINARY) physically overlap the 24-byte
+  // master slot in a fixed layout: the metadata StringValue at master offset 0 and the
+  // value StringValue at master offset sizeof(StringValue). We therefore identify each
+  // child by its offset delta from the master slot and copy the matching StringVal into
+  // it, reusing WritePrimitiveCollectVarlen so var-len bytes are allocated from 'pool'
+  // (and collected) exactly like an ordinary string write. This keeps consumers that read
+  // the master slot as two consecutive StringValues (e.g.
+  // SlotRef::GetVariantValInterpreted()) consistent.
+  const impala_udf::VariantVal* src =
+      reinterpret_cast<const impala_udf::VariantVal*>(value);
   const TupleDescriptor* children_tuple_desc = slot_desc->children_tuple_descriptor();
-  const uint8_t* src_base = reinterpret_cast<const uint8_t*>(value);
   for (SlotDescriptor* child_slot : children_tuple_desc->slots()) {
-    // For unshredded variants the children (metadata, value) are always present when the
-    // variant itself is non-null, and per-child null info is not reachable from the raw
-    // slot pointer. Revisit when shredded variants (with nullable typed children) land.
     DCHECK(child_slot->type().IsVarLenStringType())
         << "Unexpected variant child type: " << child_slot->type().DebugString();
-    const void* src_child =
-        src_base + (child_slot->tuple_offset() - slot_desc->tuple_offset());
-    WritePrimitiveCollectVarlen<COLLECT_VAR_LEN_VALS>(src_child, tuple, child_slot, pool,
+    const int64_t delta = child_slot->tuple_offset() - slot_desc->tuple_offset();
+    DCHECK(delta == 0 || delta == static_cast<int64_t>(sizeof(StringValue)));
+    const impala_udf::StringVal* part = (delta == 0) ? &src->metadata : &src->value;
+    if (part->is_null) {
+      tuple->SetNull(child_slot->null_indicator_offset());
+      continue;
+    }
+    // Wrap the UDF StringVal (ptr/len) as an internal StringValue and delegate the copy.
+    StringValue src_child(reinterpret_cast<char*>(part->ptr), part->len);
+    WritePrimitiveCollectVarlen<COLLECT_VAR_LEN_VALS>(&src_child, tuple, child_slot, pool,
         string_values);
   }
 }

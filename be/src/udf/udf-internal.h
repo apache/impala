@@ -351,6 +351,29 @@ private:
   void ReserveMemory(FunctionContext* ctx);
 };
 
+/// A VARIANT value transported across the UDF/expression boundary. Unlike CollectionVal
+/// and StructVal (which reference our internal tuple layout), a VARIANT is fully
+/// described by two byte spans following the Parquet Variant binary encoding:
+///   - 'metadata': the shared metadata dictionary blob (field-name dictionary).
+///   - 'value':    the encoded value blob, or a zero-copy slice of a parent's value blob
+///                 when navigating to a sub-value (the dictionary is shared, so slicing
+///                 never re-encodes anything).
+struct VariantVal : public AnyVal {
+  StringVal metadata;
+  StringVal value;
+
+  VariantVal() : AnyVal() {}
+
+  VariantVal(const StringVal& metadata, const StringVal& value)
+      : AnyVal(), metadata(metadata), value(value) {}
+
+  static VariantVal null() {
+    VariantVal v;
+    v.is_null = true;
+    return v;
+  }
+};
+
 #pragma GCC diagnostic ignored "-Winvalid-offsetof"
 static_assert(sizeof(CollectionVal) == sizeof(StringVal), "Wrong size.");
 static_assert(

@@ -57,6 +57,7 @@ using impala_udf::DecimalVal;
 using impala_udf::DateVal;
 using impala_udf::CollectionVal;
 using impala_udf::StructVal;
+using impala_udf::VariantVal;
 
 class FragmentState;
 struct LibCacheEntry;
@@ -278,6 +279,7 @@ class ScalarExpr : public Expr {
   StringVal GetStringVal(ScalarExprEvaluator*, const TupleRow*) const;
   CollectionVal GetCollectionVal(ScalarExprEvaluator*, const TupleRow*) const;
   StructVal GetStructVal(ScalarExprEvaluator*, const TupleRow*) const;
+  VariantVal GetVariantVal(ScalarExprEvaluator*, const TupleRow*) const;
   TimestampVal GetTimestampVal(ScalarExprEvaluator*, const TupleRow*) const;
   DecimalVal GetDecimalVal(ScalarExprEvaluator*, const TupleRow*) const;
   DateVal GetDateVal(ScalarExprEvaluator*, const TupleRow*) const;
@@ -300,6 +302,8 @@ class ScalarExpr : public Expr {
   virtual CollectionVal GetCollectionValInterpreted(
       ScalarExprEvaluator*, const TupleRow*) const;
   virtual StructVal GetStructValInterpreted(
+      ScalarExprEvaluator*, const TupleRow*) const;
+  virtual VariantVal GetVariantValInterpreted(
       ScalarExprEvaluator*, const TupleRow*) const;
   virtual TimestampVal GetTimestampValInterpreted(
       ScalarExprEvaluator*, const TupleRow*) const;
@@ -352,6 +356,12 @@ class ScalarExpr : public Expr {
   /// Return true if we should codegen this expression node, based on query options
   /// and the properties of this ScalarExpr node.
   bool ShouldCodegen(const FragmentState* state) const;
+
+  /// Returns true if this node's type or any descendant's type is VARIANT. Codegen for
+  /// VARIANT values is not implemented (TYPE_VARIANT is absent from CodegenAnyVal), so
+  /// any expression tree containing a VARIANT node must run entirely on the interpreted
+  /// path.
+  bool InvolvesVariantType() const;
 
   /// Return true if it is possible to evaluate this expression node without codegen.
   /// The vast majority of exprs support interpretation, so default to true. Scalars

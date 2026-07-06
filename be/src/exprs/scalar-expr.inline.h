@@ -38,6 +38,7 @@ namespace impala {
 /// * ScalarExpr::GetDateVal()
 /// * ScalarExpr::GetCollectionVal()
 /// * ScalarExpr::GetStructVal()
+/// * ScalarExpr::GetVariantVal()
 #pragma push_macro("SCALAR_EXPR_GET_VAL")
 #define SCALAR_EXPR_GET_VAL(val_type, type_validation)                                 \
   typedef val_type (*val_type##Wrapper)(ScalarExprEvaluator*, const TupleRow*);        \
@@ -64,10 +65,8 @@ SCALAR_EXPR_GET_VAL(StringVal, type_.IsStringType() || type_.IsUuidType()
     || type_.type == PrimitiveType::TYPE_FIXED_UDA_INTERMEDIATE);
 SCALAR_EXPR_GET_VAL(DateVal, type_.type == PrimitiveType::TYPE_DATE);
 SCALAR_EXPR_GET_VAL(CollectionVal, type_.IsCollectionType());
-// TODO(variant_get): VARIANT reuses the StructVal accessor because there is no dedicated
-// VariantVal yet and today VARIANT values only ever flow through a pass-through SlotRef.
-// When VARIANT becomes a first-class expression type, add a separate VariantVal accessor.
-SCALAR_EXPR_GET_VAL(StructVal, type_.IsStructType() || type_.IsVariantType());
+SCALAR_EXPR_GET_VAL(StructVal, type_.IsStructType());
+SCALAR_EXPR_GET_VAL(VariantVal, type_.IsVariantType());
 #pragma pop_macro("SCALAR_EXPR_GET_VAL")
 
 }

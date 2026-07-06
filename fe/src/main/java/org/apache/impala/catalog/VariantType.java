@@ -85,6 +85,12 @@ public class VariantType extends Type {
   }
 
   @Override
+  public boolean matchesType(Type t) {
+    // VARIANT is a structural singleton: all VARIANTs are the same type.
+    return t instanceof VariantType;
+  }
+
+  @Override
   public int hashCode() {
     return "VARIANT".hashCode();
   }

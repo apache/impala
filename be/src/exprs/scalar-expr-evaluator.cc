@@ -96,7 +96,7 @@ Status ScalarExprEvaluator::Create(const ScalarExpr& root, RuntimeState* state,
     DCHECK_EQ(root.fn_ctx_idx_, -1);
     DCHECK((*eval)->fn_ctxs_ptr_ == nullptr);
   }
-  if (root.type().IsStructType() || root.type().IsVariantType()) {
+  if (root.type().IsStructType()) {
     DCHECK(root.GetNumChildren() > 0);
     Status status = Create(root.children(), state, pool, expr_perm_pool,
         expr_results_pool, &((*eval)->childEvaluators_));
@@ -251,7 +251,7 @@ Status ScalarExprEvaluator::GetConstValue(RuntimeState* state, const ScalarExpr&
       "Could not allocate constant expression value", const_val));
 
   void* result = ScalarExprEvaluator::GetValue(expr, nullptr);
-  AnyValUtil::SetAnyVal(result, result_type, *const_val);
+  AnyValUtil::SetAnyValFromEvalResult(result, result_type, *const_val);
   if (result_type.IsStringType()) {
     StringVal* sv = reinterpret_cast<StringVal*>(*const_val);
     if (!sv->is_null && sv->len > 0) {
@@ -379,17 +379,10 @@ void* ScalarExprEvaluator::GetValue(const ScalarExpr& expr, const TupleRow* row)
       return &result_.struct_val;
     }
     case TYPE_VARIANT: {
-      // VARIANT slot is 24 bytes (two StringValues). Return pointer to slot directly.
-      // The SlotRef::GetValue will return the slot pointer.
-      // TODO(variant_get): VARIANT is currently scan-only, so a SlotRef is the only
-      // expression that can produce one. When VARIANT becomes a first-class expression
-      // type (a VariantVal ABI, letting functions such as variant_get() return VARIANT),
-      // this DCHECK must be relaxed and the non-SlotRef path handled here.
-      DCHECK(expr.IsSlotRef());
-      const SlotRef& slot_ref = static_cast<const SlotRef&>(expr);
-      Tuple* t = row->GetTuple(slot_ref.GetTupleIdx());
-      if (t == nullptr || t->IsNull(slot_ref.GetNullIndicatorOffset())) return nullptr;
-      return t->GetSlot(slot_ref.GetSlotOffset());
+      VariantVal v = expr.GetVariantVal(this, row);
+      if (v.is_null) return nullptr;
+      result_.variant_val = v;
+      return &result_.variant_val;
     }
     default:
       DCHECK(false) << "Type not implemented: " << expr.type_.DebugString();
@@ -451,6 +444,10 @@ CollectionVal ScalarExprEvaluator::GetCollectionVal(const TupleRow* row) {
 
 StructVal ScalarExprEvaluator::GetStructVal(const TupleRow* row) {
   return root_.GetStructVal(this, row);
+}
+
+VariantVal ScalarExprEvaluator::GetVariantVal(const TupleRow* row) {
+  return root_.GetVariantVal(this, row);
 }
 
 TimestampVal ScalarExprEvaluator::GetTimestampVal(const TupleRow* row) {

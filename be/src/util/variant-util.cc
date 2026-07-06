@@ -45,17 +45,17 @@ Status VariantToJson(impala_udf::FunctionContext* ctx,
   return value.ToJson(ctx, result);
 }
 
-Status VariantSlotToJson(const VariantSlot* slot, string* json_out) {
-  DCHECK(slot != nullptr);
-  return VariantToJson(slot->metadata.UPtr(), slot->metadata.Len(),
-      slot->value.UPtr(), slot->value.Len(), json_out);
+Status VariantValToJson(const impala_udf::VariantVal& v, string* json_out) {
+  DCHECK(!v.is_null && !v.metadata.is_null && !v.value.is_null);
+  return VariantToJson(
+      v.metadata.ptr, v.metadata.len, v.value.ptr, v.value.len, json_out);
 }
 
-Status VariantSlotToJson(const VariantSlot* slot, std::ostream* out) {
-  DCHECK(slot != nullptr);
+Status VariantValToJson(const impala_udf::VariantVal& v, std::ostream* out) {
+  DCHECK(!v.is_null && !v.metadata.is_null && !v.value.is_null);
   VariantMetadata metadata;
-  RETURN_IF_ERROR(metadata.Init(slot->metadata.UPtr(), slot->metadata.Len()));
-  VariantValue value(slot->value.UPtr(), slot->value.Len(), &metadata);
+  RETURN_IF_ERROR(metadata.Init(v.metadata.ptr, v.metadata.len));
+  VariantValue value(v.value.ptr, v.value.len, &metadata);
   return value.ToJson(out);
 }
 
