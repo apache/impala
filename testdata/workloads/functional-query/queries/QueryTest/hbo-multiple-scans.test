@@ -144,4 +144,27 @@ PLAN-ROOT SINK
    HDFS partitions=1/24 files=1 size=20.36KB
    predicates: int_col = 0
    row-size=89B cardinality=31 (from HBO)
+---- CALCITE_PLANNER_PLAN
+# Calcite does not get stats from HBO because the original
+# query is from a join and an added "id is not null" predicate
+# is added to the hbo stats string predicate.
+PLAN-ROOT SINK
+|
+03:EXCHANGE [UNPARTITIONED]
+|
+00:UNION
+|  pass-through-operands: all
+|  row-size=81B cardinality=146
+|
+|--02:SCAN HDFS [functional.alltypes b]
+|     partition predicates: `year` = 2010
+|     HDFS partitions=12/24 files=12 size=239.77KB
+|     predicates: int_col = 0, string_col = '0'
+|     row-size=85B cardinality=115
+|
+01:SCAN HDFS [functional.alltypes a]
+   partition predicates: `year` = 2010, `month` = 1
+   HDFS partitions=1/24 files=1 size=20.36KB
+   predicates: int_col = 0
+   row-size=85B cardinality=31
 ====

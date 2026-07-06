@@ -87,6 +87,10 @@ public class ImpalaFilterRel extends Filter
       ImmutableBitSet inputRefs =
           RelOptUtil.InputFinder.bits(Lists.newArrayList(getCondition()), null);
       builder.setInputRefs(inputRefs.union(context.inputRefs_));
+      // Filter only fields is used for an optimization for partitioned fields in the
+      // scan node. This tracks the fields where an input ref in the filter condition
+      // is not projected out in a parent project.
+      builder.setFilterOnlyInputRefs(inputRefs.except(context.inputRefs_));
     }
     return relInput.getPlanNode(builder.build());
   }

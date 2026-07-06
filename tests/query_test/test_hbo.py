@@ -18,6 +18,7 @@
 from __future__ import absolute_import, division, print_function
 import time
 
+from tests.common.environ import IS_CALCITE_PLANNER
 from tests.common.impala_test_suite import ImpalaTestSuite
 from tests.common.test_dimensions import (
     create_parquet_dimension,
@@ -48,13 +49,16 @@ class TestHBO(ImpalaTestSuite):
     time.sleep(1)
     test_cases = self.load_query_test_file(
         'functional-query', test_file,
-        valid_section_names=['QUERY', 'PLAN'])
+        valid_section_names=['QUERY', 'PLAN', 'CALCITE_PLANNER_PLAN'])
     self.client.set_configuration({'use_hbo_stats': True})
     for section in test_cases:
       query = remove_comments(section['QUERY'].strip())
       result = self.execute_query(query)
       actual_plan_lines = result.data[result.data.index('PLAN-ROOT SINK'):]
-      expected_plan_lines = section['PLAN'].splitlines()
+      plan_section_name = 'PLAN'
+      if IS_CALCITE_PLANNER and 'CALCITE_PLANNER_PLAN' in section:
+        plan_section_name = 'CALCITE_PLANNER_PLAN'
+      expected_plan_lines = section[plan_section_name].splitlines()
       # To avoid the test being fragile, we only compare the cardinality lines.
       actual_cardinality_lines = [line for line in actual_plan_lines
                                   if 'cardinality' in line]
@@ -62,7 +66,7 @@ class TestHBO(ImpalaTestSuite):
                                     if 'cardinality' in line]
       assert actual_cardinality_lines == expected_cardinality_lines, (
           "EXPLAIN output mismatch for {0}.\nExpected:\n{1}\n\nActual:\n{2}".format(
-              test_file, section['PLAN'], '\n'.join(actual_plan_lines)))
+              test_file, section[plan_section_name], '\n'.join(actual_plan_lines)))
 
   def test_single_scan_cardinality_partitioned_with_stats(self):
     self.client.set_configuration(QUERY_OPTIONS)
@@ -204,9 +208,14 @@ class TestHBO(ImpalaTestSuite):
         and l_shipdate < '1995-01-01'
         and l_discount between 0.05 and 0.07
         and l_quantity < 24"""
+    if IS_CALCITE_PLANNER:
+      lineitem_preds += " and l_orderkey IS NOT NULL"
     self.execute_query(
         "select count(*) from tpch_parquet.lineitem where " + lineitem_preds)
-    self.execute_query("select count(*) from tpch_parquet.orders where o_custkey < 1000")
+    order_key_query = "select count(*) from tpch_parquet.orders where o_custkey < 1000"
+    if IS_CALCITE_PLANNER:
+      order_key_query += " and o_orderkey IS NOT NULL"
+    self.execute_query(order_key_query)
     # Wait for 1 second to ensure the stats are written to the cache.
     time.sleep(1)
     res = self.execute_query("""

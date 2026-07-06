@@ -37,6 +37,17 @@ public class ParentPlanRelContext {
   // The input refs used by the parent PlanRel Node
   public final ImmutableBitSet inputRefs_;
 
+  // The input refs that are only used in a filter and are not used by a projection
+  // above the filter. This is for the partition pruning optimization. For the query
+  // "select id + 5 from alltypes where year = 2010", if the year column is partitioned,
+  // the partition pruning removes all files under the 2010 "year" directory on the
+  // file system. Since the "year" column is not in the "select" clause, there is no
+  // reason to create memory for the year column in the scan node.
+  // The variable filterOnlyInputRefs_ will contain the columns that apply for this
+  // optimization. This will be passed down to the scan node and the field will not
+  // be materialized.
+  public final ImmutableBitSet filterOnlyInputRefs_;
+
   public ImpalaAggRel parentAggregate_;
 
   /**
@@ -46,6 +57,7 @@ public class ParentPlanRelContext {
     this.ctx_ = plannerContext;
     this.filterCondition_ = null;
     this.inputRefs_ = null;
+    this.filterOnlyInputRefs_ = ImmutableBitSet.of();
     this.parentAggregate_ = null;
   }
 
@@ -53,6 +65,7 @@ public class ParentPlanRelContext {
     this.ctx_ = builder.context_;
     this.filterCondition_ = builder.filterCondition_;
     this.inputRefs_ = builder.inputRefs_;
+    this.filterOnlyInputRefs_ = builder.filterOnlyInputRefs_;
     this.parentAggregate_ = builder.parentAggregate_;
   }
 
@@ -60,6 +73,7 @@ public class ParentPlanRelContext {
     private PlannerContext context_;
     private RexNode filterCondition_;
     private ImmutableBitSet inputRefs_;
+    private ImmutableBitSet filterOnlyInputRefs_;
     private ImpalaAggRel parentAggregate_;
 
     /**
@@ -67,11 +81,13 @@ public class ParentPlanRelContext {
      */
     public Builder(PlannerContext plannerContext) {
       this.context_ = plannerContext;
+      this.filterOnlyInputRefs_ = ImmutableBitSet.of();
     }
 
     public Builder(ParentPlanRelContext planRelContext, ImpalaPlanRel planRel) {
       this.context_ = planRelContext.ctx_;
       this.filterCondition_ = planRelContext.filterCondition_;
+      this.filterOnlyInputRefs_ = planRelContext.filterOnlyInputRefs_;
       this.parentAggregate_ = ImpalaPlanRel.canPassThroughParentAggregate(planRel)
           ? planRelContext.parentAggregate_
           : null;
@@ -79,10 +95,21 @@ public class ParentPlanRelContext {
 
     public void setFilterCondition(RexNode filterCondition) {
       this.filterCondition_ = filterCondition;
+      if (filterCondition == null) {
+        // convenience setting. If there is no filter condition, the fields here
+        // can be cleared out.
+        // Note: if there is a filterCondition, it is up to the caller to set which
+        // input refs are filterOnlyInputRefs
+        this.filterOnlyInputRefs_ = ImmutableBitSet.of();
+      }
     }
 
     public void setInputRefs(ImmutableBitSet inputRefs) {
       this.inputRefs_ = inputRefs;
+    }
+
+    public void setFilterOnlyInputRefs(ImmutableBitSet filterOnlyInputRefs) {
+      this.filterOnlyInputRefs_ = filterOnlyInputRefs;
     }
 
     public void setParentAggregate(ImpalaAggRel parentAggregate) {

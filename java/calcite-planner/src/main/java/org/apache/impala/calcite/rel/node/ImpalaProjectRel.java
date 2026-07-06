@@ -30,7 +30,9 @@ import org.apache.calcite.rel.core.Project;
 import org.apache.calcite.rel.core.Values;
 import org.apache.calcite.rel.type.RelDataType;
 import org.apache.calcite.rex.RexNode;
+import org.apache.calcite.rex.RexShuttle;
 import org.apache.calcite.sql.SqlKind;
+import org.apache.calcite.util.ImmutableBitSet;
 import org.apache.impala.analysis.Analyzer;
 import org.apache.impala.analysis.Expr;
 import org.apache.impala.calcite.rel.util.CreateExprVisitor;
@@ -39,7 +41,6 @@ import org.apache.impala.planner.PlanNodeId;
 
 import java.util.ArrayList;
 import java.util.List;
-
 
 /**
  * ImpalaProjectRel is the Impala specific RelNode corresponding to
@@ -119,12 +120,34 @@ public class ImpalaProjectRel extends Project
     // Calcite rule. The only exception to this is when a bogus "coerced project"
     // (see comment in isCoercedProjectForValues method) is created after the
     // rule has been applied.
-    Preconditions.checkState(context.filterCondition_ == null,
-        "Failure, Filter RelNode needs to be passed through the Project Rel Node.");
     ImpalaPlanRel relInput = (ImpalaPlanRel) getInput(0);
     ParentPlanRelContext.Builder builder =
         new ParentPlanRelContext.Builder(context, this);
+
     builder.setInputRefs(RelOptUtil.InputFinder.bits(getProjects(), null));
+    if (context.filterCondition_ != null) {
+      builder.setFilterCondition(mapInputRefs(context.filterCondition_, getProjects()));
+
+      // Optimization for partitioned scan node columns that are not used in
+      // the output expression.
+      // If there is a filter condition present, all the projects
+      // should be RexInputRef instances. This is because RexCall projects are on
+      // top of the filter. The Project underneath the filter should only exist by
+      // creation of RelFieldTrimmer which trims the fields in between the scan
+      // RelNode and the Filter.
+      if (!context.filterOnlyInputRefs_.isEmpty()) {
+        // Map the input refs from the filter to the project. We need to do this for the
+        // following reason:
+        // Take the example "select id + 5 from alltypes where year = 2010". This will
+        // create Project-Filter-Project-Scan. The top project will have only the "id + 5"
+        // column. The lower project will have two columns, id and year. The scan node has
+        // the 13 columns in the table, where year is column 12. The lower project has
+        // two input refs, $1 and $12. The filter condition above this will have the
+        // condition "$1 = 2010", because the lower project only has 2 columns. So the
+        // map functions here change $1 to $12.
+        builder.setFilterOnlyInputRefs(mapFilterOnlyRefs(context.filterOnlyInputRefs_));
+      }
+    }
     return relInput.getPlanNode(builder.build());
   }
 
@@ -220,6 +243,27 @@ public class ImpalaProjectRel extends Project
         context.ctx_.getRootAnalyzer(), rowType, nodeWithExprsList, true);
     return NodeCreationUtils.wrapInSelectNodeIfNeeded(context, retNode,
         getCluster().getRexBuilder());
+  }
+
+  // Map the input refs from a parent level to the input ref on this project
+  // level.
+  private RexNode mapInputRefs(RexNode filterCondition,
+      List<RexNode> projects) {
+    return filterCondition.accept(new RexShuttle() {
+        @Override public RexNode visitInputRef(RexInputRef inputRef) {
+          return projects.get(inputRef.getIndex());
+        }});
+  }
+
+  // Map the input refs from a parent level to the input ref on this project
+  // level.
+  private ImmutableBitSet mapFilterOnlyRefs(ImmutableBitSet filterOnlyInputRefs) {
+    ImmutableBitSet.Builder mappedRefsBuilder = ImmutableBitSet.builder();
+    for (Integer i : filterOnlyInputRefs) {
+      RexInputRef inputRef = (RexInputRef) getProjects().get(i);
+      mappedRefsBuilder.set(inputRef.getIndex());
+    }
+    return mappedRefsBuilder.build();
   }
 
   @Override
