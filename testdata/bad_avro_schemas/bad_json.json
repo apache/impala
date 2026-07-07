@@ -1,0 +1,4 @@
+{
+  "name": "my_record", "type": "record",
+  "fields": {"name": "string1", "type": "string"}]
+}

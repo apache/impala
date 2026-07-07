@@ -87,6 +87,7 @@ WORKLOAD_DIR = options.workload_dir
 DATASET_DIR = options.dataset_dir
 TESTDATA_BIN_DIR = os.path.join(os.environ['IMPALA_HOME'], 'testdata/bin')
 AVRO_SCHEMA_DIR = "avro_schemas"
+BAD_AVRO_SCHEMA_DIR = os.path.join(os.environ['IMPALA_HOME'], 'testdata/bad_avro_schemas')
 
 GENERATE_SCHEMA_CMD = "generate-schema-statements.py --exploration_strategy=%s "\
                       "--workload=%s --scale_factor=%s --verbose"
@@ -385,6 +386,7 @@ def main():
     # Copy the avro schemas (see #2) into HDFS
     avro_schemas_path = os.path.join(sql_dir, AVRO_SCHEMA_DIR)
     copy_avro_schemas_to_hdfs(avro_schemas_path)
+    copy_avro_schemas_to_hdfs(BAD_AVRO_SCHEMA_DIR)
 
     # List all of the files in the sql directory to sort out the various types of
     # files (see #3).

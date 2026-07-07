@@ -1,0 +1,6 @@
+{
+  "name": "my_record", "type": "record",
+  "fields": [{"name": "value", "type": {
+    "type": "bytes", "logicalType": "decimal", "scale": 5, "precision": -20
+  }}]
+}
