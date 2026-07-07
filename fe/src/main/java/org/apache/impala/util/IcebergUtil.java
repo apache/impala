@@ -20,6 +20,7 @@ package org.apache.impala.util;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
+import com.google.common.primitives.Doubles;
 import com.google.common.primitives.Ints;
 import com.google.common.primitives.Longs;
 import com.google.flatbuffers.FlatBufferBuilder;
@@ -33,6 +34,7 @@ import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.time.temporal.ChronoUnit;
+import java.util.function.Function;
 import java.util.function.IntFunction;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -100,6 +102,7 @@ import org.apache.impala.analysis.TimeTravelSpec.Kind;
 import org.apache.impala.catalog.BuiltinsDb;
 import org.apache.impala.catalog.Catalog;
 import org.apache.impala.catalog.Column;
+import org.apache.impala.catalog.FeFsTable;
 import org.apache.impala.catalog.FeIcebergTable;
 import org.apache.impala.catalog.HdfsFileFormat;
 import org.apache.impala.catalog.IcebergColumn;
@@ -1169,6 +1172,217 @@ public class IcebergUtil {
       return pageSize;
     }
     return IcebergTable.UNSET_PARQUET_PAGE_SIZE;
+  }
+
+  /**
+   * Computes the optimal Parquet Bloom filter bitset size in bytes for the given
+   * expected number of distinct values ('ndv') and false positive probability
+   * ('fpp'). This mirrors the sizing used by parquet-java
+   * (BlockSplitBloomFilter.optimalNumOfBits) and Impala's own
+   * ParquetBloomFilter::OptimalByteSize (be/src/util/parquet-bloom-filter.cc), so
+   * that Bloom filters written by Impala are sized consistently with other Iceberg
+   * writers. The result is a power of two clamped to
+   * [PARQUET_BLOOM_FILTER_MIN_BYTES, PARQUET_BLOOM_FILTER_MAX_BYTES].
+   * 'ndv' must be > 0 and 'fpp' must be in the open interval (0, 1).
+   */
+  public static long optimalParquetBloomFilterByteSize(long ndv, double fpp) {
+    Preconditions.checkArgument(ndv > 0, "ndv must be > 0");
+    Preconditions.checkArgument(fpp > 0.0 && fpp < 1.0,
+        "fpp must be in the range (0, 1)");
+    // A Bloom filter bucket holds 8 32-bit words; see be/src/util/parquet-bloom-filter.h.
+    final double wordsInBucket = 8.0;
+    // Number of bits, following Putze et al. as used by parquet-java.
+    double numBits =
+        -wordsInBucket * ndv / Math.log(1 - Math.pow(fpp, 1.0 / wordsInBucket));
+    // Convert to bytes, then round up to a power of two (in log space).
+    long logBytes =
+        (long) Math.max(0, Math.ceil(Math.log(numBits / 8) / Math.log(2)));
+    return clampAndRoundBloomFilterBytes(1L << logBytes);
+  }
+
+  /**
+   * Clamps 'bytes' to the valid Parquet Bloom filter size range and rounds up to the
+   * nearest power of two. Keep in sync with be/src/util/parquet-bloom-filter.h.
+   */
+  private static long clampAndRoundBloomFilterBytes(long bytes) {
+    bytes = Math.max(FeFsTable.PARQUET_BLOOM_FILTER_MIN_BYTES, bytes);
+    bytes = Math.min(FeFsTable.PARQUET_BLOOM_FILTER_MAX_BYTES, bytes);
+    return BitUtil.roundUpToPowerOf2(bytes);
+  }
+
+  /**
+   * Returns true if 'tblProperties' contains any Iceberg-native Parquet Bloom filter
+   * property.
+   */
+  public static boolean hasParquetBloomFilterProperties(
+      Map<String, String> tblProperties) {
+    for (String key : tblProperties.keySet()) {
+      if (key.equals(IcebergTable.PARQUET_BLOOM_FILTER_MAX_BYTES)
+          || key.startsWith(IcebergTable.PARQUET_BLOOM_FILTER_ENABLED_PREFIX)
+          || key.startsWith(IcebergTable.PARQUET_BLOOM_FILTER_NDV_PREFIX)
+          || key.startsWith(IcebergTable.PARQUET_BLOOM_FILTER_FPP_PREFIX)) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  /**
+   * Validates the Iceberg-native Parquet Bloom filter table properties:
+   *  - 'write.parquet.bloom-filter-max-bytes' must be a positive 32-bit integer;
+   *  - every 'write.parquet.bloom-filter-ndv.column.<col>' must be a positive long;
+   *  - every 'write.parquet.bloom-filter-fpp.column.<col>' must be a floating point
+   *    number in the open interval (0, 1).
+   * Returns true if all present properties are valid; otherwise appends an error
+   * message to 'errMsg' and returns false.
+   */
+  public static boolean validateParquetBloomFilterProperties(
+      Map<String, String> tblProperties, StringBuilder errMsg) {
+    String maxBytesProp = tblProperties.get(IcebergTable.PARQUET_BLOOM_FILTER_MAX_BYTES);
+    if (maxBytesProp != null) {
+      Integer maxBytes = Ints.tryParse(maxBytesProp.trim());
+      if (maxBytes == null || maxBytes <= 0) {
+        errMsg.append("Invalid value for ")
+            .append(IcebergTable.PARQUET_BLOOM_FILTER_MAX_BYTES)
+            .append(": '").append(maxBytesProp)
+            .append("'. It must be a positive 32-bit integer.");
+        return false;
+      }
+    }
+    for (Map.Entry<String, String> entry : tblProperties.entrySet()) {
+      String key = entry.getKey();
+      if (key.startsWith(IcebergTable.PARQUET_BLOOM_FILTER_NDV_PREFIX)) {
+        Long ndv = Longs.tryParse(entry.getValue().trim());
+        if (ndv == null || ndv <= 0) {
+          errMsg.append("Invalid value for ").append(key).append(": '")
+              .append(entry.getValue()).append("'. It must be a positive integer.");
+          return false;
+        }
+      } else if (key.startsWith(IcebergTable.PARQUET_BLOOM_FILTER_FPP_PREFIX)) {
+        Double fpp = Doubles.tryParse(entry.getValue().trim());
+        if (fpp == null || fpp <= 0.0 || fpp >= 1.0) {
+          errMsg.append("Invalid value for ").append(key).append(": '")
+              .append(entry.getValue())
+              .append("'. It must be a floating point number in the range (0, 1).");
+          return false;
+        }
+      }
+    }
+    return true;
+  }
+
+  /**
+   * Adds an analysis warning to 'analyzer' if 'table' carries invalid Iceberg-native
+   * Parquet Bloom filter properties. Such properties may have been set by another
+   * engine without going through Impala's CREATE/ALTER validation; Impala ignores them
+   * (rather than fixing them up) on write, so this surfaces a warning instead of
+   * silently dropping them in the write path (see FeIcebergTable). Meant to be called
+   * during analysis of statements that write Iceberg data files (INSERT, UPDATE,
+   * MERGE, OPTIMIZE). IMPALA-12700.
+   */
+  public static void warnIfInvalidParquetBloomFilterProperties(
+      FeIcebergTable table, Analyzer analyzer) {
+    Map<String, String> tblProperties = table.getMetaStoreTable().getParameters();
+    StringBuilder errMsg = new StringBuilder();
+    if (hasParquetBloomFilterProperties(tblProperties)
+        && !validateParquetBloomFilterProperties(tblProperties, errMsg)) {
+      analyzer.addWarning(
+          "Ignoring invalid Iceberg Parquet Bloom filter properties: " + errMsg);
+    }
+  }
+
+  /**
+   * Builds the map of column name -> Parquet Bloom filter bitset size (in bytes) for
+   * an Iceberg table, based on the Iceberg-native Bloom filter table properties. Only
+   * columns with 'write.parquet.bloom-filter-enabled.column.<col>'='true' are
+   * included. The bitset size is derived from the expected number of distinct values
+   * (NDV) and the false positive probability (FPP), capped by
+   * 'write.parquet.bloom-filter-max-bytes' (default 1 MiB):
+   *  - The NDV is taken from 'write.parquet.bloom-filter-ndv.column.<col>' if set,
+   *    otherwise from 'ndvStatsResolver' (typically the column's computed stats), if
+   *    available.
+   *  - If the NDV is known, the size is min(optimalByteSize(ndv, fpp), maxBytes);
+   *    otherwise the size is maxBytes (matching parquet-java, which allocates the
+   *    maximum size when the NDV is unknown).
+   * Column names are lowercased to match Impala's column descriptors. Returns an
+   * empty map if no columns are enabled, or null (appending a message to 'errMsg') if
+   * any property value is invalid. 'ndvStatsResolver' may be null and, when provided,
+   * is queried with the lowercased column name; it should return the column's NDV
+   * statistic or null/<=0 if unknown.
+   */
+  public static Map<String, Long> getIcebergParquetBloomFilterColumns(
+      Map<String, String> tblProperties, Function<String, Long> ndvStatsResolver,
+      StringBuilder errMsg) {
+    if (!validateParquetBloomFilterProperties(tblProperties, errMsg)) return null;
+
+    long maxBytes = IcebergTable.DEFAULT_PARQUET_BLOOM_FILTER_MAX_BYTES;
+    String maxBytesProp = tblProperties.get(IcebergTable.PARQUET_BLOOM_FILTER_MAX_BYTES);
+    if (maxBytesProp != null) {
+      // Validated above to be a positive 32-bit integer.
+      maxBytes = Ints.tryParse(maxBytesProp.trim());
+    }
+    maxBytes = clampAndRoundBloomFilterBytes(maxBytes);
+
+    Map<String, Long> result = new HashMap<>();
+    for (Map.Entry<String, String> entry : tblProperties.entrySet()) {
+      String key = entry.getKey();
+      if (!key.startsWith(IcebergTable.PARQUET_BLOOM_FILTER_ENABLED_PREFIX)) continue;
+      if (!Boolean.parseBoolean(entry.getValue().trim())) continue;
+      // The column name as written in the property, used to look up the matching
+      // ndv/fpp properties (Iceberg matches these case-sensitively).
+      String rawCol =
+          key.substring(IcebergTable.PARQUET_BLOOM_FILTER_ENABLED_PREFIX.length());
+      // The key used in the result map must match the BE column writer's column name,
+      // which is the lowercased Impala column name.
+      String colName = rawCol.trim().toLowerCase();
+      if (colName.isEmpty()) continue;
+
+      long size = maxBytes;
+      long ndv = resolveBloomFilterNdv(tblProperties, rawCol, colName, ndvStatsResolver);
+      if (ndv > 0) {
+        double fpp = getColumnBloomFilterFpp(tblProperties, rawCol);
+        size = Math.min(optimalParquetBloomFilterByteSize(ndv, fpp), maxBytes);
+      }
+      result.put(colName, clampAndRoundBloomFilterBytes(size));
+    }
+    return result;
+  }
+
+  /**
+   * Resolves the expected number of distinct values for a Bloom filter column: the
+   * explicit 'write.parquet.bloom-filter-ndv.column.<rawCol>' property if present,
+   * else the value returned by 'ndvStatsResolver' for 'lowerCol'. Returns -1 if the
+   * NDV is unknown.
+   */
+  private static long resolveBloomFilterNdv(Map<String, String> tblProperties,
+      String rawCol, String lowerCol, Function<String, Long> ndvStatsResolver) {
+    String ndvProp =
+        tblProperties.get(IcebergTable.PARQUET_BLOOM_FILTER_NDV_PREFIX + rawCol);
+    if (ndvProp != null) {
+      Long ndv = Longs.tryParse(ndvProp.trim());
+      if (ndv != null && ndv > 0) return ndv;
+    }
+    if (ndvStatsResolver != null) {
+      Long statsNdv = ndvStatsResolver.apply(lowerCol);
+      if (statsNdv != null && statsNdv > 0) return statsNdv;
+    }
+    return -1;
+  }
+
+  /**
+   * Returns the false positive probability for a Bloom filter column: the explicit
+   * 'write.parquet.bloom-filter-fpp.column.<rawCol>' property if valid, else the
+   * Iceberg default (0.01).
+   */
+  private static double getColumnBloomFilterFpp(Map<String, String> tblProperties,
+      String rawCol) {
+    String fppProp =
+        tblProperties.get(IcebergTable.PARQUET_BLOOM_FILTER_FPP_PREFIX + rawCol);
+    if (fppProp != null) {
+      Double fpp = Doubles.tryParse(fppProp.trim());
+      if (fpp != null && fpp > 0.0 && fpp < 1.0) return fpp;
+    }
+    return IcebergTable.DEFAULT_PARQUET_BLOOM_FILTER_FPP;
   }
 
   public static Set<Long> currentAncestorIds(Table table) {

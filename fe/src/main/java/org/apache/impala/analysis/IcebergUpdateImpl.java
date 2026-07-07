@@ -84,6 +84,7 @@ public class IcebergUpdateImpl extends IcebergModifyImpl {
     }
     deleteTableId_ = analyzer.getDescTbl().addTargetTable(icePosDelTable_);
     IcebergUtil.validateIcebergTableForInsert(originalTargetTable_);
+    IcebergUtil.warnIfInvalidParquetBloomFilterProperties(originalTargetTable_, analyzer);
   }
 
   @Override

@@ -169,6 +169,7 @@ public class OptimizeStmt extends DmlStatementBase {
     }
     FeIcebergTable iceTable = (FeIcebergTable) table_;
     IcebergUtil.validateIcebergTableForInsert(iceTable);
+    IcebergUtil.warnIfInvalidParquetBloomFilterProperties(iceTable, analyzer);
 
     if (iceTable.getFormatVersion() > 3) {
       throw new AnalysisException(String.format(

@@ -16,6 +16,7 @@
 // under the License.
 package org.apache.impala.catalog;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Iterables;
@@ -58,11 +59,15 @@ import org.apache.impala.thrift.TResultSet;
 import org.apache.impala.thrift.TResultSetMetadata;
 import org.apache.impala.thrift.TSortingOrder;
 import org.apache.impala.thrift.TTableStats;
+import org.apache.impala.util.BitUtil;
 import org.apache.impala.util.HdfsCachingUtil;
 import org.apache.impala.util.ListMap;
 import org.apache.impala.util.TAccessLevelUtil;
 import org.apache.impala.util.TResultRowBuilder;
 import org.apache.thrift.TException;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import javax.annotation.Nullable;
 
@@ -107,6 +112,17 @@ public interface FeFsTable extends FeTable {
 
   // Average memory requirements (in bytes) for storing a block.
   public static final long PER_BLOCK_MEM_USAGE_BYTES = 150;
+
+  // The name of the table property that sets the parameters of writing Parquet Bloom
+  // filters.
+  public static final String PARQUET_BLOOM_FILTER_WRITING_TBL_PROPERTY =
+    "parquet.bloom.filter.columns";
+
+  // These constants are the maximal and minimal size of the bitset of a
+  // ParquetBloomFilter object (in the BE). These should be kept in sync with the values
+  // in be/src/util/parquet-bloom-filter.h.
+  public static final long PARQUET_BLOOM_FILTER_MAX_BYTES = 128 * 1024 * 1024;
+  public static final long PARQUET_BLOOM_FILTER_MIN_BYTES = 64;
 
   // Represents a set of storage-related statistics aggregated at the table or partition
   // level.
@@ -550,6 +566,27 @@ public interface FeFsTable extends FeTable {
   }
 
   /**
+   * Returns the map of column name -> Parquet Bloom filter bitset size (in bytes) that
+   * is shipped to the BE Parquet writer for this table. The base implementation honors
+   * the Impala-specific 'parquet.bloom.filter.columns' property. Iceberg tables
+   * additionally honor the Iceberg-native Bloom filter table properties (IMPALA-12700)
+   * by overriding this method (see
+   * {@link FeIcebergTable#getParquetBloomFilterColumnSizes()}). Returns an empty map if
+   * no Bloom filters are requested.
+   */
+  default Map<String, Long> getParquetBloomFilterColumnSizes() {
+    Map<String, Long> bloomFilterColInfo = new HashMap<>();
+    String parquetBloomTblProp = getMetaStoreTable().getParameters().get(
+        PARQUET_BLOOM_FILTER_WRITING_TBL_PROPERTY);
+    if (parquetBloomTblProp != null) {
+      Map<String, Long> parsedProperties =
+          Utils.parseParquetBloomFilterWritingTblProp(parquetBloomTblProp);
+      if (parsedProperties != null) bloomFilterColInfo.putAll(parsedProperties);
+    }
+    return bloomFilterColInfo;
+  }
+
+  /**
    * @return the index of hosts that store replicas of blocks of this table.
    */
   ListMap<TNetworkAddress> getHostIndex();
@@ -884,9 +921,60 @@ public interface FeFsTable extends FeTable {
    * these can become default methods of the interface.
    */
   abstract class Utils {
+    private static final Logger LOG = LoggerFactory.getLogger(FeFsTable.class);
 
     // Table property key for skip.header.line.count
     public static final String TBL_PROP_SKIP_HEADER_LINE_COUNT = "skip.header.line.count";
+
+    // The table property has the following format: a comma separated list of
+    // 'col_name:bitset_size' pairs. The 'bitset_size' part means the size of the bitset
+    // of the Bloom filter, and is optional. Values will be rounded up to the smallest
+    // power of 2 not less than the given number. If the size is not given, it will be the
+    // maximal Bloom filter size (PARQUET_BLOOM_FILTER_MAX_BYTES). No Bloom filter will be
+    // written for columns not listed here.
+    // Example: "col1:1024,col2,col4:100'.
+    @VisibleForTesting
+    public static Map<String, Long> parseParquetBloomFilterWritingTblProp(
+        final String tbl_prop) {
+      Map<String, Long> result = new HashMap<>();
+      String[] colSizePairs = tbl_prop.split(",");
+      for (String colSizePair : colSizePairs) {
+        String[] tokens = colSizePair.split(":");
+
+        if (tokens.length == 0 || tokens.length > 2) {
+          String err = "Invalid token in table property "
+            + PARQUET_BLOOM_FILTER_WRITING_TBL_PROPERTY + ": "
+            + colSizePair.trim()
+            + ". Expected either a column name or a column name and a size "
+            + "separated by a colon (':').";
+          LOG.warn(err);
+          return null;
+        }
+
+        long size;
+        if (tokens.length == 1) {
+          size = PARQUET_BLOOM_FILTER_MAX_BYTES;
+        } else {
+          assert tokens.length == 2;
+          try {
+            size = Long.parseLong(tokens[1].trim());
+          } catch (NumberFormatException e) {
+            String err =
+                  "Invalid bitset size in table property "
+                  + PARQUET_BLOOM_FILTER_WRITING_TBL_PROPERTY + ": "
+                  + tokens[1].trim();
+            LOG.warn(err);
+            return null;
+          }
+
+          size = Long.max(PARQUET_BLOOM_FILTER_MIN_BYTES, size);
+          size = Long.min(PARQUET_BLOOM_FILTER_MAX_BYTES, size);
+          size = BitUtil.roundUpToPowerOf2(size);
+        }
+        result.put(tokens[0].trim(), size);
+      }
+      return result;
+    }
 
     /**
      * Returns true if stats extrapolation is enabled for this table, false otherwise.

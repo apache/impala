@@ -663,6 +663,7 @@ public class CreateTableStmt extends StatementBase implements SingleTableStmt {
         IcebergTable.PARQUET_PLAIN_PAGE_SIZE, "page size");
     validateIcebergParquetPageSize(icebergFileFormat,
         IcebergTable.PARQUET_DICT_PAGE_SIZE, "dictionary page size");
+    validateIcebergParquetBloomFilter(icebergFileFormat);
 
     // Determine the Iceberg catalog being used. The default catalog is HiveCatalog.
     String catalogStr = getTblProperties().get(IcebergTable.ICEBERG_CATALOG);
@@ -753,6 +754,20 @@ public class CreateTableStmt extends StatementBase implements SingleTableStmt {
     StringBuilder errMsg = new StringBuilder();
     if (IcebergUtil.parseParquetPageSize(getTblProperties(), pageSizeTblProp, descr,
         errMsg) == null) {
+      throw new AnalysisException(errMsg.toString());
+    }
+  }
+
+  private void validateIcebergParquetBloomFilter(TIcebergFileFormat icebergFileFormat)
+      throws AnalysisException {
+    if (IcebergUtil.hasParquetBloomFilterProperties(getTblProperties())
+        && icebergFileFormat != TIcebergFileFormat.PARQUET) {
+      throw new AnalysisException(
+          "Parquet Bloom filter properties should be set only for parquet file format");
+    }
+
+    StringBuilder errMsg = new StringBuilder();
+    if (!IcebergUtil.validateParquetBloomFilterProperties(getTblProperties(), errMsg)) {
       throw new AnalysisException(errMsg.toString());
     }
   }

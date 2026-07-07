@@ -207,6 +207,33 @@ public class IcebergTable extends Table implements FeIcebergTable {
   public static final long MIN_PARQUET_PAGE_SIZE = 64 * 1024;
   public static final long MAX_PARQUET_PAGE_SIZE = 1024 * 1024 * 1024;
 
+  // Iceberg-native Parquet Bloom filter table properties (see
+  // https://iceberg.apache.org/docs/latest/configuration/#write-properties and
+  // org.apache.iceberg.TableProperties). Impala honors these when writing Parquet
+  // files for Iceberg tables, in addition to the Impala-specific
+  // 'parquet.bloom.filter.columns' property (see HdfsTableSink).
+  // Prefix for the per-column property that enables Bloom filter writing for a column,
+  // e.g. 'write.parquet.bloom-filter-enabled.column.col1'='true'.
+  public static final String PARQUET_BLOOM_FILTER_ENABLED_PREFIX =
+      "write.parquet.bloom-filter-enabled.column.";
+  // The maximum number of bytes for a Bloom filter bitset. Acts as an upper bound on
+  // the per-column Bloom filter size computed from the expected number of distinct
+  // values.
+  public static final String PARQUET_BLOOM_FILTER_MAX_BYTES =
+      "write.parquet.bloom-filter-max-bytes";
+  // Prefix for the per-column false positive probability property, e.g.
+  // 'write.parquet.bloom-filter-fpp.column.col1'='0.01'.
+  public static final String PARQUET_BLOOM_FILTER_FPP_PREFIX =
+      "write.parquet.bloom-filter-fpp.column.";
+  // Prefix for the per-column expected number of distinct values property, e.g.
+  // 'write.parquet.bloom-filter-ndv.column.col1'='100000'.
+  public static final String PARQUET_BLOOM_FILTER_NDV_PREFIX =
+      "write.parquet.bloom-filter-ndv.column.";
+  // Iceberg default for 'write.parquet.bloom-filter-max-bytes' (1 MiB).
+  public static final long DEFAULT_PARQUET_BLOOM_FILTER_MAX_BYTES = 1024 * 1024;
+  // Iceberg default for the per-column false positive probability.
+  public static final double DEFAULT_PARQUET_BLOOM_FILTER_FPP = 0.01;
+
   // Field IDs of the position delete files according to the Iceberg spec.
   public static final int V2_FILE_PATH_FIELD_ID = 2147483546;
   public static final int V2_POS_FIELD_ID = 2147483545;

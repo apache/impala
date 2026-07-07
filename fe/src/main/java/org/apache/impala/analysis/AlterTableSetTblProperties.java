@@ -181,6 +181,7 @@ public class AlterTableSetTblProperties extends AlterTableSetStmt {
     icebergParquetPageSizeCheck(IcebergTable.PARQUET_PLAIN_PAGE_SIZE, "page size");
     icebergParquetPageSizeCheck(IcebergTable.PARQUET_DICT_PAGE_SIZE,
         "dictionary page size");
+    icebergParquetBloomFilterCheck();
   }
 
   private void icebergPropertyCheck(String property) throws AnalysisException {
@@ -217,6 +218,13 @@ public class AlterTableSetTblProperties extends AlterTableSetStmt {
     StringBuilder errMsg = new StringBuilder();
     if (IcebergUtil.parseParquetPageSize(getTblProperties(), property, descr,
         errMsg) == null) {
+      throw new AnalysisException(errMsg.toString());
+    }
+  }
+
+  private void icebergParquetBloomFilterCheck() throws AnalysisException {
+    StringBuilder errMsg = new StringBuilder();
+    if (!IcebergUtil.validateParquetBloomFilterProperties(tblProperties_, errMsg)) {
       throw new AnalysisException(errMsg.toString());
     }
   }

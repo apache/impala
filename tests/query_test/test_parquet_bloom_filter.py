@@ -23,6 +23,7 @@ from subprocess import check_call
 from impala_thrift_gen.parquet.ttypes import BloomFilterHeader
 from tests.common.file_utils import create_table_and_copy_files
 from tests.common.impala_test_suite import ImpalaTestSuite
+from tests.common.skip import SkipIfFS
 from tests.util.filesystem_utils import get_fs_path
 from tests.util.get_parquet_metadata import get_parquet_metadata, read_serialized_object
 
@@ -354,3 +355,203 @@ class TestParquetBloomFilter(ImpalaTestSuite):
       assert exp_header == header
       assert exp_directory == directory,\
           "Incorrect directory for Bloom filter for column no. {}.".format(col)
+
+  # -- Iceberg-native Bloom filter properties (IMPALA-12700) -------------------
+  ONE_MIB = 1024 * 1024
+
+  def test_iceberg_bloom_filter_enabled(self, vector, unique_database, tmpdir):
+    """ An Iceberg table honors 'write.parquet.bloom-filter-enabled.column.<col>'.
+    Enabled columns get a Bloom filter sized at the default max-bytes (1 MiB) when no
+    NDV is known; other columns get none. """
+    tbl = 'ice_bloom_enabled'
+    self._create_iceberg_bloom_table(unique_database, tbl,
+        "'write.parquet.bloom-filter-enabled.column.i'='true',"
+        "'write.parquet.bloom-filter-enabled.column.s'='true'")
+    self._insert_iceberg_bloom_rows(vector, unique_database, tbl)
+    col_to_bytes = self._get_iceberg_bloom_filter_bytes(unique_database, tbl, tmpdir)
+    assert sorted(col_to_bytes.keys()) == ['i', 's']
+    assert col_to_bytes['i'] == self.ONE_MIB
+    assert col_to_bytes['s'] == self.ONE_MIB
+
+  def test_iceberg_bloom_filter_max_bytes(self, vector, unique_database, tmpdir):
+    """ 'write.parquet.bloom-filter-max-bytes' controls the Bloom filter size. """
+    tbl = 'ice_bloom_max_bytes'
+    self._create_iceberg_bloom_table(unique_database, tbl,
+        "'write.parquet.bloom-filter-enabled.column.i'='true',"
+        "'write.parquet.bloom-filter-max-bytes'='131072'")
+    self._insert_iceberg_bloom_rows(vector, unique_database, tbl)
+    col_to_bytes = self._get_iceberg_bloom_filter_bytes(unique_database, tbl, tmpdir)
+    assert col_to_bytes == {'i': 131072}
+
+  def test_iceberg_bloom_filter_ndv(self, vector, unique_database, tmpdir):
+    """ An explicit 'write.parquet.bloom-filter-ndv.column.<col>' sizes the filter. """
+    tbl = 'ice_bloom_ndv'
+    self._create_iceberg_bloom_table(unique_database, tbl,
+        "'write.parquet.bloom-filter-enabled.column.i'='true',"
+        "'write.parquet.bloom-filter-ndv.column.i'='100000',"
+        "'write.parquet.bloom-filter-max-bytes'='8388608'")
+    self._insert_iceberg_bloom_rows(vector, unique_database, tbl)
+    col_to_bytes = self._get_iceberg_bloom_filter_bytes(unique_database, tbl, tmpdir)
+    # optimal size for ndv=100000, fpp=0.01 is 128 KiB (< 8 MiB max-bytes).
+    assert col_to_bytes == {'i': self._optimal_bitset_size(100000, 0.01)}
+    assert col_to_bytes == {'i': 131072}
+
+  def test_iceberg_bloom_filter_ndv_from_stats(self, vector, unique_database, tmpdir):
+    """ When no explicit NDV is given, the column's NDV statistic is used to size the
+    filter (IMPALA-12700 enhancement over parquet-java). """
+    tbl = 'ice_bloom_ndv_stats'
+    self._create_iceberg_bloom_table(unique_database, tbl,
+        "'write.parquet.bloom-filter-enabled.column.i'='true',"
+        "'write.parquet.bloom-filter-max-bytes'='8388608'")
+    # Set the NDV statistic explicitly so the size is deterministic.
+    self.execute_query("alter table `{0}`.`{1}` set column stats i ('numDVs'='100000')"
+        .format(unique_database, tbl))
+    self._insert_iceberg_bloom_rows(vector, unique_database, tbl)
+    col_to_bytes = self._get_iceberg_bloom_filter_bytes(unique_database, tbl, tmpdir)
+    # The stats NDV (100000) sizes the filter to 128 KiB, well below the 8 MiB max.
+    assert col_to_bytes == {'i': 131072}
+
+  def test_iceberg_bloom_filter_impala_prop_precedence(self, vector, unique_database,
+      tmpdir):
+    """ The Impala-specific 'parquet.bloom.filter.columns' property wins over the
+    Iceberg-native properties for columns present in both. """
+    tbl = 'ice_bloom_precedence'
+    self._create_iceberg_bloom_table(unique_database, tbl,
+        "'write.parquet.bloom-filter-enabled.column.i'='true',"
+        "'write.parquet.bloom-filter-ndv.column.i'='1000000',"
+        "'write.parquet.bloom-filter-enabled.column.s'='true',"
+        "'write.parquet.bloom-filter-max-bytes'='8388608',"
+        "'parquet.bloom.filter.columns'='i:1024'")
+    self._insert_iceberg_bloom_rows(vector, unique_database, tbl)
+    col_to_bytes = self._get_iceberg_bloom_filter_bytes(unique_database, tbl, tmpdir)
+    # 'i': Impala property (1024) wins over the Iceberg-derived size.
+    # 's': only enabled via the Iceberg property, no NDV/stats -> the configured
+    # max-bytes (8 MiB).
+    assert col_to_bytes == {'i': 1024, 's': 8388608}
+
+  def test_iceberg_bloom_filter_optimize(self, vector, unique_database, tmpdir):
+    """ OPTIMIZE rewrites the data files of an Iceberg table, so the compacted file
+    honors the Iceberg-native Bloom filter properties, including properties that were set
+    after the original data files had been written. """
+    tbl = 'ice_bloom_optimize'
+    fq_tbl = "`{0}`.`{1}`".format(unique_database, tbl)
+    # Format version 2 so the table also accepts DELETE.
+    self._create_iceberg_bloom_table(unique_database, tbl, "'format-version'='2'")
+    # Two INSERTs without Bloom filter properties create two files without Bloom filters.
+    self._insert_iceberg_bloom_rows(vector, unique_database, tbl)
+    self._insert_iceberg_bloom_rows(vector, unique_database, tbl)
+    file_to_bytes = self._get_iceberg_bloom_filter_bytes_per_file(
+        unique_database, tbl, tmpdir)
+    assert list(file_to_bytes.values()) == [{}, {}]
+    # Add a delete file so OPTIMIZE also has to merge delete deltas.
+    self.execute_query("delete from {0} where i = 3".format(fq_tbl))
+
+    self.execute_query("alter table {0} set tblproperties("
+        "'write.parquet.bloom-filter-enabled.column.i'='true',"
+        "'write.parquet.bloom-filter-ndv.column.i'='100000',"
+        "'write.parquet.bloom-filter-enabled.column.s'='true',"
+        "'write.parquet.bloom-filter-max-bytes'='8388608')".format(fq_tbl))
+    # The exec options set by _insert_iceberg_bloom_rows() (num_nodes=1 and
+    # parquet_bloom_filter_write=ALWAYS) make OPTIMIZE write a single file with Bloom
+    # filters.
+    self.execute_query("optimize table {0}".format(fq_tbl),
+        vector.get_value('exec_option'))
+    col_to_bytes = self._get_iceberg_bloom_filter_bytes(unique_database, tbl, tmpdir)
+    # 'i': sized by the explicit NDV (128 KiB). 's': no NDV -> max-bytes (8 MiB).
+    assert col_to_bytes == {'i': 131072, 's': 8388608}
+    assert self.execute_query("select i, s from {0} order by i".format(fq_tbl)).data == \
+        ['1\ta', '1\ta', '2\tb', '2\tb']
+
+  @SkipIfFS.hive
+  def test_iceberg_bloom_filter_invalid_prop_warns(self, vector, unique_database):
+    """ When an Iceberg table carries invalid Parquet Bloom filter properties (e.g. set
+    by another engine, bypassing Impala's CREATE / ALTER validation), Impala does not
+    fail the write: it ignores the properties and surfaces a warning to the user, while
+    the write itself succeeds (and simply produces no Bloom filters). This holds for
+    every write path that emits data files: INSERT, UPDATE, MERGE and OPTIMIZE.
+    IMPALA-12700. """
+    fq_tbl = "{0}.{1}".format(unique_database, 'ice_bloom_invalid')
+    # Format version 2 so the table also accepts UPDATE / MERGE.
+    self.execute_query(
+        "create table {0} (i int, s string, d double) stored as iceberg "
+        "tblproperties('format-version'='2')".format(fq_tbl))
+    # Set an invalid 'max-bytes' through Hive, which does not run Impala's property
+    # validation, mimicking a table configured by another engine.
+    self.run_stmt_in_hive(
+        "alter table {0} set tblproperties"
+        "('write.parquet.bloom-filter-max-bytes'='not_a_number')".format(fq_tbl))
+    self.execute_query("refresh {0}".format(fq_tbl))
+    exec_opts = vector.get_value('exec_option')
+
+    def assert_warns(result):
+      assert "Ignoring invalid Iceberg Parquet Bloom filter properties" in result.log
+      assert "write.parquet.bloom-filter-max-bytes" in result.log
+
+    # Every write path that produces data files warns, yet still succeeds (the invalid
+    # property is ignored, not fatal).
+    assert_warns(self.execute_query(
+        "insert into {0} values (1, 'a', 1.0)".format(fq_tbl), exec_opts))
+    assert_warns(self.execute_query(
+        "update {0} set d = 2.0 where i = 1".format(fq_tbl), exec_opts))
+    assert_warns(self.execute_query(
+        "merge into {0} target using (select 1 id) source on target.i = source.id "
+        "when matched then update set d = 3.0 "
+        "when not matched then insert values (2, 'b', 4.0)".format(fq_tbl), exec_opts))
+    assert_warns(self.execute_query("optimize table {0}".format(fq_tbl), exec_opts))
+    # The row is still present (and updated) despite the ignored Bloom filter properties.
+    # Compare 'd' in SQL, as the string format of DOUBLE results differs between versions.
+    assert self.execute_query(
+        "select i, d = 3.0 from {0}".format(fq_tbl)).data == ['1\ttrue']
+
+  def _create_iceberg_bloom_table(self, db_name, tbl_name, tbl_props):
+    self.execute_query("drop table if exists `{0}`.`{1}`".format(db_name, tbl_name))
+    self.execute_query(
+        "create table `{0}`.`{1}` (i int, s string, d double) stored as iceberg "
+        "tblproperties({2})".format(db_name, tbl_name, tbl_props))
+
+  def _insert_iceberg_bloom_rows(self, vector, db_name, tbl_name):
+    vector.get_value('exec_option')['num_nodes'] = 1
+    # ALWAYS ensures the Bloom filter is written even for fully dict-encoded columns.
+    vector.get_value('exec_option')['parquet_bloom_filter_write'] = 'ALWAYS'
+    self.execute_query(
+        "insert into `{0}`.`{1}` values (1, 'a', 1.0), (2, 'b', 2.0), (3, 'c', 3.0)"
+        .format(db_name, tbl_name), vector.get_value('exec_option'))
+
+  def _get_iceberg_bloom_filter_bytes(self, db_name, tbl_name, tmpdir):
+    """ Returns a dict of column name -> Bloom filter bitset size (numBytes) for the
+    columns that have a Bloom filter in the (single) data file of an Iceberg table. """
+    file_to_bytes = self._get_iceberg_bloom_filter_bytes_per_file(
+        db_name, tbl_name, tmpdir)
+    assert len(file_to_bytes) == 1, \
+        "Expected exactly one data file, found: {0}".format(list(file_to_bytes.keys()))
+    return list(file_to_bytes.values())[0]
+
+  def _get_iceberg_bloom_filter_bytes_per_file(self, db_name, tbl_name, tmpdir):
+    """ Returns a dict of file path -> (column name -> Bloom filter bitset size) for every
+    Parquet file of an Iceberg table. """
+    result = self.execute_query("show files in `{0}`.`{1}`".format(db_name, tbl_name))
+    file_to_bytes = dict()
+    for row in result.data:
+      path = row.split('\t')[0]
+      if path.endswith('.parq') or path.endswith('.parquet'):
+        file_to_bytes[path] = self._get_bloom_filter_bytes_from_file(path, tmpdir)
+    return file_to_bytes
+
+  def _get_bloom_filter_bytes_from_file(self, path, tmpdir):
+    local_file = os.path.join(tmpdir.strpath, 'ice_data.parq')
+    check_call(['hdfs', 'dfs', '-get', '-f', path, local_file])
+
+    file_meta_data = get_parquet_metadata(local_file)
+    schema = file_meta_data.schema[1:]  # Skip the root element.
+    row_group = file_meta_data.row_groups[0]
+    assert len(schema) == len(row_group.columns)
+    col_to_bytes = dict()
+    with open(local_file, 'rb') as file_handle:
+      for i, column in enumerate(row_group.columns):
+        column_meta_data = column.meta_data
+        if column_meta_data and column_meta_data.bloom_filter_offset:
+          (header, _size) = self._try_read_bloom_filter_header(
+              file_handle, column_meta_data.bloom_filter_offset)
+          if header is not None:
+            col_to_bytes[schema[i].name] = header.numBytes
+    return col_to_bytes

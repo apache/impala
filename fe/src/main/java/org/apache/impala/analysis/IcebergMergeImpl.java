@@ -115,6 +115,7 @@ public class IcebergMergeImpl implements MergeImpl {
     Preconditions.checkState(table instanceof FeIcebergTable);
     icebergTable_ = (FeIcebergTable) table;
     IcebergUtil.validateIcebergTableForInsert(icebergTable_);
+    IcebergUtil.warnIfInvalidParquetBloomFilterProperties(icebergTable_, analyzer);
     int formatVersion = icebergTable_.getFormatVersion();
     if (formatVersion > IcebergUtil.FORMAT_VERSION_3) {
       throw new AnalysisException(String.format(

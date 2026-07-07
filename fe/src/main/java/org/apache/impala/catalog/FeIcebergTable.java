@@ -484,6 +484,37 @@ public interface FeIcebergTable extends FeFsTable {
   }
 
   /**
+   * In addition to the Impala-specific 'parquet.bloom.filter.columns' property honored
+   * by {@link FeFsTable#getParquetBloomFilterColumnSizes()}, Iceberg tables also honor
+   * the Iceberg-native Bloom filter table properties (IMPALA-12700), e.g.
+   * 'write.parquet.bloom-filter-enabled.column.<col>'. When an explicit NDV is not given
+   * for a column, its computed NDV statistic is used to size the filter. The
+   * Impala-specific property takes precedence for any column present in both.
+   */
+  @Override
+  default Map<String, Long> getParquetBloomFilterColumnSizes() {
+    Map<String, Long> bloomFilterColInfo = new HashMap<>();
+    StringBuilder errMsg = new StringBuilder();
+    Map<String, Long> icebergBloomColInfo =
+        IcebergUtil.getIcebergParquetBloomFilterColumns(
+            getMetaStoreTable().getParameters(), colName -> {
+              Column col = getColumn(colName);
+              return col != null ? col.getStats().getNumDistinctValues() : null;
+            }, errMsg);
+    if (icebergBloomColInfo != null) {
+      bloomFilterColInfo.putAll(icebergBloomColInfo);
+    } else {
+      // The properties are validated at CREATE/ALTER time, so this is not expected.
+      // Though other engines might still set invalid Parquet Bloom filter properties.
+      LOG.warn("Ignoring Iceberg Parquet Bloom filter properties: " + errMsg);
+    }
+    // The Impala-specific 'parquet.bloom.filter.columns' property takes precedence over
+    // the Iceberg-native properties for any column present in both.
+    bloomFilterColInfo.putAll(FeFsTable.super.getParquetBloomFilterColumnSizes());
+    return bloomFilterColInfo;
+  }
+
+  /**
    * Sets 'tableStats_' for the Iceberg table by it's partition stats.
    * TODO: Now the calculation of V2 Iceberg table is not accurate. After
    * IMPALA-11516(Return better partition stats for V2 tables) is ready, this method can

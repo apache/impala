@@ -3412,6 +3412,77 @@ public class AnalyzeDDLTest extends FrontendTestBase {
   }
 
   @Test
+  public void TestIcebergParquetBloomFilterProperties() throws AnalysisException {
+    // IMPALA-12700: the Iceberg-native Parquet Bloom filter properties are validated at
+    // CREATE TABLE / ALTER TABLE SET TBLPROPERTIES time. See IcebergBloomFilterUtilTest
+    // for the sizing/validation unit tests of the underlying helpers.
+
+    // Valid Bloom filter properties on a Parquet Iceberg table.
+    AnalyzesOk("create table functional.new_iceberg_tbl (i int) stored as iceberg " +
+        "tblproperties('write.parquet.bloom-filter-enabled.column.i'='true', " +
+        "'write.parquet.bloom-filter-ndv.column.i'='1000', " +
+        "'write.parquet.bloom-filter-fpp.column.i'='0.01', " +
+        "'write.parquet.bloom-filter-max-bytes'='1048576')");
+
+    // Bloom filter properties are only allowed on Parquet-backed Iceberg tables.
+    AnalysisError("create table functional.new_iceberg_tbl (i int) stored as iceberg " +
+        "tblproperties('write.format.default'='orc', " +
+        "'write.parquet.bloom-filter-enabled.column.i'='true')",
+        "Parquet Bloom filter properties should be set only for parquet file format");
+
+    // 'write.parquet.bloom-filter-max-bytes' must be a positive 32-bit integer.
+    AnalysisError("create table functional.new_iceberg_tbl (i int) stored as iceberg " +
+        "tblproperties('write.parquet.bloom-filter-max-bytes'='abc')",
+        "Invalid value for write.parquet.bloom-filter-max-bytes: 'abc'. " +
+        "It must be a positive 32-bit integer.");
+    AnalysisError("create table functional.new_iceberg_tbl (i int) stored as iceberg " +
+        "tblproperties('write.parquet.bloom-filter-max-bytes'='0')",
+        "Invalid value for write.parquet.bloom-filter-max-bytes: '0'. " +
+        "It must be a positive 32-bit integer.");
+    // A value that does not fit a signed 32-bit int is rejected (the property is an int,
+    // matching Iceberg). In-range values above Impala's 128 MiB limit are instead
+    // clamped down to it at load time (see IcebergBloomFilterUtilTest).
+    AnalysisError("create table functional.new_iceberg_tbl (i int) stored as iceberg " +
+        "tblproperties('write.parquet.bloom-filter-max-bytes'='2147483648')",
+        "Invalid value for write.parquet.bloom-filter-max-bytes: '2147483648'. " +
+        "It must be a positive 32-bit integer.");
+
+    // Per-column NDV must be a positive integer.
+    AnalysisError("create table functional.new_iceberg_tbl (i int) stored as iceberg " +
+        "tblproperties('write.parquet.bloom-filter-enabled.column.i'='true', " +
+        "'write.parquet.bloom-filter-ndv.column.i'='-5')",
+        "Invalid value for write.parquet.bloom-filter-ndv.column.i: '-5'. " +
+        "It must be a positive integer.");
+
+    // Per-column FPP must be a floating point number in the range (0, 1).
+    AnalysisError("create table functional.new_iceberg_tbl (i int) stored as iceberg " +
+        "tblproperties('write.parquet.bloom-filter-enabled.column.i'='true', " +
+        "'write.parquet.bloom-filter-fpp.column.i'='1.5')",
+        "Invalid value for write.parquet.bloom-filter-fpp.column.i: '1.5'. " +
+        "It must be a floating point number in the range (0, 1).");
+
+    // The same validation applies to ALTER TABLE SET TBLPROPERTIES.
+    AnalyzesOk("alter table functional_parquet.iceberg_partitioned set " +
+        "tblproperties('write.parquet.bloom-filter-max-bytes'='1048576')");
+    AnalysisError("alter table functional_parquet.iceberg_partitioned set " +
+        "tblproperties('write.parquet.bloom-filter-max-bytes'='-1')",
+        "Invalid value for write.parquet.bloom-filter-max-bytes: '-1'. " +
+        "It must be a positive 32-bit integer.");
+    AnalysisError("alter table functional_parquet.iceberg_partitioned set " +
+        "tblproperties('write.parquet.bloom-filter-max-bytes'='3000000000')",
+        "Invalid value for write.parquet.bloom-filter-max-bytes: '3000000000'. " +
+        "It must be a positive 32-bit integer.");
+    AnalysisError("alter table functional_parquet.iceberg_partitioned set " +
+        "tblproperties('write.parquet.bloom-filter-ndv.column.i'='abc')",
+        "Invalid value for write.parquet.bloom-filter-ndv.column.i: 'abc'. " +
+        "It must be a positive integer.");
+    AnalysisError("alter table functional_parquet.iceberg_partitioned set " +
+        "tblproperties('write.parquet.bloom-filter-fpp.column.i'='0')",
+        "Invalid value for write.parquet.bloom-filter-fpp.column.i: '0'. " +
+        "It must be a floating point number in the range (0, 1).");
+  }
+
+  @Test
   public void TestCreateBucketedTable() throws AnalysisException {
     AnalyzesOk("CREATE TABLE functional.bucket (i int COMMENT 'hello', s string) " +
         "CLUSTERED BY(i) INTO 24 BUCKETS");

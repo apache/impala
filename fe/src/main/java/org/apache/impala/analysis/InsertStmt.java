@@ -629,6 +629,7 @@ public class InsertStmt extends DmlStatementBase {
         validateBucketTransformForOverwrite(iceTable);
       }
       IcebergUtil.validateIcebergTableForInsert(iceTable);
+      IcebergUtil.warnIfInvalidParquetBloomFilterProperties(iceTable, analyzer);
     }
 
     if (isHBaseTable && overwrite_) {

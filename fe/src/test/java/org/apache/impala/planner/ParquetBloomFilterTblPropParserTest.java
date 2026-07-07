@@ -26,6 +26,8 @@ import com.google.common.collect.ImmutableMap;
 
 import java.util.Map;
 
+import org.apache.impala.catalog.FeFsTable;
+
 public class ParquetBloomFilterTblPropParserTest {
   private static final Logger LOG = LoggerFactory.getLogger(
       ParquetBloomFilterTblPropParserTest.class);
@@ -34,9 +36,9 @@ public class ParquetBloomFilterTblPropParserTest {
   public void testParsingOnlyColNames() throws Exception {
     final String props = "col1,col2,col3";
     final Map<String, Long> exp = ImmutableMap.of(
-      "col1", HdfsTableSink.PARQUET_BLOOM_FILTER_MAX_BYTES,
-      "col2", HdfsTableSink.PARQUET_BLOOM_FILTER_MAX_BYTES,
-      "col3", HdfsTableSink.PARQUET_BLOOM_FILTER_MAX_BYTES
+      "col1", FeFsTable.PARQUET_BLOOM_FILTER_MAX_BYTES,
+      "col2", FeFsTable.PARQUET_BLOOM_FILTER_MAX_BYTES,
+      "col3", FeFsTable.PARQUET_BLOOM_FILTER_MAX_BYTES
       );
 
     parseAndCheck(props, exp);
@@ -59,7 +61,7 @@ public class ParquetBloomFilterTblPropParserTest {
     final String props = "col1:128,col2,col3:64";
     final Map<String, Long> exp = ImmutableMap.of(
       "col1", 128l,
-      "col2", HdfsTableSink.PARQUET_BLOOM_FILTER_MAX_BYTES,
+      "col2", FeFsTable.PARQUET_BLOOM_FILTER_MAX_BYTES,
       "col3", 64l
     );
 
@@ -71,7 +73,7 @@ public class ParquetBloomFilterTblPropParserTest {
     final String props = "col1 : 128, col2, \ncol3: 64 \t";
     final Map<String, Long> exp = ImmutableMap.of(
       "col1", 128l,
-      "col2", HdfsTableSink.PARQUET_BLOOM_FILTER_MAX_BYTES,
+      "col2", FeFsTable.PARQUET_BLOOM_FILTER_MAX_BYTES,
       "col3", 64l
     );
 
@@ -79,7 +81,7 @@ public class ParquetBloomFilterTblPropParserTest {
   }
 
   private void parseAndCheck(final String tbl_props, final Map<String, Long> exp_res) {
-    final Map<String, Long> res = HdfsTableSink.parseParquetBloomFilterWritingTblProp(
+    final Map<String, Long> res = FeFsTable.Utils.parseParquetBloomFilterWritingTblProp(
         tbl_props);
     assertEquals(exp_res, res);
   }
