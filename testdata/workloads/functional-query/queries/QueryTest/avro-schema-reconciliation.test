@@ -1,0 +1,93 @@
+# =============================================================================
+# Schema reconciliation tests: verify that when column definitions disagree
+# with the Avro schema, CatalogOpExecutor reconciles in favor of the schema.
+# =============================================================================
+====
+---- QUERY
+# Column count mismatch: only 1 column definition, Avro schema has 11.
+# All 11 Avro schema columns must appear in DESCRIBE after reconciliation.
+CREATE TABLE avro_fewer_coldefs (id int)
+WITH SERDEPROPERTIES (
+  'avro.schema.url'='$FILESYSTEM_PREFIX/test-warehouse/avro_schemas/functional/alltypes.json'
+) STORED AS AVRO
+====
+---- QUERY
+DESCRIBE avro_fewer_coldefs
+---- TYPES
+string,string,string
+---- RESULTS
+'bigint_col','bigint','from deserializer'
+'bool_col','boolean','from deserializer'
+'date_string_col','string','from deserializer'
+'double_col','double','from deserializer'
+'float_col','float','from deserializer'
+'id','int','from deserializer'
+'int_col','int','from deserializer'
+'smallint_col','int','from deserializer'
+'string_col','string','from deserializer'
+'timestamp_col','string','from deserializer'
+'tinyint_col','int','from deserializer'
+====
+---- QUERY
+# Name mismatch: column 'bad_int_col' at position 4 does not match Avro's 'int_col'.
+# After reconciliation the column must be named 'int_col'.
+CREATE TABLE avro_mismatched_name (
+  id int, bool_col boolean, tinyint_col int, smallint_col int,
+  bad_int_col int, bigint_col bigint, float_col float, double_col double,
+  date_string_col string, string_col string, timestamp_col timestamp)
+WITH SERDEPROPERTIES (
+  'avro.schema.url'='$FILESYSTEM_PREFIX/test-warehouse/avro_schemas/functional/alltypes.json'
+) STORED AS AVRO
+====
+---- QUERY
+# 'int_col' (from Avro) must be present; 'bad_int_col' (from definition) must not be.
+DESCRIBE avro_mismatched_name
+---- TYPES
+string,string,string
+---- RESULTS
+'bigint_col','bigint','from deserializer'
+'bool_col','boolean','from deserializer'
+'date_string_col','string','from deserializer'
+'double_col','double','from deserializer'
+'float_col','float','from deserializer'
+'id','int','from deserializer'
+'int_col','int','from deserializer'
+'smallint_col','int','from deserializer'
+'string_col','string','from deserializer'
+'timestamp_col','string','from deserializer'
+'tinyint_col','int','from deserializer'====
+---- QUERY
+# The reconciled 'int_col' column must be selectable.
+SELECT int_col FROM avro_mismatched_name LIMIT 0
+---- TYPES
+int
+---- RESULTS
+====
+---- QUERY
+# Type mismatch: 'double_col' declared BIGINT but Avro schema has DOUBLE.
+# 'timestamp_col' declared TIMESTAMP maps to STRING in the Avro schema.
+# After reconciliation both must reflect the Avro types.
+CREATE TABLE avro_mismatched_type (
+  id int, bool_col boolean, tinyint_col int, smallint_col int,
+  int_col int, bigint_col bigint, float_col float, double_col bigint,
+  date_string_col string, string_col string, timestamp_col timestamp)
+STORED AS AVRO
+TBLPROPERTIES (
+  'avro.schema.url'='$FILESYSTEM_PREFIX/test-warehouse/avro_schemas/functional/alltypes.json'
+)
+====
+---- QUERY
+DESCRIBE avro_mismatched_type
+---- TYPES
+string,string,string
+---- RESULTS: VERIFY_IS_SUBSET
+'double_col','double','from deserializer'
+'timestamp_col','string','from deserializer'
+====
+---- QUERY
+# SELECT must treat double_col as DOUBLE (not BIGINT).
+SELECT double_col FROM avro_mismatched_type LIMIT 0
+---- TYPES
+double
+---- RESULTS
+====

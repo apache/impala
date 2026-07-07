@@ -1,0 +1,7 @@
+{
+  "name": "my_record", "type": "record",
+  "fields": [
+    {"name": "string1", "type": "string"},
+    {"name": "union1",  "type": ["float", "boolean"]}
+  ]
+}
