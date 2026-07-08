@@ -235,7 +235,7 @@ StatestoreSubscriber::StatestoreSubscriber(const string& subscriber_id,
     TStatestoreSubscriberType::type subscriber_type)
   : subscriber_id_(subscriber_id),
     protocol_version_(StatestoreServiceVersion::V2),
-    catalog_protocol_version_(CatalogServiceVersion::V2),
+    catalog_protocol_version_(CatalogServiceVersion::V3),
     heartbeat_address_(heartbeat_address),
     subscriber_type_(subscriber_type),
     thrift_iface_(new StatestoreSubscriberThriftIf(this)),

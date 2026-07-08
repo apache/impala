@@ -146,7 +146,7 @@ class TestCustomStatestore(CustomClusterTestSuite):
     # Verify response of normal registration for compatible subscriber.
     assert response.status.status_code == TErrorCode.OK
     assert response.protocol_version == Subscriber.StatestoreServiceVersion.V2
-    assert response.catalogd_registration.protocol == Catalog.CatalogServiceVersion.V2
+    assert response.catalogd_registration.protocol == Catalog.CatalogServiceVersion.V3
     assert response.catalogd_registration.address.port == CATALOG_SERVICE_PORT
 
   @pytest.mark.execute_serially

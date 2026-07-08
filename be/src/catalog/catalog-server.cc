@@ -646,7 +646,7 @@ class CatalogServiceThriftIf : public CatalogServiceIf {
 };
 
 CatalogServer::CatalogServer(MetricGroup* metrics)
-  : protocol_version_(CatalogServiceVersion::V2),
+  : protocol_version_(CatalogServiceVersion::V3),
     thrift_iface_(new CatalogServiceThriftIf(this)),
     thrift_serializer_(FLAGS_compact_catalog_topic),
     metrics_(metrics),
