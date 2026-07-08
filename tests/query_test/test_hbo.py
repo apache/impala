@@ -207,6 +207,8 @@ class TestHBO(ImpalaTestSuite):
     self.execute_query(
         "select count(*) from tpch_parquet.lineitem where " + lineitem_preds)
     self.execute_query("select count(*) from tpch_parquet.orders where o_custkey < 1000")
+    # Wait for 1 second to ensure the stats are written to the cache.
+    time.sleep(1)
     res = self.execute_query("""
         explain select STRAIGHT_JOIN count(l_orderkey)
         from tpch_parquet.lineitem join tpch_parquet.orders
