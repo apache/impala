@@ -3821,9 +3821,9 @@ public class ParserTest extends FrontendTestBase {
         "^\n" +
         "Encountered: IDENTIFIER\n" +
         "Expected: ALTER, COMMENT, COMPUTE, COPY, CREATE, DELETE, DESCRIBE, DROP, " +
-        "EXPLAIN, GRANT, INSERT, INVALIDATE, KILL, LOAD, MERGE, OPTIMIZE, REFRESH, " +
-        "REVOKE, SELECT, SET, SHOW, TRUNCATE, UNSET, UPDATE, UPSERT, USE, VALUES, " +
-        "WITH\n");
+        "EXPLAIN, FOR, GRANT, INSERT, INVALIDATE, KILL, LOAD, MERGE, OPTIMIZE, " +
+        "REFRESH, REVOKE, SELECT, SET, SHOW, TRUNCATE, UNSET, UPDATE, UPSERT, USE, " +
+        "VALUES, WITH\n");
 
     // missing select list
     ParserError("select from t",
@@ -4477,7 +4477,7 @@ public class ParserTest extends FrontendTestBase {
 
   @Test
   public void TestSemiColon() {
-    ParserError(";", "Syntax error");
+    ParserError(";", "Not a valid query: ;");
     ParsesOk("SELECT 1;");
     ParsesOk(" SELECT 1 ; ");
     ParsesOk("  SELECT  1  ;  ");

@@ -62,6 +62,7 @@ import org.apache.impala.calcite.rules.ImpalaProjectSimplifyRule;
 import org.apache.impala.calcite.rules.ImpalaMQContext;
 import org.apache.impala.calcite.rules.ImpalaRexExecutor;
 import org.apache.impala.calcite.rules.RemoveInfrequentCTERule;
+import org.apache.impala.calcite.rules.RemoveSnapshotRule;
 import org.apache.impala.calcite.schema.ImpalaCost;
 import org.apache.impala.calcite.util.LogUtil;
 import org.apache.impala.common.ImpalaException;
@@ -214,7 +215,8 @@ public class CalciteOptimizer implements CompilerStep {
         ImpalaCoreRules.IMPALA_MINUS_TO_DISTINCT,
         ImpalaCoreRules.COMBINE_VALUES_NODES,
         ImpalaCoreRules.EXTRACT_LITERAL_AGG,
-        ImpalaCoreRules.SORT_REMOVE_CONSTANT_KEYS
+        ImpalaCoreRules.SORT_REMOVE_CONSTANT_KEYS,
+        RemoveSnapshotRule.INSTANCE
         ));
 
     builder.addMatchOrder(HepMatchOrder.BOTTOM_UP);

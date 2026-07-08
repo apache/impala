@@ -20,14 +20,18 @@ package org.apache.impala.calcite.schema;
 import org.apache.calcite.prepare.CalciteCatalogReader;
 import org.apache.impala.analysis.Analyzer;
 import org.apache.impala.analysis.BaseTableRef;
+import org.apache.impala.analysis.TimeTravelSpec;
 import org.apache.impala.catalog.Column;
 import org.apache.impala.catalog.FeIcebergTable;
 import org.apache.impala.catalog.FeIcebergTable.Utils;
 import org.apache.impala.catalog.IcebergColumn;
+import org.apache.impala.catalog.IcebergTimeTravelTable;
 import org.apache.impala.common.ImpalaException;
 import org.apache.impala.util.IcebergUtil;
 
+import java.util.ArrayList;
 import java.util.Collection;
+import java.util.List;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -44,9 +48,20 @@ public class CalciteIcebergTable extends CalciteTable {
   // lazily populated
   private Long recordCount_;
 
+  // Special name for the time travel object. It consists of the normal table
+  // name plus the "_tt_<hashcode of TimeTravelSpec>" string.
+  private final String timeTravelName_;
+
   public CalciteIcebergTable(FeIcebergTable table, CalciteCatalogReader reader,
       Analyzer analyzer) throws ImpalaException {
     super(table, reader, analyzer);
+    timeTravelName_ = null;
+  }
+
+  public CalciteIcebergTable(FeIcebergTable table, CalciteCatalogReader reader,
+      Analyzer analyzer, String timeTravelName) throws ImpalaException {
+    super(table, reader, analyzer);
+    timeTravelName_ = timeTravelName;
   }
 
   public FeIcebergTable getFeIcebergTable() {
@@ -86,7 +101,8 @@ public class CalciteIcebergTable extends CalciteTable {
 
   public boolean hasDeleteFiles() throws ImpalaException {
     if (hasDeleteFiles_ == null) {
-      hasDeleteFiles_ = FeIcebergTable.Utils.hasDeleteFiles(getFeIcebergTable(), null);
+      hasDeleteFiles_ = FeIcebergTable.Utils.hasDeleteFiles(getFeIcebergTable(),
+          getTimeTravelSpec());
     }
     return hasDeleteFiles_;
   }
@@ -96,8 +112,9 @@ public class CalciteIcebergTable extends CalciteTable {
     if (recordCount_ == null) {
       FeIcebergTable feIcebergTable = getFeIcebergTable();
       recordCount_ = hasDeleteFiles()
-          ? Utils.getRecordCountV2(feIcebergTable, null)
-          : Utils.getRecordCountV1(feIcebergTable.getIcebergApiTable(), null);
+          ? Utils.getRecordCountV2(feIcebergTable, getTimeTravelSpec())
+          : Utils.getRecordCountV1(feIcebergTable.getIcebergApiTable(),
+              getTimeTravelSpec());
     }
     return recordCount_;
   }
@@ -113,4 +130,31 @@ public class CalciteIcebergTable extends CalciteTable {
     }
   }
 
+  @Override
+  public boolean isTemporal() {
+    return timeTravelName_ != null;
+  }
+
+  @Override
+  public List<String> getQualifiedName() {
+    List<String> qualifiedTableName = super.getQualifiedName();
+    if (!(getFeIcebergTable() instanceof IcebergTimeTravelTable)) {
+      return qualifiedTableName;
+    }
+    // all fields except the last are the same in the array.
+    List<String> newNames = new ArrayList<>();
+    for (int i = 0; i < qualifiedTableName.size() - 1; ++i) {
+      newNames.add(qualifiedTableName.get(i));
+    }
+    // last "table name" string contains the table name plus an appended
+    // "_tt_<hashcode of TimeTravelSpec>" string.
+    newNames.add(timeTravelName_.toUpperCase());
+    return newNames;
+  }
+
+  public TimeTravelSpec getTimeTravelSpec() {
+    return getFeIcebergTable() instanceof IcebergTimeTravelTable
+        ? ((IcebergTimeTravelTable) getFeIcebergTable()).getTimeTravelSpec()
+        : null;
+  }
 }

@@ -22,6 +22,7 @@ import java.util.List;
 import org.apache.impala.analysis.Analyzer;
 import org.apache.impala.analysis.Expr;
 import org.apache.impala.analysis.SlotDescriptor;
+import org.apache.impala.analysis.TimeTravelSpec;
 
 /**
  * Shared scan planning helpers and flags for the physical planner.
@@ -31,4 +32,6 @@ public interface ScanNodeHelper {
 
   SlotDescriptor getCountStarOptimizationDescriptor(ScanNode scanNode,
       Analyzer analyzer, List<Expr> conjuncts);
+
+  TimeTravelSpec getTimeTravelSpec();
 }

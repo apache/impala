@@ -121,12 +121,18 @@ import org.apache.calcite.util.Pair;
 import org.apache.calcite.util.SourceStringReader;
 import org.apache.calcite.util.Util;
 import org.apache.calcite.util.trace.CalciteTrace;
+import org.apache.impala.analysis.Parser;
+import org.apache.impala.analysis.SelectStmt;
+import org.apache.impala.analysis.TimeTravelSpec;
 import org.apache.impala.analysis.TypesUtil;
 import org.apache.impala.calcite.type.ImpalaSqlIntervalQualifier;
+import org.apache.impala.calcite.util.JavaCCParserUtils;
+import org.apache.impala.calcite.validate.ImpalaSnapshotSqlNode;
 import org.apache.impala.calcite.operators.ImpalaCustomOperatorTable;
 import org.apache.impala.calcite.operators.ImpalaConcatOrOperator;
 import org.apache.impala.calcite.operators.ImpalaSqlNumericLiteral;
 import org.apache.impala.catalog.ScalarType;
+import org.apache.impala.common.AnalysisException;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
@@ -2836,25 +2842,42 @@ JAVACODE SqlNode addLateral(SqlNode tableRef, boolean lateral) {
 
 /**
  * Parses a FOR SYSTEM_TIME clause following a table expression.
+ *
+ * Added code for Impala to handle FOR SYSTEM_VERSION and to help with parsing.
  */
 SqlSnapshot Snapshot(SqlNode tableRef) :
 {
     final Span s;
     final SqlNode e;
+    String snapshotType;
 }
 {
-    { s = span(); } <FOR> <SYSTEM_TIME> <AS> <OF>
-    // Syntax for temporal table in
-    // standard SQL 2011 IWD 9075-2:201?(E) 7.6 <table reference>
-    // supports grammar as following:
-    // 1. datetime literal
-    // 2. datetime value function, i.e. CURRENT_TIMESTAMP
-    // 3. datetime term in 1 or 2 +(or -) interval term
+    { s = span(); }
+    (
+      LOOKAHEAD(4)
+      <FOR> <SYSTEM_TIME> <AS> <OF>
+      { snapshotType = "time";}
+      |
+      LOOKAHEAD(4)
+      <FOR> <SYSTEM_VERSION> <AS> <OF>
+      { snapshotType = "version";}
+    )
 
-    // We extend to support column reference, use Expression
-    // to simplify the parsing code.
     e = Expression(ExprContext.ACCEPT_NON_QUERY) {
-        return new SqlSnapshot(s.end(this), tableRef, e);
+        try {
+          SqlParserPos p = e.getParserPosition();
+          // Special utility used to grab the expression token.
+          String timeToken = JavaCCParserUtils.extractStringFromCoordinates(originalSql,
+              p.getLineNum(), p.getColumnNum(), p.getEndLineNum(), p.getEndColumnNum());
+          // Interesting logic here: An Impala TimeTravelSpec object is needed at
+          // validation time.  So the Impala parser is invoked to create this
+          // TimeTravelSpec object here so that it can be used at validation time.
+          TimeTravelSpec tts = Parser.parseTimeTravelSpec("for system_" + snapshotType
+              + " as of " + timeToken);
+          return new ImpalaSnapshotSqlNode(s.end(this), tableRef, tts);
+        } catch (AnalysisException e2) {
+          throw new ParseException(e2.getMessage());
+        }
     }
 }
 
@@ -8466,6 +8489,7 @@ SqlPostfixOperator PostfixRowOperator() :
 |   < SYSTEM: "SYSTEM" >
 |   < SYSTEM_TIME: "SYSTEM_TIME" >
 |   < SYSTEM_USER: "SYSTEM_USER" >
+|   < SYSTEM_VERSION: "SYSTEM_VERSION" >
 |   < TABLE: "TABLE" > { beforeTableName(); }
 |   < TABLE_NAME: "TABLE_NAME" >
 |   < TABLESAMPLE: "TABLESAMPLE" >

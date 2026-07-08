@@ -40,6 +40,7 @@ import org.apache.impala.analysis.BaseTableRef;
 import org.apache.impala.analysis.Expr;
 import org.apache.impala.analysis.Path;
 import org.apache.impala.analysis.TableRef;
+import org.apache.impala.analysis.TimeTravelSpec;
 import org.apache.impala.analysis.TupleDescriptor;
 import org.apache.impala.calcite.rel.util.ImpalaBaseTableRef;
 import org.apache.impala.calcite.type.ImpalaTypeConverter;
@@ -125,12 +126,13 @@ public class CalciteTable extends RelOptAbstractTable
     }
   }
 
-  public BaseTableRef createBaseTableRef(SimplifiedAnalyzer analyzer
-      ) throws ImpalaException {
+  public BaseTableRef createBaseTableRef(SimplifiedAnalyzer analyzer,
+      TimeTravelSpec timeTravelSpec) throws ImpalaException {
 
     TableRef tblRef = new TableRef(qualifiedTableName_, null);
 
-    Path resolvedPath = analyzer.resolvePath(tblRef.getPath(), Path.PathType.TABLE_REF);
+    Path resolvedPath = analyzer.resolvePath(tblRef.getPath(), Path.PathType.TABLE_REF,
+        timeTravelSpec);
 
     BaseTableRef baseTblRef = new ImpalaBaseTableRef(tblRef, resolvedPath, analyzer);
     baseTblRef.analyze(analyzer);

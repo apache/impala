@@ -25,6 +25,7 @@ import org.apache.impala.analysis.Analyzer;
 import org.apache.impala.analysis.Expr;
 import org.apache.impala.analysis.MultiAggregateInfo;
 import org.apache.impala.analysis.SlotDescriptor;
+import org.apache.impala.analysis.TimeTravelSpec;
 
 /**
  * Default {@link ScanNodeHelper} for the classic Impala planner.
@@ -33,12 +34,19 @@ public final class ScanNodeHelperImpl implements ScanNodeHelper {
 
   private final boolean isDistinctOnly_;
 
+  private final TimeTravelSpec timeTravelSpec_;
+
   public ScanNodeHelperImpl() {
-    this(null);
+    this(null, null);
   }
 
   public ScanNodeHelperImpl(MultiAggregateInfo aggInfo) {
+    this(aggInfo, null);
+  }
+
+  public ScanNodeHelperImpl(MultiAggregateInfo aggInfo, TimeTravelSpec timeTravelSpec) {
     isDistinctOnly_ = aggInfo != null && aggInfo.hasAllDistinctAgg();
+    timeTravelSpec_ = timeTravelSpec;
   }
 
   @Override
@@ -59,5 +67,10 @@ public final class ScanNodeHelperImpl implements ScanNodeHelper {
     Preconditions.checkState(scanNode.getTupleDesc().getPath().destTable() != null);
     Preconditions.checkState(conjuncts.isEmpty());
     return scanNode.applyCountStarOptimization(analyzer);
+  }
+
+  @Override
+  public TimeTravelSpec getTimeTravelSpec() {
+    return timeTravelSpec_;
   }
 }

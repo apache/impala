@@ -27,10 +27,13 @@ import org.apache.impala.analysis.AnalysisContext;
 import org.apache.impala.analysis.ParsedStatement;
 import org.apache.impala.analysis.TableName;
 import org.apache.impala.analysis.StmtMetadataLoader;
+import org.apache.impala.analysis.TimeTravelSpec;
 import org.apache.impala.analysis.ColumnLineageGraph.OperationType;
 import org.apache.impala.common.ImpalaException;
 import org.apache.impala.thrift.TQueryCtx;
 
+import java.util.List;
+import java.util.Map;
 /**
  * Implemntation of ParsedStatement hook that holds the AST that
  * is parsed from the sql String.
@@ -40,6 +43,8 @@ public class CalciteParsedStatement implements ParsedStatement {
   private final boolean isExplain_;
   private final String sql_;
   private final Set<TableName> tableNames_;
+
+  public final Map<TableName, List<TimeTravelSpec>> tableNameMap_;
 
   public CalciteParsedStatement(TQueryCtx queryCtx) throws ImpalaException {
     sql_ = queryCtx.client_request.stmt;
@@ -56,7 +61,9 @@ public class CalciteParsedStatement implements ParsedStatement {
 
     parsedNode_.accept(tableVisitor);
 
-    tableNames_ = tableVisitor.tableNames_;
+    tableNames_ = tableVisitor.getTableNames();
+
+    tableNameMap_ = tableVisitor.getTableNameMap();
   }
 
   @Override

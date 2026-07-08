@@ -27,9 +27,11 @@ import org.apache.calcite.schema.Table;
 import org.apache.calcite.schema.impl.AbstractSchema;
 import org.apache.calcite.schema.impl.ViewTable;
 import org.apache.impala.analysis.Analyzer;
+import org.apache.impala.analysis.TimeTravelSpec;
 import org.apache.impala.catalog.FeIcebergTable;
 import org.apache.impala.catalog.FeTable;
 import org.apache.impala.catalog.FeView;
+import org.apache.impala.catalog.IcebergTimeTravelTable;
 import org.apache.impala.catalog.HdfsTable;
 import org.apache.impala.catalog.FeKuduTable;
 import org.apache.impala.catalog.local.LocalFsTable;
@@ -61,6 +63,24 @@ public class CalciteDb extends AbstractSchema {
       this.reader_ = reader;
     }
 
+    /**
+     * Special table function for Iceberg time travel tables. Iceberg time travel table
+     * objects are created at analysis time (IcebergTimeTravelTable) wrapped around the
+     * real Iceberg catalog object (FeIcebergTable). The CalciteCatalogReader needs the
+     * time travel table object for validation items like "expand star".
+     */
+    public Builder addTimeTravelTable(String tableNameKey, TimeTravelSpec tts,
+        FeTable table, Analyzer analyzer) throws ImpalaException {
+
+      if (tableMap_.containsKey(tableNameKey)) return this;
+
+      FeIcebergTable feTimeTravelTable =
+          new IcebergTimeTravelTable((FeIcebergTable) table, tts);
+      tableMap_.put(tableNameKey,
+          new CalciteIcebergTable(feTimeTravelTable, reader_, analyzer, tableNameKey));
+      return this;
+    }
+
     public Builder addTable(String tableName, FeTable feTable,
         Analyzer analyzer) throws ImpalaException {
       if (tableMap_.containsKey(tableName)) return this;
@@ -69,7 +89,7 @@ public class CalciteDb extends AbstractSchema {
 
       if (table == null) {
         throw new UnsupportedFeatureException("Table " + feTable.getFullName()
-            + " has unsupported type " + table.getClass().getSimpleName() + ".");
+            + " has unsupported type " + feTable.getClass().getSimpleName() + ".");
       }
       tableMap_.put(tableName.toLowerCase(), table);
       return this;

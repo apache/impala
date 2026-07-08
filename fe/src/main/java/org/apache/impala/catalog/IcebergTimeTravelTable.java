@@ -95,6 +95,10 @@ public class IcebergTimeTravelTable
 
   public FeIcebergTable getBase() { return base_; }
 
+  public TimeTravelSpec getTimeTravelSpec() {
+    return timeTravelSpec_;
+  }
+
   /**
    * Initialize the columns from the schema corresponding to the time travel
    * specification.

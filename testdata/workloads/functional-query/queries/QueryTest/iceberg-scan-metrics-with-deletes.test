@@ -6,7 +6,7 @@ select * from
   functional_parquet.iceberg_v2_positional_delete_all_rows FOR SYSTEM_VERSION AS OF POS_DELETE_ALL_ROWS_SNAPSHOT_ID,
   functional_parquet.iceberg_v2_positional_not_all_data_files_have_delete_files FOR SYSTEM_VERSION AS OF NOT_ALL_DATA_FILES_HAVE_DELETE_FILES_SNAPSHOT_ID
 ---- RUNTIME_PROFILE
-Iceberg Plan Metrics for Node 00:
+row_regex:Iceberg Plan Metrics for Node 0[05]:
 row_regex: total-planning-duration:
   result-data-files: 1
   result-delete-files: 0
@@ -23,13 +23,13 @@ row_regex: total-delete-file-size-in-bytes: .+ \(\d+\)
   indexed-delete-files: 0
   equality-delete-files: 0
   positional-delete-files: 0
-Iceberg Plan Metrics for Node 03:
+row_regex:Iceberg Plan Metrics for Node 0[37]:
   result-delete-files: 1
   total-delete-manifests: 1
   scanned-delete-manifests: 1
   indexed-delete-files: 1
   positional-delete-files: 1
-Iceberg Plan Metrics for Node 08:
+row_regex:Iceberg Plan Metrics for Node [01][82]:
   result-data-files: 4
   result-delete-files: 2
   total-data-manifests: 4
@@ -46,9 +46,9 @@ select * from
   functional_parquet.iceberg_v2_positional_delete_all_rows FOR SYSTEM_VERSION AS OF POS_DELETE_ALL_ROWS_SNAPSHOT_ID,
   functional_parquet.iceberg_v2_positional_not_all_data_files_have_delete_files FOR SYSTEM_VERSION AS OF NOT_ALL_DATA_FILES_HAVE_DELETE_FILES_SNAPSHOT_ID
 ---- RUNTIME_PROFILE
-Iceberg Plan Metrics for Node 00:
+row_regex:Iceberg Plan Metrics for Node 0[05]:
         Planning done without Iceberg: no Iceberg scan metrics available.
-Iceberg Plan Metrics for Node 03:
+row_regex:Iceberg Plan Metrics for Node 0[37]:
 row_regex: total-planning-duration:
   result-data-files: 1
   result-delete-files: 1
@@ -65,7 +65,7 @@ row_regex: total-delete-file-size-in-bytes: .+ \(\d+\)
   indexed-delete-files: 1
   equality-delete-files: 0
   positional-delete-files: 1
-Iceberg Plan Metrics for Node 08:
+row_regex:Iceberg Plan Metrics for Node [01][82]:
   result-data-files: 4
   result-delete-files: 2
   total-data-manifests: 4
