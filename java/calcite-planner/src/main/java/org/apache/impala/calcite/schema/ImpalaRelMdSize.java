@@ -20,6 +20,7 @@ package org.apache.impala.calcite.schema;
 import java.util.List;
 
 import org.apache.calcite.plan.volcano.RelSubset;
+import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.core.TableScan;
 import org.apache.calcite.rel.metadata.ReflectiveRelMetadataProvider;
 import org.apache.calcite.rel.metadata.RelMdSize;
@@ -29,6 +30,9 @@ import org.apache.calcite.rel.type.RelDataType;
 import org.apache.calcite.rel.type.RelDataTypeField;
 import org.apache.calcite.util.BuiltInMethod;
 import org.apache.impala.catalog.Column;
+import org.apache.impala.calcite.rel.node.ImpalaCTEConsumer;
+import org.apache.impala.calcite.rel.node.ImpalaCTEProducer;
+import org.apache.impala.calcite.rel.node.ImpalaSequence;
 
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
@@ -48,12 +52,25 @@ public class ImpalaRelMdSize extends RelMdSize {
 
   //~ Methods ----------------------------------------------------------------
 
-  // TODO: IMPALA-15156: implementing this for RelSubset doesn't seem like the right
-  // option. I think something is off about ImpalaRelMdNonCumulativeCost ignoring
-  // computeSelfCost, but not quite sure how to handle it.
   public List<Double> averageColumnSizes(RelSubset subset, RelMetadataQuery mq) {
-    // Average column sizes for a subplan is the same as that of its original rel.
-    return mq.getAverageColumnSizes(subset.getBestOrOriginal());
+    // Subsets can also occur below a stripped parent while size metadata is
+    // derived recursively.
+    return getAverageColumnSizesForMetadataRel(subset.getBestOrOriginal(), mq);
+  }
+
+  public List<Double> averageColumnSizes(ImpalaCTEConsumer consumer,
+      RelMetadataQuery mq) {
+    return getAverageColumnSizesForMetadataRel(consumer.getCTE(), mq);
+  }
+
+  public List<Double> averageColumnSizes(ImpalaCTEProducer producer,
+      RelMetadataQuery mq) {
+    return getAverageColumnSizesForMetadataRel(producer.getInput(), mq);
+  }
+
+  public List<Double> averageColumnSizes(ImpalaSequence sequence,
+      RelMetadataQuery mq) {
+    return getAverageColumnSizesForMetadataRel(sequence.getInput(0), mq);
   }
 
   @Override
@@ -126,5 +143,10 @@ public class ImpalaRelMdSize extends RelMdSize {
     default:
       return null;
     }
+  }
+
+  private static List<Double> getAverageColumnSizesForMetadataRel(
+      RelNode rel, RelMetadataQuery mq) {
+    return mq.getAverageColumnSizes(rel.stripped());
   }
 }

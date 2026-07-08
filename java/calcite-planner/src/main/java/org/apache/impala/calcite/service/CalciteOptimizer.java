@@ -25,7 +25,6 @@ import org.apache.calcite.plan.RelOptCluster;
 import org.apache.calcite.plan.RelOptMaterialization;
 import org.apache.calcite.plan.RelOptPlanner;
 import org.apache.calcite.plan.RelOptRule;
-import org.apache.calcite.plan.RelOptRules;
 import org.apache.calcite.plan.RelOptUtil;
 import org.apache.calcite.plan.RuleEventLogger;
 import org.apache.calcite.plan.hep.HepMatchOrder;
@@ -38,6 +37,7 @@ import org.apache.calcite.rel.RelCommonExpressionSuggester;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.rules.CoreRules;
 import org.apache.calcite.rel.rules.PruneEmptyRules;
+import org.apache.calcite.rel.rules.materialize.MaterializedViewRules;
 import org.apache.calcite.rex.RexBuilder;
 import org.apache.calcite.sql.SqlExplainFormat;
 import org.apache.calcite.sql.SqlExplainLevel;
@@ -88,6 +88,15 @@ import org.slf4j.LoggerFactory;
 public class CalciteOptimizer implements CompilerStep {
   protected static final Logger LOG =
       LoggerFactory.getLogger(CalciteOptimizer.class.getName());
+
+  private static final List<RelOptRule> CTE_MATERIALIZATION_RULES =
+      ImmutableList.of(
+          MaterializedViewRules.PROJECT_FILTER,
+          MaterializedViewRules.FILTER,
+          MaterializedViewRules.PROJECT_JOIN,
+          MaterializedViewRules.JOIN,
+          MaterializedViewRules.PROJECT_AGGREGATE,
+          MaterializedViewRules.AGGREGATE);
 
   private final CalciteCatalogReader reader_;
 
@@ -444,8 +453,10 @@ public class CalciteOptimizer implements CompilerStep {
       planner.addMaterialization(materialization);
     }
 
-    // Add MaterializedView rewrite rules.
-    RelOptRules.MATERIALIZATION_RULES.forEach(planner::addRule);
+    // Add MaterializedView rewrite rules. Do not use FILTER_SCAN for CTE rewrites:
+    // it runs SubstitutionVisitor on materialization.tableRel, but our CTE
+    // replacement is an ImpalaCTEConsumer rather than a standard mutable RelNode.
+    CTE_MATERIALIZATION_RULES.forEach(planner::addRule);
 
     // Optimize plan.
     planner.setRoot(basePlan);
