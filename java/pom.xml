@@ -91,9 +91,8 @@ under the License.
     <dropwizard-metrics.version>${env.IMPALA_DROPWIZARD_METRICS_VERSION}</dropwizard-metrics.version>
     <aircompressor.version>${env.IMPALA_AIRCOMPRESSOR_VERSION}</aircompressor.version>
     <datasketches.version>${env.IMPALA_DATASKETCHES_VERSION}</datasketches.version>
-    <!-- Informs maven-compiler-plugin to build for specified target.
-         Source version is fixed at 8, primarily due to sun.misc.Unsafe. -->
-    <maven.compiler.source>8</maven.compiler.source>
+    <!-- Informs maven-compiler-plugin to build for specified target. -->
+    <maven.compiler.source>17</maven.compiler.source>
     <maven.compiler.target>${env.IMPALA_JAVA_TARGET}</maven.compiler.target>
   </properties>
 
