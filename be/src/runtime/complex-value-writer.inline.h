@@ -59,6 +59,7 @@ void ComplexValueWriter<JsonStream>::PrimitiveValueToJSON(void* value,
   RawValue::PrintValue(value, type, scale, &tmp);
   const bool should_convert_to_string = map_key && stringify_map_keys_;
   if (IsPrimitiveTypePrintedAsString(type) || should_convert_to_string) {
+    DCHECK(type.IsPlainStringType() || type.IsBinaryType());
     if (type.IsBinaryType()) {
       int64_t base64_max_len;
       bool succ = Base64EncodeBufLen(tmp.size(), &base64_max_len);

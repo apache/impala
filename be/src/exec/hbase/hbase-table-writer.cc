@@ -155,13 +155,19 @@ Status HBaseTableWriter::AppendRows(RowBatch* batch) {
             string_value.clear();
             output_expr_evals_[j]->PrintValue(value, &string_value);
             const ColumnDescriptor& col_desc = table_desc_->col_descs()[j];
-            if (col_desc.type().IsBinaryType()) {
-              Base64Encode(string_value , &base64_encoded_value);
-              data = base64_encoded_value.data();
-              data_len = base64_encoded_value.length();
-            } else {
-              data = string_value.data();
-              data_len = string_value.length();
+            StringValSubtype string_val_sub_type = col_desc.type().StringSubtype();
+            switch (string_val_sub_type) {
+              case StringValSubtype::BINARY:
+                Base64Encode(string_value , &base64_encoded_value);
+                data = base64_encoded_value.data();
+                data_len = base64_encoded_value.length();
+                break;
+              case StringValSubtype::STRING:
+                data = string_value.data();
+                data_len = string_value.length();
+                break;
+              default:
+                DCHECK(false) << "Unexpected string subtype" << string_val_sub_type;
             }
           } else {
             // Binary encoded

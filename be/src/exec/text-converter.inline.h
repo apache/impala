@@ -67,6 +67,7 @@ inline bool TextConverter::WriteSlot(const SlotDescriptor* slot_desc, Tuple* tup
           !(len != 0 && (copy_string || need_escape));
 
       bool base64_decode = false;
+      DCHECK(type.IsPlainStringType() || type.IsBinaryType());
       if (type.IsBinaryType() && decode_binary_ && len != 0) {
         base64_decode = true;
         reuse_data = false;

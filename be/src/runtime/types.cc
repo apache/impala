@@ -38,7 +38,8 @@ const int ColumnType::MAX_DECIMAL8_PRECISION;
 const char* ColumnType::LLVM_CLASS_NAME = "struct.impala::ColumnType";
 
 ColumnType::ColumnType(const std::vector<TTypeNode>& types, int* idx)
-  : len(-1), precision(-1), scale(-1), is_binary_(false) {
+  : len(-1), precision(-1), scale(-1),
+    string_val_subtype_(StringValSubtype::STRING) {
   DCHECK_GE(*idx, 0);
   DCHECK_LT(*idx, types.size());
   const TTypeNode& node = types[*idx];
@@ -52,7 +53,9 @@ ColumnType::ColumnType(const std::vector<TTypeNode>& types, int* idx)
         DCHECK(scalar_type.__isset.len);
         len = scalar_type.len;
       } else if (type == TYPE_STRING) {
-        is_binary_ = scalar_type.type == TPrimitiveType::BINARY;
+        if (scalar_type.type == TPrimitiveType::BINARY) {
+          string_val_subtype_ = StringValSubtype::BINARY;
+        }
       } else if (type == TYPE_DECIMAL) {
         DCHECK(scalar_type.__isset.precision);
         DCHECK(scalar_type.__isset.scale);
@@ -116,7 +119,7 @@ PrimitiveType ThriftToType(TPrimitiveType::type ttype) {
   }
 }
 
-TPrimitiveType::type ToThrift(PrimitiveType ptype, bool is_binary) {
+TPrimitiveType::type ToThrift(PrimitiveType ptype, StringValSubtype subtype) {
   switch (ptype) {
     case INVALID_TYPE: return TPrimitiveType::INVALID_TYPE;
     case TYPE_NULL: return TPrimitiveType::NULL_TYPE;
@@ -131,7 +134,13 @@ TPrimitiveType::type ToThrift(PrimitiveType ptype, bool is_binary) {
     case TYPE_DATETIME: return TPrimitiveType::DATETIME;
     case TYPE_TIMESTAMP: return TPrimitiveType::TIMESTAMP;
     case TYPE_STRING:
-      return is_binary ? TPrimitiveType::BINARY : TPrimitiveType::STRING;
+      switch (subtype) {
+        case StringValSubtype::BINARY: return TPrimitiveType::BINARY;
+        case StringValSubtype::STRING: return TPrimitiveType::STRING;
+        default:
+          DCHECK(false) << "Unexpected string subtype" << subtype;
+          return TPrimitiveType::INVALID_TYPE;
+      }
     case TYPE_VARCHAR: return TPrimitiveType::VARCHAR;
     case TYPE_BINARY:
       DCHECK(false) << "STRING should be used instead of BINARY in the backend.";
@@ -243,7 +252,7 @@ void ColumnType::ToThrift(TColumnType* thrift_type) const {
     node.type = TTypeNodeType::SCALAR;
     node.__set_scalar_type(TScalarType());
     TScalarType& scalar_type = node.scalar_type;
-    scalar_type.__set_type(impala::ToThrift(type, is_binary_));
+    scalar_type.__set_type(impala::ToThrift(type, string_val_subtype_));
     if (type == TYPE_CHAR || type == TYPE_VARCHAR
         || type == TYPE_FIXED_UDA_INTERMEDIATE) {
       DCHECK_NE(len, -1);
@@ -260,7 +269,13 @@ void ColumnType::ToThrift(TColumnType* thrift_type) const {
 string ColumnType::DebugString() const {
   switch (type) {
     case TYPE_STRING:
-      return is_binary_ ? "BINARY" : "STRING";
+      switch (string_val_subtype_) {
+        case StringValSubtype::BINARY: return "BINARY";
+        case StringValSubtype::STRING: return "STRING";
+        default:
+          DCHECK(false) << "Unexpected string subtype" << string_val_subtype_;
+          return "";
+      }
     case TYPE_CHAR:
       return Substitute("CHAR($0)", len);
     case TYPE_DECIMAL:
@@ -283,6 +298,15 @@ vector<ColumnType> ColumnType::FromThrift(const vector<TColumnType>& ttypes) {
 
 ostream& operator<<(ostream& os, const ColumnType& type) {
   os << type.DebugString();
+  return os;
+}
+
+ostream& operator<<(ostream& os, StringValSubtype subtype) {
+  switch (subtype) {
+    case StringValSubtype::STRING: os << "STRING"; break;
+    case StringValSubtype::BINARY: os << "BINARY"; break;
+    default: os << "UNKNOWN(" << static_cast<int>(subtype) << ")"; break;
+  }
   return os;
 }
 
@@ -311,8 +335,9 @@ llvm::ConstantStruct* ColumnType::ToIR(LlvmCodeGen* codegen) const {
   llvm::Constant* field_ids_field =
       llvm::Constant::getNullValue(column_type_type->getElementType(6));
 
-  DCHECK_EQ(sizeof(is_binary_), sizeof(uint8_t));
-  llvm::Constant* is_binary_field = codegen->GetI8Constant(is_binary_);
+  DCHECK_EQ(sizeof(string_val_subtype_), sizeof(uint8_t));
+  llvm::Constant* string_val_subtype_field =
+      codegen->GetI8Constant(static_cast<uint8_t>(string_val_subtype_));
 
   llvm::Constant* padding =
       llvm::Constant::getNullValue(column_type_type->getElementType(8));
@@ -320,7 +345,7 @@ llvm::ConstantStruct* ColumnType::ToIR(LlvmCodeGen* codegen) const {
   return llvm::cast<llvm::ConstantStruct>(
       llvm::ConstantStruct::get(column_type_type, type_field, len_field, precision_field,
         scale_field, children_field, field_names_field, field_ids_field,
-        is_binary_field, padding));
+        string_val_subtype_field, padding));
 }
 
 }

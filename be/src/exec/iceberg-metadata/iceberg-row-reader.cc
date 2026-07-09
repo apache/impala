@@ -128,12 +128,17 @@ Status IcebergRowReader::WriteSlot(JNIEnv* env, const jobject* struct_like_row,
       RETURN_IF_ERROR(WriteTimeStampSlot(env, accessed_value, slot));
       break;
     } case TYPE_STRING: {
-      if (type.IsBinaryType()) { // byte[]
-        RETURN_IF_ERROR(WriteStringOrBinarySlot</* IS_BINARY */ true>(
-            env, accessed_value, slot, tuple_data_pool));
-      } else { // java.lang.String
-        RETURN_IF_ERROR(WriteStringOrBinarySlot</* IS_BINARY */ false>(
-            env, accessed_value, slot, tuple_data_pool));
+      switch (type.StringSubtype()) {
+        case StringValSubtype::BINARY: // byte[]
+          RETURN_IF_ERROR(WriteStringOrBinarySlot</* IS_BINARY */ true>(
+              env, accessed_value, slot, tuple_data_pool));
+          break;
+        case StringValSubtype::STRING: // java.lang.String
+          RETURN_IF_ERROR(WriteStringOrBinarySlot</* IS_BINARY */ false>(
+              env, accessed_value, slot, tuple_data_pool));
+          break;
+        default:
+          DCHECK(false) << "Unexpected string subtype" << type.StringSubtype();
       }
       break;
     } case TYPE_STRUCT: { // Struct type is not used by Impala to access values.
@@ -424,10 +429,14 @@ jclass IcebergRowReader::JavaClassFromImpalaType(const ColumnType type) {
       case TYPE_TIMESTAMP: {     // org.apache.iceberg.types.TimestampType
       return long_cl_;
     } case TYPE_STRING: {
-      if (type.IsBinaryType()) { // java.nio.ByteBuffer
-        return byte_buffer_cl_;
-      } else {                   // java.lang.CharSequence
-        return char_sequence_cl_;
+      switch (type.StringSubtype()) {
+        case StringValSubtype::BINARY: // java.nio.ByteBuffer
+          return byte_buffer_cl_;
+        case StringValSubtype::STRING: // java.lang.CharSequence
+          return char_sequence_cl_;
+        default:
+          DCHECK(false) << "Unexpected string subtype" << type.StringSubtype();
+          return nullptr;
       }
     } case TYPE_ARRAY: {         // java.util.List
       return list_cl_;

@@ -95,12 +95,17 @@ Status PaimonJniRowReader::WriteSlot(const arrow::Array* array, int row_index,
     }
     case TYPE_STRING:
     case TYPE_VARCHAR: {
-      if (type.IsBinaryType()) { // byte[]
-        RETURN_IF_ERROR(WriteStringOrBinarySlot</* IS_BINARY */ true>(
-            array, row_index, slot, tuple_data_pool));
-      } else {
-        RETURN_IF_ERROR(WriteStringOrBinarySlot</* IS_BINARY */ false>(
-            array, row_index, slot, tuple_data_pool));
+      switch (type.StringSubtype()) {
+        case StringValSubtype::BINARY: // byte[]
+          RETURN_IF_ERROR(WriteStringOrBinarySlot</* IS_BINARY */ true>(
+              array, row_index, slot, tuple_data_pool));
+          break;
+        case StringValSubtype::STRING:
+          RETURN_IF_ERROR(WriteStringOrBinarySlot</* IS_BINARY */ false>(
+              array, row_index, slot, tuple_data_pool));
+          break;
+        default:
+          DCHECK(false) << "Unexpected string subtype" << type.StringSubtype();
       }
       break;
     }

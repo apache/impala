@@ -110,12 +110,17 @@ Status HdfsTextTableWriter::AppendRows(
             PrintEscaped(&sv);
           } else if (type.IsVarLenStringType()) {
             const StringValue* string_value = reinterpret_cast<const StringValue*>(value);
-            if (type.IsBinaryType()) {
-              // TODO: try to find a more efficient implementation
-              Base64Encode(
-                  string_value->Ptr() , string_value->Len(), &rowbatch_stringstream_);
-            } else {
-              PrintEscaped(string_value);
+            switch (type.StringSubtype()) {
+              case StringValSubtype::BINARY:
+                // TODO: try to find a more efficient implementation
+                Base64Encode(
+                    string_value->Ptr() , string_value->Len(), &rowbatch_stringstream_);
+                break;
+              case StringValSubtype::STRING:
+                PrintEscaped(string_value);
+                break;
+              default:
+                DCHECK(false) << "Unexpected string subtype" << type.StringSubtype();
             }
           } else {
             output_expr_evals_[j]->PrintValue(value, &rowbatch_stringstream_);

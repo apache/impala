@@ -47,7 +47,7 @@ enum PrimitiveType {
   TYPE_STRING,
   TYPE_DATE,
   TYPE_DATETIME,    // Not implemented
-  TYPE_BINARY,      // Not used, see ColumnType::is_binary
+  TYPE_BINARY,      // Not used, see ColumnType::string_val_subtype_
   TYPE_DECIMAL,
   TYPE_CHAR,
   TYPE_VARCHAR,
@@ -59,7 +59,13 @@ enum PrimitiveType {
 };
 
 PrimitiveType ThriftToType(TPrimitiveType::type ttype);
-TPrimitiveType::type ToThrift(PrimitiveType ptype);
+
+// Subtype of a TYPE_STRING byte array. BINARY is represented as TYPE_STRING in
+// the backend; this field distinguishes it from a plain STRING.
+enum class StringValSubtype : uint8_t { STRING, BINARY };
+
+TPrimitiveType::type ToThrift(PrimitiveType ptype,
+    StringValSubtype subtype = StringValSubtype::STRING);
 std::string TypeToString(PrimitiveType t);
 
 std::string TypeToOdbcString(const TColumnType& type);
@@ -99,7 +105,8 @@ struct ColumnType {
   static const char* LLVM_CLASS_NAME;
 
   explicit ColumnType(PrimitiveType type = INVALID_TYPE)
-    : type(type), len(-1), precision(-1), scale(-1), is_binary_(false) {
+    : type(type), len(-1), precision(-1), scale(-1),
+      string_val_subtype_(StringValSubtype::STRING) {
     DCHECK_NE(type, TYPE_CHAR);
     DCHECK_NE(type, TYPE_VARCHAR);
     DCHECK_NE(type, TYPE_BINARY);
@@ -138,7 +145,7 @@ struct ColumnType {
 
   static ColumnType CreateBinaryType() {
     ColumnType ret(TYPE_STRING);
-    ret.is_binary_ = true;
+    ret.string_val_subtype_ = StringValSubtype::BINARY;
     return ret;
   }
 
@@ -181,7 +188,7 @@ struct ColumnType {
     if (children != o.children) return false;
     if (type == TYPE_CHAR || type == TYPE_FIXED_UDA_INTERMEDIATE) return len == o.len;
     if (type == TYPE_DECIMAL) return precision == o.precision && scale == o.scale;
-    if (type == TYPE_STRING) return is_binary_ == o.is_binary_;
+    if (type == TYPE_STRING) return string_val_subtype_ == o.string_val_subtype_;
     return true;
   }
 
@@ -220,7 +227,17 @@ struct ColumnType {
     return type == TYPE_STRING || type == TYPE_VARCHAR;
   }
 
-  inline bool IsBinaryType() const { return is_binary_; }
+  inline bool IsBinaryType() const {
+    return string_val_subtype_ == StringValSubtype::BINARY;
+  }
+
+  // True unless this is the BINARY subtype, i.e. a plain STRING value
+  // (or any non-TYPE_STRING type, whose subtype defaults to STRING).
+  inline bool IsPlainStringType() const {
+    return string_val_subtype_ == StringValSubtype::STRING;
+  }
+
+  inline StringValSubtype StringSubtype() const { return string_val_subtype_; }
 
   inline bool IsComplexType() const {
     return type == TYPE_STRUCT || type == TYPE_ARRAY || type == TYPE_MAP;
@@ -269,10 +286,7 @@ struct ColumnType {
   // some code parts, e.g. file format readers/writers differentiate between the two.
   // Instead of PrimitiveType::TYPE_BINARY, TYPE_STRING is used for the BINARY type to
   // ensure that everything that works for STRING also works for BINARY.
-  //
-  // This variable is true if 'type' is TYPE_STRING and this object represents the BINARY
-  // type, and false in all other cases.
-  bool is_binary_ = false;
+  StringValSubtype string_val_subtype_ = StringValSubtype::STRING;
 
   /// Recursive implementation of ToThrift() that populates 'thrift_type' with the
   /// TTypeNodes for this type and its children.
@@ -348,6 +362,7 @@ struct ColumnType {
 };
 
 std::ostream& operator<<(std::ostream& os, const ColumnType& type);
+std::ostream& operator<<(std::ostream& os, StringValSubtype subtype);
 
 }
 

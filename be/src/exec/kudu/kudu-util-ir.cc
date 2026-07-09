@@ -68,22 +68,27 @@ Status WriteKuduValue(int col, const ColumnType& col_type, const void* value,
     case TYPE_STRING: {
       const StringValue* sv = reinterpret_cast<const StringValue*>(value);
       kudu::Slice slice(reinterpret_cast<uint8_t*>(sv->Ptr()), sv->Len());
-      if (col_type.IsBinaryType()) {
-        if (copy_strings) {
-          KUDU_RETURN_IF_ERROR(
-              row->SetBinary(col, slice), VALUE_ERROR_MSG);
-        } else {
-          KUDU_RETURN_IF_ERROR(
-              row->SetBinaryNoCopy(col, slice), VALUE_ERROR_MSG);
-        }
-      } else {
-        if (copy_strings) {
-          KUDU_RETURN_IF_ERROR(
-              row->SetString(col, slice), VALUE_ERROR_MSG);
-        } else {
-          KUDU_RETURN_IF_ERROR(
-              row->SetStringNoCopy(col, slice), VALUE_ERROR_MSG);
-        }
+      switch (col_type.StringSubtype()) {
+        case StringValSubtype::BINARY:
+          if (copy_strings) {
+            KUDU_RETURN_IF_ERROR(
+                row->SetBinary(col, slice), VALUE_ERROR_MSG);
+          } else {
+            KUDU_RETURN_IF_ERROR(
+                row->SetBinaryNoCopy(col, slice), VALUE_ERROR_MSG);
+          }
+          break;
+        case StringValSubtype::STRING:
+          if (copy_strings) {
+            KUDU_RETURN_IF_ERROR(
+                row->SetString(col, slice), VALUE_ERROR_MSG);
+          } else {
+            KUDU_RETURN_IF_ERROR(
+                row->SetStringNoCopy(col, slice), VALUE_ERROR_MSG);
+          }
+          break;
+        default:
+          DCHECK(false) << "Unexpected string subtype" << col_type.StringSubtype();
       }
       break;
     }
