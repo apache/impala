@@ -1765,19 +1765,27 @@ bool BaseScalarColumnReader::SkipRowsInternal(int64_t num_rows, int64_t skip_row
         return false;
       }
       DCHECK_GT(num_buffered_values_, 0);
-      // Keep advancing to next page header if rows to be skipped are more than number
-      // of values in the page. Note we will just be reading headers and skipping
-      // pages without decompressing them as we advance.
+      // Keep advancing to next page header while all rows of the current page are to be
+      // skipped. Note we will just be reading headers and skipping pages without
+      // decompressing them as we advance. This includes the case where the rows to skip
+      // end exactly on a page boundary (e.g. an entire row group is filtered by
+      // row-level predicates): we discard the compressed page without decompressing and
+      // short-circuit before reading a page header that may not exist.
       // In this case, the current column is not in any collection. Therefore the number
       // of rows in the page is equal to the number of values.
       DCHECK_EQ(max_rep_level(), 0);
-      while (num_rows > num_buffered_values_) {
+      while (num_rows >= num_buffered_values_) {
         COUNTER_ADD(parent_->num_pages_skipped_by_late_materialization_counter_, 1);
         num_rows -= num_buffered_values_;
         current_row_ += num_buffered_values_;
-        if (!col_chunk_reader_.SkipPageData().ok() || !AdvanceNextPageHeader()) {
-          return false;
+        if (!col_chunk_reader_.SkipPageData().ok()) return false;
+        if (num_rows == 0) {
+          // Skipped exactly to the end of this page (and possibly the row group). No
+          // need to read the next page header, which may not exist.
+          num_buffered_values_ = 0;
+          return true;
         }
+        if (!AdvanceNextPageHeader()) return false;
         DCHECK_GT(num_buffered_values_, 0);
       }
       // Read the data page (includes decompressing them if required).

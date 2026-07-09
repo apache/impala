@@ -16,18 +16,37 @@ INT, INT
 aggregation(SUM, NumTopLevelValuesSkipped): 3
 ====
 ---- QUERY
-# Test NumTopLevelValuesSkipped counter when there is more than one page in the
-# column.
+# Test that when a column has more than one page, rows that are skipped up to a
+# page boundary are discarded as whole pages (counted in
+# NumPagesSkippedByLateMaterialization) without decompressing them, so no in-page
+# top-level values need to be skipped (NumTopLevelValuesSkipped stays 0).
 # Table `decimals_1_10` contains 60 rows, in which 8 rows are selected by the
-# query and 44 + 8 == 52 rows are skipped.
+# query and 52 rows are skipped.
 set PARQUET_LATE_MATERIALIZATION_THRESHOLD=1;
 set parquet_read_page_index = false;
 select count(d_10) from decimals_1_10 where d_1 = 1;
 ---- RESULTS
 8
 ---- RUNTIME_PROFILE
-aggregation(SUM, NumPagesSkippedByLateMaterialization): 44
-aggregation(SUM, NumTopLevelValuesSkipped): 8
+aggregation(SUM, NumPagesSkippedByLateMaterialization): 52
+aggregation(SUM, NumTopLevelValuesSkipped): 0
+====
+---- QUERY
+# Test the NumTopLevelValuesSkipped counter when the skipped rows end in the middle
+# of a page, so the page must be decompressed and values skipped within it (rather
+# than discarding whole pages). Column `d_1` has 5 values per page, so filtering on
+# `d_10` (1 value per page) and reading `d_1` forces in-page value skipping.
+# `d_10 = 3` selects the third value of each matching page, skipping the values
+# before and after it inside the page.
+# `d_10 = 3` matches 11 rows, 2 of which have a NULL `d_1`, so count(d_1) returns 9.
+set PARQUET_LATE_MATERIALIZATION_THRESHOLD=1;
+set parquet_read_page_index = false;
+select count(d_1) from decimals_1_10 where d_10 = 3;
+---- RESULTS
+9
+---- RUNTIME_PROFILE
+aggregation(SUM, NumPagesSkippedByLateMaterialization): 1
+aggregation(SUM, NumTopLevelValuesSkipped): 44
 ====
 ---- QUERY
 # Test if PARQUET_LATE_MATERIALIZATION_THRESHOLD is always 1 if there is any

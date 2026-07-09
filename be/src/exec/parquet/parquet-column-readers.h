@@ -508,7 +508,7 @@ class BaseScalarColumnReader : public ParquetColumnReader {
   /// page.
   Status ReadNextDataPageHeader();
 
-  /// Reads only the data page coontent and not the header.
+  /// Reads only the data page content and not the header.
   /// This should strictly be called only after 'ReadNextDataPageHeader' or
   /// 'AdvanceNextPageHeader' has been invoked.
   Status ReadCurrentDataPage();
