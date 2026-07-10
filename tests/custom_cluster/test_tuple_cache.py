@@ -129,7 +129,8 @@ class TestTupleCacheBase(CustomClusterTestSuite):
 
   # Generates a table containing at least <scale> KB of data.
   def create_table(self, fq_table, scale=1):
-    self.execute_query("CREATE TABLE {0} ({1})".format(fq_table, TABLE_LAYOUT))
+    self.execute_query(
+        "CREATE TABLE {0} ({1}) STORED AS TEXTFILE".format(fq_table, TABLE_LAYOUT))
     # To make the rows distinct, we keep using a different seed for table_value
     global_index = 0
     for _ in range(scale):

@@ -1,7 +1,7 @@
 # This test file covers alter table statements that add multiple partitions and use hdfs caching
 ====
 ---- QUERY
-create table i1670B_alter (s string) partitioned by (i integer);
+create table i1670B_alter (s string) partitioned by (i integer) stored as textfile;
 alter table i1670B_alter add
 partition (i=1) location '$FILESYSTEM_PREFIX/test-warehouse/$DATABASE.db/i1670B_alter/i1'
 cached in 'testPool' with replication=3
@@ -18,7 +18,7 @@ STRING, BIGINT, BIGINT, STRING, STRING, STRING, STRING, STRING, STRING, STRING
 ====
 ---- QUERY
 # IMPALA-1670: Set up i1670C_alter table for the next test case.
-create table i1670C_alter (s string) partitioned by (i integer);
+create table i1670C_alter (s string) partitioned by (i integer) stored as textfile;
 alter table i1670C_alter add
 partition (i=2) location '$FILESYSTEM_PREFIX/test-warehouse/$DATABASE.db/i1670C_alter/i2A'
 cached in 'testPool' with replication=2
@@ -55,7 +55,7 @@ STRING, BIGINT, BIGINT, STRING, STRING, STRING, STRING, STRING, STRING, STRING
 # IMPALA-1670: Partitions without explicit CACHED IN/UNCACHED clause inherit cacheop from
 # the parent table
 create table i1670D_alter (s string) partitioned by (i integer)
-cached in 'testPool' with replication=7;
+stored as textfile cached in 'testPool' with replication=7;
 alter table i1670D_alter add
 partition (i=1) cached in 'testPool' with replication=5
 partition (i=2)
@@ -74,7 +74,7 @@ STRING, BIGINT, BIGINT, STRING, STRING, STRING, STRING, STRING, STRING, STRING
 ---- QUERY
 # IMPALA-1670: After INVALIDATE METADATA Impala can access previously added partitions and
 # partition data.
-create table i1670E_alter (a int) partitioned by (x int);
+create table i1670E_alter (a int) partitioned by (x int) stored as textfile;
 alter table i1670E_alter add partition (x=1)
 partition (x=2) uncached
 partition (x=3) location '$FILESYSTEM_PREFIX/test-warehouse/$DATABASE.db/i1670E_alter/x3'

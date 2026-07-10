@@ -1504,7 +1504,8 @@ class TestTextSplitDelimiters(ImpalaTestSuite):
     TABLE_NAME = "test_text_split_delimiters"
     qualified_table_name = "%s.%s" % (unique_database, TABLE_NAME)
     location = get_fs_path("/test-warehouse/%s.db/%s" % (unique_database, TABLE_NAME))
-    query = "create table %s (s string) location '%s'" % (qualified_table_name, location)
+    query = "create table %s (s string) stored as textfile location '%s'" % (
+        qualified_table_name, location)
     self.execute_query(query, options)
 
     # Passing "w+" to NamedTemporaryFile prevents it from opening the file in bytes mode
@@ -1607,7 +1608,9 @@ class TestUncompressedText(ImpalaTestSuite):
   # IMPALA-5315: Test support for date/time in unpadded format
   def test_scan_lazy_timestamp(self, vector, unique_database):
     test_files = ["testdata/data/lazy_timestamp.csv"]
-    create_table_and_copy_files(self.client, """CREATE TABLE {db}.{tbl} (ts TIMESTAMP)""",
+    create_table_and_copy_files(self.client,
+                                """CREATE TABLE {db}.{tbl} (ts TIMESTAMP)
+                                   STORED AS TEXTFILE""",
                                 unique_database, "lazy_ts", test_files)
     self.run_test_case('QueryTest/select-lazy-timestamp', vector, unique_database)
 

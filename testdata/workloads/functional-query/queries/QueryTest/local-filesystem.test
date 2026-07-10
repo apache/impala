@@ -3,6 +3,7 @@
 create external table tbl
 (c0 string, c1 string, c2 string, c3 int, c4 int, c5 int)
 row format delimited fields terminated by ','
+stored as textfile
 location 'file://$IMPALA_HOME/testdata/data/local_tbl'
 ---- RESULTS
 'Table has been created.'

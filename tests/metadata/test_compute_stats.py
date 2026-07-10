@@ -376,7 +376,7 @@ class TestIncompatibleColStats(ImpalaTestSuite):
 
     # Create a table with a string column and populate it with some data.
     table_name = unique_database + ".badstats"
-    self.client.execute("create table %s (s string)" % table_name)
+    self.client.execute("create table %s (s string) stored as textfile" % table_name)
     self.client.execute("insert into table %s select cast(int_col as string) "
         "from functional.alltypes limit 10" % table_name)
 

@@ -666,7 +666,7 @@ STRING, STRING, BIGINT, BIGINT, BIGINT, DOUBLE, BIGINT, BIGINT
 ====
 ---- QUERY
 # IMPALA-883: Compute table stats for an empty partition.
-create table empty_partitioned (i int) partitioned by (j int);
+create table empty_partitioned (i int) partitioned by (j int) stored as textfile;
 alter table empty_partitioned add partition (j=1);
 ====
 ---- QUERY
@@ -730,7 +730,7 @@ STRING, BIGINT, BIGINT, STRING, STRING, STRING, STRING, STRING, STRING, STRING
 ====
 ---- QUERY
 # IMPALA-1614 Verify that COMPUTE STATS works on a table whose name starts with numbers.
-create table `123_table` (i int, 1p int) partitioned by (2j int);
+create table `123_table` (i int, 1p int) partitioned by (2j int) stored as textfile;
 alter table `123_table` add partition (2j=1);
 ====
 ---- QUERY

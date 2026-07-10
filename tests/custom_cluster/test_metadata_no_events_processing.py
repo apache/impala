@@ -35,7 +35,8 @@ class TestMetadataNoEventsProcessing(CustomClusterTestSuite):
     """
     tbl = unique_database + "." + "test"
     self.client.execute(
-      "create table {0} (c1 int) partitioned by (year int, month int)".format(tbl))
+      "create table {0} (c1 int) partitioned by (year int, month int)"
+      " stored as textfile".format(tbl))
     # create 3 partitions and load data in them.
     self.client.execute("insert into table {0} partition (year, month)"
       "values (100, 2009, 1), (200, 2009, 2), (300, 2009, 3)".format(tbl))
@@ -81,7 +82,7 @@ class TestMetadataNoEventsProcessing(CustomClusterTestSuite):
     assert len(result) == 4
 
     # case2: change the partition to a different file-format, note that the table's
-    # file-format is text.
+    # file-format is textfile (explicitly set).
     # add another test partition. It should use the default file-format from the table.
     self.execute_query("alter table {0} add partition (year=2020, month=9)".format(tbl))
     # change the partition file-format from hive

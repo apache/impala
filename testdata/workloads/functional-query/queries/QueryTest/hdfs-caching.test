@@ -3,7 +3,7 @@
 use cachedb
 ====
 ---- QUERY
-create table cached_tbl_nopart (i int) cached in 'testPool'
+create table cached_tbl_nopart (i int) stored as textfile cached in 'testPool'
 ====
 ---- QUERY
 insert into cached_tbl_nopart select 1
@@ -52,7 +52,7 @@ BIGINT, BIGINT, STRING, STRING, STRING, STRING, STRING, STRING, STRING
 drop table if exists cached_tbl_part
 ====
 ---- QUERY
-create table cached_tbl_part (i int) partitioned by (j int) cached in 'testPool' with replication = 9
+create table cached_tbl_part (i int) partitioned by (j int) stored as textfile cached in 'testPool' with replication = 9
 ====
 ---- QUERY
 # new partition should inherit the cached property
@@ -79,7 +79,7 @@ STRING, BIGINT, BIGINT, STRING, STRING, STRING, STRING, STRING, STRING, STRING
 drop table if exists cached_tbl_part
 ====
 ---- QUERY
-create table cached_tbl_part (i int) partitioned by (j int) cached in 'testPool'
+create table cached_tbl_part (i int) partitioned by (j int) stored as textfile cached in 'testPool'
 ====
 ---- QUERY
 # new partition should inherit the cached property
@@ -339,7 +339,7 @@ STRING, BIGINT, BIGINT, STRING, STRING, STRING, STRING, STRING, STRING, STRING
 ---- QUERY
 # Create a table which resides on the local file system
 create table uncached_tbl_local(i int)
-location 'file://$IMPALA_HOME/testdata/data/uncached_tbl_local'
+stored as textfile location 'file://$IMPALA_HOME/testdata/data/uncached_tbl_local'
 ====
 ---- QUERY
 # Turning on caching should fail for this table
@@ -349,7 +349,7 @@ Table cachedb.uncached_tbl_local cannot be cached. Please check if the table or 
 ====
 ---- QUERY
 # Create a new table on HDFS
-create table cached_tbl_local(i int) partitioned by (j int)
+create table cached_tbl_local(i int) partitioned by (j int) stored as textfile
 ====
 ---- QUERY
 # Add a partition which resides on the local filesystem

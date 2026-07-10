@@ -143,9 +143,9 @@ alter table p1 add partition (j=2,k="F");
 show partitions p1
 ---- RESULTS
 'NULL','g',-1,0,regex:.+,regex:.+,regex:.+,regex:.+,regex:.+,regex:.*/test-warehouse/.+/p1/j=__HIVE_DEFAULT_PARTITION__/k=g,'$ERASURECODE_POLICY'
-'2','D',-1,0,regex:.+,regex:.+,regex:.+,'TEXT',regex:.+,regex:.*/test-warehouse/.+/p1/j=2/k=D,'$ERASURECODE_POLICY'
-'2','E',-1,0,regex:.+,regex:.+,regex:.+,'TEXT',regex:.+,regex:.*/test-warehouse/.+/p1/j=2/k=E,'$ERASURECODE_POLICY'
-'2','F',-1,0,regex:.+,regex:.+,regex:.+,'TEXT',regex:.+,regex:.*/test-warehouse/.+/p1/j=2/k=F,'$ERASURECODE_POLICY'
+'2','D',-1,0,regex:.+,regex:.+,regex:.+,'PARQUET',regex:.+,regex:.*/test-warehouse/.+/p1/j=2/k=D,'$ERASURECODE_POLICY'
+'2','E',-1,0,regex:.+,regex:.+,regex:.+,'PARQUET',regex:.+,regex:.*/test-warehouse/.+/p1/j=2/k=E,'$ERASURECODE_POLICY'
+'2','F',-1,0,regex:.+,regex:.+,regex:.+,'PARQUET',regex:.+,regex:.*/test-warehouse/.+/p1/j=2/k=F,'$ERASURECODE_POLICY'
 '2','d',-1,0,regex:.+,regex:.+,regex:.+,'PARQUET',regex:.+,regex:.*/test-warehouse/.+/p1/j=2/k=d,'$ERASURECODE_POLICY'
 '2','e',-1,0,regex:.+,regex:.+,regex:.+,'PARQUET',regex:.+,regex:.*/test-warehouse/.+/p1/j=2/k=e,'$ERASURECODE_POLICY'
 '2','f',-1,0,regex:.+,regex:.+,regex:.+,'PARQUET',regex:.+,regex:.*/test-warehouse/.+/p1/j=2/k=f,'$ERASURECODE_POLICY'
@@ -163,9 +163,9 @@ alter table p1 partition (j=100) set location '$FILESYSTEM_PREFIX/test-warehouse
 show partitions p1
 ---- RESULTS
 'NULL','g',-1,0,regex:.+,regex:.+,regex:.+,regex:.+,regex:.+,regex:.*/test-warehouse/.+/p1/j=__HIVE_DEFAULT_PARTITION__/k=g,'$ERASURECODE_POLICY'
-'2','D',-1,0,regex:.+,regex:.+,regex:.+,'TEXT',regex:.+,regex:.*/test-warehouse/.+/p1/j=2/k=D,'$ERASURECODE_POLICY'
-'2','E',-1,0,regex:.+,regex:.+,regex:.+,'TEXT',regex:.+,regex:.*/test-warehouse/.+/p1/j=2/k=E,'$ERASURECODE_POLICY'
-'2','F',-1,0,regex:.+,regex:.+,regex:.+,'TEXT',regex:.+,regex:.*/test-warehouse/.+/p1/j=2/k=F,'$ERASURECODE_POLICY'
+'2','D',-1,0,regex:.+,regex:.+,regex:.+,'PARQUET',regex:.+,regex:.*/test-warehouse/.+/p1/j=2/k=D,'$ERASURECODE_POLICY'
+'2','E',-1,0,regex:.+,regex:.+,regex:.+,'PARQUET',regex:.+,regex:.*/test-warehouse/.+/p1/j=2/k=E,'$ERASURECODE_POLICY'
+'2','F',-1,0,regex:.+,regex:.+,regex:.+,'PARQUET',regex:.+,regex:.*/test-warehouse/.+/p1/j=2/k=F,'$ERASURECODE_POLICY'
 '2','d',-1,0,regex:.+,regex:.+,regex:.+,'PARQUET',regex:.+,regex:.*/test-warehouse/.+/p1/j=2/k=d,'$ERASURECODE_POLICY'
 '2','e',-1,0,regex:.+,regex:.+,regex:.+,'PARQUET',regex:.+,regex:.*/test-warehouse/.+/p1/j=2/k=e,'$ERASURECODE_POLICY'
 '2','f',-1,0,regex:.+,regex:.+,regex:.+,'PARQUET',regex:.+,regex:.*/test-warehouse/.+/p1/j=2/k=f,'$ERASURECODE_POLICY'

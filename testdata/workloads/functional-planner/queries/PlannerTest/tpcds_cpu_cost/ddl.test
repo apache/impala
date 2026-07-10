@@ -1,5 +1,5 @@
 # Some of tests here are copied from ../ddl.test
-create table t as select * from functional.alltypes
+create table t stored as textfile as select * from functional.alltypes
 ---- PLAN
 Max Per-Host Resource Reservation: Memory=32.00KB Threads=1
 Per-Host Resource Estimates: Memory=16MB
@@ -51,7 +51,7 @@ max-parallelism=10 segment-costs=[62944]
    tuple-ids=0 row-size=89B cardinality=7.30K cost=17343
    in pipelines: 00(GETNEXT)
 ====
-create table t as
+create table t stored as textfile as
 select distinct a.int_col, a.string_col from functional.alltypes a
 inner join functional.alltypessmall b on (a.id = b.id)
 where a.year = 2009 and b.month = 2
@@ -187,7 +187,7 @@ max-parallelism=10 segment-costs=[9666, 20] cpu-comparison-result=11 [max(10 (se
    in pipelines: 00(GETNEXT)
 ====
 # CTAS with a view that has a limit clause (IMPALA-1411)
-create table t as
+create table t stored as textfile as
 select int_col from functional.hive_view
 ---- PLAN
 Max Per-Host Resource Reservation: Memory=32.00KB Threads=1
@@ -244,7 +244,7 @@ max-parallelism=10 segment-costs=[17343]
    in pipelines: 00(GETNEXT)
 ====
 # CTAS with multiple nested inline views that have a limit clause (IMPALA-1411)
-create table t as
+create table t stored as textfile as
 select * from
   (select * from
      (select int_col from functional.alltypestiny limit 1) v1 ) v2
@@ -304,7 +304,7 @@ max-parallelism=4 segment-costs=[16]
 ====
 
 # CTAS with a select statement that has a limit and offset clause (IMPALA-1411)
-create table t as
+create table t stored as textfile as
 select * from functional.alltypestiny order by id limit 1 offset 5
 ---- PLAN
 Max Per-Host Resource Reservation: Memory=8.00KB Threads=1
@@ -373,7 +373,7 @@ max-parallelism=4 segment-costs=[29, 0]
    in pipelines: 00(GETNEXT)
 ====
 # CTAS with an inline view that has a limit and offset clause (IMPALA-1411)
-create table t as
+create table t stored as textfile as
 select * from
   (select int_col from functional.alltypestiny order by id limit 2 offset 5) v
 ---- PLAN
@@ -443,7 +443,7 @@ max-parallelism=4 segment-costs=[29, 0]
    in pipelines: 00(GETNEXT)
 ====
 # CTAS with sort columns
-create table t sort by (int_col, bool_col) as
+create table t sort by (int_col, bool_col) stored as textfile as
 select * from functional.alltypes
 ---- PLAN
 Max Per-Host Resource Reservation: Memory=12.03MB Threads=1
@@ -509,7 +509,7 @@ max-parallelism=10 segment-costs=[62944]
    in pipelines: 00(GETNEXT)
 ====
 # CTAS with partitions and sort columns
-create table t partitioned by (year, month) sort by (int_col, bool_col) as
+create table t partitioned by (year, month) sort by (int_col, bool_col) stored as textfile as
 select * from functional.alltypes
 ---- PLAN
 Max Per-Host Resource Reservation: Memory=12.03MB Threads=1
@@ -580,7 +580,7 @@ max-parallelism=10 segment-costs=[62944]
 # noshuffle hint would lead to a different plan.
 # Note that noclustered hint is added to ensure consistent plans on Impala 2.x and 3.x,
 # because IMPALA-5293 changed clustered to be the default on 3.x.
-create /*+ noclustered */table t partitioned by (year, month) as
+create /*+ noclustered */table t partitioned by (year, month) stored as textfile as
 select * from functional.alltypes
 ---- DISTRIBUTEDPLAN
 Max Per-Host Resource Reservation: Memory=32.00KB Threads=2
@@ -617,7 +617,7 @@ max-parallelism=10 segment-costs=[62944]
 # in insert.test.
 # Note that noclustered hint is added to ensure consistent plans on Impala 2.x and 3.x,
 # because IMPALA-5293 changed clustered to be the default on 3.x.
-create /*+ noshuffle, noclustered */ table t partitioned by (year, month) as
+create /*+ noshuffle, noclustered */ table t partitioned by (year, month) stored as textfile as
 select * from functional.alltypes
 ---- DISTRIBUTEDPLAN
 Max Per-Host Resource Reservation: Memory=32.00KB Threads=2
@@ -650,7 +650,7 @@ max-parallelism=10 segment-costs=[62944]
    in pipelines: 00(GETNEXT)
 ====
 # CTAS with more complex select query
-create table t partitioned by (c_nationkey) sort by (c_custkey) as
+create table t partitioned by (c_nationkey) sort by (c_custkey) stored as textfile as
 select c_custkey, max(o_totalprice) as maxprice, c_nationkey
   from tpch.orders join tpch.customer on c_custkey = o_custkey
  where c_nationkey < 10

@@ -909,8 +909,9 @@ class TestDdlStatements(TestDdlBase):
   def test_alter_tbl_properties_reload(self, unique_database):
     # IMPALA-8734: Force a table schema reload when setting table properties.
     tbl_name = "test_tbl"
-    self.execute_query_expect_success(self.client, "create table {0}.{1} (c1 string)"
-                                      .format(unique_database, tbl_name))
+    self.execute_query_expect_success(self.client,
+                                      "create table {0}.{1} (c1 string) stored as "
+                                      "textfile".format(unique_database, tbl_name))
     self.filesystem_client.create_file("{2}/{0}.db/{1}/f".
                                        format(unique_database, tbl_name, WAREHOUSE),
                                        file_data="\nfoo\n")
@@ -936,13 +937,13 @@ class TestDdlStatements(TestDdlBase):
 
   def test_create_table_file_format(self, unique_database):
     # When default_file_format query option is not specified, the default table file
-    # format is TEXT.
-    text_table = "{0}.text_tbl".format(unique_database)
+    # format is PARQUET.
+    parquet_default_table = "{0}.parquet_default_tbl".format(unique_database)
     self.execute_query_expect_success(
-        self.client, "create table {0}(i int)".format(text_table))
+        self.client, "create table {0}(i int)".format(parquet_default_table))
     result = self.execute_query_expect_success(
-        self.client, "show create table {0}".format(text_table))
-    assert any("TEXTFILE" in x for x in result.data)
+        self.client, "show create table {0}".format(parquet_default_table))
+    assert any("PARQUET" in x for x in result.data)
 
     self.execute_query_expect_failure(
         self.client, "create table {0}.foobar_tbl".format(unique_database),

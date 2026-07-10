@@ -1141,7 +1141,7 @@ public class AnalyzeDDLTest extends FrontendTestBase {
     String tmpTableName =
         QueryStringBuilder.createTmpTableName("functional", "tmp_table");
     AnalyzesOk("create table " + tmpTableName + " (id int) with serdeproperties(" +
-        "'serialization.encoding'='GBK')");
+        "'serialization.encoding'='GBK') stored as textfile");
 
     String [] unsupportedFileFormatDbs =
       {"functional_parquet", "functional_rc", "functional_avro"};
@@ -1182,11 +1182,11 @@ public class AnalyzeDDLTest extends FrontendTestBase {
         "'serialization.encoding'='NonexistentEncoding')",
         "Unsupported encoding: NonexistentEncoding.");
     AnalysisError("create table " + tmpTableName + " (id int) with serdeproperties(" +
-        "'serialization.encoding'='UTF-16')",
+        "'serialization.encoding'='UTF-16') stored as textfile",
         "Property 'serialization.encoding' only supports encodings in which line " +
         "delimiter is compatible with ASCII.");
     AnalysisError("create table " + tmpTableName + " (id int) with serdeproperties(" +
-        "'serialization.encoding'='NonexistentEncoding')",
+        "'serialization.encoding'='NonexistentEncoding') stored as textfile",
         "Unsupported encoding: NonexistentEncoding.");
 
     // Numeric table stats properties validation
@@ -3115,20 +3115,21 @@ public class AnalyzeDDLTest extends FrontendTestBase {
     // IMPALA-2251: it should not be possible to create text tables with the same
     // delimiter character used for multiple purposes.
     AnalysisError("create table functional.broken_text_table (c int) " +
-        "row format delimited fields terminated by '\001' lines terminated by '\001'",
+        "row format delimited fields terminated by '\001' lines terminated by '\001' " +
+        "stored as textfile",
         "Field delimiter and line delimiter have same value: byte 1");
     AnalysisError("create table functional.broken_text_table (c int) " +
-         "row format delimited lines terminated by '\001'",
+         "row format delimited lines terminated by '\001' stored as textfile",
         "Field delimiter and line delimiter have same value: byte 1");
     AnalysisError("create table functional.broken_text_table (c int) " +
-        "row format delimited fields terminated by '\012'",
+        "row format delimited fields terminated by '\012' stored as textfile",
         "Field delimiter and line delimiter have same value: byte 10");
     AnalyzesOk("create table functional.broken_text_table (c int) " +
-        "row format delimited escaped by '\001'",
+        "row format delimited escaped by '\001' stored as textfile",
         "Field delimiter and escape character have same value: byte 1. " +
         "Escape character will be ignored");
     AnalyzesOk("create table functional.broken_text_table (c int) " +
-        "row format delimited escaped by 'x' lines terminated by 'x'",
+        "row format delimited escaped by 'x' lines terminated by 'x' stored as textfile",
         "Line delimiter and escape character have same value: byte 120. " +
         "Escape character will be ignored");
 

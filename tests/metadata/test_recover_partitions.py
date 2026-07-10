@@ -73,7 +73,8 @@ class TestRecoverPartitions(ImpalaTestSuite):
     NULL_INSERTED_VALUE = "4"
 
     self.execute_query_expect_success(self.client,
-        "CREATE TABLE %s (c int) PARTITIONED BY (i int, p string)" % (FQ_TBL_NAME))
+        "CREATE TABLE %s (c int) PARTITIONED BY (i int, p string) "
+        "STORED AS TEXTFILE" % (FQ_TBL_NAME))
     self.execute_query_expect_success(self.client,
         "INSERT INTO TABLE %s PARTITION(i=1, p='p1') VALUES(1)" % (FQ_TBL_NAME))
 
@@ -138,7 +139,8 @@ class TestRecoverPartitions(ImpalaTestSuite):
     INSERTED_VALUE = "4"
 
     self.execute_query_expect_success(self.client,
-        "CREATE TABLE %s (c int) PARTITIONED BY (i int, p string)" % FQ_TBL_NAME)
+        "CREATE TABLE %s (c int) PARTITIONED BY (i int, p string) "
+        "STORED AS TEXTFILE" % FQ_TBL_NAME)
     self.execute_query_expect_success(self.client,
         "INSERT INTO TABLE %s PARTITION(i=1, p='p1') VALUES(1)" % FQ_TBL_NAME)
 
@@ -173,7 +175,8 @@ class TestRecoverPartitions(ImpalaTestSuite):
     DB_LOCATION = '%s/%s.db/' % (WAREHOUSE, unique_database)
 
     self.execute_query_expect_success(self.client,
-        "CREATE TABLE %s (c int) PARTITIONED BY (s string)" % (FQ_TBL_NAME))
+        "CREATE TABLE %s (c int) PARTITIONED BY (s string) "
+        "STORED AS TEXTFILE" % (FQ_TBL_NAME))
 
     # Create 700 partitions externally
     try:
@@ -217,7 +220,8 @@ class TestRecoverPartitions(ImpalaTestSuite):
     FILE_PATH = "test"
 
     self.execute_query_expect_success(self.client,
-        "CREATE TABLE %s (c int) PARTITIONED BY (i int, p string)" % FQ_TBL_NAME)
+        "CREATE TABLE %s (c int) PARTITIONED BY (i int, p string) "
+        "STORED AS TEXTFILE" % FQ_TBL_NAME)
     self.execute_query_expect_success(self.client,
         "INSERT INTO TABLE %s PARTITION(i=1, p='p1') VALUES(1)" % FQ_TBL_NAME)
 
@@ -268,7 +272,8 @@ class TestRecoverPartitions(ImpalaTestSuite):
     INSERTED_VALUE = "2"
 
     self.execute_query_expect_success(self.client,
-        "CREATE TABLE %s (c int) PARTITIONED BY (i int, p string)" % FQ_TBL_NAME)
+        "CREATE TABLE %s (c int) PARTITIONED BY (i int, p string) "
+        "STORED AS TEXTFILE" % FQ_TBL_NAME)
     self.execute_query_expect_success(self.client,
         "INSERT INTO TABLE %s PARTITION(i=1, p='p1') VALUES(1)" % FQ_TBL_NAME)
 
@@ -311,6 +316,7 @@ class TestRecoverPartitions(ImpalaTestSuite):
     self.execute_query_expect_success(self.client,
         "CREATE TABLE %s (i INT) PARTITIONED BY (a TINYINT, b SMALLINT, c INT, d BIGINT,"
         " e DECIMAL(4,2), f FLOAT, g DOUBLE, j CHAR(5), k VARCHAR(6), s STRING)"
+        " STORED AS TEXTFILE"
         % FQ_TBL_NAME)
     self.execute_query_expect_success(self.client,
         "INSERT INTO TABLE %s PARTITION(a=1, b=2, c=3, d=4, e=55.55, f=6.6, g=7.7, "
@@ -349,7 +355,8 @@ class TestRecoverPartitions(ImpalaTestSuite):
     FQ_TBL_NAME = unique_database + "." + TBL_NAME
 
     self.execute_query_expect_success(
-      self.client, "CREATE TABLE %s (s string) PARTITIONED BY (p string)" % FQ_TBL_NAME)
+      self.client, "CREATE TABLE %s (s string) PARTITIONED BY (p string)"
+      " STORED AS TEXTFILE" % FQ_TBL_NAME)
     self.execute_query_expect_success(
       self.client, "ALTER TABLE %s ADD PARTITION (p='100%%')" % FQ_TBL_NAME)
 
@@ -376,7 +383,8 @@ class TestRecoverPartitions(ImpalaTestSuite):
     tbl_location = self.__get_fs_location(unique_database, tbl_name)
 
     self.execute_query_expect_success(
-        self.client, "CREATE TABLE %s (i int) PARTITIONED BY (p string)" % fq_tbl_name)
+        self.client, "CREATE TABLE %s (i int) PARTITIONED BY (p string)"
+        " STORED AS TEXTFILE" % fq_tbl_name)
     parts = ["\'", "\"", "\\\'", "\\\"", "\\\\\'", "\\\\\""]
     for i in range(len(parts)):
       # When creating partition directories, Hive replaces special characters in
@@ -400,7 +408,8 @@ class TestRecoverPartitions(ImpalaTestSuite):
     TBL_LOCATION = self.__get_fs_location(unique_database, TBL_NAME)
 
     self.execute_query_expect_success(self.client,
-        "CREATE TABLE %s (c int) PARTITIONED BY (i int, s string)" % (FQ_TBL_NAME))
+        "CREATE TABLE %s (c int) PARTITIONED BY (i int, s string)"
+        " STORED AS TEXTFILE" % (FQ_TBL_NAME))
 
     # Adds partition directories.
     num_partitions = 10

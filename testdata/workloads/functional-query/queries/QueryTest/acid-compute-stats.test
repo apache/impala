@@ -2,7 +2,7 @@
 ---- QUERY
 # Test unpartitioned table.
 set DEFAULT_TRANSACTIONAL_TYPE=insert_only;
-create table tt (i int);
+create table tt (i int) stored as textfile;
 insert into tt values (1);
 compute stats tt;
 ====
@@ -27,7 +27,7 @@ STRING, STRING, BIGINT, BIGINT, BIGINT, DOUBLE, BIGINT, BIGINT
 ---- QUERY
 # Test partitioned table with non-incremental stats.
 set DEFAULT_TRANSACTIONAL_TYPE=insert_only;
-create table pt (x int) partitioned by (p int);
+create table pt (x int) partitioned by (p int) stored as textfile;
 insert into pt partition (p=1) values (1);
 compute stats pt;
 ====
@@ -67,7 +67,7 @@ STRING, BIGINT, BIGINT, STRING, STRING, STRING, STRING, STRING, STRING, STRING
 # recreated instead.
 set DEFAULT_TRANSACTIONAL_TYPE=insert_only;
 drop table pt;
-create table pt (x int) partitioned by (p int);
+create table pt (x int) partitioned by (p int) stored as textfile;
 insert into pt partition (p=1) values (1);
 compute incremental stats pt;
 ====

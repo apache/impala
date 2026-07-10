@@ -240,7 +240,7 @@ class TestTimestampErrors(TestDataErrors):
         v.get_value('table_format').file_format == 'text')
 
   def _setup_test_table(self, fq_tbl_name):
-    create_stmt = "CREATE TABLE " + fq_tbl_name + " (col string)"
+    create_stmt = "CREATE TABLE " + fq_tbl_name + " (col string) STORED AS TEXTFILE"
     insert_stmt = "INSERT INTO TABLE " + fq_tbl_name + " values" + \
         "('1999-03-24 07:21:02'), ('2001-ån-02 12:12:15')," + \
         "('1997-1131 02:09:32'), ('1954-12-03 15:10:02')," + \

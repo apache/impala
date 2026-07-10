@@ -422,7 +422,7 @@ struct TQueryOptions {
 
   // See comment in ImpalaService.thrift.
   79: optional CatalogObjects.THdfsFileFormat default_file_format =
-      CatalogObjects.THdfsFileFormat.TEXT;
+      CatalogObjects.THdfsFileFormat.PARQUET;
 
   // See comment in ImpalaService.thrift.
   80: optional TParquetTimestampType parquet_timestamp_type =

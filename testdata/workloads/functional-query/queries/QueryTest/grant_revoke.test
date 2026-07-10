@@ -291,7 +291,8 @@ STRING
 ====
 ---- QUERY
 # IMPALA-1670: User does not have privileges to access URI when adding partitions
-create table grant_rev_db.test_tbl_partitioned(i int) partitioned by (j int);
+create table grant_rev_db.test_tbl_partitioned(i int) partitioned by (j int)
+stored as textfile;
 alter table grant_rev_db.test_tbl_partitioned add
 partition (j=1)
 partition (j=2) location '$FILESYSTEM_PREFIX/test-warehouse/grant_rev_test_prt';

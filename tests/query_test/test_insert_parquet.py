@@ -756,8 +756,8 @@ class TestHdfsParquetTableStatsWriter(ImpalaTestSuite):
     table_name = "test_char_types"
     qualified_table_name = "{0}.{1}".format(unique_database, table_name)
 
-    create_table_stmt = "create table {0} (c3 char(3), vc varchar, st string);".format(
-        qualified_table_name)
+    create_table_stmt = ("create table {0} (c3 char(3), vc varchar, st string)"
+        " stored as textfile;").format(qualified_table_name)
     self.execute_query(create_table_stmt)
 
     insert_stmt = """insert into {0} values
@@ -840,8 +840,8 @@ class TestHdfsParquetTableStatsWriter(ImpalaTestSuite):
     table_name = "test_float_infinity"
     qualified_table_name = "{0}.{1}".format(unique_database, table_name)
 
-    create_table_stmt = "create table {0} (f float, d double);".format(
-        qualified_table_name)
+    create_table_stmt = ("create table {0} (f float, d double)"
+        " stored as textfile;").format(qualified_table_name)
     self.execute_query(create_table_stmt)
 
     insert_stmt = """insert into {0} values
@@ -880,7 +880,8 @@ class TestHdfsParquetTableStatsWriter(ImpalaTestSuite):
     table_name = "int96_nanos"
     qualified_table_name = "{0}.{1}".format(unique_database, table_name)
 
-    create_table_stmt = "create table {0} (ts timestamp);".format(qualified_table_name)
+    create_table_stmt = "create table {0} (ts timestamp) stored as textfile;".format(
+        qualified_table_name)
     self.execute_query(create_table_stmt)
 
     insert_stmt = """insert into {0} values

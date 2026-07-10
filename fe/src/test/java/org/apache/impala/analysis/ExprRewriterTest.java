@@ -333,10 +333,10 @@ public class ExprRewriterTest extends AnalyzerTest {
     assertToSql(ctx,
         "create table ctas_test as select 1 + 1",
         "CREATE TABLE default.ctas_test\n" +
-        "STORED AS TEXTFILE\n" +
+        "STORED AS PARQUET\n" +
         " AS SELECT 1 + 1",
         "CREATE TABLE default.ctas_test\n" +
-        "STORED AS TEXTFILE\n" +
+        "STORED AS PARQUET\n" +
         " AS SELECT 2");
 
     //--------------------

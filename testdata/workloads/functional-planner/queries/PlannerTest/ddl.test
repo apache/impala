@@ -1,4 +1,4 @@
-create table t as select * from functional.alltypes
+create table t stored as textfile as select * from functional.alltypes
 ---- PLAN
 WRITE TO HDFS [default.t, OVERWRITE=false]
 |  partitions=1
@@ -14,7 +14,7 @@ WRITE TO HDFS [default.t, OVERWRITE=false]
    partitions=24/24 files=24 size=478.45KB
    row-size=89B cardinality=7.30K
 ====
-create table t as
+create table t stored as textfile as
 select distinct a.int_col, a.string_col from functional.alltypes a
 inner join functional.alltypessmall b on (a.id = b.id)
 where a.year = 2009 and b.month = 2
@@ -74,7 +74,7 @@ WRITE TO HDFS [default.t, OVERWRITE=false]
    row-size=21B cardinality=3.65K
 ====
 # CTAS with a view that has a limit clause (IMPALA-1411)
-create table t as
+create table t stored as textfile as
 select int_col from functional.hive_view
 ---- PLAN
 WRITE TO HDFS [default.t, OVERWRITE=false]
@@ -97,7 +97,7 @@ WRITE TO HDFS [default.t, OVERWRITE=false]
    row-size=0B cardinality=1
 ====
 # CTAS with multiple nested inline views that have a limit clause (IMPALA-1411)
-create table t as
+create table t stored as textfile as
 select * from
   (select * from
      (select int_col from functional.alltypestiny limit 1) v1 ) v2
@@ -123,7 +123,7 @@ WRITE TO HDFS [default.t, OVERWRITE=false]
 ====
 
 # CTAS with a select statement that has a limit and offset clause (IMPALA-1411)
-create table t as
+create table t stored as textfile as
 select * from functional.alltypestiny order by id limit 1 offset 5
 ---- PLAN
 WRITE TO HDFS [default.t, OVERWRITE=false]
@@ -154,7 +154,7 @@ WRITE TO HDFS [default.t, OVERWRITE=false]
    row-size=89B cardinality=8
 ====
 # CTAS with an inline view that has a limit and offset clause (IMPALA-1411)
-create table t as
+create table t stored as textfile as
 select * from
   (select int_col from functional.alltypestiny order by id limit 2 offset 5) v
 ---- PLAN
@@ -186,7 +186,7 @@ WRITE TO HDFS [default.t, OVERWRITE=false]
    row-size=8B cardinality=8
 ====
 # CTAS with sort columns
-create table t sort by (int_col, bool_col) as
+create table t sort by (int_col, bool_col) stored as textfile as
 select * from functional.alltypes
 ---- PLAN
 WRITE TO HDFS [default.t, OVERWRITE=false]
@@ -212,7 +212,7 @@ WRITE TO HDFS [default.t, OVERWRITE=false]
    row-size=89B cardinality=7.30K
 ====
 # CTAS with partitions and sort columns
-create table t partitioned by (year, month) sort by (int_col, bool_col) as
+create table t partitioned by (year, month) sort by (int_col, bool_col) stored as textfile as
 select * from functional.alltypes
 ---- PLAN
 WRITE TO HDFS [default.t, OVERWRITE=false, PARTITION-KEYS=(year,month)]
@@ -245,7 +245,7 @@ WRITE TO HDFS [default.t, OVERWRITE=false, PARTITION-KEYS=(year,month)]
 # noshuffle hint would lead to a different plan.
 # Note that noclustered hint is added to ensure consistent plans on Impala 2.x and 3.x,
 # because IMPALA-5293 changed clustered to be the default on 3.x.
-create /*+ noclustered */table t partitioned by (year, month) as
+create /*+ noclustered */table t partitioned by (year, month) stored as textfile as
 select * from functional.alltypes
 ---- DISTRIBUTEDPLAN
 WRITE TO HDFS [default.t, OVERWRITE=false, PARTITION-KEYS=(functional.alltypes.year,functional.alltypes.month)]
@@ -262,7 +262,7 @@ WRITE TO HDFS [default.t, OVERWRITE=false, PARTITION-KEYS=(functional.alltypes.y
 # in insert.test.
 # Note that noclustered hint is added to ensure consistent plans on Impala 2.x and 3.x,
 # because IMPALA-5293 changed clustered to be the default on 3.x.
-create /*+ noshuffle, noclustered */ table t partitioned by (year, month) as
+create /*+ noshuffle, noclustered */ table t partitioned by (year, month) stored as textfile as
 select * from functional.alltypes
 ---- DISTRIBUTEDPLAN
 WRITE TO HDFS [default.t, OVERWRITE=false, PARTITION-KEYS=(functional.alltypes.year,functional.alltypes.month)]
@@ -273,7 +273,7 @@ WRITE TO HDFS [default.t, OVERWRITE=false, PARTITION-KEYS=(functional.alltypes.y
    row-size=89B cardinality=7.30K
 ====
 # CTAS with more complex select query
-create table t partitioned by (c_nationkey) sort by (c_custkey) as
+create table t partitioned by (c_nationkey) sort by (c_custkey) stored as textfile as
 select c_custkey, max(o_totalprice) as maxprice, c_nationkey
   from tpch.orders join tpch.customer on c_custkey = o_custkey
  where c_nationkey < 10

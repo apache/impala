@@ -158,7 +158,7 @@ COLUMN, TYPE, #DISTINCT VALUES, #NULLS, MAX SIZE, AVG SIZE, #TRUES, #FALSES
 STRING, STRING, BIGINT, BIGINT, BIGINT, DOUBLE, BIGINT, BIGINT
 ====
 ---- QUERY
-create table incremental_empty_partitioned (i int) partitioned by (j int);
+create table incremental_empty_partitioned (i int) partitioned by (j int) stored as textfile;
 alter table incremental_empty_partitioned add partition (j=1);
 ====
 ---- QUERY
@@ -365,7 +365,8 @@ STRING, STRING, BIGINT, BIGINT, STRING, STRING, STRING, STRING, STRING, STRING, 
 ---- QUERY
 # Test that many partition keys work correctly
 create table incremental_many_part_keys(col int)
-partitioned by (p1 int, p2 int, p3 int, p4 int, p5 int, p6 int);
+partitioned by (p1 int, p2 int, p3 int, p4 int, p5 int, p6 int)
+stored as textfile;
 insert into incremental_many_part_keys
 partition(p1=1, p2=2, p3=3, p4=4, p5=5, p6=6) values(1);
 ====
@@ -379,7 +380,7 @@ show table stats incremental_many_part_keys;
 STRING, STRING, STRING, STRING, STRING, STRING, BIGINT, BIGINT, STRING, STRING, STRING, STRING, STRING, STRING, STRING
 ====
 ---- QUERY
-create table incremental_null_part_key(col int) partitioned by (p int);
+create table incremental_null_part_key(col int) partitioned by (p int) stored as textfile;
 insert into incremental_null_part_key partition(p) values(1,NULL), (1,2);
 compute incremental stats incremental_null_part_key partition(p=2);
 ====
@@ -396,7 +397,8 @@ STRING, BIGINT, BIGINT, STRING, STRING, STRING, STRING, STRING, STRING, STRING
 ---- QUERY
 # Check that incremental stats queries handle partitions with keyword names
 create table incremental_keyword_part_key(col int)
-partitioned by (`date` int, `table` string);
+partitioned by (`date` int, `table` string)
+stored as textfile;
 insert into incremental_keyword_part_key
 partition(`date`=1, `table`='a') values(2);
 compute incremental stats incremental_keyword_part_key
@@ -439,7 +441,7 @@ STRING, STRING, BIGINT, BIGINT, STRING, STRING, STRING, STRING, STRING, STRING, 
 ====
 ---- QUERY
 create table incremental_string_part_value(col int) partitioned by
-(p string);
+(p string) stored as textfile;
 insert into incremental_string_part_value partition(p="test_string")
 values(2);
 compute incremental stats incremental_string_part_value
@@ -454,7 +456,7 @@ STRING, BIGINT, BIGINT, STRING, STRING, STRING, STRING, STRING, STRING, STRING
 ---- QUERY
 # Check that dropping a column still allows stats to be computed
 create table incremental_drop_column (a int, b int, c int)
-partitioned by (d int);
+partitioned by (d int) stored as textfile;
 alter table incremental_drop_column add partition (d=1);
 insert into incremental_drop_column partition(d=1) values (4,4,4);
 compute incremental stats incremental_drop_column;
@@ -470,7 +472,7 @@ STRING, BIGINT, BIGINT, STRING, STRING, STRING, STRING, STRING, STRING, STRING
 ====
 ---- QUERY
 # Check that adding a column invalidates all incremental stats
-create table incremental_add_column (col int) partitioned by (p int);
+create table incremental_add_column (col int) partitioned by (p int) stored as textfile;
 insert into incremental_add_column partition(p) values(1,1),(2,2);
 compute incremental stats incremental_add_column;
 insert into incremental_add_column partition(p) values(1,1);
@@ -485,7 +487,7 @@ show table stats incremental_add_column;
 STRING, BIGINT, BIGINT, STRING, STRING, STRING, STRING, STRING, STRING, STRING
 ====
 ---- QUERY
-create table incremental_no_partitions (col int) partitioned by (p int);
+create table incremental_no_partitions (col int) partitioned by (p int) stored as textfile;
 compute incremental stats incremental_no_partitions;
 show table stats incremental_no_partitions;
 ---- RESULTS
@@ -494,7 +496,7 @@ show table stats incremental_no_partitions;
 STRING, BIGINT, BIGINT, STRING, STRING, STRING, STRING, STRING, STRING, STRING
 ====
 ---- QUERY
-create table incremental_not_partitioned (col int);
+create table incremental_not_partitioned (col int) stored as textfile;
 insert into incremental_not_partitioned values(1),(2);
 compute incremental stats incremental_not_partitioned;
 show table stats incremental_not_partitioned;

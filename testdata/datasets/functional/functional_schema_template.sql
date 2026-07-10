@@ -2387,6 +2387,7 @@ parent_table
 CREATE EXTERNAL TABLE IF NOT EXISTS {db_name}{db_suffix}.{table_name} (
 id INT, year string, primary key(id, year) DISABLE NOVALIDATE RELY)
 row format delimited fields terminated by ','
+STORED AS TEXTFILE
 LOCATION '/test-warehouse/{table_name}';
 ---- ROW_FORMAT
 delimited fields terminated by '',''
@@ -2402,6 +2403,7 @@ parent_table_2
 CREATE EXTERNAL TABLE IF NOT EXISTS {db_name}{db_suffix}.{table_name} (
 a INT, primary key(a) DISABLE NOVALIDATE RELY)
 row format delimited fields terminated by ','
+STORED AS TEXTFILE
 LOCATION '/test-warehouse/{table_name}';
 ---- ROW_FORMAT
 delimited fields terminated by ','
@@ -2420,6 +2422,7 @@ seq int, id int, year string, a int, primary key(seq) DISABLE NOVALIDATE RELY, f
 RELY, foreign key(a) references {db_name}{db_suffix}.parent_table_2(a) DISABLE
 NOVALIDATE RELY)
 row format delimited fields terminated by ','
+STORED AS TEXTFILE
 LOCATION '/test-warehouse/{table_name}';
 ---- ROW_FORMAT
 delimited fields terminated by ','
@@ -2544,6 +2547,7 @@ table_no_newline
 CREATE EXTERNAL TABLE IF NOT EXISTS {db_name}{db_suffix}.{table_name} (
 id INT, col_1 BOOLEAN, col_2 DOUBLE, col_3 TIMESTAMP)
 row format delimited fields terminated by ','
+STORED AS TEXTFILE
 LOCATION '/test-warehouse/{table_name}';
 ---- LOAD
 LOAD DATA LOCAL INPATH '{impala_home}/testdata/data/table_no_newline.csv'
@@ -2558,6 +2562,7 @@ CREATE EXTERNAL TABLE IF NOT EXISTS {db_name}{db_suffix}.{table_name} (
 id INT, col_1 BOOLEAN, col_2 DOUBLE, col_3 TIMESTAMP)
 partitioned by (year INT, month INT)
 row format delimited fields terminated by ','
+STORED AS TEXTFILE
 LOCATION '/test-warehouse/{table_name}';
 ALTER TABLE {db_name}{db_suffix}.{table_name} ADD IF NOT EXISTS PARTITION (year=2015, month=3);
 ALTER TABLE {db_name}{db_suffix}.{table_name} ADD IF NOT EXISTS PARTITION (year=2010, month=3);
@@ -2684,6 +2689,7 @@ testescape_16_lf
 CREATE EXTERNAL TABLE IF NOT EXISTS {db_name}{db_suffix}.{table_name} (
   col string)
 row format delimited fields terminated by ','  escaped by '\\'
+STORED AS TEXTFILE
 LOCATION '/test-warehouse/{table_name}';
 ---- LOAD
 `${IMPALA_HOME}/testdata/common/text_delims_table.py --table_dir '/tmp/testescape_16_lf' --file_len 16 --only_newline
@@ -2696,6 +2702,7 @@ testescape_16_crlf
 CREATE EXTERNAL TABLE IF NOT EXISTS {db_name}{db_suffix}.{table_name} (
   col string)
 row format delimited fields terminated by ','  escaped by '\\'
+STORED AS TEXTFILE
 LOCATION '/test-warehouse/{table_name}';
 ---- LOAD
 `${IMPALA_HOME}/testdata/common/text_delims_table.py --table_dir '/tmp/testescape_16_crlf' --file_len 16
@@ -2708,6 +2715,7 @@ testescape_17_lf
 CREATE EXTERNAL TABLE IF NOT EXISTS {db_name}{db_suffix}.{table_name} (
   col string)
 row format delimited fields terminated by ','  escaped by '\\'
+STORED AS TEXTFILE
 LOCATION '/test-warehouse/{table_name}';
 ---- LOAD
 `${IMPALA_HOME}/testdata/common/text_delims_table.py --table_dir '/tmp/testescape_17_lf' --file_len 17 --only_newline
@@ -2720,6 +2728,7 @@ testescape_17_crlf
 CREATE EXTERNAL TABLE IF NOT EXISTS {db_name}{db_suffix}.{table_name} (
   col string)
 row format delimited fields terminated by ','  escaped by '\\'
+STORED AS TEXTFILE
 LOCATION '/test-warehouse/{table_name}';
 ---- LOAD
 `${IMPALA_HOME}/testdata/common/text_delims_table.py --table_dir '/tmp/testescape_17_crlf' --file_len 17
@@ -2732,6 +2741,7 @@ testescape_32_lf
 CREATE EXTERNAL TABLE IF NOT EXISTS {db_name}{db_suffix}.{table_name} (
   col string)
 row format delimited fields terminated by ','  escaped by '\\'
+STORED AS TEXTFILE
 LOCATION '/test-warehouse/{table_name}';
 ---- LOAD
 `${IMPALA_HOME}/testdata/common/text_delims_table.py --table_dir '/tmp/testescape_32_lf' --file_len 32 --only_newline
@@ -2744,6 +2754,7 @@ testescape_32_crlf
 CREATE EXTERNAL TABLE IF NOT EXISTS {db_name}{db_suffix}.{table_name} (
   col string)
 row format delimited fields terminated by ','  escaped by '\\'
+STORED AS TEXTFILE
 LOCATION '/test-warehouse/{table_name}';
 ---- LOAD
 `${IMPALA_HOME}/testdata/common/text_delims_table.py --table_dir '/tmp/testescape_32_crlf' --file_len 32
@@ -2756,6 +2767,7 @@ alltimezones
 CREATE EXTERNAL TABLE IF NOT EXISTS {db_name}{db_suffix}.{table_name} (
 timezone STRING, utctime TIMESTAMP, localtime TIMESTAMP)
 row format delimited fields terminated by ','
+STORED AS TEXTFILE
 LOCATION '/test-warehouse/{table_name}';
 ---- LOAD
 LOAD DATA LOCAL INPATH '{impala_home}/testdata/data/timezoneverification.csv'

@@ -417,7 +417,7 @@ CREATE TABLE show_create_table_test_db.i_1687_p (
 PARTITIONED BY (
   int_col INT
 )
-STORED AS TEXTFILE
+STORED AS PARQUET
 LOCATION '$$location_uri$$'
 ---- RESULTS-HIVE-3
 CREATE EXTERNAL TABLE show_create_table_test_db.i_1687_p (
@@ -426,7 +426,7 @@ CREATE EXTERNAL TABLE show_create_table_test_db.i_1687_p (
 PARTITIONED BY (
   int_col INT
 )
-STORED AS TEXTFILE
+STORED AS PARQUET
 LOCATION '$$location_uri$$'
 TBLPROPERTIES ('TRANSLATED_TO_EXTERNAL'='TRUE', 'external.table.purge'='TRUE')
 ====
@@ -1150,7 +1150,7 @@ CREATE TABLE bucketed_test (a int, b string) CLUSTERED BY (a) into 4 buckets;
 ---- RESULTS-HIVE-3
 CREATE EXTERNAL TABLE show_create_table_test_db.bucketed_test (a INT, b STRING)
 CLUSTERED BY (a) INTO 4 BUCKETS
-STORED AS TEXTFILE
+STORED AS PARQUET
 LOCATION '$$location_uri$$'
 TBLPROPERTIES ('TRANSLATED_TO_EXTERNAL'='TRUE', 'bucketing_version'='2',
     'external.table.purge'='TRUE')
@@ -1161,7 +1161,7 @@ CREATE TABLE bucketed_sort_test (a int, b string) CLUSTERED BY (a) sort by (b) i
 ---- RESULTS-HIVE-3
 CREATE EXTERNAL TABLE show_create_table_test_db.bucketed_sort_test (a INT, b STRING)
 CLUSTERED BY (a) SORT BY LEXICAL (b) INTO 4 BUCKETS
-STORED AS TEXTFILE
+STORED AS PARQUET
 LOCATION '$$location_uri$$'
 TBLPROPERTIES ('TRANSLATED_TO_EXTERNAL'='TRUE', 'bucketing_version'='2',
     'external.table.purge'='TRUE')

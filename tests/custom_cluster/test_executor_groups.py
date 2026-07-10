@@ -1387,9 +1387,13 @@ class TestExecutorGroups(CustomClusterTestSuite):
     # The default query options for this test.
     # Some test case will change these options along the test, but should eventually
     # restored to this default values.
+    # This test's CpuAsk / fs-writer expectations are calibrated for CTAS statements
+    # producing TEXT tables, so pin DEFAULT_FILE_FORMAT=TEXT (IMPALA-2210 changed the
+    # global default to PARQUET).
     self._set_query_options({
       'COMPUTE_PROCESSING_COST': 'true',
-      'SLOT_COUNT_STRATEGY': 'PLANNER_CPU_ASK'})
+      'SLOT_COUNT_STRATEGY': 'PLANNER_CPU_ASK',
+      'DEFAULT_FILE_FORMAT': 'TEXT'})
 
     # BEGIN testing insert + MAX_FS_WRITER
     # Test unpartitioned insert, small scan, no MAX_FS_WRITER.

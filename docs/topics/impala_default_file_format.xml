@@ -85,8 +85,14 @@ under the License.
     </p>
 
     <p>
-      <b>Default:</b> <codeph>TEXT</codeph> (<codeph>0</codeph>)
+      <b>Default:</b> <codeph>PARQUET</codeph> (<codeph>4</codeph>)
     </p>
+
+    <note>
+      The default value was changed to <codeph>PARQUET</codeph> starting from
+      <keyword keyref="impala50"/>. In earlier releases the default was
+      <codeph>TEXT</codeph>.
+    </note>
 
     <p>
       <b>Added in:</b> <keyword keyref="impala32"/>

@@ -8,11 +8,13 @@ CREATE TABLE nullinsert (
   int_cal int
 )
 row format delimited fields terminated by ','  escaped by '\\'
+stored as textfile
 LOCATION '$FILESYSTEM_PREFIX/test-warehouse/$DATABASE.db/nullinsert';
 CREATE EXTERNAL TABLE nullinsert_alt(
   whole_row string
 )
 row format delimited fields terminated by '|'
+stored as textfile
 LOCATION '$FILESYSTEM_PREFIX/test-warehouse/$DATABASE.db/nullinsert';
 create table alltypesinsert like $ORIGINAL_DB.alltypesinsert;
 create table nullformat_custom like $ORIGINAL_DB.nullformat_custom;

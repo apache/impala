@@ -1,6 +1,6 @@
 ====
 ---- QUERY
-create table corrupted (id int, name string) partitioned by (org int);
+create table corrupted (id int, name string) partitioned by (org int) stored as textfile;
 ====
 ---- QUERY
 insert into corrupted partition (org=1) values (1, "Martin"), (2, "Hans"), (3, "Peter");
@@ -161,7 +161,7 @@ explain select count(*) from corrupted where org = 2;
 STRING
 ====
 ---- QUERY
-create table corrupted_no_part (id int);
+create table corrupted_no_part (id int) stored as textfile;
 insert into corrupted_no_part values (1),(2),(3);
 compute stats corrupted_no_part;
 ====

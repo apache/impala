@@ -2,6 +2,7 @@
 ---- QUERY
 # First create an unpartitioned table
 create external table t1 (i int)
+stored as textfile
 location '$FILESYSTEM_PREFIX/test-warehouse/$DATABASE.db/t1_tmp1'
 ---- RESULTS
 'Table has been created.'
@@ -355,6 +356,7 @@ bigint,string,int,int
 # Create a partitioned table. Specify the location so we know what dirs need
 # to be cleaned after the test finishes executing.
 create external table t_part (i int) partitioned by (j int, s string)
+stored as textfile
 location '$FILESYSTEM_PREFIX/test-warehouse/$DATABASE.db/t_part_tmp';
 alter table t_part add partition (j=cast(2-1 as int), s='2012');
 alter table t_part add if not exists partition (j=1, s='2012');
@@ -861,7 +863,7 @@ bigint,bigint
 # Tests that renaming a table with column stats across databases
 # preserves table and column stats, and allows the renamed table
 # to be dropped (IMPALA-1711/HIVE-9720).
-create table $DATABASE.mv (x int, y string);
+create table $DATABASE.mv (x int, y string) stored as textfile;
 insert into $DATABASE.mv values(1, 'a'), (2, 'b'), (NULL, NULL);
 compute stats $DATABASE.mv;
 alter table $DATABASE.mv rename to $DATABASE2.mv2;
@@ -915,7 +917,7 @@ STRING
 # to be dropped (IMPALA-2810).
 #
 # Skip in Hive 3, see HIVE-21806 for details.
-create table $DATABASE.mv (x int) partitioned by (y string);
+create table $DATABASE.mv (x int) partitioned by (y string) stored as textfile;
 insert into $DATABASE.mv partition(y='a') values(1);
 insert into $DATABASE.mv partition(y='b') values(2);
 insert into $DATABASE.mv partition(y=NULL) values(NULL);
@@ -1187,7 +1189,7 @@ INT, STRING
 ====
 ---- QUERY
 # IMPALA-1670: Support adding multiple partitions in ALTER TABLE ADD PARTITION
-create table i1670A_alter (s string) partitioned by (i integer);
+create table i1670A_alter (s string) partitioned by (i integer) stored as textfile;
 alter table i1670A_alter add
 partition (i=1) location '$FILESYSTEM_PREFIX/test-warehouse/$DATABASE.db/i1670A_alter/i1'
 partition (i=2) location '$FILESYSTEM_PREFIX/test-warehouse/$DATABASE.db/i1670A_alter/i2'
@@ -1204,7 +1206,7 @@ STRING, BIGINT, BIGINT, STRING, STRING, STRING, STRING, STRING, STRING, STRING
 ---- QUERY
 # IMPALA-1670: After INVALIDATE METADATA Impala can access previously added partitions and
 # partition data.
-create table i1670A_alter_1 (a int) partitioned by (x int);
+create table i1670A_alter_1 (a int) partitioned by (x int) stored as textfile;
 alter table i1670A_alter_1 add partition (x=1)
 partition (x=2) uncached
 partition (x=3) location '$FILESYSTEM_PREFIX/test-warehouse/$DATABASE.db/i1670A_alter_1/x3';

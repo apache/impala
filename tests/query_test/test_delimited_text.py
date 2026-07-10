@@ -86,7 +86,7 @@ class TestDelimitedText(ImpalaTestSuite):
     """IMPALA-13161: Verifies reading a large file which has full of field delimiters
        won't causing crash due to overflows"""
     tbl = unique_database + ".tbl"
-    self.execute_query("create table {}(i int)".format(tbl))
+    self.execute_query("create table {}(i int) stored as textfile".format(tbl))
     table_loc = self._get_table_location(tbl, vector)
     # Generate a 3GB data file that has full of '\x00' (the default field delimiter)
     with open("data.txt", "wb") as f:

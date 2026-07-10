@@ -327,29 +327,29 @@ public class ToSqlTest extends FrontendTestBase {
         "comment 'This is a test'",
         "default",
         "CREATE TABLE default.p ( a INT ) PARTITIONED BY ( day STRING ) " +
-        "SORT BY LEXICAL ( a ) COMMENT 'This is a test' STORED AS TEXTFILE" , true);
+        "SORT BY LEXICAL ( a ) COMMENT 'This is a test' STORED AS PARQUET" , true);
     testToSql("create table p (a int, b int) partitioned by (day string) sort by (a ,b) ",
         "default",
         "CREATE TABLE default.p ( a INT, b INT ) PARTITIONED BY ( day STRING ) " +
-        "SORT BY LEXICAL ( a, b ) STORED AS TEXTFILE" , true);
+        "SORT BY LEXICAL ( a, b ) STORED AS PARQUET" , true);
 
     // Table with SORT BY LEXICAL clause.
     testToSql("create table p (a int) partitioned by (day string) sort by lexical (a) " +
         "comment 'This is a test'",
         "default",
         "CREATE TABLE default.p ( a INT ) PARTITIONED BY ( day STRING ) " +
-        "SORT BY LEXICAL ( a ) COMMENT 'This is a test' STORED AS TEXTFILE" , true);
+        "SORT BY LEXICAL ( a ) COMMENT 'This is a test' STORED AS PARQUET" , true);
     testToSql("create table p (a int, b int) partitioned by (day string) sort by " +
         "lexical (a, b)",
         "default",
         "CREATE TABLE default.p ( a INT, b INT ) PARTITIONED BY ( day STRING ) " +
-        "SORT BY LEXICAL ( a, b ) STORED AS TEXTFILE" , true);
+        "SORT BY LEXICAL ( a, b ) STORED AS PARQUET" , true);
 
     // Table with SORT BY ZORDER clause.
     testToSql("create table p (a int, b int) partitioned by (day string) sort by zorder" +
         "(a ,b) ", "default",
         "CREATE TABLE default.p ( a INT, b INT ) PARTITIONED BY ( day STRING ) " +
-        "SORT BY ZORDER ( a, b ) STORED AS TEXTFILE" , true);
+        "SORT BY ZORDER ( a, b ) STORED AS PARQUET" , true);
 
     // Kudu table with a TIMESTAMP column default value
     String kuduMasters = "127.0.0.1";
@@ -369,7 +369,7 @@ public class ToSqlTest extends FrontendTestBase {
     // TODO: Add support for displaying constraint information (DISABLE, NOVALIDATE, RELY)
     testToSql("create table pk(id int, year string, primary key (id, year))", "default",
         "CREATE TABLE default.pk ( id INT, year STRING, PRIMARY KEY (id, year) ) "
-            + "STORED AS TEXTFILE", true);
+            + "STORED AS PARQUET", true);
 
     // Foreign Key test requires a valid primary key table.
     addTestDb("test_pk_fk", "Test DB for PK/FK tests");
@@ -380,7 +380,7 @@ public class ToSqlTest extends FrontendTestBase {
         + "KEY (a) REFERENCES functional.parent_table_2(a))", "CREATE TABLE "
         + "test_pk_fk.fk ( seq INT, id INT, year STRING, a INT, FOREIGN KEY(id, year) "
         + "REFERENCES functional.parent_table(id, year), FOREIGN KEY(a) REFERENCES "
-        + "functional.parent_table_2(a) ) STORED AS TEXTFILE", true);
+        + "functional.parent_table_2(a) ) STORED AS PARQUET", true);
     // Test create table for paimon table.
     testToSql("CREATE TABLE test_create_managed_paimon_table ("
         + "user_id BIGINT, item_id BIGINT, behavior STRING) STORED AS PAIMON",
@@ -431,32 +431,32 @@ public class ToSqlTest extends FrontendTestBase {
     testToSql("create table p partitioned by (int_col) as " +
         "select double_col, int_col from functional.alltypes", "default",
         "CREATE TABLE default.p PARTITIONED BY ( int_col ) STORED AS " +
-        "TEXTFILE AS SELECT double_col, int_col FROM functional.alltypes",
+        "PARQUET AS SELECT double_col, int_col FROM functional.alltypes",
         true);
     // Table with a comment.
     testToSql("create table p partitioned by (int_col) comment 'This is a test' as " +
         "select double_col, int_col from functional.alltypes", "default",
         "CREATE TABLE default.p PARTITIONED BY ( int_col ) COMMENT 'This is a test' " +
-        "STORED AS TEXTFILE AS SELECT double_col, int_col FROM functional.alltypes",
+        "STORED AS PARQUET AS SELECT double_col, int_col FROM functional.alltypes",
         true);
     // Table with SORT BY clause.
     testToSql("create table p partitioned by (int_col) sort by (string_col) as " +
         "select double_col, string_col, int_col from functional.alltypes", "default",
         "CREATE TABLE default.p PARTITIONED BY ( int_col ) SORT BY LEXICAL " +
-        "( string_col ) STORED AS TEXTFILE AS SELECT double_col, string_col, int_col " +
+        "( string_col ) STORED AS PARQUET AS SELECT double_col, string_col, int_col " +
         "FROM functional.alltypes", true);
     // Table with SORT BY LEXICAL clause.
     testToSql("create table p partitioned by (int_col) sort by lexical (string_col) as " +
         "select double_col, string_col, int_col from functional.alltypes", "default",
         "CREATE TABLE default.p PARTITIONED BY ( int_col ) SORT BY LEXICAL " +
-        "( string_col ) STORED AS TEXTFILE AS SELECT double_col, string_col, int_col " +
+        "( string_col ) STORED AS PARQUET AS SELECT double_col, string_col, int_col " +
         "FROM functional.alltypes", true);
     // Table with SORT BY ZORDER clause.
     testToSql("create table p partitioned by (string_col) sort by zorder (int_col, " +
         "bool_col) as select int_col, bool_col, string_col from functional.alltypes",
         "default",
         "CREATE TABLE default.p PARTITIONED BY ( string_col ) SORT BY ZORDER " +
-        "( int_col, bool_col ) STORED AS TEXTFILE AS SELECT " +
+        "( int_col, bool_col ) STORED AS PARQUET AS SELECT " +
         "int_col, bool_col, string_col FROM functional.alltypes", true);
     // Kudu table with multiple partition params
     String kuduMasters = "127.0.0.1";
@@ -495,26 +495,26 @@ public class ToSqlTest extends FrontendTestBase {
         "'/test-warehouse/schemas/alltypestiny.parquet'", "default",
         "CREATE TABLE IF NOT EXISTS default.p LIKE PARQUET " +
         "'hdfs://localhost:20500/test-warehouse/schemas/alltypestiny.parquet' " +
-        "STORED AS TEXTFILE", true);
+        "STORED AS PARQUET", true);
     // Table with sort columns.
     testToSql("create table if not exists p like parquet " +
         "'/test-warehouse/schemas/alltypestiny.parquet' sort by (int_col, id)", "default",
         "CREATE TABLE IF NOT EXISTS default.p LIKE PARQUET " +
         "'hdfs://localhost:20500/test-warehouse/schemas/alltypestiny.parquet' " +
-        "SORT BY LEXICAL ( int_col, id ) STORED AS TEXTFILE", true);
+        "SORT BY LEXICAL ( int_col, id ) STORED AS PARQUET", true);
     // Table with sort LEXICAL columns.
     testToSql("create table if not exists p like parquet " +
         "'/test-warehouse/schemas/alltypestiny.parquet' sort by lexical (int_col, id)",
         "default",
         "CREATE TABLE IF NOT EXISTS default.p LIKE PARQUET " +
         "'hdfs://localhost:20500/test-warehouse/schemas/alltypestiny.parquet' " +
-        "SORT BY LEXICAL ( int_col, id ) STORED AS TEXTFILE", true);
+        "SORT BY LEXICAL ( int_col, id ) STORED AS PARQUET", true);
     // Table with ZORDER sort columns.
     testToSql("create table if not exists p like parquet " +
         "'/test-warehouse/schemas/alltypestiny.parquet' sort by zorder (int_col, id)",
         "default", "CREATE TABLE IF NOT EXISTS default.p LIKE PARQUET " +
         "'hdfs://localhost:20500/test-warehouse/schemas/alltypestiny.parquet' " +
-        "SORT BY ZORDER ( int_col, id ) STORED AS TEXTFILE", true);
+        "SORT BY ZORDER ( int_col, id ) STORED AS PARQUET", true);
   }
 
   @Test
@@ -522,17 +522,17 @@ public class ToSqlTest extends FrontendTestBase {
     testToSql("create table bucketed_table ( a int ) " +
         "CLUSTERED BY ( a ) into 24 buckets", "default",
         "CREATE TABLE default.bucketed_table ( a INT ) " +
-        "CLUSTERED BY ( a ) INTO 24 BUCKETS STORED AS TEXTFILE", true);
+        "CLUSTERED BY ( a ) INTO 24 BUCKETS STORED AS PARQUET", true);
     testToSql("create table bucketed_table1 ( a int ) " +
         "partitioned by ( dt string ) CLUSTERED BY ( a ) into 24 buckets", "default",
         "CREATE TABLE default.bucketed_table1 ( a INT ) " +
         "PARTITIONED BY ( dt STRING ) CLUSTERED BY ( a ) INTO 24 BUCKETS " +
-        "STORED AS TEXTFILE", true);
+        "STORED AS PARQUET", true);
     testToSql("create table bucketed_table2 ( a int, s string ) partitioned " +
         "by ( dt string ) CLUSTERED BY ( a ) sort by (s) into 24 buckets",
         "default", "CREATE TABLE default.bucketed_table2 " +
         "( a INT, s STRING ) PARTITIONED BY ( dt STRING ) CLUSTERED BY ( a ) SORT BY " +
-        "LEXICAL ( s ) INTO 24 BUCKETS STORED AS TEXTFILE", true);
+        "LEXICAL ( s ) INTO 24 BUCKETS STORED AS PARQUET", true);
   }
 
   @Test

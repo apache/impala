@@ -1,6 +1,6 @@
 ====
 ---- QUERY
-create table __text_write (i int, s string, d double);
+create table __text_write (i int, s string, d double) stored as textfile;
 ====
 ---- QUERY
 SET COMPRESSION_CODEC=NONE;
@@ -48,7 +48,7 @@ Writing to table format SEQUENCE_FILE is not supported.
 # Test writing to mixed format table containing partitions in both supported and
 # unsupported formats where writing to the partition with supported format should succeed.
 # Create a table containing both text(supported) and avro(unsupported) partitions.
-create table __mixed_format_write (id int) partitioned by (part int);
+create table __mixed_format_write (id int) partitioned by (part int) stored as textfile;
 ====
 ---- QUERY
 insert into __mixed_format_write partition(part=2000) values(1);

@@ -813,7 +813,7 @@ class ImpalaCursor(DbCursor):
           'but does not have any primary keys'.format(
               storage_format=table.storage_format))
 
-    if table.storage_format != 'TEXTFILE':
+    if table.storage_format != 'PARQUET':
       sql += "\nSTORED AS " + table.storage_format
     if table.storage_location:
       sql = sql.replace("CREATE TABLE", "CREATE EXTERNAL TABLE")

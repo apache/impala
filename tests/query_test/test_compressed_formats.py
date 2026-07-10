@@ -317,7 +317,7 @@ class TestReadZtsdLibCompressedFile(ImpalaTestSuite):
 
   def __create_test_table(self, table_name, location):
     self.client.execute("DROP TABLE IF EXISTS %s" % table_name)
-    self.client.execute("CREATE TABLE %s (col string) LOCATION '%s'"
+    self.client.execute("CREATE TABLE %s (col string) STORED AS TEXTFILE LOCATION '%s'"
         % (table_name, location))
 
   def test_query_large_file(self):

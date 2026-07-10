@@ -231,7 +231,7 @@ class TestHdfsCachingDdl(ImpalaTestSuite):
 
     num_entries_pre = get_num_cache_requests()
     create_table = ("create table cachedb.cached_tbl_reload "
-        "(id int) cached in 'testPool' with replication = 8")
+        "(id int) stored as textfile cached in 'testPool' with replication = 8")
     self.execute_query_using_vector(create_table, vector)
 
     # Access the table once to load the metadata
@@ -239,7 +239,8 @@ class TestHdfsCachingDdl(ImpalaTestSuite):
       "select count(*) from cachedb.cached_tbl_reload", vector)
 
     create_table = ("create table cachedb.cached_tbl_reload_part (i int) "
-        "partitioned by (j int) cached in 'testPool' with replication = 8")
+        "partitioned by (j int) stored as textfile cached in 'testPool' "
+        "with replication = 8")
     self.execute_query_using_vector(create_table, vector)
 
     # Add two partitions

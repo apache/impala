@@ -116,7 +116,7 @@ class TestExplain(ImpalaTestSuite):
     # Create a partitioned table with a mixed set of available stats,
     mixed_tbl = unique_database + ".t"
     self.execute_query(
-      "create table %s (c int) partitioned by (p int)" % mixed_tbl)
+      "create table %s (c int) partitioned by (p int) stored as textfile" % mixed_tbl)
     self.execute_query(
       "insert into table %s partition (p) values(1,1),(2,2),(3,3)" % mixed_tbl)
     # Set the number of rows at the table level.
@@ -165,7 +165,8 @@ class TestExplain(ImpalaTestSuite):
       return self.execute_query("explain " + query, query_options={'explain_level': 3})
 
     FQ_TBL_NAME = unique_database + ".t"
-    self.execute_query("create table %s (i int, s string)" % FQ_TBL_NAME)
+    self.execute_query(
+        "create table %s (i int, s string) stored as textfile" % FQ_TBL_NAME)
     # Fill the table with data that leads to avg_size of 4 for 's'.
     self.execute_query("insert into %s values (1, '123'), (2, '12345')" % FQ_TBL_NAME)
 
@@ -197,7 +198,7 @@ class TestExplainEmptyPartition(ImpalaTestSuite):
     corrupted, or used for something else."""
     self.client.execute("SET EXPLAIN_LEVEL=3")
     self.client.execute("CREATE TABLE %s.empty_partition (col int) "
-                        "partitioned by (p int)" % unique_database)
+                        "partitioned by (p int) stored as textfile" % unique_database)
     self.client.execute(
       "ALTER TABLE %s.empty_partition ADD PARTITION (p=NULL)" % unique_database)
     # Put an empty file in the partition so we have > 0 files, but 0 rows

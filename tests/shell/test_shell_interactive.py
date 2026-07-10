@@ -822,7 +822,7 @@ class TestImpalaShellInteractive(ImpalaTestSuite):
     assert "\tEXPLAIN_LEVEL: [STANDARD]" in result.stdout
     assert "INVALID_QUERY_OPTION is not supported for the impalad being connected to, "\
            "ignoring." in result.stdout
-    assert "\tDEFAULT_FILE_FORMAT: [TEXT]" in result.stdout
+    assert "\tDEFAULT_FILE_FORMAT: [PARQUET]" in result.stdout
 
   def test_commandline_flag_disable_live_progress(self, vector):
     """Test the command line flag disable_live_progress with live_progress."""

@@ -1873,7 +1873,7 @@ WRITE TO HDFS [functional.alltypesnopart, OVERWRITE=false]
 ====
 # Dynamically partitioned HDFS insert
 create table dummy_insert
-partitioned by (l_partkey) as
+partitioned by (l_partkey) stored as textfile as
 select l_comment, l_partkey from tpch.lineitem
 ---- PLAN
 Max Per-Host Resource Reservation: Memory=20.00MB Threads=2
@@ -1973,7 +1973,7 @@ Per-Instance Resources: mem-estimate=89.18MB mem-reservation=8.00MB thread-reser
 ====
 # Noclustered dynamically partitioned HDFS insert.
 create /* +noclustered */ table dummy_insert
-partitioned by (l_partkey) as
+partitioned by (l_partkey) stored as textfile as
 select l_comment, l_partkey from tpch.lineitem
 ---- PLAN
 Max Per-Host Resource Reservation: Memory=8.00MB Threads=2

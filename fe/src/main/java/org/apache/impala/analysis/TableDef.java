@@ -176,9 +176,13 @@ class TableDef {
       Preconditions.checkNotNull(serdeProperties);
       this.serdeProperties = serdeProperties;
       // The file format passed via STORED AS <file format> has a higher precedence than
-      // the one set in query options.
-      this.fileFormat = (fileFormat != null) ?
-          fileFormat : queryOptions.getDefault_file_format();
+      // the one set in query options. When STORED AS is absent but a ROW FORMAT clause is
+      // present, the file format is implicitly TEXT for backward compatibility, since
+      // ROW FORMAT only applies to TEXT tables. Otherwise, fall back to the
+      // DEFAULT_FILE_FORMAT query option.
+      this.fileFormat = (fileFormat != null) ? fileFormat
+          : (rowFormat != null) ? THdfsFileFormat.TEXT
+          : queryOptions.getDefault_file_format();
       this.location = location;
       this.cachingOp = cachingOp;
       Preconditions.checkNotNull(tblProperties);
@@ -187,10 +191,11 @@ class TableDef {
     }
 
     public Options(String comment, TQueryOptions queryOptions) {
-      // Passing null to file format so that it uses the file format from the query option
-      // if specified, otherwise it will use the default file format, which is TEXT.
+      // Passing null to row format and file format so that the file format is taken from
+      // the query option if specified, otherwise the default file format, which is
+      // PARQUET. There is no ROW FORMAT clause on this code path, hence null row format.
       this(null, new Pair<>(ImmutableList.of(), TSortingOrder.LEXICAL), comment,
-          RowFormat.DEFAULT_ROW_FORMAT, new HashMap<>(), /* file format */null, null,
+          /* row format */null, new HashMap<>(), /* file format */null, null,
           null, new HashMap<>(), queryOptions);
     }
   }

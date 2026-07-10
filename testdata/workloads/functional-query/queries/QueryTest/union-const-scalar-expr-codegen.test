@@ -22,7 +22,7 @@ ExecOption: Codegen Enabled, Codegen Disabled for const scalar expressions
 # Expect codegen to be disabled for const expressions.
 set DISABLE_CODEGEN_ROWS_THRESHOLD=1;
 drop table if exists test_values_codegen;
-create table test_values_codegen (c1 int, c2 timestamp, c3 string);
+create table test_values_codegen (c1 int, c2 timestamp, c3 string) stored as textfile;
 insert into test_values_codegen(c1) values (CAST(1+ceil(2.5)*3 as tinyint));
 ---- RUNTIME_PROFILE
 00:UNION

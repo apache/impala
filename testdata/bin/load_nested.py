@@ -139,7 +139,8 @@ def load():
       LOG.info("Creating temp orders (chunk {chunk} of {chunks})".format(
           chunk=(chunk_idx + 1), chunks=chunks))
       if chunk_idx == 0:
-        impala.execute("CREATE TABLE tmp_orders_string AS " + tmp_orders_sql)
+        impala.execute(
+            "CREATE TABLE tmp_orders_string STORED AS TEXTFILE AS " + tmp_orders_sql)
       else:
         impala.execute("INSERT INTO TABLE tmp_orders_string " + tmp_orders_sql)
 
@@ -169,7 +170,8 @@ def load():
       LOG.info("Creating temp customers (chunk {chunk} of {chunks})".format(
           chunk=(chunk_idx + 1), chunks=chunks))
       if chunk_idx == 0:
-        impala.execute("CREATE TABLE tmp_customer_string AS " + tmp_customer_sql)
+        impala.execute(
+            "CREATE TABLE tmp_customer_string STORED AS TEXTFILE AS " + tmp_customer_sql)
       else:
         impala.execute("INSERT INTO TABLE tmp_customer_string " + tmp_customer_sql)
 
@@ -220,6 +222,7 @@ def load():
     LOG.info("Creating temp regions")
     impala.execute(r"""
         CREATE TABLE tmp_region_string
+        STORED AS TEXTFILE
         AS SELECT
           r_regionkey, r_name, r_comment,
           GROUP_CONCAT(
@@ -249,8 +252,9 @@ def load():
     # avoid duplicated data.
     LOG.info("Creating temp suppliers")
     impala.execute(r"""
-      CREATE TABLE tmp_supplier_string AS
-      SELECT
+      CREATE TABLE tmp_supplier_string
+      STORED AS TEXTFILE
+      AS SELECT
         s_suppkey, s_name, s_address, s_nationkey, s_phone, s_acctbal, s_comment,
         GROUP_CONCAT(
           CONCAT(

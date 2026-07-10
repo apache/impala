@@ -4639,8 +4639,8 @@ public class CatalogOpExecutor {
     } else if (srcTable instanceof View) {
       // Here, source table is a view which has no input format. So to be
       // consistent with CREATE TABLE, default input format is assumed to be
-      // TEXT unless otherwise specified.
-      setStorageDescriptorFileFormat(tbl.getSd(), THdfsFileFormat.TEXT);
+      // PARQUET unless otherwise specified.
+      setStorageDescriptorFileFormat(tbl.getSd(), THdfsFileFormat.PARQUET);
     }
     // Set the row count of this table to unknown.
     tbl.putToParameters(StatsSetupConst.ROW_COUNT, "-1");
