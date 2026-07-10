@@ -135,19 +135,19 @@ INT,STRING,STRING,INT,BIGINT,BIGINT,STRING,STRING,STRING,STRING,STRING,STRING,BI
 select * from functional_parquet.iceberg_query_metadata.all_manifests;
 ---- RESULTS
 # Example:
-# 0,'hdfs://localhost:20500/test-warehouse/functional_parquet.db/iceberg_test_metadata/metadata/38e5a1bd-5b7f-4eae-9362-16a2de3c575d-m0.avro',6631,0,8283026816932323050,1,0,0,0,0,'[]',0,7858675898458780516
-row_regex:0,'$NAMENODE/test-warehouse/iceberg_test/metadata/iceberg_query_metadata/metadata/.*.avro',\d+,0,\d+,1,0,0,0,0,0,'\[\]',\d+
-row_regex:0,'$NAMENODE/test-warehouse/iceberg_test/metadata/iceberg_query_metadata/metadata/.*.avro',\d+,0,\d+,1,0,0,0,0,0,'\[\]',\d+
-row_regex:0,'$NAMENODE/test-warehouse/iceberg_test/metadata/iceberg_query_metadata/metadata/.*.avro',\d+,0,\d+,1,0,0,0,0,0,'\[\]',\d+
-row_regex:0,'$NAMENODE/test-warehouse/iceberg_test/metadata/iceberg_query_metadata/metadata/.*.avro',\d+,0,\d+,1,0,0,0,0,0,'\[\]',\d+
-row_regex:0,'$NAMENODE/test-warehouse/iceberg_test/metadata/iceberg_query_metadata/metadata/.*.avro',\d+,0,\d+,1,0,0,0,0,0,'\[\]',\d+
-row_regex:0,'$NAMENODE/test-warehouse/iceberg_test/metadata/iceberg_query_metadata/metadata/.*.avro',\d+,0,\d+,1,0,0,0,0,0,'\[\]',\d+
-row_regex:0,'$NAMENODE/test-warehouse/iceberg_test/metadata/iceberg_query_metadata/metadata/.*.avro',\d+,0,\d+,1,0,0,0,0,0,'\[\]',\d+
-row_regex:0,'$NAMENODE/test-warehouse/iceberg_test/metadata/iceberg_query_metadata/metadata/.*.avro',\d+,0,\d+,1,0,0,0,0,0,'\[\]',\d+
-row_regex:0,'$NAMENODE/test-warehouse/iceberg_test/metadata/iceberg_query_metadata/metadata/.*.avro',\d+,0,\d+,1,0,0,0,0,0,'\[\]',\d+
-row_regex:1,'$NAMENODE/test-warehouse/iceberg_test/metadata/iceberg_query_metadata/metadata/.*.avro',\d+,0,\d+,0,0,0,1,0,0,'\[\]',\d+
+# 0,'hdfs://localhost:20500/test-warehouse/functional_parquet.db/iceberg_test_metadata/metadata/38e5a1bd-5b7f-4eae-9362-16a2de3c575d-m0.avro',6631,0,8283026816932323050,1,0,0,0,0,'[]',0,7858675898458780516,'NULL'
+row_regex:0,'$NAMENODE/test-warehouse/iceberg_test/metadata/iceberg_query_metadata/metadata/.*.avro',\d+,0,\d+,1,0,0,0,0,0,'\[\]',\d+,'NULL'
+row_regex:0,'$NAMENODE/test-warehouse/iceberg_test/metadata/iceberg_query_metadata/metadata/.*.avro',\d+,0,\d+,1,0,0,0,0,0,'\[\]',\d+,'NULL'
+row_regex:0,'$NAMENODE/test-warehouse/iceberg_test/metadata/iceberg_query_metadata/metadata/.*.avro',\d+,0,\d+,1,0,0,0,0,0,'\[\]',\d+,'NULL'
+row_regex:0,'$NAMENODE/test-warehouse/iceberg_test/metadata/iceberg_query_metadata/metadata/.*.avro',\d+,0,\d+,1,0,0,0,0,0,'\[\]',\d+,'NULL'
+row_regex:0,'$NAMENODE/test-warehouse/iceberg_test/metadata/iceberg_query_metadata/metadata/.*.avro',\d+,0,\d+,1,0,0,0,0,0,'\[\]',\d+,'NULL'
+row_regex:0,'$NAMENODE/test-warehouse/iceberg_test/metadata/iceberg_query_metadata/metadata/.*.avro',\d+,0,\d+,1,0,0,0,0,0,'\[\]',\d+,'NULL'
+row_regex:0,'$NAMENODE/test-warehouse/iceberg_test/metadata/iceberg_query_metadata/metadata/.*.avro',\d+,0,\d+,1,0,0,0,0,0,'\[\]',\d+,'NULL'
+row_regex:0,'$NAMENODE/test-warehouse/iceberg_test/metadata/iceberg_query_metadata/metadata/.*.avro',\d+,0,\d+,1,0,0,0,0,0,'\[\]',\d+,'NULL'
+row_regex:0,'$NAMENODE/test-warehouse/iceberg_test/metadata/iceberg_query_metadata/metadata/.*.avro',\d+,0,\d+,1,0,0,0,0,0,'\[\]',\d+,'NULL'
+row_regex:1,'$NAMENODE/test-warehouse/iceberg_test/metadata/iceberg_query_metadata/metadata/.*.avro',\d+,0,\d+,0,0,0,1,0,0,'\[\]',\d+,'NULL'
 ---- TYPES
-INT,STRING,BIGINT,INT,BIGINT,INT,INT,INT,INT,INT,INT,STRING,BIGINT
+INT,STRING,BIGINT,INT,BIGINT,INT,INT,INT,INT,INT,INT,STRING,BIGINT,BINARY
 ====
 ---- QUERY
 select * from functional_parquet.iceberg_query_metadata.all_entries;
@@ -749,10 +749,10 @@ join functional_parquet.iceberg_query_metadata.snapshots s
   on h.snapshot_id = s.snapshot_id
 order by made_current_at;
 ---- RESULTS
-'append',true,regex:'{"added-data-files":"1","added-records":"1","added-files-size":"[1-9][0-9]*","changed-partition-count":"1","total-records":"1","total-files-size":"[1-9][0-9]*","total-data-files":"1","total-delete-files":"0","total-position-deletes":"0","total-equality-deletes":"0","iceberg-version":"Apache Iceberg.*"}'
-'append',true,regex:'{"added-data-files":"1","added-records":"1","added-files-size":"[1-9][0-9]*","changed-partition-count":"1","total-records":"2","total-files-size":"[1-9][0-9]*","total-data-files":"2","total-delete-files":"0","total-position-deletes":"0","total-equality-deletes":"0","iceberg-version":"Apache Iceberg.*"}'
-'append',true,regex:'{"added-data-files":"1","added-records":"1","added-files-size":"[1-9][0-9]*","changed-partition-count":"1","total-records":"3","total-files-size":"[1-9][0-9]*","total-data-files":"3","total-delete-files":"0","total-position-deletes":"0","total-equality-deletes":"0","iceberg-version":"Apache Iceberg.*"}'
-'delete',true,regex:'{"added-position-delete-files":"1","added-delete-files":"1","added-files-size":"[1-9][0-9]*","added-position-deletes":"1","changed-partition-count":"1","total-records":"3","total-files-size":"[1-9][0-9]*","total-data-files":"3","total-delete-files":"1","total-position-deletes":"1","total-equality-deletes":"0","iceberg-version":"Apache Iceberg.*"}'
+'append',true,regex:'{"manifests-created":"1","manifests-kept":"0","manifests-replaced":"0","added-data-files":"1","added-records":"1","added-files-size":"[1-9][0-9]*","changed-partition-count":"1","total-records":"1","total-files-size":"[1-9][0-9]*","total-data-files":"1","total-delete-files":"0","total-position-deletes":"0","total-equality-deletes":"0","iceberg-version":"Apache Iceberg.*"}'
+'append',true,regex:'{"manifests-created":"1","manifests-kept":"1","manifests-replaced":"0","added-data-files":"1","added-records":"1","added-files-size":"[1-9][0-9]*","changed-partition-count":"1","total-records":"2","total-files-size":"[1-9][0-9]*","total-data-files":"2","total-delete-files":"0","total-position-deletes":"0","total-equality-deletes":"0","iceberg-version":"Apache Iceberg.*"}'
+'append',true,regex:'{"manifests-created":"1","manifests-kept":"2","manifests-replaced":"0","added-data-files":"1","added-records":"1","added-files-size":"[1-9][0-9]*","changed-partition-count":"1","total-records":"3","total-files-size":"[1-9][0-9]*","total-data-files":"3","total-delete-files":"0","total-position-deletes":"0","total-equality-deletes":"0","iceberg-version":"Apache Iceberg.*"}'
+'delete',true,regex:'{"manifests-created":"1","manifests-kept":"3","manifests-replaced":"0","added-position-delete-files":"1","added-delete-files":"1","added-files-size":"[1-9][0-9]*","added-position-deletes":"1","changed-partition-count":"1","total-records":"3","total-files-size":"[1-9][0-9]*","total-data-files":"3","total-delete-files":"1","total-position-deletes":"1","total-equality-deletes":"0","iceberg-version":"Apache Iceberg.*"}'
 ---- TYPES
 STRING,BOOLEAN,STRING
 ====
@@ -1114,6 +1114,7 @@ describe functional_parquet.iceberg_query_metadata.all_manifests;
 'deleted_delete_files_count','int','','true'
 'partition_summaries','array<struct<\n  contains_null:boolean,\n  contains_nan:boolean,\n  lower_bound:string,\n  upper_bound:string\n>>','','true'
 'reference_snapshot_id','bigint','','true'
+'key_metadata','binary','','true'
 ---- TYPES
 STRING,STRING,STRING,STRING
 ====

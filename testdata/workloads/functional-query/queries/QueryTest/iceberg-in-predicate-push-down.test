@@ -460,7 +460,8 @@ aggregation(SUM, NumRowGroups): 0
 aggregation(SUM, NumFileMetadataRead): 1
 ====
 ---- QUERY
-# NOT_IN does not work because col_dt is not the partition column
+# NOT_IN on the non-partition column col_dt skips the data files whose lower and upper
+# bounds are equal and in the NOT_IN list
 select
   count(1)
 from
@@ -470,7 +471,7 @@ where
 ---- RESULTS
 3
 ---- RUNTIME_PROFILE
-aggregation(SUM, NumRowGroups): 3
+aggregation(SUM, NumRowGroups): 1
 ====
 ---- QUERY
 # Test DECIMAL(9, 3)/DECIMAL(18, 3)/DECIMAL(38, 3) InPredicate push-down
