@@ -379,6 +379,14 @@ struct THdfsScanNode {
   // when new files are being added to a table. For tuple caching, this can improve the
   // cache hits by avoiding unnecessary disruption to the runtime keys.
   16: optional bool schedule_scanranges_oldest_to_newest
+
+  // If true, this Iceberg data scan reads data files that have no delete files and is a
+  // sibling (UNION ALL branch) of an IcebergDeleteNode. The INPUT__FILE__NAME virtual
+  // slot was materialized on the shared tuple solely as a join key for that delete node,
+  // and nothing above references it. The scanner leaves the slot NULL so the (typically
+  // long) file path string is not propagated/serialized unnecessarily. Mirrors
+  // TIcebergDeleteNode.clear_file_path_slot on the with-deletes branch. See IMPALA-15171.
+  17: optional bool clear_file_path_slot
 }
 
 struct TDataSourceScanNode {
@@ -527,6 +535,13 @@ struct TNestedLoopJoinNode {
 struct TIcebergDeleteNode {
   // equi-join predicates
   1: required list<TEqJoinCondition> eq_join_conjuncts
+
+  // If true, the backend nulls out the INPUT__FILE__NAME (file path) slot on the join's
+  // output rows. The file path is only needed as a join key at this node; nulling it
+  // avoids deep-copying and serializing the (typically long) file path string through
+  // downstream exchanges. Only set by the planner when it materialized the file path
+  // slot itself, i.e. no operator above the join references it. See IMPALA-15171.
+  2: optional bool clear_file_path_slot
 }
 
 // Top-level struct for a join node. Elements that are shared between the different

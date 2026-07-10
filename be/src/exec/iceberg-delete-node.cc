@@ -40,6 +40,8 @@ Status IcebergDeletePlanNode::Init(const TPlanNode& tnode, FragmentState* state)
   DCHECK(tnode.__isset.join_node);
   DCHECK(tnode.join_node.__isset.iceberg_delete_node);
 
+  clear_file_path_slot_ = tnode.join_node.iceberg_delete_node.clear_file_path_slot;
+
   // TODO: IMPALA-12265: create the config only if it is necessary
   RETURN_IF_ERROR(IcebergDeleteBuilderConfig::CreateConfig(state, tnode_->node_id,
       tnode_->join_node.join_op, &build_row_desc(), &id_builder_config_));
@@ -78,6 +80,9 @@ Status IcebergDeleteNode::Prepare(RuntimeState* state) {
     runtime_profile()->PrependChild(builder_->profile());
   }
 
+  clear_file_path_slot_ =
+      static_cast<const IcebergDeletePlanNode&>(plan_node_).clear_file_path_slot_;
+
   auto& tuple_descs = probe_row_desc().tuple_descriptors();
   auto& slot_descs = tuple_descs[0]->slots();
 
@@ -87,6 +92,7 @@ Status IcebergDeleteNode::Prepare(RuntimeState* state) {
     }
     if (slot->virtual_column_type() == TVirtualColumnType::INPUT_FILE_NAME) {
       file_path_offset_ = slot->tuple_offset();
+      file_path_null_indicator_offset_ = slot->null_indicator_offset();
     }
   }
 
@@ -258,6 +264,17 @@ Status IcebergDeleteNode::GetNext(RuntimeState* state, RowBatch* out_batch, bool
     out_batch->set_num_rows(num_rows_before + num_rows_added);
     probe_batch_->TransferResourceOwnership(out_batch);
     *eos = true;
+  }
+
+  // The file path slot is only needed as a join key by this node. If nothing above
+  // references it, NULL it out on the rows produced by this call so the (typically long)
+  // file path string is not deep-copied and serialized through downstream exchanges.
+  // Output rows share the probe tuples (CopyRows() shallow-copies tuple pointers), and
+  // those tuples are never read again once produced, so this is safe.
+  if (clear_file_path_slot_) {
+    for (int i = num_rows_before; i < num_rows_before + num_rows_added; ++i) {
+      out_batch->GetRow(i)->GetTuple(0)->SetNull(file_path_null_indicator_offset_);
+    }
   }
 
   IncrementNumRowsReturned(num_rows_added);

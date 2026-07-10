@@ -98,6 +98,12 @@ public class IcebergScanNode extends HdfsScanNode {
   // responsible for reading the delete files of the corresponding table.
   private final PlanNodeId deleteFileScanNodeId;
 
+  // When true, the INPUT__FILE__NAME virtual slot is materialized on this scan's tuple
+  // only as a join key for a sibling IcebergDeleteNode (UNION ALL branch), and nothing
+  // above references it. The backend scanner leaves the slot NULL so the file path string
+  // is not propagated unnecessarily. See IMPALA-15171.
+  private boolean clearFilePathSlot_ = false;
+
   public IcebergScanNode(PlanNodeId id, TableRef tblRef, List<Expr> conjuncts,
       MultiAggregateInfo aggInfo, List<IcebergFileDescriptor> fileDescs,
       int numPartitions,
@@ -248,6 +254,14 @@ public class IcebergScanNode extends HdfsScanNode {
     if (deleteFileScanNodeId != null) {
       msg.hdfs_scan_node.setDeleteFileScanNodeId(deleteFileScanNodeId.asInt());
     }
+    if (clearFilePathSlot_) {
+      msg.hdfs_scan_node.setClear_file_path_slot(true);
+    }
+  }
+
+  // See clearFilePathSlot_.
+  public void setClearFilePathSlot(boolean clearFilePathSlot) {
+    clearFilePathSlot_ = clearFilePathSlot;
   }
 
   @Override
@@ -287,12 +301,17 @@ public class IcebergScanNode extends HdfsScanNode {
   protected String getDerivedExplainString(
       String indentPrefix, TExplainLevel detailLevel) {
     StringBuilder output = new StringBuilder();
-    output.append(
-        indentPrefix + "Iceberg snapshot id: " + String.valueOf(snapshotId_) + "\n");
-    if (!skippedConjuncts_.isEmpty()) {
-      output.append(indentPrefix +
-          String.format("skipped Iceberg predicates: %s\n",
-              Expr.getExplainString(skippedConjuncts_, detailLevel)));
+    if (detailLevel.ordinal() >= TExplainLevel.STANDARD.ordinal()) {
+      output.append(
+          indentPrefix + "Iceberg snapshot id: " + String.valueOf(snapshotId_) + "\n");
+      if (!skippedConjuncts_.isEmpty()) {
+        output.append(indentPrefix +
+            String.format("skipped Iceberg predicates: %s\n",
+                Expr.getExplainString(skippedConjuncts_, detailLevel)));
+      }
+    }
+    if (detailLevel.ordinal() >= TExplainLevel.EXTENDED.ordinal()) {
+      if (clearFilePathSlot_) output.append(indentPrefix + "clear file path slot\n");
     }
     return output.toString();
   }

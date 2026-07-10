@@ -43,9 +43,10 @@ from tests.common.file_utils import (
 )
 from tests.common.iceberg_test_suite import IcebergTestSuite
 from tests.common.impala_connection import IMPALA_CONNECTION_EXCEPTION
-from tests.common.skip import SkipIf, SkipIfDockerizedCluster, SkipIfFS
+from tests.common.skip import (SkipIf, SkipIfDockerizedCluster, SkipIfFS,
+    SkipIfNotHdfsMinicluster)
 from tests.common.test_dimensions import (add_exec_option_dimension,
-    create_exec_option_dimension)
+    create_exec_option_dimension, create_single_exec_option_dimension)
 from tests.common.test_result_verifier import error_msg_startswith
 from tests.shell.util import run_impala_shell_cmd
 from tests.util.filesystem_utils import FILESYSTEM_PREFIX, get_fs_path, IS_HDFS, WAREHOUSE
@@ -2948,3 +2949,57 @@ class TestIcebergTableWithPuffinStats(IcebergTestSuite):
   def _get_ndvs_from_query_result(self, query_result):
     rows = query_result.get_data().split("\n")
     return [int(row.split()[2]) for row in rows]
+
+
+class TestIcebergDeleteFilePathSlot(IcebergTestSuite):
+  """IMPALA-15171: the delete-join file path slot is nulled when nothing above the join
+  needs it, so the (long) file path string is not propagated through exchanges. A
+  self-join over a table with deletes should send < 250 MB and keep the hash join under
+  250 MB; without the fix these balloon to ~1 GB / ~590 MB."""
+
+  @classmethod
+  def add_test_dimensions(cls):
+    super(TestIcebergDeleteFilePathSlot, cls).add_test_dimensions()
+    # Heavy CTAS + self-join: run once, with a fixed batch_size the thresholds depend on.
+    cls.ImpalaTestMatrix.add_dimension(create_single_exec_option_dimension())
+    cls.ImpalaTestMatrix.add_constraint(
+        lambda v: v.get_value('table_format').file_format == 'parquet')
+
+  @SkipIfNotHdfsMinicluster.tuned_for_minicluster
+  def test_delete_file_path_slot_not_propagated(self, unique_database):
+    tbl = unique_database + ".ice_lineitem"
+    self.execute_query("create table {0} stored as iceberg as select * from "
+                       "tpch_parquet.lineitem".format(tbl))
+    # Single-row delete: we will have data files with and without deletes as well, i.e.
+    # below query exercises both the with-deletes and the without-deletes branches
+    self.execute_query("delete from {0} where l_orderkey=1000000".format(tbl))
+
+    query = ("select count(*) from {0} a, {0} b "
+             "where a.l_orderkey=b.l_orderkey".format(tbl))
+    result = self.client.execute(query, fetch_exec_summary=True)
+
+    # Correctness (also guards against nulling corrupting the shared probe tuples).
+    EXPECTED_SELF_JOIN_COUNT = 30012984
+    assert result.data == [str(EXPECTED_SELF_JOIN_COUNT)], result.data
+
+    # Bound for TotalBytesSent and hash join peak mem, tuned for the 3-node minicluster.
+    MAX_BYTES = 250 * 1024 * 1024
+
+    # First TotalBytesSent in the profile is the query-level counter.
+    match = re.search(r"- TotalBytesSent: [\d.]+ [KMGT]?B \((\d+)\)",
+                      result.runtime_profile)
+    assert match is not None, result.runtime_profile
+    total_bytes_sent = int(match.group(1))
+    assert total_bytes_sent < MAX_BYTES, (
+        "TotalBytesSent={0} bytes, expected < {1}.\n{2}".format(
+            total_bytes_sent, MAX_BYTES, result.runtime_profile))
+
+    # exec_summary 'peak_mem' is bytes; only the self-join matches "HASH JOIN" (the delete
+    # joins are labelled "... ICEBERG DELETE").
+    hash_joins = [row for row in result.exec_summary
+                  if row['operator'].endswith('HASH JOIN')]
+    assert len(hash_joins) == 1, result.exec_summary
+    hash_join_peak_mem = hash_joins[0]['peak_mem']
+    assert hash_join_peak_mem < MAX_BYTES, (
+        "HASH JOIN peak_mem={0} bytes, expected < {1}.\n{2}".format(
+            hash_join_peak_mem, MAX_BYTES, result.exec_summary))

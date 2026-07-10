@@ -105,6 +105,14 @@ void FileMetadataUtils::AddFileLevelVirtualColumns(MemPool* mem_pool,
   for (int i = 0; i < scan_node_->virtual_column_slots().size(); ++i) {
     const SlotDescriptor* slot_desc = scan_node_->virtual_column_slots()[i];
     if (slot_desc->virtual_column_type() == TVirtualColumnType::INPUT_FILE_NAME) {
+      if (scan_node_->clear_file_path_slot()) {
+        // The INPUT__FILE__NAME slot was materialized only as a join key for the
+        // position-delete join on the sibling (with-deletes) UNION branch. Nothing above
+        // references it, so leave it NULL here to avoid propagating the (typically long)
+        // file path string. Mirrors IcebergDeleteNode NULL-ing its join output.
+        template_tuple->SetNull(slot_desc->null_indicator_offset());
+        continue;
+      }
       StringValue* slot = template_tuple->GetStringSlot(slot_desc->tuple_offset());
       const char* filename = file_desc_->filename.c_str();
       int len = strlen(filename);

@@ -470,6 +470,7 @@ class HdfsScanNodeBase : public ScanNode {
   bool optimize_count_star() const { return count_star_slot_offset_ != -1; }
   int count_star_slot_offset() const { return count_star_slot_offset_; }
   bool is_partition_key_scan() const { return is_partition_key_scan_; }
+  bool clear_file_path_slot() const { return clear_file_path_slot_; }
 
   typedef std::unordered_map<TupleId, std::vector<ScalarExprEvaluator*>>
     ConjunctEvaluatorsMap;
@@ -698,6 +699,13 @@ class HdfsScanNodeBase : public ScanNode {
   // each scan range. If true, the scan node and scanner implementations should attempt
   // to do the minimum possible work to materialise one row.
   const bool is_partition_key_scan_;
+
+  /// True if the INPUT__FILE__NAME virtual slot on this scan's tuple was materialized
+  /// only as a join key for a sibling IcebergDeleteNode (UNION ALL branch) and nothing
+  /// above references it. When true, the scanner leaves the INPUT__FILE__NAME slot NULL
+  /// instead of assigning the file path, so the (typically long) path string is not
+  /// propagated unnecessarily. See IMPALA-15171.
+  const bool clear_file_path_slot_;
 
   /// RequestContext object to use with the disk-io-mgr for reads.
   std::unique_ptr<io::RequestContext> reader_context_;

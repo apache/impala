@@ -41,6 +41,12 @@ class IcebergDeletePlanNode : public BlockingJoinPlanNode {
   /// Data sink config object for creating a id builder that will be eventually used by
   /// the exec node.
   IcebergDeleteBuilderConfig* id_builder_config_;
+
+  /// If true, the exec node nulls out the INPUT__FILE__NAME (file path) slot on output
+  /// rows. The file path is only needed as a join key here; nulling it avoids
+  /// deep-copying and serializing the (typically long) file path string through
+  /// downstream exchanges. See IMPALA-15171.
+  bool clear_file_path_slot_ = false;
 };
 
 /// Operator to perform iceberg delete.
@@ -179,6 +185,14 @@ class IcebergDeleteNode : public BlockingJoinNode {
 
   int file_path_offset_;
   int pos_offset_;
+
+  /// Null indicator of the INPUT__FILE__NAME (file path) slot in the probe tuple, used
+  /// to NULL out the slot on output rows when 'clear_file_path_slot_' is true.
+  NullIndicatorOffset file_path_null_indicator_offset_{0, -1};
+
+  /// Cached from IcebergDeletePlanNode::clear_file_path_slot_ in Prepare(). When true,
+  /// the file path slot is nulled on output rows. See IMPALA-15171.
+  bool clear_file_path_slot_ = false;
 };
 
 } // namespace impala

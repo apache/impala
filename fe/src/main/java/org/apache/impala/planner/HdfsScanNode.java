@@ -2085,10 +2085,9 @@ public class HdfsScanNode extends ScanNode {
       if (isPartitionKeyScan_) {
         output.append(detailPrefix + "partition key scan\n");
       }
-
-      String derivedExplain = getDerivedExplainString(detailPrefix, detailLevel);
-      if (!derivedExplain.isEmpty()) output.append(derivedExplain);
     }
+    String derivedExplain = getDerivedExplainString(detailPrefix, detailLevel);
+    if (!derivedExplain.isEmpty()) output.append(derivedExplain);
     if (detailLevel.ordinal() >= TExplainLevel.EXTENDED.ordinal()) {
       output.append(getStatsExplainString(detailPrefix)).append("\n");
       String extrapRows;

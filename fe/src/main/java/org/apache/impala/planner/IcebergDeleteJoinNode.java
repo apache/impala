@@ -50,12 +50,18 @@ public class IcebergDeleteJoinNode extends JoinNode {
   // Record count from deletion vectors associated with the scanned data files.
   private final long dvDeletesRecordCount_;
 
+  // If true, the backend nulls out the INPUT__FILE__NAME (file path) slot on the output
+  // rows. Only set when the planner materialized the file path slot solely for this
+  // join, i.e. no operator above references it. See IMPALA-15171.
+  private final boolean clearFilePathSlot_;
+
   public IcebergDeleteJoinNode(
       PlanNode outer, PlanNode inner, List<BinaryPredicate> eqJoinConjuncts,
-      long dvDeletesRecordCount) {
+      long dvDeletesRecordCount, boolean clearFilePathSlot) {
     super(outer, inner, true, DistributionMode.NONE, JoinOperator.ICEBERG_DELETE_JOIN,
         eqJoinConjuncts, Collections.emptyList(), "ICEBERG DELETE");
     dvDeletesRecordCount_ = dvDeletesRecordCount;
+    clearFilePathSlot_ = clearFilePathSlot;
     Preconditions.checkNotNull(eqJoinConjuncts);
     Preconditions.checkState(joinOp_ == JoinOperator.ICEBERG_DELETE_JOIN);
     Preconditions.checkState(conjuncts_.isEmpty());
@@ -147,6 +153,7 @@ public class IcebergDeleteJoinNode extends JoinNode {
     msg.join_node.iceberg_delete_node = new TIcebergDeleteNode();
     msg.join_node.iceberg_delete_node.setEq_join_conjuncts(
         getThriftEquiJoinConjuncts(serialCtx));
+    msg.join_node.iceberg_delete_node.setClear_file_path_slot(clearFilePathSlot_);
   }
 
   @Override
@@ -167,6 +174,9 @@ public class IcebergDeleteJoinNode extends JoinNode {
         }
         output.append("\n");
       }
+    }
+    if (detailLevel.ordinal() >= TExplainLevel.EXTENDED.ordinal()) {
+      if (clearFilePathSlot_) output.append(detailPrefix + "clear file path slot\n");
     }
     return output.toString();
   }

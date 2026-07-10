@@ -474,6 +474,9 @@ HdfsScanNodeBase::HdfsScanNodeBase(ObjectPool* pool, const HdfsScanPlanNode& pno
             hdfs_scan_node.count_star_slot_offset :
             -1),
     is_partition_key_scan_(hdfs_scan_node.is_partition_key_scan),
+    clear_file_path_slot_(hdfs_scan_node.__isset.clear_file_path_slot ?
+            hdfs_scan_node.clear_file_path_slot :
+            false),
     tuple_desc_(pnode.tuple_desc_),
     hdfs_table_(pnode.hdfs_table_),
     avro_schema_(*pnode.avro_schema_.get()),

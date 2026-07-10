@@ -66,6 +66,7 @@ WRITE TO HDFS [functional_parquet.iceberg_v2_partitioned_position_deletes, OVERW
 |
 02:DELETE EVENTS ICEBERG DELETE [ICEBERG DELETE JOIN]
 |  equality predicates: functional_parquet.iceberg_v2_partitioned_position_deletes.file__position = functional_parquet.iceberg_v2_partitioned_position_deletes-position-delete.pos, functional_parquet.iceberg_v2_partitioned_position_deletes.input__file__name = functional_parquet.iceberg_v2_partitioned_position_deletes-position-delete.file_path
+|  clear file path slot
 |  mem-estimate=692B mem-reservation=692B thread-reservation=0
 |  tuple-ids=0 row-size=64B cardinality=10
 |  in pipelines: 00(GETNEXT), 01(OPEN)
@@ -113,6 +114,7 @@ F00:PLAN FRAGMENT [RANDOM] hosts=3 instances=3
 Per-Host Resources: mem-estimate=96.53MB mem-reservation=48.22KB thread-reservation=2
 02:DELETE EVENTS ICEBERG DELETE [ICEBERG DELETE JOIN, DIRECTED]
 |  equality predicates: functional_parquet.iceberg_v2_partitioned_position_deletes.file__position = functional_parquet.iceberg_v2_partitioned_position_deletes-position-delete.pos, functional_parquet.iceberg_v2_partitioned_position_deletes.input__file__name = functional_parquet.iceberg_v2_partitioned_position_deletes-position-delete.file_path
+|  clear file path slot
 |  mem-estimate=230B mem-reservation=230B thread-reservation=0
 |  tuple-ids=0 row-size=64B cardinality=10
 |  in pipelines: 00(GETNEXT), 01(OPEN)

@@ -160,6 +160,12 @@ public class IcebergScanPlanner {
   private long dvDeletesRecordCount_ = 0;
   private long dataFilesWithDeletesSumPaths_ = 0;
   private long dataFilesWithDeletesMaxPath_ = 0;
+  // True if the planner materialized the INPUT__FILE__NAME (file path) slot solely as a
+  // join key for the position-delete ANTI JOIN, i.e. nothing above the scan references
+  // it. When true, the file path slot is NULLed out both by the IcebergDeleteNode (on the
+  // with-deletes branch) and by the data scan node on the without-deletes UNION branch.
+  // Set in createPositionJoinNode(). See IMPALA-15171.
+  private boolean clearFilePathSlot_ = false;
   // Stores how many delete records are involved broken down by equality field ID lists.
   private Map<List<Integer>, Long> equalityDeletesRecordCount_ = new HashMap<>();
   private Set<Long> equalityDeleteSequenceNumbers_ = new HashSet<>();
@@ -308,6 +314,11 @@ public class IcebergScanPlanner {
         getIceTable().getContentFileStore().getNumPartitions(),
         nonIdentityConjuncts_, getSkippedConjuncts(), snapshotId_,
         isPartitionKeyScan, dataFileToDV_, helper_);
+    // These data files have no deletes, so they don't go through the IcebergDeleteNode
+    // that NULLs out the file path slot. If that slot was materialized only as a join key
+    // (clearFilePathSlot_), NULL it out here too so the file path string isn't propagated
+    // up through the UNION unnecessarily.
+    dataScanNode.setClearFilePathSlot(clearFilePathSlot_);
     dataScanNode.init(analyzer_);
     List<Expr> outputExprs = tblRef_.getDesc().getSlots().stream().map(
         SlotRef::new).collect(Collectors.toList());
@@ -360,7 +371,7 @@ public class IcebergScanPlanner {
     TableRef deleteDeltaRef = TableRef.newTableRef(analyzer_,
         Arrays.asList(deleteTable.getDb().getName(), deleteTable.getName()),
         tblRef_.getUniqueAlias() + "-position-delete");
-    addDataVirtualPositionSlots(tblRef_);
+    clearFilePathSlot_ = addDataVirtualPositionSlots(tblRef_);
     if (!equalityIdsToDeleteFiles_.isEmpty()) addAllSlotsForEqualityDeletes(tblRef_);
     addDeletePositionSlots(deleteDeltaRef);
     IcebergScanNode dataScanNode = new IcebergScanNode(
@@ -396,7 +407,7 @@ public class IcebergScanPlanner {
     } else {
       joinNode =
           new IcebergDeleteJoinNode(dataScanNode, deleteScanNode, positionJoinConjuncts,
-              dvDeletesRecordCount_);
+              dvDeletesRecordCount_, clearFilePathSlot_);
     }
     joinNode.setId(ctx_.getNextNodeId());
     joinNode.init(analyzer_);
@@ -412,7 +423,14 @@ public class IcebergScanPlanner {
     return joinNode;
   }
 
-  private void addDataVirtualPositionSlots(TableRef tblRef) throws AnalysisException {
+  /**
+   * Adds the INPUT__FILE__NAME and FILE__POSITION virtual slots to the data scan tuple.
+   * These are needed as join keys by the position-delete join.
+   *
+   * Returns true if the INPUT__FILE__NAME (file path) slot did not exist before this
+   * call, i.e. the planner materialized it solely for the delete join.
+   */
+  private boolean addDataVirtualPositionSlots(TableRef tblRef) throws AnalysisException {
     List<String> rawPath = Lists.newArrayList(
         tblRef.getUniqueAlias(), VirtualColumn.INPUT_FILE_NAME.getName());
 
@@ -421,6 +439,19 @@ public class IcebergScanPlanner {
     boolean isSemiJoined = analyzer_.isSemiJoined(tblRef.getId());
     if (isSemiJoined) analyzer_.setVisibleSemiJoinedTuple(tblRef.getId());
 
+    // Assume that if the slot was not registered during analyses then this is the only
+    // place where it is used during planning, so it is safe to NULL out the file path
+    // slot after delete processing.
+    Path resolvedPath;
+    try {
+      resolvedPath = analyzer_.resolvePath(rawPath, Path.PathType.SLOT_REF);
+    } catch (TableLoadingException e) {
+      throw new IllegalStateException(e);
+    }
+    Preconditions.checkNotNull(resolvedPath, "resolvedPath is null");
+    boolean filePathCreatedByPlanner = analyzer_.getSlotDescriptor(resolvedPath) == null;
+    // addSlotRefToDesc() reuses the existing slot if already registered, and always marks
+    // it materialized, which the position-delete join requires.
     SlotDescriptor fileNameSlotDesc =
         SingleNodePlanner.addSlotRefToDesc(analyzer_, rawPath);
     fileNameSlotDesc.setStats(virtualInputFileNameStats());
@@ -429,10 +460,10 @@ public class IcebergScanPlanner {
         tblRef.getUniqueAlias(), VirtualColumn.FILE_POSITION.getName());
     SlotDescriptor filePosSlotDesc =
         SingleNodePlanner.addSlotRefToDesc(analyzer_, rawPath);
+    filePosSlotDesc.setStats(virtualFilePositionStats());
 
     if (isSemiJoined) analyzer_.setVisibleSemiJoinedTuple(null);
-
-    filePosSlotDesc.setStats(virtualFilePositionStats());
+    return filePathCreatedByPlanner;
   }
 
   private void addAllSlotsForEqualityDeletes(TableRef tblRef) throws AnalysisException {
