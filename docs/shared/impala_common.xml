@@ -1678,11 +1678,10 @@ drop database temp;
         different time zones, or a cluster might include servers in more than one time zone.
       </p>
 
-      <p rev="2.2.0" id="timezone_conversion_caveat">
+      <p rev="5.0.0" id="timezone_conversion_caveat">
         The way this function deals with time zones when converting to or from
         <codeph>TIMESTAMP</codeph> values is affected by the
-        <codeph>&#8209;&#8209;use_local_tz_for_unix_timestamp_conversions</codeph> startup flag
-        for the <cmdname>impalad</cmdname> daemon. See
+        <codeph>USE_LOCAL_TZ_FOR_UNIX_TIMESTAMP_CONVERSIONS</codeph> query option. See
         <xref
           href="../topics/impala_timestamp.xml#timestamp"/> for details about how
         Impala handles time zone considerations for the <codeph>TIMESTAMP</codeph> data type.
@@ -1898,13 +1897,14 @@ drop database temp;
       </p>
 
       <p>
-        <ph id="cast_int_to_timestamp"> Casting an integer or floating-point value
+        <ph id="cast_int_to_timestamp" rev="5.0.0 IMPALA-10171">
+        Casting an integer or floating-point value
         <codeph>N</codeph> to <codeph>TIMESTAMP</codeph> produces a value that is
         <codeph>N</codeph> seconds past the start of the epoch date (January 1, 1970). By
-        default, the result value represents a date and time in the UTC time zone. If the
-        setting <codeph>&#8209;&#8209;use_local_tz_for_unix_timestamp_conversions=true</codeph>
-        is in effect, the resulting <codeph>TIMESTAMP</codeph> represents a date and time in the
-        local time zone. </ph>
+        default, the result value represents a date and time in the UTC time zone. If
+        the <codeph>USE_LOCAL_TZ_FOR_UNIX_TIMESTAMP_CONVERSIONS</codeph> query option is set to
+        <codeph>TRUE</codeph>, the resulting <codeph>TIMESTAMP</codeph> represents a date
+        and time in the local time zone. </ph>
       </p>
 
       <p id="redaction_yes" rev="2.2.0">

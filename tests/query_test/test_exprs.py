@@ -293,6 +293,8 @@ class TestTimestampFunctions(ImpalaTestSuite):
   @classmethod
   def add_test_dimensions(cls):
     super(TestTimestampFunctions, cls).add_test_dimensions()
+    cls.ImpalaTestMatrix.add_dimension(create_exec_option_dimension(
+        cluster_sizes=[0], disable_codegen_options=[False, True], batch_sizes=[0]))
     # Test with and without expr rewrites to cover regular expr evaluations
     # as well as constant folding, in particular, timestamp literals.
     add_exec_option_dimension(cls, 'enable_expr_rewrites', EXPR_REWRITE_OPTIONS)

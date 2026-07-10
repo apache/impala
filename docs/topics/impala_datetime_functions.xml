@@ -47,10 +47,9 @@ under the License.
       <codeph>DATE</codeph>.
     </p>
 
-    <p rev="2.2.0">
-      Some of the date/time functions are affected by the setting of the
-      <codeph>&#8209;&#8209;use_local_tz_for_unix_timestamp_conversions</codeph> startup flag
-      for the <cmdname>impalad</cmdname> daemon:
+    <p rev="5.0.0">
+      Some of the date/time functions are affected by the
+      <codeph>USE_LOCAL_TZ_FOR_UNIX_TIMESTAMP_CONVERSIONS</codeph> query option:
       <ul>
         <li>
           The setting is off by default, meaning that functions such as

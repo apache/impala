@@ -569,4 +569,5 @@ REMOVED_FLAG(suppress_unknown_disk_id_warnings);
 REMOVED_FLAG(unlock_mt_dop);
 REMOVED_FLAG(use_krpc);
 REMOVED_FLAG(use_kudu_kinit);
+REMOVED_FLAG(use_local_tz_for_unix_timestamp_conversions);
 REMOVED_FLAG(use_statestore);

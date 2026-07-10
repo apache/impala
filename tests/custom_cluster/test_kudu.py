@@ -72,21 +72,6 @@ class TestKuduOperations(CustomKuduTest):
     add_mandatory_exec_option(cls, "kudu_read_mode", "READ_AT_SNAPSHOT")
 
   @pytest.mark.execute_serially
-  @CustomClusterTestSuite.with_args(
-      impalad_args="--use_local_tz_for_unix_timestamp_conversions=true")
-  @SkipIfKudu.no_hybrid_clock()
-  @SkipIfKudu.hms_integration_enabled()
-  def test_local_tz_conversion_ops(self, vector, unique_database):
-    """IMPALA-5539: Test Kudu timestamp reads/writes are correct with the
-       use_local_tz_for_unix_timestamp_conversions flag."""
-    # Remove 'abort_on_error' option so we can set it at .test file.
-    # Revisit this if 'abort_on_error' dimension size increase.
-    vector.unset_exec_option('abort_on_error')
-    # These tests provide enough coverage of queries with timestamps.
-    self.run_test_case('QueryTest/kudu-scan-node', vector, use_db=unique_database)
-    self.run_test_case('QueryTest/kudu_insert', vector, use_db=unique_database)
-
-  @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args(impalad_args="-kudu_master_hosts=")
   @SkipIfKudu.hms_integration_enabled()
   def test_kudu_master_hosts(self, kudu_client):

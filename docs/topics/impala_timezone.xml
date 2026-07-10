@@ -56,7 +56,7 @@ under the License.
 
         <li>
           When converting between Unix time and timestamp if the
-          <codeph>use_local_tz_for_unix_timestamp_conversions</codeph> flag is
+          <codeph>USE_LOCAL_TZ_FOR_UNIX_TIMESTAMP_CONVERSIONS</codeph> query option is
           <codeph>TRUE</codeph>
         </li>
 

@@ -158,7 +158,7 @@ DATE_ADD (<varname>timestamp</varname>, INTERVAL <varname>interval</varname> <va
 
     <p>
       When you set the
-      <codeph>&#8209;&#8209;use_local_tz_for_unix_timestamp_conversions</codeph> startup flag to
+      <codeph>USE_LOCAL_TZ_FOR_UNIX_TIMESTAMP_CONVERSIONS</codeph> query option to
       <codeph>TRUE</codeph>, Impala treats the <codeph>TIMESTAMP</codeph> values specified in
       the local time zone. The local time zone is determined in the following order with the
       <codeph>TIMEZONE</codeph> query option takes the highest precedence:
@@ -178,12 +178,12 @@ DATE_ADD (<varname>timestamp</varname>, INTERVAL <varname>interval</varname> <va
     </p>
 
     <p>
-      The <codeph>&#8209;&#8209;use_local_tz_for_unix_timestamp_conversions</codeph> setting can
+      The <codeph>USE_LOCAL_TZ_FOR_UNIX_TIMESTAMP_CONVERSIONS</codeph> query option can
       be used to fix discrepancy in <codeph>INTERVAL</codeph> operations. For example, a
       <codeph>TIMESTAMP + INTERVAL <varname>n-hours</varname></codeph> can be affected by
       Daylight Saving Time, which Impala does not consider by default as these operations are
       applied as if the timestamp was in UTC. You can use the
-      <codeph>--use_local_tz_for_unix_timestamp_conversions</codeph> setting to fix the issue.
+      <codeph>USE_LOCAL_TZ_FOR_UNIX_TIMESTAMP_CONVERSIONS</codeph> query option to fix the issue.
     </p>
 
     <p>
@@ -194,7 +194,7 @@ DATE_ADD (<varname>timestamp</varname>, INTERVAL <varname>interval</varname> <va
     <p>
       See <xref href="impala_datetime_functions.xml#datetime_functions">Impala Date and Time
       Functions</xref> for the list of functions affected by the
-      <codeph>--use_local_tz_for_unix_timestamp_conversions</codeph> setting.
+      <codeph>USE_LOCAL_TZ_FOR_UNIX_TIMESTAMP_CONVERSIONS</codeph> query option.
     </p>
 
     <p>
@@ -232,11 +232,11 @@ DATE_ADD (<varname>timestamp</varname>, INTERVAL <varname>interval</varname> <va
         </p>
 
         <p>
-          To avoid incompatibility problems or having to code workarounds, you can specify one
-          or both of these impalad startup flags:
+          To avoid incompatibility problems or having to code workarounds, you can set one
+          or both of these query options:
           <ul>
             <li>
-              <codeph>&#8209;use_local_tz_for_unix_timestamp_conversions=true</codeph>
+              <codeph>SET USE_LOCAL_TZ_FOR_UNIX_TIMESTAMP_CONVERSIONS=TRUE</codeph>
             </li>
 
             <li>

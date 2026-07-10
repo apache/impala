@@ -477,8 +477,6 @@ Status DataSourceScanNode::GetNext(RuntimeState* state, RowBatch* row_batch, boo
       if (tuple_desc_->slots().size() > 0) {
         // Copy rows until we hit the limit/capacity or until we exhaust input_batch_
         while (!ReachedLimit() && !row_batch->AtCapacity() && InputBatchHasNext()) {
-          // TODO Timezone depends on flag use_local_tz_for_unix_timestamp_conversions.
-          //      Check if this is the intended behaviour.
           RETURN_IF_ERROR(MaterializeNextRow(
               state->time_zone_for_unix_time_conversions(), tuple_pool, tuple));
           ++rows_read;

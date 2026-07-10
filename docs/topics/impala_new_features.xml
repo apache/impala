@@ -2389,16 +2389,17 @@ under the License.
             </li>
             <li>
               <p>
-                Startup flags for the <cmdname>impalad</cmdname> daemon enable a higher level of compatibility with
+                Query options and startup flags enable a higher level of compatibility with
                 <codeph>TIMESTAMP</codeph> values written by Hive, and more flexibility for working with date and
                 time data using the local time zone instead of UTC. To enable these features, set the
-                <cmdname>impalad</cmdname> startup flags
-                <codeph>-use_local_tz_for_unix_timestamp_conversions=true</codeph> and
+                query option
+                <codeph>USE_LOCAL_TZ_FOR_UNIX_TIMESTAMP_CONVERSIONS=TRUE</codeph> and the
+                <cmdname>impalad</cmdname> startup flag
                 <codeph>-convert_legacy_hive_parquet_utc_timestamps=true</codeph>.
               </p>
 
               <p>
-                The <codeph>-use_local_tz_for_unix_timestamp_conversions</codeph> setting controls how the
+                The <codeph>USE_LOCAL_TZ_FOR_UNIX_TIMESTAMP_CONVERSIONS</codeph> query option controls how the
                 <codeph>unix_timestamp()</codeph>, <codeph>from_unixtime()</codeph>, and <codeph>now()</codeph>
                 functions handle time zones. By default (when this setting is turned off), Impala considers all
                 <codeph>TIMESTAMP</codeph> values to be in the UTC time zone when converting to or from Unix time
