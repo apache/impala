@@ -286,7 +286,7 @@ message ReportExecStatusRequestPB {
   optional int64 scan_bytes_sent = 13;
 
   // Aggregated status for all instances of a fragment on a backend. Used when
-  // TQueryCtx.gen_aggregated_profile is true.
+  // TQueryCtx.aggregated_profile is true.
   repeated FragmentExecStatusPB fragment_exec_status = 14;
 
   // Sequence number prevents out-of-order or duplicated updates from being applied.

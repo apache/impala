@@ -33,7 +33,7 @@
 
 #include "common/names.h"
 
-DECLARE_bool(gen_experimental_profile);
+DECLARE_bool(aggregated_profile);
 DECLARE_int32(status_report_interval_ms);
 DECLARE_int32(periodic_counter_update_period_ms);
 DECLARE_uint64(json_profile_event_timestamp_limit);
@@ -249,7 +249,7 @@ TEST(CountersTest, MergeAndUpdate) {
 
   // make sure we can print
   stringstream dummy;
-  averaged_profile->PrettyPrint(&dummy);
+  averaged_profile->PrettyPrint(RuntimeProfile::Verbosity::LEGACY, &dummy);
 
   // Update profile2 w/ profile1 and validate
   profile2->Update(tprofile1);
@@ -280,7 +280,7 @@ TEST(CountersTest, MergeAndUpdate) {
   }
 
   // make sure we can print
-  profile2->PrettyPrint(&dummy);
+  profile2->PrettyPrint(RuntimeProfile::Verbosity::LEGACY, &dummy);
 }
 
 // Regression test for IMPALA-6694 - child order isn't preserved if a child
@@ -350,8 +350,8 @@ TEST(CountersTest, MergeAndUpdateChildOrder) {
 
   // Make sure we can print the profiles.
   stringstream dummy;
-  averaged_profile->PrettyPrint(&dummy);
-  deserialized_profile->PrettyPrint(&dummy);
+  averaged_profile->PrettyPrint(RuntimeProfile::Verbosity::LEGACY, &dummy);
+  deserialized_profile->PrettyPrint(RuntimeProfile::Verbosity::LEGACY, &dummy);
 }
 
 TEST(CountersTest, TotalTimeCounters) {
@@ -580,7 +580,7 @@ static void VerifyThriftSummaryStats(
 
 // Test handling of summary statistics in the aggregated profile.
 TEST(CountersTest, AggregateSummaryStats) {
-  auto cert = ScopedFlagSetter<bool>::Make(&FLAGS_gen_experimental_profile, true);
+  auto cert = ScopedFlagSetter<bool>::Make(&FLAGS_aggregated_profile, true);
   const int NUM_PROFILES = 3;
   // Create a profile with event sequences with some shared event keys.
   ObjectPool pool;
@@ -810,7 +810,7 @@ static void VerifyThriftInfoStrings(
 
 // Test handling of info strings in the aggregated profile
 TEST(CountersTest, AggregateInfoStrings) {
-  auto cert = ScopedFlagSetter<bool>::Make(&FLAGS_gen_experimental_profile, true);
+  auto cert = ScopedFlagSetter<bool>::Make(&FLAGS_aggregated_profile, true);
   const int NUM_PROFILES = 3;
   // Create a profile with info strings that are shared across instances and then
   // distinct across instances to test that they are deduplicated appropriately.
@@ -1022,7 +1022,7 @@ static void VerifyThriftEventSequences(
 
 // Test handling of event sequences in the aggregated profile.
 TEST(CountersTest, AggregateEventSequences) {
-  auto cert = ScopedFlagSetter<bool>::Make(&FLAGS_gen_experimental_profile, true);
+  auto cert = ScopedFlagSetter<bool>::Make(&FLAGS_aggregated_profile, true);
   const int NUM_PROFILES = 3;
   // Create a profile with event sequences with some shared event keys.
   ObjectPool pool;
@@ -1425,7 +1425,7 @@ static void VerifyThriftTimeSeries(
 
 // Test handling of time series counters in the aggregated profile.
 TEST(TimeSeriesCounterTest, AggregateTimeSeries) {
-  auto cert = ScopedFlagSetter<bool>::Make(&FLAGS_gen_experimental_profile, true);
+  auto cert = ScopedFlagSetter<bool>::Make(&FLAGS_aggregated_profile, true);
   const int NUM_PROFILES = 3;
   // Create a profile with event sequences with some shared event keys.
   ObjectPool pool;
@@ -1497,7 +1497,7 @@ static void VerifyThriftCounters(
 // Test handling aggregation of two profile update, where the second profile update is a
 // partial update.
 TEST(CountersTest, PartialUpdate) {
-  auto cert = ScopedFlagSetter<bool>::Make(&FLAGS_gen_experimental_profile, true);
+  auto cert = ScopedFlagSetter<bool>::Make(&FLAGS_aggregated_profile, true);
   const int NUM_PROFILES = 3;
   // Create a profile with event sequences with some shared event keys.
   ObjectPool pool;
@@ -1557,13 +1557,13 @@ TEST(CountersTest, PartialUpdate) {
 
   // Update 1 has instance #1 and #2 reporting final update, while instance #0 reporting
   // its first update.
-  AggregatedRuntimeProfile* aggregated_profile_1 =
+  AggregatedRuntimeProfile* agg_profile_1 =
       AggregatedRuntimeProfile::Create(&pool, "Update 1", NUM_PROFILES, true);
   for (int i = 0; i < NUM_PROFILES; ++i) {
-    aggregated_profile_1->UpdateAggregatedFromInstance(profiles[i], i);
+    agg_profile_1->UpdateAggregatedFromInstance(profiles[i], i);
   }
   TRuntimeProfileTree ttree1;
-  aggregated_profile_1->ToThrift(&ttree1);
+  agg_profile_1->ToThrift(&ttree1);
 
   // Update 2 has only instance #0 reporting its final update, which has 1 more sample in
   // its counter, event sequence, and time series counter.
@@ -1572,11 +1572,11 @@ TEST(CountersTest, PartialUpdate) {
   profiles[0]->AddInfoString("distinct", "val0");
   seqs[0]->MarkEvent("cccc");
   ts_counters[0]->AddSample(test_period);
-  AggregatedRuntimeProfile* aggregated_profile_2 =
+  AggregatedRuntimeProfile* agg_profile_2 =
       AggregatedRuntimeProfile::Create(&pool, "Update 2", NUM_PROFILES, true);
-  aggregated_profile_2->UpdateAggregatedFromInstance(profiles[0], 0);
+  agg_profile_2->UpdateAggregatedFromInstance(profiles[0], 0);
   TRuntimeProfileTree ttree2;
-  aggregated_profile_2->ToThrift(&ttree2);
+  agg_profile_2->ToThrift(&ttree2);
 
   // Test merging both update into larger aggregated profile (size of 9) at an offset 3.
   const int MERGE_SIZE = NUM_PROFILES * 3;
@@ -1656,7 +1656,7 @@ TEST_P(TimeSeriesCounterResampleTest, TestPrettyPrint) {
   for (int i = 0; i < param.num_samples; ++i) ASSERT_EQ(samples[i], i);
 
   stringstream pretty;
-  profile->PrettyPrint(&pretty);
+  profile->PrettyPrint(RuntimeProfile::Verbosity::LEGACY, &pretty);
   const string pretty_str = pretty.str();
 
   for (const char* e : param.expected) EXPECT_STR_CONTAINS(pretty_str, e);
@@ -1726,7 +1726,7 @@ TEST(ToJson, RuntimeProfileToJsonTest) {
 
   // Serialize to json
   rapidjson::Document doc(rapidjson::kObjectType);
-  profile_a->ToJson(&doc);
+  profile_a->ToJson(RuntimeProfile::Verbosity::LEGACY, &doc);
   rapidjson::Value& content = doc["contents"];
 
   // Check profile correct
@@ -1776,7 +1776,7 @@ TEST(ToJson, EmptyTest) {
 
   // Serialize to json
   rapidjson::Document doc(rapidjson::kObjectType);
-  profile->ToJson(&doc);
+  profile->ToJson(RuntimeProfile::Verbosity::LEGACY, &doc);
   rapidjson::Value& content = doc["contents"];
 
   EXPECT_EQ("Profile", content["profile_name"]);
@@ -1829,7 +1829,7 @@ TEST(ToJson, TimeSeriesCounterToJsonTest) {
 
   // 1. TimeSeriesCounter should be empty
   rapidjson::Document doc(rapidjson::kObjectType);
-  profile->ToJson(&doc);
+  profile->ToJson(RuntimeProfile::Verbosity::LEGACY, &doc);
   EXPECT_TRUE(!doc["contents"].HasMember("time_series_counters"));
 
   // 2. Check Serialize to json
@@ -1859,7 +1859,7 @@ TEST(ToJson, TimeSeriesCounterToJsonTest) {
   value = 0;
   for (int i = 0; i < 80; ++i) counter2->AddSample(test_period);
 
-  profile->ToJson(&doc);
+  profile->ToJson(RuntimeProfile::Verbosity::LEGACY, &doc);
   EXPECT_EQ(doc["contents"]["time_series_counters"][1]["counter_name"],
       "TimeSeriesCounter");
   EXPECT_STR_CONTAINS(
@@ -1877,7 +1877,7 @@ TEST(ToJson, TimeSeriesCounterToJsonTest) {
 
 // Test handling of info strings in aggregated JSON profile
 TEST(ToJson, AggregatedInfoStringsToJsonTest) {
-  auto s1 = ScopedFlagSetter<bool>::Make(&FLAGS_gen_experimental_profile, true);
+  auto s1 = ScopedFlagSetter<bool>::Make(&FLAGS_aggregated_profile, true);
   const size_t NUM_PROFILES = 3;
 
   ObjectPool pool;
@@ -1893,16 +1893,16 @@ TEST(ToJson, AggregatedInfoStringsToJsonTest) {
   profiles[1]->AddInfoString("Table Name", "B_TABLE");
   profiles[2]->AddInfoString("Table Name", "C_TABLE");
 
-  AggregatedRuntimeProfile* aggregated_profile = AggregatedRuntimeProfile::Create(
+  AggregatedRuntimeProfile* agg_profile = AggregatedRuntimeProfile::Create(
       &pool, "PlanNode", NUM_PROFILES, true, false);
   for (int i = 0; i < NUM_PROFILES; ++i) {
-    aggregated_profile->UpdateAggregatedFromInstance(profiles[i], i);
+    agg_profile->UpdateAggregatedFromInstance(profiles[i], i);
   }
 
   rapidjson::Document doc(rapidjson::kObjectType);
   rapidjson::Value plan_node_profile(rapidjson::kObjectType);
 
-  aggregated_profile->ToJsonSubclass(RuntimeProfile::Verbosity::DEFAULT,
+  agg_profile->ToJsonSubclass(RuntimeProfile::Verbosity::DEFAULT,
       &plan_node_profile, &doc);
 
   // Verify the structure of aggregated info strings,
@@ -1984,7 +1984,7 @@ class AggregatedEventSequenceToJsonTest : public ::testing::Test {
     VLOG(1) << "Number of profiles :" << NUM_PROFILES << endl;
     VLOG(1) << "Bucket size :" << BUCKET_SIZE << endl;
 
-    auto s1 = ScopedFlagSetter<bool>::Make(&FLAGS_gen_experimental_profile, true);
+    auto s1 = ScopedFlagSetter<bool>::Make(&FLAGS_aggregated_profile, true);
     auto s2 = ScopedFlagSetter<uint64>::Make(
         &FLAGS_json_profile_event_timestamp_limit, BUCKET_SIZE);
 
@@ -2042,15 +2042,15 @@ class AggregatedEventSequenceToJsonTest : public ::testing::Test {
           << MAX_SETUP_RETRIES << "retries.";
     }
 
-    AggregatedRuntimeProfile* aggregated_profile = AggregatedRuntimeProfile::Create(
+    AggregatedRuntimeProfile* agg_profile = AggregatedRuntimeProfile::Create(
         &pool, "PlanNode", NUM_PROFILES, true, false);
     for (int i = 0; i < NUM_PROFILES; ++i) {
-      aggregated_profile->UpdateAggregatedFromInstance(profiles[i], i);
+      agg_profile->UpdateAggregatedFromInstance(profiles[i], i);
     }
 
     // This test fixture class has been added as a friend within RuntimeProfileBase
     // AggEventSequence::ToJson() method is invoked and tested through the ToJsonHelper()
-    aggregated_profile->ToJsonHelper(RuntimeProfile::Verbosity::DEFAULT,
+    agg_profile->ToJsonHelper(RuntimeProfile::Verbosity::DEFAULT,
         &plan_node_profile, &doc);
 
     // Validate the basic structure of event sequences

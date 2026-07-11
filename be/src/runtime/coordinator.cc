@@ -81,7 +81,6 @@ using boost::algorithm::token_compress_on;
 using boost::algorithm::split;
 using boost::filesystem::path;
 
-DECLARE_bool(gen_experimental_profile);
 DECLARE_string(hostname);
 DECLARE_int64(large_execquery_rpc_threshold_bytes);
 
@@ -227,6 +226,15 @@ Status Coordinator::Exec() {
 void Coordinator::InitFragmentStats() {
   const TPlanFragment* coord_fragment = exec_params_.GetCoordFragment();
   int64_t total_num_finstances = 0;
+  bool aggregated_profile = exec_params_.query_options().aggregated_profile;
+
+  RuntimeProfileBase::Type profile_type = aggregated_profile?
+      RuntimeProfileBase::Type::AGGREGATED : RuntimeProfileBase::Type::UNAGGREGATED;
+  query_profile_->AddInfoString("Profile Type",
+      static_cast<stringstream&>(stringstream() << profile_type).str());
+
+  int32_t profile_version = aggregated_profile? 2: 1;
+  query_profile_->AddInfoString("Profile Version", std::to_string(profile_version));
 
   DCHECK_GT(exec_params_.num_fragments(), 0);
   for (const TPlanFragment* fragment : exec_params_.GetFragments()) {
@@ -234,8 +242,7 @@ void Coordinator::InitFragmentStats() {
         Substitute(
           fragment == coord_fragment ? "Coordinator Fragment $0" : "Fragment $0",
           fragment->display_name);
-    const string& agg_profile_name = FLAGS_gen_experimental_profile ?
-        root_profile_name :
+    const string& agg_profile_name = aggregated_profile ? root_profile_name :
         Substitute("Averaged Fragment $0", fragment->display_name);
     int num_instances = exec_params_.query_schedule()
                             .fragment_exec_params(fragment->idx)
@@ -243,10 +250,11 @@ void Coordinator::InitFragmentStats() {
     total_num_finstances += num_instances;
     // TODO: special-case the coordinator fragment?
     FragmentStats* fragment_stats = obj_pool()->Add(new FragmentStats(
-        agg_profile_name, root_profile_name, num_instances, obj_pool()));
+        agg_profile_name, root_profile_name, num_instances, obj_pool(),
+        aggregated_profile));
     fragment_stats_.push_back(fragment_stats);
     query_profile_->AddChild(fragment_stats->agg_profile(), true);
-    if (!FLAGS_gen_experimental_profile) {
+    if (!aggregated_profile) {
       // Per-instance profiles are not included in the profile tree in profile V2.
       query_profile_->AddChild(fragment_stats->root_profile());
     }

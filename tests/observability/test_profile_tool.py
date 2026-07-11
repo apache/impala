@@ -79,6 +79,40 @@ class TestProfileTool(BaseTestSuite):
         get_profile_path(
             'impala_profile_log_tpcds_compute_stats_v2_extended.expected.pretty.json'))
 
+  def test_legacy_profile_text_output(self):
+    legacy_profile_path = 'legacy-profiles/'
+    # Test text profiles with different verbosity levels.
+    self._compare_profile_tool_output([],
+        get_profile_path(legacy_profile_path + 'impala_profile_log_tpcds_compute_stats'),
+        get_profile_path(legacy_profile_path
+            + 'impala_profile_log_tpcds_compute_stats.expected.txt'))
+    self._compare_profile_tool_output(['--profile_verbosity=default'],
+        get_profile_path(legacy_profile_path + 'impala_profile_log_tpcds_compute_stats'),
+        get_profile_path(legacy_profile_path
+            + 'impala_profile_log_tpcds_compute_stats_default.expected.txt'))
+    self._compare_profile_tool_output(['--profile_verbosity=extended'],
+        get_profile_path(legacy_profile_path + 'impala_profile_log_tpcds_compute_stats'),
+        get_profile_path(legacy_profile_path
+            + 'impala_profile_log_tpcds_compute_stats_extended.expected.txt'))
+
+  def test_legacy_profile_json_output(self):
+    legacy_profile_path = 'legacy-profiles/'
+    # Test JSON profiles with different verbosity levels.
+    self._compare_profile_tool_output(['--profile_format=json'],
+        get_profile_path(legacy_profile_path + 'impala_profile_log_tpcds_compute_stats'),
+        get_profile_path(legacy_profile_path
+            + 'impala_profile_log_tpcds_compute_stats.expected.json'))
+    self._compare_profile_tool_output(['--profile_format=prettyjson'],
+        get_profile_path(legacy_profile_path
+            + 'impala_profile_log_tpcds_compute_stats'),
+        get_profile_path(legacy_profile_path
+            + 'impala_profile_log_tpcds_compute_stats.expected.pretty.json'))
+    self._compare_profile_tool_output(['--profile_format=prettyjson',
+            '--profile_verbosity=extended'],
+        get_profile_path(legacy_profile_path + 'impala_profile_log_tpcds_compute_stats'),
+        get_profile_path(legacy_profile_path
+            + 'impala_profile_log_tpcds_compute_stats_extended.expected.pretty.json'))
+
   def test_webui_thrift_profile_text_output(self):
     # WebUI thrift profile downloads contain only the archived profile string, without
     # the timestamp and query id prefix found in profile log lines.

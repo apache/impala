@@ -144,7 +144,7 @@ DECLARE_bool(abort_on_config_error);
 DECLARE_bool(disk_spill_encryption);
 DECLARE_bool(enable_ldap_auth);
 DECLARE_bool(enable_workload_mgmt);
-DECLARE_bool(gen_experimental_profile);
+DECLARE_bool(aggregated_profile);
 DECLARE_bool(use_local_catalog);
 DECLARE_bool(otel_trace_enabled);
 
@@ -815,16 +815,21 @@ Status ImpalaServer::GetRuntimeProfileOutput(const string& user,
   if (query_handle->GetCoordinator() != nullptr) {
     UpdateExecSummary(query_handle);
   }
+
+  RuntimeProfile::Verbosity verbosity = RuntimeProfile::Verbosity::DEFAULT;
+  if (!query_handle->query_options().aggregated_profile) {
+    verbosity = RuntimeProfile::Verbosity::LEGACY;
+  }
   if (format == TRuntimeProfileFormat::BASE64) {
     RETURN_IF_ERROR(
         query_handle->profile()->SerializeToArchiveString(profile->string_output));
   } else if (format == TRuntimeProfileFormat::THRIFT) {
     query_handle->profile()->ToThrift(profile->thrift_output);
   } else if (format == TRuntimeProfileFormat::JSON) {
-    query_handle->profile()->ToJson(profile->json_output);
+    query_handle->profile()->ToJson(verbosity, profile->json_output);
   } else {
     DCHECK_EQ(format, TRuntimeProfileFormat::STRING);
-    query_handle->profile()->PrettyPrint(profile->string_output);
+    query_handle->profile()->PrettyPrint(verbosity, profile->string_output);
   }
   int64_t elapsed_time_ns = MonotonicNanos() - start_time_ns;
   if (elapsed_time_ns > FLAGS_slow_profile_dump_warning_threshold_ms * 1000 * 1000) {
@@ -968,19 +973,21 @@ Status ImpalaServer::DecompressToProfile(TRuntimeProfileFormat::type format,
   } else if (format == TRuntimeProfileFormat::THRIFT) {
     RETURN_IF_ERROR(RuntimeProfile::DecompressToThrift(
         query_record.compressed_profile, profile->thrift_output));
-  } else if (format == TRuntimeProfileFormat::JSON) {
-    ObjectPool tmp_pool;
-    RuntimeProfile* tmp_profile;
-    RETURN_IF_ERROR(RuntimeProfile::DecompressToProfile(
-        query_record.compressed_profile, &tmp_pool, &tmp_profile));
-    tmp_profile->ToJson(profile->json_output);
   } else {
-    DCHECK_EQ(format, TRuntimeProfileFormat::STRING);
     ObjectPool tmp_pool;
     RuntimeProfile* tmp_profile;
     RETURN_IF_ERROR(RuntimeProfile::DecompressToProfile(
         query_record.compressed_profile, &tmp_pool, &tmp_profile));
-    tmp_profile->PrettyPrint(profile->string_output);
+
+    RuntimeProfile::Verbosity verbosity = query_record.aggregated_profile ?
+        RuntimeProfile::Verbosity::DEFAULT: RuntimeProfile::Verbosity::LEGACY;
+
+    if (format == TRuntimeProfileFormat::JSON) {
+      tmp_profile->ToJson(verbosity, profile->json_output);
+    } else {
+      DCHECK_EQ(format, TRuntimeProfileFormat::STRING);
+      tmp_profile->PrettyPrint(verbosity, profile->string_output);
+    }
   }
   return Status::OK();
 }
@@ -1493,7 +1500,8 @@ void ImpalaServer::PrepareQueryContext(const std::string& hostname,
   query_ctx->__set_local_time_zone(local_tz_name);
   query_ctx->__set_status_report_interval_ms(FLAGS_status_report_interval_ms);
   query_ctx->__set_status_report_max_retry_s(FLAGS_status_report_max_retry_s);
-  query_ctx->__set_gen_aggregated_profile(FLAGS_gen_experimental_profile);
+  query_ctx->__set_gen_aggregated_profile(
+      query_ctx->client_request.query_options.aggregated_profile);
   query_ctx->__set_query_options_result_hash(
       QueryOptionsResultHash(query_ctx->client_request.query_options));
 
@@ -2191,6 +2199,7 @@ void ImpalaServer::InitializeConfigVariables() {
   // take precedence over the legacy flags.
   default_query_options_.__set_convert_legacy_hive_parquet_utc_timestamps(
     FLAGS_convert_legacy_hive_parquet_utc_timestamps);
+  default_query_options_.__set_aggregated_profile(FLAGS_aggregated_profile);
   QueryOptionsMask set_query_options; // unused
   Status status = ParseQueryOptions(FLAGS_default_query_options,
       &default_query_options_, &set_query_options);

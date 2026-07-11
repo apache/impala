@@ -159,7 +159,7 @@ class Coordinator::BackendState {
 
   /// Update completion_times, rates, and agg_profile for instances where the stats are
   /// not up-to-date with the latest status report received for that instance. Only
-  /// updates for completed instances when --gen_experimental_profile=false, consistent
+  /// updates for completed instances when aggregated_profile=false, consistent
   /// with past behaviour, to avoid adding overhead.  If 'finalize' is true, this is the
   /// last call to this function for the query and we must update all instances,
   /// regardless of whether they are done or not.
@@ -242,9 +242,9 @@ class Coordinator::BackendState {
    public:
     InstanceStats(const FInstanceExecParamsPB& exec_params, const TPlanFragment* fragment,
         const NetworkAddressPB& address, FragmentStats* fragment_stats,
-        ObjectPool* obj_pool);
+        ObjectPool* obj_pool, bool aggregated_profile);
 
-    /// Updates 'this' with exec_status and, if --gen_experimental_profile=false, the
+    /// Updates 'this' with exec_status and, if aggregated_profile=false, the
     /// fragment instance's thrift profile. Also updates the fragment instance's
     /// TExecStats in exec_summary. Also updates the instance's avg profile.
     /// 'report_time_ms' should be the UnixMillis() value of when the report was received.
@@ -299,12 +299,15 @@ class Coordinator::BackendState {
 
     /// The profile tree for this instance. Owned by coordinator object pool provided in
     /// the c'tor, created in Update().
-    /// When --gen_experimental_profile=true, this contains a copy of the full instance
+    /// When aggregated_profile=true, this contains a copy of the full instance
     /// profile from the executor, which is updated with each status report. It also
     /// includes some additional counters added by the coordinator.
-    /// When --gen_experimental_profile=false, this only includes the counters added
+    /// When aggregated_profile=false, this only includes the counters added
     /// by the coordinator.
     RuntimeProfile* profile_ = nullptr;
+
+    /// Stores the aggregated_profile format state for current query context
+    bool aggregated_profile_;
 
     /// True if 'agg_profile_' for the fragment is up-to-date with 'profile_'.
     /// Set to false in Update() when a new profile is received for this instance
@@ -336,6 +339,9 @@ class Coordinator::BackendState {
 
   /// ExecParams associated with the Coordinator that owns this BackendState.
   const QueryExecParams& exec_params_;
+
+  /// Stores the aggregated_profile format state for current query
+  const bool aggregated_profile_;
 
   const int state_idx_;  /// index of 'this' in Coordinator::backend_states_
   const TRuntimeFilterMode::type filter_mode_;
@@ -503,7 +509,7 @@ class Coordinator::FragmentStats {
 
   /// Create aggregated and root profiles in obj_pool.
   FragmentStats(const std::string& agg_profile_name, const std::string& root_profile_name,
-      int num_instances, ObjectPool* obj_pool);
+      int num_instances, ObjectPool* obj_pool, bool aggregated_profile);
 
   AggregatedRuntimeProfile* agg_profile() { return agg_profile_; }
   RuntimeProfile* root_profile() { return root_profile_; }
@@ -530,6 +536,9 @@ class Coordinator::FragmentStats {
 
   /// Number of instances running this fragment.
   int num_instances_;
+
+  /// Stores the aggregated_profile format state for current query context
+  bool aggregated_profile_;
 
   /// Bytes assigned for instances of this fragment
   /// TODO: IMPALA-9846: can remove when we switch to the transposed profile.

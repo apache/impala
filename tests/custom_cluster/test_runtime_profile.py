@@ -32,8 +32,8 @@ class TestRuntimeProfile(CustomClusterTestSuite):
   # Test depends on block size < 256MiB so larger table is stored in at least 4 blocks.
   @SkipIfFS.large_block_size
   @pytest.mark.execute_serially
-  @CustomClusterTestSuite.with_args('--gen_experimental_profile=true ' +
-      PERIODIC_COUNTER_UPDATE_FLAG)
+  @CustomClusterTestSuite.with_args('--aggregated_profile=true '
+      + PERIODIC_COUNTER_UPDATE_FLAG)
   def test_runtime_profile_aggregated(self, vector):
     """Sanity-check the new experimental profile format.
     --periodic_counter_update_period_ms is decreased to get more samples for time series

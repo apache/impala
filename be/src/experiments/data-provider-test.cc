@@ -71,7 +71,7 @@ int main(int argc, char **argv) {
     provider.Print(&cout, reinterpret_cast<char*>(data), rows);
   }
 
-  profile->PrettyPrint(&cout);
+  profile->PrettyPrint(RuntimeProfile::Verbosity::LEGACY, &cout);
 
   cout << endl << "Done." << endl;
   return 0;

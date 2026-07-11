@@ -1044,7 +1044,7 @@ class TestExecutorGroups(CustomClusterTestSuite):
   @UniqueDatabase.parametrize(sync_ddl=True)
   @pytest.mark.execute_serially
   def test_query_cpu_count_divisor_default(self, unique_database):
-    coordinator_test_args = "-gen_experimental_profile=true"
+    coordinator_test_args = "-aggregated_profile=true"
     self._setup_three_exec_group_cluster(coordinator_test_args)
 
     # The default query options for this test.
@@ -1381,7 +1381,7 @@ class TestExecutorGroups(CustomClusterTestSuite):
   @UniqueDatabase.parametrize(sync_ddl=True)
   @pytest.mark.execute_serially
   def test_query_cpu_count_on_insert(self, unique_database):
-    coordinator_test_args = "-gen_experimental_profile=true"
+    coordinator_test_args = "-aggregated_profile=true"
     self._setup_three_exec_group_cluster(coordinator_test_args)
 
     # The default query options for this test.
@@ -1549,7 +1549,7 @@ class TestExecutorGroups(CustomClusterTestSuite):
   def test_query_cpu_count_divisor_two(self):
     # Expect to run the query on the small group (driven by MemoryAsk),
     # But the CpuAsk is around half of EffectiveParallelism.
-    coordinator_test_args = "-gen_experimental_profile=true -query_cpu_count_divisor=2 "
+    coordinator_test_args = "-aggregated_profile=true -query_cpu_count_divisor=2 "
     self._setup_three_exec_group_cluster(coordinator_test_args)
     self._set_query_options({
       'COMPUTE_PROCESSING_COST': 'true',
@@ -1591,7 +1591,7 @@ class TestExecutorGroups(CustomClusterTestSuite):
   def test_query_cpu_count_divisor_fraction(self):
     # Expect to run the query on the large group
     coordinator_test_args = (
-      "-gen_experimental_profile=true -min_processing_per_thread=550000 "
+      "-aggregated_profile=true -min_processing_per_thread=550000 "
       "-query_cpu_count_divisor=0.03 ")
     self._setup_three_exec_group_cluster(coordinator_test_args)
     self._set_query_options({
@@ -1632,7 +1632,7 @@ class TestExecutorGroups(CustomClusterTestSuite):
     """This test check that executor group limit is enforced if
     skip_resource_checking_on_last_executor_group_set=false."""
     coordinator_test_args = (
-      "-gen_experimental_profile=true -query_cpu_count_divisor=0.01 "
+      "-aggregated_profile=true -query_cpu_count_divisor=0.01 "
       "-skip_resource_checking_on_last_executor_group_set=false ")
     self._setup_three_exec_group_cluster(coordinator_test_args)
     # if the calcite planner is being used, we don't want to run the query after
@@ -1654,7 +1654,7 @@ class TestExecutorGroups(CustomClusterTestSuite):
   def test_min_processing_per_thread_small(self):
     """Test processing cost with min_processing_per_thread smaller than default"""
     coordinator_test_args = (
-      "-gen_experimental_profile=true -min_processing_per_thread=500000")
+      "-aggregated_profile=true -min_processing_per_thread=500000")
     self._setup_three_exec_group_cluster(coordinator_test_args)
 
     # Test that GROUPING_TEST_QUERY will get assigned to the large group.

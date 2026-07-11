@@ -53,11 +53,6 @@ shared_ptr<TConfiguration> ProfileArchiveTConfiguration() {
   return config;
 }
 
-int32_t GetProfileVersion(const TRuntimeProfileTree& tree) {
-  // Assume version 1 if not set, because profile_version was only added in v2.
-  return tree.__isset.profile_version ? tree.profile_version : 1;
-}
-
 shared_ptr<TProtocol> CreateProfileArchiveDeserializeProtocol(
     shared_ptr<TMemoryBuffer> mem) {
   TCompactProtocolFactoryT<TMemoryBuffer> factory;
@@ -170,10 +165,9 @@ Status RuntimeProfile::DeserializeFromArchiveString(
 }
 
 Status RuntimeProfile::CreateFromArchiveString(const string& archive_str,
-    ObjectPool* pool, RuntimeProfile** out, int32_t* profile_version) {
+    ObjectPool* pool, RuntimeProfile** out) {
   TRuntimeProfileTree tree;
   RETURN_IF_ERROR(DeserializeFromArchiveString(archive_str, &tree));
-  *profile_version = GetProfileVersion(tree);
   *out = RuntimeProfile::CreateFromThrift(pool, tree);
   return Status::OK();
 }

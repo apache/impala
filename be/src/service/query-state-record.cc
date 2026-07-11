@@ -41,7 +41,7 @@
 
 using namespace std;
 
-DECLARE_bool(gen_experimental_profile);
+DECLARE_bool(aggregated_profile);
 
 namespace impala {
 
@@ -73,6 +73,7 @@ void QueryStateRecord::Init(const ClientRequestState& query_handle) {
   end_time_us = query_handle.end_time_us();
   wait_time_ms = query_handle.wait_time_ms();
   client_fetch_wait_time_ns = query_handle.client_fetch_wait_time_ns();
+  aggregated_profile = query_handle.query_options().aggregated_profile;
   query_handle.summary_profile()->GetTimeline(&timeline);
 
   Coordinator* coord = query_handle.GetCoordinator();
@@ -294,7 +295,7 @@ QueryStateExpanded::QueryStateExpanded(
         &process_exec_profile, &host_scratch_bytes, &scanner_io_wait, &prof_stack,
         &bytes_read_cache, this](RuntimeProfileBase* profile) {
       prof_stack.push_back(profile);
-      bool is_aggregated = FLAGS_gen_experimental_profile;
+      bool is_aggregated = query_options.aggregated_profile;
 
       // 'num_input_profile' is 1 for non-aggregated profiles.
       // Note that in V1 profile, "Averaged Fragment" node is an aggregated profile.
@@ -404,10 +405,14 @@ QueryStateExpanded::QueryStateExpanded(
   std::vector<RuntimeProfileBase*> children;
   stringstream exec_group_str;
 
+  RuntimeProfile::Verbosity verbosity =  RuntimeProfile::Verbosity::DEFAULT;
+  if (!exec_state.query_options().aggregated_profile) {
+    verbosity = RuntimeProfile::Verbosity::LEGACY;
+  }
   fe_profile->GetChildren(&children);
   for (const auto& child : children) {
     if (boost::algorithm::istarts_with(child->name(), "executor group ")) {
-      child->PrettyPrint(&exec_group_str);
+      child->PrettyPrint(verbosity, &exec_group_str);
     }
   }
   executor_groups = exec_group_str.str();

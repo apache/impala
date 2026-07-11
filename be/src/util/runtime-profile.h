@@ -97,6 +97,11 @@ class RuntimeProfileBase {
     FULL = 4,
   };
 
+  enum class Type {
+    UNAGGREGATED = 0,
+    AGGREGATED = 1
+  };
+
   class Counter {
    public:
     Counter(TUnit::type unit, int64_t value = 0)
@@ -177,11 +182,12 @@ class RuntimeProfileBase {
 
   /// Prints the contents of the profile in a name: value format.
   /// Does not hold locks when it makes any function calls.
-  /// This first overload prints at the configured default verbosity for this process.
-  /// The second overload allows the caller to specify the verbosity.
-  void PrettyPrint(std::ostream* s, const std::string& prefix = "") const;
+  /// Allows the caller to specify the verbosity.
   void PrettyPrint(
       Verbosity verbosity, std::ostream* s, const std::string& prefix = "") const;
+
+  // Get child profile beginning with a specific name prefix
+  RuntimeProfileBase* GetChildByPrefix(const std::string& name_prefix) const;
 
   void GetChildren(std::vector<RuntimeProfileBase*>* children) const;
 
@@ -699,7 +705,6 @@ class RuntimeProfile : public RuntimeProfileBase {
   /// Store an entire runtime profile tree into JSON document 'd'.
   /// This first overload prints at the configured default verbosity for this process.
   /// The second overload allows the caller to specify the verbosity.
-  void ToJson(rapidjson::Document* d) const;
   void ToJson(Verbosity verbosity, rapidjson::Document* d) const;
 
   /// Converts a JSON Document representation of a profile. If 'pretty' is true,
@@ -737,7 +742,7 @@ class RuntimeProfile : public RuntimeProfileBase {
 
   /// Creates a profile from an 'archive_str' created by SerializeToArchiveString().
   static Status CreateFromArchiveString(const std::string& archive_str, ObjectPool* pool,
-      RuntimeProfile** out, int32_t* profile_version_out);
+      RuntimeProfile** out);
 
   /// Set ExecSummary
   void SetTExecSummary(const TExecSummary& summary);
@@ -1015,4 +1020,7 @@ class AggregatedRuntimeProfile : public RuntimeProfileBase {
   static void AggregateSummaryStats(
       const std::vector<SummaryStatsCounter*> counters, SummaryStatsCounter* result);
 };
+
+std::ostream& operator<<(std::ostream& os, const RuntimeProfileBase::Type type);
+
 }

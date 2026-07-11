@@ -97,7 +97,7 @@ class TestObservability(CustomClusterTestSuite):
     verify_profile_node_lifecycle_events(runtime_profile)
 
   @pytest.mark.execute_serially
-  @CustomClusterTestSuite.with_args('--gen_experimental_profile=true')
+  @CustomClusterTestSuite.with_args('--aggregated_profile=true')
   def test_effective_runtime_filter(self, vector):
     """Verify the runtime filter table shows ineffective filters."""
     self.run_test_case('effective-runtime-filter', vector)

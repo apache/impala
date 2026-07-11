@@ -102,7 +102,7 @@ int main(int argc, char** argv) {
     return 1;
   }
   RuntimeProfileBase::Verbosity configured_verbosity =
-      RuntimeProfileBase::Verbosity::DEFAULT;
+      RuntimeProfileBase::Verbosity::LEGACY;
   if (FLAGS_profile_verbosity != ""
       && !RuntimeProfileBase::ParseVerbosity(
              FLAGS_profile_verbosity, &configured_verbosity)) {
@@ -154,9 +154,8 @@ int main(int argc, char** argv) {
 
     ObjectPool pool;
     RuntimeProfile* profile;
-    int32_t profile_version;
     Status status = RuntimeProfile::CreateFromArchiveString(
-        encoded_profile, &pool, &profile, &profile_version);
+        encoded_profile, &pool, &profile);
     if (!status.ok()) {
       cerr << "Error parsing entry " << lineno << ": " << status.GetDetail() << "\n";
       ++errors;
@@ -166,8 +165,19 @@ int main(int argc, char** argv) {
     // Default verbosity depends on version - preserve legacy output for V1 profiles.
     RuntimeProfileBase::Verbosity verbosity = configured_verbosity;
     if (FLAGS_profile_verbosity == "") {
-      verbosity = profile_version < 2 ? RuntimeProfileBase::Verbosity::LEGACY :
-                                        RuntimeProfileBase::Verbosity::DEFAULT;
+      // Assign default verbosity based on the execution profile's type
+      RuntimeProfile* exec_profile = (RuntimeProfile*)
+          profile->GetChildByPrefix("Execution Profile");
+      if (exec_profile != nullptr) {
+        const::string* profile_type = exec_profile->GetInfoString("Profile Type");
+        if (profile_type != nullptr) {
+          if (*profile_type == "UNAGGREGATED") {
+            verbosity = RuntimeProfile::Verbosity::LEGACY;
+          } else {
+            verbosity = RuntimeProfile::Verbosity::DEFAULT;
+          }
+        }
+      }
     }
 
     if (profile_format == "text") {

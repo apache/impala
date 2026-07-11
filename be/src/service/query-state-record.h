@@ -51,6 +51,9 @@ struct QueryStateRecord {
   /// summary.
   bool user_has_profile_access;
 
+  /// Stores the aggregated_profile format state for the current query
+  bool aggregated_profile;
+
   /// default db for this query
   std::string default_db;
 

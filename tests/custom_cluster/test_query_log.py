@@ -606,11 +606,11 @@ class TestQueryLogTableHS2(WorkloadManagementTestSuite):
 
   @CustomClusterTestSuite.with_args(
       cluster_size=1, log_symlinks=True,
-      impalad_args="--gen_experimental_profile",
+      impalad_args="--aggregated_profile",
       workload_mgmt=True,
       disable_log_buffering=True)
   def test_with_experimental_profile(self):
-    """Test that impalad does not crash when gen_experimental_profile flag is True."""
+    """Test that impalad does not crash when aggregated_profile flag is True."""
     impalad = self.cluster.get_first_impalad().service
 
     # Run a query which should successfully be written to the query log table.

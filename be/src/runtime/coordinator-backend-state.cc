@@ -58,7 +58,6 @@ using kudu::rpc::RpcSidecar;
 using namespace rapidjson;
 namespace accumulators = boost::accumulators;
 
-DECLARE_bool(gen_experimental_profile);
 DECLARE_int32(backend_client_rpc_timeout_ms);
 DECLARE_int64(rpc_max_message_size);
 
@@ -81,6 +80,7 @@ const char* Coordinator::BackendState::InstanceStats::LAST_REPORT_TIME_DESC =
 Coordinator::BackendState::BackendState(const QueryExecParams& exec_params, int state_idx,
     TRuntimeFilterMode::type filter_mode, const BackendExecParamsPB& backend_exec_params)
   : exec_params_(exec_params),
+    aggregated_profile_(exec_params.query_options().aggregated_profile),
     state_idx_(state_idx),
     filter_mode_(filter_mode),
     backend_exec_params_(backend_exec_params),
@@ -124,7 +124,8 @@ void Coordinator::BackendState::Init(const vector<FragmentStats*>& fragment_stat
 
     const TPlanFragment* fragment = exec_params_.GetFragments()[fragment_idx];
     InstanceStats* instance_stats = obj_pool->Add(new InstanceStats(
-        instance_params, fragment, host_, fragment_stats[fragment_idx], obj_pool));
+        instance_params, fragment, host_, fragment_stats[fragment_idx], obj_pool,
+        aggregated_profile_));
     instance_stats_map_.emplace(
         GetInstanceIdx(instance_params.instance_id()), instance_stats);
   }
@@ -513,9 +514,8 @@ bool Coordinator::BackendState::ApplyExecStatusReport(
     DmlExecState* dml_exec_state, vector<AuxErrorInfoPB>* aux_error_info,
     const vector<FragmentStats*>& fragment_stats) {
   DCHECK(!IsEmptyBackend());
-  CHECK(FLAGS_gen_experimental_profile ||
-        backend_exec_status.fragment_exec_status().empty())
-      << "Received pre-aggregated profile but --gen_experimental_profile=false";
+  CHECK(aggregated_profile_ || backend_exec_status.fragment_exec_status().empty())
+      << "Received pre-aggregated profile but aggregated_profile=false";
   // Hold the exec_summary's lock to avoid exposing it half-way through
   // the update loop below.
   lock_guard<SpinLock> l1(exec_summary->lock);
@@ -531,14 +531,14 @@ bool Coordinator::BackendState::ApplyExecStatusReport(
   if (IsDoneLocked(lock)) return false;
 
   // Use empty profile in case profile serialization/deserialization failed.
-  // Depending on the --gen_experimental_profile value, there is one profile tree per
+  // Depending on the aggregated_profile value, there is one profile tree per
   // fragment (if true) or per fragment instance (if false).
   vector<TRuntimeProfileTree> empty_profiles;
   // We iterate over the profiles in order. The profile trees include the instance
   // profiles in the same order as 'instance_exec_status', then the aggregated fragment
   // profiles in the same order as 'fragment_exec_status'.
   vector<TRuntimeProfileTree>::const_iterator profile_iter;
-  int expected_num_profiles = FLAGS_gen_experimental_profile ?
+  int expected_num_profiles = aggregated_profile_ ?
       backend_exec_status.fragment_exec_status().size() :
       backend_exec_status.instance_exec_status().size();
   if (UNLIKELY(thrift_profiles.profile_trees.size() == 0)) {
@@ -571,8 +571,7 @@ bool Coordinator::BackendState::ApplyExecStatusReport(
 
     DCHECK(!instance_stats->done_);
     instance_stats->Update(instance_exec_status,
-        FLAGS_gen_experimental_profile ? nullptr : &*profile_iter, report_time_ms,
-        exec_summary);
+        aggregated_profile_ ? nullptr : &*profile_iter, report_time_ms, exec_summary);
 
     // Update DML stats
     if (instance_exec_status.has_dml_exec_status()) {
@@ -605,7 +604,7 @@ bool Coordinator::BackendState::ApplyExecStatusReport(
       --num_remaining_instances_;
       query_progress->Update(1);
     }
-    if (!FLAGS_gen_experimental_profile) ++profile_iter;
+    if (!aggregated_profile_) ++profile_iter;
   }
   // Determine newly-completed scan ranges and update scan_range_progress.
   int64_t scan_ranges_complete = backend_exec_status.scan_ranges_complete();
@@ -633,8 +632,6 @@ bool Coordinator::BackendState::ApplyExecStatusReport(
   } else {
     for (const FragmentExecStatusPB& fragment_exec_status :
           backend_exec_status.fragment_exec_status()) {
-      DCHECK(FLAGS_gen_experimental_profile)
-          << "Per-fragment agg profiles are experimental";
       int fragment_idx = fragment_exec_status.fragment_idx();
       FragmentStats* f = fragment_stats[fragment_idx];
       const TRuntimeProfileTree& tmp_profile = *profile_iter;
@@ -690,7 +687,7 @@ void Coordinator::BackendState::UpdateExecStatsLocked(const unique_lock<mutex>& 
     // Compute the final exec stats if this was the last update. Maintain the aggregated
     // profile on all updates if we are using the V2 profile format, so that we get live
     // updates in the profile for longer-running queries.
-    if (finalize || instance_stats.done_ || FLAGS_gen_experimental_profile) {
+    if (finalize || instance_stats.done_ || aggregated_profile_) {
       instance_stats.UpdateExecStats(fragment_stats, finalize);
     }
   }
@@ -881,8 +878,10 @@ void Coordinator::BackendState::PublishFilterCompleteCb(
 
 Coordinator::BackendState::InstanceStats::InstanceStats(
     const FInstanceExecParamsPB& exec_params, const TPlanFragment* fragment,
-    const NetworkAddressPB& address, FragmentStats* fragment_stats, ObjectPool* obj_pool)
-  : exec_params_(exec_params), fragment_(fragment), profile_(nullptr) {
+    const NetworkAddressPB& address, FragmentStats* fragment_stats, ObjectPool* obj_pool,
+    bool aggregated_profile)
+  : exec_params_(exec_params), fragment_(fragment), profile_(nullptr),
+    aggregated_profile_(aggregated_profile) {
   const string& profile_name = Substitute("Instance $0 (host=$1)",
       PrintId(exec_params.instance_id()), NetworkAddressPBToString(address));
   profile_ = RuntimeProfile::Create(obj_pool, profile_name);
@@ -899,7 +898,7 @@ Coordinator::BackendState::InstanceStats::InstanceStats(
   RuntimeProfile::Counter* bytes_assigned_counter =
       PROFILE_BytesAssigned.Instantiate(profile_);
   bytes_assigned_counter->Set(total_split_size_);
-  if (!FLAGS_gen_experimental_profile) {
+  if (!aggregated_profile_) {
     (*fragment_stats->bytes_assigned())(total_split_size_);
   }
 }
@@ -914,7 +913,7 @@ void Coordinator::BackendState::InstanceStats::Update(
   if (exec_status.done()) stopwatch_.Stop();
   profile_->UpdateInfoString(LAST_REPORT_TIME_DESC,
       ToStringFromUnixMillis(last_report_time_ms_));
-  if (!FLAGS_gen_experimental_profile) {
+  if (!aggregated_profile_) {
     DCHECK(thrift_profile != nullptr);
     profile_->Update(*thrift_profile);
     profile_->ComputeTimeInProfile();
@@ -972,20 +971,20 @@ void Coordinator::BackendState::InstanceStats::UpdateExecStats(
     RuntimeProfile::Counter* completion_timer =
         PROFILE_CompletionTime.Instantiate(profile_);
     completion_timer->Set(completion_time);
-    if (!FLAGS_gen_experimental_profile) f->completion_times_(completion_time);
+    if (!aggregated_profile_) f->completion_times_(completion_time);
     if (completion_time > 0) {
       RuntimeProfile::Counter* execution_rate_counter =
           PROFILE_ExecutionRate.Instantiate(profile_);
       double rate = total_split_size_ / (completion_time / 1000.0 / 1000.0 / 1000.0);
       execution_rate_counter->Set(static_cast<int64_t>(rate));
-      if (!FLAGS_gen_experimental_profile) f->rates_(rate);
+      if (!aggregated_profile_) f->rates_(rate);
     }
     completion_time_set_ = true;
   }
   if (!agg_profile_up_to_date_) {
     // Merge this instance profile (which may or may not included the full instance
     // profile from the executor) into the aggregated profile. We need to do this
-    // regardless of the --gen_experimental_profile setting so that coordinator counters
+    // regardless of the aggregated_profile setting so that coordinator counters
     // end up in the final aggregated profile.
     f->agg_profile_->UpdateAggregatedFromInstance(profile_, per_fragment_instance_idx());
     agg_profile_up_to_date_ = true;
@@ -1017,15 +1016,16 @@ void Coordinator::BackendState::InstanceStats::ToJson(Value* value, Document* do
 }
 
 Coordinator::FragmentStats::FragmentStats(const string& agg_profile_name,
-    const string& root_profile_name, int num_instances, ObjectPool* obj_pool)
+    const string& root_profile_name, int num_instances, ObjectPool* obj_pool,
+    bool aggregated_profile)
   : agg_profile_(
       AggregatedRuntimeProfile::Create(obj_pool, agg_profile_name, num_instances)),
     root_profile_(RuntimeProfile::Create(obj_pool, root_profile_name, false)),
-    num_instances_(num_instances) {}
+    num_instances_(num_instances), aggregated_profile_(aggregated_profile) {}
 
 void Coordinator::FragmentStats::AddSplitStats() {
   // These strings are not included in the transposed profile because we have counters.
-  if (FLAGS_gen_experimental_profile) return;
+  if (aggregated_profile_) return;
   double min = accumulators::min(bytes_assigned_);
   double max = accumulators::max(bytes_assigned_);
   double mean = accumulators::mean(bytes_assigned_);
@@ -1041,7 +1041,7 @@ void Coordinator::FragmentStats::AddSplitStats() {
 void Coordinator::FragmentStats::AddExecStats() {
   root_profile_->SortChildrenByTotalTime();
   // These strings are not included in the transposed profile because we have counters.
-  if (FLAGS_gen_experimental_profile) return;
+  if (aggregated_profile_) return;
   stringstream times_label;
   times_label
     << "min:" << PrettyPrinter::Print(

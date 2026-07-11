@@ -18,6 +18,7 @@
 #include "util/runtime-profile-counters.h"
 
 #include <algorithm>
+#include <charconv>
 #include <iomanip>
 #include <iostream>
 #include <limits>
@@ -47,10 +48,10 @@
 
 // This must be set on the coordinator to enable the alternative profile representation.
 // It should not be set on executors - the setting is sent to the executors by
-// TQueryCtx.gen_aggregated_profile.
-DEFINE_bool_hidden(gen_experimental_profile, false,
-    "(Experimental) when set on coordinator, generate a new aggregated runtime profile "
-    "layout. Format is subject to change.");
+// TQueryCtx.aggregated_profile.
+DEFINE_bool(aggregated_profile, false,
+    "When set on coordinator, generate a new aggregated runtime profile "
+    "layout. Can be overriden with the query option with the same name.");
 
 DEFINE_uint64_hidden(json_profile_event_timestamp_limit, 5,
     "Sets the number of spans / buckets for grouping of event timestamps within"
@@ -125,11 +126,6 @@ static bool UntimedProfileNode(const string& name) {
       || name.compare(RuntimeProfile::HASH_TABLE) == 0
       || name.rfind(RuntimeProfile::PREFIX_FILTER, 0) == 0
       || name.rfind(RuntimeProfile::PREFIX_GROUPING_AGGREGATOR, 0) == 0;
-}
-
-static RuntimeProfile::Verbosity DefaultVerbosity() {
-  return FLAGS_gen_experimental_profile ? RuntimeProfile::Verbosity::DEFAULT :
-                                          RuntimeProfile::Verbosity::LEGACY;
 }
 
 void ProfileEntryPrototypeRegistry::AddPrototype(const ProfileEntryPrototype* prototype) {
@@ -534,8 +530,6 @@ void AggregatedRuntimeProfile::UpdateEventSequencesFromInstance(
 // TODO: do we need any special handling of the computed timers? Like local/total time.
 void AggregatedRuntimeProfile::UpdateAggregatedFromInstances(
     const TRuntimeProfileTree& src, int start_idx, bool add_default_counters) {
-  DCHECK(FLAGS_gen_experimental_profile)
-    << "Aggregated profiles should only be used on the coordinator when enabled by flag";
   if (UNLIKELY(src.nodes.size()) == 0) return;
   const TRuntimeProfileNode& root = src.nodes[0];
   DCHECK(root.__isset.aggregated);
@@ -969,6 +963,18 @@ RuntimeProfile* RuntimeProfile::CreateChild(
   return child;
 }
 
+RuntimeProfileBase* RuntimeProfileBase::GetChildByPrefix(
+    const std::string& name_prefix) const {
+  std::vector<RuntimeProfileBase*> children;
+  lock_guard<SpinLock> l(children_lock_);
+  for (const auto& child : children_) {
+    if (child.first->name().rfind(name_prefix, 0) != string::npos) {
+      return child.first;
+    }
+  }
+  return nullptr;
+}
+
 void RuntimeProfileBase::GetChildren(vector<RuntimeProfileBase*>* children) const {
   children->clear();
   lock_guard<SpinLock> l(children_lock_);
@@ -1232,10 +1238,6 @@ RuntimeProfile::EventSequence* RuntimeProfile::GetEventSequence(const string& na
   return it->second;
 }
 
-void RuntimeProfile::ToJson(Document* d) const {
-  return ToJson(DefaultVerbosity(), d);
-}
-
 void RuntimeProfile::ToJson(Verbosity verbosity, Document* d) const {
   // queryObj that stores all JSON format profile information
   Value queryObj(kObjectType);
@@ -1419,10 +1421,6 @@ void RuntimeProfile::ToJsonSubclass(
       parent->AddMember("summary_stats_counters", summary_stats_counters_json, allocator);
     }
   }
-}
-
-void RuntimeProfileBase::PrettyPrint(ostream* s, const string& prefix) const {
-  PrettyPrint(DefaultVerbosity(), s, prefix);
 }
 
 // Print the profile:
@@ -1625,11 +1623,25 @@ void RuntimeProfile::SetTExecSummary(const TExecSummary& summary) {
 void RuntimeProfileBase::ToThrift(TRuntimeProfileTree* tree) const {
   tree->nodes.clear();
   ToThriftHelper(&tree->nodes);
-  if (FLAGS_gen_experimental_profile) tree->__set_profile_version(2);
 }
 
 void RuntimeProfile::ToThrift(TRuntimeProfileTree* tree) const {
   RuntimeProfileBase::ToThrift(tree);
+
+  RuntimeProfile* exec_profile = (RuntimeProfile*) GetChildByPrefix("Execution Profile");
+  // If "Execution Profile" exists then set the 'profile_version' for thrift
+  if (exec_profile != nullptr) {
+    const::string* version_str = exec_profile->GetInfoString("Profile Version");
+    DCHECK(version_str);
+
+    int32_t profile_version;
+    const char* end = version_str->data() + version_str->length();
+    auto [ptr, ec] = std::from_chars(version_str->data(), end, profile_version);
+    DCHECK(ec == std::errc() && ptr == end);
+
+    tree->__set_profile_version(profile_version);
+  }
+
   ExecSummaryToThrift(tree);
 }
 
@@ -2154,6 +2166,7 @@ void RuntimeProfileBase::AveragedCounter::ToJsonImpl(
   // For counters with <> 1 values, show summary stats and the values.
   counter_json.AddMember("count", stats.num_vals, document.GetAllocator());
   if (stats.num_vals > 0) {
+    // Due to limitation of rapidJSON library, we cannot use "long double"
     counter_json.AddMember("min", stats.min, document.GetAllocator());
     counter_json.AddMember("max", stats.max, document.GetAllocator());
     // Only include detailed statistics if they are meaningful
@@ -3095,4 +3108,17 @@ void AggregatedRuntimeProfile::AggregateSummaryStats(
     if (counter != nullptr) result->Merge(*counter);
   }
 }
+
+std::ostream& operator<<(std::ostream& os, const RuntimeProfileBase::Type type) {
+  switch (type) {
+    case RuntimeProfileBase::Type::UNAGGREGATED:
+      os << "UNAGGREGATED";
+      break;
+    case RuntimeProfileBase::Type::AGGREGATED:
+      os << "AGGREGATED";
+      break;
+  }
+  return os;
+}
+
 }

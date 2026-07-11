@@ -1098,6 +1098,9 @@ enum TImpalaQueryOptions {
 
   // When true, store historical execution stats asynchronously after the query finishes.
   STORE_HBO_STATS = 203
+
+  // When set, generate a new aggregated runtime profile layout
+  AGGREGATED_PROFILE = 204
 }
 
 // The summary of a DML statement.

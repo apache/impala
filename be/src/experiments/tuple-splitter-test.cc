@@ -438,7 +438,7 @@ int main(int argc, char **argv) {
   cout << "Largest Partition: " << largest_partition << endl;;
 
   cout << endl;
-  profile->PrettyPrint(&cout);
+  profile->PrettyPrint(RuntimeProfile::Verbosity::LEGACY, &cout);
 
   LOG(ERROR) << "Done.";
   return 0;

@@ -1461,6 +1461,10 @@ Status impala::SetQueryOption(TImpalaQueryOptions::type option, const string& va
         query_options->__set_store_hbo_stats(IsTrue(value));
         break;
       }
+      case TImpalaQueryOptions::AGGREGATED_PROFILE: {
+        query_options->__set_aggregated_profile(IsTrue(value));
+        break;
+      }
       default:
         string key = to_string(option);
         if (IsRemovedQueryOption(key)) {
