@@ -188,6 +188,7 @@ COMPRESSION_MAP = {
   'gzip': 'org.apache.hadoop.io.compress.GzipCodec',
   'bzip': 'org.apache.hadoop.io.compress.BZip2Codec',
   'snap': 'org.apache.hadoop.io.compress.SnappyCodec',
+  'zstd': 'org.apache.hadoop.io.compress.ZStandardCodec',
   'none': ''
 }
 
