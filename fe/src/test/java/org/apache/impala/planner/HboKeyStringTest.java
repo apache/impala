@@ -1457,4 +1457,221 @@ public class HboKeyStringTest extends FrontendTestBase {
     }
     assertTopNStorePath(local, merge);
   }
+
+  private AnalyticEvalNode singleAnalytic(String query) throws ImpalaException {
+    Map<Integer, PlanNode> nodes = collectPlanNodesInDistributedPlan(query);
+    int count = 0;
+    AnalyticEvalNode analytic = null;
+    for (PlanNode n : nodes.values()) {
+      if (n instanceof AnalyticEvalNode) {
+        analytic = (AnalyticEvalNode) n;
+        count++;
+      }
+    }
+    assertEquals("Expected exactly one AnalyticEvalNode for query: " + query, 1, count);
+    return analytic;
+  }
+
+  @Test
+  public void testAnalyticNodeKeys() throws ImpalaException {
+    String query = "select id, rank() over (partition by int_col order by id) "
+        + "from functional.alltypes where year = 2009";
+    AnalyticEvalNode analytic = singleAnalytic(query);
+
+    String prefix = "CARDINALITY:AnalyticEvalNode:|Fns:[rank()]|PartExprs:[int_col]|"
+        + "OrderExprs:[id ASC NULLS LAST]|"
+        + "Window:RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW|";
+    String expectedER = prefix
+        + "Child:[CARDINALITY:ScanNode:functional.alltypes|`year` = 2009]";
+    String expectedIPC = prefix
+        + "Child:[CARDINALITY:ScanNode:functional.alltypes|`year`=<CONST>]";
+
+    assertEquals(expectedER, analytic.generateHboKeyString(
+        THboStatsType.CARDINALITY, CanonicalizationStrategy.EXPR_REWRITE));
+    assertEquals(expectedIPC, analytic.generateHboKeyString(
+        THboStatsType.CARDINALITY,
+        CanonicalizationStrategy.IGNORE_PARTITION_CONSTANTS));
+  }
+
+  @Test
+  public void testAnalyticNodeLimit() throws ImpalaException {
+    // Same analytic as testAnalyticNodeKeys but with a query-level LIMIT, which lands on
+    // the topmost plan node (the AnalyticEvalNode).
+    String query = "select id, rank() over (partition by int_col order by id) "
+        + "from functional.alltypes where year = 2009 limit 5";
+    AnalyticEvalNode analytic = singleAnalytic(query);
+    assertTrue("Expected a valid LIMIT (> 0) on the AnalyticEvalNode",
+        analytic.getLimit() > 0);
+
+    // The LIMIT is also pushed into the analytic's underlying sort so it's a TOPN.
+    String childSortFmt = "CARDINALITY:SortNode:Type:TOPN|IncludeTies:false|"
+        + "OrderKind:LEXICAL|Limit:5|Offset:0|"
+        + "OrderExprs:[int_col ASC NULLS LAST,id ASC NULLS LAST]|"
+        + "Child:[CARDINALITY:ScanNode:functional.alltypes|%s]";
+    String prefix = "CARDINALITY:AnalyticEvalNode:|limit:5|Fns:[rank()]|"
+        + "PartExprs:[int_col]|OrderExprs:[id ASC NULLS LAST]|"
+        + "Window:RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW|Child:[%s]";
+    String expectedER =
+        String.format(prefix, String.format(childSortFmt, "`year` = 2009"));
+    String expectedIPC =
+        String.format(prefix, String.format(childSortFmt, "`year`=<CONST>"));
+
+    assertEquals(expectedER, analytic.generateHboKeyString(
+        THboStatsType.CARDINALITY, CanonicalizationStrategy.EXPR_REWRITE));
+    assertEquals(expectedIPC, analytic.generateHboKeyString(
+        THboStatsType.CARDINALITY,
+        CanonicalizationStrategy.IGNORE_PARTITION_CONSTANTS));
+  }
+
+  @Test
+  public void testAnalyticImplicitAndExplicitNullsMatch() throws ImpalaException {
+    // A plain "ORDER BY id" (ASC) and an explicit "ORDER BY id ASC NULLS LAST" are
+    // identical: NULLS LAST is the default for ASC.
+    String implicitQuery = "select id, rank() over (partition by int_col order by id) "
+        + "from functional.alltypes where year = 2009";
+    String explicitQuery = "select id, rank() over (partition by int_col order by id "
+        + "asc nulls last) from functional.alltypes where year = 2009";
+    AnalyticEvalNode implicitAnalytic = singleAnalytic(implicitQuery);
+    AnalyticEvalNode explicitAnalytic = singleAnalytic(explicitQuery);
+
+    String prefix = "CARDINALITY:AnalyticEvalNode:|Fns:[rank()]|PartExprs:[int_col]|"
+        + "OrderExprs:[id ASC NULLS LAST]|"
+        + "Window:RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW|";
+    String expectedER = prefix
+        + "Child:[CARDINALITY:ScanNode:functional.alltypes|`year` = 2009]";
+    String expectedIPC = prefix
+        + "Child:[CARDINALITY:ScanNode:functional.alltypes|`year`=<CONST>]";
+
+    // Both queries pin the same expected key under each canonicalization strategy.
+    assertEquals(expectedER, implicitAnalytic.generateHboKeyString(
+        THboStatsType.CARDINALITY, CanonicalizationStrategy.EXPR_REWRITE));
+    assertEquals(expectedER, explicitAnalytic.generateHboKeyString(
+        THboStatsType.CARDINALITY, CanonicalizationStrategy.EXPR_REWRITE));
+    assertEquals(expectedIPC, implicitAnalytic.generateHboKeyString(
+        THboStatsType.CARDINALITY,
+        CanonicalizationStrategy.IGNORE_PARTITION_CONSTANTS));
+    assertEquals(expectedIPC, explicitAnalytic.generateHboKeyString(
+        THboStatsType.CARDINALITY,
+        CanonicalizationStrategy.IGNORE_PARTITION_CONSTANTS));
+
+    for (CanonicalizationStrategy strategy : CanonicalizationStrategy.values()) {
+      assertEquals("Implicit ASC and explicit ASC NULLS LAST must produce the same "
+              + "AnalyticEvalNode key for " + strategy,
+          implicitAnalytic.generateHboKeyString(THboStatsType.CARDINALITY, strategy),
+          explicitAnalytic.generateHboKeyString(THboStatsType.CARDINALITY, strategy));
+    }
+  }
+
+  @Test
+  public void testAnalyticPartitionAndOrderAffectKey() throws ImpalaException {
+    // The partition-by and order-by exprs are part of the key, so analytic nodes that
+    // differ only in partitioning or ordering must hash differently.
+    String base = "select id, rank() over (partition by %s order by %s) "
+        + "from functional.alltypes where year = 2009";
+    AnalyticEvalNode byIntCol = singleAnalytic(String.format(base, "int_col", "id"));
+    AnalyticEvalNode byBigintCol =
+        singleAnalytic(String.format(base, "bigint_col", "id"));
+    AnalyticEvalNode orderDesc =
+        singleAnalytic(String.format(base, "int_col", "id desc"));
+
+    for (CanonicalizationStrategy strategy : CanonicalizationStrategy.values()) {
+      String kIntCol =
+          byIntCol.generateHboKeyString(THboStatsType.CARDINALITY, strategy);
+      String kBigintCol =
+          byBigintCol.generateHboKeyString(THboStatsType.CARDINALITY, strategy);
+      String kOrderDesc =
+          orderDesc.generateHboKeyString(THboStatsType.CARDINALITY, strategy);
+      assertNotEquals("Different PARTITION BY must hash differently for " + strategy,
+          kIntCol, kBigintCol);
+      assertNotEquals("Different ORDER BY must hash differently for " + strategy,
+          kIntCol, kOrderDesc);
+    }
+  }
+
+  @Test
+  public void testAnalyticOverJoin() throws ImpalaException {
+    // When an AnalyticEvalNode's input is a join, its partition-by / order-by (and
+    // function) columns reference several input operands and must be qualified with the
+    // join's canonical operand index. Swapping which operand supplies the partition vs.
+    // order column must therefore hash differently.
+    String q1 = "select a.id, rank() over (partition by a.int_col order by b.id) "
+        + "from functional.alltypes a join functional.alltypestiny b on a.id = b.id";
+    String q2 = "select a.id, rank() over (partition by b.int_col order by a.id) "
+        + "from functional.alltypes a join functional.alltypestiny b on a.id = b.id";
+    AnalyticEvalNode an1 = singleAnalytic(q1);
+    AnalyticEvalNode an2 = singleAnalytic(q2);
+
+    String childKey = "Window:RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW|"
+        + "Child:[CARDINALITY:JoinNode:INNER|Operands:[CARDINALITY:ScanNode:"
+        + "functional.alltypes,CARDINALITY:ScanNode:functional.alltypestiny]|"
+        + "Predicates:[op0.id=op1.id]]";
+    // q1: partition by a.int_col (alltypes=op0), order by b.id (alltypestiny=op1).
+    String expected1 = "CARDINALITY:AnalyticEvalNode:|Fns:[rank()]|PartExprs:"
+        + "[op0.int_col]|OrderExprs:[op1.id ASC NULLS LAST]|" + childKey;
+    // q2: partition by b.int_col (alltypestiny=op1), order by a.id (alltypes=op0).
+    String expected2 = "CARDINALITY:AnalyticEvalNode:|Fns:[rank()]|PartExprs:"
+        + "[op1.int_col]|OrderExprs:[op0.id ASC NULLS LAST]|" + childKey;
+
+    for (CanonicalizationStrategy strategy : CanonicalizationStrategy.values()) {
+      assertEquals(expected1,
+          an1.generateHboKeyString(THboStatsType.CARDINALITY, strategy));
+      assertEquals(expected2,
+          an2.generateHboKeyString(THboStatsType.CARDINALITY, strategy));
+      assertNotEquals("Swapped partition/order operands must hash differently for "
+              + strategy,
+          an1.generateHboKeyString(THboStatsType.CARDINALITY, strategy),
+          an2.generateHboKeyString(THboStatsType.CARDINALITY, strategy));
+    }
+  }
+
+  @Test
+  public void testAggOverAnalyticOverJoin() throws ImpalaException {
+    // Aggregation on top of an AnalyticEvalNode on top of a join, grouping on columns
+    // from different join operands and the analytic result.
+    String query = "select int_col, bigint_col, r, count(*) from ("
+        + "select a.int_col int_col, b.bigint_col bigint_col, "
+        + "rank() over (partition by a.int_col order by b.id) r "
+        + "from functional.alltypes a join functional.alltypestiny b on a.id = b.id"
+        + ") t group by int_col, bigint_col, r";
+
+    // The analytic's partition-by (a.int_col) and order-by (b.id) are qualified by the
+    // join operand index, just like the aggregation's grouping columns below.
+    String analyticChild = "CARDINALITY:AnalyticEvalNode:|Fns:[rank()]|"
+        + "PartExprs:[op0.int_col]|OrderExprs:[op1.id ASC NULLS LAST]|"
+        + "Window:RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW|"
+        + "Child:[CARDINALITY:JoinNode:INNER|Operands:[CARDINALITY:ScanNode:"
+        + "functional.alltypes,CARDINALITY:ScanNode:functional.alltypestiny]|"
+        + "Predicates:[op0.id=op1.id]]";
+    String expectedPreagg = "CARDINALITY:AggregationNode:FIRST|Preagg:true|"
+        + "GroupingSet:false|AggClasses:[0:Group:op0.int_col,op1.bigint_col,"
+        + "rank() OVER (PARTITION BY op0.int_col ORDER BY op1.id ASC "
+        + "RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW)]"
+        + "|Child:[" + analyticChild + "]";
+
+    Map<Integer, PlanNode> nodes = collectPlanNodesInDistributedPlan(query);
+    PlanNode preagg = nodes.get(5);
+    assertEquals(expectedPreagg, preagg.generateHboKeyString(
+        THboStatsType.CARDINALITY, CanonicalizationStrategy.EXPR_REWRITE));
+  }
+
+  @Test
+  public void testAnalyticAsJoinOperand() throws ImpalaException {
+    // Test using the analytic result as the join key
+    String query = "select a.id from functional.alltypes a join ("
+        + "select id, rank() over (partition by int_col order by id) r "
+        + "from functional.alltypestiny) b on a.id = b.r";
+    JoinNode join = singleJoin(query);
+
+    String analyticOperand = "CARDINALITY:AnalyticEvalNode:|Fns:[rank()]|"
+        + "PartExprs:[int_col]|OrderExprs:[id ASC NULLS LAST]|"
+        + "Window:RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW|"
+        + "Child:[CARDINALITY:ScanNode:functional.alltypestiny]";
+    // The predicate (a.id = b.r) should be substituted and qualified to get rid of alias.
+    String expectedER = "CARDINALITY:JoinNode:INNER|Operands:["
+        + ALLTYPES_SCAN_KEY + "," + analyticOperand + "]|"
+        + "Predicates:[op0.id=rank() OVER (PARTITION BY op1.int_col ORDER BY op1.id ASC "
+        + "RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW)]";
+    assertEquals(expectedER, join.generateHboKeyString(
+        THboStatsType.CARDINALITY, CanonicalizationStrategy.EXPR_REWRITE));
+  }
 }

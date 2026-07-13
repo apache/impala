@@ -460,3 +460,31 @@ class TestHBO(HboTestMixin, ImpalaTestSuite):
           where string_col != 'test_analytic_topn') t
         where rnk <= 5""")
     self._run_hbo_explains('QueryTest/hbo-analytic-topn')
+
+  def test_agg_over_analytic_cardinality(self):
+    """Test an Aggregation over analytic nodes using the analytic results as grouping
+    keys. AnalyticEvalNode won't use HBO stats. But its parent, the AggregationNode,
+    should be able to use HBO stats."""
+    self.client.set_configuration(QUERY_OPTIONS)
+    self.execute_query("""
+        select count(*), rnk % 10 from
+          (select int_col, rank() over (order by id asc) as rnk
+           from functional.alltypes
+           where month=1 and string_col != 'test_agg_over_analytic') t
+        group by rnk % 10""")
+    self._run_hbo_explains('QueryTest/hbo-analytic-agg')
+
+  def test_join_over_analytic_cardinality(self):
+    """Test a JOIN over analytic nodes joining the analytic results. AnalyticEvalNodes
+    won't use HBO stats. But its parent, the JoinNode should be able to use HBO stats."""
+    self.client.set_configuration(QUERY_OPTIONS)
+    self.execute_query("""
+        select straight_join t1.int_col, t1.rnk from
+          (select int_col, rank() over (order by id asc) as rnk
+           from functional.alltypes
+           where month=1 and string_col != 'test_join_over_analytic') t1,
+          (select int_col, rank() over (order by id desc) as rnk
+           from functional.alltypestiny
+           where month=1 and string_col != 'test_join_over_analytic') t2
+        where t1.int_col = t2.int_col and t1.rnk = t2.rnk""")
+    self._run_hbo_explains('QueryTest/hbo-analytic-join')

@@ -1,0 +1,67 @@
+====
+---- QUERY
+EXPLAIN select count(*), rnk % 10 from
+  (select int_col, rank() over (order by id asc) as rnk
+   from functional.alltypes
+   where month=1 and string_col != 'test_agg_over_analytic') t
+group by rnk % 10
+---- PLAN
+PLAN-ROOT SINK
+|
+03:AGGREGATE [FINALIZE]
+|  output: count(*)
+|  group by: rank() % 10
+|  row-size=16B cardinality=10 (from HBO)
+|
+02:ANALYTIC
+|  functions: rank()
+|  order by: id ASC
+|  window: RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+|  row-size=29B cardinality=620
+|
+04:MERGING-EXCHANGE [UNPARTITIONED]
+|  order by: id ASC
+|
+01:SORT
+|  order by: id ASC
+|  row-size=21B cardinality=620
+|
+00:SCAN HDFS [functional.alltypes]
+   partition predicates: `month` = 1
+   HDFS partitions=2/24 files=2 size=40.32KB
+   predicates: string_col != 'test_agg_over_analytic'
+   row-size=21B cardinality=620 (from HBO)
+====
+---- QUERY
+EXPLAIN select count(*), rnk % 10 from
+  (select int_col, rank() over (order by id asc) as rnk
+   from functional.alltypes
+   where month=2 and string_col != 'test_agg_over_analytic') t
+group by rnk % 10
+---- PLAN
+PLAN-ROOT SINK
+|
+03:AGGREGATE [FINALIZE]
+|  output: count(*)
+|  group by: rank() % 10
+|  row-size=16B cardinality=10 (from HBO, key ignores partition constants)
+|
+02:ANALYTIC
+|  functions: rank()
+|  order by: id ASC
+|  window: RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+|  row-size=29B cardinality=620
+|
+04:MERGING-EXCHANGE [UNPARTITIONED]
+|  order by: id ASC
+|
+01:SORT
+|  order by: id ASC
+|  row-size=21B cardinality=620
+|
+00:SCAN HDFS [functional.alltypes]
+   partition predicates: `month` = 2
+   HDFS partitions=2/24 files=2 size=36.51KB
+   predicates: string_col != 'test_agg_over_analytic'
+   row-size=21B cardinality=620 (from HBO, key ignores partition constants)
+====

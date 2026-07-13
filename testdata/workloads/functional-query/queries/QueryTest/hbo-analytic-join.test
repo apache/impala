@@ -1,0 +1,229 @@
+====
+---- QUERY
+# EXPLAIN the analytic query that has been executed.
+EXPLAIN select straight_join t1.int_col, t1.rnk from
+  (select int_col, rank() over (order by id asc) as rnk
+   from functional.alltypes
+   where month=1 and string_col != 'test_join_over_analytic') t1,
+  (select int_col, rank() over (order by id desc) as rnk
+   from functional.alltypestiny
+   where month=1 and string_col != 'test_join_over_analytic') t2
+where t1.int_col = t2.int_col and t1.rnk = t2.rnk
+---- PLAN
+PLAN-ROOT SINK
+|
+06:HASH JOIN [INNER JOIN, BROADCAST]
+|  hash predicates: int_col = int_col, rank() = rank()
+|  row-size=66B cardinality=0 (from HBO)
+|
+|--09:EXCHANGE [UNPARTITIONED]
+|  |
+|  05:ANALYTIC
+|  |  functions: rank()
+|  |  order by: id DESC
+|  |  window: RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+|  |  row-size=33B cardinality=2
+|  |
+|  08:MERGING-EXCHANGE [UNPARTITIONED]
+|  |  order by: id DESC
+|  |
+|  04:SORT
+|  |  order by: id DESC
+|  |  row-size=25B cardinality=2
+|  |
+|  03:SCAN HDFS [functional.alltypestiny]
+|     partition predicates: `month` = 1
+|     HDFS partitions=1/4 files=1 size=115B
+|     predicates: string_col != 'test_join_over_analytic'
+|     row-size=25B cardinality=2 (from HBO)
+|
+02:ANALYTIC
+|  functions: rank()
+|  order by: id ASC
+|  window: RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+|  row-size=33B cardinality=620
+|
+07:MERGING-EXCHANGE [UNPARTITIONED]
+|  order by: id ASC
+|
+01:SORT
+|  order by: id ASC
+|  row-size=25B cardinality=620
+|
+00:SCAN HDFS [functional.alltypes]
+   partition predicates: `month` = 1
+   HDFS partitions=2/24 files=2 size=40.32KB
+   predicates: string_col != 'test_join_over_analytic'
+   row-size=25B cardinality=620 (from HBO)
+====
+---- QUERY
+# Change the JOIN order
+EXPLAIN select straight_join t1.int_col, t1.rnk from
+  (select int_col, rank() over (order by id desc) as rnk
+   from functional.alltypestiny
+   where month=1 and string_col != 'test_join_over_analytic') t2,
+  (select int_col, rank() over (order by id asc) as rnk
+   from functional.alltypes
+   where month=1 and string_col != 'test_join_over_analytic') t1
+where t1.int_col = t2.int_col and t1.rnk = t2.rnk
+---- PLAN
+PLAN-ROOT SINK
+|
+06:HASH JOIN [INNER JOIN, BROADCAST]
+|  hash predicates: int_col = int_col, rank() = rank()
+|  row-size=66B cardinality=0 (from HBO)
+|
+|--09:EXCHANGE [UNPARTITIONED]
+|  |
+|  05:ANALYTIC
+|  |  functions: rank()
+|  |  order by: id ASC
+|  |  window: RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+|  |  row-size=33B cardinality=620
+|  |
+|  08:MERGING-EXCHANGE [UNPARTITIONED]
+|  |  order by: id ASC
+|  |
+|  04:SORT
+|  |  order by: id ASC
+|  |  row-size=25B cardinality=620
+|  |
+|  03:SCAN HDFS [functional.alltypes]
+|     partition predicates: `month` = 1
+|     HDFS partitions=2/24 files=2 size=40.32KB
+|     predicates: string_col != 'test_join_over_analytic'
+|     row-size=25B cardinality=620 (from HBO)
+|
+02:ANALYTIC
+|  functions: rank()
+|  order by: id DESC
+|  window: RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+|  row-size=33B cardinality=2
+|
+07:MERGING-EXCHANGE [UNPARTITIONED]
+|  order by: id DESC
+|
+01:SORT
+|  order by: id DESC
+|  row-size=25B cardinality=2
+|
+00:SCAN HDFS [functional.alltypestiny]
+   partition predicates: `month` = 1
+   HDFS partitions=1/4 files=1 size=115B
+   predicates: string_col != 'test_join_over_analytic'
+   row-size=25B cardinality=2 (from HBO)
+====
+---- QUERY
+# Changing the analytic functions, the JOIN node have no HBO stats
+EXPLAIN select straight_join t1.int_col, t1.rnk from
+  (select int_col, rank() over (order by bigint_col, id asc) as rnk
+   from functional.alltypes
+   where month=1 and string_col != 'test_join_over_analytic') t1,
+  (select int_col, rank() over (order by bigint_col, id desc) as rnk
+   from functional.alltypestiny
+   where month=1 and string_col != 'test_join_over_analytic') t2
+where t1.int_col = t2.int_col and t1.rnk = t2.rnk
+---- PLAN
+PLAN-ROOT SINK
+|
+06:HASH JOIN [INNER JOIN, BROADCAST]
+|  hash predicates: int_col = int_col, rank() = rank()
+|  row-size=82B cardinality=1.24K
+|
+|--09:EXCHANGE [UNPARTITIONED]
+|  |
+|  05:ANALYTIC
+|  |  functions: rank()
+|  |  order by: bigint_col ASC, id DESC
+|  |  window: RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+|  |  row-size=41B cardinality=2
+|  |
+|  08:MERGING-EXCHANGE [UNPARTITIONED]
+|  |  order by: bigint_col ASC, id DESC
+|  |
+|  04:SORT
+|  |  order by: bigint_col ASC, id DESC
+|  |  row-size=33B cardinality=2
+|  |
+|  03:SCAN HDFS [functional.alltypestiny]
+|     partition predicates: `month` = 1
+|     HDFS partitions=1/4 files=1 size=115B
+|     predicates: string_col != 'test_join_over_analytic'
+|     row-size=33B cardinality=2 (from HBO)
+|
+02:ANALYTIC
+|  functions: rank()
+|  order by: bigint_col ASC, id ASC
+|  window: RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+|  row-size=41B cardinality=620
+|
+07:MERGING-EXCHANGE [UNPARTITIONED]
+|  order by: bigint_col ASC, id ASC
+|
+01:SORT
+|  order by: bigint_col ASC, id ASC
+|  row-size=33B cardinality=620
+|
+00:SCAN HDFS [functional.alltypes]
+   partition predicates: `month` = 1
+   HDFS partitions=2/24 files=2 size=40.32KB
+   predicates: string_col != 'test_join_over_analytic'
+   row-size=33B cardinality=620 (from HBO)
+====
+---- QUERY
+# Change the partition predicate to month=2
+EXPLAIN select straight_join t1.int_col, t1.rnk from
+  (select int_col, rank() over (order by id asc) as rnk
+   from functional.alltypes
+   where month=2 and string_col != 'test_join_over_analytic') t1,
+  (select int_col, rank() over (order by id desc) as rnk
+   from functional.alltypestiny
+   where month=2 and string_col != 'test_join_over_analytic') t2
+where t1.int_col = t2.int_col and t1.rnk = t2.rnk
+---- PLAN
+PLAN-ROOT SINK
+|
+06:HASH JOIN [INNER JOIN, BROADCAST]
+|  hash predicates: int_col = int_col, rank() = rank()
+|  row-size=66B cardinality=0 (from HBO, key ignores partition constants)
+|
+|--09:EXCHANGE [UNPARTITIONED]
+|  |
+|  05:ANALYTIC
+|  |  functions: rank()
+|  |  order by: id DESC
+|  |  window: RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+|  |  row-size=33B cardinality=2
+|  |
+|  08:MERGING-EXCHANGE [UNPARTITIONED]
+|  |  order by: id DESC
+|  |
+|  04:SORT
+|  |  order by: id DESC
+|  |  row-size=25B cardinality=2
+|  |
+|  03:SCAN HDFS [functional.alltypestiny]
+|     partition predicates: `month` = 2
+|     HDFS partitions=1/4 files=1 size=115B
+|     predicates: string_col != 'test_join_over_analytic'
+|     row-size=25B cardinality=2 (from HBO, key ignores partition constants)
+|
+02:ANALYTIC
+|  functions: rank()
+|  order by: id ASC
+|  window: RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+|  row-size=33B cardinality=620
+|
+07:MERGING-EXCHANGE [UNPARTITIONED]
+|  order by: id ASC
+|
+01:SORT
+|  order by: id ASC
+|  row-size=25B cardinality=620
+|
+00:SCAN HDFS [functional.alltypes]
+   partition predicates: `month` = 2
+   HDFS partitions=2/24 files=2 size=36.51KB
+   predicates: string_col != 'test_join_over_analytic'
+   row-size=25B cardinality=620 (from HBO, key ignores partition constants)
+====

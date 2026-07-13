@@ -154,7 +154,14 @@ public class AnalyticExpr extends Expr {
 
   @Override
   public String toSqlImpl(ToSqlOptions options) {
-    if (sqlString_ != null) return sqlString_;
+    if (options.showForHbo()) {
+      // HBO keys must render fresh so operand qualifiers applied to child SlotRefs are
+      // picked up. syncWithChildren re-derives the mirror fields from children_ and is
+      // semantics-preserving (same convention as resetAnalysisState/substituteImpl).
+      syncWithChildren();
+    } else if (sqlString_ != null) {
+      return sqlString_;
+    }
     StringBuilder sb = new StringBuilder();
     sb.append(fnCall_.toSql(options)).append(" OVER (");
     boolean needsSpace = false;

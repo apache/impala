@@ -18,7 +18,9 @@
 package org.apache.impala.planner;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 
 import org.apache.impala.analysis.AnalyticExpr;
 import org.apache.impala.analysis.AnalyticWindow;
@@ -42,7 +44,9 @@ import org.apache.impala.catalog.Function;
 import org.apache.impala.common.Pair;
 import org.apache.impala.thrift.TAnalyticNode;
 import org.apache.impala.thrift.TExplainLevel;
+import org.apache.impala.thrift.THboStatsType;
 import org.apache.impala.thrift.TPlanNode;
+import org.apache.impala.thrift.TPlanNodeRun;
 import org.apache.impala.thrift.TPlanNodeType;
 import org.apache.impala.thrift.TQueryOptions;
 import org.apache.impala.util.ExprUtil;
@@ -132,6 +136,7 @@ public class AnalyticEvalNode extends PlanNode {
   @Override
   public void init(Analyzer analyzer) {
     Preconditions.checkState(conjuncts_.isEmpty());
+    computeHboOperandQualifierMap(analyzer);
     computeMemLayout(analyzer);
     intermediateTupleDesc_.computeMemLayout();
 
@@ -307,6 +312,69 @@ public class AnalyticEvalNode extends PlanNode {
     if (bufferedTupleDesc_ != null) {
       msg.analytic_node.setBuffered_tuple_id(bufferedTupleDesc_.getId().asInt());
     }
+  }
+
+  @Override
+  public boolean isOperandTransparent() { return true; }
+
+  @Override
+  public void appendScanInputStats(TPlanNodeRun execStats) {
+    getChild(0).appendScanInputStats(execStats);
+  }
+
+  /**
+   * Generates an HBO key string for this analytic node. Returns null if the child node
+   * doesn't support HBO.
+   */
+  @Override
+  public String generateHboKeyString(THboStatsType statsType,
+      CanonicalizationStrategy strategy) {
+    Preconditions.checkState(children_.size() == 1);
+    Preconditions.checkState(conjuncts_.isEmpty());
+    String childKey = getChild(0).generateHboKeyString(statsType, strategy);
+    if (childKey == null) {
+      LOG.debug("Not tracking {} in HBO since the child doesn't support HBO: {}",
+          getDisplayLabel(), getChild(0).getDisplayLabel());
+      return null;
+    }
+
+    StringBuilder sb = startHboKeyString(statsType, ":AnalyticEvalNode:");
+
+    // The analytic function calls, partition-by and order-by exprs all reference the
+    // input (the preceding sort output). When that input has multiple operands (a join
+    // below the analytic), their columns are qualified with the join's canonical operand
+    // index. A single-operand input (e.g. a scan) needs no qualification.
+    Map<TupleId, String> operandIdx = getChild(0).getHboOperandQualifierMap();
+
+    // Partition-by and function calls are order-independent and canonicalized into sorted
+    // sets.
+    List<String> fnStrs =
+        ExprCanonicalizer.canonicalizeExprs(analyticFnCalls_, strategy, operandIdx);
+    sb.append("|Fns:[").append(String.join(",", fnStrs)).append("]");
+    List<String> partStrs =
+        ExprCanonicalizer.canonicalizeExprs(partitionExprs_, strategy, operandIdx);
+    sb.append("|PartExprs:[").append(String.join(",", partStrs)).append("]");
+
+    // Order-by sequence is significant for ranking, so keep it as-is (do not sort). Each
+    // expr is qualified (via a singleton list) with the same operand index as above.
+    List<String> orderStrs = new ArrayList<>(orderByElements_.size());
+    for (OrderByElement e : orderByElements_) {
+      String exprStr = ExprCanonicalizer.canonicalizeExprs(
+          Collections.singletonList(e.getExpr()), strategy, operandIdx).get(0);
+      StringBuilder ob = new StringBuilder(exprStr);
+      ob.append(e.isAsc() ? " ASC" : " DESC")
+          .append(OrderByElement.nullsFirst(e.getNullsFirstParam(), e.isAsc()) ?
+              " NULLS FIRST" : " NULLS LAST");
+      orderStrs.add(ob.toString());
+    }
+    sb.append("|OrderExprs:[").append(String.join(",", orderStrs)).append("]");
+
+    sb.append("|Window:")
+        .append(analyticWindow_ == null ? "NONE" : analyticWindow_.toSql());
+    sb.append("|Child:[").append(childKey).append("]");
+    // Analytic predicates are evaluated by a SelectNode above it, so no predicates in
+    // the key.
+    return sb.toString();
   }
 
   @Override
