@@ -143,16 +143,35 @@ class TrinoCluster(object):
     except Exception as e:
       LOG.warning("Error while stopping Trino container '%s': %s", self.container, e)
 
+  def _container_logs_tail(self, max_lines=50):
+    """Best-effort tail of the container's stdout/stderr, for embedding in error
+    messages."""
+    try:
+      out = subprocess.check_output(
+          ['docker', 'logs', '--tail', str(max_lines), self.container],
+          stderr=subprocess.STDOUT, universal_newlines=True)
+      return out.strip() or "(container produced no log output yet)"
+    except Exception as e:
+      return "(could not read 'docker logs {0}': {1})".format(self.container, e)
+
   def _wait_until_ready(self, timeout_s):
     deadline = time.time() + timeout_s
     host, _, port = self.server.partition(':')
     port = int(port)
     # Phase 1: wait for the coordinator to accept TCP connections.
+    connected = False
     while time.time() < deadline:
       with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
         if s.connect_ex((host, port)) == 0:
+          connected = True
           break
       time.sleep(0.5)
+    if not connected:
+      raise TrinoUnavailable(
+          "Trino coordinator did not accept a connection on {0}:{1} within {2}s; it "
+          "likely crashed or is still starting up. Last {3} lines of "
+          "'docker logs {4}':\n{5}".format(
+              host, port, timeout_s, 50, self.container, self._container_logs_tail()))
     # Phase 2: wait until the coordinator can actually answer a trivial query
     # (catalogs registered, workers available).
     last_err = ''
