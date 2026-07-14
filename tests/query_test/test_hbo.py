@@ -488,3 +488,14 @@ class TestHBO(HboTestMixin, ImpalaTestSuite):
            where month=1 and string_col != 'test_join_over_analytic') t2
         where t1.int_col = t2.int_col and t1.rnk = t2.rnk""")
     self._run_hbo_explains('QueryTest/hbo-analytic-join')
+
+  def test_select_cardinality(self):
+    self.client.set_configuration(QUERY_OPTIONS)
+    self.execute_query("""
+        select count(*) from (
+          select * from functional.alltypes
+          where year = 2009 and string_col != 'test_select'
+          order by id
+          limit 1000) v
+        where int_col = 0 and bigint_col = 0 and smallint_col = 0""")
+    self._run_hbo_explains('QueryTest/hbo-select')

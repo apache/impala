@@ -18,11 +18,16 @@
 package org.apache.impala.planner;
 
 import java.util.List;
+import java.util.Map;
 
 import org.apache.impala.analysis.Analyzer;
 import org.apache.impala.analysis.Expr;
+import org.apache.impala.analysis.TupleId;
+import org.apache.impala.common.ThriftSerializationCtx;
 import org.apache.impala.thrift.TExplainLevel;
+import org.apache.impala.thrift.THboStatsType;
 import org.apache.impala.thrift.TPlanNode;
+import org.apache.impala.thrift.TPlanNodeRun;
 import org.apache.impala.thrift.TPlanNodeType;
 import org.apache.impala.thrift.TQueryOptions;
 import org.slf4j.Logger;
@@ -56,6 +61,12 @@ public class SelectNode extends PlanNode {
 
   @Override
   protected void toThrift(TPlanNode msg) {
+    Preconditions.checkState(false, "Unexpected use of old toThrift() signature.");
+  }
+
+  @Override
+  protected void toThrift(TPlanNode msg, ThriftSerializationCtx serialCtx) {
+    populateHboThriftFields(msg, serialCtx);
     msg.node_type = TPlanNodeType.SELECT_NODE;
   }
 
@@ -63,6 +74,7 @@ public class SelectNode extends PlanNode {
   public void init(Analyzer analyzer) {
     analyzer.markConjunctsAssigned(conjuncts_);
     conjuncts_ = orderConjunctsByCost(conjuncts_);
+    computeHboOperandQualifierMap(analyzer);
     computeStats(analyzer);
     createDefaultSmap(analyzer);
   }
@@ -112,6 +124,7 @@ public class SelectNode extends PlanNode {
       Preconditions.checkState(cardinality_ >= 0);
     }
     cardinality_ = capCardinalityAtLimit(cardinality_);
+    tryUpdateCardinalityFromHbo(analyzer);
     if (LOG.isTraceEnabled()) {
       LOG.trace("stats Select: cardinality=" + Long.toString(cardinality_));
     }
@@ -126,6 +139,39 @@ public class SelectNode extends PlanNode {
   }
 
   public void setSelectivity(double value) { selectivity_ = value; }
+
+  @Override
+  public boolean isOperandTransparent() { return true; }
+
+  @Override
+  public void appendScanInputStats(TPlanNodeRun execStats) {
+    getChild(0).appendScanInputStats(execStats);
+  }
+
+  @Override
+  public String generateHboKeyString(THboStatsType statsType,
+      CanonicalizationStrategy strategy) {
+    Preconditions.checkState(children_.size() == 1);
+    String childKey = getChild(0).generateHboKeyString(statsType, strategy);
+    if (childKey == null) {
+      LOG.debug("Not tracking {} in HBO since the child doesn't support HBO: {}",
+          getDisplayLabel(), getChild(0).getDisplayLabel());
+      return null;
+    }
+
+    StringBuilder sb = startHboKeyString(statsType, ":SelectNode:");
+
+    // Qualify columns with the operand index if needed.
+    Map<TupleId, String> operandIdx = getChild(0).getHboOperandQualifierMap();
+
+    // The conjuncts define this node.
+    List<String> predStrs = ExprCanonicalizer.canonicalizeExprs(
+        conjuncts_, strategy, operandIdx);
+    sb.append("|Predicates:[").append(String.join(",", predStrs)).append("]");
+
+    sb.append("|Child:[").append(childKey).append("]");
+    return sb.toString();
+  }
 
   @Override
   public void computeProcessingCost(TQueryOptions queryOptions) {

@@ -1,0 +1,100 @@
+====
+---- QUERY
+# EXPLAIN the same query that has been executed.
+EXPLAIN select count(*) from (
+  select * from functional.alltypes
+  where year = 2009 and string_col != 'test_select'
+  order by id
+  limit 1000) v
+where int_col = 0 and bigint_col = 0 and smallint_col = 0
+---- PLAN
+PLAN-ROOT SINK
+|
+03:AGGREGATE [FINALIZE]
+|  output: count(*)
+|  row-size=8B cardinality=1 (from HBO)
+|
+02:SELECT
+|  predicates: bigint_col = 0, int_col = 0, smallint_col = 0
+|  row-size=18B cardinality=100 (from HBO)
+|
+04:MERGING-EXCHANGE [UNPARTITIONED]
+|  order by: id ASC
+|  limit: 1000
+|
+01:TOP-N [LIMIT=1000]
+|  order by: id ASC
+|  row-size=18B cardinality=1.00K
+|
+00:SCAN HDFS [functional.alltypes]
+   partition predicates: `year` = 2009
+   HDFS partitions=12/24 files=12 size=238.68KB
+   predicates: string_col != 'test_select'
+   row-size=31B cardinality=3.65K (from HBO)
+====
+---- QUERY
+# EXPLAIN the same query but on different partitions
+EXPLAIN select count(*) from (
+  select * from functional.alltypes
+  where year = 2010 and string_col != 'test_select'
+  order by id
+  limit 1000) v
+where int_col = 0 and bigint_col = 0 and smallint_col = 0
+---- PLAN
+PLAN-ROOT SINK
+|
+03:AGGREGATE [FINALIZE]
+|  output: count(*)
+|  row-size=8B cardinality=1 (from HBO, key ignores partition constants)
+|
+02:SELECT
+|  predicates: bigint_col = 0, int_col = 0, smallint_col = 0
+|  row-size=18B cardinality=100 (from HBO, key ignores partition constants)
+|
+04:MERGING-EXCHANGE [UNPARTITIONED]
+|  order by: id ASC
+|  limit: 1000
+|
+01:TOP-N [LIMIT=1000]
+|  order by: id ASC
+|  row-size=18B cardinality=1.00K
+|
+00:SCAN HDFS [functional.alltypes]
+   partition predicates: `year` = 2010
+   HDFS partitions=12/24 files=12 size=239.77KB
+   predicates: string_col != 'test_select'
+   row-size=31B cardinality=3.65K (from HBO, key ignores partition constants)
+====
+---- QUERY
+# Same query but reorder the conjuncts
+EXPLAIN select count(*) from (
+  select * from functional.alltypes
+  where string_col != 'test_select' and year = 2009
+  order by id
+  limit 1000) v
+where smallint_col = 0 and bigint_col = 0 and int_col = 0
+---- PLAN
+PLAN-ROOT SINK
+|
+03:AGGREGATE [FINALIZE]
+|  output: count(*)
+|  row-size=8B cardinality=1 (from HBO)
+|
+02:SELECT
+|  predicates: bigint_col = 0, int_col = 0, smallint_col = 0
+|  row-size=18B cardinality=100 (from HBO)
+|
+04:MERGING-EXCHANGE [UNPARTITIONED]
+|  order by: id ASC
+|  limit: 1000
+|
+01:TOP-N [LIMIT=1000]
+|  order by: id ASC
+|  row-size=18B cardinality=1.00K
+|
+00:SCAN HDFS [functional.alltypes]
+   partition predicates: `year` = 2009
+   HDFS partitions=12/24 files=12 size=238.68KB
+   predicates: string_col != 'test_select'
+   row-size=31B cardinality=3.65K (from HBO)
+====

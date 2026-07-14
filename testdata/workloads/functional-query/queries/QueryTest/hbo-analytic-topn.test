@@ -15,7 +15,7 @@ PLAN-ROOT SINK
 |
 03:SELECT
 |  predicates: rank() <= 5
-|  row-size=29B cardinality=50
+|  row-size=29B cardinality=50 (from HBO)
 |
 02:ANALYTIC
 |  functions: rank()

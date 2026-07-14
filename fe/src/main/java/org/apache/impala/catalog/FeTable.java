@@ -184,10 +184,15 @@ public interface FeTable {
 
     List<SlotRef> slotRefs = new ArrayList<>();
     expr.collect(SlotRef.class, slotRefs);
-    return slotRefs.stream()
-        .map(SlotRef::getDesc)
-        .map(SlotDescriptor::getColumn)
-        .anyMatch(c -> c != null && c.getPosition() < numPartitionCols);
+    for (SlotRef ref : slotRefs) {
+      // Trace through intermediate slots to the base scan slot
+      SlotDescriptor scanSlot = ref.findSrcScanSlot();
+      if (scanSlot == null) continue;
+      if (scanSlot.getParent().getTable() != this) continue;
+      Column c = scanSlot.getColumn();
+      if (c != null && c.getPosition() < numPartitionCols) return true;
+    }
+    return false;
   }
 
   /**

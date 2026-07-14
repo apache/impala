@@ -217,9 +217,11 @@ public class ExprCanonicalizer {
     expr.collect(SlotRef.class, slotRefs);
     FeTable table = null;
     for (SlotRef ref : slotRefs) {
-      SlotDescriptor desc = ref.getDesc();
+      // Trace each SlotRef to the base scan slot it ultimately comes from.
+      SlotDescriptor desc = ref.findSrcScanSlot();
       if (desc == null || desc.getParent() == null) continue;
       FeTable t = desc.getParent().getTable();
+      if (t == null) continue;
       if (table == null) {
         table = t;
       } else if (table != t) {

@@ -118,6 +118,20 @@ public class HboKeyStringTest extends FrontendTestBase {
     return null;
   }
 
+  private JoinNode findFirstJoinNode(String query) throws ImpalaException {
+    return findFirstJoinNode(planFragments(query).get(0).getPlanRoot());
+  }
+
+  private JoinNode findFirstJoinNode(PlanNode node) {
+    if (node == null) return null;
+    if (node instanceof JoinNode) return (JoinNode) node;
+    for (PlanNode child : node.getChildren()) {
+      JoinNode join = findFirstJoinNode(child);
+      if (join != null) return join;
+    }
+    return null;
+  }
+
   @Test
   public void testScanNodeKeys() throws ImpalaException {
     String query = "SELECT count(*) FROM functional.alltypes " +
@@ -1673,5 +1687,178 @@ public class HboKeyStringTest extends FrontendTestBase {
         + "RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW)]";
     assertEquals(expectedER, join.generateHboKeyString(
         THboStatsType.CARDINALITY, CanonicalizationStrategy.EXPR_REWRITE));
+  }
+
+  private SelectNode singleSelect(String query) throws ImpalaException {
+    Map<Integer, PlanNode> nodes = collectPlanNodesInDistributedPlan(query);
+    int count = 0;
+    SelectNode select = null;
+    for (PlanNode n : nodes.values()) {
+      if (n instanceof SelectNode) {
+        select = (SelectNode) n;
+        count++;
+      }
+    }
+    assertEquals("Expected exactly one SelectNode for query: " + query, 1, count);
+    return select;
+  }
+
+  @Test
+  public void testSelectNodeKeys() throws ImpalaException {
+    String query = "select * from ("
+        + "select id, rank() over (partition by int_col order by id) r "
+        + "from functional.alltypes where year = 2009) v where r <= 5";
+    SelectNode select = singleSelect(query);
+
+    String keyFmt = "CARDINALITY:SelectNode:|Predicates:[rank() OVER (PARTITION BY "
+        + "int_col ORDER BY id ASC RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW)"
+        + " <= 5]|"
+        + "Child:[CARDINALITY:AnalyticEvalNode:|Fns:[rank()]|PartExprs:[int_col]|"
+        + "OrderExprs:[id ASC NULLS LAST]|"
+        + "Window:RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW|"
+        + "Child:[CARDINALITY:SortNode:Type:PARTITIONED_TOPN|IncludeTies:true|"
+        + "OrderKind:LEXICAL|PerPartLimit:5|PartExprs:[int_col]|"
+        + "OrderExprs:[id ASC NULLS LAST]|"
+        + "Child:[CARDINALITY:ScanNode:functional.alltypes|%s]]]";
+
+    assertEquals(String.format(keyFmt, "`year` = 2009"), select.generateHboKeyString(
+        THboStatsType.CARDINALITY, CanonicalizationStrategy.EXPR_REWRITE));
+    assertEquals(String.format(keyFmt, "`year`=<CONST>"), select.generateHboKeyString(
+        THboStatsType.CARDINALITY, CanonicalizationStrategy.IGNORE_PARTITION_CONSTANTS));
+  }
+
+  @Test
+  public void testSelectNodeWithLimit() throws ImpalaException {
+    String query = "select * from ("
+        + "select id, rank() over (partition by int_col order by id) r "
+        + "from functional.alltypes where year = 2009) v where r <= 10 limit 5";
+    SelectNode select = singleSelect(query);
+
+    String keyFmt = "CARDINALITY:SelectNode:|limit:5|Predicates:["
+        + "rank() OVER (PARTITION BY int_col ORDER BY id ASC RANGE BETWEEN UNBOUNDED "
+        + "PRECEDING AND CURRENT ROW) <= 10]|"
+        + "Child:[CARDINALITY:AnalyticEvalNode:|Fns:[rank()]|"
+        + "PartExprs:[int_col]|OrderExprs:[id ASC NULLS LAST]|"
+        + "Window:RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW|"
+        + "Child:[CARDINALITY:SortNode:Type:PARTITIONED_TOPN|IncludeTies:true|"
+        + "OrderKind:LEXICAL|PerPartLimit:10|PartExprs:[int_col]|"
+        + "OrderExprs:[id ASC NULLS LAST]|"
+        + "Child:[CARDINALITY:ScanNode:functional.alltypes|%s]]]";
+
+    assertEquals(String.format(keyFmt, "`year` = 2009"), select.generateHboKeyString(
+        THboStatsType.CARDINALITY, CanonicalizationStrategy.EXPR_REWRITE));
+    assertEquals(String.format(keyFmt, "`year`=<CONST>"), select.generateHboKeyString(
+        THboStatsType.CARDINALITY, CanonicalizationStrategy.IGNORE_PARTITION_CONSTANTS));
+  }
+
+  @Test
+  public void testSelectNodeWithPartitionPredicate() throws ImpalaException {
+    // Test a partition-column predicate that cannot be pushed into an inline view and
+    // persists in the SelectNode. It should be canonicalized in
+    // IGNORE_PARTITION_CONSTANTS strategy.
+    String query = "select * from ("
+        + "select year, tinyint_col, "
+        + "sum(int_col) over(partition by year, tinyint_col order by bigint_col), "
+        + "avg(int_col) over(partition by year order by bigint_col), "
+        + "lead(int_col) over(order by tinyint_col) "
+        + "from functional.alltypes) v "
+        + "where year = 2009 and tinyint_col = 1";
+    SelectNode select = singleSelect(query);
+
+    String erKey = select.generateHboKeyString(
+        THboStatsType.CARDINALITY, CanonicalizationStrategy.EXPR_REWRITE);
+    String ipcKey = select.generateHboKeyString(
+        THboStatsType.CARDINALITY, CanonicalizationStrategy.IGNORE_PARTITION_CONSTANTS);
+
+    // Verify the SelectNode key prefix (everything before the child key)
+    String childMarker = "|Child:[";
+    String erPrefix = erKey.substring(0, erKey.indexOf(childMarker));
+    String ipcPrefix = ipcKey.substring(0, ipcKey.indexOf(childMarker));
+    assertEquals("CARDINALITY:SelectNode:|Predicates:[`year` = 2009,tinyint_col = 1]",
+        erPrefix);
+    assertEquals("CARDINALITY:SelectNode:|Predicates:[`year`=<CONST>,tinyint_col = 1]",
+        ipcPrefix);
+  }
+
+  @Test
+  public void testSelectColumnsQualifiedByJoinOperand() throws ImpalaException {
+    // When a SELECT node's input is a join, its predicate columns must be qualified with
+    // the join's canonical operand index. Uses A LIMIT on the inline view to force the
+    // outer predicate into a SELECT above the join instead of being pushed down.
+    String q1 = "select * from (select a.id x, b.int_col y from "
+        + "functional.alltypestiny a join functional.alltypes b on a.id = b.id "
+        + "limit 100) v where v.x > v.y";
+    String q2 = "select * from (select a.int_col y, b.id x from "
+        + "functional.alltypestiny a join functional.alltypes b on a.id = b.id "
+        + "limit 100) v where v.x > v.y";
+    SelectNode s1 = singleSelect(q1);
+    SelectNode s2 = singleSelect(q2);
+
+    String childKey = "|Child:[CARDINALITY:JoinNode:INNER|limit:100|Operands:["
+        + ALLTYPES_SCAN_KEY + "," + ALLTYPESTINY_SCAN_KEY
+        + "]|Predicates:[op0.id=op1.id]]";
+    String expected1 = "CARDINALITY:SelectNode:|Predicates:[op1.id > op0.int_col]"
+        + childKey;
+    String expected2 = "CARDINALITY:SelectNode:|Predicates:[op0.id > op1.int_col]"
+        + childKey;
+
+    for (CanonicalizationStrategy strategy : CanonicalizationStrategy.values()) {
+      assertEquals(expected1,
+          s1.generateHboKeyString(THboStatsType.CARDINALITY, strategy));
+      assertEquals(expected2,
+          s2.generateHboKeyString(THboStatsType.CARDINALITY, strategy));
+    }
+  }
+
+  @Test
+  public void testAggOverSelectOverJoin() throws ImpalaException {
+    // An AggregationNode above a SELECT-over-join must qualify its grouping columns with
+    // the join's canonical operand index, reaching through the operand-transparent
+    // SelectNode.
+    String query = "select g, count(*) from (select a.int_col g, "
+        + "a.smallint_col p, b.smallint_col q from "
+        + "functional.alltypestiny a join functional.alltypes b on a.id = b.id "
+        + "limit 100) v where v.p > v.q group by g";
+    AggregationNode agg = finalAggNode(query);
+
+    // Operands sort by table name: alltypes=op0, alltypestiny=op1.
+    String selectChild = "CARDINALITY:SelectNode:|Predicates:[op1.smallint_col > "
+        + "op0.smallint_col]|Child:[CARDINALITY:JoinNode:INNER|limit:100|Operands:["
+        + ALLTYPES_SCAN_KEY + "," + ALLTYPESTINY_SCAN_KEY
+        + "]|Predicates:[op0.id=op1.id]]";
+    String expected = "CARDINALITY:AggregationNode:FIRST|Preagg:false|GroupingSet:false|"
+        + "AggClasses:[0:Group:op1.int_col]|Child:[" + selectChild + "]";
+
+    for (CanonicalizationStrategy strategy : CanonicalizationStrategy.values()) {
+      assertEquals(expected,
+          agg.generateHboKeyString(THboStatsType.CARDINALITY, strategy));
+    }
+  }
+
+  @Test
+  public void testSelectOverJoinAsJoinOperand() throws ImpalaException {
+    // A SELECT-over-join used as an operand of an outer join. The outer join must descend
+    // through the operand-transparent SelectNode when building its operand-qualifier map.
+    // The inner LIMIT forces the predicate v.x > v.y into a SELECT above the bottom join.
+    String query = "select s.x from (select * from ("
+        + "select a.id x, b.int_col y from "
+        + "functional.alltypestiny a join functional.alltypes b on a.id = b.id "
+        + "limit 100) v where v.x > v.y) s "
+        + "left join functional.alltypesagg c on s.x = c.id";
+    JoinNode topJoin = findFirstJoinNode(query);
+
+    // Outer LEFT OUTER JOIN keeps operands [left, right]: op0 = the SELECT-over-join
+    // subquery, op1 = alltypesagg. Within op0 the bottom inner join sorts alltypes=op0.0,
+    // alltypestiny=op0.1.
+    String selectOperand = "CARDINALITY:SelectNode:|Predicates:[op1.id > op0.int_col]|"
+        + "Child:[CARDINALITY:JoinNode:INNER|limit:100|Operands:[" + ALLTYPES_SCAN_KEY
+        + "," + ALLTYPESTINY_SCAN_KEY + "]|Predicates:[op0.id=op1.id]]";
+    String expected = "CARDINALITY:JoinNode:LEFT_OUTER_JOIN|Eq:op0.1.id=op1.id|"
+        + "Left:" + selectOperand + "|"
+        + "Right:CARDINALITY:ScanNode:functional.alltypesagg";
+    for (CanonicalizationStrategy strategy : CanonicalizationStrategy.values()) {
+      assertEquals(expected,
+          topJoin.generateHboKeyString(THboStatsType.CARDINALITY, strategy));
+    }
   }
 }
