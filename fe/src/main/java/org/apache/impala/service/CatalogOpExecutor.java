@@ -8323,7 +8323,7 @@ public class CatalogOpExecutor {
             }
             checksum = fs.getFileChecksum(filePath);
             if (isTransactional) {
-              acidDirPath = AcidUtils.getFirstLevelAcidDirPath(filePath, fs);
+              acidDirPath = AcidUtils.getFirstLevelAcidDirPath(filePath);
             }
           } catch (CatalogException | IOException ex) {
             LOG.error("Failed to collect insert metadata for {} in table {}",

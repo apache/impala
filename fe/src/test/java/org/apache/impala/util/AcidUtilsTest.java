@@ -17,21 +17,18 @@
 package org.apache.impala.util;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertThat;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
-
-import java.util.Arrays;
-import java.util.List;
-import java.util.stream.Collectors;
 
 import com.google.common.base.Preconditions;
 
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hive.common.ValidReadTxnList;
-import org.apache.hadoop.hive.common.ValidWriteIdList;
 import org.apache.hadoop.hive.common.ValidReaderWriteIdList;
+import org.apache.hadoop.hive.common.ValidWriteIdList;
 import org.apache.impala.catalog.CatalogException;
 import org.apache.impala.compat.MetastoreShim;
 import org.hamcrest.Matchers;
@@ -39,6 +36,10 @@ import org.junit.Assume;
 import org.junit.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import java.util.Arrays;
+import java.util.List;
+import java.util.stream.Collectors;
 
 public class AcidUtilsTest {
   private static final Logger LOG = LoggerFactory.getLogger(AcidUtilsTest.class);
@@ -626,5 +627,44 @@ public class AcidUtilsTest {
 
     //Should return 1 since b is more recent
     assert(AcidUtils.compare(b,a) == 1);
+  }
+
+  @Test
+  public void testGetFirstLevelAcidDirPath() {
+    Path path1 = new Path("hdfs://localhost:20500/test-warehouse/tbl/partition_col=val/"
+        + "delta_000001_000001_0000/bucket_0000");
+    assertEquals("delta_000001_000001_0000", AcidUtils.getFirstLevelAcidDirPath(path1));
+
+    Path path2 = new Path(
+        "hdfs://localhost:20500/test-warehouse/tbl/partition_col=val/base_000001/"
+        + "bucket_0000");
+    assertEquals("base_000001", AcidUtils.getFirstLevelAcidDirPath(path2));
+
+    Path path3 = new Path("hdfs://localhost:20500/test-warehouse/tbl/partition_col=val/"
+        + "delta_000001_000001_0000/sub_dir/bucket_0000_copy_1");
+    assertEquals(
+        "delta_000001_000001_0000/sub_dir", AcidUtils.getFirstLevelAcidDirPath(path3));
+
+    Path path4 = new Path("hdfs://localhost:20500/test-warehouse/tbl/partition_col=val/"
+        + "delta_000001_000001_0000/sub_dir1/sub_dir2/bucket_0000");
+    assertEquals("delta_000001_000001_0000/sub_dir1/sub_dir2",
+        AcidUtils.getFirstLevelAcidDirPath(path4));
+
+    Path path5 = new Path("hdfs://localhost:20500/test-warehouse/tbl/partition_col=val/"
+        + "delete_delta_000001_000001_0000/bucket_0000");
+    assertEquals(
+        "delete_delta_000001_000001_0000", AcidUtils.getFirstLevelAcidDirPath(path5));
+
+    Path path6 = new Path("hdfs://localhost:20500/test-warehouse/tbl/"
+        + "delete_delta_000001_000001_0000/bucket_0000");
+    assertEquals(
+        "delete_delta_000001_000001_0000", AcidUtils.getFirstLevelAcidDirPath(path6));
+
+    Path path7 =
+        new Path("hdfs://localhost:20500/test-warehouse/non_acid_tbl/partition_col=val/"
+            + "bucket_0000");
+    assertNull(AcidUtils.getFirstLevelAcidDirPath(path7));
+
+    assertNull(AcidUtils.getFirstLevelAcidDirPath(null));
   }
 }

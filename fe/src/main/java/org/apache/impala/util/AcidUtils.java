@@ -21,7 +21,6 @@ import com.google.common.base.Preconditions;
 import com.google.common.base.Stopwatch;
 import com.google.errorprone.annotations.Immutable;
 
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashSet;
@@ -35,7 +34,6 @@ import java.util.regex.Pattern;
 import javax.annotation.Nullable;
 
 import org.apache.hadoop.fs.FileStatus;
-import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hive.common.ValidTxnList;
 import org.apache.hadoop.hive.common.ValidWriteIdList;
@@ -178,40 +176,45 @@ public class AcidUtils {
   }
 
   /**
-   * This method is copied from Hive's org.apache.hadoop.hive.ql.io.AcidUtils.java
-   * (commit hash 17ac1d9f230b8d663c09c22016753012a9b91edf). It is used to generate
-   * the ACID directory names to be added to the insert events on the transactional
-   * tables.
+   * This method is originally copied from Hive's org.apache.hadoop.hive.ql.io.AcidUtils
+   * (commit hash 17ac1d9f230b8d663c09c22016753012a9b91edf), but has been refactored to
+   * eliminate costly HDFS RPC calls(e.g. FileSystem.isDirectory).
+   * Since the input filePath is guaranteed to be a valid data file during metadata load,
+   * we can assume that all of its parent paths are directories.
+   * It is used to generate the ACID directory names to be added to the insert events on
+   * the transactional tables.
    */
-  //Get the first level acid directory (if any) from a given path
-  public static String getFirstLevelAcidDirPath(Path dataPath, FileSystem fileSystem)
-      throws IOException {
-    if (dataPath == null) {
-      return null;
-    }
-    String firstLevelAcidDir = getAcidSubDir(dataPath);
-    if (firstLevelAcidDir != null) {
-      return firstLevelAcidDir;
+  // Get the first level acid directory (if any) from a given path
+
+  public static String getFirstLevelAcidDirPath(Path filePath) {
+    if (filePath == null) return null;
+
+    Path current = filePath.getParent();
+    Path acidDir = null;
+
+    // find acid root directory
+    while (current != null) {
+      String dirName = current.getName();
+      if (dirName.startsWith("base_") || dirName.startsWith("delta_")
+          || dirName.startsWith("delete_delta_")) {
+        acidDir = current;
+        break;
+      }
+      current = current.getParent();
     }
 
-    String acidDirPath = getFirstLevelAcidDirPath(dataPath.getParent(), fileSystem);
-    if (acidDirPath == null) {
-      return null;
-    }
+    if (acidDir != null) {
+      Path fileParent = filePath.getParent();
+      String acidDirStr = acidDir.toUri().getPath();
+      String parentDirStr = fileParent.toUri().getPath();
 
-    // We need the path for directory so no need to append file name
-    if (fileSystem.isDirectory(dataPath)) {
-      return acidDirPath + Path.SEPARATOR + dataPath.getName();
-    }
-    return acidDirPath;
-  }
-
-  private static String getAcidSubDir(Path dataPath) {
-    String dataDir = dataPath.getName();
-    if (dataDir.startsWith("base_")
-        || dataDir.startsWith("delta_")
-        || dataDir.startsWith("delete_delta_")) {
-      return dataDir;
+      // Handle both cases where the file is directly under the acid root
+      // or in a subdirectory of it
+      // 1) /path/to/table/base_0000005/bucket_0000
+      //     -> Returns base_0000005
+      // 2) /path/to/table/base_0000005/0000/bucket_0000
+      //    -> Returns base_0000005/0000
+      return acidDir.getName() + parentDirStr.substring(acidDirStr.length());
     }
     return null;
   }
