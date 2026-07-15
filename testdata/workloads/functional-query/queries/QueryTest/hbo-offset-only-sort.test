@@ -1,0 +1,41 @@
+====
+---- QUERY
+# EXPLAIN the same query that has been executed
+# Use DISTRIBUTEDPLAN (explain_level=2) to show the cardinality of MERGING-EXCHANGE.
+EXPLAIN select id from functional.alltypes
+where string_col != 'test_offset_only_sort'
+order by id offset 7290
+---- DISTRIBUTEDPLAN
+F01:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
+|  Per-Host Resources: mem-estimate=4.03MB mem-reservation=4.00MB thread-reservation=1
+PLAN-ROOT SINK
+|  output exprs: id
+|  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
+|
+02:MERGING-EXCHANGE [UNPARTITIONED]
+|  offset: 7290
+|  order by: id ASC
+|  mem-estimate=33.50KB mem-reservation=0B thread-reservation=0
+|  tuple-ids=1 row-size=4B cardinality=10 (from HBO)
+|  in pipelines: 01(GETNEXT)
+|
+F00:PLAN FRAGMENT [RANDOM] hosts=3 instances=3
+Per-Host Resources: mem-estimate=166.00MB mem-reservation=6.03MB thread-reservation=2
+01:SORT
+|  order by: id ASC
+|  mem-estimate=6.00MB mem-reservation=6.00MB spill-buffer=2.00MB thread-reservation=0
+|  tuple-ids=1 row-size=4B cardinality=7.30K
+|  in pipelines: 01(GETNEXT), 00(OPEN)
+|
+00:SCAN HDFS [functional.alltypes, RANDOM]
+   HDFS partitions=24/24 files=24 size=478.45KB
+   predicates: string_col != 'test_offset_only_sort'
+   stored statistics:
+     table: rows=7.30K size=478.45KB
+     partitions: 24/24 rows=7.30K
+     columns: all
+   extrapolated-rows=disabled max-scan-range-rows=310
+   mem-estimate=160.00MB mem-reservation=32.00KB thread-reservation=1
+   tuple-ids=0 row-size=17B cardinality=7.30K (from HBO)
+   in pipelines: 00(GETNEXT)
+====

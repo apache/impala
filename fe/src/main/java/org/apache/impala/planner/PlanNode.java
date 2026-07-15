@@ -838,6 +838,10 @@ abstract public class PlanNode extends TreeNode<PlanNode> {
       numNodes_ = getChild(0).numNodes_;
       numInstances_ = getChild(0).numInstances_;
     }
+    // computeStats() can be called more than once on the same node. Clear any HBO match
+    // from an earlier pass before looking up the HBO stats (in subclass overrides).
+    hboMatch_ = null;
+    cardinalityBeforeHbo_ = -1;
   }
 
   protected void validateCardinality() { Preconditions.checkState(cardinality_ >= -1); }
@@ -1068,9 +1072,9 @@ abstract public class PlanNode extends TreeNode<PlanNode> {
   public boolean isBlockingNode() { return false; }
 
   /**
-   * Returns true if this plan node preserves the cardinality of its only input child.
+   * Returns true if this node should be ignored when building the HBO cardinality key.
    */
-  public boolean isCardinalityPreserving() { return false; }
+  public boolean ignoredInHboCardKey() { return false; }
 
   /**
    * Returns true if parent node can reference operand alias in/under this node.
@@ -1168,7 +1172,7 @@ abstract public class PlanNode extends TreeNode<PlanNode> {
    */
   public String generateHboKeyString(THboStatsType statsType,
       CanonicalizationStrategy strategy) {
-    if (isCardinalityPreserving()) {
+    if (ignoredInHboCardKey()) {
       Preconditions.checkState(children_.size() == 1);
       return getChild(0).generateHboKeyString(statsType, strategy);
     }
@@ -1179,7 +1183,7 @@ abstract public class PlanNode extends TreeNode<PlanNode> {
    * Appends scan input stats of leaf ScanNodes in the current subtree.
    */
   public void appendScanInputStats(TPlanNodeRun execStats) {
-    if (isCardinalityPreserving()) {
+    if (ignoredInHboCardKey()) {
       Preconditions.checkState(children_.size() == 1);
       getChild(0).appendScanInputStats(execStats);
     }
@@ -1207,10 +1211,6 @@ abstract public class PlanNode extends TreeNode<PlanNode> {
    * found.
    */
   protected void tryUpdateCardinalityFromHbo(Analyzer analyzer) {
-    // computeStats() can be called more than once on the same node. Clear any match from
-    // an earlier pass before looking up the key for the current node state.
-    hboMatch_ = null;
-    cardinalityBeforeHbo_ = -1;
     if (!analyzer.getQueryOptions().use_hbo_stats) return;
     // Time the whole lookup, including hash-key generation.
     long startNs = System.nanoTime();

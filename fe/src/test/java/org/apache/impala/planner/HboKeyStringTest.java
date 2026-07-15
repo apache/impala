@@ -46,6 +46,7 @@ import com.google.common.collect.Lists;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotEquals;
+import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 
@@ -1182,5 +1183,278 @@ public class HboKeyStringTest extends FrontendTestBase {
           expectedWithLimit,
           topWithLimit.generateHboKeyString(THboStatsType.CARDINALITY, strategy));
     }
+  }
+
+  private SortNode singleSort(String query) throws ImpalaException {
+    Map<Integer, PlanNode> nodes = collectPlanNodesInDistributedPlan(query);
+    SortNode sort = null;
+    int count = 0;
+    for (PlanNode n : nodes.values()) {
+      if (n instanceof SortNode) {
+        sort = (SortNode) n;
+        count++;
+      }
+    }
+    assertNotNull("Expected a sort for query: " + query, sort);
+    assertEquals("Expected exactly one sort for query: " + query, 1, count);
+    return sort;
+  }
+
+  @Test
+  public void testSortNodeCardinalityPreservation() throws ImpalaException {
+    // A plain ORDER BY (no limit) preserves cardinality and is ignored in the HBO key:
+    // its key is exactly its child's key.
+    SortNode plainSort = singleSort(
+        "select * from functional.alltypes where year = 2009 order by id");
+    assertTrue(plainSort.ignoredInHboCardKey());
+    for (CanonicalizationStrategy strategy : CanonicalizationStrategy.values()) {
+      assertEquals(
+          plainSort.getChild(0).generateHboKeyString(
+              THboStatsType.CARDINALITY, strategy),
+          plainSort.generateHboKeyString(THboStatsType.CARDINALITY, strategy));
+    }
+
+    // A TopN (ORDER BY ... LIMIT) caps its child's row count, so it is not ignored in the
+    // HBO key and carries its own HBO key that wraps the child.
+    SortNode topN = singleSort(
+        "select * from functional.alltypes where year = 2009 order by id limit 100");
+    assertFalse(topN.ignoredInHboCardKey());
+    String topNKeyFmt = "CARDINALITY:SortNode:Type:TOPN|IncludeTies:false|OrderKind:"
+        + "LEXICAL|Limit:100|Offset:0|OrderExprs:[id ASC NULLS LAST]|Child:[%s]";
+    String scanER = "CARDINALITY:ScanNode:functional.alltypes|`year` = 2009";
+    String scanIPC = "CARDINALITY:ScanNode:functional.alltypes|`year`=<CONST>";
+    assertEquals(String.format(topNKeyFmt, scanER), topN.generateHboKeyString(
+        THboStatsType.CARDINALITY, CanonicalizationStrategy.EXPR_REWRITE));
+    assertEquals(String.format(topNKeyFmt, scanIPC), topN.generateHboKeyString(
+        THboStatsType.CARDINALITY,
+        CanonicalizationStrategy.IGNORE_PARTITION_CONSTANTS));
+    // The TopN key is distinct from its child key for every strategy.
+    for (CanonicalizationStrategy strategy : CanonicalizationStrategy.values()) {
+      assertNotEquals("TopN sort must not be transparent",
+          topN.getChild(0).generateHboKeyString(THboStatsType.CARDINALITY, strategy),
+          topN.generateHboKeyString(THboStatsType.CARDINALITY, strategy));
+    }
+  }
+
+  @Test
+  public void testTopNOrderingAffectsKey() throws ImpalaException {
+    // Two queries differing only in the TopN ordering select different top-100 row sets,
+    // so the number of distinct int_col groups - the aggregation's cardinality - differs.
+    // The ordering is part of the SortNode key, so the two aggregation keys must differ.
+    String base = "select int_col, count(*) from ("
+        + "select id, int_col from functional.alltypes where year = 2009 "
+        + "order by %s limit 100) t group by int_col";
+    // The aggregation node is node 2 in the single-fragment plan for these queries.
+    PlanNode aggById = collectPlanNodesInDistributedPlan(
+        String.format(base, "id")).get(2);
+    PlanNode aggByIntCol = collectPlanNodesInDistributedPlan(
+        String.format(base, "int_col")).get(2);
+
+    String aggOverTopNKeyFmt =
+        "CARDINALITY:AggregationNode:FIRST|Preagg:false|GroupingSet:false|"
+        + "AggClasses:[0:Group:int_col]|Child:[CARDINALITY:SortNode:Type:TOPN|"
+        + "IncludeTies:false|OrderKind:LEXICAL|Limit:100|Offset:0|OrderExprs:"
+        + "[%s ASC NULLS LAST]|Child:[CARDINALITY:ScanNode:functional.alltypes|%s]]";
+    assertEquals(String.format(aggOverTopNKeyFmt, "id", "`year` = 2009"),
+        aggById.generateHboKeyString(THboStatsType.CARDINALITY,
+            CanonicalizationStrategy.EXPR_REWRITE));
+    assertEquals(String.format(aggOverTopNKeyFmt, "int_col", "`year` = 2009"),
+        aggByIntCol.generateHboKeyString(THboStatsType.CARDINALITY,
+            CanonicalizationStrategy.EXPR_REWRITE));
+    assertEquals(String.format(aggOverTopNKeyFmt, "id", "`year`=<CONST>"),
+        aggById.generateHboKeyString(THboStatsType.CARDINALITY,
+            CanonicalizationStrategy.IGNORE_PARTITION_CONSTANTS));
+    assertEquals(String.format(aggOverTopNKeyFmt, "int_col", "`year`=<CONST>"),
+        aggByIntCol.generateHboKeyString(THboStatsType.CARDINALITY,
+            CanonicalizationStrategy.IGNORE_PARTITION_CONSTANTS));
+  }
+
+  @Test
+  public void testPartitionedTopN() throws ImpalaException {
+    // A rank()<=K analytic produces a Partitioned TopN. In a distributed plan it is split
+    // into a local TopN and a merge TopN. The merge TopN SKIPS the local TopN in its HBO
+    // key so its key matches the single-node plan (CHILD is the scan). The local TopN
+    // reads the same stat under the same key (its cardinality is a whole-query summed
+    // total, on the same footing as HBO), so its key equals the merge TopN's key; only
+    // the merge TopN stores.
+    String query ="select * from ("
+        + "select int_col, id, rank() over ("
+        + "  partition by string_col, int_col"
+        + "  order by id desc, bigint_col) rnk "
+        + "from functional.alltypes WHERE month = 11) t where rnk <= 5";
+    Map<Integer, PlanNode> nodes = collectPlanNodesInDistributedPlan(query);
+    // Node ids: scan(0), topN(1,5), analytic(2), select(3), exchange(4)
+    SortNode local = (SortNode) nodes.get(1);
+    SortNode merge = (SortNode) nodes.get(5);
+    assertTrue(merge.isIncludeTies() && local.isIncludeTies());
+    assertTrue(local.isSortMergeInput());
+
+    // The merge TopN skips the local TopN: CHILD is the scan directly, so its key is
+    // identical to a single-node plan's key.
+    String mergeKeyFmt = "CARDINALITY:SortNode:Type:PARTITIONED_TOPN|IncludeTies:true|"
+        + "OrderKind:LEXICAL|PerPartLimit:5|PartExprs:[int_col,string_col]|"
+        + "OrderExprs:[id DESC NULLS FIRST,bigint_col ASC NULLS LAST]|"
+        + "Child:[CARDINALITY:ScanNode:functional.alltypes|%s]";
+    String scanER = "`month` = 11";
+    String scanIPC = "`month`=<CONST>";
+
+    assertEquals(String.format(mergeKeyFmt, scanER), merge.generateHboKeyString(
+        THboStatsType.CARDINALITY, CanonicalizationStrategy.EXPR_REWRITE));
+    assertEquals(String.format(mergeKeyFmt, scanIPC), merge.generateHboKeyString(
+        THboStatsType.CARDINALITY,
+        CanonicalizationStrategy.IGNORE_PARTITION_CONSTANTS));
+    for (CanonicalizationStrategy strategy : CanonicalizationStrategy.values()) {
+      assertEquals("Local Partitioned TopN must share the merge TopN's HBO key",
+          merge.generateHboKeyString(THboStatsType.CARDINALITY, strategy),
+          local.generateHboKeyString(THboStatsType.CARDINALITY, strategy));
+    }
+    assertTopNStorePath(local, merge);
+  }
+
+  private void assertTopNStorePath(SortNode local, PlanNode merge) {
+    // Only the merge parent stores. The local reads but never stores.
+    TQueryOptions queryOptions = new TQueryOptions();
+    queryOptions.setStore_hbo_stats(true);
+    ThriftSerializationCtx serialCtx = new ThriftSerializationCtx(queryOptions);
+    TPlanNode localMsg = new TPlanNode();
+    local.toThrift(localMsg, serialCtx);
+    assertFalse("Local Top-N must not store HBO stats", localMsg.isSetHbo_hash_keys());
+    TPlanNode mergeMsg = new TPlanNode();
+    merge.toThrift(mergeMsg, serialCtx);
+    assertTrue("Merge of Top-N must store HBO stats", mergeMsg.isSetHbo_hash_keys());
+  }
+
+  @Test
+  public void testTopNExprOperands() throws ImpalaException {
+    // A rank()<K analytic over a join produces a Partitioned TopN whose PARTITION BY and
+    // ORDER BY exprs reference columns from two different join operands. Each such column
+    // must be qualified with its canonical operand index.
+    String query = "select * from ( "
+        + "select a.int_col, rank() over("
+        + "  partition by a.int_col, b.int_col order by a.id, b.id desc) rnk "
+        + "from functional.alltypes a join functional.alltypestiny b on a.id = b.id"
+        + ") t where rnk <= 5";
+    Map<Integer, PlanNode> nodes = collectPlanNodesInDistributedPlan(query);
+    // In the distributed plan the partitioned TopN is split into a local TopN (node 3)
+    // and a merge TopN (node 8).
+    SortNode local = (SortNode) nodes.get(3);
+    SortNode merge = (SortNode) nodes.get(8);
+
+    // Operands sort by scan table name: alltypes is operand 0, alltypestiny operand 1.
+    String childKey = "CARDINALITY:JoinNode:INNER|Operands:["
+        + "CARDINALITY:ScanNode:functional.alltypes,"
+        + "CARDINALITY:ScanNode:functional.alltypestiny]|Predicates:[op0.id=op1.id]";
+    // PartExprs is sorted (partition keys are groups): [op0.int_col,op1.int_col].
+    // OrderExprs keeps the original sequence: a.id ASC (op0), b.id DESC (op1).
+    String expected = "CARDINALITY:SortNode:Type:PARTITIONED_TOPN|IncludeTies:true|"
+        + "OrderKind:LEXICAL|PerPartLimit:5|PartExprs:[op0.int_col,op1.int_col]|"
+        + "OrderExprs:[op0.id ASC NULLS LAST,op1.id DESC NULLS FIRST]|"
+        + "Child:[" + childKey + "]";
+
+    for (CanonicalizationStrategy strategy : CanonicalizationStrategy.values()) {
+      assertEquals(expected,
+          merge.generateHboKeyString(THboStatsType.CARDINALITY, strategy));
+      // The local TopN and final TopN shares the same key.
+      assertEquals(expected,
+          local.generateHboKeyString(THboStatsType.CARDINALITY, strategy));
+    }
+    assertTopNStorePath(local, merge);
+  }
+
+  @Test
+  public void testSortByMultiTableFuncExpr() throws ImpalaException {
+    // Test a sort expr that is a function call over two join operands. The columns should
+    // be qualified individually, i.e.
+    // coalesce(a.id, b.int_col) -> coalesce(op0.id, op1.int_col).
+    String[] queries = {
+        "select * from functional.alltypes a "
+            + "join functional.alltypestiny b on a.id = b.id "
+            + "order by coalesce(a.id, b.int_col) limit 10",
+        // Test an equivalent query using inline view
+        "select * from ("
+            + "select coalesce(a.id, b.int_col) as col "
+            + "from functional.alltypes a "
+            + "join functional.alltypestiny b on a.id = b.id) v "
+            + "order by col limit 10"
+    };
+    String expectedTopNKey = "CARDINALITY:SortNode:Type:TOPN|IncludeTies:false|"
+        + "OrderKind:LEXICAL|Limit:10|Offset:0|"
+        + "OrderExprs:[coalesce(op0.id, op1.int_col) ASC NULLS LAST]|"
+        + "Child:[CARDINALITY:JoinNode:INNER|Operands:["
+        + "CARDINALITY:ScanNode:functional.alltypes,"
+        + "CARDINALITY:ScanNode:functional.alltypestiny]|Predicates:[op0.id=op1.id]]";
+    for (String query : queries) {
+      Map<Integer, PlanNode> nodes = collectPlanNodesInDistributedPlan(query);
+      PlanNode topN = nodes.get(3);
+      for (CanonicalizationStrategy strategy : CanonicalizationStrategy.values()) {
+        assertEquals(expectedTopNKey,
+            topN.generateHboKeyString(THboStatsType.CARDINALITY, strategy));
+      }
+    }
+  }
+
+  @Test
+  public void testDistributedSortStorePath() throws ImpalaException {
+    // A plain distributed Top-N splits into a local Top-N and a MERGING-EXCHANGE. Only
+    // the merging-exchange stores the HBO stat. The local Top-N reads under the same key
+    // but must not store since its cardinality in profile is the summed value across all
+    // instances.
+    String query = "select id from functional.alltypes where year = 2009 "
+        + "order by id limit 100";
+    Map<Integer, PlanNode> nodes = collectPlanNodesInDistributedPlan(query);
+    SortNode local = (SortNode) nodes.get(1);
+    ExchangeNode mergeExch = (ExchangeNode) nodes.get(2);
+
+    // The local Top-N and the merging-exchange produce the same HBO key.
+    for (CanonicalizationStrategy strategy : CanonicalizationStrategy.values()) {
+      assertEquals("Local Top-N and merging-exchange must share the HBO key",
+          mergeExch.generateHboKeyString(THboStatsType.CARDINALITY, strategy),
+          local.generateHboKeyString(THboStatsType.CARDINALITY, strategy));
+    }
+    assertTopNStorePath(local, mergeExch);
+  }
+
+  @Test
+  public void testDistributedSortOffsetKey() throws ImpalaException {
+    String query = "select id from functional.alltypes where year = 2009 "
+        + "order by id limit 10 offset 5";
+    Map<Integer, PlanNode> nodes = collectPlanNodesInDistributedPlan(query);
+    SortNode local = (SortNode) nodes.get(1);
+    ExchangeNode mergeExch = (ExchangeNode) nodes.get(2);
+
+    String keyFmt = "CARDINALITY:SortNode:Type:TOPN|IncludeTies:false|OrderKind:LEXICAL|"
+        + "Limit:10|Offset:5|OrderExprs:[id ASC NULLS LAST]|"
+        + "Child:[CARDINALITY:ScanNode:functional.alltypes|`year` = 2009]";
+    // The local TopN's key uses the exchange's original limit(10)/offset(5), not its own
+    // mutated limit(15)/offset(0).
+    assertEquals(keyFmt, local.generateHboKeyString(
+        THboStatsType.CARDINALITY, CanonicalizationStrategy.EXPR_REWRITE));
+    // The merging-exchange delegates its key to the local TopN, so the keys are equal.
+    for (CanonicalizationStrategy strategy : CanonicalizationStrategy.values()) {
+      assertEquals(
+          local.generateHboKeyString(THboStatsType.CARDINALITY, strategy),
+          mergeExch.generateHboKeyString(THboStatsType.CARDINALITY, strategy));
+    }
+  }
+
+  @Test
+  public void testDistributedTopNWithTiesStorePath() throws ImpalaException {
+    String query = "select * from ("
+        + "select id, rank() over (order by id) rnk "
+        + "from functional.alltypes where year = 2009) t where rnk < 100";
+    Map<Integer, PlanNode> nodes = collectPlanNodesInDistributedPlan(query);
+
+    // Node ids: scan(0), topN(1,5), analytic(2), select(3), exchange(4)
+    SortNode merge = (SortNode) nodes.get(5);
+    SortNode local = (SortNode) nodes.get(1);
+    assertTrue(merge.isIncludeTies() && local.isIncludeTies());
+    assertTrue(local.isSortMergeInput());
+
+    for (CanonicalizationStrategy strategy : CanonicalizationStrategy.values()) {
+      assertEquals("Local and merge Top-N must share the HBO key",
+          merge.generateHboKeyString(THboStatsType.CARDINALITY, strategy),
+          local.generateHboKeyString(THboStatsType.CARDINALITY, strategy));
+    }
+    assertTopNStorePath(local, merge);
   }
 }

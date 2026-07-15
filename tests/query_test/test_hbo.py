@@ -47,30 +47,52 @@ class TestHBO(ImpalaTestSuite):
         and v.get_value('table_format').compression_codec == 'none')
 
   def _run_hbo_explains(self, test_file):
-    """Run EXPLAIN queries from a golden .test file and verify their full output
-    against the ---- PLAN sections."""
+    """Run EXPLAIN queries from a golden .test file and verify their output against
+    the plan sections. A test case may define any of PLAN, DISTRIBUTEDPLAN,
+    CALCITE_PLANNER_PLAN and CALCITE_PLANNER_DISTRIBUTED_PLAN. Each present section is
+    verified independently (only the cardinality lines are compared):
+      - PLAN / CALCITE_PLANNER_PLAN: verified at the default explain level.
+      - DISTRIBUTEDPLAN / CALCITE_PLANNER_DISTRIBUTED_PLAN: verified at EXTENDED
+        (explain_level=2) so exchange cardinalities (e.g. MERGING-EXCHANGE) are shown.
+    When IS_CALCITE_PLANNER is set, the CALCITE_PLANNER_* section overrides its
+    counterpart when present; otherwise the non-Calcite section is used."""
     # Wait for 1 second to ensure the stats are written to the cache.
     time.sleep(1)
     test_cases = self.load_query_test_file(
         'functional-query', test_file,
-        valid_section_names=['QUERY', 'PLAN', 'CALCITE_PLANNER_PLAN'])
-    self.client.set_configuration({'use_hbo_stats': True})
+        valid_section_names=['QUERY', 'PLAN', 'DISTRIBUTEDPLAN',
+            'CALCITE_PLANNER_PLAN', 'CALCITE_PLANNER_DISTRIBUTED_PLAN'])
+    plan_variants = [
+        ('PLAN', 'CALCITE_PLANNER_PLAN', {'use_hbo_stats': True}),
+        ('DISTRIBUTEDPLAN', 'CALCITE_PLANNER_DISTRIBUTED_PLAN',
+         {'use_hbo_stats': True, 'explain_level': 2}),
+    ]
     for section in test_cases:
       query = remove_comments(section['QUERY'].strip())
-      result = self.execute_query(query)
-      actual_plan_lines = result.data[result.data.index('PLAN-ROOT SINK'):]
-      plan_section_name = 'PLAN'
-      if IS_CALCITE_PLANNER and 'CALCITE_PLANNER_PLAN' in section:
-        plan_section_name = 'CALCITE_PLANNER_PLAN'
-      expected_plan_lines = section[plan_section_name].splitlines()
-      # To avoid the test being fragile, we only compare the cardinality lines.
-      actual_cardinality_lines = [line for line in actual_plan_lines
-                                  if 'cardinality' in line]
-      expected_cardinality_lines = [line for line in expected_plan_lines
+      verified_any = False
+      for default_name, calcite_name, config in plan_variants:
+        if IS_CALCITE_PLANNER and calcite_name in section:
+          plan_section_name = calcite_name
+        elif default_name in section:
+          plan_section_name = default_name
+        else:
+          continue
+        verified_any = True
+        self.client.set_configuration(config)
+        result = self.execute_query(query)
+        actual_plan_lines = result.data[result.data.index('PLAN-ROOT SINK'):]
+        expected_plan_lines = section[plan_section_name].splitlines()
+        # To avoid the test being fragile, we only compare the cardinality lines.
+        actual_cardinality_lines = [line for line in actual_plan_lines
                                     if 'cardinality' in line]
-      assert actual_cardinality_lines == expected_cardinality_lines, (
-          "EXPLAIN output mismatch for {0}.\nExpected:\n{1}\n\nActual:\n{2}".format(
-              test_file, section[plan_section_name], '\n'.join(actual_plan_lines)))
+        expected_cardinality_lines = [line for line in expected_plan_lines
+                                      if 'cardinality' in line]
+        assert actual_cardinality_lines == expected_cardinality_lines, (
+            "EXPLAIN output mismatch for {0} ({1}).\nExpected:\n{2}\n\n"
+            "Actual:\n{3}".format(test_file, plan_section_name,
+                section[plan_section_name], '\n'.join(actual_plan_lines)))
+      assert verified_any, \
+          "No plan section found for query in {0}:\n{1}".format(test_file, query)
 
   def test_single_scan_cardinality_partitioned_with_stats(self):
     self.client.set_configuration(QUERY_OPTIONS)
@@ -449,3 +471,33 @@ class TestHBO(ImpalaTestSuite):
         select id from functional.alltypestiny where string_col != 'test_intersect'
         """)
     self._run_hbo_explains('QueryTest/hbo-intersect')
+
+  def test_sort_cardinality(self):
+    """Test a query of Agg on TopN where the SortNode matters in cardinality tracking."""
+    self.client.set_configuration(QUERY_OPTIONS)
+    self.execute_query("""
+        select int_col, count(*) from (
+          select id, int_col from functional.alltypes
+          where string_col != 'test_sort'
+          order by id limit 100 offset 1000) t
+        group by int_col""")
+    self._run_hbo_explains('QueryTest/hbo-agg-on-topn-sort')
+
+  def test_offset_only_sort_cardinality(self):
+    self.client.set_configuration(QUERY_OPTIONS)
+    self.execute_query("""
+        select id from functional.alltypes
+        where string_col != 'test_offset_only_sort'
+        order by id offset 7290""")
+    self._run_hbo_explains('QueryTest/hbo-offset-only-sort')
+
+  def test_analytic_topn_cardinality(self):
+    self.client.set_configuration(QUERY_OPTIONS)
+    self.execute_query("""
+        select * from (
+          select id, int_col, rank() over (
+            partition by int_col, string_col order by id) rnk
+          from functional.alltypes
+          where string_col != 'test_analytic_topn') t
+        where rnk <= 5""")
+    self._run_hbo_explains('QueryTest/hbo-analytic-topn')

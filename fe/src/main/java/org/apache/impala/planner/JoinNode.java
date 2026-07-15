@@ -908,11 +908,8 @@ public abstract class JoinNode extends PlanNode {
     }
   }
 
-  /**
-   * Skips cardinality-preserving nodes until a non-preserving node is reached.
-   */
-  private static PlanNode skipCardinalityPreservingNodes(PlanNode node) {
-    while (node.isCardinalityPreserving()) {
+  private static PlanNode skipHboIgnoredNodes(PlanNode node) {
+    while (node.ignoredInHboCardKey()) {
       Preconditions.checkState(node.getChildCount() == 1);
       node = node.getChild(0);
     }
@@ -928,7 +925,7 @@ public abstract class JoinNode extends PlanNode {
       List<PlanNode> operands) {
     groupNodes.add(node);
     for (PlanNode child : node.getChildren()) {
-      PlanNode baseChild = skipCardinalityPreservingNodes(child);
+      PlanNode baseChild = skipHboIgnoredNodes(child);
       if (baseChild instanceof JoinNode joinChild
           && (joinChild.joinOp_.isInnerJoin() || joinChild.joinOp_.isCrossJoin())
           && !joinChild.hasLimit()) {

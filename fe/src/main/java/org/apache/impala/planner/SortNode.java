@@ -18,7 +18,9 @@
 package org.apache.impala.planner;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 
 import org.apache.impala.analysis.Analyzer;
 import org.apache.impala.analysis.Expr;
@@ -27,9 +29,13 @@ import org.apache.impala.analysis.SlotDescriptor;
 import org.apache.impala.analysis.SlotRef;
 import org.apache.impala.analysis.SortInfo;
 import org.apache.impala.analysis.ToSqlOptions;
+import org.apache.impala.analysis.TupleId;
 import org.apache.impala.common.InternalException;
+import org.apache.impala.common.ThriftSerializationCtx;
 import org.apache.impala.thrift.TExplainLevel;
+import org.apache.impala.thrift.THboStatsType;
 import org.apache.impala.thrift.TPlanNode;
+import org.apache.impala.thrift.TPlanNodeRun;
 import org.apache.impala.thrift.TPlanNodeType;
 import org.apache.impala.thrift.TQueryOptions;
 import org.apache.impala.thrift.TSortInfo;
@@ -83,6 +89,10 @@ public class SortNode extends PlanNode implements SpillableOperator {
   // The offset of the first row to return.
   protected long offset_;
 
+  // Original offset_ when the node is created. Note that offset_ could be updated later,
+  // e.g. in DistributedPlanner.createOrderByFragment().
+  protected long originalOffset_;
+
   // How many of the expressions in info_ comprise the partition key.
   // Non-negative if type_ is PARTITIONED_TOPN, -1 otherwise.
   protected int numPartitionExprs_;
@@ -105,6 +115,13 @@ public class SortNode extends PlanNode implements SpillableOperator {
 
   // The type of sort. Determines the exec node used in the BE.
   private TSortType type_;
+
+  // When non-null, this is the local sort of a distributed sort whose final, merged
+  // output is produced by the referenced merge parent.
+  // - For partitioned Top-N, it's the merge (final) Top-N.
+  // - For a plain sort, it's the merging-exchange.
+  // Null for single-node sorts and for the merge node itself.
+  private PlanNode mergeParent_ = null;
 
   // Estimated bytes of input that will go into this sort node across all backends.
   // Used for sorter spill estimation in backend code.
@@ -173,17 +190,22 @@ public class SortNode extends PlanNode implements SpillableOperator {
       Preconditions.checkState(includeTies || numPartitionExprs > 0);
       Preconditions.checkState(perPartitionLimit > 0);
     } else if (type == TSortType.TOPN) {
-      Preconditions.checkArgument(type != TSortType.TOPN || limit >= 0);
+      Preconditions.checkArgument(limit >= 0);
     }
     info_ = info;
     children_.add(input);
     offset_ = offset;
+    originalOffset_ = offset;
     numPartitionExprs_ = numPartitionExprs;
     perPartitionLimit_ = perPartitionLimit;
     includeTies_ = includeTies;
     limitWithTies_ = (type == TSortType.TOPN && includeTies) ? limit : -1;
     type_ = type;
     if (!includeTies) setLimit(limit);
+    PlanNode child = (input instanceof ExchangeNode exch) ? exch.getChild(0) : input;
+    if (child instanceof SortNode sortInput && info_ == sortInput.info_) {
+      sortInput.setSortMergeParent(this);
+    }
   }
 
   public long getOffset() { return offset_; }
@@ -209,6 +231,123 @@ public class SortNode extends PlanNode implements SpillableOperator {
   public void setIsAnalyticSort(boolean v) { isAnalyticSort_ = v; }
   public void setAnalyticEvalNode(AnalyticEvalNode n) { analyticEvalNode_ = n; }
   public AnalyticEvalNode getAnalyticEvalNode() { return analyticEvalNode_; }
+  public boolean isSortMergeInput() { return mergeParent_ != null; }
+  public void setSortMergeParent(PlanNode p) { mergeParent_ = p; }
+
+  @Override
+  public boolean ignoredInHboCardKey() {
+    // A plain SortNode (no limit/offset, not a TopN) leaves the row count unchanged, so
+    // it is ignored in the HBO key and delegates to its child. A capping sort (TopN,
+    // Partitioned TopN, or a total sort with LIMIT/OFFSET) determines the output row
+    // count, so it emits its own HBO key and is not ignored. originalOffset_ is also
+    // checked so the local sort is still not ignored after its OFFSET is transferred to
+    // the parent MERGING-EXCHANGE (where offset_ is zeroed).
+    return !(hasLimit() || originalOffset_ > 0 || offset_ > 0 || isTypeTopN()
+        || isPartitionedTopN());
+  }
+
+  @Override
+  public boolean isOperandTransparent() {
+    // A SortNode (analytic or a capping TopN) materializes a copy of its input, but the
+    // exprs above it are canonicalized against the original (pre-sort) base tuples, so
+    // the sort's own output tuple is never referenced in the key.
+    return true;
+  }
+
+  /**
+   * Returns the real child of this sort for HBO, skipping the intermediate local Top-N
+   * that belongs to the same logical sort (same SortInfo instance) and ExchangeNodes
+   * between them.
+   *
+   * A distributed partitioned/ties top-n splits into a local TopN and a merge TopN that
+   * share the same SortInfo. The merge TopN produces the final row set; the local TopN is
+   * a per-instance partial result that does not affect the final cardinality. Skipping it
+   * ensures the merge TopN's HBO key is identical to the single-node plan's key, so
+   * historical stats are consistent before and after the local TopN is created.
+   */
+  private PlanNode getHboBaseChild() {
+    PlanNode baseChild = getChild(0);
+    while ((baseChild instanceof SortNode sortChild && sortChild.info_ == info_)
+        || baseChild.ignoredInHboCardKey()) {
+      Preconditions.checkState(baseChild.getChildCount() == 1);
+      baseChild = baseChild.getChild(0);
+    }
+    return baseChild;
+  }
+
+  @Override
+  public String generateHboKeyString(THboStatsType statsType,
+      CanonicalizationStrategy strategy) {
+    Preconditions.checkState(children_.size() == 1);
+    // A sort ignored in the HBO key delegates transparently to the child.
+    if (ignoredInHboCardKey()) {
+      return getChild(0).generateHboKeyString(statsType, strategy);
+    }
+    PlanNode baseChild = getHboBaseChild();
+    String childKey = baseChild.generateHboKeyString(statsType, strategy);
+    if (childKey == null) {
+      LOG.trace("Not tracking {} in HBO since the child doesn't support HBO: {}",
+          getDisplayLabel(), baseChild.getDisplayLabel());
+      return null;
+    }
+
+    StringBuilder sb = new StringBuilder(statsType.name()).append(":SortNode:");
+    sb.append("Type:").append(type_.name()).append("|");
+    // Tie handling changes the output row count: an "include ties" Top-N can return more
+    // rows than its limit.
+    sb.append("IncludeTies:").append(includeTies_).append("|");
+    // OrderKind: LEXICAL / ZORDER
+    sb.append("OrderKind:").append(info_.getSortingOrder().name()).append("|");
+
+    // Exprs are qualified with the same operand index.
+    Map<TupleId, String> operandIdx = baseChild.getHboOperandQualifierMap();
+    // The ordering determines which rows survive the limit, so we need the sort exprs.
+    List<Expr> sortExprs = info_.getSortExprs();
+    if (type_ == TSortType.PARTITIONED_TOPN) {
+      // PARTITIONED_TOPN has no global limit/offset. Its output row count is bounded
+      // solely by the per-partition limit multiplied by the number of partitions.
+      sb.append("PerPartLimit:").append(perPartitionLimit_).append("|");
+      // Partition keys define groups, so they are order-independent (canonicalizeExprs
+      // sorts them).
+      List<String> partStrs = ExprCanonicalizer.canonicalizeExprs(
+          sortExprs.subList(0, numPartitionExprs_), strategy, operandIdx);
+      sb.append("PartExprs:[").append(String.join(",", partStrs)).append("]|");
+    } else {
+      long limit = getSortLimit();
+      long offset = offset_;
+      // For a plain distributed Top-N, the local sort's own limit/offset were mutated
+      // (limit -> limit+offset, offset -> 0), so source the original values from the
+      // merging-exchange.
+      if (mergeParent_ instanceof ExchangeNode) {
+        limit = mergeParent_.getLimit();
+        offset = ((ExchangeNode) mergeParent_).getOffset();
+      }
+      sb.append("Limit:").append(limit).append("|Offset:").append(offset).append("|");
+    }
+    // numPartitionExprs_ is -1 for the unpartitioned TOTAL/TOPN sorts, so the order-by
+    // exprs start at index 0 there.
+    int firstOrderIdx = Math.max(numPartitionExprs_, 0);
+    List<Boolean> isAsc = info_.getIsAscOrder();
+    List<Boolean> nullsFirst = info_.getNullsFirst();
+    List<String> orderStrs = new ArrayList<>(sortExprs.size() - firstOrderIdx);
+    // Order-by sequence is significant, so keep it as-is (do not sort).
+    for (int i = firstOrderIdx; i < sortExprs.size(); ++i) {
+      String exprStr = ExprCanonicalizer.canonicalizeExprs(
+          Collections.singletonList(sortExprs.get(i)), strategy, operandIdx).get(0);
+      StringBuilder ob = new StringBuilder(exprStr);
+      ob.append(isAsc.get(i) ? " ASC" : " DESC");
+      ob.append(nullsFirst.get(i) ? " NULLS FIRST" : " NULLS LAST");
+      orderStrs.add(ob.toString());
+    }
+    sb.append("OrderExprs:[").append(String.join(",", orderStrs)).append("]|");
+    sb.append("Child:[").append(childKey).append("]");
+    return sb.toString();
+  }
+
+  @Override
+  public void appendScanInputStats(TPlanNodeRun execStats) {
+    getHboBaseChild().appendScanInputStats(execStats);
+  }
 
   /**
    * Under special cases, the planner may decide to convert a total sort or
@@ -262,6 +401,7 @@ public class SortNode extends PlanNode implements SpillableOperator {
     // Do not assignConjuncts() here, so that conjuncts bound by this SortNode's tuple id
     // can be placed in a downstream SelectNode. A SortNode cannot evaluate conjuncts.
     Preconditions.checkState(conjuncts_.isEmpty());
+    computeHboOperandQualifierMap(analyzer);
     // Compute the memory layout for the generated tuple.
     computeMemLayout(analyzer);
     computeStats(analyzer);
@@ -323,6 +463,15 @@ public class SortNode extends PlanNode implements SpillableOperator {
         }
       }
     }
+    // Only use HBO stats for the final sort node, since a local sort node's per-instance
+    // cardinality can differ a lot, e.g. when a large OFFSET is added to its LIMIT (see
+    // DistributedPlanner.createOrderByFragment()). Some local sort nodes may still keep
+    // HBO stats, since DistributedPlanner won't re-run their computeStats() after adding
+    // the merge node. That's harmless because their per-instance cardinality matches the
+    // final sort node's.
+    if (!ignoredInHboCardKey() && !isSortMergeInput()) {
+      tryUpdateCardinalityFromHbo(analyzer);
+    }
 
     if (LOG.isTraceEnabled()) {
       LOG.trace("stats Sort: cardinality=" + Long.toString(cardinality_));
@@ -351,6 +500,15 @@ public class SortNode extends PlanNode implements SpillableOperator {
 
   @Override
   protected void toThrift(TPlanNode msg) {
+    Preconditions.checkState(false, "Unexpected use of old toThrift() signature.");
+  }
+
+  @Override
+  protected void toThrift(TPlanNode msg, ThriftSerializationCtx serialCtx) {
+    // Only the merge parent stores HBO stats. the local Top-N reads but never stores.
+    if (!ignoredInHboCardKey() && !isSortMergeInput()) {
+      populateHboThriftFields(msg, serialCtx);
+    }
     if (isTypeTopN()) {
       Preconditions.checkState(hasLimit() ||
               (includeTies_ && limitWithTies_ >= 0), "Top-N must have limit",

@@ -146,7 +146,7 @@ public class TupleCacheNode extends PlanNode {
   }
 
   @Override
-  public boolean isCardinalityPreserving() { return true; }
+  public boolean ignoredInHboCardKey() { return true; }
 
   @Override
   public boolean isOperandTransparent() { return true; }

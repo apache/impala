@@ -807,7 +807,7 @@ public class AggregationNode extends PlanNode implements SpillableOperator {
   /**
    * Returns the real child of this aggregation for HBO, skipping intermediate agg nodes
    * that belong to the same logical aggregation (same multiAggInfo_ instance) and
-   * cardinality preserving nodes (e.g. ExchangeNode).
+   * HBO-transparent nodes (e.g. ExchangeNode) that are ignored in the HBO key.
    *
    * Using the real child ensures the HBO key string is consistent before and after
    * intermediate aggregation nodes are created.
@@ -820,9 +820,9 @@ public class AggregationNode extends PlanNode implements SpillableOperator {
    */
   private PlanNode getHboBaseChild() {
     PlanNode baseChild = getChild(0);
-    while ((baseChild instanceof AggregationNode
-            && ((AggregationNode) baseChild).multiAggInfo_ == multiAggInfo_)
-        || baseChild.isCardinalityPreserving()) {
+    while ((baseChild instanceof AggregationNode aggChild
+            && aggChild.multiAggInfo_ == multiAggInfo_)
+        || baseChild.ignoredInHboCardKey()) {
       Preconditions.checkState(baseChild.getChildCount() == 1);
       baseChild = baseChild.getChild(0);
     }

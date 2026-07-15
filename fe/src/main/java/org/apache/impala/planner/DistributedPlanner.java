@@ -1428,7 +1428,7 @@ public class DistributedPlanner {
       // Set limit, offset and merge parameters in the exchange node.
       exchNode.unsetLimit();
       if (hasLimit) exchNode.setLimit(limit);
-      exchNode.setMergeInfo(node.getSortInfo(), offset);
+      exchNode.setMergeInfo(node, offset);
 
       // Child nodes should not process the offset. If there is a limit,
       // the child nodes need only return (offset + limit) rows.
@@ -1439,7 +1439,6 @@ public class DistributedPlanner {
       }
       childSortNode.setOffset(0);
     }
-
 
     childSortNode.computeStats(ctx_.getRootAnalyzer());
     exchNode.computeStats(ctx_.getRootAnalyzer());

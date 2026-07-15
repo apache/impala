@@ -1,0 +1,46 @@
+====
+---- QUERY
+# EXPLAIN the same query that has been executed
+# Use DISTRIBUTEDPLAN (explain_level=2) to show the cardinality of MERGING-EXCHANGE.
+EXPLAIN select * from (
+  select id, int_col, rank() over (
+    partition by int_col, string_col order by id) rnk
+  from functional.alltypes
+  where string_col != 'test_analytic_topn') t
+where rnk <= 5
+---- PLAN
+PLAN-ROOT SINK
+|
+06:EXCHANGE [UNPARTITIONED]
+|
+03:SELECT
+|  predicates: rank() <= 5
+|  row-size=29B cardinality=50
+|
+02:ANALYTIC
+|  functions: rank()
+|  partition by: int_col, string_col
+|  order by: id ASC
+|  window: RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+|  row-size=29B cardinality=50
+|
+05:TOP-N
+|  partition by: int_col, string_col
+|  order by: id ASC
+|  partition limit: 5 (include ties)
+|  row-size=21B cardinality=50 (from HBO)
+|
+04:EXCHANGE [HASH(int_col,string_col)]
+|
+01:TOP-N
+|  partition by: int_col, string_col
+|  order by: id ASC
+|  partition limit: 5 (include ties)
+|  source expr: rank() <= CAST(5 AS BIGINT)
+|  row-size=21B cardinality=50 (from HBO)
+|
+00:SCAN HDFS [functional.alltypes]
+   HDFS partitions=24/24 files=24 size=478.45KB
+   predicates: string_col != 'test_analytic_topn'
+   row-size=21B cardinality=7.30K (from HBO)
+====

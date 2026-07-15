@@ -87,6 +87,8 @@ public class ExchangeNode extends PlanNode {
 
   protected boolean isMergingExchange() { return mergeInfo_ != null; }
 
+  public long getOffset() { return offset_; }
+
   protected boolean isBroadcastExchange() {
     // If the output of the sink is not partitioned but the target fragment is
     // partitioned, then the data exchange is broadcast.
@@ -154,14 +156,20 @@ public class ExchangeNode extends PlanNode {
     Preconditions.checkState(children_.size() == 1);
     cardinality_ = capCardinalityAtLimit(children_.get(0).getCardinality(), offset_);
     hasHardEstimates_ = children_.get(0).hasHardEstimates_;
+    // A merging-exchange for a distributed sort acts like a final SortNode.
+    // Its cardinality is tracked in HBO.
+    if (isMergingExchange()) {
+      tryUpdateCardinalityFromHbo(analyzer);
+    }
   }
 
   /**
    * Set the parameters used to merge sorted input streams. This can be called
    * after init().
    */
-  public void setMergeInfo(SortInfo info, long offset) {
-    mergeInfo_ = info;
+  public void setMergeInfo(SortNode sort, long offset) {
+    mergeInfo_ = sort.getSortInfo();
+    sort.setSortMergeParent(this);
     offset_ = offset;
     displayName_ = "MERGING-EXCHANGE";
   }
@@ -367,6 +375,9 @@ public class ExchangeNode extends PlanNode {
 
   @Override
   protected void toThrift(TPlanNode msg, ThriftSerializationCtx serialCtx) {
+    // A merging-exchange with limit/offset is the store point for a plain distributed
+    // sort. Its HBO key delegates to the child local sort's key.
+    if (isMergingExchange()) populateHboThriftFields(msg, serialCtx);
     if (isMergingExchange()) {
       LOG.trace("{} ineligible for caching because it is a merging exchange", this);
       serialCtx.setTupleCachingIneligible(IneligibilityReason.MERGING_EXCHANGE);
@@ -412,7 +423,13 @@ public class ExchangeNode extends PlanNode {
   public boolean omitTupleCache() { return true; }
 
   @Override
-  public boolean isCardinalityPreserving() { return true; }
+  public boolean ignoredInHboCardKey() {
+    // An exchange never has its own HBO identity. A merging-exchange shares the key and
+    // scan stats of its child local sort (they track the same cardinality); a non-merging
+    // exchange is a pure passthrough. Either way it delegates to child 0 (handled by the
+    // PlanNode defaults for generateHboKeyString() and appendScanInputStats()).
+    return true;
+  }
 
   @Override
   public boolean isOperandTransparent() { return true; }

@@ -1,0 +1,149 @@
+====
+---- QUERY
+# EXPLAIN the same query that has been executed
+# Use DISTRIBUTEDPLAN (explain_level=2) to show the cardinality of MERGING-EXCHANGE.
+EXPLAIN select int_col, count(*) from (
+  select id, int_col from functional.alltypes
+  where string_col != 'test_sort'
+  order by id limit 100 offset 1000) t
+group by int_col
+---- DISTRIBUTEDPLAN
+F01:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
+|  Per-Host Resources: mem-estimate=14.00MB mem-reservation=5.94MB thread-reservation=1
+PLAN-ROOT SINK
+|  output exprs: int_col, count(*)
+|  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
+|
+02:AGGREGATE [FINALIZE]
+|  output: count(*)
+|  group by: int_col
+|  mem-estimate=10.00MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
+|  tuple-ids=3 row-size=12B cardinality=10 (from HBO)
+|  in pipelines: 02(GETNEXT), 01(OPEN)
+|
+03:MERGING-EXCHANGE [UNPARTITIONED]
+|  offset: 1000
+|  order by: id ASC
+|  limit: 100
+|  mem-estimate=16.00KB mem-reservation=0B thread-reservation=0
+|  tuple-ids=1 row-size=8B cardinality=100 (from HBO)
+|  in pipelines: 01(GETNEXT)
+|
+F00:PLAN FRAGMENT [RANDOM] hosts=3 instances=3
+Per-Host Resources: mem-estimate=160.01MB mem-reservation=32.00KB thread-reservation=2
+01:TOP-N [LIMIT=1100]
+|  order by: id ASC
+|  mem-estimate=8.59KB mem-reservation=0B thread-reservation=0
+|  tuple-ids=1 row-size=8B cardinality=1.10K
+|  in pipelines: 01(GETNEXT), 00(OPEN)
+|
+00:SCAN HDFS [functional.alltypes, RANDOM]
+   HDFS partitions=24/24 files=24 size=478.45KB
+   predicates: string_col != 'test_sort'
+   stored statistics:
+     table: rows=7.30K size=478.45KB
+     partitions: 24/24 rows=7.30K
+     columns: all
+   extrapolated-rows=disabled max-scan-range-rows=310
+   mem-estimate=160.00MB mem-reservation=32.00KB thread-reservation=1
+   tuple-ids=0 row-size=21B cardinality=7.30K (from HBO)
+   in pipelines: 00(GETNEXT)
+====
+---- QUERY
+# Different scan columns and agg functions
+EXPLAIN select int_col, sum(id), count(string_col) from (
+  select id, int_col, string_col from functional.alltypes
+  where string_col != 'test_sort'
+  order by id limit 100 offset 1000) t
+group by int_col
+---- DISTRIBUTEDPLAN
+F01:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
+|  Per-Host Resources: mem-estimate=14.00MB mem-reservation=5.94MB thread-reservation=1
+PLAN-ROOT SINK
+|  output exprs: int_col, sum(id), count(string_col)
+|  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
+|
+02:AGGREGATE [FINALIZE]
+|  output: sum(CAST(id AS BIGINT)), count(string_col)
+|  group by: int_col
+|  mem-estimate=10.00MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
+|  tuple-ids=3 row-size=20B cardinality=10 (from HBO)
+|  in pipelines: 02(GETNEXT), 01(OPEN)
+|
+03:MERGING-EXCHANGE [UNPARTITIONED]
+|  offset: 1000
+|  order by: id ASC
+|  limit: 100
+|  mem-estimate=16.00KB mem-reservation=0B thread-reservation=0
+|  tuple-ids=1 row-size=21B cardinality=100 (from HBO)
+|  in pipelines: 01(GETNEXT)
+|
+F00:PLAN FRAGMENT [RANDOM] hosts=3 instances=3
+Per-Host Resources: mem-estimate=160.02MB mem-reservation=32.00KB thread-reservation=2
+01:TOP-N [LIMIT=1100]
+|  order by: id ASC
+|  mem-estimate=22.56KB mem-reservation=0B thread-reservation=0
+|  tuple-ids=1 row-size=21B cardinality=1.10K
+|  in pipelines: 01(GETNEXT), 00(OPEN)
+|
+00:SCAN HDFS [functional.alltypes, RANDOM]
+   HDFS partitions=24/24 files=24 size=478.45KB
+   predicates: string_col != 'test_sort'
+   stored statistics:
+     table: rows=7.30K size=478.45KB
+     partitions: 24/24 rows=7.30K
+     columns: all
+   extrapolated-rows=disabled max-scan-range-rows=310
+   mem-estimate=160.00MB mem-reservation=32.00KB thread-reservation=1
+   tuple-ids=0 row-size=21B cardinality=7.30K (from HBO)
+   in pipelines: 00(GETNEXT)
+====
+---- QUERY
+# Different group-by columns. The TOP-N node should still hit HBO stats.
+EXPLAIN select bigint_col, count(*) from (
+  select id, bigint_col from functional.alltypes
+  where string_col != 'test_sort'
+  order by id limit 100 offset 1000) t
+group by bigint_col
+---- DISTRIBUTEDPLAN
+F01:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
+|  Per-Host Resources: mem-estimate=14.00MB mem-reservation=5.94MB thread-reservation=1
+PLAN-ROOT SINK
+|  output exprs: bigint_col, count(*)
+|  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
+|
+02:AGGREGATE [FINALIZE]
+|  output: count(*)
+|  group by: bigint_col
+|  mem-estimate=10.00MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
+|  tuple-ids=3 row-size=16B cardinality=10
+|  in pipelines: 02(GETNEXT), 01(OPEN)
+|
+03:MERGING-EXCHANGE [UNPARTITIONED]
+|  offset: 1000
+|  order by: id ASC
+|  limit: 100
+|  mem-estimate=16.00KB mem-reservation=0B thread-reservation=0
+|  tuple-ids=1 row-size=12B cardinality=100 (from HBO)
+|  in pipelines: 01(GETNEXT)
+|
+F00:PLAN FRAGMENT [RANDOM] hosts=3 instances=3
+Per-Host Resources: mem-estimate=160.01MB mem-reservation=32.00KB thread-reservation=2
+01:TOP-N [LIMIT=1100]
+|  order by: id ASC
+|  mem-estimate=12.89KB mem-reservation=0B thread-reservation=0
+|  tuple-ids=1 row-size=12B cardinality=1.10K
+|  in pipelines: 01(GETNEXT), 00(OPEN)
+|
+00:SCAN HDFS [functional.alltypes, RANDOM]
+   HDFS partitions=24/24 files=24 size=478.45KB
+   predicates: string_col != 'test_sort'
+   stored statistics:
+     table: rows=7.30K size=478.45KB
+     partitions: 24/24 rows=7.30K
+     columns: all
+   extrapolated-rows=disabled max-scan-range-rows=310
+   mem-estimate=160.00MB mem-reservation=32.00KB thread-reservation=1
+   tuple-ids=0 row-size=25B cardinality=7.30K (from HBO)
+   in pipelines: 00(GETNEXT)
+====
