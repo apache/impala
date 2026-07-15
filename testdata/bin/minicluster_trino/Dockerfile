@@ -27,6 +27,8 @@ RUN \
     echo "http-server.http.port=9091" >> /etc/trino/config.properties && \
     sed -i 's/localhost:8080/localhost:9091/g' /etc/trino/config.properties && \
     echo "node.id=impala-minicluster-trino" >> /etc/trino/node.properties && \
+    sed -i 's/-XX:InitialRAMPercentage=[0-9.]*/-XX:InitialRAMPercentage=10/' /etc/trino/jvm.config && \
+    sed -i 's/-XX:MaxRAMPercentage=[0-9.]*/-XX:MaxRAMPercentage=30/' /etc/trino/jvm.config && \
     echo "-DHADOOP_USER_NAME=$USERNAME" >> /etc/trino/jvm.config
 
 COPY hive-site.xml core-site.xml hdfs-site.xml /etc/
