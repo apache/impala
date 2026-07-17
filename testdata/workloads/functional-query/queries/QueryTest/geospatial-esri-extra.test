@@ -167,3 +167,31 @@ BIGINT
 ---- RESULTS
 7393893
 ====
+---- QUERY
+select ST_Intersects(st_geomfromtext('LINESTRING(1 0, 1 1)'), st_geomfromtext('MULTILINESTRING((0 0, 0 1), (2 0, 2 1))'));
+---- TYPES
+BOOLEAN
+---- RESULTS
+false
+====
+---- QUERY
+select st_intersects(st_geomfromtext('MULTILINESTRING((2 0, 2 2),(3 0, 3 2))'), st_geomfromtext('MULTILINESTRING((0 0, 0 2), (4 0, 4 2))'));
+---- TYPES
+BOOLEAN
+---- RESULTS
+false
+====
+---- QUERY
+select st_intersects(st_geomfromtext('LINESTRING(1 0, 1 1)'), st_geomfromtext('MULTILINESTRING((-1 1, 2 1), (2 0, 2 1))'));
+---- TYPES
+BOOLEAN
+---- RESULTS
+true
+====
+---- QUERY
+select st_intersects(st_geomfromtext('MULTILINESTRING((2 0, 2 2),(1 0, 1 1))'), st_geomfromtext('MULTILINESTRING((-1 1, 2 1), (2 0, 2 1))'));
+---- TYPES
+BOOLEAN
+---- RESULTS
+true
+====

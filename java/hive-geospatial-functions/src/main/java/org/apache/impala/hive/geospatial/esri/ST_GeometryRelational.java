@@ -20,7 +20,9 @@ package org.apache.impala.hive.geospatial.esri;
 import com.esri.core.geometry.Geometry.GeometryAccelerationDegree;
 import com.esri.core.geometry.OperatorContains;
 import com.esri.core.geometry.OperatorSimpleRelation;
+import com.esri.core.geometry.SpatialReference;
 import com.esri.core.geometry.ogc.OGCGeometry;
+
 import org.apache.hadoop.hive.ql.exec.UDFArgumentException;
 import org.apache.hadoop.hive.ql.metadata.HiveException;
 import org.apache.hadoop.hive.ql.udf.generic.GenericUDF;
@@ -99,8 +101,13 @@ public abstract class ST_GeometryRelational extends GenericUDF {
 
     firstRun = false;
 
-    return opSimpleRelation
-        .execute(geom1.getEsriGeometry(), geom2.getEsriGeometry(), geom1.getEsriSpatialReference(), null);
+    return execEvaluate(geom1, geom2, geom1.getEsriSpatialReference());
+  }
+
+  protected Object execEvaluate(OGCGeometry geom1, OGCGeometry geom2,
+      SpatialReference sr) {
+    return opSimpleRelation.execute(geom1.getEsriGeometry(), geom2.getEsriGeometry(), sr,
+        null);
   }
 
   @Override
