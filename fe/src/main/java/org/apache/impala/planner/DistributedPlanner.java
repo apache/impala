@@ -497,6 +497,7 @@ public class DistributedPlanner {
       List<Expr> lhsJoinExprs, List<Expr> rhsJoinExprs,
       List<PlanFragment> fragments) throws ImpalaException {
     Preconditions.checkState(node.getDistributionMode() == DistributionMode.PARTITIONED);
+    boolean useRandomPartitioning = node.isConstantFalseOuterJoin();
     // The lhs and rhs input fragments are already partitioned on the join exprs.
     // Combine the lhs/rhs input fragments into leftChildFragment by placing the join
     // node into leftChildFragment and setting its lhs/rhs children to the plan root of
@@ -506,7 +507,7 @@ public class DistributedPlanner {
     // may reject partitions that could be made physically compatible. Fix this by
     // removing equivalent duplicates from partition exprs and impose a canonical order
     // on partition exprs (both using the canonical equivalence class representatives).
-    if (lhsHasCompatPartition
+    if (!useRandomPartitioning && lhsHasCompatPartition
         && rhsHasCompatPartition
         && isCompatPartition(
             leftChildFragment.getDataPartition(),
@@ -532,7 +533,7 @@ public class DistributedPlanner {
     // ExchangeNode that is fed by the rhsInputFragment whose sink repartitions
     // its data by the rhs join exprs.
     DataPartition rhsJoinPartition = null;
-    if (lhsHasCompatPartition) {
+    if (!useRandomPartitioning && lhsHasCompatPartition) {
       rhsJoinPartition = getCompatPartition(lhsJoinExprs,
           leftChildFragment.getDataPartition(), rhsJoinExprs, analyzer);
       if (rhsJoinPartition != null) {
@@ -546,7 +547,7 @@ public class DistributedPlanner {
 
     // Same as above but with rhs and lhs reversed.
     DataPartition lhsJoinPartition = null;
-    if (rhsHasCompatPartition) {
+    if (!useRandomPartitioning && rhsHasCompatPartition) {
       lhsJoinPartition = getCompatPartition(rhsJoinExprs,
           rightChildFragment.getDataPartition(), lhsJoinExprs, analyzer);
       if (lhsJoinPartition != null) {
@@ -560,15 +561,23 @@ public class DistributedPlanner {
 
     Preconditions.checkState(lhsJoinPartition == null);
     Preconditions.checkState(rhsJoinPartition == null);
-    lhsJoinPartition = DataPartition.hashPartitioned(Expr.cloneList(lhsJoinExprs));
-    rhsJoinPartition = DataPartition.hashPartitioned(Expr.cloneList(rhsJoinExprs));
+    if (useRandomPartitioning) {
+      // No rows can match, so the inputs need not be co-located by their synthetic
+      // constant hash keys. Random partitioning preserves parallelism without skew.
+      lhsJoinPartition = DataPartition.RANDOM;
+      rhsJoinPartition = DataPartition.RANDOM;
+    } else {
+      lhsJoinPartition = DataPartition.hashPartitioned(Expr.cloneList(lhsJoinExprs));
+      rhsJoinPartition = DataPartition.hashPartitioned(Expr.cloneList(rhsJoinExprs));
+    }
 
     // Neither lhs nor rhs are already partitioned on the join exprs.
     // Create a new parent fragment containing a HashJoin node with two
     // ExchangeNodes as inputs; the latter are the destinations of the
     // left- and rightChildFragments, which now partition their output
     // on their respective join exprs.
-    // The new fragment is hash-partitioned on the lhs input join exprs.
+    // The new fragment uses the lhs input partition unless the join type requires a
+    // different output partition below.
     ExchangeNode lhsExchange =
         new ExchangeNode(ctx_.getNextNodeId(), leftChildFragment.getPlanRoot());
     lhsExchange.computeStats(ctx_.getRootAnalyzer());
@@ -763,7 +772,7 @@ public class DistributedPlanner {
   * For 'broadcastCost', 'partitionCost', and 'rhsDataSize' a value of -1 indicates
   * unknown, e.g., due to missing stats.
   */
- private DistributionMode computeJoinDistributionMode(JoinNode node,
+ private DistributionMode computeJoinDistributionMode(HashJoinNode node,
      long broadcastCost, long partitionCost, long rhsDataSize) {
    // Check join types that require a specific distribution strategy to run correctly.
    JoinOperator op = node.getJoinOp();
@@ -772,6 +781,16 @@ public class DistributedPlanner {
      return DistributionMode.PARTITIONED;
    }
    if (op == JoinOperator.NULL_AWARE_LEFT_ANTI_JOIN) return DistributionMode.BROADCAST;
+
+   // A constant-false left outer join has an empty build side. Broadcast that empty
+   // input instead of repartitioning the preserved probe side, even with a SHUFFLE hint.
+   if (node.isConstantFalseOuterJoin()) {
+     // Left outer is all that reaches here: full and right outer took the early return
+     // above, and a constant-false right outer was inverted into a left one while the
+     // plan was built.
+     Preconditions.checkState(op == JoinOperator.LEFT_OUTER_JOIN);
+     return DistributionMode.BROADCAST;
+   }
 
    // Check join hints.
    if (node.getDistributionModeHint() != DistributionMode.NONE) {

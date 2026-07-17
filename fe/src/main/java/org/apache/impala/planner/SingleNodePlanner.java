@@ -34,6 +34,7 @@ import org.apache.impala.analysis.Analyzer;
 import org.apache.impala.analysis.BaseTableRef;
 import org.apache.impala.analysis.BinaryPredicate;
 import org.apache.impala.analysis.BinaryPredicate.Operator;
+import org.apache.impala.analysis.BoolLiteral;
 import org.apache.impala.analysis.CollectionTableRef;
 import org.apache.impala.analysis.Expr;
 import org.apache.impala.analysis.ExprId;
@@ -2109,6 +2110,27 @@ public class SingleNodePlanner implements SingleNodePlannerIntf {
     PlanNode.removeZippingUnnestConjuncts(otherJoinConjuncts, analyzer);
     analyzer.markConjunctsAssigned(otherJoinConjuncts);
 
+    // A FALSE or NULL conjunct makes the complete On-clause impossible to satisfy.
+    // Use constant non-matching keys to make a hash join available. The distributed
+    // planner randomly partitions these joins instead of hashing the constant keys.
+    // Prune an input if the outer-join semantics do not require its unmatched rows.
+    boolean optimizeConstantFalseOuterJoin = innerRef.getJoinOp().isOuterJoin()
+        && Iterables.any(otherJoinConjuncts,
+            e -> Expr.IS_FALSE_LITERAL.apply(e) || Expr.IS_NULL_VALUE.apply(e));
+    if (optimizeConstantFalseOuterJoin) {
+      eqJoinConjuncts.clear();
+      eqJoinConjuncts.add(createNonMatchingEqJoinConjunct(analyzer));
+      // The synthetic predicate already guarantees that no rows can match.
+      otherJoinConjuncts.clear();
+      if (innerRef.getJoinOp().isLeftOuterJoin()) {
+        inner = createEmptyJoinInput(inner, analyzer);
+      } else if (innerRef.getJoinOp().isRightOuterJoin()) {
+        outer = createEmptyJoinInput(outer, analyzer);
+      } else {
+        Preconditions.checkState(innerRef.getJoinOp().isFullOuterJoin());
+      }
+    }
+
     if (analyzer.getQueryOptions().isEnable_distinct_semi_join_optimization() &&
             innerRef.getJoinOp().isLeftSemiJoin()) {
       inner =
@@ -2126,11 +2148,41 @@ public class SingleNodePlanner implements SingleNodePlannerIntf {
       result = new NestedLoopJoinNode(outer, inner, analyzer.isStraightJoin(),
           innerRef.getDistributionMode(), innerRef.getJoinOp(), otherJoinConjuncts);
     } else {
-      result = new HashJoinNode(outer, inner, analyzer.isStraightJoin(),
+      HashJoinNode hashJoin = new HashJoinNode(outer, inner, analyzer.isStraightJoin(),
           innerRef.getDistributionMode(), innerRef.getJoinOp(), eqJoinConjuncts,
           otherJoinConjuncts);
+      if (optimizeConstantFalseOuterJoin) hashJoin.markAsConstantFalseOuterJoin();
+      result = hashJoin;
     }
     result.init(analyzer);
+    return result;
+  }
+
+  /**
+   * Creates an empty replacement for a join input while preserving its tuple and
+   * substitution metadata.
+   */
+  private EmptySetNode createEmptyJoinInput(PlanNode input, Analyzer analyzer) {
+    EmptySetNode empty = new EmptySetNode(ctx_.getNextNodeId(), input.getTupleIds());
+    empty.setTblRefIds(Lists.newArrayList(input.getTblRefIds()));
+    empty.setOutputSmap(input.getOutputSmap());
+    empty.init(analyzer);
+    return empty;
+  }
+
+  /**
+   * Creates a hash predicate whose probe and build keys can never match.
+   *
+   * <p>The join needs an equi conjunct to be a hash join at all: with the FALSE left
+   * where the analyzer put it, among the other conjuncts, the planner picks a nested
+   * loop join instead and the constant buys nothing. So the usable keys are replaced
+   * by one that cannot match rather than removed.
+   */
+  private BinaryPredicate createNonMatchingEqJoinConjunct(Analyzer analyzer)
+      throws AnalysisException {
+    BinaryPredicate result = new BinaryPredicate(
+        Operator.EQ, new BoolLiteral(true), new BoolLiteral(false));
+    result.analyze(analyzer);
     return result;
   }
 

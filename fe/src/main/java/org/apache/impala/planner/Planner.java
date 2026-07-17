@@ -1019,13 +1019,15 @@ public class Planner {
   /**
    * Traverses the plan tree rooted at 'root' and inverts joins in the following
    * situations:
-   * 1. If the left-hand side is a SingularRowSrcNode then we invert the join because
+   * 1. If a constant-false right outer join has an empty left-hand side then we invert
+   *    the join so that the empty input becomes the build side.
+   * 2. If the left-hand side is a SingularRowSrcNode then we invert the join because
    *    then the build side is guaranteed to have only a single row.
-   * 2. There is no backend support for distributed non-equi right outer/semi joins,
+   * 3. There is no backend support for distributed non-equi right outer/semi joins,
    *    so we invert them (any distributed left semi/outer join is ok).
-   * 3. If we estimate that the inverted join is cheaper (see isInvertedJoinCheaper()).
+   * 4. If we estimate that the inverted join is cheaper (see isInvertedJoinCheaper()).
    *    Do not invert if relevant stats are missing.
-   * The first two inversion rules are independent of the presence/absence of stats.
+   * The first three inversion rules are independent of the presence/absence of stats.
    * Left Null Aware Anti Joins are never inverted due to lack of backend support.
    * Joins that originate from query blocks with a straight join hint are not inverted.
    * The 'isLocalPlan' parameter indicates whether the plan tree rooted at 'root'
@@ -1057,7 +1059,13 @@ public class Planner {
         return;
       }
 
-      if (joinNode.getChild(0) instanceof SingularRowSrcNode) {
+      if (joinNode instanceof HashJoinNode
+          && ((HashJoinNode) joinNode).isConstantFalseOuterJoin()
+          && joinOp.isRightOuterJoin()) {
+        // Put the empty input on the build side so the distributed planner can
+        // broadcast it without duplicating unmatched rows from the preserved side.
+        joinNode.invertJoin();
+      } else if (joinNode.getChild(0) instanceof SingularRowSrcNode) {
         // Always place a singular row src on the build side because it
         // only produces a single row.
         joinNode.invertJoin();

@@ -152,18 +152,32 @@ PLAN-ROOT SINK
 # assigned to the join.
 select *
 from functional.alltypessmall a
-left outer join functional.alltypestiny b
+left outer join [shuffle] functional.alltypestiny b
 on (a.id = b.id and 1 + 1 > 10)
 ---- PLAN
 PLAN-ROOT SINK
 |
-02:NESTED LOOP JOIN [LEFT OUTER JOIN]
-|  join predicates: FALSE
+03:HASH JOIN [LEFT OUTER JOIN]
+|  hash predicates: TRUE = FALSE
 |  row-size=178B cardinality=100
 |
-|--01:SCAN HDFS [functional.alltypestiny b]
-|     HDFS partitions=4/4 files=4 size=460B
-|     row-size=89B cardinality=8
+|--02:EMPTYSET
+|
+00:SCAN HDFS [functional.alltypessmall a]
+   HDFS partitions=4/4 files=4 size=6.32KB
+   row-size=89B cardinality=100
+---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
+05:EXCHANGE [UNPARTITIONED]
+|
+03:HASH JOIN [LEFT OUTER JOIN, BROADCAST]
+|  hash predicates: TRUE = FALSE
+|  row-size=178B cardinality=100
+|
+|--04:EXCHANGE [BROADCAST]
+|  |
+|  02:EMPTYSET
 |
 00:SCAN HDFS [functional.alltypessmall a]
    HDFS partitions=4/4 files=4 size=6.32KB
@@ -173,40 +187,72 @@ PLAN-ROOT SINK
 # assigned to the join.
 select *
 from functional.alltypessmall a
-right outer join functional.alltypestiny b
-on (a.id = b.id and !true)
+right outer join [shuffle] functional.alltypestiny b
+on (a.id = b.id and false)
 ---- PLAN
 PLAN-ROOT SINK
 |
-02:NESTED LOOP JOIN [RIGHT OUTER JOIN]
-|  join predicates: FALSE
-|  row-size=178B cardinality=100
+03:HASH JOIN [LEFT OUTER JOIN]
+|  hash predicates: FALSE = TRUE
+|  row-size=178B cardinality=8
 |
-|--01:SCAN HDFS [functional.alltypestiny b]
-|     HDFS partitions=4/4 files=4 size=460B
-|     row-size=89B cardinality=8
+|--02:EMPTYSET
 |
-00:SCAN HDFS [functional.alltypessmall a]
-   HDFS partitions=4/4 files=4 size=6.32KB
-   row-size=89B cardinality=100
+01:SCAN HDFS [functional.alltypestiny b]
+   HDFS partitions=4/4 files=4 size=460B
+   row-size=89B cardinality=8
+---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
+05:EXCHANGE [UNPARTITIONED]
+|
+03:HASH JOIN [LEFT OUTER JOIN, BROADCAST]
+|  hash predicates: FALSE = TRUE
+|  row-size=178B cardinality=8
+|
+|--04:EXCHANGE [BROADCAST]
+|  |
+|  02:EMPTYSET
+|
+01:SCAN HDFS [functional.alltypestiny b]
+   HDFS partitions=4/4 files=4 size=460B
+   row-size=89B cardinality=8
 ====
-# Constant conjunct in the ON-clause of an outer join is
-# assigned to the join.
+# A typed NULL conjunct in the ON-clause of an outer join is assigned to the join.
 select *
 from functional.alltypessmall a
 full outer join functional.alltypestiny b
-on (a.id = b.id and null = "abc")
+on (a.id = b.id and cast(null as boolean))
 ---- PLAN
 PLAN-ROOT SINK
 |
 02:HASH JOIN [FULL OUTER JOIN]
-|  hash predicates: a.id = b.id
-|  other join predicates: NULL
+|  hash predicates: TRUE = FALSE
 |  row-size=178B cardinality=108
 |
 |--01:SCAN HDFS [functional.alltypestiny b]
 |     HDFS partitions=4/4 files=4 size=460B
 |     row-size=89B cardinality=8
+|
+00:SCAN HDFS [functional.alltypessmall a]
+   HDFS partitions=4/4 files=4 size=6.32KB
+   row-size=89B cardinality=100
+---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
+05:EXCHANGE [UNPARTITIONED]
+|
+02:HASH JOIN [FULL OUTER JOIN, PARTITIONED]
+|  hash predicates: TRUE = FALSE
+|  row-size=178B cardinality=108
+|
+|--04:EXCHANGE [RANDOM]
+|  |
+|  01:SCAN HDFS [functional.alltypestiny b]
+|     HDFS partitions=4/4 files=4 size=460B
+|     row-size=89B cardinality=8
+|
+03:EXCHANGE [RANDOM]
 |
 00:SCAN HDFS [functional.alltypessmall a]
    HDFS partitions=4/4 files=4 size=6.32KB

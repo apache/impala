@@ -53,6 +53,16 @@ import com.google.common.base.Preconditions;
 public class HashJoinNode extends JoinNode implements SpillableOperator {
   private final static Logger LOG = LoggerFactory.getLogger(HashJoinNode.class);
 
+  // True when the join uses synthetic non-matching constant hash keys for an outer
+  // join whose On-clause contains FALSE or NULL. Partitioned execution must distribute
+  // these inputs randomly because hashing either constant would create data skew.
+  //
+  // What the distributed planner reads off this is that the join produces no match at
+  // all; a constant-false On-clause is today the only thing that proves it. Another
+  // proof - say two conjuncts that cannot hold at once - would want the same handling
+  // and this name would then be the narrow one.
+  private boolean isConstantFalseOuterJoin_ = false;
+
   // Coefficients for estimating hash join CPU processing cost.  Derived from
   // benchmarking. Probe side cost per input row consumed
   private static final double COST_COEFFICIENT_PROBE_INPUT = 0.2565;
@@ -76,6 +86,13 @@ public class HashJoinNode extends JoinNode implements SpillableOperator {
 
   @Override
   public List<BinaryPredicate> getEqJoinConjuncts() { return eqJoinConjuncts_; }
+
+  void markAsConstantFalseOuterJoin() {
+    Preconditions.checkState(joinOp_.isOuterJoin());
+    isConstantFalseOuterJoin_ = true;
+  }
+
+  boolean isConstantFalseOuterJoin() { return isConstantFalseOuterJoin_; }
 
   @Override
   public void init(Analyzer analyzer) throws ImpalaException {

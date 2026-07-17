@@ -1,5 +1,37 @@
 ====
 ---- QUERY
+# IMPALA-7996: Constant-false outer joins preserve the left input.
+select count(*), count(a.id), count(b.id)
+from (select 1 id union all select 2) a
+left outer join (select 3 id union all select 4) b on false
+---- RESULTS
+2,2,0
+---- TYPES
+bigint,bigint,bigint
+====
+---- QUERY
+# IMPALA-7996: Constant-false outer joins preserve the right input.
+select count(*), count(a.id), count(b.id)
+from (select 1 id union all select 2) a
+right outer join (select 3 id union all select 4) b on false
+---- RESULTS
+2,0,2
+---- TYPES
+bigint,bigint,bigint
+====
+---- QUERY
+# IMPALA-7996: A typed NULL conjunct makes the equi predicate non-matching, even
+# for overlapping keys, so a full outer join returns both inputs as unmatched rows.
+select count(*), count(a.id), count(b.id)
+from (select 1 id union all select 2) a
+full outer join (select 1 id union all select 3) b
+on a.id = b.id and cast(null as boolean)
+---- RESULTS
+4,2,2
+---- TYPES
+bigint,bigint,bigint
+====
+---- QUERY
 # join cols are not part of select list (and still get materialized)
 select j.test_name, d.name
 from JoinTbl j inner join DimTbl d on (j.test_id = d.id)
