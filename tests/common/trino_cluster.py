@@ -29,6 +29,7 @@
 import json
 import logging
 import os
+import re
 import socket
 import subprocess
 import time
@@ -46,6 +47,17 @@ TRINO_SERVER = os.getenv('IMPALA_TRINO_SERVER', 'localhost:9091')
 # Parquet encoding that Impala cannot read yet) are applied server-side via the
 # image's session-property-config, not per query here.
 DEFAULT_CATALOG = 'iceberg'
+
+# Trino's type names mostly match the names used by Impala query test TYPES
+# sections. Keep the differences here so TRINO_QUERY sections use the same
+# vocabulary as QUERY and HIVE_QUERY sections.
+TRINO_TO_IMPALA_TYPE = {
+    'integer': 'INT',
+    'real': 'FLOAT',
+    'varbinary': 'BINARY',
+    'row': 'STRUCT',
+}
+TRINO_NON_FINITE_FLOAT_VALUES = frozenset(('NaN', 'Infinity', '-Infinity'))
 
 
 class TrinoUnavailable(Exception):
@@ -189,7 +201,7 @@ class TrinoCluster(object):
 
   def run_query(self, sql, catalog=DEFAULT_CATALOG, schema='default',
                 output_format='JSON', user=None, timeout_s=120):
-    """Run a single SQL statement through the containerized Trino CLI. Returns a
+    """Run SQL statements through the containerized Trino CLI. Returns a
     (stdout, stderr, returncode) tuple; does NOT raise on query error so callers
     can decide how to report failures."""
     cmd = ['docker', 'exec', self.container, 'trino',
@@ -211,13 +223,42 @@ class TrinoCluster(object):
       return stdout, "Trino query timed out after {0}s\n{1}".format(timeout_s, stderr), 1
     return stdout, stderr, proc.returncode
 
+  def get_query_metadata(self, sql, catalog=DEFAULT_CATALOG, schema='default',
+                         user=None, timeout_s=120):
+    """Return normalized output column labels and types without executing 'sql'.
 
-def _format_trino_value(value):
+    PREPARE accepts all Trino statements, unlike the inline-query form of
+    DESCRIBE OUTPUT. The two statements run in one CLI session so the prepared
+    statement is visible to DESCRIBE OUTPUT. The CLI writes PREPARE's status to
+    stderr and the JSON rows from DESCRIBE OUTPUT to stdout.
+    """
+    metadata_sql = (
+        "PREPARE __impala_test_query FROM\n{0}\n;\n"
+        "DESCRIBE OUTPUT __impala_test_query".format(sql))
+    stdout, stderr, rc = self.run_query(
+        metadata_sql, catalog=catalog, schema=schema, user=user,
+        timeout_s=timeout_s)
+    if rc != 0:
+      raise RuntimeError(
+          "Could not determine Trino result types for:\n{0}\n{1}".format(
+              sql, stderr))
+    try:
+      labels, types = parse_trino_describe_output(stdout)
+      if not types:
+        raise ValueError("DESCRIBE OUTPUT returned no columns")
+      return labels, types
+    except (KeyError, TypeError, ValueError) as e:
+      raise RuntimeError(
+          "Could not parse Trino result types for:\n{0}\n{1}".format(sql, e))
+
+
+def _format_trino_value(value, column_type=None):
   """Format a single JSON-decoded Trino value using the same textual convention as
   Impala RESULTS lines: SQL NULL -> bare 'NULL'; booleans -> 'true'/'false';
   integers -> bare; strings (and everything Trino emits as a JSON string, e.g.
-  DECIMAL/DOUBLE/TIMESTAMP, plus complex values) -> single-quoted with embedded
-  single quotes doubled."""
+  DECIMAL/TIMESTAMP, plus complex values) -> single-quoted with embedded
+  single quotes doubled. Trino's JSON protocol represents non-finite FLOAT/DOUBLE
+  values as strings, so use column metadata to restore their numeric spelling."""
   if value is None:
     return 'NULL'
   if isinstance(value, bool):
@@ -227,15 +268,18 @@ def _format_trino_value(value):
   if isinstance(value, float):
     return repr(value)
   if isinstance(value, str):
+    if column_type in ('FLOAT', 'DOUBLE') and value in TRINO_NON_FINITE_FLOAT_VALUES:
+      return value
     return "'%s'" % value.replace("'", "''")
   # Arrays / objects: serialize compactly and quote so they compare as a string.
   return "'%s'" % json.dumps(value, sort_keys=True).replace("'", "''")
 
 
-def parse_trino_json_output(stdout):
+def parse_trino_json_output(stdout, column_types=None):
   """Parse Trino '--output-format JSON' output (one JSON object per row, keys in
   select order) into (column_labels, rows) where each row is a comma-joined string
-  in the Impala RESULTS convention (see _format_trino_value)."""
+  in the Impala RESULTS convention (see _format_trino_value). Optional normalized
+  column types disambiguate non-finite floating-point values from strings."""
   labels = []
   rows = []
   for line in stdout.splitlines():
@@ -246,21 +290,79 @@ def parse_trino_json_output(stdout):
     pairs = json.loads(line, object_pairs_hook=list)
     if not labels:
       labels = [key for key, _ in pairs]
-    rows.append(','.join(_format_trino_value(val) for _, val in pairs))
+    if column_types is not None and len(column_types) != len(pairs):
+      raise ValueError(
+          "Trino result has {0} columns but metadata has {1} types".format(
+              len(pairs), len(column_types)))
+    formatted_values = []
+    for idx, (_, val) in enumerate(pairs):
+      column_type = column_types[idx] if column_types is not None else None
+      formatted_values.append(_format_trino_value(val, column_type))
+    rows.append(','.join(formatted_values))
   return labels, rows
+
+
+def normalize_trino_type(type_name):
+  """Convert a Trino display type to the vocabulary used by .test TYPES.
+
+  Query tests intentionally check primitive type names rather than precision,
+  scale, length or nested child types. Preserve meaningful suffixes such as
+  WITH TIME ZONE while removing those parameters. An unbounded Trino VARCHAR
+  represents Impala STRING, while varchar(n) represents Impala VARCHAR.
+  """
+  normalized = type_name.strip().lower()
+  if normalized == 'varchar':
+    return 'STRING'
+  if normalized.startswith('varchar('):
+    return 'VARCHAR'
+  if normalized.startswith('timestamp'):
+    suffix = ' WITH TIME ZONE' if normalized.endswith('with time zone') else ''
+    return 'TIMESTAMP' + suffix
+  if normalized.startswith('time'):
+    suffix = ' WITH TIME ZONE' if normalized.endswith('with time zone') else ''
+    return 'TIME' + suffix
+
+  base_type = re.split(r'\s*\(', normalized, maxsplit=1)[0]
+  return TRINO_TO_IMPALA_TYPE.get(base_type, base_type.upper())
+
+
+def parse_trino_describe_output(stdout):
+  """Parse JSON rows produced by Trino's DESCRIBE OUTPUT statement."""
+  labels = []
+  types = []
+  for line in stdout.splitlines():
+    line = line.strip()
+    if not line:
+      continue
+    row = json.loads(line)
+    labels.append(row['Column Name'])
+    types.append(normalize_trino_type(row['Type']))
+  return labels, types
 
 
 class TrinoQueryResult(object):
   """Minimal result object for a Trino query exposing the subset of attributes the
   test framework relies on (mirrors what ImpalaConnection results provide to
   run_test_case and the result verifiers): 'query', 'success', 'log',
-  'column_labels' and 'data' (rows formatted in the Impala RESULTS convention)."""
+  'column_labels', 'column_types' and 'data' (rows formatted in the Impala
+  RESULTS convention)."""
 
-  def __init__(self, query, stdout, stderr, returncode):
+  def __init__(self, query, stdout, stderr, returncode,
+               column_labels=None, column_types=None):
     self.query = query
     self.success = returncode == 0
     self.log = stderr or ''
     self.column_labels = []
+    # Keep missing metadata distinct from a genuine (albeit unexpected) empty
+    # type list so the verifier cannot silently accept an empty result set.
+    self.column_types = column_types
     self.data = []
     if self.success and stdout.strip():
-      self.column_labels, self.data = parse_trino_json_output(stdout)
+      self.column_labels, self.data = parse_trino_json_output(
+          stdout, column_types=column_types)
+    if column_labels is not None:
+      if self.column_labels and self.column_labels != column_labels:
+        raise ValueError(
+            "Trino result labels {0} differ from DESCRIBE OUTPUT labels {1}".format(
+                self.column_labels, column_labels))
+      self.column_labels = column_labels

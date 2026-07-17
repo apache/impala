@@ -943,25 +943,42 @@ class ImpalaTestSuite(BaseTestSuite):
       finally:
         h.close()
 
-    def __exec_in_trino(query, user=None):
+    def __exec_in_trino(query, user=None, fetch_types=False):
       """
       Helper to execute a query block in Trino via the containerized Trino CLI.
       Statements run in the 'iceberg' catalog under the current 'use_db' schema
       (so table names resolve like the Impala QUERY sections). Only the final
       statement's result is returned, mirroring __exec_in_hive. A failed statement
       raises RuntimeError so CATCH sections behave the same as for Impala/Hive.
+      When fetch_types is true, DESCRIBE OUTPUT retrieves metadata for the final
+      statement without executing it.
       """
       trino = TrinoCluster()
       schema = use_db or 'default'
       result = None
-      for stmt in query.split(';'):
-        if not stmt.strip():
-          continue
+      statements = [stmt for stmt in query.split(';') if stmt.strip()]
+      for idx, stmt in enumerate(statements):
+        column_labels = None
+        column_types = None
+        metadata_error = None
+        if fetch_types and idx == len(statements) - 1:
+          try:
+            column_labels, column_types = trino.get_query_metadata(
+                stmt, schema=schema, user=user)
+          except RuntimeError as e:
+            # Run the original statement even if metadata lookup failed. This
+            # preserves its error for CATCH sections and avoids masking it with
+            # an auxiliary DESCRIBE OUTPUT failure.
+            metadata_error = e
         stdout, stderr, rc = trino.run_query(stmt, schema=schema, user=user)
-        result = TrinoQueryResult(stmt, stdout, stderr, rc)
+        result = TrinoQueryResult(
+            stmt, stdout, stderr, rc, column_labels=column_labels,
+            column_types=column_types)
         if not result.success:
           raise RuntimeError(
               "Trino query failed:\n{0}\n{1}".format(stmt, stderr))
+        if metadata_error is not None:
+          raise metadata_error
       return result
 
     sections = self.load_query_test_file(self.get_workload(), test_file_name,
@@ -1019,7 +1036,11 @@ class ImpalaTestSuite(BaseTestSuite):
             if IS_CALCITE_PLANNER and 'CALCITE_PLANNER_CATCH' in test_section \
             else 'CATCH'
         try:
-          result = exec_fn(query, user=test_section.get('USER', '').strip() or None)
+          user = test_section.get('USER', '').strip() or None
+          if 'TRINO_QUERY' in test_section:
+            result = exec_fn(query, user=user, fetch_types='RESULTS' in test_section)
+          else:
+            result = exec_fn(query, user=user)
         except Exception as e:
           if catch_section_name in test_section:
             self.__verify_exceptions(test_section[catch_section_name], str(e), use_db)
@@ -1056,8 +1077,8 @@ class ImpalaTestSuite(BaseTestSuite):
               test_section[results_section_name], use_db=use_db, extra=test_file_vars)
           if 'TRINO_QUERY' in test_section:
             # Verify the rows returned by a TRINO_QUERY against the expected results.
-            # Trino's result type differs from Impala/Hive, so it uses a dedicated
-            # verifier that compares every column as an opaque string.
+            # Trino's result representation differs from Impala/Hive, so it uses a
+            # dedicated verifier with types supplied by DESCRIBE OUTPUT.
             verify_trino_results(test_section, result,
                 result_section=results_section_name,
                 update_section=self.pytest_config().option.update_results)

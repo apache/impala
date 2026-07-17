@@ -91,7 +91,16 @@ uses `DELTA_LENGTH_BYTE_ARRAY` for string columns, which Impala cannot read yet,
 the `iceberg` catalog, using the test's database as the schema), analogous to
 `HIVE_QUERY`. A `TRINO_QUERY` that returns rows can be verified against a
 `RESULTS` section (which accepts an optional `VERIFY_*` modifier), exactly as
-`HIVE_QUERY` and `QUERY` do. Trino rows are compared as opaque strings in the
-same textual convention as `RESULTS`: strings are single-quoted, numbers/booleans are bare,
-and SQL NULL is written as bare `NULL`. Note that Trino renders DECIMAL/DOUBLE
-(and other non-integer numerics) as quoted strings.
+`HIVE_QUERY` and `QUERY` do. Result checking is type-aware: the framework uses
+Trino's `DESCRIBE OUTPUT` metadata, and an optional `TYPES` section checks the
+normalized output types. Common Trino names are mapped to the existing `.test`
+vocabulary, such as `integer` to `INT`, `real` to `FLOAT`, unbounded `varchar`
+to `STRING`, and `varbinary` to `BINARY`. Type parameters are omitted, as they
+are for Impala results, so `decimal(10,2)` is `DECIMAL` and `varchar(10)` is
+`VARCHAR`.
+
+Rows use the same textual convention as `RESULTS`: strings are single-quoted,
+numbers/booleans are bare, and SQL NULL is written as bare `NULL`. Note that
+Trino values represented as JSON strings, including DECIMAL and temporal
+values, are quoted. Non-finite FLOAT/DOUBLE values are normalized to bare
+`NaN`, `Infinity`, and `-Infinity`, matching Impala's `RESULTS` convention.

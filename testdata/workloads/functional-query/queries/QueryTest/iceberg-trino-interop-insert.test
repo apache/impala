@@ -44,6 +44,8 @@ SELECT * FROM it_insert ORDER BY i
 10,'x'
 20,'y'
 30,'z'
+---- TYPES
+INT,STRING
 ====
 ---- TRINO_QUERY
 # VERIFY_IS_EQUAL_SORTED ignores row order even when the query has an ORDER BY: Trino
@@ -65,4 +67,19 @@ SELECT * FROM it_insert ORDER BY i DESC
 30,'z'
 20,'y'
 10,'x'
+====
+---- TRINO_QUERY
+# Trino serializes non-finite floating-point values as JSON strings. Column metadata
+# must distinguish them from an actual VARCHAR with the same text.
+SELECT CAST('NaN' AS DOUBLE) AS d_nan,
+       CAST('Infinity' AS DOUBLE) AS d_pos_inf,
+       CAST('-Infinity' AS DOUBLE) AS d_neg_inf,
+       CAST('NaN' AS REAL) AS r_nan,
+       CAST('Infinity' AS REAL) AS r_pos_inf,
+       CAST('-Infinity' AS REAL) AS r_neg_inf,
+       CAST('NaN' AS VARCHAR) AS s_nan
+---- RESULTS
+NaN,Infinity,-Infinity,NaN,Infinity,-Infinity,'NaN'
+---- TYPES
+DOUBLE,DOUBLE,DOUBLE,FLOAT,FLOAT,FLOAT,STRING
 ====

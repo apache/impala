@@ -518,10 +518,11 @@ def verify_trino_results(test_section, trino_result, result_section='RESULTS',
 
   'trino_result' is a TrinoQueryResult (see tests/common/trino_cluster.py) whose
   'data' rows are already formatted in the Impala RESULTS textual convention
-  (strings single-quoted, numbers/booleans bare, SQL NULL as bare NULL). Because
-  Trino's SQL type names differ from Impala's, every column is compared as an
-  opaque STRING (i.e. exact textual match); we do not cross-check column types.
-  The verifier is chosen from an optional 'VERIFY_*' comment on the section, and
+  (strings single-quoted, numbers/booleans bare, SQL NULL as bare NULL). Its
+  column types come from Trino's DESCRIBE OUTPUT and are normalized to the type
+  names used by .test files. The optional TYPES section is checked when present;
+  the actual types are still used for value comparison when it is absent. The
+  verifier is chosen from an optional 'VERIFY_*' comment on the section, and
   ordering follows the presence of an ORDER BY in the Trino query (as for RESULTS).
   """
   assert result_section in test_section
@@ -529,9 +530,24 @@ def verify_trino_results(test_section, trino_result, result_section='RESULTS',
       remove_comments(test_section[result_section]))
   actual_results_list = trino_result.data
   labels = trino_result.column_labels or ['DUMMY_LABEL']
-  # Treat all columns as STRING so comparison is an exact textual match on both
-  # sides. The number of columns must be consistent, so size types to the labels.
-  column_types = ['STRING'] * max(len(labels), 1)
+  actual_types = trino_result.column_types
+  assert actual_types is not None, "Trino result types were not collected"
+  assert len(actual_types) == len(trino_result.column_labels), \
+      "Trino result labels and types have different lengths"
+
+  if 'TYPES' in test_section:
+    expected_types = [c.strip().upper() for c in
+        remove_comments(test_section['TYPES']).rstrip('\n').split(',')]
+    try:
+      verify_results(expected_types, actual_types, order_matters=True)
+    except AssertionError:
+      if update_section:
+        test_section['TYPES'] = join_section_lines([', '.join(actual_types)])
+        expected_types = actual_types
+      else:
+        raise
+  else:
+    expected_types = actual_types
 
   verifier = test_section.get('VERIFIER')
   assert verifier in VERIFIER_MAP.keys(), "Unknown verifier: " + str(verifier)
@@ -541,8 +557,8 @@ def verify_trino_results(test_section, trino_result, result_section='RESULTS',
   if verifier and verifier.upper() == 'VERIFY_IS_EQUAL_SORTED':
     order_matters = False
 
-  expected = QueryTestResult(expected_results_list, column_types, labels, order_matters)
-  actual = QueryTestResult(actual_results_list, column_types, labels, order_matters)
+  expected = QueryTestResult(expected_results_list, expected_types, labels, order_matters)
+  actual = QueryTestResult(actual_results_list, actual_types, labels, order_matters)
   try:
     VERIFIER_MAP[verifier](expected, actual)
   except AssertionError:
