@@ -623,28 +623,6 @@ under the License.
       </plugin>
 
       <plugin>
-        <groupId>net.sourceforge.czt.dev</groupId>
-        <artifactId>cup-maven-plugin</artifactId>
-        <version>1.6-cdh</version>
-        <executions>
-          <execution>
-            <id>cup</id>
-            <phase>generate-sources</phase>
-            <goals>
-              <goal>generate</goal>
-            </goals>
-          </execution>
-        </executions>
-        <configuration>
-          <cupDefinition>sql-parser.cup</cupDefinition>
-          <className>SqlParser</className>
-          <symbolsName>SqlParserSymbols</symbolsName>
-          <outputDirectory>${project.build.directory}/generated-sources/cup</outputDirectory>
-          <expectedConflicts>0</expectedConflicts>
-        </configuration>
-      </plugin>
-
-      <plugin>
         <groupId>de.jflex</groupId>
         <artifactId>maven-jflex-plugin</artifactId>
         <version>1.4.3</version>
@@ -755,10 +733,31 @@ under the License.
                         to do this manually for the CUP and Thrift generated code
                         -->
                 <source>${project.basedir}/generated-sources/gen-java</source>
-                <source>${project.build.directory}/generated-sources/cup</source>
+                <source>${project.basedir}/generated-sources/cup</source>
                 <source>${project.build.directory}/generated-sources/jflex</source>
                 <source>${project.basedir}/src/compat-${hive.dist.type}/java</source>
                </sources>
+            </configuration>
+          </execution>
+          <!-- CUP generates a separate action_table.dat file that it loads at
+               runtime. This adds it as a resource to be included in the
+               impala-frontend jar. -->
+          <execution>
+            <id>add-resource</id>
+            <phase>generate-resources</phase>
+            <goals>
+              <goal>add-resource</goal>
+            </goals>
+            <configuration>
+              <resources>
+                <resource>
+                  <directory>${project.basedir}/generated-sources/cup</directory>
+                  <filtering>false</filtering>
+                  <includes>
+                    <include>**/*.dat</include>
+                  </includes>
+                </resource>
+              </resources>
             </configuration>
           </execution>
         </executions>

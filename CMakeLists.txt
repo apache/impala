@@ -518,6 +518,7 @@ add_subdirectory(common/function-registry)
 add_subdirectory(common/thrift)
 add_subdirectory(common/fbs)
 add_subdirectory(common/protobuf)
+add_subdirectory(common/cup)
 add_subdirectory(be)
 add_subdirectory(docker)
 add_subdirectory(java)
@@ -525,7 +526,7 @@ add_subdirectory(shell)
 add_subdirectory(package)
 
 # Build target for all generated files which most backend code depends on
-add_custom_target(gen-deps ALL DEPENDS thrift-deps proto-deps fb-deps
+add_custom_target(gen-deps ALL DEPENDS thrift-deps proto-deps fb-deps cup-deps
   kudu-util-proto-deps kudu-rpc-proto-deps kudu-security-proto-deps gen_ir_descriptions)
 
 add_custom_target(tarballs ALL DEPENDS shell_tarball)
