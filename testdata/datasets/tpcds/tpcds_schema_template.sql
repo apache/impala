@@ -41,6 +41,7 @@ text:serialization.null.format=
 INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name}
 SELECT * FROM {db_name}.{table_name};
 ---- LOAD
+ALTER TABLE {db_name}{db_suffix}.{table_name} SET SERDEPROPERTIES('serialization.encoding'='ISO-8859-1');
 LOAD DATA LOCAL INPATH '{impala_home}/testdata/impala-data/{db_name}/time_dim/'
 OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name};
 ====
@@ -86,6 +87,7 @@ text:serialization.null.format=
 INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name}
 SELECT * FROM {db_name}.{table_name};
 ---- LOAD
+ALTER TABLE {db_name}{db_suffix}.{table_name} SET SERDEPROPERTIES('serialization.encoding'='ISO-8859-1');
 LOAD DATA LOCAL INPATH '{impala_home}/testdata/impala-data/{db_name}/date_dim/'
 OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name};
 ====
@@ -106,6 +108,7 @@ text:serialization.null.format=
 INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name}
 SELECT * FROM {db_name}.{table_name};
 ---- LOAD
+ALTER TABLE {db_name}{db_suffix}.{table_name} SET SERDEPROPERTIES('serialization.encoding'='ISO-8859-1');
 LOAD DATA LOCAL INPATH '{impala_home}/testdata/impala-data/{db_name}/reason/'
 OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name};
 ====
@@ -136,6 +139,7 @@ text:serialization.null.format=
 INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name}
 SELECT * FROM {db_name}.{table_name};
 ---- LOAD
+ALTER TABLE {db_name}{db_suffix}.{table_name} SET SERDEPROPERTIES('serialization.encoding'='ISO-8859-1');
 LOAD DATA LOCAL INPATH '{impala_home}/testdata/impala-data/{db_name}/customer_address/'
 OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name};
 ====
@@ -156,6 +160,7 @@ text:serialization.null.format=
 INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name}
 SELECT * FROM {db_name}.{table_name};
 ---- LOAD
+ALTER TABLE {db_name}{db_suffix}.{table_name} SET SERDEPROPERTIES('serialization.encoding'='ISO-8859-1');
 LOAD DATA LOCAL INPATH '{impala_home}/testdata/impala-data/{db_name}/income_band/'
 OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name};
 ====
@@ -179,6 +184,7 @@ text:serialization.null.format=
 INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name}
 SELECT * FROM {db_name}.{table_name};
 ---- LOAD
+ALTER TABLE {db_name}{db_suffix}.{table_name} SET SERDEPROPERTIES('serialization.encoding'='ISO-8859-1');
 LOAD DATA LOCAL INPATH
 '{impala_home}/testdata/impala-data/{db_name}/household_demographics/'
 OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name};
@@ -206,6 +212,7 @@ text:serialization.null.format=
 INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name}
 SELECT * FROM {db_name}.{table_name};
 ---- LOAD
+ALTER TABLE {db_name}{db_suffix}.{table_name} SET SERDEPROPERTIES('serialization.encoding'='ISO-8859-1');
 LOAD DATA LOCAL INPATH
 '{impala_home}/testdata/impala-data/{db_name}/customer_demographics/'
 OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name};
@@ -230,6 +237,7 @@ text:serialization.null.format=
 INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name}
 SELECT * FROM {db_name}.{table_name};
 ---- LOAD
+ALTER TABLE {db_name}{db_suffix}.{table_name} SET SERDEPROPERTIES('serialization.encoding'='ISO-8859-1');
 LOAD DATA LOCAL INPATH '{impala_home}/testdata/impala-data/{db_name}/ship_mode/'
 OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name};
 ====
@@ -269,6 +277,7 @@ text:serialization.null.format=
 INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name}
 SELECT * FROM {db_name}.{table_name};
 ---- LOAD
+ALTER TABLE {db_name}{db_suffix}.{table_name} SET SERDEPROPERTIES('serialization.encoding'='ISO-8859-1');
 LOAD DATA LOCAL INPATH '{impala_home}/testdata/impala-data/{db_name}/item/'
 OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name};
 ====
@@ -300,6 +309,7 @@ text:serialization.null.format=
 INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name}
 SELECT * FROM {db_name}.{table_name};
 ---- LOAD
+ALTER TABLE {db_name}{db_suffix}.{table_name} SET SERDEPROPERTIES('serialization.encoding'='ISO-8859-1');
 LOAD DATA LOCAL INPATH '{impala_home}/testdata/impala-data/{db_name}/warehouse/'
 OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name};
 ====
@@ -350,6 +360,7 @@ text:serialization.null.format=
 INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name}
 SELECT * FROM {db_name}.{table_name};
 ---- LOAD
+ALTER TABLE {db_name}{db_suffix}.{table_name} SET SERDEPROPERTIES('serialization.encoding'='ISO-8859-1');
 LOAD DATA LOCAL INPATH
 '{impala_home}/testdata/impala-data/{db_name}/call_center/'
 OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name};
@@ -391,6 +402,7 @@ text:serialization.null.format=
 INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name}
 SELECT * FROM {db_name}.{table_name};
 ---- LOAD
+ALTER TABLE {db_name}{db_suffix}.{table_name} SET SERDEPROPERTIES('serialization.encoding'='ISO-8859-1');
 LOAD DATA LOCAL INPATH '{impala_home}/testdata/impala-data/{db_name}/customer/'
 OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name};
 ====
@@ -430,6 +442,7 @@ text:serialization.null.format=
 INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name}
 SELECT * FROM {db_name}.{table_name};
 ---- LOAD
+ALTER TABLE {db_name}{db_suffix}.{table_name} SET SERDEPROPERTIES('serialization.encoding'='ISO-8859-1');
 LOAD DATA LOCAL INPATH '{impala_home}/testdata/impala-data/{db_name}/promotion/'
 OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name};
 ====
@@ -477,6 +490,7 @@ text:serialization.null.format=
 INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name}
 SELECT * FROM {db_name}.{table_name};
 ---- LOAD
+ALTER TABLE {db_name}{db_suffix}.{table_name} SET SERDEPROPERTIES('serialization.encoding'='ISO-8859-1');
 LOAD DATA LOCAL INPATH '{impala_home}/testdata/impala-data/{db_name}/store/'
 OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name};
 ====
@@ -505,6 +519,7 @@ text:serialization.null.format=
 INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name}
 SELECT * FROM {db_name}.{table_name};
 ---- LOAD
+ALTER TABLE {db_name}{db_suffix}.{table_name} SET SERDEPROPERTIES('serialization.encoding'='ISO-8859-1');
 LOAD DATA LOCAL INPATH
 '{impala_home}/testdata/impala-data/{db_name}/catalog_page/'
 OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name};
@@ -540,6 +555,7 @@ text:serialization.null.format=
 INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name}
 SELECT * FROM {db_name}.{table_name};
 ---- LOAD
+ALTER TABLE {db_name}{db_suffix}.{table_name} SET SERDEPROPERTIES('serialization.encoding'='ISO-8859-1');
 LOAD DATA LOCAL INPATH '{impala_home}/testdata/impala-data/{db_name}/web_page/'
 OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name};
 ====
@@ -585,6 +601,7 @@ text:serialization.null.format=
 INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name}
 SELECT * FROM {db_name}.{table_name};
 ---- LOAD
+ALTER TABLE {db_name}{db_suffix}.{table_name} SET SERDEPROPERTIES('serialization.encoding'='ISO-8859-1');
 LOAD DATA LOCAL INPATH '{impala_home}/testdata/impala-data/{db_name}/web_site/'
 OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name};
 ====
@@ -609,6 +626,7 @@ text:serialization.null.format=
 INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name}
 SELECT * FROM {db_name}.{table_name};
 ---- LOAD
+ALTER TABLE {db_name}{db_suffix}.{table_name} SET SERDEPROPERTIES('serialization.encoding'='ISO-8859-1');
 set hive.exec.max.dynamic.partitions.pernode=10000;
 set hive.exec.max.dynamic.partitions=10000;
 set hive.exec.dynamic.partition.mode=nonstrict;
@@ -685,6 +703,7 @@ text:serialization.null.format=
 INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name}
 SELECT * FROM {db_name}.{table_name};
 ---- LOAD
+ALTER TABLE {db_name}{db_suffix}.{table_name} SET SERDEPROPERTIES('serialization.encoding'='ISO-8859-1');
 LOAD DATA LOCAL INPATH
 '{impala_home}/testdata/impala-data/{db_name}/catalog_sales/'
 OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name};
@@ -747,6 +766,7 @@ text:serialization.null.format=
 INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name}
 SELECT * FROM {db_name}.{table_name};
 ---- LOAD
+ALTER TABLE {db_name}{db_suffix}.{table_name} SET SERDEPROPERTIES('serialization.encoding'='ISO-8859-1');
 LOAD DATA LOCAL INPATH
 '{impala_home}/testdata/impala-data/{db_name}/catalog_returns/'
 OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name};
@@ -787,6 +807,7 @@ text:serialization.null.format=
 INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name}
 SELECT * FROM {db_name}.{table_name};
 ---- LOAD
+ALTER TABLE {db_name}{db_suffix}.{table_name} SET SERDEPROPERTIES('serialization.encoding'='ISO-8859-1');
 LOAD DATA LOCAL INPATH '{impala_home}/testdata/impala-data/{db_name}/store_sales/'
 OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name};
 ====
@@ -937,6 +958,7 @@ text:serialization.null.format=
 INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name}
 SELECT * FROM {db_name}.{table_name};
 ---- LOAD
+ALTER TABLE {db_name}{db_suffix}.{table_name} SET SERDEPROPERTIES('serialization.encoding'='ISO-8859-1');
 LOAD DATA LOCAL INPATH '{impala_home}/testdata/impala-data/{db_name}/store_returns/'
 OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name};
 ====
@@ -1005,6 +1027,7 @@ text:serialization.null.format=
 INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name}
 SELECT * FROM {db_name}.{table_name};
 ---- LOAD
+ALTER TABLE {db_name}{db_suffix}.{table_name} SET SERDEPROPERTIES('serialization.encoding'='ISO-8859-1');
 LOAD DATA LOCAL INPATH '{impala_home}/testdata/impala-data/{db_name}/web_sales/'
 OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name};
 ====
@@ -1060,6 +1083,7 @@ text:serialization.null.format=
 INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name}
 SELECT * FROM {db_name}.{table_name};
 ---- LOAD
+ALTER TABLE {db_name}{db_suffix}.{table_name} SET SERDEPROPERTIES('serialization.encoding'='ISO-8859-1');
 LOAD DATA LOCAL INPATH '{impala_home}/testdata/impala-data/{db_name}/web_returns/'
 OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name};
 ====
