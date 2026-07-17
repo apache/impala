@@ -44,6 +44,7 @@ import org.apache.impala.planner.JoinNode.DistributionMode;
 import org.apache.impala.planner.PlanNode;
 import org.apache.impala.rewrite.ExprRewriter;
 import org.apache.impala.thrift.TReplicaPreference;
+import org.apache.impala.util.IcebergUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -688,8 +689,9 @@ public class TableRef extends StmtNode {
         // create predicate "<left>.colName = <right>.colName"
         BinaryPredicate eqPred =
             new BinaryPredicate(BinaryPredicate.Operator.EQ,
-              new SlotRef(Path.createRawPath(leftTblRef_.getUniqueAlias(), colName)),
-              new SlotRef(Path.createRawPath(getUniqueAlias(), colName)));
+              createUsingClauseSideExpr(leftTblRef_.getUniqueAlias(), colName,
+                  leftColPath),
+              createUsingClauseSideExpr(getUniqueAlias(), colName, rightColPath));
         onClause_ = CompoundPredicate.createConjunction(eqPred, onClause_);
       }
     }
@@ -762,6 +764,31 @@ public class TableRef extends StmtNode {
     } else {
       // Indicate that this table ref has an empty ON-clause.
       analyzer.registerOnClauseConjuncts(Collections.<Expr>emptyList(), this);
+    }
+  }
+
+  /**
+   * Builds the expression referencing 'colName' (resolved to 'colPath') of the table
+   * identified by 'alias' for a USING-clause equi-join predicate.
+   *
+   * Iceberg V3 syntactic-sugar virtual columns (_row_id, _last_updated_sequence_number)
+   * are expanded here into their COALESCE() equivalents instead of returning a raw
+   * SlotRef. These virtual columns are otherwise rewritten by the mandatory
+   * IcebergVirtualColumnRewriteRule, but that rewrite runs only once (between the first
+   * analyze() and re-analysis) while the USING clause is re-generated into an on-clause
+   * on every analysis pass (see analyzeJoin() and reset()). Relying on the rewrite would
+   * therefore leave a raw virtual-column reference after re-analysis, which must never
+   * reach the backend (IMPALA-15191).
+   */
+  private static Expr createUsingClauseSideExpr(String alias, String colName,
+      Path colPath) {
+    switch (colPath.getVirtualColumnType()) {
+      case ICEBERG_ROW_ID:
+        return IcebergUtil.buildRowIdExpr(alias);
+      case ICEBERG_LAST_UPDATED_SEQUENCE_NUMBER:
+        return IcebergUtil.buildLastUpdatedSeqNoExpr(alias);
+      default:
+        return new SlotRef(Path.createRawPath(alias, colName));
     }
   }
 

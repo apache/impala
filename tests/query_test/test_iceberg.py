@@ -2461,6 +2461,9 @@ class TestIcebergV3Table(IcebergTestSuite):
     self.load_table(unique_database, "iceberg_v3_row_lineage_orc", format="orc")
     self.run_test_case('QueryTest/iceberg-v3-row-lineage', vector, unique_database)
 
+  def test_v3_row_lineage_join(self, vector, unique_database):
+    self.run_test_case('QueryTest/iceberg-v3-row-lineage-join', vector, unique_database)
+
   def test_v3_delete(self, vector, unique_database):
     """Test Iceberg V3 deletion vectors (Puffin files)."""
     self.load_table(unique_database, "iceberg_v3_deletion_vectors")

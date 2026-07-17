@@ -1,0 +1,57 @@
+====
+---- QUERY
+# IMPALA-15191: exact reproduction from the JIRA. An Iceberg V3 table (whose _row_id
+# is a syntactic-sugar virtual column, expanded during analysis to a COALESCE()
+# expression) joined with a Kudu table that has a real _row_id column via a USING
+# clause.
+create table fk (_row_id int primary key) stored as kudu;
+insert into fk values (1);
+create table fi (i int) stored as iceberg tblproperties('format-version'='3');
+insert into fi values (10), (11);
+====
+---- QUERY
+# fi._row_id is 0 for i=10 and 1 for i=11; fk._row_id is 1, so only i=11 matches.
+select i from fi join fk using (_row_id);
+---- RESULTS
+11
+---- TYPES
+INT
+====
+---- QUERY
+# The same join expressed with an explicit ON clause.
+select i from fi join fk on fi._row_id = fk._row_id;
+---- RESULTS
+11
+---- TYPES
+INT
+====
+---- QUERY
+# The _row_id join used as the source of a MERGE statement: the source sub-query
+# joins the Iceberg V3 table with the Kudu table on _row_id (explicit ON) and drives
+# a MERGE ... WHEN MATCHED THEN DELETE, deleting the matching target row (i=11).
+merge into fi tgt using (
+  select ice.i from fi ice join fk dels on ice._row_id = dels._row_id) src
+on src.i = tgt.i
+when matched then delete;
+---- DML_RESULTS: fi
+10
+---- TYPES
+INT
+====
+---- QUERY
+# Re-create 'fi' (the row deleted above) so the MERGE can be repeated.
+drop table fi;
+create table fi (i int) stored as iceberg tblproperties('format-version'='3');
+insert into fi values (10), (11);
+====
+---- QUERY
+# The same MERGE, but the source sub-query joins on _row_id via a USING clause.
+merge into fi tgt using (
+  select ice.i from fi ice join fk dels using (_row_id)) src
+on src.i = tgt.i
+when matched then delete;
+---- DML_RESULTS: fi
+10
+---- TYPES
+INT
+====

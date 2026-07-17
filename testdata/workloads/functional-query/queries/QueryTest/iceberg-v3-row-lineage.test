@@ -111,6 +111,45 @@ from iceberg_v3_row_lineage;
 INT,BIGINT,BIGINT
 ====
 ---- QUERY
+# IMPALA-15191: JOIN USING (_row_id) must expand the Iceberg V3 syntactic-sugar
+# virtual column into its COALESCE() form on both sides of the equi-join predicate.
+select a.i, a._row_id
+from iceberg_v3_row_lineage a join iceberg_v3_row_lineage b using (_row_id)
+order by a.i;
+---- RESULTS
+1,0
+2,1
+3,2
+---- TYPES
+INT,BIGINT
+====
+---- QUERY
+# IMPALA-15191: the same join expressed with an explicit ON clause.
+select a.i, a._row_id
+from iceberg_v3_row_lineage a join iceberg_v3_row_lineage b
+  on a._row_id = b._row_id
+order by a.i;
+---- RESULTS
+1,0
+2,1
+3,2
+---- TYPES
+INT,BIGINT
+====
+---- QUERY
+# IMPALA-15191: JOIN USING with the _last_updated_sequence_number syntactic sugar.
+select a.i, a._last_updated_sequence_number
+from iceberg_v3_row_lineage a
+  join iceberg_v3_row_lineage b using (_last_updated_sequence_number)
+order by a.i;
+---- RESULTS
+1,1
+2,2
+3,3
+---- TYPES
+INT,BIGINT
+====
+---- QUERY
 INSERT INTO iceberg_v3_row_lineage (i) VALUES (4);
 ====
 ---- QUERY
