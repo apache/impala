@@ -53,7 +53,7 @@ from tests.common.test_dimensions import (
 from tests.common.test_result_verifier import parse_result_rows, QueryTestResult
 from tests.common.test_vector import ImpalaTestDimension
 from tests.util.filesystem_utils import get_fs_path, IS_HDFS
-from tests.util.get_parquet_metadata import get_parquet_metadata
+from tests.util.get_parquet_metadata import get_parquet_metadata_from_hdfs_folder
 from tests.util.parse_util import get_bytes_summary_stats_counter
 from tests.util.test_file_parser import QueryTestSectionReader
 
@@ -927,7 +927,17 @@ class TestParquet(ImpalaTestSuite):
         # Assert that (min == avg == max)
         assert min_max_time[0] == min_max_time[1] == min_max_time[2] != 0
 
-  def test_annotate_utf8_option(self, vector, unique_database):
+  def _get_parquet_schema_columns(self, tmpdir, unique_database, table_name):
+    """Returns {column_name: SchemaElement} for the single Parquet file of
+    `unique_database.table_name`. Uses a fresh subdirectory of `tmpdir` so it can be
+    called again after the table is overwritten."""
+    hdfs_path = get_fs_path('/test-warehouse/%s.db/%s' % (unique_database, table_name))
+    dest_dir = tempfile.mkdtemp(dir=tmpdir.strpath)
+    file_metadata_list = get_parquet_metadata_from_hdfs_folder(hdfs_path, dest_dir)
+    assert len(file_metadata_list) == 1
+    return {element.name: element for element in file_metadata_list[0].schema}
+
+  def test_annotate_utf8_option(self, vector, unique_database, tmpdir):
     if self.exploration_strategy() != 'exhaustive': pytest.skip("Only run in exhaustive")
 
     # Create table
@@ -938,41 +948,19 @@ class TestParquet(ImpalaTestSuite):
             'stored as parquet' % qualified_table_name
     self.execute_query(query, options)
 
-    # Insert data that should have UTF8 annotation
+    # Insert data that should have UTF8 annotation.
     query = 'insert overwrite table %s '\
             'values("a", cast("b" as char(10)), cast("c" as varchar(10)), "d")' \
             % qualified_table_name
     options['parquet_annotate_strings_utf8'] = True
     self.execute_query(query, options)
 
-    def get_schema_elements():
-      # Copy the created file to the local filesystem and parse metadata
-      local_file = '/tmp/utf8_test_%s.parq' % random.randint(0, 10000)
-      LOG.info("test_annotate_utf8_option local file name: " + local_file)
-      hdfs_file = get_fs_path('/test-warehouse/%s.db/%s/*.parq'
-          % (unique_database, TABLE_NAME))
-      check_call(['hadoop', 'fs', '-copyToLocal', hdfs_file, local_file])
-      metadata = get_parquet_metadata(local_file)
-
-      # Extract SchemaElements corresponding to the table columns
-      a_schema_element = metadata.schema[1]
-      assert a_schema_element.name == 'a'
-      b_schema_element = metadata.schema[2]
-      assert b_schema_element.name == 'b'
-      c_schema_element = metadata.schema[3]
-      assert c_schema_element.name == 'c'
-      d_schema_element = metadata.schema[4]
-      assert d_schema_element.name == 'd'
-
-      os.remove(local_file)
-      return a_schema_element, b_schema_element, c_schema_element, d_schema_element
-
     # Check that the schema uses the UTF8 annotation
-    a_schema_elt, b_schema_elt, c_schema_elt, d_schema_elt = get_schema_elements()
-    assert a_schema_elt.converted_type == ConvertedType.UTF8
-    assert b_schema_elt.converted_type == ConvertedType.UTF8
-    assert c_schema_elt.converted_type == ConvertedType.UTF8
-    assert d_schema_elt.converted_type == ConvertedType.UTF8
+    cols = self._get_parquet_schema_columns(tmpdir, unique_database, TABLE_NAME)
+    assert cols['a'].converted_type == ConvertedType.UTF8
+    assert cols['b'].converted_type == ConvertedType.UTF8
+    assert cols['c'].converted_type == ConvertedType.UTF8
+    assert cols['d'].converted_type == ConvertedType.UTF8
 
     # Create table and insert data that should not have UTF8 annotation for strings
     options['parquet_annotate_strings_utf8'] = False
@@ -980,11 +968,82 @@ class TestParquet(ImpalaTestSuite):
 
     # Check that the schema does not use the UTF8 annotation except for CHAR and VARCHAR
     # columns
-    a_schema_elt, b_schema_elt, c_schema_elt, d_schema_elt = get_schema_elements()
-    assert a_schema_elt.converted_type is None
-    assert b_schema_elt.converted_type == ConvertedType.UTF8
-    assert c_schema_elt.converted_type == ConvertedType.UTF8
-    assert d_schema_elt.converted_type is None
+    cols = self._get_parquet_schema_columns(tmpdir, unique_database, TABLE_NAME)
+    assert cols['a'].converted_type is None
+    assert cols['b'].converted_type == ConvertedType.UTF8
+    assert cols['c'].converted_type == ConvertedType.UTF8
+    assert cols['d'].converted_type is None
+
+  def test_utf8_string_validation(self, vector, unique_database, tmpdir):
+    """UTF-8 annotation is enabled by default and this means that validation too, so
+    writing a STRING value that is not valid UTF-8 to Parquet fails. The only way to write
+    such a value into a STRING column is to disable the annotation
+    (PARQUET_ANNOTATE_STRINGS_UTF8=false)."""
+    table_name = "utf8_validation"
+    qualified_table_name = "%s.%s" % (unique_database, table_name)
+    self.execute_query(
+        "create table %s (s string) stored as parquet" % qualified_table_name)
+
+    # unhex('ff') produces a single 0xFF byte, which is not valid UTF-8.
+    invalid = "insert overwrite %s values (unhex('ff'))" % qualified_table_name
+
+    def s_converted_type():
+      cols = self._get_parquet_schema_columns(tmpdir, unique_database, table_name)
+      return cols['s'].converted_type
+
+    # Valid UTF-8 with the default options (annotation on, validation on).
+    self.execute_query("insert overwrite %s values ('hello')" % qualified_table_name,
+        vector.get_value('exec_option'))
+    assert s_converted_type() == ConvertedType.UTF8
+
+    # An invalid UTF-8 value is rejected by default.
+    err = self.execute_query_expect_failure(self.client, invalid,
+        vector.get_value('exec_option'))
+    assert "not valid UTF-8" in str(err)
+
+    # The failed INSERT OVERWRITE must not have altered the table.
+    result = self.execute_query("select s from %s" % qualified_table_name,
+        vector.get_value('exec_option'))
+    assert result.data == ['hello']
+
+    # Disabling the annotation
+    opts = deepcopy(vector.get_value('exec_option'))
+    opts['parquet_annotate_strings_utf8'] = False
+    self.execute_query(invalid, opts)
+    assert s_converted_type() is None
+
+    src_tbl = "%s.utf8_validation_src" % unique_database
+    self.execute_query("create table %s (s string) stored as parquet" % src_tbl)
+    self.execute_query("insert into %s values (unhex('ff'))" % src_tbl, opts)
+
+    err = self.execute_query_expect_failure(self.client,
+        "insert overwrite %s select s from %s" % (qualified_table_name, src_tbl),
+        vector.get_value('exec_option'))
+    assert "not valid UTF-8" in str(err)
+
+    ctas_tbl = "%s.utf8_validation_ctas" % unique_database
+    err = self.execute_query_expect_failure(self.client,
+            "create table %s as select s from %s" % (ctas_tbl, src_tbl),
+            vector.get_value('exec_option'))
+    assert "not valid UTF-8" in str(err)
+
+  def test_utf8_varchar_not_validated(self, vector, unique_database, tmpdir):
+    """CHAR/VARCHAR columns are always annotated as UTF-8 but, unlike STRING, are not
+    validated. Writing non-UTF-8 bytes into a VARCHAR column therefore succeeds with the
+    default options while the UTF-8 annotation is still emitted -- it's a documented
+    asymmetry vs. STRING (see impala_parquet_annotate_strings_utf8.xml)."""
+    table_name = "utf8_varchar"
+    qualified_table_name = "%s.%s" % (unique_database, table_name)
+    self.execute_query(
+        "create table %s (c varchar(10)) stored as parquet" % qualified_table_name)
+    self.execute_query(
+        "insert overwrite %s values (cast(unhex('ff') as varchar(10)))"
+        % qualified_table_name,
+        vector.get_value('exec_option'))
+
+    # The VARCHAR column is still annotated as UTF-8.
+    cols = self._get_parquet_schema_columns(tmpdir, unique_database, table_name)
+    assert cols['c'].converted_type == ConvertedType.UTF8
 
   def test_resolution_by_name(self, vector, unique_database):
     self.run_test_case('QueryTest/parquet-resolution-by-name', vector,

@@ -267,12 +267,14 @@ struct TQueryOptions {
   // Maximum number of bloom runtime filters allowed per query
   41: optional i32 max_num_runtime_filters = 10
 
-  // If true, use UTF-8 annotation for string columns. Note that char and varchar columns
+  // If true, use UTF-8 annotation for STRING columns. Note that CHAR and VARCHAR columns
   // always use the annotation.
   //
-  // This is disabled by default in order to preserve the existing behavior of legacy
-  // workloads. In addition, Impala strings are not necessarily UTF8-encoded.
-  42: optional bool parquet_annotate_strings_utf8 = false
+  // Enabled by default since Impala 5.0 (IMPALA-12675). A non-UTF-8 value aborts the
+  // write with PARQUET_INVALID_UTF8_STRING. Set to false to store non-UTF-8 bytes in
+  // STRING columns.
+  // Iceberg always annotates and validates STRING regardless of this option.
+  42: optional bool parquet_annotate_strings_utf8 = true
 
   // Determines how to resolve Parquet files' schemas in the absence of field IDs (which
   // is always, since fields IDs are NYI). Valid values are "position" (default) and

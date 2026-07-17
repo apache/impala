@@ -584,11 +584,11 @@ public class CardinalityTest extends PlannerTestBase {
 
     // There is no available statistics in functional_parquet.alltypestiny.
     // True cardinality of functional_parquet.alltypestiny is 8.
-    // Estimated cardinality of functional_parquet.alltypestiny is 742.
-    // Estimated cardinality of the NestedLoopJoinNode is 550,564 = 742 * 742.
+    // Estimated cardinality of functional_parquet.alltypestiny is 761.
+    // Estimated cardinality of the NestedLoopJoinNode is 579,121 = 761 * 761.
     verifyApproxCardinality("SELECT * "
         + "FROM functional_parquet.alltypestiny a, "
-        + "functional_parquet.alltypestiny b", 550_564, true,
+        + "functional_parquet.alltypestiny b", 579_121, true,
         ImmutableSet.of(), path, NestedLoopJoinNode.class);
   }
 

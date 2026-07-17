@@ -351,6 +351,9 @@ class TestHdfsParquetTableIndexWriter(ImpalaTestSuite):
     """Test string values that are all 0xFFs or end with 0xFFs."""
 
     col_type = "STRING"
+    # These values are deliberately not valid UTF-8, so disable the annotation on the
+    # Parquet write path to skip validation as well.
+    vector.get_value('exec_option')['parquet_annotate_strings_utf8'] = False
     # String value is all of 0xFFs but its length is less than PAGE_INDEX_TRUNCATE_LENGTH.
     short_tbl = "short_tbl"
     short_hdfs_path = self._create_table_with_values_of_type(col_type, vector,

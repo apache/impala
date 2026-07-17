@@ -11,10 +11,10 @@ explain select id from alltypes;
 ---- RESULTS: VERIFY_IS_SUBSET
 '   stored statistics:'
 '     table: rows=unavailable size=unavailable'
-'     partitions: 0/12 rows=5.97K'
+'     partitions: 0/12 rows=5.98K'
 '     columns: unavailable'
 row_regex:.* extrapolated-rows=unavailable.*
-'   tuple-ids=0 row-size=4B cardinality=5.97K'
+'   tuple-ids=0 row-size=4B cardinality=5.98K'
 ---- TYPES
 STRING
 ====

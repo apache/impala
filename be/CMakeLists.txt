@@ -685,6 +685,7 @@ set (IMPALA_DEPENDENCIES
   lz4
   zstd
   re2
+  simdutf
   ${Boost_LIBRARIES}
   ${LLVM_MODULE_LIBS}
   thrift

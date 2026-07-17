@@ -160,6 +160,7 @@ set_dep_root(CALLONCEHACK)
 set_dep_root(CLOUDFLAREZLIB)
 set_dep_root(OPENTELEMETRY_CPP)
 set_dep_root(TCMALLOC)
+set_dep_root(SIMDUTF)
 
 set(ABSL_ROOT
     $ENV{IMPALA_TOOLCHAIN_PACKAGES_HOME}/abseil-cpp-$ENV{IMPALA_ABSEIL_CPP_VERSION})
@@ -348,6 +349,10 @@ IMPALA_ADD_THIRDPARTY_LIB(zstd ${ZSTD_INCLUDE_DIR} ${ZSTD_STATIC_LIB} "")
 # find re2 headers and libs
 find_package(Re2 REQUIRED)
 IMPALA_ADD_THIRDPARTY_LIB(re2 ${RE2_INCLUDE_DIR} ${RE2_STATIC_LIB} "")
+
+# find simdutf headers and libs
+find_package(Simdutf REQUIRED)
+IMPALA_ADD_THIRDPARTY_LIB(simdutf ${SIMDUTF_INCLUDE_DIR} ${SIMDUTF_STATIC_LIB} "")
 
 # find jwt-cpp headers
 find_package(JwtCpp REQUIRED)

@@ -31,19 +31,29 @@ class TestDatasketches(ImpalaTestSuite):
   def test_hll(self, vector, unique_database):
     create_table_from_parquet(self.client, unique_database, 'hll_sketches_from_hive')
     create_table_from_parquet(self.client, unique_database, 'hll_sketches_from_impala')
+    # Sketches are serialized binary data stored in STRING columns, so they are not valid
+    # UTF-8. Disable the annotation until IMPALA-9821 makes these functions return BINARY,
+    # after which setting the option will no longer be needed.
+    vector.get_value('exec_option')['parquet_annotate_strings_utf8'] = False
     self.run_test_case('QueryTest/datasketches-hll', vector, unique_database)
 
   def test_cpc(self, vector, unique_database):
     create_table_from_parquet(self.client, unique_database, 'cpc_sketches_from_hive')
     create_table_from_parquet(self.client, unique_database, 'cpc_sketches_from_impala')
+    # Binary sketches aren't UTF-8; disable the annotation until IMPALA-9821.
+    vector.get_value('exec_option')['parquet_annotate_strings_utf8'] = False
     self.run_test_case('QueryTest/datasketches-cpc', vector, unique_database)
 
   def test_theta(self, vector, unique_database):
     create_table_from_parquet(self.client, unique_database, 'theta_sketches_from_hive')
     create_table_from_parquet(self.client, unique_database, 'theta_sketches_from_impala')
+    # Binary sketches aren't UTF-8; disable the annotation until IMPALA-9821.
+    vector.get_value('exec_option')['parquet_annotate_strings_utf8'] = False
     self.run_test_case('QueryTest/datasketches-theta', vector, unique_database)
 
   def test_kll(self, vector, unique_database):
     create_table_from_parquet(self.client, unique_database, 'kll_sketches_from_hive')
     create_table_from_parquet(self.client, unique_database, 'kll_sketches_from_impala')
+    # Binary sketches aren't UTF-8; disable the annotation until IMPALA-9821.
+    vector.get_value('exec_option')['parquet_annotate_strings_utf8'] = False
     self.run_test_case('QueryTest/datasketches-kll', vector, unique_database)

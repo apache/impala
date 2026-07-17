@@ -27,6 +27,7 @@
 #include "exec/parquet/parquet-bloom-filter-util.h"
 #include "exprs/scalar-expr-evaluator.h"
 #include "exprs/scalar-expr.h"
+#include "gutil/stringprintf.h"
 #include "rpc/thrift-util.h"
 #include "runtime/date-value.h"
 #include "runtime/decimal-value.h"
@@ -48,6 +49,7 @@
 #include "util/pretty-printer.h"
 #include "util/rle-encoding.h"
 #include "util/string-util.h"
+#include "util/utf8-util.h"
 
 #include <sstream>
 #include <string>
@@ -144,6 +146,7 @@ class HdfsParquetTableWriter::BaseColumnWriter {
         new RleEncoder(parent_->reusable_col_mem_pool_->Allocate(DEFAULT_DATA_PAGE_SIZE),
                        DEFAULT_DATA_PAGE_SIZE, 1));
     values_buffer_ = parent_->reusable_col_mem_pool_->Allocate(values_buffer_len_);
+    validate_utf8_ = ShouldValidateUtf8();
   }
 
   virtual ~BaseColumnWriter() {}
@@ -338,6 +341,25 @@ class HdfsParquetTableWriter::BaseColumnWriter {
   // Writes out the dictionary encoded data buffered in dict_encoder_.
   void WriteDictDataPage();
 
+  // Whether values in this column must be validated as UTF-8: a non-binary STRING column
+  // written with the UTF-8 annotation. CHAR/VARCHAR are always annotated but are defined
+  // as text, and BINARY is never annotated as UTF-8 (see FillSchemaElement), so both are
+  // excluded.
+  bool ShouldValidateUtf8() const {
+    return parent_->string_utf8_ && type().type == TYPE_STRING && !type().IsBinaryType();
+  }
+
+  // Validates that 'value' (a non-null StringValue) is valid UTF-8, returning
+  // PARQUET_INVALID_UTF8_STRING (with the offset and hex of the offending byte) if not.
+  Status ValidateUtf8(const void* value) WARN_UNUSED_RESULT {
+    const StringValue* sv = reinterpret_cast<const StringValue*>(value);
+    int64_t pos = FindFirstInvalidUtf8(sv->Ptr(), sv->Len());
+    if (LIKELY(pos < 0)) return Status::OK();
+    uint8_t bad = static_cast<uint8_t>(sv->Ptr()[pos]);
+    return Status(TErrorCode::PARQUET_INVALID_UTF8_STRING, column_name(), pos,
+        StringPrintf("%02x", bad));
+  }
+
   struct DataPage {
     // Page header.  This is a union of all page types.
     parquet::PageHeader header;
@@ -440,6 +462,10 @@ class HdfsParquetTableWriter::BaseColumnWriter {
 
   // True, if we should write the page index.
   bool write_page_index_;
+
+  // Cached result of ShouldValidateUtf8(), set once in the ctor since the column type and
+  // annotation setting do not change over the writer's lifetime.
+  bool validate_utf8_ = false;
 
   // Column descriptor from the HdfsTableDescriptor.
   const ColumnDescriptor& col_desc_;
@@ -915,6 +941,12 @@ protected:
 inline Status HdfsParquetTableWriter::BaseColumnWriter::AppendRow(TupleRow* row) {
   ++num_values_;
   void* value = ConvertValue(expr_eval_->GetValue(row));
+  // Validate before encoding, so a rejected value fails before any partial
+  // state is committed. Runs once per non-null value here; ProcessValue() below may be
+  // retried on a new page.
+  if (validate_utf8_ && value != nullptr) {
+    RETURN_IF_ERROR(ValidateUtf8(value));
+  }
   if (current_page_ == nullptr) NewPage();
 
   int64_t bytes_needed = 0;

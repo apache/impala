@@ -472,8 +472,9 @@ void ParquetMetadataUtils::FillSchemaElement(const ColumnType& col_type,
       SetUtf8ConvertedAndLogicalType(col_schema);
       break;
     case TYPE_STRING:
-      // By default STRING has no logical type, see IMPALA-5982.
-      // VARCHAR and CHAR are always set to UTF8.
+      // Since Impala 5.0 (IMPALA-12675), STRING is annotated with the UTF-8 logical type
+      // by default (controlled by PARQUET_ANNOTATE_STRINGS_UTF8, on unless overridden).
+      // BINARY (a STRING subtype) is never annotated.
       if (string_utf8 && !col_type.IsBinaryType()) {
         SetUtf8ConvertedAndLogicalType(col_schema);
       }

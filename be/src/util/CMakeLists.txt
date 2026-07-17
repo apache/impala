@@ -132,6 +132,7 @@ set(UTIL_SRCS
   tuple-row-compare.cc
   uid-util.cc
   url-parser.cc
+  utf8-util.cc
   variant-util.cc
   version-util.cc
   ${SQUEASEL_SRC_DIR}/squeasel.c
@@ -316,6 +317,7 @@ add_library(UtilTests STATIC
   tuple-row-compare-test.cc
   uid-util-test.cc
   uuid-util-test.cc
+  utf8-util-test.cc
   variant-util-test.cc
   version-util-test.cc
   zip-util-test.cc
@@ -398,6 +400,7 @@ ADD_UNIFIED_BE_LSAN_TEST(time-test "TimeTest.*")
 ADD_UNIFIED_BE_LSAN_TEST(tuple-row-compare-test "TupleRowCompareTest.*")
 ADD_UNIFIED_BE_LSAN_TEST(uid-util-test "UidUtil.*")
 ADD_UNIFIED_BE_LSAN_TEST(uuid-util-test "UuidUtil.*")
+ADD_UNIFIED_BE_LSAN_TEST(utf8-util-test "Utf8UtilTest.*")
 ADD_UNIFIED_BE_LSAN_TEST(variant-util-test "VariantUtilTest.*")
 ADD_UNIFIED_BE_LSAN_TEST(version-util-test "VersionUtilTest.*")
 # Using standalone webserver-test for now, nonstandard main() passes in a port.

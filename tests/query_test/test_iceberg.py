@@ -96,6 +96,21 @@ class TestIcebergTable(IcebergTestSuite):
         table_location="${IMPALA_HOME}/testdata/data/iceberg_test/iceberg_uuid")
     self.run_test_case('QueryTest/iceberg-uuid-type', vector, use_db=unique_database)
 
+  def test_utf8_string_validation(self, unique_database):
+    """IMPALA-12675: Iceberg always annotates STRING as UTF-8, so writing non-UTF-8 bytes
+    to a STRING column always fails; a BINARY column stores them instead."""
+    str_tbl = unique_database + ".utf8_string"
+    bin_tbl = unique_database + ".utf8_binary"
+    self.client.execute("create table {0} (s string) stored as iceberg".format(str_tbl))
+    self.client.execute("create table {0} (b binary) stored as iceberg".format(bin_tbl))
+    # UNHEX('ff') is a single 0xFF byte, which is not valid UTF-8.
+    err = self.execute_query_expect_failure(
+        self.client, "insert into {0} values (unhex('ff'))".format(str_tbl))
+    assert "not valid UTF-8" in str(err)
+    # The same bytes are valid in a BINARY column (the recommended alternative).
+    bin_insert = "insert into {0} values (cast(unhex('ff') as binary))".format(bin_tbl)
+    self.execute_query_expect_success(self.client, bin_insert)
+
   def test_external_iceberg_tables(self, vector, unique_database):
     self.run_test_case('QueryTest/iceberg-external', vector, unique_database)
 

@@ -475,8 +475,8 @@ def get_toolchain_downloads():
        "calloncehack", "cctz", "cloudflarezlib", "cmake", "crcutil", "curl",
        "flatbuffers", "gdb", "gflags", "glog", "gperftools", "jwt-cpp", "libev",
        "libunwind", "lz4", "mold", "openldap", "opentelemetry-cpp", "orc",
-       "protobuf", "python", "rapidjson", "re2", "snappy", "tcmalloc", "tpc-h",
-       "tpc-ds", "zlib", "zstd"]]
+       "protobuf", "python", "rapidjson", "re2", "simdutf", "snappy", "tcmalloc",
+       "tpc-h", "tpc-ds", "zlib", "zstd"]]
   gtest_package = ToolchainPackage(
       "googletest", explicit_version=os.environ.get("IMPALA_GTEST_VERSION"))
   toolchain_packages += [gtest_package]

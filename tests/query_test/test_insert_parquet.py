@@ -431,6 +431,15 @@ class TestHdfsParquetTableWriter(ImpalaTestSuite):
     assert schema.converted_type is None
     assert schema.logicalType is None
 
+  def _check_utf8_logical_type(self, schemas, column_name):
+    """Checks that the schema with name 'column_name' is annotated as a UTF-8 string,
+    i.e. it has the UTF8 converted type and the STRING logical type."""
+    schema = self._get_schema(schemas, column_name)
+    assert schema.converted_type == ConvertedType.UTF8
+    assert schema.logicalType is not None
+    self._check_only_one_member_var_is_set(schema.logicalType, "STRING")
+    assert schema.logicalType.STRING is not None
+
   def _check_int_logical_type(self, schemas, column_name, bit_width):
     """Checks that the schema with name 'column_name' has logical and converted type that
     describe a signed integer with 'bit_width' bits."""
@@ -477,8 +486,8 @@ class TestHdfsParquetTableWriter(ImpalaTestSuite):
     self._check_no_logical_type(schemas, "float_col")
     self._check_no_logical_type(schemas, "double_col")
 
-    # By default STRING has no logical type, see IMPALA-5982.
-    self._check_no_logical_type(schemas, "string_col")
+    # STRING is annotated with the UTF-8 logical type by default.
+    self._check_utf8_logical_type(schemas, "string_col")
 
     # Currently TIMESTAMP is written as INT96 and has no logical type.
     # This test will break once INT64 becomes the default Parquet type for TIMESTAMP

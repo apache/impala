@@ -66,6 +66,27 @@ under the License.
               fails with an analysis error.</p><p>To restore the previous behavior, set the
                 <codeph>EXPAND_COMPLEX_TYPES</codeph> query option to <codeph>false</codeph>.
               See <xref href="impala_expand_complex_types.xml"/>.</p></li>
+          <li>STRING columns in Parquet are annotated as UTF-8 by default<p>Starting in
+            <keyword keyref="impala50"/>, the
+            <xref keyref="parquet_annotate_strings_utf8"/> defaults to
+            <codeph>true</codeph>, so Impala annotates <codeph>STRING</codeph> columns
+            written to Parquet with the UTF-8 logical type and validates that the values
+            are valid UTF-8. An <codeph>INSERT</codeph> or <codeph>CREATE TABLE AS
+              SELECT</codeph> that writes non-UTF-8 bytes (for example, binary or Latin-1
+            data) into a <codeph>STRING</codeph> Parquet column now fails with
+              <codeph>PARQUET_INVALID_UTF8_STRING</codeph>, where it previously
+            succeeded.</p><p>To store non-UTF-8 data, use a <codeph>BINARY</codeph>
+            column, or set <codeph>PARQUET_ANNOTATE_STRINGS_UTF8=false</codeph> to restore
+            the previous behavior. Iceberg tables always annotate <codeph>STRING</codeph>
+            columns as UTF-8 and cannot disable it, so a <codeph>BINARY</codeph> column is
+            required there.</p>
+            <note>Existing Iceberg tables that already contain non-UTF-8 bytes in
+            <codeph>STRING</codeph> columns may start to fail on operations that rewrite
+            data, such as <codeph>OPTIMIZE</codeph>, <codeph>UPDATE</codeph>, and
+            <codeph>MERGE</codeph>, because the rewritten values are validated on the
+            write path. To store such data, use a <codeph>BINARY</codeph> column
+            instead.</note>
+          </li>
         </ul>
       </p>
     </conbody>

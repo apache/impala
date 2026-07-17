@@ -738,7 +738,7 @@ public class TestCalciteStats extends PlannerTestBase {
       assertEquals(1.0, (double) mq.getRowCount(getRelNodeForQuery("SELECT" +
           " bigint_col, id FROM functional_parquet.alltypes where bigint_col = 10")),
           DOUBLE_ERR);
-      assertEquals(758.0, (double) mq.getRowCount(getRelNodeForQuery(
+      assertEquals(761.0, (double) mq.getRowCount(getRelNodeForQuery(
            "SELECT a.id FROM functional_parquet.alltypes a inner join " +
            "functional_parquet.alltypestiny b on (a.id= b.id)")), DOUBLE_ERR);
     } catch (ImpalaException e) {

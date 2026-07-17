@@ -507,7 +507,14 @@ error_codes = (
    "catalogd $0 is in standby mode"),
 
   ("PARQUET_CORRUPT_DELTA_LENGTH_VALUE", 166, "File '$0' is corrupt: error decoding "
-   "DELTA_LENGTH_BYTE_ARRAY value of type $1 at offset $2")
+   "DELTA_LENGTH_BYTE_ARRAY value of type $1 at offset $2"),
+
+  ("PARQUET_INVALID_UTF8_STRING", 167, "Column '$0' contains a value that is not valid "
+   "UTF-8 (invalid byte 0x$2 at offset $1), but the Parquet file is annotated as UTF-8 "
+   "(PARQUET_ANNOTATE_STRINGS_UTF8=true). To write such values, disable the "
+   "UTF-8 annotation (PARQUET_ANNOTATE_STRINGS_UTF8=false), or use a BINARY "
+   "column instead of STRING. Note that Iceberg tables always annotate STRING "
+   "columns as UTF-8, so a BINARY column is required there.")
 )
 
 import sys

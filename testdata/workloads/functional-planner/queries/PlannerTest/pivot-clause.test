@@ -35,7 +35,7 @@ PLAN-ROOT SINK
 |
 00:SCAN HDFS [functional_parquet.alltypestiny]
    partition predicates: functional_parquet.alltypestiny.year = 2009
-   HDFS partitions=4/4 files=4 size=11.92KB
+   HDFS partitions=4/4 files=4 size=11.96KB
    partition key scan
    row-size=8B cardinality=4
 ====
@@ -76,7 +76,7 @@ PLAN-ROOT SINK
 |  row-size=12B cardinality=4
 |
 00:SCAN HDFS [functional_parquet.alltypestiny]
-   HDFS partitions=4/4 files=4 size=11.92KB
+   HDFS partitions=4/4 files=4 size=11.96KB
    partition key scan
    row-size=8B cardinality=4
 ====
@@ -96,7 +96,7 @@ PLAN-ROOT SINK
 04:HASH JOIN [INNER JOIN, BROADCAST]
 |  hash predicates: t2.`year` = `year`
 |  runtime filters: RF000 <- `year`, RF001 <- `year`
-|  row-size=16B cardinality=758
+|  row-size=16B cardinality=761
 |
 |--09:EXCHANGE [BROADCAST]
 |  |
@@ -125,14 +125,14 @@ PLAN-ROOT SINK
 |  |  row-size=12B cardinality=4
 |  |
 |  00:SCAN HDFS [functional_parquet.alltypestiny]
-|     HDFS partitions=4/4 files=4 size=11.92KB
+|     HDFS partitions=4/4 files=4 size=11.96KB
 |     partition key scan
 |     row-size=8B cardinality=4
 |
 03:SCAN HDFS [functional_parquet.alltypestiny t2]
-   HDFS partitions=4/4 files=4 size=11.92KB
+   HDFS partitions=4/4 files=4 size=11.96KB
    runtime filters: RF001 -> t2.`year`, RF000 -> t2.`year`
-   row-size=4B cardinality=758
+   row-size=4B cardinality=761
 ====
 # The output of the AGGREGATE node is consumed by a JOIN node on a column
 # created from the split.
@@ -151,7 +151,7 @@ PLAN-ROOT SINK
 04:HASH JOIN [INNER JOIN, BROADCAST]
 |  hash predicates: t2.`month` = aggif(`month` = 2, result)
 |  runtime filters: RF000 <- aggif(`month` = 2, result), RF001 <- aggif(`month` = 2, result)
-|  row-size=16B cardinality=758
+|  row-size=16B cardinality=761
 |
 |--09:EXCHANGE [BROADCAST]
 |  |
@@ -180,14 +180,14 @@ PLAN-ROOT SINK
 |  |  row-size=12B cardinality=4
 |  |
 |  00:SCAN HDFS [functional_parquet.alltypestiny]
-|     HDFS partitions=4/4 files=4 size=11.92KB
+|     HDFS partitions=4/4 files=4 size=11.96KB
 |     partition key scan
 |     row-size=8B cardinality=4
 |
 03:SCAN HDFS [functional_parquet.alltypestiny t2]
-   HDFS partitions=4/4 files=4 size=11.92KB
+   HDFS partitions=4/4 files=4 size=11.96KB
    runtime filters: RF001 -> t2.`month`, RF000 -> t2.`month`
-   row-size=4B cardinality=758
+   row-size=4B cardinality=761
 ====
 # Aggregates with multiple DISTINCTs in the PIVOT clause.
 with t1 (a, b, c) as (

@@ -41,8 +41,11 @@ under the License.
     </p>
 
     <p conref="../shared/impala_common.xml#common/usage_notes_blurb"/>
-    <p>
-      By default, Impala represents a <codeph>STRING</codeph> column in Parquet as an unannotated binary field.
+    <p rev="5.0.0 IMPALA-12675">
+      Starting in <keyword keyref="impala50"/>, Impala annotates a <codeph>STRING</codeph> column in
+      Parquet with the UTF-8 logical type by default. In earlier releases, and when this option is set
+      to <codeph>false</codeph>, a <codeph>STRING</codeph> column is written as an unannotated binary
+      field.
     </p>
     <p>
       Impala always uses the UTF-8 annotation when writing <codeph>CHAR</codeph> and <codeph>VARCHAR</codeph>
@@ -50,13 +53,23 @@ under the License.
       values to <codeph>VARCHAR</codeph>.
     </p>
     <p>
-      This option is to help make Impala-written data more interoperable with other data processing engines.
-      Impala itself currently does not support all operations on UTF-8 data.
-      Although data processed by Impala is typically represented in ASCII, it is valid to designate the
-      data as UTF-8 when storing on disk, because ASCII is a subset of UTF-8.
+      The UTF-8 annotation helps make Impala-written data more interoperable with other data processing
+      engines. Impala itself currently does not support all operations on UTF-8 data.
+      Because ASCII is a subset of UTF-8, ASCII data is also valid UTF-8, so designating it as UTF-8 on
+      disk is safe.
+    </p>
+    <p rev="5.0.0 IMPALA-12675">
+      When the UTF-8 annotation is enabled, Impala validates that <codeph>STRING</codeph> values written
+      to Parquet are valid UTF-8, so that the annotation is truthful. A value that is not valid UTF-8
+      causes the write to fail. To store non-UTF-8 data (for example, binary or Latin-1 bytes), set this
+      option to <codeph>false</codeph> to omit the annotation, or use a <codeph>BINARY</codeph> column
+      instead of <codeph>STRING</codeph>. <codeph>CHAR</codeph> and <codeph>VARCHAR</codeph> columns,
+      which are always annotated as UTF-8, are not validated. Iceberg tables always annotate
+      <codeph>STRING</codeph> columns as UTF-8 regardless of this option, so a <codeph>BINARY</codeph>
+      column is required to store non-UTF-8 bytes there.
     </p>
     <p conref="../shared/impala_common.xml#common/type_boolean"/>
-    <p conref="../shared/impala_common.xml#common/default_false_0"/>
+    <p conref="../shared/impala_common.xml#common/default_true_1"/>
 
     <p conref="../shared/impala_common.xml#common/added_in_260"/>
 
