@@ -61,7 +61,9 @@ public class ImpalaRelMdDistinctRowCount extends RelMdDistinctRowCount {
       if (distinctValues < 0) {
         return totalRows;
       }
-      distinctRows *= distinctValues;
+      if (distinctValues != 0.0) {
+        distinctRows *= distinctValues;
+      }
       // number of distinct rows can never be more than number of total rows
       if (distinctRows >= totalRows) {
         return totalRows;

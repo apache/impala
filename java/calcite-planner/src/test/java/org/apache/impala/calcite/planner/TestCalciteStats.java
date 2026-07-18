@@ -28,6 +28,7 @@ import org.apache.calcite.jdbc.JavaTypeFactoryImpl;
 import org.apache.calcite.plan.RelOptCluster;
 import org.apache.calcite.plan.RelOptCostImpl;
 import org.apache.calcite.plan.RelOptPlanner;
+import org.apache.calcite.plan.RelOptRule;
 import org.apache.calcite.plan.hep.HepPlanner;
 import org.apache.calcite.plan.hep.HepProgramBuilder;
 import org.apache.calcite.plan.volcano.VolcanoPlanner;
@@ -58,6 +59,8 @@ import org.apache.impala.common.RuntimeEnv;
 import org.apache.impala.planner.PlannerTestBase;
 import org.apache.impala.thrift.TQueryOptions;
 
+import static org.apache.impala.calcite.schema.FilterSelectivityEstimator.DEFAULT_IS_NULL_PERCENTAGE;
+
 import static org.junit.Assert.assertEquals;
 
 import org.slf4j.Logger;
@@ -73,6 +76,15 @@ public class TestCalciteStats extends PlannerTestBase {
   private static final double ALL_TYPES_CARD = 7300.0;
 
   private static final double ALL_TYPES_TINY_CARD = 8.0;
+
+  private static final double MANY_NULLS_CARD = 11000;
+
+  // The amount of nulls in the many_nulls.null_col table
+  private static final double MANY_NULLS_NULL_COL_NULLS = 5500;
+
+  private static final double MANY_NULLS_SMALL_NDVS = 4897;
+
+  private static final double MANY_NULLS_NULL_COL_PERC = .5;
 
   private static final double BIGINT_NDV = 10.0;
 
@@ -303,11 +315,16 @@ public class TestCalciteStats extends PlannerTestBase {
   private RelNode runFilterRule(CalciteAnalysisResult analysisResult)
       throws ImpalaException {
     RelNode relNode = getRelNodeForQuery(analysisResult);
-    HepProgramBuilder builder = new HepProgramBuilder();
     RexBuilder rexBuilder = relNode.getCluster().getRexBuilder();
     ImpalaRexSimplify simplifier =
         new ImpalaRexSimplify(rexBuilder, new ImpalaRexExecutor(analysisResult, null));
-    builder.addRuleInstance(new ImpalaFilterSimplifyRule(simplifier));
+    return runFilterRule(relNode, new ImpalaFilterSimplifyRule(simplifier));
+  }
+
+  private RelNode runFilterRule(RelNode relNode, RelOptRule rule)
+      throws ImpalaException {
+    HepProgramBuilder builder = new HepProgramBuilder();
+    builder.addRuleInstance(rule);
     HepPlanner planner = new HepPlanner(builder.build(),
         relNode.getCluster().getPlanner().getContext(), true, null,
         RelOptCostImpl.FACTORY);
@@ -455,6 +472,242 @@ public class TestCalciteStats extends PlannerTestBase {
   }
 
   @Test
+  public void testLeftJoinWithNonEqualityPredicate() {
+    try {
+      RelNode logicalPlan = getRelNodeForQuery("SELECT a.id, b.id FROM " +
+          "functional.alltypes a left join functional.alltypestiny b " +
+          " on ( a.id > b.id) where b.id is null");
+      RelMetadataQuery mq = getMQ();
+      Double isNullRows =
+          ALL_TYPES_CARD * ALL_TYPES_TINY_CARD * DEFAULT_IS_NULL_PERCENTAGE;
+      assertEquals(isNullRows, (double) mq.getRowCount(logicalPlan), DOUBLE_ERR);
+    } catch (ImpalaException e) {
+      throw new RuntimeException(e);
+    }
+  }
+
+  @Test
+  public void testLeftJoinWithIsNotNullFilterOnLeftWithNonEquality() {
+    try {
+      RelNode logicalPlan = getRelNodeForQuery("SELECT a.id, b.id FROM " +
+          "functional.alltypes a left join functional.alltypestiny b " +
+          " on ( a.id > b.id) where a.id is not null");
+      RelMetadataQuery mq = getMQ();
+      Double isNotNullRows = ALL_TYPES_CARD * ALL_TYPES_TINY_CARD;
+      assertEquals(isNotNullRows, (double) mq.getRowCount(logicalPlan), DOUBLE_ERR);
+    } catch (ImpalaException e) {
+      throw new RuntimeException(e);
+    }
+  }
+
+
+  @Test
+  public void testLeftJoinWithIsNullFilterOnRight() {
+    try {
+      RelNode logicalPlan = getRelNodeForQuery("SELECT a.id, b.id FROM " +
+          "functional.alltypes a left join functional.alltypestiny b " +
+          " on ( a.id = b.id) where b.id is null");
+      RelMetadataQuery mq = getMQ();
+      Double isNullRows = ALL_TYPES_CARD - ALL_TYPES_TINY_CARD;
+      assertEquals(isNullRows, (double) mq.getRowCount(logicalPlan), DOUBLE_ERR);
+    } catch (ImpalaException e) {
+      throw new RuntimeException(e);
+    }
+  }
+
+  @Test
+  public void testLeftJoinWithIsNotNullFilterOnLeft() {
+    try {
+      RelNode logicalPlan = getRelNodeForQuery("SELECT a.id, b.id FROM " +
+          "functional.alltypes a left join functional.alltypestiny b " +
+          " on ( a.id = b.id) where a.id is not null");
+      RelMetadataQuery mq = getMQ();
+      Double isNotNullRows = ALL_TYPES_CARD;
+      assertEquals(isNotNullRows, (double) mq.getRowCount(logicalPlan), DOUBLE_ERR);
+    } catch (ImpalaException e) {
+      throw new RuntimeException(e);
+    }
+  }
+
+  @Test
+  public void testRightJoinWithIsNotNullFilterOnRight() {
+    // This specific test is checking a bug found in the code review. The recursion for
+    // getNullPercentage was looking at the parent RelNode but using the input ref
+    // passed in for mq_.getColumnOrigin();
+    try {
+      RelNode logicalPlan = getRelNodeForQuery("SELECT a.string_col, b.null_str FROM " +
+          "functional.alltypestiny a right join functional.nullrows b " +
+          " on (a.string_col = b.null_str) where b.null_str is not null");
+      RelMetadataQuery mq = getMQ();
+      // The getNullPercentage returns 0.0 percentage, but the internals of getRowCount()
+      // that are called after this boosts the row count up to 1.0.
+      Double isNotNullRows = 1.0;
+      assertEquals(isNotNullRows, (double) mq.getRowCount(logicalPlan), DOUBLE_ERR);
+    } catch (ImpalaException e) {
+      throw new RuntimeException(e);
+    }
+  }
+
+  @Test
+  public void testFullJoinWithIsNullBiggerTableOnRight() {
+    try {
+      RelNode logicalPlan = getRelNodeForQuery(
+          "select a.id, b.id from functional.alltypes a full join " +
+          "functional.manynulls_withstats  b on ( a.id = b.id) where nullcol is null");
+      RelMetadataQuery mq = getMQ();
+      Double isNotNullRows = MANY_NULLS_NULL_COL_NULLS;
+      assertEquals(isNotNullRows, (double) mq.getRowCount(logicalPlan), DOUBLE_ERR);
+    } catch (ImpalaException e) {
+      throw new RuntimeException(e);
+    }
+  }
+
+  @Test
+  public void testFullJoinWithIsNullBiggerTableOnLeft() {
+    // This specific test is checking a bug found in the code review. The recursion for
+    // getNullPercentage was looking at the parent RelNode but using the input ref
+    // passed in for mq_.getColumnOrigin();
+    try {
+      RelNode logicalPlan = getRelNodeForQuery(
+          "select a.id, b.id from functional.alltypes a full join " +
+          "functional.manynullssmall_withstats b on ( a.id = b.id) " +
+          "where nullcol is null");
+      RelMetadataQuery mq = getMQ();
+      // Number of unmatched rows are the rows on the left side that don't join with
+      // the right side. Assume ndvs map 1:1, so the percentage matching are the
+      // unmatched ndvs divided by total rows.
+      Double unmatchedRows =
+          ALL_TYPES_CARD * (1.0 - MANY_NULLS_SMALL_NDVS/ALL_TYPES_CARD);
+
+      Double isNotNullRows =
+          unmatchedRows + (MANY_NULLS_NULL_COL_PERC * MANY_NULLS_SMALL_NDVS);
+      assertEquals(isNotNullRows, (double) mq.getRowCount(logicalPlan), DOUBLE_ERR);
+    } catch (ImpalaException e) {
+      throw new RuntimeException(e);
+    }
+  }
+
+  @Test
+  public void testLeftJoinWithIsNullBiggerTableOnLeft() {
+    try {
+      RelNode logicalPlan = getRelNodeForQuery(
+          "select a.id, b.id from functional.alltypes a left join " +
+          "functional.manynullssmall_withstats b on ( a.id = b.id) " +
+          "where nullcol is null");
+      RelMetadataQuery mq = getMQ();
+      // Number of unmatched rows are the rows on the left side that don't join with
+      // the right side. Assume ndvs map 1:1, so the percentage matching are the
+      // unmatched ndvs divided by total rows.
+      Double unmatchedRows =
+          ALL_TYPES_CARD * (1.0 - MANY_NULLS_SMALL_NDVS/ALL_TYPES_CARD);
+
+      Double isNotNullRows =
+          unmatchedRows + (MANY_NULLS_NULL_COL_PERC * MANY_NULLS_SMALL_NDVS);
+      assertEquals(isNotNullRows, (double) mq.getRowCount(logicalPlan), DOUBLE_ERR);
+    } catch (ImpalaException e) {
+      throw new RuntimeException(e);
+    }
+  }
+
+  @Test
+  public void testRightJoinWithIsNullBiggerTableOnRight() {
+    try {
+      RelNode logicalPlan = getRelNodeForQuery(
+          "select a.id, b.id from functional.manynullssmall_withstats a right join " +
+          "functional.alltypes b on ( a.id = b.id) " +
+          "where nullcol is null");
+      RelMetadataQuery mq = getMQ();
+      // Number of unmatched rows are the rows on the left side that don't join with
+      // the right side. Assume ndvs map 1:1, so the percentage matching are the
+      // unmatched ndvs divided by total rows.
+      Double unmatchedRows =
+          ALL_TYPES_CARD * (1.0 - MANY_NULLS_SMALL_NDVS/ALL_TYPES_CARD);
+
+      Double isNotNullRows =
+          unmatchedRows + (MANY_NULLS_NULL_COL_PERC * MANY_NULLS_SMALL_NDVS);
+      assertEquals(isNotNullRows, (double) mq.getRowCount(logicalPlan), DOUBLE_ERR);
+    } catch (ImpalaException e) {
+      throw new RuntimeException(e);
+    }
+  }
+
+  @Test
+  public void testLeftJoinWithIsNotNullFilter() {
+    try {
+      RelNode logicalPlan = getRelNodeForQuery("SELECT a.id, b.id FROM " +
+          "functional.alltypes a left join functional.alltypestiny b " +
+          " on ( a.id = b.id) where b.id is not null");
+      RelMetadataQuery mq = getMQ();
+      Double isNullRows = ALL_TYPES_TINY_CARD;
+      assertEquals(isNullRows, (double) mq.getRowCount(logicalPlan), DOUBLE_ERR);
+    } catch (ImpalaException e) {
+      throw new RuntimeException(e);
+    }
+  }
+
+  @Test
+  public void testLeftJoinWithIsNullTestFilterAndProject() {
+    try {
+      RelNode logicalPlan = getRelNodeForQuery("select id_2 from " +
+          "(SELECT b.id id_2, a.id id_1 FROM " +
+          "functional.alltypes a left join functional.alltypestiny b " +
+          " on ( a.id = b.id)) where id_2 is null");
+
+      logicalPlan = runFilterRule(logicalPlan, CoreRules.PROJECT_FILTER_TRANSPOSE);
+      RelMetadataQuery mq = getMQ();
+      Double isNullRows = ALL_TYPES_CARD - ALL_TYPES_TINY_CARD;
+      assertEquals(isNullRows, (double) mq.getRowCount(logicalPlan), DOUBLE_ERR);
+    } catch (ImpalaException e) {
+      throw new RuntimeException(e);
+    }
+  }
+
+  @Test
+  public void testLeftJoinWithInnerJoinMultiMapToOuterJoin() {
+    try {
+      RelNode logicalPlan = getRelNodeForQuery("SELECT a.bigint_col, b.bigint_col FROM " +
+          "functional.alltypes a left join functional.alltypestiny b " +
+          " on ( a.bigint_col = b.bigint_col) where b.bigint_col is null");
+      RelMetadataQuery mq = getMQ();
+      Double isNullRows = 5840.0;
+      assertEquals(isNullRows, (double) mq.getRowCount(logicalPlan), DOUBLE_ERR);
+    } catch (ImpalaException e) {
+      throw new RuntimeException(e);
+    }
+  }
+
+  @Test
+  public void testRightJoinTwoJoins() {
+    try {
+      RelNode logicalPlan = getRelNodeForQuery(
+          "select a.id from functional.alltypestiny a right join " +
+          "(select c.id id_1, d.id id_2 from functional.alltypes c " +
+          "inner join functional.alltypestiny d on (c.id = d.id)) b " +
+          "on (a.id = b.id_1) where b.id_1 is not null");
+
+      RelMetadataQuery mq = getMQ();
+      Double dd = mq.getRowCount(logicalPlan);
+      Double isNullRows = ALL_TYPES_TINY_CARD;
+      assertEquals(isNullRows, (double) mq.getRowCount(logicalPlan), DOUBLE_ERR);
+    } catch (ImpalaException e) {
+      throw new RuntimeException(e);
+    }
+  }
+
+  @Test
+  public void testRightJoinWithIsNullFilter() {
+    try {
+      RelNode logicalPlan = getRelNodeForQuery("SELECT a.id, b.id FROM " +
+          "functional.alltypestiny a right join functional.alltypes b " +
+          " on ( a.id = b.id) where a.id is null");
+      RelMetadataQuery mq = getMQ();
+      Double isNullRows = ALL_TYPES_CARD - ALL_TYPES_TINY_CARD;
+      assertEquals(isNullRows, (double) mq.getRowCount(logicalPlan), DOUBLE_ERR);
+    } catch (ImpalaException e) {
+      throw new RuntimeException(e);
+    }
+  }
+  @Test
   public void testRightJoin() {
     try {
       RelNode logicalPlan = getRelNodeForQuery("SELECT b.id, a.id FROM " +
@@ -488,6 +741,22 @@ public class TestCalciteStats extends PlannerTestBase {
       assertEquals(758.0, (double) mq.getRowCount(getRelNodeForQuery(
            "SELECT a.id FROM functional_parquet.alltypes a inner join " +
            "functional_parquet.alltypestiny b on (a.id= b.id)")), DOUBLE_ERR);
+    } catch (ImpalaException e) {
+      throw new RuntimeException(e);
+    }
+  }
+
+  @Test
+  public void testSimpleQueryOnNullTable() {
+    try {
+      RelNode logicalPlan = getRelNodeForQuery("SELECT * FROM functional.nullrows");
+      RelNode tableScanRelNode = logicalPlan.getInput(0);
+      RelMetadataQuery mq = getMQ();
+      ImmutableBitSet bitSet = ImmutableBitSet.of(2);
+      // catalogd returns 0 ndvs when all columns are null, but Calcite overrides this
+      // to 1.0.
+      assertEquals(1.0, (double) mq.getDistinctRowCount(tableScanRelNode,
+          bitSet, null), DOUBLE_ERR);
     } catch (ImpalaException e) {
       throw new RuntimeException(e);
     }

@@ -54,4 +54,11 @@ public interface SingleNodePlannerIntf {
    * planner does not use Calcite.
    */
   String calcitePlan();
+
+  /**
+   * true if should attempt to invert joins via cost in the physical planner stage.
+   * For Calcite planner, this will be set to false since the join ordering is
+   * determined at optimization time and should not be checked again.
+   */
+  boolean allowPlannerToInvertCheaperJoin();
 }

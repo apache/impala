@@ -25,8 +25,11 @@ import java.util.Set;
 
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.core.JoinRelType;
+import org.apache.calcite.rel.core.Project;
 import org.apache.calcite.rel.core.TableScan;
 import org.apache.calcite.rel.metadata.RelMetadataQuery;
+import org.apache.calcite.rel.metadata.RelColumnOrigin;
+import org.apache.calcite.rex.RexBuilder;
 import org.apache.calcite.rex.RexCall;
 import org.apache.calcite.rex.RexInputRef;
 import org.apache.calcite.rex.RexLiteral;
@@ -35,7 +38,9 @@ import org.apache.calcite.sql.type.SqlTypeName;
 import org.apache.calcite.util.ImmutableBitSet;
 import org.apache.calcite.util.Sarg;
 import org.apache.impala.analysis.Expr;
+import org.apache.impala.calcite.rel.node.ImpalaPlanRel;
 import org.apache.impala.calcite.rel.util.RexInputRefCollector;
+import org.apache.impala.calcite.schema.CalciteTable;
 import org.apache.impala.catalog.Column;
 import org.apache.impala.catalog.ColumnStats;
 
@@ -51,6 +56,8 @@ public class FilterSelectivityEstimator {
 
   protected static final Logger LOG =
       LoggerFactory.getLogger(FilterSelectivityEstimator.class);
+
+  public static final double DEFAULT_IS_NULL_PERCENTAGE = .02;
 
   private final RelNode childRel_;
 
@@ -171,47 +178,147 @@ public class FilterSelectivityEstimator {
   }
 
   private Double computeIsNullSelectivity(RexCall call) {
-    if (childRel_ instanceof TableScan
-        && call.getOperands().get(0) instanceof RexInputRef) {
-      TableScan tableScan = (TableScan) childRel_;
-      return getNumNulls(call, tableScan) / Math.max(mq_.getRowCount(tableScan), 1);
-    } else if (childRel_ instanceof Join) {
-      Join join = (Join) childRel_;
-      // TODO: fix this.  If it's a non-inner join, we can hopefully calculate the number
-      // of null rows based on what happens with the outer join. We also only change
-      // the cardinality if the input ref is on the "outer" side.
-      if (join.getJoinType() != JoinRelType.INNER) {
-        return 1.0 - Expr.DEFAULT_SELECTIVITY;
-      }
-    }
-    return null;
+    return getNullPercentage(childRel_, call.getOperands().get(0));
   }
 
   private Double computeIsNotNullSelectivity(RexCall call) {
-    if (childRel_ instanceof TableScan
-        && call.getOperands().get(0) instanceof RexInputRef) {
-      TableScan tableScan = (TableScan) childRel_;
-      double noOfNulls = getNumNulls(call, tableScan);
-      double totalNoOfTuples = mq_.getRowCount(tableScan);
-      return (totalNoOfTuples - noOfNulls) / Math.max(totalNoOfTuples, 1);
-    } else if (childRel_ instanceof Join) {
-      Join join = (Join) childRel_;
-      // TODO: fix this.  If it's a non-inner join, we can hopefully calculate the number
-      // of null rows based on what happens with the outer join. We also only change
-      // the cardinality if the input ref is on the "outer" side.
-      if (join.getJoinType() != JoinRelType.INNER) {
-        return Expr.DEFAULT_SELECTIVITY;
-      }
+    return 1.0 - getNullPercentage(childRel_, call.getOperands().get(0));
+  }
+
+  private Double getNullPercentage(RelNode relNode, RexNode nullOperand) {
+    // Check to see if this column is on top of an outer join relNode which generates
+    // null data if the row is not present on the "outer" side.
+    // If a null is returned, then no outer join was detected.
+    Double outerJoinEstimate = getJoinNullPercentageEstimate(relNode, nullOperand);
+    if (outerJoinEstimate != null) {
+      return outerJoinEstimate;
     }
-    // IMPALA-14235:  This does not seem right. We are returning an
-    // unknown selectivity here if the child is not a Join or TableScan. If this is the
-    // only condition, the selectivity will be the default of .1 which seems wrong.
-    // Tpcds tests seemed to be good leaving this as null, but this requires further
-    // investigation because we may be able to get better plans if this is changed.
-    // Also, while this is actually similar to the logic in IsNullPredicate does, it is
-    // possible that higher levels (where the child is not just a TableScan or Join) may
-    // still be able to deduce the number of nulls.
-    return null;
+
+    // TODO: We can probably do an approximation on most RexCalls, but
+    // let's punt this for now.
+    if (!(nullOperand instanceof RexInputRef)) {
+      return DEFAULT_IS_NULL_PERCENTAGE;
+    }
+
+    RexInputRef inputRef = (RexInputRef) nullOperand;
+
+    // If the origin table can be found, get the null percentage from there.
+    RelColumnOrigin originCol = mq_.getColumnOrigin(relNode, inputRef.getIndex());
+    // Return default percentage if we cannot retrieve information stats information
+    // from the base table.
+    if (originCol == null || originCol.isDerived()) {
+      return DEFAULT_IS_NULL_PERCENTAGE;
+    }
+    int columnNum = originCol.getOriginColumnOrdinal();
+    CalciteTable table = (CalciteTable) originCol.getOriginTable();
+    Preconditions.checkNotNull(table);
+    Double tableRowCount = table.getRowCount();
+    return tableRowCount != 0.0
+        ? ((double) getNumNulls(columnNum, table)) / table.getRowCount()
+        : 0.0;
+  }
+
+  /**
+   * Returns the join null percentage if the RelNode is on top of an
+   * outer join, null if it is not.
+   * This method will recursively call its children until it either finds a
+   * join RelNode and returns a null percentage estimate, or it finds a node
+   * that might affect the null percentage and returns null.
+   */
+  private Double getJoinNullPercentageEstimate(RelNode relNode, RexNode column) {
+    // TODO: We can probably do an approximation on most RexCalls, but
+    // let's punt this for now.
+    if (!(column instanceof RexInputRef)) {
+      return null;
+    }
+    RexInputRef inputRef = (RexInputRef) column;
+    int columnNum = inputRef.getIndex();
+    RelNode realRelNode = (relNode instanceof HepRelVertex)
+        ? ((HepRelVertex)relNode).getCurrentRel()
+        : relNode;
+    switch (ImpalaPlanRel.getRelNodeType(realRelNode)) {
+      case JOIN:
+        Join join = (Join) realRelNode;
+        RelNode childRelNode = join.getInput(0);
+        int numFieldsOnLeft = childRelNode.getRowType().getFieldList().size();
+        boolean columnOnLeft = (columnNum < numFieldsOnLeft);
+        JoinRelType joinRelType = join.getJoinType();
+        RexBuilder rexBuilder = childRelNode.getCluster().getRexBuilder();
+        if (!columnOnLeft) {
+          // If column is on the right, all the join information needs to
+          // be manipulated for the right side.
+          columnNum = columnNum - numFieldsOnLeft;
+          inputRef = rexBuilder.makeInputRef(column.getType(), columnNum);
+          childRelNode = join.getInput(1);
+        }
+
+        // For the case where it is either an inner, we recursively call
+        // getNullPercentage for this column for the child.
+        if (joinRelType  == JoinRelType.INNER ||
+            (joinRelType == JoinRelType.LEFT && columnOnLeft) ||
+            (joinRelType == JoinRelType.RIGHT && !columnOnLeft)) {
+          return getNullPercentage(childRelNode, inputRef);
+        }
+
+        if (!(joinRelType == JoinRelType.LEFT || joinRelType == JoinRelType.RIGHT ||
+            joinRelType == JoinRelType.FULL)) {
+          return null;
+        }
+
+        // if we are here, we know the column is on the outer join side. We
+        // calculate the number of rows as if there were an inner join. Then
+        // we calculate the number of rows on the non-outer join side.
+        // The difference is the number of rows on the outer join side that
+        // won't match up and thus put in a null value for that column.
+
+        // Retrieve the JoinRelationInfo for the outer join
+        JoinRelationInfo info =
+            new JoinRelationInfo(join, rexBuilder, mq_, joinRelType);
+        if (!info.hasEqualityConjunctions()) {
+          // TODO: If there are no equality conjunctions, we need to come up
+          // with a formula to figure out what percentage of rows on the outer
+          // side didn't match. For now, return the default null percentage.
+          return DEFAULT_IS_NULL_PERCENTAGE;
+        }
+
+        Double outerRowCount = info.getRowCount();
+        if (outerRowCount == 0.0) {
+          return 0.0;
+        }
+
+        // unmatchedRows is the number of rows on the outer side of the join.
+        Double unmatchedRows = info.getUnmatchedRowsToOuterJoin(!columnOnLeft);
+        // (outerRowCount - totalNullRows) should represent the number of rows on
+        // the non-outer side that come through the full join, since the totalNumRows is
+        // currently equal to the unmatched rows. Multiplying this by the null
+        // percentage should give us the number of nulls for the column as if this were
+        // an inner join.
+        Double totalRowsNonOuterSide = Math.max(outerRowCount - unmatchedRows, 0.0);
+        // totalNullRows = the total number of unmatched Rows on the outer side +
+        // the calculated number of null rows on the non-outer side.
+        Double totalNullRows = unmatchedRows + (totalRowsNonOuterSide *
+            getNullPercentage(childRelNode, inputRef));
+        Double nullPercentage = Math.min(totalNullRows/outerRowCount, 1.0);
+        return Math.max(nullPercentage, 0.0);
+      case SORT:
+      case FILTER:
+        // For these RelNodes, we look at the RelNode child to see if it is an
+        // outer join
+        return getNullPercentage(realRelNode.getInput(0), column);
+      case PROJECT:
+        // For project, we need to get the projected column from the input.
+        Project project = (Project) realRelNode;
+        RexNode newColumn = project.getProjects().get(columnNum);
+        return getNullPercentage(realRelNode.getInput(0), newColumn);
+      case VALUES:
+      case HDFSSCAN:
+      case UNION:
+      case AGGREGATE:
+      default:
+        // For these RelNodes, either there is no outer join, or the number of nulls
+        // could be affected if it is on top of an outer join.
+        return null;
+    }
   }
 
   private Double computeSearchSelectivity(RexCall call) {
@@ -312,12 +419,8 @@ public class FilterSelectivityEstimator {
    * @param t
    * @return estimated number of nulls from statistics
    */
-  private long getNumNulls(RexCall call, TableScan t) {
-    Preconditions.checkState(call.getOperands().size() == 1);
-    Preconditions.checkState(call.getOperands().get(0) instanceof RexInputRef);
-    RexInputRef inputRef = (RexInputRef) call.getOperands().get(0);
-    CalciteTable table = (CalciteTable) t.getTable();
-    Column column = table.getColumn(inputRef.getIndex());
+  private long getNumNulls(int index, CalciteTable table) {
+    Column column = table.getColumn(index);
     return column.getStats() != null
         ? Math.max(column.getStats().getNumNulls(), 0)
         : 0;

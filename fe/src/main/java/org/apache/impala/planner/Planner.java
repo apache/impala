@@ -148,7 +148,8 @@ public class Planner {
     checkForSmallQueryOptimization(singleNodePlan);
 
     // Join rewrites.
-    invertJoins(singleNodePlan, ctx_.isSingleNodeExec());
+    invertJoins(singleNodePlan, ctx_.isSingleNodeExec(),
+        singleNodePlannerIntf_.allowPlannerToInvertCheaperJoin());
     singleNodePlan = useNljForSingularRowBuilds(singleNodePlan, ctx_.getRootAnalyzer());
 
     if(ctx_.isMerge()) {
@@ -980,13 +981,20 @@ public class Planner {
    * Joins that originate from query blocks with a straight join hint are not inverted.
    * The 'isLocalPlan' parameter indicates whether the plan tree rooted at 'root'
    * will be executed locally within one machine, i.e., without any data exchanges.
+   *
+   * The last parameter, shouldCheckForInvertJoinCost, will invert joins based on the
+   * cheaper plan when true. This is avoided when the Calcite planner is used since
+   * it already determined the join ordering in the optimization phase.
    */
-  public static void invertJoins(PlanNode root, boolean isLocalPlan) {
+  public static void invertJoins(PlanNode root, boolean isLocalPlan,
+      boolean shouldCheckForInvertJoinCost) {
     if (root instanceof SubplanNode) {
-      invertJoins(root.getChild(0), isLocalPlan);
-      invertJoins(root.getChild(1), true);
+      invertJoins(root.getChild(0), isLocalPlan, shouldCheckForInvertJoinCost);
+      invertJoins(root.getChild(1), true, shouldCheckForInvertJoinCost);
     } else {
-      for (PlanNode child: root.getChildren()) invertJoins(child, isLocalPlan);
+      for (PlanNode child: root.getChildren()) {
+        invertJoins(child, isLocalPlan, shouldCheckForInvertJoinCost);
+      }
     }
 
     if (root instanceof JoinNode) {
@@ -1009,7 +1017,11 @@ public class Planner {
         // The current join is a distributed non-equi right outer or semi join
         // which has no backend support. Invert the join to make it executable.
         joinNode.invertJoin();
-      } else if (isInvertedJoinCheaper(joinNode, isLocalPlan)) {
+      } else if (shouldCheckForInvertJoinCost &&
+          isInvertedJoinCheaper(joinNode, isLocalPlan)) {
+        // IMPALA-15196: Calcite plan should avoid the invert joins in its
+        // optimization phase that are related to costs since it has already
+        // been evaluated.
         joinNode.invertJoin();
       }
       // Re-compute the numNodes and numInstances based on the new input order

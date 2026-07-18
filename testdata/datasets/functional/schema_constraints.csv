@@ -185,6 +185,8 @@ table_name:subquery_view, constraint:restrict_to, table_format:rc/none/none
 # writing NULLs to primary key columns.
 table_name:liketbl, constraint:exclude, table_format:hbase/none/none
 table_name:manynulls, constraint:exclude, table_format:hbase/none/none
+table_name:manynulls_withstats, constraint:exclude, table_format:hbase/none/none
+table_name:manynullssmall_withstats, constraint:exclude, table_format:hbase/none/none
 table_name:tblwithraggedcolumns, constraint:exclude, table_format:hbase/none/none
 
 # Tables with only one column are not supported in hbase.

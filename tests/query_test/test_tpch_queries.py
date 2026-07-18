@@ -18,6 +18,7 @@
 # Functional tests running the TPCH workload.
 import pytest
 
+from tests.common.environ import IS_CALCITE_PLANNER
 from tests.common.impala_test_suite import ImpalaTestSuite
 from tests.common.skip import SkipIfDockerizedCluster
 from tests.common.test_dimensions import (
@@ -40,9 +41,16 @@ class TestTpchQuery(ImpalaTestSuite):
     # execute over.
     # TODO: the planner tests are based on text and need this.
     if cls.exploration_strategy() == 'core':
+      # Avoid the Calcite Planner for text files. There are no stats for these database
+      # tables. The number of rows in the table can be estimated, but the number of
+      # distinct values cannot, and it is causing a join ordering for Q5 that is
+      # extremely slow.
+      if IS_CALCITE_PLANNER:
+        file_formats = ['parquet', 'kudu', 'orc']
+      else:
+        file_formats = ['text', 'parquet', 'kudu', 'orc', 'json']
       cls.ImpalaTestMatrix.add_constraint(lambda v:\
-          v.get_value('table_format').file_format in ['text', 'parquet', 'kudu', 'orc',
-                                                      'json'])
+          v.get_value('table_format').file_format in file_formats)
 
   def idfn(val):
     return "TPC-H: Q{0}".format(val)

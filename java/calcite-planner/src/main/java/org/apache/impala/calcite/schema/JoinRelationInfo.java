@@ -60,10 +60,18 @@ public class JoinRelationInfo {
 
   private final RelMetadataQuery mq_;
 
+  private final JoinRelType joinRelType_;
+
   public JoinRelationInfo(Join join, RexBuilder rexBuilder, RelMetadataQuery mq) {
+    this(join, rexBuilder, mq, join.getJoinType());
+  }
+
+  public JoinRelationInfo(Join join, RexBuilder rexBuilder, RelMetadataQuery mq,
+      JoinRelType joinRelType) {
     List<RexNode> conjunctions = RelOptUtil.conjunctions(join.getCondition());
     join_ = join;
     mq_ = mq;
+    joinRelType_ = joinRelType;
     ImmutableList.Builder<EqualityConjunction> equalityConjBuilder =
         ImmutableList.builder();
     ImmutableList.Builder<RexNode> nonEqualityConjBuilder = ImmutableList.builder();
@@ -85,10 +93,16 @@ public class JoinRelationInfo {
         : null;
   }
 
+  public boolean hasEqualityConjunctions() {
+    // if there are no equality conjunctions, just use the Calcite
+    // default row count method.
+    return equalityConjunctions_.size() != 0;
+  }
+
   public boolean useDefaultRowCount() {
     // if there are no equality conjunctions, just use the Calcite
     // default row count method.
-    return equalityConjunctions_.size() == 0;
+    return !hasEqualityConjunctions();
   }
 
   public Double getRowCount() {
@@ -98,12 +112,12 @@ public class JoinRelationInfo {
     EqualityConjunction conj0 = equalityConjunctions_.get(0);
 
     Double ret = conj0.lhsNumRows_ * conj0.rhsNumRows_ / getDistinctRows();
-    if (join_.getJoinType() == JoinRelType.LEFT ||
-        join_.getJoinType() == JoinRelType.FULL) {
+    if (joinRelType_ == JoinRelType.LEFT ||
+        joinRelType_ == JoinRelType.FULL) {
       ret = Math.max(conj0.lhsNumRows_, ret);
     }
-    if (join_.getJoinType() == JoinRelType.RIGHT ||
-        join_.getJoinType() == JoinRelType.FULL) {
+    if (joinRelType_ == JoinRelType.RIGHT ||
+        joinRelType_ == JoinRelType.FULL) {
       ret = Math.max(conj0.rhsNumRows_, ret);
     }
 
@@ -195,6 +209,60 @@ public class JoinRelationInfo {
     return Math.max(maxLeft, maxRight);
   }
 
+  /**
+   * If there is an outer join, return the number of rows that are unmatched with the
+   * outer join side that will produce nulls on that side.  Inner joins do not have
+   * unmatched rows. Full joins have unmatched rows on both sides.
+   */
+  public double getUnmatchedRowsToOuterJoin(boolean isLeftUnmatchedSide) {
+    if (!hasEqualityConjunctions()) {
+      return 0.0;
+    }
+
+    // number of rows should be the same on any conjunction so just
+    // use the first.
+    EqualityConjunction conj0 = equalityConjunctions_.get(0);
+
+    double leftRows = conj0.lhsNumRows_;
+    double rightRows = conj0.rhsNumRows_;
+    double leftNdvs = 1.0;
+    double rightNdvs = 1.0;
+
+    for (EqualityConjunction equalityConj : equalityConjunctions_) {
+      // blind assumption that there is no correlation between distinct
+      // values across equi-conditions.
+      // TODO: could probably do a little better and check if the same
+      // column is used across equality conjunctions, but this is probably
+      // rare.
+      leftNdvs = Math.min(leftRows, leftNdvs * equalityConj.lhsNdv_);
+      rightNdvs = Math.min(rightRows, rightNdvs * equalityConj.rhsNdv_);
+    }
+
+    // For a left join, if the number of distinct values on the left is
+    // greater than the number of distinct values on the right, we obtain
+    // the percentage of the right distinct values over the left distinct values
+    // which will be assume to be the percentage of the number of rows that match.
+    // Subtracting this percentage from 1 gives us the percentage of the
+    // number of rows that do not match, and multiplying that number by the
+    // number of rows on the left side gives us the number of unmatched rows.
+    // Right join is similar.
+    // For full join, the correct parameter should be passed in to decide which
+    // unmatched side rows we are interested in.
+    double overlappedNdvs = Math.min(leftNdvs, rightNdvs);
+    if (isLeftUnmatchedSide) {
+      if (joinRelType_ == JoinRelType.LEFT ||
+          joinRelType_ == JoinRelType.FULL) {
+        return leftRows * (1.0 - overlappedNdvs / leftNdvs);
+      }
+    } else {
+      if (joinRelType_ == JoinRelType.RIGHT ||
+          joinRelType_ == JoinRelType.FULL) {
+        return rightRows * (1.0 - overlappedNdvs / rightNdvs);
+      }
+    }
+    return 0.0;
+  }
+
   public static class EqualityConjunction {
 
     public final Double lhsNumRows_;
@@ -211,8 +279,10 @@ public class JoinRelationInfo {
 
       ImmutableBitSet leftColumnBitSet = ImmutableBitSet.of(joinCols.left);
       ImmutableBitSet rightColumnBitSet = ImmutableBitSet.of(joinCols.right);
-      lhsNdv_ = mq.getDistinctRowCount(leftInput, leftColumnBitSet, null);
-      rhsNdv_ = mq.getDistinctRowCount(rightInput, rightColumnBitSet, null);
+      lhsNdv_ =
+          Math.max(mq.getDistinctRowCount(leftInput, leftColumnBitSet, null), 1.0);
+      rhsNdv_ =
+          Math.max(mq.getDistinctRowCount(rightInput, rightColumnBitSet, null), 1.0);
     }
   }
 }

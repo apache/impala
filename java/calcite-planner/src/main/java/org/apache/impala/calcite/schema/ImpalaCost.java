@@ -19,6 +19,7 @@ package org.apache.impala.calcite.schema;
 
 import org.apache.calcite.plan.RelOptCost;
 import org.apache.calcite.plan.RelOptCostFactory;
+import org.apache.calcite.plan.RelOptUtil;
 
 import java.util.Objects;
 
@@ -124,22 +125,9 @@ public class ImpalaCost implements RelOptCost {
       return false;
     }
     ImpalaCost that = (ImpalaCost) other;
-    // changed the epsilon value to be higher.  Without this, q17
-    // was producing a bad plan.  It should now pick
-    // ((store_sales, store_returns), catalog_sales)
-    // over
-    // ((catalog_sales, store_returns), store_sales)
-    // The problem was that store_returns does not have a PK/FK
-    // relationship with either table. It is a subset.  But the
-    // cardinality calculation doesn't understand this, so the
-    // number of join rows calculated is equal for both. The
-    // store_sales join produces waaaaay more rows.
-    // The join optimizer has a secondary way of determining join
-    // ordering if the cost is a tie, so if the cost is
-    // essentially the same, we'd prefer to use the tiebreaking method
-    // rather than this method.
-    return (this == other)
-      || Math.abs(1.0 - (this.cpu + this.io) / (other.getCpu() + other.getIo())) < .01;
+    return (this == that)
+      || ((Math.abs(this.cpu - that.cpu) < RelOptUtil.EPSILON)
+      && (Math.abs(this.io - that.io) < RelOptUtil.EPSILON));
   }
 
   @Override public RelOptCost minus(RelOptCost other) {
