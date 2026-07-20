@@ -14,6 +14,8 @@ MULTI DATA SINK
 |->WRITE TO HDFS [functional_parquet.iceberg_v2_no_deletes, OVERWRITE=false]
 |->BUFFERED DELETE FROM ICEBERG [functional_parquet.iceberg_v2_no_deletes-POSITION-DELETE]
 |
+01:EXCHANGE [HASH(functional_parquet.iceberg_v2_no_deletes.INPUT__FILE__NAME)]
+|
 00:SCAN HDFS [functional_parquet.iceberg_v2_no_deletes]
    HDFS partitions=1/1 files=1 size=625B
    predicates: i = 3, s IS DISTINCT FROM concat(s, s)
@@ -43,6 +45,8 @@ MULTI DATA SINK
 MULTI DATA SINK
 |->WRITE TO HDFS [functional_parquet.iceberg_v2_delete_positional, OVERWRITE=false]
 |->BUFFERED DELETE FROM ICEBERG [functional_parquet.iceberg_v2_delete_positional-POSITION-DELETE]
+|
+04:EXCHANGE [HASH(functional_parquet.iceberg_v2_delete_positional.INPUT__FILE__NAME)]
 |
 02:DELETE EVENTS ICEBERG DELETE [ICEBERG DELETE JOIN, DIRECTED]
 |  row-size=40B cardinality=1
@@ -84,6 +88,8 @@ MULTI DATA SINK
 |->WRITE TO HDFS [functional_parquet.iceberg_v2_delete_positional, OVERWRITE=false]
 |->BUFFERED DELETE FROM ICEBERG [functional_parquet.iceberg_v2_delete_positional-POSITION-DELETE]
 |
+04:EXCHANGE [HASH(functional_parquet.iceberg_v2_delete_positional.INPUT__FILE__NAME)]
+|
 02:DELETE EVENTS ICEBERG DELETE [ICEBERG DELETE JOIN, DIRECTED]
 |  row-size=40B cardinality=1
 |
@@ -123,6 +129,8 @@ MULTI DATA SINK
 MULTI DATA SINK
 |->WRITE TO HDFS [functional_parquet.iceberg_v2_delete_positional, OVERWRITE=false]
 |->BUFFERED DELETE FROM ICEBERG [functional_parquet.iceberg_v2_delete_positional-POSITION-DELETE]
+|
+04:EXCHANGE [HASH(functional_parquet.iceberg_v2_delete_positional.INPUT__FILE__NAME)]
 |
 02:DELETE EVENTS ICEBERG DELETE [ICEBERG DELETE JOIN, DIRECTED]
 |  row-size=40B cardinality=1
@@ -559,6 +567,8 @@ MULTI DATA SINK
 MULTI DATA SINK
 |->WRITE TO HDFS [functional_parquet.iceberg_lineitem_multiblock, OVERWRITE=false]
 |->BUFFERED DELETE FROM ICEBERG [functional_parquet.iceberg_lineitem_multiblock-POSITION-DELETE]
+|
+04:EXCHANGE [HASH(functional_parquet.iceberg_lineitem_multiblock.INPUT__FILE__NAME)]
 |
 02:DELETE EVENTS ICEBERG DELETE [ICEBERG DELETE JOIN, DIRECTED]
 |  row-size=72B cardinality=17.89K

@@ -146,10 +146,8 @@ public class IcebergUpdateImpl extends IcebergModifyImpl {
     selectList.addAll(ExprUtil.exprsAsSelectList(insertPartitionKeyExprs_));
     selectList.addAll(ExprUtil.exprsAsSelectList(deleteResultExprs_));
     selectList.addAll(ExprUtil.exprsAsSelectList(deletePartitionKeyExprs_));
-    if (originalTargetTable_.getFormatVersion() >= 3 &&
-        !originalTargetTable_.isPartitioned()) {
-      // For V3 tables, we need to add file name to the select list for shuffle to ensure
-      // that all rows from the same file are shuffled to the same node.
+    if (!originalTargetTable_.isPartitioned()) {
+      // Materialize the file name slot so the shuffle exchange can reference it.
       selectList.addAll(ExprUtil.exprsAsSelectList(shuffleExprs_));
     }
     addSortColumns();

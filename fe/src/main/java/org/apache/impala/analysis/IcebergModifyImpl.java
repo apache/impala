@@ -125,10 +125,10 @@ abstract class IcebergModifyImpl extends ModifyImpl {
 
   protected List<Expr> buildShuffleExprs(Analyzer analyzer) throws AnalysisException {
     if (!originalTargetTable_.isPartitioned()) {
-      if (originalTargetTable_.getFormatVersion() >= 3) {
-        return getSlotRefs(analyzer, Lists.newArrayList("INPUT__FILE__NAME"));
-      }
-      return Collections.emptyList();
+      // Shuffle position deletes by data file path so all deletes for a file are
+      // processed by a single instance. Required for correct per-instance duplicate
+      // detection on V2 tables (IMPALA-15197) and one Deletion Vector per file on V3.
+      return getSlotRefs(analyzer, Lists.newArrayList("INPUT__FILE__NAME"));
     }
     return getPartitionedShuffleExprs();
   }
