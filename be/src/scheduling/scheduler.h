@@ -17,6 +17,7 @@
 
 #pragma once
 
+#include <algorithm>
 #include <random>
 #include <string>
 #include <vector>
@@ -26,6 +27,7 @@
 
 #include "common/global-types.h"
 #include "common/status.h"
+#include "gen-cpp/DataSinks_types.h"
 #include "gen-cpp/PlanNodes_types.h"
 #include "gen-cpp/Types_types.h"
 #include "scheduling/executor-group.h"
@@ -477,16 +479,26 @@ class Scheduler {
   static Status CheckEffectiveInstanceCount(
       const FragmentScheduleState* fragment_state, ScheduleState* state);
 
-  /// Check if sink_fragment_state has hdfs_table_sink AND ref_fragment_state scheduled
-  /// to exceed max_fs_writers query option.
+  static inline bool HasFsWriter(const TDataSink& data_sink) {
+    return data_sink.__isset.table_sink
+        && (data_sink.table_sink.__isset.hdfs_table_sink
+            || data_sink.table_sink.__isset.iceberg_delete_sink);
+  }
+
+  /// Check if sink_fragment_state has a filesystem writer sink AND ref_fragment_state
+  /// is scheduled to exceed the max_fs_writers query option.
   static inline bool IsExceedMaxFsWriters(
       const FragmentScheduleState* sink_fragment_state,
       const FragmentScheduleState* ref_fragment_state, const ScheduleState* state) {
-    return (sink_fragment_state->fragment.output_sink.__isset.table_sink
-        && sink_fragment_state->fragment.output_sink.table_sink.__isset.hdfs_table_sink
+    const auto& output_sink = sink_fragment_state->fragment.output_sink;
+    bool has_fs_writer = output_sink.__isset.child_data_sinks
+        ? std::any_of(output_sink.child_data_sinks.begin(),
+              output_sink.child_data_sinks.end(), HasFsWriter)
+        : HasFsWriter(output_sink);
+    return has_fs_writer
         && state->query_options().max_fs_writers > 0
         && ref_fragment_state->instance_states.size()
-            > state->query_options().max_fs_writers);
+            > state->query_options().max_fs_writers;
   }
 
   /// Comparator to order scan ranges for scheduling. This uses ScanRangeWeight(), but it

@@ -550,15 +550,8 @@ public class PlanFragment extends TreeNode<PlanFragment> {
   public int getNumNodes() {
     if (dataPartition_ == DataPartition.UNPARTITIONED) {
       return 1;
-    } else if (sink_ instanceof JoinBuildSink) {
-      // One instance is scheduled per node, for all instances of the fragment containing
-      // the destination join node. ParallelPlanner sets the destination fragment when
-      // adding the JoinBuildSink.
-      return ((JoinBuildSink)sink_).getNumNodes();
-    } else if (sink_ instanceof HdfsTableSink) {
-      return ((HdfsTableSink)sink_).getNumNodes();
-    } else if (sink_ instanceof KuduTableSink) {
-      return ((KuduTableSink)sink_).getNumNodes();
+    } else if (sink_ instanceof HasQuantityLimit hasLimit) {
+      return hasLimit.getNumNodes();
     } else {
       return planRoot_.getNumNodes();
     }
@@ -587,15 +580,8 @@ public class PlanFragment extends TreeNode<PlanFragment> {
   public int getNumInstances() {
     if (dataPartition_ == DataPartition.UNPARTITIONED) {
       return 1;
-    } else if (sink_ instanceof JoinBuildSink) {
-      // One instance is scheduled per instance of the fragment containing the destination
-      // join. ParallelPlanner sets the destination fragment when adding the
-      // JoinBuildSink.
-      return ((JoinBuildSink)sink_).getNumInstances();
-    } else if (sink_ instanceof HdfsTableSink) {
-      return ((HdfsTableSink)sink_).getNumInstances();
-    } else if (sink_ instanceof KuduTableSink) {
-      return ((KuduTableSink)sink_).getNumInstances();
+    } else if (sink_ instanceof HasQuantityLimit hasLimit) {
+      return hasLimit.getNumInstances();
     } else {
       if (originalInstanceCount_ > -1) {
         int adjustedCount = getAdjustedInstanceCount();

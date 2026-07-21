@@ -225,14 +225,12 @@ public class IcebergUpdateImpl extends IcebergModifyImpl {
         true, new Pair<>(sortColumns_, sortingOrder_), -1, null,
         modifyStmt_.maxTableSinks_);
     TableSink deleteSink = new IcebergBufferedDeleteSink(
-        icePosDelTable_, deletePartitionKeyExprs_, deleteResultExprs_, deleteTableId_);
+        icePosDelTable_, deletePartitionKeyExprs_, deleteResultExprs_, deleteTableId_,
+        modifyStmt_.maxTableSinks_);
 
-    MultiDataSink ret = new MultiDataSink();
     // The real table sink should be added as the first element, before the virtual tables
     // This order is maintained to conveniently retrieve the actual table name
-    ret.addDataSink(insertSink);
-    ret.addDataSink(deleteSink);
-    return ret;
+    return new MultiDataSink(insertSink, deleteSink);
   }
 
   String getModifyMode() {

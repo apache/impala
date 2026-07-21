@@ -37,7 +37,8 @@ import static org.apache.impala.analysis.ToSqlOptions.DEFAULT;
 /**
  * Sink to materialize the build side of a join.
  */
-public class JoinBuildSink extends DataSink implements SpillableOperator {
+public class JoinBuildSink extends DataSink implements SpillableOperator,
+    HasQuantityLimit {
   // id of join's build-side table assigned during planning
   private final JoinTableId joinTableId_;
 
@@ -56,12 +57,10 @@ public class JoinBuildSink extends DataSink implements SpillableOperator {
     joinTableId_ = joinTableId;
     joinNode_ = joinNode;
     Preconditions.checkNotNull(joinNode);
-    Preconditions.checkState(joinNode instanceof JoinNode);
     if (joinNode instanceof HashJoinNode) {
-      for (Expr eqJoinConjunct: joinNode.getEqJoinConjuncts()) {
-        BinaryPredicate p = (BinaryPredicate) eqJoinConjunct;
+      for (BinaryPredicate eqJoinConjunct: joinNode.getEqJoinConjuncts()) {
         // by convention the build exprs are the rhs of the join conjuncts
-        buildExprs_.add(p.getChild(1).clone());
+        buildExprs_.add(eqJoinConjunct.getChild(1).clone());
       }
     }
     runtimeFilters_.addAll(joinNode.getRuntimeFilters());
@@ -128,6 +127,7 @@ public class JoinBuildSink extends DataSink implements SpillableOperator {
    * on. This is based on the number of nodes of the join node, since they are
    * co-located.
    */
+  @Override
   public int getNumNodes() {
     return joinNode_.getFragment().getNumNodes();
   }
@@ -137,6 +137,7 @@ public class JoinBuildSink extends DataSink implements SpillableOperator {
    * on. This is based on the number of instances or nodes of the join node, since they
    * are co-located, but the build may be shared.
    */
+  @Override
   public int getNumInstances() {
     return joinNode_.canShareBuild() ? joinNode_.getFragment().getNumNodes() :
                                        joinNode_.getFragment().getNumInstances();

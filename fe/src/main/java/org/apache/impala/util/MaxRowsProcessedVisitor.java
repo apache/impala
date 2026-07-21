@@ -48,16 +48,15 @@ public class MaxRowsProcessedVisitor implements Visitor<PlanNode> {
     if (caller instanceof DataSourceScanNode) {
       // Operations on DataSourceScanNode are processed on coordinator.
       if (fragment == null) {
-        numNodes = ((DataSourceScanNode)caller).getNumNodes();
+        numNodes = caller.getNumNodes();
       }
       Preconditions.checkState(numNodes == 1);
       if (numNodes != 1) {
         valid_ = false;
         return;
       }
-    } else if (caller instanceof ScanNode) {
+    } else if (caller instanceof ScanNode scan) {
       long numRows = caller.getInputCardinality();
-      ScanNode scan = (ScanNode) caller;
       boolean missingStats = scan.isTableMissingStats() || scan.hasCorruptTableStats();
       // In the absence of collection stats, treat scans on collections as if they
       // have no limit.

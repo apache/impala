@@ -39,7 +39,7 @@ import org.apache.impala.thrift.TTableSinkType;
 import java.util.List;
 import org.apache.impala.util.Hash128;
 
-public class IcebergBufferedDeleteSink extends TableSink {
+public class IcebergBufferedDeleteSink extends CappedTableSink {
 
   private final int deleteTableId_;
 
@@ -48,14 +48,9 @@ public class IcebergBufferedDeleteSink extends TableSink {
   protected final Map<Hash128, TIcebergDeletionVector> referencedDVs_;
 
   public IcebergBufferedDeleteSink(FeIcebergTable targetTable,
-      List<Expr> partitionKeyExprs, List<Expr> outputExprs) {
-    this(targetTable, partitionKeyExprs, outputExprs, 0);
-  }
-
-  public IcebergBufferedDeleteSink(FeIcebergTable targetTable,
       List<Expr> partitionKeyExprs, List<Expr> outputExprs,
-      int deleteTableId) {
-    super(targetTable, Op.DELETE, outputExprs);
+      int deleteTableId, int maxTableSinks) {
+    super(targetTable, Op.DELETE, outputExprs, maxTableSinks);
     Preconditions.checkState(targetTable instanceof IcebergDeleteTable);
     FeIcebergTable originalTable = ((IcebergDeleteTable) targetTable).getBaseTable();
     referencedDVs_ = originalTable.getContentFileStore().getDataFileToDV();

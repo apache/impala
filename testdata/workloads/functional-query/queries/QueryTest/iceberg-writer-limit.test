@@ -1,0 +1,156 @@
+====
+---- QUERY
+# -- CTAS (unpartitioned, no limit) --
+# Sanity: without MAX_FS_WRITERS, mt_dop=4 produces multiple data files.
+set mt_dop=4;
+CREATE TABLE ins_no_limit STORED BY ICEBERG
+AS SELECT id, string_col FROM functional_parquet.alltypes ORDER BY id;
+====
+---- QUERY
+SELECT count(*) FROM $DATABASE.ins_no_limit.`files` WHERE content = 0;
+---- RESULTS
+12
+---- TYPES
+BIGINT
+====
+---- QUERY
+# -- CTAS (unpartitioned, limited) --
+# With max_fs_writers=1 should produce exactly 1 data file.
+set mt_dop=4;
+set max_fs_writers=1;
+CREATE TABLE ins_limited STORED BY ICEBERG
+AS SELECT id, string_col FROM functional_parquet.alltypes ORDER BY id;
+====
+---- QUERY
+SELECT count(*) FROM $DATABASE.ins_limited.`files` WHERE content = 0;
+---- RESULTS
+1
+---- TYPES
+BIGINT
+====
+---- QUERY
+# -- DELETE (V2, unpartitioned) --
+# Create and populate a V2 table with mt_dop=4 to get multiple data files.
+set mt_dop=4;
+CREATE TABLE del_v2 STORED BY ICEBERG
+TBLPROPERTIES ('format-version'='2')
+AS SELECT id, string_col FROM functional_parquet.alltypes ORDER BY id;
+====
+---- QUERY
+# Delete with max_fs_writers=1. Should produce exactly 1 position delete file.
+set mt_dop=4;
+set max_fs_writers=1;
+DELETE FROM del_v2 WHERE id % 2 = 0;
+====
+---- QUERY
+SELECT count(*) FROM $DATABASE.del_v2.`files` WHERE content = 1;
+---- RESULTS
+1
+---- TYPES
+BIGINT
+====
+---- QUERY
+# -- UPDATE (V2, unpartitioned) --
+set mt_dop=4;
+CREATE TABLE upd_v2 STORED BY ICEBERG
+TBLPROPERTIES ('format-version'='2')
+AS SELECT id, string_col FROM functional_parquet.alltypes ORDER BY id;
+====
+---- QUERY
+# Update with max_fs_writers=1. Should produce exactly 1 new data file.
+set mt_dop=4;
+set max_fs_writers=1;
+UPDATE upd_v2 SET string_col = 'x' WHERE id % 2 = 0;
+====
+---- QUERY
+# Exactly 1 position delete file from the update.
+SELECT count(*) FROM $DATABASE.upd_v2.`files` WHERE content = 1;
+---- RESULTS
+1
+---- TYPES
+BIGINT
+====
+---- QUERY
+# Exactly 1 new data file holds the updated rows.
+SELECT count(DISTINCT input__file__name) FROM upd_v2 WHERE string_col = 'x';
+---- RESULTS
+1
+---- TYPES
+BIGINT
+====
+---- QUERY
+# -- MERGE (V2, unpartitioned) --
+CREATE TABLE merge_source STORED BY ICEBERG
+AS SELECT id, 'updated' as string_col
+FROM functional_parquet.alltypes WHERE id % 3 = 0 ORDER BY id;
+====
+---- QUERY
+set mt_dop=4;
+CREATE TABLE merge_v2 STORED BY ICEBERG
+TBLPROPERTIES ('format-version'='2')
+AS SELECT id, string_col FROM functional_parquet.alltypes ORDER BY id;
+====
+---- QUERY
+set mt_dop=4;
+set max_fs_writers=1;
+MERGE INTO merge_v2 t USING merge_source s ON t.id = s.id
+WHEN MATCHED THEN UPDATE SET string_col = s.string_col;
+====
+---- QUERY
+# Exactly 1 position delete file from the merge.
+SELECT count(*) FROM $DATABASE.merge_v2.`files` WHERE content = 1;
+---- RESULTS
+1
+---- TYPES
+BIGINT
+====
+---- QUERY
+# Exactly 1 new data file holds the merged rows.
+SELECT count(DISTINCT input__file__name) FROM merge_v2 WHERE string_col = 'updated';
+---- RESULTS
+1
+---- TYPES
+BIGINT
+====
+---- QUERY
+# -- DELETE (V3, deletion vectors) --
+set mt_dop=4;
+CREATE TABLE del_v3 STORED BY ICEBERG
+TBLPROPERTIES ('format-version'='3')
+AS SELECT id, string_col FROM functional_parquet.alltypes ORDER BY id;
+====
+---- QUERY
+set mt_dop=4;
+set max_fs_writers=1;
+DELETE FROM del_v3 WHERE id % 2 = 0;
+====
+---- QUERY
+# One writer puts all of its deletion vectors into a single Puffin file.
+SELECT count(DISTINCT file_path) FROM $DATABASE.del_v3.`files`
+WHERE content = 1 AND file_format = 'PUFFIN';
+---- RESULTS
+1
+---- TYPES
+BIGINT
+====
+---- QUERY
+# -- UPDATE (V3, deletion vectors) --
+set mt_dop=4;
+CREATE TABLE upd_v3 STORED BY ICEBERG
+TBLPROPERTIES ('format-version'='3')
+AS SELECT id, string_col FROM functional_parquet.alltypes ORDER BY id;
+====
+---- QUERY
+set mt_dop=4;
+set max_fs_writers=1;
+UPDATE upd_v3 SET string_col = 'x' WHERE id % 2 = 0;
+====
+---- QUERY
+# One writer puts all of its deletion vectors into a single Puffin file.
+SELECT count(DISTINCT file_path) FROM $DATABASE.upd_v3.`files`
+WHERE content = 1 AND file_format = 'PUFFIN';
+---- RESULTS
+1
+---- TYPES
+BIGINT
+====

@@ -3276,3 +3276,21 @@ class TestIcebergDeleteFilePathSlot(IcebergTestSuite):
     assert hash_join_peak_mem < MAX_BYTES, (
         "HASH JOIN peak_mem={0} bytes, expected < {1}.\n{2}".format(
             hash_join_peak_mem, MAX_BYTES, result.exec_summary))
+
+
+class TestIcebergWriterLimit(IcebergTestSuite):
+  """Tests that MAX_FS_WRITERS limits the number of files written for Iceberg DML
+  operations (INSERT, DELETE, UPDATE, MERGE), including V3 tables. On partitioned tables
+  the writers are shuffled by partition, so the file count can't show the limit; the
+  planner tests cover those."""
+
+  @classmethod
+  def add_test_dimensions(cls):
+    super(TestIcebergWriterLimit, cls).add_test_dimensions()
+    cls.ImpalaTestMatrix.add_dimension(create_single_exec_option_dimension())
+    cls.ImpalaTestMatrix.add_constraint(
+        lambda v: v.get_value('table_format').file_format == 'parquet')
+
+  def test_writer_limit(self, vector, unique_database):
+    self.run_test_case('QueryTest/iceberg-writer-limit', vector,
+        use_db=unique_database)

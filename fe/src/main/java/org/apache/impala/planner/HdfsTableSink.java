@@ -50,7 +50,7 @@ import org.slf4j.LoggerFactory;
  *
  * TODO(vercegovac): rename to FsTableSink
  */
-public class HdfsTableSink extends TableSink {
+public class HdfsTableSink extends CappedTableSink {
   private final static Logger LOG = LoggerFactory.getLogger(HdfsTableSink.class);
 
   // Minimum total writes in bytes that individual HdfsTableSink should aim.
@@ -62,7 +62,7 @@ public class HdfsTableSink extends TableSink {
   // column stats.
   protected final long DEFAULT_NUM_PARTITIONS = 10;
 
-  // Coefficiencts for estimating insert CPU processing cost. Derived from benchmarking.
+  // Coefficients for estimating insert CPU processing cost. Derived from benchmarking.
   // Cost per byte for Parquet inserts
   private static final double COST_COEFFICIENT_PARQUET_BYTES_INSERTED = 0.1170;
   // Fixed cost for Parquet inserts
@@ -99,10 +99,6 @@ public class HdfsTableSink extends TableSink {
   // Stores the allocated write id if the target table is transactional, otherwise -1.
   private long writeId_;
 
-  // Set the limit on the maximum number of hdfs table sink instances.
-  // A value of 0 means no limit.
-  private int maxHdfsSinks_;
-
   // Stores the desired location for the sink output. Primarily intended to be used by
   // external FEs that expect the results at a certain location for the purposes of
   // post processing and finalization.
@@ -122,7 +118,7 @@ public class HdfsTableSink extends TableSink {
       List<Expr> outputExprs, boolean overwrite, boolean inputIsClustered,
       Pair<List<Integer>, TSortingOrder> sortProperties, long writeId,
       int maxTableSinks, boolean isResultSink) {
-    super(targetTable, Op.INSERT, outputExprs);
+    super(targetTable, Op.INSERT, outputExprs, maxTableSinks);
     Preconditions.checkState(targetTable instanceof FeFsTable);
     partitionKeyExprs_ = partitionKeyExprs;
     overwrite_ = overwrite;
@@ -130,7 +126,6 @@ public class HdfsTableSink extends TableSink {
     sortColumns_ = sortProperties.first;
     sortingOrder_ = sortProperties.second;
     writeId_ = writeId;
-    maxHdfsSinks_ = maxTableSinks;
     isResultSink_ = isResultSink;
   }
 
@@ -283,7 +278,7 @@ public class HdfsTableSink extends TableSink {
     StringBuilder error = new StringBuilder();
     int skipHeaderLineCount = table.parseSkipHeaderLineCount(error);
     // Errors will be caught during analysis.
-    Preconditions.checkState(error.length() == 0);
+    Preconditions.checkState(error.isEmpty());
     if (skipHeaderLineCount > 0) {
       hdfsTableSink.setSkip_header_line_count(skipHeaderLineCount);
     }
@@ -327,34 +322,6 @@ public class HdfsTableSink extends TableSink {
     }
   }
 
-  /**
-   * Return an estimate of the number of nodes the fragment with this sink will
-   * run on. This is based on the number of nodes set for the plan root and has an
-   * upper limit set by the MAX_FS_WRITERS query option.
-   */
-  public int getNumNodes() {
-    int num_nodes = getFragment().getPlanRoot().getNumNodes();
-    if (maxHdfsSinks_ > 0) {
-      // If there are more nodes than instances where the fragment was initially
-      // planned to run then, then the instances will be distributed evenly across them.
-      num_nodes = Math.min(num_nodes, getNumInstances());
-    }
-    return num_nodes;
-  }
-
-  /**
-   * Return an estimate of the number of instances the fragment with this sink
-   * will run on. This is based on the number of instances set for the plan root
-   * and has an upper limit set by the MAX_FS_WRITERS query option.
-   */
-  public int getNumInstances() {
-    int num_instances = getFragment().getPlanRoot().getNumInstances();
-    if (maxHdfsSinks_ > 0) {
-      num_instances =  Math.min(num_instances, maxHdfsSinks_);
-    }
-    return num_instances;
-  }
-
   @Override
   public void computeRowConsumptionAndProductionToCost() {
     super.computeRowConsumptionAndProductionToCost();
@@ -374,7 +341,7 @@ public class HdfsTableSink extends TableSink {
     Preconditions.checkArgument(inputCardinality >= 0);
     Preconditions.checkArgument(avgRowSize >= 0);
     if (inputCardinality == 0) return 1;
-    long byteBasedNumWriters = (long) Math.round(
+    long byteBasedNumWriters = Math.round(
         (avgRowSize / HdfsTableSink.MIN_WRITE_BYTES) * inputCardinality);
 
     if (isPartitioned && totalNumPartitions > 0) {

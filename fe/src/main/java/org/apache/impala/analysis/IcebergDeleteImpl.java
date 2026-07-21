@@ -101,7 +101,7 @@ public class IcebergDeleteImpl extends IcebergModifyImpl {
   public DataSink createDataSink() {
     Preconditions.checkState(modifyStmt_.table_ instanceof FeIcebergTable);
     return new IcebergBufferedDeleteSink(icePosDelTable_, deletePartitionKeyExprs_,
-        deleteResultExprs_);
+        deleteResultExprs_, 0, modifyStmt_.maxTableSinks_);
   }
 
   String getModifyMode() {

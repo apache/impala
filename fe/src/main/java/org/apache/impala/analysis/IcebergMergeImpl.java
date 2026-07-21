@@ -376,7 +376,8 @@ public class IcebergMergeImpl implements MergeImpl {
       deletePartitionKeys = targetPartitionMetaExpressions_;
     }
     return new IcebergBufferedDeleteSink(icebergPositionalDeleteTable_,
-        deletePartitionKeys, targetRowMetaExpressions_, deleteTableId_);
+        deletePartitionKeys, targetRowMetaExpressions_, deleteTableId_,
+        mergeStmt_.maxTableSinks_);
   }
 
   public TableSink createInsertSink() {

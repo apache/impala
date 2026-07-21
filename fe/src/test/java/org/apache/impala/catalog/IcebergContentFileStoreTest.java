@@ -22,11 +22,8 @@ import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNotSame;
 import static org.junit.Assert.assertTrue;
 
-import com.google.flatbuffers.FlatBufferBuilder;
-import java.nio.ByteBuffer;
 import java.util.HashMap;
 import java.util.Map;
-import org.apache.impala.fb.FbFileDesc;
 import org.apache.impala.testutil.CatalogServiceTestCatalog;
 import org.junit.After;
 import org.junit.Before;
@@ -47,16 +44,6 @@ public class IcebergContentFileStoreTest {
 
   @After
   public void cleanUp() { catalog_.close(); }
-
-  private FbFileDesc createFbFileDesc() {
-    FlatBufferBuilder fbb = new FlatBufferBuilder(1);
-    fbb.finish(FbFileDesc.createFbFileDesc(
-        fbb, 0, 10L, (byte) 0, 10000L, 0, false, 0, false, (byte) 0));
-    ByteBuffer bb = fbb.dataBuffer().slice();
-    ByteBuffer compressedBb = ByteBuffer.allocate(bb.capacity());
-    compressedBb.put(bb);
-    return FbFileDesc.getRootAsFbFileDesc((ByteBuffer) compressedBb.flip());
-  }
 
   @Test
   public void testEncodeDecode() throws Exception {

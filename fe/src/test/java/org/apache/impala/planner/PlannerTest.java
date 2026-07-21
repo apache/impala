@@ -394,6 +394,12 @@ public class PlannerTest extends PlannerTestBase {
   }
 
   @Test
+  public void testIcebergWriterLimit() {
+    runPlannerTestFile("iceberg-writer-limit", "functional_parquet",
+        ImmutableSet.of(PlannerTestOption.EXTENDED_EXPLAIN));
+  }
+
+  @Test
   public void testHdfs() {
     runPlannerTestFile("hdfs");
   }

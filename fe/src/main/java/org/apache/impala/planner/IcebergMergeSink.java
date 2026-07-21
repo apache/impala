@@ -34,8 +34,7 @@ public class IcebergMergeSink extends MultiDataSink {
 
   public IcebergMergeSink(
       TableSink insertSink, TableSink deleteSink, List<Expr> mergeActionExpr) {
-    dataSinks_.add(insertSink);
-    dataSinks_.add(deleteSink);
+    super(insertSink, deleteSink);
     this.mergeActionExpr_ = mergeActionExpr;
   }
 
