@@ -523,6 +523,7 @@ void ScanRange::Reset(const FileInfo &fi, int64_t len, int64_t offset, int disk_
   disk_id_ = disk_id;
   is_encrypted_ = fi.is_encrypted;
   is_erasure_coded_ = fi.is_erasure_coded;
+  open_options_ = fi.open_options;
   cache_options_ = buffer_opts.cache_options_;
   disk_file_ = disk_file;
   disk_buffer_file_ = disk_buffer_file;

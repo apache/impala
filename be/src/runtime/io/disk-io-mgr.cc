@@ -966,10 +966,11 @@ int DiskIoMgr::AssignQueue(
 
 Status DiskIoMgr::GetExclusiveHdfsFileHandle(const hdfsFS& fs,
     std::string* fname, int64_t mtime, RequestContext *reader,
-    unique_ptr<ExclusiveHdfsFileHandle>& fid_out) {
+    unique_ptr<ExclusiveHdfsFileHandle>& fid_out,
+    const OpenFileOptions& open_options) {
   SCOPED_TIMER(reader->open_file_timer_);
   unique_ptr<ExclusiveHdfsFileHandle> fid;
-  fid.reset(new ExclusiveHdfsFileHandle(fs, fname, mtime));
+  fid.reset(new ExclusiveHdfsFileHandle(fs, fname, mtime, open_options));
   RETURN_IF_ERROR(fid->Init(&hdfs_monitor_));
   fid_out.swap(fid);
   ImpaladMetrics::IO_MGR_NUM_FILE_HANDLES_OUTSTANDING->Increment(1L);
@@ -987,11 +988,12 @@ void DiskIoMgr::ReleaseExclusiveHdfsFileHandle(unique_ptr<ExclusiveHdfsFileHandl
 }
 
 Status DiskIoMgr::GetCachedHdfsFileHandle(const hdfsFS& fs, std::string* fname,
-    int64_t mtime, RequestContext* reader, FileHandleCache::Accessor* accessor) {
+    int64_t mtime, RequestContext* reader, FileHandleCache::Accessor* accessor,
+    const OpenFileOptions& open_options) {
   bool cache_hit;
   SCOPED_TIMER(reader->open_file_timer_);
-  RETURN_IF_ERROR(
-      file_handle_cache_.GetFileHandle(fs, fname, mtime, false, accessor, &cache_hit));
+  RETURN_IF_ERROR(file_handle_cache_.GetFileHandle(
+      fs, fname, mtime, false, accessor, &cache_hit, open_options));
   if (cache_hit) {
     ImpaladMetrics::IO_MGR_CACHED_FILE_HANDLES_HIT_RATIO->Update(1L);
     ImpaladMetrics::IO_MGR_CACHED_FILE_HANDLES_HIT_COUNT->Increment(1L);
@@ -1005,15 +1007,16 @@ Status DiskIoMgr::GetCachedHdfsFileHandle(const hdfsFS& fs, std::string* fname,
 }
 
 Status DiskIoMgr::ReopenCachedHdfsFileHandle(const hdfsFS& fs, std::string* fname,
-    int64_t mtime, RequestContext* reader, FileHandleCache::Accessor* accessor) {
+    int64_t mtime, RequestContext* reader, FileHandleCache::Accessor* accessor,
+    const OpenFileOptions& open_options) {
   bool cache_hit;
   SCOPED_TIMER(reader->open_file_timer_);
   ImpaladMetrics::IO_MGR_CACHED_FILE_HANDLES_REOPENED->Increment(1L);
 
   accessor->Destroy();
 
-  Status status =
-      file_handle_cache_.GetFileHandle(fs, fname, mtime, true, accessor, &cache_hit);
+  Status status = file_handle_cache_.GetFileHandle(
+      fs, fname, mtime, true, accessor, &cache_hit, open_options);
   if (!status.ok()) {
     return status;
   }

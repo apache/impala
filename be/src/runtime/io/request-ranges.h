@@ -30,6 +30,7 @@
 #include "common/status.h"
 #include "runtime/bufferpool/buffer-pool.h"
 #include "runtime/io/disk-file.h"
+#include "runtime/io/open-file-options.h"
 #include "runtime/io/scan-buffer-manager.h"
 #include "util/internal-queue.h"
 
@@ -272,12 +273,15 @@ class ScanRange : public RequestRange {
   /// Struct for passing file info for constructing ScanRanges. Only contains details
   /// consistent across all ranges for a given file. Filename is only used for the
   /// duration of calls accepting FileInfo.
+  /// Options passed to the libhdfs openFile builder when opening file. On filesystems
+  /// that don't understand them, they are ignored. See open-file-options-util.h.
   struct FileInfo {
     const char *filename;
     hdfsFS fs = nullptr;
     int64_t mtime = ScanRange::INVALID_MTIME;
     bool is_encrypted = false;
     bool is_erasure_coded = false;
+    OpenFileOptions open_options{};
   };
 
   /// Allocate a scan range object stored in the given 'obj_pool' and calls Reset() on it
@@ -288,7 +292,8 @@ class ScanRange : public RequestRange {
 
   /// Get file info for the current scan range.
   FileInfo GetFileInfo() const {
-    return FileInfo{file_.c_str(), fs_, mtime_, is_encrypted_, is_erasure_coded_};
+    return FileInfo{
+        file_.c_str(), fs_, mtime_, is_encrypted_, is_erasure_coded_, open_options_};
   }
 
   /// Resets this scan range object with the scan range description. The scan range
@@ -369,6 +374,8 @@ class ScanRange : public RequestRange {
   const static int64_t INVALID_MTIME = -1;
 
   int64_t mtime() const { return mtime_; }
+
+  const OpenFileOptions& open_options() const { return open_options_; }
 
   bool HasSubRanges() const { return !sub_ranges_.empty(); }
 
@@ -539,6 +546,10 @@ class ScanRange : public RequestRange {
 
   /// Last modified time of the file associated with the scan range. Set in Reset().
   int64_t mtime_;
+
+  /// Options passed to the libhdfs openFile builder when opening this file. Set in
+  /// Reset() from FileInfo::open_options.
+  OpenFileOptions open_options_;
 
   DiskIoMgr* io_mgr_ = nullptr;
 

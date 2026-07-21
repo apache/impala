@@ -34,9 +34,9 @@ class TestHdfsTimeouts(CustomClusterTestSuite):
   @CustomClusterTestSuite.with_args(
     impalad_args="--hdfs_operation_timeout_sec=5 --max_cached_file_handles=0")
   def test_hdfs_open_timeout(self, vector):
-    """This verifies that hdfsOpenFile times out appropriately. It tests this by
-       halting the NameNode, running a query that needs to do hdfsOpenFile,
-       and verifying that it times out and throws an error."""
+    """This verifies that opening a file times out appropriately. It tests this by
+       halting the NameNode, running a query that needs to open a file via the
+       openFile builder API, and verifying that it times out and throws an error."""
 
     # Find the NameNode's pid via pgrep. This would raise an error if it did not
     # find a pid, so there is at least one match.
@@ -56,8 +56,8 @@ class TestHdfsTimeouts(CustomClusterTestSuite):
         "select count(*) from functional.alltypes", vector=vector)
 
     # Stop the NameNode and execute the query again. Since the file handle cache is off,
-    # the query will do hdfsOpenFile calls and talk to the NameNode. Since the NameNode
-    # is stopped, those calls will hang, testing the timeout functionality.
+    # the query will do openFile builder calls and talk to the NameNode. Since the
+    # NameNode is stopped, those calls will hang, testing the timeout functionality.
     ex = None
     result = None
     try:
@@ -79,7 +79,7 @@ class TestHdfsTimeouts(CustomClusterTestSuite):
       assert False, "Query should have failed, but instead returned {0}".format(result)
 
     # The exception should contain the appropriate error message
-    error_pattern = (r"hdfsOpenFile\(\) for.*at backend.*"
+    error_pattern = (r"openFile builder for.*at backend.*"
                      r"failed to finish before the 5 second timeout")
     assert len(re.findall(error_pattern, str(ex))) > 0
 

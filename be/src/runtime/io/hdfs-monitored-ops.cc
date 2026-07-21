@@ -15,6 +15,9 @@
 // specific language governing permissions and limitations
 // under the License.
 
+#include <cerrno>
+#include <cstring>
+
 #include "gutil/strings/substitute.h"
 
 #include "common/names.h"
@@ -25,6 +28,19 @@
 #include "util/time.h"
 
 namespace impala {
+
+namespace {
+// hdfsOpenFileFutureGet() reports failure by returning a null handle without
+// translating the underlying Java exception to errno, unlike the hdfsOpenFile()
+// call it replaced (IMPALA-8523). Recognize a file-not-found root cause so the
+// open path can restore the classic ENOENT ("No such file or directory") surface
+// that scanners and tests depend on.
+bool IsFileNotFoundRootCause(const char* root_cause) {
+  if (root_cause == nullptr) return false;
+  return strstr(root_cause, "FileNotFoundException") != nullptr
+      || strstr(root_cause, "File does not exist") != nullptr;
+}
+}
 
 namespace io {
 
@@ -44,12 +60,11 @@ class OpenHdfsFileOp : public SynchronousWorkItem {
  public:
   // To guarantee the appropriate lifetime, the 'fname' argument is copied. The 'fs'
   // is safe, because it is kept open until the process terminates (see hdfs-fs-cache.h).
-  OpenHdfsFileOp(const hdfsFS& fs, const std::string* fname, int flags,
-      uint64_t blocksize)
-    : fs_(fs), fname_(*fname), flags_(flags), blocksize_(blocksize) {}
+  OpenHdfsFileOp(const hdfsFS& fs, const std::string* fname, OpenFileOptions open_options)
+    : fs_(fs), fname_(*fname), open_options_(std::move(open_options)) {}
 
-  // Run hdfsOpenFile() and return error status if hdfsOpenFile() fails. If hdfsOpenFile()
-  // succeeds, it is valid to call GetFileHandle().
+  // Open the file via the builder-based openFile API and return an error status on
+  // failure. On success, it is valid to call GetFileHandle().
   virtual Status Execute() override;
 
   virtual std::string GetDescription() override;
@@ -60,29 +75,66 @@ class OpenHdfsFileOp : public SynchronousWorkItem {
  private:
   const hdfsFS& fs_;
   const std::string fname_;
-  int flags_;
-  uint64_t blocksize_;
+  // Optional openFile builder parameters, passed via hdfsOpenFileBuilderOpt().
+  const OpenFileOptions open_options_;
   hdfsFile hdfs_file_;
 };
 
 Status OpenHdfsFileOp::Execute() {
-  hdfs_file_ = hdfsOpenFile(fs_, fname_.data(), flags_, 0, 0, blocksize_);
-  if (hdfs_file_ == nullptr) {
-    // GetHdfsErrorMsg references thread local state to get error information, so it
-    // must happen in the same thread as the hdfsOpenFile().
+  // GetHdfsErrorMsg references thread local state to get error information, so any
+  // error message must be built in the same thread as the failing libhdfs call.
+  hdfsOpenFileBuilder* builder = hdfsOpenFileBuilderAlloc(fs_, fname_.data());
+  if (builder == nullptr) {
     return Status(TErrorCode::DISK_IO_ERROR, GetBackendString(),
-        GetHdfsErrorMsg("Failed to open HDFS file ", fname_));
+        GetHdfsErrorMsg("Failed to allocate open file builder for HDFS file ", fname_));
+  }
+  for (const auto& opt : open_options_) {
+    // Opt() sets an optional parameter, keys a filesystem doesn't understand are ignored,
+    // so this is safe for all filesystems. On failure it returns nullptr without freeing
+    // the builder, and Build() (which normally frees the builder) is never reached,
+    // so free it explicitly before bailing out.
+    hdfsOpenFileBuilder* opt_builder =
+        hdfsOpenFileBuilderOpt(builder, opt.first.c_str(), opt.second.c_str());
+    if (opt_builder == nullptr) {
+      hdfsOpenFileBuilderFree(builder);
+      return Status(TErrorCode::DISK_IO_ERROR, GetBackendString(),
+          Substitute("Failed to set open file builder option '$0' for HDFS file $1",
+              opt.first, fname_));
+    }
+    builder = opt_builder;
+  }
+  // hdfsOpenFileBuilderBuild() consumes (frees) the builder.
+  hdfsOpenFileFuture* future = hdfsOpenFileBuilderBuild(builder);
+  if (future == nullptr) {
+    return Status(TErrorCode::DISK_IO_ERROR, GetBackendString(),
+        GetHdfsErrorMsg("Failed to build open file future for HDFS file ", fname_));
+  }
+  // Block on the future here inside the thread-pool worker; the pool provides the
+  // outer timeout (see OpenHdfsFileWithTimeout).
+  hdfs_file_ = hdfsOpenFileFutureGet(future);
+  hdfsOpenFileFutureFree(future);
+  if (hdfs_file_ == nullptr) {
+    // The builder future does not map the Java exception to errno the way
+    // hdfsOpenFile() did, so a missing file would otherwise report "Unknown error"
+    // instead of ENOENT. Restore the classic surface (IMPALA-8523) by mapping a
+    // file-not-found root cause back to ENOENT before building the message, so it
+    // reads "No such file or directory". The message is captured into a local
+    // first because argument evaluation order is unspecified and errno must still
+    // be ENOENT when GetHdfsErrorMsg() reads it.
+    if (IsFileNotFoundRootCause(hdfsGetLastExceptionRootCause())) errno = ENOENT;
+    const string msg = GetHdfsErrorMsg("Failed to open HDFS file ", fname_);
+    return Status(TErrorCode::DISK_IO_ERROR, GetBackendString(), msg);
   }
   return Status::OK();
 }
 
 std::string OpenHdfsFileOp::GetDescription() {
-  return Substitute("hdfsOpenFile() for $0 at backend $1", fname_, GetBackendString());
+  return Substitute("openFile builder for $0 at backend $1", fname_, GetBackendString());
 }
 
 Status HdfsMonitor::OpenHdfsFileWithTimeout(const hdfsFS& fs, const std::string* fname,
-  int flags, uint64_t blocksize, hdfsFile* fid_out) {
-  std::shared_ptr<OpenHdfsFileOp> op(new OpenHdfsFileOp(fs, fname, flags, blocksize));
+  hdfsFile* fid_out, const OpenFileOptions& open_options) {
+  std::shared_ptr<OpenHdfsFileOp> op(new OpenHdfsFileOp(fs, fname, open_options));
 
   // Submit the operation to the synchronous thread pool. If this times out, it returns
   // an error status.

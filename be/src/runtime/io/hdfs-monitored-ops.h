@@ -39,16 +39,14 @@ class HdfsMonitor {
   // and leaves 'hdfs_file_out' untouched. If the operation does not time out, then
   // the operation can still fail if the file does not exist. In this case,
   // 'hdfs_file_out' is null and an error status is returned. If the operation succeeds,
-  // then 'hdfs_file_out' contains the file handle.
+  // then 'hdfs_file_out' contains the file handle. The file is always opened read-only.
   //
-  // This is a thin wrapper around hdfsOpenFile() that implements a timeout.
-  // The differences from hdfsOpenFile() are:
-  //  - The filename is taken as a const string* rather than a const char*
-  //  - The bufferSize and replication are omitted, since no Impala code sets
-  //    these to anything other than 0.
-  //  - It has be rearranged to return Status.
-  Status OpenHdfsFileWithTimeout(const hdfsFS& fs, const std::string* fname, int flags,
-      uint64_t blocksize, hdfsFile* hdfs_file_out) WARN_UNUSED_RESULT;
+  // This is a thin wrapper around the libhdfs builder-based openFile API that implements
+  // a timeout. 'open_options' are passed to the builder as optional parameters
+  // (hdfsOpenFileBuilderOpt); options a filesystem does not understand are ignored.
+  Status OpenHdfsFileWithTimeout(const hdfsFS& fs, const std::string* fname,
+      hdfsFile* hdfs_file_out, const OpenFileOptions& open_options = {})
+      WARN_UNUSED_RESULT;
 
  private:
   // Pool of threads handling HDFS operations.

@@ -24,6 +24,7 @@
 
 #include "common/hdfs.h"
 #include "common/status.h"
+#include "runtime/io/open-file-options.h"
 #include "util/aligned-new.h"
 #include "util/lru-multi-cache.h"
 #include "util/thread.h"
@@ -52,8 +53,10 @@ class HdfsFileHandle {
   int64_t mtime() const { return mtime_; }
 
  protected:
- HdfsFileHandle(const hdfsFS& fs, const std::string* fname, int64_t mtime)
-    : fs_(fs), fname_(fname), mtime_(mtime) {}
+ HdfsFileHandle(const hdfsFS& fs, const std::string* fname, int64_t mtime,
+     OpenFileOptions open_options = {})
+    : fs_(fs), fname_(fname), mtime_(mtime),
+      open_options_(std::move(open_options)) {}
 
  private:
   hdfsFS fs_;
@@ -61,13 +64,16 @@ class HdfsFileHandle {
   const std::string* fname_;
   hdfsFile hdfs_file_ = nullptr;
   int64_t mtime_;
+  // Options passed to the openFile builder in Init(). See open-file-options-util.h.
+  OpenFileOptions open_options_;
 };
 
 /// CachedHdfsFileHandles are owned by the file handle cache and are used for no
 /// other purpose.
 class CachedHdfsFileHandle : public HdfsFileHandle {
  public:
-  CachedHdfsFileHandle(const hdfsFS& fs, const std::string* fname, int64_t mtime);
+  CachedHdfsFileHandle(const hdfsFS& fs, const std::string* fname, int64_t mtime,
+      OpenFileOptions open_options = {});
   ~CachedHdfsFileHandle();
 };
 
@@ -75,8 +81,9 @@ class CachedHdfsFileHandle : public HdfsFileHandle {
 /// is not appropriate.
 class ExclusiveHdfsFileHandle : public HdfsFileHandle {
  public:
-  ExclusiveHdfsFileHandle(const hdfsFS& fs, const std::string* fname, int64_t mtime)
-    : HdfsFileHandle(fs, fname, mtime) {}
+  ExclusiveHdfsFileHandle(const hdfsFS& fs, const std::string* fname, int64_t mtime,
+      OpenFileOptions open_options = {})
+    : HdfsFileHandle(fs, fname, mtime, std::move(open_options)) {}
 };
 
 /// The FileHandleCache is a data structure that owns HdfsFileHandles to share between
@@ -172,7 +179,8 @@ class FileHandleCache {
   ///
   /// This obtains exclusive control over the returned file handle.
   Status GetFileHandle(const hdfsFS& fs, std::string* fname, int64_t mtime,
-      bool require_new_handle, Accessor* accessor, bool* cache_hit) WARN_UNUSED_RESULT;
+      bool require_new_handle, Accessor* accessor, bool* cache_hit,
+      const OpenFileOptions& open_options = {}) WARN_UNUSED_RESULT;
 
  private:
   /// Periodic check to evict unused file handles. Only executed by eviction_thread_.

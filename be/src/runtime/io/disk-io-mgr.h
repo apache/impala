@@ -358,7 +358,8 @@ class DiskIoMgr : public CacheLineAligned {
   /// error, returns status and 'fid' is untouched.
   Status GetExclusiveHdfsFileHandle(const hdfsFS& fs,
       std::string* fname, int64_t mtime, RequestContext* reader,
-      std::unique_ptr<ExclusiveHdfsFileHandle>& fid) WARN_UNUSED_RESULT;
+      std::unique_ptr<ExclusiveHdfsFileHandle>& fid,
+      const OpenFileOptions& open_options = {}) WARN_UNUSED_RESULT;
 
   /// Releases an exclusive file handle, destroying it
   void ReleaseExclusiveHdfsFileHandle(std::unique_ptr<ExclusiveHdfsFileHandle> fid);
@@ -370,13 +371,15 @@ class DiskIoMgr : public CacheLineAligned {
   /// well as at the system level. In case of an error, returns status and 'accessor' is
   /// untouched.
   Status GetCachedHdfsFileHandle(const hdfsFS& fs, std::string* fname, int64_t mtime,
-      RequestContext* reader, FileHandleCache::Accessor* accessor) WARN_UNUSED_RESULT;
+      RequestContext* reader, FileHandleCache::Accessor* accessor,
+      const OpenFileOptions& open_options = {}) WARN_UNUSED_RESULT;
 
   /// Reopens a file handle by destroying the file handle and getting a fresh
   /// file handle accessor from the cache. Records the time spent reopening the handle
   /// in 'reader'. Returns an error if the file could not be reopened.
   Status ReopenCachedHdfsFileHandle(const hdfsFS& fs, std::string* fname, int64_t mtime,
-      RequestContext* reader, FileHandleCache::Accessor* accessor) WARN_UNUSED_RESULT;
+      RequestContext* reader, FileHandleCache::Accessor* accessor,
+      const OpenFileOptions& open_options = {}) WARN_UNUSED_RESULT;
 
   // Function to change the underlying LocalFileSystem object used for disk I/O.
   // DiskIoMgr will also take responsibility of the received LocalFileSystem pointer.

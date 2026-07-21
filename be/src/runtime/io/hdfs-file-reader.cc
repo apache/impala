@@ -70,7 +70,7 @@ Status HdfsFileReader::DoOpen() {
   // Get a new exclusive file handle.
   RETURN_IF_ERROR(io_mgr->GetExclusiveHdfsFileHandle(hdfs_fs_,
       scan_range_->file_string(), scan_range_->mtime(), scan_range_->reader_,
-      exclusive_hdfs_fh_));
+      exclusive_hdfs_fh_, scan_range_->open_options()));
   if (hdfsSeek(hdfs_fs_, exclusive_hdfs_fh_->file(), scan_range_->offset_) != 0) {
     // Destroy the file handle
     io_mgr->ReleaseExclusiveHdfsFileHandle(std::move(exclusive_hdfs_fh_));
@@ -159,7 +159,8 @@ Status HdfsFileReader::ReadFromPos(DiskQueue* queue, int64_t file_offset, uint8_
       hdfs_file = exclusive_hdfs_fh_->file();
     } else if (scan_range_->FileHandleCacheEnabled()) {
       RETURN_IF_ERROR(io_mgr->GetCachedHdfsFileHandle(hdfs_fs_,
-          scan_range_->file_string(), scan_range_->mtime(), request_context, &accessor));
+          scan_range_->file_string(), scan_range_->mtime(), request_context, &accessor,
+          scan_range_->open_options()));
       hdfs_file = accessor.Get()->file();
     } else {
       RETURN_IF_ERROR(DoOpen());
@@ -191,7 +192,8 @@ Status HdfsFileReader::ReadFromPos(DiskQueue* queue, int64_t file_offset, uint8_
         req_context_read_timer.Stop();
         RETURN_IF_ERROR(
             io_mgr->ReopenCachedHdfsFileHandle(hdfs_fs_, scan_range_->file_string(),
-                scan_range_->mtime(), request_context, &accessor));
+                scan_range_->mtime(), request_context, &accessor,
+                scan_range_->open_options()));
         hdfs_file = accessor.Get()->file();
         VLOG_FILE << "Reopening file " << scan_range_->file_string() << " with mtime "
                   << scan_range_->mtime() << " offset " << file_offset;

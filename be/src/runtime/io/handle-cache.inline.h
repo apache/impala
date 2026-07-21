@@ -42,16 +42,16 @@ HdfsFileHandle::~HdfsFileHandle() {
 }
 
 Status HdfsFileHandle::Init(HdfsMonitor* monitor) {
-  Status status = monitor->OpenHdfsFileWithTimeout(fs_, fname_, O_RDONLY, 0,
-      &hdfs_file_);
+  Status status =
+      monitor->OpenHdfsFileWithTimeout(fs_, fname_, &hdfs_file_, open_options_);
   // fname_ is no longer needed, null it out
   fname_ = nullptr;
   return status;
 }
 
 CachedHdfsFileHandle::CachedHdfsFileHandle(const hdfsFS& fs, const string* fname,
-    int64_t mtime)
-  : HdfsFileHandle(fs, fname, mtime) {
+    int64_t mtime, OpenFileOptions open_options)
+  : HdfsFileHandle(fs, fname, mtime, std::move(open_options)) {
   ImpaladMetrics::IO_MGR_NUM_CACHED_FILE_HANDLES->Increment(1L);
 }
 
@@ -141,7 +141,8 @@ Status FileHandleCache::Init() {
 }
 
 Status FileHandleCache::GetFileHandle(const hdfsFS& fs, std::string* fname, int64_t mtime,
-    bool require_new_handle, FileHandleCache::Accessor* accessor, bool* cache_hit) {
+    bool require_new_handle, FileHandleCache::Accessor* accessor, bool* cache_hit,
+    const OpenFileOptions& open_options) {
   DCHECK_GT(mtime, 0);
   // Hash the key and get appropriate partition
   int index = HashUtil::Hash(fname->data(), fname->size(), 0) % cache_partitions_.size();
@@ -166,7 +167,7 @@ Status FileHandleCache::GetFileHandle(const hdfsFS& fs, std::string* fname, int6
   *cache_hit = false;
 
   // Emplace a new file handle and get access
-  auto accessor_tmp = p.cache.EmplaceAndGet(cache_key, fs, fname, mtime);
+  auto accessor_tmp = p.cache.EmplaceAndGet(cache_key, fs, fname, mtime, open_options);
 
   // Opening a file handle requires talking to the NameNode so it can take some time.
   Status status = accessor_tmp.Get()->Init(hdfs_monitor_);

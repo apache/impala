@@ -104,6 +104,7 @@ set(UTIL_SRCS
   minidump.cc
   mpfit-util.cc
   network-util.cc
+  open-file-options-util.cc
   openssl-util.cc
   os-util.cc
   parquet-bloom-filter.cc
@@ -278,6 +279,7 @@ add_library(UtilTests STATIC
   metrics-test.cc
   min-max-filter-test.cc
   network-util-test.cc
+  open-file-options-util-test.cc
   openssl-util-test.cc
   os-info-test.cc
   os-util-test.cc
@@ -348,6 +350,7 @@ ADD_UNIFIED_BE_LSAN_TEST(min-max-filter-test "MinMaxFilterTest.*")
 # minidump-test is flaky when the jvm pause monitor is running. So it can't be unified.
 ADD_BE_LSAN_TEST(minidump-test)
 ADD_UNIFIED_BE_LSAN_TEST(network-util-test "NetworkUtil.*")
+ADD_UNIFIED_BE_LSAN_TEST(open-file-options-util-test "OpenFileOptionsUtilTest.*")
 ADD_UNIFIED_BE_LSAN_TEST(openssl-util-test "OpenSSLUtilTest.*")
 ADD_UNIFIED_BE_LSAN_TEST(os-info-test "OsInfo.*")
 ADD_UNIFIED_BE_LSAN_TEST(os-util-test "OsUtil.*")

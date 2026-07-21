@@ -39,6 +39,7 @@
 #include "runtime/io/request-ranges.h"
 #include "util/avro-util.h"
 #include "util/container-util.h"
+#include "util/open-file-options-util.h"
 #include "util/progress-updater.h"
 #include "util/spinlock.h"
 #include "util/unique-id-hash.h"
@@ -71,8 +72,10 @@ struct HdfsFileDesc {
       file_format(THdfsFileFormat::TEXT) {}
 
   io::ScanRange::FileInfo GetFileInfo() const {
+    io::OpenFileOptions open_options =
+        BuildOpenFileOptions(filename.c_str(), file_length);
     return io::ScanRange::FileInfo{
-        filename.c_str(), fs, mtime, is_encrypted, is_erasure_coded};
+        filename.c_str(), fs, mtime, is_encrypted, is_erasure_coded, open_options};
   }
 
   /// Connection to the filesystem containing the file.
