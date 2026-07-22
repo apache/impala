@@ -29,7 +29,9 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.mockito.Mockito.when;
 
+import java.lang.reflect.Method;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -67,10 +69,14 @@ public class MetaProviderDecoratorTest {
 
   @Test
   public void testMetaProviderMethodCount() {
+    // Jacoco code coverage adds a '$jacocoInit' method to classes. Filter it
+    // out to keep the count the same when using code coverage.
+    List<Method> methods = Arrays.asList(MetaProvider.class.getDeclaredMethods())
+        .stream().filter(m -> m.getName() != "$jacocoInit").toList();
     // Use reflection to count public methods in MetaProvider interface
     assertThat("Number of public methods in MetaProvider interface has changed. " +
         "Update EXPECTED_METHOD_COUNT and add tests for new methods.",
-        MetaProvider.class.getDeclaredMethods().length, equalTo(EXPECTED_METHOD_COUNT));
+        methods.size(), equalTo(EXPECTED_METHOD_COUNT));
 
     assertThat("Abstract class MetaProviderDecorator is missing an implementation for " +
         "one or more methods on the MetaProvider interface",
