@@ -42,6 +42,7 @@ public enum PrimitiveType {
   STRING("STRING", 12, TPrimitiveType.STRING),
   VARCHAR("VARCHAR", 12, TPrimitiveType.VARCHAR),
   BINARY("BINARY", 12, TPrimitiveType.BINARY),
+  UUID("UUID", 16, TPrimitiveType.UUID),
 
   // For decimal at the highest precision, the BE uses 16 bytes.
   DECIMAL("DECIMAL", 16, TPrimitiveType.DECIMAL),
@@ -89,6 +90,7 @@ public enum PrimitiveType {
       case CHAR: return CHAR;
       case DECIMAL: return DECIMAL;
       case BINARY: return BINARY;
+      case UUID: return UUID;
       case FIXED_UDA_INTERMEDIATE: return FIXED_UDA_INTERMEDIATE;
     }
     return INVALID_TYPE;

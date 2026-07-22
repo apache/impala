@@ -126,6 +126,8 @@ public class BinaryPredicate extends Predicate {
   public static void initBuiltins(Db db) {
     for (Type t: Type.getSupportedTypes()) {
       if (t.isNull()) continue; // NULL is handled through type promotion.
+      // TODO: Add UUID builtin support.
+      if (t.isUuid()) continue;
       db.addBuiltin(ScalarFunction.createBuiltinOperator(
           Operator.EQ.getName(), Lists.newArrayList(t, t), Type.BOOLEAN));
       db.addBuiltin(ScalarFunction.createBuiltinOperator(

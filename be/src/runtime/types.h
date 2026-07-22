@@ -52,6 +52,7 @@ enum PrimitiveType {
   TYPE_CHAR,
   TYPE_VARCHAR,
   TYPE_FIXED_UDA_INTERMEDIATE,
+  TYPE_UUID,
 
   TYPE_STRUCT,
   TYPE_ARRAY,
@@ -76,10 +77,12 @@ std::string TypeToOdbcString(const TColumnType& type);
 struct ColumnType {
   PrimitiveType type;
 
-  /// Only set if type one of TYPE_CHAR, TYPE_VARCHAR, TYPE_FIXED_UDA_INTERMEDIATE.
+  /// Only set if type one of TYPE_CHAR, TYPE_VARCHAR, TYPE_FIXED_UDA_INTERMEDIATE,
+  /// TYPE_UUID.
   int len;
   static const int MAX_VARCHAR_LENGTH = (1 << 16) - 1; // 65535
   static const int MAX_CHAR_LENGTH = (1 << 8) - 1; // 255
+  static const int UUID_BYTE_LENGTH = 16;
 
   /// Only set if type == TYPE_DECIMAL
   int precision, scale;
@@ -115,6 +118,7 @@ struct ColumnType {
     DCHECK_NE(type, TYPE_ARRAY);
     DCHECK_NE(type, TYPE_MAP);
     DCHECK_NE(type, TYPE_FIXED_UDA_INTERMEDIATE);
+    DCHECK_NE(type, TYPE_UUID);
   }
 
   static ColumnType CreateCharType(int len) {
@@ -146,6 +150,13 @@ struct ColumnType {
   static ColumnType CreateBinaryType() {
     ColumnType ret(TYPE_STRING);
     ret.string_val_subtype_ = StringValSubtype::BINARY;
+    return ret;
+  }
+
+  static ColumnType CreateUuidType() {
+    ColumnType ret;
+    ret.type = TYPE_UUID;
+    ret.len = UUID_BYTE_LENGTH;
     return ret;
   }
 
@@ -239,6 +250,8 @@ struct ColumnType {
 
   inline StringValSubtype StringSubtype() const { return string_val_subtype_; }
 
+  inline bool IsUuidType() const { return type == TYPE_UUID; }
+
   inline bool IsComplexType() const {
     return type == TYPE_STRUCT || type == TYPE_ARRAY || type == TYPE_MAP;
   }
@@ -308,6 +321,7 @@ struct ColumnType {
         return 12;
       case TYPE_CHAR:
       case TYPE_FIXED_UDA_INTERMEDIATE:
+      case TYPE_UUID:
         return col_type.len;
       case TYPE_ARRAY:
       case TYPE_MAP:
@@ -334,6 +348,7 @@ struct ColumnType {
         return 0;
       case TYPE_CHAR:
       case TYPE_FIXED_UDA_INTERMEDIATE:
+      case TYPE_UUID:
         return col_type.len;
       case TYPE_NULL:
       case TYPE_BOOLEAN:

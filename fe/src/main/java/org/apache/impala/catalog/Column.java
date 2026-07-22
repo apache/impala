@@ -166,7 +166,7 @@ public class Column {
       @Override
       public FieldSchema apply(Column column) {
         Preconditions.checkNotNull(column.getType());
-        return new FieldSchema(column.getName(), column.getType().toSql().toLowerCase(),
+        return new FieldSchema(column.getName(), column.getType().toHiveMetastoreType(),
             column.getComment());
       }
     });

@@ -176,6 +176,8 @@ public class CaseExpr extends Expr {
   public static void initBuiltins(Db db) {
     for (Type t: Type.getSupportedTypes()) {
       if (t.isNull()) continue;
+      // TODO: Add UUID builtin support.
+      if (t.isUuid()) continue;
       if (t.isScalarType(PrimitiveType.CHAR)) continue;
       // TODO: case is special and the signature cannot be represented.
       // It is alternating varargs

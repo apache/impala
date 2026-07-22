@@ -309,6 +309,7 @@ add_library(UtilTests STATIC
   time-test.cc
   tuple-row-compare-test.cc
   uid-util-test.cc
+  uuid-util-test.cc
   variant-util-test.cc
   version-util-test.cc
   zip-util-test.cc
@@ -388,6 +389,7 @@ ADD_UNIFIED_BE_LSAN_TEST(thread-pool-test "ThreadPoolTest.*")
 ADD_UNIFIED_BE_LSAN_TEST(time-test "TimeTest.*")
 ADD_UNIFIED_BE_LSAN_TEST(tuple-row-compare-test "TupleRowCompareTest.*")
 ADD_UNIFIED_BE_LSAN_TEST(uid-util-test "UidUtil.*")
+ADD_UNIFIED_BE_LSAN_TEST(uuid-util-test "UuidUtil.*")
 ADD_UNIFIED_BE_LSAN_TEST(variant-util-test "VariantUtilTest.*")
 ADD_UNIFIED_BE_LSAN_TEST(version-util-test "VersionUtilTest.*")
 # Using standalone webserver-test for now, nonstandard main() passes in a port.

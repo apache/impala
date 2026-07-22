@@ -60,7 +60,7 @@ SCALAR_EXPR_GET_VAL(FloatVal, type_.type == PrimitiveType::TYPE_FLOAT);
 SCALAR_EXPR_GET_VAL(DoubleVal, type_.type == PrimitiveType::TYPE_DOUBLE);
 SCALAR_EXPR_GET_VAL(TimestampVal, type_.type == PrimitiveType::TYPE_TIMESTAMP);
 SCALAR_EXPR_GET_VAL(DecimalVal, type_.type == PrimitiveType::TYPE_DECIMAL);
-SCALAR_EXPR_GET_VAL(StringVal, type_.IsStringType()
+SCALAR_EXPR_GET_VAL(StringVal, type_.IsStringType() || type_.IsUuidType()
     || type_.type == PrimitiveType::TYPE_FIXED_UDA_INTERMEDIATE);
 SCALAR_EXPR_GET_VAL(DateVal, type_.type == PrimitiveType::TYPE_DATE);
 SCALAR_EXPR_GET_VAL(CollectionVal, type_.IsCollectionType());

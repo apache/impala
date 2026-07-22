@@ -60,6 +60,8 @@ public class IsNullPredicate extends Predicate {
   public static void initBuiltins(Db db) {
     for (Type t: Type.getSupportedTypes()) {
       if (t.isNull()) continue;
+      // TODO: Add UUID builtin support.
+      if (t.isUuid()) continue;
       String isNullSymbol;
       if (t.isBoolean()) {
         isNullSymbol = "_ZN6impala15IsNullPredicate6IsNullIN10impala_udf10BooleanValE" +

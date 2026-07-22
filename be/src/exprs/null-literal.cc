@@ -75,7 +75,7 @@ DoubleVal NullLiteral::GetDoubleValInterpreted(
 
 StringVal NullLiteral::GetStringValInterpreted(
     ScalarExprEvaluator* eval, const TupleRow* row) const {
-  DCHECK(type_.IsStringType()) << type_;
+  DCHECK(type_.IsStringType() || type_.IsUuidType()) << type_;
   return StringVal::null();
 }
 

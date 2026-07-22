@@ -52,6 +52,7 @@ enum TPrimitiveType {
   CHAR = 15
   VARCHAR = 16
   FIXED_UDA_INTERMEDIATE = 17
+  UUID = 18
 }
 
 enum TTypeNodeType {

@@ -94,7 +94,8 @@ parser code {:
     return (
         tokenId == SqlParserSymbols.KW_DEFAULT ||
         tokenId == SqlParserSymbols.KW_KILL ||
-        tokenId == SqlParserSymbols.KW_QUERY
+        tokenId == SqlParserSymbols.KW_QUERY ||
+        tokenId == SqlParserSymbols.KW_UUID
     );
   }
 
@@ -352,8 +353,8 @@ terminal
   KW_SYSTEM_TIME, KW_SYSTEM_VERSION, KW_TABLE, KW_TABLES, KW_TABLESAMPLE, KW_TBLPROPERTIES,
   KW_TERMINATED, KW_TEXTFILE, KW_THEN, KW_TIMESTAMP, KW_TINYINT, KW_TRUNCATE, KW_STATS,
   KW_TO, KW_TRAILING, KW_TRUE, KW_UDF, KW_UNBOUNDED, KW_UNCACHED, KW_UNION, KW_UNIQUE, KW_UNKNOWN,
-  KW_UNNEST, KW_UNPIVOT, KW_UNSET, KW_UPDATE, KW_UPDATE_FN, KW_UPSERT, KW_USE, KW_USING, KW_VALIDATE,
-  KW_VALUES, KW_VARCHAR, KW_VIEW, KW_VIEWS, KW_WHEN, KW_WHERE, KW_WITH, KW_ZORDER;
+  KW_UNNEST, KW_UNPIVOT, KW_UNSET, KW_UPDATE, KW_UPDATE_FN, KW_UPSERT, KW_USE, KW_USING, KW_UUID,
+  KW_VALIDATE, KW_VALUES, KW_VARCHAR, KW_VIEW, KW_VIEWS, KW_WHEN, KW_WHERE, KW_WITH, KW_ZORDER;
 
 terminal UNUSED_RESERVED_WORD;
 
@@ -4509,6 +4510,8 @@ type ::=
   {: RESULT = Type.STRING; :}
   | KW_BINARY
   {: RESULT = Type.BINARY; :}
+  | KW_UUID
+  {: RESULT = Type.UUID; :}
   | KW_CHAR LPAREN INTEGER_LITERAL:len RPAREN
   {: RESULT = ScalarType.createCharType(len.intValue()); :}
   | KW_DECIMAL LPAREN INTEGER_LITERAL:precision RPAREN
@@ -4557,6 +4560,8 @@ ident_or_unreserved ::=
   | KW_KILL:name
   {: RESULT = name.toString(); :}
   | KW_QUERY:name
+  {: RESULT = name.toString(); :}
+  | KW_UUID:name
   {: RESULT = name.toString(); :}
   ;
 
@@ -5032,6 +5037,8 @@ word ::=
   | KW_USE:r
   {: RESULT = r.toString(); :}
   | KW_USING:r
+  {: RESULT = r.toString(); :}
+  | KW_UUID:r
   {: RESULT = r.toString(); :}
   | KW_VALIDATE:r
   {: RESULT = r.toString(); :}

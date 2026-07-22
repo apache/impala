@@ -162,6 +162,7 @@ public class DataSourceTable extends Table implements FeDataSourceTable {
       case DATE:
         return true;
       case BINARY:
+      case UUID:
       case CHAR:
       case DATETIME:
       case INVALID_TYPE:

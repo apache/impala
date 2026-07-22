@@ -96,6 +96,8 @@ public class IcebergSchemaConverter {
         return Type.DATE;
       case BINARY:
         return Type.BINARY;
+      case UUID:
+        return Type.UUID;
       case TIMESTAMP:
         return Type.TIMESTAMP;
       case DECIMAL:
@@ -137,7 +139,7 @@ public class IcebergSchemaConverter {
     for (Types.NestedField column : schema.columns()) {
       Type colType = toImpalaType(column.type());
       // Update sd cols by iceberg NestedField
-      ret.add(new FieldSchema(column.name().toLowerCase(), colType.toSql().toLowerCase(),
+      ret.add(new FieldSchema(column.name().toLowerCase(), colType.toHiveMetastoreType(),
           column.doc()));
     }
     return ret;
@@ -366,6 +368,8 @@ public class IcebergSchemaConverter {
           return Types.DateType.get();
         case BINARY:
           return Types.BinaryType.get();
+        case UUID:
+          return Types.UUIDType.get();
         case TIMESTAMP:
           // Impala TIMESTAMP has timestamp without time zone semantics.
           return Types.TimestampType.withoutZone();
@@ -436,6 +440,10 @@ public class IcebergSchemaConverter {
       case STRING:
         Object val = literal.value();
         return val != null ? val.toString() : null;
+
+      case UUID:
+        Object uuidVal = literal.value();
+        return uuidVal != null ? uuidVal.toString() : null;
 
       default:
         return literal.toString();

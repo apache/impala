@@ -296,7 +296,8 @@ void CodegenReadingStringOrCollectionVal(LlvmCodeGen* codegen, LlvmBuilder* buil
     llvm::Value* len_ptr = builder->CreateStructGEP(nullptr, val_ptr, 1, "len_ptr");
     *len = builder->CreateLoad(len_ptr, "len");
   } else {
-    DCHECK(type.type == TYPE_CHAR || type.type == TYPE_FIXED_UDA_INTERMEDIATE);
+    DCHECK(type.type == TYPE_CHAR || type.type == TYPE_UUID
+        || type.type == TYPE_FIXED_UDA_INTERMEDIATE);
     // ptr and len are the slot and its fixed length.
     *ptr = builder->CreateBitCast(val_ptr, codegen->ptr_type());
     *len = codegen->GetI32Constant(type.len);
@@ -364,7 +365,8 @@ CodegenAnyValReadWriteInfo SlotRef::CodegenReadSlot(LlvmCodeGen* codegen,
            child_eval, row_ptr, child_entry_block);
      res.children().push_back(codegen_anyval_info);
     }
-  } else if (type_.IsStringType() || type_.type == TYPE_FIXED_UDA_INTERMEDIATE
+  } else if (type_.IsStringType() || type_.type == TYPE_UUID
+      || type_.type == TYPE_FIXED_UDA_INTERMEDIATE
       || type_.IsCollectionType()) {
     llvm::Value* ptr;
     llvm::Value* len;
@@ -492,11 +494,13 @@ SLOT_REF_GET_FUNCTION(TYPE_DOUBLE, DoubleVal, double);
 
 StringVal SlotRef::GetStringValInterpreted(
     ScalarExprEvaluator* eval, const TupleRow* row) const {
-  DCHECK(type_.IsStringType() || type_.type == TYPE_FIXED_UDA_INTERMEDIATE);
+  DCHECK(type_.IsStringType() || type_.type == TYPE_UUID
+      || type_.type == TYPE_FIXED_UDA_INTERMEDIATE);
   Tuple* t = row->GetTuple(tuple_idx_);
   if (t == NULL || t->IsNull(null_indicator_offset_)) return StringVal::null();
   StringVal result;
-  if (type_.type == TYPE_CHAR || type_.type == TYPE_FIXED_UDA_INTERMEDIATE) {
+  if (type_.type == TYPE_CHAR || type_.type == TYPE_UUID
+      || type_.type == TYPE_FIXED_UDA_INTERMEDIATE) {
     result.ptr = reinterpret_cast<uint8_t*>(t->GetSlot(slot_offset_));
     result.len = type_.len;
   } else {

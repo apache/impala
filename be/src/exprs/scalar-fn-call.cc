@@ -554,7 +554,8 @@ GET_VAL_INTERPRETED(BigIntVal, type_.type == PrimitiveType::TYPE_BIGINT);
 GET_VAL_INTERPRETED(FloatVal, type_.type == PrimitiveType::TYPE_FLOAT);
 GET_VAL_INTERPRETED(DoubleVal, type_.type == PrimitiveType::TYPE_DOUBLE);
 GET_VAL_INTERPRETED(StringVal,
-    type_.IsStringType() || type_.type == PrimitiveType::TYPE_FIXED_UDA_INTERMEDIATE);
+    type_.IsStringType() || type_.IsUuidType()
+    || type_.type == PrimitiveType::TYPE_FIXED_UDA_INTERMEDIATE);
 GET_VAL_INTERPRETED(TimestampVal, type_.type == PrimitiveType::TYPE_TIMESTAMP);
 GET_VAL_INTERPRETED(DecimalVal, type_.type == PrimitiveType::TYPE_DECIMAL);
 GET_VAL_INTERPRETED(DateVal, type_.type == PrimitiveType::TYPE_DATE);

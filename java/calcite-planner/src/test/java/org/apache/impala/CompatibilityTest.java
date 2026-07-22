@@ -49,6 +49,13 @@ public class CompatibilityTest {
             toPType == PrimitiveType.FIXED_UDA_INTERMEDIATE) {
           continue;
         }
+        // UUID is an Iceberg-only type that is not modeled in the Calcite planner
+        // (Calcite has no native UUID type, and mapping it to VARCHAR(36) would collide
+        // with genuine VARCHAR(36) columns). UUID queries do not flow through the
+        // Calcite planner, so it is excluded from the compatibility mapping.
+        if (fromPType == PrimitiveType.UUID || toPType == PrimitiveType.UUID) {
+          continue;
+        }
         if (fromPType == PrimitiveType.FLOAT && toPType == PrimitiveType.DECIMAL) {
           continue;
         }

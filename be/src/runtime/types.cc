@@ -34,6 +34,7 @@ const int ColumnType::MIN_ADJUSTED_SCALE;
 
 const int ColumnType::MAX_DECIMAL4_PRECISION;
 const int ColumnType::MAX_DECIMAL8_PRECISION;
+const int ColumnType::UUID_BYTE_LENGTH;
 
 const char* ColumnType::LLVM_CLASS_NAME = "struct.impala::ColumnType";
 
@@ -52,6 +53,8 @@ ColumnType::ColumnType(const std::vector<TTypeNode>& types, int* idx)
           || type == TYPE_FIXED_UDA_INTERMEDIATE) {
         DCHECK(scalar_type.__isset.len);
         len = scalar_type.len;
+      } else if (type == TYPE_UUID) {
+        len = UUID_BYTE_LENGTH;
       } else if (type == TYPE_STRING) {
         if (scalar_type.type == TPrimitiveType::BINARY) {
           string_val_subtype_ = StringValSubtype::BINARY;
@@ -112,6 +115,7 @@ PrimitiveType ThriftToType(TPrimitiveType::type ttype) {
     case TPrimitiveType::VARCHAR: return TYPE_VARCHAR;
     // BINARY is generally handled the same way as STRING by the backend.
     case TPrimitiveType::BINARY: return TYPE_STRING;
+    case TPrimitiveType::UUID: return TYPE_UUID;
     case TPrimitiveType::DECIMAL: return TYPE_DECIMAL;
     case TPrimitiveType::CHAR: return TYPE_CHAR;
     case TPrimitiveType::FIXED_UDA_INTERMEDIATE: return TYPE_FIXED_UDA_INTERMEDIATE;
@@ -147,6 +151,7 @@ TPrimitiveType::type ToThrift(PrimitiveType ptype, StringValSubtype subtype) {
       return TPrimitiveType::INVALID_TYPE;
     case TYPE_DECIMAL: return TPrimitiveType::DECIMAL;
     case TYPE_CHAR: return TPrimitiveType::CHAR;
+    case TYPE_UUID: return TPrimitiveType::UUID;
     case TYPE_FIXED_UDA_INTERMEDIATE: return TPrimitiveType::FIXED_UDA_INTERMEDIATE;
     case TYPE_STRUCT:
     case TYPE_ARRAY:
@@ -176,6 +181,7 @@ string TypeToString(PrimitiveType t) {
     case TYPE_BINARY: return "BINARY";
     case TYPE_DECIMAL: return "DECIMAL";
     case TYPE_CHAR: return "CHAR";
+    case TYPE_UUID: return "UUID";
     case TYPE_FIXED_UDA_INTERMEDIATE: return "FIXED_UDA_INTERMEDIATE";
     case TYPE_STRUCT: return "STRUCT";
     case TYPE_ARRAY: return "ARRAY";
@@ -205,11 +211,12 @@ string TypeToOdbcString(const TColumnType& type) {
     case TYPE_DATETIME: return "datetime";
     case TYPE_TIMESTAMP: return "timestamp";
     case TYPE_STRING:
-      if(col_type == TPrimitiveType::BINARY) {
+      if (col_type == TPrimitiveType::BINARY) {
         return "binary";
       } else {
         return "string";
       }
+    case TYPE_UUID: return "uuid";
     case TYPE_VARCHAR: return "string";
 
     case TYPE_DECIMAL: return "decimal";
@@ -276,6 +283,8 @@ string ColumnType::DebugString() const {
           DCHECK(false) << "Unexpected string subtype" << string_val_subtype_;
           return "";
       }
+    case TYPE_UUID:
+      return "UUID";
     case TYPE_CHAR:
       return Substitute("CHAR($0)", len);
     case TYPE_DECIMAL:
@@ -311,7 +320,7 @@ ostream& operator<<(ostream& os, StringValSubtype subtype) {
 }
 
 llvm::ConstantStruct* ColumnType::ToIR(LlvmCodeGen* codegen) const {
-  // ColumnType = { i32, i8, i32, i32, i32, <vector>, <vector>, <vector> }
+  // ColumnType = { i32, i32, i32, i32, <vector>, <vector>, <vector>, i8, <padding> }
   llvm::StructType* column_type_type = codegen->GetStructType<ColumnType>();
 
   DCHECK_EQ(sizeof(type), sizeof(int32_t));

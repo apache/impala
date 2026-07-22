@@ -106,6 +106,11 @@ public class AlterTableAddColsStmt extends AlterTableStmt {
         throw new AnalysisException("Duplicate column name: " + colName);
       }
 
+      if (!(t instanceof FeIcebergTable) && c.getType().containsUuid()) {
+        throw new AnalysisException(
+            "UUID type is only supported for Iceberg tables.");
+      }
+
       if (t instanceof FeKuduTable) {
         if (c.getType().isComplexType()) {
           throw new AnalysisException("Kudu tables do not support complex types: " +

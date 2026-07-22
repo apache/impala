@@ -327,6 +327,12 @@ public class CreateTableStmt extends StatementBase implements SingleTableStmt {
         throw new AnalysisException(
             "PARTITIONED BY SPEC is only valid for Iceberg tables.");
       }
+      for (ColumnDef col : getColumnDefs()) {
+        if (col.getType().containsUuid()) {
+          throw new AnalysisException(
+              "UUID type is only supported for Iceberg tables.");
+        }
+      }
     }
 
     if (getFileFormat() == THdfsFileFormat.JDBC) {

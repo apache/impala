@@ -593,6 +593,7 @@ llvm::Type* LlvmCodeGen::GetSlotType(const ColumnType& type) {
       return string_value_type_;
     case TYPE_CHAR:
     case TYPE_FIXED_UDA_INTERMEDIATE:
+    case TYPE_UUID:
       // Represent this as an array of bytes.
       return llvm::ArrayType::get(i8_type(), type.len);
     case TYPE_TIMESTAMP:

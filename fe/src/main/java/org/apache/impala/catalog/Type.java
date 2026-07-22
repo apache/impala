@@ -61,6 +61,7 @@ public abstract class Type {
   public static final ScalarType DOUBLE = new ScalarType(PrimitiveType.DOUBLE);
   public static final ScalarType STRING = new ScalarType(PrimitiveType.STRING);
   public static final ScalarType BINARY = new ScalarType(PrimitiveType.BINARY);
+  public static final ScalarType UUID = new ScalarType(PrimitiveType.UUID);
   public static final ScalarType TIMESTAMP = new ScalarType(PrimitiveType.TIMESTAMP);
   public static final ScalarType DATE = new ScalarType(PrimitiveType.DATE);
   public static final ScalarType DATETIME = new ScalarType(PrimitiveType.DATETIME);
@@ -111,6 +112,7 @@ public abstract class Type {
     supportedTypes.add(DECIMAL);
     supportedTypes.add(DATE);
     supportedTypes.add(BINARY);
+    supportedTypes.add(UUID);
 
     unsupportedTypes = new ArrayList<>();
     unsupportedTypes.add(DATETIME);
@@ -151,6 +153,7 @@ public abstract class Type {
       case STRING: return STRING;
       case VARCHAR: return VARCHAR;
       case BINARY: return BINARY;
+      case UUID: return UUID;
       case DECIMAL: return DECIMAL;
       case CHAR: return CHAR;
       case FIXED_UDA_INTERMEDIATE: return FIXED_UDA_INTERMEDIATE;
@@ -163,6 +166,18 @@ public abstract class Type {
    * The string must match exactly.
    */
   public final String toSql() { return toSql(0); }
+
+  /**
+   * Type string stored in the Hive Metastore for table columns. HMS does not support all
+   * Impala types (e.g. UUID is Iceberg-only), so those are mapped to compatible HMS
+   * types here while Impala retains the native type from Iceberg metadata.
+   */
+  public String toHiveMetastoreType() {
+    if (isUuid()) {
+      return "string";
+    }
+    return toSql().toLowerCase();
+  }
 
   /**
    * Recursive helper for toSql() to be implemented by subclasses. Keeps track of the
@@ -193,6 +208,7 @@ public abstract class Type {
   public boolean isVarchar() { return isScalarType(PrimitiveType.VARCHAR); }
   public boolean isString() { return isScalarType(PrimitiveType.STRING); }
   public boolean isBinary() { return isScalarType(PrimitiveType.BINARY); }
+  public boolean isUuid() { return isScalarType(PrimitiveType.UUID); }
   public boolean isVarLenStringType() { return isVarchar() || isString() || isBinary(); }
   public boolean isWildcardDecimal() { return false; }
   public boolean isWildcardVarchar() { return false; }
@@ -278,6 +294,27 @@ public abstract class Type {
       for (StructField field : ((StructType) this).getFields()) {
         Type fieldType = field.getType();
         if (fieldType.containsCollection()) return true;
+      }
+    }
+    return false;
+  }
+
+  /**
+   * Returns true if this type is UUID or contains a UUID type (recursively).
+   */
+  public boolean containsUuid() {
+    if (isUuid()) return true;
+    if (isArrayType()) {
+      return ((ArrayType) this).getItemType().containsUuid();
+    }
+    if (isMapType()) {
+      MapType mapType = (MapType) this;
+      return mapType.getKeyType().containsUuid() ||
+          mapType.getValueType().containsUuid();
+    }
+    if (isStructType()) {
+      for (StructField field : ((StructType) this).getFields()) {
+        if (field.getType().containsUuid()) return true;
       }
     }
     return false;
@@ -557,6 +594,7 @@ public abstract class Type {
    * For datetime types this is the length in characters of the String representation
    * (assuming the maximum allowed precision of the fractional seconds component).
    * For binary data this is the length in bytes.
+   * For UUID this is the canonical string display length in characters (36).
    * Null is returned for for data types where the column size is not applicable.
    */
   public Integer getColumnSize() {
@@ -567,6 +605,8 @@ public abstract class Type {
       case STRING:
       case BINARY:
         return Integer.MAX_VALUE;
+      case UUID:
+        return 36;
       case TIMESTAMP:
         return 29;
       case DATE:
@@ -695,6 +735,7 @@ public abstract class Type {
       case CHAR: return java.sql.Types.CHAR;
       case VARCHAR: return java.sql.Types.VARCHAR;
       case BINARY: return java.sql.Types.BINARY;
+      case UUID: return java.sql.Types.VARCHAR;
       case DECIMAL: return java.sql.Types.DECIMAL;
       case FIXED_UDA_INTERMEDIATE: return java.sql.Types.BINARY;
       default:
@@ -743,6 +784,7 @@ public abstract class Type {
     List<CompatibilityRule> defaultCompatibilityRules = new ArrayList<>();
     defaultCompatibilityRules.add(new DiagonalCompatibility());
     defaultCompatibilityRules.add(new BinaryCompatibility());
+    defaultCompatibilityRules.add(new UuidCompatibility());
     defaultCompatibilityRules.add(new FixedUdaCompatibility());
     defaultCompatibilityRules.add(new DefaultCompatibility());
     defaultCompatibilityRules.add(new CheckEmptyCompatibility());

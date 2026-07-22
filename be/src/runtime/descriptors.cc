@@ -765,6 +765,7 @@ void SlotDescriptor::CodegenLoadAnyVal(CodegenAnyVal* any_val, llvm::Value* raw_
       break;
     }
     case TYPE_CHAR:
+    case TYPE_UUID:
     case TYPE_FIXED_UDA_INTERMEDIATE: {
       // Convert fixed-size slot to StringVal.
       any_val->SetPtr(builder->CreateBitCast(raw_val_ptr, codegen->ptr_type()));
@@ -1037,6 +1038,7 @@ CodegenAnyValReadWriteInfo CodegenAnyValToReadWriteInfo(CodegenAnyVal& any_val,
       break;
     }
     case TYPE_CHAR:
+    case TYPE_UUID:
       rwi.SetPtrAndLen(any_val.GetPtr(), rwi.codegen()->GetI32Constant(rwi.type().len));
       break;
     case TYPE_FIXED_UDA_INTERMEDIATE:
@@ -1094,6 +1096,7 @@ void SlotDescriptor::CodegenStoreNonNullAnyVal(
       break;
     }
     case TYPE_CHAR:
+    case TYPE_UUID:
       read_write_info.codegen()->CodegenMemcpy(
           builder, raw_val_ptr, read_write_info.GetPtrAndLen().ptr, type.len);
       break;

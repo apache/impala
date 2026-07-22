@@ -1002,6 +1002,8 @@ public class BuiltinsDb extends Db {
       if (t.isNull()) continue; // NULL is handled through type promotion.
       if (t.isScalarType(PrimitiveType.CHAR)) continue; // promoted to STRING
       if (t.isScalarType(PrimitiveType.VARCHAR)) continue; // promoted to STRING
+      // TODO: Add UUID builtin support.
+      if (t.isUuid()) continue;
 
       // Count
       db.addBuiltin(AggregateFunction.createBuiltin(db, "count",
@@ -1038,6 +1040,8 @@ public class BuiltinsDb extends Db {
       if (t.isScalarType(PrimitiveType.CHAR)) continue; // promoted to STRING
       if (t.isScalarType(PrimitiveType.VARCHAR)) continue; // promoted to STRING
       if (t.isBinary()) continue; // Only supported for count/min/max
+      // TODO: Add UUID builtin support.
+      if (t.isUuid()) continue;
 
       // Sample
       db.addBuiltin(AggregateFunction.createBuiltin(db, "sample",
@@ -1699,6 +1703,8 @@ public class BuiltinsDb extends Db {
       if (t.isScalarType(PrimitiveType.VARCHAR)) continue; // promoted to STRING
       // BINARY is not supported for analytic functions.
       if (t.isBinary()) continue;
+      // TODO: Add UUID builtin support.
+      if (t.isUuid()) continue;
       db.addBuiltin(AggregateFunction.createAnalyticBuiltin(
           db, "first_value", Lists.newArrayList(t), t, t,
           t.isStringType() ? initNullString : initNull,
@@ -1774,6 +1780,8 @@ public class BuiltinsDb extends Db {
         /*isAnalyticFn=*/ false, /*returnsNonNullOnEmpty=*/ true));
     // grouping() can take any grouping expression as input.
     for (Type t: Type.getSupportedTypes()) {
+      // TODO: Add UUID builtin support.
+      if (t.isUuid()) continue;
       db.addBuiltin(AggregateFunction.createRewrittenBuiltin(db, "grouping",
           Lists.newArrayList(t), Type.TINYINT, /*ignoresDistinct=*/ true,
           /*isAnalyticFn=*/ false, /*returnsNonNullOnEmpty=*/ true));

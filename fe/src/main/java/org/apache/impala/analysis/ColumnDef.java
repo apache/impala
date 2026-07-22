@@ -322,6 +322,13 @@ public class ColumnDef {
         }
       }
 
+      // UUID columns require UUID-typed default literals only.
+      if (type_.isUuid() && defaultValLiteral.getType().isString()) {
+        throw new AnalysisException(String.format("Default value %s (type: %s) " +
+            "is not compatible with column '%s' (type: %s).", defaultValue_.toSql(),
+            defaultValue_.getType().toSql(), colName_, type_.toSql()));
+      }
+
       TypeCompatibility compatibility =
           analyzer.getRegularCompatibilityLevel(TypeCompatibility.STRICT);
       if (!Type.isImplicitlyCastable(defaultValLiteral.getType(), type_, compatibility)) {

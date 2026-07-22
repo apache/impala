@@ -143,6 +143,9 @@ public class ScalarFunction extends Function {
         case BINARY:
           beFn += "_StringVal";
           break;
+        case UUID:
+          beFn += "_Uuid";
+          break;
         case CHAR:
           beFn += "_Char";
           break;

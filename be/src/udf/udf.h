@@ -110,7 +110,9 @@ class FunctionContext {
     TYPE_VARCHAR,
     // A fixed-size buffer, passed as a StringVal.
     TYPE_FIXED_UDA_INTERMEDIATE,
-    TYPE_STRUCT
+    TYPE_STRUCT,
+    // 16-byte fixed buffer, passed as a StringVal.
+    TYPE_UUID
   };
 
   struct TypeDesc {
@@ -120,8 +122,8 @@ class FunctionContext {
     int precision;
     int scale;
 
-    /// Only valid if type is one of TYPE_FIXED_BUFFER, TYPE_FIXED_UDA_INTERMEDIATE or
-    /// TYPE_VARCHAR.
+    /// Only valid if type is one of TYPE_FIXED_BUFFER, TYPE_FIXED_UDA_INTERMEDIATE,
+    /// TYPE_UUID or TYPE_VARCHAR.
     int len;
   };
 

@@ -536,6 +536,62 @@ public class AnalyzeDDLTest extends FrontendTestBase {
   }
 
   @Test
+  public void TestUuidDdl() {
+    // CREATE TABLE: Iceberg tables may use UUID scalar and nested types.
+    AnalyzesOk("create table functional.ice_uuid (id UUID, name STRING) " +
+        "stored by iceberg");
+    AnalyzesOk("create table functional.ice_uuid_complex (id INT, " +
+        "uuid_array ARRAY<UUID>, uuid_map MAP<UUID, STRING>) stored by iceberg");
+    AnalyzesOk("create table functional.ice_uuid_struct (id INT, " +
+        "s STRUCT<uuid_col:UUID, name:STRING>) stored by iceberg");
+    AnalyzesOk("create table functional.ice_uuid_notnull (id UUID NOT NULL, " +
+        "name STRING) stored by iceberg");
+    AnalyzesOk("create table functional.ice_uuid_parquet (id UUID) stored by iceberg " +
+        "tblproperties ('write.format.default'='parquet')");
+    AnalyzesOk("create table functional.ice_uuid_orc (id UUID) stored by iceberg " +
+        "tblproperties ('write.format.default'='orc')");
+    AnalyzesOk("create table functional.ice_uuid_avro (id UUID) stored by iceberg " +
+        "tblproperties ('write.format.default'='avro')");
+
+    // CREATE TABLE: UUID is rejected on non-Iceberg table types.
+    AnalysisError("create table functional.uuid_hdfs (id UUID) stored as parquet",
+        "UUID type is only supported for Iceberg tables.");
+    AnalysisError("create table functional.uuid_complex_hdfs (id INT, " +
+        "uuid_array ARRAY<UUID>, uuid_map MAP<UUID, STRING>) stored as parquet",
+        "UUID type is only supported for Iceberg tables.");
+    AnalysisError("CREATE TABLE functional.uuid_paimon (id UUID) STORED BY PAIMON",
+        "UUID type is only supported for Iceberg tables.");
+
+    // CREATE TABLE: UUID cannot be used as a partition column.
+    AnalysisError("create table functional.ice_uuid_bad_part (id UUID, val INT) " +
+        "partitioned by (dt UUID) stored by iceberg",
+        "Type 'UUID' is not supported as partition-column type in column: dt");
+
+    // CREATE TABLE: STRING defaults are not accepted for UUID columns (even on Iceberg).
+    AnalysisError("create table functional.ice_uuid_default (id UUID " +
+        "DEFAULT '550e8400-e29b-41d4-a716-446655440000') stored by iceberg " +
+        "tblproperties ('format-version'='3')",
+        "Default value '550e8400-e29b-41d4-a716-446655440000' (type: STRING) " +
+        "is not compatible with column 'id' (type: UUID).");
+
+    // ALTER TABLE ADD COLUMN(S): rejected on non-Iceberg tables.
+    AnalysisError("alter table functional.alltypes add column hdfs_uuid_col UUID",
+        "UUID type is only supported for Iceberg tables.");
+    AnalysisError("alter table functional.alltypes add columns (hdfs_uuid_col UUID)",
+        "UUID type is only supported for Iceberg tables.");
+    AnalysisError("alter table functional_kudu.alltypes add column kudu_uuid_col UUID",
+        "UUID type is only supported for Iceberg tables.");
+
+    // ALTER TABLE ADD COLUMN(S): allowed on Iceberg.
+    AnalyzesOk("alter table functional_parquet.iceberg_non_partitioned " +
+        "add column uuid_col UUID");
+    AnalyzesOk("alter table functional_parquet.iceberg_partitioned " +
+        "add column uuid_col UUID NOT NULL");
+    AnalyzesOk("alter table functional_parquet.iceberg_non_partitioned " +
+        "add columns (uuid_col UUID, uuid_col2 UUID)");
+  }
+
+  @Test
   public void TestAlterTableAddColumns() {
     AnalyzesOk("alter table functional.alltypes add columns (new_col int)");
     AnalyzesOk("alter table functional.alltypes add columns (NEW_COL int)");
@@ -1319,7 +1375,7 @@ public class AnalyzeDDLTest extends FrontendTestBase {
 
     // Test updating stats on all scalar types.
     for (Type t: Type.getSupportedTypes()) {
-      if (t.isNull()) continue;
+      if (t.isNull() || t.isUuid()) continue;
       Preconditions.checkState(t.isScalarType());
       String typeStr = t.getPrimitiveType().toString();
       if (t.getPrimitiveType() == PrimitiveType.CHAR ||
@@ -3299,6 +3355,7 @@ public class AnalyzeDDLTest extends FrontendTestBase {
     AnalysisError("CREATE TABLE DataSrcTable1 (x int) PRODUCED BY DATA SOURCE " +
         "not_a_data_src(\"\")", "Data source does not exist");
     for (Type t: Type.getSupportedTypes()) {
+      if (t.isUuid()) continue;  // UUID is only supported for Iceberg tables.
       PrimitiveType type = t.getPrimitiveType();
       if (DataSourceTable.isSupportedPrimitiveType(type) || t.isNull()) continue;
       String typeSpec = type.name();

@@ -122,6 +122,8 @@ public class CastExpr extends Expr {
       if (fromType.isNull()) continue;
       for (Type toType : Type.getSupportedTypes()) {
         if (toType.isNull()) continue;
+        // TODO: Add UUID cast builtin support.
+        if (fromType.isUuid() || toType.isUuid()) continue;
         // Disable casting from string to boolean
         if (fromType.isStringType() && toType.isBoolean()) continue;
         // Casting from date is only allowed when to-type is timestamp or string.

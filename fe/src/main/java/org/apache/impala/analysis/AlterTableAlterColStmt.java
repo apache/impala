@@ -150,6 +150,10 @@ public class AlterTableAlterColStmt extends AlterTableStmt {
     isAlterColumnOptionsStmt_ = alterColumnSetStmt;
     // Check that the new column def's name is valid.
     newColDef_.analyze(analyzer);
+    if (!(t instanceof FeIcebergTable) && newColDef_.getType().containsUuid()) {
+      throw new AnalysisException(
+          "UUID type is only supported for Iceberg tables.");
+    }
     // Verify that if the column name is being changed, the new name doesn't conflict
     // with an existing column.
     if (!colName_.toLowerCase().equals(newColDef_.getColName().toLowerCase()) &&

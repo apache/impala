@@ -381,7 +381,8 @@ public class AnalyzeExprsTest extends AnalyzerTest {
       if (type.isNull() || type.isDecimal() || type.isBoolean() || type.isDateOrTimeType()
           || type.getPrimitiveType() == PrimitiveType.VARCHAR
           || type.getPrimitiveType() == PrimitiveType.CHAR
-          || type.getPrimitiveType() == PrimitiveType.BINARY) {
+          || type.getPrimitiveType() == PrimitiveType.BINARY
+          || type.getPrimitiveType() == PrimitiveType.UUID) {
         continue;
       }
       AnalyzesOk("select cast(1.1 as " + type + ")");
@@ -3472,5 +3473,20 @@ public class AnalyzeExprsTest extends AnalyzerTest {
             + "source expressions.\nExpression 'cast(100 as decimal(9,0))' "
             + "(type: DECIMAL(9,0)) is not compatible with column "
             + "'string_col' (type: STRING)");
+  }
+
+  /**
+   * UUID column reads are blocked until read support is implemented.
+   */
+  @Test
+  public void TestUuidReadNotSupported() {
+    final String uuidSubquery = "(select cast(null as uuid) u) t";
+
+    AnalysisError("select u from " + uuidSubquery,
+        "Reading UUID columns is not yet supported.");
+    AnalysisError("select u from " + uuidSubquery + " where u is null",
+        "Reading UUID columns is not yet supported.");
+    AnalysisError("select count(u) from " + uuidSubquery,
+        "Reading UUID columns is not yet supported.");
   }
 }

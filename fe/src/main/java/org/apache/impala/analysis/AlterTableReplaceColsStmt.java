@@ -83,6 +83,10 @@ public class AlterTableReplaceColsStmt extends AlterTableStmt {
     Set<String> colNames = new HashSet<>();
     for (ColumnDef c: columnDefs_) {
       c.analyze(analyzer);
+      if (!(t instanceof FeIcebergTable) && c.getType().containsUuid()) {
+        throw new AnalysisException(
+            "UUID type is only supported for Iceberg tables.");
+      }
       String colName = c.getColName().toLowerCase();
       if (existingPartitionKeys.contains(colName)) {
         throw new AnalysisException(

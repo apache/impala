@@ -85,6 +85,7 @@ public class ScalarType extends Type {
       case STRING: return STRING;
       case VARCHAR: return createVarcharType();
       case BINARY: return BINARY;
+      case UUID: return UUID;
       case TIMESTAMP: return TIMESTAMP;
       case DATE: return DATE;
       case DATETIME: return DATETIME;
@@ -308,7 +309,7 @@ public class ScalarType extends Type {
         || type_ == PrimitiveType.DOUBLE || type_ == PrimitiveType.DATE
         || type_ == PrimitiveType.DATETIME || type_ == PrimitiveType.TIMESTAMP
         || type_ == PrimitiveType.CHAR || type_ == PrimitiveType.DECIMAL
-        || type_ == PrimitiveType.FIXED_UDA_INTERMEDIATE;
+        || type_ == PrimitiveType.FIXED_UDA_INTERMEDIATE || type_ == PrimitiveType.UUID;
   }
 
   @Override
@@ -331,6 +332,8 @@ public class ScalarType extends Type {
       case TIMESTAMP:
       // Hive allows BINARY partition columns, but it is buggy at the moment: HIVE-12680
       case BINARY:
+      // UUID is only supported in Iceberg tables; HMS partition columns don't support it.
+      case UUID:
         return false;
       default:
         return true;
