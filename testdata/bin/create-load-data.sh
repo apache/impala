@@ -202,6 +202,7 @@ function load-custom-schemas {
   SCHEMA_TMP_DIR="${TMP_DIR}/schemas"
   mkdir ${SCHEMA_TMP_DIR}
   mkdir ${SCHEMA_TMP_DIR}/enum
+  mkdir ${SCHEMA_TMP_DIR}/bad_avro_schemas
   ln -s ${SCHEMA_SRC_DIR}/zipcode_incomes.parquet ${SCHEMA_TMP_DIR}
   ln -s ${SCHEMA_SRC_DIR}/alltypestiny.parquet ${SCHEMA_TMP_DIR}
   ln -s ${SCHEMA_SRC_DIR}/enum/* ${SCHEMA_TMP_DIR}/enum
@@ -209,6 +210,7 @@ function load-custom-schemas {
   ln -s ${SCHEMA_SRC_DIR}/decimal.parquet ${SCHEMA_TMP_DIR}
   ln -s ${SCHEMA_SRC_DIR}/nested/modern_nested.parquet ${SCHEMA_TMP_DIR}
   ln -s ${SCHEMA_SRC_DIR}/nested/legacy_nested.parquet ${SCHEMA_TMP_DIR}
+  ln -s ${SCHEMA_SRC_DIR}/bad_avro_schemas/* ${SCHEMA_TMP_DIR}/bad_avro_schemas
 
   # CHAR and VARCHAR tables written by Hive
   mkdir -p ${TMP_DIR}/chars_formats_avro_snap \

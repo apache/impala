@@ -8,21 +8,21 @@
 # CREATE TABLE with a schema literal where the decimal field has no precision.
 # Precision is required by the Avro spec; the error is caught in CatalogOpExecutor.
 CREATE TABLE avro_decimal_no_precision STORED AS AVRO TBLPROPERTIES (
-  'avro.schema.url'='/test-warehouse/bad_avro_schemas/no_precision.json')
+  'avro.schema.url'='$FILESYSTEM_PREFIX/test-warehouse/schemas/bad_avro_schemas/no_precision.json')
 ---- CATCH
 No 'precision' property specified for 'decimal' logicalType
 ====
 ---- QUERY
 # CREATE TABLE with a schema literal where the decimal precision is negative.
 CREATE TABLE avro_decimal_neg_precision STORED AS AVRO TBLPROPERTIES (
-  'avro.schema.url'='/test-warehouse/bad_avro_schemas/neg_precision.json')
+  'avro.schema.url'='$FILESYSTEM_PREFIX/test-warehouse/schemas/bad_avro_schemas/neg_precision.json')
 ---- CATCH
 Invalid decimal 'precision' property value
 ====
 ---- QUERY
 # CREATE TABLE with a schema literal where the decimal scale is negative.
 CREATE TABLE avro_decimal_neg_scale STORED AS AVRO TBLPROPERTIES (
-  'avro.schema.url'='/test-warehouse/bad_avro_schemas/neg_scale.json')
+  'avro.schema.url'='$FILESYSTEM_PREFIX/test-warehouse/schemas/bad_avro_schemas/neg_scale.json')
 ---- CATCH
 Invalid decimal 'scale' property value
 ====
@@ -30,7 +30,7 @@ Invalid decimal 'scale' property value
 # CREATE TABLE with a schema literal containing a non-nullable union, which Impala
 # does not support. Error is caught in CatalogOpExecutor.
 CREATE TABLE avro_create_union_type STORED AS AVRO TBLPROPERTIES (
-  'avro.schema.url'='/test-warehouse/bad_avro_schemas/union.json')
+  'avro.schema.url'='$FILESYSTEM_PREFIX/test-warehouse/schemas/bad_avro_schemas/union.json')
 ---- CATCH
 Unsupported type 'union' of column 'union1'
 ====
@@ -38,7 +38,7 @@ Unsupported type 'union' of column 'union1'
 # CREATE TABLE with a syntactically invalid JSON schema literal.
 # Error is caught in CatalogOpExecutor.
 CREATE TABLE avro_create_bad_json STORED AS AVRO TBLPROPERTIES (
-  'avro.schema.url'='/test-warehouse/bad_avro_schemas/bad_json.json')
+  'avro.schema.url'='$FILESYSTEM_PREFIX/test-warehouse/schemas/bad_avro_schemas/bad_json.json')
 ---- CATCH
 Unexpected close marker ']': expected '}'
 ====
@@ -49,28 +49,28 @@ CREATE TABLE avro_alter_schema_errors (s string) STORED AS AVRO
 ---- QUERY
 # ALTER TABLE with a schema literal containing a non-nullable union type.
 ALTER TABLE avro_alter_schema_errors SET TBLPROPERTIES (
-  'avro.schema.url'='/test-warehouse/bad_avro_schemas/union.json')
+  'avro.schema.url'='$FILESYSTEM_PREFIX/test-warehouse/schemas/bad_avro_schemas/union.json')
 ---- CATCH
 Unsupported type 'union' of column 'union1'
 ====
 ---- QUERY
 # ALTER TABLE with a syntactically invalid JSON schema literal.
 ALTER TABLE avro_alter_schema_errors SET TBLPROPERTIES (
-  'avro.schema.url'='/test-warehouse/bad_avro_schemas/bad_json.json')
+  'avro.schema.url'='$FILESYSTEM_PREFIX/test-warehouse/schemas/bad_avro_schemas/bad_json.json')
 ---- CATCH
 Unexpected close marker ']': expected '}'
 ====
 ---- QUERY
 # ALTER TABLE with a schema literal that has no "type" field.
 ALTER TABLE avro_alter_schema_errors SET TBLPROPERTIES (
-  'avro.schema.url'='/test-warehouse/bad_avro_schemas/no_type.json')
+  'avro.schema.url'='$FILESYSTEM_PREFIX/test-warehouse/schemas/bad_avro_schemas/no_type.json')
 ---- CATCH
 No type:
 ====
 ---- QUERY
 # ALTER TABLE with a schema literal record that has no "name" field.
 ALTER TABLE avro_alter_schema_errors SET TBLPROPERTIES (
-  'avro.schema.url'='/test-warehouse/bad_avro_schemas/no_name.json')
+  'avro.schema.url'='$FILESYSTEM_PREFIX/test-warehouse/schemas/bad_avro_schemas/no_name.json')
 ---- CATCH
 No name in schema:
 ====

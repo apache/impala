@@ -84,8 +84,7 @@ class TestAvroSchemaUrls(ImpalaTestSuite):
         self.client,
         "create table {db}.t stored as avro tblproperties "
         "('avro.schema.url'='{loc}')".format(db=unique_database, loc=nonexistent))
-    err_str = str(err)
-    assert "does not exist" in err_str
+    assert "Unable to read schema from given path" in str(err)
 
   def test_literal_overrides_http_url(self, unique_database):
     """avro.schema.literal takes precedence; avro.schema.url is never evaluated.
