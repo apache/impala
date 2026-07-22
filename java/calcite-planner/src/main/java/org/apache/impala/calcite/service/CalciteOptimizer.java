@@ -17,6 +17,7 @@
 
 package org.apache.impala.calcite.service;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableList;
 import org.apache.calcite.plan.RelOptRule;
 import org.apache.calcite.plan.RelOptUtil;
@@ -87,6 +88,23 @@ public class CalciteOptimizer implements CompilerStep {
   }
 
   public ImpalaPlanRel optimize(RelNode logPlan) throws ImpalaException {
+    return convertToImpalaPlan(createPreImpalaConvertPlan(logPlan));
+  }
+
+  private ImpalaPlanRel convertToImpalaPlan(RelNode preImpalaConvertPlan)
+      throws ImpalaException {
+
+    // Change the Calcite RelNodes into ImpalaPlanRel RelNodes, all of which
+    // contain a method that converts the RelNodes into Impala PlanNodes.
+    ImpalaPlanRel finalOptimizedPlan = runImpalaConvertProgram(preImpalaConvertPlan);
+    timeline_.markEvent("Created final Impala convert plan");
+    LogUtil.logDebug(finalOptimizedPlan, "Final Impala optimized plan");
+
+    return finalOptimizedPlan;
+  }
+
+  @VisibleForTesting
+  RelNode createPreImpalaConvertPlan(RelNode logPlan) throws ImpalaException {
     RelBuilder relBuilder = ImpalaCoreRules.LOGICAL_BUILDER_NO_SIMPLIFY.create(
         logPlan.getCluster(), reader_);
 
@@ -142,14 +160,7 @@ public class CalciteOptimizer implements CompilerStep {
     LogUtil.logDebug(preImpalaConvertPlan, "Optimized plan after final "
         + "preparation done before conversion to physical nodes.");
 
-    // Change the Calcite RelNodes into ImpalaPlanRel RelNodes, all of which
-    // contain a method that converts the RelNodes into Impala PlanNodes.
-    ImpalaPlanRel finalOptimizedPlan =
-        runImpalaConvertProgram(preImpalaConvertPlan, simplifier);
-    timeline_.markEvent("Created final Impala convert plan");
-    LogUtil.logDebug(finalOptimizedPlan, "Final Impala optimized plan");
-
-    return finalOptimizedPlan;
+    return preImpalaConvertPlan;
   }
 
   private RelNode runExpandNodesProgram(RelNode plan,
@@ -278,8 +289,7 @@ public class CalciteOptimizer implements CompilerStep {
     return runProgram(retRelNode, builder.build(), simplifier);
   }
 
-  private ImpalaPlanRel runImpalaConvertProgram(RelNode plan,
-      ImpalaRexSimplify simplifier) throws ImpalaException {
+  private ImpalaPlanRel runImpalaConvertProgram(RelNode plan) throws ImpalaException {
     HepProgramBuilder builder = new HepProgramBuilder();
 
     builder.addRuleCollection(ImmutableList.of(
@@ -293,7 +303,7 @@ public class CalciteOptimizer implements CompilerStep {
         new ConvertToImpalaRelRules.ImpalaValuesRule()
         ));
 
-    return (ImpalaPlanRel) runProgram(plan, builder.build(), simplifier);
+    return (ImpalaPlanRel) runProgram(plan, builder.build(), null);
   }
 
   private RelNode runProgram(RelNode currentNode, HepProgram program,
@@ -307,7 +317,7 @@ public class CalciteOptimizer implements CompilerStep {
     if (LOG.isTraceEnabled()) {
       planner.addListener(new RuleEventLogger());
     }
-    planner.setExecutor(simplifier.getRexExecutor());
+    if (simplifier != null) planner.setExecutor(simplifier.getRexExecutor());
 
     return planner.findBestExp();
   }
