@@ -45,7 +45,9 @@ class TestBannedLogMessages(BaseTestSuite):
 
   def test_no_unsupported_operations(self):
     """Test that cluster logs do not contain jamm.CannotAccessFieldException"""
-    self.assert_message_absent('CannotAccessFieldException')
+    # Skip 'coverage' dirs as they contain Java source code and some of our Java classes
+    # reference CannotAccessFieldException.
+    self.assert_message_absent('CannotAccessFieldException', skip_subdirs={'coverage'})
 
   def test_no_tuniqueid(self):
     """Test that cluster logs do not contain TUniqueId. They should instead print
