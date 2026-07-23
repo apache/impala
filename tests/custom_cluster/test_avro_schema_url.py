@@ -132,7 +132,7 @@ class TestAvroSchemaUrlAllowedSchemes(CustomClusterTestSuite):
           "create table default.{t} stored as avro tblproperties "
           "('avro.schema.url'='{url}')".format(t=unique_name, url=fs_url))
       assert SCHEME_NOT_ALLOWED_ERROR not in str(result)
-      assert 'FileNotFoundException' in str(result)
+      assert 'Unable to read schema from given path' in str(result)
     finally:
       self.client.execute(
           "drop table if exists default.{t}".format(t=unique_name))
