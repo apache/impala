@@ -542,7 +542,7 @@ class TestWebPage(CustomClusterTestSuite):
   def test_catalog_tables_stats_legacy_catalog(self):
     self._test_catalog_tables_stats_after_describe("functional.alltypes", 24)
     self._test_catalog_tables_stats_after_describe(
-        "functional_parquet.iceberg_lineitem_sixblocks", 4)
+        "functional_parquet.iceberg_lineitem_sixblocks", 2)
 
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args(
@@ -551,7 +551,7 @@ class TestWebPage(CustomClusterTestSuite):
   def test_catalog_tables_stats_local_catalog(self):
     self._test_catalog_tables_stats_after_describe("functional.alltypes", 24)
     self._test_catalog_tables_stats_after_describe(
-        "functional_parquet.iceberg_lineitem_sixblocks", 4)
+        "functional_parquet.iceberg_lineitem_sixblocks", 2)
 
 
 class TestWebPageAndCloseSession(CustomClusterTestSuite):
