@@ -32,6 +32,7 @@ import pytest
 
 from impala_thrift_gen.ImpalaService import ImpalaHiveServer2Service
 from impala_thrift_gen.TCLIService import TCLIService
+from tests.common.environ import build_flavor_timeout
 from tests.common.impala_test_suite import IMPALAD_HOSTNAME, IMPALAD_HS2_HTTP_PORT
 from tests.common.skip import SkipIfDockerizedCluster
 from tests.hs2.hs2_test_suite import (
@@ -416,8 +417,11 @@ class TestHS2(HS2TestSuite):
       end_time = time.time()
       TestHS2.check_response(get_operation_status_resp)
       # Each call into get_operation_status should wait at most 50ms. Verify that the
-      # sleeps are never longer than 100ms.
-      assert end_time - start_time < 0.1
+      # sleeps are never longer than the threshold. On regular builds, this uses 100ms.
+      # On slow builds like UBSAN, there have been some outliers as high as 200ms, so
+      # this uses a 250ms threshold.
+      threshold = build_flavor_timeout(0.1, slow_build_timeout=0.25)
+      assert end_time - start_time < threshold
       if get_operation_status_resp.operationState == \
          TCLIService.TOperationState.FINISHED_STATE:
         break
