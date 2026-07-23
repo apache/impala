@@ -33,7 +33,6 @@ import org.apache.impala.catalog.HBaseColumn;
 import org.apache.impala.catalog.Type;
 import org.apache.impala.common.ImpalaException;
 import org.apache.impala.datagenerator.HBaseTestDataRegionAssignment;
-import org.apache.impala.service.BackendConfig;
 import org.apache.impala.service.Frontend.PlanCtx;
 import org.apache.impala.testutil.TestUtils;
 import org.apache.impala.testutil.TestUtils.IgnoreValueFilter;
@@ -61,17 +60,6 @@ public class PlannerTest extends PlannerTestBase {
   @BeforeClass
   public static void setUp() throws Exception {
     PlannerTestBase.setUp();
-
-    // Initialize trusted_jar_paths to the same default as start-impala-cluster.py:
-    // FILESYSTEM_PREFIX/test-warehouse/data-sources/,
-    // DEFAULT_FS/test-warehouse/data-sources/
-    String filesystemPrefix = System.getenv("FILESYSTEM_PREFIX");
-    if (filesystemPrefix == null) filesystemPrefix = "";
-    String defaultFs = System.getenv("DEFAULT_FS");
-    if (defaultFs == null) defaultFs = "";
-    BackendConfig.INSTANCE.getBackendCfg().setTrusted_jar_paths(
-        filesystemPrefix + "/test-warehouse/data-sources/,"
-        + defaultFs + "/test-warehouse/data-sources/");
 
     // Rebalance the HBase tables. This is necessary because some tests rely on HBase
     // tables being arranged in a deterministic way. See IMPALA-7061 for details.
