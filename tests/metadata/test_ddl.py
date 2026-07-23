@@ -1117,7 +1117,9 @@ class TestAsyncDDL(TestDdlBase):
     # enter FINISHED state after another delay of at least SLEEP_S.
     assert client.get_impala_exec_state(handle) == PENDING
     client.wait_for_impala_state(handle, RUNNING, SLEEP_S + 3)
-    client.wait_for_impala_state(handle, FINISHED, SLEEP_S + 3)
+    # On slower builds, the query can take a while to complete. To avoid flakiness,
+    # allow the query to take up to 10 seconds beyond the sleep time.
+    client.wait_for_impala_state(handle, FINISHED, SLEEP_S + 10)
     client.close_query(handle)
 
   def test_get_operation_status_for_async_ddl(self, vector, unique_database):
