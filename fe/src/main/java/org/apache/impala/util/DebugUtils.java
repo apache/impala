@@ -84,6 +84,15 @@ public class DebugUtils {
   // debug action label to inject a delay in processing each HMS event
   public static final String EVENT_PROCESSING_DELAY = "catalogd_event_processing_delay";
 
+  // debug action label to inject a delay in addDbIfNotRemovedLater after the delete-log
+  // check and before adding the db to catalog.
+  public static final String ADD_DB_AFTER_CHECK_DELAY =
+      "catalogd_add_db_after_check_delay";
+
+  // debug action label to inject a delay before getting the db from catalog.
+  // Currently only used in addTableIfNotRemovedLater.
+  public static final String GET_DB_DELAY = "catalogd_get_db_delay";
+
   // debug action label for introducing delay in table metadata loading by catalogd.
   public static final String LOAD_METADATA_DELAY = "catalogd_load_metadata_delay";
 

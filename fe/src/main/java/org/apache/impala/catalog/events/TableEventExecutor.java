@@ -191,6 +191,13 @@ public class TableEventExecutor {
         ((DbBarrierEvent) event).incrExpectedProceedCount();
       } else if (event.getEventType() == MetastoreEventType.DROP_TABLE) {
         skipEventId_.set(event.getEventId());
+        // Also add this to DeleteEventLog so CREATE_TABLE event that is already
+        // in-processing can be skipped (see CatalogOpExecutor#addTableIfNotRemovedLater).
+        // This is a best-effort. The DROP_TABLE or ALTER_TABLE rename events could still
+        // not reach here, e.g. not polled from HMS or still at dispatcher/DBEventExecutor
+        // thread.
+        eventProcessor.getDeleteEventLog().addRemovedObject(event.getEventId(),
+            DeleteEventLog.getTblKey(event.getDbName(), event.getTableName()));
       }
       synchronized (processorLock_) {
         Preconditions.checkState(!isTerminating());
@@ -253,6 +260,8 @@ public class TableEventExecutor {
       Counter eventSkipCounter = event.getMetrics()
           .getCounter(MetastoreEventsProcessor.EVENTS_SKIPPED_METRIC);
       eventSkipCounter.inc();
+      event.debugLog("Skipped since table is dropped later by event {}",
+          skipEventId_.get());
       event.debugLog("Incremented skipped metric to {}", eventSkipCounter.getCount());
       return true;
     }

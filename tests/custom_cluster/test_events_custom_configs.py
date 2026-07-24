@@ -2358,3 +2358,60 @@ class TestEventProcessingCatchupModeCustom(TestEventProcessingCustomConfigsBase)
     self.assert_catalogd_log_contains("INFO", log_regex, expected_count=1, timeout_s=20)
     log_regex = r"ALTER_TABLE.*{}.* Catch-up Mode: Skipping".format(tbl)
     self.assert_catalogd_log_contains("INFO", log_regex, expected_count=1, timeout_s=20)
+
+
+class TestEventProcessingRace(TestEventProcessingCustomConfigsBase):
+  """Regression test for IMPALA-14618: processing HMS events racing with a catalog reset()
+  (INVALIDATE METADATA / catalogd-HA failover) must not leave the database with a
+  stale table list."""
+
+  @CustomClusterTestSuite.with_args(
+    catalogd_args="--debug_actions=catalogd_add_db_after_check_delay:SLEEP@3000",
+    disable_log_buffering=True)
+  def test_create_db_table_survives_reset(self, unique_name):
+    """Create a db + table via Hive. While the CREATE_DATABASE event is parked, issue
+    INVALIDATE METADATA to trigger a reset that rebuilds the db with its table list. After
+    both complete, the table must still be present."""
+    db = unique_name + "_db"
+    self.run_stmt_in_hive("drop database if exists {0} cascade".format(db))
+    self.execute_query("invalidate metadata")
+    try:
+      self.run_stmt_in_hive("create database {0}".format(db))
+      self.run_stmt_in_hive("create table {0}.t1 (id int)".format(db))
+
+      # Wait until the CREATE_DATABASE event is being processed.
+      self.assert_catalogd_log_contains(
+          "INFO", r"Sleeping for .* to execute debug action")
+
+      # Trigger a full reset while the CREATE_DATABASE event is parked. It finishes
+      # before the CREATE_DATABASE event is processed/skipped.
+      self.execute_query("invalidate metadata")
+
+      # The CREATE_DATABASE event should be skipped.
+      self.assert_catalogd_log_contains("INFO", r"Database {0} was not added".format(db))
+
+      tables = self.execute_query("show tables in {0}".format(db)).data
+      assert "t1" in tables
+      self.execute_query_expect_success(self.client, "describe {0}.t1".format(db))
+    finally:
+      self.run_stmt_in_hive("drop database if exists {0} cascade".format(db))
+
+  @CustomClusterTestSuite.with_args(
+    catalogd_args="--debug_actions=catalogd_get_db_delay:SLEEP@6000",
+    disable_log_buffering=True)
+  def test_create_drop_table_with_reset(self, unique_database):
+    EventProcessorUtils.wait_for_event_processing(self)
+    self.run_stmt_in_hive("create table {0}.tbl (id int)".format(unique_database))
+    self.assert_catalogd_log_contains(
+        "INFO", r"Sleeping for .* to execute debug action")
+
+    # Drop the table and run a concurrent reset to load the latest table list.
+    # These happen before the event processing thread wakes up.
+    self.run_stmt_in_hive("drop table {0}.tbl".format(unique_database))
+    self.execute_query("invalidate metadata")
+
+    # The CREATE_TABLE event should be skipped.
+    self.assert_catalogd_log_contains(
+        "INFO", r"Table {0}.tbl was not added".format(unique_database))
+    tables = self.execute_query("show tables in {0}".format(unique_database)).data
+    assert len(tables) == 0

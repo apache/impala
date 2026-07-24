@@ -1444,7 +1444,7 @@ public class CatalogServiceCatalog extends Catalog {
   }
 
   /**
-   * Utillity class to facilitate simple read or write locking of versionLock_ and
+   * Utility class to facilitate simple read or write locking of versionLock_ and
    * lookup the requested database from dbCache_. The lock is released when close()
    * is called, which is automatically called when using try-with-resources statement.
    * Use either the ReadLockAndLookupDb or WriteLockAndLookupDb subclass to get
@@ -2354,6 +2354,7 @@ public class CatalogServiceCatalog extends Catalog {
       loadFunctions(newDb, prefetchedObjects.getNativeFunctions(),
           prefetchedObjects.getJavaFunctions());
       newDb.setCatalogVersion(incrementAndGetCatalogVersion());
+      newDb.setCreateEventId(currentEventId);
 
       int numTables = 0;
       List<TTableName> tblsToBackgroundLoad = new ArrayList<>();
@@ -2719,6 +2720,56 @@ public class CatalogServiceCatalog extends Catalog {
     Db removedDb = super.removeDb(dbName);
     if (removedDb != null) updateDeleteLog(removedDb);
     return removedDb;
+  }
+
+  /**
+   * Atomically adds a database only if it does not already exist, after waiting for any
+   * ongoing reset() to finish loading it.
+   * @return the newly added Db, or null if the db already exists in the cache.
+   */
+  public @Nullable Db addDbIfNotExists(String dbName,
+      org.apache.hadoop.hive.metastore.api.Database msDb, long eventId) {
+    try (WriteLockAndLookupDb lookup = new WriteLockAndLookupDb(dbName)) {
+      if (lookup.getDb() != null) {
+        // The db already exists, possibly just rebuilt by a concurrent reset(). Do not
+        // overwrite it (which would drop its table list).
+        return null;
+      }
+      Db newDb = new Db(dbName, msDb);
+      newDb.setCatalogVersion(incrementAndGetCatalogVersion());
+      newDb.setCreateEventId(eventId);
+      addDb(newDb);
+      return newDb;
+    }
+  }
+
+  /**
+   * Atomically removes a database only if it exists and its createEventId is not newer
+   * than 'eventId'.
+   * @return true if the db was removed
+   */
+  public boolean removeDbIfNotAddedLater(String dbName, long eventId) {
+    try (WriteLockAndLookupDb lookup = new WriteLockAndLookupDb(dbName)) {
+      Db db = lookup.getDb();
+      if (db == null) {
+        LOG.info(
+            "EventId: {} Skipping the event since database {} does not exist anymore",
+            eventId, dbName);
+        return false;
+      }
+      // if this database has been created after this drop database event is generated
+      // the createdEventId of the database will be higher than eventId. In such case
+      // it means that catalog has recreated this database again and events processor
+      // is just receiving the earlier drop database event. We should ignore such event.
+      if (db.getCreateEventId() > eventId) {
+        LOG.info(
+            "EventId: {} Not removing the database {} since the create event id is {}",
+            eventId, dbName, db.getCreateEventId());
+        return false;
+      }
+      removeDbLocked(dbName);
+      return true;
+    }
   }
 
   /**

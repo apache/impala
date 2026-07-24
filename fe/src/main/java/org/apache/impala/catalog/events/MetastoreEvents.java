@@ -1863,12 +1863,6 @@ public class MetastoreEvents {
         // Don't put the event processor into error state, instead ignore this event.
         errorLog("Create table {}.{} failed because the database does not exist cache." +
             " Ignoring the CREATE_TABLE event", dbName_, tblName_, ex);
-      } catch (CatalogException e) {
-        // if a DatabaseNotFoundException is caught here it means either we incorrectly
-        // determined that the event needs to be processed instead of skipped, or we
-        // somehow missed the previous create database event.
-        throw new MetastoreNotificationException(
-            debugString("Unable to process event"), e);
       }
     }
 

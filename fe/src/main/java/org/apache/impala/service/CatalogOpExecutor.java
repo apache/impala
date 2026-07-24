@@ -889,6 +889,8 @@ public class CatalogOpExecutor {
     getMetastoreDdlLock().lock();
     try {
       String dbName = msTbl.getDbName();
+      DebugUtils.executeDebugAction(BackendConfig.INSTANCE.debugActions(),
+          DebugUtils.GET_DB_DELAY);
       Db db = catalog_.getDb(dbName);
       DeleteEventLog deleteEventLog = catalog_.getMetastoreEventProcessor()
           .getDeleteEventLog();
@@ -909,11 +911,7 @@ public class CatalogOpExecutor {
       if (existingTable != null) {
         LOG.debug("EventId: {} Table {} was not added since "
                 + "it already exists in catalog.", eventId, existingTable.getFullName());
-        if (existingTable.getCreateEventId() != eventId) {
-          LOG.warn("Existing table {} create event Id: {} does not match the "
-                  + "event id: {}", existingTable.getFullName(),
-              existingTable.getCreateEventId(), eventId);
-        }
+        existingTable.setCreateEventId(eventId, false);
         return false;
       }
       // table does not exist in catalog. We must make sure that the table was
@@ -921,6 +919,15 @@ public class CatalogOpExecutor {
       if (deleteEventLog.wasRemovedAfter(eventId, DeleteEventLog.getKey(msTbl))) {
         LOG.debug(
             "EventId: {} Table was not added since it was removed later", eventId);
+        return false;
+      }
+      // DeleteEventLog might miss the corresponding DROP_TABLE event, e.g. when the event
+      // hasn't been pulled from HMS but a catalog reset moves the start event id forward.
+      // In such cases, we check createEventId of the db to see if current event is stale.
+      if (eventId <= db.getCreateEventId()) {
+        LOG.debug("EventId: {} Table {}.{} was not added since db is re-created or "
+                + "re-loaded later at event {}",
+            eventId, dbName, tblName, db.getCreateEventId());
         return false;
       }
       // set the createEventId of the table to eventId since we are adding table
@@ -1011,16 +1018,15 @@ public class CatalogOpExecutor {
     getMetastoreDdlLock().lock();
     try {
       String dbName = msDb.getName();
-      Db db = catalog_.getDb(dbName);
       DeleteEventLog deleteEventLog = catalog_.getMetastoreEventProcessor()
           .getDeleteEventLog();
-      if (db == null) {
-        if (!deleteEventLog.wasRemovedAfter(eventId, DeleteEventLog.getKey(msDb))) {
-          catalog_.addDb(dbName, msDb, eventId);
-          return true;
-        }
+      if (deleteEventLog.wasRemovedAfter(eventId, DeleteEventLog.getKey(msDb))) {
+        return false;
       }
-      return false;
+      LOG.info("EventId: {} Processing CREATE_DATABASE for db: {}", eventId, dbName);
+      DebugUtils.executeDebugAction(BackendConfig.INSTANCE.debugActions(),
+          DebugUtils.ADD_DB_AFTER_CHECK_DELAY);
+      return catalog_.addDbIfNotExists(dbName, msDb, eventId) != null;
     } finally {
       getMetastoreDdlLock().unlock();
     }
@@ -1036,25 +1042,7 @@ public class CatalogOpExecutor {
   public boolean removeDbIfNotAddedLater(long eventId, String dbName) {
     getMetastoreDdlLock().lock();
     try {
-      Db catalogDb = catalog_.getDb(dbName);
-      if (catalogDb == null) {
-        LOG.info(
-            "EventId: {} Skipping the event since database {} does not exist anymore",
-            eventId, dbName);
-        return false;
-      }
-      // if this database has been created after this drop database event is generated
-      // the createdEventId of the database will be higher than eventId. In such case
-      // if means that catalog has recreated this database again and events processor
-      // is just receiving the earlier drop database event. We should ignore such event.
-      if (catalogDb.getCreateEventId() > eventId) {
-        LOG.info(
-            "EventId: {} Not removing the database {} since the create event id is {}",
-            eventId, dbName, catalogDb.getCreateEventId());
-        return false;
-      }
-      catalog_.removeDb(dbName);
-      return true;
+      return catalog_.removeDbIfNotAddedLater(dbName, eventId);
     } finally {
       getMetastoreDdlLock().unlock();
     }
