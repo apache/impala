@@ -22,6 +22,7 @@ import static org.junit.Assume.assumeTrue;
 import java.net.URI;
 
 import org.apache.hadoop.fs.Path;
+import org.apache.impala.thrift.TQueryOptions;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Ignore;
@@ -107,7 +108,11 @@ public class S3PlannerTest extends PlannerTestBase {
 
   @Test
   public void testNestedCollections() {
-    runPlannerTestFile("nested-collections");
+    // This file's golden plans predate EXPAND_COMPLEX_TYPES defaulting to true; keep '*'
+    // skipping complex columns so the expected row sizes/output exprs stay valid.
+    TQueryOptions options = defaultQueryOptions();
+    options.setExpand_complex_types(false);
+    runPlannerTestFile("nested-collections", options);
   }
 
   @Ignore("IMPALA-8949")
