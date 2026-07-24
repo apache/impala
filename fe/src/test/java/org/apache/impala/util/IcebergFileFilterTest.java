@@ -64,11 +64,20 @@ public class IcebergFileFilterTest {
     return df;
   }
 
+  private void checkNoOp(GroupedContentFiles contentFiles, int fileSizeThreshold) {
+    IcebergOptimizeFileFilter.FileFilteringResult result =
+        IcebergOptimizeFileFilter.filterFilesBySize(
+            new IcebergOptimizeFileFilter.FilterArgs(contentFiles, fileSizeThreshold));
+    assertTrue(result.isNoOp());
+    assertTrue(result.getSelectedFilesWithoutDeletes().isEmpty());
+  }
+
   private void checkFiltering(GroupedContentFiles contentFiles, int fileSizeThreshold,
       TIcebergOptimizationMode expectedMode, Set<String> expectedPaths) {
     IcebergOptimizeFileFilter.FileFilteringResult result =
         IcebergOptimizeFileFilter.filterFilesBySize(
             new IcebergOptimizeFileFilter.FilterArgs(contentFiles, fileSizeThreshold));
+    assertTrue(!result.isNoOp());
     assertEquals(result.getSelectedFilesWithoutDeletes().size(),
         expectedPaths != null ? expectedPaths.size() : 0);
     assertEquals(result.getOptimizationMode(), expectedMode);
@@ -92,8 +101,8 @@ public class IcebergFileFilterTest {
       contentFiles.dataFilesWithoutDeletes.add(df);
     }
 
-    checkFiltering(contentFiles, 0, TIcebergOptimizationMode.NOOP, null);
-    checkFiltering(contentFiles, 2, TIcebergOptimizationMode.NOOP, null);
+    checkNoOp(contentFiles, 0);
+    checkNoOp(contentFiles, 2);
 
     Set<String> filePaths = new HashSet<>();
     Collections.addAll(filePaths,
@@ -127,7 +136,7 @@ public class IcebergFileFilterTest {
 
     // Only a=0/size_2 meets the filtering criteria, but it is the only selected file from
     // the partition, so it will not be rewritten.
-    checkFiltering(contentFiles, 5, TIcebergOptimizationMode.NOOP, null);
+    checkNoOp(contentFiles, 5);
 
     // Add data files with deletes to check if they are considered in the 1 file per
     // partition rule.

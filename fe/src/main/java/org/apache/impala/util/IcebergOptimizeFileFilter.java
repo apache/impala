@@ -24,6 +24,7 @@ import org.apache.impala.common.Pair;
 import org.apache.impala.thrift.TIcebergOptimizationMode;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -31,16 +32,22 @@ import java.util.Map;
 /**
  * This class provides file filtering for Iceberg files, based on file size. Used by
  * OptimizeStmt to filter small data files to compact.
- * It also determines the mode of optimization: full table compaction, partial compaction
- * or none (no-op).
+ * It also determines the mode of optimization: full table compaction or partial
+ * compaction. If no files are selected the result is a no-op, signalled by the absence
+ * of an optimization mode (see FileFilteringResult.isNoOp()).
  */
 public class IcebergOptimizeFileFilter {
 
   public static class FileFilteringResult {
-    // Defines if the operation is a partial or full table compaction or no-op.
+    // Null iff the operation is a no-op, i.e. no files were selected for compaction.
+    // Otherwise it is a partial or full table compaction.
     private final TIcebergOptimizationMode optimizationMode_;
     // Contains the selected data files without deletes to compact.
     private final List<DataFile> selectedFilesWithoutDeletes_;
+
+    // Builds the no-op result: no optimization mode and no selected files.
+    private static final FileFilteringResult NO_OP_RESULT =
+        new FileFilteringResult(null, Collections.emptyList());
 
     public FileFilteringResult(TIcebergOptimizationMode mode,
         List<DataFile> selectedFiles) {
@@ -48,7 +55,10 @@ public class IcebergOptimizeFileFilter {
       selectedFilesWithoutDeletes_ = selectedFiles;
     }
 
+    public boolean isNoOp() { return this == FileFilteringResult.NO_OP_RESULT; }
+
     public TIcebergOptimizationMode getOptimizationMode() {
+      Preconditions.checkState(optimizationMode_ != null);
       return optimizationMode_;
     }
 
@@ -124,9 +134,15 @@ public class IcebergOptimizeFileFilter {
     } else if (args.fileSizeThreshold_ < 0) {
       // Select all files if FILE_SIZE_THRESHOLD_MB was not specified. We must still
       // calculate the optimization mode since the operation could be 'REWRITE_ALL'
-      // or 'NOOP'.
+      // or a no-op.
       Preconditions.checkState(args.fileSizeThreshold_ == -1);
       selectedFiles = args.filesToFilter_.dataFilesWithoutDeletes;
+    }
+    // No files are selected for optimization: the operation is a no-op.
+    if (selectedFiles.isEmpty() && args.filesToFilter_.dataFilesWithDeletes.isEmpty()) {
+      Preconditions.checkState(args.filesToFilter_.positionDeleteFiles.isEmpty() &&
+          args.filesToFilter_.equalityDeleteFiles.isEmpty());
+      return FileFilteringResult.NO_OP_RESULT;
     }
     TIcebergOptimizationMode mode =
         calculateOptimizationMode(args.filesToFilter_, selectedFiles);
@@ -138,17 +154,10 @@ public class IcebergOptimizeFileFilter {
 
   private static TIcebergOptimizationMode calculateOptimizationMode(
       GroupedContentFiles filesToFilter, List<DataFile> selectedFiles) {
-    // Check if no files are selected for optimization, and set the operation no-op.
-    if (selectedFiles.isEmpty() && filesToFilter.dataFilesWithDeletes.isEmpty()) {
-      Preconditions.checkState(filesToFilter.positionDeleteFiles.isEmpty() &&
-          filesToFilter.equalityDeleteFiles.isEmpty());
-      return TIcebergOptimizationMode.NOOP;
+    if (selectedFiles.size() == filesToFilter.dataFilesWithoutDeletes.size()) {
+      return TIcebergOptimizationMode.REWRITE_ALL;
     } else {
-      if (selectedFiles.size() == filesToFilter.dataFilesWithoutDeletes.size()) {
-        return TIcebergOptimizationMode.REWRITE_ALL;
-      } else {
-        return TIcebergOptimizationMode.PARTIAL;
-      }
+      return TIcebergOptimizationMode.PARTIAL;
     }
   }
 }

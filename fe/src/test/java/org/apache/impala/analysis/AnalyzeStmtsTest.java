@@ -5369,4 +5369,14 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
         "CONVERT TO ICEBERG doesn't accept 'metadata.generator.threads' as TBLPROPERTY.");
     AnalyzesOk("alter table functional_parquet.iceberg_alltypes_part convert to iceberg");
   }
+
+  @Test
+  public void TestOptimizeNoOp() throws AnalysisException {
+    AnalysisContext ctx = createAnalysisCtx("functional_parquet");
+    // This table contains only 1 file, it should not be rewritten.
+    OptimizeStmt stmt = (OptimizeStmt) AnalyzesOk(
+        "optimize table iceberg_v2_no_deletes (file_size_threshold_mb=256)", ctx);
+    assertTrue(stmt.isNoOp());
+    assertEquals("The table is already optimized.", stmt.getNoopSummary().get(0));
+  }
 }

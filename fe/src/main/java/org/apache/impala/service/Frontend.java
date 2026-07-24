@@ -3185,6 +3185,13 @@ public class Frontend {
             insertStmt.setWriteId(planCtx.compilationState_.getWriteId());
           }
         }
+      } else if (analysisResult.isNoOpStmt()) {
+        result.setResult_set_metadata(new TResultSetMetadata(
+            Collections.singletonList(
+                new TColumn("summary", Type.STRING.toThrift()))));
+        result.setStmt_type(TStmtType.NO_OP);
+        result.setNoop_result(analysisResult.getStmt().getNoopSummary());
+        return result;
       } else if (analysisResult.isLoadDataStmt()) {
         result.stmt_type = TStmtType.LOAD;
         result.setResult_set_metadata(new TResultSetMetadata(
@@ -3209,14 +3216,9 @@ public class Frontend {
         result.setResult_set_metadata(new TResultSetMetadata(
             Collections.singletonList(new TColumn("summary", Type.STRING.toThrift()))));
         ConvertTableToIcebergStmt stmt = analysisResult.getConvertTableToIcebergStmt();
-        if (stmt.isNoOp()) {
-          result.setStmt_type(TStmtType.NO_OP);
-          result.setNoop_result(stmt.getNoopSummary());
-        } else {
-          result.setStmt_type(TStmtType.CONVERT);
-          result.setConvert_table_request(
-              analysisResult.getConvertTableToIcebergStmt().toThrift());
-        }
+        result.setStmt_type(TStmtType.CONVERT);
+        result.setConvert_table_request(
+            analysisResult.getConvertTableToIcebergStmt().toThrift());
         return result;
       } else if (analysisResult.isTestCaseStmt()) {
         CopyTestCaseStmt testCaseStmt = ((CopyTestCaseStmt) analysisResult.getStmt());

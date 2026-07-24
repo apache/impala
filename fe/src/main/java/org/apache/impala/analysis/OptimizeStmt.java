@@ -42,6 +42,7 @@ import org.apache.impala.util.IcebergUtil;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -102,9 +103,9 @@ public class OptimizeStmt extends DmlStatementBase {
   // File paths of data files without deletes selected for compaction after file size
   // filtering.
   private Set<String> selectedIcebergFilePaths_ = new HashSet<>();
-  // Describes the mode of this OPTIMIZE operation. Decided during analysis.
-  // NOOP: The table was empty or no files were selected for compaction. This means that
-  // the operation has no effect.
+  // Describes the mode of this OPTIMIZE operation. Decided during analysis. Null if the
+  // operation is a no-op (see isNoOp()), i.e. the table was empty or no files were
+  // selected for compaction, so the operation has no effect.
   // PARTIAL: In this mode only the selected files are compacted, all others will remain
   // unchanged. Files that will be selected:
   // - data files without deletes that are smaller than fileSizeThreshold_,
@@ -176,6 +177,7 @@ public class OptimizeStmt extends DmlStatementBase {
     }
 
     selectFiles(iceTable);
+    if (isNoOp()) return;
 
     prepareExpressions(analyzer);
     createSourceStmt(analyzer);
@@ -194,14 +196,15 @@ public class OptimizeStmt extends DmlStatementBase {
     super.reset();
     tableName_ = originalTableName_;
     tableRef_.reset();
-    sourceStmt_.reset();
     resultExprs_.clear();
     sortExprs_.clear();
-    sortColumns_.clear();
     sortingOrder_ = TSortingOrder.LEXICAL;
     partitionKeyExprs_.clear();
     selectedIcebergFilePaths_.clear();
     mode_ = null;
+    if (isNoOp()) return;
+    sourceStmt_.reset();
+    sortColumns_.clear();
   }
 
   public DataSink createDataSink() {
@@ -217,21 +220,25 @@ public class OptimizeStmt extends DmlStatementBase {
       GroupedContentFiles contentFiles = IcebergUtil.getIcebergFiles(
           iceTable, Lists.newArrayList(), null);
       if (contentFiles.isEmpty()) {
-        mode_ = TIcebergOptimizationMode.NOOP;
-      } else {
-        IcebergOptimizeFileFilter.FilterArgs args =
-            new IcebergOptimizeFileFilter.FilterArgs(contentFiles, fileSizeThreshold_);
-        IcebergOptimizeFileFilter.FileFilteringResult filterResult =
-            IcebergOptimizeFileFilter.filterFilesBySize(args);
-        mode_ = filterResult.getOptimizationMode();
+        setIsNoOp();
+        return;
+      }
+      IcebergOptimizeFileFilter.FilterArgs args =
+          new IcebergOptimizeFileFilter.FilterArgs(contentFiles, fileSizeThreshold_);
+      IcebergOptimizeFileFilter.FileFilteringResult filterResult =
+          IcebergOptimizeFileFilter.filterFilesBySize(args);
+      if (filterResult.isNoOp()) {
+        setIsNoOp();
+        return;
+      }
+      mode_ = filterResult.getOptimizationMode();
 
-        if (mode_ == TIcebergOptimizationMode.PARTIAL) {
-          List<IcebergFileDescriptor> selectedDataFilesWithoutDeletes =
-              dataFilesWithoutDeletesToFileDescriptors(
-                  filterResult.getSelectedFilesWithoutDeletes(), iceTable);
-          tableRef_.setSelectedDataFilesForOptimize(selectedDataFilesWithoutDeletes);
-          collectAbsolutePaths(selectedDataFilesWithoutDeletes);
-        }
+      if (mode_ == TIcebergOptimizationMode.PARTIAL) {
+        List<IcebergFileDescriptor> selectedDataFilesWithoutDeletes =
+            dataFilesWithoutDeletesToFileDescriptors(
+                filterResult.getSelectedFilesWithoutDeletes(), iceTable);
+        tableRef_.setSelectedDataFilesForOptimize(selectedDataFilesWithoutDeletes);
+        collectAbsolutePaths(selectedDataFilesWithoutDeletes);
       }
     } catch (Exception e) {
       throw new AnalysisException(e);
@@ -308,12 +315,18 @@ public class OptimizeStmt extends DmlStatementBase {
     return "OPTIMIZE TABLE" + tableName_.toSql();
   }
 
+  @Override
+  public List<String> getNoopSummary() throws AnalysisException {
+    return Collections.singletonList("The table is already optimized.");
+  }
+
   public QueryStmt getQueryStmt() {
     return sourceStmt_;
   }
 
   @Override
   public void substituteResultExprs(ExprSubstitutionMap smap, Analyzer analyzer) {
+    if (isNoOp()) return;
     sourceStmt_.substituteResultExprs(smap, analyzer);
     resultExprs_ = Expr.substituteList(resultExprs_, smap, analyzer, true);
     partitionKeyExprs_ = Expr.substituteList(partitionKeyExprs_, smap, analyzer, true);
@@ -334,6 +347,7 @@ public class OptimizeStmt extends DmlStatementBase {
 
   public TIcebergOptimizationMode getOptimizationMode() {
     Preconditions.checkState(isAnalyzed());
+    Preconditions.checkState(!isNoOp());
     return mode_;
   }
 
@@ -350,6 +364,7 @@ public class OptimizeStmt extends DmlStatementBase {
   @Override
   public void rewriteExprs(ExprRewriter rewriter) throws AnalysisException {
     Preconditions.checkState(isAnalyzed());
+    if (isNoOp()) return;
     sourceStmt_.rewriteExprs(rewriter);
   }
 }

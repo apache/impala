@@ -189,6 +189,7 @@ public class AnalysisContext {
     public boolean isDeleteStmt() { return stmt_ instanceof DeleteStmt; }
     public DeleteStmt getDeleteStmt() { return (DeleteStmt) stmt_; }
     public boolean isCommentOnStmt() { return stmt_ instanceof CommentOnStmt; }
+    public boolean isNoOpStmt() { return stmt_ != null && stmt_.isNoOp(); }
 
     public boolean isAlterDbStmt() { return stmt_ instanceof AlterDbStmt; }
 

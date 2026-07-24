@@ -6,8 +6,15 @@ STORED BY ICEBERG
 TBLPROPERTIES ('format-version'='2');
 ====
 ---- QUERY
-# Insert a value then delete everything from the table.
+# Write 1 file to the table and check that OPTIMIZE with file size threshold does
+# not modify anything. Note that full table OPTIMIZE always rewrites the entire table.
 INSERT INTO ice_optimize_part VALUES(1, 'one', true);
+OPTIMIZE TABLE ice_optimize_part (FILE_SIZE_THRESHOLD_MB=10);
+---- RESULTS
+'The table is already optimized.'
+====
+---- QUERY
+# Delete everything from the table.
 DELETE FROM ice_optimize_part WHERE bool_col=true;
 SHOW FILES IN ice_optimize_part;
 ---- LABELS
@@ -29,7 +36,6 @@ Path,Size,Partition,EC Policy
 STRING, STRING, STRING, STRING
 ====
 ---- QUERY
-# Testing that OPTIMIZE empty table is no-op.
 DESCRIBE HISTORY ice_optimize_part;
 ---- LABELS
 creation_time,snapshot_id,parent_id,is_current_ancestor
@@ -41,7 +47,12 @@ row_regex:'.*','.*','.*','TRUE'
 STRING, STRING, STRING, STRING
 ====
 ---- QUERY
+# Testing that OPTIMIZE empty table is no-op.
 OPTIMIZE TABLE ice_optimize_part;
+---- RESULTS
+'The table is already optimized.'
+====
+---- QUERY
 DESCRIBE HISTORY ice_optimize_part;
 ---- LABELS
 creation_time,snapshot_id,parent_id,is_current_ancestor
@@ -94,6 +105,10 @@ STRING, STRING, STRING, STRING
 ====
 ---- QUERY
 OPTIMIZE TABLE ice_optimize;
+---- RESULTS
+'The table is already optimized.'
+====
+---- QUERY
 DESCRIBE HISTORY ice_optimize;
 ---- LABELS
 creation_time,snapshot_id,parent_id,is_current_ancestor

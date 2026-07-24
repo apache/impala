@@ -1892,7 +1892,6 @@ bool ClientRequestState::CreateIcebergCatalogOps(
     case TIcebergOperation::OPTIMIZE: {
       DCHECK(ice_params.__isset.optimize_params);
       const TIcebergOptimizeParams& opt = ice_params.optimize_params;
-      if (opt.mode == TIcebergOptimizationMode::NOOP) break;
       cat_ice_op->__set_iceberg_data_files_fb(dml->CreateIcebergDataFilesVector());
       if (opt.mode == TIcebergOptimizationMode::PARTIAL) {
         DCHECK(opt.__isset.selected_data_files_without_deletes);

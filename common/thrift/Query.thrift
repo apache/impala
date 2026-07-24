@@ -1034,13 +1034,13 @@ struct TPlanExecInfo {
 
 // Determines the type of the OPTIMIZE operation. Based on the number of files selected
 // for compaction, it can be
-// 1. a full table rewrite,
-// 2. a partial optimization with file filtering, or
-// 3. no-op with no selected files.
+// 1. a full table rewrite, or
+// 2. a partial optimization with file filtering.
+// The no-op case (no files selected) is not a mode here: it is handled entirely in the
+// frontend as a no-op statement and is never sent to the backend.
 enum TIcebergOptimizationMode {
   REWRITE_ALL = 0
   PARTIAL = 1
-  NOOP = 2
 }
 
 struct TIcebergOptimizeParams {

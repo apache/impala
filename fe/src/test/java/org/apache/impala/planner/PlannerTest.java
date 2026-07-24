@@ -44,6 +44,7 @@ import org.apache.impala.testutil.TestUtils.IgnoreValueFilter;
 import org.apache.impala.thrift.TRuntimeFilterType;
 import org.apache.impala.thrift.TExecRequest;
 import org.apache.impala.thrift.TExplainLevel;
+import org.apache.impala.thrift.TStmtType;
 import org.apache.impala.thrift.TJoinDistributionMode;
 import org.apache.impala.thrift.TKuduReplicaSelection;
 import org.apache.impala.thrift.TQueryCtx;
@@ -1492,12 +1493,28 @@ public class PlannerTest extends PlannerTestBase {
    * Test that OPTIMIZE TABLE statements on Iceberg tables work as expected.
    */
   @Test
-  public void testIcebergOptimize() {
+  public void testIcebergOptimize() throws ImpalaException {
     TQueryOptions options = defaultQueryOptions();
     options.setMax_fs_writers(2);
     options.setExplain_level(TExplainLevel.EXTENDED);
     runPlannerTestFile("iceberg-optimize", "functional_parquet", options,
         ImmutableSet.of(PlannerTestOption.VALIDATE_CARDINALITY));
+
+    // Regression test for IMPALA-15222. Table is already compact, should not create plan.
+    TQueryCtx queryCtx = TestUtils.createQueryContext(
+        "functional_parquet", System.getProperty("user.name"));
+    queryCtx.client_request.setStmt(
+        "optimize table functional_parquet.iceberg_v2_no_deletes "
+        + "(file_size_threshold_mb=100)");
+    queryCtx.client_request.query_options = defaultQueryOptions();
+    PlanCtx planCtx = new PlanCtx(queryCtx);
+    TExecRequest request = frontend_.createExecRequest(planCtx);
+    Assert.assertEquals(TStmtType.NO_OP, request.stmt_type);
+    Assert.assertNotNull(request.noop_result);
+    Assert.assertEquals(1, request.noop_result.size());
+    Assert.assertEquals(
+        "The table is already optimized.", request.noop_result.get(0));
+    Assert.assertFalse(request.isSetQuery_exec_request());
   }
 
   /**

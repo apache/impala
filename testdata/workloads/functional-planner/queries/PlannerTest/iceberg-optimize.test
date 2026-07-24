@@ -148,4 +148,3 @@ Per-Host Resources: mem-estimate=96.53MB mem-reservation=48.22KB thread-reservat
    tuple-ids=0 row-size=64B cardinality=20
    in pipelines: 00(GETNEXT)
 ====
-
