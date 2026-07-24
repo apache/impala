@@ -56,7 +56,9 @@ Status VariantMetadata::Init(const uint8_t* data, uint32_t len) {
   is_sorted_ = (header >> 4) & 0x01;
   offset_size_ = ((header >> 6) & 0x03) + 1;
 
-  int pos = 1;
+  // All offset arithmetic below is done in 64-bit so that a corrupt (large) dict_size_
+  // cannot overflow the bounds checks and let an under-sized blob pass validation.
+  uint64_t pos = 1;
   if (pos + offset_size_ > len) {
     return Status("Variant metadata too short for dictionary size");
   }
@@ -68,13 +70,33 @@ Status VariantMetadata::Init(const uint8_t* data, uint32_t len) {
 
   // Offsets array: (dict_size_ + 1) entries of offset_size_ bytes each.
   offsets_ = data + pos;
-  int offsets_len = (dict_size_ + 1) * offset_size_;
+  uint64_t offsets_len = (static_cast<uint64_t>(dict_size_) + 1) * offset_size_;
   if (pos + offsets_len > len) {
     return Status("Variant metadata too short for offset array");
   }
   pos += offsets_len;
 
   string_data_ = data + pos;
+  // pos <= len is guaranteed by the check above, so this fits in uint32_t.
+  string_data_len_ = static_cast<uint32_t>(len - pos);
+
+  // Validate the dictionary offsets once here (rather than on every field-name access):
+  // they must be non-decreasing and stay within the string-data region, so GetFieldName()
+  // can never construct a string_view that points out of bounds.
+  uint32_t prev = ReadOffset(0);
+  for (uint32_t i = 1; i <= dict_size_; ++i) {
+    uint32_t cur = ReadOffset(i);
+    // Offsets must be non-decreasing. Equal consecutive offsets denote a zero-length
+    // (empty-string) field name, e.g. the key in {"": 1}: that is valid JSON and is not
+    // forbidden by the Variant spec, so only a strict decrease is rejected.
+    if (cur < prev) {
+      return Status("Variant metadata has non-monotonic dictionary offsets");
+    }
+    prev = cur;
+  }
+  if (prev > string_data_len_) {
+    return Status("Variant metadata dictionary offset exceeds string data");
+  }
   return Status::OK();
 }
 
@@ -101,9 +123,13 @@ uint32_t VariantMetadata::ReadOffset(uint32_t index) const {
 }
 
 string_view VariantMetadata::GetFieldName(uint32_t index) const {
+  // Callers (FindFieldId and FieldNameFromLayout) must bound-check the index.
   DCHECK_LT(index, dict_size_);
   uint32_t start = ReadOffset(index);
   uint32_t end = ReadOffset(index + 1);
+  // Guaranteed by the offset validation in Init().
+  DCHECK_LE(start, end);
+  DCHECK_LE(end, string_data_len_);
   return string_view(reinterpret_cast<const char*>(string_data_ + start),
       end - start);
 }
@@ -163,69 +189,64 @@ bool VariantValue::IsNull() const {
       && GetPhysicalType() == VariantPhysicalType::VNULL;
 }
 
-bool VariantValue::GetBoolean() const {
-  VariantPhysicalType pt = GetPhysicalType();
-  DCHECK(pt == VariantPhysicalType::BOOLEAN_TRUE
-      || pt == VariantPhysicalType::BOOLEAN_FALSE);
-  return pt == VariantPhysicalType::BOOLEAN_TRUE;
+bool VariantValue::GetBoolean(bool* out) const {
+  VariantPhysicalType pt;
+  if (!AsPrimitive(&pt)) return false;
+  if (pt == VariantPhysicalType::BOOLEAN_TRUE) { *out = true; return true; }
+  if (pt == VariantPhysicalType::BOOLEAN_FALSE) { *out = false; return true; }
+  return false;
 }
 
-int8_t VariantValue::GetInt8() const {
-  DCHECK_EQ(GetPhysicalType(), VariantPhysicalType::INT8);
-  return static_cast<int8_t>(data_[1]);
+bool VariantValue::GetInt8(int8_t* out) const {
+  return ReadValueOfType(VariantPhysicalType::INT8, out);
 }
 
-int16_t VariantValue::GetInt16() const {
-  DCHECK_EQ(GetPhysicalType(), VariantPhysicalType::INT16);
-  return ReadValue<int16_t>();
+bool VariantValue::GetInt16(int16_t* out) const {
+  return ReadValueOfType(VariantPhysicalType::INT16, out);
 }
 
-int32_t VariantValue::GetInt32() const {
-  DCHECK_EQ(GetPhysicalType(), VariantPhysicalType::INT32);
-  return ReadValue<int32_t>();
+bool VariantValue::GetInt32(int32_t* out) const {
+  return ReadValueOfType(VariantPhysicalType::INT32, out);
 }
 
-int64_t VariantValue::GetInt64() const {
-  DCHECK_EQ(GetPhysicalType(), VariantPhysicalType::INT64);
-  return ReadValue<int64_t>();
+bool VariantValue::GetInt64(int64_t* out) const {
+  return ReadValueOfType(VariantPhysicalType::INT64, out);
 }
 
-float VariantValue::GetFloat() const {
-  DCHECK_EQ(GetPhysicalType(), VariantPhysicalType::FLOAT);
-  return ReadValue<float>();
+bool VariantValue::GetFloat(float* out) const {
+  return ReadValueOfType(VariantPhysicalType::FLOAT, out);
 }
 
-double VariantValue::GetDouble() const {
-  DCHECK_EQ(GetPhysicalType(), VariantPhysicalType::DOUBLE);
-  return ReadValue<double>();
+bool VariantValue::GetDouble(double* out) const {
+  return ReadValueOfType(VariantPhysicalType::DOUBLE, out);
 }
 
-StringValue VariantValue::GetString() const {
+bool VariantValue::GetString(StringValue* out) const {
+  if (data_ == nullptr || len_ < 1) return false;
   VariantBasicType bt = GetBasicType();
   if (bt == VariantBasicType::SHORT_STRING) {
-    int str_len = (data_[0] >> 2) & 0x3F;
-    StringValue sv;
-    sv.Assign(reinterpret_cast<char*>(const_cast<uint8_t*>(data_ + 1)),
-        str_len);
-    return sv;
+    uint32_t str_len = (data_[0] >> 2) & 0x3F;
+    if (str_len > len_ - 1) return false;
+    out->Assign(reinterpret_cast<char*>(const_cast<uint8_t*>(data_ + 1)), str_len);
+    return true;
   }
-  DCHECK_EQ(bt, VariantBasicType::PRIMITIVE);
-  DCHECK_EQ(GetPhysicalType(), VariantPhysicalType::STRING);
+  if (bt != VariantBasicType::PRIMITIVE
+      || GetPhysicalType() != VariantPhysicalType::STRING || len_ < 5) {
+    return false;
+  }
   uint32_t str_len = ReadUint(data_ + 1, 4);
-  StringValue sv;
-  sv.Assign(reinterpret_cast<char*>(const_cast<uint8_t*>(data_ + 5)),
-      str_len);
-  return sv;
+  if (str_len > len_ - 5) return false;
+  out->Assign(reinterpret_cast<char*>(const_cast<uint8_t*>(data_ + 5)), str_len);
+  return true;
 }
 
-StringValue VariantValue::GetBinary() const {
-  DCHECK_EQ(GetBasicType(), VariantBasicType::PRIMITIVE);
-  DCHECK_EQ(GetPhysicalType(), VariantPhysicalType::BINARY);
+bool VariantValue::GetBinary(StringValue* out) const {
+  VariantPhysicalType pt;
+  if (!AsPrimitive(&pt) || pt != VariantPhysicalType::BINARY || len_ < 5) return false;
   uint32_t bin_len = ReadUint(data_ + 1, 4);
-  StringValue sv;
-  sv.Assign(reinterpret_cast<char*>(const_cast<uint8_t*>(data_ + 5)),
-      bin_len);
-  return sv;
+  if (bin_len > len_ - 5) return false;
+  out->Assign(reinterpret_cast<char*>(const_cast<uint8_t*>(data_ + 5)), bin_len);
+  return true;
 }
 
 // --- Object accessors ---
@@ -240,88 +261,85 @@ uint32_t VariantValue::ObjectOffsetSize() const {
   return ((data_[0] >> 2) & 0x03) + 1;
 }
 
-uint32_t VariantValue::ObjectNumFields() const {
-  DCHECK_EQ(GetBasicType(), VariantBasicType::OBJECT);
-  bool is_large = (data_[0] >> 6) & 0x01;
-  uint32_t size_bytes = is_large ? 4 : 1;
-  return ReadUint(data_ + 1, size_bytes);
-}
-
-const uint8_t* VariantValue::ObjectFieldIdsStart() const {
-  bool is_large = (data_[0] >> 6) & 0x01;
-  uint32_t size_bytes = is_large ? 4 : 1;
-  return data_ + 1 + size_bytes;
-}
-
-const uint8_t* VariantValue::ObjectOffsetsStart() const {
-  uint32_t num_fields = ObjectNumFields();
-  uint32_t field_id_size = ObjectFieldIdSize();
-  return ObjectFieldIdsStart() + num_fields * field_id_size;
-}
-
-const uint8_t* VariantValue::ObjectDataStart() const {
-  uint32_t num_fields = ObjectNumFields();
-  uint32_t offset_size = ObjectOffsetSize();
-  return ObjectOffsetsStart() + (num_fields + 1) * offset_size;
-}
-
-uint32_t VariantValue::GetObjectSize() const {
-  if (GetBasicType() != VariantBasicType::OBJECT) return 0;
-  return ObjectNumFields();
-}
-
-bool VariantValue::GetFieldByName(string_view name,
-    VariantValue* result) const {
+bool VariantValue::ParseObjectLayout(ObjectLayout* out) const {
+  if (data_ == nullptr || len_ < 1) return false;
   if (GetBasicType() != VariantBasicType::OBJECT) return false;
+  bool is_large = (data_[0] >> 6) & 0x01;
+  uint32_t num_size = is_large ? 4 : 1;
+  if (len_ < 1 + num_size) return false;
+  uint32_t num_fields = ReadUint(data_ + 1, num_size);
+  uint32_t field_id_size = ObjectFieldIdSize();
+  uint32_t offset_size = ObjectOffsetSize();
+  // Layout: header | field_ids[num_fields] | offsets[num_fields + 1] | data.
+  // 64-bit math so a corrupt (large) num_fields cannot overflow the bound check.
+  uint64_t data_start_off = static_cast<uint64_t>(1) + num_size
+      + static_cast<uint64_t>(num_fields) * field_id_size
+      + (static_cast<uint64_t>(num_fields) + 1) * offset_size;
+  if (data_start_off > len_) return false;
+  out->num_fields = num_fields;
+  out->field_ids = data_ + 1 + num_size;
+  out->offsets = out->field_ids + static_cast<uint64_t>(num_fields) * field_id_size;
+  out->data = data_ + data_start_off;
+  out->data_len = static_cast<uint32_t>(len_ - data_start_off);
+  return true;
+}
+
+bool VariantValue::GetObjectSize(uint32_t* out) const {
+  ObjectLayout layout;
+  if (!ParseObjectLayout(&layout)) return false;
+  *out = layout.num_fields;
+  return true;
+}
+
+bool VariantValue::GetFieldByName(string_view name, VariantValue* result) const {
   if (metadata_ == nullptr) return false;
+  ObjectLayout layout;
+  if (!ParseObjectLayout(&layout)) return false;
 
   int field_id = metadata_->FindFieldId(name);
   if (field_id < 0) return false;
 
-  uint32_t num_fields = ObjectNumFields();
-  uint32_t field_id_size = ObjectFieldIdSize();
-  const uint8_t* field_ids = ObjectFieldIdsStart();
-
   // Search for this field_id in the object's field_id array.
-  int field_index = -1;
-  for (uint32_t i = 0; i < num_fields; ++i) {
-    uint32_t fid = ReadUint(field_ids + i * field_id_size, field_id_size);
-    if (fid == field_id) {
-      field_index = i;
-      break;
-    }
+  uint32_t field_id_size = ObjectFieldIdSize();
+  for (uint32_t i = 0; i < layout.num_fields; ++i) {
+    uint32_t fid = ReadUint(layout.field_ids + i * field_id_size, field_id_size);
+    if (fid == static_cast<uint32_t>(field_id)) return FieldFromLayout(layout, i, result);
   }
-  if (field_index < 0) return false;
-
-  return GetFieldByIndex(field_index, result);
+  return false;
 }
 
-bool VariantValue::GetFieldByIndex(uint32_t index, VariantValue* result) const {
-  if (GetBasicType() != VariantBasicType::OBJECT) return false;
-  uint32_t num_fields = ObjectNumFields();
-  if (index >= num_fields) return false;
-
+bool VariantValue::FieldFromLayout(const ObjectLayout& layout, uint32_t index,
+    VariantValue* result) const {
+  if (index >= layout.num_fields) return false;
   uint32_t offset_size = ObjectOffsetSize();
-  const uint8_t* offsets = ObjectOffsetsStart();
-  const uint8_t* data_start = ObjectDataStart();
-
-  uint32_t field_offset =
-      ReadUint(offsets + index * offset_size, offset_size);
-  uint32_t next_offset =
-      ReadUint(offsets + (index + 1) * offset_size, offset_size);
-  uint32_t field_len = next_offset - field_offset;
-
-  *result = VariantValue(data_start + field_offset, field_len, metadata_);
+  uint32_t start = ReadUint(layout.offsets + index * offset_size, offset_size);
+  uint32_t end = ReadUint(layout.offsets + (index + 1) * offset_size, offset_size);
+  if (end < start || end > layout.data_len) return false;
+  *result = VariantValue(layout.data + start, end - start, metadata_);
   return true;
 }
 
-string_view VariantValue::GetFieldNameByIndex(uint32_t index) const {
-  DCHECK_EQ(GetBasicType(), VariantBasicType::OBJECT);
+bool VariantValue::GetFieldByIndex(uint32_t index, VariantValue* result) const {
+  ObjectLayout layout;
+  if (!ParseObjectLayout(&layout)) return false;
+  return FieldFromLayout(layout, index, result);
+}
+
+bool VariantValue::FieldNameFromLayout(const ObjectLayout& layout, uint32_t index,
+    string_view* out) const {
+  if (index >= layout.num_fields) return false;
   uint32_t field_id_size = ObjectFieldIdSize();
-  const uint8_t* field_ids = ObjectFieldIdsStart();
-  uint32_t fid =
-      ReadUint(field_ids + index * field_id_size, field_id_size);
-  return metadata_->GetFieldName(fid);
+  uint32_t fid = ReadUint(layout.field_ids + index * field_id_size, field_id_size);
+  uint32_t dict_size = (metadata_ != nullptr) ? metadata_->DictionarySize() : 0;
+  if (fid >= dict_size) return false;
+  *out = metadata_->GetFieldName(fid);
+  return true;
+}
+
+bool VariantValue::GetFieldNameByIndex(uint32_t index, string_view* out) const {
+  ObjectLayout layout;
+  if (!ParseObjectLayout(&layout)) return false;
+  return FieldNameFromLayout(layout, index, out);
 }
 
 // --- Array accessors ---
@@ -331,47 +349,47 @@ uint32_t VariantValue::ArrayOffsetSize() const {
   return ((data_[0] >> 2) & 0x03) + 1;
 }
 
-uint32_t VariantValue::ArrayNumElements() const {
-  DCHECK_EQ(GetBasicType(), VariantBasicType::ARRAY);
+bool VariantValue::ParseArrayLayout(ArrayLayout* out) const {
+  if (data_ == nullptr || len_ < 1) return false;
+  if (GetBasicType() != VariantBasicType::ARRAY) return false;
   bool is_large = (data_[0] >> 4) & 0x01;
-  uint32_t size_bytes = is_large ? 4 : 1;
-  return ReadUint(data_ + 1, size_bytes);
-}
-
-const uint8_t* VariantValue::ArrayOffsetsStart() const {
-  bool is_large = (data_[0] >> 4) & 0x01;
-  uint32_t size_bytes = is_large ? 4 : 1;
-  return data_ + 1 + size_bytes;
-}
-
-const uint8_t* VariantValue::ArrayDataStart() const {
-  uint32_t num_elements = ArrayNumElements();
+  uint32_t num_size = is_large ? 4 : 1;
+  if (len_ < 1 + num_size) return false;
+  uint32_t num_elems = ReadUint(data_ + 1, num_size);
   uint32_t offset_size = ArrayOffsetSize();
-  return ArrayOffsetsStart() + (num_elements + 1) * offset_size;
+  // Layout: header | offsets[num_elems + 1] | data.
+  uint64_t data_start_off = static_cast<uint64_t>(1) + num_size
+      + (static_cast<uint64_t>(num_elems) + 1) * offset_size;
+  if (data_start_off > len_) return false;
+  out->num_elems = num_elems;
+  out->offsets = data_ + 1 + num_size;
+  out->data = data_ + data_start_off;
+  out->data_len = static_cast<uint32_t>(len_ - data_start_off);
+  return true;
 }
 
-uint32_t VariantValue::GetArraySize() const {
-  if (GetBasicType() != VariantBasicType::ARRAY) return 0;
-  return ArrayNumElements();
+bool VariantValue::GetArraySize(uint32_t* out) const {
+  ArrayLayout layout;
+  if (!ParseArrayLayout(&layout)) return false;
+  *out = layout.num_elems;
+  return true;
+}
+
+bool VariantValue::ElementFromLayout(const ArrayLayout& layout, uint32_t index,
+    VariantValue* result) const {
+  if (index >= layout.num_elems) return false;
+  uint32_t offset_size = ArrayOffsetSize();
+  uint32_t start = ReadUint(layout.offsets + index * offset_size, offset_size);
+  uint32_t end = ReadUint(layout.offsets + (index + 1) * offset_size, offset_size);
+  if (end < start || end > layout.data_len) return false;
+  *result = VariantValue(layout.data + start, end - start, metadata_);
+  return true;
 }
 
 bool VariantValue::GetArrayElement(uint32_t index, VariantValue* result) const {
-  if (GetBasicType() != VariantBasicType::ARRAY) return false;
-  uint32_t num_elements = ArrayNumElements();
-  if (index >= num_elements) return false;
-
-  uint32_t offset_size = ArrayOffsetSize();
-  const uint8_t* offsets = ArrayOffsetsStart();
-  const uint8_t* data_start = ArrayDataStart();
-
-  uint32_t elem_offset =
-      ReadUint(offsets + index * offset_size, offset_size);
-  uint32_t next_offset =
-      ReadUint(offsets + (index + 1) * offset_size, offset_size);
-  uint32_t elem_len = next_offset - elem_offset;
-
-  *result = VariantValue(data_start + elem_offset, elem_len, metadata_);
-  return true;
+  ArrayLayout layout;
+  if (!ParseArrayLayout(&layout)) return false;
+  return ElementFromLayout(layout, index, result);
 }
 
 // --- Path navigation ---
@@ -429,12 +447,35 @@ bool VariantValue::NavigatePath(const string& path,
 
 using JsonWriter = rapidjson::Writer<rapidjson::StringBuffer>;
 
-static Status ValueToJson(const VariantValue& val,
-    const VariantMetadata& metadata, JsonWriter* writer,
-    impala_udf::FunctionContext* ctx = nullptr) {
+// Builds the error status returned when a variant value cannot be decoded because it is
+// truncated or its payload would read out of bounds. 'what' names the offending part,
+// e.g. "INT32" or "object field name".
+static Status MalformedVariant(const char* what) {
+  return Status(Substitute("Malformed variant $0", what));
+}
+
+// Serializes a VariantValue to JSON. A friend of VariantValue (declared in the header) so
+// it can parse each object/array layout once via the private layout helpers and reuse it
+// across the field/element loop, while keeping rapidjson out of variant-value.h.
+struct VariantJsonSerializer {
+  static Status Write(const VariantValue& val, const VariantMetadata& metadata,
+      JsonWriter* writer, int depth = ColumnType::MAX_NESTING_DEPTH);
+};
+
+Status VariantJsonSerializer::Write(const VariantValue& val,
+    const VariantMetadata& metadata, JsonWriter* writer, int depth) {
+  if (UNLIKELY(depth <= 0)) {
+    return Status("Variant value nesting exceeds the maximum allowed depth");
+  }
+  if (UNLIKELY(!val.IsValid() || val.Len() < 1)) {
+    return MalformedVariant("value: empty or truncated value buffer");
+  }
   switch (val.GetBasicType()) {
     case VariantBasicType::SHORT_STRING: {
-      StringValue sv = val.GetString();
+      StringValue sv;
+      if (UNLIKELY(!val.GetString(&sv))) {
+        return MalformedVariant("short string");
+      }
       writer->String(sv.Ptr(), sv.Len());
       return Status::OK();
     }
@@ -449,110 +490,136 @@ static Status ValueToJson(const VariantValue& val,
         case VariantPhysicalType::BOOLEAN_FALSE:
           writer->Bool(false);
           break;
-        case VariantPhysicalType::INT8:
-          writer->Int(val.GetInt8());
+        case VariantPhysicalType::INT8: {
+          int8_t v;
+          if (UNLIKELY(!val.GetInt8(&v))) return MalformedVariant("INT8");
+          writer->Int(v);
           break;
-        case VariantPhysicalType::INT16:
-          writer->Int(val.GetInt16());
+        }
+        case VariantPhysicalType::INT16: {
+          int16_t v;
+          if (UNLIKELY(!val.GetInt16(&v))) return MalformedVariant("INT16");
+          writer->Int(v);
           break;
-        case VariantPhysicalType::INT32:
-          writer->Int(val.GetInt32());
+        }
+        case VariantPhysicalType::INT32: {
+          int32_t v;
+          if (UNLIKELY(!val.GetInt32(&v))) return MalformedVariant("INT32");
+          writer->Int(v);
           break;
-        case VariantPhysicalType::INT64:
-          writer->Int64(val.GetInt64());
+        }
+        case VariantPhysicalType::INT64: {
+          int64_t v;
+          if (UNLIKELY(!val.GetInt64(&v))) return MalformedVariant("INT64");
+          writer->Int64(v);
           break;
+        }
         case VariantPhysicalType::FLOAT: {
+          float v;
+          if (UNLIKELY(!val.GetFloat(&v))) return MalformedVariant("FLOAT");
           char buf[24];
-          int n = snprintf(buf, sizeof(buf), "%g", val.GetFloat());
+          int n = snprintf(buf, sizeof(buf), "%g", v);
           writer->RawValue(buf, n, rapidjson::kNumberType);
           break;
         }
-        case VariantPhysicalType::DOUBLE:
-          writer->Double(val.GetDouble());
+        case VariantPhysicalType::DOUBLE: {
+          double v;
+          if (UNLIKELY(!val.GetDouble(&v))) return MalformedVariant("DOUBLE");
+          writer->Double(v);
           break;
+        }
         case VariantPhysicalType::STRING: {
-          StringValue sv = val.GetString();
+          StringValue sv;
+          if (UNLIKELY(!val.GetString(&sv))) return MalformedVariant("STRING");
           writer->String(sv.Ptr(), sv.Len());
           break;
         }
         case VariantPhysicalType::DATE: {
-          DateValue dv(static_cast<int64_t>(val.ReadValue<int32_t>()));
+          int32_t days;
+          if (UNLIKELY(!val.ReadValue(&days))) return MalformedVariant("DATE");
+          DateValue dv(static_cast<int64_t>(days));
           char buf[SimpleDateFormatTokenizer::DEFAULT_DATE_FMT_LEN];
           int n = DateParser::FormatDefault(dv, buf);
-          if (LIKELY(n > 0)) {
-            DCHECK_LE(n, sizeof(buf));
-            writer->String(buf, n);
-          } else {
-            if (ctx) {
-              ctx->AddWarning("Invalid DATE value in VARIANT");
-            }
-            writer->String("<invalid-date>");
-          }
+          if (UNLIKELY(n <= 0)) return Status("Variant DATE value out of range");
+          DCHECK_LE(n, sizeof(buf));
+          writer->String(buf, n);
           break;
         }
         case VariantPhysicalType::DECIMAL4: {
+          int32_t unscaled;
+          if (UNLIKELY(!val.ReadValue(&unscaled, 2))) {
+            return MalformedVariant("DECIMAL4");
+          }
           int scale = val.Data()[1];
-          int32_t unscaled = val.ReadValue<int32_t>(2);
-          string s = Decimal4Value(unscaled).ToString(9, scale);
+          if (UNLIKELY(scale > ColumnType::MAX_DECIMAL4_PRECISION)) {
+            return MalformedVariant("DECIMAL4: scale out of range");
+          }
+          string s = Decimal4Value(unscaled).ToString(
+              ColumnType::MAX_DECIMAL4_PRECISION, scale);
           writer->RawValue(s.data(), s.size(), rapidjson::kNumberType);
           break;
         }
         case VariantPhysicalType::DECIMAL8: {
+          int64_t unscaled;
+          if (UNLIKELY(!val.ReadValue(&unscaled, 2))) {
+            return MalformedVariant("DECIMAL8");
+          }
           int scale = val.Data()[1];
-          int64_t unscaled = val.ReadValue<int64_t>(2);
-          string s = Decimal8Value(unscaled).ToString(18, scale);
+          if (UNLIKELY(scale > ColumnType::MAX_DECIMAL8_PRECISION)) {
+            return MalformedVariant("DECIMAL8: scale out of range");
+          }
+          string s = Decimal8Value(unscaled).ToString(
+              ColumnType::MAX_DECIMAL8_PRECISION, scale);
           writer->RawValue(s.data(), s.size(), rapidjson::kNumberType);
           break;
         }
         case VariantPhysicalType::DECIMAL16: {
+          __int128_t unscaled;
+          if (UNLIKELY(!val.ReadValue(&unscaled, 2))) {
+            return MalformedVariant("DECIMAL16");
+          }
           int scale = val.Data()[1];
-          __int128_t unscaled = val.ReadValue<__int128_t>(2);
-          string s = Decimal16Value(unscaled).ToString(38, scale);
+          if (UNLIKELY(scale > ColumnType::MAX_PRECISION)) {
+            return MalformedVariant("DECIMAL16: scale out of range");
+          }
+          string s = Decimal16Value(unscaled).ToString(
+              ColumnType::MAX_PRECISION, scale);
           writer->RawValue(s.data(), s.size(), rapidjson::kNumberType);
           break;
         }
         case VariantPhysicalType::TIMESTAMPNTZ: {
-          int64_t micros = val.ReadValue<int64_t>();
+          int64_t micros;
+          if (UNLIKELY(!val.ReadValue(&micros))) {
+            return MalformedVariant("TIMESTAMP");
+          }
           TimestampValue ts = TimestampValue::UtcFromUnixTimeMicros(micros);
           char buf[SimpleDateFormatTokenizer::DEFAULT_DATE_TIME_FMT_LEN];
           int n = TimestampParser::FormatDefault(ts.date(), ts.time(), buf);
-          if (LIKELY(n > 0)) {
-            DCHECK_LE(n, sizeof(buf));
-            writer->String(buf, n);
-          } else {
-            if (ctx) {
-              ctx->AddWarning("Invalid TIMESTAMP value in VARIANT");
-            }
-            writer->String("<invalid-timestamp>");
-          }
+          if (UNLIKELY(n <= 0)) return Status("Variant TIMESTAMP value out of range");
+          DCHECK_LE(n, sizeof(buf));
+          writer->String(buf, n);
           break;
         }
         case VariantPhysicalType::TIMESTAMPNTZ_NANOS: {
-          int64_t nanos = val.ReadValue<int64_t>();
+          int64_t nanos;
+          if (UNLIKELY(!val.ReadValue(&nanos))) {
+            return MalformedVariant("TIMESTAMP");
+          }
           TimestampValue ts =
               TimestampValue::UtcFromUnixTimeLimitedRangeNanos(nanos);
           char buf[SimpleDateFormatTokenizer::DEFAULT_DATE_TIME_FMT_LEN];
           int n = TimestampParser::FormatDefault(ts.date(), ts.time(), buf);
-          if (LIKELY(n > 0)) {
-            DCHECK_LE(n, sizeof(buf));
-            writer->String(buf, n);
-          } else {
-            if (ctx) {
-              ctx->AddWarning("Invalid timestamp value in VARIANT");
-            }
-            writer->String("<invalid-timestamp>");
-          }
+          if (UNLIKELY(n <= 0)) return Status("Variant TIMESTAMP value out of range");
+          DCHECK_LE(n, sizeof(buf));
+          writer->String(buf, n);
           break;
         }
         case VariantPhysicalType::BINARY: {
-          StringValue sv = val.GetBinary();
+          StringValue sv;
+          if (UNLIKELY(!val.GetBinary(&sv))) return MalformedVariant("BINARY");
           int64_t out_max;
           if (UNLIKELY(!Base64EncodeBufLen(sv.Len(), &out_max))) {
-            if (ctx) {
-              ctx->AddWarning("Invalid BINARY value in VARIANT");
-            }
-            writer->String("<invalid-binary>");
-            break;
+            return Status("Variant BINARY value too large to encode");
           }
           string encoded(out_max, '\0');
           unsigned out_len;
@@ -571,29 +638,40 @@ static Status ValueToJson(const VariantValue& val,
       return Status::OK();
     }
     case VariantBasicType::OBJECT: {
+      // Parse and bounds-check the header + offset table once, then reuse the layout for
+      // every field rather than re-parsing on each accessor call.
+      VariantValue::ObjectLayout layout;
+      if (UNLIKELY(!val.ParseObjectLayout(&layout))) {
+        return MalformedVariant("object");
+      }
       writer->StartObject();
-      uint32_t num_fields = val.GetObjectSize();
-      for (uint32_t i = 0; i < num_fields; ++i) {
-        string_view field_name = val.GetFieldNameByIndex(i);
+      for (uint32_t i = 0; i < layout.num_fields; ++i) {
+        string_view field_name;
+        if (UNLIKELY(!val.FieldNameFromLayout(layout, i, &field_name))) {
+          return MalformedVariant("object field name");
+        }
         writer->Key(field_name.data(), field_name.size());
         VariantValue child;
-        if (!val.GetFieldByIndex(i, &child)) {
+        if (UNLIKELY(!val.FieldFromLayout(layout, i, &child))) {
           return Status("Failed to read object field");
         }
-        RETURN_IF_ERROR(ValueToJson(child, metadata, writer));
+        RETURN_IF_ERROR(Write(child, metadata, writer, depth - 1));
       }
       writer->EndObject();
       return Status::OK();
     }
     case VariantBasicType::ARRAY: {
+      VariantValue::ArrayLayout layout;
+      if (UNLIKELY(!val.ParseArrayLayout(&layout))) {
+        return MalformedVariant("array");
+      }
       writer->StartArray();
-      uint32_t num_elements = val.GetArraySize();
-      for (uint32_t i = 0; i < num_elements; ++i) {
+      for (uint32_t i = 0; i < layout.num_elems; ++i) {
         VariantValue elem;
-        if (!val.GetArrayElement(i, &elem)) {
+        if (UNLIKELY(!val.ElementFromLayout(layout, i, &elem))) {
           return Status("Failed to read array element");
         }
-        RETURN_IF_ERROR(ValueToJson(elem, metadata, writer));
+        RETURN_IF_ERROR(Write(elem, metadata, writer, depth - 1));
       }
       writer->EndArray();
       return Status::OK();
@@ -612,7 +690,8 @@ Status VariantValue::ToJson(std::string* json_out) const {
   DCHECK(metadata_ != nullptr);
   auto buffer = CreateStringBuffer(Len() * 2);
   JsonWriter writer(buffer);
-  RETURN_IF_ERROR(ValueToJson(*this, *metadata_, &writer));
+  RETURN_IF_ERROR(VariantJsonSerializer::Write(
+      *this, *metadata_, &writer));
   json_out->assign(buffer.GetString(), buffer.GetSize());
   return Status::OK();
 }
@@ -622,7 +701,8 @@ Status VariantValue::ToJson(impala_udf::FunctionContext* ctx,
   DCHECK(metadata_ != nullptr);
   auto buffer = CreateStringBuffer(Len() * 2);
   JsonWriter writer(buffer);
-  RETURN_IF_ERROR(ValueToJson(*this, *metadata_, &writer, ctx));
+  RETURN_IF_ERROR(VariantJsonSerializer::Write(
+      *this, *metadata_, &writer));
   *result = impala_udf::StringVal::CopyFrom(ctx,
       reinterpret_cast<const uint8_t*>(buffer.GetString()), buffer.GetSize());
   return Status::OK();
@@ -634,7 +714,8 @@ Status VariantValue::ToJson(std::ostream* out) const {
   // some bytes have already been written to 'writer') does not leak partial JSON.
   auto buffer = CreateStringBuffer(Len() * 2);
   JsonWriter writer(buffer);
-  RETURN_IF_ERROR(ValueToJson(*this, *metadata_, &writer));
+  RETURN_IF_ERROR(VariantJsonSerializer::Write(
+      *this, *metadata_, &writer));
   out->write(buffer.GetString(), buffer.GetSize());
   return Status::OK();
 }

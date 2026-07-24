@@ -47,6 +47,7 @@ public abstract class Type {
   // generating and scanning deeply nested Parquet and Avro files. In those experiments,
   // we exceeded the stack space in the scanner (which uses recursion for dealing with
   // nested types) at a nesting depth between 200 and 300 (200 worked, 300 crashed).
+  // Must be kept in sync with the backend's ColumnType::MAX_NESTING_DEPTH.
   public static int MAX_NESTING_DEPTH = 100;
 
   // Static constant types for scalar types that don't require additional information.

@@ -134,6 +134,7 @@ class VariantMetadata {
 
   const uint8_t* offsets_ = nullptr;
   const uint8_t* string_data_ = nullptr;
+  uint32_t string_data_len_ = 0;  // number of bytes in the string-data region
   uint32_t dict_size_ = 0;
   uint8_t version_ = 0;
   uint8_t offset_size_ = 0;  // 1, 2, 3, or 4 bytes per offset
@@ -154,7 +155,7 @@ class VariantMetadata {
 class VariantValue {
  public:
   VariantValue() = default;
-  VariantValue(const uint8_t* data, int32_t len, const VariantMetadata* metadata)
+  VariantValue(const uint8_t* data, uint32_t len, const VariantMetadata* metadata)
       : data_(data), len_(len), metadata_(metadata) {}
 
   // Returns the basic type of this value.
@@ -166,33 +167,36 @@ class VariantValue {
   // Returns true if this value is null.
   bool IsNull() const;
 
-  // Scalar accessors. Caller must ensure the physical type matches.
-  bool GetBoolean() const;
-  int8_t GetInt8() const;
-  int16_t GetInt16() const;
-  int32_t GetInt32() const;
-  int64_t GetInt64() const;
-  float GetFloat() const;
-  double GetDouble() const;
-  StringValue GetString() const;
-  StringValue GetBinary() const;
+  // Scalar accessors. Each returns false and leaves '*out' unchanged if the value is not
+  // of the expected physical type or its payload would read out of bounds.
+  [[nodiscard]] bool GetBoolean(bool* out) const;
+  [[nodiscard]] bool GetInt8(int8_t* out) const;
+  [[nodiscard]] bool GetInt16(int16_t* out) const;
+  [[nodiscard]] bool GetInt32(int32_t* out) const;
+  [[nodiscard]] bool GetInt64(int64_t* out) const;
+  [[nodiscard]] bool GetFloat(float* out) const;
+  [[nodiscard]] bool GetDouble(double* out) const;
+  [[nodiscard]] bool GetString(StringValue* out) const;
+  [[nodiscard]] bool GetBinary(StringValue* out) const;
 
-  // Object access.
-  uint32_t GetObjectSize() const;
-  // Gets the field value by field name. Returns false if field not found.
-  bool GetFieldByName(std::string_view name, VariantValue* result) const;
+  // Object access. Each returns false if this value is not a well-formed object (a
+  // corrupt or truncated header/offset table), if 'index' is out of range, or if the
+  // field's encoding is out of bounds.
+  [[nodiscard]] bool GetObjectSize(uint32_t* out) const;
+  // Gets the field value by field name. Returns false if the field is not found.
+  [[nodiscard]] bool GetFieldByName(std::string_view name, VariantValue* result) const;
   // Gets the field value by position index.
-  bool GetFieldByIndex(uint32_t index, VariantValue* result) const;
+  [[nodiscard]] bool GetFieldByIndex(uint32_t index, VariantValue* result) const;
   // Gets the field name at position index in this object.
-  std::string_view GetFieldNameByIndex(uint32_t index) const;
+  [[nodiscard]] bool GetFieldNameByIndex(uint32_t index, std::string_view* out) const;
 
-  // Array access.
-  uint32_t GetArraySize() const;
-  bool GetArrayElement(uint32_t index, VariantValue* result) const;
+  // Array access. Returns false on a corrupt/truncated array or an out-of-range index.
+  [[nodiscard]] bool GetArraySize(uint32_t* out) const;
+  [[nodiscard]] bool GetArrayElement(uint32_t index, VariantValue* result) const;
 
   // Navigate a dotted path like "field.nested[0].value".
   // Returns false if the path cannot be resolved.
-  bool NavigatePath(const std::string& path, VariantValue* result) const;
+  [[nodiscard]] bool NavigatePath(const std::string& path, VariantValue* result) const;
 
   // Serialize this variant value to JSON string.
   Status ToJson(std::string* json_out) const;
@@ -205,33 +209,78 @@ class VariantValue {
   const uint8_t* Data() const { return data_; }
   uint32_t Len() const { return len_; }
 
-  // Reads a primitive value of type T from the payload (data_ + offset).
-  // Default offset is 1 (immediately after the header byte).
+  // Reads a primitive of type T from the payload at data_ + offset (offset defaults to 1,
+  // just past the header byte). Returns false without modifying '*out' if the read would
+  // extend past the end of the value buffer.
   template <typename T>
-  T ReadValue(uint32_t offset = 1) const {
-    DCHECK_GE(len_, offset + sizeof(T));
-    T val;
-    memcpy(&val, data_ + offset, sizeof(T));
-    return val;
+  [[nodiscard]] bool ReadValue(T* out, uint32_t offset = 1) const {
+    if (offset > len_ || sizeof(T) > len_ - offset) return false;
+    memcpy(out, data_ + offset, sizeof(T));
+    return true;
   }
 
  private:
   // Helper to read a variable-width unsigned integer.
   static uint32_t ReadUint(const uint8_t* data, uint32_t size);
 
-  // For OBJECT: parse the header to get field count and internal layout.
+  // If this value is a PRIMITIVE with a readable header byte, sets '*pt' to its physical
+  // type and returns true; otherwise returns false.
+  [[nodiscard]] bool AsPrimitive(VariantPhysicalType* pt) const {
+    if (data_ == nullptr || len_ < 1) return false;
+    if (GetBasicType() != VariantBasicType::PRIMITIVE) return false;
+    *pt = GetPhysicalType();
+    return true;
+  }
+
+  // Checks this value is a PRIMITIVE of 'expected' physical type, then reads a T-sized
+  // payload just past the header byte (see ReadValue()). Returns false without modifying
+  // '*out' on a type mismatch or a truncated payload. Shared by the typed scalar getters.
+  template <typename T>
+  [[nodiscard]] bool ReadValueOfType(VariantPhysicalType expected, T* out) const {
+    VariantPhysicalType pt;
+    if (!AsPrimitive(&pt) || pt != expected) return false;
+    return ReadValue(out);
+  }
+
+  // Validated internal layout of an object/array value. The pointers and lengths are
+  // guaranteed to lie within the value buffer once the matching Parse*() returns true.
+  struct ObjectLayout {
+    uint32_t num_fields;
+    const uint8_t* field_ids;
+    const uint8_t* offsets;
+    const uint8_t* data;
+    uint32_t data_len;
+  };
+  struct ArrayLayout {
+    uint32_t num_elems;
+    const uint8_t* offsets;
+    const uint8_t* data;
+    uint32_t data_len;
+  };
+  // Parse and bounds-check the object/array header + offset table. Returns false (without
+  // reading out of bounds) if the value is not that type or the header/tables do not fit.
+  [[nodiscard]] bool ParseObjectLayout(ObjectLayout* out) const;
+  [[nodiscard]] bool ParseArrayLayout(ArrayLayout* out) const;
+
+  // Extract a single field/element from an already-parsed, validated layout, bounds-
+  // checking the individual entry's offsets (and, for a field name, that its dictionary
+  // id is in range). Shared by the public single-access accessors and by JSON
+  // serialization, which parses the layout once and reuses it across the whole loop.
+  [[nodiscard]] bool FieldFromLayout(const ObjectLayout& layout, uint32_t index,
+      VariantValue* result) const;
+  [[nodiscard]] bool FieldNameFromLayout(const ObjectLayout& layout, uint32_t index,
+      std::string_view* out) const;
+  [[nodiscard]] bool ElementFromLayout(const ArrayLayout& layout, uint32_t index,
+      VariantValue* result) const;
+
+  // JSON serialization lives in the .cc (so rapidjson stays out of this header) but needs
+  // the private layout helpers above to parse each object/array once and reuse it.
+  friend struct VariantJsonSerializer;
+
+  // Bit-width helpers derived from the header byte (require a readable header).
   uint32_t ObjectFieldIdSize() const;
   uint32_t ObjectOffsetSize() const;
-  uint32_t ObjectNumFields() const;
-  const uint8_t* ObjectFieldIdsStart() const;
-  const uint8_t* ObjectOffsetsStart() const;
-  const uint8_t* ObjectDataStart() const;
-
-  // For ARRAY: parse the header to get element count and offsets.
   uint32_t ArrayOffsetSize() const;
-  uint32_t ArrayNumElements() const;
-  const uint8_t* ArrayOffsetsStart() const;
-  const uint8_t* ArrayDataStart() const;
 
   const uint8_t* data_ = nullptr;
   uint32_t len_ = 0;

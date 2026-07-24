@@ -27,7 +27,11 @@ StringVal VariantFunctions::VariantToJson(FunctionContext* ctx,
   StringVal result;
   Status status = impala::VariantToJson(
       ctx, metadata.ptr, metadata.len, value.ptr, value.len, &result);
-  if (!status.ok()) return StringVal::null();
+  if (!status.ok()) {
+    // A corrupt/unrepresentable variant value yields SQL NULL; surface why via a warning.
+    ctx->AddWarning(status.GetDetail().c_str());
+    return StringVal::null();
+  }
   return result;
 }
 

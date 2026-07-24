@@ -98,6 +98,10 @@ struct ColumnType {
   /// The maximum precision representable by a 8-byte decimal (Decimal8Value)
   static const int MAX_DECIMAL8_PRECISION = 18;
 
+  /// Maximum nesting depth of a type or value. Must be kept in sync with FE's
+  /// Type.MAX_NESTING_DEPTH.
+  static const int MAX_NESTING_DEPTH = 100;
+
   /// Empty for scalar types
   std::vector<ColumnType> children;
 

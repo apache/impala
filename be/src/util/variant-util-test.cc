@@ -176,11 +176,14 @@ TEST(VariantUtilTest, BooleanValue) {
   vector<uint8_t> true_bytes = BuildBoolean(true);
   VariantValue true_val(true_bytes.data(), true_bytes.size(), &metadata);
   EXPECT_FALSE(true_val.IsNull());
-  EXPECT_TRUE(true_val.GetBoolean());
+  bool b = false;
+  EXPECT_TRUE(true_val.GetBoolean(&b));
+  EXPECT_TRUE(b);
 
   vector<uint8_t> false_bytes = BuildBoolean(false);
   VariantValue false_val(false_bytes.data(), false_bytes.size(), &metadata);
-  EXPECT_FALSE(false_val.GetBoolean());
+  EXPECT_TRUE(false_val.GetBoolean(&b));
+  EXPECT_FALSE(b);
 }
 
 TEST(VariantUtilTest, Int32Value) {
@@ -192,7 +195,9 @@ TEST(VariantUtilTest, Int32Value) {
   VariantValue val(val_bytes.data(), val_bytes.size(), &metadata);
   EXPECT_EQ(val.GetBasicType(), VariantBasicType::PRIMITIVE);
   EXPECT_EQ(val.GetPhysicalType(), VariantPhysicalType::INT32);
-  EXPECT_EQ(42, val.GetInt32());
+  int32_t int_val;
+  EXPECT_TRUE(val.GetInt32(&int_val));
+  EXPECT_EQ(42, int_val);
 }
 
 TEST(VariantUtilTest, ShortString) {
@@ -203,7 +208,8 @@ TEST(VariantUtilTest, ShortString) {
   vector<uint8_t> val_bytes = BuildShortString("hello");
   VariantValue val(val_bytes.data(), val_bytes.size(), &metadata);
   EXPECT_EQ(val.GetBasicType(), VariantBasicType::SHORT_STRING);
-  StringValue sv = val.GetString();
+  StringValue sv;
+  ASSERT_TRUE(val.GetString(&sv));
   EXPECT_EQ(string(sv.Ptr(), sv.Len()), "hello");
 }
 
@@ -220,14 +226,19 @@ TEST(VariantUtilTest, SimpleObject) {
 
   VariantValue obj(obj_bytes.data(), obj_bytes.size(), &metadata);
   EXPECT_EQ(obj.GetBasicType(), VariantBasicType::OBJECT);
-  EXPECT_EQ(2, obj.GetObjectSize());
+  uint32_t obj_size;
+  EXPECT_TRUE(obj.GetObjectSize(&obj_size));
+  EXPECT_EQ(2, obj_size);
 
   VariantValue field_val;
+  int32_t field_int;
   EXPECT_TRUE(obj.GetFieldByName("age", &field_val));
-  EXPECT_EQ(30, field_val.GetInt32());
+  EXPECT_TRUE(field_val.GetInt32(&field_int));
+  EXPECT_EQ(30, field_int);
 
   EXPECT_TRUE(obj.GetFieldByName("name", &field_val));
-  StringValue sv = field_val.GetString();
+  StringValue sv;
+  ASSERT_TRUE(field_val.GetString(&sv));
   EXPECT_EQ(string(sv.Ptr(), sv.Len()), "Alice");
 
   EXPECT_FALSE(obj.GetFieldByName("unknown", &field_val));
@@ -245,13 +256,18 @@ TEST(VariantUtilTest, SimpleArray) {
 
   VariantValue arr(arr_bytes.data(), arr_bytes.size(), &metadata);
   EXPECT_EQ(arr.GetBasicType(), VariantBasicType::ARRAY);
-  EXPECT_EQ(3, arr.GetArraySize());
+  uint32_t arr_size;
+  EXPECT_TRUE(arr.GetArraySize(&arr_size));
+  EXPECT_EQ(3, arr_size);
 
   VariantValue elem;
+  int32_t elem_int;
   EXPECT_TRUE(arr.GetArrayElement(0, &elem));
-  EXPECT_EQ(1, elem.GetInt32());
+  EXPECT_TRUE(elem.GetInt32(&elem_int));
+  EXPECT_EQ(1, elem_int);
   EXPECT_TRUE(arr.GetArrayElement(2, &elem));
-  EXPECT_EQ(3, elem.GetInt32());
+  EXPECT_TRUE(elem.GetInt32(&elem_int));
+  EXPECT_EQ(3, elem_int);
   EXPECT_FALSE(arr.GetArrayElement(3, &elem));
 }
 
@@ -270,11 +286,14 @@ TEST(VariantUtilTest, PathNavigation) {
   VariantValue root(outer_obj.data(), outer_obj.size(), &metadata);
 
   VariantValue result;
+  int32_t nav_int;
   EXPECT_TRUE(root.NavigatePath("$.data.items[1]", &result));
-  EXPECT_EQ(20, result.GetInt32());
+  EXPECT_TRUE(result.GetInt32(&nav_int));
+  EXPECT_EQ(20, nav_int);
 
   EXPECT_TRUE(root.NavigatePath("$.data.items[2]", &result));
-  EXPECT_EQ(30, result.GetInt32());
+  EXPECT_TRUE(result.GetInt32(&nav_int));
+  EXPECT_EQ(30, nav_int);
 
   EXPECT_FALSE(root.NavigatePath("$.data.unknown", &result));
   EXPECT_FALSE(root.NavigatePath("$.data.items[100]", &result));
@@ -603,14 +622,19 @@ TEST(VariantUtilTest, ObjectDifferentFieldIdAndOffsetSize) {
 
   VariantValue obj(obj_buf.data(), obj_buf.size(), &metadata);
   EXPECT_EQ(obj.GetBasicType(), VariantBasicType::OBJECT);
-  EXPECT_EQ(2, obj.GetObjectSize());
+  uint32_t obj_size;
+  EXPECT_TRUE(obj.GetObjectSize(&obj_size));
+  EXPECT_EQ(2, obj_size);
 
   VariantValue field_val;
+  int32_t field_int;
   EXPECT_TRUE(obj.GetFieldByName("f0", &field_val));
-  EXPECT_EQ(42, field_val.GetInt32());
+  EXPECT_TRUE(field_val.GetInt32(&field_int));
+  EXPECT_EQ(42, field_int);
 
   EXPECT_TRUE(obj.GetFieldByName("f299", &field_val));
-  EXPECT_EQ(7, field_val.GetInt32());
+  EXPECT_TRUE(field_val.GetInt32(&field_int));
+  EXPECT_EQ(7, field_int);
 
   EXPECT_FALSE(obj.GetFieldByName("f1", &field_val));
 }
@@ -638,7 +662,8 @@ TEST(VariantUtilTest, LongStringPrimitive) {
   VariantValue val(val_buf.data(), val_buf.size(), &metadata);
   EXPECT_EQ(val.GetBasicType(), VariantBasicType::PRIMITIVE);
   EXPECT_EQ(val.GetPhysicalType(), VariantPhysicalType::STRING);
-  StringValue sv = val.GetString();
+  StringValue sv;
+  ASSERT_TRUE(val.GetString(&sv));
   EXPECT_EQ(string(sv.Ptr(), sv.Len()), long_str);
 }
 
@@ -821,6 +846,160 @@ TEST(VariantUtilTest, DuckDbVariants) {
         tc.value.data(), tc.value.size(), &json));
     EXPECT_EQ(json, tc.expected_json) << "Mismatch on test case " << i;
   }
+}
+
+// --- Corrupt / malformed input handling ---
+
+// Expects VariantToJson to reject the (metadata, value) blobs with an error rather than
+// reading out of bounds.
+static void ExpectVariantError(const vector<uint8_t>& metadata,
+    const vector<uint8_t>& value) {
+  string json;
+  Status s = VariantToJson(metadata.data(), metadata.size(),
+      value.data(), value.size(), &json);
+  EXPECT_FALSE(s.ok()) << "expected an error but succeeded with json: " << json;
+}
+
+// Expects VariantMetadata::Init to reject 'metadata' as malformed.
+static void ExpectMetadataError(const vector<uint8_t>& metadata) {
+  VariantMetadata m;
+  EXPECT_FALSE(m.Init(metadata.data(), metadata.size()).ok());
+}
+
+TEST(VariantUtilTest, MetadataCorruptionRejected) {
+  // Empty blob.
+  ExpectMetadataError({});
+  // Unsupported version (version=2).
+  ExpectMetadataError({0x02, 0x00, 0x00});
+  // offset_size=4 (header bits 6-7 = 3) but blob too short to hold the dictionary size.
+  ExpectMetadataError({0xC1, 0x00});
+  // dict_size=3 but no offset array / string data present.
+  ExpectMetadataError({0x01, 0x03});
+  // Integer-overflow attempt: offset_size=4, dict_size=0xFFFFFFFF, short blob. In 32-bit
+  // math (dict_size+1)*offset_size wraps to 0, so the check would wrongly pass; the
+  // 64-bit math must reject it.
+  ExpectMetadataError({0xC1, 0xFF, 0xFF, 0xFF, 0xFF});
+  // Non-monotonic dictionary offsets [0, 5, 3].
+  ExpectMetadataError({0x01, 0x02, 0x00, 0x05, 0x03, 'a', 'b', 'c', 'd', 'e'});
+  // Last offset (10) exceeds the 2-byte string-data region.
+  ExpectMetadataError({0x01, 0x01, 0x00, 0x0A, 'a', 'b'});
+
+  // Valid baseline still parses.
+  VariantMetadata m;
+  const vector<uint8_t> valid = {0x01, 0x01, 0x00, 0x03, 'a', 'b', 'c'};
+  EXPECT_OK(m.Init(valid.data(), valid.size()));
+  EXPECT_EQ(m.GetFieldName(0), "abc");
+}
+
+TEST(VariantUtilTest, ValueCorruptionRejected) {
+  const vector<uint8_t> empty_meta = {0x01, 0x00, 0x00};
+  // Metadata dictionary [a, b, c, d, e] (sorted).
+  const vector<uint8_t> meta5 = {0x11, 0x05, 0x00, 0x01, 0x02, 0x03, 0x04, 0x05,
+      0x61, 0x62, 0x63, 0x64, 0x65};
+
+  // Empty value buffer.
+  ExpectVariantError(empty_meta, {});
+  // Short string claims length 5 but has only 2 payload bytes.
+  ExpectVariantError(empty_meta, {0x15, 'a', 'b'});
+  // Long string (STRING=0x40) with a 4-byte length of 0xFFFFFFFF and no payload.
+  ExpectVariantError(empty_meta, {0x40, 0xFF, 0xFF, 0xFF, 0xFF});
+  // Long string with a truncated (2-byte) length prefix.
+  ExpectVariantError(empty_meta, {0x40, 0x01, 0x00});
+  // INT8 (0x0c) with no payload byte (needs 1).
+  ExpectVariantError(empty_meta, {0x0c});
+  // INT16 (0x10) with only 1 payload byte (needs 2).
+  ExpectVariantError(empty_meta, {0x10, 0x01});
+  // INT32 (0x14) with only 2 payload bytes (needs 4).
+  ExpectVariantError(empty_meta, {0x14, 0x01, 0x02});
+  // INT64 (0x18) with only 4 payload bytes (needs 8).
+  ExpectVariantError(empty_meta, {0x18, 0x01, 0x02, 0x03, 0x04});
+  // FLOAT (0x38) with only 2 payload bytes (needs 4).
+  ExpectVariantError(empty_meta, {0x38, 0x01, 0x02});
+  // DOUBLE (0x1c) with only 4 payload bytes (needs 8).
+  ExpectVariantError(empty_meta, {0x1c, 0x01, 0x02, 0x03, 0x04});
+  // Binary (0x3c) claiming a huge payload length.
+  ExpectVariantError(empty_meta, {0x3c, 0xFF, 0xFF, 0xFF, 0x7F});
+  // Object claiming num_fields=100 in a tiny buffer.
+  ExpectVariantError(meta5, {0x02, 0x64, 0x00});
+  // Object with a field offset (99) past the end of the data region.
+  ExpectVariantError(meta5, {0x02, 0x01, 0x00, 0x00, 0x63});
+  // Object with non-monotonic field offsets [5, 0].
+  ExpectVariantError(meta5,
+      {0x02, 0x01, 0x00, 0x05, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00});
+  // Object with a field id (200) that is out of range of the 5-entry dictionary.
+  ExpectVariantError(meta5, {0x02, 0x01, 0xC8, 0x00, 0x01, 0x00});
+  // Array claiming num_elements=200 in a tiny buffer.
+  ExpectVariantError(empty_meta, {0x03, 0xC8, 0x00});
+  // Array with an element offset (50) past the end of the data region.
+  ExpectVariantError(empty_meta, {0x03, 0x01, 0x00, 0x32});
+  // DECIMAL4 (0x20) with scale=255, past the max precision of 9. An unchecked scale would
+  // underflow the output buffer in DecimalValue::ToString (OOB write).
+  ExpectVariantError(empty_meta, {0x20, 0xFF, 0x00, 0x00, 0x00, 0x00});
+  // DECIMAL4 with scale=10, one past the max precision of 9.
+  ExpectVariantError(empty_meta, {0x20, 0x0A, 0x00, 0x00, 0x00, 0x00});
+  // DECIMAL8 (0x24) with scale=200, past the max precision of 18.
+  ExpectVariantError(empty_meta,
+      {0x24, 0xC8, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00});
+  // DECIMAL16 (0x28) with scale=255, past the max precision of 38.
+  ExpectVariantError(empty_meta,
+      {0x28, 0xFF, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+       0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00});
+  // Truncated fixed-width payloads: the scale byte is present but the unscaled value is
+  // cut short (DECIMAL4/8/16 need 4/8/16 bytes past the scale byte).
+  ExpectVariantError(empty_meta, {0x20, 0x02, 0x01});
+  ExpectVariantError(empty_meta, {0x24, 0x02, 0x01, 0x02, 0x03, 0x04});
+  ExpectVariantError(empty_meta,
+      {0x28, 0x02, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08});
+  // DATE (0x2c) whose day count (0x7FFFFFFF) is far outside the [0001-01-01, 9999-12-31]
+  // range: structurally well-formed but unrepresentable, so it is rejected like any other
+  // malformed value rather than silently emitting a placeholder string.
+  ExpectVariantError(empty_meta, {0x2c, 0xFF, 0xFF, 0xFF, 0x7F});
+  // DATE (0x2c) with only 1 payload byte (needs 4).
+  ExpectVariantError(empty_meta, {0x2c, 0x01});
+  // TIMESTAMPNTZ (0x34) with only 1 payload byte (needs 8).
+  ExpectVariantError(empty_meta, {0x34, 0x01});
+  // TIMESTAMPNTZ_NANOS (0x4c) with only 1 payload byte (needs 8).
+  ExpectVariantError(empty_meta, {0x4c, 0x01});
+}
+
+// A decimal whose scale is exactly the max precision (the boundary of the valid range)
+// must still serialize successfully.
+TEST(VariantUtilTest, DecimalScaleBoundaryAccepted) {
+  const vector<uint8_t> empty_meta = {0x01, 0x00, 0x00};
+  string json;
+  // DECIMAL4 with scale=9 (== MAX_DECIMAL4_PRECISION), unscaled=0.
+  vector<uint8_t> dec4 = {0x20, 0x09, 0x00, 0x00, 0x00, 0x00};
+  EXPECT_OK(VariantToJson(empty_meta.data(), empty_meta.size(),
+      dec4.data(), dec4.size(), &json));
+}
+
+// Builds a value that wraps 'inner' in 'depth' nested single-element arrays. Uses 2-byte
+// offsets so the growing child sizes stay representable as the nesting deepens.
+static vector<uint8_t> WrapInArrays(vector<uint8_t> inner, int depth) {
+  for (int i = 0; i < depth; ++i) {
+    uint32_t child_size = inner.size();
+    // header 0x07 = ARRAY with 2-byte offsets; num_elems=1; offsets [0, child_size].
+    vector<uint8_t> a = {0x07, 0x01, 0x00, 0x00,
+        static_cast<uint8_t>(child_size & 0xFF),
+        static_cast<uint8_t>((child_size >> 8) & 0xFF)};
+    a.insert(a.end(), inner.begin(), inner.end());
+    inner.swap(a);
+  }
+  return inner;
+}
+
+TEST(VariantUtilTest, NestingDepthLimit) {
+  const vector<uint8_t> empty_meta = {0x01, 0x00, 0x00};
+
+  // A structurally valid but excessively deep value must be rejected (not overflow the
+  // stack) when serialized.
+  ExpectVariantError(empty_meta, WrapInArrays({0x00}, 105));
+
+  // A moderately nested value within the cap serializes fine.
+  vector<uint8_t> ok = WrapInArrays({0x00}, 50);
+  string json;
+  EXPECT_OK(VariantToJson(empty_meta.data(), empty_meta.size(),
+      ok.data(), ok.size(), &json));
 }
 
 }  // namespace impala
