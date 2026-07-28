@@ -75,7 +75,7 @@ fi
 # Skip building backend tests, which aren't used.
 time -p ./buildall.sh -format -testdata -notests < /dev/null
 # Kill non-dockerised cluster.
-start-impala-cluster.py --kill
+./bin/start-impala-cluster.py --kill
 
 # Build the docker images required to start the cluster.
 # parquet-reader and impala-profile-tool are needed for e2e tests but not built for
@@ -91,7 +91,7 @@ case ${IMPALA_DOCKER_JAVA:-17} in
   *)
     ;;
 esac
-make -j ${IMPALA_BUILD_THREADS} \
+${IMPALA_MAKE_CMD} -j ${IMPALA_BUILD_THREADS-} \
     ${IMAGE_TYPE}_images parquet-reader impala-profile-tool kudu-array-inserter
 
 source_impala_config
