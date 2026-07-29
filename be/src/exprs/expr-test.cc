@@ -11327,6 +11327,70 @@ TEST_P(ExprTest, AiFunctionsTest) {
   EXPECT_EQ(AiFunctions::AI_PLATFORM::UNSUPPORTED,
       AiFunctions::GetAiPlatformFromEndpoint("https://fake-api.openai.com/v1/chat"));
 
+  // Standard Userinfo (@) bypass
+  // Test trying to make the validator see the trusted domain, while the HTTP client
+  // connects to the fake domain.
+  EXPECT_EQ(AiFunctions::AI_PLATFORM::UNSUPPORTED,
+      AiFunctions::GetAiPlatformFromEndpoint("https://api.openai.com@fake.com/v1/chat"));
+
+  // Port + Userinfo (@) bypass
+  EXPECT_EQ(AiFunctions::AI_PLATFORM::UNSUPPORTED,
+      AiFunctions::GetAiPlatformFromEndpoint(
+          "https://api.openai.com:999@fake.com/v1/chat"));
+
+  // URL-encoded Userinfo bypass
+  // %40 is the URL-encoded value of '@'.
+  EXPECT_EQ(AiFunctions::AI_PLATFORM::UNSUPPORTED,
+      AiFunctions::GetAiPlatformFromEndpoint(
+          "https://api.openai.com%40attacker.com/v1/chat"));
+
+  // URL-encoded Port and Userinfo bypass
+  // %34%34%33%40 is '443@' URL-encoded.
+  EXPECT_EQ(AiFunctions::AI_PLATFORM::UNSUPPORTED,
+      AiFunctions::GetAiPlatformFromEndpoint(
+          "https://api.openai.com:%34%34%33%40attacker.com/v1/chat"));
+
+  // Backslash (\) Delimiter Confusion
+  // Some parsers treat \ as a path separator, others treat it as part of the authority
+  // block.
+  EXPECT_EQ(AiFunctions::AI_PLATFORM::UNSUPPORTED,
+      AiFunctions::GetAiPlatformFromEndpoint(
+          "https://api.openai.com\\@fake.com/v1/chat"));
+  EXPECT_EQ(AiFunctions::AI_PLATFORM::UNSUPPORTED,
+      AiFunctions::GetAiPlatformFromEndpoint("https://fake.com\\api.openai.com/v1/chat"));
+  EXPECT_EQ(AiFunctions::AI_PLATFORM::UNSUPPORTED,
+      AiFunctions::GetAiPlatformFromEndpoint(
+          "https://api.openai.com\\.fake.com/v1/chat"));
+
+  // Whitespace or Control Character Injection
+  EXPECT_EQ(AiFunctions::AI_PLATFORM::UNSUPPORTED,
+      AiFunctions::GetAiPlatformFromEndpoint("https://api.openai.com @fake.com/v1/chat"));
+  EXPECT_EQ(AiFunctions::AI_PLATFORM::UNSUPPORTED,
+      AiFunctions::GetAiPlatformFromEndpoint(
+          "https://api.openai.com%20@fake.com/v1/chat"));
+
+  // Test to use \0 to truncate the string in C-style parsers. We construct a
+  // string with an explicit null byte in the middle and a valid domain before the
+  // null byte but a fake domain after.
+  std::string nul_attack_str = "https://api.openai.com";
+  nul_attack_str.push_back('\0');
+  nul_attack_str.append(".fake.com/v1/chat");
+
+  EXPECT_EQ(AiFunctions::AI_PLATFORM::UNSUPPORTED,
+      AiFunctions::GetAiPlatformFromEndpoint(nul_attack_str));
+
+  // Test malformed URLs or valid but no host.
+  EXPECT_EQ(AiFunctions::AI_PLATFORM::UNSUPPORTED,
+      AiFunctions::GetAiPlatformFromEndpoint("this_is_not_a_url"));
+  EXPECT_EQ(AiFunctions::AI_PLATFORM::UNSUPPORTED,
+      AiFunctions::GetAiPlatformFromEndpoint("https://:80"));
+  EXPECT_EQ(AiFunctions::AI_PLATFORM::UNSUPPORTED,
+      AiFunctions::GetAiPlatformFromEndpoint("https://[::1"));
+  EXPECT_EQ(AiFunctions::AI_PLATFORM::UNSUPPORTED,
+      AiFunctions::GetAiPlatformFromEndpoint("file:///etc/passwd"));
+  EXPECT_EQ(AiFunctions::AI_PLATFORM::UNSUPPORTED,
+      AiFunctions::GetAiPlatformFromEndpoint("https:///no-host"));
+
   // Test fastpath
   StringVal result =
       AiFunctions::AiGenerateTextInternal<true, AiFunctions::AI_PLATFORM::OPEN_AI>(ctx,
@@ -11611,6 +11675,24 @@ TEST_P(ExprTest, AiFunctionsTestAdditionalSites) {
       AiFunctions::is_api_endpoint_supported("https://fake.com/ai-api.com"), false);
   EXPECT_EQ(
       AiFunctions::is_api_endpoint_supported("https://another-ai.org.fake.com"), false);
+  EXPECT_EQ(AiFunctions::is_api_endpoint_supported(
+                "https://another-ai.org:999@fake.com/v1/generate"),
+      false);
+  EXPECT_EQ(
+      AiFunctions::is_api_endpoint_supported("https://ai-api.com%40fake.com/v1/generate"),
+      false);
+  EXPECT_EQ(AiFunctions::is_api_endpoint_supported(
+                "https://another-ai.org\\@fake.com/v1/generate"),
+      false);
+  EXPECT_EQ(
+      AiFunctions::is_api_endpoint_supported("https://fake.com\\ai-api.com/v1/generate"),
+      false);
+  EXPECT_EQ(
+      AiFunctions::is_api_endpoint_supported("https://ai-api.com\\.fake.com/v1/generate"),
+      false);
+  EXPECT_EQ(
+      AiFunctions::is_api_endpoint_supported("https://ai-api.com @fake.com/v1/generate"),
+      false);
 
 }
 

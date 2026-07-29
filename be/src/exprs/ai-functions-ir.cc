@@ -22,6 +22,7 @@
 
 #include <boost/algorithm/string/predicate.hpp>
 #include <boost/algorithm/string/trim.hpp>
+#include <curl/curl.h>
 
 #include "exprs/ai-functions.inline.h"
 
@@ -87,22 +88,38 @@ static const char* OPEN_AI_RESPONSE_FIELD_CHOICES = "choices";
 static const char* OPEN_AI_RESPONSE_FIELD_MESSAGE = "message";
 static const char* OPEN_AI_RESPONSE_FIELD_CONTENT = "content";
 
-// Helper to extract the hostname from a URL. Returns empty string if invalid.
-static string_view ExtractHost(const string_view& endpoint) {
-  string_view prefix = AI_API_ENDPOINT_PREFIX;
-  if (endpoint.length() < prefix.length() ||
-      strncasecmp(endpoint.data(), prefix.data(), prefix.length()) != 0) {
-    return {};
+// Helper to extract the hostname from a URL using libcurl.
+// Returns empty string if invalid.
+// The input 'endpoint' must be null-terminated (\0).
+static string ExtractHost(const string_view& endpoint) {
+  string final_host = "";
+  // Reject any endpoint embedded NULL bytes (\0).
+  if (UNLIKELY(endpoint.find('\0') != string_view::npos)) {
+    LOG(WARNING) << "Rejected AI endpoint containing embedded null byte(s).";
+    return final_host;
   }
-  string_view without_prefix = endpoint.substr(prefix.length());
-  // Truncate the string at the first standard URL delimiter ('/', '?', '#',
-  // or ':'). This extracts the raw host name, ensuring that any trailing
-  // paths are ignored.
-  size_t host_end = without_prefix.find_first_of("/?:#");
-  if (host_end == string_view::npos) {
-    return without_prefix;
+  // Use the libcurl URL parser to extract the host name from the endpoint.
+  CURLU* url_handle = curl_url();
+  if (UNLIKELY(url_handle == nullptr)) {
+    LOG(WARNING) << "Failed to allocate libcurl handle extracting host from endpoint";
+    return final_host;
   }
-  return without_prefix.substr(0, host_end);
+  CURLUcode rc = curl_url_set(url_handle, CURLUPART_URL, endpoint.data(), 0);
+  if (LIKELY(rc == CURLUE_OK)) {
+    char* host = nullptr;
+    rc = curl_url_get(url_handle, CURLUPART_HOST, &host, 0);
+    if (LIKELY(rc == CURLUE_OK)) {
+      final_host = host;
+      curl_free(host);
+    } else {
+      DCHECK(host == nullptr) << "libcurl should not set host pointer on failure";
+      LOG(WARNING) << "Failed to curl_url_get(). CURLUcode: " << rc;
+    }
+  } else {
+    LOG(WARNING) << "Failed to curl_url_set(). CURLUcode: " << rc;
+  }
+  curl_url_cleanup(url_handle);
+  return final_host;
 }
 
 // Helper to strictly validate a host against a target domain.
@@ -194,7 +211,7 @@ AiFunctions::AI_PLATFORM AiFunctions::GetAiPlatformFromEndpoint(
   if (UNLIKELY(dry_run)) AIAdditionalPlatforms::GetInstance().Reset();
 
   // Validate the canonical host.
-  string_view host = ExtractHost(endpoint);
+  string host = ExtractHost(endpoint);
   if (host.empty()) return AiFunctions::AI_PLATFORM::UNSUPPORTED;
 
   if (IsHostMatch(host, OPEN_AI_PUBLIC_ENDPOINT)) {
@@ -258,10 +275,13 @@ StringVal AiFunctions::AiGenerateTextHelper(FunctionContext* ctx,
     const StringVal& endpoint, const StringVal& prompt, const StringVal& model,
     const StringVal& auth_credential, const StringVal& platform_params,
     const StringVal& impala_options) {
+  string endpoint_str;
   string_view endpoint_sv(FLAGS_ai_endpoint);
   // endpoint validation
   if (!fastpath && endpoint.ptr != nullptr && endpoint.len != 0) {
-    endpoint_sv = string_view(reinterpret_cast<char*>(endpoint.ptr), endpoint.len);
+    // Copy the StringVal to a std::string to ensure it is null-terminated (\0).
+    endpoint_str = string(reinterpret_cast<char*>(endpoint.ptr), endpoint.len);
+    endpoint_sv = endpoint_str;
     // Simple validation for endpoint. It should start with https://
     if (!is_api_endpoint_valid(endpoint_sv)) {
       LOG(ERROR) << "AI Generate Text: \ninvalid protocol: " << endpoint_sv;
