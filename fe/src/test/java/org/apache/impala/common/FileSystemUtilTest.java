@@ -29,6 +29,9 @@ import static org.junit.Assert.assertEquals;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.hdfs.protocol.ErasureCodingPolicy;
+import org.apache.hadoop.hdfs.protocol.HdfsFileStatus;
+import org.apache.hadoop.hdfs.protocol.SystemErasureCodingPolicies;
 import org.apache.impala.thrift.TTableName;
 import org.junit.Test;
 import org.mockito.Mockito;
@@ -204,6 +207,41 @@ public class FileSystemUtilTest {
       // Reset default configuration.
       FileSystemUtil.setConfiguration(new Configuration());
     }
+  }
+
+  @Test
+  public void testGetErasureCodingPolicyId() {
+    // A file that is not erasure-coded maps to the id of the replication policy.
+    FileStatus stat = Mockito.mock(FileStatus.class);
+    Mockito.when(stat.isErasureCoded()).thenReturn(false);
+    assertEquals(0, FileSystemUtil.getErasureCodingPolicyId(stat));
+
+    // A file that is erasure-coded but whose status does not carry the policy
+    // (e.g. on a non-HDFS filesystem) maps to 0 as well, meaning "unknown".
+    Mockito.when(stat.isErasureCoded()).thenReturn(true);
+    assertEquals(0, FileSystemUtil.getErasureCodingPolicyId(stat));
+
+    // The status of an erasure-coded HDFS file carries the policy of the file.
+    ErasureCodingPolicy policy = SystemErasureCodingPolicies.getByID(
+        SystemErasureCodingPolicies.RS_6_3_POLICY_ID);
+    FileStatus ecStat = Mockito.mock(FileStatus.class,
+        Mockito.withSettings().extraInterfaces(HdfsFileStatus.class));
+    Mockito.when(ecStat.isErasureCoded()).thenReturn(true);
+    Mockito.when(((HdfsFileStatus) ecStat).getErasureCodingPolicy()).thenReturn(policy);
+    assertEquals(policy.getId(), FileSystemUtil.getErasureCodingPolicyId(ecStat));
+  }
+
+  @Test
+  public void testGetErasureCodingPolicyName() {
+    Path dummyPath = new Path("hdfs://localhost:20500/dummy");
+    // The id of the replication policy means "not erasure-coded".
+    assertEquals(FileSystemUtil.NO_ERASURE_CODE_LABEL,
+        FileSystemUtil.getErasureCodingPolicyName((byte) 0, dummyPath));
+    // System policies are resolved locally, without an RPC.
+    assertEquals("RS-6-3-1024k", FileSystemUtil.getErasureCodingPolicyName(
+        SystemErasureCodingPolicies.RS_6_3_POLICY_ID, dummyPath));
+    assertEquals("XOR-2-1-1024k", FileSystemUtil.getErasureCodingPolicyName(
+        SystemErasureCodingPolicies.XOR_2_1_POLICY_ID, dummyPath));
   }
 
   @Test

@@ -36,6 +36,10 @@ import org.apache.hadoop.hdfs.DistributedFileSystem;
 import org.apache.hadoop.hdfs.client.HdfsAdmin;
 import org.apache.hadoop.hdfs.protocol.EncryptionZone;
 import org.apache.hadoop.hdfs.protocol.ErasureCodingPolicy;
+import org.apache.hadoop.hdfs.protocol.ErasureCodingPolicyInfo;
+import org.apache.hadoop.hdfs.protocol.HdfsFileStatus;
+import org.apache.hadoop.hdfs.protocol.SystemErasureCodingPolicies;
+import org.apache.hadoop.io.erasurecode.ErasureCodeConstants;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneVolume;
@@ -51,9 +55,11 @@ import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.io.UncheckedIOException;
 import java.net.URI;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -63,6 +69,8 @@ import java.util.Set;
 import java.util.Stack;
 import java.util.StringTokenizer;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
 
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
 
@@ -320,6 +328,89 @@ public class FileSystemUtil {
       }
     }
     return NO_ERASURE_CODE_LABEL;
+  }
+
+  /**
+   * Returns the id of the erasure coding policy of the file represented by
+   * 'fileStatus', or 0 (the id of the replication policy) if the file is not
+   * erasure-coded or the listing does not carry the policy (e.g. non-HDFS
+   * filesystems). Purely local, issues no RPC.
+   */
+  public static byte getErasureCodingPolicyId(FileStatus fileStatus) {
+    if (fileStatus.isErasureCoded() && fileStatus instanceof HdfsFileStatus) {
+      ErasureCodingPolicy policy = ((HdfsFileStatus) fileStatus).getErasureCodingPolicy();
+      if (policy != null) return policy.getId();
+    }
+    return ErasureCodeConstants.REPLICATION_POLICY_ID;
+  }
+
+  /**
+   * Cache of the id to name mapping of the erasure coding policies of a filesystem,
+   * keyed by filesystem URI. Only consulted for policies that are not built-in system
+   * policies, i.e. user-defined ones. Populated with a single
+   * getAllErasureCodingPolicies() RPC per filesystem and refreshed once when an id
+   * that is missing from the snapshot is looked up, so policies added to the
+   * NameNode later are still resolved.
+   */
+  private static final ConcurrentMap<String, Map<Byte, String>> EC_POLICY_NAME_CACHE =
+      new ConcurrentHashMap<>();
+
+  /**
+   * Fetches the id to name mapping of the erasure coding policies of 'fs' (including
+   * disabled and removed ones, whose files remain readable) with a single
+   * getAllErasureCodingPolicies() RPC. Wraps the IOException of the RPC so that the
+   * method can be used in the compute functions of EC_POLICY_NAME_CACHE.
+   */
+  private static Map<Byte, String> fetchErasureCodingPolicyNames(
+      DistributedFileSystem fs) {
+    try {
+      Map<Byte, String> result = new HashMap<>();
+      for (ErasureCodingPolicyInfo info : fs.getAllErasureCodingPolicies()) {
+        result.put(info.getPolicy().getId(), info.getPolicy().getName());
+      }
+      return result;
+    } catch (IOException e) {
+      throw new UncheckedIOException(e);
+    }
+  }
+
+  /**
+   * Returns the name of the erasure coding policy with id 'policyId' for a file on the
+   * same filesystem as 'p'. System policies are resolved locally without an RPC. Names
+   * of user-defined policies are fetched with one getAllErasureCodingPolicies() call
+   * per filesystem and cached. As a last resort falls back to a per-path
+   * getErasureCodingPolicy() lookup.
+   */
+  public static String getErasureCodingPolicyName(byte policyId, Path p) {
+    if (policyId == ErasureCodeConstants.REPLICATION_POLICY_ID) {
+      return NO_ERASURE_CODE_LABEL;
+    }
+    ErasureCodingPolicy systemPolicy = SystemErasureCodingPolicies.getByID(policyId);
+    if (systemPolicy != null) return systemPolicy.getName();
+    try {
+      FileSystem fs = p.getFileSystem(CONF);
+      if (fs instanceof DistributedFileSystem) {
+        DistributedFileSystem dfs = (DistributedFileSystem) fs;
+        Map<Byte, String> names = EC_POLICY_NAME_CACHE.computeIfAbsent(
+            dfs.getUri().toString(), uri -> fetchErasureCodingPolicyNames(dfs));
+        String name = names.get(policyId);
+        if (name == null) {
+          // The id is missing from the cached snapshot: a policy may have been added
+          // to the NameNode after the snapshot was taken. Refresh the snapshot once;
+          // callers that raced here reuse a refreshed map that already resolves the
+          // id instead of refetching again.
+          names = EC_POLICY_NAME_CACHE.compute(dfs.getUri().toString(),
+              (uri, old) -> old != null && old.containsKey(policyId)
+                  ? old : fetchErasureCodingPolicyNames(dfs));
+          name = names.get(policyId);
+        }
+        if (name != null) return name;
+      }
+    } catch (IOException | UncheckedIOException e) {
+      LOG.warn("Unable to retrieve erasure coding policies of the filesystem of {}",
+          p, e);
+    }
+    return getErasureCodingPolicy(p);
   }
 
   /**

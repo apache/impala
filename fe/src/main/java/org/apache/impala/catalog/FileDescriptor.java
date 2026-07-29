@@ -37,6 +37,7 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.fs.BlockLocation;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.Path;
+import org.apache.impala.common.FileSystemUtil;
 import org.apache.impala.fb.FbCompression;
 import org.apache.impala.fb.FbFileBlock;
 import org.apache.impala.fb.FbFileDesc;
@@ -197,6 +198,7 @@ public class FileDescriptor implements Comparable<FileDescriptor> {
     FbFileDesc.addLastModificationTime(fbb, fileStatus.getModificationTime());
     FbFileDesc.addIsEncrypted(fbb, isEncrypted);
     FbFileDesc.addIsEc(fbb, isEc);
+    FbFileDesc.addEcPolicyId(fbb, FileSystemUtil.getErasureCodingPolicyId(fileStatus));
     HdfsCompression comp = HdfsCompression.fromFileName(fileStatus.getPath().getName());
     FbFileDesc.addCompression(fbb, comp.toFb());
     if (blockVectorOffset >= 0) FbFileDesc.addFileBlocks(fbb, blockVectorOffset);
@@ -278,6 +280,15 @@ public class FileDescriptor implements Comparable<FileDescriptor> {
 
   public boolean getIsEc() {
     return fbFileDescriptor_.isEc();
+  }
+
+  /**
+   * Returns the erasure coding policy id of this file, or 0 (the id of the replication
+   * policy) if the file is not erasure-coded or the policy is unknown, e.g. when the
+   * descriptor was created by a version that did not populate the field.
+   */
+  public byte getEcPolicyId() {
+    return fbFileDescriptor_.ecPolicyId();
   }
 
   public FbFileBlock getFbFileBlock(int idx) {

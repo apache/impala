@@ -50,8 +50,8 @@ public class IcebergContentFileStoreTest {
 
   private FbFileDesc createFbFileDesc() {
     FlatBufferBuilder fbb = new FlatBufferBuilder(1);
-    fbb.finish(
-        FbFileDesc.createFbFileDesc(fbb, 0, 10L, (byte) 0, 10000L, 0, false, 0, false));
+    fbb.finish(FbFileDesc.createFbFileDesc(
+        fbb, 0, 10L, (byte) 0, 10000L, 0, false, 0, false, (byte) 0));
     ByteBuffer bb = fbb.dataBuffer().slice();
     ByteBuffer compressedBb = ByteBuffer.allocate(bb.capacity());
     compressedBb.put(bb);

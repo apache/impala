@@ -82,6 +82,10 @@ public interface FeFsTable extends FeTable {
   // and its usage in getFileSystem suggests it should be.
   public static final Configuration CONF = new Configuration();
 
+  // Label reported in the EC Policy column of a partition whose files do not all
+  // share the same erasure coding policy.
+  public static final String MIXED_ERASURE_CODE_LABEL = "MIXED";
+
   // Internal table property that specifies the number of files in the table.
   public static final String NUM_FILES = "numFiles";
 
@@ -708,10 +712,71 @@ public interface FeFsTable extends FeTable {
     rowBuilder.add(p.getFileFormat().toString());
     rowBuilder.add(String.valueOf(p.hasIncrementalStats()));
     rowBuilder.add(p.getLocation());
-    rowBuilder.add(FileSystemUtil.getErasureCodingPolicy(p.getLocationPath()));
+    rowBuilder.add(getErasureCodingPolicy(p));
 
     result.addToRows(rowBuilder.get());
     return new long[] { cachedBytes, size, numFiles, numRows };
+  }
+
+  /**
+   * Returns the erasure coding policy to report for partition 'p', derived from the
+   * policies of its files, which are known from the directory listing that loaded them.
+   * This avoids the per-partition NameNode RPC that looking up the policy of the
+   * partition directory would cost, and reflects how the data is actually stored
+   * rather than which policy new files would get. Returns NONE if no file is
+   * erasure-coded, the policy name if all files share one policy, and MIXED if the
+   * partition mixes plain and erasure-coded files or several policies. Falls back to
+   * the per-directory lookup when the partition has no files or when it cannot be
+   * decided from the descriptors alone: every file is erasure-coded but the policy id
+   * of some of them is unknown (e.g. file metadata written by an older version, or a
+   * filesystem whose listing does not carry the policy, like Ozone).
+   */
+  static String getErasureCodingPolicy(FeFsPartition p) {
+    List<FileDescriptor> fds = p.getFileDescriptors();
+    if (fds.isEmpty()) {
+      return FileSystemUtil.getErasureCodingPolicy(p.getLocationPath());
+    }
+    byte policyId = 0;
+    boolean sawEc = false;
+    boolean sawNonEc = false;
+    boolean sawUnknownEc = false;
+    for (FileDescriptor fd : fds) {
+      if (!fd.getIsEc()) {
+        sawNonEc = true;
+      } else if (fd.getEcPolicyId() == 0) {
+        // Erasure-coded, but the policy id was not recorded: the descriptor was
+        // written by an older version or the listing did not carry the policy.
+        sawUnknownEc = true;
+      } else if (sawEc && fd.getEcPolicyId() != policyId) {
+        return MIXED_ERASURE_CODE_LABEL;
+      } else {
+        sawEc = true;
+        policyId = fd.getEcPolicyId();
+      }
+      // A mix of plain and erasure-coded files is MIXED even if the policy of the
+      // erasure-coded files is unknown; no later file can change that.
+      if (sawNonEc && (sawEc || sawUnknownEc)) return MIXED_ERASURE_CODE_LABEL;
+    }
+    if (sawUnknownEc) {
+      // Every file is erasure-coded but some policy ids are unknown, so whether they
+      // all share one policy cannot be decided from the descriptors.
+      return FileSystemUtil.getErasureCodingPolicy(p.getLocationPath());
+    }
+    if (!sawEc) return FileSystemUtil.NO_ERASURE_CODE_LABEL;
+    return FileSystemUtil.getErasureCodingPolicyName(policyId, p.getLocationPath());
+  }
+
+  /**
+   * Returns the erasure coding policy to report for the file with descriptor 'fd' at
+   * path 'p': NONE if the file is not erasure-coded, otherwise the policy name
+   * resolved from the policy id recorded when the file metadata was loaded. Neither
+   * costs an RPC in the common case. Falls back to the per-path lookup when the file
+   * is erasure-coded but its policy id is unknown (see getErasureCodingPolicy above).
+   */
+  static String getErasureCodingPolicy(FileDescriptor fd, Path p) {
+    if (!fd.getIsEc()) return FileSystemUtil.NO_ERASURE_CODE_LABEL;
+    if (fd.getEcPolicyId() == 0) return FileSystemUtil.getErasureCodingPolicy(p);
+    return FileSystemUtil.getErasureCodingPolicyName(fd.getEcPolicyId(), p);
   }
 
   /**
@@ -916,7 +981,7 @@ public interface FeFsTable extends FeTable {
           rowBuilder.add(absPath);
           rowBuilder.add(PrintUtils.printBytes(fd.getFileLength()));
           rowBuilder.add(p.getPartitionName());
-          rowBuilder.add(FileSystemUtil.getErasureCodingPolicy(new Path(absPath)));
+          rowBuilder.add(getErasureCodingPolicy(fd, new Path(absPath)));
           result.addToRows(rowBuilder.get());
         }
       }

@@ -86,6 +86,12 @@ table FbFileDesc {
 
   // Whether this file is encrypted
   is_encrypted: bool = false (id: 7);
+
+  // The HDFS erasure coding policy id of this file, taken from the file status
+  // returned by the directory listing. 0 (the id of the replication policy) means
+  // the file is not erasure-coded or the policy is unknown; 'is_ec' remains the
+  // authoritative flag for whether the file is erasure-coded.
+  ec_policy_id: byte = 0 (id: 8);
 }
 
 // Additional file-related metadata

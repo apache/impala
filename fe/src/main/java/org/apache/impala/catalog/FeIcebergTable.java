@@ -532,7 +532,7 @@ public interface FeIcebergTable extends FeFsTable {
         rowBuilder.add(absPath);
         rowBuilder.add(PrintUtils.printBytes(fd.getFileLength()));
         rowBuilder.add("");
-        rowBuilder.add(FileSystemUtil.getErasureCodingPolicy(new Path(absPath)));
+        rowBuilder.add(FeFsTable.getErasureCodingPolicy(fd, new Path(absPath)));
         result.addToRows(rowBuilder.get());
       }
       return result;
@@ -567,7 +567,9 @@ public interface FeIcebergTable extends FeFsTable {
         }
 
         rowBuilder.add("");         // Partition - empty for now
-        rowBuilder.add(FileSystemUtil.getErasureCodingPolicy(new Path(filePath)));
+        rowBuilder.add(fd != null
+            ? FeFsTable.getErasureCodingPolicy(fd, new Path(filePath))
+            : FileSystemUtil.getErasureCodingPolicy(new Path(filePath)));
         result.addToRows(rowBuilder.get());
       }
 
