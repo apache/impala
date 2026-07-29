@@ -200,11 +200,16 @@ else:
   for jar in dep_classpath.split(":"):
     num_jars_on_classpath += 1
     assert os.path.exists(jar), "missing jar from classpath: {0}".format(jar)
-    if jar.find("calcite-planner") != -1:
-      assert jar.find("tests") == -1
+    jar_name = os.path.basename(jar)
+    if jar_name.find("calcite-planner") != -1:
+      if jar_name.find("tests") != -1:
+        raise Exception("The test jar {0} should be excluded "
+            "from the container image context".format(jar))
       num_calcite_jars += 1
-    if jar.find("impala-frontend") != -1:
-      assert jar.find("tests") == -1
+    if jar_name.find("impala-frontend") != -1:
+      if jar_name.find("tests") != -1:
+        raise Exception("The test jar {0} should be excluded "
+            "from the container image context".format(jar))
       num_frontend_jars += 1
     symlink_file_into_dir(jar, LIB_DIR)
 
