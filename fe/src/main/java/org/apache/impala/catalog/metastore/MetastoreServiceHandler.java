@@ -3132,17 +3132,8 @@ public abstract class MetastoreServiceHandler extends AbstractThriftHiveMetastor
       return;
     }
 
-    String dbName = dbNameWithCatalog;
-    try {
-      // Parse db name. Throw error if parsing fails.
-      dbName = MetaStoreUtils.parseDbName(dbNameWithCatalog, serverConf_)[1];
-    } catch (MetaException ex) {
-      LOG.error("Successfully executed HMS api: {} but encountered error " +
-              "when trying to invalidate table {}.{} from cache with " +
-              "error message: {}", apiName, dbNameWithCatalog, tableName,
-          ex.getMessage());
-      throw ex;
-    }
+    // Parse db name.
+    String dbName = MetaStoreUtils.parseDbName(dbNameWithCatalog, serverConf_)[1];
     org.apache.impala.catalog.Table catalogTbl= null;
     try {
       catalogTbl = catalog_.getTable(dbName, tableName);
@@ -3243,19 +3234,10 @@ public abstract class MetastoreServiceHandler extends AbstractThriftHiveMetastor
       return;
     }
 
-    String toParse = null, oldDbName, newDbName;
-    // Parse old and new db names. Throw error if parsing fails
-    try {
-      toParse = oldDbNameWithCatalog;
-      oldDbName = MetaStoreUtils.parseDbName(toParse, serverConf_)[1];
-      toParse = newDbNameWithCatalog;
-      newDbName = MetaStoreUtils.parseDbName(toParse, serverConf_)[1];
-    } catch (MetaException ex) {
-      LOG.error("Successfully executed metastore api: {} but encountered " +
-              "error when parsing dbName {}" + "with error message: {}",
-          apiName, toParse, ex.getMessage());
-      throw ex;
-    }
+    String oldDbName, newDbName;
+    // Parse old and new db names.
+    oldDbName = MetaStoreUtils.parseDbName(oldDbNameWithCatalog, serverConf_)[1];
+    newDbName = MetaStoreUtils.parseDbName(newDbNameWithCatalog, serverConf_)[1];
     TTableName oldTable = new TTableName(oldDbName, oldTableName);
     TTableName newTable = new TTableName(newDbName, newTableName);
     String tableInfo = "old table " + oldDbName + "." + oldTableName +
