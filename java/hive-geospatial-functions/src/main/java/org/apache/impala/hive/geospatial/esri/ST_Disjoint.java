@@ -19,6 +19,11 @@ package org.apache.impala.hive.geospatial.esri;
 
 import com.esri.core.geometry.OperatorDisjoint;
 import com.esri.core.geometry.OperatorSimpleRelation;
+import com.esri.core.geometry.SpatialReference;
+import com.esri.core.geometry.ogc.OGCGeometry;
+import com.esri.core.geometry.ogc.OGCLineString;
+import com.esri.core.geometry.ogc.OGCMultiLineString;
+
 import org.apache.hadoop.hive.ql.exec.Description;
 
 @Description(name = "ST_Disjoint",
@@ -37,5 +42,41 @@ public class ST_Disjoint extends ST_GeometryRelational {
   @Override
   public String getDisplayString(String[] args) {
     return String.format("returns true if %s and %s are disjoint", args[0], args[1]);
+  }
+
+  @Override
+  protected Object execEvaluate(OGCGeometry geom1, OGCGeometry geom2,
+      SpatialReference sr) {
+    // IMPALA-15193: Workaround for an underlying issue in the ESRI geometry-api-java
+    // dependency. This issue causes ST_Intersects to incorrectly return true when
+    // geometry 2 is a MultiLineString and geometry 1 is either a LineString or a
+    // MultiLineString.
+    if (geom2 instanceof OGCMultiLineString) {
+      if (geom1 instanceof OGCLineString) {
+        OGCMultiLineString geom2MLS = (OGCMultiLineString) geom2;
+        for (int i = 0; i < geom2MLS.numGeometries(); i++) {
+          if (! (Boolean) super.execEvaluate(geom1, geom2MLS.geometryN(i), sr)) {
+            return false;
+          }
+        }
+
+        return true;
+      } else if(geom1 instanceof OGCMultiLineString) {
+        OGCMultiLineString geom1MLS = (OGCMultiLineString) geom1;
+        OGCMultiLineString geom2MLS = (OGCMultiLineString) geom2;
+        for (int i = 0; i < geom1MLS.numGeometries(); i++) {
+          for (int j = 0; j < geom2MLS.numGeometries(); j++) {
+            if (! (Boolean) super.execEvaluate(geom1MLS.geometryN(i), geom2MLS.geometryN(j),
+                sr)) {
+              return false;
+            }
+          }
+        }
+
+        return true;
+      }
+    }
+
+    return super.execEvaluate(geom1, geom2, sr);
   }
 }
