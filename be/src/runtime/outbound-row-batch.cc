@@ -127,6 +127,9 @@ Status OutboundRowBatch::CodegenAppendRowWithDedup(LlvmCodeGen* codegen,
   LlvmBuilder builder(context);
   llvm::Value* args[6];
   *fn = prototype.GeneratePrototype(&builder, args);
+  // Mark the first argument explicitly as sret, so the generated function's prototype
+  // matches that of OutboundRowBatch::AppendRowWithDedup (returning Status as a struct).
+  (*fn)->addAttribute(1, llvm::Attribute::StructRet);
   llvm::Value* status = args[0];
   llvm::Value* this_ptr = args[1];
   llvm::Value* row = args[2];
