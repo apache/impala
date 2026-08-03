@@ -50,7 +50,7 @@ STRING, BOOLEAN
 grant role role_01 to user non_owner
 ---- RESULTS: VERIFY_IS_SUBSET
 ---- CATCH
-User doesn't have permissions to grant role role_01
+User $USER does not have privilege to role role_01
 ====
 ---- QUERY
 # Since the $GRANTEE_TYPE '$GRANTEE_NAME' is not an admin of the role 'role_01',
@@ -58,7 +58,7 @@ User doesn't have permissions to grant role role_01
 grant role role_01 to group non_owner_2
 ---- RESULTS: VERIFY_IS_SUBSET
 ---- CATCH
-User doesn't have permissions to grant role role_01
+User $USER does not have privilege to role role_01
 ====
 ---- QUERY
 # Since the $GRANTEE_TYPE '$GRANTEE_NAME' is an admin of the role 'role_02',

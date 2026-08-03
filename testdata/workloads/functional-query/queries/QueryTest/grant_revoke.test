@@ -499,14 +499,14 @@ test_user
 ---- QUERY
 grant role grant_revoke_test_ALL_SERVER to $GRANTEE_TYPE `$GRANTEE_NAME`
 ---- CATCH
-User doesn't have permissions to grant role grant_revoke_test_ALL_SERVER
+User test_user does not have privilege to role grant_revoke_test_ALL_SERVER
 ====
 ---- USER
 test_user
 ---- QUERY
 revoke role grant_revoke_test_ALL_SERVER from $GRANTEE_TYPE `$GRANTEE_NAME`
 ---- CATCH
-User doesn't have permissions to revoke role grant_revoke_test_ALL_SERVER
+User test_user does not have privilege to role grant_revoke_test_ALL_SERVER
 ====
 ---- USER
 non_owner
@@ -621,7 +621,7 @@ non_owner
 # Also cannot create/drop/grant roles
 grant role grant_revoke_test_NON_OWNER to $GRANTEE_TYPE non_owner
 ---- CATCH
-User doesn't have permissions to grant role grant_revoke_test_NON_OWNER
+User non_owner does not have privilege to role grant_revoke_test_NON_OWNER
 ====
 ---- USER
 admin
