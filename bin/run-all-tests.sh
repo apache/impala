@@ -70,6 +70,8 @@ fi
 : ${CLUSTER_TEST_FILES:=}
 # Run Helm chart render assertions on demand.
 : ${HELM_CHART_TEST:=false}
+# Run Kubernetes-in-Docker E2E tests on demand.
+: ${K8S_E2E_TEST:=false}
 # Run JS tests
 : ${JS_TEST:=false}
 # Verifiers to run after all tests. Skipped if true.
@@ -416,6 +418,12 @@ do
 
   if [[ "$HELM_CHART_TEST" == true ]]; then
     if ! "${IMPALA_HOME}/helm/impala/tests/run-chart-tests.sh"; then
+      TEST_RET_CODE=1
+    fi
+  fi
+
+  if [[ "$K8S_E2E_TEST" == true ]]; then
+    if ! "${IMPALA_HOME}/bin/jenkins/run-k8s-e2e-tests.sh"; then
       TEST_RET_CODE=1
     fi
   fi

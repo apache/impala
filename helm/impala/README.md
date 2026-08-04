@@ -437,6 +437,42 @@ Required dependencies to run this harness:
 This is a render-time validation suite; it does not require a running
 Kubernetes cluster or Docker runtime.
 
+## Kubernetes end-to-end test smoke run
+
+Use the upstream test harness against an existing Kubernetes deployment:
+
+```bash
+K8S_NAMESPACE=impala \
+K8S_IMPALAD_SERVICE=impala-impala-impalad \
+./bin/run-k8s-e2e-tests.sh
+```
+
+By default this script port-forwards the Impalad service and runs
+`tests/infra/test_k8s_external_cluster.py` in remote-cluster mode.
+If service-level port-forwarding is not reliable in a local runtime, set
+`K8S_PORT_FORWARD_MODE=pod` (or use `auto` to try service first, then pod).
+Override the test target with `K8S_TEST_TARGET` or pass additional pytest
+arguments after the script name.
+
+For Jenkins-style ephemeral Kubernetes execution from this repository, use:
+
+```bash
+./bin/jenkins/run-k8s-e2e-tests.sh
+```
+
+This script now supports both `kind` and `k3d` Kubernetes-in-Docker runtimes:
+
+```bash
+# Default runtime is kind
+K8S_E2E_RUNTIME=kind ./bin/jenkins/run-k8s-e2e-tests.sh
+
+# Use k3d as an alternate runtime
+K8S_E2E_RUNTIME=k3d ./bin/jenkins/run-k8s-e2e-tests.sh
+```
+
+For architecture details and runtime diagrams, see
+`helm/impala/kubernetes-in-docker-e2e.md`.
+
 ## Control-plane guidance
 
 Use one control path per release/namespace:
