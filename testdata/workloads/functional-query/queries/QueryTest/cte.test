@@ -3,8 +3,8 @@
 EXPLAIN WITH v1 AS (SELECT n_name, n_nationkey FROM tpch.nation WHERE n_regionkey = 0)
 SELECT v1.n_name, v1_next.n_name FROM v1, v1 v1_next WHERE v1.n_nationkey + 1 = v1_next.n_nationkey;
 ---- RESULTS: VERIFY_IS_EQUAL
-'Max Per-Host Resource Reservation: Memory=19.95MB Threads=2'
-'Per-Host Resource Estimates: Memory=52MB'
+'Max Per-Host Resource Reservation: Memory=20.95MB Threads=2'
+'Per-Host Resource Estimates: Memory=53MB'
 ''
 'PLAN-ROOT SINK'
 '|'
@@ -21,12 +21,14 @@ SELECT v1.n_name, v1_next.n_name FROM v1, v1 v1_next WHERE v1.n_nationkey + 1 = 
 '|'
 '05:HASH JOIN [INNER JOIN]'
 '|  hash predicates: add(n_nationkey, 1) = n_nationkey'
+'|  runtime filters: RF000 <- n_nationkey, RF001 <- n_nationkey'
 '|  row-size=32B cardinality=5'
 '|'
 '|--04:CTE CONSUMER [cte_suggestion_0]'
 '|     row-size=23B cardinality=5'
 '|'
 '03:CTE CONSUMER [cte_suggestion_0]'
+'   runtime filters: RF001 -> add(n_nationkey, 1), RF000 -> add(n_nationkey, 1)'
 '   row-size=23B cardinality=5'
 ====
 ---- QUERY
@@ -107,4 +109,41 @@ d2 as (
 select d1.id_col, d2.id_col from d1, d2;
 ---- RESULTS: VERIFY_IS_SUBSET
 '00:SEQUENCE'
+====
+---- QUERY
+select c_name, sum(l_quantity)
+from tpch.customer, tpch.orders, tpch.lineitem
+where
+  o_orderkey in (
+    select l_orderkey from tpch.lineitem group by l_orderkey having sum(l_quantity) > 300)
+  and c_custkey = o_custkey
+  and o_orderkey = l_orderkey
+group by c_name, c_custkey, o_orderkey, o_orderdate, o_totalprice
+order by o_totalprice desc, o_orderdate, o_orderkey
+limit 10
+---- RESULTS
+'Customer#000128120',323.00
+'Customer#000144617',317.00
+'Customer#000013940',304.00
+'Customer#000066790',327.00
+'Customer#000046435',309.00
+'Customer#000015272',302.00
+'Customer#000146608',303.00
+'Customer#000096103',312.00
+'Customer#000024341',302.00
+'Customer#000137446',311.00
+---- TYPES
+STRING, DECIMAL
+---- RUNTIME_PROFILE
+# Verify Final filter table:
+#  ID  Src. Node  Tgt. Node(s)  Eff. Tgt. Node(s)  Target type  ...
+# -----------------------------------------------------------------
+#   4          7             4                  N        LOCAL  ...
+#   3          8             3                  N        LOCAL  ...
+#   2          8             3                  3        LOCAL  ...
+#   0         10             4                  N        LOCAL  ...
+row_regex: 4\s+7\s+4\s+N\s+LOCAL
+row_regex: 3\s+8\s+3\s+[3N]\s+LOCAL
+row_regex: 2\s+8\s+3\s+3\s+LOCAL
+row_regex: 0\s+10\s+4\s+N\s+LOCAL
 ====

@@ -22,6 +22,7 @@
 #include <vector>
 
 #include "common/status.h"
+#include "exec/filter-context.h"
 #include "gen-cpp/PlanNodes_types.h"
 #include "gutil/threading/thread_collision_warner.h"
 #include "runtime/bufferpool/buffer-pool.h"
@@ -530,6 +531,12 @@ class ExecNode {
   /// Sets the eos and returns true, if the limit is reached.
   /// Uses thread safe functions.
   bool CheckLimitAndTruncateRowBatchIfNeededShared(RowBatch* row_batch, bool* eos);
+
+  /// Waits for all filters in 'filter_ctxs' to arrive (up to runtime_filter_wait_time_ms
+  /// or the query-option override), then records arrival results in the runtime profile.
+  /// Returns true if all filters arrived within the time limit.
+  bool WaitForRuntimeFilters(RuntimeState* state,
+      const std::vector<FilterContext>& filter_ctxs);
 
  private:
   DISALLOW_COPY_AND_ASSIGN(ExecNode);

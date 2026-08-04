@@ -422,7 +422,8 @@ void Coordinator::InitFilterRoutingTable() {
                 || plan_node.join_node.__isset.nested_loop_join_node)) {
           AddFilterSource(
               fragment_params, num_instances, num_backends, filter, plan_node.node_id);
-        } else if (plan_node.__isset.hdfs_scan_node || plan_node.__isset.kudu_scan_node) {
+        } else if (plan_node.__isset.hdfs_scan_node || plan_node.__isset.kudu_scan_node
+            || plan_node.__isset.cte_consumer) {
           FilterState* f = filter_routing_table_->GetOrCreateFilterState(filter);
           auto it = filter.planid_to_target_ndx.find(plan_node.node_id);
           DCHECK(it != filter.planid_to_target_ndx.end());

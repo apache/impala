@@ -114,6 +114,8 @@ public class NodeCreationUtils {
     TupleDescriptorFactory tupleDescFactory =
         new TupleDescriptorFactory(cteName, rowType);
     TupleDescriptor desc = tupleDescFactory.create(analyzer);
+    // Mark as CTE output so runtime filters can target this tuple.
+    desc.setIsCTEOutput(true);
     Preconditions.checkState(desc.getSlots().size() == producer.outputExprs_.size(),
         "Number of slots in CTEConsumerNode tuple descriptor does not match " +
         "number of output exprs from CTEProducerNode");

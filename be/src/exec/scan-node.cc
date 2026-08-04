@@ -17,7 +17,6 @@
 
 #include "exec/scan-node.h"
 
-#include <boost/algorithm/string/join.hpp>
 #include <boost/bind.hpp>
 
 #include "exec/data-source-scan-node.h"
@@ -31,7 +30,6 @@
 #include "runtime/fragment-state.h"
 #include "runtime/io/disk-io-mgr.h"
 #include "runtime/row-batch.h"
-#include "runtime/runtime-filter.inline.h"
 #include "runtime/runtime-state.h"
 #include "runtime/scanner-mem-limiter.h"
 #include "util/debug-util.h"
@@ -55,8 +53,6 @@ DEFINE_int32_hidden(max_queued_row_batches_per_scanner_thread, 5,
 
 DEFINE_int64(max_queued_row_batch_bytes, 16L * 1024 * 1024,
     "(Advanced) the maximum bytes of queued rows per multithreaded scan node.");
-
-using boost::algorithm::join;
 
 namespace impala {
 
@@ -210,46 +206,6 @@ void ScanNode::Close(RuntimeState* state) {
   // and 'bytes_read_timeseries_counter_'. Subclasses may also have started counters.
   runtime_profile_->StopPeriodicCounters();
   ExecNode::Close(state);
-}
-
-bool ScanNode::WaitForRuntimeFilters() {
-  int32_t wait_time_ms = FLAGS_runtime_filter_wait_time_ms;
-  if (runtime_state_->query_options().runtime_filter_wait_time_ms > 0) {
-    wait_time_ms = runtime_state_->query_options().runtime_filter_wait_time_ms;
-  }
-  vector<string> arrived_filter_ids;
-  vector<string> missing_filter_ids;
-  int32_t max_arrival_delay = 0;
-  int64_t start = MonotonicMillis();
-  for (auto& ctx: filter_ctxs_) {
-    string filter_id = Substitute("$0", ctx.filter->id());
-    if (ctx.filter->WaitForArrival(wait_time_ms)) {
-      arrived_filter_ids.push_back(filter_id);
-    } else {
-      missing_filter_ids.push_back(filter_id);
-    }
-    max_arrival_delay = max(max_arrival_delay, ctx.filter->arrival_delay_ms());
-  }
-  int64_t end = MonotonicMillis();
-  const string& wait_time = PrettyPrinter::Print(end - start, TUnit::TIME_MS);
-  const string& arrival_delay = PrettyPrinter::Print(max_arrival_delay, TUnit::TIME_MS);
-
-  if (arrived_filter_ids.size() == filter_ctxs_.size()) {
-    runtime_profile()->AddInfoString("Runtime filters",
-        Substitute("All filters arrived. Waited $0. Maximum arrival delay: $1.",
-                                         wait_time, arrival_delay));
-    VLOG(2) << "Filters arrived. Waited " << wait_time
-            << ". Current time since reboot(ms) " << end;
-    return true;
-  }
-
-  const string& filter_str = Substitute("Not all filters arrived (arrived: [$0], missing "
-                                        "[$1]), waited for $2. Arrival delay: $3.",
-      join(arrived_filter_ids, ", "), join(missing_filter_ids, ", "), wait_time,
-      arrival_delay);
-  runtime_profile()->AddInfoString("Runtime filters", filter_str);
-  VLOG(2) << filter_str;
-  return false;
 }
 
 void ScanNode::ScannerThreadState::Prepare(

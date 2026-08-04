@@ -17,6 +17,7 @@
 
 #include "exec/exec-node.h"
 
+#include <boost/algorithm/string/join.hpp>
 #include <memory>
 #include <sstream>
 #include <unistd.h>  // for sleep()
@@ -73,11 +74,17 @@
 #include "runtime/row-batch.h"
 #include "runtime/runtime-state.h"
 #include "util/debug-util.h"
+#include "util/pretty-printer.h"
 #include "util/runtime-profile-counters.h"
 #include "util/string-parser.h"
+#include "util/time.h"
 #include "util/uid-util.h"
 
 #include "common/names.h"
+
+DECLARE_int32(runtime_filter_wait_time_ms);
+
+using boost::algorithm::join;
 
 using strings::Substitute;
 
@@ -544,6 +551,48 @@ bool ExecNode::CheckLimitAndTruncateRowBatchIfNeededShared(
 Status ExecNode::QueryMaintenance(RuntimeState* state) {
   expr_results_pool_->Clear();
   return state->CheckQueryState();
+}
+
+bool ExecNode::WaitForRuntimeFilters(RuntimeState* state,
+    const vector<FilterContext>& filter_ctxs) {
+  int32_t wait_time_ms = FLAGS_runtime_filter_wait_time_ms;
+  if (state->query_options().runtime_filter_wait_time_ms > 0) {
+    wait_time_ms = state->query_options().runtime_filter_wait_time_ms;
+  }
+  vector<string> arrived_filter_ids;
+  vector<string> missing_filter_ids;
+  int32_t max_arrival_delay = 0;
+  int64_t start = MonotonicMillis();
+  for (const FilterContext& ctx : filter_ctxs) {
+    string filter_id = Substitute("$0", ctx.filter->id());
+    if (ctx.filter->WaitForArrival(wait_time_ms)) {
+      arrived_filter_ids.push_back(filter_id);
+    } else {
+      missing_filter_ids.push_back(filter_id);
+    }
+    max_arrival_delay = max(max_arrival_delay, ctx.filter->arrival_delay_ms());
+  }
+  int64_t end = MonotonicMillis();
+  const string& wait_time = PrettyPrinter::Print(end - start, TUnit::TIME_MS);
+  const string& arrival_delay = PrettyPrinter::Print(max_arrival_delay, TUnit::TIME_MS);
+
+  if (arrived_filter_ids.size() == filter_ctxs.size()) {
+    runtime_profile()->AddInfoString("Runtime filters",
+        Substitute("All filters arrived. Waited $0. Maximum arrival delay: $1.",
+            wait_time, arrival_delay));
+    VLOG(2) << "Filters arrived. Waited " << wait_time
+            << ". Current time since reboot(ms) " << end;
+    return true;
+  }
+
+  const string& filter_str = Substitute(
+      "Not all filters arrived (arrived: [$0], missing [$1]), waited for $2. "
+      "Arrival delay: $3.",
+      join(arrived_filter_ids, ", "), join(missing_filter_ids, ", "), wait_time,
+      arrival_delay);
+  runtime_profile()->AddInfoString("Runtime filters", filter_str);
+  VLOG(2) << filter_str;
+  return false;
 }
 
 // Codegen for EvalConjuncts.  The generated signature is the same as EvalConjuncts().

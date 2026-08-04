@@ -37,7 +37,7 @@ select
   ,rank_within_parent
  limit 100
 ---- PLAN
-Max Per-Host Resource Reservation: Memory=85.41MB Threads=1
+Max Per-Host Resource Reservation: Memory=89.41MB Threads=1
 Per-Host Resource Estimates: Memory=88.23GB
 ImpalaSequence
   ImpalaProjectRel(TOTAL_SUM=[$0], S_STATE=[$1], S_COUNTY=[$2], LOCHIERARCHY=[$3], RANK_WITHIN_PARENT=[$4])
@@ -75,7 +75,7 @@ ImpalaSequence
         ImpalaProjectRel(d_date_sk=[$0], d_month_seq=[$3])
           ImpalaHdfsScanRel(table=[[tpcds_partitioned_parquet_snap, date_dim]])
 F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Instance Resources: mem-estimate=88.23GB mem-reservation=85.41MB thread-reservation=1 runtime-filters-memory=1.00MB
+|  Per-Instance Resources: mem-estimate=88.23GB mem-reservation=89.41MB thread-reservation=1 runtime-filters-memory=5.00MB
 |  max-parallelism=1 segment-costs=[9201337999, 79, 9845400328, 8242, 3284, 9372, 1657382579]
 PLAN-ROOT SINK
 |  output exprs: aggif(valid_tid(19,20,21) IN (19, 20, 21), CASE valid_tid(19,20,21) WHEN 19 THEN sum(ss_net_profit) WHEN 20 THEN sum(ss_net_profit) WHEN 21 THEN sum(ss_net_profit) END), CASE valid_tid(19,20,21) WHEN 19 THEN tpcds_partitioned_parquet_snap.store.s_state WHEN 20 THEN tpcds_partitioned_parquet_snap.store.s_state WHEN 21 THEN NULL END, CASE valid_tid(19,20,21) WHEN 19 THEN tpcds_partitioned_parquet_snap.store.s_county WHEN 20 THEN NULL WHEN 21 THEN NULL END, add(CAST(aggif(valid_tid(19,20,21) IN (19, 20, 21), CASE valid_tid(19,20,21) WHEN 19 THEN 0 WHEN 20 THEN 0 WHEN 21 THEN 1 END) AS SMALLINT), CAST(aggif(valid_tid(19,20,21) IN (19, 20, 21), CASE valid_tid(19,20,21) WHEN 19 THEN 0 WHEN 20 THEN 1 WHEN 21 THEN 1 END) AS SMALLINT)), rank()
@@ -168,6 +168,7 @@ PLAN-ROOT SINK
 19:HASH JOIN [INNER JOIN]
 |  hash predicates: ss_sold_date_sk = d_date_sk
 |  fk/pk conjuncts: ss_sold_date_sk = d_date_sk
+|  runtime filters: RF000[bloom] <- d_date_sk, RF001[min_max] <- d_date_sk
 |  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
 |  tuple-ids=4,5,16,15,18 row-size=98B cardinality=1.65G cost=722356735
 |  in pipelines: 05(GETNEXT), 18(OPEN)
@@ -180,6 +181,7 @@ PLAN-ROOT SINK
 17:HASH JOIN [INNER JOIN]
 |  hash predicates: ss_store_sk = tpcds_partitioned_parquet_snap.store.s_store_sk
 |  fk/pk conjuncts: ss_store_sk = tpcds_partitioned_parquet_snap.store.s_store_sk
+|  runtime filters: RF002[bloom] <- tpcds_partitioned_parquet_snap.store.s_store_sk, RF003[min_max] <- tpcds_partitioned_parquet_snap.store.s_store_sk
 |  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
 |  tuple-ids=4,5,16,15 row-size=94B cardinality=1.65G cost=2319881543
 |  in pipelines: 05(GETNEXT), 06(OPEN)
@@ -187,7 +189,7 @@ PLAN-ROOT SINK
 |--16:HASH JOIN [INNER JOIN]
 |  |  hash predicates: tpcds_partitioned_parquet_snap.store.s_state = tpcds_partitioned_parquet_snap.store_0.s_state
 |  |  fk/pk conjuncts: none
-|  |  runtime filters: RF002[bloom] <- tpcds_partitioned_parquet_snap.store_0.s_state, RF003[min_max] <- tpcds_partitioned_parquet_snap.store_0.s_state
+|  |  runtime filters: RF004[bloom] <- tpcds_partitioned_parquet_snap.store_0.s_state, RF005[min_max] <- tpcds_partitioned_parquet_snap.store_0.s_state
 |  |  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
 |  |  tuple-ids=5,16,15 row-size=82B cardinality=140 cost=64
 |  |  in pipelines: 06(GETNEXT), 13(OPEN)
@@ -226,6 +228,7 @@ PLAN-ROOT SINK
 |  |  11:HASH JOIN [INNER JOIN]
 |  |  |  hash predicates: ss_store_sk = tpcds_partitioned_parquet_snap.store_0.s_store_sk
 |  |  |  fk/pk conjuncts: ss_store_sk = tpcds_partitioned_parquet_snap.store_0.s_store_sk
+|  |  |  runtime filters: RF006[bloom] <- tpcds_partitioned_parquet_snap.store_0.s_store_sk, RF007[min_max] <- tpcds_partitioned_parquet_snap.store_0.s_store_sk
 |  |  |  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
 |  |  |  tuple-ids=7,8,9 row-size=34B cardinality=7.88G cost=3448431655
 |  |  |  in pipelines: 07(GETNEXT), 10(OPEN)
@@ -245,6 +248,7 @@ PLAN-ROOT SINK
 |  |  09:HASH JOIN [INNER JOIN]
 |  |  |  hash predicates: ss_sold_date_sk = d_date_sk
 |  |  |  fk/pk conjuncts: ss_sold_date_sk = d_date_sk
+|  |  |  runtime filters: RF008[bloom] <- d_date_sk, RF009[min_max] <- d_date_sk
 |  |  |  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
 |  |  |  tuple-ids=7,8 row-size=16B cardinality=7.88G cost=3448437610
 |  |  |  in pipelines: 07(GETNEXT), 08(OPEN)
@@ -255,6 +259,7 @@ PLAN-ROOT SINK
 |  |  |     in pipelines: 08(GETNEXT)
 |  |  |
 |  |  07:CTE CONSUMER [cte_suggestion_0]
+|  |     runtime filters: RF007[min_max] -> ss_store_sk, RF009[min_max] -> ss_sold_date_sk, RF006[bloom] -> ss_store_sk, RF008[bloom] -> ss_sold_date_sk
 |  |     mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
 |  |     tuple-ids=7 row-size=12B cardinality=7.88G cost=0
 |  |     in pipelines: 07(GETNEXT)
@@ -262,7 +267,7 @@ PLAN-ROOT SINK
 |  06:SCAN HDFS [tpcds_partitioned_parquet_snap.store]
 |     HDFS partitions=1/1 files=1 size=119.76KB
 |     predicates: tpcds_partitioned_parquet_snap.store.s_state IS NOT NULL, tpcds_partitioned_parquet_snap.store.s_store_sk IS NOT NULL
-|     runtime filters: RF003[min_max] -> tpcds_partitioned_parquet_snap.store.s_state, RF002[bloom] -> tpcds_partitioned_parquet_snap.store.s_state
+|     runtime filters: RF005[min_max] -> tpcds_partitioned_parquet_snap.store.s_state, RF004[bloom] -> tpcds_partitioned_parquet_snap.store.s_state
 |     stored statistics:
 |       table: rows=1.35K size=119.76KB
 |       columns: all
@@ -273,12 +278,13 @@ PLAN-ROOT SINK
 |     in pipelines: 06(GETNEXT)
 |
 05:CTE CONSUMER [cte_suggestion_0]
+   runtime filters: RF001[min_max] -> ss_sold_date_sk, RF003[min_max] -> ss_store_sk, RF000[bloom] -> ss_sold_date_sk, RF002[bloom] -> ss_store_sk
    mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
    tuple-ids=4 row-size=12B cardinality=7.88G cost=0
    in pipelines: 05(GETNEXT)
 ---- DISTRIBUTEDPLAN
-Max Per-Host Resource Reservation: Memory=427.16MB Threads=50
-Per-Host Resource Estimates: Memory=9.89GB
+Max Per-Host Resource Reservation: Memory=435.16MB Threads=50
+Per-Host Resource Estimates: Memory=9.90GB
 ImpalaSequence
   ImpalaProjectRel(TOTAL_SUM=[$0], S_STATE=[$1], S_COUNTY=[$2], LOCHIERARCHY=[$3], RANK_WITHIN_PARENT=[$4])
     ImpalaSortRel(sort0=[$3], sort1=[$5], sort2=[$4], dir0=[DESC], dir1=[ASC], dir2=[ASC], fetch=[100:TINYINT])
@@ -387,6 +393,7 @@ max-parallelism=10 segment-costs=[365183, 8242, 4743] cpu-comparison-result=251 
 |  in pipelines: 02(GETNEXT)
 |
 F00:PLAN FRAGMENT [RANDOM] hosts=10 instances=120
+Per-Host Shared Resources: mem-estimate=2.00MB mem-reservation=2.00MB thread-reservation=0 runtime-filters-memory=2.00MB
 Per-Instance Resources: mem-estimate=39.86MB mem-reservation=10.00MB thread-reservation=1
 max-parallelism=120 segment-costs=[9846127317, 1707075] cpu-comparison-result=251 [max(240 (self) vs 251 (sum children))]
 20:AGGREGATE [STREAMING]
@@ -412,11 +419,12 @@ max-parallelism=120 segment-costs=[9846127317, 1707075] cpu-comparison-result=25
 |  in pipelines: 02(GETNEXT), 04(OPEN)
 |
 |--F12:PLAN FRAGMENT [RANDOM] hosts=10 instances=10
-|  |  Per-Instance Resources: mem-estimate=23.29MB mem-reservation=23.25MB thread-reservation=1
+|  |  Per-Instance Resources: mem-estimate=24.29MB mem-reservation=24.25MB thread-reservation=1 runtime-filters-memory=1.00MB
 |  |  max-parallelism=10 segment-costs=[17005]
 |  JOIN BUILD
 |  |  join-table-id=00 plan-id=01 cohort-id=01
 |  |  build expressions: d_date_sk
+|  |  runtime filters: RF000[bloom] <- d_date_sk, RF001[min_max] <- d_date_sk
 |  |  mem-estimate=23.25MB mem-reservation=23.25MB spill-buffer=64.00KB thread-reservation=0 cost=7305
 |  |
 |  31:EXCHANGE [BROADCAST]
@@ -462,11 +470,12 @@ max-parallelism=120 segment-costs=[9846127317, 1707075] cpu-comparison-result=25
 |  in pipelines: 02(GETNEXT), 06(OPEN)
 |
 |--F13:PLAN FRAGMENT [RANDOM] hosts=10 instances=10
-|  |  Per-Instance Resources: mem-estimate=23.27MB mem-reservation=23.25MB thread-reservation=1
+|  |  Per-Instance Resources: mem-estimate=24.27MB mem-reservation=24.25MB thread-reservation=1 runtime-filters-memory=1.00MB
 |  |  max-parallelism=10 segment-costs=[320] cpu-comparison-result=240 [max(11 (self) vs 240 (sum children))]
 |  JOIN BUILD
 |  |  join-table-id=01 plan-id=02 cohort-id=01
 |  |  build expressions: tpcds_partitioned_parquet_snap.store.s_store_sk
+|  |  runtime filters: RF002[bloom] <- tpcds_partitioned_parquet_snap.store.s_store_sk, RF003[min_max] <- tpcds_partitioned_parquet_snap.store.s_store_sk
 |  |  mem-estimate=23.25MB mem-reservation=23.25MB spill-buffer=64.00KB thread-reservation=0 cost=140
 |  |
 |  30:EXCHANGE [BROADCAST]
@@ -492,7 +501,7 @@ max-parallelism=120 segment-costs=[9846127317, 1707075] cpu-comparison-result=25
 |  |  JOIN BUILD
 |  |  |  join-table-id=02 plan-id=03 cohort-id=02
 |  |  |  build expressions: tpcds_partitioned_parquet_snap.store_0.s_state
-|  |  |  runtime filters: RF002[bloom] <- tpcds_partitioned_parquet_snap.store_0.s_state, RF003[min_max] <- tpcds_partitioned_parquet_snap.store_0.s_state
+|  |  |  runtime filters: RF004[bloom] <- tpcds_partitioned_parquet_snap.store_0.s_state, RF005[min_max] <- tpcds_partitioned_parquet_snap.store_0.s_state
 |  |  |  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0 cost=3
 |  |  |
 |  |  29:EXCHANGE [BROADCAST]
@@ -540,6 +549,7 @@ max-parallelism=120 segment-costs=[9846127317, 1707075] cpu-comparison-result=25
 |  |  |  in pipelines: 02(GETNEXT)
 |  |  |
 |  |  F02:PLAN FRAGMENT [RANDOM] hosts=10 instances=120
+|  |  Per-Host Shared Resources: mem-estimate=2.00MB mem-reservation=2.00MB thread-reservation=0 runtime-filters-memory=2.00MB
 |  |  Per-Instance Resources: mem-estimate=15.33MB mem-reservation=6.00MB thread-reservation=1
 |  |  max-parallelism=120 segment-costs=[9201338187, 8516] cpu-comparison-result=240 [max(240 (self) vs 23 (sum children))]
 |  |  12:AGGREGATE [STREAMING]
@@ -558,11 +568,12 @@ max-parallelism=120 segment-costs=[9846127317, 1707075] cpu-comparison-result=25
 |  |  |  in pipelines: 02(GETNEXT), 10(OPEN)
 |  |  |
 |  |  |--F15:PLAN FRAGMENT [RANDOM] hosts=10 instances=10
-|  |  |  |  Per-Instance Resources: mem-estimate=23.29MB mem-reservation=23.25MB thread-reservation=1
+|  |  |  |  Per-Instance Resources: mem-estimate=24.29MB mem-reservation=24.25MB thread-reservation=1 runtime-filters-memory=1.00MB
 |  |  |  |  max-parallelism=10 segment-costs=[3140]
 |  |  |  JOIN BUILD
 |  |  |  |  join-table-id=03 plan-id=04 cohort-id=03
 |  |  |  |  build expressions: tpcds_partitioned_parquet_snap.store_0.s_store_sk
+|  |  |  |  runtime filters: RF006[bloom] <- tpcds_partitioned_parquet_snap.store_0.s_store_sk, RF007[min_max] <- tpcds_partitioned_parquet_snap.store_0.s_store_sk
 |  |  |  |  mem-estimate=23.25MB mem-reservation=23.25MB spill-buffer=64.00KB thread-reservation=0 cost=1350
 |  |  |  |
 |  |  |  26:EXCHANGE [BROADCAST]
@@ -594,11 +605,12 @@ max-parallelism=120 segment-costs=[9846127317, 1707075] cpu-comparison-result=25
 |  |  |  in pipelines: 02(GETNEXT), 04(OPEN)
 |  |  |
 |  |  |--F16:PLAN FRAGMENT [RANDOM] hosts=10 instances=10
-|  |  |  |  Per-Instance Resources: mem-estimate=23.29MB mem-reservation=23.25MB thread-reservation=1
+|  |  |  |  Per-Instance Resources: mem-estimate=24.29MB mem-reservation=24.25MB thread-reservation=1 runtime-filters-memory=1.00MB
 |  |  |  |  max-parallelism=10 segment-costs=[17005]
 |  |  |  JOIN BUILD
 |  |  |  |  join-table-id=04 plan-id=05 cohort-id=03
 |  |  |  |  build expressions: d_date_sk
+|  |  |  |  runtime filters: RF008[bloom] <- d_date_sk, RF009[min_max] <- d_date_sk
 |  |  |  |  mem-estimate=23.25MB mem-reservation=23.25MB spill-buffer=64.00KB thread-reservation=0 cost=7305
 |  |  |  |
 |  |  |  25:EXCHANGE [BROADCAST]
@@ -636,6 +648,7 @@ max-parallelism=120 segment-costs=[9846127317, 1707075] cpu-comparison-result=25
 |  |  |     in pipelines: 04(GETNEXT)
 |  |  |
 |  |  07:CTE CONSUMER [cte_suggestion_0]
+|  |  |  runtime filters: RF007[min_max] -> ss_store_sk, RF009[min_max] -> ss_sold_date_sk, RF006[bloom] -> ss_store_sk, RF008[bloom] -> ss_sold_date_sk
 |  |  |  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
 |  |  |  tuple-ids=7 row-size=12B cardinality=7.88G cost=0
 |  |  |  in pipelines: 02(GETNEXT)
@@ -665,7 +678,7 @@ max-parallelism=120 segment-costs=[9846127317, 1707075] cpu-comparison-result=25
 |  06:SCAN HDFS [tpcds_partitioned_parquet_snap.store, RANDOM]
 |     HDFS partitions=1/1 files=1 size=119.76KB
 |     predicates: tpcds_partitioned_parquet_snap.store.s_state IS NOT NULL, tpcds_partitioned_parquet_snap.store.s_store_sk IS NOT NULL
-|     runtime filters: RF003[min_max] -> tpcds_partitioned_parquet_snap.store.s_state, RF002[bloom] -> tpcds_partitioned_parquet_snap.store.s_state
+|     runtime filters: RF005[min_max] -> tpcds_partitioned_parquet_snap.store.s_state, RF004[bloom] -> tpcds_partitioned_parquet_snap.store.s_state
 |     stored statistics:
 |       table: rows=1.35K size=119.76KB
 |       columns: all
@@ -676,6 +689,7 @@ max-parallelism=120 segment-costs=[9846127317, 1707075] cpu-comparison-result=25
 |     in pipelines: 06(GETNEXT)
 |
 05:CTE CONSUMER [cte_suggestion_0]
+|  runtime filters: RF001[min_max] -> ss_sold_date_sk, RF003[min_max] -> ss_store_sk, RF000[bloom] -> ss_sold_date_sk, RF002[bloom] -> ss_store_sk
 |  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
 |  tuple-ids=4 row-size=12B cardinality=7.88G cost=0
 |  in pipelines: 02(GETNEXT)
@@ -751,8 +765,8 @@ LOCAL MULTI SINK [FRAGMENT=F11, EXCHANGE=03, cte_suggestion_1]
    tuple-ids=2 row-size=8B cardinality=7.30K cost=14573
    in pipelines: 04(GETNEXT)
 ---- PARALLELPLANS
-Max Per-Host Resource Reservation: Memory=427.16MB Threads=50
-Per-Host Resource Estimates: Memory=9.89GB
+Max Per-Host Resource Reservation: Memory=435.16MB Threads=50
+Per-Host Resource Estimates: Memory=9.90GB
 ImpalaSequence
   ImpalaProjectRel(TOTAL_SUM=[$0], S_STATE=[$1], S_COUNTY=[$2], LOCHIERARCHY=[$3], RANK_WITHIN_PARENT=[$4])
     ImpalaSortRel(sort0=[$3], sort1=[$5], sort2=[$4], dir0=[DESC], dir1=[ASC], dir2=[ASC], fetch=[100:TINYINT])
@@ -861,6 +875,7 @@ max-parallelism=10 segment-costs=[365183, 8242, 4743] cpu-comparison-result=251 
 |  in pipelines: 02(GETNEXT)
 |
 F00:PLAN FRAGMENT [RANDOM] hosts=10 instances=120
+Per-Host Shared Resources: mem-estimate=2.00MB mem-reservation=2.00MB thread-reservation=0 runtime-filters-memory=2.00MB
 Per-Instance Resources: mem-estimate=39.86MB mem-reservation=10.00MB thread-reservation=1
 max-parallelism=120 segment-costs=[9846127317, 1707075] cpu-comparison-result=251 [max(240 (self) vs 251 (sum children))]
 20:AGGREGATE [STREAMING]
@@ -886,11 +901,12 @@ max-parallelism=120 segment-costs=[9846127317, 1707075] cpu-comparison-result=25
 |  in pipelines: 02(GETNEXT), 04(OPEN)
 |
 |--F12:PLAN FRAGMENT [RANDOM] hosts=10 instances=10
-|  |  Per-Instance Resources: mem-estimate=23.29MB mem-reservation=23.25MB thread-reservation=1
+|  |  Per-Instance Resources: mem-estimate=24.29MB mem-reservation=24.25MB thread-reservation=1 runtime-filters-memory=1.00MB
 |  |  max-parallelism=10 segment-costs=[17005]
 |  JOIN BUILD
 |  |  join-table-id=00 plan-id=01 cohort-id=01
 |  |  build expressions: d_date_sk
+|  |  runtime filters: RF000[bloom] <- d_date_sk, RF001[min_max] <- d_date_sk
 |  |  mem-estimate=23.25MB mem-reservation=23.25MB spill-buffer=64.00KB thread-reservation=0 cost=7305
 |  |
 |  31:EXCHANGE [BROADCAST]
@@ -936,11 +952,12 @@ max-parallelism=120 segment-costs=[9846127317, 1707075] cpu-comparison-result=25
 |  in pipelines: 02(GETNEXT), 06(OPEN)
 |
 |--F13:PLAN FRAGMENT [RANDOM] hosts=10 instances=10
-|  |  Per-Instance Resources: mem-estimate=23.27MB mem-reservation=23.25MB thread-reservation=1
+|  |  Per-Instance Resources: mem-estimate=24.27MB mem-reservation=24.25MB thread-reservation=1 runtime-filters-memory=1.00MB
 |  |  max-parallelism=10 segment-costs=[320] cpu-comparison-result=240 [max(11 (self) vs 240 (sum children))]
 |  JOIN BUILD
 |  |  join-table-id=01 plan-id=02 cohort-id=01
 |  |  build expressions: tpcds_partitioned_parquet_snap.store.s_store_sk
+|  |  runtime filters: RF002[bloom] <- tpcds_partitioned_parquet_snap.store.s_store_sk, RF003[min_max] <- tpcds_partitioned_parquet_snap.store.s_store_sk
 |  |  mem-estimate=23.25MB mem-reservation=23.25MB spill-buffer=64.00KB thread-reservation=0 cost=140
 |  |
 |  30:EXCHANGE [BROADCAST]
@@ -966,7 +983,7 @@ max-parallelism=120 segment-costs=[9846127317, 1707075] cpu-comparison-result=25
 |  |  JOIN BUILD
 |  |  |  join-table-id=02 plan-id=03 cohort-id=02
 |  |  |  build expressions: tpcds_partitioned_parquet_snap.store_0.s_state
-|  |  |  runtime filters: RF002[bloom] <- tpcds_partitioned_parquet_snap.store_0.s_state, RF003[min_max] <- tpcds_partitioned_parquet_snap.store_0.s_state
+|  |  |  runtime filters: RF004[bloom] <- tpcds_partitioned_parquet_snap.store_0.s_state, RF005[min_max] <- tpcds_partitioned_parquet_snap.store_0.s_state
 |  |  |  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0 cost=3
 |  |  |
 |  |  29:EXCHANGE [BROADCAST]
@@ -1014,6 +1031,7 @@ max-parallelism=120 segment-costs=[9846127317, 1707075] cpu-comparison-result=25
 |  |  |  in pipelines: 02(GETNEXT)
 |  |  |
 |  |  F02:PLAN FRAGMENT [RANDOM] hosts=10 instances=120
+|  |  Per-Host Shared Resources: mem-estimate=2.00MB mem-reservation=2.00MB thread-reservation=0 runtime-filters-memory=2.00MB
 |  |  Per-Instance Resources: mem-estimate=15.33MB mem-reservation=6.00MB thread-reservation=1
 |  |  max-parallelism=120 segment-costs=[9201338187, 8516] cpu-comparison-result=240 [max(240 (self) vs 23 (sum children))]
 |  |  12:AGGREGATE [STREAMING]
@@ -1032,11 +1050,12 @@ max-parallelism=120 segment-costs=[9846127317, 1707075] cpu-comparison-result=25
 |  |  |  in pipelines: 02(GETNEXT), 10(OPEN)
 |  |  |
 |  |  |--F15:PLAN FRAGMENT [RANDOM] hosts=10 instances=10
-|  |  |  |  Per-Instance Resources: mem-estimate=23.29MB mem-reservation=23.25MB thread-reservation=1
+|  |  |  |  Per-Instance Resources: mem-estimate=24.29MB mem-reservation=24.25MB thread-reservation=1 runtime-filters-memory=1.00MB
 |  |  |  |  max-parallelism=10 segment-costs=[3140]
 |  |  |  JOIN BUILD
 |  |  |  |  join-table-id=03 plan-id=04 cohort-id=03
 |  |  |  |  build expressions: tpcds_partitioned_parquet_snap.store_0.s_store_sk
+|  |  |  |  runtime filters: RF006[bloom] <- tpcds_partitioned_parquet_snap.store_0.s_store_sk, RF007[min_max] <- tpcds_partitioned_parquet_snap.store_0.s_store_sk
 |  |  |  |  mem-estimate=23.25MB mem-reservation=23.25MB spill-buffer=64.00KB thread-reservation=0 cost=1350
 |  |  |  |
 |  |  |  26:EXCHANGE [BROADCAST]
@@ -1068,11 +1087,12 @@ max-parallelism=120 segment-costs=[9846127317, 1707075] cpu-comparison-result=25
 |  |  |  in pipelines: 02(GETNEXT), 04(OPEN)
 |  |  |
 |  |  |--F16:PLAN FRAGMENT [RANDOM] hosts=10 instances=10
-|  |  |  |  Per-Instance Resources: mem-estimate=23.29MB mem-reservation=23.25MB thread-reservation=1
+|  |  |  |  Per-Instance Resources: mem-estimate=24.29MB mem-reservation=24.25MB thread-reservation=1 runtime-filters-memory=1.00MB
 |  |  |  |  max-parallelism=10 segment-costs=[17005]
 |  |  |  JOIN BUILD
 |  |  |  |  join-table-id=04 plan-id=05 cohort-id=03
 |  |  |  |  build expressions: d_date_sk
+|  |  |  |  runtime filters: RF008[bloom] <- d_date_sk, RF009[min_max] <- d_date_sk
 |  |  |  |  mem-estimate=23.25MB mem-reservation=23.25MB spill-buffer=64.00KB thread-reservation=0 cost=7305
 |  |  |  |
 |  |  |  25:EXCHANGE [BROADCAST]
@@ -1110,6 +1130,7 @@ max-parallelism=120 segment-costs=[9846127317, 1707075] cpu-comparison-result=25
 |  |  |     in pipelines: 04(GETNEXT)
 |  |  |
 |  |  07:CTE CONSUMER [cte_suggestion_0]
+|  |  |  runtime filters: RF007[min_max] -> ss_store_sk, RF009[min_max] -> ss_sold_date_sk, RF006[bloom] -> ss_store_sk, RF008[bloom] -> ss_sold_date_sk
 |  |  |  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
 |  |  |  tuple-ids=7 row-size=12B cardinality=7.88G cost=0
 |  |  |  in pipelines: 02(GETNEXT)
@@ -1139,7 +1160,7 @@ max-parallelism=120 segment-costs=[9846127317, 1707075] cpu-comparison-result=25
 |  06:SCAN HDFS [tpcds_partitioned_parquet_snap.store, RANDOM]
 |     HDFS partitions=1/1 files=1 size=119.76KB
 |     predicates: tpcds_partitioned_parquet_snap.store.s_state IS NOT NULL, tpcds_partitioned_parquet_snap.store.s_store_sk IS NOT NULL
-|     runtime filters: RF003[min_max] -> tpcds_partitioned_parquet_snap.store.s_state, RF002[bloom] -> tpcds_partitioned_parquet_snap.store.s_state
+|     runtime filters: RF005[min_max] -> tpcds_partitioned_parquet_snap.store.s_state, RF004[bloom] -> tpcds_partitioned_parquet_snap.store.s_state
 |     stored statistics:
 |       table: rows=1.35K size=119.76KB
 |       columns: all
@@ -1150,6 +1171,7 @@ max-parallelism=120 segment-costs=[9846127317, 1707075] cpu-comparison-result=25
 |     in pipelines: 06(GETNEXT)
 |
 05:CTE CONSUMER [cte_suggestion_0]
+|  runtime filters: RF001[min_max] -> ss_sold_date_sk, RF003[min_max] -> ss_store_sk, RF000[bloom] -> ss_sold_date_sk, RF002[bloom] -> ss_store_sk
 |  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
 |  tuple-ids=4 row-size=12B cardinality=7.88G cost=0
 |  in pipelines: 02(GETNEXT)

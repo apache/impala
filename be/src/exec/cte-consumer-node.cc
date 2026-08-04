@@ -24,15 +24,23 @@
 #include "runtime/fragment-state.h"
 #include "runtime/local-exchanger.h"
 #include "runtime/row-batch.h"
+#include "runtime/runtime-filter-bank.h"
+#include "runtime/runtime-filter.inline.h"
+#include "runtime/runtime-filter.h"
 #include "runtime/runtime-state.h"
 #include "runtime/tuple.h"
 #include "util/debug-util.h"
+#include "util/pretty-printer.h"
 #include "util/runtime-profile-counters.h"
 #include "util/runtime-profile.h"
 
 #include "common/names.h"
 
+DECLARE_double(min_filter_reject_ratio);
+
 namespace impala {
+
+constexpr int BATCHES_PER_FILTER_SELECTIVITY_CHECK = 16;
 
 Status CTEConsumerPlanNode::Init(const TPlanNode& tnode, FragmentState* state) {
   RETURN_IF_ERROR(PlanNode::Init(tnode, state));
@@ -49,12 +57,24 @@ Status CTEConsumerPlanNode::Init(const TPlanNode& tnode, FragmentState* state) {
       ScalarExpr::Create(cte_node.result_exprs, input_row_desc, state, &input_exprs_));
   DCHECK_EQ(input_exprs_.size(), tuple_desc_->slots().size());
 
+  // Set up runtime filter expressions, one per filter assigned to this node.
+  for (const TRuntimeFilterDesc& filter_desc : tnode.runtime_filters) {
+    auto it = filter_desc.planid_to_target_ndx.find(tnode.node_id);
+    DCHECK(it != filter_desc.planid_to_target_ndx.end());
+    const TRuntimeFilterTargetDesc& target = filter_desc.targets[it->second];
+    ScalarExpr* filter_expr;
+    RETURN_IF_ERROR(
+        ScalarExpr::Create(target.target_expr, *row_descriptor_, state, &filter_expr));
+    runtime_filter_exprs_.push_back(filter_expr);
+  }
+
   is_passthrough_ = row_descriptor_->LayoutEquals(input_row_desc);
   return Status::OK();
 }
 
 void CTEConsumerPlanNode::Close() {
   ScalarExpr::Close(input_exprs_);
+  ScalarExpr::Close(runtime_filter_exprs_);
   PlanNode::Close();
 }
 
@@ -113,6 +133,29 @@ Status CTEConsumerNode::Prepare(RuntimeState* state) {
     RETURN_IF_ERROR(ScalarExprEvaluator::Create(input_exprs_, state, pool_,
         expr_perm_pool(), expr_results_pool(), &input_expr_evals_));
   }
+
+  const CTEConsumerPlanNode& pnode =
+      static_cast<const CTEConsumerPlanNode&>(plan_node());
+  const std::vector<ScalarExpr*>& filter_exprs = pnode.runtime_filter_exprs_;
+  DCHECK_EQ(filter_exprs.size(), plan_node().tnode_->runtime_filters.size());
+  for (int i = 0; i < filter_exprs.size(); ++i) {
+    const TRuntimeFilterDesc& filter_desc =
+        plan_node().tnode_->runtime_filters[i];
+    filter_ctxs_.emplace_back();
+    FilterContext& filter_ctx = filter_ctxs_.back();
+    filter_ctx.filter = state->filter_bank()->RegisterConsumer(filter_desc);
+    string filter_profile_title =
+        Substitute("$0$1 ($2)", RuntimeProfile::PREFIX_FILTER, filter_desc.filter_id,
+            PrettyPrinter::Print(filter_ctx.filter->filter_size(), TUnit::BYTES));
+    RuntimeProfile* filter_profile =
+        RuntimeProfile::Create(state->obj_pool(), filter_profile_title, false);
+    runtime_profile_->AddChild(filter_profile);
+    filter_ctx.stats = state->obj_pool()->Add(new FilterStats(filter_profile));
+    RETURN_IF_ERROR(ScalarExprEvaluator::Create(*filter_exprs[i], state, pool_,
+        expr_perm_pool(), expr_results_pool(), &filter_ctx.expr_eval));
+  }
+  filter_stats_.resize(filter_ctxs_.size());
+
   // Must match CTEProducerPlanNode::GetCTEName. CTEProducerPlanNode::Init registers CTEs
   // before fragment instances begin execution, so the mapping must exist here.
   if (auto it = state->instance_ctx().cte_consumer_to_producer_idx.find(id());
@@ -136,6 +179,10 @@ Status CTEConsumerNode::Open(RuntimeState* state) {
 
   if (!is_passthrough_) {
     RETURN_IF_ERROR(ScalarExprEvaluator::Open(input_expr_evals_, state));
+  }
+
+  for (FilterContext& ctx : filter_ctxs_) {
+    RETURN_IF_ERROR(ctx.expr_eval->Open(state));
   }
 
   DCHECK_EQ(nullptr, exchanger_);
@@ -205,6 +252,14 @@ Status CTEConsumerNode::GetNext(
     }
   }
 
+  if (!filter_ctxs_.empty()) {
+    if (!filters_waited_) {
+      filters_waited_ = true;
+      WaitForRuntimeFilters(state, filter_ctxs_);
+    }
+    FilterRowBatch(output_batch);
+  }
+
   CheckLimitAndTruncateRowBatchIfNeeded(output_batch, eos);
   COUNTER_SET(rows_returned_counter_, rows_returned());
   return Status::OK();
@@ -219,6 +274,7 @@ Status CTEConsumerNode::Reset(RuntimeState* state, RowBatch* row_batch) {
 
 void CTEConsumerNode::Close(RuntimeState* state) {
   if (is_closed()) return;
+  FinalizeFilters(state);
   if (exchanger_) {
     VLOG_QUERY << "Closing consumer of CTE exchange " << name_ << " in instance "
         << state->instance_ctx().per_fragment_instance_idx << " of " << label();
@@ -236,4 +292,71 @@ void CTEConsumerNode::DebugString(int indentation_level, stringstream* out) cons
   *out << ")";
 }
 
+bool CTEConsumerNode::EvalRuntimeFilters(
+    TupleRow* row, vector<LocalFilterContext>& local_filter_ctxs) noexcept {
+  for (LocalFilterContext& local_filter_ctx : local_filter_ctxs) {
+    LocalFilterStats& stats = local_filter_ctx.stats;
+    ++stats.total_possible;
+    if (!stats.enabled_for_row || !local_filter_ctx.filter_ctx.filter->HasFilter()) {
+      continue;
+    }
+    ++stats.considered;
+    if (!local_filter_ctx.filter_ctx.Eval(row)) {
+      ++stats.rejected;
+      return false;
+    }
+  }
+  return true;
+}
+
+void CTEConsumerNode::FilterRowBatch(RowBatch* batch) noexcept {
+  int num_rows = batch->num_rows();
+  vector<LocalFilterContext> local_filter_ctxs;
+  local_filter_ctxs.reserve(filter_ctxs_.size());
+  for (int i = 0; i < filter_ctxs_.size(); ++i) {
+    local_filter_ctxs.emplace_back(filter_ctxs_[i], filter_stats_[i]);
+  }
+  int out_idx = 0;
+  for (int i = 0; i < num_rows; ++i) {
+    TupleRow* row = batch->GetRow(i);
+    if (EvalRuntimeFilters(row, local_filter_ctxs)) {
+      if (out_idx != i) batch->CopyRows(out_idx, i, 1);
+      ++out_idx;
+    }
+  }
+  batch->set_num_rows(out_idx);
+
+  ++row_batches_since_filter_check_;
+  if (row_batches_since_filter_check_ == BATCHES_PER_FILTER_SELECTIVITY_CHECK) {
+    CheckFiltersEffectiveness();
+    row_batches_since_filter_check_ = 0;
+  }
+}
+
+void CTEConsumerNode::CheckFiltersEffectiveness() noexcept {
+  for (int i = 0; i < filter_stats_.size(); ++i) {
+    LocalFilterStats& stats = filter_stats_[i];
+    const RuntimeFilter* filter = filter_ctxs_[i].filter;
+    double reject_ratio = stats.rejected / static_cast<double>(stats.considered);
+    if (filter->AlwaysTrue() || reject_ratio < FLAGS_min_filter_reject_ratio) {
+      stats.enabled_for_row = false;
+    }
+  }
+}
+
+void CTEConsumerNode::FinalizeFilters(RuntimeState* state) noexcept {
+  for (int i = 0; i < filter_stats_.size(); ++i) {
+    const LocalFilterStats& stats = filter_stats_[i];
+    filter_ctxs_[i].stats->IncrCounters(FilterStats::ROWS_KEY,
+        stats.total_possible, stats.considered, stats.rejected);
+  }
+  for (const FilterContext& ctx : filter_ctxs_) {
+    if (ctx.stats != nullptr) {
+      if (ctx.stats->HasRejectedRows()) {
+        effective_filter_ids_.push_back(ctx.filter->id());
+      }
+      ctx.expr_eval->Close(state);
+    }
+  }
+}
 }

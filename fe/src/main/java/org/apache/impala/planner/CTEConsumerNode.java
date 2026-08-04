@@ -18,6 +18,8 @@
 package org.apache.impala.planner;
 
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Set;
 
@@ -27,11 +29,13 @@ import org.apache.impala.analysis.SlotDescriptor;
 import org.apache.impala.analysis.TupleDescriptor;
 import org.apache.impala.analysis.TupleId;
 import org.apache.impala.common.ImpalaException;
+import org.apache.impala.planner.RuntimeFilterGenerator.RuntimeFilter;
 import org.apache.impala.thrift.TCTEConsumer;
 import org.apache.impala.thrift.TExplainLevel;
 import org.apache.impala.thrift.TPlanNode;
 import org.apache.impala.thrift.TPlanNodeType;
 import org.apache.impala.thrift.TQueryOptions;
+import org.apache.impala.thrift.TRuntimeFilterType;
 
 import com.google.common.base.MoreObjects;
 import com.google.common.base.Preconditions;
@@ -127,6 +131,21 @@ public class CTEConsumerNode extends PlanNode {
     return cteName_;
   }
 
+  /**
+   * Sort filters in runtimeFilters_: min/max first followed by bloom.
+   */
+  public void arrangeRuntimeFilters() {
+    Collections.sort(runtimeFilters_, new Comparator<RuntimeFilter>() {
+      @Override
+      public int compare(RuntimeFilter a, RuntimeFilter b) {
+        if (a.getType() == b.getType()) return 0;
+        if (a.getType() == TRuntimeFilterType.MIN_MAX) return -1;
+        if (b.getType() == TRuntimeFilterType.MIN_MAX) return 1;
+        return 0;
+      }
+    });
+  }
+
   @Override
   protected String getNodeExplainString(String prefix, String detailPrefix,
       TExplainLevel detailLevel) {
@@ -136,6 +155,10 @@ public class CTEConsumerNode extends PlanNode {
     if (!conjuncts_.isEmpty()) {
       output.append(detailPrefix + "predicates: " +
           Expr.getExplainString(conjuncts_, detailLevel) + "\n");
+    }
+    if (!runtimeFilters_.isEmpty()) {
+      output.append(detailPrefix + "runtime filters: ");
+      output.append(getRuntimeFilterExplainString(false, detailLevel));
     }
     return output.toString();
   }

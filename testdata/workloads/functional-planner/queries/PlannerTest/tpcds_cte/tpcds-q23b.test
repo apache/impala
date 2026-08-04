@@ -369,6 +369,7 @@ PLAN-ROOT SINK
 |  |  |  in pipelines: 46(GETNEXT), 47(OPEN)
 |  |  |
 |  |  |--47:CTE CONSUMER [cte_suggestion_2]
+|  |  |     runtime filters: RF019[min_max] -> c_customer_sk
 |  |  |     mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
 |  |  |     tuple-ids=43 row-size=4B cardinality=30.00M cost=0
 |  |  |     in pipelines: 47(GETNEXT)
@@ -607,6 +608,7 @@ PLAN-ROOT SINK
 |  |  in pipelines: 19(GETNEXT), 20(OPEN)
 |  |
 |  |--20:CTE CONSUMER [cte_suggestion_2]
+|  |     runtime filters: RF001[min_max] -> c_customer_sk
 |  |     mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
 |  |     tuple-ids=19 row-size=4B cardinality=30.00M cost=0
 |  |     in pipelines: 20(GETNEXT)
@@ -1206,6 +1208,7 @@ max-parallelism=20 segment-costs=[132860130, 67652568, 450815418, 167] cpu-compa
 |  |  |  Per-Instance Resources: mem-estimate=4.03MB mem-reservation=4.00MB thread-reservation=1
 |  |  |  max-parallelism=10 segment-costs=[972000]
 |  |  |  47:CTE CONSUMER [cte_suggestion_2]
+|  |  |  |  runtime filters: RF019[min_max] -> c_customer_sk
 |  |  |  |  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
 |  |  |  |  tuple-ids=43 row-size=4B cardinality=30.00M cost=0
 |  |  |  |  in pipelines: 04(GETNEXT)
@@ -1793,6 +1796,7 @@ max-parallelism=50 segment-costs=[496542852]
 |  |  Per-Instance Resources: mem-estimate=4.03MB mem-reservation=4.00MB thread-reservation=1
 |  |  max-parallelism=10 segment-costs=[972000]
 |  |  20:CTE CONSUMER [cte_suggestion_2]
+|  |  |  runtime filters: RF001[min_max] -> c_customer_sk
 |  |  |  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
 |  |  |  tuple-ids=19 row-size=4B cardinality=30.00M cost=0
 |  |  |  in pipelines: 04(GETNEXT)
@@ -2601,6 +2605,7 @@ max-parallelism=20 segment-costs=[132860130, 67652568, 450815418, 167] cpu-compa
 |  |  |  Per-Instance Resources: mem-estimate=4.03MB mem-reservation=4.00MB thread-reservation=1
 |  |  |  max-parallelism=10 segment-costs=[972000]
 |  |  |  47:CTE CONSUMER [cte_suggestion_2]
+|  |  |  |  runtime filters: RF019[min_max] -> c_customer_sk
 |  |  |  |  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
 |  |  |  |  tuple-ids=43 row-size=4B cardinality=30.00M cost=0
 |  |  |  |  in pipelines: 04(GETNEXT)
@@ -3188,6 +3193,7 @@ max-parallelism=50 segment-costs=[496542852]
 |  |  Per-Instance Resources: mem-estimate=4.03MB mem-reservation=4.00MB thread-reservation=1
 |  |  max-parallelism=10 segment-costs=[972000]
 |  |  20:CTE CONSUMER [cte_suggestion_2]
+|  |  |  runtime filters: RF001[min_max] -> c_customer_sk
 |  |  |  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
 |  |  |  tuple-ids=19 row-size=4B cardinality=30.00M cost=0
 |  |  |  in pipelines: 04(GETNEXT)

@@ -21,6 +21,7 @@
 
 #include "codegen/codegen-fn-ptr.h"
 #include "exec/exec-node.h"
+#include "exec/filter-context.h"
 
 namespace impala {
 
@@ -36,6 +37,9 @@ class CTEConsumerPlanNode : public PlanNode {
 
   TupleDescriptor* tuple_desc_;
   std::vector<ScalarExpr*> input_exprs_;
+
+  /// Runtime filter expressions, one per filter in tnode.runtime_filters.
+  std::vector<ScalarExpr*> runtime_filter_exprs_;
 
   typedef void (*MaterializeBatchFn)(CTEConsumerNode*, RowBatch*, RowBatch*, uint8_t**);
   /// Vector of pointers to codegen'ed MaterializeBatch functions. The vector contains one
@@ -71,6 +75,11 @@ class CTEConsumerNode : public ExecNode {
   void MaterializeExprs(const std::vector<ScalarExprEvaluator*>& evaluators,
       TupleRow* row, uint8_t* tuple_buf, RowBatch* dst_batch);
 
+  /// A list of Filter IDs that were effective (rejected rows) at this scan node.
+  const std::vector<int32_t>& effective_filter_ids() const {
+    return effective_filter_ids_;
+  }
+
  private:
   std::string name_;
   LocalExchanger* exchanger_ = nullptr;
@@ -81,6 +90,53 @@ class CTEConsumerNode : public ExecNode {
       codegend_materialize_batch_fn_;
   int32_t consumer_index_;
   bool is_passthrough_;
+
+  /// Runtime filter contexts, one per filter assigned to this node.
+  std::vector<FilterContext> filter_ctxs_;
+
+  /// Filter IDs that were effective (rejected rows) at this scan node.
+  /// Populated in Close().
+  std::vector<int32_t> effective_filter_ids_;
+
+  struct LocalFilterStats {
+    int64_t total_possible = 0;
+    int64_t considered = 0;
+    int64_t rejected = 0;
+    bool enabled_for_row = true;
+  };
+
+  /// Track cumulative statistics of each filter locally to determine effectiveness.
+  std::vector<LocalFilterStats> filter_stats_;
+
+  struct LocalFilterContext {
+    LocalFilterContext(const FilterContext& ctx, LocalFilterStats& local_stats)
+      : filter_ctx(ctx), stats(local_stats) {}
+    const FilterContext& filter_ctx;
+    LocalFilterStats& stats;
+  };
+
+  /// Returns true if 'row' passes all runtime filters, false if any filter rejects it.
+  /// Updates local and batch filter stats and short-circuits on the first filter that
+  /// rejects 'row'.
+  bool EvalRuntimeFilters(
+      TupleRow* row, std::vector<LocalFilterContext>& local_filter_ctxs) noexcept;
+
+  /// Filters rows in 'batch' that fail the runtime filters, compacting the batch
+  /// in-place. Rows that pass remain; rows that fail are removed.
+  void FilterRowBatch(RowBatch* batch) noexcept;
+
+  /// Disable runtime filters whose rejection ratio is too low to pay off at row level.
+  void CheckFiltersEffectiveness() noexcept;
+
+  /// Merge local runtime filter stats into the runtime profile counters, compute
+  /// effective filters, and close the FilterContexts.
+  void FinalizeFilters(RuntimeState* state) noexcept;
+
+  /// True after WaitForRuntimeFilters() has been called.
+  bool filters_waited_ = false;
+
+  /// Number of row batches since the last runtime filter effectiveness check.
+  int64_t row_batches_since_filter_check_ = 0;
 };
 
 }

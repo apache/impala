@@ -104,6 +104,10 @@ public class TupleDescriptor {
   // If false, this tuple doesn't need to be materialized.
   private boolean isMaterialized_ = true;
 
+  // If true, this tuple is the output tuple of a CTE consumer node. Used by the runtime
+  // filter generator to identify CTE consumer tuples as valid filter targets.
+  private boolean isCTEOutput_ = false;
+
   // If true, computeMemLayout() has been called and we can't add any additional slots.
   private boolean hasMemLayout_ = false;
 
@@ -246,6 +250,8 @@ public class TupleDescriptor {
   public void setIsMaterialized(boolean value) {
     isMaterialized_ = value;
   }
+  public boolean isCTEOutput() { return isCTEOutput_; }
+  public void setIsCTEOutput(boolean value) { isCTEOutput_ = value; }
   public boolean hasMemLayout() { return hasMemLayout_; }
   public void setAliases(String[] aliases, boolean hasExplicitAlias) {
     aliases_ = aliases;

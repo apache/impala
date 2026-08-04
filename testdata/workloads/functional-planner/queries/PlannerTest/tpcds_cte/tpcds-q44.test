@@ -47,8 +47,8 @@ WHERE asceding.rnk = descending.rnk
 ORDER BY asceding.rnk
 LIMIT 100
 ---- PLAN
-Max Per-Host Resource Reservation: Memory=102.19MB Threads=1
-Per-Host Resource Estimates: Memory=173MB
+Max Per-Host Resource Reservation: Memory=104.19MB Threads=1
+Per-Host Resource Estimates: Memory=175MB
 ImpalaSequence
   ImpalaSortRel(sort0=[$0], dir0=[ASC], fetch=[100:TINYINT])
     ImpalaProjectRel(RNK=[$3], BEST_PERFORMING=[$1], WORST_PERFORMING=[$5])
@@ -90,7 +90,7 @@ ImpalaSequence
       ImpalaProjectRel(i_item_sk=[$0], i_product_name=[$21])
         ImpalaHdfsScanRel(table=[[tpcds_partitioned_parquet_snap, item]])
 F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Instance Resources: mem-estimate=173.15MB mem-reservation=102.19MB thread-reservation=1
+|  Per-Instance Resources: mem-estimate=175.15MB mem-reservation=104.19MB thread-reservation=1 runtime-filters-memory=2.00MB
 |  max-parallelism=1 segment-costs=[1740398017, 1979329186, 3822129, 1740398017, 1979329186, 3822129, 184743, 149317]
 PLAN-ROOT SINK
 |  output exprs: rank(), i_product_name, i_product_name
@@ -134,6 +134,7 @@ PLAN-ROOT SINK
 |--22:HASH JOIN [INNER JOIN]
 |  |  hash predicates: i_item_sk = tpcds_partitioned_parquet_snap.store_sales_1.ss_item_sk
 |  |  fk/pk conjuncts: none
+|  |  runtime filters: RF002[bloom] <- tpcds_partitioned_parquet_snap.store_sales_1.ss_item_sk, RF003[min_max] <- tpcds_partitioned_parquet_snap.store_sales_1.ss_item_sk
 |  |  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
 |  |  tuple-ids=17,30,29 row-size=48B cardinality=1 cost=92341
 |  |  in pipelines: 13(GETNEXT), 19(OPEN)
@@ -209,6 +210,7 @@ PLAN-ROOT SINK
 |  |     in pipelines: 14(GETNEXT)
 |  |
 |  13:CTE CONSUMER [cte_suggestion_0]
+|     runtime filters: RF003[min_max] -> i_item_sk, RF002[bloom] -> i_item_sk
 |     mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
 |     tuple-ids=17 row-size=39B cardinality=360.00K cost=0
 |     in pipelines: 13(GETNEXT)
@@ -216,6 +218,7 @@ PLAN-ROOT SINK
 12:HASH JOIN [INNER JOIN]
 |  hash predicates: i_item_sk = tpcds_partitioned_parquet_snap.store_sales.ss_item_sk
 |  fk/pk conjuncts: none
+|  runtime filters: RF000[bloom] <- tpcds_partitioned_parquet_snap.store_sales.ss_item_sk, RF001[min_max] <- tpcds_partitioned_parquet_snap.store_sales.ss_item_sk
 |  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
 |  tuple-ids=2,15,14 row-size=48B cardinality=1 cost=92341
 |  in pipelines: 03(GETNEXT), 09(OPEN)
@@ -291,11 +294,12 @@ PLAN-ROOT SINK
 |     in pipelines: 04(GETNEXT)
 |
 03:CTE CONSUMER [cte_suggestion_0]
+   runtime filters: RF001[min_max] -> i_item_sk, RF000[bloom] -> i_item_sk
    mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
    tuple-ids=2 row-size=39B cardinality=360.00K cost=0
    in pipelines: 03(GETNEXT)
 ---- DISTRIBUTEDPLAN
-Max Per-Host Resource Reservation: Memory=544.06MB Threads=64
+Max Per-Host Resource Reservation: Memory=548.06MB Threads=64
 Per-Host Resource Estimates: Memory=1.36GB
 ImpalaSequence
   ImpalaSortRel(sort0=[$0], dir0=[ASC], fetch=[100:TINYINT])
@@ -382,6 +386,7 @@ max-parallelism=4 segment-costs=[0, 2] cpu-comparison-result=480 [max(12 (self) 
 |  |  in pipelines: 02(GETNEXT)
 |  |
 |  F06:PLAN FRAGMENT [RANDOM] hosts=4 instances=4
+|  Per-Host Shared Resources: mem-estimate=1.00MB mem-reservation=1.00MB thread-reservation=0 runtime-filters-memory=1.00MB
 |  Per-Instance Resources: mem-estimate=4.94MB mem-reservation=4.00MB thread-reservation=1
 |  max-parallelism=4 segment-costs=[92344]
 |  22:HASH JOIN [INNER JOIN, BROADCAST]
@@ -393,11 +398,12 @@ max-parallelism=4 segment-costs=[0, 2] cpu-comparison-result=480 [max(12 (self) 
 |  |  in pipelines: 02(GETNEXT), 39(OPEN)
 |  |
 |  |--F16:PLAN FRAGMENT [RANDOM] hosts=4 instances=4
-|  |  |  Per-Instance Resources: mem-estimate=1.95MB mem-reservation=1.94MB thread-reservation=1
+|  |  |  Per-Instance Resources: mem-estimate=2.95MB mem-reservation=2.94MB thread-reservation=1 runtime-filters-memory=1.00MB
 |  |  |  max-parallelism=4 segment-costs=[1] cpu-comparison-result=240 [max(4 (self) vs 240 (sum children))]
 |  |  JOIN BUILD
 |  |  |  join-table-id=01 plan-id=02 cohort-id=02
 |  |  |  build expressions: tpcds_partitioned_parquet_snap.store_sales_1.ss_item_sk
+|  |  |  runtime filters: RF002[bloom] <- tpcds_partitioned_parquet_snap.store_sales_1.ss_item_sk, RF003[min_max] <- tpcds_partitioned_parquet_snap.store_sales_1.ss_item_sk
 |  |  |  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0 cost=1
 |  |  |
 |  |  40:EXCHANGE [BROADCAST]
@@ -540,6 +546,7 @@ max-parallelism=4 segment-costs=[0, 2] cpu-comparison-result=480 [max(12 (self) 
 |  |     in pipelines: 14(GETNEXT)
 |  |
 |  13:CTE CONSUMER [cte_suggestion_0]
+|  |  runtime filters: RF003[min_max] -> i_item_sk, RF002[bloom] -> i_item_sk
 |  |  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
 |  |  tuple-ids=17 row-size=39B cardinality=360.00K cost=0
 |  |  in pipelines: 02(GETNEXT)
@@ -570,6 +577,7 @@ max-parallelism=4 segment-costs=[0, 2] cpu-comparison-result=480 [max(12 (self) 
 |  in pipelines: 02(GETNEXT)
 |
 F00:PLAN FRAGMENT [RANDOM] hosts=4 instances=4
+Per-Host Shared Resources: mem-estimate=1.00MB mem-reservation=1.00MB thread-reservation=0 runtime-filters-memory=1.00MB
 Per-Instance Resources: mem-estimate=4.94MB mem-reservation=4.00MB thread-reservation=1
 max-parallelism=4 segment-costs=[92344]
 12:HASH JOIN [INNER JOIN, BROADCAST]
@@ -581,11 +589,12 @@ max-parallelism=4 segment-costs=[92344]
 |  in pipelines: 02(GETNEXT), 31(OPEN)
 |
 |--F18:PLAN FRAGMENT [RANDOM] hosts=4 instances=4
-|  |  Per-Instance Resources: mem-estimate=1.95MB mem-reservation=1.94MB thread-reservation=1
+|  |  Per-Instance Resources: mem-estimate=2.95MB mem-reservation=2.94MB thread-reservation=1 runtime-filters-memory=1.00MB
 |  |  max-parallelism=4 segment-costs=[1] cpu-comparison-result=240 [max(4 (self) vs 240 (sum children))]
 |  JOIN BUILD
 |  |  join-table-id=03 plan-id=04 cohort-id=01
 |  |  build expressions: tpcds_partitioned_parquet_snap.store_sales.ss_item_sk
+|  |  runtime filters: RF000[bloom] <- tpcds_partitioned_parquet_snap.store_sales.ss_item_sk, RF001[min_max] <- tpcds_partitioned_parquet_snap.store_sales.ss_item_sk
 |  |  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0 cost=1
 |  |
 |  32:EXCHANGE [BROADCAST]
@@ -728,6 +737,7 @@ max-parallelism=4 segment-costs=[92344]
 |     in pipelines: 04(GETNEXT)
 |
 03:CTE CONSUMER [cte_suggestion_0]
+|  runtime filters: RF001[min_max] -> i_item_sk, RF000[bloom] -> i_item_sk
 |  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
 |  tuple-ids=2 row-size=39B cardinality=360.00K cost=0
 |  in pipelines: 02(GETNEXT)
@@ -775,7 +785,7 @@ LOCAL MULTI SINK [FRAGMENT=F14, EXCHANGE=01, cte_suggestion_0]
    tuple-ids=0 row-size=39B cardinality=360.00K cost=149314
    in pipelines: 02(GETNEXT)
 ---- PARALLELPLANS
-Max Per-Host Resource Reservation: Memory=544.06MB Threads=64
+Max Per-Host Resource Reservation: Memory=548.06MB Threads=64
 Per-Host Resource Estimates: Memory=1.36GB
 ImpalaSequence
   ImpalaSortRel(sort0=[$0], dir0=[ASC], fetch=[100:TINYINT])
@@ -862,6 +872,7 @@ max-parallelism=4 segment-costs=[0, 2] cpu-comparison-result=480 [max(12 (self) 
 |  |  in pipelines: 02(GETNEXT)
 |  |
 |  F06:PLAN FRAGMENT [RANDOM] hosts=4 instances=4
+|  Per-Host Shared Resources: mem-estimate=1.00MB mem-reservation=1.00MB thread-reservation=0 runtime-filters-memory=1.00MB
 |  Per-Instance Resources: mem-estimate=4.94MB mem-reservation=4.00MB thread-reservation=1
 |  max-parallelism=4 segment-costs=[92344]
 |  22:HASH JOIN [INNER JOIN, BROADCAST]
@@ -873,11 +884,12 @@ max-parallelism=4 segment-costs=[0, 2] cpu-comparison-result=480 [max(12 (self) 
 |  |  in pipelines: 02(GETNEXT), 39(OPEN)
 |  |
 |  |--F16:PLAN FRAGMENT [RANDOM] hosts=4 instances=4
-|  |  |  Per-Instance Resources: mem-estimate=1.95MB mem-reservation=1.94MB thread-reservation=1
+|  |  |  Per-Instance Resources: mem-estimate=2.95MB mem-reservation=2.94MB thread-reservation=1 runtime-filters-memory=1.00MB
 |  |  |  max-parallelism=4 segment-costs=[1] cpu-comparison-result=240 [max(4 (self) vs 240 (sum children))]
 |  |  JOIN BUILD
 |  |  |  join-table-id=01 plan-id=02 cohort-id=02
 |  |  |  build expressions: tpcds_partitioned_parquet_snap.store_sales_1.ss_item_sk
+|  |  |  runtime filters: RF002[bloom] <- tpcds_partitioned_parquet_snap.store_sales_1.ss_item_sk, RF003[min_max] <- tpcds_partitioned_parquet_snap.store_sales_1.ss_item_sk
 |  |  |  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0 cost=1
 |  |  |
 |  |  40:EXCHANGE [BROADCAST]
@@ -1020,6 +1032,7 @@ max-parallelism=4 segment-costs=[0, 2] cpu-comparison-result=480 [max(12 (self) 
 |  |     in pipelines: 14(GETNEXT)
 |  |
 |  13:CTE CONSUMER [cte_suggestion_0]
+|  |  runtime filters: RF003[min_max] -> i_item_sk, RF002[bloom] -> i_item_sk
 |  |  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
 |  |  tuple-ids=17 row-size=39B cardinality=360.00K cost=0
 |  |  in pipelines: 02(GETNEXT)
@@ -1050,6 +1063,7 @@ max-parallelism=4 segment-costs=[0, 2] cpu-comparison-result=480 [max(12 (self) 
 |  in pipelines: 02(GETNEXT)
 |
 F00:PLAN FRAGMENT [RANDOM] hosts=4 instances=4
+Per-Host Shared Resources: mem-estimate=1.00MB mem-reservation=1.00MB thread-reservation=0 runtime-filters-memory=1.00MB
 Per-Instance Resources: mem-estimate=4.94MB mem-reservation=4.00MB thread-reservation=1
 max-parallelism=4 segment-costs=[92344]
 12:HASH JOIN [INNER JOIN, BROADCAST]
@@ -1061,11 +1075,12 @@ max-parallelism=4 segment-costs=[92344]
 |  in pipelines: 02(GETNEXT), 31(OPEN)
 |
 |--F18:PLAN FRAGMENT [RANDOM] hosts=4 instances=4
-|  |  Per-Instance Resources: mem-estimate=1.95MB mem-reservation=1.94MB thread-reservation=1
+|  |  Per-Instance Resources: mem-estimate=2.95MB mem-reservation=2.94MB thread-reservation=1 runtime-filters-memory=1.00MB
 |  |  max-parallelism=4 segment-costs=[1] cpu-comparison-result=240 [max(4 (self) vs 240 (sum children))]
 |  JOIN BUILD
 |  |  join-table-id=03 plan-id=04 cohort-id=01
 |  |  build expressions: tpcds_partitioned_parquet_snap.store_sales.ss_item_sk
+|  |  runtime filters: RF000[bloom] <- tpcds_partitioned_parquet_snap.store_sales.ss_item_sk, RF001[min_max] <- tpcds_partitioned_parquet_snap.store_sales.ss_item_sk
 |  |  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0 cost=1
 |  |
 |  32:EXCHANGE [BROADCAST]
@@ -1208,6 +1223,7 @@ max-parallelism=4 segment-costs=[92344]
 |     in pipelines: 04(GETNEXT)
 |
 03:CTE CONSUMER [cte_suggestion_0]
+|  runtime filters: RF001[min_max] -> i_item_sk, RF000[bloom] -> i_item_sk
 |  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
 |  tuple-ids=2 row-size=39B cardinality=360.00K cost=0
 |  in pipelines: 02(GETNEXT)

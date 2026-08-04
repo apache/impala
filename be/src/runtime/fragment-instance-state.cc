@@ -25,6 +25,7 @@
 #include <thrift/protocol/TDebugProtocol.h>
 
 #include "codegen/llvm-codegen.h"
+#include "exec/cte-consumer-node.h"
 #include "exec/exchange-node.h"
 #include "exec/exec-node.h"
 #include "exec/hdfs-scan-node-base.h"
@@ -395,7 +396,7 @@ void FragmentInstanceState::GetStatusReport(FragmentInstanceExecStatusPB* instan
   total_bytes_sent_  = total_bytes_sent;
   per_join_rows_produced_ = per_join_rows_produced;
 
-  // Aggregate effective filter targets from scan nodes.
+  // Aggregate effective filter targets from scan nodes and CTE consumers.
   if (exec_tree_ != nullptr) {
     vector<ExecNode*> scan_nodes;
     exec_tree_->CollectScanNodes(&scan_nodes);
@@ -403,6 +404,14 @@ void FragmentInstanceState::GetStatusReport(FragmentInstanceExecStatusPB* instan
       ScanNode* scan_node = static_cast<ScanNode*>(node);
       for (int32_t filter_id : scan_node->effective_filter_ids()) {
         per_scan_effective_filters_.insert({filter_id, scan_node->id()});
+      }
+    }
+    scan_nodes.clear();
+    exec_tree_->CollectNodes(TPlanNodeType::CTE_CONSUMER_NODE, &scan_nodes);
+    for (ExecNode* node : scan_nodes) {
+      CTEConsumerNode* cte_node = static_cast<CTEConsumerNode*>(node);
+      for (int32_t filter_id : cte_node->effective_filter_ids()) {
+        per_scan_effective_filters_.insert({filter_id, cte_node->id()});
       }
     }
   }

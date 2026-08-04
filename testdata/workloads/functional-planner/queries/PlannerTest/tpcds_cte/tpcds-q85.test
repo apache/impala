@@ -58,8 +58,8 @@ ORDER BY SUBSTRING(r_reason_desc,1,20) ,
          avg(wr_fee)
 LIMIT 100;
 ---- PLAN
-Max Per-Host Resource Reservation: Memory=139.77MB Threads=1
-Per-Host Resource Estimates: Memory=800MB
+Max Per-Host Resource Reservation: Memory=141.77MB Threads=1
+Per-Host Resource Estimates: Memory=802MB
 ImpalaSequence
   ImpalaSortRel(sort0=[$0], sort1=[$1], sort2=[$2], sort3=[$3], dir0=[ASC], dir1=[ASC], dir2=[ASC], dir3=[ASC], fetch=[100:TINYINT])
     ImpalaProjectRel(EXPR$0=[SUBSTRING($0, 1:BIGINT, 20:BIGINT)], EXPR$1=[$1], EXPR$2=[$2], EXPR$3=[$3])
@@ -99,7 +99,7 @@ ImpalaSequence
       ImpalaProjectRel(cd_demo_sk=[$0], cd_marital_status=[$2], cd_education_status=[$3])
         ImpalaHdfsScanRel(table=[[tpcds_partitioned_parquet_snap, customer_demographics]])
 F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Instance Resources: mem-estimate=799.63MB mem-reservation=139.77MB thread-reservation=1 runtime-filters-memory=10.00MB
+|  Per-Instance Resources: mem-estimate=801.63MB mem-reservation=141.77MB thread-reservation=1 runtime-filters-memory=12.00MB
 |  max-parallelism=1 segment-costs=[493827856, 224, 997021]
 PLAN-ROOT SINK
 |  output exprs: substring(tpcds_partitioned_parquet_snap.reason.r_reason_desc, CAST(1 AS BIGINT), CAST(20 AS BIGINT)), avg(tpcds_partitioned_parquet_snap.web_sales.ws_quantity), avg(tpcds_partitioned_parquet_snap.web_returns.wr_refunded_cash), avg(tpcds_partitioned_parquet_snap.web_returns.wr_fee)
@@ -222,7 +222,7 @@ PLAN-ROOT SINK
 |  |--09:HASH JOIN [INNER JOIN]
 |  |  |  hash predicates: tpcds_partitioned_parquet_snap.web_returns.wr_refunded_cdemo_sk = cd_demo_sk, cd_marital_status = cd_marital_status, cd_education_status = cd_education_status
 |  |  |  fk/pk conjuncts: tpcds_partitioned_parquet_snap.web_returns.wr_refunded_cdemo_sk = cd_demo_sk
-|  |  |  runtime filters: RF012[bloom] <- cd_demo_sk, RF013[min_max] <- cd_demo_sk
+|  |  |  runtime filters: RF012[bloom] <- cd_demo_sk, RF013[bloom] <- cd_marital_status, RF014[bloom] <- cd_education_status, RF015[min_max] <- cd_demo_sk, RF016[min_max] <- cd_marital_status, RF017[min_max] <- cd_education_status
 |  |  |  mem-estimate=17.00MB mem-reservation=17.00MB spill-buffer=1.00MB thread-reservation=0
 |  |  |  tuple-ids=6,8,9 row-size=92B cardinality=2.36M cost=6167744
 |  |  |  in pipelines: 05(GETNEXT), 08(OPEN)
@@ -235,12 +235,13 @@ PLAN-ROOT SINK
 |  |  07:HASH JOIN [INNER JOIN]
 |  |  |  hash predicates: tpcds_partitioned_parquet_snap.web_returns.wr_returning_cdemo_sk = cd_demo_sk
 |  |  |  fk/pk conjuncts: tpcds_partitioned_parquet_snap.web_returns.wr_returning_cdemo_sk = cd_demo_sk
-|  |  |  runtime filters: RF014[bloom] <- cd_demo_sk, RF015[min_max] <- cd_demo_sk
+|  |  |  runtime filters: RF018[bloom] <- cd_demo_sk, RF019[min_max] <- cd_demo_sk
 |  |  |  mem-estimate=17.00MB mem-reservation=17.00MB spill-buffer=1.00MB thread-reservation=0
 |  |  |  tuple-ids=6,8 row-size=64B cardinality=21.54M cost=10199108
 |  |  |  in pipelines: 05(GETNEXT), 06(OPEN)
 |  |  |
 |  |  |--06:CTE CONSUMER [cte_suggestion_0]
+|  |  |     runtime filters: RF016[min_max] -> cd_marital_status, RF017[min_max] -> cd_education_status, RF013[bloom] -> cd_marital_status, RF014[bloom] -> cd_education_status
 |  |  |     mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
 |  |  |     tuple-ids=8 row-size=39B cardinality=213.47K cost=0
 |  |  |     in pipelines: 06(GETNEXT)
@@ -248,7 +249,7 @@ PLAN-ROOT SINK
 |  |  05:SCAN HDFS [tpcds_partitioned_parquet_snap.web_returns]
 |  |     HDFS partitions=2114/2114 files=2114 size=16.74GB
 |  |     predicates: tpcds_partitioned_parquet_snap.web_returns.wr_refunded_addr_sk IS NOT NULL, tpcds_partitioned_parquet_snap.web_returns.wr_reason_sk IS NOT NULL, tpcds_partitioned_parquet_snap.web_returns.wr_refunded_cdemo_sk IS NOT NULL, tpcds_partitioned_parquet_snap.web_returns.wr_returning_cdemo_sk IS NOT NULL, tpcds_partitioned_parquet_snap.web_returns.wr_item_sk IS NOT NULL, tpcds_partitioned_parquet_snap.web_returns.wr_order_number IS NOT NULL
-|  |     runtime filters: RF015[min_max] -> tpcds_partitioned_parquet_snap.web_returns.wr_returning_cdemo_sk, RF013[min_max] -> tpcds_partitioned_parquet_snap.web_returns.wr_refunded_cdemo_sk, RF001[min_max] -> tpcds_partitioned_parquet_snap.web_returns.wr_reason_sk, RF014[bloom] -> tpcds_partitioned_parquet_snap.web_returns.wr_returning_cdemo_sk, RF012[bloom] -> tpcds_partitioned_parquet_snap.web_returns.wr_refunded_cdemo_sk, RF000[bloom] -> tpcds_partitioned_parquet_snap.web_returns.wr_reason_sk
+|  |     runtime filters: RF019[min_max] -> tpcds_partitioned_parquet_snap.web_returns.wr_returning_cdemo_sk, RF015[min_max] -> tpcds_partitioned_parquet_snap.web_returns.wr_refunded_cdemo_sk, RF001[min_max] -> tpcds_partitioned_parquet_snap.web_returns.wr_reason_sk, RF018[bloom] -> tpcds_partitioned_parquet_snap.web_returns.wr_returning_cdemo_sk, RF012[bloom] -> tpcds_partitioned_parquet_snap.web_returns.wr_refunded_cdemo_sk, RF000[bloom] -> tpcds_partitioned_parquet_snap.web_returns.wr_reason_sk
 |  |     stored statistics:
 |  |       table: rows=216.00M size=16.74GB
 |  |       partitions: 2114/2114 rows=216.00M
@@ -289,8 +290,8 @@ PLAN-ROOT SINK
    tuple-ids=2 row-size=32B cardinality=5.92M(filtered from 215.90M) cost=315161305
    in pipelines: 03(GETNEXT)
 ---- DISTRIBUTEDPLAN
-Max Per-Host Resource Reservation: Memory=311.84MB Threads=23
-Per-Host Resource Estimates: Memory=809MB
+Max Per-Host Resource Reservation: Memory=315.84MB Threads=23
+Per-Host Resource Estimates: Memory=813MB
 ImpalaSequence
   ImpalaSortRel(sort0=[$0], sort1=[$1], sort2=[$2], sort3=[$3], dir0=[ASC], dir1=[ASC], dir2=[ASC], dir3=[ASC], fetch=[100:TINYINT])
     ImpalaProjectRel(EXPR$0=[SUBSTRING($0, 1:BIGINT, 20:BIGINT)], EXPR$1=[$1], EXPR$2=[$2], EXPR$3=[$3])
@@ -548,12 +549,12 @@ max-parallelism=40 segment-costs=[327742670, 29034] cpu-comparison-result=83 [ma
 |  |  |  in pipelines: 05(GETNEXT), 02(OPEN)
 |  |  |
 |  |  |--F17:PLAN FRAGMENT [RANDOM] hosts=10 instances=10
-|  |  |  |  Per-Instance Resources: mem-estimate=41.01MB mem-reservation=35.00MB thread-reservation=1 runtime-filters-memory=1.00MB
+|  |  |  |  Per-Instance Resources: mem-estimate=43.01MB mem-reservation=37.00MB thread-reservation=1 runtime-filters-memory=3.00MB
 |  |  |  |  max-parallelism=10 segment-costs=[497170]
 |  |  |  JOIN BUILD
 |  |  |  |  join-table-id=05 plan-id=06 cohort-id=03
 |  |  |  |  build expressions: cd_demo_sk, cd_marital_status, cd_education_status
-|  |  |  |  runtime filters: RF012[bloom] <- cd_demo_sk, RF013[min_max] <- cd_demo_sk
+|  |  |  |  runtime filters: RF012[bloom] <- cd_demo_sk, RF013[bloom] <- cd_marital_status, RF014[bloom] <- cd_education_status, RF015[min_max] <- cd_demo_sk, RF016[min_max] <- cd_marital_status, RF017[min_max] <- cd_education_status
 |  |  |  |  mem-estimate=34.00MB mem-reservation=34.00MB spill-buffer=1.00MB thread-reservation=0 cost=213470
 |  |  |  |
 |  |  |  21:EXCHANGE [BROADCAST]
@@ -604,7 +605,7 @@ max-parallelism=40 segment-costs=[327742670, 29034] cpu-comparison-result=83 [ma
 |  |  |  JOIN BUILD
 |  |  |  |  join-table-id=06 plan-id=07 cohort-id=03
 |  |  |  |  build expressions: cd_demo_sk
-|  |  |  |  runtime filters: RF014[bloom] <- cd_demo_sk, RF015[min_max] <- cd_demo_sk
+|  |  |  |  runtime filters: RF018[bloom] <- cd_demo_sk, RF019[min_max] <- cd_demo_sk
 |  |  |  |  mem-estimate=34.00MB mem-reservation=34.00MB spill-buffer=1.00MB thread-reservation=0 cost=213470
 |  |  |  |
 |  |  |  20:EXCHANGE [BROADCAST]
@@ -613,9 +614,11 @@ max-parallelism=40 segment-costs=[327742670, 29034] cpu-comparison-result=83 [ma
 |  |  |  |  in pipelines: 02(GETNEXT)
 |  |  |  |
 |  |  |  F03:PLAN FRAGMENT [RANDOM] hosts=10 instances=10
+|  |  |  Per-Host Shared Resources: mem-estimate=2.00MB mem-reservation=2.00MB thread-reservation=0 runtime-filters-memory=2.00MB
 |  |  |  Per-Instance Resources: mem-estimate=4.12MB mem-reservation=4.00MB thread-reservation=1
 |  |  |  max-parallelism=10 segment-costs=[20749]
 |  |  |  06:CTE CONSUMER [cte_suggestion_0]
+|  |  |  |  runtime filters: RF016[min_max] -> cd_marital_status, RF017[min_max] -> cd_education_status, RF013[bloom] -> cd_marital_status, RF014[bloom] -> cd_education_status
 |  |  |  |  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
 |  |  |  |  tuple-ids=8 row-size=39B cardinality=213.47K cost=0
 |  |  |  |  in pipelines: 02(GETNEXT)
@@ -644,7 +647,7 @@ max-parallelism=40 segment-costs=[327742670, 29034] cpu-comparison-result=83 [ma
 |  |  05:SCAN HDFS [tpcds_partitioned_parquet_snap.web_returns, RANDOM]
 |  |     HDFS partitions=2114/2114 files=2114 size=16.74GB
 |  |     predicates: tpcds_partitioned_parquet_snap.web_returns.wr_refunded_addr_sk IS NOT NULL, tpcds_partitioned_parquet_snap.web_returns.wr_reason_sk IS NOT NULL, tpcds_partitioned_parquet_snap.web_returns.wr_refunded_cdemo_sk IS NOT NULL, tpcds_partitioned_parquet_snap.web_returns.wr_returning_cdemo_sk IS NOT NULL, tpcds_partitioned_parquet_snap.web_returns.wr_item_sk IS NOT NULL, tpcds_partitioned_parquet_snap.web_returns.wr_order_number IS NOT NULL
-|  |     runtime filters: RF015[min_max] -> tpcds_partitioned_parquet_snap.web_returns.wr_returning_cdemo_sk, RF013[min_max] -> tpcds_partitioned_parquet_snap.web_returns.wr_refunded_cdemo_sk, RF001[min_max] -> tpcds_partitioned_parquet_snap.web_returns.wr_reason_sk, RF014[bloom] -> tpcds_partitioned_parquet_snap.web_returns.wr_returning_cdemo_sk, RF012[bloom] -> tpcds_partitioned_parquet_snap.web_returns.wr_refunded_cdemo_sk, RF000[bloom] -> tpcds_partitioned_parquet_snap.web_returns.wr_reason_sk
+|  |     runtime filters: RF019[min_max] -> tpcds_partitioned_parquet_snap.web_returns.wr_returning_cdemo_sk, RF015[min_max] -> tpcds_partitioned_parquet_snap.web_returns.wr_refunded_cdemo_sk, RF001[min_max] -> tpcds_partitioned_parquet_snap.web_returns.wr_reason_sk, RF018[bloom] -> tpcds_partitioned_parquet_snap.web_returns.wr_returning_cdemo_sk, RF012[bloom] -> tpcds_partitioned_parquet_snap.web_returns.wr_refunded_cdemo_sk, RF000[bloom] -> tpcds_partitioned_parquet_snap.web_returns.wr_reason_sk
 |  |     stored statistics:
 |  |       table: rows=216.00M size=16.74GB
 |  |       partitions: 2114/2114 rows=216.00M
@@ -718,8 +721,8 @@ LOCAL MULTI SINK [FRAGMENT=F11, EXCHANGE=01, cte_suggestion_0]
    tuple-ids=0 row-size=39B cardinality=213.47K cost=996757
    in pipelines: 02(GETNEXT)
 ---- PARALLELPLANS
-Max Per-Host Resource Reservation: Memory=186.52MB Threads=25
-Per-Host Resource Estimates: Memory=477MB
+Max Per-Host Resource Reservation: Memory=190.52MB Threads=25
+Per-Host Resource Estimates: Memory=481MB
 ImpalaSequence
   ImpalaSortRel(sort0=[$0], sort1=[$1], sort2=[$2], sort3=[$3], dir0=[ASC], dir1=[ASC], dir2=[ASC], dir3=[ASC], fetch=[100:TINYINT])
     ImpalaProjectRel(EXPR$0=[SUBSTRING($0, 1:BIGINT, 20:BIGINT)], EXPR$1=[$1], EXPR$2=[$2], EXPR$3=[$3])
@@ -976,12 +979,12 @@ max-parallelism=10 segment-costs=[23985204, 29034] cpu-comparison-result=83 [max
 |  |  |  in pipelines: 05(GETNEXT), 02(OPEN)
 |  |  |
 |  |  |--F18:PLAN FRAGMENT [RANDOM] hosts=10 instances=10
-|  |  |  |  Per-Instance Resources: mem-estimate=41.01MB mem-reservation=35.00MB thread-reservation=1 runtime-filters-memory=1.00MB
+|  |  |  |  Per-Instance Resources: mem-estimate=43.01MB mem-reservation=37.00MB thread-reservation=1 runtime-filters-memory=3.00MB
 |  |  |  |  max-parallelism=10 segment-costs=[497170]
 |  |  |  JOIN BUILD
 |  |  |  |  join-table-id=05 plan-id=06 cohort-id=03
 |  |  |  |  build expressions: cd_demo_sk, cd_marital_status, cd_education_status
-|  |  |  |  runtime filters: RF012[bloom] <- cd_demo_sk, RF013[min_max] <- cd_demo_sk
+|  |  |  |  runtime filters: RF012[bloom] <- cd_demo_sk, RF013[bloom] <- cd_marital_status, RF014[bloom] <- cd_education_status, RF015[min_max] <- cd_demo_sk, RF016[min_max] <- cd_marital_status, RF017[min_max] <- cd_education_status
 |  |  |  |  mem-estimate=34.00MB mem-reservation=34.00MB spill-buffer=1.00MB thread-reservation=0 cost=213470
 |  |  |  |
 |  |  |  21:EXCHANGE [BROADCAST]
@@ -1032,7 +1035,7 @@ max-parallelism=10 segment-costs=[23985204, 29034] cpu-comparison-result=83 [max
 |  |  |  JOIN BUILD
 |  |  |  |  join-table-id=06 plan-id=07 cohort-id=03
 |  |  |  |  build expressions: cd_demo_sk
-|  |  |  |  runtime filters: RF014[bloom] <- cd_demo_sk, RF015[min_max] <- cd_demo_sk
+|  |  |  |  runtime filters: RF018[bloom] <- cd_demo_sk, RF019[min_max] <- cd_demo_sk
 |  |  |  |  mem-estimate=34.00MB mem-reservation=34.00MB spill-buffer=1.00MB thread-reservation=0 cost=213470
 |  |  |  |
 |  |  |  20:EXCHANGE [BROADCAST]
@@ -1041,9 +1044,11 @@ max-parallelism=10 segment-costs=[23985204, 29034] cpu-comparison-result=83 [max
 |  |  |  |  in pipelines: 02(GETNEXT)
 |  |  |  |
 |  |  |  F03:PLAN FRAGMENT [RANDOM] hosts=10 instances=10
+|  |  |  Per-Host Shared Resources: mem-estimate=2.00MB mem-reservation=2.00MB thread-reservation=0 runtime-filters-memory=2.00MB
 |  |  |  Per-Instance Resources: mem-estimate=4.12MB mem-reservation=4.00MB thread-reservation=1
 |  |  |  max-parallelism=10 segment-costs=[20749]
 |  |  |  06:CTE CONSUMER [cte_suggestion_0]
+|  |  |  |  runtime filters: RF016[min_max] -> cd_marital_status, RF017[min_max] -> cd_education_status, RF013[bloom] -> cd_marital_status, RF014[bloom] -> cd_education_status
 |  |  |  |  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
 |  |  |  |  tuple-ids=8 row-size=39B cardinality=213.47K cost=0
 |  |  |  |  in pipelines: 02(GETNEXT)
@@ -1072,7 +1077,7 @@ max-parallelism=10 segment-costs=[23985204, 29034] cpu-comparison-result=83 [max
 |  |  05:SCAN HDFS [tpcds_partitioned_parquet_snap.web_returns, RANDOM]
 |  |     HDFS partitions=2114/2114 files=2114 size=16.74GB
 |  |     predicates: tpcds_partitioned_parquet_snap.web_returns.wr_refunded_addr_sk IS NOT NULL, tpcds_partitioned_parquet_snap.web_returns.wr_reason_sk IS NOT NULL, tpcds_partitioned_parquet_snap.web_returns.wr_refunded_cdemo_sk IS NOT NULL, tpcds_partitioned_parquet_snap.web_returns.wr_returning_cdemo_sk IS NOT NULL, tpcds_partitioned_parquet_snap.web_returns.wr_item_sk IS NOT NULL, tpcds_partitioned_parquet_snap.web_returns.wr_order_number IS NOT NULL
-|  |     runtime filters: RF015[min_max] -> tpcds_partitioned_parquet_snap.web_returns.wr_returning_cdemo_sk, RF013[min_max] -> tpcds_partitioned_parquet_snap.web_returns.wr_refunded_cdemo_sk, RF001[min_max] -> tpcds_partitioned_parquet_snap.web_returns.wr_reason_sk, RF014[bloom] -> tpcds_partitioned_parquet_snap.web_returns.wr_returning_cdemo_sk, RF012[bloom] -> tpcds_partitioned_parquet_snap.web_returns.wr_refunded_cdemo_sk, RF000[bloom] -> tpcds_partitioned_parquet_snap.web_returns.wr_reason_sk
+|  |     runtime filters: RF019[min_max] -> tpcds_partitioned_parquet_snap.web_returns.wr_returning_cdemo_sk, RF015[min_max] -> tpcds_partitioned_parquet_snap.web_returns.wr_refunded_cdemo_sk, RF001[min_max] -> tpcds_partitioned_parquet_snap.web_returns.wr_reason_sk, RF018[bloom] -> tpcds_partitioned_parquet_snap.web_returns.wr_returning_cdemo_sk, RF012[bloom] -> tpcds_partitioned_parquet_snap.web_returns.wr_refunded_cdemo_sk, RF000[bloom] -> tpcds_partitioned_parquet_snap.web_returns.wr_reason_sk
 |  |     stored statistics:
 |  |       table: rows=216.00M size=16.74GB
 |  |       partitions: 2114/2114 rows=216.00M

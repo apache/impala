@@ -135,7 +135,7 @@ Status KuduScanNodeBase::Open(RuntimeState* state) {
   if (latest_ts > 0) client_->SetLatestObservedTimestamp(latest_ts);
 
   runtime_profile_->AddInfoString("Table Name", table_desc_->fully_qualified_name());
-  if (filter_ctxs_.size() > 0) WaitForRuntimeFilters();
+  if (filter_ctxs_.size() > 0) WaitForRuntimeFilters(state, filter_ctxs_);
   return Status::OK();
 }
 

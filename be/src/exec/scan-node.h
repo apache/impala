@@ -195,12 +195,6 @@ class ScanNode : public ExecNode {
   /// 'total_throughput_counter_'
   void AddBytesReadCounters();
 
-  /// Waits for runtime filters to arrive, checking every 20ms. Max wait time is specified
-  /// by the 'runtime_filter_wait_time_ms' flag, which is overridden by the query option
-  /// of the same name. The wait starts from when this function is called. Returns
-  /// true if all filters arrived within the time limit, false otherwise.
-  bool WaitForRuntimeFilters();
-
   /// Additional state only used by multi-threaded scan node implementations.
   /// The lifecycle is as follows:
   /// 1. Prepare() is called.
