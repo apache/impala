@@ -88,4 +88,10 @@ public class LocalMultiSink extends DataSink {
   @Override
   public void collectExprsForLineage(List<Expr> exprs) {
   }
+
+  @Override
+  public void computeRowConsumptionAndProductionToCost() {
+    super.computeRowConsumptionAndProductionToCost();
+    fragment_.setFixedInstanceCount(fragment_.getNumInstances());
+  }
 }

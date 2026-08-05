@@ -28,8 +28,10 @@ import org.apache.impala.common.TreeNode;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 /**
@@ -162,6 +164,9 @@ public class CostingSegment extends TreeNode<CostingSegment> {
     }
 
     // Look up child fragment that is connected through this segment.
+    // Track non-blocking child fragments already counted to avoid double-counting the
+    // same CTEProducer fragment when multiple CTEConsumerNodes in this segment share it.
+    Set<PlanFragmentId> seenNonBlockingFragments = new HashSet<>();
     for (PlanNode node : nodes_) {
       for (int i = 0; i < node.getChildCount(); i++) {
         PlanFragment childFragment = node.getChild(i).getFragment();
@@ -169,17 +174,28 @@ public class CostingSegment extends TreeNode<CostingSegment> {
 
         Pair<CoreCount, List<CoreCount>> childCores =
             fragmentCoreState.get(childFragment.getId());
-        Preconditions.checkNotNull(childCores);
+        if (childCores == null) {
+          // We may not have visited the fragment associated with the CTEProducerNode for
+          // this CTEConsumerNode yet. In that case, we will not have a CoreCount for the
+          // child fragment. We can skip it here since the CTEProducerNode will be visited
+          // once by the single CTEConsumerNode that has the CTEProducerNode as a child
+          // and its CoreCount will be added to the subtreeCoreBuilder.
+          Preconditions.checkState(node instanceof CTEConsumerNode);
+          continue;
+        }
 
         if (childFragment.hasBlockingNode()) {
           CoreCount childCoreCount = childFragment.maxCore(
               childCores.first, CoreCount.sum(childCores.second), findUnboundedCount);
           subtreeCoreBuilder.add(childCoreCount);
         } else {
-          Preconditions.checkState(node instanceof ExchangeNode);
+          Preconditions.checkState(node instanceof ExchangeNode
+              || node instanceof CTEConsumerNode);
           Preconditions.checkState(i == 0);
-          segmentCore = CoreCount.sum(segmentCore, childCores.first);
-          subtreeCoreBuilder.addAll(childCores.second);
+          if (seenNonBlockingFragments.add(childFragment.getId())) {
+            segmentCore = CoreCount.sum(segmentCore, childCores.first);
+            subtreeCoreBuilder.addAll(childCores.second);
+          }
         }
       }
     }

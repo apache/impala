@@ -49,8 +49,8 @@ import java.util.Set;
 /**
  * Tests for TPC-DS queries with CTE suggestions enabled. For the most part, this is a
  * copy of {@link org.apache.impala.calcite.planner.TpcdsCpuCostPlannerTest} with few
- * tweaks to trigger CTE recommendations. The test only verifies single node plans since
- * DISTRIBUTED and PARALLEL plans do not yet support CTEs.
+ * tweaks to trigger CTE recommendations. The test verifies single node, distributed, and
+ * parallel plans with CTE support.
  */
 @RunWith(Parameterized.class)
 public class TpcdsCtePlannerTest extends PlannerTestBase {
@@ -191,8 +191,7 @@ public class TpcdsCtePlannerTest extends PlannerTestBase {
       14, List.of("q14a", "q14b"),
       23, List.of("q23a", "q23b"),
       24, List.of("q24a", "q24b"),
-      // IMPALA-15243: Error while applying rule MaterializedViewFilterScanRule for Q39
-      39, List.of()
+      39, List.of("q39a", "q39b")
     );
     List<Object[]> queries = new ArrayList<>(99);
     for (int i = 1; i <= 99; i++) {

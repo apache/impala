@@ -1122,7 +1122,8 @@ public class PlanFragment extends TreeNode<PlanFragment> {
       // step 2: Try lower parallelism by comparing output ProcessingCost of the input
       //   child fragment against this fragment's segment costs.
       Preconditions.checkState(getChildCount() > 0);
-      Preconditions.checkState(getChild(0).getSink() instanceof DataStreamSink);
+      Preconditions.checkState(getChild(0).getSink() instanceof DataStreamSink
+          || getChild(0).getSink() instanceof LocalMultiSink);
 
       // Check if this fragment parallelism can be lowered.
       int maxParallelism = getAdjustedInstanceCount();
@@ -1140,7 +1141,8 @@ public class PlanFragment extends TreeNode<PlanFragment> {
     // underparallelized.
     if (parentFragment == null && hasChild(0)
         && verdict != ScalingVerdict.FIXED_BY_PLAN_NODE
-        && verdict != ScalingVerdict.FIXED_BY_PARTITIONED_JOIN_BUILD) {
+        && verdict != ScalingVerdict.FIXED_BY_PARTITIONED_JOIN_BUILD
+        && verdict != ScalingVerdict.CTE_FRAGMENT_BOUNDED) {
       // Cap max parallelism at left child max.
       // This is to prevent Scheduler::CreateInputCollocatedInstances to overparallelize.
       // It is safe to do if verdict is neither of FIXED_BY_PLAN_NODE nor
@@ -1174,6 +1176,12 @@ public class PlanFragment extends TreeNode<PlanFragment> {
 
   protected boolean isPartitionedJoinBuildFragment() {
     return (sink_ instanceof JoinBuildSink) && !((JoinBuildSink) sink_).isShared();
+  }
+
+  protected boolean isCTEConsumerFragment() {
+    List<CTEConsumerNode> cteConsumers = Lists.newArrayList();
+    collectPlanNodes(Predicates.instanceOf(CTEConsumerNode.class), cteConsumers);
+    return !cteConsumers.isEmpty();
   }
 
   protected int getMaxParallelismForUnionFragment(
@@ -1233,6 +1241,7 @@ public class PlanFragment extends TreeNode<PlanFragment> {
     FIXED_BY_PARTITIONED_JOIN_BUILD,
     UNION_FRAGMENT_BOUNDED,
     SCAN_FRAGMENT_BOUNDED,
+    CTE_FRAGMENT_BOUNDED,
     MIN_GLOBAL_PARALLELISM
   }
 
@@ -1280,6 +1289,14 @@ public class PlanFragment extends TreeNode<PlanFragment> {
         logCountAdjustmentTrace(selectedParallelism, parentParallelism, verdict,
             "Partitioned join build fragment follow parent's parallelism.");
       }
+    } else if (isCTEConsumerFragment()) {
+      // This is a CTE consumer fragment. Parallelism is fixed because we don't yet
+      // represent the shared CTE producer with a DAG and it must match the producer.
+      maxParallelism_ = selectedParallelism;
+      Preconditions.checkState(maxParallelism_ <= maxThreadAllowed);
+      verdict = ScalingVerdict.CTE_FRAGMENT_BOUNDED;
+      LOG.trace("{} instance count fixed to {}. verdict={}", getId(), maxParallelism_,
+          verdict);
     } else {
       UnionNode unionNode = getUnionNode();
 
