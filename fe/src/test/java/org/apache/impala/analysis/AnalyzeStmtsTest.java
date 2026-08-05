@@ -3124,8 +3124,7 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
     // can't group a complex type
     AnalysisError("select int_struct_col, count(*) from "
         + "functional_parquet.allcomplextypes" + " group by int_struct_col",
-        "GROUP BY expression cannot be used on complex types without specifying a field:"
-        + " int_struct_col");
+        "GROUP BY expression 'int_struct_col' with type 'STRUCT<");
 
     // multiple grouping cols
     AnalyzesOk("select int_col, string_col, bigint_col, count(*) " +
@@ -3242,10 +3241,10 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
     // Ordering by complex-typed expressions is not allowed.
     AnalysisError("select * from functional_orc_def.complextypes_structs " +
         "order by tiny_struct", "ORDER BY expression 'tiny_struct' with " +
-        "complex type 'STRUCT<b:BOOLEAN>' is not supported.");
+        "type 'STRUCT<b:BOOLEAN>' is not supported.");
     AnalysisError("select * from functional_parquet.allcomplextypes " +
         "order by int_array_col", "ORDER BY expression 'int_array_col' with " +
-        "complex type 'ARRAY<INT>' is not supported.");
+        "type 'ARRAY<INT>' is not supported.");
   }
 
   @Test

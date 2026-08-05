@@ -467,10 +467,10 @@ types_nested_structs)
 ---- QUERY
 select distinct outer_struct from complextypes_nested_structs
 ---- CATCH
-AnalysisException: Complex types are not supported in SELECT DISTINCT clauses.
+AnalysisException: SELECT DISTINCT expression 'outer_struct' with type 'STRUCT<
 ====
 ---- QUERY
 select count(distinct outer_struct) from complextypes_nested_structs;
 ---- CATCH
-AnalysisException: Complex types are not supported as DISTINCT parameters of aggregate functions.
+AnalysisException: DISTINCT aggregate parameter 'outer_struct' with type 'STRUCT<
 ====

@@ -431,18 +431,10 @@ public class AnalyticExpr extends Expr {
     type_ = getFnCall().getType();
 
     for (Expr e: partitionExprs_) {
-      if (e.getType().isComplexOrVariantType()) {
-        throw new AnalysisException(String.format("PARTITION BY expression '%s' with " +
-            "complex type '%s' is not supported.", e.toSql(),
-            e.getType().toSql()));
-      }
+      e.getType().throwIfNotComparable("PARTITION BY expression", e);
     }
     for (OrderByElement e: orderByElements_) {
-      if (e.getExpr().getType().isComplexOrVariantType()) {
-        throw new AnalysisException(String.format("ORDER BY expression '%s' with " +
-            "complex type '%s' is not supported.", e.getExpr().toSql(),
-            e.getExpr().getType().toSql()));
-      }
+      e.getExpr().getType().throwIfNotComparable("ORDER BY expression", e.getExpr());
     }
 
     if (getFnCall().getParams().isDistinct()) {

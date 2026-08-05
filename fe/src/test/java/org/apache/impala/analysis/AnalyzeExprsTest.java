@@ -1306,10 +1306,10 @@ public class AnalyzeExprsTest extends AnalyzerTest {
     // Cannot order or partition by complex-typed expression.
     AnalysisError("select id, row_number() over (order by int_array_col) " +
         "from functional_parquet.allcomplextypes", "ORDER BY expression " +
-        "'int_array_col' with complex type 'ARRAY<INT>' is not supported.");
+        "'int_array_col' with type 'ARRAY<INT>' is not supported.");
     AnalysisError("select id, count() over (partition by tiny_struct) from " +
         "functional_orc_def.complextypes_structs",
-        "PARTITION BY expression 'tiny_struct' with complex type " +
+        "PARTITION BY expression 'tiny_struct' with type " +
         "'STRUCT<b:BOOLEAN>' is not supported.");
   }
 

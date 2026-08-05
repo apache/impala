@@ -259,8 +259,9 @@ public class MultiAggregateInfo {
       } else if (aggExpr.isDistinct()) {
         List<Expr> children = AggregateFunction.getCanonicalDistinctAggChildren(aggExpr);
 
-        // Complex types are not supported as DISTINCT parameters of aggregate functions.
-        checkComplexDistinctParams(aggExpr, children);
+        // Non-comparable types (complex and VARIANT) are not supported as DISTINCT
+        // parameters of aggregate functions.
+        checkComparableDistinctParams(children);
 
         int groupIdx = distinctExprs.indexOf(children);
         List<FunctionCallExpr> groupAggFns;
@@ -355,17 +356,10 @@ public class MultiAggregateInfo {
     }
   }
 
-  private static void checkComplexDistinctParams(FunctionCallExpr aggExpr,
-      List<Expr> params) throws AnalysisException {
+  private static void checkComparableDistinctParams(List<Expr> params)
+      throws AnalysisException {
     for (Expr child : params) {
-      if (child.getType().isComplexOrVariantType()) {
-        String subject =
-            child.getType().isVariantType() ? "VARIANT type is" : "Complex types are";
-        throw new AnalysisException(subject + " not supported " +
-            "as DISTINCT parameters of aggregate functions. Distinct parameter: '" +
-            child.toSql() + "', type: '" + child.getType().toSql() +
-            "' in aggregate function '" + aggExpr.toSql() + "'.");
-      }
+      child.getType().throwIfNotComparable("DISTINCT aggregate parameter", child);
     }
   }
 

@@ -603,14 +603,14 @@ AnalysisException: Set operations don't support STRUCT types or types containing
 select id, tiny_struct from complextypes_structs
 order by tiny_struct
 ---- CATCH
-AnalysisException: ORDER BY expression 'tiny_struct' with complex type 'STRUCT<b:BOOLEAN>' is not supported.
+AnalysisException: ORDER BY expression 'tiny_struct' with type 'STRUCT<b:BOOLEAN>' is not supported.
 ====
 ---- QUERY
 # Ordering by struct column (using the index of the column) is not supported.
 select id, tiny_struct from complextypes_structs
 order by 2
 ---- CATCH
-AnalysisException: ORDER BY expression 'tiny_struct' with complex type 'STRUCT<b:BOOLEAN>' is not supported.
+AnalysisException: ORDER BY expression 'tiny_struct' with type 'STRUCT<b:BOOLEAN>' is not supported.
 ====
 ---- QUERY
 # Check that the order by don't confuse the 3rd column with the member of the struct.

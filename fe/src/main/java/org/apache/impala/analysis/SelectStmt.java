@@ -48,6 +48,7 @@ import org.apache.impala.catalog.MapType;
 import org.apache.impala.catalog.StructField;
 import org.apache.impala.catalog.StructType;
 import org.apache.impala.catalog.TableLoadingException;
+import org.apache.impala.catalog.Type;
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.common.ColumnAliasGenerator;
 import org.apache.impala.common.Pair;
@@ -634,31 +635,28 @@ public class SelectStmt extends QueryStmt {
       }
 
       for (Expr expr: resultExprs_) {
-        if (selectList_.isDistinct() && expr.getType().isComplexOrVariantType()) {
-          String subject =
-              expr.getType().isVariantType() ? "VARIANT type is" : "Complex types are";
-          throw new AnalysisException(subject + " not supported " +
-              "in SELECT DISTINCT clauses. Expr: '" + expr.toSql() + "', type: '"
-              + expr.getType().toSql() + "'.");
+        Type type = expr.getType();
+        if (selectList_.isDistinct()) {
+          type.throwIfNotComparable("SELECT DISTINCT expression", expr);
         }
 
-        if (expr.getType().isArrayType()) {
-          ArrayType arrayType = (ArrayType) expr.getType();
+        if (type.isArrayType()) {
+          ArrayType arrayType = (ArrayType) type;
           if (!arrayType.getItemType().isSupported()) {
             throw new AnalysisException("Unsupported type '" +
-                expr.getType().toSql() + "' in '" + expr.toSql() + "'.");
+                type.toSql() + "' in '" + expr.toSql() + "'.");
           }
-        } else if (expr.getType().isMapType()) {
-          MapType mapType = (MapType) expr.getType();
+        } else if (type.isMapType()) {
+          MapType mapType = (MapType) type;
           if (!mapType.getKeyType().isSupported()
               || !mapType.getValueType().isSupported()) {
             throw new AnalysisException("Unsupported type '" +
-                expr.getType().toSql() + "' in '" + expr.toSql() + "'.");
+                type.toSql() + "' in '" + expr.toSql() + "'.");
           }
         }
-        if (!expr.getType().isSupported()) {
+        if (!type.isSupported()) {
           throw new AnalysisException("Unsupported type '"
-              + expr.getType().toSql() + "' in '" + expr.toSql() + "'.");
+              + type.toSql() + "' in '" + expr.toSql() + "'.");
         }
       }
 
@@ -1167,12 +1165,7 @@ public class SelectStmt extends QueryStmt {
               "GROUP BY expression must not contain analytic expressions: "
                   + expr.toSql());
         }
-        if (expr.getType().isComplexOrVariantType()) {
-          String detail = expr.getType().isVariantType()
-              ? "VARIANT type" : "complex types without specifying a field";
-          throw new AnalysisException(
-              "GROUP BY expression cannot be used on " + detail + ": " + expr.toSql());
-        }
+        expr.getType().throwIfNotComparable("GROUP BY expression", expr);
       }
 
       if (groupByClause_ != null && groupByClause_.hasGroupingSets()) {

@@ -566,10 +566,10 @@ INT,STRING,STRING
 ---- QUERY
 select distinct arr1 from complextypes_arrays
 ---- CATCH
-AnalysisException: Complex types are not supported in SELECT DISTINCT clauses.
+AnalysisException: SELECT DISTINCT expression 'arr1' with type 'ARRAY<INT>' is not supported.
 ====
 ---- QUERY
 select count(distinct arr1) from complextypes_arrays
 ---- CATCH
-AnalysisException: Complex types are not supported as DISTINCT parameters of aggregate functions.
+AnalysisException: DISTINCT aggregate parameter 'arr1' with type 'ARRAY<INT>' is not supported.
 ====

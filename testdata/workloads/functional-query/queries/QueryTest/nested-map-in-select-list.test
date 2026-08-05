@@ -495,10 +495,10 @@ STRING,STRING,STRING,STRING,STRING,STRING,STRING,STRING,STRING,STRING,STRING,STR
 ---- QUERY
 select distinct int_map from complextypestbl
 ---- CATCH
-AnalysisException: Complex types are not supported in SELECT DISTINCT clauses.
+AnalysisException: SELECT DISTINCT expression 'int_map' with type 'MAP<STRING,INT>' is not supported.
 ====
 ---- QUERY
 select count(distinct int_map) from complextypestbl;
 ---- CATCH
-AnalysisException: Complex types are not supported as DISTINCT parameters of aggregate functions.
+AnalysisException: DISTINCT aggregate parameter 'int_map' with type 'MAP<STRING,INT>' is not supported.
 ====

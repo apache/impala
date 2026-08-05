@@ -360,9 +360,11 @@ public class SetOperationStmt extends QueryStmt {
     if (!hasOnlyUnionAllOps()) {
       for (Expr expr: widestExprs_) {
         // UNION/INTERSECT/EXCEPT (DISTINCT) must hash/compare result columns, which is
-        // not supported for collection or variant types. Reject with a clear error rather
-        // than letting it reach (and crash) the backend.
-        if (expr.getType().isCollectionType() || expr.getType().isVariantType()) {
+        // not supported for non-comparable types (collections and VARIANT). Reject with
+        // a clear error rather than letting it reach (and crash) the backend. Note UNION
+        // ALL does not compare, so it stays allowed; STRUCTs are rejected earlier by
+        // castToSetOpCompatibleTypes.
+        if (!expr.getType().supportsComparison()) {
           throw new AnalysisException("UNION, EXCEPT and INTERSECT are not supported "
               + "for " + expr.getType().toSql() + " type.");
         }

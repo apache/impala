@@ -252,23 +252,23 @@ AnalysisException: Sorting is not supported if the select list contains collecti
 # Sorting by collections is not supported. Test with an array of fixed length type.
 select id, arr_int_1d from collection_tbl order by arr_int_1d
 ---- CATCH
-AnalysisException: ORDER BY expression 'arr_int_1d' with complex type 'ARRAY<INT>' is not supported.
+AnalysisException: ORDER BY expression 'arr_int_1d' with type 'ARRAY<INT>' is not supported.
 ====
 ---- QUERY
 # Sorting by collections is not supported. Test with an array of variable length type.
 select id, arr_string_1d from collection_tbl order by arr_string_1d
 ---- CATCH
-AnalysisException: ORDER BY expression 'arr_string_1d' with complex type 'ARRAY<STRING>' is not supported.
+AnalysisException: ORDER BY expression 'arr_string_1d' with type 'ARRAY<STRING>' is not supported.
 ====
 ---- QUERY
 # Sorting by collections is not supported. Test with a map of fixed length type.
 select id, map_int_int from map_non_varlen order by map_int_int
 ---- CATCH
-AnalysisException: ORDER BY expression 'map_int_int' with complex type 'MAP<INT,INT>' is not supported.
+AnalysisException: ORDER BY expression 'map_int_int' with type 'MAP<INT,INT>' is not supported.
 ====
 ---- QUERY
 # Sorting by collections is not supported. Test with a map of variable length type.
 select id, map_1d from collection_tbl order by map_1d
 ---- CATCH
-AnalysisException: ORDER BY expression 'map_1d' with complex type 'MAP<INT,STRING>' is not supported.
+AnalysisException: ORDER BY expression 'map_1d' with type 'MAP<INT,STRING>' is not supported.
 ====

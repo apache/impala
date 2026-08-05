@@ -359,19 +359,19 @@ aggregation(SUM, TotalMergesPerformed)> 0
 # ORDER BY a variant.
 SELECT id FROM functional_parquet.trino_variant ORDER BY v;
 ---- CATCH
-ORDER BY expression 'v' with complex type 'VARIANT' is not supported.
+ORDER BY expression 'v' with type 'VARIANT' is not supported.
 ====
 ---- QUERY
 # GROUP BY a variant.
 SELECT count(*) FROM functional_parquet.trino_variant GROUP BY v;
 ---- CATCH
-GROUP BY expression cannot be used on VARIANT type: v
+GROUP BY expression 'v' with type 'VARIANT' is not supported.
 ====
 ---- QUERY
 # SELECT DISTINCT on a variant.
 SELECT DISTINCT v FROM functional_parquet.trino_variant;
 ---- CATCH
-VARIANT type is not supported in SELECT DISTINCT clauses
+SELECT DISTINCT expression 'v' with type 'VARIANT' is not supported.
 ====
 ---- QUERY
 # UNION (DISTINCT) of a variant.
@@ -401,19 +401,19 @@ VARIANT type is not supported in DECODE expressions
 # Analytic PARTITION BY a variant.
 SELECT row_number() OVER (PARTITION BY v) FROM functional_parquet.trino_variant;
 ---- CATCH
-PARTITION BY expression 'v' with complex type 'VARIANT' is not supported.
+PARTITION BY expression 'v' with type 'VARIANT' is not supported.
 ====
 ---- QUERY
 # Analytic ORDER BY a variant.
 SELECT row_number() OVER (ORDER BY v) FROM functional_parquet.trino_variant;
 ---- CATCH
-ORDER BY expression 'v' with complex type 'VARIANT' is not supported.
+ORDER BY expression 'v' with type 'VARIANT' is not supported.
 ====
 ---- QUERY
 # count(DISTINCT) on a variant.
 SELECT count(DISTINCT v) FROM functional_parquet.trino_variant;
 ---- CATCH
-VARIANT type is not supported as DISTINCT parameters
+DISTINCT aggregate parameter 'v' with type 'VARIANT' is not supported.
 ====
 ---- QUERY
 # IS NULL on a variant.

@@ -22,6 +22,7 @@ import java.util.List;
 
 import org.apache.impala.analysis.CollectionStructType;
 import org.apache.impala.analysis.CreateTableStmt;
+import org.apache.impala.analysis.Expr;
 import org.apache.impala.analysis.Parser;
 import org.apache.impala.analysis.StatementBase;
 import org.apache.impala.analysis.TypeDef;
@@ -271,6 +272,29 @@ public abstract class Type {
   public boolean isArrayType() { return this instanceof ArrayType; }
   public boolean isStructType() { return this instanceof StructType; }
   public boolean isVariantType() { return this instanceof VariantType; }
+
+  /**
+   * Whether values of this type can be compared and ordered: usable with the comparison
+   * operators (=, !=, <, >, ...), IN, as an equi-join key, and in ORDER BY / GROUP BY /
+   * SELECT DISTINCT / DISTINCT aggregate parameters. Complex types and VARIANT are the
+   * only types that are not comparable, by design.
+   */
+  public boolean supportsComparison() {
+    return !isComplexOrVariantType();
+  }
+
+  /**
+   * Throws an AnalysisException if this type cannot be compared/ordered (see
+   * supportsComparison()); does nothing otherwise. 'exprDesc' names the clause and
+   * 'expr' the offending expression; they are combined with the type name into
+   * "<exprDesc> '<expr>' with type '<type>' is not supported.".
+   */
+  public void throwIfNotComparable(String exprDesc, Expr expr) throws AnalysisException {
+    if (!supportsComparison()) {
+      throw new AnalysisException(String.format(
+          "%s '%s' with type '%s' is not supported.", exprDesc, expr.toSql(), toSql()));
+    }
+  }
 
   /**
    * Returns true if 't' is a VARIANT or (recursively) contains a VARIANT nested inside an

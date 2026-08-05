@@ -311,11 +311,7 @@ public abstract class QueryStmt extends StatementBase {
   protected void createSortTupleInfo(Analyzer analyzer) throws AnalysisException {
     Preconditions.checkState(evaluateOrderBy_);
     for (Expr orderingExpr: sortInfo_.getSortExprs()) {
-      if (orderingExpr.getType().isComplexOrVariantType()) {
-        throw new AnalysisException(String.format("ORDER BY expression '%s' with " +
-            "complex type '%s' is not supported.", orderingExpr.toSql(),
-            orderingExpr.getType().toSql()));
-      }
+      orderingExpr.getType().throwIfNotComparable("ORDER BY expression", orderingExpr);
     }
 
     checkTypeValidityForSorting(analyzer);
