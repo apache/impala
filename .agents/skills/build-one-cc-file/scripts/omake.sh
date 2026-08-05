@@ -43,9 +43,18 @@ fi
 
 BASENAME="${1%.*}"
 BASENAME=${BASENAME##*/}
-MAKEFILE=$(grep -l "$BASENAME.cc.o:" $IMPALA_HOME/be/src/*/CMakeFiles/*.dir/build.make)
-MAKEFILE=${MAKEFILE#$IMPALA_HOME/}
-MAKE_CMD=(make DEBUG_NOOPT=1 -s -f "$MAKEFILE" "${MAKEFILE%/*}/$BASENAME.cc.o")
+if [[ "${IMPALA_MAKE_CMD}" == "make" ]]; then
+  MAKEFILE=$(grep -l "$BASENAME.cc.o:" $IMPALA_HOME/be/src/*/CMakeFiles/*.dir/build.make)
+  MAKEFILE=${MAKEFILE#$IMPALA_HOME/}
+  MAKE_CMD=(make DEBUG_NOOPT=1 -s -f "$MAKEFILE" "${MAKEFILE%/*}/$BASENAME.cc.o")
+elif [[ "${IMPALA_MAKE_CMD}" == "ninja" ]]; then
+  BUILD_TGT=$(grep -o "build .*$BASENAME.cc.o:" $IMPALA_HOME/build.ninja)
+  BUILD_TGT=${BUILD_TGT#build }
+  MAKE_CMD=(ninja "${BUILD_TGT%:}")
+else
+  echo "Unknown generator ${IMPALA_MAKE_CMD}"
+  exit 1
+fi
 
 echo "${MAKE_CMD[*]}"
 if [[ "$DRY_RUN" -eq 1 ]]; then
