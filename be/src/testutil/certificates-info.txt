@@ -1,6 +1,17 @@
 The following SSL certificates are used in Impala tests. This lists what each certificate is
-responsible for and how they were created:
+responsible for and how they were created.
 
+EKU policy for leaf certificates
+============================================
+The leaf certificates that Impala's TLS tests exercise on server sockets
+(server-cert.pem, localhost.pem, localhost-ecdsa.pem, wildcard-cert.pem,
+wildcard-san-cert.pem) carry Extended Key Usage = serverAuth ONLY.
+Impala never presents its certificate in a TLS client role. Every code path
+that loads --ssl_server_certificate uses the cert only in server role during
+the TLS handshake.
+
+
+-------------
   1) wildcardCA.pem & wildcardCA.key:
 
     This is a root certificate and its key which was used to sign wildcard-cert.pem and
@@ -27,8 +38,14 @@ responsible for and how they were created:
       openssl req -new -key wildcard-cert.key -out wildcard-cert.csr \
           -subj "/C=US/ST=CA/L=SF/O=Cloudera/CN=*.impala.test"
 
+      cat > wildcard-ext.cnf <<'EOF'
+      basicConstraints = CA:FALSE
+      extendedKeyUsage = serverAuth
+      EOF
+
       openssl x509 -req -in wildcard-cert.csr -CA wildcardCA.pem -CAkey wildcardCA.key \
-          -CAcreateserial -out wildcard-cert.pem -days 10000 -sha256
+          -CAcreateserial -out wildcard-cert.pem -days 10000 -sha256 \
+          -extfile wildcard-ext.cnf
 
 -------------
   3) wildcard-san-cert.pem & wildcard-san-cert.key:
@@ -43,14 +60,19 @@ responsible for and how they were created:
       openssl genrsa -out wildcard-san-cert.key 2048
 
       openssl req -new -sha256 -key wildcard-san-cert.key \
-          -subj "/C=US/ST=CA/L=SF/O=Cloudera/CN=badCN" -reqexts SAN \
-          -config <(cat /etc/ssl/openssl.cnf <(printf "[SAN]\nsubjectAltName=DNS:alsoBad,DNS:*.impala.test")) \
+          -subj "/C=US/ST=CA/L=SF/O=Cloudera/CN=badCN" \
           -out wildcard-san-cert.csr
+
+      cat > wildcard-san-ext.cnf <<'EOF'
+      basicConstraints = CA:FALSE
+      subjectAltName = DNS:alsoBad,DNS:*.impala.test
+      extendedKeyUsage = serverAuth
+      EOF
 
       openssl x509 -req -in wildcard-san-cert.csr -CA wildcardCA.pem \
           -CAkey wildcardCA.key -CAcreateserial \
-          -extfile <(cat /etc/ssl/openssl.cnf <(printf "[SAN]\nsubjectAltName=DNS:alsoBad,DNS:*.impala.test")) \
-          -extensions SAN -out wildcard-san-cert.pem -days 10000 -sha256
+          -extfile wildcard-san-ext.cnf \
+          -out wildcard-san-cert.pem -days 10000 -sha256
 
 -------------
   4) server-key.pem & server-key-password.pem & server-cert.key:
@@ -63,15 +85,20 @@ responsible for and how they were created:
 
       openssl genrsa -out server-key.pem 2048
 
-      openssl req -x509 -new -nodes -key server-key.pem -sha256 -days 10000 -out server-cert.pem \
-          -addext 'basicConstraints=CA:FALSE' \
-          -addext 'subjectAltName=DNS:localhost,IP:192.168.1.1'
+      cat > server-ext.cnf <<'EOF'
+      [ v3_req ]
+      basicConstraints = CA:FALSE
+      subjectAltName = DNS:localhost,IP:192.168.1.1
+      extendedKeyUsage = serverAuth
+      EOF
 
-      (Fill in all the details according to prompts with common name set to 'localhost')
+      openssl req -x509 -new -nodes -key server-key.pem -sha256 -days 10000 \
+          -out server-cert.pem \
+          -subj '/C=US/ST=CA/L=SF/O=Cloudera/CN=localhost' \
+          -config server-ext.cnf -extensions v3_req
 
-      openssl rsa -aes256 -in server-key.pem -out server-key-password.pem
-
-      (Specify "password" for the pass phrase)
+      openssl rsa -aes256 -in server-key.pem -out server-key-password.pem \
+          -passout pass:password
 
 -------------
   5) incorrect-commonname-cert.pem & incorrect-commonname-cert.key:
@@ -88,6 +115,22 @@ responsible for and how they were created:
     testing. The subject has no locality or emailAddress and uses:
     C=US, ST=CA, O=Cloudera, OU=Impala, CN=localhost
     It has the subject alternative name "DNS:localhost,IP:127.0.0.1".
+
+      openssl genrsa -out localhost.key 2048
+
+      openssl req -new -key localhost.key -out localhost.csr \
+          -subj '/C=US/ST=CA/O=Cloudera/OU=Impala/CN=localhost'
+
+      cat > localhost-ext.cnf <<'EOF'
+      basicConstraints = CA:FALSE
+      subjectAltName = DNS:localhost,IP:127.0.0.1
+      extendedKeyUsage = serverAuth
+      EOF
+
+      openssl x509 -req -in localhost.csr \
+          -CA wildcardCA.pem -CAkey wildcardCA.key -CAcreateserial \
+          -out localhost.pem -days 10000 -sha256 \
+          -extfile localhost-ext.cnf
 
 -------------
   7) wildcardCA-ecdsa.pem & wildcardCA-ecdsa.key:
@@ -108,6 +151,18 @@ responsible for and how they were created:
     algorithm "id-ecPublicKey". The subject has no locality or emailAddress and uses:
     C=US, ST=CA, O=Cloudera, OU=Impala, CN=localhost
     It has the subject alternative name "DNS:localhost,IP:127.0.0.1".
+
+      openssl ecparam -name prime256v1 -genkey -noout -out localhost-ecdsa.key
+
+      openssl req -new -key localhost-ecdsa.key -out localhost-ecdsa.csr \
+          -subj '/C=US/ST=CA/O=Cloudera/OU=Impala/CN=localhost'
+
+      # Uses the same extfile as localhost.pem (basicConstraints, SAN, EKU).
+
+      openssl x509 -req -in localhost-ecdsa.csr \
+          -CA wildcardCA-ecdsa.pem -CAkey wildcardCA-ecdsa.key -CAcreateserial \
+          -out localhost-ecdsa.pem -days 10000 -sha256 \
+          -extfile localhost-ext.cnf
 
 -------------
 
