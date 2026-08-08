@@ -70,7 +70,7 @@ requests == 2.34.2
   certifi == 2026.5.20
 sasl == 0.4a1
 # Can't upgrade until https://github.com/andialbrecht/sqlparse/issues/814 is fixed.
-sqlparse == 0.3.1
+sqlparse == 0.5.4
 avro==1.12.1
 thrift==0.23.0
 
