@@ -68,6 +68,8 @@ fi
 # Run Cluster Tests
 : ${CLUSTER_TEST:=true}
 : ${CLUSTER_TEST_FILES:=}
+# Run Helm chart render assertions on demand.
+: ${HELM_CHART_TEST:=false}
 # Run JS tests
 : ${JS_TEST:=false}
 # Verifiers to run after all tests. Skipped if true.
@@ -410,6 +412,12 @@ do
     fi
     popd
     export IMPALA_MAX_LOG_FILES="${IMPALA_MAX_LOG_FILES_SAVE}"
+  fi
+
+  if [[ "$HELM_CHART_TEST" == true ]]; then
+    if ! "${IMPALA_HOME}/helm/impala/tests/run-chart-tests.sh"; then
+      TEST_RET_CODE=1
+    fi
   fi
 
   if [ ! -z "${TEST_SUITE_VERIFIERS}" ]; then

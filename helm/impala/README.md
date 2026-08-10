@@ -390,6 +390,28 @@ helm upgrade impala ./helm/impala -n impala \
   --set catalogd.hmsEventPollingIntervalS=0
 ```
 
+## Automated chart checks
+
+From the repository root, run:
+
+```bash
+./helm/impala/tests/run-chart-tests.sh
+```
+
+This script runs `helm lint`, renders default and override manifests with
+`helm template`, and validates key chart behavior with assertions.
+Coverage includes default core settings plus optional LDAP, Ranger, Kudu,
+OAuth, and secure-cluster (Kerberos/TLS/Istio) rendering paths.
+
+Required dependencies to run this harness:
+
+- `helm` 3.x on `PATH`
+- `impala-python3` on `PATH` (or Impala dev environment sourced)
+- shell utilities used by the script (`bash`, `mktemp`)
+
+This is a render-time validation suite; it does not require a running
+Kubernetes cluster or Docker runtime.
+
 ## Control-plane guidance
 
 Use one control path per release/namespace:
