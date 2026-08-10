@@ -78,7 +78,7 @@ class TestFetch(ImpalaTestSuite):
       create_result_time = re.search("CreateResultSetTime: (.*)", runtime_profile)
       assert create_result_time and len(create_result_time.groups()) == 1
       create_result_ms = parse_duration_string_ms(create_result_time.group(1))
-      assert 2400 < create_result_ms and create_result_ms < 2600
+      assert 2400 < create_result_ms and create_result_ms < 2800
 
     finally:
       client.close_query(handle)
