@@ -75,7 +75,6 @@ import org.apache.impala.catalog.events.SelfEventContext;
 import org.apache.impala.catalog.local.MetaProvider.PartitionMetadata;
 import org.apache.impala.catalog.local.MetaProvider.PartitionRef;
 import org.apache.impala.catalog.local.MetaProvider.TableMetaRef;
-import org.apache.impala.catalog.metastore.ICatalogMetastoreServer;
 import org.apache.impala.common.ImpalaRuntimeException;
 import org.apache.impala.common.Metrics;
 import org.apache.impala.service.CatalogOpExecutor;
@@ -528,15 +527,6 @@ public class MetastoreShim extends Hive2MetastoreShimBase {
       Map<PartitionRef, PartitionMetadata> metas, String unPartitionedName)
       throws TException {
     throw new UnsupportedOperationException("checkLatestCompaction is not supported.");
-  }
-
-  /**
-   * CDP Hive-3 only function.
-   */
-  public static ICatalogMetastoreServer getCatalogMetastoreServer(
-      CatalogOpExecutor catalogOpExecutor) {
-    throw new UnsupportedOperationException(
-        "getCatalogMetastoreServer is not supported.");
   }
 
   /**

@@ -124,8 +124,6 @@ import org.apache.impala.catalog.events.SelfEventContext;
 import org.apache.impala.catalog.local.MetaProvider.PartitionMetadata;
 import org.apache.impala.catalog.local.MetaProvider.PartitionRef;
 import org.apache.impala.catalog.local.MetaProvider.TableMetaRef;
-import org.apache.impala.catalog.metastore.CatalogMetastoreServer;
-import org.apache.impala.catalog.metastore.ICatalogMetastoreServer;
 import org.apache.impala.common.ImpalaRuntimeException;
 import org.apache.impala.common.Metrics;
 import org.apache.impala.common.PrintUtils;
@@ -903,16 +901,6 @@ public class MetastoreShim extends Hive3MetastoreShimBase {
     LOG.debug("Checked the latest compaction info for {}.{}. Time taken: {}", dbName,
         tableName, PrintUtils.printTimeMs(sw.stop().elapsed(TimeUnit.MILLISECONDS)));
     return stalePartitions;
-  }
-
-  /**
-   * Returns an instance of CatalogMetastoreServer.
-   */
-  public static ICatalogMetastoreServer getCatalogMetastoreServer(
-      CatalogOpExecutor catalogOpExecutor) {
-    int portNumber = BackendConfig.INSTANCE.getHMSPort();
-    Preconditions.checkState(portNumber > 0, "Invalid port number for HMS service.");
-    return new CatalogMetastoreServer(catalogOpExecutor);
   }
 
   /**

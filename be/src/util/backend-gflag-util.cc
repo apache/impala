@@ -96,12 +96,7 @@ DECLARE_int64(topic_update_tbl_max_wait_time_ms);
 DECLARE_int32(catalog_max_lock_skipped_topic_updates);
 DECLARE_string(scratch_dirs);
 DECLARE_int32(max_wait_time_for_sync_ddl_s);
-DECLARE_bool(start_hms_server);
-DECLARE_int32(hms_port);
-DECLARE_bool(fallback_to_hms_on_errors);
-DECLARE_bool(enable_catalogd_hms_cache);
 DECLARE_string(kudu_sasl_protocol_name);
-DECLARE_bool(invalidate_hms_cache_on_ddls);
 DECLARE_bool(hms_event_incremental_refresh_transactional_table);
 DECLARE_bool(auto_check_compaction);
 DECLARE_bool(enable_sync_to_latest_event_on_ddls);
@@ -542,14 +537,9 @@ Status PopulateThriftBackendGflags(TBackendGflags& cfg) {
   cfg.__set_scratch_dirs(FLAGS_scratch_dirs);
   cfg.__set_max_wait_time_for_sync_ddl_s(FLAGS_max_wait_time_for_sync_ddl_s);
   cfg.__set_allow_ordinals_in_having(FLAGS_allow_ordinals_in_having);
-  cfg.__set_start_hms_server(FLAGS_start_hms_server);
-  cfg.__set_hms_port(FLAGS_hms_port);
-  cfg.__set_fallback_to_hms_on_errors(FLAGS_fallback_to_hms_on_errors);
-  cfg.__set_enable_catalogd_hms_cache(FLAGS_enable_catalogd_hms_cache);
   cfg.__set_kudu_sasl_protocol_name(FLAGS_kudu_sasl_protocol_name);
   cfg.__set_warn_catalog_response_size_mb(FLAGS_warn_catalog_response_size_mb);
   cfg.__set_warn_catalog_response_duration_s(FLAGS_warn_catalog_response_duration_s);
-  cfg.__set_invalidate_hms_cache_on_ddls(FLAGS_invalidate_hms_cache_on_ddls);
   cfg.__set_startup_filesystem_check_directories(
       FLAGS_startup_filesystem_check_directories);
   cfg.__set_hms_event_incremental_refresh_transactional_table(

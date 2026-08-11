@@ -26,7 +26,6 @@ import org.apache.impala.catalog.CatalogServiceCatalog;
 import org.apache.impala.catalog.MetaStoreClientPool;
 import org.apache.impala.catalog.events.MetastoreEvents.EventFactoryForSyncToLatestEvent;
 import org.apache.impala.catalog.events.NoOpEventProcessor;
-import org.apache.impala.catalog.metastore.NoOpCatalogMetastoreServer;
 import org.apache.impala.compat.MetastoreShim;
 import org.apache.impala.common.ImpalaException;
 import org.apache.impala.hive.executor.TestHiveJavaFunctionFactory;
@@ -84,7 +83,6 @@ public class CatalogServiceTestCatalog extends CatalogServiceCatalog {
       cs = catalogSupplier.get();
       cs.setAuthzManager(factory.newAuthorizationManager(cs));
       cs.setMetastoreEventProcessor(NoOpEventProcessor.getInstance());
-      cs.setCatalogMetastoreServer(NoOpCatalogMetastoreServer.INSTANCE);
       cs.setCatalogOpExecutor(new CatalogOpExecutor(cs,
           new NoopAuthorizationFactory().getAuthorizationConfig(),
           new NoopAuthorizationFactory.NoopAuthorizationManager(),

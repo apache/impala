@@ -207,13 +207,13 @@ struct TBackendGflags {
 
   87: required bool allow_ordinals_in_having
 
-  88: required bool start_hms_server
+  // REMOVED: 88: required bool start_hms_server
 
-  89: required i32 hms_port
+  // REMOVED: 89: required i32 hms_port
 
-  90: required bool fallback_to_hms_on_errors
+  // REMOVED: 90: required bool fallback_to_hms_on_errors
 
-  91: required bool enable_catalogd_hms_cache
+  // REMOVED: 91: required bool enable_catalogd_hms_cache
 
   92: required string kudu_sasl_protocol_name
 
@@ -221,7 +221,7 @@ struct TBackendGflags {
 
   94: required i32 warn_catalog_response_duration_s
 
-  95: required bool invalidate_hms_cache_on_ddls
+  // REMOVED: 95: required bool invalidate_hms_cache_on_ddls
 
   96: required string startup_filesystem_check_directories
 

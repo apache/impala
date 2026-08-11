@@ -1518,12 +1518,9 @@ under the License.
             <artifactId>maven-compiler-plugin</artifactId>
             <configuration>
               <excludes>
-                <exclude>**/org/apache/impala/catalog/metastore/*.java</exclude>
-                <exclude>**/org/apache/impala/catalog/CatalogHmsAPIHelper.java</exclude>
                 <exclude>**/org/apache/impala/catalog/CompactionInfoLoader.java</exclude>
               </excludes>
               <testExcludes>
-                <testExclude>**/org/apache/impala/catalog/metastore/*.java</testExclude>
                 <testExclude>**/org/apache/impala/testutil/Catalog*.java</testExclude>
               </testExcludes>
             </configuration>

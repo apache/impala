@@ -131,22 +131,6 @@ DEFINE_int32(hms_event_catchup_threshold_s, 1800,
     "A value of 0 or less disables this feature.");
 
 DECLARE_string(debug_actions);
-DEFINE_bool(start_hms_server, false, "When set to true catalog server starts a HMS "
-    "server at a port specified by hms_port flag");
-
-DEFINE_int32(hms_port, 5899, "If start_hms_server is set to true, this "
-    "configuration specifies the port number at which it is started.");
-
-DEFINE_bool(fallback_to_hms_on_errors, true, "This configuration is only used if "
-    "start_hms_server is true. This is used to determine if the Catalog should fallback "
-    "to the backing HMS service if there are errors while processing the HMS request");
-
-DEFINE_bool(invalidate_hms_cache_on_ddls, true, "This configuration is used "
-    "only if start_hms_server is true. This is used to invalidate catalogd cache "
-    "for non transactional tables if alter/create/delete table hms apis are "
-    "invoked over catalogd's metastore endpoint. Note that when this flag is false, the "
-    "catalogd cache could still be updated by the event processor if "
-    "hms_event_polling_interval_s is greater than 0");
 
 DEFINE_bool(hms_event_incremental_refresh_transactional_table, true, "When set to true "
     "events processor will refresh transactional tables incrementally for partition "
@@ -155,9 +139,7 @@ DEFINE_bool(hms_event_incremental_refresh_transactional_table, true, "When set t
 
 DEFINE_bool(enable_sync_to_latest_event_on_ddls, false, "This configuration is "
     "used to sync db/table in catalogd cache to latest HMS event id whenever DDL "
-    "operations are performed from Impala shell and catalog metastore server "
-    "(if enabled). If this config is enabled, then the flag invalidate_hms_cache_on_ddls "
-    "should be disabled");
+    "operations are performed from Impala shell.");
 
 DEFINE_bool(enable_reload_events, false, "This configuration is used to fire a "
     "refresh/invalidate table event to the HMS such that other event processors "

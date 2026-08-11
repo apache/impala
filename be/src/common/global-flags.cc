@@ -408,11 +408,6 @@ DEFINE_bool(enable_incremental_metadata_updates, true,
     "propagated as a whole object in the statestore topic updates. Note that legacy "
     "coordinators can apply incremental or full table updates so don't need this flag.");
 
-DEFINE_bool(enable_catalogd_hms_cache, true,
-    "If true, response for the HMS APIs that are implemented in catalogd will be served "
-    "from catalogd. If this flag is false or a given API is not implemented in catalogd,"
-    " it will be redirected to HMS.");
-
 DEFINE_bool(enable_legacy_avx_support, false,
     "If true, Impala relaxes its x86_64 CPU feature requirement to allow running on "
     "machines with AVX but no AVX2. This allows running Impala on older machines "
@@ -531,6 +526,7 @@ REMOVED_FLAG(coordinator_rpc_threads);
 REMOVED_FLAG(disable_admission_control);
 REMOVED_FLAG(disable_mem_pools);
 REMOVED_FLAG(enable_accept_queue_server);
+REMOVED_FLAG(enable_catalogd_hms_cache);
 REMOVED_FLAG(enable_orc_scanner);
 REMOVED_FLAG(enable_partitioned_aggregation);
 REMOVED_FLAG(enable_partitioned_hash_join);

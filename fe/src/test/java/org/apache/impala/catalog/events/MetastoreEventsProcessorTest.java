@@ -791,10 +791,8 @@ public class MetastoreEventsProcessorTest {
       boolean isPartitioned) throws Exception {
     // Test insert into partition
     boolean prevFlagVal = BackendConfig.INSTANCE.enableSyncToLatestEventOnDdls();
-    boolean invalidateHMSFlag = BackendConfig.INSTANCE.invalidateCatalogdHMSCacheOnDDLs();
     try {
       BackendConfig.INSTANCE.setEnableSyncToLatestEventOnDdls(true);
-      BackendConfig.INSTANCE.setInvalidateCatalogdHMSCacheOnDDLs(false);
       createDatabase(dbName, null);
       createTable(dbName, tblName, isPartitioned);
       eventsProcessor_.processEvents();
@@ -823,7 +821,6 @@ public class MetastoreEventsProcessorTest {
           lastSyncedEventIdAfter <= currentEventIdHms);
     } finally {
       BackendConfig.INSTANCE.setEnableSyncToLatestEventOnDdls(prevFlagVal);
-      BackendConfig.INSTANCE.setInvalidateCatalogdHMSCacheOnDDLs(invalidateHMSFlag);
     }
   }
 
@@ -3606,10 +3603,8 @@ public class MetastoreEventsProcessorTest {
   @Test
   public void testSkippingOlderEvents() throws Exception {
     boolean prevFlagVal = BackendConfig.INSTANCE.enableSyncToLatestEventOnDdls();
-    boolean invalidateHMSFlag = BackendConfig.INSTANCE.invalidateCatalogdHMSCacheOnDDLs();
     try {
       BackendConfig.INSTANCE.setEnableSyncToLatestEventOnDdls(true);
-      BackendConfig.INSTANCE.setInvalidateCatalogdHMSCacheOnDDLs(false);
       BackendConfig.INSTANCE.setSkippingOlderEvents(true);
       createDatabase(TEST_DB_NAME, null);
       final String testTblName = "testSkippingOlderEvents";
@@ -3646,7 +3641,6 @@ public class MetastoreEventsProcessorTest {
       confirmTableIsLoaded(TEST_DB_NAME, testTblName);
     } finally {
       BackendConfig.INSTANCE.setEnableSyncToLatestEventOnDdls(prevFlagVal);
-      BackendConfig.INSTANCE.setInvalidateCatalogdHMSCacheOnDDLs(invalidateHMSFlag);
     }
   }
 

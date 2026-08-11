@@ -1039,62 +1039,6 @@ struct TEventProcessorMetrics {
   25: optional i64 greatest_synced_event_time
 }
 
-struct TCatalogHmsCacheApiMetrics {
-  // name of the API
-  1: required string api_name
-
-  // number of API requests
-  2: optional i64 api_requests
-
-  // p99 response time in milliseconds
-  3: optional double p99_response_time_ms
-
-  // p95 response time in milliseconds
-  4: optional double p95_response_time_ms
-
-  // Mean response time in milliseconds
-  5: optional double response_time_mean_ms
-
-  // Max response time in milliseconds
-  6: optional double response_time_max_ms
-
-  // Min response time in milliseconds
-  7: optional double response_time_min_ms
-
-  // Average number of API requests in 1 minute
-  8: optional double api_requests_1min_rate
-
-  // Average number of API requests in 5 minutes
-  9: optional double api_requests_5min_rate
-
-  // Average number of API requests in 15 min
-  10: optional double api_requests_15min_rate
-
-  // Cache hit ratio
-  11: optional double cache_hit_ratio
-}
-
-struct TCatalogdHmsCacheMetrics {
-
-  // API specific Catalogd HMS cache metrics
-  1: required list<TCatalogHmsCacheApiMetrics> api_metrics
-
-  // overall cache hit ratio
-  2: optional double cache_hit_ratio
-
-  // total number of API requests
-  3: optional i64 api_requests
-
-  // Average number of API requests in 1 minute
-  4: optional double api_requests_1min_rate
-
-  // Average number of API requests in 5 minutes
-  5: optional double api_requests_5min_rate
-
-  // Average number of API requests in 15 min
-  6: optional double api_requests_15min_rate
-}
-
 // Response to GetCatalogServerMetrics() call.
 struct TGetCatalogServerMetricsResponse {
   // Partial fetch RPC queue length.
@@ -1103,8 +1047,7 @@ struct TGetCatalogServerMetricsResponse {
   // gets the events processor metrics if configured
   2: optional TEventProcessorMetrics event_metrics
 
-  // get the catalogd Hive metastore server metrics, if configured
-  3: optional TCatalogdHmsCacheMetrics catalogd_hms_cache_metrics
+  // REMOVED: 3: optional TCatalogdHmsCacheMetrics catalogd_hms_cache_metrics
 
   // Metrics of table metadata loading
   4: optional i32 catalog_num_file_metadata_loading_threads

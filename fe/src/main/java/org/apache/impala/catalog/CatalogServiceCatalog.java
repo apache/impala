@@ -88,9 +88,6 @@ import org.apache.impala.catalog.events.MetastoreEventsProcessor.EventProcessorS
 import org.apache.impala.catalog.events.MetastoreNotificationFetchException;
 import org.apache.impala.catalog.events.NoOpEventProcessor;
 import org.apache.impala.catalog.events.SelfEventContext;
-import org.apache.impala.catalog.metastore.CatalogHmsUtils;
-import org.apache.impala.catalog.metastore.HmsApiNameEnum;
-import org.apache.impala.catalog.metastore.ICatalogMetastoreServer;
 import org.apache.impala.catalog.monitor.CatalogMonitor;
 import org.apache.impala.catalog.monitor.CatalogTableMetrics;
 import org.apache.impala.catalog.monitor.TableLoadingTimeHistogram;
@@ -113,7 +110,6 @@ import org.apache.impala.thrift.TCatalogInfoSelector;
 import org.apache.impala.thrift.TCatalogObject;
 import org.apache.impala.thrift.TCatalogObjectType;
 import org.apache.impala.thrift.TCatalogUpdateResult;
-import org.apache.impala.thrift.TCatalogdHmsCacheMetrics;
 import org.apache.impala.thrift.TDataSource;
 import org.apache.impala.thrift.TDatabase;
 import org.apache.impala.thrift.TErrorCode;
@@ -350,8 +346,6 @@ public class CatalogServiceCatalog extends Catalog {
 
   // Manages the event processing from metastore for issuing invalidates on tables
   private ExternalEventsProcessor metastoreEventProcessor_;
-
-  private ICatalogMetastoreServer catalogMetastoreServer_;
 
   private MetastoreEventFactory syncToLatestEventFactory_;
   /**
@@ -2889,7 +2883,6 @@ public class CatalogServiceCatalog extends Catalog {
       // have validWriteIdList, so we can simply ignore this value if table is external
       if (isLoaded
           && (validWriteIdList == null || (!AcidUtils.isTransactionalTable(tbl)))) {
-        incrementCatalogDCacheHitMetric(reason);
         LOG.trace("returning already loaded table {}", tbl.getFullName());
         return tbl;
       }
@@ -2901,7 +2894,6 @@ public class CatalogServiceCatalog extends Catalog {
       // the ValidWriteIdList only when the table id matches.
       if (tbl instanceof HdfsTable
           && AcidUtils.compare((HdfsTable) tbl, validWriteIdList, tableId) >= 0) {
-        incrementCatalogDCacheHitMetric(reason);
         // Check if any partition of the table has a newly compacted file.
         // We just take the read lock here so that we don't serialize all the getTable
         // calls for the same table. If there are concurrent calls, it is possible we
@@ -2920,18 +2912,6 @@ public class CatalogServiceCatalog extends Catalog {
         // If all the partitions don't have a newly compacted file, return the table
         if (partsToBeRefreshed.isEmpty()) return tbl;
       } else {
-        CatalogMonitor.INSTANCE.getCatalogdHmsCacheMetrics()
-            .getCounter(CatalogHmsUtils.CATALOGD_CACHE_MISS_METRIC)
-            .inc();
-        // Update the cache stats for a HMS API from which the current method got invoked.
-        if (HmsApiNameEnum.contains(reason)) {
-          // Update the cache miss metric, as the valid write id list did not match and we
-          // have to reload the table.
-          CatalogMonitor.INSTANCE.getCatalogdHmsCacheMetrics()
-              .getCounter(String.format(
-                  CatalogHmsUtils.CATALOGD_CACHE_API_MISS_METRIC, reason))
-              .inc();
-        }
         previousCatalogVersion = tbl.getCatalogVersion();
         LOG.trace("Loading full table {}", tbl.getFullName());
         loadReq = tableLoadingMgr_.loadAsync(tableName, tbl.getCreateEventId(), reason,
@@ -2950,23 +2930,6 @@ public class CatalogServiceCatalog extends Catalog {
       return replaceTableIfUnchanged(t, previousCatalogVersion, tableId);
     } finally {
       loadReq.close();
-    }
-  }
-
-  /**
-   * Increments catalogD's cache hit metrics
-   * @param reason
-   */
-  private void incrementCatalogDCacheHitMetric(String reason) {
-    CatalogMonitor.INSTANCE.getCatalogdHmsCacheMetrics()
-        .getCounter(CatalogHmsUtils.CATALOGD_CACHE_HIT_METRIC)
-        .inc();
-    // Update the cache stats for a HMS API from which the current method got invoked.
-    if (HmsApiNameEnum.contains(reason)) {
-      CatalogMonitor.INSTANCE.getCatalogdHmsCacheMetrics()
-          .getCounter(String
-              .format(CatalogHmsUtils.CATALOGD_CACHE_API_HIT_METRIC, reason))
-          .inc();
     }
   }
 
@@ -4186,13 +4149,6 @@ public class CatalogServiceCatalog extends Catalog {
   }
 
   /**
-   * Gets the Catalogd HMS cache metrics. Used for publishing metrics on the webUI.
-   */
-  public TCatalogdHmsCacheMetrics getCatalogdHmsCacheMetrics() {
-    return catalogMetastoreServer_.getCatalogdHmsCacheMetrics();
-  }
-
-  /**
    * Gets the events processor summary. Used for populating the contents of the events
    * processor detailed view page
    */
@@ -4983,10 +4939,6 @@ public class CatalogServiceCatalog extends Catalog {
   public void setMetastoreEventProcessor(
       ExternalEventsProcessor metastoreEventProcessor) {
     this.metastoreEventProcessor_ = metastoreEventProcessor;
-  }
-
-  public void setCatalogMetastoreServer(ICatalogMetastoreServer catalogMetastoreServer) {
-    this.catalogMetastoreServer_ = catalogMetastoreServer;
   }
 
   public void setEventFactoryForSyncToLatestEvent(MetastoreEventFactory factory) {

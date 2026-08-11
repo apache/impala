@@ -19,7 +19,6 @@ package org.apache.impala.service;
 
 import static org.apache.impala.service.CatalogOpExecutor.CATALOG_TIMELINE_NAME;
 
-import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Lists;
@@ -54,8 +53,6 @@ import org.apache.impala.catalog.events.MetastoreEvents.EventFactoryForSyncToLat
 import org.apache.impala.catalog.events.MetastoreEvents.MetastoreEventFactory;
 import org.apache.impala.catalog.events.MetastoreEventsProcessor;
 import org.apache.impala.catalog.events.NoOpEventProcessor;
-import org.apache.impala.catalog.metastore.ICatalogMetastoreServer;
-import org.apache.impala.catalog.metastore.NoOpCatalogMetastoreServer;
 import org.apache.impala.common.ImpalaException;
 import org.apache.impala.common.InternalException;
 import org.apache.impala.common.JniUtil;
@@ -123,7 +120,6 @@ public class JniCatalog {
       new TBinaryProtocol.Factory();
   private final CatalogServiceCatalog catalog_;
   private final CatalogOpExecutor catalogOpExecutor_;
-  private final ICatalogMetastoreServer catalogMetastoreServer_;
   private final AuthorizationManager authzManager_;
 
   // A unique identifier for this instance of the Catalog Service.
@@ -185,25 +181,9 @@ public class JniCatalog {
     ExternalEventsProcessor eventsProcessor =
         getEventsProcessor(metaStoreClientPool, catalogOpExecutor_);
     catalog_.setMetastoreEventProcessor(eventsProcessor);
-    catalogMetastoreServer_ = getCatalogMetastoreServer(catalogOpExecutor_);
-    catalog_.setCatalogMetastoreServer(catalogMetastoreServer_);
-    catalogMetastoreServer_.start();
 
     // catalog-server.cc is responsible to call catalog_.reset() for the first time.
     // The first reset also will call startEventsProcessor().
-  }
-
-  /**
-   * Returns an instance of CatalogMetastoreServer if start_hms_server configuration is
-   * true. Otherwise, returns a NoOpCatalogMetastoreServer
-   */
-  @VisibleForTesting
-  private ICatalogMetastoreServer getCatalogMetastoreServer(
-      CatalogOpExecutor catalogOpExecutor) {
-    if (!BackendConfig.INSTANCE.startHmsServer()) {
-      return NoOpCatalogMetastoreServer.INSTANCE;
-    }
-    return MetastoreShim.getCatalogMetastoreServer(catalogOpExecutor);
   }
 
   /**

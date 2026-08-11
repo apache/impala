@@ -331,31 +331,6 @@ public class BackendConfig {
     return backendCfg_.max_wait_time_for_sync_ddl_s;
   }
 
-  public boolean startHmsServer() {
-    return backendCfg_.start_hms_server;
-  }
-
-  public int getHMSPort() {
-    return backendCfg_.hms_port;
-  }
-
-  public boolean fallbackToHMSOnErrors() {
-    return backendCfg_.fallback_to_hms_on_errors;
-  }
-
-  @VisibleForTesting
-  public void setEnableCatalogdHMSCache(boolean flag) {
-    backendCfg_.enable_catalogd_hms_cache = flag;
-  }
-
-  public boolean enableCatalogdHMSCache() {
-    return backendCfg_.enable_catalogd_hms_cache;
-  }
-
-  public boolean invalidateCatalogdHMSCacheOnDDLs() {
-    return backendCfg_.invalidate_hms_cache_on_ddls;
-  }
-
   public String getStartupFilesystemCheckDirectories() {
     return backendCfg_.startup_filesystem_check_directories;
   }
@@ -370,11 +345,6 @@ public class BackendConfig {
 
   public boolean isAutoCheckCompaction() {
     return backendCfg_.auto_check_compaction;
-  }
-
-  @VisibleForTesting
-  public void setInvalidateCatalogdHMSCacheOnDDLs(boolean flag) {
-    backendCfg_.invalidate_hms_cache_on_ddls = flag;
   }
 
   public boolean enableSyncToLatestEventOnDdls() {
