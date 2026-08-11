@@ -481,6 +481,10 @@ void BufferPool::Client::DestroyPageInternal(
     }
     DCHECK(!page->in_queue());
     --num_pages_;
+    // The buffer is being extracted from the page, so it will be accounted for in
+    // buffers_allocated_bytes_ instead of pinned_pages_.bytes(). Count is updated early
+    // because it needs to be updated while holding lock_
+    if (out_buffer != nullptr) buffers_allocated_bytes_ += page->buffer.len();
   }
 
   if (page->write_handle != NULL) {
@@ -490,7 +494,7 @@ void BufferPool::Client::DestroyPageInternal(
   if (out_buffer != NULL) {
     DCHECK(page->buffer.is_open());
     *out_buffer = std::move(page->buffer);
-    buffers_allocated_bytes_ += out_buffer->len();
+    // buffers_allocated_bytes_ was updated above within the lock_.
   } else if (page->buffer.is_open()) {
     pool_->allocator_->Free(move(page->buffer));
   }
@@ -683,6 +687,10 @@ Status BufferPool::Client::CleanPages(
               << " len=" << len << "\n"
               << DebugStringLocked();
   }
+  DCHECK_GE(target_dirty_bytes, 0) << "target_dirty_bytes=" << target_dirty_bytes
+      << " reservation=" << reservation_.GetReservation()
+      << " buffers_allocated_bytes_=" << buffers_allocated_bytes_
+      << " pinned_pages_.bytes()=" << pinned_pages_.bytes() << " len=" << len;
   // Start enough writes to ensure that the loop condition below will eventually become
   // false (or a write error will be encountered).
   int64_t min_bytes_to_write =
