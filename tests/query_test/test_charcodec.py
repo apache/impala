@@ -185,6 +185,7 @@ class TestCharCodecGen(ImpalaTestSuite):
         INSERT OVERWRITE TABLE {}.{} SELECT * FROM {}.{}
         """.format("false" if codec == "None" else "true",
                    codec, db, encoded_table, db, utf8_table))
+    self.execute_query("INVALIDATE METADATA {}.{}".format(db, encoded_table))
     return encoded_table
 
   @SkipIfFS.hive
