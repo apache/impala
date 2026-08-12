@@ -250,7 +250,7 @@ class TestAutomaticCatalogInvalidation(CustomClusterTestSuite):
     max_wait_time = 15 + self.metrics_test_ttl_s + 2
 
     # Test 1: Load a single table and verify it gets invalidated
-    self.execute_query(self.query)
+    self.execute_query("DESCRIBE functional.alltypes")
     catalogd.wait_for_metric_value(loaded_tables_metric, 1, timeout=5)
 
     # Wait for table to be unloaded
@@ -282,18 +282,18 @@ class TestAutomaticCatalogInvalidation(CustomClusterTestSuite):
         % (baseline_memory_count, memory_count_after_first))
 
     # Test 3: Load multiple tables in one query
-    join_query = (
-        "SELECT 1 FROM functional.alltypessmall s "
-        "INNER JOIN functional.alltypesagg a ON s.id = a.id "
-        "INNER JOIN functional.alltypes t ON t.id = s.id LIMIT 1")
-    self.execute_query(join_query)
+    union_query = (
+        "SELECT 1 FROM functional.alltypessmall LIMIT 0 "
+        "UNION ALL SELECT 1 FROM functional.alltypesagg LIMIT 0 "
+        "UNION ALL SELECT 1 FROM functional.alltypes LIMIT 0")
+    self.execute_query(union_query)
     catalogd.wait_for_metric_value(loaded_tables_metric, 3, timeout=5)
 
-    # Wait for all join tables to be unloaded
+    # Wait for all tables to be unloaded
     catalogd.wait_for_metric_value(loaded_tables_metric, 0, timeout=max_wait_time,
         interval=2)
 
-    # Wait for TTL metric to reach 4 (1 from first test + 3 from join)
+    # Wait for TTL metric to reach 4 (1 from first test + 3 from third test)
     expected_final_ttl = 4
     catalogd.wait_for_metric_value(ttl_metric, expected_final_ttl,
         timeout=5, allow_greater=True)
@@ -307,7 +307,7 @@ class TestAutomaticCatalogInvalidation(CustomClusterTestSuite):
     # short TTL, tables may expire across multiple daemon cycles (e.g. on multi-node
     # clusters where last-used times are refreshed at slightly different times).
     assert 1 <= last_ttl_tables_2 <= 3, (
-        "last-ttl-invalidated-tables after join round should be 1-3 (got %d)"
+        "last-ttl-invalidated-tables after multi-table round should be 1-3 (got %d)"
         % last_ttl_tables_2)
     assert last_ttl_ms_2 >= last_ttl_ms_1, (
         "last-ttl-invalidation-ms should not go backwards (%d -> %d)"
