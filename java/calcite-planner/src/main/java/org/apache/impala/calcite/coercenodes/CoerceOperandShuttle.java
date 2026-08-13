@@ -46,6 +46,8 @@ import org.apache.impala.catalog.Type;
 import org.apache.impala.calcite.functions.FunctionResolver;
 import org.apache.impala.calcite.functions.ImplicitTypeChecker;
 import org.apache.impala.calcite.operators.ImpalaDecodeFunction;
+import org.apache.impala.calcite.operators.ImpalaAdjustPrecisionFunction;
+import org.apache.impala.calcite.operators.ImpalaAdjustScaleFunction;
 import org.apache.impala.calcite.type.ImpalaTypeConverter;
 
 import java.util.ArrayList;
@@ -273,7 +275,7 @@ public class CoerceOperandShuttle extends RexShuttle {
     boolean isCaseFunction = isCaseFunction(fn);
     boolean castedOperand = false;
     Type commonDecOperandType =
-        getCommonDecimalTypeToUse(op.getKind(), argTypes, retType, factory);
+        getCommonDecimalTypeToUse(op, argTypes, retType, factory);
 
     Preconditions.checkState(argTypes.size() == 0 || fn.getNumArgs() > 0);
     for (int i = 0; i < argTypes.size(); ++i) {
@@ -319,8 +321,9 @@ public class CoerceOperandShuttle extends RexShuttle {
    * This is used for when the type is defined as a wildcard because a specific decimal
    * type is needed by the backend.
    */
-  public static Type getCommonDecimalTypeToUse(SqlKind kind, List<RelDataType> argTypes,
+  public static Type getCommonDecimalTypeToUse(SqlOperator op, List<RelDataType> argTypes,
       RelDataType retType, RelDataTypeFactory factory) {
+    SqlKind kind = op.getKind();
 
     // For arithmetic and comparison operations, the operands will not be cast, so there
     // is no need to find a common decimal type.
@@ -332,7 +335,10 @@ public class CoerceOperandShuttle extends RexShuttle {
     // If the return type is a decimal, then this is the common type. It has already been
     // determined in the validation stage in inferReturnType.
     if (SqlTypeUtil.isDecimal(retType)) {
-      return ImpalaTypeConverter.createImpalaType(retType);
+      RelDataType commonType = isAdjustedFunction(op)
+          ? argTypes.get(0)
+          : retType;
+      return ImpalaTypeConverter.createImpalaType(commonType);
     }
 
     // The return type is something other than a decimal. If there are no decimal
@@ -510,5 +516,10 @@ public class CoerceOperandShuttle extends RexShuttle {
         ? decodeCall
         : (RexCall) rexBuilder.makeCall(returnType, decodeCall.getOperator(),
             newOperands);
+  }
+
+  private static boolean isAdjustedFunction(SqlOperator op) {
+    return op instanceof ImpalaAdjustScaleFunction ||
+        op instanceof ImpalaAdjustPrecisionFunction;
   }
 }

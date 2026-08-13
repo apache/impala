@@ -3429,9 +3429,55 @@ least(cast(19.44 as decimal(4,2)), cast(18.3 as decimal(3,1)));
 DECIMAL,DECIMAL,DECIMAL,DECIMAL
 ====
 ---- QUERY
-select dfloor(1.1), dceil(1.1);
+select
+floor(-9.9), floor(cast(-9.9 as double)),
+dfloor(-9.9), dfloor(cast(-9.9 as double)),
+floor(9.9),floor(cast(9.9 as double)),
+dfloor(9.9), dfloor(cast(9.9 as double))
 ---- RESULTS
-1,2
+-10,-10,-10,-10,9,9,9,9
 ---- TYPES
-DECIMAL,DECIMAL
+DECIMAL,DOUBLE,DECIMAL,DOUBLE,DECIMAL,DOUBLE,DECIMAL,DOUBLE
+====
+---- QUERY
+select
+ceil(-9.9), ceiling(-9.9), ceil(cast(-9.9 as double)),
+dceil(-9.9), dceil(cast(-9.9 as double)),
+ceil(9.9), ceiling(9.9), ceil(cast(9.9 as double)),
+dceil(9.9), dceil(cast(9.9 as double))
+---- RESULTS
+-9,-9,-9,-9,-9,10,10,10,10,10
+---- TYPES
+DECIMAL,DECIMAL,DOUBLE,DECIMAL,DOUBLE,DECIMAL,DECIMAL,DOUBLE,DECIMAL,DOUBLE
+====
+---- QUERY
+select
+truncate(-9.9), trunc(-9.9), trunc(cast(-9.9 as double)),
+dtrunc(-9.9), dtrunc(cast(-9.9 as double)),
+truncate(9.9), trunc(9.9), trunc(cast(9.9 as double)),
+dtrunc(9.9), dtrunc(cast(9.9 as double))
+---- RESULTS
+-9,-9,-9,-9,-9,9,9,9,9,9
+---- TYPES
+DECIMAL,DECIMAL,DOUBLE,DECIMAL,DOUBLE,DECIMAL,DECIMAL,DOUBLE,DECIMAL,DOUBLE
+====
+---- QUERY
+select
+round(-9.9), dround(-9.9), dround(cast(-9.9 as double)),
+round(9.9), dround(9.9), dround(cast(9.9 as double))
+---- RESULTS
+-10,-10,-10,10,10,10
+---- TYPES
+DECIMAL,DECIMAL,DOUBLE,DECIMAL,DECIMAL,DOUBLE
+====
+---- QUERY
+select
+round(-9.78, 1), round(cast(-9.78 as double), 1),
+dround(-9.78, 1), dround(cast(-9.78 as double), 1),
+round(9.78, 1), round(cast(9.78 as double), 1),
+dround(9.78, 1), dround(cast(9.78 as double), 1)
+---- RESULTS
+-9.8,-9.8,-9.8,-9.8,9.8,9.8,9.8,9.8
+---- TYPES
+DECIMAL,DOUBLE,DECIMAL,DOUBLE,DECIMAL,DOUBLE,DECIMAL,DOUBLE
 ====

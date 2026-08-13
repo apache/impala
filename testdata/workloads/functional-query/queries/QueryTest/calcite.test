@@ -1377,3 +1377,29 @@ STRING
 ---- RUNTIME_PROFILE
 row_regex: PlannerType: CalcitePlanner
 ====
+---- QUERY
+select
+floor(-9.9), floor(cast(-9.9 as double)),
+dfloor(-9.9), dfloor(cast(-9.9 as double)),
+floor(9.9),floor(cast(9.9 as double)),
+dfloor(9.9), dfloor(cast(9.9 as double))
+---- RESULTS
+-10,-10,-10,-10,9,9,9,9
+---- TYPES
+DECIMAL,DOUBLE,DECIMAL,DOUBLE,DECIMAL,DOUBLE,DECIMAL,DOUBLE
+---- RUNTIME_PROFILE
+row_regex: PlannerType: CalcitePlanner
+====
+---- QUERY
+select
+ceil(-9.9), ceiling(-9.9), ceil(cast(-9.9 as double)),
+dceil(-9.9), dceil(cast(-9.9 as double)),
+ceil(9.9), ceiling(9.9), ceil(cast(9.9 as double)),
+dceil(9.9), dceil(cast(9.9 as double))
+---- RESULTS
+-9,-9,-9,-9,-9,10,10,10,10,10
+---- TYPES
+DECIMAL,DECIMAL,DOUBLE,DECIMAL,DOUBLE,DECIMAL,DECIMAL,DOUBLE,DECIMAL,DOUBLE
+---- RUNTIME_PROFILE
+row_regex: PlannerType: CalcitePlanner
+====

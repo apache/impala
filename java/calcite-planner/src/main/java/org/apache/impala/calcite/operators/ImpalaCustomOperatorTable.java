@@ -204,6 +204,21 @@ public class ImpalaCustomOperatorTable extends ReflectiveSqlOperatorTable {
   public static final ImpalaAdjustScaleFunction DTRUNC =
       new ImpalaAdjustScaleFunction("DTRUNC");
 
+  public static final ImpalaAdjustPrecisionFunction CEIL =
+      new ImpalaAdjustPrecisionFunction("CEIL");
+
+  public static final ImpalaAdjustPrecisionFunction CEILING =
+      new ImpalaAdjustPrecisionFunction("CEILING");
+
+  public static final ImpalaAdjustPrecisionFunction DCEIL =
+      new ImpalaAdjustPrecisionFunction("DCEIL");
+
+  public static final ImpalaAdjustPrecisionFunction FLOOR =
+      new ImpalaAdjustPrecisionFunction("FLOOR");
+
+  public static final ImpalaAdjustPrecisionFunction DFLOOR =
+      new ImpalaAdjustPrecisionFunction("DFLOOR");
+
   public static final ImpalaCoalesceFunction COALESCE =
       new ImpalaCoalesceFunction();
 
