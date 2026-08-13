@@ -130,7 +130,7 @@ under the License.
 
     <dependency>
       <groupId>org.apache.ranger</groupId>
-      <artifactId>ranger-plugins-audit</artifactId>
+      <artifactId>ranger-audit-core</artifactId>
       <version>${ranger.version}</version>
       <exclusions>
         <!-- Ranger jar also includes solr artifacts which we not exclude here since
@@ -159,6 +159,21 @@ under the License.
           <artifactId>aws-java-sdk-bundle</artifactId>
         </exclusion>
       </exclusions>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.ranger</groupId>
+      <artifactId>ranger-audit-dest-solr</artifactId>
+      <version>${ranger.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.ranger</groupId>
+      <artifactId>ranger-audit-dest-hdfs</artifactId>
+      <version>${ranger.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.ranger</groupId>
+      <artifactId>ranger-audit-dest-log4j</artifactId>
+      <version>${ranger.version}</version>
     </dependency>
 
     <dependency>

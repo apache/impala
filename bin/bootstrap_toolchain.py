@@ -543,7 +543,8 @@ def get_hadoop_downloads():
                        archive_basename_tmpl="tez-${version}-minimal",
                        makedir=True)
   if use_apache_ranger:
-    url_prefix_tmpl = "https://${toolchain_host}/build/apache_components/tarballs/"
+    url_prefix_tmpl = "https://${toolchain_host}/build/apache_components/tarballs/" + \
+        "${name}/${version}/"
     archive_basename_tmpl = "${name}-${version}-admin"
     template_subs = {
       "toolchain_host": os.environ["IMPALA_TOOLCHAIN_HOST"],
