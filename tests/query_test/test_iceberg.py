@@ -1301,7 +1301,7 @@ class TestIcebergTable(IcebergTestSuite):
           AS SELECT * from tpcds_partitioned_parquet_snap.date_dim;
           """.format(date_dim_tbl))
       q22_result = impalad_client.execute("""
-          select i_product_name, i_brand, i_class, i_category,
+          select /*+ straight_join */ i_product_name, i_brand, i_class, i_category,
                 avg(inv_quantity_on_hand) qoh
           from inventory_ice, date_dim_ice, item_ice
           where inv_date_sk=d_date_sk and
@@ -1317,10 +1317,13 @@ class TestIcebergTable(IcebergTestSuite):
       files_rejected_array = re.findall(r"Files rejected: \d+ \((\d+)\)", profile)
       avg_files_rejected = int(files_rejected_array[0])
       THRESHOLD = 3
+      found_a_rejected_file = False
       for files_rejected_str in files_rejected_array:
         files_rejected = int(files_rejected_str)
         if files_rejected != 0:
+          found_a_rejected_file = True
           assert abs(avg_files_rejected - files_rejected) < THRESHOLD
+      assert found_a_rejected_file
 
   def test_in_predicate_push_down(self, vector, unique_database):
     self.execute_query("SET RUNTIME_FILTER_MODE=OFF")

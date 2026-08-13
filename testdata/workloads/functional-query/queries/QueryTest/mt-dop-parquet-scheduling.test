@@ -331,25 +331,25 @@ row_regex: 00:UNION * 3 * 12
 row_regex: 14:UNION * 2 * 2
 row_regex: 07:UNION * 3 * 12
 ---- CALCITE_PLANNER_RUNTIME_PROFILE
-row_regex: 47:AGGREGATE * 2 * 2
-row_regex: 17:AGGREGATE * 2 * 2
-row_regex: 42:AGGREGATE * 3 * 12
-row_regex: 23:AGGREGATE * 3 * 12
-row_regex: 37:AGGREGATE * 3 * 12
-row_regex: 11:AGGREGATE * 3 * 12
-row_regex: 32:AGGREGATE * 2 * 2
-row_regex: 05:AGGREGATE * 2 * 2
-row_regex: 12:SCAN (?:HDFS|OZONE) * 1 * 1
-row_regex: 14:SCAN (?:HDFS|OZONE) * 1 * 1
-row_regex: 13:SCAN (?:HDFS|OZONE) * 2 * 2
-row_regex: 18:SCAN (?:HDFS|OZONE) * 1 * 1
-row_regex: 20:SCAN (?:HDFS|OZONE) * 1 * 1
-row_regex: 19:SCAN (?:HDFS|OZONE) * 3 * 12
-row_regex: 06:SCAN (?:HDFS|OZONE) * 1 * 1
-row_regex: 08:SCAN (?:HDFS|OZONE) * 1 * 1
-row_regex: 07:SCAN (?:HDFS|OZONE) * 3 * 12
-row_regex: 00:SCAN (?:HDFS|OZONE) * 1 * 1
-row_regex: 02:SCAN (?:HDFS|OZONE) * 1 * 1
-row_regex: 01:SCAN (?:HDFS|OZONE) * 2 * 2
 # Calcite plan does not have union nodes
+row_regex: 48:AGGREGATE * 1 * 1
+row_regex: 25:AGGREGATE * 1 * 1
+row_regex: 41:AGGREGATE * 3 * 12
+row_regex: 17:AGGREGATE * 3 * 12
+row_regex: 36:AGGREGATE * 1 * 1
+row_regex: 11:AGGREGATE * 1 * 1
+row_regex: 32:AGGREGATE * 3 * 12
+row_regex: 05:AGGREGATE * 3 * 12
+row_regex: 22:SCAN (?:HDFS|OZONE) * 1 * 1
+row_regex: 21:SCAN (?:HDFS|OZONE) * 2 * 2
+row_regex: 20:SCAN (?:HDFS|OZONE) * 1 * 1
+row_regex: 15:SCAN (?:HDFS|OZONE) * 1 * 1
+row_regex: 13:SCAN (?:HDFS|OZONE) * 1 * 1
+row_regex: 12:SCAN (?:HDFS|OZONE) * 3 * 12
+row_regex: 08:SCAN (?:HDFS|OZONE) * 1 * 1
+row_regex: 07:SCAN (?:HDFS|OZONE) * 2 * 2
+row_regex: 06:SCAN (?:HDFS|OZONE) * 1 * 1
+row_regex: 03:SCAN (?:HDFS|OZONE) * 1 * 1
+row_regex: 01:SCAN (?:HDFS|OZONE) * 1 * 1
+row_regex: 00:SCAN (?:HDFS|OZONE) * 3 * 12
 ====

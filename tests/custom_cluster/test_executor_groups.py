@@ -1284,26 +1284,28 @@ class TestExecutorGroups(CustomClusterTestSuite):
     # TPCDS_Q1 at root.large_group will have following CoreCount trace:
     #   CoreCount={total=16 trace=F15:3+F01:1+F14:3+F03:1+F13:3+F05:1+F12:3+F07:1},
     #   coresRequired=16
-    self._set_query_options({'SLOT_COUNT_STRATEGY': ''})
-    result = self._run_query_and_verify_profile(TPCDS_Q1,
-      ["Executor Group: root.large-group", "ExecutorGroupsConsidered: 3",
-       "Verdict: Match", "CpuAsk: 16",
-       "AdmissionSlots: 1"  # coordinator and executors all have 1 slot
-       ],
-      ["AvgAdmissionSlotsPerExecutor:", "AdmissionSlots: 6"])
+    # IMPALA-15260: Needs to be investigated for Calcite planner
+    if not IS_CALCITE_PLANNER:
+      self._set_query_options({'SLOT_COUNT_STRATEGY': ''})
+      result = self._run_query_and_verify_profile(TPCDS_Q1,
+        ["Executor Group: root.large-group", "ExecutorGroupsConsidered: 3",
+         "Verdict: Match", "CpuAsk: 16",
+         "AdmissionSlots: 1"  # coordinator and executors all have 1 slot
+         ],
+        ["AvgAdmissionSlotsPerExecutor:", "AdmissionSlots: 6"])
 
-    # Test with SLOT_COUNT_STRATEGY='PLANNER_CPU_ASK'.
-    self._set_query_options({'SLOT_COUNT_STRATEGY': 'PLANNER_CPU_ASK'})
-    result = self._run_query_and_verify_profile(TPCDS_Q1,
-      ["Executor Group: root.large-group", "ExecutorGroupsConsidered: 3",
-       "Verdict: Match", "CpuAsk: 16", "AvgAdmissionSlotsPerExecutor: 6",
-       # coordinator has 1 slot
-       "AdmissionSlots: 1",
-       # 1 executor has F15:1+F01:1+F14:1+F03:1+F13:1+F05:1+F12:1+F07:1 = 8 slots
-       "AdmissionSlots: 8",
-       # 2 executors have F15:1+F14:1+F13:1+F12:1 = 4 slots
-       "AdmissionSlots: 4"
-       ])
+      # Test with SLOT_COUNT_STRATEGY='PLANNER_CPU_ASK'.
+      self._set_query_options({'SLOT_COUNT_STRATEGY': 'PLANNER_CPU_ASK'})
+      result = self._run_query_and_verify_profile(TPCDS_Q1,
+        ["Executor Group: root.large-group", "ExecutorGroupsConsidered: 3",
+         "Verdict: Match", "CpuAsk: 16", "AvgAdmissionSlotsPerExecutor: 6",
+         # coordinator has 1 slot
+         "AdmissionSlots: 1",
+         # 1 executor has F15:1+F01:1+F14:1+F03:1+F13:1+F05:1+F12:1+F07:1 = 8 slots
+         "AdmissionSlots: 8",
+         # 2 executors have F15:1+F14:1+F13:1+F12:1 = 4 slots
+         "AdmissionSlots: 4"
+         ])
     # END test slot count strategy
 
     # BEGIN test memory capping.

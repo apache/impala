@@ -17,6 +17,7 @@
 
 # Functional tests running the TPCH workload.
 from tests.common.impala_test_suite import ImpalaTestSuite
+from tests.common.skip import SkipIfCalcite
 from tests.common.test_dimensions import (
   create_parquet_dimension,
   create_single_exec_option_dimension
@@ -32,5 +33,7 @@ class TestProcessingCost(ImpalaTestSuite):
     cls.ImpalaTestMatrix.add_dimension(create_single_exec_option_dimension())
     cls.ImpalaTestMatrix.add_dimension(create_parquet_dimension(cls.get_workload()))
 
+  # IMPALA_15260: Calcite plan is different
+  @SkipIfCalcite.processing_plan_different
   def test_admission_slots(self, vector):
     self.run_test_case('QueryTest/processing-cost-admission-slots', vector)

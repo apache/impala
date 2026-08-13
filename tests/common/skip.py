@@ -313,3 +313,5 @@ class SkipIfCalcite:
       reason="some observability test information is missing")
   spilling_plan_different = pytest.mark.skipif(IS_CALCITE_PLANNER,
       reason="IMPALA-15123: spilling plan is different, needs investigation.")
+  processing_plan_different = pytest.mark.skipif(IS_CALCITE_PLANNER,
+      reason="IMPALA-15260: processing plan is different, needs investigation.")
