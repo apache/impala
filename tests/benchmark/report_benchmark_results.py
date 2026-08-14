@@ -136,6 +136,10 @@ parser.add_option("--allowed_latency_diff_secs",
                  dest="allowed_latency_diff_secs", default=0.0, type="float",
                  help="If specified, only a timing change that differs by more than"
                  " this value will be considered significant.")
+parser.add_option("--generate_html_profile_diff", action="store_true",
+                 help="If specified, generates HTML output with profile differences. "
+                 "This is very expensive and unwieldy for large profiles, so it is off "
+                 "by default.")
 options, args = parser.parse_args()
 
 
@@ -381,7 +385,7 @@ class Report(object):
         else:
           self.perf_change_str = ''
 
-      if not options.hive_results:
+      if not options.hive_results and options.generate_html_profile_diff:
         try:
           save_runtime_diffs(results, ref_results, self.perf_change, self.zval, self.tval)
         except Exception as e:
