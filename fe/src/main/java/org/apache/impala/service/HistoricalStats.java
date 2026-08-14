@@ -35,6 +35,11 @@ import com.google.common.base.Preconditions;
 public class HistoricalStats {
   private final static Logger LOG = LoggerFactory.getLogger(HistoricalStats.class);
   public static HistoricalStats INSTANCE = new HistoricalStats();
+
+  /** A matched HBO cardinality and the lookup provenance used to select it. */
+  public record PlanNodeStatsMatch(
+      long numRows, CanonicalizationStrategy strategy, String hashKey) {}
+
   private final CacheBackend cacheBackend_;
   private final double similarityThreshold_;
   private final int maxRunsPerKey_;
@@ -163,16 +168,18 @@ public class HistoricalStats {
   }
 
   /**
-   * Retrieves the number of output rows from historical stats, trying multiple hash keys
-   * in order from most accurate to most aggressive canonicalization strategy.
-   * Returns the first match found, or null if no match exists.
+   * Retrieves a matching historical run, trying multiple hash keys in order from most
+   * accurate to most aggressive canonicalization strategy. Returns the first match found
+   * together with the strategy and hash key that selected it, or null if no match
+   * exists.
    *
    * @param hashKeys HBO hash strings keyed by canonicalization strategy.
    * @param node display string for the PlanNode. Only used in logging.
    * @param currRun scan input stats for the current run.
-   * @return Number of rows from matched historical run, or null if no match.
+   * @return Matched row count and lookup provenance, or null if no match.
    */
-  public Long getPlanNodeOutputRows(Map<CanonicalizationStrategy, String> hashKeys,
+  public PlanNodeStatsMatch getPlanNodeStats(
+      Map<CanonicalizationStrategy, String> hashKeys,
       String node, TPlanNodeRun currRun) {
     for (CanonicalizationStrategy strategy : CanonicalizationStrategy.values()) {
       String hashKey = hashKeys.get(strategy);
@@ -189,7 +196,8 @@ public class HistoricalStats {
                   + "cardinality={}",
               node, strategy, hashKey, currRun,
               runs.get(similarRunIndex).getNum_rows());
-          return runs.get(similarRunIndex).getNum_rows();
+          return new PlanNodeStatsMatch(runs.get(similarRunIndex).getNum_rows(),
+              strategy, hashKey);
         } else {
           LOG.debug("HBO cache miss for {} using strategy {} (key: {}, "
                   + "scanInputRows: {}). No similar run",

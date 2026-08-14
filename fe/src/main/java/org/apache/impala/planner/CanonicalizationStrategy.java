@@ -63,6 +63,31 @@ public enum CanonicalizationStrategy {
     return errorLevel_;
   }
 
+  /**
+   * What a match under this strategy leaves out, or an empty string when it leaves out
+   * nothing. EXPR_REWRITE matches an equivalent query, so the number it found describes
+   * the query being planned. A strategy that drops part of the query from the key can
+   * match a different query instead - IGNORE_PARTITION_CONSTANTS one that differs in
+   * its partition equality predicates - and a reader of the estimate has to know that.
+   * Whether the data behind the match still looks the same is a separate question,
+   * settled by picking a similar run out of the value list by its input stats.
+   *
+   * <p>The words, not the punctuation around them: the caller decides how to show this.
+   * They say what the key leaves out rather than what the node does, because the key
+   * covers the whole subtree - an aggregate above a scan carries the caveat of the
+   * partition predicates below it, having none of its own.
+   */
+  public String getMatchCaveat() {
+    switch (this) {
+      case EXPR_REWRITE:
+        return "";
+      case IGNORE_PARTITION_CONSTANTS:
+        return "key ignores partition constants";
+      default:
+        throw new IllegalStateException("Unknown strategy: " + this);
+    }
+  }
+
   public TCanonicalizationStrategy toThrift() {
     switch (this) {
       case EXPR_REWRITE:

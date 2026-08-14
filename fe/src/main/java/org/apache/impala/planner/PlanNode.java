@@ -55,6 +55,7 @@ import org.apache.impala.planner.TupleCacheInfo.IneligibilityReason;
 import org.apache.impala.planner.TupleCacheInfo.HashTraceElement;
 import org.apache.impala.service.BackendConfig;
 import org.apache.impala.service.HistoricalStats;
+import org.apache.impala.service.HistoricalStats.PlanNodeStatsMatch;
 import org.apache.impala.thrift.TExecNodePhase;
 import org.apache.impala.thrift.TExecStats;
 import org.apache.impala.thrift.TExplainLevel;
@@ -208,8 +209,12 @@ abstract public class PlanNode extends TreeNode<PlanNode> {
 
   protected TupleCacheInfo tupleCacheInfo_;
 
-  // True if the cardinality is from HBO stats.
-  protected boolean hasHboCard_ = false;
+  // The HBO match that replaced cardinality_, or null when the estimate is the planner's
+  // own. Also carries the strategy and hash key that selected the match.
+  protected PlanNodeStatsMatch hboMatch_;
+
+  // Cardinality before an HBO match replaced it. Only meaningful when hboMatch_ is set.
+  protected long cardinalityBeforeHbo_ = -1;
 
   protected PlanNode(PlanNodeId id, List<TupleId> tupleIds, String displayName) {
     this(id, displayName);
@@ -458,11 +463,13 @@ abstract public class PlanNode extends TreeNode<PlanNode> {
         expBuilder.append(PrintUtils.printEstCardinality(filteredCardinality_))
             .append("(filtered from ")
             .append(PrintUtils.printEstCardinality(cardinality_));
-        if (hasHboCard_) expBuilder.append(" from HBO");
+        if (hboMatch_ != null) expBuilder.append(" from HBO").append(hboCaveat());
         expBuilder.append(")");
       } else {
         expBuilder.append(PrintUtils.printEstCardinality(cardinality_));
-        if (hasHboCard_) expBuilder.append(" (from HBO)");
+        if (hboMatch_ != null) {
+          expBuilder.append(" (from HBO").append(hboCaveat()).append(")");
+        }
       }
       if (Planner.isProcessingCostAvailable(queryOptions)) {
         // Show processing cost total.
@@ -474,6 +481,21 @@ abstract public class PlanNode extends TreeNode<PlanNode> {
         }
       }
       expBuilder.append("\n");
+      if (hboMatch_ != null
+          && detailLevel.ordinal() >= TExplainLevel.EXTENDED.ordinal()) {
+        expBuilder.append(detailPrefix)
+            .append("HBO match: strategy=").append(hboMatch_.strategy())
+            .append(", hash=").append(hboMatch_.hashKey())
+            .append(", original estimate=")
+            .append(PrintUtils.printEstCardinality(cardinalityBeforeHbo_))
+            // How far the match moved the estimate, as a plain number so a reader
+            // does not have to parse "7.30K" back out of the line. An original
+            // estimate of 0 divides no better than the -1 standing for none, so
+            // both read "N/A".
+            .append(", ratio=").append(
+                PrintUtils.printTwoDecimalsRatio(cardinality_, cardinalityBeforeHbo_))
+            .append("\n");
+      }
     }
 
     if (detailLevel.ordinal() >= TExplainLevel.EXTENDED.ordinal()) {
@@ -1093,22 +1115,33 @@ abstract public class PlanNode extends TreeNode<PlanNode> {
     }
   }
 
+  /** The caveat of the strategy that matched, ready to follow "from HBO" in EXPLAIN. */
+  private String hboCaveat() {
+    String caveat = hboMatch_.strategy().getMatchCaveat();
+    return caveat.isEmpty() ? "" : ", " + caveat;
+  }
+
   /**
    * Overrides cardinality_ with a value from HBO stats if a matching historical run is
    * found.
    */
   protected void tryUpdateCardinalityFromHbo(Analyzer analyzer) {
+    // computeStats() can be called more than once on the same node. Clear any match from
+    // an earlier pass before looking up the key for the current node state.
+    hboMatch_ = null;
+    cardinalityBeforeHbo_ = -1;
     if (!analyzer.getQueryOptions().use_hbo_stats) return;
     Map<CanonicalizationStrategy, String> hashKeys =
         generateHboHashStrings(THboStatsType.CARDINALITY);
     if (hashKeys.isEmpty()) return;
     TPlanNodeRun currRun = new TPlanNodeRun();
     appendScanInputStats(currRun);
-    Long hboCardinality = HistoricalStats.INSTANCE.getPlanNodeOutputRows(
+    PlanNodeStatsMatch hboMatch = HistoricalStats.INSTANCE.getPlanNodeStats(
         hashKeys, getDisplayLabel(), currRun);
-    if (hboCardinality != null) {
-      hasHboCard_ = true;
-      cardinality_ = capCardinalityAtLimit(hboCardinality);
+    if (hboMatch != null) {
+      hboMatch_ = hboMatch;
+      cardinalityBeforeHbo_ = cardinality_;
+      cardinality_ = capCardinalityAtLimit(hboMatch.numRows());
     } else {
       LOG.debug("No HBO stats for {}. Keys: {}", getDisplayLabel(), hashKeys);
     }

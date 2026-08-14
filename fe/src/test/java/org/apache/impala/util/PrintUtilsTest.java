@@ -21,6 +21,8 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
+import java.util.Locale;
+
 import org.apache.impala.common.PrintUtils;
 import org.junit.Test;
 
@@ -180,5 +182,25 @@ public class PrintUtilsTest {
     assertEquals("16m40s", PrintUtils.printTimeNs(1000000000000L));
     assertEquals("2h46m", PrintUtils.printTimeNs(10000000000000L));
     assertEquals("27h46m", PrintUtils.printTimeNs(100000000000000L));
+  }
+
+  /**
+   * A ratio is read by tools as well as by people, so it stays a plain number whatever
+   * locale the JVM runs under. A German default writes 0,05 for everything else.
+   */
+  @Test
+  public void testPrintTwoDecimalsRatio() {
+    Locale original = Locale.getDefault();
+    try {
+      Locale.setDefault(Locale.GERMANY);
+      assertEquals("0.05", PrintUtils.printTwoDecimalsRatio(365, 7300));
+      assertEquals("1.00", PrintUtils.printTwoDecimalsRatio(7300, 7300));
+      assertEquals("2.50", PrintUtils.printTwoDecimalsRatio(5, 2));
+      // A denominator of 0 divides no better than the -1 standing for no value at all.
+      assertEquals("N/A", PrintUtils.printTwoDecimalsRatio(365, 0));
+      assertEquals("N/A", PrintUtils.printTwoDecimalsRatio(365, -1));
+    } finally {
+      Locale.setDefault(original);
+    }
   }
 }

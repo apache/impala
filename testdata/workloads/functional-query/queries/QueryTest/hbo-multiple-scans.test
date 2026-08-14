@@ -108,14 +108,14 @@ PLAN-ROOT SINK
 |     partition predicates: a.`year` = 2009, a.`month` = 10
 |     HDFS partitions=1/24 files=1 size=20.36KB
 |     predicates: a.int_col = 0
-|     row-size=8B cardinality=31 (from HBO)
+|     row-size=8B cardinality=31 (from HBO, key ignores partition constants)
 |
 01:SCAN HDFS [functional.alltypes b]
    partition predicates: b.`year` = 2009
    HDFS partitions=12/24 files=12 size=238.68KB
    predicates: b.int_col = 0, b.string_col = '0'
    runtime filters: RF000 -> b.id
-   row-size=21B cardinality=365 (from HBO)
+   row-size=21B cardinality=365 (from HBO, key ignores partition constants)
 ====
 ---- QUERY
 # Different statement but same ScanNodes

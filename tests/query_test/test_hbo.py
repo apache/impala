@@ -16,7 +16,9 @@
 # under the License.
 
 from __future__ import absolute_import, division, print_function
+import re
 import time
+import uuid
 
 from tests.common.environ import IS_CALCITE_PLANNER
 from tests.common.impala_test_suite import ImpalaTestSuite
@@ -75,6 +77,67 @@ class TestHBO(ImpalaTestSuite):
         SELECT count(*) FROM functional.alltypes
         WHERE year=2009 AND int_col=1 AND string_col='1'""")
     self._run_hbo_explains('QueryTest/hbo-single-scan-partitioned-stats')
+
+  def test_matching_provenance(self):
+    self.client.set_configuration(QUERY_OPTIONS)
+    # The aggressive case below relies on year=2010 having no exact history, and this
+    # test records one as soon as it runs. A literal that is unique per run keeps a
+    # second run against the same cluster from matching itself through EXPR_REWRITE.
+    marker = 'hbo_provenance_' + uuid.uuid4().hex[:8]
+    exact_query = """SELECT count(*) FROM functional.alltypes
+        WHERE year=2009 AND int_col=1 AND string_col='{0}'""".format(marker)
+    miss_query = exact_query.replace(marker, marker + '_miss')
+
+    miss_plan = '\n'.join(self.execute_query('EXPLAIN ' + miss_query).data)
+    assert 'from HBO' not in miss_plan, miss_plan
+
+    self.execute_query(exact_query)
+    time.sleep(1)
+    # A statement that is not an EXPLAIN renders its plan at EXTENDED, so the profile
+    # carries the details without being asked: it is the artifact left behind once the
+    # query is gone, and it names the strategy that matched.
+    exact_profile = self.execute_query(exact_query).runtime_profile
+    assert re.search(
+        r'HBO match: strategy=EXPR_REWRITE, hash=[0-9a-f]{32}, '
+        r'original estimate=(?!unavailable)\S+, ratio=(?!N/A)\S+',
+        exact_profile), exact_profile
+
+    exact_plan = '\n'.join(self.execute_query('EXPLAIN ' + exact_query).data)
+    # An exact match carries no caveat, so the default annotation is unchanged.
+    assert '(from HBO)' in exact_plan, exact_plan
+    # The details line needs EXTENDED, so the default EXPLAIN does not grow a line per
+    # plan node.
+    assert 'HBO match:' not in exact_plan, exact_plan
+    detailed_plan = '\n'.join(self.execute_query(
+        'EXPLAIN ' + exact_query,
+        {**QUERY_OPTIONS, 'explain_level': 2}).data)
+    assert re.search(
+        r'HBO match: strategy=EXPR_REWRITE, hash=[0-9a-f]{32}, '
+        r'original estimate=(?!unavailable)\S+, ratio=(?!N/A)\S+',
+        detailed_plan), detailed_plan
+
+    # The root aggregation is computed once before the statement LIMIT is attached and
+    # again afterwards. The first pass matches the unlimited query above, while the
+    # final LIMIT-specific key has no history. Verify the first pass does not leave stale
+    # provenance on the final non-HBO estimate.
+    limited_plan_lines = self.execute_query(
+        'EXPLAIN ' + exact_query + ' LIMIT 1').data
+    limit_line_idx = next(
+        i for i, line in enumerate(limited_plan_lines) if 'limit: 1' in line)
+    limited_cardinality = next(
+        line for line in limited_plan_lines[limit_line_idx:] if 'cardinality=' in line)
+    assert 'from HBO' not in limited_cardinality, '\n'.join(limited_plan_lines)
+
+    aggressive_query = exact_query.replace('year=2009', 'year=2010')
+    aggressive_profile = self.execute_query(aggressive_query).runtime_profile
+    # This one matched a run recorded for another partition, and the annotation says so
+    # at every explain level, since it changes how much the number can be trusted.
+    assert 'from HBO, key ignores partition constants' in aggressive_profile, \
+        aggressive_profile
+    assert re.search(
+        r'HBO match: strategy=IGNORE_PARTITION_CONSTANTS, hash=[0-9a-f]{32}, '
+        r'original estimate=(?!unavailable)\S+, ratio=(?!N/A)\S+',
+        aggressive_profile), aggressive_profile
 
   def test_single_scan_cardinality_partitioned_no_stats(self):
     self.client.set_configuration(QUERY_OPTIONS)

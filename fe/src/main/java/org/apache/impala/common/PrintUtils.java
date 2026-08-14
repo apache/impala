@@ -24,7 +24,9 @@ import static org.apache.impala.common.ByteUnits.PETABYTE;
 import static org.apache.impala.common.ByteUnits.TERABYTE;
 
 import java.text.DecimalFormat;
+import java.text.DecimalFormatSymbols;
 import java.util.Iterator;
+import java.util.Locale;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -143,6 +145,20 @@ public class PrintUtils {
    */
   public static String printEstCardinality(long cardinality) {
     return (cardinality != -1) ? printMetric(cardinality) : "unavailable";
+  }
+
+  /**
+   * Print a ratio with two decimals, or "N/A" when the denominator is not positive and
+   * the ratio therefore says nothing.
+   *
+   * <p>Unlike the printers above this one is locale-independent, since a ratio is meant
+   * to be read by a tool as well as by a person and a default locale would write 0,05
+   * on some hosts.
+   */
+  public static String printTwoDecimalsRatio(long numerator, long denominator) {
+    if (denominator <= 0) return "N/A";
+    return new DecimalFormat("0.00", DecimalFormatSymbols.getInstance(Locale.ROOT))
+        .format((double) numerator / denominator);
   }
 
   /**

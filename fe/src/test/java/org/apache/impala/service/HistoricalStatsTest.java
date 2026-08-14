@@ -18,14 +18,18 @@
 package org.apache.impala.service;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
 
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.EnumMap;
 import java.util.List;
+import java.util.Map;
 
 import org.apache.impala.planner.CanonicalizationStrategy;
+import org.apache.impala.service.HistoricalStats.PlanNodeStatsMatch;
 import org.apache.impala.thrift.THboStatsType;
 import org.apache.impala.thrift.TPlanNodeRun;
 import org.apache.impala.thrift.TPlanNodeRunWithKeys;
@@ -68,8 +72,46 @@ public class HistoricalStatsTest {
   }
 
   private Long read(CanonicalizationStrategy strategy, String key, TPlanNodeRun run) {
-    return HistoricalStats.INSTANCE.getPlanNodeOutputRows(
-        Collections.singletonMap(strategy, key), "test.tbl", run);
+    PlanNodeStatsMatch match = readMatch(Collections.singletonMap(strategy, key), run);
+    return match == null ? null : match.numRows();
+  }
+
+  private PlanNodeStatsMatch readMatch(
+      Map<CanonicalizationStrategy, String> hashKeys, TPlanNodeRun run) {
+    return HistoricalStats.INSTANCE.getPlanNodeStats(hashKeys, "test.tbl", run);
+  }
+
+  @Test
+  public void testMatchProvenance() {
+    CanonicalizationStrategy matchingStrategy =
+        CanonicalizationStrategy.IGNORE_PARTITION_CONSTANTS;
+    String matchingHash = "provenance-ignore-partition-constants";
+    write(matchingStrategy, matchingHash, run(321, scan(1000)));
+
+    Map<CanonicalizationStrategy, String> hashKeys =
+        new EnumMap<>(CanonicalizationStrategy.class);
+    hashKeys.put(CanonicalizationStrategy.EXPR_REWRITE, "provenance-expr-miss");
+    hashKeys.put(matchingStrategy, matchingHash);
+    PlanNodeStatsMatch match = readMatch(hashKeys, run(0, scan(1050)));
+
+    assertNotNull(match);
+    assertEquals(321, match.numRows());
+    assertEquals(matchingStrategy, match.strategy());
+    assertEquals(matchingHash, match.hashKey());
+  }
+
+  @Test
+  public void testMatchProvenanceWithoutScans() {
+    String matchingHash = "provenance-no-scans";
+    write(CanonicalizationStrategy.EXPR_REWRITE, matchingHash, run(2));
+
+    PlanNodeStatsMatch match = readMatch(Collections.singletonMap(
+        CanonicalizationStrategy.EXPR_REWRITE, matchingHash), run(0));
+
+    assertNotNull(match);
+    assertEquals(2, match.numRows());
+    assertEquals(CanonicalizationStrategy.EXPR_REWRITE, match.strategy());
+    assertEquals(matchingHash, match.hashKey());
   }
 
   /** Both scans have valid input_rows: row-count similarity is used. */
