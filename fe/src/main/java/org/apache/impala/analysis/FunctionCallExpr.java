@@ -560,6 +560,7 @@ public class FunctionCallExpr extends Expr {
       return ScalarType.createAdjustedDecimalType(resultPrecision, resultScale);
     } else if (fnName_.getFunction().equalsIgnoreCase("ceil") ||
                fnName_.getFunction().equalsIgnoreCase("ceiling") ||
+               fnName_.getFunction().equalsIgnoreCase("dceil") ||
                fnName_.getFunction().equals("floor") ||
                fnName_.getFunction().equals("dfloor")) {
       // These functions just return with scale 0 but can trigger rounding. We need

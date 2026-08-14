@@ -477,7 +477,7 @@ visible_functions = [
   [['precision'], 'INT', ['DECIMAL'], 'impala::DecimalFunctions::Precision'],
   [['scale'], 'INT', ['DECIMAL'], 'impala::DecimalFunctions::Scale'],
   [['abs'], 'DECIMAL', ['DECIMAL'], 'impala::DecimalFunctions::Abs'],
-  [['ceil', 'ceiling'], 'DECIMAL', ['DECIMAL'], 'impala::DecimalFunctions::Ceil'],
+  [['ceil','ceiling','dceil'], 'DECIMAL', ['DECIMAL'], 'impala::DecimalFunctions::Ceil'],
   [['floor','dfloor'], 'DECIMAL', ['DECIMAL'], 'impala::DecimalFunctions::Floor'],
   [['round','dround'], 'DECIMAL', ['DECIMAL'], 'impala::DecimalFunctions::Round'],
   # The reason why we declare the following function several times (instead of simply

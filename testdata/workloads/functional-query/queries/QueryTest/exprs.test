@@ -3428,3 +3428,10 @@ least(cast(19.44 as decimal(4,2)), cast(18.3 as decimal(3,1)));
 ---- TYPES
 DECIMAL,DECIMAL,DECIMAL,DECIMAL
 ====
+---- QUERY
+select dfloor(1.1), dceil(1.1);
+---- RESULTS
+1,2
+---- TYPES
+DECIMAL,DECIMAL
+====
