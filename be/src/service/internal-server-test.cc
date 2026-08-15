@@ -41,6 +41,7 @@
 #include "util/debug-util.h"
 #include "util/jni-util.h"
 #include "util/string-util.h"
+#include "util/time.h"
 
 DECLARE_string(log_dir);
 DECLARE_string(debug_actions);
@@ -226,9 +227,14 @@ TEST(InternalServerTest, QueryTimeout) {
 
   TUniqueId session_id;
   TUniqueId query_id;
+  int64_t start_timestamp = MonotonicSeconds();
 
+  // Parquet dictionary filtering evaluates the conjunct (in this case a sleep) to see if
+  // it returns true for NULL. We don't want the sleep executing during planning, so this
+  // disables Parquet dictionary filtering.
   ASSERT_OK(fixture->OpenSession("impala", session_id,
-      {{TImpalaQueryOptions::FETCH_ROWS_TIMEOUT_MS, "1"}}));
+      {{TImpalaQueryOptions::FETCH_ROWS_TIMEOUT_MS, "1"},
+       {TImpalaQueryOptions::PARQUET_DICTIONARY_FILTERING, "false"}}));
 
   // Run a query that will execute for longer than the configured exec timeout.
   ASSERT_OK(fixture->SubmitQuery(StrCat("select * from ", db_test.GetTableName(),
@@ -243,6 +249,11 @@ TEST(InternalServerTest, QueryTimeout) {
 
   fixture->CloseQuery(query_id);
   fixture->CloseSession(session_id);
+
+  // Verify that the test took less than a minute. It usually takes a few seconds,
+  // so this is just a sanity check to make sure that the sleep isn't happening
+  // during planning.
+  EXPECT_LT(MonotonicSeconds() - start_timestamp, 60);
 
   assertQueryState(query_id, QUERY_STATE_FAILED);
 } // TEST QueryTimeout
