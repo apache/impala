@@ -24,7 +24,6 @@ import org.apache.calcite.rex.RexBuilder;
 import org.apache.calcite.rex.RexCall;
 import org.apache.calcite.rex.RexNode;
 import org.apache.calcite.sql.SqlCall;
-import org.apache.calcite.sql.SqlKind;
 import org.apache.calcite.sql.SqlNode;
 import org.apache.calcite.sql.SqlOperator;
 import org.apache.calcite.sql.fun.SqlStdOperatorTable;
@@ -61,8 +60,11 @@ public class ImpalaConvertletTable extends ReflectiveConvertletTable {
   public ImpalaConvertletTable() {
     addAlias(ImpalaCustomOperatorTable.PERCENT_REMAINDER, SqlStdOperatorTable.MOD);
     registerOp(ImpalaCastFunction.INSTANCE, this::convertExplicitCast);
-    registerOp(SqlStdOperatorTable.IS_DISTINCT_FROM, this::convertIsDistinctFrom);
-    registerOp(SqlStdOperatorTable.IS_NOT_DISTINCT_FROM, this::convertIsNotDistinctFrom);
+    registerOp(ImpalaCustomOperatorTable.IS_DISTINCT_FROM, this::convertIsDistinctFrom);
+    registerOp(ImpalaCustomOperatorTable.IS_NOT_DISTINCT_FROM,
+        this::convertIsNotDistinctFrom);
+    registerOp(ImpalaCustomOperatorTable.EQUALS, this::convertEquals);
+    registerOp(ImpalaCustomOperatorTable.NOT_EQUALS, this::convertNotEquals);
     registerOp(ImpalaConcatOrOperator.INSTANCE, this::convertConcatOr);
     registerOp(SqlStdOperatorTable.SQRT, this::convertSqrt);
     registerOp(SqlStdOperatorTable.PLUS, this::convertPlus);
@@ -78,9 +80,12 @@ public class ImpalaConvertletTable extends ReflectiveConvertletTable {
       return super.get(call);
     }
 
-    if (call.getOperator().getKind().equals(SqlKind.IS_DISTINCT_FROM) ||
-        call.getOperator().getKind().equals(SqlKind.IS_NOT_DISTINCT_FROM)) {
-      return super.get(call);
+    switch (call.getOperator().getKind()) {
+      case IS_DISTINCT_FROM:
+      case IS_NOT_DISTINCT_FROM:
+      case EQUALS:
+      case NOT_EQUALS:
+        return super.get(call);
     }
 
     // EXPLICIT_CAST convertlet has to be handled by our convertlet. Operation
@@ -168,6 +173,32 @@ public class ImpalaConvertletTable extends ReflectiveConvertletTable {
     List<RexNode> operands = Lists.newArrayList(cx.convertExpression(expr1));
     return rexBuilder.makeCall(returnType, SqlStdOperatorTable.SQRT,
         operands);
+  }
+
+  /**
+   * convertEquals calls the regular Calcite convertCall, but changes the operator
+   * from ImpalaCustomOperatorTable.EQUALS to SqlStdOperatorTable.EQUALS
+   */
+  private RexNode convertEquals(
+      @UnknownInitialization ImpalaConvertletTable this,
+      SqlRexContext cx, SqlCall call) {
+    final RexCall rex = (RexCall) StandardConvertletTable.INSTANCE.convertCall(cx, call);
+    final RexBuilder rexBuilder = cx.getRexBuilder();
+    return rexBuilder.makeCall(rex.getType(), SqlStdOperatorTable.EQUALS,
+        rex.getOperands());
+  }
+
+  /**
+   * convertNotEquals calls the regular Calcite convertCall, but changes the operator
+   * from ImpalaCustomOperatorTable.NOT_EQUALS to SqlStdOperatorTable.NOT_EQUALS
+   */
+  private RexNode convertNotEquals(
+      @UnknownInitialization ImpalaConvertletTable this,
+      SqlRexContext cx, SqlCall call) {
+    final RexCall rex = (RexCall) StandardConvertletTable.INSTANCE.convertCall(cx, call);
+    final RexBuilder rexBuilder = cx.getRexBuilder();
+    return rexBuilder.makeCall(rex.getType(), SqlStdOperatorTable.NOT_EQUALS,
+        rex.getOperands());
   }
 
   /**

@@ -3336,7 +3336,7 @@ void AddSubsetDefinition(List<SqlNode> list) :
     varList = ExpressionCommaList(span(), ExprContext.ACCEPT_NON_QUERY)
     <RPAREN> {
         list.add(
-            SqlStdOperatorTable.EQUALS.createCall(span().end(var), var,
+            ImpalaCustomOperatorTable.EQUALS.createCall(span().end(var), var,
                 varList));
     }
 }
@@ -7775,12 +7775,12 @@ SqlBinaryOperator BinaryRowOperator() :
 }
 {
     // <IN> is handled as a special case
-    <EQ> { return SqlStdOperatorTable.EQUALS; }
+    <EQ> { return ImpalaCustomOperatorTable.EQUALS; }
 |   <GT> { return SqlStdOperatorTable.GREATER_THAN; }
 |   <LT> { return SqlStdOperatorTable.LESS_THAN; }
 |   <LE> { return SqlStdOperatorTable.LESS_THAN_OR_EQUAL; }
 |   <GE> { return SqlStdOperatorTable.GREATER_THAN_OR_EQUAL; }
-|   <NE> { return SqlStdOperatorTable.NOT_EQUALS; }
+|   <NE> { return ImpalaCustomOperatorTable.NOT_EQUALS; }
 |   <NULL_SAFE_EQUAL> { return SqlStdOperatorTable.IS_NOT_DISTINCT_FROM; }
 |   <REGEXP> { return SqlStdOperatorTable.POSIX_REGEX_CASE_SENSITIVE; }
 |   LOOKAHEAD(2) <NOT> <REGEXP> { return SqlStdOperatorTable.NEGATED_POSIX_REGEX_CASE_SENSITIVE; }
@@ -7790,7 +7790,7 @@ SqlBinaryOperator BinaryRowOperator() :
         if (!this.conformance.isBangEqualAllowed()) {
             throw SqlUtil.newContextException(getPos(), RESOURCE.bangEqualNotAllowed());
         }
-        return SqlStdOperatorTable.NOT_EQUALS;
+        return ImpalaCustomOperatorTable.NOT_EQUALS;
     }
 |   <PLUS> { return ImpalaCustomOperatorTable.PLUS; }
 |   <MINUS> { return ImpalaCustomOperatorTable.MINUS; }

@@ -234,6 +234,58 @@ public class ImpalaCustomOperatorTable extends ReflectiveSqlOperatorTable {
   public static final SqlAggFunction GROUPING_ID =
       new ImpalaGroupingIdFunction();
 
+  // IMPALA-15269: Same as SqlStdOperatorTable.EQUALS, but last param
+  // is ORDERED instead of UNORDERED. The UNORDERED checker results in
+  // a consistency change in the params to ensure each operand takes on
+  // the "leastRestrictive" type. In the case of comparing a Dec(22,8)
+  // with a Dec(36,5), Impala returns INVALID_TYPE, causing the query
+  // to fail. However, it is ok to compare these two decimal types.
+  // Any other mismatch of types will be taken care of in the "coercenodes"
+  // module.
+  // Note: This operator is only needed at validation time when doing operand
+  // checks. Unfortunately, there are places in Calcite that look explicitly
+  // for (and create) the SqlStdOperatorTable.EQUALS variable during optimization
+  // rules. So this operator gets converted to the SqlStdOperatorTable one at
+  // SqlNode to RelConverter time via the ImpalaConvertletTable object.
+  public static final SqlBinaryOperator EQUALS =
+      new SqlBinaryOperator(
+          "=",
+          SqlKind.EQUALS,
+          30,
+          true,
+          ReturnTypes.BOOLEAN_NULLABLE,
+          InferTypes.FIRST_KNOWN,
+          OperandTypes.COMPARABLE_ORDERED_COMPARABLE_ORDERED);
+
+  public static final SqlBinaryOperator NOT_EQUALS =
+      new SqlBinaryOperator(
+          "<>",
+          SqlKind.NOT_EQUALS,
+          30,
+          true,
+          ReturnTypes.BOOLEAN_NULLABLE,
+          InferTypes.FIRST_KNOWN,
+          OperandTypes.COMPARABLE_ORDERED_COMPARABLE_ORDERED);
+
+  public static final SqlBinaryOperator IS_DISTINCT_FROM =
+      new SqlBinaryOperator(
+          "IS DISTINCT FROM",
+          SqlKind.IS_DISTINCT_FROM,
+          30,
+          true,
+          ReturnTypes.BOOLEAN,
+          InferTypes.FIRST_KNOWN,
+          OperandTypes.COMPARABLE_ORDERED_COMPARABLE_ORDERED);
+
+  public static final SqlBinaryOperator IS_NOT_DISTINCT_FROM =
+      new SqlBinaryOperator(
+          "IS NOT DISTINCT FROM",
+          SqlKind.IS_NOT_DISTINCT_FROM,
+          30,
+          true,
+          ReturnTypes.BOOLEAN,
+          InferTypes.FIRST_KNOWN,
+          OperandTypes.COMPARABLE_ORDERED_COMPARABLE_ORDERED);
   public static final ImpalaConcatOrOperator CONCAT_OR = ImpalaConcatOrOperator.INSTANCE;
 
   // The explicit cast function was created to deal with the cast function using
