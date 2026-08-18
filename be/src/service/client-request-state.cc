@@ -38,6 +38,7 @@
 #include "observe/otel.h"
 #include "observe/otel-trace-manager.h"
 #include "rpc/rpc-mgr.inline.h"
+#include "rpc/thrift-server.h"
 #include "runtime/coordinator.h"
 #include "runtime/exec-env.h"
 #include "runtime/mem-tracker.h"
@@ -126,6 +127,13 @@ ClientRequestState::ClientRequestState(const TQueryCtx& query_ctx, Frontend* fro
     start_time_us_(UnixMicros()),
     fetch_rows_timeout_us_(MICROS_PER_MILLI * query_options().fetch_rows_timeout_ms),
     parent_driver_(query_driver) {
+
+  const ThriftServer::ConnectionContext* connection_context =
+      ThriftServer::GetThreadConnectionContext();
+  if (connection_context != nullptr) {
+    http_traceparent_ = connection_context->http_traceparent;
+    http_tracestate_ = connection_context->http_tracestate;
+  }
 
   if (FLAGS_otel_trace_enabled && should_otel_trace_query(
       query_ctx_.session.session_type, query_ctx_.client_request)) {

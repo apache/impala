@@ -26,6 +26,7 @@ add_library(Observe
   otel-flags.cc
   otel-flags-trace.cc
   otel-log-handler.cc
+  otel-propagation.cc
   otel.cc
   otel-trace-manager.cc
 )

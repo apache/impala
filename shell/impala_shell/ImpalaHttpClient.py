@@ -275,9 +275,12 @@ class ImpalaHttpClient(TTransportBase):
       headers = f()
       if headers is not None:
         for key in headers:
-          assert key[0:2].lower() == "x-", \
-            "header '{0}' is not valid, all custom headers must start with "\
-            "'X-' or 'x-'".format(key)
+          key_lower = key.lower()
+          is_allowed_header = key_lower.startswith("x-") or key_lower in (
+              "traceparent", "tracestate")
+          assert is_allowed_header, \
+            "header '{0}' is not valid, custom headers must start with 'X-' or 'x-', " \
+            "or be W3C Trace Context headers 'traceparent' or 'tracestate'".format(key)
           assert key not in self.__custom_headers, \
             "header '{0}' already exists in custom headers dictionary".format(key)
           self.__custom_headers[key] = headers[key]

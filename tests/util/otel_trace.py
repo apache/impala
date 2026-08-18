@@ -157,7 +157,11 @@ class OtelSpan:
     self.query_id = ""
 
   def is_root(self):
-    return self.parent_span_id is None
+    if self.parent_span_id is None:
+      return True
+    # When W3C trace context is propagated via hs2-http, the query root span is a child
+    # of the remote parent span but is still named with the query id.
+    return self.query_id != "" and self.name == self.query_id
 
   def add_attribute(self, key, value):
     assert isinstance(key, str), "key must be a string"
@@ -353,7 +357,7 @@ def parse_trace_file(file_path, query_id):
 def assert_trace(log_file_path, trace_file_path, trace_file_count, query_id,
     query_profile, cluster_id, trace_cnt=1, err_span="", missing_spans=[],
     async_close=False, exact_trace_cnt=False, adm_result_missing=False,
-    http_request_id=None):
+    http_request_id=None, propagated_parent_span_id=None):
   # Validate http_request_id is a valid UUID if provided
   if http_request_id is not None:
     try:
@@ -413,7 +417,8 @@ def assert_trace(log_file_path, trace_file_path, trace_file_count, query_id,
   # Assert root span.
   root_span_id = __assert_rootspan_attrs(trace.root_span, query_id, session_id,
     cluster_id, db_user, "default-pool", impala_query_state, query_status,
-    original_query_id, retried_query_id, coordinator, log_file_path, http_request_id)
+    original_query_id, retried_query_id, coordinator, log_file_path, http_request_id,
+    propagated_parent_span_id)
 
   # Assert Init span.
   if "Init" not in missing_spans:
@@ -507,7 +512,8 @@ def __assert_trace_common(trace, expected_child_spans_count):
 
 
 def __assert_scopespan_common(span, query_id, is_root, name, attributes_count,
-      status, log_file_path, root_span_id=None, err_msg=""):
+      status, log_file_path, root_span_id=None, err_msg="",
+      propagated_parent_span_id=None):
   """
     Helper function to assert common data points of a single scope span. These spans
     contain the actual root and child spans. Assertions include the span object's
@@ -531,7 +537,13 @@ def __assert_scopespan_common(span, query_id, is_root, name, attributes_count,
   actual_kind = span.kind
 
   if (is_root):
-    assert span.parent_span_id is None, "Found parentSpanId on root span"
+    if propagated_parent_span_id is not None:
+      actual = span.parent_span_id
+      assert actual == propagated_parent_span_id, \
+          "Root span expected parentSpanId: '{}', actual: '{}'".format(
+              propagated_parent_span_id, actual)
+    else:
+      assert span.parent_span_id is None, "Found parentSpanId on root span"
     assert actual_kind == 2, "Span '{}' expected kind: '{}', actual: '{}'" \
         .format(expected_name, 2, actual_kind)
   else:
@@ -649,7 +661,7 @@ def __assert_span_events(span, expected_events=[]):
 
 def __assert_rootspan_attrs(span, query_id, session_id, cluster_id, user_name,
     request_pool, state, err_msg, original_query_id, retried_query_id, coordinator,
-    log_file_path, http_request_id=None):
+    log_file_path, http_request_id=None, propagated_parent_span_id=None):
   """
     Helper function that asserts the common attributes in the root span.
   """
@@ -658,7 +670,7 @@ def __assert_rootspan_attrs(span, query_id, session_id, cluster_id, user_name,
   # Root span has 14 base attributes, plus 1 if HttpRequestId is present
   expected_attr_count = 15 if http_request_id is not None else 14
   __assert_scopespan_common(span, query_id, True, "Root", expected_attr_count, "",
-      log_file_path, None, err_msg)
+      log_file_path, None, err_msg, propagated_parent_span_id)
 
   __assert_attr(span.name, span.attributes, "QueryId", query_id)
   __assert_attr(span.name, span.attributes, "SessionId", session_id)

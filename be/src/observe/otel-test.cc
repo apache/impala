@@ -18,6 +18,8 @@
 #include "observe/otel.h"
 
 #include <chrono>
+#include <iomanip>
+#include <sstream>
 #include <string>
 #include <string_view>
 
@@ -34,6 +36,7 @@
 #include <opentelemetry/sdk/trace/simple_processor.h>
 #include "gen-cpp/Query_types.h"
 #include "observe/otel-log-handler.h"
+#include "observe/otel-propagation.h"
 #include "testutil/scoped-flag-setter.h"
 
 using namespace std;
@@ -355,4 +358,42 @@ TEST(OtelTest, InitLogHandlerNone) {
   EXPECT_EQ(LogLevel::None, GlobalLogHandler::GetLogLevel());
 
   shutdown_otel_tracer();
+}
+
+// Verifies W3C Trace Context header parsing used for hs2-http context propagation.
+TEST(OtelTest, ExtractSpanContextFromHttpHeaders) {
+  using namespace opentelemetry::trace;
+
+  const string trace_id = "4bf92f3577b34da6a3ce929d0e0e4736";
+  const string parent_span_id = "00f067aa0ba902b7";
+  const string traceparent = "00-" + trace_id + "-" + parent_span_id + "-01";
+  const string tracestate = "congo=t61rcWkgMzE";
+
+  SpanContext ctx = ExtractSpanContextFromHttpHeaders(traceparent, tracestate);
+  EXPECT_TRUE(ctx.IsValid());
+
+  ostringstream trace_id_str;
+  for (auto byte : ctx.trace_id().Id()) {
+    trace_id_str << hex << setw(2) << setfill('0') << static_cast<int>(byte);
+  }
+  EXPECT_EQ(trace_id, trace_id_str.str());
+
+  ostringstream span_id_str;
+  for (auto byte : ctx.span_id().Id()) {
+    span_id_str << hex << setw(2) << setfill('0') << static_cast<int>(byte);
+  }
+  EXPECT_EQ(parent_span_id, span_id_str.str());
+
+  EXPECT_EQ(tracestate, ctx.trace_state()->ToHeader());
+  string vendor_value;
+  EXPECT_TRUE(ctx.trace_state()->Get("congo", vendor_value));
+  EXPECT_EQ("t61rcWkgMzE", vendor_value);
+}
+
+TEST(OtelTest, ExtractSpanContextFromHttpHeadersEmptyTraceparent) {
+  EXPECT_FALSE(ExtractSpanContextFromHttpHeaders("", "").IsValid());
+}
+
+TEST(OtelTest, ExtractSpanContextFromHttpHeadersInvalidTraceparent) {
+  EXPECT_FALSE(ExtractSpanContextFromHttpHeaders("invalid", "").IsValid());
 }

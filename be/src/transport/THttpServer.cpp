@@ -148,6 +148,8 @@ const std::string THttpServer::HEADER_X_FORWARDED_FOR = "X-Forwarded-For";
 const std::string THttpServer::HEADER_AUTHORIZATION = "Authorization";
 const std::string THttpServer::HEADER_COOKIE = "Cookie";
 const std::string THttpServer::HEADER_EXPECT = "Expect";
+const std::string THttpServer::HEADER_TRACEPARENT = "traceparent";
+const std::string THttpServer::HEADER_TRACESTATE = "tracestate";
 
 // Checks whether the name of the http header given in the 'header' parameter,
 // with length 'header_name_len', matches the constant given in 'header_constant_str'
@@ -212,6 +214,12 @@ void THttpServer::parseHeader(char* header) {
   } else if (MatchesHeader(header, HEADER_IMPALA_QUERY_ID, sz)) {
     header_x_query_id_ = string(value);
     StripWhiteSpace(&header_x_query_id_);
+  } else if (MatchesHeader(header, HEADER_TRACEPARENT, sz)) {
+    header_traceparent_ = string(value);
+    StripWhiteSpace(&header_traceparent_);
+  } else if (MatchesHeader(header, HEADER_TRACESTATE, sz)) {
+    header_tracestate_ = string(value);
+    StripWhiteSpace(&header_tracestate_);
   }
 }
 
@@ -294,6 +302,13 @@ void THttpServer::headersDone() {
   string request_id;
   std::swap(request_id, header_x_request_id_);
   callbacks_.set_http_request_id_fn(request_id);
+
+  // Store W3C Trace Context headers in the Connection Context.
+  string traceparent;
+  string tracestate;
+  std::swap(traceparent, header_traceparent_);
+  std::swap(tracestate, header_tracestate_);
+  callbacks_.set_http_trace_context_fn(traceparent, tracestate);
 
   if (!has_ldap_ && !has_kerberos_ && !has_saml_ && !has_jwt_ && !has_oauth_) {
     // We don't need to authenticate.

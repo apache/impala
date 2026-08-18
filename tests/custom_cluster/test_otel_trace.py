@@ -37,7 +37,7 @@ from tests.common.impala_test_suite import IMPALAD_HS2_HOST_PORT
 from tests.common.skip import SkipIf
 from tests.common.test_vector import BEESWAX, ImpalaTestDimension
 from tests.util.cancel_util import FetchingThread
-from tests.util.otel_trace import assert_trace
+from tests.util.otel_trace import assert_trace, parse_trace_file
 from tests.util.query_profile_util import parse_query_id, parse_retry_status
 from tests.util.retry import retry
 
@@ -58,13 +58,14 @@ class TestOtelTraceBase(CustomClusterTestSuite):
 
   def assert_trace(self, query_id, query_profile, cluster_id, trace_cnt=1, err_span="",
       missing_spans=[], async_close=False, exact_trace_cnt=False,
-      adm_result_missing=False, http_request_id=None):
+      adm_result_missing=False, http_request_id=None, propagated_parent_span_id=None):
     """Helper method to assert a trace exists in the trace file with the required inputs
        for log file path, trace file path, and trace file line count (that was determined
        before the test ran)."""
     assert_trace(self.build_log_path("impalad", "INFO"), self.trace_file_path,
         self.trace_file_count, query_id, query_profile, cluster_id, trace_cnt, err_span,
-        missing_spans, async_close, exact_trace_cnt, adm_result_missing, http_request_id)
+        missing_spans, async_close, exact_trace_cnt, adm_result_missing, http_request_id,
+        propagated_parent_span_id)
 
 
 @CustomClusterTestSuite.with_args(
@@ -592,6 +593,48 @@ class TestOtelTraceSelectsDMLs(TestOtelTraceBase):
           query_profile=runtime_profile,
           cluster_id="select_dml",
           http_request_id=expected_http_request_id)
+
+    finally:
+      client.close_connection()
+
+  def test_trace_context_propagation(self):
+    """Asserts that when traceparent header is provided via hs2-http protocol, the query
+       root span uses the propagated trace id and parent span id."""
+
+    propagated_trace_id = "4bf92f3577b34da6a3ce929d0e0e4736"
+    propagated_parent_span_id = "00f067aa0ba902b7"
+    traceparent = "00-{0}-{1}-01".format(propagated_trace_id, propagated_parent_span_id)
+
+    impalad_service = self.cluster.impalads[0].service
+    client = ImpalaHS2Client(
+        (impalad_service.external_interface, impalad_service.hs2_http_port),
+        fetch_size=1024,
+        kerberos_host_fqdn=None,
+        use_http_base_transport=True,
+        http_path='cliservice',
+        http_tracing=False,
+        traceparent=traceparent)
+
+    try:
+      client.connect()
+      query = "SELECT COUNT(*) FROM functional.alltypes"
+      query_handle = client.execute_query(query, {})
+      query_id = client.get_query_id_str(query_handle)
+
+      client.wait_to_finish(query_handle)
+
+      runtime_profile, _ = client.get_runtime_profile(query_handle)
+      client.close_query(query_handle)
+
+      self.assert_trace(
+          query_id=query_id,
+          query_profile=runtime_profile,
+          cluster_id="select_dml",
+          propagated_parent_span_id=propagated_parent_span_id)
+
+      trace = parse_trace_file(self.trace_file_path, query_id)
+      assert trace.root_span.trace_id == propagated_trace_id
+      assert trace.root_span.parent_span_id == propagated_parent_span_id
 
     finally:
       client.close_connection()

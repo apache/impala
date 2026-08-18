@@ -21,6 +21,7 @@
 #include <memory>
 #include <mutex>
 #include <string>
+#include <string_view>
 #include <utility>
 
 #include <gflags/gflags.h>
@@ -34,6 +35,7 @@
 #include "common/status.h"
 #include "gen-cpp/Types_types.h"
 #include "observe/buffered-span.h"
+#include "observe/otel-propagation.h"
 #include "runtime/coordinator.h"
 #include "runtime/exec-env.h"
 #include "scheduling/admission-control-client.h"
@@ -178,6 +180,25 @@ OtelTraceManager::OtelTraceManager(nostd::shared_ptr<trace::Tracer> tracer,
   {
     lock_guard<mutex> crs_lock(*(client_request_state_->lock()));
 
+    nostd::variant<trace::SpanContext, context::Context> parent =
+        context::Context().SetValue(trace::kIsRootSpanKey, true);
+    std::string_view http_traceparent = client_request_state_->http_traceparent();
+    if (!http_traceparent.empty()) {
+      std::string_view http_tracestate = client_request_state_->http_tracestate();
+      trace::SpanContext propagated = ExtractSpanContextFromHttpHeaders(
+          nostd::string_view(http_traceparent.data(), http_traceparent.size()),
+          nostd::string_view(http_tracestate.data(), http_tracestate.size()));
+      if (propagated.IsValid()) {
+        parent = propagated;
+        VLOG(2) << "Using propagated OpenTelemetry trace context for query_id='"
+            << query_id_ << "'";
+      } else {
+        LOG(WARNING) << "Invalid W3C Trace Context headers for query_id='" << query_id_
+            << "': traceparent='" << http_traceparent << "', tracestate='"
+            << http_tracestate << "'";
+      }
+    }
+
     span_root_ = make_unique<BufferedSpan>(tracer_, query_id_, ATTR_QUERY_START_TIME,
         ATTR_RUNTIME,
         BufferedSpan::BufferedAttributesMap{
@@ -188,7 +209,7 @@ OtelTraceManager::OtelTraceManager(nostd::shared_ptr<trace::Tracer> tracer,
           {ATTR_USER_NAME, client_request_state_->effective_user()},
           {ATTR_COORDINATOR, TNetworkAddressToString(
               ExecEnv::GetInstance()->configured_backend_address())}},
-        context::Context().SetValue(trace::kIsRootSpanKey, true),
+        parent,
         trace::SpanKind::kServer);
 
     // Add HttpRequestId if X-Request-Id header was provided via hs2-http

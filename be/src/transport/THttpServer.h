@@ -121,6 +121,13 @@ public:
       return false;
     };
 
+    // Function that stores the connection's W3C Trace Context 'traceparent' and
+    // 'tracestate' headers in the Connection Context so that they can be tracked.
+    std::function<bool(std::string, std::string)> set_http_trace_context_fn =
+        [&](const std::string&, const std::string&) {
+      return false;
+    };
+
     // Function that takes the connection's 'Authorization' header and returns true if
     // the basic auth header contains a valid username.
     std::function<bool(const std::string&)> trusted_auth_header_handle_fn =
@@ -188,6 +195,8 @@ protected:
   static const std::string HEADER_AUTHORIZATION;
   static const std::string HEADER_COOKIE;
   static const std::string HEADER_EXPECT;
+  static const std::string HEADER_TRACEPARENT;
+  static const std::string HEADER_TRACESTATE;
 
   void readHeaders();
   virtual void parseHeader(char* header);
@@ -271,6 +280,10 @@ protected:
 
   // The value from the 'X-Impala-Query-Id' header.
   std::string header_x_query_id_ = "";
+
+  // The values from the W3C Trace Context http message headers.
+  std::string header_traceparent_ = "";
+  std::string header_tracestate_ = "";
 
   // The maximum length of the 'X-Forwarded-For' header that will be stored in the runtime
   // Profile.

@@ -17,6 +17,8 @@
 
 #pragma once
 
+#include <string_view>
+
 #include "common/atomic.h"
 #include "common/object-pool.h"
 #include "common/status.h"
@@ -244,6 +246,14 @@ class ClientRequestState {
 
   /// Returns the session for this query.
   std::shared_ptr<ImpalaServer::SessionState> session() const { return session_; }
+
+  /// Returns the W3C Trace Context traceparent header from the hs2-http request that
+  /// submitted this query, if any.
+  std::string_view http_traceparent() const { return http_traceparent_; }
+
+  /// Returns the W3C Trace Context tracestate header from the hs2-http request that
+  /// submitted this query, if any.
+  std::string_view http_tracestate() const { return http_tracestate_; }
 
   /// Queries are run and authorized on behalf of the effective_user.
   const std::string& effective_user() const;
@@ -628,6 +638,10 @@ class ClientRequestState {
 
   /// Session that this query is from
   std::shared_ptr<ImpalaServer::SessionState> session_;
+
+  /// W3C Trace Context headers from the hs2-http request that submitted this query.
+  std::string http_traceparent_;
+  std::string http_tracestate_;
 
   /// Resource assignment determined by scheduler.
   std::unique_ptr<QuerySchedulePB> schedule_;
