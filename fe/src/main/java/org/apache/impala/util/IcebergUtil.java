@@ -177,15 +177,13 @@ public class IcebergUtil {
   /**
    * Returns the corresponding catalog implementation.
    */
-  public static IcebergCatalog getIcebergCatalog(TIcebergCatalog catalog, String location)
-      throws ImpalaRuntimeException {
-    switch (catalog) {
-      case HADOOP_TABLES: return IcebergHadoopTables.getInstance();
-      case HIVE_CATALOG: return IcebergHiveCatalog.getInstance();
-      case HADOOP_CATALOG: return new IcebergHadoopCatalog(location);
-      case CATALOGS: return IcebergCatalogUtil.getInstance();
-      default: throw new ImpalaRuntimeException("Unexpected catalog type: " + catalog);
-    }
+  public static IcebergCatalog getIcebergCatalog(TIcebergCatalog catalog, String location) {
+    return switch (catalog) {
+      case HADOOP_TABLES -> IcebergHadoopTables.getInstance();
+      case HIVE_CATALOG -> IcebergHiveCatalog.getInstance();
+      case HADOOP_CATALOG -> IcebergHadoopCatalog.getInstance(location);
+      case CATALOGS -> IcebergCatalogUtil.getInstance();
+    };
   }
 
   /**
@@ -203,14 +201,8 @@ public class IcebergUtil {
   public static Table loadTable(TIcebergCatalog catalog, TableIdentifier tableId,
       String location, Map<String, String> tableProps)
       throws IcebergTableLoadingException {
-    try {
-      IcebergCatalog cat = getIcebergCatalog(catalog, location);
-      return cat.loadTable(tableId, location, tableProps);
-    } catch (ImpalaRuntimeException e) {
-      throw new IcebergTableLoadingException(String.format(
-          "Failed to load Iceberg table: %s at location: %s",
-          tableId, location), e);
-    }
+    IcebergCatalog cat = getIcebergCatalog(catalog, location);
+    return cat.loadTable(tableId, location, tableProps);
   }
 
   /**

@@ -27,7 +27,6 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -710,26 +709,6 @@ public class IcebergTable extends Table implements FeIcebergTable {
     String val = msTable_.getParameters().get(ICEBERG_DISABLE_READING_PUFFIN_STATS);
     if (val == null) return true;
     return Boolean.parseBoolean(val);
-  }
-
-  private long getLastComputeStatsTimeMs() {
-    String val = msTable_.getParameters().get(Table.TBL_PROP_LAST_COMPUTE_STATS_TIME);
-    try {
-      return Long.parseLong(val) * 1000;
-    } catch (Exception e) {
-      return -1;
-    }
-  }
-
-  private Set<Integer> collectFieldIdsWithNdvStats() {
-    Set<Integer> res = new HashSet<>();
-    for (Column col : colsByPos_) {
-      if (col.getStats().hasNumDistinctValues()) {
-        IcebergColumn iCol = (IcebergColumn) col;
-        res.add(iCol.getFieldId());
-      }
-    }
-    return res;
   }
 
   /**

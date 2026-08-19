@@ -43,16 +43,15 @@ import com.google.common.base.Preconditions;
 public class IcebergHadoopTables implements IcebergCatalog {
   private final static Logger LOG = LoggerFactory.getLogger(IcebergHadoopTables.class);
 
-  private static IcebergHadoopTables instance_;
-
-  public synchronized static IcebergHadoopTables getInstance() {
-    if (instance_ == null) {
-      instance_ = new IcebergHadoopTables();
-    }
-    return instance_;
+  private static final class Holder {
+    static final IcebergHadoopTables INSTANCE = new IcebergHadoopTables();
   }
 
-  private HadoopTables hadoopTables;
+  public static IcebergHadoopTables getInstance() {
+    return Holder.INSTANCE;
+  }
+
+  private final HadoopTables hadoopTables;
 
   private IcebergHadoopTables() {
     hadoopTables = new HadoopTables(FileSystemUtil.getConfiguration());

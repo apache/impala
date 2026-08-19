@@ -20,6 +20,7 @@ package org.apache.impala.catalog.iceberg;
 import java.io.UncheckedIOException;
 import java.lang.NullPointerException;
 import java.util.Map;
+import java.util.concurrent.ExecutionException;
 
 import org.apache.iceberg.CatalogProperties;
 import org.apache.iceberg.PartitionSpec;
@@ -38,22 +39,39 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.google.common.base.Preconditions;
+import com.google.common.cache.Cache;
+import com.google.common.cache.CacheBuilder;
 
 /**
  * Implementation of IcebergCatalog for tables stored in HadoopCatalog.
+ * Instances are cached by catalog location to avoid creating a new HadoopCatalog
+ * (and its associated FileIO) for each table operation.
  */
 public class IcebergHadoopCatalog implements IcebergCatalog {
-  private final static Logger LOG = LoggerFactory.getLogger(IcebergHadoopTables.class);
+  private final static Logger LOG = LoggerFactory.getLogger(IcebergHadoopCatalog.class);
 
-  private HadoopCatalog hadoopCatalog;
+  private static final Cache<String, IcebergHadoopCatalog> catalogCache_ =
+    CacheBuilder.newBuilder().softValues().build();
 
-  public IcebergHadoopCatalog(String catalogLocation) {
+  public static IcebergHadoopCatalog getInstance(String catalogLocation) {
+    try {
+      return catalogCache_.get(catalogLocation,
+          () -> new IcebergHadoopCatalog(catalogLocation));
+    } catch (ExecutionException e) {
+      throw new RuntimeException(
+          "Failed to create HadoopCatalog for location: " + catalogLocation, e);
+    }
+  }
+
+  private final HadoopCatalog hadoopCatalog_;
+
+  private IcebergHadoopCatalog(String catalogLocation) {
     setContextClassLoader();
-    hadoopCatalog = new HadoopCatalog();
+    hadoopCatalog_ = new HadoopCatalog();
     Map<String, String> props = IcebergUtil.composeCatalogProperties();
     props.put(CatalogProperties.WAREHOUSE_LOCATION, catalogLocation);
-    hadoopCatalog.setConf(FileSystemUtil.getConfiguration());
-    hadoopCatalog.initialize("", props);
+    hadoopCatalog_.setConf(FileSystemUtil.getConfiguration());
+    hadoopCatalog_.initialize("", props);
   }
 
   @Override
@@ -64,7 +82,7 @@ public class IcebergHadoopCatalog implements IcebergCatalog {
       String location,
       Map<String, String> properties) {
     // We pass null as 'location' to let Iceberg decide the table location.
-    return hadoopCatalog.createTable(identifier, schema, spec, /*location=*/null,
+    return hadoopCatalog_.createTable(identifier, schema, spec, /*location=*/null,
         properties);
   }
 
@@ -85,7 +103,7 @@ public class IcebergHadoopCatalog implements IcebergCatalog {
     int attempt = 0;
     while (attempt < MAX_ATTEMPTS) {
       try {
-        return hadoopCatalog.loadTable(tableId);
+        return hadoopCatalog_.loadTable(tableId);
       } catch (NoSuchTableException e) {
         throw new IcebergTableLoadingException(e.getMessage());
       } catch (NullPointerException | UncheckedIOException e) {
@@ -113,19 +131,19 @@ public class IcebergHadoopCatalog implements IcebergCatalog {
     Preconditions.checkState(
       feTable.getIcebergCatalog() == TIcebergCatalog.HADOOP_CATALOG);
     TableIdentifier tableId = IcebergUtil.getIcebergTableIdentifier(feTable);
-    return hadoopCatalog.dropTable(tableId, purge);
+    return hadoopCatalog_.dropTable(tableId, purge);
   }
 
   @Override
   public boolean dropTable(String dbName, String tblName, boolean purge) {
-    return hadoopCatalog.dropTable(TableIdentifier.of(dbName, tblName), purge);
+    return hadoopCatalog_.dropTable(TableIdentifier.of(dbName, tblName), purge);
   }
 
   @Override
   public void renameTable(FeIcebergTable feTable, TableIdentifier newTableId) {
     TableIdentifier oldTableId = IcebergUtil.getIcebergTableIdentifier(feTable);
     try {
-      hadoopCatalog.renameTable(oldTableId, newTableId);
+      hadoopCatalog_.renameTable(oldTableId, newTableId);
     } catch (UnsupportedOperationException e) {
       throw new UnsupportedOperationException(
           "Cannot rename Iceberg tables that use 'hadoop.catalog' as catalog.");

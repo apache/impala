@@ -41,13 +41,12 @@ import com.google.common.base.Preconditions;
  * Implementation of IcebergCatalog for tables stored in HiveCatalog.
  */
 public class IcebergHiveCatalog implements IcebergCatalog {
-  private static IcebergHiveCatalog instance_;
+  private static final class Holder {
+    static final IcebergHiveCatalog INSTANCE = new IcebergHiveCatalog();
+  }
 
-  public synchronized static IcebergHiveCatalog getInstance() {
-    if (instance_ == null) {
-      instance_ = new IcebergHiveCatalog();
-    }
-    return instance_;
+  public static IcebergHiveCatalog getInstance() {
+    return Holder.INSTANCE;
   }
 
   private final HiveCatalog hiveCatalog_;

@@ -47,19 +47,18 @@ import org.apache.impala.util.IcebergUtil;
  * Supports custom catalog configurations via iceberg.catalog.<name>.* properties.
  */
 public class IcebergCatalogUtil implements IcebergCatalog {
-  private static IcebergCatalogUtil instance_;
-
   public static final String CATALOGS_NAME_PROPERTY = "name";
   public static final String CATALOGS_LOCATION_PROPERTY = "location";
   public static final String CATALOG_CONFIG_PREFIX = "iceberg.catalog.";
   // Based on InputFormatConfig.TABLE_IDENTIFIER
   public static final String TABLE_IDENTIFIER = "iceberg.mr.table.identifier";
 
-  public synchronized static IcebergCatalogUtil getInstance() {
-    if (instance_ == null) {
-      instance_ = new IcebergCatalogUtil();
-    }
-    return instance_;
+  private static final class Holder {
+    static final IcebergCatalogUtil INSTANCE = new IcebergCatalogUtil();
+  }
+
+  public static IcebergCatalogUtil getInstance() {
+    return Holder.INSTANCE;
   }
 
   private final Configuration configuration_;
