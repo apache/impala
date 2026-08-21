@@ -621,7 +621,7 @@ PLAN-ROOT SINK
 |
 02:TOP-N [LIMIT=100 OFFSET=4]
 |  order by: id ASC
-|  row-size=4B cardinality=5
+|  row-size=4B cardinality=1
 |
 01:TOP-N [LIMIT=5 OFFSET=5]
 |  order by: id ASC
@@ -635,7 +635,7 @@ PLAN-ROOT SINK
 |
 02:TOP-N [LIMIT=100 OFFSET=4]
 |  order by: id ASC
-|  row-size=4B cardinality=5
+|  row-size=4B cardinality=1
 |
 03:MERGING-EXCHANGE [UNPARTITIONED]
 |  offset: 5

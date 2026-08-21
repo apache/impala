@@ -834,6 +834,15 @@ abstract public class PlanNode extends TreeNode<PlanNode> {
     return MathUtil.smallestValidCardinality(cardinality, limit_);
   }
 
+  // Same as above but consider the offset first.
+  protected long capCardinalityAtLimit(long cardinality, long offset) {
+    if (cardinality > 0 && offset > 0) {
+      // Don't round cardinality down to zero for safety.
+      cardinality = Math.max(1, cardinality - offset);
+    }
+    return capCardinalityAtLimit(cardinality);
+  }
+
   // Default implementation of computing the total data processed in bytes.
   protected ProcessingCost computeDefaultProcessingCost() {
     Preconditions.checkState(hasValidStats());

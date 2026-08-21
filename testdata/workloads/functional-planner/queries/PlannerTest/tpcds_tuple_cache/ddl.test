@@ -95,7 +95,7 @@ WRITE TO HDFS [tpcds_partitioned_parquet_snap.t, OVERWRITE=false]
 |  mem-estimate=221B mem-reservation=0B thread-reservation=0 cost=3621916
 |
 07:TUPLE CACHE
-|  cache key: 89f349da969161a4392a5eb15fd9317f
+|  cache key: f9a7cc1229e5de03ea0d5bdbce95ce97
 |  input scan node ids: 0,1
 |  estimated serialized size: 273B
 |  estimated serialized size per node: 27B
@@ -113,7 +113,7 @@ WRITE TO HDFS [tpcds_partitioned_parquet_snap.t, OVERWRITE=false]
 |  in pipelines: 03(GETNEXT), 00(OPEN)
 |
 06:TUPLE CACHE
-|  cache key: d854334e882191f1850f630d53cf6a52
+|  cache key: 8568dc763852927f77f33c6f489c2073
 |  input scan node ids: 0,1
 |  estimated serialized size: 429B
 |  estimated serialized size per node: 42B
@@ -159,7 +159,7 @@ WRITE TO HDFS [tpcds_partitioned_parquet_snap.t, OVERWRITE=false]
 |     in pipelines: 01(GETNEXT)
 |
 04:TUPLE CACHE
-|  cache key: dcfaf0dd9db4f9e48346f66c018f9b76
+|  cache key: 30089e9690d81a3c94405758573cf8c9
 |  input scan node ids: 0
 |  estimated serialized size: 89.11KB
 |  estimated serialized size per node: 8.91KB
@@ -211,7 +211,7 @@ Per-Host Shared Resources: mem-estimate=1.00MB mem-reservation=1.00MB thread-res
 Per-Instance Resources: mem-estimate=38.08MB mem-reservation=14.03MB thread-reservation=1
 max-parallelism=10 segment-costs=[9666, 20] cpu-comparison-result=11 [max(10 (self) vs 11 (sum children))]
 10:TUPLE CACHE
-|  cache key: 29c1b3e6e5fd5e3abdb24c53f7946183
+|  cache key: 4760ecbd1f76d650f517ec257a2dfeb5
 |  input scan node ids: 0
 |  estimated serialized size: 273B
 |  estimated serialized size per node: 27B
@@ -229,7 +229,7 @@ max-parallelism=10 segment-costs=[9666, 20] cpu-comparison-result=11 [max(10 (se
 |  in pipelines: 00(GETNEXT)
 |
 09:TUPLE CACHE
-|  cache key: 6092feea7102cf822b1014338cbbfb4f
+|  cache key: 8824db083791d49cdba433b678d84198
 |  input scan node ids: 0
 |  estimated serialized size: 429B
 |  estimated serialized size per node: 42B
@@ -292,7 +292,7 @@ max-parallelism=10 segment-costs=[9666, 20] cpu-comparison-result=11 [max(10 (se
 |     in pipelines: 01(GETNEXT)
 |
 07:TUPLE CACHE
-|  cache key: 1be59b310c281a24c8566057f9c130e8
+|  cache key: 9a74e8143840803d1173a7568fb5a859
 |  input scan node ids: 0
 |  estimated serialized size: 89.11KB
 |  estimated serialized size per node: 8.91KB
@@ -483,24 +483,24 @@ WRITE TO HDFS [tpcds_partitioned_parquet_snap.t, OVERWRITE=false]
 Max Per-Host Resource Reservation: Memory=4.01MB Threads=2
 Per-Host Resource Estimates: Memory=20MB
 F01:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Instance Resources: mem-estimate=372.09KB mem-reservation=0B thread-reservation=1
-|  max-parallelism=1 segment-costs=[3621900] cpu-comparison-result=4 [max(1 (self) vs 4 (sum children))]
+|  Per-Instance Resources: mem-estimate=16.09KB mem-reservation=0B thread-reservation=1
+|  max-parallelism=1 segment-costs=[3621918] cpu-comparison-result=4 [max(1 (self) vs 4 (sum children))]
 WRITE TO HDFS [tpcds_partitioned_parquet_snap.t, OVERWRITE=false]
 |  partitions=1
 |  output exprs: id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month
-|  mem-estimate=89B mem-reservation=0B thread-reservation=0 cost=3621898
+|  mem-estimate=89B mem-reservation=0B thread-reservation=0 cost=3621916
 |
 02:MERGING-EXCHANGE [UNPARTITIONED]
 |  offset: 5
 |  order by: id ASC
 |  limit: 1
-|  mem-estimate=372.00KB mem-reservation=0B thread-reservation=0
-|  tuple-ids=1 row-size=89B cardinality=0 cost=2
+|  mem-estimate=16.00KB mem-reservation=0B thread-reservation=0
+|  tuple-ids=1 row-size=89B cardinality=1 cost=2
 |  in pipelines: 01(GETNEXT)
 |
 F00:PLAN FRAGMENT [RANDOM] hosts=4 instances=4
 Per-Instance Resources: mem-estimate=20.00MB mem-reservation=4.01MB thread-reservation=1
-max-parallelism=4 segment-costs=[29, 0]
+max-parallelism=4 segment-costs=[29, 2]
 01:TOP-N [LIMIT=6]
 |  order by: id ASC
 |  mem-estimate=534B mem-reservation=0B thread-reservation=0
@@ -581,24 +581,24 @@ WRITE TO HDFS [tpcds_partitioned_parquet_snap.t, OVERWRITE=false]
 Max Per-Host Resource Reservation: Memory=4.01MB Threads=2
 Per-Host Resource Estimates: Memory=20MB
 F01:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Instance Resources: mem-estimate=48.01KB mem-reservation=0B thread-reservation=1
-|  max-parallelism=1 segment-costs=[3621899] cpu-comparison-result=4 [max(1 (self) vs 4 (sum children))]
+|  Per-Instance Resources: mem-estimate=16.02KB mem-reservation=0B thread-reservation=1
+|  max-parallelism=1 segment-costs=[3621903] cpu-comparison-result=4 [max(1 (self) vs 4 (sum children))]
 WRITE TO HDFS [tpcds_partitioned_parquet_snap.t, OVERWRITE=false]
 |  partitions=1
 |  output exprs: int_col
-|  mem-estimate=8B mem-reservation=0B thread-reservation=0 cost=3621898
+|  mem-estimate=16B mem-reservation=0B thread-reservation=0 cost=3621902
 |
 02:MERGING-EXCHANGE [UNPARTITIONED]
 |  offset: 5
 |  order by: id ASC
 |  limit: 2
-|  mem-estimate=48.00KB mem-reservation=0B thread-reservation=0
-|  tuple-ids=1 row-size=8B cardinality=0 cost=1
+|  mem-estimate=16.00KB mem-reservation=0B thread-reservation=0
+|  tuple-ids=1 row-size=8B cardinality=2 cost=1
 |  in pipelines: 01(GETNEXT)
 |
 F00:PLAN FRAGMENT [RANDOM] hosts=4 instances=4
 Per-Instance Resources: mem-estimate=20.00MB mem-reservation=4.01MB thread-reservation=1
-max-parallelism=4 segment-costs=[29, 0]
+max-parallelism=4 segment-costs=[29, 1]
 01:TOP-N [LIMIT=7]
 |  order by: id ASC
 |  mem-estimate=56B mem-reservation=0B thread-reservation=0
@@ -945,7 +945,7 @@ WRITE TO HDFS [tpcds_partitioned_parquet_snap.t, OVERWRITE=false, PARTITION-KEYS
 |  in pipelines: 04(GETNEXT), 03(OPEN)
 |
 08:TUPLE CACHE
-|  cache key: c187d7b049442e572c2b1019065a6abc
+|  cache key: bf0e92ac10993e0ae48c9742a5257b0f
 |  input scan node ids: 0,1
 |  estimated serialized size: 3.15MB
 |  estimated serialized size per node: 1.57MB
@@ -964,7 +964,7 @@ WRITE TO HDFS [tpcds_partitioned_parquet_snap.t, OVERWRITE=false, PARTITION-KEYS
 |  in pipelines: 03(GETNEXT), 00(OPEN)
 |
 07:TUPLE CACHE
-|  cache key: 4fc6ab4227340a39e2041a7783a7c8c1
+|  cache key: df97919fb60786724259ffef71e51cb9
 |  input scan node ids: 0,1
 |  estimated serialized size: 7.41MB
 |  estimated serialized size per node: 3.71MB
@@ -1009,7 +1009,7 @@ WRITE TO HDFS [tpcds_partitioned_parquet_snap.t, OVERWRITE=false, PARTITION-KEYS
 |     in pipelines: 01(GETNEXT)
 |
 05:TUPLE CACHE
-|  cache key: 1aa7fe675bff4e543d21e63a429572af
+|  cache key: 867c674d8945d8bf912b67b4322561b3
 |  input scan node ids: 0
 |  estimated serialized size: 28.61MB
 |  estimated serialized size per node: 14.31MB
@@ -1074,7 +1074,7 @@ Per-Host Shared Resources: mem-estimate=1.00MB mem-reservation=1.00MB thread-res
 Per-Instance Resources: mem-estimate=38.17MB mem-reservation=25.00MB thread-reservation=1
 max-parallelism=2 segment-costs=[7499075, 267937] cpu-comparison-result=3 [max(2 (self) vs 3 (sum children))]
 12:TUPLE CACHE
-|  cache key: a6f9ec361b25c05eb2c60b52dd40f02d
+|  cache key: 10d53091634b51485a2acc7d46f05e99
 |  input scan node ids: 0
 |  estimated serialized size: 3.36MB
 |  estimated serialized size per node: 1.68MB
@@ -1093,7 +1093,7 @@ max-parallelism=2 segment-costs=[7499075, 267937] cpu-comparison-result=3 [max(2
 |  in pipelines: 00(GETNEXT)
 |
 11:TUPLE CACHE
-|  cache key: f2ab66f35f71a00699252a8674e2ec9d
+|  cache key: d3b576bfc3b619beb77bc32d94a25d6c
 |  input scan node ids: 0
 |  estimated serialized size: 7.41MB
 |  estimated serialized size per node: 3.71MB
@@ -1155,7 +1155,7 @@ max-parallelism=2 segment-costs=[7499075, 267937] cpu-comparison-result=3 [max(2
 |     in pipelines: 01(GETNEXT)
 |
 09:TUPLE CACHE
-|  cache key: 50a9d47ec2455a48aa56887c985d602d
+|  cache key: 9f3b2b3f02f8d1c820dfc0e05bcce349
 |  input scan node ids: 0
 |  estimated serialized size: 28.61MB
 |  estimated serialized size per node: 14.31MB

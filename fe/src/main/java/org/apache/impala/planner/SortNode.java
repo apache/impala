@@ -304,10 +304,11 @@ public class SortNode extends PlanNode implements SpillableOperator {
   public void computeStats(Analyzer analyzer) {
     super.computeStats(analyzer);
     if (isTypeTopN() && includeTies_) {
+      Preconditions.checkState(offset_ == 0, "Tie handling with offset not supported");
       cardinality_ =
           MathUtil.smallestValidCardinality(getChild(0).cardinality_, limitWithTies_);
     } else {
-      cardinality_ = capCardinalityAtLimit(getChild(0).cardinality_);
+      cardinality_ = capCardinalityAtLimit(getChild(0).cardinality_, offset_);
     }
     if (type_ == TSortType.PARTITIONED_TOPN) {
       // We may be able to get a more precise estimate based on the number of

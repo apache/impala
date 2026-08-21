@@ -1,0 +1,111 @@
+# Cardinality tests for OFFSET.
+#
+# OFFSET in TOP-N
+select id, int_col from functional.alltypes order by id limit 1000 offset 6200
+---- PLAN
+PLAN-ROOT SINK
+|
+01:TOP-N [LIMIT=1000 OFFSET=6200]
+|  order by: id ASC
+|  row-size=8B cardinality=1.00K
+|
+00:SCAN HDFS [functional.alltypes]
+   HDFS partitions=24/24 files=24 size=478.45KB
+   row-size=8B cardinality=7.30K
+====
+# OFFSET in MERGING-EXCHANGE
+# Cardinality of ExchangeNode is only shown when explain_level >= EXTENDED(2)
+select id, int_col from functional.alltypes order by id limit 1000 offset 6200
+---- QUERYOPTIONS
+explain_level=2
+---- DISTRIBUTEDPLAN
+F01:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
+|  Per-Host Resources: mem-estimate=4.04MB mem-reservation=4.00MB thread-reservation=1
+PLAN-ROOT SINK
+|  output exprs: id, int_col
+|  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
+|
+02:MERGING-EXCHANGE [UNPARTITIONED]
+|  offset: 6200
+|  order by: id ASC
+|  limit: 1000
+|  mem-estimate=37.76KB mem-reservation=0B thread-reservation=0
+|  tuple-ids=1 row-size=8B cardinality=1.00K
+|  in pipelines: 01(GETNEXT)
+|
+F00:PLAN FRAGMENT [RANDOM] hosts=3 instances=3
+Per-Host Resources: mem-estimate=160.05MB mem-reservation=32.00KB thread-reservation=2
+01:TOP-N [LIMIT=7200]
+|  order by: id ASC
+|  mem-estimate=56.25KB mem-reservation=0B thread-reservation=0
+|  tuple-ids=1 row-size=8B cardinality=7.20K
+|  in pipelines: 01(GETNEXT), 00(OPEN)
+|
+00:SCAN HDFS [functional.alltypes, RANDOM]
+   HDFS partitions=24/24 files=24 size=478.45KB
+   stored statistics:
+     table: rows=7.30K size=478.45KB
+     partitions: 24/24 rows=7.30K
+     columns: all
+   extrapolated-rows=disabled max-scan-range-rows=310
+   mem-estimate=160.00MB mem-reservation=32.00KB thread-reservation=1
+   tuple-ids=0 row-size=8B cardinality=7.30K
+   in pipelines: 00(GETNEXT)
+====
+# OFFSET > estimated cardinality in TOP-N
+select id, int_col from functional.alltypes
+where int_col < 1
+order by id limit 1000 offset 6200
+---- PLAN
+PLAN-ROOT SINK
+|
+01:TOP-N [LIMIT=1000 OFFSET=6200]
+|  order by: id ASC
+|  row-size=8B cardinality=1
+|
+00:SCAN HDFS [functional.alltypes]
+   HDFS partitions=24/24 files=24 size=478.45KB
+   predicates: int_col < 1
+   row-size=8B cardinality=730
+====
+# OFFSET > estimated cardinality in MERGING-EXCHANGE
+select id, int_col from functional.alltypes
+where int_col < 1
+order by id limit 1000 offset 6200
+---- QUERYOPTIONS
+explain_level=2
+---- DISTRIBUTEDPLAN
+F01:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
+|  Per-Host Resources: mem-estimate=4.02MB mem-reservation=4.00MB thread-reservation=1
+PLAN-ROOT SINK
+|  output exprs: id, int_col
+|  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
+|
+02:MERGING-EXCHANGE [UNPARTITIONED]
+|  offset: 6200
+|  order by: id ASC
+|  limit: 1000
+|  mem-estimate=16.00KB mem-reservation=0B thread-reservation=0
+|  tuple-ids=1 row-size=8B cardinality=1
+|  in pipelines: 01(GETNEXT)
+|
+F00:PLAN FRAGMENT [RANDOM] hosts=3 instances=3
+Per-Host Resources: mem-estimate=160.01MB mem-reservation=32.00KB thread-reservation=2
+01:TOP-N [LIMIT=7200]
+|  order by: id ASC
+|  mem-estimate=5.70KB mem-reservation=0B thread-reservation=0
+|  tuple-ids=1 row-size=8B cardinality=730
+|  in pipelines: 01(GETNEXT), 00(OPEN)
+|
+00:SCAN HDFS [functional.alltypes, RANDOM]
+   HDFS partitions=24/24 files=24 size=478.45KB
+   predicates: int_col < CAST(1 AS INT)
+   stored statistics:
+     table: rows=7.30K size=478.45KB
+     partitions: 24/24 rows=7.30K
+     columns: all
+   extrapolated-rows=disabled max-scan-range-rows=310
+   mem-estimate=160.00MB mem-reservation=32.00KB thread-reservation=1
+   tuple-ids=0 row-size=8B cardinality=730
+   in pipelines: 00(GETNEXT)
+====

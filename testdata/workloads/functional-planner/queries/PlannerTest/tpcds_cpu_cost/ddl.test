@@ -337,24 +337,24 @@ WRITE TO HDFS [tpcds_partitioned_parquet_snap.t, OVERWRITE=false]
 Max Per-Host Resource Reservation: Memory=8.00KB Threads=2
 Per-Host Resource Estimates: Memory=16MB
 F01:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Instance Resources: mem-estimate=372.09KB mem-reservation=0B thread-reservation=1
-|  max-parallelism=1 segment-costs=[3621900] cpu-comparison-result=4 [max(1 (self) vs 4 (sum children))]
+|  Per-Instance Resources: mem-estimate=16.09KB mem-reservation=0B thread-reservation=1
+|  max-parallelism=1 segment-costs=[3621918] cpu-comparison-result=4 [max(1 (self) vs 4 (sum children))]
 WRITE TO HDFS [tpcds_partitioned_parquet_snap.t, OVERWRITE=false]
 |  partitions=1
 |  output exprs: id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month
-|  mem-estimate=89B mem-reservation=0B thread-reservation=0 cost=3621898
+|  mem-estimate=89B mem-reservation=0B thread-reservation=0 cost=3621916
 |
 02:MERGING-EXCHANGE [UNPARTITIONED]
 |  offset: 5
 |  order by: id ASC
 |  limit: 1
-|  mem-estimate=372.00KB mem-reservation=0B thread-reservation=0
-|  tuple-ids=1 row-size=89B cardinality=0 cost=2
+|  mem-estimate=16.00KB mem-reservation=0B thread-reservation=0
+|  tuple-ids=1 row-size=89B cardinality=1 cost=2
 |  in pipelines: 01(GETNEXT)
 |
 F00:PLAN FRAGMENT [RANDOM] hosts=4 instances=4
 Per-Instance Resources: mem-estimate=16.00MB mem-reservation=8.00KB thread-reservation=1
-max-parallelism=4 segment-costs=[29, 0]
+max-parallelism=4 segment-costs=[29, 2]
 01:TOP-N [LIMIT=6]
 |  order by: id ASC
 |  mem-estimate=534B mem-reservation=0B thread-reservation=0
@@ -407,24 +407,24 @@ WRITE TO HDFS [tpcds_partitioned_parquet_snap.t, OVERWRITE=false]
 Max Per-Host Resource Reservation: Memory=8.00KB Threads=2
 Per-Host Resource Estimates: Memory=16MB
 F01:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Instance Resources: mem-estimate=48.01KB mem-reservation=0B thread-reservation=1
-|  max-parallelism=1 segment-costs=[3621899] cpu-comparison-result=4 [max(1 (self) vs 4 (sum children))]
+|  Per-Instance Resources: mem-estimate=16.02KB mem-reservation=0B thread-reservation=1
+|  max-parallelism=1 segment-costs=[3621903] cpu-comparison-result=4 [max(1 (self) vs 4 (sum children))]
 WRITE TO HDFS [tpcds_partitioned_parquet_snap.t, OVERWRITE=false]
 |  partitions=1
 |  output exprs: int_col
-|  mem-estimate=8B mem-reservation=0B thread-reservation=0 cost=3621898
+|  mem-estimate=16B mem-reservation=0B thread-reservation=0 cost=3621902
 |
 02:MERGING-EXCHANGE [UNPARTITIONED]
 |  offset: 5
 |  order by: id ASC
 |  limit: 2
-|  mem-estimate=48.00KB mem-reservation=0B thread-reservation=0
-|  tuple-ids=1 row-size=8B cardinality=0 cost=1
+|  mem-estimate=16.00KB mem-reservation=0B thread-reservation=0
+|  tuple-ids=1 row-size=8B cardinality=2 cost=1
 |  in pipelines: 01(GETNEXT)
 |
 F00:PLAN FRAGMENT [RANDOM] hosts=4 instances=4
 Per-Instance Resources: mem-estimate=16.00MB mem-reservation=8.00KB thread-reservation=1
-max-parallelism=4 segment-costs=[29, 0]
+max-parallelism=4 segment-costs=[29, 1]
 01:TOP-N [LIMIT=7]
 |  order by: id ASC
 |  mem-estimate=56B mem-reservation=0B thread-reservation=0

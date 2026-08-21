@@ -127,6 +127,12 @@ public class PlannerTest extends PlannerTestBase {
   }
 
   @Test
+  public void testOffsetCardinality() {
+    runPlannerTestFile("card-limit-offset",
+        ImmutableSet.of(PlannerTestOption.VALIDATE_CARDINALITY));
+  }
+
+  @Test
   public void testPredicatePropagation() {
     runPlannerTestFile("predicate-propagation");
   }
@@ -490,7 +496,8 @@ public class PlannerTest extends PlannerTestBase {
 
   @Test
   public void testInlineViewLimit() {
-    runPlannerTestFile("inline-view-limit");
+    runPlannerTestFile("inline-view-limit", ImmutableSet.of(
+        PlannerTestOption.VALIDATE_CARDINALITY));
   }
 
   @Test
