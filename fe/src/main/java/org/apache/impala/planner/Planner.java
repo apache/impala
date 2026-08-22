@@ -19,6 +19,7 @@ package org.apache.impala.planner;
 
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -33,6 +34,7 @@ import org.apache.impala.analysis.ColumnLineageGraph;
 import org.apache.impala.analysis.ColumnLineageGraph.ColumnLabel;
 import org.apache.impala.analysis.ColumnLineageGraph.OperationType;
 import org.apache.impala.analysis.DeleteStmt;
+import org.apache.impala.analysis.DescriptorTable;
 import org.apache.impala.analysis.DmlStatementBase;
 import org.apache.impala.analysis.Expr;
 import org.apache.impala.analysis.ExprSubstitutionMap;
@@ -79,6 +81,7 @@ import org.slf4j.LoggerFactory;
 
 import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
+import com.google.common.base.Predicates;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 
@@ -886,6 +889,44 @@ public class Planner {
     request.setMax_parallelism_per_node(rootAnalyzer.getMaxParallelismPerNode());
     LOG.info("CoreCountUnbounded=" + unboundedCores
         + ", coresRequiredUnbounded=" + coresRequiredUnbounded);
+  }
+
+  /**
+   * Rebuilds 'descTbl's referenced partitions from the HDFS scans reachable from
+   * 'planRoots'.
+   *
+   * HdfsScanNode registers its partitions with the descriptor table while its subtree
+   * is built, which makes the descriptor table describe every scan the planner ever
+   * constructed rather than the scans that ended up in the plan. A subtree that is
+   * replaced afterwards - by an EmptySetNode, for example - therefore keeps shipping
+   * partition descriptors to the backend that nothing reads.
+   *
+   * Keeping the union over the surviving scans of what each of them registered leaves
+   * plans that discard nothing byte-for-byte unchanged, and cannot drop a partition
+   * some scan still needs.
+   */
+  public static void retainPartitionsOfFinalPlan(
+      List<PlanFragment> planRoots, DescriptorTable descTbl) {
+    // Replacing the sets from an empty plan list would drop every partition.
+    Preconditions.checkState(!planRoots.isEmpty());
+    Map<FeTable, Set<Long>> perTable = new HashMap<>();
+    List<HdfsScanNode> scans = new ArrayList<>();
+    for (PlanFragment planRoot : planRoots) {
+      // Every fragment, including the join build fragments that
+      // getFragmentsInPlanPreorder() leaves out: a scan under one of those still runs.
+      for (PlanFragment fragment : planRoot.<PlanFragment>getNodesPreOrder()) {
+        fragment.collectPlanNodes(Predicates.instanceOf(HdfsScanNode.class), scans);
+      }
+    }
+    for (HdfsScanNode scan : scans) {
+      Set<Long> ids = perTable.get(scan.getFsTable());
+      if (ids == null) {
+        ids = new HashSet<>();
+        perTable.put(scan.getFsTable(), ids);
+      }
+      ids.addAll(scan.getReferencedPartitionIds());
+    }
+    descTbl.retainReferencedPartitions(perTable);
   }
 
   /**

@@ -239,7 +239,7 @@ public class PlannerTestBase extends FrontendTestBase {
    * table/partition descriptor that is not present).
    */
   private void testHdfsPartitionsReferenced(TQueryExecRequest execRequest,
-      String query, StringBuilder errorLog) {
+      Section section, String query, StringBuilder errorLog) {
     long insertTableId = -1;
     // Collect all partitions that are referenced by a scan range.
     Set<THdfsPartition> scanRangePartitions = Sets.newHashSet();
@@ -285,7 +285,9 @@ public class PlannerTestBase extends FrontendTestBase {
              hdfsTable.getPartitions().entrySet()) {
           THdfsPartition partition = e.getValue();
           if (!scanRangePartitions.contains(partition)) {
-            if (first) errorLog.append("query:\n" + query + "\n");
+            if (first) {
+              errorLog.append("section " + section + " of query:\n" + query + "\n");
+            }
             errorLog.append(
                 " unreferenced partition: HdfsTable: " + tableDesc.getId() +
                 " HdfsPartition: " + partition.getId() + "\n");
@@ -479,11 +481,17 @@ public class PlannerTestBase extends FrontendTestBase {
     checkColumnLineage(testCase, singleNodeExecRequest, errorLog, actualOutput);
     checkLimitCardinality(query, singleNodeExecRequest, errorLog);
     // Test distributed plan.
-    testPlan(testCase, Section.DISTRIBUTEDPLAN, queryCtx.deepCopy(), testOptions,
-        errorLog, actualOutput);
+    TExecRequest distributedExecRequest = testPlan(testCase, Section.DISTRIBUTEDPLAN,
+        queryCtx.deepCopy(), testOptions, errorLog, actualOutput);
     // test parallel plans
-    testPlan(testCase, Section.PARALLELPLANS, queryCtx.deepCopy(), testOptions,
-        errorLog, actualOutput);
+    TExecRequest parallelExecRequest = testPlan(testCase, Section.PARALLELPLANS,
+        queryCtx.deepCopy(), testOptions, errorLog, actualOutput);
+    if (scanRangeLocationsCheckEnabled()) {
+      checkPartitionsReferenced(
+          query, Section.DISTRIBUTEDPLAN, distributedExecRequest, errorLog);
+      checkPartitionsReferenced(
+          query, Section.PARALLELPLANS, parallelExecRequest, errorLog);
+    }
   }
 
   /**
@@ -649,6 +657,26 @@ public class PlannerTestBase extends FrontendTestBase {
         explainStr, Collections.<PlannerTestOption>emptySet());
   }
 
+  /**
+   * Runs testHdfsPartitionsReferenced() on the plan of 'section'. Leaves the maps built
+   * for 'execRequest', so printScanRangeLocations() can use them.
+   */
+  private void checkPartitionsReferenced(String query, Section section,
+      TExecRequest execRequest, StringBuilder errorLog) {
+    // Query exec request may not be set for DDL, e.g., CTAS.
+    if (execRequest == null || !execRequest.isSetQuery_exec_request()) return;
+    if (execRequest.query_exec_request.plan_exec_info == null) return;
+    buildMaps(execRequest.query_exec_request);
+    // If we optimize the partition key scans, we may get all the partition key values
+    // from the metadata and don't reference any table. Skip the check in this case.
+    TQueryOptions options = execRequest.getQuery_options();
+    if (!(options.isSetOptimize_partition_key_scans() &&
+        options.optimize_partition_key_scans)) {
+      testHdfsPartitionsReferenced(
+          execRequest.query_exec_request, section, query, errorLog);
+    }
+  }
+
   private void checkScanRangeLocations(TestCase testCase, TExecRequest execRequest,
       StringBuilder errorLog, StringBuilder actualOutput) {
     String query = testCase.getQuery();
@@ -656,14 +684,7 @@ public class PlannerTestBase extends FrontendTestBase {
     String locationsStr = null;
     if (execRequest != null && execRequest.isSetQuery_exec_request()) {
       if (execRequest.query_exec_request.plan_exec_info == null) return;
-      buildMaps(execRequest.query_exec_request);
-      // If we optimize the partition key scans, we may get all the partition key values
-      // from the metadata and don't reference any table. Skip the check in this case.
-      TQueryOptions options = execRequest.getQuery_options();
-      if (!(options.isSetOptimize_partition_key_scans() &&
-          options.optimize_partition_key_scans)) {
-        testHdfsPartitionsReferenced(execRequest.query_exec_request, query, errorLog);
-      }
+      checkPartitionsReferenced(query, Section.PLAN, execRequest, errorLog);
       locationsStr =
           printScanRangeLocations(execRequest.query_exec_request).toString();
     }
@@ -1038,7 +1059,8 @@ public class PlannerTestBase extends FrontendTestBase {
 
   /**
    * Returns true if {@link #checkScanRangeLocations(TestCase, TExecRequest,
-   * StringBuilder, StringBuilder)} should be run, returns false if it should not be run.
+   * StringBuilder, StringBuilder)} and the partition checks of the distributed and
+   * parallel plans should be run, returns false if they should not be run.
    */
   protected boolean scanRangeLocationsCheckEnabled() {
     return true;

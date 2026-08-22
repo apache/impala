@@ -138,9 +138,40 @@ public class DescriptorTable {
   /**
    * Add the partition with ID partitionId to the set of referenced partitions for the
    * given table.
+   *
+   * HdfsScanNode is the only caller, and retainReferencedPartitions() relies on that:
+   * it rebuilds these sets from what the scans in the final plan registered, so a
+   * partition added here by anything else would be dropped again once the plan is
+   * final. Another caller needs that path to learn about it.
    */
   public void addReferencedPartition(FeTable table, long partitionId) {
     getReferencedPartitions(table).add(Long.valueOf(partitionId));
+  }
+
+  /**
+   * Narrows the referenced partitions of every table to 'perTable'. Scan nodes register
+   * their partitions while their subtree is built, so a subtree that planning later
+   * replaces - for example by an EmptySetNode - leaves partitions here that no scan in
+   * the final plan reads. Called once from the planner after the plan is final.
+   *
+   * The new sets have to be subsets of what was registered: a partition some scan still
+   * reads must not disappear from the descriptors the backend gets. The caller keeps
+   * that true by taking what the surviving scans registered rather than deriving the
+   * partitions again, and the check here is what says so at the boundary.
+   */
+  public void retainReferencedPartitions(Map<FeTable, Set<Long>> perTable) {
+    for (Map.Entry<FeTable, Set<Long>> entry : perTable.entrySet()) {
+      // A scan that registered nothing - a partitioned table with no partitions, say -
+      // has no entry here to be a subset of, and asks for none.
+      if (entry.getValue().isEmpty()) continue;
+      Set<Long> registered = referencedPartitionsPerTable_.get(entry.getKey());
+      Preconditions.checkState(
+          registered != null && registered.containsAll(entry.getValue()),
+          "narrowing the referenced partitions of %s added partitions to it",
+          entry.getKey().getFullName());
+    }
+    referencedPartitionsPerTable_.clear();
+    referencedPartitionsPerTable_.putAll(perTable);
   }
 
   /**

@@ -2134,6 +2134,11 @@ public class Frontend {
       planCtx.plan_ = planRoots;
     }
 
+    // The plan is final here, so the descriptor table can stop describing scans that
+    // planning built and then replaced.
+    Planner.retainPartitionsOfFinalPlan(
+        planRoots, planner.getAnalysisResult().getAnalyzer().getDescTbl());
+
     // Compute resource requirements of the final plans.
     Planner.computeResourceReqs(planRoots, queryCtx, result,
         planner.getPlannerCtx(), planner.getAnalysisResult().isQueryStmt());

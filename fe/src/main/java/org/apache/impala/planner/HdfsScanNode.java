@@ -202,6 +202,14 @@ public class HdfsScanNode extends ScanNode {
   // List of partitions to be scanned. Partitions have been pruned.
   protected final List<FeFsPartition> partitions_;
 
+  // Ids of the partitions this scan registered with the descriptor table in
+  // computeScanRangeLocations(). Planning rebuilds the descriptor table's referenced
+  // partitions from the scans that are still in the final plan, so a scan whose
+  // subtree is replaced does not leave its partitions behind. Accumulates and is not
+  // reset with the per-run counters above: the descriptor table it mirrors only ever
+  // gains entries, so anything this scan registered there has to stay visible here.
+  private final Set<Long> referencedPartitionIds_ = new HashSet<>();
+
   // List of paritions that has been reduced through sampling.
   // Only initialized at checkSamplingAndCountStar() if sampling is True.
   // Accessors must fallback to partitions_ if sampledPartitions_ stays null after
@@ -443,6 +451,14 @@ public class HdfsScanNode extends ScanNode {
     if (!hasParquet(fileFormats_) && !hasOrc(fileFormats_)) return false;
     return super.canApplyCountStarOptimization(analyzer);
   }
+
+  public FeFsTable getFsTable() { return tbl_; }
+
+  /**
+   * Ids of the partitions this scan registered with the descriptor table. Empty until
+   * computeScanRangeLocations() has run.
+   */
+  public Set<Long> getReferencedPartitionIds() { return referencedPartitionIds_; }
 
   // Return sampledPartitions_ if not null. Otherwise, return partitions_.
   private List<FeFsPartition> getSampledOrRawPartitions() {
@@ -1374,6 +1390,7 @@ public class HdfsScanNode extends ScanNode {
 
       long partitionNumRows = partition.getNumRows();
       analyzer.getDescTbl().addReferencedPartition(tbl_, partition.getId());
+      referencedPartitionIds_.add(partition.getId());
       if (!partition.getFileFormat().isParquetBased()) {
         allParquet = false;
       }
