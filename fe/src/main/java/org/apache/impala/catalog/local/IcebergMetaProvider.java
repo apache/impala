@@ -67,6 +67,7 @@ import org.apache.impala.catalog.VirtualColumn;
 import org.apache.impala.catalog.iceberg.GroupedContentFiles;
 import org.apache.impala.catalog.iceberg.IcebergRESTCatalog;
 import org.apache.impala.catalog.local.LocalIcebergTable.TableParams;
+import org.apache.impala.common.Credential;
 import org.apache.impala.common.FileSystemUtil;
 import org.apache.impala.common.ImpalaRuntimeException;
 import org.apache.impala.common.Pair;
@@ -187,8 +188,9 @@ public class IcebergMetaProvider implements MetaProvider {
       Table msTable = new Table();
       msTable.setDbName(dbName);
       Namespace ns = Namespace.of(dbName);
-      org.apache.iceberg.Table tbl = iceCatalog_.loadTable(
-          TableIdentifier.of(ns, tableName), null, null);
+      TableIdentifier tableId = TableIdentifier.of(ns, tableName);
+      org.apache.iceberg.Table tbl = iceCatalog_.loadTable(tableId, null, null);
+      List<Credential> credentials = Credential.extract(tbl.io());
       msTable.setTableName(getIcebergTableName(tbl));
       msTable.setSd(createStorageDescriptor(tbl));
       // Iceberg partitioning is not stored in HMS.
@@ -199,7 +201,7 @@ public class IcebergMetaProvider implements MetaProvider {
       MetastoreShim.setTableAccessType(msTable, ACCESSTYPE_READ);
       long loadingTime = System.currentTimeMillis();
       TableMetaRef ref = new TableMetaRefImpl(dbName, tableName, msTable, tbl,
-          loadingTime);
+          loadingTime, credentials);
       return Pair.create(msTable, ref);
     } catch (ImpalaRuntimeException|IcebergTableLoadingException e) {
       throw new IllegalStateException(
@@ -473,9 +475,11 @@ public class IcebergMetaProvider implements MetaProvider {
     private final long loadingTimeMs_;
     private final HdfsPartitionLocationCompressor partitionLocationCompressor_;
     private final org.apache.iceberg.Table iceApiTbl_;
+    private final List<Credential> credentials_;
 
     public TableMetaRefImpl(String dbName, String tableName, Table msTable,
-                            org.apache.iceberg.Table iceApiTbl, long loadingTimeMs) {
+        org.apache.iceberg.Table iceApiTbl, long loadingTimeMs,
+        List<Credential> credentials) {
       this.dbName_ = dbName;
       this.tableName_ = tableName;
       this.msTable_ = msTable;
@@ -484,6 +488,7 @@ public class IcebergMetaProvider implements MetaProvider {
       this.partitionLocationCompressor_ = new HdfsPartitionLocationCompressor(
           msTable.getPartitionKeysSize(),
           Lists.newArrayList(msTable.getSd().getLocation()));
+      this.credentials_ = credentials;
     }
 
     @Override
@@ -533,6 +538,11 @@ public class IcebergMetaProvider implements MetaProvider {
     @Override
     public boolean isIceberg() {
       return true;
+    }
+
+    @Override
+    public List<Credential> getCredentials() {
+      return credentials_;
     }
   }
 

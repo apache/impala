@@ -698,6 +698,19 @@ struct TIcebergDropPartitionRequest {
   3: required i64 num_partitions
 }
 
+// A storage credential for a set of file locations.
+struct TCredential {
+  // The storage location prefix this credential is valid for, e.g.
+  // "provider://bucket/warehouse/".
+  1: required string prefix
+  // The credential properties as Hadoop-native config keys
+  2: required map<string, string> config
+  // The absolute expiration time of the credential in milliseconds since the Unix epoch.
+  // Not set if the credential does not expire, e.g. when the catalog vended static keys,
+  // or when the storage system does not provide an expiration time.
+  3: optional i64 expires_at_ms
+}
+
 struct TIcebergTable {
   // Iceberg file system table location
   1: required string table_location
@@ -718,6 +731,7 @@ struct TIcebergTable {
   9: optional i64 parquet_dict_page_size;
   10: optional map<string, TIcebergPartitionStats> partition_stats;
   11: optional i32 format_version = -1;
+  12: optional list<TCredential> credentials;
 }
 
 // System Table identifiers.

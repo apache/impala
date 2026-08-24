@@ -17,6 +17,7 @@
 
 package org.apache.impala.catalog.local;
 
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 
@@ -38,6 +39,7 @@ import org.apache.impala.catalog.IcebergContentFileStore;
 import org.apache.impala.catalog.SqlConstraints;
 import org.apache.impala.catalog.VirtualColumn;
 import org.apache.impala.catalog.local.LocalIcebergTable.TableParams;
+import org.apache.impala.common.Credential;
 import org.apache.impala.common.Pair;
 import org.apache.impala.thrift.TBriefTableMeta;
 import org.apache.impala.thrift.TIcebergPartitionStats;
@@ -198,6 +200,11 @@ public interface MetaProvider {
     long getCatalogVersion();
     long getLoadedTimeMs();
     boolean isIceberg();
+
+    /** Credentials for this table. */
+    default List<Credential> getCredentials() {
+      return Collections.emptyList();
+    }
   }
 
   /**
