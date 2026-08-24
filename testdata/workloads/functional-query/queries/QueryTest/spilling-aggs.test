@@ -1,6 +1,6 @@
 ====
 ---- QUERY
-set buffer_pool_limit=30m;
+set buffer_pool_limit=25m;
 select l_orderkey, count(*)
 from lineitem
 group by 1
