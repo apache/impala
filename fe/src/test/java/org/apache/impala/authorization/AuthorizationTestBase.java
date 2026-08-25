@@ -19,7 +19,6 @@ package org.apache.impala.authorization;
 
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Sets;
-import com.sun.jersey.api.client.ClientResponse;
 import org.apache.impala.analysis.AnalysisContext;
 import org.apache.impala.authorization.ranger.RangerAuthorizationChecker;
 import org.apache.impala.authorization.ranger.RangerAuthorizationConfig;
@@ -47,7 +46,6 @@ import org.apache.impala.thrift.TResultRow;
 import org.apache.impala.thrift.TTableName;
 import org.apache.ranger.plugin.util.GrantRevokeRequest;
 import org.apache.ranger.plugin.util.RangerRESTClient;
-import org.apache.ranger.plugin.util.RangerRESTUtils;
 import org.json.simple.JSONObject;
 import org.json.simple.parser.JSONParser;
 import org.json.simple.parser.ParseException;
@@ -55,9 +53,11 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import javax.ws.rs.core.Response.Status.Family;
+import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -618,40 +618,91 @@ public abstract class AuthorizationTestBase extends FrontendTestBase {
   }
 
   protected long createRangerPolicy(String policyName, String json) {
-    ClientResponse response = rangerRestClient_
-        .getResource("/service/public/v2/api/policy")
-        .accept(RangerRESTUtils.REST_MIME_TYPE_JSON)
-        .type(RangerRESTUtils.REST_MIME_TYPE_JSON)
-        .post(ClientResponse.class, json);
-    if (response.getStatusInfo().getFamily() != Family.SUCCESSFUL) {
-      throw new RuntimeException(String.format(
-          "Unable to create a Ranger policy: %s Response: %s",
-          policyName, response.getEntity(String.class)));
-    }
-    String content = response.getEntity(String.class);
-    JSONParser parser = new JSONParser();
-    long policyId = -1;
     try {
-      Object obj = parser.parse(content);
-      policyId = (Long) ((JSONObject) obj).get("id");
-    } catch (ParseException e) {
-      LOG.error("Error parsing response content: {}", content);
+      Object response = rangerRestClient_.post(
+          "/service/public/v2/api/policy", null, json);
+      if (!isSuccessfulRangerResponse(response)) {
+        throw new RuntimeException(String.format(
+            "Unable to create a Ranger policy: %s Response: %s",
+            policyName, readRangerResponseBody(response)));
+      }
+      String content = readRangerResponseBody(response);
+      JSONParser parser = new JSONParser();
+      long policyId = -1;
+      try {
+        Object obj = parser.parse(content);
+        policyId = (Long) ((JSONObject) obj).get("id");
+      } catch (ParseException e) {
+        LOG.error("Error parsing response content: {}", content);
+      }
+      LOG.info("Created ranger policy id={}, {}: {}", policyId, policyName, json);
+      return policyId;
+    } catch (Exception e) {
+      throw new RuntimeException(
+          String.format("Unable to create a Ranger policy: %s", policyName), e);
     }
-    LOG.info("Created ranger policy id={}, {}: {}", policyId, policyName, json);
-    return policyId;
   }
 
   protected void deleteRangerPolicy(String policyName) {
-    ClientResponse response = rangerRestClient_
-        .getResource("/service/public/v2/api/policy")
-        .queryParam("servicename", RANGER_SERVICE_NAME)
-        .queryParam("policyname", policyName)
-        .delete(ClientResponse.class);
-    if (response.getStatusInfo().getFamily() != Family.SUCCESSFUL) {
+    try {
+      Map<String, String> queryParams = new HashMap<>();
+      queryParams.put("servicename", RANGER_SERVICE_NAME);
+      queryParams.put("policyname", policyName);
+      Object response = rangerRestClient_.delete(
+          "/service/public/v2/api/policy", queryParams);
+      if (!isSuccessfulRangerResponse(response)) {
+        throw new RuntimeException(
+            String.format("Unable to delete Ranger policy: %s.", policyName));
+      }
+      LOG.info("Deleted ranger policy {}", policyName);
+    } catch (Exception e) {
       throw new RuntimeException(
-          String.format("Unable to delete Ranger policy: %s.", policyName));
+          String.format("Unable to delete Ranger policy: %s.", policyName), e);
     }
-    LOG.info("Deleted ranger policy {}", policyName);
+  }
+
+  /**
+   * Apache Ranger uses Jersey 1.x ({@code ClientResponse#getEntity()}) while CDP Ranger
+   * uses Jersey 2.x ({@code Response#readEntity()}). Use reflection with
+   * {@code setAccessible(true)} so the same test code compiles and runs against either
+   * Ranger build and on Java 17.
+   */
+  private static boolean isSuccessfulRangerResponse(Object response) {
+    try {
+      try {
+        Method getStatusInfo = response.getClass().getMethod("getStatusInfo");
+        getStatusInfo.setAccessible(true);
+        Object statusInfo = getStatusInfo.invoke(response);
+        Method getFamily = statusInfo.getClass().getMethod("getFamily");
+        getFamily.setAccessible(true);
+        Family family = (Family) getFamily.invoke(statusInfo);
+        return family == Family.SUCCESSFUL;
+      } catch (NoSuchMethodException e) {
+        // Jersey 1.x fallback: check HTTP status code directly.
+        Method getStatus = response.getClass().getMethod("getStatus");
+        getStatus.setAccessible(true);
+        int status = (Integer) getStatus.invoke(response);
+        return status >= 200 && status < 300;
+      }
+    } catch (ReflectiveOperationException e) {
+      throw new RuntimeException("Failed to read Ranger REST response status", e);
+    }
+  }
+
+  private static String readRangerResponseBody(Object response) {
+    try {
+      try {
+        Method readEntity = response.getClass().getMethod("readEntity", Class.class);
+        readEntity.setAccessible(true);
+        return (String) readEntity.invoke(response, String.class);
+      } catch (NoSuchMethodException e) {
+        Method getEntity = response.getClass().getMethod("getEntity", Class.class);
+        getEntity.setAccessible(true);
+        return (String) getEntity.invoke(response, String.class);
+      }
+    } catch (ReflectiveOperationException e) {
+      throw new RuntimeException("Failed to read Ranger REST response body", e);
+    }
   }
 
   protected String createJsonDenyPolicy(String policyName, String databaseName,
