@@ -92,7 +92,6 @@ import org.apache.hadoop.io.IOUtils;
 import org.apache.hadoop.util.StringUtils;
 import org.apache.iceberg.TableProperties;
 import org.apache.iceberg.catalog.TableIdentifier;
-import org.apache.iceberg.exceptions.CommitStateUnknownException;
 import org.apache.iceberg.exceptions.ValidationException;
 import org.apache.impala.analysis.AlterTableSortByStmt;
 import org.apache.impala.analysis.FunctionName;
@@ -8079,10 +8078,8 @@ public class CatalogOpExecutor {
       throws ImpalaException {
     FeIcebergTable iceTbl = (FeIcebergTable)table;
     org.apache.iceberg.Transaction iceTxn = IcebergUtil.getIcebergTransaction(iceTbl);
-    try {
-      DebugUtils.executeDebugAction(
-          update.getDebug_action(), DebugUtils.ICEBERG_CONFLICT);
-      IcebergCatalogOpExecutor.execute(iceTbl, iceTxn, update.getIceberg_operation());
+    IcebergDmlFinalizer.finalizeDml(iceTbl, iceTxn, update.getIceberg_operation(),
+        update.getDebug_action(), () -> {
       catalogTimeline.markEvent("Executed Iceberg operation " +
           update.getIceberg_operation().getOperation());
       if (isIcebergHmsIntegrationEnabled(iceTbl.getMetaStoreTable())) {
@@ -8094,23 +8091,8 @@ public class CatalogOpExecutor {
             iceTxn, catalog_.getCatalogServiceId(), modification.newVersionNumber());
         catalogTimeline.markEvent("Updated table properties");
       }
-
-      DebugUtils.executeDebugAction(update.getDebug_action(), DebugUtils.ICEBERG_COMMIT);
-      iceTxn.commitTransaction();
-      catalogTimeline.markEvent("Committed Iceberg transaction");
-    // If we have no information about the success of the commit, we should not delete
-    // anything.
-    } catch (CommitStateUnknownException u) {
-      throw new ImpalaRuntimeException(u.getMessage(), u);
-    // If the commit failed, the newly written files should be deleted to avoid creating
-    // orphan files in the table. Only data/delete files need cleanup from Impala, Iceberg
-    // deletes the metadata files created for this update.
-    } catch (Exception e) {
-      IcebergCatalogOpExecutor.cleanupUncommittedFiles(update.getIceberg_operation());
-      LOG.info("Cleaned up uncommitted data files after failing to commit them to " +
-          "table {}", table.getFullName());
-      throw new ImpalaRuntimeException(e.getMessage(), e);
-    }
+    });
+    catalogTimeline.markEvent("Committed Iceberg transaction");
     modification.markInflightEventRegistrationComplete();
   }
 
