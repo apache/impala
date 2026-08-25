@@ -29,7 +29,9 @@ if [ ! -s "$CP_FILE" ]; then
 fi
 
 CLASSPATH=$(cat $CP_FILE):"$CLASSPATH"
+REST_SERVER_JAR=
+REST_SERVER_JAR+="java/iceberg-rest-catalog-test/target/"
+REST_SERVER_JAR+="impala-iceberg-rest-catalog-test-${IMPALA_VERSION}.jar"
 
-$JAVA -cp java/iceberg-rest-catalog-test/target/impala-iceberg-rest-catalog-test-${IMPALA_VERSION}.jar:$CLASSPATH \
-    org.apache.iceberg.rest.IcebergRestCatalogTest $@
-
+exec "$JAVA" -cp "${REST_SERVER_JAR}:${CLASSPATH}" \
+    org.apache.iceberg.rest.IcebergRestCatalogTest "$@"

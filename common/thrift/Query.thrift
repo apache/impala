@@ -1067,6 +1067,9 @@ struct TIcebergDmlFinalizeParams {
 
   // Stores the Iceberg table UUID observed while planning this DML operation.
   5: optional string table_uuid;
+
+  // Name of the REST catalog that owns coordinator-side DML finalization.
+  6: optional string rest_catalog_name;
 }
 
 // Metadata required to finalize a query - that is, to clean up after the query is done.

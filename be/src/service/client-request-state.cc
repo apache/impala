@@ -1771,6 +1771,29 @@ Status ClientRequestState::UpdateCatalog() {
                      << "(query id: " << PrintId(query_id()) << ")";
           return Status::OK();
         }
+        const TIcebergDmlFinalizeParams& ice_params = finalize_params.iceberg_params;
+        if (ice_params.__isset.rest_catalog_name) {
+          TIcebergDmlFinalizeRequest request;
+          request.__set_db_name(finalize_params.table_db);
+          request.__set_target_table(finalize_params.table_name);
+          request.__set_iceberg_operation(catalog_update.iceberg_operation);
+          request.__set_rest_catalog_name(ice_params.rest_catalog_name);
+          if (exec_req.query_options.__isset.debug_action) {
+            request.__set_debug_action(exec_req.query_options.debug_action);
+          }
+          VLOG_QUERY << "Finalizing Iceberg DML using the coordinator frontend";
+          Status status = DebugAction(query_options(), "CLIENT_REQUEST_UPDATE_CATALOG");
+          if (status.ok()) status = frontend_->FinalizeIcebergDml(request);
+          if (!status.ok()) {
+            LOG(ERROR) << "ERROR Finalizing Iceberg REST DML: " << status.GetDetail();
+            return status;
+          }
+          query_events_->MarkEvent("Iceberg REST catalog commit finished");
+          if (otel_trace_query()) {
+            otel_trace_manager_->AddChildSpanEvent("IcebergRestCatalogCommitFinished");
+          }
+          return Status::OK();
+        }
       }
 
       Status cnxn_status;

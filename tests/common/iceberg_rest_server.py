@@ -50,9 +50,10 @@ class IcebergRestServer(object):
     log_pattern = self.LOG_PATTERN % (IMPALA_CLUSTER_LOGS, self.port, start_time)
     self.stdout = open(log_pattern + '.stdout', 'w')
     self.stderr = open(log_pattern + '.stderr', 'w')
+    command = ['testdata/bin/run-iceberg-rest-server.sh', "--port",
+        str(self.port), "--catalog-location", self.catalog_location]
     self.process = subprocess.Popen(
-        ['testdata/bin/run-iceberg-rest-server.sh', "--port",
-          str(self.port), "--catalog-location", self.catalog_location],
+        command,
         stdout=self.stdout, stderr=self.stderr,
         preexec_fn=os.setsid, cwd=IMPALA_HOME)
     self._wait_for_rest_server_to_start(timeout_s)
@@ -60,10 +61,12 @@ class IcebergRestServer(object):
   def stop_rest_server(self, timeout_s=60):
     try:
       if self.process:
-        os.killpg(self.process.pid, signal.SIGTERM)
-        self._wait_for_rest_server_to_be_killed(timeout_s)
+        if self.process.poll() is None:
+          os.killpg(self.process.pid, signal.SIGTERM)
+        self.process.wait(timeout=timeout_s)
     except Exception as e:
       LOG.error("An error occurred while stopping the Iceberg REST server: %s", e)
+      raise
     finally:
       if self.stdout:
         self.stdout.close()
@@ -81,16 +84,3 @@ class IcebergRestServer(object):
       time.sleep(sleep_interval_s)
     raise Exception("Webserver did not become available within {} "
         "seconds.".format(timeout_s))
-
-  def _wait_for_rest_server_to_be_killed(self, timeout_s):
-    sleep_interval_s = 0.5
-    start_time = time.time()
-    while time.time() - start_time < timeout_s:
-      with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-        if s.connect_ex(('localhost', self.port)) != 0:
-          LOG.info("Iceberg REST server has stopped.")
-          return
-      time.sleep(sleep_interval_s)
-    # Let's not throw an exception as this is typically invoked during cleanup, and we
-    # want the rest of the cleanup code to be executed.
-    LOG.info("Iceberg REST server hasn't stopped in time.")

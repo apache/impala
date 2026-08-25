@@ -35,9 +35,10 @@ import org.apache.impala.catalog.TableLoadingException;
 import org.apache.impala.util.IcebergUtil;
 
 /**
- * Implementation of IcebergCatalog for tables stored in HadoopCatalog.
+ * Implementation of IcebergCatalog for tables stored in a REST catalog.
  */
 public class IcebergRESTCatalog implements IcebergCatalog {
+  private final String name_;
   private final String REST_URI;
 
   private final RESTCatalog restCatalog_;
@@ -46,14 +47,17 @@ public class IcebergRESTCatalog implements IcebergCatalog {
     setContextClassLoader();
 
     RESTCatalogProperties restConfig = new RESTCatalogProperties(properties);
+    name_ = restConfig.getName();
     REST_URI = restConfig.getUri();
     restCatalog_ = new RESTCatalog();
     HiveConf conf = new HiveConf(IcebergRESTCatalog.class);
     restCatalog_.setConf(conf);
     restCatalog_.initialize(
-        restConfig.getName(),
+        name_,
         restConfig.getCatalogProperties());
   }
+
+  public String getName() { return name_; }
 
   public String getUri() {
     return REST_URI;

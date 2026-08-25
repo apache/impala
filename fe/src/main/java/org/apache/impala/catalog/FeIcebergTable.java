@@ -110,6 +110,24 @@ import org.slf4j.LoggerFactory;
  */
 public interface FeIcebergTable extends FeFsTable {
   final static Logger LOG = LoggerFactory.getLogger(FeIcebergTable.class);
+
+  /** REST catalog name used for coordinator-side DML finalization. */
+  default String getIcebergDmlCatalogName() { return null; }
+
+  /**
+   * Whether the metadata provider decides what this table supports, rather than the
+   * HMS access type. A provider that loads a table without HMS behind it sets the
+   * access type to READ because there is nothing to derive it from, so the write
+   * checks have to ask the provider instead. Today only the Iceberg REST catalog
+   * does this.
+   */
+  default boolean hasProviderDerivedCapabilities() { return false; }
+
+  /** INSERT OVERWRITE and metadata writes are intentionally excluded. */
+  default boolean supportsInsertInto() {
+    return hasProviderDerivedCapabilities() && getIcebergDmlCatalogName() != null;
+  }
+
   /**
    * Return content file store.
    */

@@ -476,7 +476,7 @@ public class InsertStmt extends DmlStatementBase {
     }
 
     Analyzer.ensureTableNotFullAcid(table_, "INSERT");
-    Analyzer.checkTableCapability(table_, Analyzer.OperationType.WRITE);
+    Analyzer.ensureTableWriteSupported(table_, !overwrite_ && !isUpsert_);
 
     // We do not support (in|up)serting into tables with unsupported column types.
     for (Column c: table_.getColumns()) {

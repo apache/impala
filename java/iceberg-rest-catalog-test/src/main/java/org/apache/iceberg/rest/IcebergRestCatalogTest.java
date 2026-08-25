@@ -34,6 +34,7 @@ import org.apache.commons.cli.Option;
 import org.apache.commons.cli.Options;
 import org.apache.commons.cli.ParseException;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.Path;
 import org.apache.iceberg.catalog.Catalog;
 import org.apache.iceberg.hadoop.HadoopCatalog;
 import org.apache.iceberg.rest.responses.ErrorResponse;
@@ -68,6 +69,9 @@ public class IcebergRestCatalogTest {
   }
 
   private String getWarehouseLocation() {
+    if (new Path(warehouseLocation).toUri().getScheme() != null) {
+      return warehouseLocation;
+    }
     String filesystemPrefix = System.getenv("FILESYSTEM_PREFIX");
     if (filesystemPrefix != null && !filesystemPrefix.isEmpty()) {
       return filesystemPrefix + warehouseLocation;

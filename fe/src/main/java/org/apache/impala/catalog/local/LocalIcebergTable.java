@@ -245,6 +245,16 @@ public class LocalIcebergTable extends LocalTable implements FeIcebergTable {
   }
 
   @Override
+  public String getIcebergDmlCatalogName() {
+    return ref_ == null ? null : ref_.getIcebergDmlCatalogName();
+  }
+
+  @Override
+  public boolean hasProviderDerivedCapabilities() {
+    return ref_ != null && ref_.hasProviderDerivedCapabilities();
+  }
+
+  @Override
   public String getIcebergCatalogLocation() {
     return tableParams_.icebergCatalogLocation_;
   }

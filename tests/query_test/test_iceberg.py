@@ -1563,7 +1563,7 @@ class TestIcebergTable(IcebergTestSuite):
     tbl_name = unique_database + ".abort_iceberg_transaction"
     # The query options that inject an iceberg transaction commit failure.
     abort_ice_transaction_options = {'debug_action':
-                       'CATALOGD_ICEBERG_COMMIT:EXCEPTION@'
+                       'ICEBERG_COMMIT:EXCEPTION@'
                        'CommitFailedException@'
                        'simulated commit failure'}
     # Create an iceberg table and insert a row.

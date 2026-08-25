@@ -217,6 +217,7 @@ import org.apache.impala.thrift.TGetTableHistoryResultItem;
 import org.apache.impala.thrift.TGrantRevokePrivParams;
 import org.apache.impala.thrift.TGrantRevokeRoleParams;
 import org.apache.impala.thrift.TIcebergDmlFinalizeParams;
+import org.apache.impala.thrift.TIcebergDmlFinalizeRequest;
 import org.apache.impala.thrift.TIcebergOperation;
 import org.apache.impala.thrift.TIcebergOptimizationMode;
 import org.apache.impala.thrift.TIcebergOptimizeParams;
@@ -667,6 +668,12 @@ public class Frontend {
           getCatalog().getAuthPolicy()));
     }
     return resp;
+  }
+
+  /** Finalizes Iceberg DML through its owning local metadata provider. */
+  public void finalizeIcebergDml(TIcebergDmlFinalizeRequest request)
+      throws ImpalaException {
+    IcebergDmlFinalizer.finalizeDml(catalogManager_, request);
   }
 
   /**
@@ -3531,6 +3538,8 @@ public class Frontend {
     iceFinalizeParams.operation = iceOperation;
     iceFinalizeParams.setSpec_id(iceTable.getDefaultPartitionSpecId());
     iceFinalizeParams.setInitial_snapshot_id(iceTable.snapshotId());
+    String catalogName = iceTable.getIcebergDmlCatalogName();
+    if (catalogName != null) iceFinalizeParams.setRest_catalog_name(catalogName);
     Table apiTable = iceTable.getIcebergApiTable();
     if (apiTable == null) return iceFinalizeParams;
 

@@ -391,13 +391,88 @@ public class Analyzer {
       throws AnalysisException {
     switch(type) {
       case WRITE:
-        ensureTableWriteSupported(table);
+        ensureTableWriteSupported(table, false);
         break;
       case READ:
       case ANY:
       default:
         ensureTableSupported(table);
         break;
+    }
+  }
+
+  static boolean supportsInsertInto(FeTable table) {
+    return table instanceof FeIcebergTable
+        && ((FeIcebergTable)table).supportsInsertInto();
+  }
+
+  static boolean hasProviderDerivedCapabilities(FeTable table) {
+    return table instanceof FeIcebergTable
+        && ((FeIcebergTable)table).hasProviderDerivedCapabilities();
+  }
+
+  /**
+   * Refuses every DML other than INSERT INTO on a table whose capabilities come from
+   * its provider.
+   *
+   * <p>Called by hand from MergeStmt, ModifyStmt and OptimizeStmt, because those three
+   * do not go through checkTableCapability() at all - only InsertStmt, AlterTableStmt,
+   * DropTableOrViewStmt, LoadDataStmt, TruncateStmt and BaseTableRef do. A new DML
+   * statement, or a new path into an existing one, needs this call adding. Bringing
+   * the three under checkTableCapability() instead is IMPALA-15320: it would start
+   * running ensureTableWriteSupported() on statements that have never run it, which
+   * is a behaviour change of its own and not one to make here.
+   */
+  static void ensureNonInsertDmlSupported(FeTable table) throws AnalysisException {
+    if (hasProviderDerivedCapabilities(table)) {
+      throw new AnalysisException(String.format(
+          "Only INSERT INTO is supported for REST-backed Iceberg table: %s",
+          table.getFullName()));
+    }
+  }
+
+  /** Check whether a table supports this write operation. */
+  static void ensureTableWriteSupported(FeTable table, boolean isInsertInto)
+      throws AnalysisException {
+    if (!hasProviderDerivedCapabilities(table)) {
+      ensureTableWriteSupported(table);
+      return;
+    }
+    if (!isInsertInto) {
+      throw new AnalysisException(String.format(
+          "Only INSERT INTO is supported for REST-backed Iceberg table: %s",
+          table.getFullName()));
+    }
+    ensureRestCatalogInsertEnabled(table);
+    // The provider-derived capability replaces only the HMS access-type check. Keep
+    // the structural checks that apply to every INSERT target.
+    ensureTableNotBucketed(table);
+    if (MetastoreShim.getMajorVersion() <= 2) {
+      ensureTableNotTransactional(table, "Write");
+    }
+  }
+
+  private static void ensureRestCatalogInsertEnabled(FeTable table)
+      throws AnalysisException {
+    if (!supportsInsertInto(table)) {
+      throw new AnalysisException(String.format(
+          "INSERT INTO is disabled because the REST catalog does not have a "
+              + "unique name: %s",
+          table.getFullName()));
+    }
+
+    org.apache.iceberg.Table apiTable =
+        ((FeIcebergTable)table).getIcebergApiTable();
+    try {
+      if (apiTable == null || apiTable.uuid() == null) {
+        throw new AnalysisException(String.format(
+            "INSERT INTO is disabled because the Iceberg table UUID is unavailable: %s",
+            table.getFullName()));
+      }
+    } catch (UnsupportedOperationException e) {
+      throw new AnalysisException(String.format(
+          "INSERT INTO is disabled because the Iceberg table UUID is unavailable: %s",
+          table.getFullName()));
     }
   }
 

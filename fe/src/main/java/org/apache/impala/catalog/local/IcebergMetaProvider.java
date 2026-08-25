@@ -102,12 +102,16 @@ public class IcebergMetaProvider implements MetaProvider {
   private final AuthorizationPolicy authPolicy_ = new AuthorizationPolicy();
 
   private IcebergRESTCatalog iceCatalog_;
+  private final String dmlCatalogName_;
 
   Properties properties_;
 
-  public IcebergMetaProvider(Properties properties) {
+  public IcebergMetaProvider(Properties properties, String dmlCatalogName) {
     properties_ = properties;
     iceCatalog_ = new IcebergRESTCatalog(properties);
+    Preconditions.checkArgument(dmlCatalogName == null
+        || dmlCatalogName.equals(iceCatalog_.getName()));
+    dmlCatalogName_ = dmlCatalogName;
   }
 
   public String getURI() {
@@ -197,7 +201,8 @@ public class IcebergMetaProvider implements MetaProvider {
       msTable.setPartitionKeys(Collections.emptyList());
       msTable.setParameters(createTableProps(tbl));
       msTable.setTableType(TableType.EXTERNAL_TABLE.toString());
-      // Only allow READONLY operations.
+      // General metadata writes remain unsupported. INSERT INTO is enabled through the
+      // provider-derived DML capability on TableMetaRef instead of this HMS capability.
       MetastoreShim.setTableAccessType(msTable, ACCESSTYPE_READ);
       long loadingTime = System.currentTimeMillis();
       TableMetaRef ref = new TableMetaRefImpl(dbName, tableName, msTable, tbl,
@@ -543,6 +548,16 @@ public class IcebergMetaProvider implements MetaProvider {
     @Override
     public List<Credential> getCredentials() {
       return credentials_;
+    }
+
+    @Override
+    public boolean hasProviderDerivedCapabilities() {
+      return true;
+    }
+
+    @Override
+    public String getIcebergDmlCatalogName() {
+      return dmlCatalogName_;
     }
   }
 

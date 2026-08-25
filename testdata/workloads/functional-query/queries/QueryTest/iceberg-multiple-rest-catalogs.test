@@ -33,8 +33,3 @@ ON berg_air.iata = ice_air.iata AND berg_air.iata = "00M"
 ---- TYPES
 STRING, DOUBLE, DOUBLE
 ====
----- QUERY
-INSERT INTO berg.airports_parquet(lat) VALUES (32.1)
----- CATCH
-AnalysisException: Write not supported. Table berg.airports_parquet  access type is: READONLY
-====

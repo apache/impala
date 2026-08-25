@@ -17,6 +17,8 @@
 
 package org.apache.impala.util;
 
+import org.apache.iceberg.exceptions.CommitFailedException;
+import org.apache.iceberg.exceptions.CommitStateUnknownException;
 import org.junit.Assert;
 import org.junit.Test;
 
@@ -24,6 +26,13 @@ import org.junit.Test;
  * Tests for the debug actions implementation.
  */
 public class DebugUtilsTest {
+
+  @Test(expected = CommitFailedException.class)
+  public void testIcebergCommitDebugAction() {
+    DebugUtils.executeDebugAction(
+        "ICEBERG_COMMIT:EXCEPTION@CommitFailedException@commit failure",
+        DebugUtils.ICEBERG_COMMIT);
+  }
 
   @Test
   public void testSleepDebugAction() {
@@ -79,6 +88,15 @@ public class DebugUtilsTest {
     } catch (Exception e) {
       Assert.assertTrue(e.getClass().getName().contains("CommitFailedException"));
       Assert.assertTrue(e.getMessage().contains("some text"));
+    }
+
+    try {
+      DebugUtils.executeDebugAction(
+          "TEST_FAIL_ACTION:EXCEPTION@CommitStateUnknownException@unknown state",
+          "test_fail_action");
+      Assert.fail("should have got exception");
+    } catch (CommitStateUnknownException e) {
+      Assert.assertTrue(e.getMessage().contains("unknown state"));
     }
   }
 

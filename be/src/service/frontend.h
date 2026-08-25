@@ -48,6 +48,9 @@ class Frontend {
   Status UpdateCatalogCache(const TUpdateCatalogCacheRequest& req,
       TUpdateCatalogCacheResponse *resp);
 
+  /// Finalizes Iceberg DML through the coordinator Java frontend.
+  Status FinalizeIcebergDml(const TIcebergDmlFinalizeRequest& req);
+
   /// Request to update the Impalad frontend cluster membership snapshot of executors.
   /// The TUpdateExecutorMembershipRequest contains the latest set of executor nodes.
   Status UpdateExecutorMembership(const TUpdateExecutorMembershipRequest& req);
@@ -286,6 +289,7 @@ class Frontend {
   jmethodID get_hadoop_groups_id_;  // JniFrontend.getHadoopGroups()
   jmethodID check_config_id_; // JniFrontend.checkConfiguration()
   jmethodID update_catalog_cache_id_; // JniFrontend.updateCatalogCache(byte[][])
+  jmethodID finalize_iceberg_dml_id_; // JniFrontend.finalizeIcebergDml(byte[])
   jmethodID update_membership_id_; // JniFrontend.updateExecutorMembership()
   jmethodID get_catalog_info_; // JniFrontend.getCatalogInfo()
   jmethodID get_catalog_metrics_id_; // JniFrontend.getCatalogMetrics()

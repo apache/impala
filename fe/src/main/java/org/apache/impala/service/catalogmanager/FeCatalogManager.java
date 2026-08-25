@@ -74,6 +74,16 @@ public abstract class FeCatalogManager {
   public abstract FeCatalog getOrCreateCatalog();
 
   /**
+   * Returns a catalog backed by the metadata provider that owns coordinator-side
+   * Iceberg DML finalization.
+   */
+  public FeCatalog getCatalogForIcebergDml(String catalogName)
+      throws ImpalaRuntimeException {
+    throw new ImpalaRuntimeException(
+        "Coordinator-side Iceberg DML finalization is not configured");
+  }
+
+  /**
    * Update the Catalog based on an update from the state store.
    *
    * This can be called either in response to a DDL statement (in which case the update

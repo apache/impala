@@ -168,6 +168,7 @@ public class OptimizeStmt extends DmlStatementBase {
       throw new AnalysisException("OPTIMIZE is only supported for Iceberg tables.");
     }
     FeIcebergTable iceTable = (FeIcebergTable) table_;
+    Analyzer.ensureNonInsertDmlSupported(iceTable);
     IcebergUtil.validateIcebergTableForInsert(iceTable);
     IcebergUtil.warnIfInvalidParquetBloomFilterProperties(iceTable, analyzer);
 

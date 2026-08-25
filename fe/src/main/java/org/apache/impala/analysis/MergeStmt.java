@@ -76,6 +76,7 @@ public class MergeStmt extends DmlStatementBase {
     targetTableRef_ = analyzer.resolveTableRef(targetTableRef_);
 
     table_ = targetTableRef_.getTable();
+    Analyzer.ensureNonInsertDmlSupported(table_);
 
     if (impl_ == null) {
       if (table_ instanceof FeIcebergTable) {
@@ -86,7 +87,6 @@ public class MergeStmt extends DmlStatementBase {
             "Target table must be an Iceberg table: %s", table_.getFullName()));
       }
     }
-
     impl_.analyze(analyzer);
 
     for (MergeCase mergeCase : getCases()) {

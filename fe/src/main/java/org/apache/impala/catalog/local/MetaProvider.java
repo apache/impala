@@ -205,6 +205,15 @@ public interface MetaProvider {
     default List<Credential> getCredentials() {
       return Collections.emptyList();
     }
+
+    /**
+     * Whether this provider, rather than the HMS access type, decides what the table
+     * supports. See FeIcebergTable.hasProviderDerivedCapabilities().
+     */
+    default boolean hasProviderDerivedCapabilities() { return false; }
+
+    /** REST catalog name used for coordinator-side DML finalization. */
+    default String getIcebergDmlCatalogName() { return null; }
   }
 
   /**

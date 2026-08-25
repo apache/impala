@@ -81,6 +81,7 @@ import org.apache.impala.thrift.TGetMetadataTablesParams;
 import org.apache.impala.thrift.TGetTableHistoryResult;
 import org.apache.impala.thrift.TGetTablesParams;
 import org.apache.impala.thrift.TGetTablesResult;
+import org.apache.impala.thrift.TIcebergDmlFinalizeRequest;
 import org.apache.impala.thrift.TLoadDataReq;
 import org.apache.impala.thrift.TLoadDataResp;
 import org.apache.impala.thrift.TLogLevel;
@@ -222,6 +223,13 @@ public class JniFrontend {
     JniUtil.deserializeThrift(protocolFactory_, request, req);
     return new TSerializer(protocolFactory_).serialize(
         frontend_.updateCatalogCache(request));
+  }
+
+  public void finalizeIcebergDml(byte[] req) throws ImpalaException {
+    Preconditions.checkNotNull(frontend_);
+    TIcebergDmlFinalizeRequest request = new TIcebergDmlFinalizeRequest();
+    JniUtil.deserializeThrift(protocolFactory_, request, req);
+    frontend_.finalizeIcebergDml(request);
   }
 
   /**

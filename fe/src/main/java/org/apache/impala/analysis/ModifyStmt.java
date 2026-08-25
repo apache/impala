@@ -157,6 +157,7 @@ public abstract class ModifyStmt extends DmlStatementBase {
               "but the following table is neither: %s",
               dstTbl.getFullName()));
     }
+    Analyzer.ensureNonInsertDmlSupported(dstTbl);
     if (dstTbl instanceof FeIcebergTable) {
       setMaxTableSinks(analyzer_.getQueryOptions().getMax_fs_writers());
     }

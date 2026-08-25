@@ -127,6 +127,16 @@ iceberg.rest-catalog.warehouse=hdfs://namenode:8020/warehouse/iceberg</codeblock
 # Or:
 iceberg.rest-catalog.prefix=my_catalog</codeblock>
           <p>
+            <b>Catalog Name:</b>
+          </p>
+          <p>
+            Required for INSERT INTO, and unused otherwise. The name identifies the
+            catalog that finalizes the write, so it has to be unique among the
+            configured REST catalogs; INSERT INTO is disabled for a catalog that
+            leaves it unset, and for every catalog sharing a name with another.
+          </p>
+          <codeblock>iceberg.rest-catalog.name=my_catalog</codeblock>
+          <p>
             <b>OAuth Configuration:</b>
           </p>
           <codeblock>iceberg.rest-catalog.security=OAUTH2
@@ -264,7 +274,9 @@ iceberg.rest-catalog.uri=http://rest-catalog-server:9084</codeblock>
               be set to <codeph>false</codeph>. Only flat namespace hierarchies are supported.
             </li>
             <li>
-              <b>Write Operations:</b> Write operations (INSERT, UPDATE, DELETE, MERGE) are not supported.
+              <b>Write Operations:</b> Only INSERT INTO is supported, and only for a catalog
+              configured with a unique <codeph>iceberg.rest-catalog.name</codeph>. INSERT
+              OVERWRITE, UPDATE, DELETE, MERGE, OPTIMIZE and TRUNCATE are not supported.
             </li>
             <li>
               <b>DDL Operations:</b> DDL operations (CREATE, ALTER, DROP,...) are not supported.

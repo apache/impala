@@ -24,6 +24,7 @@ import java.util.List;
 import java.util.Random;
 
 import org.apache.iceberg.exceptions.CommitFailedException;
+import org.apache.iceberg.exceptions.CommitStateUnknownException;
 import org.apache.iceberg.exceptions.ValidationException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -58,7 +59,7 @@ public class DebugUtils {
   public static final String INSERT_FINISH_DELAY = "catalogd_insert_finish_delay";
 
   // debug action label for Iceberg transaction commit.
-  public static final String ICEBERG_COMMIT = "catalogd_iceberg_commit";
+  public static final String ICEBERG_COMMIT = "iceberg_commit";
 
   // debug action label for Iceberg validation check failure.
   public static final String ICEBERG_CONFLICT = "catalogd_iceberg_conflict";
@@ -241,6 +242,10 @@ public class DebugUtils {
           switch (exceptionClazz.toLowerCase()) {
             case "commitfailedexception":
               exceptionToThrow = new CommitFailedException(param);
+              break;
+            case "commitstateunknownexception":
+              exceptionToThrow =
+                  new CommitStateUnknownException(new RuntimeException(param));
               break;
             case "validationexception":
               exceptionToThrow = new ValidationException(param);

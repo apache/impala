@@ -38,8 +38,3 @@ SELECT p_float, string_col from ice.iceberg_alltypes_part ice_alltypes INNER JOI
 ---- TYPES
 FLOAT, STRING
 ====
----- QUERY
-INSERT INTO ice.iceberg_alltypes_part(i) VALUES (567)
----- CATCH
-AnalysisException: Write not supported. Table ice.iceberg_alltypes_part  access type is: READONLY
-====

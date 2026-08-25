@@ -34,6 +34,16 @@ include "Query.thrift"
 // These are supporting structs for JniFrontend.java, which serves as the glue
 // between our C++ execution environment and the Java frontend.
 
+// Request to finalize Iceberg DML through a REST catalog owned by the coordinator.
+// This request never goes to CatalogD.
+struct TIcebergDmlFinalizeRequest {
+  1: required string db_name
+  2: required string target_table
+  3: required CatalogService.TIcebergOperationParam iceberg_operation
+  4: required string rest_catalog_name
+  5: optional string debug_action
+}
+
 // Struct for HiveUdf expr to create the proper execution object in the FE
 // java side. See exprs/hive-udf-call.h for how hive Udfs are executed in general.
 // TODO: this could be the UdfID, collapsing the first 3 arguments but synchronizing
