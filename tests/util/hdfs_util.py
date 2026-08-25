@@ -19,11 +19,13 @@
 
 import getpass
 import http.client
+import logging
 import os.path
 import re
 import requests
 import subprocess
 import tempfile
+import time
 from os import environ
 from pywebhdfs.webhdfs import PyWebHdfsClient, errors, _raise_pywebhdfs_exception
 from xml.etree.ElementTree import parse
@@ -31,6 +33,13 @@ from xml.etree.ElementTree import parse
 from tests.util.filesystem_base import BaseFilesystem
 from tests.util.filesystem_utils import FILESYSTEM_PREFIX
 from tests.util.parse_util import bytes_to_str
+
+LOG = logging.getLogger(__name__)
+
+# Max number of retries for HadoopFsCommandLineClient.exists() when the underlying
+# 'hdfs dfs -test' command fails with a transient error (e.g. S3 503 Slow Down). The
+# retries use exponential backoff, sleeping 1s, 2s, 4s, ... between attempts.
+MAX_FS_EXISTS_RETRIES = 6
 
 
 class HdfsConfig(object):
@@ -291,8 +300,26 @@ class HadoopFsCommandLineClient(BaseFilesystem):
     return files
 
   def exists(self, path):
-    """Checks if a particular path exists"""
-    (status, stdout, stderr) = self._hadoop_fs_shell(['-test', '-e', path])
+    """Checks if a particular path exists.
+
+    'hdfs dfs -test -e' exits 0 if the path exists. A missing path exits non-zero
+    with empty stderr, while a transient failure (e.g. S3 503 Slow Down) exits non-zero
+    WITH a message on stderr. Only the latter is retried, with exponential backoff.
+    Genuine absence returns False immediately."""
+    delay = 1
+    for attempt in range(MAX_FS_EXISTS_RETRIES + 1):
+      (status, stdout, stderr) = self._hadoop_fs_shell(['-test', '-e', path])
+      # Path exists, or genuinely absent (non-zero status with empty stderr).
+      if status == 0 or not stderr.strip():
+        return status == 0
+      if attempt < MAX_FS_EXISTS_RETRIES:
+        LOG.warning('{0} exists check on {1} failed: {2}; {3}. Retry {4}/{5} after '
+            '{6}s.'.format(self.filesystem_type, path, stderr.strip(), stdout.strip(),
+                attempt + 1, MAX_FS_EXISTS_RETRIES, delay))
+        time.sleep(delay)
+        delay *= 2
+    LOG.warning('{0} exists check on {1} still failing after {2} retries: {3}'.format(
+        self.filesystem_type, path, MAX_FS_EXISTS_RETRIES, stderr.strip()))
     return status == 0
 
   def delete_file_dir(self, path, recursive=False):
