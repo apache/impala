@@ -47,6 +47,7 @@ import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Set;
+import java.util.UUID;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
@@ -3497,12 +3498,25 @@ public class Frontend {
     queryExecRequest.setFinalize_params(finalizeParams);
   }
 
-  private static TIcebergDmlFinalizeParams addFinalizationParamsForIcebergDml(
+  @VisibleForTesting
+  static TIcebergDmlFinalizeParams addFinalizationParamsForIcebergDml(
       FeIcebergTable iceTable, TIcebergOperation iceOperation) {
     TIcebergDmlFinalizeParams iceFinalizeParams = new TIcebergDmlFinalizeParams();
     iceFinalizeParams.operation = iceOperation;
     iceFinalizeParams.setSpec_id(iceTable.getDefaultPartitionSpecId());
     iceFinalizeParams.setInitial_snapshot_id(iceTable.snapshotId());
+    Table apiTable = iceTable.getIcebergApiTable();
+    if (apiTable == null) return iceFinalizeParams;
+
+    // Iceberg CTAS targets have no API table until the table is created. Also, uuid()
+    // is a default Iceberg API method that third-party Table implementations may not
+    // support. The field is optional so those callers retain their previous behavior.
+    try {
+      UUID tableUuid = apiTable.uuid();
+      if (tableUuid != null) iceFinalizeParams.setTable_uuid(tableUuid.toString());
+    } catch (UnsupportedOperationException e) {
+      // Leave table_uuid unset for implementations that cannot provide one.
+    }
     return iceFinalizeParams;
   }
 

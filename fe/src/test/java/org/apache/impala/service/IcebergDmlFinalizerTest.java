@@ -32,6 +32,7 @@ import com.google.flatbuffers.FlatBufferBuilder;
 import java.io.File;
 import java.nio.ByteBuffer;
 import java.util.Collections;
+import java.util.UUID;
 
 import org.apache.iceberg.AppendFiles;
 import org.apache.iceberg.Transaction;
@@ -120,6 +121,28 @@ public class IcebergDmlFinalizerTest {
     } catch (ImpalaRuntimeException e) {
       assertSame(failure, e.getCause());
     }
+    verify(transaction_, never()).commitTransaction();
+    assertFalse(uncommittedFile.exists());
+  }
+
+  @Test
+  public void testUuidMismatchCleansUpFilesWithoutExecuting() throws Exception {
+    File uncommittedFile = addUncommittedFile();
+    UUID expectedUuid = UUID.randomUUID();
+    UUID currentUuid = UUID.randomUUID();
+    org.apache.iceberg.Table apiTable = mock(org.apache.iceberg.Table.class);
+    operation_.setTable_uuid(expectedUuid.toString());
+    when(table_.getFullName()).thenReturn("db.table");
+    when(table_.getIcebergApiTable()).thenReturn(apiTable);
+    when(apiTable.uuid()).thenReturn(currentUuid);
+
+    try {
+      IcebergDmlFinalizer.finalizeDml(table_, transaction_, operation_, null);
+      fail("Expected a changed Iceberg table to be rejected");
+    } catch (ImpalaRuntimeException e) {
+      assertTrue(e.getMessage().contains("Iceberg table changed"));
+    }
+    verify(transaction_, never()).newAppend();
     verify(transaction_, never()).commitTransaction();
     assertFalse(uncommittedFile.exists());
   }

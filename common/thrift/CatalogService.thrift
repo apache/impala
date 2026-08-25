@@ -254,6 +254,9 @@ struct TIcebergOperationParam {
   // The snapshot id when the operation was started
   4: optional i64 initial_snapshot_id;
 
+  // The Iceberg table UUID observed while planning the operation.
+  11: optional string table_uuid;
+
   // The data files referenced by the position delete files.
   7: optional list<string> data_files_referenced_by_position_deletes
 

@@ -1064,6 +1064,9 @@ struct TIcebergDmlFinalizeParams {
 
   // Stores additional information about the OPTIMIZE operation.
   4: optional TIcebergOptimizeParams optimize_params;
+
+  // Stores the Iceberg table UUID observed while planning this DML operation.
+  5: optional string table_uuid;
 }
 
 // Metadata required to finalize a query - that is, to clean up after the query is done.
@@ -1182,4 +1185,3 @@ struct TQueryExecRequest {
   // Used by scheduler.cc as sanity check during scheduling.
   19: optional i32 max_parallelism_per_node
 }
-

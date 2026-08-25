@@ -1855,6 +1855,9 @@ bool ClientRequestState::CreateIcebergCatalogOps(
   cat_ice_op->__set_operation(ice_params.operation);
   cat_ice_op->__set_initial_snapshot_id(ice_params.initial_snapshot_id);
   cat_ice_op->__set_spec_id(ice_params.spec_id);
+  if (ice_params.__isset.table_uuid) {
+    cat_ice_op->__set_table_uuid(ice_params.table_uuid);
+  }
 
   bool has_data_files = false;
   bool has_delete_artifacts = false;

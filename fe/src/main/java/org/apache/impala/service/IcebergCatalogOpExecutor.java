@@ -24,6 +24,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.UUID;
 import java.util.concurrent.ExecutorService;
 
 import org.apache.iceberg.AppendFiles;
@@ -438,6 +439,42 @@ public class IcebergCatalogOpExecutor {
       case OPTIMIZE: optimizeTable(feIcebergTable, txn, icebergOp); break;
       default: throw new ImpalaRuntimeException(
           "Unknown Iceberg operation: " + icebergOp.operation);
+    }
+  }
+
+  static void validateTableUuid(FeIcebergTable table,
+      TIcebergOperationParam operation) throws ImpalaRuntimeException {
+    if (!operation.isSetTable_uuid()) return;
+
+    UUID expectedUuid;
+    try {
+      expectedUuid = UUID.fromString(operation.getTable_uuid());
+    } catch (IllegalArgumentException e) {
+      throw new ImpalaRuntimeException(String.format(
+          "Invalid Iceberg table UUID '%s' while finalizing DML for %s",
+          operation.getTable_uuid(), table.getFullName()), e);
+    }
+
+    Table apiTable = table.getIcebergApiTable();
+    if (apiTable == null) {
+      throw new ImpalaRuntimeException(String.format(
+          "Unable to verify the Iceberg table UUID while finalizing DML for %s",
+          table.getFullName()));
+    }
+
+    UUID currentUuid;
+    try {
+      currentUuid = apiTable.uuid();
+    } catch (UnsupportedOperationException e) {
+      throw new ImpalaRuntimeException(String.format(
+          "Unable to verify the Iceberg table UUID while finalizing DML for %s",
+          table.getFullName()), e);
+    }
+    if (!expectedUuid.equals(currentUuid)) {
+      throw new ImpalaRuntimeException(String.format(
+          "Iceberg table changed while finalizing DML for %s: "
+              + "expected UUID %s, found %s",
+          table.getFullName(), expectedUuid, currentUuid));
     }
   }
 

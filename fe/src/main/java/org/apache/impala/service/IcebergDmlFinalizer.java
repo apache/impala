@@ -52,6 +52,7 @@ final class IcebergDmlFinalizer {
       TIcebergOperationParam operation, String debugAction,
       PostOperationHook postOperationHook) throws ImpalaRuntimeException {
     try {
+      IcebergCatalogOpExecutor.validateTableUuid(table, operation);
       DebugUtils.executeDebugAction(debugAction, DebugUtils.ICEBERG_CONFLICT);
       IcebergCatalogOpExecutor.execute(table, transaction, operation);
       postOperationHook.run();
