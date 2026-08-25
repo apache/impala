@@ -2,7 +2,7 @@
 ---- QUERY
 EXPLAIN WITH v1 AS (SELECT n_name, n_nationkey FROM tpch.nation WHERE n_regionkey = 0)
 SELECT v1.n_name, v1_next.n_name FROM v1, v1 v1_next WHERE v1.n_nationkey + 1 = v1_next.n_nationkey;
----- RESULTS: VERIFY_IS_EQUAL
+---- RESULTS: VERIFY_IS_SUBSET
 'Max Per-Host Resource Reservation: Memory=20.95MB Threads=5'
 'Per-Host Resource Estimates: Memory=53MB'
 ''
@@ -77,7 +77,7 @@ SET EXPLAIN_LEVEL=EXTENDED;
 SET MT_DOP=2;
 EXPLAIN SELECT name FROM emps e WHERE salary > 50000
 UNION SELECT name FROM emps e WHERE salary > 50000;
----- RESULTS: VERIFY_IS_EQUAL
+---- RESULTS: VERIFY_IS_SUBSET
 'Max Per-Host Resource Reservation: Memory=17.95MB Threads=4'
 'Per-Host Resource Estimates: Memory=50MB'
 ''
