@@ -247,7 +247,7 @@ public class ImpalaJdbcClient {
     }
     boolean useSasl = transportOption.equalsIgnoreCase("SASL");
 
-    String connStr = cmdArgs.getOptionValue("c", null);
+    String connStr = cmdArgs.getOptionValue("c");
 
     // If the user didn't specify a custom connection string, build a connection
     // string using HiveServer 2 JDBC driver and no security.
