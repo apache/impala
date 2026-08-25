@@ -13,6 +13,13 @@ PLAN-ROOT SINK
 00:UNION
    constant-operands=2
    row-size=1B cardinality=2
+---- CALCITE_PLANNER_PLAN
+# Calcite does not generate the AggregationNode.
+PLAN-ROOT SINK
+|
+00:UNION
+   constant-operands=2
+   row-size=1B cardinality=2
 ====
 ---- QUERY
 # Test UNION ALL
