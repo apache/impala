@@ -201,7 +201,10 @@ class TestIcebergTable(IcebergTestSuite):
                                       format(full_table_name))
 
   def test_insert(self, vector, unique_database):
-    self.run_test_case('QueryTest/iceberg-insert', vector, use_db=unique_database)
+    # With block locations preloaded the SHOW FILES EC policy is $ERASURECODE_POLICY;
+    self.run_test_case('QueryTest/iceberg-insert', vector, use_db=unique_database,
+        test_file_vars={'$EXPECTED_ERASURECODE_POLICY':
+                        os.getenv('ERASURECODE_POLICY', 'NONE')})
 
   def test_partitioned_insert_v1(self, vector, unique_database):
     self.run_test_case('QueryTest/iceberg-partitioned-insert-v1', vector,

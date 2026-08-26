@@ -159,14 +159,17 @@ public class FileDescriptor implements Comparable<FileDescriptor> {
   }
 
   /**
-   * Creates the file descriptor of a file represented by 'fileStatus' that
-   * resides in a filesystem that doesn't support the BlockLocation API (e.g. S3).
+   * Creates the descriptor of a file whose block locations are not loaded (the
+   * filesystem lacks the BlockLocation API, e.g. S3, or preloading is disabled for its
+   * scheme). No blocks are recorded, but the encryption and erasure-coding flags come
+   * from 'fileStatus', as in create(), so getIsEncrypted()/getIsEc() are reliable on
+   * every load path.
    */
   public static FileDescriptor createWithNoBlocks(
       FileStatus fileStatus, String relPath, @Nullable String absPath) {
     FlatBufferBuilder fbb = new FlatBufferBuilder(1);
-    return new FileDescriptor(
-        createFbFileDesc(fbb, fileStatus, relPath, null, false, false, absPath));
+    return new FileDescriptor(createFbFileDesc(fbb, fileStatus, relPath, null,
+        fileStatus.isEncrypted(), fileStatus.isErasureCoded(), absPath));
   }
 
   /**

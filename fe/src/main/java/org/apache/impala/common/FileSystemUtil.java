@@ -99,6 +99,10 @@ public class FileSystemUtil {
 
   public static final String NO_ERASURE_CODE_LABEL = "NONE";
 
+  // "EC Policy" shown when it cannot be determined from the file descriptor, e.g. an
+  // Iceberg file loaded without block locations (IMPALA-15291).
+  public static final String UNKNOWN_ERASURE_CODE_LABEL = "N/A";
+
   /**
    * Set containing all FileSystem scheme that known to supports storage UUIDs in
    * BlockLocation calls.

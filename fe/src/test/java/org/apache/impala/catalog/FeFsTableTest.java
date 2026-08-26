@@ -22,6 +22,7 @@ import static org.junit.Assert.assertEquals;
 import com.google.flatbuffers.FlatBufferBuilder;
 import java.nio.ByteBuffer;
 import java.util.Arrays;
+import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hdfs.protocol.SystemErasureCodingPolicies;
 import org.apache.impala.common.FileSystemUtil;
@@ -39,6 +40,15 @@ public class FeFsTableTest {
     ByteBuffer copy = ByteBuffer.allocate(bb.capacity());
     copy.put(bb);
     return new FileDescriptor(FbFileDesc.getRootAsFbFileDesc((ByteBuffer) copy.flip()));
+  }
+
+  /** Builds a descriptor through createWithNoBlocks (the no-block-locations path). */
+  private static FileDescriptor noBlockFd(boolean isEc, boolean isEncrypted) {
+    FileStatus status = Mockito.mock(FileStatus.class);
+    Mockito.when(status.isErasureCoded()).thenReturn(isEc);
+    Mockito.when(status.isEncrypted()).thenReturn(isEncrypted);
+    Mockito.when(status.getPath()).thenReturn(new Path("/dummy/f"));
+    return FileDescriptor.createWithNoBlocks(status, "f", null);
   }
 
   private static FeFsPartition mockPartition(FileDescriptor... fds) {
@@ -75,5 +85,24 @@ public class FeFsTableTest {
         mockPartition(createFd(false, (byte) 0), createFd(true, (byte) 0))));
     assertEquals(FeFsTable.MIXED_ERASURE_CODE_LABEL, FeFsTable.getErasureCodingPolicy(
         mockPartition(createFd(true, (byte) 0), createFd(false, (byte) 0))));
+  }
+
+  /**
+   * IMPALA-15291: createWithNoBlocks records the erasure-coding and encryption flags,
+   * so the EC Policy column reflects them instead of always reporting NONE.
+   */
+  @Test
+  public void testGetErasureCodingPolicyNoBlockLocations() {
+    FileDescriptor ecFd = noBlockFd(true, false);
+    FileDescriptor plainFd = noBlockFd(false, false);
+    // The flags survive with no block locations loaded.
+    assertEquals(true, ecFd.getIsEc());
+    assertEquals(false, plainFd.getIsEc());
+    assertEquals(true, noBlockFd(false, true).getIsEncrypted());
+    // All-plain is NONE; a plain+EC mix is MIXED (the EC file is not seen as plain).
+    assertEquals(FileSystemUtil.NO_ERASURE_CODE_LABEL,
+        FeFsTable.getErasureCodingPolicy(mockPartition(plainFd, plainFd)));
+    assertEquals(FeFsTable.MIXED_ERASURE_CODE_LABEL,
+        FeFsTable.getErasureCodingPolicy(mockPartition(ecFd, plainFd)));
   }
 }

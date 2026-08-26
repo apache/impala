@@ -556,7 +556,7 @@ public interface FeIcebergTable extends FeFsTable {
         rowBuilder.add(absPath);
         rowBuilder.add(PrintUtils.printBytes(fd.getFileLength()));
         rowBuilder.add("");
-        rowBuilder.add(FeFsTable.getErasureCodingPolicy(fd, new Path(absPath)));
+        rowBuilder.add(getShowFilesEcPolicy(fd, new Path(absPath)));
         result.addToRows(rowBuilder.get());
       }
       return result;
@@ -592,12 +592,27 @@ public interface FeIcebergTable extends FeFsTable {
 
         rowBuilder.add("");         // Partition - empty for now
         rowBuilder.add(fd != null
-            ? FeFsTable.getErasureCodingPolicy(fd, new Path(filePath))
+            ? getShowFilesEcPolicy(fd, new Path(filePath))
             : FileSystemUtil.getErasureCodingPolicy(new Path(filePath)));
         result.addToRows(rowBuilder.get());
       }
 
       return result;
+    }
+
+    /**
+     * Erasure-coding policy for a SHOW FILES row. is_ec is only ever set from a real
+     * FileStatus, so trust it when present (the policy resolves locally from the recorded
+     * id). Otherwise the file is either not erasure-coded, or came from the no-preload
+     * path where Iceberg builds a synthetic FileStatus with no erasure-coding info.
+     */
+    private static String getShowFilesEcPolicy(FileDescriptor fd, Path path) {
+      if (fd.getIsEc()) return FeFsTable.getErasureCodingPolicy(fd, path);
+      boolean syntheticNoBlocks = fd.getFileLength() > 0 && fd.getNumFileBlocks() == 0
+          && (FileSystemUtil.isDistributedFileSystem(path)
+              || FileSystemUtil.isOzoneFileSystem(path));
+      return syntheticNoBlocks ? FileSystemUtil.UNKNOWN_ERASURE_CODE_LABEL
+                               : FileSystemUtil.NO_ERASURE_CODE_LABEL;
     }
 
     /**

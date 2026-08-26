@@ -50,7 +50,10 @@ class TestDisabledBlockLocations(CustomClusterTestSuite):
   def test_iceberg_smoke(self, vector, unique_database):
     self.run_test_case('QueryTest/iceberg-create', vector, unique_database)
     self.run_test_case('QueryTest/iceberg-external', vector, unique_database)
-    self.run_test_case('QueryTest/iceberg-insert', vector, unique_database)
+    # IMPALA-15291: without preloaded block locations Iceberg descriptors carry no
+    # erasure-coding info, so SHOW FILES reports 'N/A' for the EC policy.
+    self.run_test_case('QueryTest/iceberg-insert', vector, unique_database,
+        test_file_vars={'$EXPECTED_ERASURECODE_POLICY': 'N/A'})
     self.run_test_case('QueryTest/iceberg-delete', vector, unique_database)
     self.run_test_case('QueryTest/iceberg-delete-partitioned', vector, unique_database)
 
