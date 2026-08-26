@@ -73,7 +73,8 @@ UBUNTU=
 UBUNTU20=
 UBUNTU22=
 UBUNTU24=
-IN_DOCKER=
+IN_DOCKER=${IN_DOCKER:-}
+DOCKER_BUILD=${DOCKER_BUILD:-}
 if [[ -f /etc/redhat-release ]]; then
   REDHAT=true
   echo "Identified redhat system."
@@ -118,7 +119,7 @@ else
     exit 1
   fi
 fi
-if grep docker /proc/1/cgroup; then
+if grep docker /proc/1/cgroup || grep -q '/docker/' /proc/self/mountinfo; then
   IN_DOCKER=true
   echo "Identified we are running inside of Docker."
 fi
@@ -322,6 +323,7 @@ if [ ! -d "/usr/local/apache-maven-${MVN_VERSION}" ]; then
   # Ensure that Impala's preferred version is installed locally,
   # even if a previous version exists there.
   sudo ln -s -f "/usr/local/apache-maven-${MVN_VERSION}/bin/mvn" "/usr/local/bin"
+  sudo rm "apache-maven-${MVN_VERSION}-bin.tar.gz"
 
   # reset permissions on redhat
   # TODO: figure out why this is necessary for redhat
@@ -428,25 +430,35 @@ ssh localhost whoami
 #    ...
 #  ...ConnectionError: ('Connection aborted.', error(111, 'Connection refused'))
 # Prefer the FQDN first for rpc-mgr-kerberized-test as newer krb5 requires FQDN.
-add_if_not_there() {
-   grep -q "$2" $1 || echo "$2" | sudo tee -a $1
-}
-add_if_not_there "/etc/hosts" "127.0.0.1 $(hostname) $(hostname -s)"
-
-# Add hostnames with multiple labels to allow matching wildcard TLS certificates.
-# Create names that map to v4/v6/dual localhost to help ipv6 testing.
-add_if_not_there "/etc/hosts" "127.0.0.1 ip4.impala.test ip46.impala.test"
-add_if_not_there "/etc/hosts" "::1       ip6.impala.test ip46.impala.test"
-
 #
-# In Docker, one can change /etc/hosts as above but not with sed -i. The error message is
-# "sed: cannot rename /etc/sedc3gPj8: Device or resource busy". The following lines are
-# basically sed -i but with cp instead of mv for -i part.
-NEW_HOSTS=$(mktemp)
-sed 's/127.0.1.1/127.0.0.1/g' /etc/hosts > "${NEW_HOSTS}"
-diff -u /etc/hosts "${NEW_HOSTS}" || true
-sudo cp "${NEW_HOSTS}" /etc/hosts
-rm "${NEW_HOSTS}"
+# During docker builds, the /etc/hosts file is read only and hosts are configured using
+# the --add-host command line arg.
+if [[ "${DOCKER_BUILD}" != "true" ]]; then
+  add_if_not_there() {
+    grep -q "$2" $1 || echo "$2" | sudo tee -a $1
+  }
+
+  # Container hostname is random during the build process and is different at run time.
+  # Thus, we should not add current hostname to /etc/hosts during the Docker build since
+  # that entry would also be in the runtime container.
+  add_if_not_there "/etc/hosts" "127.0.0.1 $(hostname) $(hostname -s)"
+
+  # Add hostnames with multiple labels to allow matching wildcard TLS certificates.
+  # Create names that map to v4/v6/dual localhost to help ipv6 testing.
+  add_if_not_there "/etc/hosts" "127.0.0.1 ip4.impala.test ip46.impala.test"
+  add_if_not_there "/etc/hosts" "::1       ip6.impala.test ip46.impala.test"
+
+  # In Docker, one can change /etc/hosts as above but not with sed -i. The error message
+  # is "sed: cannot rename /etc/sedc3gPj8: Device or resource busy". The following lines
+  # are basically sed -i but with cp instead of mv for -i part.
+  if [[ $(grep -c 127.0.1.1 /etc/hosts || true) != "0" ]]; then
+    NEW_HOSTS=$(mktemp)
+    sed 's/127.0.1.1/127.0.0.1/g' /etc/hosts > "${NEW_HOSTS}"
+    diff -u /etc/hosts "${NEW_HOSTS}" || true
+    sudo cp "${NEW_HOSTS}" /etc/hosts
+    rm "${NEW_HOSTS}"
+  fi
+fi
 
 sudo mkdir -p /var/lib/hadoop-hdfs
 sudo chown $(whoami) /var/lib/hadoop-hdfs/

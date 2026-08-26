@@ -106,6 +106,9 @@ eclipse-classes/
 *.code-workspace
 .vscode/
 
+# Devcontainer Files
+.devcontainer-build/devcontainer-lock.json
+
 # Debugging
 ad-hoc.test
 nohup.out

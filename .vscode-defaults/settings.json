@@ -27,6 +27,13 @@ under the License.
   "editor.tabSize": 2,
   "makefile.configureOnOpen": true,
   "python.languageServer": "Default",
+  "python-envs.pythonProjects": [
+    {
+      "path": "tests"
+    }
+  ],
+  "python.terminal.activateEnvironment": false,
+  "python.terminal.activateEnvInCurrentTerminal": false,
   "java.jdt.ls.vmargs": "-XX:+UseParallelGC -XX:GCTimeRatio=4 -XX:AdaptiveSizePolicyWeight=90 -Dsun.zip.disableMemoryMapping=true -Xmx8G -Xms100m -Xlog:disable",
   "java.configuration.runtimes": [
     {
@@ -161,6 +168,10 @@ under the License.
     },
     "10001": {
       "label": "Hive Thrift",
+      "onAutoForward": "silent"
+    },
+    "10002": {
+      "label": "HS2 WebUI",
       "onAutoForward": "silent"
     },
     "11050": {

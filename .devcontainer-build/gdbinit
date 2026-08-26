@@ -1,0 +1,47 @@
+# Licensed to the Apache Software Foundation (ASF) under one
+# or more contributor license agreements.  See the NOTICE file
+# distributed with this work for additional information
+# regarding copyright ownership.  The ASF licenses this file
+# to you under the Apache License, Version 2.0 (the
+# "License"); you may not use this file except in compliance
+# with the License.  You may obtain a copy of the License at
+#
+#   http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing,
+# software distributed under the License is distributed on an
+# "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+# KIND, either express or implied.  See the License for the
+# specific language governing permissions and limitations
+# under the License.
+
+echo Loading gdbinit\n
+
+define hook-stop
+  handle SIGSEGV stop print pass
+end
+define hook-run
+  handle SIGSEGV nostop noprint pass
+end
+define hook-continue
+  handle SIGSEGV nostop noprint pass
+end
+
+# Used to get full backtrace of all threads
+define bt-thread
+  thread apply all bt full
+end
+
+# These help improve GDB output, but make the output take up more screen spaace.
+set print pretty on
+set print array on
+
+# By default this will log to 'gdb.log'
+set logging file ~/gdb.log
+set logging enabled
+
+set history save on
+
+handle SIGSEGV nostop noprint pass
+
+echo Done loading gdbinit\n

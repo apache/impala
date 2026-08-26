@@ -1,26 +1,102 @@
+/*
+Licensed to the Apache Software Foundation (ASF) under one
+or more contributor license agreements.  See the NOTICE file
+distributed with this work for additional information
+regarding copyright ownership.  The ASF licenses this file
+to you under the Apache License, Version 2.0 (the
+"License"); you may not use this file except in compliance
+with the License.  You may obtain a copy of the License at
+
+  http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing,
+software distributed under the License is distributed on an
+"AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+KIND, either express or implied.  See the License for the
+specific language governing permissions and limitations
+under the License.
+*/
+
 {
-  "name": "Impala Dev",
-  "dockerFile": "Dockerfile",
-  "runArgs": [
-    "--privileged",
-    "--cpu=8",
-    "--memory=20g"
+  "image": "apache/impala-dev:stable",
+  "name": "Impala-Dev",
+  "workspaceMount": "type=volume,target=/home/impdev/impala",
+  "mounts": [
+    "source=/tmp/.impala-devcontainer-git,target=/.impala-devcontainer-git,type=bind,consistency=cached,readonly",
+    "source=/tmp/.impala-devcontainer-tz,target=/.impala-devcontainer-tz,type=bind,consistency=cached,readonly",
+    "source=/tmp/.impala-devcontainer-locale,target=/.impala-devcontainer-locale,type=bind,consistency=cached,readonly"
   ],
+  "workspaceFolder": "/home/impdev/impala",
   "remoteUser": "impdev",
   "containerUser": "impdev",
-  "forwardPorts": [5070, 6080, 8051, 8088, 10001, 25000, 25001, 25002, 25010, 25020],
-  "postCreateCommand": "echo 'yes' | bin/bootstrap_development.sh",
-  "postStartCommand": "sudo service postgresql start",
-  "customizations": {
-    "vscode": {
-      "extensions": [
-        "ms-vscode.cmake-tools",
-        "llvm-vs-code-extensions.vscode-clangd",
-        "vadimcn.vscode-lldb",
-        "webfreak.debug",
-        "vscjava.vscode-java-pack",
-        "ms-python.python"
-      ]
-    }
-  }
+  "updateRemoteUserUID": false,
+  "initializeCommand": "git config --get-regexp 'user.*|core.editor' > /tmp/.impala-devcontainer-git || true; ls -l /etc/localtime | sed 's|^.*/zoneinfo/||' > /tmp/.impala-devcontainer-tz || true; echo \"${LANG:-en_US.UTF-8}\" > /tmp/.impala-devcontainer-locale || true",
+  "onCreateCommand": "/home/impdev/impala/.devcontainer/regen-ssh-keys.sh 2>&1 | sudo tee -a /var/log/devcontainer-regen-ssh-keys.log; /home/impdev/impala/.devcontainer/set-tz-locale.sh 2>&1 | sudo tee -a /var/log/devcontainer-set-tz-locale.log",
+  "postStartCommand": "/home/impdev/impala/.devcontainer/entrypoint.sh 2>&1 | sudo tee -a /var/log/devcontainer-entrypoint.log",
+  "postAttachCommand": "/home/impdev/impala/.devcontainer/configure-container.sh 2>&1 | sudo tee -a /var/log/devcontainer-configure.log",
+  "runArgs": [
+      "--privileged",
+      "--add-host=ip4.impala.test:127.0.0.1",
+      "--add-host=ip4:127.0.0.1",
+      "--add-host=ip46.impala.test:127.0.0.1",
+      "--add-host=ip6.impala.test:[::1]",
+      "--add-host=ip6:[::1]",
+      "--add-host=ip46:[::1]"
+  ],
+  "capAdd": [
+    "SYS_PTRACE"
+  ],
+  "securityOpt": [
+    "seccomp=unconfined"
+  ],
+  "hostRequirements": {
+    "cpus": 8,
+    "memory": "20gb",
+    "storage": "100gb",
+    "gpu": false
+  },
+  "forwardPorts": [
+    55888
+  ],
+  "appPort": [
+    "25000:25000",
+    "25001:25001",
+    "25002:25002",
+    "25003:25003",
+    "25004:25004",
+    "25005:25005",
+    "25006:25006",
+    "25007:25007",
+    "25008:25008",
+    "25009:25009",
+    "25010:25010",
+    "25020:25020",
+    "21050:21050",
+    "21051:21051",
+    "21052:21052",
+    "21053:21053",
+    "21054:21054",
+    "21055:21055",
+    "21056:21056",
+    "21057:21057",
+    "21058:21058",
+    "21059:21059",
+    "28000:28000",
+    "28001:28001",
+    "28002:28002",
+    "28003:28003",
+    "28004:28004",
+    "28005:28005",
+    "28006:28006",
+    "28007:28007",
+    "28008:28008",
+    "28009:28009",
+    "5432:5432",
+    "6080:6080",
+    "5070:5070",
+    "8051:8051",
+    "8088:8088",
+    "10001:10001",
+    "10002:10002"
+  ]
 }
