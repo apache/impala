@@ -475,9 +475,10 @@ bootstrap_dependencies() {
         rm -rf ${HADOOP_HOME}/lib
       fi
       # If ${HADOOP_HOME}/lib is a symlink (but pointed the wrong place), we can just
-      # update it.
+      # update it. The -T option tells ln not to treat the second argument as a
+      # target directory (we want to set $HADOOP_HOME/lib not $HADOOP_HOME/lib/lib).
       echo "Linking ${HADOOP_HOME}/lib to point to ${ARM_HADOOP_LIB_DIR}"
-      ln -sf ${ARM_HADOOP_LIB_DIR} ${HADOOP_HOME}/lib
+      ln -sf -T ${ARM_HADOOP_LIB_DIR} ${HADOOP_HOME}/lib
       # Confirm that the symlink points where we expect
       [[ "$(realpath ${HADOOP_HOME}/lib)" == "$(realpath ${ARM_HADOOP_LIB_DIR})" ]]
     fi
