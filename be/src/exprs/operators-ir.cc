@@ -25,6 +25,7 @@
 #include "runtime/string-value.inline.h"
 #include "runtime/timestamp-value.h"
 #include "util/bit-util.h"
+#include "util/uuid-util.h"
 
 #include "common/names.h"
 
@@ -117,6 +118,24 @@
     BINARY_PREDICATE_CHAR_NONNULL(OP, v1, v2);\
   }
 
+#define BINARY_PREDICATE_UUID_NONNULL(CMP, V1, V2) \
+  return BooleanVal(memcmp(V1.ptr, V2.ptr, UUID_BYTE_LEN) CMP 0)
+
+#define BINARY_PREDICATE_UUID(NAME, CMP) \
+  BooleanVal Operators::NAME##_Uuid_Uuid(\
+      FunctionContext* c, const StringVal& v1, const StringVal& v2) {\
+    if (v1.is_null || v2.is_null) return BooleanVal::null();\
+    BINARY_PREDICATE_UUID_NONNULL(CMP, v1, v2);\
+  }
+
+#define NULLSAFE_UUID_DISTINCTION(NAME, CMP, IS_EQUAL) \
+  BooleanVal Operators::NAME##_Uuid_Uuid(\
+      FunctionContext* c, const StringVal& v1, const StringVal& v2) {\
+    if (v1.is_null) return BooleanVal(IS_EQUAL ? v2.is_null : !v2.is_null); \
+    if (v2.is_null) return BooleanVal(!IS_EQUAL);\
+    BINARY_PREDICATE_UUID_NONNULL(CMP, v1, v2);\
+  }
+
 #define NULLSAFE_NUMERIC_DISTINCTION(NAME, TYPE, OP, IS_EQUAL) \
   BooleanVal Operators::NAME##_##TYPE##_##TYPE(\
       FunctionContext* c, const TYPE& v1, const TYPE& v2) {\
@@ -174,7 +193,8 @@
   BINARY_PREDICATE_NUMERIC_FN(NAME, DateVal, OP);\
   BINARY_PREDICATE_NONNUMERIC_FN(NAME, StringVal, StringValue, OP);\
   BINARY_PREDICATE_NONNUMERIC_FN(NAME, TimestampVal, TimestampValue, OP);\
-  BINARY_PREDICATE_CHAR(NAME, OP);
+  BINARY_PREDICATE_CHAR(NAME, OP);\
+  BINARY_PREDICATE_UUID(NAME, OP);
 
 #define NULLSAFE_DISTINCTION(NAME, OP, IS_EQUAL) \
   NULLSAFE_NUMERIC_DISTINCTION(NAME, BooleanVal, OP, IS_EQUAL); \
@@ -187,7 +207,8 @@
   NULLSAFE_NUMERIC_DISTINCTION(NAME, DateVal, OP, IS_EQUAL); \
   NULLSAFE_NONNUMERIC_DISTINCTION(NAME, StringVal, StringValue, OP, IS_EQUAL);\
   NULLSAFE_NONNUMERIC_DISTINCTION(NAME, TimestampVal, TimestampValue, OP, IS_EQUAL);\
-  NULLSAFE_CHAR_DISTINCTION(NAME, OP, IS_EQUAL);
+  NULLSAFE_CHAR_DISTINCTION(NAME, OP, IS_EQUAL);\
+  NULLSAFE_UUID_DISTINCTION(NAME, OP, IS_EQUAL);
 
 namespace impala {
 

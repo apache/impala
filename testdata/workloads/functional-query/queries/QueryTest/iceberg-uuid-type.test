@@ -1,7 +1,7 @@
 ====
 ---- QUERY
 # Iceberg UUID Parquet read-path tests.
-# Casts, predicates, and aggregates are not yet supported.
+# Casts, LIKE, and aggregates are not yet supported.
 DESCRIBE iceberg_uuid_test
 ---- RESULTS: VERIFY_IS_SUBSET
 'id','int','','true'
@@ -68,17 +68,204 @@ SELECT id, uuid_col FROM iceberg_uuid_test_avro
 Reading UUID columns from AVRO format is not yet supported
 ====
 ---- QUERY
-# Equality predicates are not yet supported on UUID columns.
+# Equality predicate on two UUID-typed operands (via scalar subquery).
+SELECT id FROM iceberg_uuid_test WHERE uuid_col = (SELECT uuid_col FROM iceberg_uuid_test WHERE id = 1)
+---- RESULTS
+1
+---- TYPES
+INT
+====
+---- QUERY
+# Inequality predicate on two UUID-typed operands.
+SELECT id, name FROM iceberg_uuid_test
+WHERE uuid_col != (SELECT uuid_col FROM iceberg_uuid_test WHERE id = 3) AND id = 5
+ORDER BY id
+---- RESULTS
+5,'max'
+---- TYPES
+INT,STRING
+====
+---- QUERY
+# IN predicate with a UUID-typed subquery.
+SELECT id FROM iceberg_uuid_test
+WHERE uuid_col IN (SELECT uuid_col FROM iceberg_uuid_test WHERE id IN (1, 2))
+ORDER BY id
+---- RESULTS
+1
+2
+---- TYPES
+INT
+====
+---- QUERY
+# NOT IN predicate with a UUID-typed subquery.
+# Rows with NULL uuid_col are excluded (NULL NOT IN (...) is unknown).
+SELECT id FROM iceberg_uuid_test
+WHERE uuid_col NOT IN (SELECT uuid_col FROM iceberg_uuid_test WHERE id IN (1, 2))
+ORDER BY id
+---- RESULTS
+3
+5
+---- TYPES
+INT
+====
+---- QUERY
+# Range comparison predicates on UUID-typed operands.
+SELECT id, name FROM iceberg_uuid_test
+WHERE uuid_col > (SELECT uuid_col FROM iceberg_uuid_test WHERE id = 3)
+  AND uuid_col < (SELECT uuid_col FROM iceberg_uuid_test WHERE id = 5)
+ORDER BY uuid_col DESC
+---- RESULTS
+2,'bob'
+1,'alice'
+---- TYPES
+INT,STRING
+====
+---- QUERY
+# BETWEEN predicate on UUID-typed operands.
+SELECT id FROM iceberg_uuid_test
+WHERE uuid_col BETWEEN
+  (SELECT uuid_col FROM iceberg_uuid_test WHERE id = 1)
+  AND (SELECT uuid_col FROM iceberg_uuid_test WHERE id = 2)
+ORDER BY id
+---- RESULTS
+1
+2
+---- TYPES
+INT
+====
+---- QUERY
+# JOIN on a UUID column exercises UUID equality.
+SELECT a.id FROM iceberg_uuid_test a
+JOIN iceberg_uuid_test b ON a.uuid_col = b.uuid_col AND b.id = 1
+ORDER BY a.id
+---- RESULTS
+1
+---- TYPES
+INT
+====
+---- QUERY
+# STRING literals are not implicitly cast to UUID.
 SELECT id FROM iceberg_uuid_test WHERE uuid_col = '12345678-1234-5678-1234-567812345678'
 ---- CATCH
 operands of type UUID and STRING are not comparable
 ====
 ---- QUERY
-# IN predicates are not yet supported on UUID columns.
+# STRING literals in IN lists are not implicitly cast to UUID.
 SELECT id FROM iceberg_uuid_test
 WHERE uuid_col IN ('12345678-1234-5678-1234-567812345678', 'abcdefab-cdef-abcd-efab-cdefabcdefab')
 ---- CATCH
 Incompatible return types 'UUID' and 'STRING'
+====
+---- QUERY
+# STRING literals in BETWEEN are not implicitly cast to UUID.
+SELECT id FROM iceberg_uuid_test
+WHERE uuid_col BETWEEN '12345678-1234-5678-1234-567812345678' AND 'abcdefab-cdef-abcd-efab-cdefabcdefab'
+---- CATCH
+Incompatible return types 'UUID' and 'STRING'
+====
+---- QUERY
+# IS NULL and IS NOT NULL on UUID columns.
+SELECT
+  sum(case when uuid_col IS NULL then 1 else 0 end),
+  sum(case when uuid_col IS NOT NULL then 1 else 0 end)
+FROM iceberg_uuid_test
+---- RESULTS
+1,4
+---- TYPES
+BIGINT,BIGINT
+====
+---- QUERY
+SELECT id FROM iceberg_uuid_test WHERE uuid_col IS NULL ORDER BY id
+---- RESULTS
+4
+---- TYPES
+INT
+====
+---- QUERY
+SELECT id FROM iceberg_uuid_test WHERE uuid_col IS NOT NULL ORDER BY id
+---- RESULTS
+1
+2
+3
+5
+---- TYPES
+INT
+====
+---- QUERY
+# IS NOT DISTINCT FROM on equal UUID values (null-safe equality).
+SELECT id FROM iceberg_uuid_test a
+WHERE a.uuid_col IS NOT DISTINCT FROM (SELECT uuid_col FROM iceberg_uuid_test WHERE id = 1)
+ORDER BY id
+---- RESULTS
+1
+---- TYPES
+INT
+====
+---- QUERY
+# IS DISTINCT FROM on different UUID values.
+SELECT id FROM iceberg_uuid_test
+WHERE uuid_col IS DISTINCT FROM (SELECT uuid_col FROM iceberg_uuid_test WHERE id = 1) AND id != 1
+ORDER BY id
+---- RESULTS
+2
+3
+4
+5
+---- TYPES
+INT
+====
+---- QUERY
+# IS NOT DISTINCT FROM treats two NULL UUIDs as equal.
+SELECT id FROM iceberg_uuid_test
+WHERE uuid_col IS NOT DISTINCT FROM (SELECT uuid_col FROM iceberg_uuid_test WHERE id = 4)
+ORDER BY id
+---- RESULTS
+4
+---- TYPES
+INT
+====
+---- QUERY
+# IS DISTINCT FROM treats NULL and non-NULL UUIDs as distinct.
+SELECT id FROM iceberg_uuid_test
+WHERE uuid_col IS DISTINCT FROM (SELECT uuid_col FROM iceberg_uuid_test WHERE id = 1)
+ORDER BY id
+---- RESULTS
+2
+3
+4
+5
+---- TYPES
+INT
+====
+---- QUERY
+# JOIN on IS NOT DISTINCT FROM supports null-safe UUID equality.
+SELECT a.id FROM iceberg_uuid_test a
+JOIN iceberg_uuid_test b ON a.uuid_col IS NOT DISTINCT FROM b.uuid_col AND b.id = 4
+ORDER BY a.id
+---- RESULTS
+4
+---- TYPES
+INT
+====
+---- QUERY
+# STRING literals are not implicitly cast for IS DISTINCT FROM.
+SELECT id FROM iceberg_uuid_test
+WHERE uuid_col IS DISTINCT FROM '12345678-1234-5678-1234-567812345678'
+---- CATCH
+operands of type UUID and STRING are not comparable
+====
+---- QUERY
+# STRING literals are not implicitly cast for IS NOT DISTINCT FROM.
+SELECT id FROM iceberg_uuid_test
+WHERE uuid_col IS NOT DISTINCT FROM '12345678-1234-5678-1234-567812345678'
+---- CATCH
+operands of type UUID and STRING are not comparable
+====
+---- QUERY
+# String functions require a cast; UUID is not implicitly converted to STRING.
+SELECT length(uuid_col) FROM iceberg_uuid_test WHERE id = 1
+---- CATCH
+No matching function with signature: length(UUID)
 ====
 ---- QUERY
 # LIKE predicates are not yet supported on UUID columns.
@@ -93,7 +280,7 @@ SELECT CAST(uuid_col AS STRING) FROM iceberg_uuid_test WHERE id = 1
 Invalid type cast of uuid_col from UUID to STRING
 ====
 ---- QUERY
-# CAST from STRING literal to UUID is not yet supported.
+# Explicit CAST from STRING to UUID is not yet supported.
 SELECT CAST('12345678-1234-5678-1234-567812345678' AS UUID)
 ---- CATCH
 Invalid type cast of '12345678-1234-5678-1234-567812345678' from STRING to UUID
@@ -189,16 +376,4 @@ STRING,BIGINT
 SELECT uuid_col FROM iceberg_uuid_test GROUP BY uuid_col HAVING uuid_col
 ---- CATCH
 HAVING clause 'uuid_col' requires return type 'BOOLEAN'. Actual type is 'UUID'.
-====
----- QUERY
-# IS NULL is not yet supported on UUID columns (no is_null_pred builtin).
-SELECT id FROM iceberg_uuid_test WHERE uuid_col IS NULL
----- CATCH
-No matching function with signature: is_null_pred(UUID).
-====
----- QUERY
-# IS NOT NULL is not yet supported on UUID columns (no is_not_null_pred builtin).
-SELECT id FROM iceberg_uuid_test WHERE uuid_col IS NOT NULL
----- CATCH
-No matching function with signature: is_not_null_pred(UUID).
 ====

@@ -1144,6 +1144,7 @@ invisible_functions = [
   [['distinctfrom'], 'BOOLEAN', ['CHAR', 'CHAR'], 'impala::Operators::DistinctFrom_Char_Char'],
   [['distinctfrom'], 'BOOLEAN', ['DECIMAL', 'DECIMAL'], 'impala::DecimalOperators::DistinctFrom_DecimalVal_DecimalVal'],
   [['distinctfrom'], 'BOOLEAN', ['DATE', 'DATE'], 'impala::Operators::DistinctFrom_DateVal_DateVal'],
+  [['distinctfrom'], 'BOOLEAN', ['UUID', 'UUID'], 'impala::Operators::DistinctFrom_Uuid_Uuid'],
 
   [['notdistinct'], 'BOOLEAN', ['BOOLEAN', 'BOOLEAN'], 'impala::Operators::NotDistinct_BooleanVal_BooleanVal'],
   [['notdistinct'], 'BOOLEAN', ['TINYINT', 'TINYINT'], 'impala::Operators::NotDistinct_TinyIntVal_TinyIntVal'],
@@ -1158,6 +1159,7 @@ invisible_functions = [
   [['notdistinct'], 'BOOLEAN', ['CHAR', 'CHAR'], 'impala::Operators::NotDistinct_Char_Char'],
   [['notdistinct'], 'BOOLEAN', ['DECIMAL', 'DECIMAL'], 'impala::DecimalOperators::NotDistinct_DecimalVal_DecimalVal'],
   [['notdistinct'], 'BOOLEAN', ['DATE', 'DATE'], 'impala::Operators::NotDistinct_DateVal_DateVal'],
+  [['notdistinct'], 'BOOLEAN', ['UUID', 'UUID'], 'impala::Operators::NotDistinct_Uuid_Uuid'],
 
   # Functions related to Apache Iceberg functionality.
   [['iceberg_truncate_transform'], 'INT', ['INT', 'INT'],

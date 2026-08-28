@@ -145,6 +145,7 @@ class Operators {
   static BooleanVal Eq_StringVal_StringVal(
       FunctionContext*, const StringVal&, const StringVal&);
   static BooleanVal Eq_Char_Char(FunctionContext*, const StringVal&, const StringVal&);
+  static BooleanVal Eq_Uuid_Uuid(FunctionContext*, const StringVal&, const StringVal&);
   static BooleanVal Eq_TimestampVal_TimestampVal(
       FunctionContext*, const TimestampVal&, const TimestampVal&);
 
@@ -165,6 +166,7 @@ class Operators {
   static BooleanVal Ne_StringVal_StringVal(
       FunctionContext*, const StringVal&, const StringVal&);
   static BooleanVal Ne_Char_Char(FunctionContext*, const StringVal&, const StringVal&);
+  static BooleanVal Ne_Uuid_Uuid(FunctionContext*, const StringVal&, const StringVal&);
   static BooleanVal Ne_TimestampVal_TimestampVal(
       FunctionContext*, const TimestampVal&, const TimestampVal&);
 
@@ -187,6 +189,8 @@ class Operators {
   static BooleanVal DistinctFrom_StringVal_StringVal(
       FunctionContext*, const StringVal&, const StringVal&);
   static BooleanVal DistinctFrom_Char_Char(
+      FunctionContext*, const StringVal&, const StringVal&);
+  static BooleanVal DistinctFrom_Uuid_Uuid(
       FunctionContext*, const StringVal&, const StringVal&);
   static BooleanVal DistinctFrom_TimestampVal_TimestampVal(
       FunctionContext*, const TimestampVal&, const TimestampVal&);
@@ -211,6 +215,8 @@ class Operators {
       FunctionContext*, const StringVal&, const StringVal&);
   static BooleanVal NotDistinct_Char_Char(
       FunctionContext*, const StringVal&, const StringVal&);
+  static BooleanVal NotDistinct_Uuid_Uuid(
+      FunctionContext*, const StringVal&, const StringVal&);
   static BooleanVal NotDistinct_TimestampVal_TimestampVal(
       FunctionContext*, const TimestampVal&, const TimestampVal&);
 
@@ -231,6 +237,7 @@ class Operators {
   static BooleanVal Gt_StringVal_StringVal(
       FunctionContext*, const StringVal&, const StringVal&);
   static BooleanVal Gt_Char_Char(FunctionContext*, const StringVal&, const StringVal&);
+  static BooleanVal Gt_Uuid_Uuid(FunctionContext*, const StringVal&, const StringVal&);
   static BooleanVal Gt_TimestampVal_TimestampVal(
       FunctionContext*, const TimestampVal&, const TimestampVal&);
 
@@ -251,6 +258,7 @@ class Operators {
   static BooleanVal Lt_StringVal_StringVal(
       FunctionContext*, const StringVal&, const StringVal&);
   static BooleanVal Lt_Char_Char(FunctionContext*, const StringVal&, const StringVal&);
+  static BooleanVal Lt_Uuid_Uuid(FunctionContext*, const StringVal&, const StringVal&);
   static BooleanVal Lt_TimestampVal_TimestampVal(
       FunctionContext*, const TimestampVal&, const TimestampVal&);
 
@@ -271,6 +279,7 @@ class Operators {
   static BooleanVal Ge_StringVal_StringVal(
       FunctionContext*, const StringVal&, const StringVal&);
   static BooleanVal Ge_Char_Char( FunctionContext*, const StringVal&, const StringVal&);
+  static BooleanVal Ge_Uuid_Uuid(FunctionContext*, const StringVal&, const StringVal&);
   static BooleanVal Ge_TimestampVal_TimestampVal(
       FunctionContext*, const TimestampVal&, const TimestampVal&);
 
@@ -291,6 +300,7 @@ class Operators {
   static BooleanVal Le_StringVal_StringVal(
       FunctionContext*, const StringVal&, const StringVal&);
   static BooleanVal Le_Char_Char(FunctionContext*, const StringVal&, const StringVal&);
+  static BooleanVal Le_Uuid_Uuid(FunctionContext*, const StringVal&, const StringVal&);
   static BooleanVal Le_TimestampVal_TimestampVal(
       FunctionContext*, const TimestampVal&, const TimestampVal&);
 };
