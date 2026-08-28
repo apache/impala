@@ -272,6 +272,9 @@ Operator root:
 
 Current model: the operator reconciles an `ImpalaCluster` CR and performs Helm installs/upgrades.
 
+For the operator's architecture, reconcile model, and design trade-offs, see
+[operator/impala-operator/design.md](../../operator/impala-operator/design.md).
+
 ## Deploy with Operator
 
 Build and push operator image:
