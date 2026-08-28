@@ -19,7 +19,6 @@ package org.apache.impala.calcite.service;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableList;
-import com.google.common.collect.Multimap;
 
 import org.apache.calcite.plan.RelOptCluster;
 import org.apache.calcite.plan.RelOptMaterialization;
@@ -34,6 +33,7 @@ import org.apache.calcite.plan.hep.HepProgramBuilder;
 import org.apache.calcite.plan.volcano.VolcanoPlanner;
 import org.apache.calcite.prepare.CalciteCatalogReader;
 import org.apache.calcite.rel.RelCommonExpressionSuggester;
+import org.apache.calcite.rel.RelHomogeneousShuttle;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.rules.CoreRules;
 import org.apache.calcite.rel.rules.PruneEmptyRules;
@@ -482,22 +482,16 @@ public class CalciteOptimizer implements CompilerStep {
   }
 
   private <N extends RelNode> List<N> findAll(Class<N> cls, RelNode rel) {
-    final Multimap<Class<? extends RelNode>, RelNode> nodes =
-        rel.getCluster().getMetadataQuery().getNodeTypes(rel);
     final List<N> results = new ArrayList<>();
-    if (nodes == null) {
-      return results;
-    }
-    for (Map.Entry<Class<? extends RelNode>, Collection<RelNode>> e
-        : nodes.asMap().entrySet()) {
-      if (e.getKey().isAssignableFrom(cls)) {
-        for (RelNode node : e.getValue()) {
-          if (cls.isInstance(node)) {
-            results.add(cls.cast(node));
-          }
+    rel.accept(new RelHomogeneousShuttle() {
+      @Override
+      public RelNode visit(RelNode other) {
+        if (cls.isInstance(other)) {
+          results.add(cls.cast(other));
         }
+        return visitChildren(other);
       }
-    }
+    });
     return results;
   }
 

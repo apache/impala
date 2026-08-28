@@ -34,5 +34,9 @@ public class ImpalaRelMetadataProvider {
                   ImpalaRelMdNonCumulativeCost.SOURCE,
                   ImpalaRelMdCumulativeCost.SOURCE,
                   ImpalaRelMdSelectivity.SOURCE,
+                  ImpalaRelMdAllPredicates.SOURCE,
+                  ImpalaRelMdTableReferences.SOURCE,
+                  ImpalaRelMdExpressionLineage.SOURCE,
+                  ImpalaRelMdNodeTypes.SOURCE,
                   JaninoRelMetadataProvider.DEFAULT)));
 }
