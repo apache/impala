@@ -480,9 +480,21 @@ class CustomClusterTestSuite(ImpalaTestSuite):
 
   @classmethod
   def _impala_cluster_teardown(cls, name, args):
-    if args.get(WORKLOAD_MGMT, False):
+    # Stop impalads before clear_tmp_dirs() deletes dirs they write to, but only if the
+    # cluster was expected to start (else no clients exist). WORKLOAD_MGMT needs a
+    # graceful shutdown to flush query-log rows; other TMP_DIRS tests just hard-kill,
+    # avoiding the lineage flush thread aborting on a vanished dir (and the
+    # graceful-shutdown membership crash).
+    started = not args.get(EXPECT_CORES, False) \
+        and not args.get(EXPECT_STARTUP_FAIL, False)
+    if started and args.get(WORKLOAD_MGMT, False):
       cls.close_impala_clients()
       cls.cluster.graceful_shutdown_impalads()
+    elif started and cls.TMP_DIRS:
+      cls.close_impala_clients()
+      cls.cluster.refresh()
+      for impalad in cls.cluster.impalads:
+        impalad.kill_and_wait_for_exit()
 
     cls.clear_tmp_dirs()
 
