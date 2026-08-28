@@ -49,6 +49,7 @@ import org.apache.impala.analysis.Analyzer;
 import org.apache.impala.calcite.coercenodes.CoerceNodes;
 import org.apache.impala.calcite.operators.ImpalaRexBuilder;
 import org.apache.impala.calcite.operators.ImpalaRexSimplify;
+import org.apache.impala.calcite.rel.MaterializedViewSubTreeSplitter;
 import org.apache.impala.calcite.rel.node.ConvertToImpalaRelRules;
 import org.apache.impala.calcite.rel.node.ImpalaCTEConsumer;
 import org.apache.impala.calcite.rel.node.ImpalaCTEProducer;
@@ -386,13 +387,19 @@ public class CalciteOptimizer implements CompilerStep {
     if (ctes.isEmpty()) {
       return plan;
     }
+
+    // Split the CTEs into rewritable subtrees, otherwise
+    // they cannot be exploited by the MV rewrite algorithm.
     // Since we assign a name to every CTE we need to enforce
     // some order among them to keep plans deterministic
     // We could potentially delegate this responsibility to
     // the suggester implementation. However, since suggesters
     // are pluggable/configurable not sure if we should rely on
     // the end user.
-    ctes = ctes.stream().map(cte -> Pair.create(RelOptUtil.toString(cte), cte))
+    ctes = ctes.stream()
+        .map(MaterializedViewSubTreeSplitter::maximalSubTrees)
+        .flatMap(Collection::stream)
+        .map(cte -> Pair.create(RelOptUtil.toString(cte), cte))
         .sorted(Comparator.comparing(Pair::getFirst)).map(Pair::getSecond).toList();
     List<RelOptMaterialization> cteMVs = new ArrayList<>();
     int i = 0;

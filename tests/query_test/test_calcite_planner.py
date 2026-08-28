@@ -57,6 +57,11 @@ class TestCalcitePlanner(ImpalaTestSuite):
     vector.get_value('exec_option')['cte_threshold'] = 1
     self.run_test_case('QueryTest/cte-distributed', vector, use_db=unique_database)
 
+  def test_cte_decompose(self, vector):
+    vector.get_value('exec_option')['num_nodes'] = 1
+    vector.get_value('exec_option')['cte_threshold'] = 1
+    vector.get_value('exec_option')['enable_explain_calcite'] = True
+    self.run_test_case('QueryTest/cte_decompose', vector, use_db='tpch')
 
 class TestFallbackPlanner(ImpalaTestSuite):
 
