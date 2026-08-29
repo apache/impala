@@ -105,7 +105,7 @@ under the License.
     <dependency>
       <groupId>org.apache.httpcomponents.core5</groupId>
       <artifactId>httpcore5</artifactId>
-      <version>5.4</version>
+      <version>5.4.3</version>
     </dependency>
   </dependencies>
 
