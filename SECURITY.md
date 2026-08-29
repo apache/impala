@@ -33,7 +33,7 @@
 - **Status**: v1.
 - **Reporting**: vulnerabilities that fall under §8 (claimed properties) should be
   reported per the Apache Security Team disclosure channel
-  (<security@impala.apache.org>); reports that fall under §3 (out of scope), §9
+  (<security@apache.org>); reports that fall under §3 (out of scope), §9
   (properties not provided), or §11a (known non-findings) will be closed by Impala
   triagers citing this document.
 - **Provenance legend** —
