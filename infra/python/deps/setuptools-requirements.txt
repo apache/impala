@@ -16,7 +16,7 @@
 # under the License.
 
 # Newer versions of setuptools don't provide pkg_resources for Kudu/Impyla.
-setuptools == 80.10.2
+setuptools == 83.0.0
   wheel == 0.47.0
     flit-core == 3.12.0
   packaging == 26.2
