@@ -34,11 +34,5 @@ RUN \
 COPY hive-site.xml core-site.xml hdfs-site.xml /etc/
 COPY iceberg_lakekeeper.properties iceberg_rest.properties iceberg.properties hive.properties /etc/trino/catalog/
 
-# Apply default session properties server-side via the file session property
-# manager. Used to disable the DELTA_LENGTH_BYTE_ARRAY Parquet encoding for the
-# Iceberg catalog, which Impala cannot read for string/binary columns yet (Trino
-# 482 defaults it on). Trino auto-loads etc/session-property-config.properties.
-COPY session-property-config.properties session-property-config.json /etc/trino/
-
 # Expose the Trino port
 EXPOSE 9091

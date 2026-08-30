@@ -88,6 +88,10 @@ class ParquetDeltaDecoder {
     /// Only valid to call when 'NewPage()' has already been called.
     int SkipValues(int num_values) WARN_UNUSED_RESULT;
 
+    /// Returns the number of bytes remaining in the page buffer after the last decoded
+    /// value. Only valid to call after 'NewPage()' has been called.
+    int BytesLeftInPage() { return reader_.bytes_left(); }
+
   private:
     using UINT_T = typename std::make_unsigned<INT_T>::type;
 

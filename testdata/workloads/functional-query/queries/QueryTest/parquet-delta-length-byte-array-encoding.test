@@ -1,0 +1,98 @@
+====
+---- QUERY
+-- Verify that all rows and columns are returned correctly.
+select id, str_col, bin_col from delta_length_byte_array_tbl
+---- TYPES
+INT,STRING,BINARY
+---- RESULTS
+1,'hello','foo'
+2,'longer_string!','longer_binary!'
+3,'',''
+4,'impala','baz'
+5,'another_long_str','more_bin_data'
+6,'world','bar'
+7,'hi','hi'
+8,'long_string_007','long_binary_007'
+9,'abc','abc'
+10,'long_string_010','long_binary_010'
+11,'test','tst'
+12,'long_string_012','long_binary_012'
+13,'ok','ok'
+14,'long_string_014','long_binary_014'
+15,'short','bin'
+16,'long_string_016','long_binary_016'
+17,'x','x'
+18,'long_string_018','long_binary_018'
+19,'end','end'
+20,'long_string_020','long_binary_020'
+NULL,'NULL','NULL'
+====
+---- QUERY
+-- Verify total row count and non-null counts per column.
+select count(*), count(str_col), count(bin_col) from delta_length_byte_array_tbl
+---- TYPES
+BIGINT,BIGINT,BIGINT
+---- RESULTS
+21,20,20
+====
+---- QUERY
+-- Verify filtering on a DELTA_LENGTH_BYTE_ARRAY column.
+select id from delta_length_byte_array_tbl where str_col = 'impala'
+---- TYPES
+INT
+---- RESULTS
+4
+====
+---- QUERY
+-- Verify that empty strings are decoded correctly.
+select id from delta_length_byte_array_tbl where str_col = ''
+---- TYPES
+INT
+---- RESULTS
+3
+====
+---- QUERY
+-- Verify projection of only the DELTA_LENGTH_BYTE_ARRAY column.
+select str_col from delta_length_byte_array_tbl where id is not null
+---- TYPES
+STRING
+---- RESULTS
+'hello'
+'longer_string!'
+''
+'impala'
+'another_long_str'
+'world'
+'hi'
+'long_string_007'
+'abc'
+'long_string_010'
+'test'
+'long_string_012'
+'ok'
+'long_string_014'
+'short'
+'long_string_016'
+'x'
+'long_string_018'
+'end'
+'long_string_020'
+====
+---- QUERY
+-- Verify that SkipEncodedValuesInPage is exercised: filter on INT column forces
+-- the decoder to skip the first 10 string values before reading the rest.
+select str_col from delta_length_byte_array_tbl where id > 10
+---- TYPES
+STRING
+---- RESULTS
+'test'
+'long_string_012'
+'ok'
+'long_string_014'
+'short'
+'long_string_016'
+'x'
+'long_string_018'
+'end'
+'long_string_020'
+====

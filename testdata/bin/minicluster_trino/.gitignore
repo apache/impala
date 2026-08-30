@@ -1,0 +1,5 @@
+# Copied from $HADOOP_CONF_DIR by build-trino-docker-image.sh at build time.
+# Machine-specific; must not be committed.
+core-site.xml
+hdfs-site.xml
+hive-site.xml

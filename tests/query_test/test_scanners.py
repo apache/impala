@@ -36,6 +36,7 @@ from tests.common.impala_test_suite import ImpalaTestSuite, LOG
 from tests.common.skip import (
     SkipIf,
     SkipIfDockerizedCluster,
+    SkipIfExploration,
     SkipIfFS,
     SkipIfHive2,
     SkipIfHive3,
@@ -1983,6 +1984,91 @@ class TestParquetV2(ImpalaTestSuite):
 
   def test_parquet_v2(self, vector):
     self.run_test_case('QueryTest/parquet-v2', vector)
+
+  def test_delta_length_byte_array_encoding(self, vector, unique_database):
+    """Verify that Impala can read Parquet files that use DELTA_LENGTH_BYTE_ARRAY
+    encoding for BYTE_ARRAY (STRING and BINARY) columns."""
+    table_name = "delta_length_byte_array_tbl"
+    create_stmt = """CREATE TABLE {db}.{tbl}
+        (id INT, str_col STRING, bin_col BINARY)
+        STORED AS PARQUET""".format(db=unique_database, tbl=table_name)
+    create_table_and_copy_files(
+        self.client, create_stmt, unique_database, table_name,
+        [os.path.join("testdata/data", "mixed_types_delta_length_byte_array.parquet")])
+    self.run_test_case(
+        "QueryTest/parquet-delta-length-byte-array-encoding", vector, unique_database)
+
+  def test_delta_length_byte_array_smallify_boundary(self, vector, unique_database):
+    """Verify correct decoding at the smallify boundary (SMALL_LIMIT = 11 bytes):
+    a 11-byte string is smallified; a 12-byte string points into the page buffer."""
+    table_name = "delta_length_byte_array_boundary_tbl"
+    create_stmt = """CREATE TABLE {db}.{tbl}
+        (id INT, str_col STRING, bin_col BINARY)
+        STORED AS PARQUET""".format(db=unique_database, tbl=table_name)
+    create_table_and_copy_files(
+        self.client, create_stmt, unique_database, table_name,
+        [os.path.join("testdata/data",
+                      "boundary_smallify_delta_length_byte_array.parquet")])
+    result = self.execute_query(
+        "SELECT id, str_col, length(str_col) FROM {db}.{tbl} ORDER BY id".format(
+            db=unique_database, tbl=table_name),
+        vector.get_value('exec_option'))
+    assert result.data == ["1\t11chars_str\t11", "2\t12chars_str!\t12"], result.data
+
+  @SkipIfExploration.is_not_exhaustive()
+  def test_delta_length_byte_array_large_table(self, vector, unique_database):
+    """Exercises FillLengthsBuffer() refill: 2000 values per page forces the streaming
+    length-batch decoder to refill twice (1024 + 976), covering the >1024 path E2E."""
+    table_name = "delta_length_byte_array_large_tbl"
+    create_stmt = """CREATE TABLE {db}.{tbl}
+        (id INT, str_col STRING)
+        STORED AS PARQUET""".format(db=unique_database, tbl=table_name)
+    create_table_and_copy_files(
+        self.client, create_stmt, unique_database, table_name,
+        [os.path.join("testdata/data", "large_delta_length_byte_array.parquet")])
+    count_result = self.execute_query(
+        "SELECT COUNT(*), COUNT(str_col) FROM {db}.{tbl}".format(
+            db=unique_database, tbl=table_name),
+        vector.get_value('exec_option'))
+    assert count_result.data == ["2000\t2000"], count_result.data
+    # Spot-check rows at the batch boundaries (1024 and 1025) and endpoints.
+    spot_result = self.execute_query(
+        "SELECT id, str_col FROM {db}.{tbl} WHERE id IN (1, 1024, 1025, 2000)"
+        " ORDER BY id".format(db=unique_database, tbl=table_name),
+        vector.get_value('exec_option'))
+    assert spot_result.data == [
+        "1\tvalue_0000", "1024\tvalue_1023",
+        "1025\tvalue_1024", "2000\tvalue_1999",
+    ], spot_result.data
+
+  @SkipIfExploration.is_not_exhaustive()
+  def test_delta_length_byte_array_multipage(self, vector, unique_database):
+    """Exercises cross-page decoding: 2400 rows split into 2 data pages of 1200 rows
+    each. The first page triggers a FillLengthsBuffer() refill at row 1024; NewPage()
+    must correctly reset decoder state before the second page begins."""
+    table_name = "delta_length_byte_array_multipage_tbl"
+    create_stmt = """CREATE TABLE {db}.{tbl}
+        (id INT, str_col STRING)
+        STORED AS PARQUET""".format(db=unique_database, tbl=table_name)
+    create_table_and_copy_files(
+        self.client, create_stmt, unique_database, table_name,
+        [os.path.join("testdata/data",
+                      "multipage_delta_length_byte_array.parquet")])
+    count_result = self.execute_query(
+        "SELECT COUNT(*), COUNT(str_col) FROM {db}.{tbl}".format(
+            db=unique_database, tbl=table_name),
+        vector.get_value('exec_option'))
+    assert count_result.data == ["2400\t2400"], count_result.data
+    # Spot-check rows at page boundaries: last row of page 1 (1200), first of page 2
+    # (1201), and the endpoints.
+    spot_result = self.execute_query(
+        "SELECT id, str_col FROM {db}.{tbl} WHERE id IN (1, 1200, 1201, 2400)"
+        " ORDER BY id".format(db=unique_database, tbl=table_name),
+        vector.get_value('exec_option'))
+    assert spot_result.data == [
+        "1\tvalue_0000", "1200\tvalue_1199",
+        "1201\tvalue_1200", "2400\tvalue_2399",
+    ], spot_result.data
 
 
 class TestSingleFileTable(ImpalaTestSuite):

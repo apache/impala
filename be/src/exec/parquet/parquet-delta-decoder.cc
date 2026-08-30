@@ -51,12 +51,14 @@ Status ParquetDeltaDecoder<INT_T>::NewPage(const uint8_t* input_buffer,
         "multiple of 128. Current value: $0.", block_size_in_values_));
   }
 
-  /// The number of miniblocks in a block must be a divisor of the number of
+  /// The number of miniblocks in a block must be a non-zero divisor of the number of
   /// values in a block.
-  if (UNLIKELY(block_size_in_values_ % miniblocks_in_block_ != 0)) {
-    return Status(Substitute("The number of miniblocks in a block must be a divisor of "
-        "the number of values in a block. Number of miniblocks in a block: $0, number "
-        "of values in a block: $1.", miniblocks_in_block_, block_size_in_values_));
+  if (UNLIKELY(miniblocks_in_block_ == 0
+      || block_size_in_values_ % miniblocks_in_block_ != 0)) {
+    return Status(Substitute("The number of miniblocks in a block must be a non-zero "
+        "divisor of the number of values in a block. Number of miniblocks in a block: "
+        "$0, number of values in a block: $1.",
+        miniblocks_in_block_, block_size_in_values_));
   }
 
   miniblock_size_in_values_ = block_size_in_values_ / miniblocks_in_block_;

@@ -86,7 +86,7 @@ class TestTrinoInterop(CustomClusterTestSuite):
     assert rows == ["1,'a'", "2,'b'", "3,'c'"], rows
 
   @pytest.mark.execute_serially
-  def test_impala_reads_trino_objects(self, unique_name):
+  def test_impala_reads_trino_orc(self, unique_name):
     """Trino creates its own database + legacy Hive table and writes rows; Impala picks
     them up from the HMS events (no explicit INVALIDATE), since Impala must learn about
     HMS objects created out-of-band."""
@@ -100,10 +100,7 @@ class TestTrinoInterop(CustomClusterTestSuite):
       # Create an empty table and populate it with a separate INSERT. Our HMS metadata
       # transformer converts the MANAGED table Trino requests into an EXTERNAL one
       # (Trino does not advertise Hive ACID write capabilities); the image sets
-      # hive.non-managed-table-writes-enabled=true so Trino can still INSERT into it. ORC
-      # is used (not Parquet) because Trino's Parquet writer emits DELTA_LENGTH_BYTE_ARRAY
-      # for string columns, which Impala cannot read yet -- and the hive connector,
-      # unlike iceberg, exposes no session property to disable it.
+      # hive.non-managed-table-writes-enabled=true so Trino can still INSERT into it.
       self.run_stmt_in_trino(
           "CREATE TABLE {0}.t (id INTEGER, s VARCHAR) WITH (format = 'ORC')".format(
               trino_db),
@@ -121,6 +118,34 @@ class TestTrinoInterop(CustomClusterTestSuite):
       assert result.data == ["1\tx", "2\ty"], result.data
     finally:
       # Clean up the Trino-created schema (unique_name only provides a name, not a DB).
+      self.run_stmt_in_trino(
+          "DROP SCHEMA IF EXISTS {0}.{1} CASCADE".format(self.HIVE_CATALOG, trino_db),
+          catalog=self.HIVE_CATALOG)
+
+  @pytest.mark.execute_serially
+  def test_impala_reads_trino_parquet(self, unique_name):
+    """Trino writes a Parquet table with string columns; Impala reads it back.
+    Trino 482 encodes VARCHAR columns with DELTA_LENGTH_BYTE_ARRAY in Parquet V2,
+    so this specifically exercises Impala's DELTA_LENGTH_BYTE_ARRAY decoder."""
+    trino_db = unique_name
+    try:
+      self.run_stmt_in_trino(
+          "CREATE SCHEMA {0}.{1}".format(self.HIVE_CATALOG, trino_db),
+          catalog=self.HIVE_CATALOG)
+      # Trino's Parquet writer uses DELTA_LENGTH_BYTE_ARRAY for VARCHAR columns.
+      self.run_stmt_in_trino(
+          "CREATE TABLE {0}.t (id INTEGER, s VARCHAR) WITH (format = 'PARQUET')".format(
+              trino_db),
+          catalog=self.HIVE_CATALOG)
+      self.run_stmt_in_trino(
+          "INSERT INTO {0}.t VALUES (1, 'hello'), (2, 'world'), (3, '')".format(trino_db),
+          catalog=self.HIVE_CATALOG)
+
+      EventProcessorUtils.wait_for_event_processing(self)
+      result = self.execute_query(
+          "SELECT id, s FROM {0}.t ORDER BY id".format(trino_db))
+      assert result.data == ["1\thello", "2\tworld", "3\t"], result.data
+    finally:
       self.run_stmt_in_trino(
           "DROP SCHEMA IF EXISTS {0}.{1} CASCADE".format(self.HIVE_CATALOG, trino_db),
           catalog=self.HIVE_CATALOG)

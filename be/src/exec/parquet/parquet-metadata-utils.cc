@@ -97,14 +97,20 @@ bool IsIntLogicalType(const parquet::SchemaElement& element) {
 }
 
 /// Returns true if encoding 'e' is supported by Impala, false otherwise.
-static bool IsEncodingSupported(parquet::Encoding::type e) {
+static bool IsEncodingSupported(parquet::Encoding::type e,
+    parquet::Type::type col_type) {
   switch (e) {
     case parquet::Encoding::PLAIN:
     case parquet::Encoding::PLAIN_DICTIONARY:
     case parquet::Encoding::BIT_PACKED:
     case parquet::Encoding::RLE:
     case parquet::Encoding::RLE_DICTIONARY:
+    case parquet::Encoding::DELTA_LENGTH_BYTE_ARRAY:
       return true;
+    case parquet::Encoding::DELTA_BINARY_PACKED:
+      // DELTA_BINARY_PACKED is listed in column chunk metadata by some writers when
+      // encoding BYTE_ARRAY columns with DELTA_LENGTH_BYTE_ARRAY.
+      return col_type == parquet::Type::BYTE_ARRAY;
     default:
       return false;
   }
@@ -333,7 +339,7 @@ Status ParquetMetadataUtils::ValidateRowGroupColumn(
   // Check the encodings are supported.
   const vector<parquet::Encoding::type>& encodings = col_chunk_metadata.encodings;
   for (int i = 0; i < encodings.size(); ++i) {
-    if (!IsEncodingSupported(encodings[i])) {
+    if (!IsEncodingSupported(encodings[i], schema_element.type)) {
       return Status(Substitute("File '$0' uses an unsupported encoding: $1 for column "
           "'$2'.", filename, PrintValue(encodings[i]), schema_element.name));
     }

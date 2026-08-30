@@ -200,6 +200,7 @@ private:
   friend Tuple;
   friend StringValueTest;
   friend class ParquetPlainEncoder;
+  friend class ParquetDeltaLengthByteArrayDecoder;
   /// !!! THIS IS UNSAFE TO CALL ON EXISTING STRINGVALUE OBJECTS !!!
   /// Please make sure you only invoke it for newly created StringValues, e.g. on the
   /// target StringValue object of a deep copy operation.

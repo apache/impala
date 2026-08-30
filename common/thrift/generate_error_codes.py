@@ -504,7 +504,10 @@ error_codes = (
   ("CHARSET_CONVERSION_ERROR", 164, "Error during buffer conversion: $0"),
 
   ("CATALOG_IN_STANDBY_MODE", 165, "Request for Catalog service is rejected since "
-   "catalogd $0 is in standby mode")
+   "catalogd $0 is in standby mode"),
+
+  ("PARQUET_CORRUPT_DELTA_LENGTH_VALUE", 166, "File '$0' is corrupt: error decoding "
+   "DELTA_LENGTH_BYTE_ARRAY value of type $1 at offset $2")
 )
 
 import sys

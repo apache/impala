@@ -34,6 +34,7 @@ add_library(ExecParquet
   parquet-complex-column-reader.cc
   parquet-delta-decoder.cc
   parquet-delta-encoder.cc
+  parquet-delta-length-byte-array-decoder.cc
   parquet-level-decoder.cc
   parquet-metadata-utils.cc
   parquet-column-chunk-reader.cc
@@ -55,6 +56,7 @@ add_library(ExecParquetTests STATIC
   parquet-byte-stream-split-test.cc
   parquet-common-test.cc
   parquet-delta-coder-test.cc
+  parquet-delta-length-byte-array-decoder-test.cc
   parquet-page-index-test.cc
   parquet-plain-test.cc
   parquet-version-test.cc
@@ -66,6 +68,7 @@ ADD_UNIFIED_BE_LSAN_TEST(parquet-bool-decoder-test ParquetBoolDecoder.*)
 ADD_UNIFIED_BE_LSAN_TEST(parquet-byte-stream-split-test "ParquetByteStreamSplitDecoderTest.*:ParquetByteStreamSplitEncoderTest.*:ParquetByteStreamSplitCoderTest.*")
 ADD_UNIFIED_BE_LSAN_TEST(parquet-common-test ParquetCommon.*)
 ADD_UNIFIED_BE_LSAN_TEST(parquet-delta-coder-test "ParquetDeltaEncoder.*:ParquetDeltaDecoder.*:ParquetDeltaCoder.*")
+ADD_UNIFIED_BE_LSAN_TEST(parquet-delta-length-byte-array-decoder-test "ParquetDeltaLengthByteArrayDecoderTest.*")
 ADD_UNIFIED_BE_LSAN_TEST(parquet-page-index-test ParquetPageIndex.*)
 ADD_UNIFIED_BE_LSAN_TEST(parquet-plain-test PlainEncoding.*)
 ADD_UNIFIED_BE_LSAN_TEST(parquet-version-test ParquetVersionTest.*)

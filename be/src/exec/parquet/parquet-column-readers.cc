@@ -23,6 +23,7 @@
 #include "exec/parquet/hdfs-parquet-scanner.h"
 #include "exec/parquet/parquet-bool-decoder.h"
 #include "exec/parquet/parquet-data-converter.h"
+#include "exec/parquet/parquet-delta-length-byte-array-decoder.h"
 #include "exec/parquet/parquet-level-decoder.h"
 #include "exec/parquet/parquet-metadata-utils.h"
 #include "exec/parquet/parquet-struct-column-reader.h"
@@ -249,6 +250,12 @@ class ScalarColumnReader : public BaseScalarColumnReader {
         slot_desc_->type().DebugString(), col_chunk_reader_.stream()->file_offset());
   }
 
+  void __attribute__((noinline)) SetDeltaLengthDecodeError() {
+    parent_->parse_status_ = Status(TErrorCode::PARQUET_CORRUPT_DELTA_LENGTH_VALUE,
+        filename(), slot_desc_->type().DebugString(),
+        col_chunk_reader_.stream()->file_offset());
+  }
+
   void __attribute__((noinline)) SetBoolDecodeError() {
     parent_->parse_status_ = Status(TErrorCode::PARQUET_CORRUPT_BOOL_VALUE, filename(),
         PrintValue(page_encoding_), col_chunk_reader_.stream()->file_offset());
@@ -274,6 +281,9 @@ class ScalarColumnReader : public BaseScalarColumnReader {
   /// Contains extra state required to decode boolean values. Only initialised for
   /// BOOLEAN columns.
   unique_ptr<ParquetBoolDecoder> bool_decoder_;
+
+  /// Decoder for DELTA_LENGTH_BYTE_ARRAY pages. Only used for BYTE_ARRAY columns.
+  ParquetDeltaLengthByteArrayDecoder delta_length_byte_array_decoder_;
 
   /// Allocated from parent_->perm_pool_ if NeedsConversion() is true and null otherwise.
   uint8_t* conversion_buffer_ = nullptr;
@@ -348,8 +358,19 @@ Status ScalarColumnReader<InternalType, PARQUET_TYPE, MATERIALIZED>::InitDataDec
   DCHECK(slot_desc_ == nullptr || slot_desc_->type().type != TYPE_BOOLEAN)
       << "Bool has specialized impl";
   if (!IsDictionaryEncoding(page_encoding_)
-      && page_encoding_ != parquet::Encoding::PLAIN) {
+      && page_encoding_ != parquet::Encoding::PLAIN
+      && page_encoding_ != parquet::Encoding::DELTA_LENGTH_BYTE_ARRAY) {
     return GetUnsupportedDecodingError();
+  }
+
+  if (page_encoding_ == parquet::Encoding::DELTA_LENGTH_BYTE_ARRAY) {
+    if (PARQUET_TYPE == parquet::Type::BYTE_ARRAY &&
+        std::is_same_v<InternalType, StringValue>) {
+      RETURN_IF_ERROR(
+          delta_length_byte_array_decoder_.NewPage(data, size, num_buffered_values_));
+    } else {
+      return GetUnsupportedDecodingError();
+    }
   }
 
   // PLAIN_DICTIONARY is deprecated in Parquet V2. It means the same as RLE_DICTIONARY
@@ -399,18 +420,22 @@ bool ScalarColumnReader<InternalType, PARQUET_TYPE,
     DCHECK_EQ(slot_desc_, nullptr);
     return true;
   }
-  if (bool_decoder_) {
+  if (PARQUET_TYPE == parquet::Type::BOOLEAN && bool_decoder_) {
     return bool_decoder_->SkipValues(num_values);
   }
   if (IsDictionaryEncoding(page_encoding_)) {
     return dict_decoder_.SkipValues(num_values);
-  } else {
-    DCHECK_EQ(page_encoding_, Encoding::PLAIN);
-    int64_t encoded_len = ParquetPlainEncoder::EncodedLen<PARQUET_TYPE>(
-        data_, data_end_, fixed_len_size_, num_values);
-    if (encoded_len < 0) return false;
-    data_ += encoded_len;
   }
+  if (PARQUET_TYPE == parquet::Type::BYTE_ARRAY &&
+      page_encoding_ == Encoding::DELTA_LENGTH_BYTE_ARRAY) {
+    return delta_length_byte_array_decoder_.SkipValues(
+        static_cast<int>(num_values)) == static_cast<int>(num_values);
+  }
+  DCHECK_EQ(page_encoding_, Encoding::PLAIN);
+  int64_t encoded_len = ParquetPlainEncoder::EncodedLen<PARQUET_TYPE>(
+      data_, data_end_, fixed_len_size_, num_values);
+  if (encoded_len < 0) return false;
+  data_ += encoded_len;
   return true;
 }
 
@@ -432,6 +457,11 @@ bool ScalarColumnReader<InternalType, PARQUET_TYPE, MATERIALIZED>::ReadValue(
         continue_execution = NeedsConversionInline() ?
             ReadSlot<Encoding::PLAIN_DICTIONARY, true>(tuple) :
             ReadSlot<Encoding::PLAIN_DICTIONARY, false>(tuple);
+      } else if (PARQUET_TYPE == parquet::Type::BYTE_ARRAY &&
+                 page_encoding_ == Encoding::DELTA_LENGTH_BYTE_ARRAY) {
+        continue_execution = NeedsConversionInline() ?
+            ReadSlot<Encoding::DELTA_LENGTH_BYTE_ARRAY, true>(tuple) :
+            ReadSlot<Encoding::DELTA_LENGTH_BYTE_ARRAY, false>(tuple);
       } else {
         DCHECK_EQ(page_encoding_, Encoding::PLAIN);
         continue_execution = NeedsConversionInline() ?
@@ -697,6 +727,17 @@ bool ScalarColumnReader<InternalType, PARQUET_TYPE, MATERIALIZED>::MaterializeVa
       return MaterializeValueBatch<IN_COLLECTION, Encoding::PLAIN_DICTIONARY, false>(
           max_values, tuple_size, tuple_mem, num_values);
     }
+  } else if (PARQUET_TYPE == parquet::Type::BYTE_ARRAY &&
+             page_encoding_ == Encoding::DELTA_LENGTH_BYTE_ARRAY) {
+    if (NeedsConversionInline()) {
+      return MaterializeValueBatch<IN_COLLECTION,
+          Encoding::DELTA_LENGTH_BYTE_ARRAY, true>(
+          max_values, tuple_size, tuple_mem, num_values);
+    } else {
+      return MaterializeValueBatch<IN_COLLECTION,
+          Encoding::DELTA_LENGTH_BYTE_ARRAY, false>(
+          max_values, tuple_size, tuple_mem, num_values);
+    }
   } else {
     DCHECK_EQ(page_encoding_, Encoding::PLAIN);
     if (NeedsConversionInline()) {
@@ -853,6 +894,25 @@ Status ScalarColumnReader<StringValue, parquet::Type::BYTE_ARRAY, true>
   return Status::OK();
 }
 
+// StringValue DELTA_LENGTH_BYTE_ARRAY: decode the next string from the decoder.
+// The data pointer is managed by the decoder; data/data_end args are unused.
+template<>
+template<>
+bool ScalarColumnReader<StringValue, parquet::Type::BYTE_ARRAY, true>::
+    DecodeValue<Encoding::DELTA_LENGTH_BYTE_ARRAY>(
+      uint8_t** RESTRICT data, const uint8_t* RESTRICT data_end,
+      StringValue* RESTRICT val) RESTRICT {
+  DCHECK_EQ(page_encoding_, Encoding::DELTA_LENGTH_BYTE_ARRAY);
+  if (UNLIKELY(delta_length_byte_array_decoder_.NextValue(val) != 1)) {
+    SetDeltaLengthDecodeError();
+    return false;
+  }
+  if (!delta_length_byte_array_decoder_.HasOnlySmallStrings()) {
+    col_chunk_reader_.keep_data_page_pool_ = true;
+  }
+  return true;
+}
+
 // StringValue PLAIN: Check if string could be smallified.
 // If not, data page pool has to be kept, because string ptr points into it.
 template<>
@@ -915,6 +975,9 @@ bool ScalarColumnReader<InternalType, PARQUET_TYPE, MATERIALIZED>::DecodeValues(
     int64_t stride, int64_t count, InternalType* RESTRICT out_vals) RESTRICT {
   if (IsDictionaryEncoding(page_encoding_)) {
     return DecodeValues<Encoding::PLAIN_DICTIONARY>(stride, count, out_vals);
+  } else if (PARQUET_TYPE == parquet::Type::BYTE_ARRAY &&
+             page_encoding_ == Encoding::DELTA_LENGTH_BYTE_ARRAY) {
+    return DecodeValues<Encoding::DELTA_LENGTH_BYTE_ARRAY>(stride, count, out_vals);
   } else {
     DCHECK_EQ(page_encoding_, Encoding::PLAIN);
     return DecodeValues<Encoding::PLAIN>(stride, count, out_vals);
@@ -939,6 +1002,25 @@ bool ScalarColumnReader<InternalType, PARQUET_TYPE, MATERIALIZED>::DecodeValues(
       return false;
     }
     data_ += encoded_len;
+  }
+  return true;
+}
+
+// StringValue DELTA_LENGTH_BYTE_ARRAY: decode a batch of strings from the decoder.
+template <>
+template <>
+bool ScalarColumnReader<StringValue, parquet::Type::BYTE_ARRAY, true>
+  ::DecodeValues<Encoding::DELTA_LENGTH_BYTE_ARRAY>(int64_t stride, int64_t count,
+    StringValue* RESTRICT out_vals) RESTRICT {
+  DCHECK_EQ(page_encoding_, Encoding::DELTA_LENGTH_BYTE_ARRAY);
+  int decoded = delta_length_byte_array_decoder_.NextValues(
+      static_cast<int>(count), out_vals, stride);
+  if (UNLIKELY(decoded != static_cast<int>(count))) {
+    SetDeltaLengthDecodeError();
+    return false;
+  }
+  if (!delta_length_byte_array_decoder_.HasOnlySmallStrings()) {
+    col_chunk_reader_.keep_data_page_pool_ = true;
   }
   return true;
 }

@@ -1,0 +1,8 @@
+The mixed_types_delta_length_byte_array.parquet file was generated with the
+parquet_files_generator.py script, which uses PyArrow (https://arrow.apache.org/docs/python).
+
+The file encodes BYTE_ARRAY columns (str_col, bin_col) using the
+DELTA_LENGTH_BYTE_ARRAY Parquet encoding (enum value 6).
+
+To regenerate the file, run from IMPALA_HOME:
+  python3 testdata/parquet_delta_length_byte_array_encoding/parquet_files_generator.py
