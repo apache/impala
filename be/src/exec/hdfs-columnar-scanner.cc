@@ -342,17 +342,21 @@ void HdfsColumnarScanner::AddSkippedReadBytesCounter(int64_t total_bytes) {
 }
 
 void HdfsColumnarScanner::CloseInternal() {
-  // Only aggregate the counters at the end to reduce the contention between scanner
-  // threads.
-  MemPoolCounters counters = scratch_batch_->tuple_mem_pool.GetMemPoolCounters();
-  scratch_mem_alloc_duration_->Merge(counters.sys_alloc_duration);
-  scratch_mem_free_duration_->Merge(counters.sys_free_duration);
-  scratch_mem_alloc_bytes_->Merge(counters.allocated_bytes);
-  // Merge counters of aux_mem_pool
-  counters = scratch_batch_->aux_mem_pool.GetMemPoolCounters();
-  scratch_mem_alloc_duration_->Merge(counters.sys_alloc_duration);
-  scratch_mem_free_duration_->Merge(counters.sys_free_duration);
-  scratch_mem_alloc_bytes_->Merge(counters.allocated_bytes);
+  if (scratch_mem_alloc_duration_ != nullptr) {
+    DCHECK(scratch_mem_free_duration_ != nullptr);
+    DCHECK(scratch_mem_alloc_bytes_ != nullptr);
+    // Only aggregate the counters at the end to reduce the contention between scanner
+    // threads.
+    MemPoolCounters counters = scratch_batch_->tuple_mem_pool.GetMemPoolCounters();
+    scratch_mem_alloc_duration_->Merge(counters.sys_alloc_duration);
+    scratch_mem_free_duration_->Merge(counters.sys_free_duration);
+    scratch_mem_alloc_bytes_->Merge(counters.allocated_bytes);
+    // Merge counters of aux_mem_pool
+    counters = scratch_batch_->aux_mem_pool.GetMemPoolCounters();
+    scratch_mem_alloc_duration_->Merge(counters.sys_alloc_duration);
+    scratch_mem_free_duration_->Merge(counters.sys_free_duration);
+    scratch_mem_alloc_bytes_->Merge(counters.allocated_bytes);
+  }
   HdfsScanner::CloseInternal();
 }
 

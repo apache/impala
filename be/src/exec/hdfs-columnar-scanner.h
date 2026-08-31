@@ -166,9 +166,9 @@ class HdfsColumnarScanner : public HdfsScanner {
   RuntimeProfile::Counter* num_file_metadata_read_;
 
   /// MemPool counters for the scratch batch
-  RuntimeProfile::SummaryStatsCounter* scratch_mem_alloc_duration_;
-  RuntimeProfile::SummaryStatsCounter* scratch_mem_free_duration_;
-  RuntimeProfile::SummaryStatsCounter* scratch_mem_alloc_bytes_;
+  RuntimeProfile::SummaryStatsCounter* scratch_mem_alloc_duration_ = nullptr;
+  RuntimeProfile::SummaryStatsCounter* scratch_mem_free_duration_ = nullptr;
+  RuntimeProfile::SummaryStatsCounter* scratch_mem_alloc_bytes_ = nullptr;
 
   /// Time spent in allocating collection memory and copying memory in doubling
   /// the tuple buffer
