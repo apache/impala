@@ -95,6 +95,26 @@ public abstract class JoinNode extends PlanNode {
   // True if this join is used to do the join between insert and delete delta files.
   protected boolean isDeleteRowsJoin_ = false;
 
+  // Set when an HBO cardinality on one of the inputs is what decided which side this
+  // join builds on, i.e. the cost model reaches the opposite verdict on the estimates
+  // the planner computed itself. INVERTED means HBO caused the inversion, KEPT means it
+  // prevented one. See Planner.invertJoins().
+  public enum HboBuildSideEffect { NONE, INVERTED, KEPT }
+  protected HboBuildSideEffect hboBuildSideEffect_ = HboBuildSideEffect.NONE;
+
+  public void setHboBuildSideEffect(HboBuildSideEffect e) { hboBuildSideEffect_ = e; }
+  public HboBuildSideEffect getHboBuildSideEffect() { return hboBuildSideEffect_; }
+
+  @Override
+  protected String getHboDecisionExplainString(String detailPrefix) {
+    if (hboBuildSideEffect_ == HboBuildSideEffect.NONE) return "";
+    // Says what the planner would have done on its own estimates, so a reader comparing
+    // this plan with a use_hbo_stats=false run knows which difference to expect.
+    return detailPrefix + "HBO chose the build side: without it this join would "
+        + (hboBuildSideEffect_ == HboBuildSideEffect.INVERTED ? "not " : "")
+        + "have been inverted\n";
+  }
+
   public void setIsDeleteRowsJoin() {
     isDeleteRowsJoin_ = true;
     displayName_ = "DELETE EVENTS " + displayName_;

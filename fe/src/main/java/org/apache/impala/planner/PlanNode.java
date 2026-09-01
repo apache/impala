@@ -313,6 +313,16 @@ abstract public class PlanNode extends TreeNode<PlanNode> {
   public long getLimit() { return limit_; }
   public boolean hasLimit() { return limit_ > -1; }
   public long getCardinality() { return cardinality_; }
+  public boolean hasHboMatch() { return hboMatch_ != null; }
+  /**
+   * The estimate this node carried before an HBO match replaced it, or the current
+   * cardinality when no match applied to this node. Note that a match below this node
+   * has already been folded into both, so this is the estimate without the
+   * substitution on this node rather than without HBO altogether.
+   */
+  public long getCardinalityBeforeHbo() {
+    return hboMatch_ != null ? cardinalityBeforeHbo_ : cardinality_;
+  }
   public int getNumNodes() { return numNodes_; }
   public int getNumInstances() { return numInstances_; }
   public ResourceProfile getNodeResourceProfile() { return nodeResourceProfile_; }
@@ -506,6 +516,9 @@ abstract public class PlanNode extends TreeNode<PlanNode> {
             .append(", ratio=").append(
                 PrintUtils.printTwoDecimalsRatio(cardinality_, cardinalityBeforeHbo_))
             .append("\n");
+      }
+      if (detailLevel.ordinal() >= TExplainLevel.EXTENDED.ordinal()) {
+        expBuilder.append(getHboDecisionExplainString(detailPrefix));
       }
     }
 
@@ -1201,6 +1214,12 @@ abstract public class PlanNode extends TreeNode<PlanNode> {
   }
 
   /** The caveat of the strategy that matched, ready to follow "from HBO" in EXPLAIN. */
+  /**
+   * A line describing a planner decision that an HBO cardinality changed, shown at
+   * EXTENDED and above. Empty unless a node records such a decision.
+   */
+  protected String getHboDecisionExplainString(String detailPrefix) { return ""; }
+
   private String hboCaveat() {
     String caveat = hboMatch_.strategy().getMatchCaveat();
     return caveat.isEmpty() ? "" : ", " + caveat;

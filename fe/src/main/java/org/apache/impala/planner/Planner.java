@@ -1074,12 +1074,13 @@ public class Planner {
         // The current join is a distributed non-equi right outer or semi join
         // which has no backend support. Invert the join to make it executable.
         joinNode.invertJoin();
-      } else if (shouldCheckForInvertJoinCost &&
-          isInvertedJoinCheaper(joinNode, isLocalPlan)) {
+      } else if (shouldCheckForInvertJoinCost) {
         // IMPALA-15196: Calcite plan should avoid the invert joins in its
         // optimization phase that are related to costs since it has already
         // been evaluated.
-        joinNode.invertJoin();
+        boolean invert = isInvertedJoinCheaper(joinNode, isLocalPlan);
+        joinNode.setHboBuildSideEffect(hboBuildSideEffect(joinNode, isLocalPlan, invert));
+        if (invert) joinNode.invertJoin();
       }
       // Re-compute the numNodes and numInstances based on the new input order
       joinNode.recomputeNodes();
@@ -1138,8 +1139,18 @@ public class Planner {
    * bytes is needed to justify inversion.
    */
   public static boolean isInvertedJoinCheaper(JoinNode joinNode, boolean isLocalPlan) {
-    long lhsCard = joinNode.getChild(0).getCardinality();
-    long rhsCard = joinNode.getChild(1).getCardinality();
+    return isInvertedJoinCheaper(joinNode, isLocalPlan,
+        joinNode.getChild(0).getCardinality(), joinNode.getChild(1).getCardinality());
+  }
+
+  /**
+   * The cost model of isInvertedJoinCheaper() run on the given input cardinalities
+   * rather than the ones the inputs currently carry. Everything else the model reads -
+   * row sizes and parallelism - is unaffected by an HBO substitution, so passing the
+   * cardinalities is enough to ask what the verdict would have been without one.
+   */
+  private static boolean isInvertedJoinCheaper(
+      JoinNode joinNode, boolean isLocalPlan, long lhsCard, long rhsCard) {
     // Need cardinality estimates to make a decision.
     if (lhsCard == -1 || rhsCard == -1) return false;
     double lhsBytes = lhsCard * joinNode.getChild(0).getAvgRowSize();
@@ -1176,6 +1187,32 @@ public class Planner {
   }
 
   /**
+   * Returns how an HBO cardinality on this join's inputs affected the build side:
+   * INVERTED when the substitution is what caused the inversion, KEPT when it is what
+   * prevented one, and NONE when the verdict holds either way or no input carries a
+   * match.
+   *
+   * The comparison is against the estimates the planner computed for the two inputs
+   * themselves (PlanNode.getCardinalityBeforeHbo()). A match further down has already
+   * been folded into those, so this answers "did the substitution on an input change
+   * this decision", not "would the plan differ with use_hbo_stats=false" - the latter
+   * needs a second planning pass.
+   */
+  private static JoinNode.HboBuildSideEffect hboBuildSideEffect(
+      JoinNode joinNode, boolean isLocalPlan, boolean invertVerdict) {
+    PlanNode lhs = joinNode.getChild(0);
+    PlanNode rhs = joinNode.getChild(1);
+    if (!lhs.hasHboMatch() && !rhs.hasHboMatch()) {
+      return JoinNode.HboBuildSideEffect.NONE;
+    }
+    boolean withoutHbo = isInvertedJoinCheaper(joinNode, isLocalPlan,
+        lhs.getCardinalityBeforeHbo(), rhs.getCardinalityBeforeHbo());
+    if (withoutHbo == invertVerdict) return JoinNode.HboBuildSideEffect.NONE;
+    return invertVerdict ? JoinNode.HboBuildSideEffect.INVERTED
+                         : JoinNode.HboBuildSideEffect.KEPT;
+  }
+
+  /**
    * Converts hash joins to nested-loop joins if the right-side is a SingularRowSrcNode.
    * Does not convert Null Aware Anti Joins because we only support that join op with
    * a hash join.
@@ -1201,6 +1238,9 @@ public class Planner {
         joinNode.getDistributionModeHint(), joinNode.getJoinOp(), otherJoinConjuncts);
     newJoinNode.getConjuncts().addAll(joinNode.getConjuncts());
     newJoinNode.setId(joinNode.getId());
+    // This replaces a node invertJoins() has already ruled on, so carry its verdict
+    // over rather than losing it with the old node.
+    newJoinNode.setHboBuildSideEffect(joinNode.getHboBuildSideEffect());
     newJoinNode.init(analyzer);
     return newJoinNode;
   }
