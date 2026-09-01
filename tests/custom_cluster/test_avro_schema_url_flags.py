@@ -23,6 +23,7 @@
 # When avro.schema.literal is also present, the URL is never evaluated and
 # no URI privilege is required.
 
+from __future__ import absolute_import
 import pytest
 
 from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
