@@ -73,6 +73,21 @@ DEFINE_int64(thrift_external_rpc_max_message_size, 2L * 1024 * 1024 * 1024,
     "This must be set to at least the default defined in Thrift (100MB). "
     "Setting 0 or a negative value will use the default defined in Thrift.");
 
+DEFINE_int32(internal_keepalive_probe_period_s, 60,
+    "The interval in seconds between the last data packet sent and the first TCP "
+    "keepalive probe on internal Thrift connections."
+    "Set to 0 to disable TCP keepalive on internal Thrift connections.");
+
+DEFINE_int32(internal_keepalive_retry_period_s, 3,
+    "The interval in seconds between TCP keepalive retries on internal Thrift "
+    "connections."
+    "Effective only if --internal_keepalive_probe_period_s is not 0.");
+
+DEFINE_int32(internal_keepalive_retry_count, 10,
+    "The maximum number of TCP keepalive retries on internal Thrift connections "
+    "before declaring the connection dead. Effective only if "
+    "--internal_keepalive_probe_period_s is not 0.");
+
 using namespace apache::thrift;
 using namespace apache::thrift::transport;
 using namespace apache::thrift::server;
@@ -232,6 +247,25 @@ Status SetKeepAliveOptionsForSocket(THRIFT_SOCKET socket, int32_t probe_period_s
         "TCP_KEEPCNT (keepalive retry count)", retry_count));
   }
   return Status::OK();
+}
+
+Status ApplyInternalClientKeepAlive(TSocket* socket) {
+  DCHECK(socket != nullptr);
+  if (socket == nullptr) {
+    return Status("socket cannot be null");
+  }
+  if (FLAGS_internal_keepalive_probe_period_s <= 0) return Status::OK();
+
+  socket->setKeepAlive(true);
+
+  THRIFT_SOCKET fd = socket->getSocketFD();
+  DCHECK_NE(fd, THRIFT_INVALID_SOCKET);
+  if (fd == THRIFT_INVALID_SOCKET) {
+    return Status("ApplyInternalClientKeepAlive called before the socket was "
+                  "opened. Skipping TCP_KEEP* tuning");
+  }
+  return SetKeepAliveOptionsForSocket(fd, FLAGS_internal_keepalive_probe_period_s,
+      FLAGS_internal_keepalive_retry_period_s, FLAGS_internal_keepalive_retry_count);
 }
 
 static void ThriftOutputFunction(const char* output) {

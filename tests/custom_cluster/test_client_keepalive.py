@@ -41,24 +41,6 @@ class TestClientKeepalive(CustomClusterTestSuite):
 
   KEEPALIVE_ARGS = ("--client_keepalive_probe_period_s=600")
 
-  def get_ss_command(self):
-    # HACK: Most systems have ss on the PATH, but sometimes the PATH is misconfigured
-    # while ss is still available in /usr/sbin. This tries the PATH and then falls back
-    # to trying /usr/sbin/ss.
-    possible_ss_commands = ['ss', '/usr/sbin/ss']
-    with open(os.devnull, "w") as devnull:
-      for ss_command in possible_ss_commands:
-        try:
-          retcode = subprocess.call([ss_command], stdout=devnull, stderr=devnull)
-          LOG.info("{0} returns {1}".format(ss_command, retcode))
-          if retcode == 0:
-            return ss_command
-        except Exception as e:
-          LOG.info(e)
-          pass
-
-    raise Exception("No valid ss executable. Tried: {0}".format(possible_ss_commands))
-
   def check_keepalive(self, vector, ssl):
     ss = self.get_ss_command()
     impalad_port = get_impalad_port(vector)

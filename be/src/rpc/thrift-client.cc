@@ -66,6 +66,13 @@ Status ThriftClientImpl::Open() {
   try {
     if (!transport_->isOpen()) {
       transport_->open();
+
+      Status keepalive_status = ApplyInternalClientKeepAlive(socket_.get());
+      if (!keepalive_status.ok()) {
+        LOG(WARNING) << "Could not apply keepalive to internal Thrift client "
+                     << "socket for " << TNetworkAddressToString(address_) << ": "
+                     << keepalive_status.GetDetail();
+      }
     }
   } catch (const TException& e) {
     try {

@@ -192,6 +192,10 @@ class ImpalaTlsSocketFactory : public apache::thrift::transport::TSSLSocketFacto
 Status SetKeepAliveOptionsForSocket(THRIFT_SOCKET, int32_t probe_period_s,
     int32_t retry_period_s, int32_t retry_count);
 
+// Apply TCP keepalive options to the provided TSocket. This is used for internal Thrift
+// connections.
+Status ApplyInternalClientKeepAlive(apache::thrift::transport::TSocket* socket);
+
 // Impala uses TServerSocket and TSSLServerSocket for external client connections.
 // Thrift has a built-in ability to turn on keepalive for the TCP socket. However, it
 // does not have an ability to tune the keepalive options, so the socket would use the
@@ -202,6 +206,8 @@ Status SetKeepAliveOptionsForSocket(THRIFT_SOCKET, int32_t probe_period_s,
 //  - probe period / TCP_KEEPIDLE: Time before first keepalive probe
 //  - retry period / TCP_KEEPINTVL: Time between retries after keepalive starts
 //  - number of retries / TCP_KEEPCNT: Maximum number of retries
+// A failure to apply these options is logged but does not prevent the connection
+// from being accepted, matching ApplyInternalClientKeepAlive's behavior.
 template <typename ThriftServerSocketType>
 class ImpalaKeepAliveServerSocket : public ThriftServerSocketType {
  public:
@@ -231,9 +237,8 @@ class ImpalaKeepAliveServerSocket : public ThriftServerSocketType {
       Status status = SetKeepAliveOptionsForSocket(socket, keepalive_probe_period_s_,
           keepalive_retry_period_s_, keepalive_retry_count_);
       if (!status.ok()) {
-        throw apache::thrift::transport::TTransportException(
-            apache::thrift::transport::TTransportException::INTERNAL_ERROR,
-            status.msg().msg());
+        LOG(WARNING) << "Failed to apply keepalive options to accepted Thrift "
+                     << "socket: " << status.GetDetail();
       }
     }
     return tsocket;

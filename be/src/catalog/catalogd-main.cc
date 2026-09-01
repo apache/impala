@@ -39,6 +39,9 @@
 
 DECLARE_int32(catalog_service_port);
 DECLARE_bool(enable_workload_mgmt);
+DECLARE_int32(internal_keepalive_probe_period_s);
+DECLARE_int32(internal_keepalive_retry_count);
+DECLARE_int32(internal_keepalive_retry_period_s);
 DECLARE_int32(metrics_webserver_port);
 DECLARE_int32(webserver_port);
 DECLARE_int32(state_store_subscriber_port);
@@ -89,6 +92,8 @@ int CatalogdMain(int argc, char** argv) {
   ThriftServerBuilder builder("CatalogService", processor, FLAGS_catalog_service_port);
   // Mark this as an internal service to use a more permissive Thrift max message size
   builder.is_external_facing(false);
+  builder.keepalive(FLAGS_internal_keepalive_probe_period_s,
+      FLAGS_internal_keepalive_retry_period_s, FLAGS_internal_keepalive_retry_count);
 
   if (IsInternalTlsConfigured()) {
     SSLProtocol ssl_version;

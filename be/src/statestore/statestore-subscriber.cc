@@ -71,6 +71,9 @@ DEFINE_int32(statestore_client_rpc_timeout_ms, 300000, "(Advanced) The underlyin
     "TSocket send/recv timeout in milliseconds for a catalog client RPC.");
 
 DECLARE_bool(enable_statestored_ha);
+DECLARE_int32(internal_keepalive_probe_period_s);
+DECLARE_int32(internal_keepalive_retry_count);
+DECLARE_int32(internal_keepalive_retry_period_s);
 DECLARE_bool(tolerate_statestore_startup_delay);
 DECLARE_string(debug_actions);
 DECLARE_string(ssl_client_ca_certificate);
@@ -307,6 +310,9 @@ Status StatestoreSubscriber::Start() {
       "StatestoreSubscriber", processor, heartbeat_address_.port);
   // Mark this as an internal service to use a more permissive Thrift max message size
   builder.is_external_facing(false);
+  builder.keepalive(FLAGS_internal_keepalive_probe_period_s,
+      FLAGS_internal_keepalive_retry_period_s, FLAGS_internal_keepalive_retry_count);
+
   if (IsInternalTlsConfigured()) {
     SSLProtocol ssl_version;
     RETURN_IF_ERROR(

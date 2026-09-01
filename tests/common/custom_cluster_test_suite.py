@@ -131,6 +131,8 @@ class CustomClusterTestSuite(ImpalaTestSuite):
   # set and accessed via @classmethod functions set/get_current_test_method(). This is
   # awkward, but it should work because custom cluster tests are single threaded.
   CURRENT_TEST_METHOD_NAME = None
+  ss_cmd_cache = None
+
 
   @classmethod
   def add_test_dimensions(cls):
@@ -873,3 +875,26 @@ class CustomClusterTestSuite(ImpalaTestSuite):
     """
     service = self.cluster.impalads[coord_idx].service
     return service.read_query_profile_page(query_id)
+
+  @classmethod
+  def get_ss_command(cls):
+    # HACK: Most systems have ss on the PATH, but sometimes the PATH is misconfigured
+    # while ss is still available in /usr/sbin. This tries the PATH and then falls back
+    # to trying /usr/sbin/ss.
+    if cls.ss_cmd_cache:
+      return cls.ss_cmd_cache
+
+    possible_ss_commands = ['ss', '/usr/sbin/ss']
+    with open(os.devnull, "w") as devnull:
+      for ss_command in possible_ss_commands:
+        try:
+          retcode = subprocess.call([ss_command], stdout=devnull, stderr=devnull)
+          LOG.info("{0} returns {1}".format(ss_command, retcode))
+          if retcode == 0:
+            cls.ss_cmd_cache = ss_command
+            return ss_command
+        except Exception as e:
+          LOG.info(e)
+          pass
+
+    raise Exception("No valid ss executable. Tried: {0}".format(possible_ss_commands))

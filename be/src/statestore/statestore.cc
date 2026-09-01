@@ -168,6 +168,9 @@ DEFINE_int64(update_statestore_rpc_resend_interval_ms, 100, "(Advanced) Interval
     "to subscribers if the statestore has failed to send the RPCs to the subscribers.");
 
 DECLARE_string(hostname);
+DECLARE_int32(internal_keepalive_probe_period_s);
+DECLARE_int32(internal_keepalive_retry_count);
+DECLARE_int32(internal_keepalive_retry_period_s);
 DECLARE_bool(enable_catalogd_ha);
 DECLARE_int64(active_catalogd_designation_monitoring_interval_ms);
 DECLARE_int64(update_catalogd_rpc_resend_interval_ms);
@@ -795,6 +798,8 @@ Status Statestore::Init(int32_t state_store_port) {
   ThriftServerBuilder builder("StatestoreService", processor, state_store_port);
   // Mark this as an internal service to use a more permissive Thrift max message size
   builder.is_external_facing(false);
+  builder.keepalive(FLAGS_internal_keepalive_probe_period_s,
+      FLAGS_internal_keepalive_retry_period_s, FLAGS_internal_keepalive_retry_count);
   if (IsInternalTlsConfigured()) {
     SSLProtocol ssl_version;
     RETURN_IF_ERROR(
@@ -1844,6 +1849,8 @@ Status Statestore::InitStatestoreHa(
   ThriftServerBuilder builder("StatestoreHaService", processor, statestore_ha_port);
   // Mark this as an internal service to use a more permissive Thrift max message size
   builder.is_external_facing(false);
+  builder.keepalive(FLAGS_internal_keepalive_probe_period_s,
+      FLAGS_internal_keepalive_retry_period_s, FLAGS_internal_keepalive_retry_count);
   if (IsInternalTlsConfigured()) {
     SSLProtocol ssl_version;
     RETURN_IF_ERROR(
