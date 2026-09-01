@@ -39,13 +39,13 @@ public interface AuthorizationManager {
   /**
    * Creates a role.
    */
-  void createRole(User requestingUser, TCreateDropRoleParams params,
+  void createRole(TCatalogServiceRequestHeader header, TCreateDropRoleParams params,
       TDdlExecResponse response) throws ImpalaException;
 
   /**
    * Drops a role.
    */
-  void dropRole(User requestingUser, TCreateDropRoleParams params,
+  void dropRole(TCatalogServiceRequestHeader header, TCreateDropRoleParams params,
       TDdlExecResponse response) throws ImpalaException;
 
   /**

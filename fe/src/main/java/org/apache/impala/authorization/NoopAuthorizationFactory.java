@@ -77,15 +77,15 @@ public class NoopAuthorizationFactory implements AuthorizationFactory {
 
   public static class NoopAuthorizationManager implements AuthorizationManager {
     @Override
-    public void createRole(User requestingUser, TCreateDropRoleParams params,
-        TDdlExecResponse response) throws ImpalaException {
+    public void createRole(TCatalogServiceRequestHeader header,
+        TCreateDropRoleParams params, TDdlExecResponse response) throws ImpalaException {
       throw new UnsupportedOperationException(String.format("%s is not supported",
           ClassUtil.getMethodName()));
     }
 
     @Override
-    public void dropRole(User requestingUser, TCreateDropRoleParams params,
-        TDdlExecResponse response) throws ImpalaException {
+    public void dropRole(TCatalogServiceRequestHeader header,
+        TCreateDropRoleParams params, TDdlExecResponse response) throws ImpalaException {
       throw new UnsupportedOperationException(String.format("%s is not supported",
           ClassUtil.getMethodName()));
     }

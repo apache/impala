@@ -101,7 +101,6 @@ import org.apache.impala.analysis.TableName;
 import org.apache.impala.authorization.AuthorizationConfig;
 import org.apache.impala.authorization.AuthorizationDelta;
 import org.apache.impala.authorization.AuthorizationManager;
-import org.apache.impala.authorization.User;
 import org.apache.impala.catalog.CatalogException;
 import org.apache.impala.catalog.CatalogObject;
 import org.apache.impala.catalog.CatalogServiceCatalog;
@@ -464,14 +463,10 @@ public class CatalogOpExecutor {
     TDdlExecResponse response = new TDdlExecResponse();
     response.setResult(new TCatalogUpdateResult());
     response.getResult().setCatalog_service_id(JniCatalog.getServiceId());
-    User requestingUser = null;
     TUniqueId queryId = null;
     boolean wantMinimalResult = false;
     if (ddlRequest.isSetHeader()) {
       TCatalogServiceRequestHeader header = ddlRequest.getHeader();
-      if (header.isSetRequesting_user()) {
-        requestingUser = new User(ddlRequest.getHeader().getRequesting_user());
-      }
       wantMinimalResult = ddlRequest.getHeader().isWant_minimal_response();
       queryId = header.getQuery_id();
     }
@@ -611,14 +606,14 @@ public class CatalogOpExecutor {
               ddlRequest.getCreate_drop_role_params();
           tTableName = Optional.of(new TTableName(create_role_params.role_name, ""));
           catalogOpTracker_.increment(ddlRequest, tTableName);
-          createRole(requestingUser, create_role_params, response);
+          createRole(ddlRequest.getHeader(), create_role_params, response);
           break;
         case DROP_ROLE:
           TCreateDropRoleParams drop_role_params =
             ddlRequest.getCreate_drop_role_params();
           tTableName = Optional.of(new TTableName(drop_role_params.role_name, ""));
           catalogOpTracker_.increment(ddlRequest, tTableName);
-          dropRole(requestingUser, drop_role_params, response);
+          dropRole(ddlRequest.getHeader(), drop_role_params, response);
           break;
         case GRANT_ROLE:
           TGrantRevokeRoleParams grant_role_params =
@@ -7183,28 +7178,26 @@ public class CatalogOpExecutor {
   /**
    * Creates a role on behalf of the requestingUser.
    */
-  private void createRole(User requestingUser,
+  private void createRole(TCatalogServiceRequestHeader header,
       TCreateDropRoleParams createDropRoleParams, TDdlExecResponse resp)
       throws ImpalaException {
-    Preconditions.checkNotNull(requestingUser);
     Preconditions.checkNotNull(createDropRoleParams);
     Preconditions.checkNotNull(resp);
     Preconditions.checkArgument(!createDropRoleParams.isIs_drop());
-    authzManager_.createRole(requestingUser, createDropRoleParams, resp);
+    authzManager_.createRole(header, createDropRoleParams, resp);
     addSummary(resp, "Role has been created.");
   }
 
   /**
    * Drops a role on behalf of the requestingUser.
    */
-  private void dropRole(User requestingUser,
+  private void dropRole(TCatalogServiceRequestHeader header,
       TCreateDropRoleParams createDropRoleParams, TDdlExecResponse resp)
       throws ImpalaException {
-    Preconditions.checkNotNull(requestingUser);
     Preconditions.checkNotNull(createDropRoleParams);
     Preconditions.checkNotNull(resp);
     Preconditions.checkArgument(createDropRoleParams.isIs_drop());
-    authzManager_.dropRole(requestingUser, createDropRoleParams, resp);
+    authzManager_.dropRole(header, createDropRoleParams, resp);
     addSummary(resp, "Role has been dropped.");
   }
 

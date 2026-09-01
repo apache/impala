@@ -81,8 +81,12 @@ public class RangerCatalogdAuthorizationManager implements AuthorizationManager 
   private static final String AUTHZ_CACHE_INVALIDATION_MARKER = "ranger";
 
   public static final String ALTER_ACCESS_TYPE = "alter";
+  public static final String CREATE_ACCESS_TYPE = "create";
+  public static final String DROP_ACCESS_TYPE = "drop";
   public static final String GRANT_ROLE_ACTION = "GRANT_ROLE";
   public static final String REVOKE_ROLE_ACTION = "REVOKE_ROLE";
+  public static final String CREATE_ROLE_ACTION = "CREATEROLE";
+  public static final String DROP_ROLE_ACTION = "DROPROLE";
 
   private final Supplier<RangerImpalaPlugin> plugin_;
   private final CatalogServiceCatalog catalog_;
@@ -94,20 +98,26 @@ public class RangerCatalogdAuthorizationManager implements AuthorizationManager 
   }
 
   @Override
-  public void createRole(User requestingUser, TCreateDropRoleParams params,
-      TDdlExecResponse response) throws ImpalaException {
+  public void createRole(TCatalogServiceRequestHeader header,
+      TCreateDropRoleParams params, TDdlExecResponse response) throws ImpalaException {
     RangerRole role = new RangerRole();
     role.setName(params.getRole_name());
+    Preconditions.checkArgument(header.isSetRequesting_user());
+    User requestingUser = new User(header.getRequesting_user());
     role.setCreatedByUser(requestingUser.getShortName());
-
+    boolean isAllowed = false;
     try {
       plugin_.get().createRole(role, /*resultProcessor*/ null);
+      isAllowed = true;
     } catch (Exception e) {
       LOG.error("Error creating role {} by user {} in Ranger.", params.getRole_name(),
           requestingUser.getShortName());
       throw new InternalException("Error creating role " + params.getRole_name() +
           " by user " + requestingUser.getShortName() +
           " in Ranger. Ranger error message: " + e.getMessage());
+    } finally {
+      auditAndFlush(header, CREATE_ACCESS_TYPE, CREATE_ROLE_ACTION, isAllowed,
+          requestingUser);
     }
     // Update the authorization refresh marker so that the Impalads can refresh their
     // Ranger caches.
@@ -115,8 +125,11 @@ public class RangerCatalogdAuthorizationManager implements AuthorizationManager 
   }
 
   @Override
-  public void dropRole(User requestingUser, TCreateDropRoleParams params,
+  public void dropRole(TCatalogServiceRequestHeader header, TCreateDropRoleParams params,
       TDdlExecResponse response) throws ImpalaException {
+    Preconditions.checkArgument(header.isSetRequesting_user());
+    User requestingUser = new User(header.getRequesting_user());
+    boolean isAllowed = false;
     try {
       // We found that when a non-Ranger administrator is trying to remove a role that
       // does not exist in Ranger, the error message returned from Ranger would indicate
@@ -128,12 +141,16 @@ public class RangerCatalogdAuthorizationManager implements AuthorizationManager 
       RangerUtil.validateRangerAdmin(plugin_.get(), requestingUser.getShortName());
       plugin_.get().dropRole(requestingUser.getShortName(), params.getRole_name(),
           /*resultProcessor*/ null);
+      isAllowed = true;
     } catch (Exception e) {
       LOG.error("Error dropping role {} by user {} in Ranger.", params.getRole_name(),
           requestingUser.getShortName());
       throw new InternalException("Error dropping role " + params.getRole_name() +
           " by user " + requestingUser.getShortName() +
           " in Ranger. Ranger error message: " + e.getMessage());
+    } finally {
+      auditAndFlush(header, DROP_ACCESS_TYPE, DROP_ROLE_ACTION, isAllowed,
+          requestingUser);
     }
     // Update the authorization refresh marker so that the Impalads can refresh their
     // Ranger caches.
@@ -153,8 +170,8 @@ public class RangerCatalogdAuthorizationManager implements AuthorizationManager 
         "%s is not supported in Catalogd", ClassUtil.getMethodName()));
   }
 
-  private void auditGrantRevokeRole(TCatalogServiceRequestHeader header, String action,
-      boolean isAllowed, User requestingUser) throws InternalException {
+  private void auditAndFlush(TCatalogServiceRequestHeader header, String accessType,
+      String action, boolean isAllowed, User requestingUser) throws InternalException {
     // We produce the Ranger audit event here. This mimics what
     // RangerHiveAuthorizer#grantRole() and revokeRole() do in their finally blocks.
     RangerAccessResourceImpl resource = new RangerImpalaResourceBuilder()
@@ -166,7 +183,7 @@ public class RangerCatalogdAuthorizationManager implements AuthorizationManager 
     // determined only by 'access/accessType' of 'accessRequest'.
     RangerAccessRequestImpl accessRequest = createRangerAccessRequest(resource,
         requestingUser.getShortName(), header.getRedacted_sql_stmt(), plugin_.get(),
-        /* accessType */ ALTER_ACCESS_TYPE, /* action */ action,
+        /* accessType */ accessType, /* action */ action,
         header.getClient_ip());
     RangerAccessResult accessResult = createRangerAccessResult(plugin_.get(),
         accessRequest, isAllowed);
@@ -252,7 +269,8 @@ public class RangerCatalogdAuthorizationManager implements AuthorizationManager 
             "Ranger error message: " + e.getMessage());
       }
     } finally {
-      auditGrantRevokeRole(header, GRANT_ROLE_ACTION, isAllowed, requestingUser);
+      auditAndFlush(header, ALTER_ACCESS_TYPE, GRANT_ROLE_ACTION, isAllowed,
+          requestingUser);
     }
     // Update the authorization refresh marker so that the Impalads can refresh their
     // Ranger caches.
@@ -288,7 +306,8 @@ public class RangerCatalogdAuthorizationManager implements AuthorizationManager 
           requestingUser.getShortName() + " in Ranger. " +
           "Ranger error message: " + e.getMessage());
     } finally {
-      auditGrantRevokeRole(header, REVOKE_ROLE_ACTION, isAllowed, requestingUser);
+      auditAndFlush(header, ALTER_ACCESS_TYPE, REVOKE_ROLE_ACTION, isAllowed,
+          requestingUser);
     }
     // Update the authorization refresh marker so that the Impalads can refresh their
     // Ranger caches.

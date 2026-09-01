@@ -22,7 +22,6 @@ import com.google.common.collect.Lists;
 import org.apache.hadoop.hive.metastore.api.PrincipalType;
 import org.apache.impala.authorization.AuthorizationDelta;
 import org.apache.impala.authorization.AuthorizationManager;
-import org.apache.impala.authorization.User;
 import org.apache.impala.catalog.Type;
 import org.apache.impala.common.ImpalaException;
 import org.apache.impala.common.InternalException;
@@ -89,14 +88,14 @@ public class RangerImpaladAuthorizationManager implements AuthorizationManager {
   }
 
   @Override
-  public void createRole(User requestingUser, TCreateDropRoleParams params,
-      TDdlExecResponse response) throws ImpalaException {
+  public void createRole(TCatalogServiceRequestHeader header,
+      TCreateDropRoleParams params, TDdlExecResponse response) throws ImpalaException {
     throw new UnsupportedOperationException(String.format(
         "%s is not supported in Impalad", ClassUtil.getMethodName()));
   }
 
   @Override
-  public void dropRole(User requestingUser, TCreateDropRoleParams params,
+  public void dropRole(TCatalogServiceRequestHeader header, TCreateDropRoleParams params,
       TDdlExecResponse response) throws ImpalaException {
     throw new UnsupportedOperationException(String.format(
         "%s is not supported in Impalad", ClassUtil.getMethodName()));

@@ -17,6 +17,7 @@
 
 package org.apache.impala.authorization.ranger;
 
+import org.apache.impala.analysis.CreateDropRoleStmt;
 import org.apache.impala.analysis.GrantRevokeRoleStmt;
 import org.apache.impala.authorization.AuthorizationProvider;
 import org.apache.impala.authorization.AuthorizationTestBase;
@@ -25,6 +26,7 @@ import org.apache.impala.common.ImpalaException;
 import org.apache.impala.common.InternalException;
 import org.apache.impala.thrift.TCatalogServiceRequestHeader;
 import org.apache.impala.thrift.TCatalogUpdateResult;
+import org.apache.impala.thrift.TCreateDropRoleParams;
 import org.apache.impala.thrift.TDdlExecResponse;
 import org.apache.impala.thrift.TGrantRevokeRoleParams;
 import org.apache.ranger.audit.model.AuthzAuditEvent;
@@ -44,7 +46,8 @@ public class RangerCatalogdAuthorizationManagerTest extends AuthorizationTestBas
   private static List<AutoFlush> capturedAuditHandlers;
   private static RangerCatalogdAuthorizationManager authzManager;
   private static String CLIENT_IP_ADDRESS = "127.0.0.1";
-  private static String TEST_ROLE = "test_role";
+  private static String TEST_ROLE_1 = "test_role_1";
+  private static String TEST_ROLE_2 = "test_role_2";
   private static String GRANTEE_GROUP = "non_owner";
   private static String GRANTEE_USER = "non_owner";
   private static String REVOKEE_GROUP = "non_owner";
@@ -52,6 +55,10 @@ public class RangerCatalogdAuthorizationManagerTest extends AuthorizationTestBas
   private static boolean isSetupDone = false;
   private static String ALTER_ACTION = "alter";
   private static String ALTER_ACCESS_TYPE = "ALTER";
+  private static String CREATE_ACTION = "create";
+  private static String CREATE_ACCESS_TYPE = "CREATE";
+  private static String DROP_ACTION = "drop";
+  private static String DROP_ACCESS_TYPE = "DROP";
   private static RangerImpalaPlugin staticPluginRef;
 
   public RangerCatalogdAuthorizationManagerTest() throws ImpalaException {
@@ -74,13 +81,13 @@ public class RangerCatalogdAuthorizationManagerTest extends AuthorizationTestBas
 
   @Before
   public void setUpTest() throws Exception {
-    // The role 'TEST_ROLE' only has to be created once for the tests to run.
+    // The role 'TEST_ROLE_1' only has to be created once for the tests to run.
     // We do not annotate this method as @BeforeClass and call
     // 'staticPluginRef.createRole()' because 'staticPluginRef' would have been null
     // when this method is called.
     if (!isSetupDone) {
       RangerRole role = new RangerRole();
-      role.setName(TEST_ROLE);
+      role.setName(TEST_ROLE_1);
       role.setCreatedByUser(RANGER_ADMIN.getName());
       rangerImpalaPlugin_.createRole(role, /* resultProcessor */ null);
       isSetupDone = true;
@@ -91,8 +98,45 @@ public class RangerCatalogdAuthorizationManagerTest extends AuthorizationTestBas
   public static void teardown() throws Exception {
     // We do not call rangerImpalaPlugin_.createRole() because 'rangerImpalaPlugin_' is
     // not static.
-    staticPluginRef.dropRole(RANGER_ADMIN.getName(), TEST_ROLE,
+    staticPluginRef.dropRole(RANGER_ADMIN.getName(), TEST_ROLE_1,
         /* resultProcessor */ null);
+  }
+
+  @Test
+  public void testCreateAndDropRoleAuditEvents() throws Exception {
+    createRole(handlers -> {
+      assertEquals(1, handlers.size());
+      List<AuthzAuditEvent> events = handlers.get(0).getAuthzEvents();
+      assertEventEquals(events.get(0), CREATE_ACTION, CREATE_ACCESS_TYPE,
+          RANGER_ADMIN.getName(), /* expectSuccess */ true, /* policyId */ -1L,
+          CLIENT_IP_ADDRESS, "CREATE ROLE test_role_2",
+          /* resultReason */ null, /* resultPath */ null, /* resultType */ null);
+    }, RANGER_ADMIN.getName(), TEST_ROLE_2, /* expectSuccess */ true);
+    dropRole(handlers -> {
+      assertEquals(1, handlers.size());
+      List<AuthzAuditEvent> events = handlers.get(0).getAuthzEvents();
+      assertEventEquals(events.get(0), DROP_ACTION, DROP_ACCESS_TYPE,
+          RANGER_ADMIN.getName(), /* expectSuccess */ true, /* policyId */ -1L,
+          CLIENT_IP_ADDRESS, "DROP ROLE test_role_2",
+          /* resultReason */ null, /* resultPath */ null, /* resultType */ null);
+    }, RANGER_ADMIN.getName(), TEST_ROLE_2, /* expectSuccess */ true);
+
+    createRole(handlers -> {
+      assertEquals(1, handlers.size());
+      List<AuthzAuditEvent> events = handlers.get(0).getAuthzEvents();
+      assertEventEquals(events.get(0), CREATE_ACTION, CREATE_ACCESS_TYPE,
+          OWNER_USER.getName(), /* expectSuccess */ false, /* policyId */ -1L,
+          CLIENT_IP_ADDRESS, "CREATE ROLE test_role_2",
+          /* resultReason */ null, /* resultPath */ null, /* resultType */ null);
+    }, OWNER_USER.getName(), TEST_ROLE_2, /* expectSuccess */ false);
+    dropRole(handlers -> {
+      assertEquals(1, handlers.size());
+      List<AuthzAuditEvent> events = handlers.get(0).getAuthzEvents();
+      assertEventEquals(events.get(0), DROP_ACTION, DROP_ACCESS_TYPE,
+          OWNER_USER.getName(), /* expectSuccess */ false, /* policyId */ -1L,
+          CLIENT_IP_ADDRESS, "DROP ROLE test_role_2",
+          /* resultReason */ null, /* resultPath */ null, /* resultType */ null);
+    }, OWNER_USER.getName(), TEST_ROLE_2, /* expectSuccess */ false);
   }
 
   @Test
@@ -102,36 +146,36 @@ public class RangerCatalogdAuthorizationManagerTest extends AuthorizationTestBas
           List<AuthzAuditEvent> events = handlers.get(0).getAuthzEvents();
           assertEventEquals(events.get(0), ALTER_ACTION, ALTER_ACCESS_TYPE,
               RANGER_ADMIN.getName(), /* expectSuccess */ true, /* policyId */ -1L,
-              CLIENT_IP_ADDRESS, "GRANT ROLE test_role TO USER non_owner",
+              CLIENT_IP_ADDRESS, "GRANT ROLE test_role_1 TO USER non_owner",
               /* resultReason */ null, /* resultPath */ null, /* resultType */ null);
-        }, RANGER_ADMIN.getName(), TEST_ROLE, null, GRANTEE_USER,
+        }, RANGER_ADMIN.getName(), TEST_ROLE_1, null, GRANTEE_USER,
         /* expectSuccess */ true);
     grantRole(handlers -> {
           assertEquals(1, handlers.size());
           List<AuthzAuditEvent> events = handlers.get(0).getAuthzEvents();
           assertEventEquals(events.get(0), ALTER_ACTION, ALTER_ACCESS_TYPE,
               OWNER_USER.getName(), /* expectSuccess */ false, /* policyId */ -1L,
-              CLIENT_IP_ADDRESS, "GRANT ROLE test_role TO USER non_owner",
+              CLIENT_IP_ADDRESS, "GRANT ROLE test_role_1 TO USER non_owner",
               /* resultReason */ null, /* resultPath */ null, /* resultType */ null);
-        }, OWNER_USER.getName(), TEST_ROLE, null, GRANTEE_USER,
+        }, OWNER_USER.getName(), TEST_ROLE_1, null, GRANTEE_USER,
         /* expectSuccess */ false);
     grantRole(handlers -> {
           assertEquals(1, handlers.size());
           List<AuthzAuditEvent> events = handlers.get(0).getAuthzEvents();
           assertEventEquals(events.get(0), ALTER_ACTION, ALTER_ACCESS_TYPE,
               RANGER_ADMIN.getName(), /* expectSuccess */ true, /* policyId */ -1L,
-              CLIENT_IP_ADDRESS, "GRANT ROLE test_role TO GROUP non_owner",
+              CLIENT_IP_ADDRESS, "GRANT ROLE test_role_1 TO GROUP non_owner",
               /* resultReason */ null, /* resultPath */ null, /* resultType */ null);
-        }, RANGER_ADMIN.getName(), TEST_ROLE, GRANTEE_GROUP, null,
+        }, RANGER_ADMIN.getName(), TEST_ROLE_1, GRANTEE_GROUP, null,
         /* expectSuccess */ true);
     grantRole(handlers -> {
           assertEquals(1, handlers.size());
           List<AuthzAuditEvent> events = handlers.get(0).getAuthzEvents();
           assertEventEquals(events.get(0), ALTER_ACTION, ALTER_ACCESS_TYPE,
               OWNER_USER.getName(), /* expectSuccess */ false, /* policyId */ -1L,
-              CLIENT_IP_ADDRESS, "GRANT ROLE test_role TO GROUP non_owner",
+              CLIENT_IP_ADDRESS, "GRANT ROLE test_role_1 TO GROUP non_owner",
               /* resultReason */ null, /* resultPath */ null, /* resultType */ null);
-        }, OWNER_USER.getName(), TEST_ROLE, GRANTEE_GROUP, null,
+        }, OWNER_USER.getName(), TEST_ROLE_1, GRANTEE_GROUP, null,
         /* expectSuccess */ false);
   }
 
@@ -142,37 +186,91 @@ public class RangerCatalogdAuthorizationManagerTest extends AuthorizationTestBas
           List<AuthzAuditEvent> events = handlers.get(0).getAuthzEvents();
           assertEventEquals(events.get(0), ALTER_ACTION, ALTER_ACCESS_TYPE,
               RANGER_ADMIN.getName(), /* expectSuccess */ true, /* policyId */ -1L,
-              CLIENT_IP_ADDRESS, "REVOKE ROLE test_role FROM USER non_owner",
+              CLIENT_IP_ADDRESS, "REVOKE ROLE test_role_1 FROM USER non_owner",
               /* resultReason */ null, /* resultPath */ null, /* resultType */ null);
-        }, RANGER_ADMIN.getName(), TEST_ROLE, null, REVOKEE_USER,
+        }, RANGER_ADMIN.getName(), TEST_ROLE_1, null, REVOKEE_USER,
         /* expectSuccess */ true);
     revokeRole(handlers -> {
           assertEquals(1, handlers.size());
           List<AuthzAuditEvent> events = handlers.get(0).getAuthzEvents();
           assertEventEquals(events.get(0), ALTER_ACTION, ALTER_ACCESS_TYPE,
               OWNER_USER.getName(), /* expectSuccess */ false, /* policyId */ -1L,
-              CLIENT_IP_ADDRESS, "REVOKE ROLE test_role FROM USER non_owner",
+              CLIENT_IP_ADDRESS, "REVOKE ROLE test_role_1 FROM USER non_owner",
               /* resultReason */ null, /* resultPath */ null, /* resultType */ null);
-        }, OWNER_USER.getName(), TEST_ROLE, null, REVOKEE_USER,
+        }, OWNER_USER.getName(), TEST_ROLE_1, null, REVOKEE_USER,
         /* expectSuccess */ false);
     revokeRole(handlers -> {
           assertEquals(1, handlers.size());
           List<AuthzAuditEvent> events = handlers.get(0).getAuthzEvents();
           assertEventEquals(events.get(0), ALTER_ACTION, ALTER_ACCESS_TYPE,
               RANGER_ADMIN.getName(), /* expectSuccess */ true, /* policyId */ -1L,
-              CLIENT_IP_ADDRESS, "REVOKE ROLE test_role FROM GROUP non_owner",
+              CLIENT_IP_ADDRESS, "REVOKE ROLE test_role_1 FROM GROUP non_owner",
               /* resultReason */ null, /* resultPath */ null, /* resultType */ null);
-        }, RANGER_ADMIN.getName(), TEST_ROLE, REVOKEE_GROUP, null,
+        }, RANGER_ADMIN.getName(), TEST_ROLE_1, REVOKEE_GROUP, null,
         /* expectSuccess */ true);
     revokeRole(handlers -> {
           assertEquals(1, handlers.size());
           List<AuthzAuditEvent> events = handlers.get(0).getAuthzEvents();
           assertEventEquals(events.get(0), ALTER_ACTION, ALTER_ACCESS_TYPE,
               OWNER_USER.getName(), /* expectSuccess */ false, /* policyId */ -1L,
-              CLIENT_IP_ADDRESS, "REVOKE ROLE test_role FROM GROUP non_owner",
+              CLIENT_IP_ADDRESS, "REVOKE ROLE test_role_1 FROM GROUP non_owner",
               /* resultReason */ null, /* resultPath */ null, /* resultType */ null);
-        }, OWNER_USER.getName(), TEST_ROLE, REVOKEE_GROUP, null,
+        }, OWNER_USER.getName(), TEST_ROLE_1, REVOKEE_GROUP, null,
         /* expectSuccess */ false);
+  }
+
+  private static void createRole(Consumer<List<AutoFlush>> resultChecker,
+      String requestingUser, String role, boolean expectSuccess) throws Exception {
+    CreateDropRoleStmt stmt = new CreateDropRoleStmt(role, /* isDropRole */ false);
+    String createRoleSqlStmt = stmt.toSql();
+    TCatalogServiceRequestHeader header = createHeader(requestingUser, createRoleSqlStmt,
+        CLIENT_IP_ADDRESS);
+    TCreateDropRoleParams params = stmt.toThrift();
+    try {
+      String errorString = null;
+      try {
+        authzManager.createRole(header, params,
+            new TDdlExecResponse(new TCatalogUpdateResult()));
+      } catch (ImpalaException e) {
+        errorString = e.getMessage();
+      }
+      if (expectSuccess && errorString != null) {
+        throw new InternalException(errorString);
+      } else if (!expectSuccess && errorString == null) {
+        throw new Exception("We expected the test to throw but it did not.");
+      }
+
+      resultChecker.accept(capturedAuditHandlers);
+    } finally {
+      capturedAuditHandlers.clear();
+    }
+  }
+
+  private static void dropRole(Consumer<List<AutoFlush>> resultChecker,
+      String requestingUser, String role, boolean expectSuccess) throws Exception {
+    CreateDropRoleStmt dropRoleStmt = new CreateDropRoleStmt(role, /* isDropRole */ true);
+    String dropRoleSqlStmt = dropRoleStmt.toSql();
+    TCatalogServiceRequestHeader header = createHeader(requestingUser, dropRoleSqlStmt,
+        CLIENT_IP_ADDRESS);
+    TCreateDropRoleParams dropRoleParams = dropRoleStmt.toThrift();
+    try {
+      String errorString = null;
+      try {
+        authzManager.dropRole(header, dropRoleParams,
+            new TDdlExecResponse(new TCatalogUpdateResult()));
+      } catch (ImpalaException e) {
+        errorString = e.getMessage();
+      }
+      if (expectSuccess && errorString != null) {
+        throw new InternalException(errorString);
+      } else if (!expectSuccess && errorString == null) {
+        throw new Exception("We expected the test to throw but it did not.");
+      }
+
+      resultChecker.accept(capturedAuditHandlers);
+    } finally {
+      capturedAuditHandlers.clear();
+    }
   }
 
   private static void grantRole(Consumer<List<AutoFlush>> resultChecker,
