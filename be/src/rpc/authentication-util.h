@@ -75,6 +75,32 @@ Status GetXFFOriginClientAddress(const std::string_view& xff_addresses,
 Status BasicAuthExtractCredentials(
     const string& token, string& username, string& password);
 
+// Functions below are used by both hs2-http and Webserver
+// Parses and validates FLAGS_saml2_sp_callback_url or
+// FLAGS_webserver_saml2_sp_callback_url. Sets saml_sp_path to the path part if
+// successful.
+Status ParseSamlSpUrl(string* saml_sp_path, const string& url);
+
+// Parses a param string.
+//  params_to_check: map from the name of params that should be parsed to pointers where
+//                   the value should be written
+//  original: the full http path (used only in error message)
+//  params_string: & delimited param string to parse
+//  err_msg: write detailed message here in case of error
+bool ParseParams(std::map<string, string*>& params_to_check, const string& original,
+    const string& params_string, string* err_msg);
+
+// Returns an RFC 1123 formatted date string for HTTP headers.
+std::string GetTimeRFC1123();
+
+// Functions with extracted shared code for THttpServer.cpp and Webserver.cc
+std::unique_ptr<TWrappedHttpResponse> GetSaml2RedirectInternal(
+    const TWrappedHttpRequest& request);
+std::unique_ptr<TWrappedHttpResponse> ValidateSaml2AuthnResponseInternal(
+    TWrappedHttpRequest& request);
+std::unique_ptr<TWrappedHttpRequest> InitWrappedHttpRequestInternal(
+    const std::string& remote_ip, const std::string& server_name);
+
 constexpr int RAND_MAX_LENGTH = 10;
 
 } // namespace impala

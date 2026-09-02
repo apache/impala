@@ -195,7 +195,6 @@ protected:
   virtual void headersDone();
   // Called if the whole body has to be read for authentication. Only used in SAML SSO.
   virtual void bodyDone(uint32_t size);
-  std::string getTimeRFC1123();
   // Returns a '401 - Unauthorized' to the client.
   void returnUnauthorized();
   // Returns a response based on a TWrappedHttpResponse that can come from Frontend code.
@@ -213,12 +212,12 @@ protected:
   // Currently SAML2 SSO browser profile is implemented, which needs 3 different http
   // requests to Impala before switching to cookie authentication.
   //  1. redirecting connection from the client to the SSO provider
-  //  2. validating an authNRespone from the SSO provider
+  //  2. validating an authNResponse from the SSO provider
   //     - this could be handled on another port than the hs2-http, but handling it on
   //       the same allows supporting SAML without having to expose an extra port.
   //  3. validating the bearer token from the client and returning an auth cookie instead
   //
-  // SAML can be used alongside LDAP or Kerberos - if the SAML related path of headers
+  // SAML can be used alongside LDAP or Kerberos - if the SAML related path or headers
   // are not detected, Impala fall back to other authentications.
   bool has_saml_ = false;
 
@@ -235,7 +234,7 @@ protected:
   std::string cookie_value_ = "";
 
   // Used in SAML2 SSO browser profile authentication to set the port opened by the client
-  // where expects to receive the bearer token.
+  // where the bearer token is expected.
   // Comes from header 'X-Hive-Token-Response-Port'.
   int saml_port_ = -1;
 

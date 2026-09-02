@@ -2022,8 +2022,17 @@ class ImpalaTestSuite(BaseTestSuite):
   # Checks if an Impala connection is functional.
   @staticmethod
   def check_connection(conn):
-    res = conn.execute("select 1 + 1")
-    assert res.data == ["2"]
+    try:
+      res = conn.execute("select 1 + 1")
+      assert res.data == ["2"]
+      return True
+    except Exception as e:
+      if "HTTP code 401: Unauthorized" in str(e):
+        # Don't count connections that fail with 401 Unauthorized
+        return False
+      else:
+        # Re-raise other exceptions
+        raise
 
   # Checks connections for all protocols.
   def check_connections(cls):
@@ -2034,13 +2043,10 @@ class ImpalaTestSuite(BaseTestSuite):
     # default client must exist
     cls.check_connection(cls.client)
     count = 0
-    if cls.beeswax_client:
-      cls.check_connection(cls.beeswax_client)
+    if cls.beeswax_client and cls.check_connection(cls.beeswax_client):
       count += 1
-    if cls.hs2_client:
-      cls.check_connection(cls.hs2_client)
+    if cls.hs2_client and cls.check_connection(cls.hs2_client):
       count += 1
-    if cls.hs2_http_client:
-      cls.check_connection(cls.hs2_http_client)
+    if cls.hs2_http_client and cls.check_connection(cls.hs2_http_client):
       count += 1
     assert count == expected_count

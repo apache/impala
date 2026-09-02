@@ -145,7 +145,7 @@ Status MetricGroup::RegisterHttpHandlers(Webserver* webserver) {
   if (webserver != NULL) {
     Webserver::UrlCallback default_callback =
         bind<void>(mem_fn(&MetricGroup::CMCompatibleCallback), this, _1, _2);
-    webserver->RegisterUrlCallback("/jsonmetrics", "legacy-metrics.tmpl",
+    webserver->RegisterUrlCallback(Webserver::JSON_METRICS_URL, "legacy-metrics.tmpl",
         default_callback, false);
 
     Webserver::UrlCallback json_callback =

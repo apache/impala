@@ -28,8 +28,8 @@ import org.apache.impala.service.BackendConfig;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-// slightly modified (config replaced) version of
-// https://github.com/vihangk1/hive/blob/master_saml/service/src/java/org/apache/hive/service/auth/saml/HiveSamlAuthTokenGenerator.java
+// based on (config replaced)
+// https://github.com/vihangk1/hive/blob/d0209a6f026106622523bd4ec7eeeae33782e7a3/service/src/java/org/apache/hive/service/auth/saml/HiveSamlAuthTokenGenerator.java
 
 /**
  * A token is generated when the SAML assertion is successfully validated. This Token
@@ -49,7 +49,8 @@ public class HiveSamlAuthTokenGenerator implements AuthTokenGenerator {
   public static final String RELAY_STATE = "rs";
   private static final String SIGN = "sg";
   private static HiveSamlAuthTokenGenerator INSTANCE;
-  private static final Logger LOG = LoggerFactory.getLogger(HiveSamlAuthTokenGenerator.class);
+  private static final Logger LOG =
+      LoggerFactory.getLogger(HiveSamlAuthTokenGenerator.class);
 
   public static synchronized AuthTokenGenerator get() {
     if (INSTANCE != null) {

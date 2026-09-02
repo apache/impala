@@ -17,13 +17,19 @@
 
 #include "rpc/authentication-util.h"
 
+#include <cstdlib>
+#include <ctime>
+#include <memory>
 #include <gutil/strings/escaping.h>
-#include <gutil/strings/util.h>
 #include <gutil/strings/split.h>
 #include <gutil/strings/strcat.h>
 #include <gutil/strings/strip.h>
+#include <gutil/strings/util.h>
 
 #include "kudu/util/net/sockaddr.h"
+#include "runtime/exec-env.h"
+#include "service/frontend.h"
+#include "util/coding-util.h"
 #include "util/network-util.h"
 #include "util/openssl-util.h"
 #include "util/string-parser.h"
@@ -251,6 +257,96 @@ Status BasicAuthExtractCredentials(
   username = decoded.substr(0, colon);
   password = decoded.substr(colon + 1);
   return Status::OK();
+}
+
+Status ParseSamlSpUrl(string* saml_sp_path, const string& url) {
+  vector<string> split = Split(url, delimiter::Limit("/", 3));
+  if (split.size() != 4 || (split[0] != "http:" && split[0] != "https:") ||
+      !split[1].empty() || split[2].empty()) {
+    return Status(
+        Substitute("Bad saml2_sp_callback_url: $0", url));
+  }
+  // The port in the url should be the same as FLAGS_hs2_http_port / FLAGS_webserver_port
+  // in general, but this is not enforced to allow the use case when the port is mapped,
+  // e.g. external_port->http_port. FLAGS_saml2_sp_callback_url has to contain the
+  // external_port in this case.
+  if (saml_sp_path != nullptr) *saml_sp_path = "/" + split[3];
+  return Status::OK();
+}
+
+bool ParseParams(std::map<string, string*>& params_to_check, const string& original,
+    const string& params_string, string* err_msg) {
+  for (auto pair : Split(params_string, "&")) {
+    vector<string> key_value = Split(pair, delimiter::Limit("=", 1));
+    if (key_value.size() == 2) {
+      auto it = params_to_check.find(key_value[0]);
+      if (it == params_to_check.end()) continue;
+      string decoded;
+      if (!UrlDecode(key_value[1], &decoded)) {
+        *err_msg =
+            Substitute("Could not decode '$0' parameter from HTTP request with path: $1",
+                key_value[0], original);
+        return false;
+      } else {
+        *it->second = decoded;
+      }
+    }
+  }
+  return true;
+}
+
+std::unique_ptr<TWrappedHttpResponse> GetSaml2RedirectInternal(
+    const TWrappedHttpRequest& request) {
+  auto response = std::make_unique<TWrappedHttpResponse>();
+  Status status = ExecEnv::GetInstance()->frontend()->GetSaml2Redirect(request,
+      response.get());
+  if (!status.ok()) {
+    return nullptr;
+  }
+  return response;
+}
+
+std::unique_ptr<TWrappedHttpResponse> ValidateSaml2AuthnResponseInternal(
+    TWrappedHttpRequest& request) {
+  auto response = std::make_unique<TWrappedHttpResponse>();
+  // Parse the body.
+  std::map<string, string*> params_to_check;
+  string saml_relay_state;
+  params_to_check["RelayState"] = &saml_relay_state;
+  string error_msg;
+  const string& content = request.content;
+  if (!ParseParams(params_to_check, content, content, &error_msg)) {
+    LOG(ERROR) << "failed to parse SAML response params: " << error_msg;
+    return nullptr;
+  }
+  StripWhiteSpace(&saml_relay_state);
+  request.params["RelayState"] = saml_relay_state;
+  // We return some html in case of auth error. TODO: Should handle other
+  // errors where no response is generated.
+  discard_result(
+      ExecEnv::GetInstance()->frontend()->ValidateSaml2Response(request, response.get()));
+  return response;
+}
+
+std::unique_ptr<TWrappedHttpRequest> InitWrappedHttpRequestInternal(
+    const std::string& remote_ip, const std::string& server_name) {
+  auto request = std::make_unique<TWrappedHttpRequest>();
+  request->remote_ip = remote_ip;
+  request->server_name = server_name;
+  // Intentionally lying to the pac4j lib in the frontend to ensure that non-secure
+  // test setups work similarly to secure production systems. SAML must use TLS if
+  // FLAGS_saml2_allow_without_tls_debug_only is not true.
+  request->secure = true;
+  return request;
+}
+
+std::string GetTimeRFC1123() {
+  char buf[64];
+  std::time_t t = std::time(nullptr);
+  std::tm tm;
+  gmtime_r(&t, &tm);
+  std::strftime(buf, sizeof(buf), "%a, %d %b %Y %H:%M:%S GMT", &tm);
+  return buf;
 }
 
 } // namespace impala

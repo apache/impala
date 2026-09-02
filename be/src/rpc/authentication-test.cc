@@ -458,6 +458,192 @@ TEST(Auth, FormatPermissions) {
   ASSERT_EQ("drwxrwxrwT", FormatPermissions(mode));
 }
 
+TEST(Auth, ParseSamlSpUrl) {
+  string saml_sp_path;
+  Status status;
+
+  // Test valid HTTP URL
+  status = ParseSamlSpUrl(&saml_sp_path, "http://localhost:25000/SAML2/SSO");
+  ASSERT_OK(status);
+  ASSERT_EQ("/SAML2/SSO", saml_sp_path);
+
+  // Test valid HTTPS URL
+  status = ParseSamlSpUrl(&saml_sp_path, "https://example.com:8080/saml/callback");
+  ASSERT_OK(status);
+  ASSERT_EQ("/saml/callback", saml_sp_path);
+
+  // Test valid HTTPS URL with default port
+  status = ParseSamlSpUrl(&saml_sp_path, "https://host.domain.com:443/auth/saml");
+  ASSERT_OK(status);
+  ASSERT_EQ("/auth/saml", saml_sp_path);
+
+  // Test path with multiple segments
+  status = ParseSamlSpUrl(&saml_sp_path, "http://server:9999/api/v1/saml/sso");
+  ASSERT_OK(status);
+  ASSERT_EQ("/api/v1/saml/sso", saml_sp_path);
+
+  // Test nullptr for saml_sp_path (should not crash)
+  status = ParseSamlSpUrl(nullptr, "http://localhost:25000/SAML2/SSO");
+  ASSERT_OK(status);
+
+  // Test invalid URLs
+  // Missing protocol
+  status = ParseSamlSpUrl(&saml_sp_path, "localhost:25000/SAML2/SSO");
+  ASSERT_FALSE(status.ok());
+
+  // Wrong protocol
+  status = ParseSamlSpUrl(&saml_sp_path, "ftp://localhost:25000/SAML2/SSO");
+  ASSERT_FALSE(status.ok());
+
+  // Missing path
+  status = ParseSamlSpUrl(&saml_sp_path, "http://localhost:25000");
+  ASSERT_FALSE(status.ok());
+
+  // Missing host
+  status = ParseSamlSpUrl(&saml_sp_path, "http:///SAML2/SSO");
+  ASSERT_FALSE(status.ok());
+
+  // Empty string
+  status = ParseSamlSpUrl(&saml_sp_path, "");
+  ASSERT_FALSE(status.ok());
+
+  // Malformed URL (too few parts)
+  status = ParseSamlSpUrl(&saml_sp_path, "http://localhost");
+  ASSERT_FALSE(status.ok());
+
+  // Malformed URL (no slashes after protocol)
+  status = ParseSamlSpUrl(&saml_sp_path, "http:localhost:25000/SAML2/SSO");
+  ASSERT_FALSE(status.ok());
+
+  // Malformed URL (only one slash after protocol)
+  status = ParseSamlSpUrl(&saml_sp_path, "http:/localhost:25000/SAML2/SSO");
+  ASSERT_FALSE(status.ok());
+}
+
+TEST(Auth, ParseParams) {
+  // Test with single parameter
+  std::map<string, string*> params;
+  string value1;
+  params["key1"] = &value1;
+  string err_msg;
+  bool result = ParseParams(params, "original", "key1=value1", &err_msg);
+  ASSERT_TRUE(result);
+  ASSERT_EQ("value1", value1);
+
+  // Test with multiple parameters
+  string value2, value3;
+  params.clear();
+  params["key1"] = &value1;
+  params["key2"] = &value2;
+  params["key3"] = &value3;
+  value1.clear();
+  value2.clear();
+  value3.clear();
+  result = ParseParams(params, "original", "key1=val1&key2=val2&key3=val3", &err_msg);
+  ASSERT_TRUE(result);
+  ASSERT_EQ("val1", value1);
+  ASSERT_EQ("val2", value2);
+  ASSERT_EQ("val3", value3);
+
+  // Test with URL encoded values
+  params.clear();
+  params["name"] = &value1;
+  params["email"] = &value2;
+  value1.clear();
+  value2.clear();
+  result = ParseParams(params, "original", "name=John+Doe&email=test%40example.com",
+      &err_msg);
+  ASSERT_TRUE(result);
+  ASSERT_EQ("John Doe", value1);
+  ASSERT_EQ("test@example.com", value2);
+
+  // Test with special characters URL encoded
+  params.clear();
+  params["data"] = &value1;
+  value1.clear();
+  result = ParseParams(params, "original", "data=hello%20world%21%3F%26%3D", &err_msg);
+  ASSERT_TRUE(result);
+  ASSERT_EQ("hello world!?&=", value1);
+
+  // Test with only matching some keys
+  params.clear();
+  params["key1"] = &value1;
+  params["key3"] = &value2;
+  value1.clear();
+  value2.clear();
+  result = ParseParams(params, "original", "key1=a&key2=b&key3=c", &err_msg);
+  ASSERT_TRUE(result);
+  ASSERT_EQ("a", value1);
+  ASSERT_EQ("c", value2);
+
+  // Test with empty value
+  params.clear();
+  params["key"] = &value1;
+  value1.clear();
+  result = ParseParams(params, "original", "key=", &err_msg);
+  ASSERT_TRUE(result);
+  ASSERT_EQ("", value1);
+
+  // Test with no matching keys
+  params.clear();
+  params["key1"] = &value1;
+  value1 = "unchanged";
+  result = ParseParams(params, "original", "other=value", &err_msg);
+  ASSERT_TRUE(result);
+  ASSERT_EQ("unchanged", value1);
+
+  // Test with empty params string
+  params.clear();
+  params["key"] = &value1;
+  value1 = "unchanged";
+  result = ParseParams(params, "original", "", &err_msg);
+  ASSERT_TRUE(result);
+  ASSERT_EQ("unchanged", value1);
+
+  // Test with invalid URL encoding
+  params.clear();
+  params["key"] = &value1;
+  value1.clear();
+  result = ParseParams(params, "original", "key=%ZZ", &err_msg);
+  ASSERT_FALSE(result);
+  ASSERT_TRUE(err_msg.find("Could not decode") != string::npos);
+  ASSERT_TRUE(err_msg.find("key") != string::npos);
+
+  // Test with malformed parameter (no value, just key)
+  params.clear();
+  params["key"] = &value1;
+  value1 = "unchanged";
+  result = ParseParams(params, "original", "key", &err_msg);
+  ASSERT_TRUE(result);
+  ASSERT_EQ("unchanged", value1);
+
+  // Test with multiple parameters and one invalid encoding
+  params.clear();
+  params["key1"] = &value1;
+  params["key2"] = &value2;
+  value1 = "unchanged";
+  value2 = "unchanged";
+  result = ParseParams(params, "original", "key1=valid&key2=%GG", &err_msg);
+  ASSERT_FALSE(result);
+  ASSERT_TRUE(err_msg.find("Could not decode") != string::npos);
+
+  // Test with = in the value (should only split on first =)
+  params.clear();
+  params["key"] = &value1;
+  value1.clear();
+  result = ParseParams(params, "original", "key=value%3Dwith%3Dequals", &err_msg);
+  ASSERT_TRUE(result);
+  ASSERT_EQ("value=with=equals", value1);
+
+  // Test with & in URL encoded value
+  params.clear();
+  params["data"] = &value1;
+  value1.clear();
+  result = ParseParams(params, "original", "data=a%26b%26c", &err_msg);
+  ASSERT_TRUE(result);
+  ASSERT_EQ("a&b&c", value1);
+}
+
 }
 int main(int argc, char** argv) {
   ::testing::InitGoogleTest(&argc, argv);

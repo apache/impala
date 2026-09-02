@@ -253,11 +253,23 @@ public class BackendConfig {
     return backendCfg_.saml2_private_key_password;
   }
 
-  public String getSaml2IdpMetadata() { return backendCfg_.saml2_idp_metadata; }
+  public String getHS2Saml2IdpMetadata() {
+    return backendCfg_.saml2_idp_metadata;
+  }
+
+  public String getWSSaml2IdpMetadata() {
+    return backendCfg_.webserver_saml2_idp_metadata;
+  }
 
   public String getSaml2SpEntityId() { return backendCfg_.saml2_sp_entity_id; }
 
-  public String getSaml2SpCallbackUrl() { return backendCfg_.saml2_sp_callback_url; }
+  public String getHS2Saml2SpCallbackUrl() {
+    return backendCfg_.saml2_sp_callback_url;
+  }
+
+  public String getWSSaml2SpCallbackUrl() {
+    return backendCfg_.webserver_saml2_sp_callback_url;
+  }
 
   public boolean getSaml2WantAsserationsSigned() {
     return backendCfg_.saml2_want_assertations_signed;

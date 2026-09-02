@@ -75,6 +75,10 @@ class Webserver {
   typedef std::function<void (const WebRequest& req, std::stringstream* output,
       HttpStatusCode* response)> RawUrlCallback;
 
+  static constexpr const char JSON_METRICS_URL[] = "/jsonmetrics";
+  static constexpr const char BACKENDS_URL[] = "/backends";
+  static constexpr const char VARZ_URL[] = "/varz";
+
   /// Any callback may add a member to their Json output with key ENABLE_RAW_HTML_KEY;
   /// this causes the result of the template rendering process to be sent to the browser
   /// as text, not HTML.
@@ -200,11 +204,27 @@ class Webserver {
   sq_callback_result_t BeginRequestCallback(struct sq_connection* connection,
       struct sq_request_info* request_info);
 
+  // Returns a '401 - Unauthorized' / 'AuthenticationRequired' to the client.
+  void returnUnauthorized(
+      struct sq_connection* connection);
+
+  // Helper method to handle SAML authentication failure with metrics and return code
+  sq_callback_result_t returnSamlAuthFailure(struct sq_connection* connection);
+
+  // Returns a response based on a TWrappedHttpResponse that can come from Frontend code.
+  void returnWrappedResponse(
+      struct sq_connection* connection, const impala::TWrappedHttpResponse& response);
+
+  // Reads HTTP POST body from connection into out_body, up to max_length bytes.
+  sq_callback_result_t ReadPostBody(
+      struct sq_connection* connection, int32_t max_length, std::string* out_body);
+
   // Handle SPNEGO authentication for this request. Returns SQ_CONTINUE_HANDLING
   // if authentication was successful, otherwise responds to the request and
   // returns SQ_HANDLED_OK.
-  sq_callback_result_t HandleSpnego(struct sq_connection* connection,
-      struct sq_request_info* request_info, std::vector<std::string>* response_headers);
+  sq_callback_result_t HandleSpnego(const char* authz_header,
+      struct sq_connection* connection, struct sq_request_info* request_info,
+      std::vector<std::string>* response_headers);
 
   /// Checks and returns true if the connection originated from a trusted domain and has a
   /// valid username set in the request's the Authorization header (using Basic Auth).
@@ -223,13 +243,13 @@ class Webserver {
 
   // Handle Basic authentication for this request. Returns an error if authentication was
   // unsuccessful.
-  Status HandleBasic(struct sq_connection* connection,
+  Status HandleBasic(const char* authz_header, struct sq_connection* connection,
       struct sq_request_info* request_info, std::vector<std::string>* response_headers);
 
   // Adds a 'Set-Cookie' header to 'response_headers', if cookie support is enabled.
   // Returns the random value portion of the cookie in 'rand' for use in CSRF prevention.
   void AddCookie(const char* user, vector<string>* response_headers,
-      const string& authMech, string* rand);
+      const string& authMech, string* rand, const string& extra_flags="");
 
   // Get username from Authorization header.
   bool GetUsernameFromAuthHeader(struct sq_connection* connection,
@@ -310,6 +330,17 @@ class Webserver {
   // Track memory for the comppressed string buffer
   std::shared_ptr<MemTracker> compressed_buffer_mem_tracker_;
 
+  // An implementation of SAML2 SSO browser profile, similar to HS2-HTTP server, only
+  // without bearer token. Two requests are needed to Impala before switching to cookie
+  // authentication.
+  //  1. redirecting connection from the client to the SSO provider
+  //  2. validating an authNRespone from the SSO provider; returning redirect to initial
+  //  resource along with Set-Cookie
+  //
+  // SAML can be used alongside LDAP or Kerberos - if the SAML related path of headers
+  // are not detected, Impala fall back to other authentications.
+  bool use_saml_ = false;
+
   /// Used to validate usernames/passwords If LDAP authentication is in use.
   std::unique_ptr<ImpalaLdap> ldap_;
 
@@ -345,6 +376,10 @@ class Webserver {
   /// attempts.
   IntCounter* total_oauth_token_auth_success_ = nullptr;
   IntCounter* total_oauth_token_auth_failure_ = nullptr;
-};
 
+  /// If 'use_saml_' is true, metrics for the number of successful and failed SAML2 auth
+  /// attempts.
+  IntCounter* total_saml_auth_success_ = nullptr;
+  IntCounter* total_saml_auth_failure_ = nullptr;
+};
 }

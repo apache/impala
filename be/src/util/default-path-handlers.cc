@@ -50,6 +50,7 @@
 #include "util/process-state-info.h"
 #include "util/runtime-profile-counters.h"
 #include "util/thread.h"
+#include "util/webserver.h"
 
 #include "common/names.h"
 
@@ -422,7 +423,7 @@ void AddDefaultUrlCallbacks(Webserver* webserver, MetricGroup* metric_group,
   if (!FLAGS_logtostderr) {
     webserver->RegisterUrlCallback("/logs", "logs.tmpl", LogsHandler, true);
   }
-  webserver->RegisterUrlCallback("/varz", "flags.tmpl", FlagsHandler, true);
+  webserver->RegisterUrlCallback(Webserver::VARZ_URL, "flags.tmpl", FlagsHandler, true);
   webserver->RegisterUrlCallback(
       "/profile_docs", "profile_docs.tmpl", ProfileDocsHandler, true);
   webserver->RegisterUrlCallback("/stacks", "raw_text.tmpl", StacksHandler, false);

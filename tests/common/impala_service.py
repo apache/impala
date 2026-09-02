@@ -76,7 +76,14 @@ class BaseImpalaService(object):
         file_part = cert.split("/")[-1]
         if file_part in CERT_TO_CA_MAP:
           cert = cert.replace(file_part, CERT_TO_CA_MAP[file_part])
-        return requests.get(url, verify=cert, auth=self.webserver_username_password)
+        headers = {}
+        if hasattr(self, 'webserver_saml2_sp_callback_url') and \
+            self.webserver_saml2_sp_callback_url:
+          # Setting this to bypass LDAP/SPNEGO and SAML authentication for bootstrap
+          # checks.
+          headers["X-Impala-EETest"] = "Yes"
+        return requests.get(url, verify=cert, auth=self.webserver_username_password,
+                            headers=headers)
       except Exception as e:
         LOG.info("Debug webpage not yet available: %s", str(e))
       sleep(interval)
@@ -297,7 +304,7 @@ class ImpaladService(BaseImpalaService):
   def __init__(self, hostname, webserver_interface="", external_interface="",
       webserver_port=25000, beeswax_port=21000, krpc_port=27000, hs2_port=21050,
       hs2_http_port=28000, webserver_certificate_file="",
-      ssl_client_ca_certificate_file=""):
+               ssl_client_ca_certificate_file="", webserver_saml2_sp_callback_url=""):
     super(ImpaladService, self).__init__(
         hostname, webserver_interface, webserver_port, webserver_certificate_file,
         ssl_client_ca_certificate_file)
@@ -306,6 +313,7 @@ class ImpaladService(BaseImpalaService):
     self.krpc_port = krpc_port
     self.hs2_port = hs2_port
     self.hs2_http_port = hs2_http_port
+    self.webserver_saml2_sp_callback_url = webserver_saml2_sp_callback_url
 
   def get_num_known_live_executors(self, timeout=30, interval=1,
       include_shutting_down=True):

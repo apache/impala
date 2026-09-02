@@ -4171,6 +4171,30 @@
     "key": "impala.webserver.total-oauth-token-auth-failure"
   },
   {
+    "description": "The number of HTTP connection requests to this daemon's webserver that were successfully authenticated using SAML2.",
+    "contexts": [
+      "IMPALAD",
+      "CATALOGSERVER",
+      "STATESTORE"
+    ],
+    "label": "Webserver HTTP Connection SAML2 Auth Success",
+    "units": "NONE",
+    "kind": "COUNTER",
+    "key": "impala.webserver.total-saml-auth-success"
+  },
+  {
+    "description": "The number of Webserver connection requests to this Impala Daemon that were attempted to authenticate using SAML but were unsuccessful.",
+    "contexts": [
+      "IMPALAD",
+      "CATALOGSERVER",
+      "STATESTORE"
+    ],
+    "label": "Webserver HTTP Connection SAML2 Auth Failure",
+    "units": "NONE",
+    "kind": "COUNTER",
+    "key": "impala.webserver.total-saml-auth-failure"
+  },
+  {
     "description": "The number of times the FAIL debug action returned an error. For testing only.",
     "contexts": [
       "IMPALAD"

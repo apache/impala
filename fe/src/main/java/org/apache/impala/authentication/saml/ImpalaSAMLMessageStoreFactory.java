@@ -17,9 +17,24 @@
 
 package org.apache.impala.authentication.saml;
 
+import org.pac4j.core.context.WebContext;
+import org.pac4j.saml.store.SAMLMessageStore;
+import org.pac4j.saml.store.SAMLMessageStoreFactory;
+
 /**
- * Common interface for relay state information used in SAML authentication.
- * Allows different implementations for HS2 (port-based) and WebServer (URI-based).
+ * Factory for creating ImpalaSAMLMessageStore instances.
+ *
+ * This factory provides SAML message stores backed by a Guava cache instead of
+ * HTTP session cookies, enabling InResponseTo validation and replay attack
+ * prevention across separate HTTP requests without session cookie dependencies.
  */
-public interface HiveSamlRelayStateInfo {
+public class ImpalaSAMLMessageStoreFactory implements SAMLMessageStoreFactory {
+
+  private static final ImpalaSAMLMessageStore INSTANCE = new ImpalaSAMLMessageStore();
+
+  @Override
+  public SAMLMessageStore getMessageStore(WebContext context) {
+    // Return singleton instance since the cache is static and shared
+    return INSTANCE;
+  }
 }

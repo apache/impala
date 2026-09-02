@@ -601,6 +601,9 @@ class BaseImpalaProcess(Process):
   def _get_external_interface(self):
     return self._get_arg_value("external_interface", socket.gethostname())
 
+  def _get_webserver_saml2_sp_callback_url(self):
+    return self._get_arg_value("webserver_saml2_sp_callback_url", "")
+
   def _get_arg_value(self, arg_name, default=None):
     """Gets the argument value for given argument name"""
     for arg in self.cmd:
@@ -628,7 +631,8 @@ class ImpaladProcess(BaseImpalaProcess):
         self.external_interface,
         self.get_webserver_port(), self.__get_beeswax_port(),
         self.__get_krpc_port(), self.__get_hs2_port(), self.__get_hs2_http_port(),
-        self._get_webserver_certificate_file(), self._get_ssl_client_ca_certificate())
+        self._get_webserver_certificate_file(), self._get_ssl_client_ca_certificate(),
+        self._get_webserver_saml2_sp_callback_url())
 
   def _get_default_webserver_port(self):
     return DEFAULT_IMPALAD_WEBSERVER_PORT

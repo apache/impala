@@ -29,50 +29,56 @@ import org.pac4j.core.util.generator.ValueGenerator;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-// slightly modified copy of https://github.com/vihangk1/hive/blob/master_saml/service/src/java/org/apache/hive/service/auth/saml/HiveSamlRelayStateInfo.java
 /**
- * Relay state generator for the SAML Request which includes the port number from the
- * request header. This port number is used eventually to redirect the token to the
- * localhost:port from the browser.
+ * Base class for SAML relay state generators. Contains common functionality
+ * for managing relay state cache and client identifier validation.
+ *
+ * @param <T> The type of relay state info stored in the cache
  */
-public class HiveSamlRelayStateStore implements ValueGenerator {
+public abstract class HiveSamlRelayStateCacheBase<T extends HiveSamlRelayStateInfo>
+    implements ValueGenerator {
 
-  private final Cache<String, HiveSamlRelayStateInfo> relayStateCache =
+  protected final Cache<String, T> relayStateCache =
       CacheBuilder.newBuilder()
           //TODO(Vihang) make this configurable
           .expireAfterWrite(5, TimeUnit.MINUTES)
           .build();
-  private static final Random randGenerator = new SecureRandom();
-  private static final Logger LOG = LoggerFactory
-      .getLogger(HiveSamlRelayStateStore.class);
 
-  private static final HiveSamlRelayStateStore INSTANCE = new HiveSamlRelayStateStore();
+  protected static final Random randGenerator = new SecureRandom();
+  protected final Logger LOG = LoggerFactory.getLogger(getClass());
 
-  private HiveSamlRelayStateStore() {
-  }
-
-  public static HiveSamlRelayStateStore get() {
-    return INSTANCE;
+  protected HiveSamlRelayStateCacheBase() {
   }
 
   @Override
   public String generateValue(WebContext webContext) {
-    Optional<String> portNumber = webContext
-        .getRequestHeader(HiveSamlUtils.SSO_TOKEN_RESPONSE_PORT);
-    if (!portNumber.isPresent()) {
-      throw new RuntimeException(
-          "SAML response port header " + HiveSamlUtils.SSO_TOKEN_RESPONSE_PORT
-              + " is not set ");
-    }
-    int port = Integer.parseInt(portNumber.get());
     String relayState = UUID.randomUUID().toString();
-    HiveSamlRelayStateInfo relayStateInfo = new HiveSamlRelayStateInfo(port,
-        UUID.randomUUID().toString());
-    webContext.setResponseHeader(HiveSamlUtils.SSO_CLIENT_IDENTIFIER,
-        relayStateInfo.getClientIdentifier());
+    T relayStateInfo = createRelayStateInfo(webContext);
+    String clientIdentifier = getClientIdentifier(relayStateInfo);
+    if (clientIdentifier != null) {
+      webContext.setResponseHeader(HiveSamlUtils.SSO_CLIENT_IDENTIFIER, clientIdentifier);
+    }
     relayStateCache.put(relayState, relayStateInfo);
     return relayState;
   }
+
+  /**
+   * Creates the appropriate relay state info object based on the web context.
+   * This method must be implemented by subclasses to provide the specific
+   * relay state info type and extraction logic.
+   *
+   * @param webContext the web context containing request information
+   * @return the relay state info object
+   */
+  protected abstract T createRelayStateInfo(WebContext webContext);
+
+  /**
+   * Extracts the client identifier from the relay state info object.
+   *
+   * @param relayStateInfo the relay state info object
+   * @return the client identifier string
+   */
+  protected abstract String getClientIdentifier(T relayStateInfo);
 
   public String getRelayStateInfo(WebContext webContext)
       throws HttpSamlAuthenticationException {
@@ -84,9 +90,9 @@ public class HiveSamlRelayStateStore implements ValueGenerator {
     return relayState.get();
   }
 
-  public HiveSamlRelayStateInfo getRelayStateInfo(String relayState)
+  public T getRelayStateInfo(String relayState)
       throws HttpSamlAuthenticationException {
-    HiveSamlRelayStateInfo relayStateInfo = relayStateCache.getIfPresent(relayState);
+    T relayStateInfo = relayStateCache.getIfPresent(relayState);
     if (relayStateInfo == null) {
       throw new HttpSamlAuthenticationException(
           "Invalid value of relay state received: " + relayState);
@@ -96,13 +102,25 @@ public class HiveSamlRelayStateStore implements ValueGenerator {
 
   public synchronized boolean validateClientIdentifier(String relayStateKey,
       String clientIdentifier) {
-    HiveSamlRelayStateInfo relayStateInfo = relayStateCache.getIfPresent(relayStateKey);
+    T relayStateInfo = relayStateCache.getIfPresent(relayStateKey);
     if (relayStateInfo == null) {
       return false;
     }
     relayStateCache.invalidate(relayStateKey);
+    String storedClientIdentifier = getClientIdentifier(relayStateInfo);
+    // If stored client identifier is null, this workflow doesn't use client validation
+    if (storedClientIdentifier == null) {
+      return true;
+    }
     LOG.debug("Validating client identifier {} with {}", clientIdentifier,
-        relayStateInfo.getClientIdentifier());
-    return relayStateInfo.getClientIdentifier().equals(clientIdentifier);
+        storedClientIdentifier);
+    return storedClientIdentifier.equals(clientIdentifier);
+  }
+
+  /**
+   * Invalidates a relay state, making it one-time use.
+   */
+  public void invalidateRelayState(String relayStateKey) {
+    relayStateCache.invalidate(relayStateKey);
   }
 }

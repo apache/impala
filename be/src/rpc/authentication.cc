@@ -29,7 +29,6 @@
 #include <gutil/strings/split.h>
 #include <gutil/strings/strip.h>
 #include <gutil/strings/substitute.h>
-#include <algorithm>
 #include <map>
 #include <vector>
 #include <string>
@@ -952,33 +951,6 @@ vector<string> ReturnHeaders(ThriftServer::ConnectionContext* connection_context
   return std::move(connection_context->return_headers);
 }
 
-// Parses a param string.
-//  params_to_check: map from the name of params that should be parsed to pointers where
-//                   the value should be written
-//  original: the full http path (used only in error message)
-//  params_string: & delimited param string to parse
-//  err_msg: write detailed message here in case of error
-bool ParseParams(std::map<string, string*>& params_to_check,
-   const string& original, const string& params_string, string* err_msg) {
-  for (auto pair : Split(params_string, "&")) {
-    vector<string> key_value = Split(pair, delimiter::Limit("=", 1));
-    if (key_value.size() == 2) {
-      auto it = params_to_check.find(key_value[0]);
-      if (it == params_to_check.end()) continue;
-      string decoded;
-      if (!UrlDecode(key_value[1], &decoded)) {
-        *err_msg = Substitute(
-            "Could not decode '$0' parameter from HTTP request with path: $1",
-                key_value[0], original);
-        return false;
-      } else {
-        *it->second = decoded;
-      }
-    }
-  }
-  return true;
-}
-
 // Takes the path component of an HTTP request and parses it.
 // The followings are inspected in the path:
 // - the 'doAs' parameter if it exists
@@ -1010,40 +982,25 @@ TWrappedHttpResponse* GetSaml2Redirect(
   TWrappedHttpResponse* response = connection_context->response.get();
   DCHECK(request != nullptr);
   DCHECK(response == nullptr);
-  response = new TWrappedHttpResponse();
-  connection_context->response.reset(response);
-  Status status =
-      ExecEnv::GetInstance()->frontend()->GetSaml2Redirect(*request, response);
-  if (!status.ok()) return nullptr;
-
+  std::unique_ptr<TWrappedHttpResponse> response_ptr = GetSaml2RedirectInternal(*request);
+  response = response_ptr.get();
+  connection_context->response.reset(response_ptr.release());
   return response;
 }
 
 TWrappedHttpResponse* ValidateSaml2AuthnResponse(
-    ThriftServer::ConnectionContext* connection_context,
-    const AuthenticationHash& hash) {
+    ThriftServer::ConnectionContext* connection_context, const AuthenticationHash& hash) {
   TWrappedHttpRequest* request = connection_context->request.get();
   TWrappedHttpResponse* response = connection_context->response.get();
   DCHECK(request != nullptr);
   DCHECK(response == nullptr);
-  response = new TWrappedHttpResponse();
-  connection_context->response.reset(response);
-  // Parse the body.
-  std::map<string, string*> params_to_check;
-  string saml_relay_state;
-  params_to_check["RelayState"] =  &saml_relay_state;
-  string error_msg;
-  const string& content = request->content;
-  if(!ParseParams(params_to_check, content, content, &error_msg)) {
-    LOG(ERROR) << "failed to parse SAML response params: " << error_msg;
+  std::unique_ptr<TWrappedHttpResponse> response_ptr =
+      ValidateSaml2AuthnResponseInternal(*request);
+  if (UNLIKELY(response_ptr == nullptr)) {
     return nullptr;
   }
-  StripWhiteSpace(&saml_relay_state);
-  request->params["RelayState"] = saml_relay_state;
-  // We return some html in case of auth error. TODO: Should handle other
-  // errors where no response is generated.
-  Status status =
-      ExecEnv::GetInstance()->frontend()->ValidateSaml2Response(*request, response);
+  response = response_ptr.get();
+  connection_context->response.reset(response_ptr.release());
   return response;
 }
 
@@ -1064,33 +1021,12 @@ bool ValidateSaml2Bearer(ThriftServer::ConnectionContext* connection_context,
 }
 
 TWrappedHttpRequest* InitWrappedHttpRequest(
-      ThriftServer::ConnectionContext* connection_context) {
-  TWrappedHttpRequest* request = new TWrappedHttpRequest();
-  request->remote_ip = connection_context->network_address.hostname;
-  request->server_name = connection_context->server_name;
-  // Intentionally lying to the pac4j lib  in the frontend to ensure that non-secure
-  // test setups work similarly to secure production systems. SAML must use TLS if
-  // FLAGS_saml2_allow_without_tls_debug_only is not true.
-  request->secure = true;
-  connection_context->request.reset(request);
+    ThriftServer::ConnectionContext* connection_context) {
+  std::unique_ptr<TWrappedHttpRequest> request_ptr = InitWrappedHttpRequestInternal(
+      connection_context->network_address.hostname, connection_context->server_name);
+  TWrappedHttpRequest* request = request_ptr.get();
+  connection_context->request.reset(request_ptr.release());
   return request;
-}
-
-// Parses and validates FLAGS_saml2_sp_callback_url.
-// Sets saml_sp_path to the path part if successful.
-Status ParseSamlSpUrl(string* saml_sp_path) {
-  vector<string> split =
-      Split(FLAGS_saml2_sp_callback_url, delimiter::Limit("/", 3));
-  if (split.size() != 4 || (split[0] != "http:" && split[0] != "https:")) {
-    return Status(
-        Substitute("Bad saml2_sp_callback_url: $0", FLAGS_saml2_sp_callback_url));
-  }
-  // The port in the url should be the same as FLAGS_hs2_http_port in general,
-  // but this is not enforced to allow the use case when the port is mapped,
-  // e.g. external_port->http_port. FLAGS_saml2_sp_callback_url has to contain the
-  // external_port in this case.
-  if (saml_sp_path != nullptr) *saml_sp_path = "/" + split[3];
-  return Status::OK();
 }
 
 namespace {
@@ -1582,7 +1518,7 @@ void SecureAuthProvider::SetupConnectionContext(
 
       string saml_path;
       if (has_saml_) {
-        Status parse_status = ParseSamlSpUrl(&saml_path);
+        Status parse_status = ParseSamlSpUrl(&saml_path, FLAGS_saml2_sp_callback_url);
         DCHECK(parse_status.ok());
       }
       callbacks.path_fn = std::bind(
@@ -1726,7 +1662,7 @@ Status AuthManager::Init() {
   // Could use any other requiered flag for SAML
   bool use_saml = !FLAGS_saml2_sp_callback_url.empty();
   if (use_saml) {
-    RETURN_IF_ERROR(ParseSamlSpUrl(nullptr));
+    RETURN_IF_ERROR(ParseSamlSpUrl(nullptr, FLAGS_saml2_sp_callback_url));
     if (!IsExternalTlsConfigured()) {
       if (!FLAGS_saml2_allow_without_tls_debug_only) {
         return Status("SAML SSO authentication should be only used with TLS enabled.");

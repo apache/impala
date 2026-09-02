@@ -384,4 +384,8 @@ struct TBackendGflags {
   177: required string avro_schema_url_http_allowed_hosts
 
   178: required string trusted_jar_paths
+
+  179: required string webserver_saml2_idp_metadata
+
+  180: required string webserver_saml2_sp_callback_url
 }

@@ -114,8 +114,8 @@ DEFINE_string(webserver_authentication_domain, "",
     "Domain used for debug webserver authentication");
 DEFINE_string(webserver_password_file, "",
     "(Optional) Location of .htpasswd file containing user names and hashed passwords for"
-    " debug webserver authentication. Cannot be used with --webserver_require_ldap or "
-    "--webserver_require_spnego.");
+    " debug webserver authentication. Cannot be used with --webserver_require_ldap, "
+    "--webserver_require_spnego, or --webserver_saml2_sp_callback_url.");
 
 DEFINE_string(webserver_x_frame_options, "DENY",
     "webserver will add X-Frame-Options HTTP header with this value");
@@ -176,6 +176,9 @@ DECLARE_string(spnego_keytab_file);
 DECLARE_bool(oauth_token_auth);
 DECLARE_bool(oauth_jwt_validate_signature);
 DECLARE_string(oauth_jwt_custom_claim_username);
+DECLARE_string(webserver_saml2_sp_callback_url);
+DECLARE_bool(saml2_ee_test_mode);
+DECLARE_bool(saml2_allow_without_tls_debug_only);
 
 static const char* DOC_FOLDER = "/www/";
 static const int DOC_FOLDER_LEN = strlen(DOC_FOLDER);
@@ -222,6 +225,8 @@ string HttpStatusCodeToString(HttpStatusCode code) {
   switch (code) {
     case HttpStatusCode::Ok:
       return "200 OK";
+    case HttpStatusCode::MovedTemporarily:
+      return "302 Moved Temporarily";
     case HttpStatusCode::TemporaryRedirect:
       return "307 Temporary Redirect";
     case HttpStatusCode::BadRequest:
@@ -241,6 +246,33 @@ string HttpStatusCodeToString(HttpStatusCode code) {
   }
   LOG(FATAL) << "Unexpected HTTP response code";
   return "";
+}
+
+int16_t HttpStatusCodeToInt(HttpStatusCode code) {
+  switch (code) {
+    case HttpStatusCode::Ok:
+      return 200;
+    case HttpStatusCode::MovedTemporarily:
+      return 302;
+    case HttpStatusCode::TemporaryRedirect:
+      return 307;
+    case HttpStatusCode::BadRequest:
+      return 400;
+    case HttpStatusCode::AuthenticationRequired:
+      return 401;
+    case HttpStatusCode::NotFound:
+      return 404;
+    case HttpStatusCode::LengthRequired:
+      return 411;
+    case HttpStatusCode::RequestEntityTooLarge:
+      return 413;
+    case HttpStatusCode::InternalServerError:
+      return 500;
+    case HttpStatusCode::ServiceUnavailable:
+      return 503;
+  }
+  LOG(FATAL) << "Unexpected HTTP response code";
+  return -1;
 }
 
 Status CompressStringToBuffer(const string& content,
@@ -321,7 +353,9 @@ Webserver::Webserver(const string& interface, const int port, MetricGroup* metri
     check_trusted_domain_(!FLAGS_trusted_domain.empty()),
     check_trusted_auth_header_(!FLAGS_trusted_auth_header.empty()),
     use_jwt_(FLAGS_jwt_token_auth),
-    use_oauth_(FLAGS_oauth_token_auth) {
+    use_oauth_(FLAGS_oauth_token_auth),
+    // excluding catalogd, statestored and impalad executors
+    use_saml_(FLAGS_is_coordinator && !FLAGS_webserver_saml2_sp_callback_url.empty()) {
   http_address_ = MakeNetworkAddress(interface.empty() ? "0.0.0.0" : interface, port);
   Init();
 
@@ -337,7 +371,7 @@ Webserver::Webserver(const string& interface, const int port, MetricGroup* metri
     total_basic_auth_failure_ =
         metrics->AddCounter("impala.webserver.total-basic-auth-failure", 0);
   }
-  if (use_cookies_ && auth_mode_ != AuthMode::NONE) {
+  if (use_cookies_ && (auth_mode_ != AuthMode::NONE || use_saml_)) {
     total_cookie_auth_success_ =
         metrics->AddCounter("impala.webserver.total-cookie-auth-success", 0);
     total_cookie_auth_failure_ =
@@ -364,6 +398,12 @@ Webserver::Webserver(const string& interface, const int port, MetricGroup* metri
         metrics->AddCounter("impala.webserver.total-oauth-token-auth-success", 0);
     total_oauth_token_auth_failure_ =
         metrics->AddCounter("impala.webserver.total-oauth-token-auth-failure", 0);
+  }
+  if (use_saml_) {
+    total_saml_auth_success_ =
+        metrics->AddCounter("impala.webserver.total-saml-auth-success", 0);
+    total_saml_auth_failure_ =
+        metrics->AddCounter("impala.webserver.total-saml-auth-failure", 0);
   }
 }
 
@@ -476,6 +516,10 @@ Status Webserver::Start() {
   }
 
   if (!FLAGS_webserver_password_file.empty()) {
+    if (!FLAGS_webserver_saml2_sp_callback_url.empty()) {
+      return Status("--webserver_password_file cannot be used with "
+                    "--webserver_saml2_sp_callback_url.");
+    }
     if (IsFIPSMode()) {
       return Status("HTTP digest authorization is not supported in FIPS approved mode.");
     } else {
@@ -528,6 +572,13 @@ Status Webserver::Start() {
         &ldap_, FLAGS_webserver_ldap_user_filter, FLAGS_webserver_ldap_group_filter));
 
     LOG(INFO) << "Webserver: secured with LDAP authentication.";
+  }
+
+  if (use_saml_ && !IsSecure()) {
+    if (!FLAGS_saml2_allow_without_tls_debug_only) {
+      return Status("SAML SSO authentication should be only used with TLS enabled.");
+    }
+    LOG(WARNING) << "SAML SSO authentication is used without TLS.";
   }
 
   options.push_back("listening_ports");
@@ -763,11 +814,13 @@ sq_callback_result_t Webserver::BeginRequestCallback(struct sq_connection* conne
   // Flags if we have a valid cookie to test for CSRF.
   bool cookie_authenticated = false;
 
+  // Read Authorization header once for all authentication methods
+  const char* authz_header = sq_get_header(connection, "Authorization");
+
   // Try authenticating with JWT token first, if enabled.
   if (use_jwt_ || use_oauth_) {
     const char* auth_value = nullptr;
-    const char* value = sq_get_header(connection, "Authorization");
-    if (value != nullptr) auth_value = StripLeadingWhiteSpace(value);
+    if (authz_header != nullptr) auth_value = StripLeadingWhiteSpace(authz_header);
     // Check Authorization header with the Bearer authentication scheme as:
     // Authorization: Bearer <token>
     // A well-formed JWT consists of three concatenated Base64url-encoded strings,
@@ -807,7 +860,7 @@ sq_callback_result_t Webserver::BeginRequestCallback(struct sq_connection* conne
     }
   }
 
-  if (!authenticated && auth_mode_ == AuthMode::NONE) {
+  if (!authenticated && auth_mode_ == AuthMode::NONE && !use_saml_) {
     // With AuthMode::NONE, any protection can be bypassed. We sometimes initialize a 2nd
     // Metrics webserver using AuthMode::NONE, and metrics counters are not named
     // uniquely to work with two webservers using cookies so we skip using cookies.
@@ -838,7 +891,7 @@ sq_callback_result_t Webserver::BeginRequestCallback(struct sq_connection* conne
     }
   }
 
-  if (!authenticated && auth_mode_ == AuthMode::HTPASSWD) {
+  if (!authenticated && auth_mode_ == AuthMode::HTPASSWD && !use_saml_) {
     // Squeasel already handled HTPASSWD authentication. We still enable CSRF protection
     // as browsers automatically include HTPASSWD credentials in requests, so add and use
     // cookies to avoid requiring the custom header.
@@ -894,29 +947,61 @@ sq_callback_result_t Webserver::BeginRequestCallback(struct sq_connection* conne
     }
   }
 
+  // Bypass LDAP/SPNEGO and SAML authentication for bootstrap health checks.
+  // Restricted to localhost-only requests and monitoring endpoints to limit attack
+  // surface (an external attacker knowing the header name cannot exploit this).
+  if (!authenticated && FLAGS_saml2_ee_test_mode
+      && sq_get_header(connection, "X-Impala-EETest") != nullptr) {
+    const bool is_localhost = (request_info->remote_ip == 0x7F000001); // 127.0.0.1
+    const char* uri = request_info->uri;
+    const bool is_monitoring_endpoint =
+        strncmp(uri, JSON_METRICS_URL, sizeof(JSON_METRICS_URL) - 1) == 0 ||
+        strncmp(uri, BACKENDS_URL, sizeof(BACKENDS_URL) - 1) == 0 ||
+        strncmp(uri, VARZ_URL, sizeof(VARZ_URL) - 1) == 0;
+    if (is_localhost && is_monitoring_endpoint) {
+      authenticated = true;
+      check_csrf_protection = false;
+    }
+  }
+
   if (!authenticated) {
-    if (auth_mode_ == AuthMode::SPNEGO) {
+    // Intelligent fallthrough: if no Authorization header and SAML is enabled,
+    // skip SPNEGO/LDAP entirely and proceed directly to SAML
+    if (!authz_header && use_saml_) {
+      // No credentials provided and SAML is available - skip to SAML2
+    } else if (auth_mode_ == AuthMode::SPNEGO) {
+      bool client_initiated_spnego = (authz_header != nullptr &&
+          strncasecmp(authz_header, "Negotiate ", 10) == 0);
+
       sq_callback_result_t spnego_result =
-          HandleSpnego(connection, request_info, &response_headers);
+          HandleSpnego(authz_header, connection, request_info, &response_headers);
       if (spnego_result == SQ_CONTINUE_HANDLING) {
         // Spnego negotiation was successful.
+        authenticated = true;
         AddCookie(request_info->remote_user, &response_headers,
             HTTP_AUTH_MECH_SPNEGO, &cookie_rand_value);
-      } else {
-        // Spnego negotiation is incomplete or failed, stop processing the request.
+      } else if (client_initiated_spnego) {
+        // Client explicitly sent Negotiate auth and it failed.
+        // Don't fallthrough to other methods, return the SPNEGO failure.
         return spnego_result;
       }
-    } else {
-      DCHECK(auth_mode_ == AuthMode::LDAP);
-      Status basic_status = HandleBasic(connection, request_info, &response_headers);
+      // If SPNEGO fails but client didn't explicitly initiate it (no Negotiate header),
+      // continue to try other auth methods (e.g., SAML2)
+    } else if (auth_mode_ == AuthMode::LDAP) {
+      bool client_initiated_ldap = (authz_header != nullptr &&
+          strncasecmp(authz_header, "Basic ", 6) == 0);
+
+      Status basic_status =
+          HandleBasic(authz_header, connection, request_info, &response_headers);
       if (basic_status.ok()) {
         // Basic auth was successful.
+        authenticated = true;
         total_basic_auth_success_->Increment(1);
         AddCookie(request_info->remote_user, &response_headers,
             HTTP_AUTH_MECH_LDAP, &cookie_rand_value);
       } else {
         total_basic_auth_failure_->Increment(1);
-        if (!sq_get_header(connection, "Authorization")) {
+        if (!authz_header) {
           // This case is expected, as some clients will always initially try to connect
           // without an 'Authorization' and only provide one after getting the
           // 'WWW-Authenticate' back, so we don't log it as an error.
@@ -925,11 +1010,92 @@ sq_callback_result_t Webserver::BeginRequestCallback(struct sq_connection* conne
           LOG(ERROR) << "Failed to authenticate: " << basic_status.GetDetail();
         }
         response_headers.push_back("WWW-Authenticate: Basic");
-        SendResponse(connection, "401 Authentication Required", "text/plain",
-            "Must authenticate with Basic authentication.", response_headers);
-        return SQ_HANDLED_OK;
+
+        if (client_initiated_ldap || !use_saml_) {
+          // Return 401 immediately if:
+          // - client explicitly tried Basic auth and it failed, OR
+          // - SAML is not configured (no fallback available)
+          SendResponse(connection, "401 Authentication Required", "text/plain",
+              "Must authenticate with Basic authentication.", response_headers);
+          return SQ_HANDLED_OK;
+        }
+        // If no Authorization header was provided (browser with no credentials)
+        // and SAML is configured, continue to try SAML auth as a fallback.
       }
     }
+  }
+
+  bool post_body_read = false;
+  if (!authenticated && use_saml_) {
+    string ip_str = GetRemoteAddress(request_info).host();
+    auto request = InitWrappedHttpRequestInternal(ip_str, "");
+    request->method = request_info->request_method;
+
+    string saml_path;
+    Status parse_status = ParseSamlSpUrl(&saml_path,
+        FLAGS_webserver_saml2_sp_callback_url);
+    DCHECK(parse_status.ok());
+    bool is_saml_response = !saml_path.empty() && request_info->uri == saml_path;
+
+    if (!is_saml_response) {
+      // SAML Step 1 of 2: Redirect to the SAML Identity Provider (IdP) for
+      // authentication.
+      request->path = request_info->uri;
+      auto response = GetSaml2RedirectInternal(*request);
+      if (response == nullptr) return returnSamlAuthFailure(connection);
+      // Upon success sending the redirect to IDP
+      returnWrappedResponse(connection, *response);
+      return SQ_HANDLED_OK;
+    } else {
+      // SAML Step 2 of 2: Process the SAML response, return redirect to original page
+      // with cookies
+      std::string post_body;
+      sq_callback_result_t result =
+          ReadPostBody(connection, FLAGS_webserver_max_post_length_bytes, &post_body);
+      if (result == SQ_CONTINUE_HANDLING) {
+        post_body_read = true;
+      } else {
+        return result;
+      }
+      request->__set_content(post_body);
+      auto response = ValidateSaml2AuthnResponseInternal(*request);
+      if (response == nullptr) return returnSamlAuthFailure(connection);
+      if (response->status_code
+          == HttpStatusCodeToInt(HttpStatusCode::MovedTemporarily)) {
+        // Upon succcess sending the redirect to initial page stored in RelayState
+        DCHECK(response->__isset.content);
+        DCHECK(!response->content.empty());
+        authenticated = true;
+        request_info->remote_user = strdup(response->content.c_str());
+        response->__set_content("");
+        std::vector<string> headers;
+        // Scope the cookie to the whole site with Path=/. It is set on the response to
+        // the deep ACS callback path (e.g. /SAML2/SSO/POST);
+        AddCookie(request_info->remote_user, &headers, HTTP_AUTH_MECH_SAML,
+            &cookie_rand_value, ";path=/");
+        // pack cookie header into response
+        for (const auto& h : headers) {
+          auto pos = h.find(": ");
+          if (pos != std::string::npos) {
+            response->headers[h.substr(0, pos)] = h.substr(pos + 2);
+          }
+        }
+        returnWrappedResponse(connection, *response);
+        total_saml_auth_success_->Increment(1);
+        return SQ_HANDLED_OK;
+      } else {
+        returnWrappedResponse(connection, *response);
+        total_saml_auth_failure_->Increment(1);
+        return SQ_HANDLED_CLOSE_CONNECTION;
+      }
+    }
+  }
+
+  // Final authentication check: if no auth method succeeded, return 401
+  if (!authenticated) {
+    SendResponse(connection, "401 Authentication Required", "text/plain",
+        "Must authenticate.", response_headers);
+    return SQ_HANDLED_OK;
   }
 
   if (!FLAGS_webserver_doc_root.empty() && FLAGS_enable_webserver_doc_root) {
@@ -972,41 +1138,15 @@ sq_callback_result_t Webserver::BeginRequestCallback(struct sq_connection* conne
 
   req.request_method = request_info->request_method;
   if (req.request_method == "POST") {
-    const char* content_len_str = sq_get_header(connection, "Content-Length");
-    int32_t content_len = 0;
-    if (content_len_str == nullptr ||
-        !safe_strto32(content_len_str, &content_len)) {
-      sq_printf(connection,
-                "HTTP/1.1 %s\r\n",
-                HttpStatusCodeToString(HttpStatusCode::LengthRequired).c_str());
-      return SQ_HANDLED_OK;
-    }
-    if (content_len > FLAGS_webserver_max_post_length_bytes) {
-      // TODO: for this and other HTTP requests, we should log the
-      // remote IP, etc.
-      LOG(WARNING) << "Rejected POST with content length " << content_len;
-      sq_printf(connection,
-                "HTTP/1.1 %s\r\n",
-                HttpStatusCodeToString(HttpStatusCode::RequestEntityTooLarge).c_str());
-      return SQ_HANDLED_CLOSE_CONNECTION;
-    }
-
-    char buf[8192];
-    int rem = content_len;
-    while (rem > 0) {
-      int n = sq_read(connection, buf, std::min<int>(sizeof(buf), rem));
-      if (n <= 0) {
-        LOG(WARNING) << "error reading POST data: expected "
-                     << content_len << " bytes but only read "
-                     << req.post_data.size();
-        sq_printf(connection,
-                  "HTTP/1.1 %s\r\n",
-                  HttpStatusCodeToString(HttpStatusCode::InternalServerError).c_str());
-        return SQ_HANDLED_CLOSE_CONNECTION;
-      }
-
-      req.post_data.append(buf, n);
-      rem -= n;
+    // post_body_read should be false here, since we should not reach this point if
+    // it was read for authentication
+    DCHECK(!post_body_read);
+    sq_callback_result_t result =
+        ReadPostBody(connection, FLAGS_webserver_max_post_length_bytes, &req.post_data);
+    if (result == SQ_CONTINUE_HANDLING) {
+      post_body_read = true;
+    } else {
+      return result;
     }
 
     if (check_csrf_protection) {
@@ -1077,9 +1217,86 @@ sq_callback_result_t Webserver::BeginRequestCallback(struct sq_connection* conne
   return SQ_HANDLED_OK;
 }
 
-sq_callback_result_t Webserver::HandleSpnego(struct sq_connection* connection,
-    struct sq_request_info* request_info, vector<string>* response_headers) {
-  const char* authz_header = sq_get_header(connection, "Authorization");
+void Webserver::returnUnauthorized(
+    struct sq_connection* connection) {
+  TWrappedHttpResponse response;
+  response.status_code = HttpStatusCodeToInt(HttpStatusCode::AuthenticationRequired);
+  response.status_text = "Authentication Required";
+  returnWrappedResponse(connection, response);
+}
+
+sq_callback_result_t Webserver::returnSamlAuthFailure(struct sq_connection* connection) {
+  total_saml_auth_failure_->Increment(1);
+  returnUnauthorized(connection);
+  return SQ_HANDLED_CLOSE_CONNECTION;
+}
+
+void Webserver::returnWrappedResponse(
+    struct sq_connection* connection, const impala::TWrappedHttpResponse& response) {
+  std::ostringstream oss;
+  // Status line
+  oss << "HTTP/1.1 " << response.status_code << " " << response.status_text << CRLF;
+  // Date header
+  oss << "Date: " << GetTimeRFC1123() << CRLF;
+  // Headers
+  for (const auto& header : response.headers) {
+    oss << header.first << ": " << header.second << CRLF;
+  }
+  // For some reason this is needed for squeasel even with no content
+  oss << "Content-Length: " << response.content.size() << CRLF;
+  oss << CRLF;
+  oss << response.content;
+
+  std::string out = oss.str();
+  sq_write(connection, out.c_str(), out.size());
+}
+
+sq_callback_result_t Webserver::ReadPostBody(
+    struct sq_connection* connection, int32_t max_length, std::string* out_body) {
+  const char* content_len_str = sq_get_header(connection, "Content-Length");
+  int32_t content_len = 0;
+  if (content_len_str == nullptr ||
+      !safe_strto32(content_len_str, &content_len)) {
+    sq_printf(connection,
+              "HTTP/1.1 %s\r\n",
+              HttpStatusCodeToString(HttpStatusCode::LengthRequired).c_str());
+    return SQ_HANDLED_OK;
+  }
+  if (content_len > max_length) {
+    // TODO: for this and other HTTP requests, we should log the
+    // remote IP, etc.
+    LOG(WARNING) << "Rejected POST with content length " << content_len;
+    sq_printf(connection,
+              "HTTP/1.1 %s\r\n",
+              HttpStatusCodeToString(HttpStatusCode::RequestEntityTooLarge).c_str());
+    return SQ_HANDLED_CLOSE_CONNECTION;
+  }
+
+  char buf[8192];
+  int rem = content_len;
+  out_body->reserve(content_len);
+  while (rem > 0) {
+    int n = sq_read(connection, buf, std::min<int>(sizeof(buf), rem));
+    if (n <= 0) {
+      LOG(WARNING) << "error reading POST data: expected "
+                    << content_len << " bytes but only read "
+                    << out_body->size();
+      sq_printf(connection,
+                "HTTP/1.1 %s\r\n",
+                HttpStatusCodeToString(HttpStatusCode::InternalServerError).c_str());
+      return SQ_HANDLED_CLOSE_CONNECTION;
+    }
+
+    out_body->append(buf, n);
+    rem -= n;
+  }
+
+  return SQ_CONTINUE_HANDLING;
+}
+
+sq_callback_result_t Webserver::HandleSpnego(const char* authz_header,
+    struct sq_connection* connection, struct sq_request_info* request_info,
+    vector<string>* response_headers) {
   string authn_princ;
   kudu::Status s = RunSpnegoStep(authz_header, response_headers, &authn_princ);
   if (s.IsIncomplete()) {
@@ -1218,9 +1435,9 @@ bool Webserver::OAuthTokenAuth(const std::string& oauth_token,
   return true;
 }
 
-Status Webserver::HandleBasic(struct sq_connection* connection,
-    struct sq_request_info* request_info, vector<string>* response_headers) {
-  const char* authz_header = sq_get_header(connection, "Authorization");
+Status Webserver::HandleBasic(const char* authz_header,
+    struct sq_connection* connection, struct sq_request_info* request_info,
+    vector<string>* response_headers) {
   if (!authz_header) {
     return Status::Expected("No Authorization header provided.");
   }
@@ -1246,7 +1463,7 @@ Status Webserver::HandleBasic(struct sq_connection* connection,
 }
 
 void Webserver::AddCookie(const char* user, vector<string>* response_headers,
-    const string& authMech, string* cookie_rand_value) {
+    const string& authMech, string* cookie_rand_value, const string& extra_flags) {
   if (use_cookies_) {
     // If cookie auth failed and we generated a 'delete cookie' header, remove it.
     auto eq = [](const string& header) { return header.rfind("Set-Cookie", 0) == 0; };
@@ -1256,8 +1473,8 @@ void Webserver::AddCookie(const char* user, vector<string>* response_headers,
     }
     // Generate a cookie to return.
     const AuthenticationHash& hash = AuthManager::GetInstance()->GetAuthHash();
-    response_headers->push_back(Substitute("Set-Cookie: $0",
-        GenerateCookie(user, hash, authMech, cookie_rand_value)));
+    response_headers->push_back(Substitute("Set-Cookie: $0$1",
+        GenerateCookie(user, hash, authMech, cookie_rand_value), extra_flags));
   }
 }
 

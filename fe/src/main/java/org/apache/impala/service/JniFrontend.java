@@ -36,6 +36,7 @@ import org.apache.hadoop.security.ShellBasedUnixGroupsNetgroupMapping;
 import org.apache.impala.analysis.DescriptorTable;
 import org.apache.impala.analysis.ToSqlUtils;
 import org.apache.impala.analysis.SqlScanner;
+import org.apache.impala.authentication.saml.ImpalaSamlClientBase;
 import org.apache.impala.authentication.saml.WrappedWebContext;
 import org.apache.impala.authorization.AuthorizationFactory;
 import org.apache.impala.authorization.ImpalaInternalAdminUser;
@@ -874,12 +875,17 @@ public class JniFrontend {
 
   public byte[] getSaml2Redirect(byte[] serializedRequest) throws ImpalaException {
     Preconditions.checkNotNull(frontend_);
-    Preconditions.checkNotNull(frontend_.getSaml2Client());
     final TWrappedHttpRequest request = new TWrappedHttpRequest();
     final TWrappedHttpResponse response = new TWrappedHttpResponse();
     JniUtil.deserializeThrift(protocolFactory_, request, serializedRequest);
     WrappedWebContext webContext = new WrappedWebContext(request, response);
-    frontend_.getSaml2Client().setRedirect(webContext);
+
+    ImpalaSamlClientBase client = frontend_.getSaml2ClientForServer(request.server_name);
+    Preconditions.checkNotNull(client, "SAML client not configured. "
+        + "For HiveServer2, set --saml2_idp_metadata. "
+        + "For web UI, set --webserver_saml2_idp_metadata.");
+    client.setRedirect(webContext);
+
     try {
       TSerializer serializer = new TSerializer(protocolFactory_);
       return serializer.serialize(response);
@@ -890,12 +896,17 @@ public class JniFrontend {
 
   public byte[] validateSaml2Response(byte[] serializedRequest) throws ImpalaException {
     Preconditions.checkNotNull(frontend_);
-    Preconditions.checkNotNull(frontend_.getSaml2Client());
     final TWrappedHttpRequest request = new TWrappedHttpRequest();
     final TWrappedHttpResponse response = new TWrappedHttpResponse();
     JniUtil.deserializeThrift(protocolFactory_, request, serializedRequest);
     WrappedWebContext webContext = new WrappedWebContext(request, response);
-    frontend_.getSaml2Client().validateAuthnResponse(webContext);
+
+    ImpalaSamlClientBase client = frontend_.getSaml2ClientForServer(request.server_name);
+    Preconditions.checkNotNull(client, "SAML client not configured. "
+        + "For HiveServer2, set --saml2_idp_metadata. "
+        + "For web UI, set --webserver_saml2_idp_metadata.");
+    client.validateAuthnResponse(webContext);
+
     try {
       TSerializer serializer = new TSerializer(protocolFactory_);
       return serializer.serialize(response);
@@ -958,15 +969,19 @@ public class JniFrontend {
     }
   }
 
+  /**
+   * Note: Bearer tokens are used for HiveServer2 HTTP transport authentication only. so
+   * getSaml2ClientHS2() is called directly
+   */
   public String validateSaml2Bearer(byte[] serializedRequest) throws ImpalaException{
     Preconditions.checkNotNull(frontend_);
-    Preconditions.checkNotNull(frontend_.getSaml2Client());
+    Preconditions.checkNotNull(frontend_.getSaml2ClientHS2());
     final TWrappedHttpRequest request = new TWrappedHttpRequest();
     // The responsee won't be used but it is needed to create a WebContext.
     final TWrappedHttpResponse dummyResponse = new TWrappedHttpResponse();
     JniUtil.deserializeThrift(protocolFactory_, request, serializedRequest);
     WrappedWebContext webContext = new WrappedWebContext(request, dummyResponse);
-    return frontend_.getSaml2Client().validateBearer(webContext);
+    return frontend_.getSaml2ClientHS2().validateBearer(webContext);
   }
 
   /**

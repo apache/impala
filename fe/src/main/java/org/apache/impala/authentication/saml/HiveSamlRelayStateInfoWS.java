@@ -17,9 +17,14 @@
 
 package org.apache.impala.authentication.saml;
 
-/**
- * Common interface for relay state information used in SAML authentication.
- * Allows different implementations for HS2 (port-based) and WebServer (URI-based).
- */
-public interface HiveSamlRelayStateInfo {
+public class HiveSamlRelayStateInfoWS implements HiveSamlRelayStateInfo {
+  private final String uri;
+
+  HiveSamlRelayStateInfoWS(String uri) {
+    this.uri = uri;
+  }
+
+  public String getUri() {
+    return uri;
+  }
 }

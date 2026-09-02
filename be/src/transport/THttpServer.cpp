@@ -253,7 +253,7 @@ bool THttpServer::parseStatusLine(char* status) {
 
     // Construct the HTTP header
     std::ostringstream h;
-    h << "HTTP/1.1 200 OK" << CRLF << "Date: " << getTimeRFC1123() << CRLF
+    h << "HTTP/1.1 200 OK" << CRLF << "Date: " << impala::GetTimeRFC1123() << CRLF
       << "Access-Control-Allow-Origin: *" << CRLF << "Access-Control-Allow-Methods: POST, OPTIONS"
       << CRLF << "Access-Control-Allow-Headers: Content-Type" << CRLF << CRLF;
     string header = h.str();
@@ -525,7 +525,7 @@ void THttpServer::flush() {
 
   // Construct the HTTP header
   std::ostringstream h;
-  h << "HTTP/1.1 200 OK" << CRLF << "Date: " << getTimeRFC1123() << CRLF
+  h << "HTTP/1.1 200 OK" << CRLF << "Date: " << impala::GetTimeRFC1123() << CRLF
     << "Server: Thrift/" << PACKAGE_VERSION << CRLF
     << "Access-Control-Allow-Origin: *" << CRLF
     << "Content-Type: application/x-thrift" << CRLF << "Content-Length: " << len << CRLF
@@ -548,29 +548,9 @@ void THttpServer::flush() {
   readHeaders_ = true;
 }
 
-std::string THttpServer::getTimeRFC1123() {
-  static const char* Days[] = {"Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"};
-  static const char* Months[]
-      = {"Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"};
-  char buff[128];
-  time_t t = time(NULL);
-  tm* broken_t = gmtime(&t);
-
-  sprintf(buff,
-          "%s, %d %s %d %d:%d:%d GMT",
-          Days[broken_t->tm_wday],
-          broken_t->tm_mday,
-          Months[broken_t->tm_mon],
-          broken_t->tm_year + 1900,
-          broken_t->tm_hour,
-          broken_t->tm_min,
-          broken_t->tm_sec);
-  return std::string(buff);
-}
-
 void THttpServer::returnUnauthorized() {
   std::ostringstream h;
-  h << "HTTP/1.1 401 Unauthorized" << CRLF << "Date: " << getTimeRFC1123() << CRLF
+  h << "HTTP/1.1 401 Unauthorized" << CRLF << "Date: " << impala::GetTimeRFC1123() << CRLF
     << "Connection: close" << CRLF;
   vector<string> return_headers = callbacks_.return_headers_fn();
   for (const string& header : return_headers) {
@@ -586,8 +566,8 @@ void THttpServer::returnWrappedResponse(const impala::TWrappedHttpResponse& resp
   int code = response.status_code;
   string status = response.status_text;
   std::ostringstream h;
-  h << "HTTP/1.1 "<< code << " " << status << CRLF << "Date: " << getTimeRFC1123() << CRLF;
-  vector<string> return_headers = callbacks_.return_headers_fn();
+  h << "HTTP/1.1 " << code << " " << status << CRLF
+    << "Date: " << impala::GetTimeRFC1123() << CRLF;
   for (const auto& header : response.headers) {
     h << header.first << ": " << header.second << CRLF;
   }

@@ -119,7 +119,7 @@ void ImpalaHttpHandler::RegisterHandlers(Webserver* webserver, bool metrics_only
   if (is_admissiond_) {
     // The admissiond only exposes a subset of endpoints that have info relevant to
     // admission control.
-    webserver->RegisterUrlCallback("/backends", "backends.tmpl",
+    webserver->RegisterUrlCallback(Webserver::BACKENDS_URL, "backends.tmpl",
         MakeCallback(this, &ImpalaHttpHandler::BackendsHandler), true);
 
     webserver->RegisterUrlCallback("/admission", "admission_controller.tmpl",
@@ -130,7 +130,7 @@ void ImpalaHttpHandler::RegisterHandlers(Webserver* webserver, bool metrics_only
     return;
   }
 
-  webserver->RegisterUrlCallback("/backends", "backends.tmpl",
+  webserver->RegisterUrlCallback(Webserver::BACKENDS_URL, "backends.tmpl",
       MakeCallback(this, &ImpalaHttpHandler::BackendsHandler), true);
 
   webserver->RegisterUrlCallback("/hadoop-varz", "hadoop-varz.tmpl",

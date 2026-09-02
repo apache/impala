@@ -178,9 +178,16 @@ DEFINE_string(saml2_private_key_password_cmd, "",
 TAG_FLAG(saml2_private_key_password_cmd, sensitive);
 
 DEFINE_string(saml2_idp_metadata, "",
-    "IDP metadata file for the SAML configuration. This metadata file must be "
-    "exported from the external identity provider. This is used to validate the SAML "
-    "assertions received. Setting this is required for SAML authentication");
+    "IDP metadata file for the SAML configuration for client connections that use the "
+    "hs2-http protocol. This metadata file must be exported from the external identity "
+    "provider. This is used to validate the SAML assertions received. Setting this is "
+    "required for SAML authentication on HiveServer2");
+
+DEFINE_string(webserver_saml2_idp_metadata, "",
+    "IDP metadata file for the SAML configuration for debug web UI. This metadata file "
+    "must be exported from the external identity provider. This is used to validate the "
+    "SAML assertions received. Setting this is required for SAML authentication on "
+    "WebServer");
 
 DEFINE_string(saml2_sp_entity_id, "",
     "Service provider entity id for this impalad. This must match with the "
@@ -188,8 +195,13 @@ DEFINE_string(saml2_sp_entity_id, "",
     "will be used as the SP id.");
 
 DEFINE_string(saml2_sp_callback_url, "",
-    "Callback URL where SAML responses should be posted. Currently this must be "
-    "configured at the same port number as the --hs2_http_port flag.");
+    "Callback URL where SAML responses for hs2-http connections should be posted. "
+    "Currently this "
+    "must be configured at the same port number as the --hs2_http_port flag.");
+
+DEFINE_string(webserver_saml2_sp_callback_url, "",
+    "Callback URL where SAML responses for debug web UI should be posted. Currently this "
+    "must be configured at the same port number as the --webserver_port flag.");
 
 DEFINE_bool(saml2_want_assertations_signed, true,
     "When this configuration is set to true, Impala will validate the signature "
@@ -517,8 +529,10 @@ Status PopulateThriftBackendGflags(TBackendGflags& cfg) {
       FLAGS_saml2_private_key_password_cmd,saml2_private_key_password));
   cfg.__set_saml2_private_key_password(saml2_private_key_password);
   cfg.__set_saml2_idp_metadata(FLAGS_saml2_idp_metadata);
+  cfg.__set_webserver_saml2_idp_metadata(FLAGS_webserver_saml2_idp_metadata);
   cfg.__set_saml2_sp_entity_id(FLAGS_saml2_sp_entity_id);
   cfg.__set_saml2_sp_callback_url(FLAGS_saml2_sp_callback_url);
+  cfg.__set_webserver_saml2_sp_callback_url(FLAGS_webserver_saml2_sp_callback_url);
   cfg.__set_saml2_want_assertations_signed(FLAGS_saml2_want_assertations_signed);
   cfg.__set_saml2_sign_requests(FLAGS_saml2_sign_requests);
   cfg.__set_saml2_callback_token_ttl(FLAGS_saml2_callback_token_ttl);

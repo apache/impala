@@ -115,7 +115,9 @@ import org.apache.impala.analysis.TableName;
 import org.apache.impala.analysis.TableRef;
 import org.apache.impala.analysis.ToSqlUtils;
 import org.apache.impala.analysis.TruncateStmt;
-import org.apache.impala.authentication.saml.ImpalaSamlClient;
+import org.apache.impala.authentication.saml.ImpalaSamlClientBase;
+import org.apache.impala.authentication.saml.ImpalaSamlClientHS2;
+import org.apache.impala.authentication.saml.ImpalaSamlClientWS;
 import org.apache.impala.authorization.AuthorizationChecker;
 import org.apache.impala.authorization.AuthorizationConfig;
 import org.apache.impala.authorization.AuthorizationFactory;
@@ -527,7 +529,9 @@ public class Frontend {
 
   private static ExecutorService checkAuthorizationPool_;
 
-  private final ImpalaSamlClient saml2Client_;
+  private final ImpalaSamlClientHS2 saml2ClientHS2_;
+
+  private final ImpalaSamlClientWS saml2ClientWS_;
 
   private final KuduTransactionManager kuduTxnManager_;
 
@@ -589,10 +593,15 @@ public class Frontend {
       metaStoreClientPool_ = null;
       transactionKeepalive_ = null;
     }
-    if (!BackendConfig.INSTANCE.getSaml2IdpMetadata().isEmpty()) {
-      saml2Client_ =  ImpalaSamlClient.get();
+    if (!BackendConfig.INSTANCE.getHS2Saml2IdpMetadata().isEmpty()) {
+      saml2ClientHS2_ =  ImpalaSamlClientHS2.get();
     } else {
-      saml2Client_ = null;
+      saml2ClientHS2_ = null;
+    }
+    if (!BackendConfig.INSTANCE.getWSSaml2IdpMetadata().isEmpty()) {
+      saml2ClientWS_ = ImpalaSamlClientWS.get();
+    } else {
+      saml2ClientWS_ = null;
     }
     kuduTxnManager_ = new KuduTransactionManager();
   }
@@ -631,7 +640,22 @@ public class Frontend {
     return impaladTableUsageTracker_;
   }
 
-  public ImpalaSamlClient getSaml2Client() { return saml2Client_; }
+  public ImpalaSamlClientHS2 getSaml2ClientHS2() { return saml2ClientHS2_; }
+
+  public ImpalaSamlClientWS getSaml2ClientWS() { return saml2ClientWS_; }
+
+  /**
+   * Returns the appropriate SAML client based on the server name.
+   * @param serverName the name of the server (e.g., "hiveserver2-http-frontend")
+   * @return the appropriate SAML client for the given server
+   */
+  public ImpalaSamlClientBase getSaml2ClientForServer(String serverName) {
+    if ("hiveserver2-http-frontend".equals(serverName)) {
+      return saml2ClientHS2_;
+    } else {
+      return saml2ClientWS_;
+    }
+  }
 
   public TUpdateCatalogCacheResponse updateCatalogCache(
       TUpdateCatalogCacheRequest req) throws ImpalaException, TException {
