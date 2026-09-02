@@ -34,6 +34,7 @@ import org.apache.impala.thrift.TPlanNode;
 import org.apache.impala.thrift.TPlanNodeType;
 import org.apache.impala.thrift.TQueryOptions;
 import org.apache.impala.thrift.TSortInfo;
+import org.apache.impala.util.MathUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -316,22 +317,36 @@ public class ExchangeNode extends PlanNode {
     // memory usage at runtime. The following estimates assume that memory usage will
     // lean towards the soft limits.
     int numSenders = getNumSenders();
-    long estimatedTotalQueueByteSize = estimateTotalQueueByteSize(numSenders);
+    long rowsReachingQueues = getRowsReachingQueues();
+    long estimatedTotalQueueByteSize =
+        estimateTotalQueueByteSize(numSenders, rowsReachingQueues);
     long estimatedDeferredRPCQueueSize = estimateDeferredRPCQueueSize(queryOptions,
-        numSenders);
+        numSenders, rowsReachingQueues);
     long estimatedMem = Math.max(
         LongMath.saturatedAdd(estimatedTotalQueueByteSize, estimatedDeferredRPCQueueSize),
         MIN_ESTIMATE_BYTES);
     nodeResourceProfile_ = ResourceProfile.noReservation(estimatedMem);
   }
 
+  // Returns the estimated number of rows that reach the receiver's queues: the senders
+  // do not apply the offset, so the queues hold the rows before it.
+  private long getRowsReachingQueues() {
+    // Do not use the filtered cardinality: this bounds what can be buffered, and a late
+    // or non-selective runtime filter still leaves the full stream in the queues.
+    long inputCardinality = getChild(0).getCardinality();
+    if (inputCardinality > -1) return inputCardinality;
+    // No input estimate, but the senders still stop after 'limit + offset' rows.
+    if (!hasLimit()) return -1;
+    return offset_ > 0 ? MathUtil.addCardinalities(limit_, offset_) : limit_;
+  }
+
   // Returns the estimated size of the deferred batch queue (in bytes) by
   // assuming that at least one row batch rpc payload per sender is queued.
   private long estimateDeferredRPCQueueSize(TQueryOptions queryOptions,
-      int numSenders) {
+      int numSenders, long rowsReachingQueues) {
     long rowBatchSize = getRowBatchSize(queryOptions);
-    // Set an upper limit based on estimated cardinality.
-    if (getCardinality() > 0) rowBatchSize = Math.min(rowBatchSize, getCardinality());
+    // Set an upper limit based on the rows that reach the queues.
+    if (rowsReachingQueues > 0) rowBatchSize = Math.min(rowBatchSize, rowsReachingQueues);
     long avgRowBatchByteSize =
         Math.min((long) Math.ceil(rowBatchSize * getAvgSerializedRowSize(this)),
             ROWBATCH_MAX_MEM_USAGE);
@@ -342,16 +357,17 @@ public class ExchangeNode extends PlanNode {
   // Returns the total estimated size (in bytes) of the row batch queues by
   // assuming enough batches can be queued such that it hits the row batch
   // queue's soft mem limit.
-  private long estimateTotalQueueByteSize(int numSenders) {
+  private long estimateTotalQueueByteSize(int numSenders, long rowsReachingQueues) {
     int numQueues = isMergingExchange() ? numSenders : 1;
     long maxQueueByteSize = BackendConfig.INSTANCE.getBackendCfg().
         exchg_node_buffer_size_bytes;
     // TODO: Should we set a better default size here? This might be alot for
     // queries without stats.
     long estimatedTotalQueueByteSize = numQueues * maxQueueByteSize;
-    // Set an upper limit based on estimated cardinality.
-    if (getCardinality() > -1 && (isBroadcastExchange() || getNumNodes() > 0)) {
-      long totalBytesToReceive = (long) Math.ceil(getAvgRowSize() * getCardinality());
+    // Set an upper limit based on the rows that reach the queues.
+    if (rowsReachingQueues > -1 && (isBroadcastExchange() || getNumNodes() > 0)) {
+      long totalBytesToReceive =
+          (long) Math.ceil((double) getAvgRowSize() * rowsReachingQueues);
       // Assuming no skew in distribution during data shuffling.
       long bytesToReceivePerExchNode = isBroadcastExchange() ? totalBytesToReceive
           : totalBytesToReceive / getNumNodes();

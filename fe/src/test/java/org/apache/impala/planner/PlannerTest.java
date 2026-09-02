@@ -131,7 +131,8 @@ public class PlannerTest extends PlannerTestBase {
   @Test
   public void testOffsetCardinality() {
     runPlannerTestFile("card-limit-offset",
-        ImmutableSet.of(PlannerTestOption.VALIDATE_CARDINALITY));
+        ImmutableSet.of(PlannerTestOption.VALIDATE_CARDINALITY,
+            PlannerTestOption.VALIDATE_RESOURCES));
   }
 
   @Test
