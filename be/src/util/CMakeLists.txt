@@ -95,6 +95,8 @@ set(UTIL_SRCS
   ldap-search-bind.cc
   ldap-simple-bind.cc
   logging-support.cc
+  oauth-server-config.cc
+  oauth-servers-manager.cc
   mem-info.cc
   memory-metrics.cc
   memusage-path-handlers.cc
@@ -278,6 +280,8 @@ add_library(UtilTests STATIC
   iceberg-utility-functions-test.cc
   in-list-filter-test.cc
   jwt-util-test.cc
+  oauth-server-config-test.cc
+  oauth-servers-manager-test.cc
   logging-support-test.cc
   lru-multi-cache-test.cc
   metrics-test.cc
@@ -343,6 +347,8 @@ ADD_UNIFIED_BE_LSAN_TEST(iceberg-utility-functions-test "IcebergPartitions.*")
 ADD_BE_LSAN_TEST(internal-queue-test)
 ADD_UNIFIED_BE_LSAN_TEST(in-list-filter-test "InListFilterTest.*")
 ADD_UNIFIED_BE_LSAN_TEST(jwt-util-test "JwtUtilTest.*")
+ADD_UNIFIED_BE_LSAN_TEST(oauth-server-config-test "OAuthServerConfigTest.*")
+ADD_UNIFIED_BE_LSAN_TEST(oauth-servers-manager-test "OAuthServersManagerTest.*")
 ADD_UNIFIED_BE_LSAN_TEST(lru-multi-cache-test "LruMultiCache.*")
 ADD_UNIFIED_BE_LSAN_TEST(logging-support-test "LoggingSupport.*")
 ADD_UNIFIED_BE_LSAN_TEST(metrics-test "MetricsTest.*")

@@ -83,8 +83,7 @@ public class JwtWebserverTest {
     String jwksFilename =
         new File(System.getenv("IMPALA_HOME"), "testdata/jwt/jwks_rs256.json").getPath();
     setUp(String.format(
-              "--jwt_token_auth=true --jwt_validate_signature=true --jwks_file_path=%s "
-                  + "--jwt_allow_without_tls=true",
+              "--jwt_token_auth=true --jwks_file_path=%s --jwt_allow_without_tls=true",
               jwksFilename),
         "");
 
@@ -143,8 +142,8 @@ public class JwtWebserverTest {
     String jwksFilename =
         new File(System.getenv("IMPALA_HOME"), "testdata/jwt/jwks_rs256.json").getPath();
     setUp(String.format(
-              "--oauth_token_auth=true --oauth_jwt_validate_signature=true "
-                  + "--oauth_jwks_file_path=%s --oauth_allow_without_tls=true",
+              "--oauth_token_auth=true --oauth_jwks_file_path=%s "
+                  + "--oauth_allow_without_tls=true",
               jwksFilename),
         "");
 

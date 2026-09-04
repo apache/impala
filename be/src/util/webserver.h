@@ -231,15 +231,10 @@ class Webserver {
   bool TrustedDomainCheck(const std::string& origin, struct sq_connection* connection,
       struct sq_request_info* request_info);
 
-  /// Checks and returns true if the JWT token in Authorization header could be verified
-  /// and the token has a valid username.
-  bool JWTTokenAuth(const std::string& jwt_token, struct sq_connection* connection,
-      struct sq_request_info* request_info);
-
-  /// Checks and returns true if the OAuth token in Authorization header could be verified
-  /// and the token has a valid username.
-  bool OAuthTokenAuth(const std::string& oauth_token, struct sq_connection* connection,
-      struct sq_request_info* request_info);
+  /// Checks and returns true if a JWT/OAuth Bearer token in Authorization header
+  /// could be validated and the token has a valid username.
+  bool OAuthTokenAuth(const std::string& token, struct sq_request_info* request_info,
+      std::vector<std::string>* response_headers);
 
   // Handle Basic authentication for this request. Returns an error if authentication was
   // unsuccessful.

@@ -265,6 +265,7 @@ ExecEnv::ExecEnv(int krpc_port, int subscriber_port, int webserver_port,
     rpc_metrics_(metrics_->GetOrCreateChildGroup("rpc")),
     enable_webserver_(FLAGS_enable_webserver && webserver_port > 0),
     external_fe_(external_fe),
+    oauth_servers_mgr_(std::make_shared<OAuthServersManager>()),
     configured_backend_address_(MakeNetworkAddress(FLAGS_hostname, krpc_port)) {
   UUIDToUniqueIdPB(boost::uuids::random_generator()(), &backend_id_);
 
@@ -551,9 +552,6 @@ Status ExecEnv::Init() {
     return Status(Substitute("Unsupported --ai_endpoint=$0, supported platforms are: $1",
         FLAGS_ai_endpoint, supported_platforms));
   }
-
-  jwt_helper_ = new JWTHelper();
-  oauth_helper_ = new JWTHelper();
 
   return Status::OK();
 }

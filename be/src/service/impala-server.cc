@@ -89,6 +89,7 @@
 #include "util/histogram-metric.h"
 #include "util/impalad-metrics.h"
 #include "util/jwt-util.h"
+#include "util/oauth-server-config.h"
 #include "util/metrics.h"
 #include "util/network-util.h"
 #include "util/openssl-util.h"
@@ -448,21 +449,9 @@ DEFINE_int32(wait_for_new_catalog_service_id_max_iterations, 10,
 DEFINE_int64(slow_profile_dump_warning_threshold_ms, 500,
     "(Advanced) Threshold for considering dumping a profile to be unusually slow.");
 
-// Flags for JWT token based authentication.
+// Flags for JWT / OAuth token based authentication.
 DECLARE_bool(jwt_token_auth);
-DECLARE_bool(jwt_validate_signature);
-DECLARE_string(jwks_file_path);
-DECLARE_string(jwks_url);
-DECLARE_bool(jwks_verify_server_certificate);
-DECLARE_string(jwks_ca_certificate);
-
-// Flags for OAuth token based authentication.
 DECLARE_bool(oauth_token_auth);
-DECLARE_bool(oauth_jwt_validate_signature);
-DECLARE_string(oauth_jwks_file_path);
-DECLARE_string(oauth_jwks_url);
-DECLARE_bool(oauth_jwks_verify_server_certificate);
-DECLARE_string(oauth_jwks_ca_certificate);
 
 namespace {
 using namespace impala;
@@ -3401,38 +3390,8 @@ Status ImpalaServer::Start(int32_t beeswax_port, int32_t hs2_port,
     LOG(INFO) << "Initialized executor Impala server on "
               << TNetworkAddressToString(exec_env_->configured_backend_address());
   } else {
-    // Load JWKS from file if validation for signature of JWT token is enabled.
-    if (FLAGS_jwt_token_auth && FLAGS_jwt_validate_signature) {
-      if (!FLAGS_jwks_file_path.empty()) {
-        RETURN_IF_ERROR(ExecEnv::GetInstance()->GetJWTHelperInstance()->Init(
-            FLAGS_jwks_file_path));
-      } else if (!FLAGS_jwks_url.empty()) {
-        if (TestInfo::is_test()) sleep(1);
-        RETURN_IF_ERROR(ExecEnv::GetInstance()->GetJWTHelperInstance()->Init(
-            FLAGS_jwks_url, FLAGS_jwks_verify_server_certificate,
-            FLAGS_jwks_ca_certificate, false));
-      } else {
-        LOG(ERROR) << "JWKS file is not specified when the validation of JWT signature "
-                   << " is enabled.";
-        return Status("JWKS file is not specified");
-      }
-    }
-
-    // Load JWKS from file if validation for signature of OAuth token is enabled.
-    if (FLAGS_oauth_token_auth && FLAGS_oauth_jwt_validate_signature) {
-      if (!FLAGS_oauth_jwks_file_path.empty()) {
-        RETURN_IF_ERROR(ExecEnv::GetInstance()->GetOAuthHelperInstance()->Init(
-            FLAGS_oauth_jwks_file_path));
-      } else if (!FLAGS_oauth_jwks_url.empty()) {
-        if (TestInfo::is_test()) sleep(1);
-        RETURN_IF_ERROR(ExecEnv::GetInstance()->GetOAuthHelperInstance()->Init(
-            FLAGS_oauth_jwks_url, FLAGS_oauth_jwks_verify_server_certificate,
-            FLAGS_oauth_jwks_ca_certificate, false));
-      } else {
-        LOG(ERROR) << "JWKS file is not specified when the validation of OAuth signature "
-                   << " is enabled.";
-        return Status("JWKS file for OAuth is not specified");
-      }
+    if (FLAGS_jwt_token_auth || FLAGS_oauth_token_auth) {
+      RETURN_IF_ERROR(ExecEnv::GetInstance()->oauth_servers_mgr()->Init());
     }
 
     // Initialize the client servers.

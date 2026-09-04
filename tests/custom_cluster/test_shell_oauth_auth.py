@@ -145,7 +145,7 @@ class TestImpalaShellOAuthAuth(CustomClusterTestSuite):
 
     # Ensure OAuth auth failed by checking impala coordinator logs
     expected_string = (
-      'Error verifying OAuth token'
+      'Error validating bearer token in Authorization header'
       '.*'
       'Error verifying JWT Token: Verification failed, error: token expired'
     )

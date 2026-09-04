@@ -145,7 +145,7 @@ class TestImpalaShellJWTAuth(CustomClusterTestSuite):
 
     # Ensure JWT auth failed by checking impala coordinator logs
     expected_string = (
-      'Error verifying JWT token'
+      'Error validating bearer token in Authorization header'
       '.*'
       'Error verifying JWT Token: Verification failed, error: token expired'
     )
@@ -189,9 +189,9 @@ class TestImpalaShellJWTAuth(CustomClusterTestSuite):
 
     # Ensure JWT auth failed by checking impala coordinator logs
     expected_string = (
-      'Error verifying JWT token'
+      'Error validating bearer token in Authorization header'
       '.*'
-      'Error verifying JWT Token: Invalid JWK ID in the JWT token'
+      'Error verifying JWT Token: Verification failed, no matching key'
     )
     self.assert_impalad_log_contains("ERROR", expected_string, expected_count=-1)
 

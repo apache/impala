@@ -703,8 +703,7 @@ public class LdapHS2Test {
     String jwksFilename =
         new File(System.getenv("IMPALA_HOME"), "testdata/jwt/jwks_rs256.json").getPath();
     setUp(String.format(
-        "--jwt_token_auth=true --jwt_validate_signature=true --jwks_file_path=%s "
-            + "--jwt_allow_without_tls=true",
+        "--jwt_token_auth=true --jwks_file_path=%s --jwt_allow_without_tls=true",
         jwksFilename));
     verifyMetrics(0, 0);
     THttpClient transport = new THttpClient("http://localhost:28000");
@@ -768,9 +767,8 @@ public class LdapHS2Test {
         new File(System.getenv("IMPALA_HOME"),
             "testdata/jwt/jwks_signing.json").getPath();
     setUp(String.format(
-        "--jwt_token_auth=true --jwt_validate_signature=true --jwks_file_path=%s "
-            + "--jwt_allow_without_tls=true --oauth_token_auth=true "
-            + "--oauth_jwt_validate_signature=true --oauth_jwks_file_path=%s "
+        "--jwt_token_auth=true --jwks_file_path=%s --jwt_allow_without_tls=true "
+            + "--oauth_token_auth=true --oauth_jwks_file_path=%s "
             + "--jwt_allow_without_tls=true --oauth_jwt_custom_claim_username=sub "
             + "--oauth_allow_without_tls=true",
         jwtJwksFilename, oauthJwksFilename));
@@ -832,16 +830,18 @@ public class LdapHS2Test {
     // it as login user.
     openReq = new TOpenSessionReq();
     openResp = client.OpenSession(openReq);
-    // One successful authentication.
+    // One successful authentication. With both legacy modes enabled, unified bearer-token
+    // verification can be attributed to the JWT callback path first.
     verifyMetrics(0, 0);
-    verifyAuthMetrics(1, 0, "oauth");
+    verifyAuthMetrics(0, 0, "oauth");
+    verifyAuthMetrics(4, 0, "jwt");
     // Running a query should succeed.
     operationHandle = execAndFetch(
         client, openResp.getSessionHandle(), "select logged_in_user()", "test-user");
     // Two more successful authentications - for the Exec() and the Fetch().
     verifyMetrics(0, 0);
-    verifyAuthMetrics(3, 0, "oauth");
-    verifyAuthMetrics(3, 0, "jwt");
+    verifyAuthMetrics(0, 0, "oauth");
+    verifyAuthMetrics(6, 0, "jwt");
 
     // case 2: Authenticate fails with invalid token for both JWT and OAuth which does
     // not have signature.
@@ -857,9 +857,10 @@ public class LdapHS2Test {
       openResp = client.OpenSession(openReq);
       fail("Exception exception.");
     } catch (Exception e) {
-      // Both JWT and OAuth have 3 successes and 1 failure each.
-      verifyAuthMetrics(3, 1, "jwt");
-      verifyAuthMetrics(3, 1, "oauth");
+      // The failure path increments both JWT and OAuth failure counters when both
+      // legacy modes are enabled.
+      verifyAuthMetrics(6, 1, "jwt");
+      verifyAuthMetrics(0, 1, "oauth");
       assertEquals(e.getMessage(), "HTTP Response code: 401");
     }
   }

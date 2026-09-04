@@ -254,7 +254,7 @@ subset:
 | `--principal`, `--keytab-file` | unset | dev/test or operating with LDAP, operator must enable per §10 *(maintainer)* | enables Kerberos auth |
 | `--authorization_provider=ranger` | unset *(documented: `docs/topics/impala_authorization.xml`)* | dev/test, operator must enable per §10 *(maintainer)* | enables Ranger authz; absent → all queries run as `impala` user (no enforcement) |
 | `--jwt_token_auth` / `--oauth_token_auth` | `false` | optional alternative auth *(documented: `be/src/rpc/authentication.cc`)* | enables bearer-token auth |
-| `--jwt_validate_signature`, `--oauth_jwt_validate_signature` | `true` | hardened default; flipping to `false` voids §8 P3 *(maintainer)* | turns off JWT/OAuth signature check |
+| `--oauth_servers` | unset | required for bearer-token auth; signature validation is always enforced *(maintainer)* | defines JWKS sources and username claim mapping for JWT/OAuth verification |
 | `--jwt_allow_without_tls`, `--oauth_allow_without_tls`, `--saml2_allow_without_tls_debug_only` | `false`, marked `_hidden` | "debug only" per name *(→)* | permits bearer / SAML auth over unencrypted transport |
 | `--trusted_domain`, `--trusted_auth_header` | unset *(documented)* | when set, Impala accepts identity assertions from named peer without re-auth | reachability for `OUT-OF-MODEL: trusted-input` reports |
 | `--trusted_domain_use_xff_header` | `false` | when `true`, parses `X-Forwarded-For` to identify the originating client *(documented: `be/src/rpc/authentication.cc` line 132)* | exposes a path where a misconfigured proxy can let a client claim any source address *(maintainer)* |
@@ -277,7 +277,7 @@ be turned on for production" posture. The maintainer ruling on whether the
 | HS2 binary `:21050`, HS2-HTTP `:28000`, Beeswax `:21000` | SQL text | **yes** | nothing — Impala parses, plans, and applies Ranger |
 | HS2-HTTP `:28000` | `X-Forwarded-For` header | **yes** if `--trusted_domain_use_xff_header` is on; **never trust** otherwise *(maintainer)* | per §10, only enable behind a load balancer that strips and resets XFF |
 | HS2-HTTP `:28000` | session cookie | signed with `--cookie_secret_file` HMAC; not attacker-forgeable when secret is unguessable *(maintainer)* | per §10, rotate the cookie-secret file if compromised |
-| HS2-HTTP `:28000` | JWT / OAuth bearer | **yes**; signature checked when `--jwt_validate_signature=true` (default) *(documented: `be/src/rpc/authentication.cc`)* | per §10, leave signature checking on, set `--jwt_allow_without_tls=false` |
+| HS2-HTTP `:28000` | JWT / OAuth bearer | **yes**; signature is always checked using keys from `--oauth_servers` *(documented: `be/src/rpc/authentication.cc`)* | per §10, set `--jwt_allow_without_tls=false` |
 | HS2-HTTP `:28000` | `--trusted_auth_header` value | **yes**; treated as the authenticated identity | **never** expose the port directly to untrusted peers when this flag is set *(maintainer)* |
 | Web UI `:25000`/`:25010`/`:25020` | `.htpasswd` credential | **yes** if `--webserver_password_file` is set | per §10, set the flag; per §10, set `--webserver_certificate_file` for HTTPS |
 | Web UI `:25000`/`:25010`/`:25020` | session cookie | signed with `--cookie_secret_file` | per §10, rotate the cookie-secret file if compromised |
@@ -663,7 +663,7 @@ Revise this document when any of the following lands:
   `ai_generate_text`).
 - A UDF sandboxing story (changes §9 and §3 item 5).
 - A change in the default value of any §5a flag, especially flags
-  controlling auth (`--ssl_minimum_version`, `--jwt_validate_signature`).
+  controlling auth (`--ssl_minimum_version`, `--jwt_allow_without_tls`).
 - A vulnerability report that cannot be cleanly routed to one of the §13
   dispositions: that is evidence the model is incomplete.
 

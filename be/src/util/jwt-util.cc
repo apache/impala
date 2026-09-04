@@ -37,6 +37,7 @@
 #include <rapidjson/error/en.h>
 #include <rapidjson/filereadstream.h>
 
+#include "common/compiler-util.h"
 #include "common/names.h"
 #include "hash-util.h"
 #include "jwt-util-internal.h"
@@ -55,6 +56,10 @@ DECLARE_int32(jwks_pulling_timeout_s);
 // support more than one.
 #define MAX_X5C_CERTIFICATES 1
 static const char* ARRAY_TYPE = "Array";
+static const char* HS_ALGORITHM_PREFIX = "hs";
+static const char* RS_ALGORITHM_PREFIX = "rs";
+static const char* PS_ALGORITHM_PREFIX = "ps";
+static const char* ES_ALGORITHM_PREFIX = "es";
 
 namespace impala {
 
@@ -653,14 +658,14 @@ Status JWKSSnapshot::LoadKeysFromFile(const string& jwks_file_path) {
 // Download JWKS from the given URL with Kudu's EasyCurl wrapper.
 Status JWKSSnapshot::LoadKeysFromUrl(
     const std::string& jwks_url, bool jwks_verify_server_certificate,
-    const std::string& jwks_ca_certificate, uint64_t cur_jwks_checksum,
-    bool* is_changed) {
+    const std::string& jwks_ca_certificate, uint64_t cur_jwks_checksum, bool* is_changed,
+    int32_t jwks_pull_timeout_secs) {
   kudu::EasyCurl curl;
   kudu::faststring dst;
   Status status;
 
   curl.set_timeout(
-      kudu::MonoDelta::FromMilliseconds(FLAGS_jwks_pulling_timeout_s * 1000));
+      kudu::MonoDelta::FromMilliseconds(jwks_pull_timeout_secs * 1000));
   curl.set_verify_peer(jwks_verify_server_certificate);
   curl.set_ca_certificates(jwks_ca_certificate);
   // TODO support CurlAuthType by calling kudu::EasyCurl::set_auth().
@@ -756,11 +761,16 @@ JWKSMgr::~JWKSMgr() {
 }
 
 Status JWKSMgr::Init(const std::string& jwks_uri, bool jwks_verify_server_certificate,
-    const std::string& jwks_ca_certificate, bool is_local_file) {
+    const std::string& jwks_ca_certificate, bool is_local_file,
+    int32_t jwks_pull_timeout_secs, int32_t jwks_update_frequency_secs) {
   Status status;
   jwks_uri_ = jwks_uri;
   jwks_verify_server_certificate_ = jwks_verify_server_certificate;
   jwks_ca_certificate_ = jwks_ca_certificate;
+  jwks_pull_timeout_secs_ = jwks_pull_timeout_secs;
+  jwks_update_frequency_secs_ = jwks_update_frequency_secs;
+  DCHECK_GT(jwks_pull_timeout_secs_, 0);
+  DCHECK(is_local_file || jwks_update_frequency_secs_ > 0);
   std::shared_ptr<JWKSSnapshot> new_jwks = std::make_shared<JWKSSnapshot>();
   if (is_local_file) {
     status = new_jwks->LoadKeysFromFile(jwks_uri);
@@ -770,20 +780,10 @@ Status JWKSMgr::Init(const std::string& jwks_uri, bool jwks_verify_server_certif
     }
     SetJWKSSnapshot(new_jwks);
   } else {
-    if (FLAGS_jwks_update_frequency_s <= 0) {
-      LOG(WARNING) << "Invalid value for flag jwks_update_frequency_s: "
-                   << FLAGS_jwks_update_frequency_s << ", use default value 60.";
-      FLAGS_jwks_update_frequency_s = 60;
-    }
-    if (FLAGS_jwks_pulling_timeout_s <= 0) {
-      LOG(WARNING) << "Invalid value for flag jwks_pulling_timeout_s: "
-                   << FLAGS_jwks_pulling_timeout_s << ", use default value 10.";
-      FLAGS_jwks_pulling_timeout_s = 10;
-    }
-
     bool is_changed = false;
     status = new_jwks->LoadKeysFromUrl(jwks_uri, jwks_verify_server_certificate,
-        jwks_ca_certificate, current_jwks_checksum_, &is_changed);
+        jwks_ca_certificate, current_jwks_checksum_, &is_changed,
+        jwks_pull_timeout_secs_);
     if (!status.ok()) {
       LOG(ERROR) << "Failed to load JWKS: " << status;
       return status;
@@ -802,7 +802,7 @@ Status JWKSMgr::Init(const std::string& jwks_uri, bool jwks_verify_server_certif
 
 void JWKSMgr::UpdateJWKSThread() {
   std::shared_ptr<JWKSSnapshot> new_jwks;
-  int64_t timeout_millis = FLAGS_jwks_update_frequency_s * 1000;
+  int64_t timeout_millis = jwks_update_frequency_secs_ * 1000;
   while (true) {
     // This Get() will time out until shutdown, when the promise is set.
     bool timed_out;
@@ -813,7 +813,8 @@ void JWKSMgr::UpdateJWKSThread() {
     bool is_changed = false;
     Status status =
         new_jwks->LoadKeysFromUrl(jwks_uri_, jwks_verify_server_certificate_,
-            jwks_ca_certificate_, current_jwks_checksum_, &is_changed);
+            jwks_ca_certificate_, current_jwks_checksum_, &is_changed,
+            jwks_pull_timeout_secs_);
     if (!status.ok()) {
       LOG(WARNING) << "Failed to update JWKS: " << status;
     } else if (is_changed) {
@@ -853,15 +854,22 @@ void JWTHelper::TokenDeleter::operator()(JWTHelper::JWTDecodedToken* token) cons
   if (token != nullptr) delete token;
 };
 
+JWTHelper::JWTHelper() = default;
+JWTHelper::~JWTHelper() = default;
+JWTHelper::JWTHelper(JWTHelper&&) noexcept = default;
+JWTHelper& JWTHelper::operator=(JWTHelper&&) noexcept = default;
+
 Status JWTHelper::Init(const std::string& jwks_file_path) {
   return Init(jwks_file_path, false, "", true);
 }
 
 Status JWTHelper::Init(const std::string& jwks_uri, bool jwks_verify_server_certificate,
-    const std::string& jwks_ca_certificate, bool is_local_file) {
-  jwks_mgr_.reset(new JWKSMgr());
+    const std::string& jwks_ca_certificate, bool is_local_file,
+    int32_t jwks_pull_timeout_secs, int32_t jwks_update_frequency_secs) {
+  jwks_mgr_ = std::make_unique<JWKSMgr>();
   RETURN_IF_ERROR(jwks_mgr_->Init(jwks_uri, jwks_verify_server_certificate,
-      jwks_ca_certificate, is_local_file));
+      jwks_ca_certificate, is_local_file, jwks_pull_timeout_secs,
+      jwks_update_frequency_secs));
   if (!initialized_) initialized_ = true;
   return Status::OK();
 }
@@ -980,6 +988,60 @@ Status JWTHelper::Verify(const JWTDecodedToken* decoded_token) const {
         Substitute("Token varification failed, error: $0", e.what()));
   }
   return status;
+}
+
+Status JWTHelper::CanVerify(
+    const JWTDecodedToken* decoded_token, bool* can_verify_out) const {
+  DCHECK(initialized_);
+  DCHECK(decoded_token != nullptr);
+  DCHECK(can_verify_out != nullptr);
+  DCHECK(jwks_mgr_ != nullptr);
+  *can_verify_out = false;
+
+  JWKSSnapshotPtr jwks = GetJWKS();
+  if (jwks->IsEmpty()) {
+    return Status::OK();
+  }
+  string algorithm =
+      boost::algorithm::to_lower_copy(decoded_token->decoded_jwt_.get_algorithm());
+  if (UNLIKELY(algorithm.empty() || algorithm.length() < 2)) {
+    return Status(TErrorCode::JWT_VERIFY_FAILED,
+        "Missing cryptographic algorithm in JWT");
+  }
+  const string prefix = algorithm.substr(0, 2);
+
+  const JWKSSnapshot::JWTPublicKeyMap* key_map = nullptr;
+  if (prefix == HS_ALGORITHM_PREFIX) {
+    key_map = jwks->GetAllHSKeys();
+  } else if (prefix == RS_ALGORITHM_PREFIX || prefix == PS_ALGORITHM_PREFIX) {
+    key_map = jwks->GetAllRSAPublicKeys();
+  } else if (prefix == ES_ALGORITHM_PREFIX) {
+    key_map = jwks->GetAllECPublicKeys();
+  } else {
+    return Status(TErrorCode::JWT_VERIFY_FAILED,
+        Substitute("Unsupported cryptographic algorithm '$0' for JWT", algorithm));
+  }
+  if (key_map->empty()) return Status::OK();
+  if (!decoded_token->decoded_jwt_.has_key_id()) {
+    // Without a key id in the JWT header, any helper with a matching algorithm
+    // family remains a candidate for verification.
+    *can_verify_out = true;
+    return Status::OK();
+  }
+
+  // With an explicit key id in the JWT header, this helper can verify only if
+  // its JWKS contains the same key id.
+  const JWTPublicKey* pub_key = nullptr;
+  const string key_id = decoded_token->decoded_jwt_.get_key_id();
+  if (prefix == HS_ALGORITHM_PREFIX) {
+    pub_key = jwks->LookupHSKey(key_id);
+  } else if (prefix == RS_ALGORITHM_PREFIX || prefix == PS_ALGORITHM_PREFIX) {
+    pub_key = jwks->LookupRSAPublicKey(key_id);
+  } else if (prefix == ES_ALGORITHM_PREFIX) {
+    pub_key = jwks->LookupECPublicKey(key_id);
+  }
+  *can_verify_out = pub_key != nullptr;
+  return Status::OK();
 }
 
 Status JWTHelper::GetCustomClaimUsername(const JWTDecodedToken* decoded_token,

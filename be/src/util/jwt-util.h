@@ -18,6 +18,7 @@
 #ifndef IMPALA_JWT_UTIL_H
 #define IMPALA_JWT_UTIL_H
 
+#include <memory>
 #include <string>
 
 #include "common/logging.h"
@@ -37,6 +38,13 @@ class JWKSMgr;
 /// The class is thread safe.
 class JWTHelper {
  public:
+  JWTHelper();
+  ~JWTHelper();
+  JWTHelper(JWTHelper&&) noexcept;
+  JWTHelper& operator=(JWTHelper&&) noexcept;
+  JWTHelper(const JWTHelper&) = delete;
+  JWTHelper& operator=(const JWTHelper&) = delete;
+
   /// Opaque types for storing the JWT decoded token. This allows us to avoid including
   /// header file jwt-cpp/jwt.h.
   struct JWTDecodedToken;
@@ -58,7 +66,8 @@ class JWTHelper {
   /// Load JWKS from a given local JSON file or URL. Returns an error if problems were
   /// encountered.
   Status Init(const std::string& jwks_uri, bool jwks_verify_server_certificate,
-      const std::string& jwks_ca_certificate, bool is_local_file);
+      const std::string& jwks_ca_certificate, bool is_local_file,
+      int32_t jwks_pull_timeout_secs = 10, int32_t jwks_update_frequency_secs = 60);
 
   /// Decode the given JWT token. The decoding result is stored in decoded_token_.
   /// Return Status::OK if the decoding is successful.
@@ -69,6 +78,10 @@ class JWTHelper {
   /// calling Decode().
   /// Return Status::OK if the verification is successful.
   Status Verify(const JWTDecodedToken* decoded_token) const;
+
+  /// Returns true if this helper has a matching key candidate for the token's key id /
+  /// algorithm family, and false otherwise.
+  Status CanVerify(const JWTDecodedToken* decoded_token, bool* can_verify_out) const;
 
   /// Extract custom claim "Username" from from the payload of the decoded JWT token.
   /// Return Status::OK if the extraction is successful.

@@ -19,6 +19,7 @@
 
 #include <signal.h>
 #include <fstream>
+#include <memory>
 #include <string>
 #include <boost/algorithm/string.hpp>
 #include <boost/filesystem.hpp>
@@ -55,6 +56,7 @@
 #include "util/debug-util.h"
 #include "util/disk-info.h"
 #include "util/jwt-util.h"
+#include "util/oauth-servers-manager.h"
 #include "util/mem-info.h"
 #include "util/metrics.h"
 #include "util/os-info.h"
@@ -169,13 +171,9 @@ DECLARE_bool(trusted_domain_use_xff_header);
 DECLARE_bool(trusted_domain_empty_xff_header_use_origin);
 DECLARE_bool(trusted_domain_strict_localhost);
 DECLARE_bool(jwt_token_auth);
-DECLARE_bool(jwt_validate_signature);
-DECLARE_string(jwt_custom_claim_username);
 DECLARE_string(trusted_auth_header);
 DECLARE_string(spnego_keytab_file);
 DECLARE_bool(oauth_token_auth);
-DECLARE_bool(oauth_jwt_validate_signature);
-DECLARE_string(oauth_jwt_custom_claim_username);
 DECLARE_string(webserver_saml2_sp_callback_url);
 DECLARE_bool(saml2_ee_test_mode);
 DECLARE_bool(saml2_allow_without_tls_debug_only);
@@ -816,8 +814,6 @@ sq_callback_result_t Webserver::BeginRequestCallback(struct sq_connection* conne
 
   // Read Authorization header once for all authentication methods
   const char* authz_header = sq_get_header(connection, "Authorization");
-
-  // Try authenticating with JWT token first, if enabled.
   if (use_jwt_ || use_oauth_) {
     const char* auth_value = nullptr;
     if (authz_header != nullptr) auth_value = StripLeadingWhiteSpace(authz_header);
@@ -830,31 +826,27 @@ sq_callback_result_t Webserver::BeginRequestCallback(struct sq_connection* conne
       string bearer_token= string(auth_value + 7);
       StripWhiteSpace(&bearer_token);
       if (!bearer_token.empty()) {
-        if (use_jwt_) {
-          if (JWTTokenAuth(bearer_token, connection, request_info)) {
-            total_jwt_token_auth_success_->Increment(1);
-            authenticated = true;
-            check_csrf_protection = false;
-            // TODO: cookies are not added, but are not needed right now
-          }
-        }
-        if (!authenticated && use_oauth_) {
-          if (OAuthTokenAuth(bearer_token, connection, request_info)) {
-            total_oauth_token_auth_success_->Increment(1);
-            authenticated = true;
-            check_csrf_protection = false;
-            // TODO: cookies are not added, but are not needed right now
-          }
-        }
-        if (!authenticated) {
+        const bool token_authenticated =
+            OAuthTokenAuth(bearer_token, request_info, &response_headers);
+        if (token_authenticated) {
+          authenticated = true;
+          check_csrf_protection = false;
+          // TODO: if both legacy modes are enabled, metric attribution can be
+          // imperfect because OAuthTokenAuth() uses unified verification and
+          // doesn't return which provider matched. A follow-up should return
+          // provider metadata for precise JWT/OAuth metric accounting.
           if (use_jwt_) {
-            LOG(INFO) << "Invalid JWT token provided";
-            total_jwt_token_auth_failure_->Increment(1);
+            total_jwt_token_auth_success_->Increment(1);
+          } else if (use_oauth_) {
+            total_oauth_token_auth_success_->Increment(1);
           }
-          if (use_oauth_) {
-            LOG(INFO) << "Invalid OAuth token provided";
-            total_oauth_token_auth_failure_->Increment(1);
-          }
+          // TODO: cookies are not added, but are not needed right now
+        } else if (use_jwt_) {
+          LOG(INFO) << "Invalid JWT token provided";
+          total_jwt_token_auth_failure_->Increment(1);
+        } else if (use_oauth_) {
+          LOG(INFO) << "Invalid OAuth token provided";
+          total_oauth_token_auth_failure_->Increment(1);
         }
       }
     }
@@ -1371,63 +1363,18 @@ bool Webserver::TrustedDomainCheck(const string& origin, struct sq_connection* c
   return true;
 }
 
-bool Webserver::JWTTokenAuth(const std::string& jwt_token,
-    struct sq_connection* connection, struct sq_request_info* request_info) {
-  JWTHelper::UniqueJWTDecodedToken decoded_token;
-  Status status = JWTHelper::Decode(jwt_token, decoded_token);
-  if (!status.ok()) {
-    LOG(ERROR) << "Error decoding JWT token in Authorization header, "
-               << "Error: " << status;
-    return false;
-  }
-  if (FLAGS_jwt_validate_signature) {
-    status = ExecEnv::GetInstance()->GetJWTHelperInstance()->Verify(decoded_token.get());
-    if (!status.ok()) {
-      LOG(ERROR) << "Error verifying JWT token in Authorization header, "
-                 << "Error: " << status;
-      return false;
-    }
-  }
-
-  DCHECK(!FLAGS_jwt_custom_claim_username.empty());
+bool Webserver::OAuthTokenAuth(const std::string& token,
+    struct sq_request_info* request_info, vector<string>* response_headers) {
+  DCHECK(response_headers != nullptr);
+  std::shared_ptr<OAuthServersManager> oauth_servers_mgr =
+      ExecEnv::GetInstance()->oauth_servers_mgr();
   string username;
-  status = JWTHelper::GetCustomClaimUsername(
-      decoded_token.get(), FLAGS_jwt_custom_claim_username, username);
+  Status status = oauth_servers_mgr->AuthenticateBearerToken(token, &username);
   if (!status.ok()) {
-    LOG(ERROR) << "Cannot retrieve username from JWT token in Authorization header, "
+    LOG(ERROR) << "Error validating bearer token in Authorization header from "
+               << GetRemoteAddress(request_info).ToString() << ", "
                << "Error: " << status;
-    return false;
-  }
-  request_info->remote_user = strdup(username.c_str());
-  return true;
-}
-
-bool Webserver::OAuthTokenAuth(const std::string& oauth_token,
-    struct sq_connection* connection, struct sq_request_info* request_info) {
-  JWTHelper::UniqueJWTDecodedToken decoded_token;
-  Status status = JWTHelper::Decode(oauth_token, decoded_token);
-  if (!status.ok()) {
-    LOG(ERROR) << "Error decoding OAuth token in Authorization header, "
-               << "Error: " << status;
-    return false;
-  }
-  if (FLAGS_oauth_jwt_validate_signature) {
-    status = ExecEnv::GetInstance()->GetOAuthHelperInstance()->Verify(
-        decoded_token.get());
-    if (!status.ok()) {
-      LOG(ERROR) << "Error verifying OAuth token in Authorization header, "
-                 << "Error: " << status;
-      return false;
-    }
-  }
-
-  DCHECK(!FLAGS_oauth_jwt_custom_claim_username.empty());
-  string username;
-  status = JWTHelper::GetCustomClaimUsername(
-      decoded_token.get(), FLAGS_oauth_jwt_custom_claim_username, username);
-  if (!status.ok()) {
-    LOG(ERROR) << "Cannot retrieve username from OAUTh token in Authorization header, "
-               << "Error: " << status;
+    response_headers->push_back(OAuthServersManager::BearerAuthFailureHeader(status));
     return false;
   }
   request_info->remote_user = strdup(username.c_str());

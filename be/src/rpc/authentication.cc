@@ -30,6 +30,7 @@
 #include <gutil/strings/strip.h>
 #include <gutil/strings/substitute.h>
 #include <map>
+#include <memory>
 #include <vector>
 #include <string>
 #include <vector>
@@ -57,6 +58,7 @@
 #include "util/debug-util.h"
 #include "util/error-util.h"
 #include "util/jwt-util.h"
+#include "util/oauth-servers-manager.h"
 #include "util/ldap-util.h"
 #include "util/network-util.h"
 #include "util/os-util.h"
@@ -179,47 +181,42 @@ DECLARE_string(saml2_sp_callback_url);
 // If set, Impala support for trusting an authentication based on JWT token in the HTTP
 // header.
 DEFINE_bool(jwt_token_auth, false,
-    "When true, read the JWT token out of the HTTP Header and extract user name from "
-    "the token payload.");
-// The last segment of a JWT is the signature, which is used to verify that the token was
-// signed by the sender and not altered in any way. By default, it's required to validate
-// the signature of the JWT tokens. Otherwise it may expose security issue.
-DEFINE_bool(jwt_validate_signature, true,
-    "When true, validate the signature of JWT token with pre-installed JWKS.");
+    "(DEPRECATED) When true, read the JWT token out of the HTTP Header and extract user "
+    "name from the token payload. Use --oauth_token_auth with --oauth_servers instead.");
 // JWKS consists the public keys used by the signing party to the clients that need to
 // validate signatures. It represents cryptographic keys in JSON data structure.
 DEFINE_string(jwks_file_path, "",
-    "File path of the pre-installed JSON Web Key Set (JWKS) for JWT verification");
+    "(DEPRECATED) File path of the pre-installed JSON Web Key Set (JWKS) for JWT "
+    "verification. Use --oauth_servers instead.");
 // This specifies the URL for JWKS to be downloaded.
-DEFINE_string(jwks_url, "", "URL of the JSON Web Key Set (JWKS) for JWT verification");
+DEFINE_string(jwks_url, "",
+    "(DEPRECATED) URL of the JSON Web Key Set (JWKS) for JWT verification. Use "
+    "--oauth_servers instead.");
 // Enables retrieving the JWKS URL without verifying the presented TLS certificate
 // from the server.
 DEFINE_bool(jwks_verify_server_certificate, true,
-    "Specifies if the TLS certificate of the JWKS server is verified when retrieving "
-    "the JWKS from the specified JWKS URL.  A certificate is considered valid if a "
-    "trust chain can be established for it, and if the certificate has a common name or "
-    "SAN that matches the server's hostname. This should only be set to false for "
-    "development / testing.");
+    "(DEPRECATED) Specifies if the TLS certificate of the JWKS server is verified when "
+    "retrieving the JWKS from the specified JWKS URL. Use --oauth_servers instead.");
 // Enables defining a custom pem bundle file containing root certificates to trust.
-DEFINE_string(jwks_ca_certificate, "", "File path of a pem bundle of root ca "
-    "certificates that will be trusted when retrieving the JWKS from the "
-    "specified JWKS URL.");
+DEFINE_string(jwks_ca_certificate, "",
+    "(DEPRECATED) File path of a pem bundle of root ca certificates that will be trusted "
+    "when retrieving the JWKS from the specified JWKS URL. Use --oauth_servers instead.");
 DEFINE_int32(jwks_update_frequency_s, 60,
-    "(Advanced) The time in seconds to wait between downloading JWKS from the specified "
-    "URL.");
+    "(DEPRECATED) (Advanced) The time in seconds to wait between downloading JWKS from "
+    "the specified URL. Use --oauth_servers instead.");
 DEFINE_int32(jwks_pulling_timeout_s, 10,
-    "(Advanced) The time in seconds for connection timed out when pulling JWKS from the "
-    "specified URL.");
+    "(DEPRECATED) (Advanced) The time in seconds for connection timed out when pulling "
+    "JWKS from the specified URL. Use --oauth_servers instead.");
 // This specifies the custom claim in the JWT that contains the "username" for the
 // session.
-DEFINE_string(jwt_custom_claim_username, "username", "Custom claim 'username'");
+DEFINE_string(jwt_custom_claim_username, "username",
+    "(DEPRECATED) Custom claim 'username'. Use --oauth_servers instead.");
 // If set, Impala allows JWT authentication on unsecure channel.
 // JWT is only secure when used with TLS. But in some deployment scenarios, TLS is handled
 // by proxy so that it does not show up as TLS to Impala.
 DEFINE_bool_hidden(jwt_allow_without_tls, false,
-    "When this configuration is set to true, Impala allows JWT authentication on "
-    "unsecure channel. This should be only enabled for testing, or development for which "
-    "TLS is handled by proxy.");
+    "(DEPRECATED) When this configuration is set to true, Impala allows JWT "
+    "authentication on unsecure channel. Use --oauth_allow_without_tls instead.");
 
 // OAuth functions
 // If set, Impala will support OAuth based authentication.
@@ -227,41 +224,35 @@ DEFINE_bool_hidden(jwt_allow_without_tls, false,
 DEFINE_bool(oauth_token_auth, false,
     "When true, read the OAuth token out of the HTTP Header and extract user name from "
     "the token payload.");
-// The last segment of an OAuth token is the signature, which is used to verify that the
-// token was signed by the sender and not altered in any way. By default, it's required
-// to validate the signature of the OAuth tokens. Otherwise it may expose security issue.
-DEFINE_bool(oauth_jwt_validate_signature, true,
-    "When true, validate the signature of OAuth token with pre-installed JWKS."
-    "This should only be set to false for development / testing");
 // JWKS contains the public keys used by the signing party to the clients that need to
 // validate signatures. It represents cryptographic keys in JSON data structure.
 DEFINE_string(oauth_jwks_file_path, "",
-    "File path of the pre-installed JSON Web Key Set (JWKS) for OAuth verification");
+    "(DEPRECATED) File path of the pre-installed JSON Web Key Set (JWKS) for OAuth "
+    "verification. Use --oauth_servers instead.");
 // This specifies the URL for OAuth to be downloaded.
-DEFINE_string(oauth_jwks_url, "", "URL of the OAuth Endpoint for token verification");
+DEFINE_string(oauth_jwks_url, "",
+    "(DEPRECATED) URL of the OAuth Endpoint for token verification. Use --oauth_servers "
+    "instead.");
 // Enables retrieving the OAuth JWKS from the specified URL without verifying the
 // presented TLS certificate from the server.
 DEFINE_bool(oauth_jwks_verify_server_certificate, true,
-    "Specifies if the TLS certificate of the JWKS server is verified when retrieving "
-    "the JWKS from the specified JWKS URL.  A certificate is considered valid if a "
-    "trust chain can be established for it, and if the certificate has a common name or "
-    "SAN that matches the server's hostname. This should only be set to false for "
-    "development / testing.");
+    "(DEPRECATED) Specifies if the TLS certificate of the JWKS server is verified when "
+    "retrieving the JWKS from the specified JWKS URL. Use --oauth_servers instead.");
 // Enables defining a custom pem bundle file containing root certificates to trust.
-DEFINE_string(oauth_jwks_ca_certificate, "", "File path of a pem bundle of root ca "
-    "certificates that will be trusted when retrieving the JWKS from the "
-    "specified JWKS URL.");
+DEFINE_string(oauth_jwks_ca_certificate, "",
+    "(DEPRECATED) File path of a pem bundle of root ca certificates that will be trusted "
+    "when retrieving the JWKS from the specified JWKS URL. Use --oauth_servers instead.");
 DEFINE_int32(oauth_jwks_update_frequency_s, 60,
-    "(Advanced) The time in seconds to wait for refreshing the OAuth token "
-    "from the OAuth URL.");
+    "(DEPRECATED) (Advanced) The time in seconds to wait for refreshing the OAuth token "
+    "from the OAuth URL. Use --oauth_servers instead.");
 DEFINE_int32(oauth_jwks_pulling_timeout_s, 10,
-    "(Advanced) The time in seconds for connection timed out when verifying OAuth token "
-    "from the specified OAuth server.");
+    "(DEPRECATED) (Advanced) The time in seconds for connection timed out when verifying "
+    "OAuth token from the specified OAuth server. Use --oauth_servers instead.");
 // This specifies the custom claim in the OAuth token that contains the "username" for
 // the session.
 DEFINE_string(oauth_jwt_custom_claim_username, "username",
-    "Custom claim of the token that "
-    "contains the username");
+    "(DEPRECATED) Custom claim of the token that contains the username. Use "
+    "--oauth_servers instead.");
 // If set, Impala allows OAuth authentication on unsecure channel.
 // OAuth is only secure when used with TLS. But in some deployment scenarios, TLS is
 // handled by proxy so that it does not show up as TLS to Impala.
@@ -795,86 +786,27 @@ bool BasicAuth(ThriftServer::ConnectionContext* connection_context,
   return false;
 }
 
-bool JWTTokenAuth(ThriftServer::ConnectionContext* connection_context,
-    const AuthenticationHash& hash, const string& token) {
-  JWTHelper::UniqueJWTDecodedToken decoded_token;
-  Status status = JWTHelper::Decode(token, decoded_token);
-  if (!status.ok()) {
-    LOG(ERROR) << "Error decoding JWT token received from: "
-               << TNetworkAddressToString(connection_context->network_address)
-               << " Error: " << status;
-    return false;
-  }
-  if (FLAGS_jwt_validate_signature) {
-    status =  ExecEnv::GetInstance()->GetJWTHelperInstance()->Verify(decoded_token.get());
-    if (!status.ok()) {
-      LOG(ERROR) << "Error verifying JWT token received from: "
-                 << TNetworkAddressToString(connection_context->network_address)
-                 << " Error: " << status;
-      connection_context->return_headers.push_back(
-          Substitute("WWW-Authenticate: Bearer error=\"invalid_token\",\
-error_description=\"$0 \"", status.GetDetail()));
-      return false;
-    }
-  }
-
-  DCHECK(!FLAGS_jwt_custom_claim_username.empty());
-  string username;
-  status = JWTHelper::GetCustomClaimUsername(
-      decoded_token.get(), FLAGS_jwt_custom_claim_username, username);
-  if (!status.ok()) {
-    LOG(ERROR) << "Error extracting username from JWT token received from: "
-               << TNetworkAddressToString(connection_context->network_address)
-               << " Error: " << status;
-    return false;
-  }
-  connection_context->username = username;
-
-  // Create a cookie to return.
-  connection_context->return_headers.push_back(
-      Substitute("Set-Cookie: $0", GenerateCookie(username, hash, HTTP_AUTH_MECH_JWT)));
-  return true;
-}
-
 bool OAuthTokenAuth(ThriftServer::ConnectionContext* connection_context,
     const AuthenticationHash& hash, const string& token) {
-  JWTHelper::UniqueJWTDecodedToken decoded_token;
-  Status status = JWTHelper::Decode(token, decoded_token);
-  if (!status.ok()) {
-    LOG(ERROR) << "Error decoding OAuth token received from: "
-               << TNetworkAddressToString(connection_context->network_address)
-               << " Error: " << status;
-    return false;
-  }
-  if (FLAGS_oauth_jwt_validate_signature) {
-    status = ExecEnv::GetInstance()->GetOAuthHelperInstance()->Verify(
-        decoded_token.get());
-    if (!status.ok()) {
-      LOG(ERROR) << "Error verifying OAuth token received from: "
-                 << TNetworkAddressToString(connection_context->network_address)
-                 << " Error: " << status;
-      connection_context->return_headers.push_back(
-          Substitute("WWW-Authenticate: Bearer error=\"invalid_token\",\
-error_description=\"$0 \"", status.GetDetail()));
-      return false;
-    }
-  }
-
-  DCHECK(!FLAGS_oauth_jwt_custom_claim_username.empty());
+  std::shared_ptr<OAuthServersManager> oauth_servers_mgr =
+      ExecEnv::GetInstance()->oauth_servers_mgr();
   string username;
-  status = JWTHelper::GetCustomClaimUsername(
-      decoded_token.get(), FLAGS_oauth_jwt_custom_claim_username, username);
+  Status status = oauth_servers_mgr->AuthenticateBearerToken(token, &username);
   if (!status.ok()) {
-    LOG(ERROR) << "Error extracting username from OAuth token received from: "
+    LOG(ERROR) << "Error validating bearer token in Authorization header received from: "
                << TNetworkAddressToString(connection_context->network_address)
-               << " Error: " << status;
+               << ". Error: " << status
+               << (username.empty() ? "" : Substitute(" Username: '$0'.", username));
+    connection_context->return_headers.push_back(
+        OAuthServersManager::BearerAuthFailureHeader(status));
     return false;
   }
   connection_context->username = username;
 
   // Create a cookie to return.
   connection_context->return_headers.push_back(
-      Substitute("Set-Cookie: $0", GenerateCookie(username, hash, HTTP_AUTH_MECH_OAUTH)));
+      Substitute("Set-Cookie: $0",
+          GenerateCookie(username, hash, HTTP_AUTH_MECH_OAUTH)));
   return true;
 }
 
@@ -1556,7 +1488,7 @@ void SecureAuthProvider::SetupConnectionContext(
       }
       if (has_jwt_ ) {
         callbacks.jwt_token_auth_fn = std::bind(
-            JWTTokenAuth, connection_ptr.get(), hash, std::placeholders::_1);
+            OAuthTokenAuth, connection_ptr.get(), hash, std::placeholders::_1);
       }
       if (has_oauth_) {
         callbacks.oauth_token_auth_fn = std::bind(

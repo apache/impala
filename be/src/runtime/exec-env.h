@@ -19,6 +19,7 @@
 #ifndef IMPALA_RUNTIME_EXEC_ENV_H
 #define IMPALA_RUNTIME_EXEC_ENV_H
 
+#include <memory>
 #include <unordered_map>
 
 #include <boost/scoped_ptr.hpp>
@@ -32,6 +33,7 @@
 #include "testutil/gtest-util.h"
 #include "util/jwt-util-internal.h"
 #include "util/jwt-util.h"
+#include "util/oauth-servers-manager.h"
 #include "util/hdfs-bulk-ops-defs.h" // For declaration of HdfsOpThreadPool
 #include "util/network-util.h"
 #include "util/spinlock.h"
@@ -104,10 +106,6 @@ class ExecEnv {
   /// we return the most recently created instance.
   static ExecEnv* GetInstance() { return exec_env_; }
 
-  // Returns JWT and OAuth Helper instances.
-  JWTHelper* GetJWTHelperInstance() { return jwt_helper_; }
-  JWTHelper* GetOAuthHelperInstance() { return oauth_helper_; }
-
   /// Destructor - only used in backend tests that create new environment per test.
   ~ExecEnv();
 
@@ -159,6 +157,7 @@ class ExecEnv {
   ReservationTracker* buffer_reservation() { return buffer_reservation_.get(); }
   BufferPool* buffer_pool() { return buffer_pool_.get(); }
   SystemStateInfo* system_state_info() { return system_state_info_.get(); }
+  std::shared_ptr<OAuthServersManager> oauth_servers_mgr() { return oauth_servers_mgr_; }
 
   bool get_enable_webserver() const { return enable_webserver_; }
 
@@ -295,8 +294,7 @@ class ExecEnv {
   FRIEND_TEST(HdfsUtilTest, CheckFilesystemsAndBucketsMatch);
 
   static ExecEnv* exec_env_;
-  JWTHelper* jwt_helper_;
-  JWTHelper* oauth_helper_;
+  std::shared_ptr<OAuthServersManager> oauth_servers_mgr_;
   bool is_fe_tests_ = false;
 
   /// The network address that the backend KRPC service is listening on:

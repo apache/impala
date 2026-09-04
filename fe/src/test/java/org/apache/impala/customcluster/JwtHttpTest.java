@@ -222,8 +222,7 @@ public class JwtHttpTest {
         new File(System.getenv("IMPALA_HOME"),
         String.format("testdata/jwt/%s", JWKS_FILE_NAME)).getPath();
     setUp(String.format(
-        "--jwt_token_auth=true --jwt_validate_signature=true --jwks_file_path=%s "
-            + "--jwt_allow_without_tls=true",
+        "--jwt_token_auth=true --jwks_file_path=%s --jwt_allow_without_tls=true",
         jwksFilename));
     THttpClient transport = new THttpClient("http://localhost:28000");
     Map<String, String> headers = new HashMap<String, String>();
@@ -291,16 +290,16 @@ public class JwtHttpTest {
 
   /**
    * Tests if sessions are authenticated by verifying the JWT token for connections
-   * to the HTTP hiveserver2 endpoint. The JWKS for JWT verification is not specified
-   * and JWT signatures are not verified.
+   * to the HTTP hiveserver2 endpoint.
    */
   @Test
   public void testJwtAuthNotVerifySig() throws Exception {
     createJWKSForWebServer_ = false;
-    // Start Impala without jwt_validate_signature as false so that the signature of
-    // JWT token will not be validated.
-    setUp("--jwt_token_auth=true --jwt_validate_signature=false "
-        + "--jwt_allow_without_tls=true");
+    String jwksFilename =
+        new File(System.getenv("IMPALA_HOME"),
+            String.format("testdata/jwt/%s", JWKS_FILE_NAME)).getPath();
+    setUp(String.format("--jwt_token_auth=true --jwks_file_path=%s "
+        + "--jwt_allow_without_tls=true", jwksFilename));
     THttpClient transport = new THttpClient("http://localhost:28000");
     Map<String, String> headers = new HashMap<String, String>();
 
@@ -334,7 +333,7 @@ public class JwtHttpTest {
     String statestoreWebserverArgs = "--webserver_port=25010";
     String jwksHttpUrl = "http://localhost:25010/www/temp_jwks.json";
     String impaladJwtArgs = String.format("--jwt_token_auth=true "
-            + "--jwt_validate_signature=true --jwks_url=%s "
+            + "--jwks_url=%s "
             + "--jwks_update_frequency_s=1 --jwt_allow_without_tls=true",
         jwksHttpUrl);
     setUp(impaladJwtArgs, "", statestoreWebserverArgs, 0);
@@ -396,7 +395,7 @@ public class JwtHttpTest {
             Paths.get(certDir, SERVER_CERT), Paths.get(certDir, SERVER_KEY));
     String jwksHttpUrl = "https://localhost:25010/www/temp_jwks.json";
     String impaladJwtArgs = String.format("--jwt_token_auth=true "
-        + "--jwt_validate_signature=true --jwks_url=%s "
+        + "--jwks_url=%s "
         + "--jwt_allow_without_tls=true --jwks_verify_server_certificate=false ",
         jwksHttpUrl);
     setUp(impaladJwtArgs, "", statestoreWebserverArgs, 0);
@@ -445,7 +444,7 @@ public class JwtHttpTest {
             Paths.get(certDir, SERVER_CERT), Paths.get(certDir, SERVER_KEY));
     String jwksHttpUrl = "https://localhost:25010/www/temp_jwks.json";
     String impaladJwtArgs = String.format("--jwt_token_auth=true "
-        + "--jwt_validate_signature=true --jwks_url=%s "
+        + "--jwks_url=%s "
         + "--jwt_allow_without_tls=true --log_dir=%s --logbuflevel=-1 ",
         jwksHttpUrl, logDir.toAbsolutePath());
     String expectedErrString = String.format("Impalad services did not start correctly, "
@@ -484,7 +483,7 @@ public class JwtHttpTest {
             Paths.get(certDir, SERVER_CERT), Paths.get(certDir, SERVER_KEY));
     String jwksHttpUrl = "https://localhost:25010/www/temp_jwks.json";
     String impaladJwtArgs = String.format("--jwt_token_auth=true "
-        + "--jwt_validate_signature=true --jwks_url=%s "
+        + "--jwks_url=%s "
         + "--jwt_allow_without_tls=true --log_dir=%s --jwks_ca_certificate=%s "
         + "--logbuflevel=-1 ", jwksHttpUrl, logDir.toAbsolutePath(),
         Paths.get(certDir, CA_CERT));
@@ -518,7 +517,7 @@ public class JwtHttpTest {
             Paths.get(certDir, SERVER_CERT), Paths.get(certDir, SERVER_KEY));
     String jwksHttpUrl = "https://localhost:25010/www/temp_jwks.json";
     String impaladJwtArgs = String.format("--jwt_token_auth=true "
-        + "--jwt_validate_signature=true --jwks_url=%s "
+        + "--jwks_url=%s "
         + "--jwt_allow_without_tls=true --jwks_ca_certificate=%s ",
         jwksHttpUrl, Paths.get(certDir, CA_CERT));
 
@@ -571,7 +570,7 @@ public class JwtHttpTest {
     String jwksFilename =
         new File(System.getenv("IMPALA_HOME"), "testdata/jwt/jwks_x5c_rs256.json").getPath();
     String impaladJwtArgs = String.format("--jwt_token_auth=true "
-            + "--jwt_validate_signature=true --jwks_file_path=%s "
+            + "--jwks_file_path=%s "
             + "--jwt_custom_claim_username=sub "
             + "--jwt_allow_without_tls=true", jwksFilename);
     setUp(impaladJwtArgs);
