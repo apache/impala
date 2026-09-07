@@ -212,6 +212,21 @@ public class HistoricalStats {
     return null;
   }
 
+  /**
+   * Drops all stored runs in the configured cache backend. With the in-memory backend,
+   * this only affects the coordinator that handles the request.
+   *
+   * <p>Note on concurrency: this method only clears entries currently in the cache.
+   * Since {@link #writePlanNodeStats(TPlanNodeRunWithKeys)} modifies cache entries
+   * without holding any locks, a query unregistering concurrently can store a run
+   * after this method returns. This race should be handled in the writer implementation.
+   */
+  public void clearCache() {
+    LOG.info("Clearing HBO stats cache. Stats before clearing: {}",
+        cacheBackend_.getStats());
+    cacheBackend_.clear();
+  }
+
   public String getCacheStats() {
     return cacheBackend_.getStats();
   }

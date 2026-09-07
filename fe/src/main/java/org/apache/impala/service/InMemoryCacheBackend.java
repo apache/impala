@@ -118,6 +118,11 @@ public class InMemoryCacheBackend implements CacheBackend {
   }
 
   @Override
+  public void clear() {
+    cache_.invalidateAll();
+  }
+
+  @Override
   public String getStats() {
     return cache_.stats().toString();
   }

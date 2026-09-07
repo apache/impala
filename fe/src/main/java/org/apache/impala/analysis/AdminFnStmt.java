@@ -37,8 +37,8 @@ import com.google.common.base.Preconditions;
  * Represents an administrative function call, e.g. ": shutdown('hostname:123')".
  *
  * This "admin statement" framework provides a way to expand the set of supported admin
- * statements without modifying the SQL grammar. For now, the only supported functions are
- * shutdown() and event_processor(), so the logic in here is not generic.
+ * statements without modifying the SQL grammar. Supported functions are shutdown(),
+ * event_processor() and clear_hbo_stats().
  */
 public class AdminFnStmt extends StatementBase {
   // Name of the function. Validated during analysis.
@@ -90,7 +90,7 @@ public class AdminFnStmt extends StatementBase {
     } else if (type_ == TAdminRequestType.EVENT_PROCESSOR) {
       result.event_processor_cmd_params = new TEventProcessorCmdParams(action_);
       if (event_id_ != 0) result.event_processor_cmd_params.setEvent_id(event_id_);
-    } else {
+    } else if (type_ != TAdminRequestType.CLEAR_HBO_STATS) {
       Preconditions.checkState(false, "Unsupported TAdminRequest type %s", type_);
     }
     return result;
@@ -106,6 +106,12 @@ public class AdminFnStmt extends StatementBase {
     } else if (fnName_.equalsIgnoreCase("event_processor")) {
       type_ = TAdminRequestType.EVENT_PROCESSOR;
       analyzeEventProcessorCmd(analyzer);
+    } else if (fnName_.equalsIgnoreCase("clear_hbo_stats")) {
+      type_ = TAdminRequestType.CLEAR_HBO_STATS;
+      registerPrivReq(analyzer);
+      if (!params_.isEmpty()) {
+        throw new AnalysisException("clear_hbo_stats() takes no arguments: " + toSql());
+      }
     } else {
       throw new AnalysisException("Unknown admin function: " + fnName_);
     }

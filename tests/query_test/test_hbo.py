@@ -20,6 +20,8 @@ import re
 import time
 import uuid
 
+import pytest
+
 from tests.common.environ import IS_CALCITE_PLANNER
 from tests.common.impala_test_suite import ImpalaTestSuite
 from tests.common.test_dimensions import (
@@ -169,6 +171,32 @@ class TestHBO(ImpalaTestSuite):
     # file size when HMS stats (numRows) are missing.
     self.execute_query("refresh functional_parquet.alltypes_nonpartitioned")
     self._run_hbo_explains('QueryTest/hbo-single-scan-nonpartitioned-no-stats')
+
+  @pytest.mark.execute_serially
+  def test_clear_hbo_cache(self):
+    """The admin function drops the stored runs, so the next plan falls back to the
+    regular estimate instead of the remembered cardinality. Runs serially because it
+    clears the cache shared by every query on this coordinator."""
+    self.client.set_configuration(QUERY_OPTIONS)
+    query = """
+        SELECT count(*) FROM functional.alltypes
+        WHERE year=2010 AND int_col=7 AND string_col='7'"""
+    self.execute_query(query)
+    # Wait for 1 second to ensure the stats are written to the cache.
+    time.sleep(1)
+
+    explain = "explain " + query
+    assert "(from HBO)" in "\n".join(self.execute_query(explain).data)
+
+    # The cache is per coordinator, so clear the one this suite's client talks to.
+    response = self.execute_query(": clear_hbo_stats()")
+    assert response.data == ["Cleared the HBO stats cache."]
+    assert "(from HBO)" not in "\n".join(self.execute_query(explain).data)
+
+    # Clearing an empty cache succeeds too.
+    response = self.execute_query(": clear_hbo_stats()")
+    assert response.data == ["Cleared the HBO stats cache."]
+    assert "(from HBO)" not in "\n".join(self.execute_query(explain).data)
 
   def test_multiple_scans_cardinality(self):
     self.client.set_configuration(QUERY_OPTIONS)

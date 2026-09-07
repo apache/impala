@@ -383,6 +383,9 @@ Status ClientRequestState::Exec() {
         RETURN_IF_ERROR(ExecShutdownRequest());
       } else if (exec_req.admin_request.type == TAdminRequestType::EVENT_PROCESSOR) {
         RETURN_IF_ERROR(ExecEventProcessorCmd());
+      } else if (exec_req.admin_request.type == TAdminRequestType::CLEAR_HBO_STATS) {
+        RETURN_IF_ERROR(frontend_->ClearHboStats());
+        SetResultSet({"Cleared the HBO stats cache."});
       } else {
         DCHECK(false);
       }

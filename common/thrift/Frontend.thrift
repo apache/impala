@@ -614,6 +614,7 @@ struct TShutdownParams {
 enum TAdminRequestType {
   SHUTDOWN = 0
   EVENT_PROCESSOR = 1
+  CLEAR_HBO_STATS = 2
 }
 
 // Parameters for administrative function statement. This is essentially a tagged union
@@ -621,7 +622,8 @@ enum TAdminRequestType {
 struct TAdminRequest {
   1: required TAdminRequestType type
 
-  // The below member corresponding to 'type' should be set.
+  // The below member corresponding to 'type' should be set. CLEAR_HBO_STATS has no
+  // parameters.
   2: optional TShutdownParams shutdown_params
   3: optional CatalogService.TEventProcessorCmdParams event_processor_cmd_params
 }

@@ -42,6 +42,12 @@ public interface CacheBackend {
   Object getIfPresent(THboStatsType statsType, String key);
 
   /**
+   * Discard every entry in the cache. Used to drop stats that no longer describe the
+   * data, and by tests that need a known-empty cache before storing new runs.
+   */
+  void clear();
+
+  /**
    * Get statistics about the cache (for monitoring/debugging).
    * @return A human-readable string with cache statistics
    */

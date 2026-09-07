@@ -171,7 +171,8 @@ Frontend::Frontend() {
     {"commitKuduTransaction", "([B)V", &commit_kudu_txn_},
     {"cancelExecRequest", "([B)V", &cancel_exec_request_id_},
     {"getNonOdbcKeywords", "([B)Ljava/lang/String;", &get_non_odbc_keywords_id_},
-    {"storeExecStats", "([B)V", &store_exec_stats_}
+    {"storeExecStats", "([B)V", &store_exec_stats_},
+    {"clearHboStats", "()V", &clear_hbo_stats_}
   };
 
   JniMethodDescriptor staticMethods[] = {
@@ -508,4 +509,8 @@ Status Frontend::GetNonOdbcKeywords(const string& odbc_keywords_csv, string* res
 
 Status Frontend::StoreExecStats(const THistoricalStatsUpdate& stats) {
   return JniUtil::CallJniMethod(fe_, store_exec_stats_, stats);
+}
+
+Status Frontend::ClearHboStats() {
+  return JniUtil::CallJniMethod(fe_, clear_hbo_stats_);
 }

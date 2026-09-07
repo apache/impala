@@ -39,6 +39,7 @@ import org.apache.impala.common.FileSystemUtil;
 import org.apache.impala.common.ImpalaException;
 import org.apache.impala.service.BackendConfig;
 import org.apache.impala.service.FeSupport;
+import org.apache.impala.thrift.TAdminRequestType;
 import org.apache.impala.thrift.TFunctionCategory;
 import org.junit.Assert;
 import org.junit.Test;
@@ -5010,6 +5011,17 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
     AnalysisError(": shutdown(-1)", "deadline must be a non-negative integer: -1 = -1");
     AnalysisError(": shutdown(1.234)",
         "deadline expression must be an integer type but is 'DECIMAL(4,3)': 1.234");
+  }
+
+  @Test
+  public void TestClearHboStats() throws ImpalaException {
+    AdminFnStmt stmt = (AdminFnStmt) AnalyzesOk(": clear_hbo_stats()");
+    assertEquals(TAdminRequestType.CLEAR_HBO_STATS, stmt.toThrift().getType());
+    AnalyzesOk(":ClEaR_HbO_sTaTs()");
+    AnalysisError(": clear_hbo_stats(1)",
+        "clear_hbo_stats() takes no arguments: :clear_hbo_stats(1)");
+    AnalysisError(": clear_hbo_stats('table', 1)",
+        "clear_hbo_stats() takes no arguments: :clear_hbo_stats('table', 1)");
   }
 
   @Test

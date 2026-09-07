@@ -1026,6 +1026,13 @@ public class JniFrontend {
   }
 
   /**
+   * Drops every run stored in this coordinator's HBO cache.
+   */
+  public void clearHboStats() {
+    HistoricalStats.INSTANCE.clearCache();
+  }
+
+  /**
    * Returns an error string describing configuration issue with the groups mapping
    * provider implementation.
    */

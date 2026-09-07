@@ -3270,6 +3270,18 @@ public class AuthorizationStmtTest extends AuthorizationTestBase {
             onTable("functional", "alltypes", TPrivilegeLevel.ALL));
   }
 
+  @Test
+  public void testClearHboStats() throws ImpalaException {
+    authorize(": clear_hbo_stats()")
+        .ok(onServer(TPrivilegeLevel.ALL))
+        .error(accessError("server"))
+        .error(accessError("server"), onServer(TPrivilegeLevel.REFRESH))
+        .error(accessError("server"), onServer(TPrivilegeLevel.SELECT))
+        .error(accessError("server"), onDatabase("functional", TPrivilegeLevel.ALL))
+        .error(accessError("server"),
+            onTable("functional", "alltypes", TPrivilegeLevel.ALL));
+  }
+
   private void createColumnMaskingPolicy(String policyName, String dbName, String tblName,
       String colName, String user, String maskType, String maskExpr) {
     String json = String.format("{\n" +
