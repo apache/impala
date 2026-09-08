@@ -34,13 +34,16 @@ import org.apache.calcite.rel.RelVisitor;
 import org.apache.calcite.rel.logical.LogicalFilter;
 import org.apache.calcite.rel.logical.LogicalProject;
 import org.apache.calcite.rel.logical.LogicalTableScan;
+import org.apache.calcite.rel.logical.LogicalUnion;
 import org.apache.calcite.rel.logical.LogicalValues;
 import org.apache.calcite.rel.type.RelDataType;
 import org.apache.calcite.rel.type.RelDataTypeField;
-import org.apache.calcite.rex.RexOver;
+import org.apache.calcite.rex.RexBuilder;
 import org.apache.calcite.rex.RexNode;
+import org.apache.calcite.rex.RexOver;
 import org.apache.calcite.rex.RexShuttle;
 import org.apache.calcite.sql.type.SqlTypeName;
+import org.apache.impala.calcite.coercenodes.CoerceNodes;
 import org.apache.impala.calcite.rel.node.ImpalaCTEConsumer;
 import org.apache.impala.calcite.rel.node.ImpalaCTEProducer;
 import org.apache.impala.calcite.rel.node.ImpalaPlanRel;
@@ -364,6 +367,37 @@ public class CalciteOptimizerTest extends FrontendTestBase {
             ImpalaCTEProducer.class),
         collectCteRels(
             createPreImpalaConvertPlan(threeUses, cteThreshold(2)).plan()));
+  }
+
+  @Test
+  public void testUnionInputsUseCommonDecimalType() throws ImpalaException {
+    RelNode source = createCalcitePlanInput("select decimal_col, "
+        + "cast(decimal_col as decimal(9, 3)) from " + TEST_TABLE).logicalPlan();
+    RexBuilder rexBuilder = source.getCluster().getRexBuilder();
+    List<RelNode> branches = new ArrayList<>();
+    for (int i = 0; i < 2; ++i) {
+      RexNode column = rexBuilder.makeInputRef(source, i);
+      assertEquals(9, column.getType().getPrecision());
+      assertEquals(2 + i, column.getType().getScale());
+      branches.add(LogicalProject.create(source, ImmutableList.of(),
+          ImmutableList.of(column), rexBuilder.getTypeFactory().builder()
+              .add("v", column.getType()).build()));
+    }
+
+    // Build UNION after SQL analysis so that the validator cannot insert casts.
+    // Its output type is already common, but both inputs still need coercion.
+    for (List<RelNode> inputs : ImmutableList.of(branches,
+        ImmutableList.of(branches.get(1), branches.get(0)))) {
+      LogicalUnion union = LogicalUnion.create(inputs, true);
+      RelNode coerced = CoerceNodes.coerceNodes(union, rexBuilder);
+      assertEquals(2, coerced.getInputs().size());
+      for (RelNode input : coerced.getInputs()) {
+        RelDataType type = input.getRowType().getFieldList().get(0).getType();
+        assertEquals(SqlTypeName.DECIMAL, type.getSqlTypeName());
+        assertEquals(10, type.getPrecision());
+        assertEquals(3, type.getScale());
+      }
+    }
   }
 
   @Test

@@ -1,0 +1,353 @@
+# Licensed to the Apache Software Foundation (ASF) under one
+# or more contributor license agreements.  See the NOTICE file
+# distributed with this work for additional information
+# regarding copyright ownership.  The ASF licenses this file
+# to you under the Apache License, Version 2.0 (the
+# "License"); you may not use this file except in compliance
+# with the License.  You may obtain a copy of the License at
+#
+#   http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing,
+# software distributed under the License is distributed on an
+# "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+# KIND, either express or implied.  See the License for the
+# specific language governing permissions and limitations
+# under the License.
+====
+---- QUERY
+# UNION ALL keeps duplicates within an input and across inputs, including NULLs.
+with a as (
+  select 1 id, cast(null as int) v union all select 1, null
+  union all select cast(null as tinyint), 2 union all select 1, 2
+  union all select cast(null as tinyint), 2
+  union all select 3, 3
+), b as (
+  select 1 id, cast(null as int) v union all select cast(null as tinyint), null
+  union all select 1, 2 union all select 1, 2 union all select 4, 4
+)
+select * from a union all select * from b
+---- TYPES
+TINYINT, INT
+---- RESULTS
+1,NULL
+1,NULL
+NULL,2
+1,2
+NULL,2
+3,3
+1,NULL
+NULL,NULL
+1,2
+1,2
+4,4
+---- RUNTIME_PROFILE
+row_regex: PlannerType: CalcitePlanner
+====
+---- QUERY
+# DISTINCT compares the whole row and treats NULLs as equal.
+with a as (
+  select 1 id, cast(null as int) v union all select 1, null
+  union all select cast(null as tinyint), 2 union all select 1, 2
+  union all select cast(null as tinyint), 2
+  union all select 3, 3
+), b as (
+  select 1 id, cast(null as int) v union all select cast(null as tinyint), null
+  union all select 1, 2 union all select 1, 2 union all select 4, 4
+)
+select * from a union distinct select * from b
+---- TYPES
+TINYINT, INT
+---- RESULTS
+1,NULL
+NULL,2
+1,2
+3,3
+NULL,NULL
+4,4
+---- RUNTIME_PROFILE
+row_regex: PlannerType: CalcitePlanner
+====
+---- QUERY
+# Repeated rows on either side contribute only once to INTERSECT.
+with a as (
+  select 1 id, cast(null as int) v union all select 1, null
+  union all select cast(null as tinyint), 2 union all select 1, 2
+  union all select cast(null as tinyint), 2
+  union all select 3, 3
+), b as (
+  select 1 id, cast(null as int) v union all select cast(null as tinyint), null
+  union all select 1, 2 union all select 1, 2 union all select 4, 4
+)
+select * from a intersect select * from b
+---- TYPES
+TINYINT, INT
+---- RESULTS
+1,NULL
+1,2
+---- RUNTIME_PROFILE
+row_regex: PlannerType: CalcitePlanner
+====
+---- QUERY
+# A matching row removes every copy from the left input. Matching only one
+# column does not remove a row, even when that column is NULL. Repeated rows
+# that survive appear only once.
+with a as (
+  select 1 id, cast(null as int) v union all select 1, null
+  union all select cast(null as tinyint), 2 union all select 1, 2
+  union all select cast(null as tinyint), 2
+  union all select 3, 3
+), b as (
+  select 1 id, cast(null as int) v union all select cast(null as tinyint), null
+  union all select 1, 2 union all select 1, 2 union all select 4, 4
+)
+select * from a except select * from b
+---- TYPES
+TINYINT, INT
+---- RESULTS
+NULL,2
+3,3
+---- RUNTIME_PROFILE
+row_regex: PlannerType: CalcitePlanner
+====
+---- QUERY
+# EXCEPT must check every later input, not only the second one.
+with a as (
+  select 1 id, cast(null as int) v union all select 1, null
+  union all select cast(null as tinyint), 2 union all select 1, 2
+  union all select cast(null as tinyint), 2
+  union all select 3, 3
+), b as (
+  select 1 id, cast(null as int) v union all select cast(null as tinyint), null
+  union all select 1, 2 union all select 1, 2 union all select 4, 4
+)
+select * from a except select * from b except select 3, 3
+---- TYPES
+TINYINT, INT
+---- RESULTS
+NULL,2
+---- RUNTIME_PROFILE
+row_regex: PlannerType: CalcitePlanner
+====
+---- QUERY
+# No row belongs to all three inputs, although each pair has a common row.
+with a as (
+  select 1 id, cast(null as int) v union all select 2, 2
+), b as (
+  select 1 id, cast(null as int) v union all select 3, 3
+), c as (
+  select 2 id, 2 v union all select 3, 3
+)
+select * from a intersect select * from b intersect select * from c
+---- TYPES
+TINYINT, INT
+---- RESULTS
+---- RUNTIME_PROFILE
+row_regex: PlannerType: CalcitePlanner
+====
+---- QUERY
+# A row shared by all three inputs appears once, including a row with NULL.
+with a as (
+  select 1 id, cast(null as int) v union all select 1, null union all select 2, 2
+), b as (
+  select 1 id, cast(null as int) v union all select 3, 3
+), c as (
+  select 1 id, cast(null as int) v union all select 1, null union all select 3, 3
+)
+select * from a intersect select * from b intersect select * from c
+---- TYPES
+TINYINT, INT
+---- RESULTS
+1,NULL
+---- RUNTIME_PROFILE
+row_regex: PlannerType: CalcitePlanner
+====
+---- QUERY
+# EXCEPT still removes duplicates after pruning a known empty right input.
+with a as (
+  select 1 id, cast(null as int) v union all select 1, null union all select 2, 2
+), b as (
+  select cast(null as tinyint) id, cast(null as int) v
+  from (select 1) t where false
+)
+select * from a except select * from b
+---- TYPES
+TINYINT, INT
+---- RESULTS
+1,NULL
+2,2
+---- RUNTIME_PROFILE
+row_regex: PlannerType: CalcitePlanner
+====
+---- QUERY
+# EXCEPT removes duplicates when the right input produces no rows at runtime.
+with a as (
+  select 1 id, cast(null as int) v union all select 1, null union all select 2, 2
+), b as (
+  select cast(id as tinyint) id, int_col v from alltypestiny where id = -1
+)
+select * from a except select * from b
+---- TYPES
+TINYINT, INT
+---- RESULTS
+1,NULL
+2,2
+---- RUNTIME_PROFILE
+row_regex: PlannerType: CalcitePlanner
+row_regex: .*HDFS_SCAN_NODE.*
+====
+---- QUERY
+# EXCEPT returns no rows when the left input produces no rows at runtime.
+with a as (
+  select 1 id, cast(null as int) v union all select 1, null union all select 2, 2
+), b as (
+  select cast(id as tinyint) id, int_col v from alltypestiny where id = -1
+)
+select * from b except select * from a
+---- TYPES
+TINYINT, INT
+---- RESULTS
+---- RUNTIME_PROFILE
+row_regex: PlannerType: CalcitePlanner
+row_regex: .*HDFS_SCAN_NODE.*
+====
+---- QUERY
+# INTERSECT returns no rows when one input produces no rows at runtime.
+with a as (
+  select 1 id, cast(null as int) v union all select 1, null union all select 2, 2
+), b as (
+  select cast(id as tinyint) id, int_col v from alltypestiny where id = -1
+)
+select * from a intersect select * from b
+---- TYPES
+TINYINT, INT
+---- RESULTS
+---- RUNTIME_PROFILE
+row_regex: PlannerType: CalcitePlanner
+row_regex: .*HDFS_SCAN_NODE.*
+====
+---- QUERY
+# UNION ALL preserves integer digits and fractional digits from both inputs.
+with a as (
+  select cast(1234567.89 as decimal(9, 2)) v
+  union all select cast(1.23 as decimal(9, 2))
+  union all select cast(null as decimal(9, 2))
+), b as (
+  select cast(1.230 as decimal(9, 3)) v
+  union all select cast(123456.789 as decimal(9, 3))
+  union all select cast(null as decimal(9, 3))
+)
+select * from a union all select * from b
+---- TYPES
+DECIMAL
+---- RESULTS
+1234567.890
+1.230
+NULL
+1.230
+123456.789
+NULL
+---- RUNTIME_PROFILE
+row_regex: PlannerType: CalcitePlanner
+====
+---- QUERY
+# UNION compares decimal values after conversion to the common type.
+with a as (
+  select cast(1234567.89 as decimal(9, 2)) v
+  union all select cast(1.23 as decimal(9, 2))
+  union all select cast(null as decimal(9, 2))
+), b as (
+  select cast(1.230 as decimal(9, 3)) v
+  union all select cast(123456.789 as decimal(9, 3))
+  union all select cast(null as decimal(9, 3))
+)
+select * from a union select * from b
+---- TYPES
+DECIMAL
+---- RESULTS
+1234567.890
+1.230
+123456.789
+NULL
+---- RUNTIME_PROFILE
+row_regex: PlannerType: CalcitePlanner
+====
+---- QUERY
+# INTERSECT matches equal decimals with different scales and matches NULLs.
+with a as (
+  select cast(1234567.89 as decimal(9, 2)) v
+  union all select cast(1.23 as decimal(9, 2))
+  union all select cast(null as decimal(9, 2))
+), b as (
+  select cast(1.230 as decimal(9, 3)) v
+  union all select cast(123456.789 as decimal(9, 3))
+  union all select cast(null as decimal(9, 3))
+)
+select * from a intersect select * from b
+---- TYPES
+DECIMAL
+---- RESULTS
+1.230
+NULL
+---- RUNTIME_PROFILE
+row_regex: PlannerType: CalcitePlanner
+====
+---- QUERY
+# EXCEPT removes equal decimals and NULLs after conversion to the common type.
+with a as (
+  select cast(1234567.89 as decimal(9, 2)) v
+  union all select cast(1.23 as decimal(9, 2))
+  union all select cast(null as decimal(9, 2))
+), b as (
+  select cast(1.230 as decimal(9, 3)) v
+  union all select cast(123456.789 as decimal(9, 3))
+  union all select cast(null as decimal(9, 3))
+)
+select * from a except select * from b
+---- TYPES
+DECIMAL
+---- RESULTS
+1234567.890
+---- RUNTIME_PROFILE
+row_regex: PlannerType: CalcitePlanner
+====
+---- QUERY
+# Impala gives UNION and INTERSECT equal precedence and groups left to right.
+select 100 union select 101 intersect select 101
+---- TYPES
+TINYINT
+---- RESULTS
+101
+---- RUNTIME_PROFILE
+row_regex: PlannerType: CalcitePlanner
+====
+---- QUERY
+# Parentheses override the default grouping of UNION and INTERSECT.
+select 100 union (select 101 intersect select 101)
+---- TYPES
+TINYINT
+---- RESULTS
+100
+101
+---- RUNTIME_PROFILE
+row_regex: PlannerType: CalcitePlanner
+====
+---- QUERY
+# Impala also groups EXCEPT and INTERSECT left to right.
+select 100 except select 101 intersect select 101
+---- TYPES
+TINYINT
+---- RESULTS
+---- RUNTIME_PROFILE
+row_regex: PlannerType: CalcitePlanner
+====
+---- QUERY
+# Parentheses override the default grouping of EXCEPT and INTERSECT.
+select 100 except (select 101 intersect select 101)
+---- TYPES
+TINYINT
+---- RESULTS
+100
+---- RUNTIME_PROFILE
+row_regex: PlannerType: CalcitePlanner
+====
