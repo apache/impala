@@ -41,8 +41,10 @@ import org.apache.impala.util.MathUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
+import com.google.common.collect.ImmutableList;
 
 /**
  * Node that merges the results of its child plans, Normally, this is done by
@@ -102,6 +104,19 @@ public class UnionNode extends PlanNode {
   }
 
   public void addConstExprList(List<Expr> exprs) { constExprLists_.add(exprs); }
+
+  /**
+   * Returns an immutable snapshot of the constant-expression list structure for tests.
+   * The Expr objects themselves are not copied.
+   */
+  @VisibleForTesting
+  public List<List<Expr>> getConstExprLists() {
+    ImmutableList.Builder<List<Expr>> snapshot = ImmutableList.builder();
+    for (List<Expr> exprs : constExprLists_) {
+      snapshot.add(ImmutableList.copyOf(exprs));
+    }
+    return snapshot.build();
+  }
 
   /**
    * Returns true if this UnionNode has only constant exprs.

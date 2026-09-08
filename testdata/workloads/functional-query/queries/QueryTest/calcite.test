@@ -1412,3 +1412,17 @@ where smallint_col > sleep(100);
 ---- RUNTIME_PROFILE
 row_regex: PlannerType: CalcitePlanner
 ====
+---- QUERY
+-- A TIMESTAMP literal inside a VALUES row. Impala's own parser has no such literal,
+-- so only the Calcite planner reaches this at all: when it refused the literal, the
+-- fallback to the original planner reported a syntax error instead.
+values (timestamp '2024-01-01 00:02:03.456'),
+       (timestamp '1970-01-01 00:00:01.234567891')
+---- RESULTS
+2024-01-01 00:02:03.456000000
+1970-01-01 00:00:01.234567891
+---- TYPES
+timestamp
+---- RUNTIME_PROFILE
+row_regex: PlannerType: CalcitePlanner
+====
