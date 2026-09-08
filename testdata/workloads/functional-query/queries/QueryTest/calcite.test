@@ -1426,3 +1426,19 @@ timestamp
 ---- RUNTIME_PROFILE
 row_regex: PlannerType: CalcitePlanner
 ====
+---- QUERY
+-- The literals RexLiteralConverter had no case for. A binary literal reaches only
+-- the Calcite planner, since Impala's own parser has no X'...' of its own. The
+-- second value is not valid UTF-8, so it is only ever bytes. A REAL literal is
+-- ordinary Impala SQL that the original planner accepts.
+select hex(cast(x'616263' as string)) as text_bytes,
+       hex(cast(x'ff00fe' as string)) as raw_bytes,
+       length(x'ff00fe') as raw_length,
+       cast(1.5 as real) as real_value
+---- RESULTS
+'616263','FF00FE',3,1.5
+---- TYPES
+STRING, STRING, INT, DOUBLE
+---- RUNTIME_PROFILE
+row_regex: PlannerType: CalcitePlanner
+====

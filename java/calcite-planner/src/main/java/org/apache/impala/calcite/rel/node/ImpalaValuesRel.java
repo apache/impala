@@ -125,12 +125,15 @@ public class ImpalaValuesRel extends Values
       return nullLiteral;
     }
 
-    // A timestamp cannot make this round trip: LiteralExpr.createFromStr has no case
-    // for TIMESTAMP and throws, so the literal RexLiteralConverter has just folded
-    // would be discarded. It is also of the declared type already, which is what the
-    // round trip is for. Every other type keeps going through createFromStr, which
-    // gives a literal parsed at a narrower type the one the column declares.
-    if (impalaType.isTimestamp() && impalaType.equals(expr.getType())) {
+    // A timestamp or a binary value cannot make this round trip. createFromStr has no
+    // case for TIMESTAMP at all, and for BINARY it goes through the literal's text,
+    // which bytes that are not valid UTF-8 do not have -- the literal keeps those as
+    // bytes precisely because a String would lose them. Both already carry the
+    // declared type, which is what the round trip is for. Every other type keeps
+    // going through createFromStr, which gives a literal the column's type when the
+    // two differ.
+    if ((impalaType.isTimestamp() || impalaType.isBinary())
+        && impalaType.equals(expr.getType())) {
       return expr;
     }
 

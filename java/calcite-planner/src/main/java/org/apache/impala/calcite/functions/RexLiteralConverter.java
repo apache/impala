@@ -21,6 +21,7 @@ import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Lists;
 import org.apache.calcite.rel.type.RelDataType;
+import org.apache.calcite.avatica.util.ByteString;
 import org.apache.calcite.rex.RexLiteral;
 import org.apache.calcite.sql.type.SqlTypeName;
 import org.apache.calcite.util.DateString;
@@ -71,6 +72,10 @@ public class RexLiteralConverter {
         Expr boolExpr = new BoolLiteral((Boolean) rexLiteral.getValueAs(Boolean.class));
         return boolExpr;
       case DOUBLE:
+      // Calcite's REAL is Impala's DOUBLE (ImpalaTypeConverter reads it as one), and
+      // a REAL literal is how "cast(x as real)" arrives -- SQL the original planner
+      // accepts.
+      case REAL:
         Double d = rexLiteral.getValueAs(Double.class);
         // NumericLiteral will throw an exception if it is a Nan or Inf, so create
         // a cast around it.
@@ -100,6 +105,12 @@ public class RexLiteralConverter {
       case VARCHAR:
         return new StringLiteral(rexLiteral.getValueAs(String.class),
             ImpalaTypeConverter.createImpalaType(rexLiteral.getType()), true);
+      case BINARY:
+        // Calcite keeps a binary literal as a ByteString, and Impala's StringLiteral
+        // takes the bytes: it holds them as bytes when they are not valid UTF-8, which
+        // is the case a String would not survive.
+        return new StringLiteral(rexLiteral.getValueAs(ByteString.class).getBytes(),
+            ImpalaTypeConverter.createImpalaType(rexLiteral.getType()));
       case DATE:
         DateString dateStringClass = rexLiteral.getValueAs(DateString.class);
         String dateString = (dateStringClass == null) ? null : dateStringClass.toString();
@@ -108,8 +119,10 @@ public class RexLiteralConverter {
       case TIMESTAMP:
           return createTimestampExpr(rexLiteral, analyzer);
       default:
+        // The type this switch is on, not the literal's own type name: a REAL literal
+        // reports itself as DOUBLE, and the message named a case that is right there.
         Preconditions.checkState(false, "Unsupported RexLiteral: "
-            + rexLiteral.getTypeName());
+            + rexLiteral.getType().getSqlTypeName());
         return null;
     }
   }
