@@ -600,6 +600,13 @@ under the License.
       <artifactId>zero-allocation-hashing</artifactId>
       <version>0.16</version>
     </dependency>
+
+    <!-- Jedis client for the distributed (Redis/Valkey) HBO cache backend. Version is
+         managed in java/pom.xml dependencyManagement. -->
+    <dependency>
+      <groupId>redis.clients</groupId>
+      <artifactId>jedis</artifactId>
+    </dependency>
   </dependencies>
 
   <reporting>

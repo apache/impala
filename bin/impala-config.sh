@@ -292,6 +292,7 @@ export IMPALA_HTTPCLIENT5_VERSION=5.5
 export IMPALA_HTTPCORE5_VERSION=5.3.4
 export IMPALA_JACKSON_VERSION=2.19.4
 export IMPALA_JACKSON_DATABIND_VERSION=2.19.4
+export IMPALA_JEDIS_VERSION=4.4.8
 export IMPALA_JSON_SMART_VERSION=2.6.0
 export IMPALA_JUNIT_VERSION=4.13.2
 export IMPALA_KITE_VERSION=1.1.0
@@ -309,6 +310,12 @@ export IMPALA_AIRCOMPRESSOR_VERSION=2.0.3
 export IMPALA_DATASKETCHES_VERSION=6.0.0
 export IMPALA_PAIMON_VERSION=1.3.1
 export IMPALA_ESRI_GEOMETRY_API_VERSION=2.2.4
+
+# Docker image used for the Valkey (Redis-compatible) server that backs the distributed
+# HBO cache in custom-cluster tests (tests/common/valkey_cluster.py). Pinned rather than
+# 'latest' so the tests are reproducible. Valkey is wire-compatible with the Jedis client
+# Impala uses. Override to test against a different server (e.g. "redis:7").
+export IMPALA_TEST_VALKEY_IMAGE=${IMPALA_TEST_VALKEY_IMAGE:-"valkey/valkey:8"}
 # When Impala is building docker images on Redhat-based distributions,
 # it is useful to be able to customize the base image. Some users will
 # want to use open source / free distributions like Centos/Rocky/Alma/etc.

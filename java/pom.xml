@@ -87,6 +87,7 @@ under the License.
     <springframework.version>${env.IMPALA_SPRINGFRAMEWORK_VERSION}</springframework.version>
     <velocity-engine-core.version>${env.IMPALA_VELOCITY_ENGINE_CORE_VERSION}</velocity-engine-core.version>
     <json-smart.version>${env.IMPALA_JSON_SMART_VERSION}</json-smart.version>
+    <jedis.version>${env.IMPALA_JEDIS_VERSION}</jedis.version>
     <commons-dbcp2.version>${env.IMPALA_DBCP2_VERSION}</commons-dbcp2.version>
     <log4j2.version>${env.IMPALA_LOG4J2_VERSION}</log4j2.version>
     <dropwizard-metrics.version>${env.IMPALA_DROPWIZARD_METRICS_VERSION}</dropwizard-metrics.version>
@@ -435,6 +436,25 @@ under the License.
         <groupId>org.apache.datasketches</groupId>
         <artifactId>datasketches-java</artifactId>
         <version>${datasketches.version}</version>
+      </dependency>
+
+      <dependency>
+        <groupId>redis.clients</groupId>
+        <artifactId>jedis</artifactId>
+        <version>${jedis.version}</version>
+        <exclusions>
+          <!-- org.json's "JSON License" is ASF Category X (forbidden). It and gson are
+               only used by Jedis's RediSearch/JSON helpers, which the HBO cache backend
+               does not use (it does plain byte[] GET/SET), so both are safe to drop. -->
+          <exclusion>
+            <groupId>org.json</groupId>
+            <artifactId>json</artifactId>
+          </exclusion>
+          <exclusion>
+            <groupId>com.google.code.gson</groupId>
+            <artifactId>gson</artifactId>
+          </exclusion>
+        </exclusions>
       </dependency>
 
       <dependency>

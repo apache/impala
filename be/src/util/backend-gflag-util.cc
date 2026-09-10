@@ -17,6 +17,8 @@
 
 #include "common/global-flags.h"
 
+#include <boost/algorithm/string.hpp>
+
 #include "common/version.h"
 #include "gen-cpp/BackendGflags_types.h"
 #include "gutil/strings/substitute.h"
@@ -145,9 +147,6 @@ DECLARE_bool(keeps_warmup_tables_loaded);
 DECLARE_bool(truncate_external_tables_with_hms);
 DECLARE_bool(disable_hms_sync_by_default);
 DECLARE_bool(otel_trace_enabled);
-DECLARE_double(hbo_similarity_threshold);
-DECLARE_int32(hbo_max_runs_per_key);
-DECLARE_int64(hbo_in_memory_backend_cache_size_bytes);
 DECLARE_int32(unregistration_thread_pool_size);
 DECLARE_string(cte_suggester_class);
 DECLARE_string(trusted_jar_paths);
@@ -352,6 +351,60 @@ DEFINE_double(tuple_cache_cost_coefficient_read_bytes, 0.00,
 DEFINE_double(tuple_cache_cost_coefficient_read_rows, 0.1329,
     "Cost coefficient for reading a row from the tuple cache.");
 
+DEFINE_double(hbo_similarity_threshold, 0.1,
+    "Threshold in [0, 1] for comparing scan input rows in Historical Based Optimization. "
+    "Two runs are considered similar if the relative difference is within this threshold."
+    " Default is 0.1 (10% tolerance).");
+
+DEFINE_int32(hbo_max_runs_per_key, 100,
+    "Maximum number of historical runs to retain per hash key in the HBO cache. "
+    "When exceeded, the oldest run is evicted.");
+
+DEFINE_int64(hbo_in_memory_backend_cache_size_bytes, 1024LL * 1024 * 1024,
+    "Maximum size in bytes of the HBO in-memory backend (InMemoryCacheBackend). "
+    "Default is 1GB. The in-memory backend is mainly used for testing.");
+
+DEFINE_string(hbo_cache_backend, "in_memory",
+    "Selects the HBO cache backend implementation. Valid values are 'in_memory' "
+    "(default, a per-coordinator Guava cache) and 'redis' (a distributed cache shared "
+    "across coordinators, backed by a Redis/Valkey server). Note: When 'redis' is"
+    "used, the database instance should be dedicated solely to HBO, as HBO operations "
+    "may flush or clear the entire database.");
+
+DEFINE_string(hbo_cache_redis_host, "localhost",
+    "Host of the Redis/Valkey server for the HBO cache. Only used when "
+    "--hbo_cache_backend=redis.");
+
+DEFINE_int32(hbo_cache_redis_port, 6379,
+    "Port of the Redis/Valkey server for the HBO cache. Only used when "
+    "--hbo_cache_backend=redis.");
+
+DEFINE_int32(hbo_cache_redis_timeout_ms, 2000,
+    "Socket/connection timeout in milliseconds for the Redis/Valkey HBO cache client. "
+    "Only used when --hbo_cache_backend=redis.");
+
+DEFINE_int32(hbo_cache_redis_db, 0,
+    "Redis/Valkey logical database index for the HBO cache. Only used when "
+    "--hbo_cache_backend=redis.");
+
+DEFINE_int32(hbo_cache_redis_max_connections, 16,
+    "Maximum number of connections in the Redis/Valkey HBO cache client connection "
+    "pool (JedisPool maxTotal). The pool is shared across all queries on a "
+    "coordinator. Only used when --hbo_cache_backend=redis.");
+
+DEFINE_int32(hbo_cache_redis_ttl_seconds, 4320000,
+    "Time-to-live in seconds for HBO cache entries in Redis/Valkey. The TTL is "
+    "refreshed on every write (sliding expiry), so an entry expires only after this "
+    "many seconds without an update. Default is 4320000 (50 days). 0 disables expiry "
+    "(entries never expire). Only used when --hbo_cache_backend=redis.");
+
+DEFINE_string(hbo_cache_redis_password_cmd, "",
+    "A Unix command whose output returns the password of the Redis/Valkey server for "
+    "the HBO cache. The output of the command will be truncated to 1024 bytes and "
+    "trimmed of trailing whitespace. Empty means no authentication. Only used when "
+    "--hbo_cache_backend=redis.");
+TAG_FLAG(hbo_cache_redis_password_cmd, sensitive);
+
 using strings::Substitute;
 
 namespace impala {
@@ -398,6 +451,40 @@ static bool ValidatePositiveInt32(const char* flagname, int32_t value) {
   return ValidatePositiveInt64(flagname, value);
 }
 
+static bool ValidateNonnegativeInt32(const char* flagname, int32_t value) {
+  if (0 <= value) {
+    return true;
+  }
+  LOG(ERROR) << Substitute(
+      "$0 must be a non-negative integer, value $1 is invalid", flagname, value);
+  return false;
+}
+
+// Parses an hbo_cache_backend flag value (whitespace-trimmed, case-insensitive) into a
+// THboBackendType. Returns true and sets '*result' on success, or false if 'value' is
+// not a recognized backend.
+static bool ParseHboCacheBackend(const string& value, THboBackendType::type* result) {
+  string normalized = boost::algorithm::trim_copy(value);
+  boost::algorithm::to_lower(normalized);
+  if (normalized == "in_memory") {
+    *result = THboBackendType::IN_MEMORY;
+    return true;
+  }
+  if (normalized == "redis") {
+    *result = THboBackendType::REDIS;
+    return true;
+  }
+  return false;
+}
+
+static bool ValidateHboCacheBackend(const char* flagname, const string& value) {
+  THboBackendType::type backend;
+  if (ParseHboCacheBackend(value, &backend)) return true;
+  LOG(ERROR) << Substitute(
+      "$0 must be 'in_memory' or 'redis', value '$1' is invalid", flagname, value);
+  return false;
+}
+
 DEFINE_validator(query_cpu_count_divisor, &ValidatePositiveDouble);
 DEFINE_validator(min_processing_per_thread, &ValidatePositiveInt64);
 DEFINE_validator(query_cpu_root_factor, &ValidatePositiveDouble);
@@ -410,6 +497,12 @@ DEFINE_validator(tuple_cache_cost_coefficient_read_rows, &ValidateNonnegativeDou
 DEFINE_validator(hbo_similarity_threshold, &ValidateHboSimilarityThreshold);
 DEFINE_validator(hbo_max_runs_per_key, &ValidatePositiveInt32);
 DEFINE_validator(hbo_in_memory_backend_cache_size_bytes, &ValidatePositiveInt64);
+DEFINE_validator(hbo_cache_backend, &ValidateHboCacheBackend);
+DEFINE_validator(hbo_cache_redis_port, &ValidatePositiveInt32);
+DEFINE_validator(hbo_cache_redis_timeout_ms, &ValidatePositiveInt32);
+DEFINE_validator(hbo_cache_redis_db, &ValidateNonnegativeInt32);
+DEFINE_validator(hbo_cache_redis_max_connections, &ValidatePositiveInt32);
+DEFINE_validator(hbo_cache_redis_ttl_seconds, &ValidateNonnegativeInt32);
 DEFINE_validator(unregistration_thread_pool_size, &ValidatePositiveInt32);
 
 Status GetConfigFromCommand(const string& flag_cmd, string& result) {
@@ -646,6 +739,20 @@ Status PopulateThriftBackendGflags(TBackendGflags& cfg) {
   cfg.__set_hbo_max_runs_per_key(FLAGS_hbo_max_runs_per_key);
   cfg.__set_hbo_in_memory_backend_cache_size_bytes(
       FLAGS_hbo_in_memory_backend_cache_size_bytes);
+  THboBackendType::type hbo_cache_backend;
+  bool parsed = ParseHboCacheBackend(FLAGS_hbo_cache_backend, &hbo_cache_backend);
+  DCHECK(parsed);
+  cfg.__set_hbo_cache_backend(hbo_cache_backend);
+  cfg.__set_hbo_cache_redis_host(FLAGS_hbo_cache_redis_host);
+  cfg.__set_hbo_cache_redis_port(FLAGS_hbo_cache_redis_port);
+  string hbo_cache_redis_password;
+  RETURN_IF_ERROR(GetConfigFromCommand(
+      FLAGS_hbo_cache_redis_password_cmd, hbo_cache_redis_password));
+  cfg.__set_hbo_cache_redis_password(hbo_cache_redis_password);
+  cfg.__set_hbo_cache_redis_timeout_ms(FLAGS_hbo_cache_redis_timeout_ms);
+  cfg.__set_hbo_cache_redis_db(FLAGS_hbo_cache_redis_db);
+  cfg.__set_hbo_cache_redis_max_connections(FLAGS_hbo_cache_redis_max_connections);
+  cfg.__set_hbo_cache_redis_ttl_seconds(FLAGS_hbo_cache_redis_ttl_seconds);
   cfg.__set_unregistration_thread_pool_size(FLAGS_unregistration_thread_pool_size);
   cfg.__set_cte_suggester_class(FLAGS_cte_suggester_class);
   cfg.__set_avro_schema_url_allowed_schemes(FLAGS_avro_schema_url_allowed_schemes);

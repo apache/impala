@@ -57,6 +57,16 @@ struct TPlanNodeRun {
   3: optional i64 mem_usage
 }
 
+// Wrapper for the list of historical runs stored under a single HBO cache key. This
+// mirrors the Java-only HistoricalStatsValue<TPlanNodeRun> so that external cache
+// backends (e.g. the Redis/Valkey backend) can serialize the cached value to Thrift
+// binary. Thrift's field-id-based schema evolution keeps stored values forward/backward
+// compatible as TPlanNodeRun / TScanInputStats gain fields; an undecodable entry is only
+// a cache miss.
+struct THistoricalStatsValue {
+  1: optional list<TPlanNodeRun> runs
+}
+
 struct TPlanNodeRunWithKeys {
   1: required TPlanNodeRun run
   // The HBO hash keys of the PlanNode generated for different canonicalization

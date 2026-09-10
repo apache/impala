@@ -34,6 +34,7 @@ from tests.common.file_utils import cleanup_tmp_test_dir, make_tmp_test_dir
 from tests.common.impala_test_suite import ImpalaTestSuite
 from tests.common.impala_cluster import ImpalaCluster
 from tests.common.trino_cluster import TrinoCluster
+from tests.common.valkey_cluster import ValkeyCluster
 from tests.util.filesystem_utils import IS_LOCAL
 from tests.util.workload_management import QUERY_TBL_LOG_NAME, QUERY_TBL_LIVE_NAME
 from time import sleep, time
@@ -84,6 +85,16 @@ FORCE_RESTART = 'force_restart'
 # If True, start the Trino Docker container (for Impala <-> Trino interop tests)
 # before the Impala cluster and stop it on teardown. See tests/common/trino_cluster.py.
 RUN_TRINO = 'run_trino'
+# If True, start the Valkey (Redis-compatible) Docker container (for the distributed HBO
+# cache tests) before the Impala cluster and stop it on teardown. See
+# tests/common/valkey_cluster.py.
+RUN_VALKEY = 'run_valkey'
+# Optional overrides for the Valkey container started by run_valkey=True. A test that
+# needs a password-protected instance sets these so it comes up on its own container
+# name/port without clashing with the default passwordless one.
+VALKEY_CONTAINER = 'valkey_container'
+VALKEY_PORT = 'valkey_port'
+VALKEY_PASSWORD = 'valkey_password'
 
 # Args that accept additional formatting to supply temporary dir path.
 ACCEPT_FORMATTING = set([IMPALAD_ARGS, CATALOGD_ARGS, IMPALA_LOG_DIR])
@@ -122,6 +133,10 @@ class CustomClusterTestSuite(ImpalaTestSuite):
   # Set to the TrinoCluster instance when a test requests run_trino=True; used to stop
   # the container on teardown. Left None otherwise.
   trino = None
+
+  # Set to the ValkeyCluster instance when a test requests run_valkey=True; used to stop
+  # the container on teardown. Left None otherwise.
+  valkey = None
 
   # The currently executing test method. setup_method() populates this and tear_method()
   # clears it. This is used to set the log directory location when a test manually
@@ -177,7 +192,8 @@ class CustomClusterTestSuite(ImpalaTestSuite):
       tmp_dir_placeholders=[],
       expect_startup_fail=False, disable_log_buffering=False, log_symlinks=False,
       workload_mgmt=False, force_restart=False, custom_core_site_dir=None,
-      admissiond_args=None, run_trino=False):
+      admissiond_args=None, run_trino=False, run_valkey=False,
+      valkey_container=None, valkey_port=None, valkey_password=None):
     """Records arguments to be passed to a cluster by adding them to the decorated
     method's func_dict"""
     args = dict()
@@ -231,6 +247,14 @@ class CustomClusterTestSuite(ImpalaTestSuite):
       args[ADMISSIOND_ARGS] = admissiond_args
     if run_trino:
       args[RUN_TRINO] = True
+    if run_valkey:
+      args[RUN_VALKEY] = True
+    if valkey_container is not None:
+      args[VALKEY_CONTAINER] = valkey_container
+    if valkey_port is not None:
+      args[VALKEY_PORT] = valkey_port
+    if valkey_password is not None:
+      args[VALKEY_PASSWORD] = valkey_password
 
     def merge_args(args_first, args_last):
       result = args_first.copy()
@@ -320,6 +344,35 @@ class CustomClusterTestSuite(ImpalaTestSuite):
     cls.trino = None
 
   @classmethod
+  def _start_valkey(cls, args):
+    """Start (or attach to) the Valkey Docker container used by the distributed HBO
+    cache tests. start() is idempotent (an already-running container is left as-is).
+    ValkeyUnavailable is allowed to propagate so an unavailable Valkey/Docker fails the
+    test rather than skipping silently; gate the test with the appropriate SkipIf
+    decorator instead. Keys are flushed so each class starts from an empty cache.
+    A test may override the container name/port/password (e.g. to run a
+    password-protected instance beside the default one) via the valkey_* with_args."""
+    kwargs = {}
+    if args.get(VALKEY_CONTAINER) is not None:
+      kwargs['container'] = args[VALKEY_CONTAINER]
+    if args.get(VALKEY_PORT) is not None:
+      kwargs['port'] = args[VALKEY_PORT]
+    if args.get(VALKEY_PASSWORD) is not None:
+      kwargs['password'] = args[VALKEY_PASSWORD]
+    cls.valkey = ValkeyCluster(**kwargs)
+    cls.valkey.start()
+    cls.valkey.flush_all()
+
+  @classmethod
+  def _stop_valkey(cls):
+    """Stop the Valkey container iff this class started it, so we do not disturb a
+    container a developer already had running."""
+    valkey = getattr(cls, 'valkey', None)
+    if valkey is not None and valkey.started_by_us:
+      valkey.stop()
+    cls.valkey = None
+
+  @classmethod
   def cluster_setup(cls, args):
     # Optionally bring up Trino before the (heavier) Impala cluster so that a
     # Trino/Docker problem surfaces quickly. If anything below fails after Trino
@@ -327,11 +380,17 @@ class CustomClusterTestSuite(ImpalaTestSuite):
     # setup raises, so this is the only place that can avoid leaking the container.
     if args.get(RUN_TRINO, False):
       cls._start_trino()
+    # Bring up Valkey before the Impala cluster so coordinators can reach the distributed
+    # HBO cache as soon as they start serving queries.
+    if args.get(RUN_VALKEY, False):
+      cls._start_valkey(args)
     try:
       cls._impala_cluster_setup(args)
     except Exception:
       if args.get(RUN_TRINO, False):
         cls._stop_trino()
+      if args.get(RUN_VALKEY, False):
+        cls._stop_valkey()
       raise
 
   @classmethod
@@ -473,10 +532,12 @@ class CustomClusterTestSuite(ImpalaTestSuite):
     try:
       cls._impala_cluster_teardown(name, args)
     finally:
-      # Always stop Trino (if this class started it) even if the Impala teardown
-      # above raised, so the container is not leaked.
+      # Always stop Trino/Valkey (if this class started them) even if the Impala
+      # teardown above raised, so the containers are not leaked.
       if args.get(RUN_TRINO, False):
         cls._stop_trino()
+      if args.get(RUN_VALKEY, False):
+        cls._stop_valkey()
 
   @classmethod
   def _impala_cluster_teardown(cls, name, args):

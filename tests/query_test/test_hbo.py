@@ -23,17 +23,15 @@ import uuid
 import pytest
 
 from tests.common.environ import IS_CALCITE_PLANNER
+from tests.common.hbo_test_util import HboTestMixin, QUERY_OPTIONS
 from tests.common.impala_test_suite import ImpalaTestSuite
 from tests.common.test_dimensions import (
     create_parquet_dimension,
     create_single_exec_option_dimension,
 )
-from tests.util.test_file_parser import remove_comments
-
-QUERY_OPTIONS = {'use_hbo_stats': True, 'store_hbo_stats': True}
 
 
-class TestHBO(ImpalaTestSuite):
+class TestHBO(HboTestMixin, ImpalaTestSuite):
   """Tests for HBO (History-Based Optimization) cardinality tracking."""
 
   @classmethod
@@ -45,54 +43,6 @@ class TestHBO(ImpalaTestSuite):
     cls.ImpalaTestMatrix.add_constraint(
         lambda v: v.get_value('table_format').file_format == 'parquet'
         and v.get_value('table_format').compression_codec == 'none')
-
-  def _run_hbo_explains(self, test_file):
-    """Run EXPLAIN queries from a golden .test file and verify their output against
-    the plan sections. A test case may define any of PLAN, DISTRIBUTEDPLAN,
-    CALCITE_PLANNER_PLAN and CALCITE_PLANNER_DISTRIBUTED_PLAN. Each present section is
-    verified independently (only the cardinality lines are compared):
-      - PLAN / CALCITE_PLANNER_PLAN: verified at the default explain level.
-      - DISTRIBUTEDPLAN / CALCITE_PLANNER_DISTRIBUTED_PLAN: verified at EXTENDED
-        (explain_level=2) so exchange cardinalities (e.g. MERGING-EXCHANGE) are shown.
-    When IS_CALCITE_PLANNER is set, the CALCITE_PLANNER_* section overrides its
-    counterpart when present; otherwise the non-Calcite section is used."""
-    # Wait for 1 second to ensure the stats are written to the cache.
-    time.sleep(1)
-    test_cases = self.load_query_test_file(
-        'functional-query', test_file,
-        valid_section_names=['QUERY', 'PLAN', 'DISTRIBUTEDPLAN',
-            'CALCITE_PLANNER_PLAN', 'CALCITE_PLANNER_DISTRIBUTED_PLAN'])
-    plan_variants = [
-        ('PLAN', 'CALCITE_PLANNER_PLAN', {'use_hbo_stats': True}),
-        ('DISTRIBUTEDPLAN', 'CALCITE_PLANNER_DISTRIBUTED_PLAN',
-         {'use_hbo_stats': True, 'explain_level': 2}),
-    ]
-    for section in test_cases:
-      query = remove_comments(section['QUERY'].strip())
-      verified_any = False
-      for default_name, calcite_name, config in plan_variants:
-        if IS_CALCITE_PLANNER and calcite_name in section:
-          plan_section_name = calcite_name
-        elif default_name in section:
-          plan_section_name = default_name
-        else:
-          continue
-        verified_any = True
-        self.client.set_configuration(config)
-        result = self.execute_query(query)
-        actual_plan_lines = result.data[result.data.index('PLAN-ROOT SINK'):]
-        expected_plan_lines = section[plan_section_name].splitlines()
-        # To avoid the test being fragile, we only compare the cardinality lines.
-        actual_cardinality_lines = [line for line in actual_plan_lines
-                                    if 'cardinality' in line]
-        expected_cardinality_lines = [line for line in expected_plan_lines
-                                      if 'cardinality' in line]
-        assert actual_cardinality_lines == expected_cardinality_lines, (
-            "EXPLAIN output mismatch for {0} ({1}).\nExpected:\n{2}\n\n"
-            "Actual:\n{3}".format(test_file, plan_section_name,
-                section[plan_section_name], '\n'.join(actual_plan_lines)))
-      assert verified_any, \
-          "No plan section found for query in {0}:\n{1}".format(test_file, query)
 
   def test_single_scan_cardinality_partitioned_with_stats(self):
     self.client.set_configuration(QUERY_OPTIONS)

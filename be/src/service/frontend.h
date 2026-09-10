@@ -280,8 +280,9 @@ class Frontend {
 
   Status StoreExecStats(const THistoricalStatsUpdate& stats);
 
-  /// Clears the HBO stats cache held by this coordinator's frontend.
-  Status ClearHboStats();
+  /// Clears the HBO stats cache used by this coordinator's frontend. On success
+  /// 'error_msg' is set to the empty string.
+  Status ClearHboStats(std::string* error_msg);
 
  private:
   jclass fe_class_; // org.apache.impala.service.JniFrontend class

@@ -33,6 +33,8 @@ import org.slf4j.LoggerFactory;
 
 import com.google.common.base.Preconditions;
 
+import javax.annotation.Nonnull;
+
 public class HistoricalStats {
   private final static Logger LOG = LoggerFactory.getLogger(HistoricalStats.class);
   public static HistoricalStats INSTANCE = new HistoricalStats();
@@ -59,21 +61,15 @@ public class HistoricalStats {
   private final int maxRunsPerKey_;
 
   private HistoricalStats() {
-    int concurrencyLevel;
-    long cacheSizeBytes;
     if (BackendConfig.INSTANCE != null) {
-      concurrencyLevel = BackendConfig.INSTANCE.getUnregistrationThreadPoolSize();
-      cacheSizeBytes = BackendConfig.INSTANCE.getHboInMemoryBackendCacheSizeBytes();
       similarityThreshold_ = BackendConfig.INSTANCE.getHboSimilarityThreshold();
       maxRunsPerKey_ = BackendConfig.INSTANCE.getHboMaxRunsPerKey();
     } else {
       // BackendConfig.INSTANCE could be null in tests.
-      concurrencyLevel = 4;
-      cacheSizeBytes = 1024L * 1024 * 1024;
       similarityThreshold_ = 0.1;
       maxRunsPerKey_ = 100;
     }
-    cacheBackend_ = new InMemoryCacheBackend(concurrencyLevel, cacheSizeBytes);
+    cacheBackend_ = CacheBackendFactory.create();
   }
 
   private boolean exceedsThreshold(long curr, long hist) {
@@ -256,11 +252,14 @@ public class HistoricalStats {
    * Since {@link #writePlanNodeStats(TPlanNodeRunWithKeys)} modifies cache entries
    * without holding any locks, a query unregistering concurrently can store a run
    * after this method returns. This race should be handled in the writer implementation.
+   *
+   * @return the error message if the backend failed to clear. Empty if the cache was
+   * cleared successfully
    */
-  public void clearCache() {
+  public @Nonnull String clearCache() {
     LOG.info("Clearing HBO stats cache. Stats before clearing: {}",
         cacheBackend_.getStats());
-    cacheBackend_.clear();
+    return cacheBackend_.clear();
   }
 
   public String getCacheStats() {

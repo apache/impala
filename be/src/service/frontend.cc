@@ -172,7 +172,7 @@ Frontend::Frontend() {
     {"cancelExecRequest", "([B)V", &cancel_exec_request_id_},
     {"getNonOdbcKeywords", "([B)Ljava/lang/String;", &get_non_odbc_keywords_id_},
     {"storeExecStats", "([B)V", &store_exec_stats_},
-    {"clearHboStats", "()V", &clear_hbo_stats_}
+    {"clearHboStats", "()Ljava/lang/String;", &clear_hbo_stats_}
   };
 
   JniMethodDescriptor staticMethods[] = {
@@ -511,6 +511,6 @@ Status Frontend::StoreExecStats(const THistoricalStatsUpdate& stats) {
   return JniUtil::CallJniMethod(fe_, store_exec_stats_, stats);
 }
 
-Status Frontend::ClearHboStats() {
-  return JniUtil::CallJniMethod(fe_, clear_hbo_stats_);
+Status Frontend::ClearHboStats(string* error_msg) {
+  return JniUtil::CallJniMethod(fe_, clear_hbo_stats_, error_msg);
 }

@@ -32,6 +32,11 @@ enum TGeospatialLibrary{
   WKB_EXPERIMENTAL
 }
 
+enum THboBackendType {
+  IN_MEMORY,
+  REDIS
+}
+
 // Used to pass gflags from backend to frontend, JniCatalog and JniFrontend
 // Attributes without comments correspond to gflags
 struct TBackendGflags {
@@ -388,4 +393,20 @@ struct TBackendGflags {
   179: required string webserver_saml2_idp_metadata
 
   180: required string webserver_saml2_sp_callback_url
+
+  181: required THboBackendType hbo_cache_backend = THboBackendType.IN_MEMORY
+
+  182: required string hbo_cache_redis_host
+
+  183: required i32 hbo_cache_redis_port
+
+  184: required string hbo_cache_redis_password
+
+  185: required i32 hbo_cache_redis_timeout_ms
+
+  186: required i32 hbo_cache_redis_db
+
+  187: required i32 hbo_cache_redis_max_connections
+
+  188: required i32 hbo_cache_redis_ttl_seconds
 }

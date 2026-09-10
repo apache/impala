@@ -41,21 +41,17 @@ public class HistoricalStatsValue<T> implements Serializable {
     this.runs.add(initialRun);
   }
 
+  /**
+   * Create a historical stats value from an existing list of runs. Used when
+   * reconstructing the value from a serialized form. The runs are copied so later
+   * mutations of the argument do not affect this value.
+   */
+  public HistoricalStatsValue(List<T> runs) {
+    this.runs = new LinkedList<>(runs);
+  }
+
   public List<T> getRuns() {
     return runs;
-  }
-
-  public void addRun(T run) {
-    runs.add(run);
-  }
-
-  /**
-   * Remove the oldest historical run (first element).
-   */
-  public void removeOldestRun() {
-    if (!runs.isEmpty()) {
-      runs.remove(0);
-    }
   }
 
   public int size() {

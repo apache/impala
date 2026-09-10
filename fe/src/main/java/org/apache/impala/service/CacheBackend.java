@@ -19,6 +19,8 @@ package org.apache.impala.service;
 
 import org.apache.impala.thrift.THboStatsType;
 
+import javax.annotation.Nonnull;
+
 /**
  * Interface for cache storage backends used by HistoryStats.
  * Implementations can provide different storage mechanisms such as
@@ -44,8 +46,10 @@ public interface CacheBackend {
   /**
    * Discard every entry in the cache. Used to drop stats that no longer describe the
    * data, and by tests that need a known-empty cache before storing new runs.
+   * @return the error message if the entries could not be discarded. Empty if succeeds.
    */
-  void clear();
+  @Nonnull
+  String clear();
 
   /**
    * Get statistics about the cache (for monitoring/debugging).

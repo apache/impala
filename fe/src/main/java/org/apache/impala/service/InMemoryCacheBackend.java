@@ -27,6 +27,8 @@ import org.apache.impala.thrift.THboStatsType;
 import org.apache.impala.thrift.TPlanNodeRun;
 import org.apache.impala.thrift.TScanInputStats;
 
+import javax.annotation.Nonnull;
+
 /**
  * In-memory cache backend implementation using Guava Cache.
  * This is the default cache backend that stores data in local memory.
@@ -118,8 +120,9 @@ public class InMemoryCacheBackend implements CacheBackend {
   }
 
   @Override
-  public void clear() {
+  public @Nonnull String clear() {
     cache_.invalidateAll();
+    return "";
   }
 
   @Override

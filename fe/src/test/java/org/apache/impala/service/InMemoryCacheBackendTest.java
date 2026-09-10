@@ -34,7 +34,7 @@ public class InMemoryCacheBackendTest {
     assertEquals("value1", cache.getIfPresent(THboStatsType.CARDINALITY, "key1"));
     assertEquals("value2", cache.getIfPresent(THboStatsType.CARDINALITY, "key2"));
 
-    cache.clear();
+    assertEquals("In-memory clear never fails", "", cache.clear());
 
     assertNull(cache.getIfPresent(THboStatsType.CARDINALITY, "key1"));
     assertNull(cache.getIfPresent(THboStatsType.CARDINALITY, "key2"));
@@ -43,7 +43,7 @@ public class InMemoryCacheBackendTest {
   @Test
   public void testClearOnEmptyCache() {
     InMemoryCacheBackend cache = new InMemoryCacheBackend(1, CACHE_SIZE_BYTES);
-    cache.clear();
+    assertEquals("In-memory clear never fails", "", cache.clear());
     assertNull(cache.getIfPresent(THboStatsType.CARDINALITY, "key1"));
 
     // The cache stays usable afterwards.

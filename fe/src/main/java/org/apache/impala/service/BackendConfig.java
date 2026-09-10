@@ -28,6 +28,7 @@ import org.apache.hadoop.security.authentication.util.KerberosName;
 import org.apache.impala.analysis.SqlScanner;
 import org.apache.impala.thrift.TBackendGflags;
 import org.apache.impala.thrift.TGeospatialLibrary;
+import org.apache.impala.thrift.THboBackendType;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
@@ -637,6 +638,38 @@ public class BackendConfig {
 
   public long getHboInMemoryBackendCacheSizeBytes() {
     return backendCfg_.hbo_in_memory_backend_cache_size_bytes;
+  }
+
+  public THboBackendType getHboCacheBackend() {
+    return backendCfg_.hbo_cache_backend;
+  }
+
+  public String getHboCacheRedisHost() {
+    return backendCfg_.hbo_cache_redis_host;
+  }
+
+  public int getHboCacheRedisPort() {
+    return backendCfg_.hbo_cache_redis_port;
+  }
+
+  public String getHboCacheRedisPassword() {
+    return backendCfg_.hbo_cache_redis_password;
+  }
+
+  public int getHboCacheRedisTimeoutMs() {
+    return backendCfg_.hbo_cache_redis_timeout_ms;
+  }
+
+  public int getHboCacheRedisDb() {
+    return backendCfg_.hbo_cache_redis_db;
+  }
+
+  public int getHboCacheRedisMaxConnections() {
+    return backendCfg_.hbo_cache_redis_max_connections;
+  }
+
+  public int getHboCacheRedisTtlSeconds() {
+    return backendCfg_.hbo_cache_redis_ttl_seconds;
   }
 
   public int getUnregistrationThreadPoolSize() {

@@ -122,6 +122,7 @@ import org.apache.thrift.protocol.TBinaryProtocol;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import javax.annotation.Nonnull;
 import java.io.File;
 import java.io.IOException;
 import java.lang.IllegalArgumentException;
@@ -1041,9 +1042,12 @@ public class JniFrontend {
 
   /**
    * Drops every run stored in this coordinator's HBO cache.
+   * @return an empty string on success, or a human-readable error message if the cache
+   *     backend could not be cleared. Never null, since the value crosses the JNI
+   *     boundary into a C++ std::string.
    */
-  public void clearHboStats() {
-    HistoricalStats.INSTANCE.clearCache();
+  public @Nonnull String clearHboStats() {
+    return HistoricalStats.INSTANCE.clearCache();
   }
 
   /**
