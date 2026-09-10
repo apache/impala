@@ -99,11 +99,11 @@ using namespace apache::thrift::concurrency;
 // TSocket.cpp and TSSLSocket.cpp. Those functions may change between different versions
 // of Thrift.
 #define NEW_THRIFT_VERSION_MSG \
-  "Thrift 0.16.0 is expected. Please check Thrift error codes during Thrift upgrade."
+  "Thrift 0.24.0 is expected. Please check Thrift error codes during Thrift upgrade."
 static_assert(PACKAGE_VERSION[0] == '0', NEW_THRIFT_VERSION_MSG);
 static_assert(PACKAGE_VERSION[1] == '.', NEW_THRIFT_VERSION_MSG);
-static_assert(PACKAGE_VERSION[2] == '1', NEW_THRIFT_VERSION_MSG);
-static_assert(PACKAGE_VERSION[3] == '6', NEW_THRIFT_VERSION_MSG);
+static_assert(PACKAGE_VERSION[2] == '2', NEW_THRIFT_VERSION_MSG);
+static_assert(PACKAGE_VERSION[3] == '4', NEW_THRIFT_VERSION_MSG);
 static_assert(PACKAGE_VERSION[4] == '.', NEW_THRIFT_VERSION_MSG);
 static_assert(PACKAGE_VERSION[5] == '0', NEW_THRIFT_VERSION_MSG);
 static_assert(PACKAGE_VERSION[6] == '\0', NEW_THRIFT_VERSION_MSG);
@@ -133,6 +133,57 @@ std::shared_ptr<TProtocol> CreateDeserializeProtocol(
     return tproto_factory.getProtocol(move(mem));
   }
 }
+
+namespace {
+
+// Builds a version-flexible OpenSSL context allowing protocols >= 'min_version'.
+// By default (--ssl_minimum_version=tlsv1.2) similar to Thrift's SSLContext::SSLContext
+// with protocol==SSLTLS and allows tls 1.2/1.3/potential newer protocols in the future.
+// https://github.com/apache/thrift/blob/release/0.24.0/lib/cpp/src/thrift/transport/TSSLSocket.cpp#L182
+// Also disables TLS renegotiation (IMPALA-11195).
+// Uses newer functions than Thrift version as ancient OpenSSL versions are excluded.
+std::shared_ptr<SSLContext> createSslContext(SSLProtocol min_version) {
+  static_assert(OPENSSL_VERSION_NUMBER >= 0x10101000L,
+      "Impala requires OpenSSL >= 1.1.1");
+  SSL_CTX* ctx = SSL_CTX_new(TLS_method());
+  if (ctx == nullptr) {
+    throw TSSLException("SSL_CTX_new: " + kudu::security::GetOpenSSLErrors());
+  }
+  // TLS_method() negotiates a version-flexible connection. Pin the LOWER bound to
+  // 'min_version' and leave the upper bound open, so newer protocols (e.g. TLS 1.3) are
+  // still negotiated. A minimum of TLS 1.0 also excludes SSLv2/SSLv3, so no separate
+  // SSL_OP_NO_SSLv* is needed.
+  int min_proto_version;
+  switch (min_version) {
+    case TLSv1_0:
+      min_proto_version = TLS1_VERSION;
+      break;
+    case TLSv1_1:
+      min_proto_version = TLS1_1_VERSION;
+      break;
+    case TLSv1_2:
+      min_proto_version = TLS1_2_VERSION;
+      break;
+    default:
+      SSL_CTX_free(ctx);
+      throw TSSLException("SSLContext: unsupported SSL/TLS protocol");
+  }
+  if (SSL_CTX_set_min_proto_version(ctx, min_proto_version) != 1) {
+    const string errors = kudu::security::GetOpenSSLErrors();
+    SSL_CTX_free(ctx);
+    throw TSSLException("SSL_CTX_set_min_proto_version: " + errors);
+  }
+  // IMPALA-11195: disable TLS renegotiation. SSL_OP_NO_RENEGOTIATION exists since OpenSSL
+  // 1.1.0h.
+  SSL_CTX_set_options(ctx, SSL_OP_NO_RENEGOTIATION);
+  SSL_CTX_set_mode(ctx, SSL_MODE_AUTO_RETRY);
+  return std::make_shared<SSLContext>(ctx);
+}
+
+} // anonymous namespace
+
+ImpalaTlsSocketFactory::ImpalaTlsSocketFactory(SSLProtocol version)
+  : TSSLSocketFactory([version]() { return createSslContext(version); }) {}
 
 void ImpalaTlsSocketFactory::configureCiphers(const string& cipher_list,
     const string& tls_ciphersuites, bool disable_tls12) {
@@ -273,7 +324,7 @@ static void ThriftOutputFunction(const char* output) {
 }
 
 void InitThriftLogging() {
-  GlobalOutput.setOutputFunction(ThriftOutputFunction);
+  apache::thrift::TOutput::instance().setOutputFunction(ThriftOutputFunction);
 }
 
 Status WaitForLocalServer(const ThriftServer& server, int num_retries,

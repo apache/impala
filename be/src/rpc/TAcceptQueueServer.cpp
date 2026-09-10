@@ -94,30 +94,30 @@ class TAcceptQueueServer::Task : public Runnable {
           std::string(ttx.what()).find("MaxMessageSize") != std::string::npos;
       if (ttx.getType() != TTransportException::END_OF_FILE || hit_max_message_size) {
         string errStr = string("TAcceptQueueServer client died: ") + ttx.what();
-        GlobalOutput(errStr.c_str());
+        TOutput::instance()(errStr.c_str());
         if (hit_max_message_size) {
-          GlobalOutput("MaxMessageSize errors can be addressed by increasing "
+          TOutput::instance()("MaxMessageSize errors can be addressed by increasing "
               "thrift_rpc_max_message_size on the receiving nodes.");
         }
       }
     } catch (const std::exception& x) {
-      GlobalOutput.printf(
+      TOutput::instance().printf(
           "TAcceptQueueServer exception: %s: %s", typeid(x).name(), x.what());
     } catch (...) {
-      GlobalOutput("TAcceptQueueServer uncaught exception.");
+      TOutput::instance()("TAcceptQueueServer uncaught exception.");
     }
 
     try {
       input_->getTransport()->close();
     } catch (const TTransportException& ttx) {
       string errStr = string("TAcceptQueueServer input close failed: ") + ttx.what();
-      GlobalOutput(errStr.c_str());
+      TOutput::instance()(errStr.c_str());
     }
     try {
       output_->getTransport()->close();
     } catch (const TTransportException& ttx) {
       string errStr = string("TAcceptQueueServer output close failed: ") + ttx.what();
-      GlobalOutput(errStr.c_str());
+      TOutput::instance()(errStr.c_str());
     }
 
     // Delete the context after closing the transports in case they have references to it.
@@ -170,7 +170,7 @@ class TAcceptQueueServer::Task : public Runnable {
               static_cast<ThriftServer::ThriftServerEventProcessor*>(eventHandler);
           if (thriftServerHandler->IsIdleContext(connectionContext)) {
             const string& client = socket->getSocketInfo();
-            GlobalOutput.printf(
+            TOutput::instance().printf(
                "TAcceptQueueServer closing connection to idle client %s", client.c_str());
             bytes_pending = false;
             break;
@@ -223,7 +223,7 @@ void TAcceptQueueServer::CleanupAndClose(const string& error,
   if (client != nullptr) {
     client->close();
   }
-  GlobalOutput(error.c_str());
+  TOutput::instance()(error.c_str());
 }
 
 // New.
@@ -355,7 +355,7 @@ void TAcceptQueueServer::serve() {
   if (!status.ok()) {
     status.AddDetail("TAcceptQueueServer: thread pool could not start.");
     string errStr = status.GetDetail();
-    GlobalOutput(errStr.c_str());
+    TOutput::instance()(errStr.c_str());
     stop_ = true;
   }
 
@@ -378,7 +378,7 @@ void TAcceptQueueServer::serve() {
       // Note that we move() entry so it's owned by SetupConnection thread.
       if (!connection_setup_pool.Offer(std::move(entry))) {
         string errStr = string("TAcceptQueueServer: thread pool unexpectedly shut down.");
-        GlobalOutput(errStr.c_str());
+        TOutput::instance()(errStr.c_str());
         stop_ = true;
         break;
       }
@@ -387,16 +387,16 @@ void TAcceptQueueServer::serve() {
       if (!stop_ || ttx.getType() != TTransportException::INTERRUPTED) {
         string errStr =
             string("TAcceptQueueServer: TServerTransport died on accept: ") + ttx.what();
-        GlobalOutput(errStr.c_str());
+        TOutput::instance()(errStr.c_str());
       }
       continue;
     } catch (const TException& tx) {
       string errStr = string("TAcceptQueueServer: Caught TException: ") + tx.what();
-      GlobalOutput(errStr.c_str());
+      TOutput::instance()(errStr.c_str());
       continue;
     } catch (const string& s) {
       string errStr = "TAcceptQueueServer: Unknown exception: " + s;
-      GlobalOutput(errStr.c_str());
+      TOutput::instance()(errStr.c_str());
       break;
     }
   }
@@ -408,7 +408,7 @@ void TAcceptQueueServer::serve() {
       connection_setup_pool.Shutdown();
     } catch (TException& tx) {
       string errStr = string("TAcceptQueueServer: Exception shutting down: ") + tx.what();
-      GlobalOutput(errStr.c_str());
+      TOutput::instance()(errStr.c_str());
     }
     try {
       Synchronized s(tasksMonitor_);
@@ -418,7 +418,7 @@ void TAcceptQueueServer::serve() {
     } catch (const TException& tx) {
       string errStr =
           string("TAcceptQueueServer: Exception joining workers: ") + tx.what();
-      GlobalOutput(errStr.c_str());
+      TOutput::instance()(errStr.c_str());
     }
     stop_ = false;
   }

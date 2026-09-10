@@ -177,8 +177,7 @@ Status DeserializeThriftMsg(const uint8_t* buf, uint32_t* len, bool compact,
 
 class ImpalaTlsSocketFactory : public apache::thrift::transport::TSSLSocketFactory {
  public:
-  ImpalaTlsSocketFactory(apache::thrift::transport::SSLProtocol version)
-    : TSSLSocketFactory(version) {}
+  ImpalaTlsSocketFactory(apache::thrift::transport::SSLProtocol version);
 
   // 'cipher_list': TLS1.2 and below cipher list
   // 'tls_ciphersuites': TLS1.3 and above cipher suites

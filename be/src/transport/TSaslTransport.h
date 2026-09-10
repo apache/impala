@@ -24,6 +24,7 @@
 #include <string>
 
 #include <boost/shared_ptr.hpp>
+#include <boost/scoped_array.hpp>
 #include <boost/scoped_ptr.hpp>
 #include <thrift/transport/TTransport.h>
 #include <thrift/transport/TVirtualTransport.h>

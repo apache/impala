@@ -81,13 +81,13 @@ export USE_AVRO_CPP=${USE_AVRO_CPP:=false}
 # moving to a different build of the toolchain, e.g. when a version is bumped or a
 # compile option is changed. The build id can be found in the output of the toolchain
 # build jobs, it is constructed from the build number and toolchain git hash prefix.
-export IMPALA_TOOLCHAIN_BUILD_ID_AARCH64=199-30fcdeb21b
-export IMPALA_TOOLCHAIN_BUILD_ID_X86_64=672-30fcdeb21b
+export IMPALA_TOOLCHAIN_BUILD_ID_AARCH64=206-32269ea38b
+export IMPALA_TOOLCHAIN_BUILD_ID_X86_64=678-32269ea38b
 export IMPALA_TOOLCHAIN_REPO=\
 ${IMPALA_TOOLCHAIN_REPO:-https://github.com/cloudera/native-toolchain.git}
 export IMPALA_TOOLCHAIN_BRANCH=${IMPALA_TOOLCHAIN_BRANCH:-master}
 export IMPALA_TOOLCHAIN_COMMIT_HASH=\
-${IMPALA_TOOLCHAIN_COMMIT_HASH-30fcdeb21b0d73534a2e9d4c4328a9a7a3a3d52f}
+${IMPALA_TOOLCHAIN_COMMIT_HASH-32269ea38b19f85985dc2234cc941bbf3ae6609e}
 # Compare the build ref in build IDs by removing everything up-to-and-including the
 # first hyphen.
 if [ "${IMPALA_TOOLCHAIN_BUILD_ID_AARCH64#*-}" \
@@ -486,7 +486,7 @@ fi
 # respect this version). If upgrading IMPALA_THRIFT_PY_VERSION, also upgrade the
 # thrift version in shell/packaging/requirements.txt and
 # infra/python/deps/requirements.txt.
-export IMPALA_THRIFT_CPP_VERSION=0.16.0-p7
+export IMPALA_THRIFT_CPP_VERSION=0.24.0-p3
 unset IMPALA_THRIFT_CPP_URL
 if $USE_APACHE_HIVE_3 || $USE_APACHE_HIVE_2; then
   # Apache Hive 3 clients can't run on thrift versions >= 0.14 (IMPALA-11801)
@@ -1223,7 +1223,7 @@ if [[ "$IMPALA_MINIMAL_DEBUG_INFO" == "true" ||
 else
   MEM_PER_LINK=5
 fi
-BOUNDED_LINKS=$((AVAILABLE_MEM / MEM_PER_LINK))
+BOUNDED_LINKS=$(((AVAILABLE_MEM - 6) / MEM_PER_LINK)) # leave 6GB for maven
 if [[ $BOUNDED_LINKS -gt $IMPALA_BUILD_THREADS ]]; then
   # Avoid regressing behavior if IMPALA_BUILD_THREADS is already set to a low value.
   BOUNDED_LINKS=${IMPALA_BUILD_THREADS}

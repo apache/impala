@@ -17,6 +17,7 @@
 
 #include "gflag-validator-util.h"
 
+#include <cmath>
 #include <limits>
 
 #include "testutil/gtest-util.h"

@@ -50,7 +50,7 @@ constexpr void static_assert_size() {
   inline void static_assert_size_##type() { static_assert_size<type, expected>(); }
 
 // TUniqueId
-STATIC_ASSERT_SIZE(TUniqueId, 24);
+STATIC_ASSERT_SIZE(TUniqueId, 16);
 
 inline bool operator==(const TUniqueId& lhs, const TUniqueId& rhs) {
   return std::tie(lhs.hi, lhs.lo) == std::tie(rhs.hi, rhs.lo);
@@ -80,7 +80,7 @@ inline bool operator<(const UniqueIdPB& lhs, const UniqueIdPB& rhs) {
 }
 
 // TNetworkAddress
-STATIC_ASSERT_SIZE(TNetworkAddress, 88);
+STATIC_ASSERT_SIZE(TNetworkAddress, 80);
 
 inline bool operator==(const TNetworkAddress& lhs, const TNetworkAddress& rhs) {
   return std::tie(lhs.hostname, lhs.port) == std::tie(rhs.hostname, rhs.port);
@@ -102,16 +102,15 @@ inline bool operator!=(const NetworkAddressPB& lhs, const NetworkAddressPB& rhs)
 }
 
 // TStatus
-STATIC_ASSERT_SIZE(TStatus, 48);
+STATIC_ASSERT_SIZE(TStatus, 40);
 
 inline bool operator==(const TStatus& lhs, const TStatus& rhs) {
-  //static_assert_size<TStatus, 48>();
   return std::tie(lhs.status_code, lhs.error_msgs)
       == std::tie(rhs.status_code, rhs.error_msgs);
 }
 
 // TCounter
-STATIC_ASSERT_SIZE(TCounter, 56);
+STATIC_ASSERT_SIZE(TCounter, 48);
 
 inline bool operator==(const TCounter& lhs, const TCounter& rhs) {
   return std::tie(lhs.name, lhs.unit, lhs.value)
@@ -119,7 +118,7 @@ inline bool operator==(const TCounter& lhs, const TCounter& rhs) {
 }
 
 // THeavyMemoryQuery
-STATIC_ASSERT_SIZE(THeavyMemoryQuery, 40);
+STATIC_ASSERT_SIZE(THeavyMemoryQuery, 24);
 
 inline bool operator>(const THeavyMemoryQuery& lhs, const THeavyMemoryQuery& rhs) {
   return std::tie(lhs.memory_consumed, lhs.queryId)
