@@ -66,6 +66,9 @@ under the License.
     <!-- Beware compatibility requirements with Thrift and
          KMS; see IMPALA-4210. -->
     <httpcomponents.core.version>${env.IMPALA_HTTP_CORE_VERSION}</httpcomponents.core.version>
+    <!-- HttpComponents 5.x, distinct from the v4 httpcomponents.core.version above. -->
+    <httpclient5.version>${env.IMPALA_HTTPCLIENT5_VERSION}</httpclient5.version>
+    <httpcore5.version>${env.IMPALA_HTTPCORE5_VERSION}</httpcore5.version>
     <yarn-extras.version>${project.version}</yarn-extras.version>
     <eclipse.output.directory>eclipse-classes</eclipse.output.directory>
     <!-- hive-exec seems to leak this version of guava onto our classpath,
@@ -305,13 +308,31 @@ under the License.
         <version>${thrift.version}</version>
       </dependency>
 
-      <!-- Override httpcore from libthrift to a later maintenance version. Noticed
-          certain SPNEGO auth errors when connecting to kerberized HTTP endpoints
-          using v4.4.1 pulled by libthrift. -->
+      <!-- Override httpcore (v4), pulled by various dependencies, including pac4j, to a
+          later maintenance version. Noticed certain SPNEGO auth errors when connecting to
+          kerberized HTTP endpoints using older v4.4.x versions. -->
       <dependency>
         <groupId>org.apache.httpcomponents</groupId>
         <artifactId>httpcore</artifactId>
         <version>${httpcomponents.core.version}</version>
+      </dependency>
+
+      <!-- libthrift 0.24 pulls in httpclient5 5.2.1 / httpcore5 5.2, but the Iceberg
+          REST catalog client requires  httpclient5 >= 5.4. Pin to a newer version. -->
+      <dependency>
+        <groupId>org.apache.httpcomponents.client5</groupId>
+        <artifactId>httpclient5</artifactId>
+        <version>${httpclient5.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.httpcomponents.core5</groupId>
+        <artifactId>httpcore5</artifactId>
+        <version>${httpcore5.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.httpcomponents.core5</groupId>
+        <artifactId>httpcore5-h2</artifactId>
+        <version>${httpcore5.version}</version>
       </dependency>
 
       <dependency>
@@ -476,6 +497,12 @@ under the License.
           <exclusion>
             <groupId>org.bouncycastle</groupId>
             <artifactId>*</artifactId>
+          </exclusion>
+          <!-- Apache Hive 3.1.3's hive-exec is built against Hadoop 3.1.0 and drags in
+               hadoop-yarn-registry:3.1.0, which brings the banned jersey-server:1.19. -->
+          <exclusion>
+            <groupId>org.apache.hadoop</groupId>
+            <artifactId>hadoop-yarn-registry</artifactId>
           </exclusion>
         </exclusions>
       </dependency>

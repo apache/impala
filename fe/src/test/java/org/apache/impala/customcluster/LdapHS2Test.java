@@ -38,11 +38,12 @@ import org.apache.directory.server.annotations.CreateTransport;
 import org.apache.directory.server.core.annotations.ApplyLdifFiles;
 import org.apache.directory.server.core.integ.CreateLdapServerRule;
 import org.apache.hive.service.rpc.thrift.*;
-import org.apache.http.HttpResponse;
-import org.apache.http.HttpResponseInterceptor;
-import org.apache.http.impl.client.CloseableHttpClient;
-import org.apache.http.impl.client.HttpClients;
-import org.apache.http.protocol.HttpContext;
+import org.apache.hc.client5.http.impl.classic.CloseableHttpClient;
+import org.apache.hc.client5.http.impl.classic.HttpClients;
+import org.apache.hc.core5.http.EntityDetails;
+import org.apache.hc.core5.http.HttpResponse;
+import org.apache.hc.core5.http.HttpResponseInterceptor;
+import org.apache.hc.core5.http.protocol.HttpContext;
 import org.apache.impala.testutil.WebClient;
 import org.apache.thrift.transport.THttpClient;
 import org.apache.thrift.protocol.TBinaryProtocol;
@@ -1014,7 +1015,8 @@ public class LdapHS2Test {
     // so we can store a cookie from an anonymous function.
     final String[] cookie = new String[1];
     HttpResponseInterceptor cookieSaver = new HttpResponseInterceptor() {
-      @Override public void process(HttpResponse response, HttpContext context) {
+      @Override public void process(
+          HttpResponse response, EntityDetails entity, HttpContext context) {
         if (response.containsHeader("Set-Cookie")) {
           cookie[0] = response.getFirstHeader("Set-Cookie").getValue();
         } else {
@@ -1024,7 +1026,7 @@ public class LdapHS2Test {
     };
 
     try (CloseableHttpClient clientImpl =
-            HttpClients.custom().addInterceptorFirst(cookieSaver).build();
+            HttpClients.custom().addResponseInterceptorFirst(cookieSaver).build();
         THttpClient transport = new THttpClient("http://localhost:28000", clientImpl)) {
       Map<String, String> headers = new HashMap<String, String>();
       // Authenticate as 'Test1Ldap' with password '12345'
@@ -1091,6 +1093,10 @@ public class LdapHS2Test {
         throw new Exception("Expected failure due to changed cookie secret.");
       }
     }, 20, 100);
-    assertEquals("HTTP Response code: 401", respMessage);
+    // Thrift 0.24's THttpClient prefixes the message with the wrapped exception type
+    // (e.g. "java.io.IOException: HTTP Response code: 401"), so match the suffix rather
+    // than the whole string.
+    assertTrue("Unexpected message: " + respMessage,
+        respMessage.contains("HTTP Response code: 401"));
   }
 }

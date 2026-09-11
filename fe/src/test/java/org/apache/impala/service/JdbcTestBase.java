@@ -31,6 +31,8 @@ import org.apache.impala.analysis.Parser;
 import org.apache.impala.analysis.StatementBase;
 import org.apache.impala.testutil.ImpalaJdbcClient;
 import org.junit.After;
+import org.junit.Assume;
+import org.junit.Before;
 import org.junit.runners.Parameterized;
 import org.junit.runner.RunWith;
 
@@ -52,6 +54,20 @@ public abstract class JdbcTestBase {
   @Parameterized.Parameters
   public static String[] createConnections() {
     return new String[] {"binary", "http"};
+  }
+
+  // TODO(IMPALA-15384): The HTTP JDBC transport goes through the Hive JDBC driver, which
+  // was built against Thrift 0.16 and calls
+  // THttpClient(String, org.apache.http.client.HttpClient) (Apache HttpClient 4). Thrift
+  // 0.24 replaced that constructor with an HttpClient 5 signature, so every HTTP case
+  // fails with NoSuchMethodError. Skip the HTTP cases until IMPALA-15384 provides Hive
+  // dependencies built against Thrift 0.24; the binary transport is unaffected.
+  @Before
+  public void assumeTransportSupported() {
+    Assume.assumeFalse(
+        "HTTP JDBC transport needs the Hive JDBC driver built against Thrift 0.24; "
+            + "skipping until Hive dependencies are updated (IMPALA-15384).",
+        "http".equals(connectionType_));
   }
 
   /**
