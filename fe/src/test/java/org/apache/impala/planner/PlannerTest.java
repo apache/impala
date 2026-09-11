@@ -1576,6 +1576,15 @@ public class PlannerTest extends PlannerTestBase {
     runPlannerTestFile("optimize-simple-limit", options);
   }
 
+  @Test
+  public void testIcebergOptimizeSimpleLimit() {
+    TQueryOptions options = defaultQueryOptions();
+    options.setOptimize_simple_limit(true);
+    options.setTimezone("UTC");
+    runPlannerTestFile("iceberg-optimize-simple-limit", "functional_parquet", options,
+        ImmutableSet.of(PlannerTestOption.VALIDATE_ICEBERG_SNAPSHOT_IDS));
+  }
+
   /**
    * Test the distribution method for a join
    */

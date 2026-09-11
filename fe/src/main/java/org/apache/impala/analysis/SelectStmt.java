@@ -187,12 +187,12 @@ public class SelectStmt extends QueryStmt {
         return null;
       }
       if (hasLimit()) {
-        return new Pair<>(Boolean.valueOf(true), getLimit());
+        return new Pair<>(Boolean.TRUE, getLimit());
       } else {
         // even if this SELECT statement does not have a LIMIT, it is a
         // simple select which may be an inline view and eligible for a
         // limit pushdown from an outer block, so we return a non-null value
-        return new Pair<>(Boolean.valueOf(false), null);
+        return new Pair<>(Boolean.FALSE, null);
       }
     }
     return null;

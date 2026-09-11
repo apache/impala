@@ -18,7 +18,6 @@
 package org.apache.impala.planner;
 
 import com.google.common.base.Joiner;
-import static org.apache.impala.util.IcebergUtil.getFilePathHash;
 
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
@@ -34,6 +33,7 @@ import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.TreeSet;
 import java.util.function.Predicate;
@@ -275,6 +275,9 @@ public class IcebergScanPlanner {
   private PlanNode createIcebergScanPlanImpl() throws ImpalaException {
     // Check for nested fields as they are not supported for Iceberg default values
     checkForNestedDefaultValues();
+
+    Optional<PlanNode> simpleLimitNode = new SimpleLimitOptimizer().tryOptimize();
+    if (simpleLimitNode.isPresent()) return simpleLimitNode.get();
 
     boolean isPartitionKeyScan = IsPartitionKeyScan();
     if (noDeleteFiles()) {
@@ -1264,4 +1267,49 @@ public class IcebergScanPlanner {
     return true;
   }
 
+  private class SimpleLimitOptimizer {
+    Optional<PlanNode> tryOptimize() throws ImpalaException {
+      long limit = getSimpleLimitValue();
+      if (limit <= 0) return Optional.empty();
+      if (dataFilesWithoutDeletes_.isEmpty()) return Optional.empty();
+
+      List<IcebergFileDescriptor> candidates = limit > 1
+          ? dataFilesWithoutDeletes_.stream()
+                .sorted(Comparator.comparingLong(
+                    (IcebergFileDescriptor f) ->
+                        f.getFbFileMetadata().icebergMetadata().recordCount())
+                    .reversed())
+                .toList()
+          : dataFilesWithoutDeletes_;
+      long accumulatedRows = 0;
+      List<IcebergFileDescriptor> limitedFiles = new ArrayList<>();
+      for (IcebergFileDescriptor fd : candidates) {
+        limitedFiles.add(fd);
+        long recordCount = fd.getFbFileMetadata().icebergMetadata().recordCount();
+        accumulatedRows += (recordCount > 0) ? recordCount : 1;
+        if (accumulatedRows >= limit) break;
+      }
+
+      if (accumulatedRows < limit) return Optional.empty();
+
+      PlanNode ret = new IcebergScanNode(ctx_.getNextNodeId(), tblRef_, conjuncts_,
+          aggInfo_, limitedFiles,
+          getIceTable().getContentFileStore().getNumPartitions(),
+          nonIdentityConjuncts_,
+          getSkippedConjuncts(), snapshotId_, false,
+          Collections.emptyMap(), helper_);
+      ret.init(analyzer_);
+      return Optional.of(ret);
+    }
+
+    private long getSimpleLimitValue() {
+      if (!analyzer_.getQueryCtx().client_request.getQuery_options()
+          .isOptimize_simple_limit()) {
+        return -1;
+      }
+      Pair<Boolean, Long> simpleLimitStatus = analyzer_.getSimpleLimitStatus();
+      if (simpleLimitStatus == null || !simpleLimitStatus.first) return -1;
+      return simpleLimitStatus.second;
+    }
+  }
 }
