@@ -863,6 +863,8 @@ under the License.
                     <exclude>org.bouncycastle:bcprov-jdk15on:*</exclude>
                     <exclude>org.bouncycastle:bcprov-jdk15to18:*</exclude>
                     <exclude>org.bouncycastle:bcpkix-jdk15to18:*</exclude>
+                    <!-- Impala generates its own version from Thrift (IMPALA-15349). -->
+                    <exclude>org.apache.hive:hive-service-rpc</exclude>
                   </excludes>
                   <includes>
                     <!-- ranger-plugins-audit depends on jetty-client, which in turn pulls in jetty-http and jetty-io. -->
@@ -1092,6 +1094,13 @@ under the License.
               <groupId>org.apache.hive</groupId>
               <artifactId>hive-metastore</artifactId>
             </exclusion>
+            <!-- hive-service-rpc contains only the org.apache.hive.service.rpc.thrift
+               (HiveServer2 / TCLIService) classes; Impala now generates its own copy with
+               the Impala Thrift compiler (IMPALA-15349) -->
+            <exclusion>
+              <groupId>org.apache.hive</groupId>
+              <artifactId>hive-service-rpc</artifactId>
+            </exclusion>
             <exclusion>
               <groupId>org.apache.hive.shims</groupId>
               <artifactId>hive-shims-0.20</artifactId>
@@ -1220,6 +1229,13 @@ under the License.
               <groupId>log4j</groupId>
               <artifactId>log4j</artifactId>
             </exclusion>
+            <!-- hive-service-rpc contains only the org.apache.hive.service.rpc.thrift
+               (HiveServer2 / TCLIService) classes; Impala now generates its own copy with
+               the Impala Thrift compiler (IMPALA-15349) -->
+            <exclusion>
+              <groupId>org.apache.hive</groupId>
+              <artifactId>hive-service-rpc</artifactId>
+            </exclusion>
           </exclusions>
         </dependency>
 
@@ -1250,6 +1266,14 @@ under the License.
             <exclusion>
               <groupId>log4j</groupId>
               <artifactId>log4j</artifactId>
+            </exclusion>
+            <!-- hive-service-rpc contains only the org.apache.hive.service.rpc.thrift
+               (HiveServer2 / TCLIService) classes; Impala now generates its own copy with
+               the Impala Thrift compiler (IMPALA-15349). In Hive 2.3.x hive-serde has an
+               (otherwise unused) dependency on hive-service-rpc. -->
+            <exclusion>
+              <groupId>org.apache.hive</groupId>
+              <artifactId>hive-service-rpc</artifactId>
             </exclusion>
           </exclusions>
         </dependency>
@@ -1336,6 +1360,13 @@ under the License.
             <exclusion>
               <groupId>log4j</groupId>
               <artifactId>log4j</artifactId>
+            </exclusion>
+            <!-- hive-service-rpc contains only the org.apache.hive.service.rpc.thrift
+               (HiveServer2 / TCLIService) classes; Impala now generates its own copy with
+               the Impala Thrift compiler (IMPALA-15349) -->
+            <exclusion>
+              <groupId>org.apache.hive</groupId>
+              <artifactId>hive-service-rpc</artifactId>
             </exclusion>
           </exclusions>
         </dependency>

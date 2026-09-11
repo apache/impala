@@ -59,9 +59,8 @@ function(THRIFT_GEN VAR)
       set(CPP_ARGS -r ${CPP_ARGS})
     ENDIF(THRIFT_FILE STREQUAL "beeswax.thrift")
 
-    IF (THRIFT_FILE STREQUAL ${TCLI_SERVICE_THRIFT} OR THRIFT_FILE STREQUAL "parquet.thrift")
-      # Do not generate Java HiveServer2 and Parquet files because we should use the jar
-      # from Hive or Parquet.
+    IF (THRIFT_FILE STREQUAL "parquet.thrift")
+      # Do not generate Java Parquet files because we should use the jar from Parquet.
       add_custom_command(
         OUTPUT ${OUTPUT_BE_FILE}
         COMMAND ${THRIFT_QUIET_WRAPPER} ${THRIFT_CPP_COMPILER} ${CPP_ARGS} ${THRIFT_FILE}
@@ -93,7 +92,26 @@ function(THRIFT_GEN VAR)
         COMMENT "Running thrift compiler on ${THRIFT_FILE}"
         VERBATIM
       )
-    ELSE (THRIFT_FILE STREQUAL ${TCLI_SERVICE_THRIFT} OR THRIFT_FILE STREQUAL "parquet.thrift")
+    ELSEIF (THRIFT_FILE STREQUAL ${TCLI_SERVICE_THRIFT})
+      # Generate the HiveServer2 (TCLIService) Java with the "beans" flag. This makes
+      # the generated setters return void and the members private, which exactly matches
+      # the ABI of the TCLIService classes that Hive compiles into its own jars.
+      add_custom_command(
+        OUTPUT ${OUTPUT_BE_FILE}
+        COMMAND ${THRIFT_QUIET_WRAPPER} ${THRIFT_CPP_COMPILER} ${CPP_ARGS} ${THRIFT_FILE}
+        COMMAND mkdir -p ${FE_OUTPUT_DIR}/gen-java
+        COMMAND ${THRIFT_QUIET_WRAPPER} ${THRIFT_JAVA_COMPILER}
+            ${THRIFT_JAVA_INCLUDE_DIR_OPTION} --gen java:beans
+            -out ${FE_OUTPUT_DIR}/gen-java ${THRIFT_FILE}
+        COMMAND ${THRIFT_QUIET_WRAPPER} ${THRIFT_PY_COMPILER} ${PYTHON_ARGS} ${THRIFT_FILE}
+        # Ugly hack: Thrift incorrectly generates an unnecessary __init__.py at the top
+        # level. Remove it until we can patch Thrift to avoid generating this.
+        COMMAND rm -f ${PYTHON_OUTPUT_DIR}/__init__.py
+        DEPENDS ${ABS_THRIFT_FILE}
+        COMMENT "Running thrift compiler on ${THRIFT_FILE}"
+        VERBATIM
+      )
+    ELSE()
       add_custom_command(
         OUTPUT ${OUTPUT_BE_FILE}
         COMMAND ${THRIFT_QUIET_WRAPPER} ${THRIFT_CPP_COMPILER} ${CPP_ARGS} ${THRIFT_FILE}
@@ -106,7 +124,7 @@ function(THRIFT_GEN VAR)
         COMMENT "Running thrift compiler on ${THRIFT_FILE}"
         VERBATIM
     )
-    ENDIF (THRIFT_FILE STREQUAL ${TCLI_SERVICE_THRIFT} OR THRIFT_FILE STREQUAL "parquet.thrift")
+    ENDIF()
   endforeach(THRIFT_FILE)
 
   set(${VAR} ${${VAR}} PARENT_SCOPE)
