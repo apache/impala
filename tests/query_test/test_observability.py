@@ -19,6 +19,7 @@ from collections import defaultdict
 from datetime import datetime
 import re
 from time import sleep, time
+import uuid
 
 import pytest
 
@@ -517,6 +518,34 @@ class TestObservability(ImpalaTestSuite):
     query = "select * from functional.alltypes"
     runtime_profile = self.execute_query(query).runtime_profile
     verify_profile_event_sequence(event_regexes, runtime_profile)
+
+  def test_query_profile_contains_hbo_stats_counters(self):
+    """Verify the Frontend profile exposes the HBO counters."""
+    # A literal unique to this run keeps the populate/read pair from colliding with HBO
+    # stats left by other tests (or an earlier run).
+    marker = 'hbo_counters_' + uuid.uuid4().hex[:8]
+    query = ("select count(*) from functional.alltypes "
+             "where year = 2009 and int_col = 1 and string_col = '%s'" % marker)
+    self.client.set_configuration({'use_hbo_stats': True, 'store_hbo_stats': True})
+    # Run the query twice. First run misses all HBO stats. Second run reads the
+    # populated stats.
+    for i in range(2):
+      profile = self.execute_query(query).runtime_profile
+      for counter in ('HBOStats.TotalTime', 'HBOStats.ReadTime', 'HBOStats.ReadCount',
+                      'HBOStats.HitCount'):
+        assert counter in profile, \
+            "Missing HBO counter {0} in profile:\n{1}".format(counter, profile)
+      # ReadCount and HitCount use TUnit.NONE, which renders as a plain integer.
+      read_count = int(re.search(r'HBOStats\.ReadCount: (\d+)', profile).group(1))
+      hit_count = int(re.search(r'HBOStats\.HitCount: (\d+)', profile).group(1))
+      # Hits are a subset of reads.
+      assert read_count >= hit_count, profile
+      if i > 0:
+        # The second run hits the keys the first run populated.
+        assert hit_count >= 1, profile
+      else:
+        # Wait for 1 second to ensure the stats are written to the cache.
+        sleep(1)
 
   def test_query_profile_contains_query_compilation_metadata_load_events(self,
         cluster_properties, unique_database):

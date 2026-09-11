@@ -27,6 +27,7 @@ import org.apache.impala.thrift.THistoricalStatsUpdate;
 import org.apache.impala.thrift.TPlanNodeRun;
 import org.apache.impala.thrift.TPlanNodeRunWithKeys;
 import org.apache.impala.thrift.TScanInputStats;
+import org.apache.impala.thrift.TUnit;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -35,6 +36,19 @@ import com.google.common.base.Preconditions;
 public class HistoricalStats {
   private final static Logger LOG = LoggerFactory.getLogger(HistoricalStats.class);
   public static HistoricalStats INSTANCE = new HistoricalStats();
+
+  // Frontend profile counter names for HBO stats lookups during planning. Emitted under
+  // the query profile's "Frontend" node.
+  public static final String HBO_STATS_PREFIX = "HBOStats";
+  // Total time in PlanNode.tryUpdateCardinalityFromHbo() including hash-key generation
+  // and reading stats.
+  public static final String HBO_STATS_TOTAL_TIME = HBO_STATS_PREFIX + ".TotalTime";
+  // Time spent reading stats from the cache backend (subset of TotalTime).
+  public static final String HBO_STATS_READ_TIME = HBO_STATS_PREFIX + ".ReadTime";
+  // Number of cache-backend lookups performed.
+  public static final String HBO_STATS_READ_COUNT = HBO_STATS_PREFIX + ".ReadCount";
+  // Number of those reads that found the key in the cache (subset of ReadCount).
+  public static final String HBO_STATS_HIT_COUNT = HBO_STATS_PREFIX + ".HitCount";
 
   /** A matched HBO cardinality and the lookup provenance used to select it. */
   public record PlanNodeStatsMatch(
@@ -144,8 +158,7 @@ public class HistoricalStats {
       String hashKey = entry.getValue();
       @SuppressWarnings("unchecked")
       HistoricalStatsValue<TPlanNodeRun> statsValue =
-          (HistoricalStatsValue<TPlanNodeRun>) cacheBackend_.getIfPresent(
-              statsType, hashKey);
+          (HistoricalStatsValue<TPlanNodeRun>) getIfPresentTimed(statsType, hashKey);
       if (statsValue == null) {
         cacheBackend_.put(statsType, hashKey, new HistoricalStatsValue<>(currRun));
       } else {
@@ -168,6 +181,29 @@ public class HistoricalStats {
   }
 
   /**
+   * Reads one entry from the cache backend, recording read latency and hit/miss into the
+   * current frontend profile (if any).
+   */
+  private Object getIfPresentTimed(THboStatsType statsType, String hashKey) {
+    long startNs = System.nanoTime();
+    Object value = null;
+    try {
+      value = cacheBackend_.getIfPresent(statsType, hashKey);
+      return value;
+    } finally {
+      FrontendProfile profile = FrontendProfile.getCurrentOrNull();
+      if (profile != null) {
+        profile.addToCounter(
+            HBO_STATS_READ_TIME, TUnit.TIME_NS, System.nanoTime() - startNs);
+        profile.addToCounter(HBO_STATS_READ_COUNT, TUnit.NONE, 1);
+        // Always emit HitCount (0 on a miss) so the counter is present even when no read
+        // hits the cache.
+        profile.addToCounter(HBO_STATS_HIT_COUNT, TUnit.NONE, value != null ? 1 : 0);
+      }
+    }
+  }
+
+  /**
    * Retrieves a matching historical run, trying multiple hash keys in order from most
    * accurate to most aggressive canonicalization strategy. Returns the first match found
    * together with the strategy and hash key that selected it, or null if no match
@@ -186,7 +222,7 @@ public class HistoricalStats {
       if (hashKey == null) continue;
       @SuppressWarnings("unchecked")
       HistoricalStatsValue<TPlanNodeRun> statsValue =
-          (HistoricalStatsValue<TPlanNodeRun>) cacheBackend_.getIfPresent(
+          (HistoricalStatsValue<TPlanNodeRun>) getIfPresentTimed(
               THboStatsType.CARDINALITY, hashKey);
       if (statsValue != null) {
         List<TPlanNodeRun> runs = statsValue.getRuns();

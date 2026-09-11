@@ -54,6 +54,7 @@ import org.apache.impala.planner.RuntimeFilterGenerator.RuntimeFilter;
 import org.apache.impala.planner.TupleCacheInfo.IneligibilityReason;
 import org.apache.impala.planner.TupleCacheInfo.HashTraceElement;
 import org.apache.impala.service.BackendConfig;
+import org.apache.impala.service.FrontendProfile;
 import org.apache.impala.service.HistoricalStats;
 import org.apache.impala.service.HistoricalStats.PlanNodeStatsMatch;
 import org.apache.impala.thrift.TExecNodePhase;
@@ -69,6 +70,7 @@ import org.apache.impala.thrift.TQueryOptions;
 import org.apache.impala.thrift.TSortingOrder;
 import org.apache.impala.thrift.TQueryOptionsHash;
 import org.apache.impala.thrift.TScanInputStats;
+import org.apache.impala.thrift.TUnit;
 import org.apache.impala.util.BitUtil;
 import org.apache.impala.util.ExprUtil;
 import org.apache.impala.util.MathUtil;
@@ -1210,19 +1212,29 @@ abstract public class PlanNode extends TreeNode<PlanNode> {
     hboMatch_ = null;
     cardinalityBeforeHbo_ = -1;
     if (!analyzer.getQueryOptions().use_hbo_stats) return;
-    Map<CanonicalizationStrategy, String> hashKeys =
-        generateHboHashStrings(THboStatsType.CARDINALITY);
-    if (hashKeys.isEmpty()) return;
-    TPlanNodeRun currRun = new TPlanNodeRun();
-    appendScanInputStats(currRun);
-    PlanNodeStatsMatch hboMatch = HistoricalStats.INSTANCE.getPlanNodeStats(
-        hashKeys, getDisplayLabel(), currRun);
-    if (hboMatch != null) {
-      hboMatch_ = hboMatch;
-      cardinalityBeforeHbo_ = cardinality_;
-      cardinality_ = capCardinalityAtLimit(hboMatch.numRows());
-    } else {
-      LOG.debug("No HBO stats for {}. Keys: {}", getDisplayLabel(), hashKeys);
+    // Time the whole lookup, including hash-key generation.
+    long startNs = System.nanoTime();
+    try {
+      Map<CanonicalizationStrategy, String> hashKeys =
+          generateHboHashStrings(THboStatsType.CARDINALITY);
+      if (hashKeys.isEmpty()) return;
+      TPlanNodeRun currRun = new TPlanNodeRun();
+      appendScanInputStats(currRun);
+      PlanNodeStatsMatch hboMatch = HistoricalStats.INSTANCE.getPlanNodeStats(
+          hashKeys, getDisplayLabel(), currRun);
+      if (hboMatch != null) {
+        hboMatch_ = hboMatch;
+        cardinalityBeforeHbo_ = cardinality_;
+        cardinality_ = capCardinalityAtLimit(hboMatch.numRows());
+      } else {
+        LOG.debug("No HBO stats for {}. Keys: {}", getDisplayLabel(), hashKeys);
+      }
+    } finally {
+      FrontendProfile profile = FrontendProfile.getCurrentOrNull();
+      if (profile != null) {
+        profile.addToCounter(HistoricalStats.HBO_STATS_TOTAL_TIME, TUnit.TIME_NS,
+            System.nanoTime() - startNs);
+      }
     }
   }
 
