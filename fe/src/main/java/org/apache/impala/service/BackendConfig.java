@@ -23,6 +23,7 @@ import static org.apache.hadoop.fs.CommonConfigurationKeysPublic
 import java.util.Scanner;
 
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.security.authentication.util.KerberosName;
 import org.apache.impala.analysis.SqlScanner;
 import org.apache.impala.thrift.TBackendGflags;
@@ -566,19 +567,56 @@ public class BackendConfig {
   }
 
   /**
-   * Returns true if 'path' starts with one of the allowed prefixes configured in
-   * --trusted_jar_paths. An empty allowlist (the default) disables jar
+   * Returns true if 'path', once resolved the same way Hadoop's Path class resolves
+   * it (collapsing '.' and '..' segments), is inside one of the directories
+   * configured in --trusted_jar_paths. An empty allowlist (the default) disables jar
    * loading from table properties entirely.
+   *
+   * 'path' must be resolved (rather than compared as a raw string) because the caller
+   * eventually turns it into a Hadoop Path before reading the file, and Hadoop
+   * resolves '..' segments at that point. Comparing the raw, unresolved string would
+   * let a path like '<trusted_dir>/../../secret.jar' pass the allowlist check while
+   * actually resolving to a location outside the trusted directory.
    */
   public boolean isJarPathAllowed(String path) {
     String allowlist = backendCfg_.trusted_jar_paths;
     if (Strings.isNullOrEmpty(allowlist) || Strings.isNullOrEmpty(path)) return false;
+    String resolvedPath = resolveJarPath(path);
+    if (resolvedPath == null) return false;
     try (Scanner scanner = new Scanner(allowlist).useDelimiter(",")) {
       while (scanner.hasNext()) {
         String prefix = scanner.next().trim();
-        if (!prefix.isEmpty() && path.startsWith(prefix)) return true;
+        if (prefix.isEmpty()) continue;
+        String resolvedPrefix = resolveJarPath(prefix);
+        if (resolvedPrefix != null && isWithinTrustedDir(resolvedPath, resolvedPrefix)) {
+          return true;
+        }
       }
     }
     return false;
+  }
+
+  /**
+   * Resolves 'rawPath' via Hadoop's Path class so that '.' and '..' segments are
+   * collapsed the same way they will be when the path is later used to read a file.
+   * Returns null if 'rawPath' cannot be parsed as a Path.
+   */
+  private static String resolveJarPath(String rawPath) {
+    try {
+      return new Path(rawPath).toString();
+    } catch (IllegalArgumentException e) {
+      return null;
+    }
+  }
+
+  /**
+   * Returns true if resolved path 'path' is exactly the resolved directory
+   * 'trustedDir', or is nested inside it. Both arguments must already be resolved via
+   * resolveJarPath().
+   */
+  private static boolean isWithinTrustedDir(String path, String trustedDir) {
+    if (path.equals(trustedDir)) return true;
+    String trustedDirWithSlash = trustedDir.endsWith("/") ? trustedDir : trustedDir + "/";
+    return path.startsWith(trustedDirWithSlash);
   }
 }

@@ -111,4 +111,51 @@ public class BackendConfigTest {
     BackendConfig cfg = configWith(",");
     assertFalse(cfg.isJarPathAllowed("/trusted/foo.jar"));
   }
+
+  // --- isJarPathAllowed: path traversal ('..') resolution ---
+
+  @Test
+  public void testIsJarPathAllowed_dotDotEscapesTrustedDir_returnsFalse() {
+    // Raw string starts with the trusted prefix, but resolving '..' segments (the
+    // same way the caller's Hadoop Path will) lands outside the trusted directory.
+    BackendConfig cfg = configWith("/trusted/");
+    assertFalse(cfg.isJarPathAllowed("/trusted/../../secret/foo.jar"));
+  }
+
+  @Test
+  public void testIsJarPathAllowed_dotDotEscapesTrustedDirWithScheme_returnsFalse() {
+    BackendConfig cfg = configWith("hdfs://nn/trusted/");
+    assertFalse(cfg.isJarPathAllowed("hdfs://nn/trusted/../../secret/foo.jar"));
+  }
+
+  @Test
+  public void testIsJarPathAllowed_dotDotStaysWithinTrustedDir_returnsTrue() {
+    // '..' segments that resolve to a location still inside the trusted directory
+    // are legitimate and should be allowed.
+    BackendConfig cfg = configWith("/trusted/");
+    assertTrue(cfg.isJarPathAllowed("/trusted/sub/../foo.jar"));
+  }
+
+  @Test
+  public void testIsJarPathAllowed_dotSegmentIsNoOp_returnsTrue() {
+    BackendConfig cfg = configWith("/trusted/");
+    assertTrue(cfg.isJarPathAllowed("/trusted/./foo.jar"));
+  }
+
+  @Test
+  public void testIsJarPathAllowed_siblingDirWithSamePrefixSpelling_returnsFalse() {
+    // A directory named similarly to the trusted one (but not nested inside it) must
+    // not be treated as trusted just because the raw string starts with the prefix.
+    BackendConfig cfg = configWith("/trusted");
+    assertFalse(cfg.isJarPathAllowed("/trusted-evil/foo.jar"));
+  }
+
+  @Test
+  public void testIsJarPathAllowed_unparsablePrefix_isSkipped() {
+    // A malformed allowlist entry must not be able to match everything; it should be
+    // skipped, and a valid subsequent entry should still be usable.
+    BackendConfig cfg = configWith("::not a valid path::,/trusted/");
+    assertTrue(cfg.isJarPathAllowed("/trusted/foo.jar"));
+    assertFalse(cfg.isJarPathAllowed("/untrusted/foo.jar"));
+  }
 }
