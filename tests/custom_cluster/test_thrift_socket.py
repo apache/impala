@@ -82,7 +82,7 @@ class TestThriftSocket(CustomClusterTestSuite):
     # Iterate over test vector within test function to avoid restarting cluster.
     for protocol_dim in create_client_protocol_dimension():
       for vector in [ImpalaTestVector([protocol_dim])]:
-        shell_args = ["-Q", "idle_session_timeout=1800", "--ssl"]
+        shell_args = ["-Q", "idle_session_timeout=1800", "--ssl", "--no_verify_cert"]
         # This uses a longer idle time to verify IMPALA-12114, see comment above.
         self._run_idle_shell(vector, shell_args, 12)
     self.assert_impalad_log_contains('INFO',

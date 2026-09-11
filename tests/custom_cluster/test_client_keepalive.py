@@ -74,6 +74,7 @@ class TestClientKeepalive(CustomClusterTestSuite):
     shell_options = ["-q", "shell {0}".format(ss_command)]
     if ssl:
       shell_options.append("--ssl")
+      shell_options.append("--no_verify_cert")
     result = run_impala_shell_cmd(vector, shell_options)
     LOG.info("STDOUT: {0} STDERR: {1}".format(result.stdout, result.stderr))
 

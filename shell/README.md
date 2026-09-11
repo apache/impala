@@ -65,11 +65,13 @@ Impala.
 To connect to a secure host using kerberos and SSL:
 
 ```
-$ impala-shell -k --ssl --verify_cert -i impalad-secure-host.domain.com
+$ impala-shell -k --ssl -i impalad-secure-host.domain.com
 ```
 
-The command above will try to verify the server with default OpenSSL CA certificates.
-Set --ca_cert to use a custom certificate or remove --verify_cert to skip verification.
+The command above verifies the server with the default OpenSSL CA certificates. Set
+--ca_cert to use a custom certificate (for example a copy of a self-signed server
+certificate), or pass --no_verify_cert to skip verification entirely (insecure). The
+same can be configured from an .impalarc file with ca_cert=... or verify_cert=false.
 
 ### Disconnecting
 

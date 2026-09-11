@@ -247,22 +247,33 @@ def get_option_parser(defaults):
                     help="User to authenticate with.")
   parser.add_option("--ssl", dest="ssl",
                     action="store_true",
-                    help="Connect to Impala via SSL-secured connection. Does not verify "
-                    "the server's TLS certificate by default (see --ca_cert and "
-                    "--verify_cert options).")
+                    help="Connect to Impala via SSL-secured connection. By default the "
+                    "server's TLS certificate is verified using the system's default CA "
+                    "certificates (see the --ca_cert, --verify_cert and --no_verify_cert "
+                    "options).")
   parser.add_option("--ca_cert", dest="ca_cert",
                     help=("Full path to "
                     "certificate file used to authenticate Impala's SSL certificate."
                     " May either be a copy of Impala's certificate (for self-signed "
-                    "certs) or the certificate of a trusted third-party CA. If not set, "
-                    "but SSL is enabled, server verification is based on --verify_cert "
-                    "flag."))
+                    "certs) or the certificate of a trusted third-party CA. If set, the "
+                    "server certificate is always verified using this CA cert. If not "
+                    "set, but SSL is enabled, the server certificate is verified using "
+                    "the system's default CA certificates unless --no_verify_cert is "
+                    "given."))
   parser.add_option("--verify_cert", dest="verify_cert",
                     action="store_true",
                     help=("Verify the Impala server's TLS certificate using the "
                     "system's default CA certificates when SSL is enabled and --ca_cert "
-                    "is not set. If --ca_cert is set, the server certificate will always "
-                    "be verified using the provided CA cert regardless of this flag."))
+                    "is not set. This is the default behavior; the flag is only useful "
+                    "to override --no_verify_cert or verify_cert=false loaded from a "
+                    "config file. If --ca_cert is set, the server certificate is always "
+                    "verified using the provided CA cert regardless of this flag."))
+  parser.add_option("--no_verify_cert", dest="verify_cert",
+                    action="store_false",
+                    help=("Do not verify the Impala server's TLS certificate when SSL "
+                    "is enabled and --ca_cert is not set. To disable verification from "
+                    "a config file, set verify_cert=false instead. Ignored if --ca_cert "
+                    "is set."))
   parser.add_option("--config_file", dest="config_file",
                     help=("Specify the configuration file to load options. "
                           "The following sections are used: [impala], "
@@ -435,6 +446,10 @@ def get_option_parser(defaults):
     # (print disable_live_progress is false since live_progress is true)
     elif option == parser.get_option('--disable_live_progress'):
       option.help += " [default: %s]" % (not defaults['live_progress'])
+    # --no_verify_cert is the negation of verify_cert, so print the opposite value of
+    # the verify_cert default (print no_verify_cert is false since verify_cert is true).
+    elif option == parser.get_option('--no_verify_cert'):
+      option.help += " [default: %s]" % (not defaults['verify_cert'])
     elif option != parser.get_option('--help') and option.help is not SUPPRESS_HELP:
       # don't want to print default value for help or options without help text
       option.help += " [default: %default]"
@@ -452,6 +467,9 @@ def get_option_parser(defaults):
 
   if '--verbose' in sys.argv and '--quiet' in sys.argv:
     parser.error("options --verbose and --quiet are mutually exclusive")
+
+  if '--verify_cert' in sys.argv and '--no_verify_cert' in sys.argv:
+    parser.error("options --verify_cert and --no_verify_cert are mutually exclusive")
 
   parser.set_defaults(**defaults)
 

@@ -262,7 +262,7 @@ subset:
 | `--authorized_proxy_user_config` / `--authorized_proxy_group_config` | unset *(documented: `docs/topics/impala_delegation.xml`)* | required for Hue-style impersonation; whitelists which authenticated principals may `doas` to which users | breaks B1 if mis-scoped |
 | `--cookie_secret_file` | empty *(documented: `be/src/rpc/authentication.cc` line 98)* | when unset, HS2-HTTP cookies fall back to per-process random — sessions do not survive cluster restarts but are not forgeable *(maintainer)* | shared cluster-wide secret for cookie HMAC |
 | `--abort_on_config_error` | `true` *(maintainer)* | when off, security misconfigurations may not prevent startup | |
-| `impala-shell --ssl` | `false` | when true, must also configure `ca_cert` or `verify_cert` to validate server certificate | required for TLS configured endpoints |
+| `impala-shell --ssl` | `false` | when enabled, the server certificate is verified by default since Impala 5.0 (against system CA certs, or `--ca_cert` if set), `false` before 5.0; `--no_verify_cert` (or `verify_cert=false`) opts out *(documented: `docs/topics/impala_ssl.xml`)* | required for TLS configured endpoints |
 
 **The insecure-default case.** A number of these flags ship in the "off, must
 be turned on for production" posture. The maintainer ruling on whether the
@@ -560,8 +560,10 @@ The operator deploying Impala in production **must**:
 15. Secure the underlying storage (HDFS, S3, ADLS, Ozone) with native ACLs;
     Impala enforces only what it can see *(documented:
     `docs/topics/impala_security_files.xml`)*.
-16. Provide `.impalarc` for `impala-shell` users configuring `ssl` and either
-    `ca_cert` or `verify_cert` *(maintainer)*.
+16. For `impala-shell` users connecting with `ssl`, the server certificate is
+    verified by default; provide `.impalarc` with `ca_cert` when the server
+    uses a self-signed or private-CA certificate, and reserve
+    `verify_cert=false` for testing *(maintainer)*.
 
 ## §11 Known misuse patterns
 
@@ -591,9 +593,15 @@ The operator deploying Impala in production **must**:
   cluster.** Impala 2.0+ accepts both Kerberos and LDAP on the same port; an
   operator who *also* leaves a single coordinator unauthenticated produces a
   bypass *(documented: `docs/topics/impala_mixed_security.xml`)*.
-- **`impala-shell` failure to verify server certificate.** Invoking
-  `impala-shell --ssl` without specifying `--ca_cert` or `--verify_cert` is a
-  known insecure default that will be addressed in a future release.
+- **`impala-shell` connecting with certificate verification disabled.**
+  `impala-shell --ssl` verifies the server certificate by default; passing
+  `--no_verify_cert` (or setting `verify_cert=false`) disables that check and
+  leaves the connection open to man-in-the-middle attacks. Reserve it for
+  testing, and use `--ca_cert` for self-signed or private-CA servers. This is
+  the default since Impala 5.0 (IMPALA-15007); before 5.0, `verify_cert` was
+  `false` by default and `impala-shell --ssl` did **not** verify the server
+  certificate unless `--ca_cert` or `--verify_cert` was set
+  *(documented: `docs/topics/impala_ssl.xml`)*.
 
 ## §11a Known non-findings (recurring false positives)
 

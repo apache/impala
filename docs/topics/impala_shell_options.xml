@@ -488,10 +488,26 @@ under the License.
               </entry>
               <entry>
                 The local pathname pointing to the third-party CA certificate, or to a copy of the server
-                certificate for self-signed server certificates. If <codeph>--ca_cert</codeph> is not set,
-                <cmdname>impala-shell</cmdname> enables TLS/SSL, but does not validate the server certificate. This is
-                useful for connecting to a known-good Impala that is only running over TLS/SSL, when a copy of the
-                certificate is not available (such as when debugging customer installations).
+                certificate for self-signed server certificates. If <codeph>--ca_cert</codeph> is set, the server
+                certificate is always verified against it. If <codeph>--ca_cert</codeph> is not set,
+                <cmdname>impala-shell</cmdname> verifies the server certificate against the system's default CA
+                certificates (see <codeph>--verify_cert</codeph> / <codeph>--no_verify_cert</codeph> below).
+              </entry>
+            </row>
+            <row>
+              <entry>
+                --verify_cert / --no_verify_cert
+              </entry>
+              <entry>
+                verify_cert=true|false
+              </entry>
+              <entry>
+                Controls whether <cmdname>impala-shell</cmdname> verifies the Impala server's TLS certificate when
+                TLS/SSL is enabled and <codeph>--ca_cert</codeph> is not set. Verification against the system's
+                default CA certificates is enabled by default. Pass <codeph>--no_verify_cert</codeph> (or set
+                <codeph>verify_cert=false</codeph> in a config file) to skip verification, for example when
+                connecting to an Impala that uses a self-signed certificate and a copy of that certificate is not
+                available. This option has no effect if <codeph>--ca_cert</codeph> is set.
               </entry>
             </row>
             <row rev="1.2.2">

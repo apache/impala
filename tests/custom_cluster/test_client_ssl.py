@@ -92,7 +92,7 @@ class TestClientSsl(CustomClusterTestSuite):
     impalad = ImpaladService(socket.getfqdn())
     assert impalad.wait_for_num_in_flight_queries(0)
     impalad.wait_for_metric_value('impala-server.backend-num-queries-executing', 0)
-    p = ImpalaShell(vector, args=["--ssl"])
+    p = ImpalaShell(vector, args=["--ssl", "--no_verify_cert"])
     p.send_cmd("SET DEBUG_ACTION=0:OPEN:WAIT")
     p.send_cmd("select count(*) from functional.alltypes")
     # Wait until the query has been planned and started executing, at which point it
@@ -254,12 +254,18 @@ class TestClientSsl(CustomClusterTestSuite):
     # default CA certs from OS while test certs are self signed.
     run_shell(["--ssl", "--verify_cert"])
 
+    # Certificate verification is on by default, so plain --ssl must also fail against
+    # the self-signed test certs (the OS default CA certs do not trust them).
+    run_shell(["--ssl"])
+
   def _validate_positive_cases(self, vector, ca_cert="", host=None):
     python3_10_version_re = re.compile(r"using Python 3\.1[0-9]")
     shell_options = ["--ssl", "-q", "select 1 + 2"]
     if host:
       shell_options.extend(["-i", host])
-    result = run_impala_shell_cmd(vector, shell_options)
+    # Without a --ca_cert the self-signed test certs cannot be verified against the OS
+    # default CA certs, so verification has to be explicitly disabled.
+    result = run_impala_shell_cmd(vector, shell_options + ["--no_verify_cert"])
     for msg in [self.SSL_ENABLED, self.CONNECTED, self.FETCHED]:
       assert msg in result.stderr
     # Python >3.10 has deprecated ssl.PROTOCOL_TLS and impala-shell currently emits a

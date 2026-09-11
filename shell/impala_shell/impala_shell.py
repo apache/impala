@@ -2454,7 +2454,8 @@ def impala_shell_main():
     if options.ca_cert is None and not options.verify_cert:
       if options.verbose:
         print("SSL is enabled. Impala server certificates will NOT be verified "
-              "(set --ca_cert or --verify_cert to change)", file=sys.stderr)
+              "(--no_verify_cert is set). Set --ca_cert or remove --no_verify_cert "
+              "to verify the server certificate.", file=sys.stderr)
     else:
       if options.verbose:
         print("SSL is enabled", file=sys.stderr)

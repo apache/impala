@@ -103,14 +103,20 @@ under the License.
           <li>
             <codeph>--ca_cert</codeph>: The local pathname pointing to the
             third-party CA certificate, or to a copy of the server certificate
-            for self-signed server certificates. </li>
+            for self-signed server certificates. When set, the server
+            certificate is always verified against it. </li>
+          <li>
+            <codeph>--no_verify_cert</codeph>: Disables verification of the
+            server certificate (see below). </li>
         </ul>
         <p> If <codeph>--ca_cert</codeph> is not set,
-            <cmdname>impala-shell</cmdname> enables TLS/SSL, but does not
-          validate the server certificate. This is useful for connecting to a
-          known-good Impala that is only running over TLS/SSL, when a copy of
-          the certificate is not available (such as when debugging customer
-          installations). </p>
+            <cmdname>impala-shell</cmdname> verifies the server certificate
+          against the system's default CA certificates. To skip verification,
+          pass <codeph>--no_verify_cert</codeph> (or set
+            <codeph>verify_cert=false</codeph> in a configuration file). This is
+          useful for connecting to a known-good Impala that is only running over
+          TLS/SSL, when a copy of the certificate is not available (such as when
+          debugging customer installations).</p>
         <p>For <cmdname>impala-shell</cmdname> to successfully connect to an
           Impala cluster that has the minimum allowed TLS/SSL version set to 1.2
             (<codeph>--ssl_minimum_version=tlsv1.2</codeph>), the Python version
