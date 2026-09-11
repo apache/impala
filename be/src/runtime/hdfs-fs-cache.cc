@@ -17,16 +17,18 @@
 
 #include "runtime/hdfs-fs-cache.h"
 
+#include <map>
 #include <mutex>
+#include <string>
 
 #include <gutil/strings/substitute.h>
 
 #include "common/logging.h"
+#include "runtime/s3-conn-credentials.h"
 #include "util/debug-util.h"
 #include "util/error-util.h"
 #include "util/hdfs-util.h"
 #include "util/test-info.h"
-#include "util/os-util.h"
 
 #include "common/names.h"
 
@@ -34,37 +36,11 @@ using namespace strings;
 
 namespace impala {
 
-DEFINE_string(s3a_access_key_cmd, "", "A Unix command whose output returns the "
-    "access key to S3, i.e. \"fs.s3a.access.key\".");
-
-DEFINE_string(s3a_secret_key_cmd, "", "A Unix command whose output returns the "
-    "secret key to S3, i.e. \"fs.s3a.secret.key\".");
-
 scoped_ptr<HdfsFsCache> HdfsFsCache::instance_;
-string HdfsFsCache::s3a_access_key_;
-string HdfsFsCache::s3a_secret_key_;
 
 Status HdfsFsCache::Init() {
   DCHECK(HdfsFsCache::instance_.get() == NULL);
   HdfsFsCache::instance_.reset(new HdfsFsCache());
-
-  if (!FLAGS_s3a_access_key_cmd.empty() && !FLAGS_s3a_secret_key_cmd.empty()) {
-    if (!RunShellProcess(FLAGS_s3a_access_key_cmd, &s3a_access_key_, true,
-        {"JAVA_TOOL_OPTIONS"})) {
-      return Status(Substitute("Could not run command '$0' to retrieve S3 Access Key. "
-          "Impala will not be able to access S3.", FLAGS_s3a_access_key_cmd));
-    }
-    LOG(INFO) << "S3 Access Key retrieval command '" << FLAGS_s3a_access_key_cmd
-              << "' executed successfully.";
-
-    if (!RunShellProcess(FLAGS_s3a_secret_key_cmd, &s3a_secret_key_, true,
-        {"JAVA_TOOL_OPTIONS"})) {
-      return Status(Substitute("Could not run command '$0' to retrieve S3 Access Key. "
-          "Impala will not be able to access S3.", FLAGS_s3a_secret_key_cmd));
-    }
-    LOG(INFO) << "S3 Secret Key retrieval command '" << FLAGS_s3a_secret_key_cmd
-              << "' executed successfully.";
-  }
   return Status::OK();
 }
 
@@ -90,18 +66,18 @@ Status HdfsFsCache::GetConnection(const string& path, hdfsFS* fs, HdfsFsMap* loc
     if (i == fs_map_.end()) {
       hdfsBuilder* hdfs_builder = hdfsNewBuilder();
       hdfsBuilderSetNameNode(hdfs_builder, namenode.c_str());
-      if (!s3a_access_key_.empty() || (options != nullptr && !options->empty())) {
+      // Process-global S3 credential from the --s3a_access_key_cmd /
+      // --s3a_secret_key_cmd flags, resolved once at startup by S3ConnCredentials.
+      const map<string, string>& s3_cred = S3ConnCredentials::Get();
+      if (!s3_cred.empty() || (options != nullptr && !options->empty())) {
         // Use a new instance of the filesystem object to be sure that it picks up the
         // configuration changes we're going to make. Without this call, a cached
         // filesystem object is used which is unaffected by calls to
         // hdfsBuilderConfSetStr(). This is unexpected behavior in the HDFS API, but is
         // unlikely to change.
         hdfsBuilderSetForceNewInstance(hdfs_builder);
-        if (!s3a_access_key_.empty()) {
-          hdfsBuilderConfSetStr(
-              hdfs_builder, "fs.s3a.access.key", s3a_access_key_.c_str());
-          hdfsBuilderConfSetStr(
-              hdfs_builder, "fs.s3a.secret.key", s3a_secret_key_.c_str());
+        for (const auto& kv : s3_cred) {
+          hdfsBuilderConfSetStr(hdfs_builder, kv.first.c_str(), kv.second.c_str());
         }
         if (options != nullptr) {
           for (const auto& option : *options) {

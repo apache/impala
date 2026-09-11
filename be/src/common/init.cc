@@ -38,6 +38,7 @@
 #include "runtime/exec-env.h"
 #include "runtime/hdfs-fs-cache.h"
 #include "runtime/lib-cache.h"
+#include "runtime/s3-conn-credentials.h"
 #include "runtime/mem-tracker.h"
 #include "service/impala-server.h"
 #include "kudu/util/debug-util.h"
@@ -638,6 +639,8 @@ void impala::InitCommonRuntime(int argc, char** argv, bool init_jvm,
   ABORT_IF_ERROR(impala::LibCache::Init(external_fe));
   Status fs_cache_init_status = impala::HdfsFsCache::Init();
   if (!fs_cache_init_status.ok()) CLEAN_EXIT_WITH_ERROR(fs_cache_init_status.GetDetail());
+  Status s3_cred_init_status = impala::S3ConnCredentials::Init();
+  if (!s3_cred_init_status.ok()) CLEAN_EXIT_WITH_ERROR(s3_cred_init_status.GetDetail());
 
   if (init_jvm) {
     if (!external_fe) {

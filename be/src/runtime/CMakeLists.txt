@@ -88,6 +88,7 @@ add_library(Runtime
   runtime-filter.cc
   runtime-filter-bank.cc
   runtime-state.cc
+  s3-conn-credentials.cc
   scanner-mem-limiter.cc
   sorted-run-merger.cc
   sorter.cc

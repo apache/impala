@@ -62,16 +62,6 @@ class HdfsFsCache {
   /// Exposed as a static method for testing purpose.
   static std::string GetNameNodeFromPath(const std::string& path, std::string* err);
 
-  /// S3A access key retrieved by running command in Init().
-  /// If either s3a_secret_key_ or this are empty, the default value is taken from the
-  /// local Hadoop client configuration.
-  static std::string s3a_access_key_;
-
-  /// S3A secret key retrieved by running command in Init().
-  /// If either s3a_access_key_ or this are empty, the default value is taken from the
-  /// local Hadoop client configuration.
-  static std::string s3a_secret_key_;
-
  private:
   /// Singleton instance. Instantiated in Init().
   static boost::scoped_ptr<HdfsFsCache> instance_;
