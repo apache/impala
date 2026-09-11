@@ -230,7 +230,11 @@ public class IcebergMetaProvider implements MetaProvider {
       Namespace ns = Namespace.of(dbName);
       TableIdentifier tableId = TableIdentifier.of(ns, tableName);
       org.apache.iceberg.Table tbl = iceCatalog_.loadTable(tableId, null, null);
-      List<Credential> credentials = Credential.extract(tbl.io());
+      // Only use vended credentials when vending is enabled in the catalog config. Some
+      // REST catalogs return storage credentials regardless of the access-delegation
+      // header; honouring the flag keeps the behaviour predictable for operators.
+      List<Credential> credentials = iceCatalog_.isVendedCredentialsEnabled()
+          ? Credential.extract(tbl.io()) : Collections.emptyList();
       msTable.setTableName(getIcebergTableName(tbl));
       msTable.setSd(createStorageDescriptor(tbl));
       // Iceberg partitioning is not stored in HMS.
@@ -643,6 +647,8 @@ public class IcebergMetaProvider implements MetaProvider {
       org.apache.iceberg.Table apiTable,
       ListMap<TNetworkAddress> hostIndex, boolean loadPartStats) {
     try {
+      // Manifest reads go through the table's FileIO, which for a vending catalog opens
+      // each file with the credential vended for it (VendedCredentialsFileIO).
       TableScan scan = apiTable.newScan();
       GroupedContentFiles groupedFiles = new GroupedContentFiles(scan.planFiles());
       IcebergFileMetadataLoader iceFml = new IcebergFileMetadataLoader(

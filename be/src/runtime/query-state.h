@@ -33,6 +33,7 @@
 #include "gen-cpp/control_service.pb.h"
 #include "gutil/macros.h"
 #include "gutil/threading/thread_collision_warner.h" // for DFAKE_*
+#include "runtime/query-credentials.h"
 #include "util/counting-barrier.h"
 #include "util/spinlock.h"
 #include "util/unique-id-hash.h"
@@ -176,6 +177,12 @@ class QueryState {
     return &node_to_file_schedulings_;
   }
   UniqueIdPB GetCoordinatorBackendId() const;
+
+  /// Per-query store for vended storage credentials from Iceberg REST catalogs.
+  /// Valid for the lifetime of the QueryState. StartFInstances() registers the
+  /// credentials of every table of the query here before it starts any fragment
+  /// instance; HdfsFsCache resolves them when it is asked for a filesystem connection.
+  QueryCredentials* query_credentials() { return &query_credentials_; }
 
   /// The following getters are only valid after Init().
   ScannerMemLimiter* scanner_mem_limiter() const { return scanner_mem_limiter_; }
@@ -425,6 +432,9 @@ class QueryState {
   /// Set in Init().
   std::unique_ptr<ControlServiceProxy> proxy_;
 
+  /// Per-query vended credential store. Populated in StartFInstances().
+  QueryCredentials query_credentials_;
+
   /// Set in Init(). TODO: find a way not to have to copy this
   ExecQueryFInstancesRequestPB exec_rpc_params_;
   TExecPlanFragmentInfo fragment_info_;
@@ -552,6 +562,15 @@ class QueryState {
   /// once. Must be called before destroying the QueryState. Not idempotent and not
   /// thread-safe.
   void ReleaseBackendResources();
+
+  /// Registers the vended storage credentials of all the tables in 'desc_tbl_' with
+  /// 'query_credentials_'. A no-op for a query without such tables.
+  Status RegisterVendedCredentials() WARN_UNUSED_RESULT;
+
+  /// Drops this query from the HdfsFsCache's tracking of vended-credential connections
+  /// so that they can be evicted once stale. Idempotent; a no-op if the query
+  /// registered no vended credentials.
+  void ReleaseVendedConnections();
 
   /// Functions for calculating user or system time spent on async codegen threads.
   int64_t AsyncCodegenThreadHelper(const std::string& suffix) const;

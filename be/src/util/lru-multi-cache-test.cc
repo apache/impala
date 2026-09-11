@@ -456,4 +456,70 @@ TEST(LruMultiCache, HashCollision) {
   }
 }
 
+TEST(LruMultiCache, EvictIf) {
+  LruMultiCache<std::string, TestType> cache(100);
+
+  // "a": 3 available objects, "b": 1 available and 1 in use, "c": 1 in use,
+  // "d": 1 available.
+  for (int i = 0; i < 3; i++) {
+    auto accessor = cache.EmplaceAndGet("a", i, 1.0f);
+  }
+  auto b_in_use = cache.EmplaceAndGet("b", 10, 1.0f);
+  { auto accessor = cache.EmplaceAndGet("b", 11, 1.0f); }
+  auto c_in_use = cache.EmplaceAndGet("c", 100, 1.0f);
+  { auto accessor = cache.EmplaceAndGet("d", 1000, 1.0f); }
+
+  ASSERT_EQ(7, cache.Size());
+  ASSERT_EQ(4, cache.NumberOfKeys());
+  ASSERT_EQ(5, cache.NumberOfAvailableObjects());
+
+  // No key matches, nothing changes.
+  ASSERT_EQ(0, cache.EvictIf([](const std::string& key) { return key == "x"; }));
+  ASSERT_EQ(7, cache.Size());
+  ASSERT_EQ(4, cache.NumberOfKeys());
+  ASSERT_EQ(5, cache.NumberOfAvailableObjects());
+
+  // The available objects of "a" and "b" are evicted, "a" together with its owning
+  // list. The objects in use are reported and stay.
+  ASSERT_EQ(2, cache.EvictIf([](const std::string& key) { return key != "d"; }));
+  ASSERT_EQ(3, cache.Size());
+  ASSERT_EQ(3, cache.NumberOfKeys());
+  ASSERT_EQ(1, cache.NumberOfAvailableObjects());
+  ASSERT_EQ(nullptr, cache.Get("a").Get());
+  ASSERT_EQ(nullptr, cache.Get("b").Get());
+  ASSERT_EQ(10, b_in_use.Get()->i);
+  ASSERT_EQ(100, c_in_use.Get()->i);
+
+  // "d" was not selected.
+  {
+    auto accessor = cache.Get("d");
+    ASSERT_NE(nullptr, accessor.Get());
+    ASSERT_EQ(1000, accessor.Get()->i);
+  }
+
+  // The objects that were in use can still be released or destroyed, and a released one
+  // is evicted by the next call.
+  b_in_use.Release();
+  c_in_use.Destroy();
+  ASSERT_EQ(2, cache.Size());
+  ASSERT_EQ(0, cache.EvictIf([](const std::string& key) { return key == "b"; }));
+  ASSERT_EQ(1, cache.Size());
+  ASSERT_EQ(1, cache.NumberOfKeys());
+  ASSERT_EQ(1, cache.NumberOfAvailableObjects());
+
+  // Everything can be evicted in one call, also when the keys share a bucket.
+  LruMultiCache<CollidingKey, TestType> colliding_cache(100);
+  CollidingKey keys[] = {"a", "b", "c", "d", "e"};
+  for (const CollidingKey& key : keys) {
+    for (int i = 0; i < 2; i++) {
+      auto accessor = colliding_cache.EmplaceAndGet(key, i, 1.0f);
+    }
+  }
+  ASSERT_EQ(10, colliding_cache.Size());
+  ASSERT_EQ(0, colliding_cache.EvictIf([](const CollidingKey& key) { return true; }));
+  ASSERT_EQ(0, colliding_cache.Size());
+  ASSERT_EQ(0, colliding_cache.NumberOfKeys());
+  ASSERT_EQ(0, colliding_cache.NumberOfAvailableObjects());
+}
+
 } // namespace impala

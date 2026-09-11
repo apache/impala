@@ -31,6 +31,8 @@
 
 namespace impala {
 
+class QueryState;
+
 enum HdfsOpType {
   DELETE,
   CREATE_DIR,
@@ -92,8 +94,11 @@ HdfsOpThreadPool* CreateHdfsOpThreadPool(const std::string& name, uint32_t num_t
 /// added.
 class HdfsOperationSet {
  public:
-  /// Initializes an operation set. 'connection_cache' is not owned.
-  HdfsOperationSet(HdfsFsCache::HdfsFsMap* connection_cache);
+  /// Initializes an operation set. 'connection_cache' and 'query_state' are not owned.
+  /// 'query_state' (optional) is used to resolve the query's vended credentials when
+  /// opening filesystem connections.
+  HdfsOperationSet(HdfsFsCache::HdfsFsMap* connection_cache,
+      QueryState* query_state = nullptr);
 
   /// Add an operation that takes only a single 'src' parameter (e.g. DELETE, CREATE_DIR,
   /// DELETE_THEN_CREATE)
@@ -134,6 +139,8 @@ class HdfsOperationSet {
 
   /// A connection cache used by this operation set. Not owned.
   HdfsFsCache::HdfsFsMap* connection_cache_;
+  /// Query whose vended credentials apply to the connections, or nullptr.
+  QueryState* query_state_;
 
   /// Protects errors_ and abort_on_error_ during Execute
   std::mutex errors_lock_;

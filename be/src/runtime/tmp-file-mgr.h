@@ -20,6 +20,7 @@
 #include <functional>
 #include <map>
 #include <memory>
+#include <string>
 #include <unordered_map>
 #include <utility>
 #include <bits/stdc++.h>
@@ -312,8 +313,11 @@ class TmpFileMgr {
   /// If a remote scratch space is registered in the TmpFileMgr.
   bool HasRemoteDir() { return tmp_dirs_remote_ != nullptr; }
 
-  /// Return default S3 options for spilling.
-  const vector<std::pair<string, string>>* s3a_options() { return &s3a_options_; }
+  /// S3A upload-tuning options to layer onto S3 spill connections; empty when no S3
+  /// scratch dir is configured.  Passed to HdfsFsCache::GetConnection().
+  const std::map<std::string, std::string>* s3a_options() const {
+    return &s3a_options_;
+  }
 
   MemTracker* compressed_buffer_tracker() const {
     return compressed_buffer_tracker_.get();
@@ -387,11 +391,12 @@ class TmpFileMgr {
   /// The path of the directory to store local buffers for remote temporary files.
   std::unique_ptr<TmpDir> local_buff_dir_;
 
-  /// Default S3 options for spilling to S3.
-  HdfsFsCache::HdfsConnOptions s3a_options_;
-
   /// Local cache for HDFS connection handle.
   HdfsFsCache::HdfsFsMap hdfs_conns_;
+
+  /// S3A upload-tuning options layered onto the connection when spilling to S3. Empty
+  /// unless an S3 scratch directory is configured.
+  std::map<std::string, std::string> s3a_options_;
 
   /// Memory tracker to track compressed buffers. Set up in InitCustom() if disk spill
   /// compression is enabled

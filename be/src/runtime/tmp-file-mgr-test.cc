@@ -1164,12 +1164,16 @@ TEST_F(TmpFileMgrTest, TestDirectoryLimitParsingRemotePath) {
     EXPECT_EQ(full_hdfs_path, dirs7->path());
   }
 
-  // Successful cases for parsing S3 paths.
-  // Create a fake s3 connection in order to pass the connection verification.
+  // Successful cases for parsing S3 paths. Seed a fake connection to pass connection
+  // verification. The S3 spill options widen the cache key, so seed under the same key
+  // GetConnection() computes (via the shared BuildCacheKey() helper).
   HdfsFsCache::HdfsFsMap fake_hdfs_conn_map;
   hdfsFS fake_conn = reinterpret_cast<hdfsFS>(1);
   FLAGS_remote_scratch_cleanup_on_start_stop = false;
-  fake_hdfs_conn_map.insert(make_pair("s3a://fake_host/", fake_conn));
+  const map<string, string> s3a_options = {
+      {"fs.s3a.fast.upload", "true"}, {"fs.s3a.fast.upload.buffer", "disk"}};
+  fake_hdfs_conn_map.insert(make_pair(
+      HdfsFsCache::BuildCacheKey("s3a://fake_host/", "", &s3a_options), fake_conn));
   // Two types of paths, one with directory, one without.
   vector<string> s3_paths{"s3a://fake_host", "s3a://fake_host/dir"};
   for (const string& s3_path : s3_paths) {

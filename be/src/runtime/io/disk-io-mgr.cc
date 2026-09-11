@@ -1024,6 +1024,10 @@ Status DiskIoMgr::ReopenCachedHdfsFileHandle(const hdfsFS& fs, std::string* fnam
   return Status::OK();
 }
 
+size_t DiskIoMgr::CloseCachedHdfsFileHandles(const hdfsFS& fs) {
+  return file_handle_cache_.EvictHandles(fs);
+}
+
 void DiskQueue::ShutDown() {
   {
     unique_lock<mutex> disk_lock(lock_);

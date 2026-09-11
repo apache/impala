@@ -43,15 +43,20 @@ public class IcebergRESTCatalog implements IcebergCatalog {
 
   private final RESTCatalog restCatalog_;
 
+  // Whether credential vending is enabled in the catalog configuration. Some REST
+  // catalogs (e.g. Lakekeeper) return storage credentials even when the client does not
+  // request access delegation; those are ignored when this is false.
+  private final boolean vendedCredentialsEnabled_;
+
   public IcebergRESTCatalog(Properties properties) {
     setContextClassLoader();
 
     RESTCatalogProperties restConfig = new RESTCatalogProperties(properties);
     name_ = restConfig.getName();
     REST_URI = restConfig.getUri();
+    vendedCredentialsEnabled_ = restConfig.isVendedCredentialsEnabled();
     restCatalog_ = new RESTCatalog();
-    HiveConf conf = new HiveConf(IcebergRESTCatalog.class);
-    restCatalog_.setConf(conf);
+    restCatalog_.setConf(new HiveConf(IcebergRESTCatalog.class));
     restCatalog_.initialize(
         name_,
         restConfig.getCatalogProperties());
@@ -61,6 +66,11 @@ public class IcebergRESTCatalog implements IcebergCatalog {
 
   public String getUri() {
     return REST_URI;
+  }
+
+  /** True when 'iceberg.rest-catalog.vended-credentials-enabled' is set. */
+  public boolean isVendedCredentialsEnabled() {
+    return vendedCredentialsEnabled_;
   }
 
   @Override
@@ -95,6 +105,8 @@ public class IcebergRESTCatalog implements IcebergCatalog {
   @Override
   public Table loadTable(TableIdentifier tableId, String tableLocation,
       Map<String, String> properties) throws IcebergTableLoadingException {
+    // 'tableLocation' and 'properties' are part of the IcebergCatalog interface but are
+    // not meaningful for a REST catalog, which resolves everything from 'tableId'.
     return restCatalog_.loadTable(tableId);
   }
 

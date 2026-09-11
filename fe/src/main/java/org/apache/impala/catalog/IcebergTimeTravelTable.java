@@ -34,6 +34,7 @@ import org.apache.impala.analysis.TableName;
 import org.apache.impala.analysis.TimeTravelSpec;
 import org.apache.impala.catalog.CatalogObject.ThriftObjectType;
 import org.apache.impala.common.AnalysisException;
+import org.apache.impala.common.Credential;
 import org.apache.impala.common.FileSystemUtil;
 import org.apache.impala.common.ImpalaRuntimeException;
 import org.apache.impala.thrift.TCatalogObjectType;
@@ -277,6 +278,11 @@ class ForwardingFeIcebergTable implements FeIcebergTable {
   @Override
   public IcebergContentFileStore getContentFileStore() {
     return base.getContentFileStore();
+  }
+
+  @Override
+  public List<Credential> getCredentials() {
+    return base.getCredentials();
   }
 
   @Override

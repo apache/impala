@@ -381,6 +381,11 @@ class DiskIoMgr : public CacheLineAligned {
       RequestContext* reader, FileHandleCache::Accessor* accessor,
       const OpenFileOptions& open_options = {}) WARN_UNUSED_RESULT;
 
+  /// Closes the file handles in the file handle cache that were opened on the connection
+  /// 'fs' and are not in use. Returns the number of cached handles of 'fs' that are in
+  /// use and were left open. Must be called before 'fs' is disconnected.
+  size_t CloseCachedHdfsFileHandles(const hdfsFS& fs);
+
   // Function to change the underlying LocalFileSystem object used for disk I/O.
   // DiskIoMgr will also take responsibility of the received LocalFileSystem pointer.
   // It is only for testing purposes to use a fault injected version of LocalFileSystem.

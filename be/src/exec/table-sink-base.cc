@@ -25,6 +25,7 @@
 #include "exprs/scalar-expr-evaluator.h"
 #include "gen-cpp/CatalogObjects_types.h"
 #include "runtime/hdfs-fs-cache.h"
+#include "runtime/query-state.h"
 #include "runtime/raw-value.inline.h"
 #include "runtime/row-batch.h"
 #include "runtime/runtime-state.h"
@@ -203,16 +204,18 @@ Status TableSinkBase::InitOutputPartition(RuntimeState* state,
     OutputPartition* output_partition, bool empty_partition) {
   BuildHdfsFileNames(partition_descriptor, output_partition);
 
+  QueryState* qs = state->query_state();
   if (ShouldSkipStaging(state, output_partition)) {
     // We will be writing to the final file if we're skipping staging, so get a connection
     // to its filesystem.
     RETURN_IF_ERROR(HdfsFsCache::instance()->GetConnection(
         output_partition->final_hdfs_file_name_prefix,
-        &output_partition->hdfs_connection));
+        &output_partition->hdfs_connection, nullptr, nullptr, qs));
   } else {
     // Else get a connection to the filesystem of the tmp file.
     RETURN_IF_ERROR(HdfsFsCache::instance()->GetConnection(
-        output_partition->tmp_hdfs_file_name_prefix, &output_partition->hdfs_connection));
+        output_partition->tmp_hdfs_file_name_prefix,
+        &output_partition->hdfs_connection, nullptr, nullptr, qs));
   }
 
   output_partition->partition_descriptor = &partition_descriptor;

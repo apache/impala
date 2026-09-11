@@ -990,9 +990,16 @@ Status Coordinator::FinalizeHdfsDml() {
     else if (!is_hive_acid) {
       // 'write_id' is NOT set, therefore we need to do some finalization, e.g. moving
       // files or delete old files in case of INSERT OVERWRITE.
-      return_status = dml_exec_state_.FinalizeHdfsInsert(*finalize_params(),
-          query_ctx().client_request.query_options.s3_skip_insert_staging,
-          hdfs_table, query_profile_);
+      // 'query_state_' only knows the vended credentials of the target table if it
+      // started fragment instances on this backend (see QueryState::StartFInstances()),
+      // which a dedicated coordinator does not do, so register them for the finalization.
+      return_status =
+          query_state_->query_credentials()->RegisterTableCredentials(*hdfs_table);
+      if (return_status.ok()) {
+        return_status = dml_exec_state_.FinalizeHdfsInsert(*finalize_params(),
+            query_ctx().client_request.query_options.s3_skip_insert_staging,
+            hdfs_table, query_profile_, query_state_);
+      }
     }
     hdfs_table->ReleaseResources();
   } else if (is_hive_acid) {

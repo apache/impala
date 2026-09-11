@@ -294,6 +294,11 @@ HdfsTableDescriptor::HdfsTableDescriptor(const TTableDescriptor& tdesc, ObjectPo
     iceberg_parquet_row_group_size_ = tdesc.icebergTable.parquet_row_group_size;
     iceberg_parquet_plain_page_size_ = tdesc.icebergTable.parquet_plain_page_size;
     iceberg_parquet_dict_page_size_ = tdesc.icebergTable.parquet_dict_page_size;
+    if (tdesc.icebergTable.__isset.credentials) {
+      for (const TCredential& cred : tdesc.icebergTable.credentials) {
+        storage_credentials_.push_back(CredentialEntryFromThrift(cred));
+      }
+    }
   }
 }
 
@@ -322,6 +327,14 @@ const TIcebergPartitionSpec* HdfsTableDescriptor::GetIcebergPartitionSpec(
     int32_t spec_id) const {
   auto it = iceberg_partition_specs_.find(spec_id);
   return it == iceberg_partition_specs_.end() ? nullptr : &it->second;
+}
+
+CredentialEntry CredentialEntryFromThrift(const TCredential& cred) {
+  CredentialEntry entry;
+  entry.prefix = cred.prefix;
+  entry.config = cred.config;
+  entry.expiry_ms = cred.__isset.expires_at_ms ? cred.expires_at_ms : 0;
+  return entry;
 }
 
 void HdfsTableDescriptor::ReleaseResources() {
@@ -741,6 +754,16 @@ void DescriptorTbl::ReleaseResources() {
   for (auto entry: tbl_desc_map_) {
     if (entry.second->type() != TTableType::HDFS_TABLE) continue;
     static_cast<HdfsTableDescriptor*>(entry.second)->ReleaseResources();
+  }
+}
+
+void DescriptorTbl::GetHdfsTableDescs(vector<const HdfsTableDescriptor*>* descs) const {
+  descs->clear();
+  for (const auto& entry : tbl_desc_map_) {
+    // See CreateTblDescriptorInternal() for the types described by HdfsTableDescriptor.
+    TTableType::type type = entry.second->type();
+    if (type != TTableType::HDFS_TABLE && type != TTableType::ICEBERG_TABLE) continue;
+    descs->push_back(static_cast<const HdfsTableDescriptor*>(entry.second));
   }
 }
 

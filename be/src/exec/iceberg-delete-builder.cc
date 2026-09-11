@@ -23,6 +23,7 @@
 #include "exec/join-op.h"
 #include "runtime/exec-env.h"
 #include "runtime/fragment-state.h"
+#include "runtime/query-state.h"
 #include "runtime/row-batch.h"
 #include "runtime/runtime-state.h"
 #include "runtime/tuple-row.h"
@@ -196,7 +197,7 @@ Status IcebergDeleteBuilder::CalculateDataFiles() {
         SCOPED_TIMER(dv_load_timer_);
         RETURN_IF_ERROR(dv_reader_.Load(reader_context_.get(), mem_tracker(), &obj_pool_,
             ice_del_vector->path()->str(), ice_del_vector->content_offset(),
-            content_size, &bitmap));
+            content_size, &bitmap, runtime_state_->query_state()));
       }
       deleted_rows_.emplace(std::piecewise_construct,
           std::forward_as_tuple(ptr_copy, file_path_str.length()),

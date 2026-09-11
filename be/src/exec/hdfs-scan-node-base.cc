@@ -339,7 +339,8 @@ Status HdfsScanPlanNode::ProcessScanRangesAndInitSharedState(FragmentState* stat
           file_desc->file_format = partition_desc->file_format();
         }
         RETURN_IF_ERROR(HdfsFsCache::instance()->GetConnection(
-            native_file_path, &file_desc->fs, &fs_cache));
+            native_file_path, &file_desc->fs, &fs_cache, nullptr,
+            state->query_state()));
         shared_state_.per_type_files_[partition_desc->file_format()].push_back(file_desc);
       } else {
         // File already processed

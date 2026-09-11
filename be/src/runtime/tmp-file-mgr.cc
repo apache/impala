@@ -298,9 +298,11 @@ Status TmpFileMgr::InitCustom(const vector<string>& tmp_dir_specifiers,
         || IsOzonePath(tmp_dir_spec_trimmed.c_str(), false)) {
       tmp_dir = std::make_unique<TmpDirHdfs>(tmp_dir_spec_trimmed);
     } else if (IsS3APath(tmp_dir_spec_trimmed.c_str(), false)) {
-      // Initialize the S3 options for later getting S3 connection.
-      s3a_options_ = {make_pair("fs.s3a.fast.upload", "true"),
-          make_pair("fs.s3a.fast.upload.buffer", "disk")};
+      // The S3 spill upload-tuning options are connection tuning, not credentials, so
+      // they are layered onto the spill connection per call via GetConnection(), on top
+      // of whatever credential applies to the scratch path.
+      s3a_options_ = {{"fs.s3a.fast.upload", "true"},
+          {"fs.s3a.fast.upload.buffer", "disk"}};
       tmp_dir = std::make_unique<TmpDirS3>(tmp_dir_spec_trimmed);
     } else if (IsGcsPath(tmp_dir_spec_trimmed.c_str(), false)) {
       // TODO(IMPALA-10561): Add support for spilling to GCS
@@ -490,8 +492,10 @@ void TmpFileMgr::RemoveRemoteDirForQuery(TmpFileGroup* file_group) {
   const string querylevel_dir =
       ConstructRemoteDirPath(dir, hostname, backend_id, query_id);
   hdfsFS hdfs_conn;
-  Status status =
-      HdfsFsCache::instance()->GetConnection(querylevel_dir, &hdfs_conn, &hdfs_conns_);
+  // Go through the scratch dir so that the lookup uses the same options (and therefore
+  // the same cache key) the connection was seeded with in VerifyAndCreate(). A miss
+  // would insert into 'hdfs_conns_', which other threads read concurrently.
+  Status status = tmp_dirs_remote_->GetConnection(this, &hdfs_conn);
   if (status.ok()) {
     DCHECK(hdfs_conn != nullptr);
     hdfsDelete(hdfs_conn, querylevel_dir.c_str(), 1);
@@ -1018,7 +1022,9 @@ TmpFileRemote::TmpFileRemote(TmpFileGroup* file_group, TmpFileMgr::DeviceId devi
   : TmpFile(file_group, device_id, path, expected_local) {
   DCHECK(hdfs_url != nullptr);
   hdfs_conn_ = nullptr;
-  const HdfsFsCache::HdfsConnOptions* options = nullptr;
+  // S3 spill layers its upload-tuning options onto the connection; credentials are
+  // resolved by HdfsFsCache.
+  const map<string, string>* options = nullptr;
   if (IsHdfsPath(hdfs_url, false)) {
     disk_type_ = io::DiskFileType::DFS;
     disk_id_ = file_group->io_mgr_->RemoteDfsDiskId();

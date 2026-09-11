@@ -39,6 +39,7 @@ class TFinalizeParams;
 class TUpdateCatalogRequest;
 class RuntimeProfile;
 class HdfsTableDescriptor;
+class QueryState;
 
 /// DmlExecState manages the state related to the execution of a DML statement
 /// (creation of new files, new partitions, etc.).
@@ -120,8 +121,10 @@ class DmlExecState {
   /// for 'hdfs_table' as required.  Adds child timers to profile for the various
   /// stages of finalization.  If the table is on an S3 path and
   /// 's3_skip_insert_staging' is true, does not create new partition directories.
+  /// 'query_state' is used to resolve per-query vended credentials for S3 paths.
   Status FinalizeHdfsInsert(const TFinalizeParams& params, bool s3_skip_insert_staging,
-      HdfsTableDescriptor* hdfs_table, RuntimeProfile* profile) WARN_UNUSED_RESULT;
+      HdfsTableDescriptor* hdfs_table, RuntimeProfile* profile,
+      QueryState* query_state = nullptr) WARN_UNUSED_RESULT;
 
   /// Serialize to protobuf and stores the result in 'dml_status'.
   void ToProto(DmlExecStatusPB* dml_status);

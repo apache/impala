@@ -38,6 +38,7 @@
 #include "runtime/exec-env.h"
 #include "runtime/fragment-instance-state.h"
 #include "runtime/fragment-state.h"
+#include "runtime/hdfs-fs-cache.h"
 #include "runtime/initial-reservations.h"
 #include "runtime/krpc-data-stream-mgr.h"
 #include "runtime/mem-tracker.h"
@@ -136,6 +137,11 @@ void QueryState::ReleaseBackendResources() {
   if (initial_reservations_ != nullptr) initial_reservations_->ReleaseResources();
   if (buffer_reservation_ != nullptr) buffer_reservation_->Close();
   if (desc_tbl_ != nullptr) desc_tbl_->ReleaseResources();
+  // All fragment instances are done, so they no longer use the filesystem connections
+  // handed out for this query's vended credentials. Release them here rather than
+  // waiting for ~QueryState(): on the coordinator that only runs when the client closes
+  // the query, which would keep the connections pinned past their credential's expiry.
+  ReleaseVendedConnections();
   // Release any memory associated with codegen.
   for (auto& elem : fragment_state_map_) {
     elem.second->ReleaseResources();
@@ -149,9 +155,31 @@ void QueryState::ReleaseBackendResources() {
   released_backend_resources_ = true;
 }
 
+Status QueryState::RegisterVendedCredentials() {
+  // Register the credentials of all the tables rather than leaving it to the operators
+  // that read them: a table sink writes its target table without scanning it, and it
+  // may run on a backend that scans none of the query's tables.
+  vector<const HdfsTableDescriptor*> hdfs_tables;
+  desc_tbl_->GetHdfsTableDescs(&hdfs_tables);
+  for (const HdfsTableDescriptor* hdfs_table : hdfs_tables) {
+    RETURN_IF_ERROR(query_credentials_.RegisterTableCredentials(*hdfs_table));
+  }
+  return Status::OK();
+}
+
+void QueryState::ReleaseVendedConnections() {
+  if (!query_credentials_.empty() && HdfsFsCache::instance() != nullptr) {
+    HdfsFsCache::instance()->ReleaseQueryConnections(query_id());
+  }
+}
+
 QueryState::~QueryState() {
   DCHECK_EQ(refcnt_.Load(), 0);
   DCHECK_EQ(backend_resource_refcnt_.Load(), 0);
+  // Backstop for ReleaseBackendResources(): covers a QueryState whose backend resources
+  // were never acquired, and connections obtained after they were released (e.g. the
+  // coordinator's DML finalization).
+  ReleaseVendedConnections();
   if (query_mem_tracker_ != nullptr) {
     // Disconnect the query MemTracker hierarchy from the global hierarchy. After this
     // point nothing must touch this query's MemTracker and all tracked memory associated
@@ -875,6 +903,11 @@ bool QueryState::StartFInstances() {
   if (UNLIKELY(!start_finstances_status.ok())) goto error;
   VLOG(2) << "descriptor table for query=" << PrintId(query_id())
           << "\n" << desc_tbl_->DebugString();
+  // Must precede the creation of the fragment states: plan nodes and sinks open
+  // filesystem connections from then on, and the connection of a table with vended
+  // credentials has to be built with them.
+  start_finstances_status = RegisterVendedCredentials();
+  if (UNLIKELY(!start_finstances_status.ok())) goto error;
   // IMPALA-13378: Verify that tuple ids in all PlanNode exist in the descriptor table.
   for (TPlanFragment f : fragment_info_.fragments) {
     for (TPlanNode node : f.plan.nodes) {

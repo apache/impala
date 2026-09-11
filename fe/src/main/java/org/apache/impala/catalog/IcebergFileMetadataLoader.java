@@ -50,6 +50,7 @@ import org.apache.iceberg.ContentFile;
 import org.apache.impala.catalog.FeFsTable.FileMetadataStats;
 import org.apache.impala.catalog.FeIcebergTable.Utils;
 import org.apache.impala.catalog.iceberg.GroupedContentFiles;
+import org.apache.impala.catalog.iceberg.VendedCredentialsFileIO;
 import org.apache.impala.common.FileSystemUtil;
 import org.apache.impala.common.PrintUtils;
 import org.apache.impala.common.Pair;
@@ -148,7 +149,7 @@ public class IcebergFileMetadataLoader extends FileMetadataLoader {
     // and use different handling methods accordingly.
     // This considers that different ContentFiles are on different FileSystems
     List<ContentFile<?>> filesSupportsStorageIds = Lists.newArrayList();
-    FileSystem fsForTable = FileSystemUtil.getFileSystemForPath(tablePath_);
+    FileSystem fsForTable = fileSystemFor(tablePath_);
     FileSystem defaultFs = FileSystemUtil.getDefaultFileSystem();
     AtomicLong numUnknownDiskIds = new AtomicLong();
     for (ContentFile<?> contentFile : newContentFiles) {
@@ -157,8 +158,7 @@ public class IcebergFileMetadataLoader extends FileMetadataLoader {
       // for all ContentFiles is the same as fsForTable
       if (!requiresDataFilesInTableLocation_) {
         Path path = new Path(contentFile.location());
-        fsForPath = path.toUri().getScheme() != null ?
-            FileSystemUtil.getFileSystemForPath(path) : defaultFs;
+        fsForPath = path.toUri().getScheme() != null ? fileSystemFor(path) : defaultFs;
       }
       // If the specific fs does not support StorageIds, then
       // we create FileDescriptor directly
@@ -336,6 +336,18 @@ public class IcebergFileMetadataLoader extends FileMetadataLoader {
     return ret;
   }
 
+  /**
+   * The FileSystem to list 'path' with. A table loaded from a vending REST catalog reads
+   * through a VendedCredentialsFileIO, whose per-credential FileSystem instances must be
+   * used here too; other tables use Hadoop's cached FileSystem for the path.
+   */
+  private FileSystem fileSystemFor(Path path) throws IOException {
+    if (iceTbl_.io() instanceof VendedCredentialsFileIO) {
+      return ((VendedCredentialsFileIO) iceTbl_.io()).fileSystemFor(path);
+    }
+    return FileSystemUtil.getFileSystemForPath(path);
+  }
+
   private Map<Path, List<ContentFile<?>>> collectPartitionPaths(
       List<ContentFile<?>> contentFiles) {
     final Clock clock = Clock.defaultClock();
@@ -363,7 +375,7 @@ public class IcebergFileMetadataLoader extends FileMetadataLoader {
   private List<IcebergFileDescriptor> createFdsForPartition(Path partitionPath,
       List<ContentFile<?>> contentFiles, AtomicLong numUnknownDiskIds)
       throws IOException, CatalogException {
-    FileSystem fs = FileSystemUtil.getFileSystemForPath(partitionPath);
+    FileSystem fs = fileSystemFor(partitionPath);
     RemoteIterator<? extends FileStatus> remoteIterator =
         FileSystemUtil.listFiles(fs, partitionPath, recursive_, debugAction_);
     Map<Path, FileStatus> pathToFileStatus = new HashMap<>();

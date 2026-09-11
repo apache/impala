@@ -132,6 +132,7 @@ public class RESTCatalogProperties {
 
   private final Map<String, String> finalMap_;
   private final String uri_;
+  private final boolean vendedCredentialsEnabled_;
   private String name_ = "";
 
   public RESTCatalogProperties(Properties properties) {
@@ -152,14 +153,21 @@ public class RESTCatalogProperties {
     // When vending is enabled, ask the REST catalog to return storage credentials on
     // loadTable by sending the access-delegation header. The vended credentials are
     // then extracted from the loaded table's FileIO (see Credential.extract).
-    boolean credentialsEnabled = Boolean.parseBoolean(
+    vendedCredentialsEnabled_ = Boolean.parseBoolean(
         finalMap_.get(VENDED_CREDENTIALS_ENABLED));
-    if (credentialsEnabled) {
+    if (vendedCredentialsEnabled_) {
       finalMap_.put(ACCESS_DELEGATION_HEADER, ACCESS_DELEGATION_VENDED);
+      // Planning-time reads must use the vended credentials too: VendedCredentialsFileIO
+      // opens each file with the credential vended for its prefix. An explicitly
+      // configured io-impl is left alone.
+      finalMap_.putIfAbsent(
+          CatalogProperties.FILE_IO_IMPL, VendedCredentialsFileIO.class.getName());
     }
   }
 
   public String getName() { return name_; }
   public String getUri() { return uri_; }
+  /** True when credential vending is enabled for this catalog. */
+  public boolean isVendedCredentialsEnabled() { return vendedCredentialsEnabled_; }
   public Map<String, String> getCatalogProperties() { return finalMap_; }
 }

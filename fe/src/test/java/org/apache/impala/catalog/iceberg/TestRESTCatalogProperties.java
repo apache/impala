@@ -157,10 +157,24 @@ public class TestRESTCatalogProperties {
 
     RESTCatalogProperties restProps = new RESTCatalogProperties(props);
     Map<String, String> catProps = restProps.getCatalogProperties();
-    assertEquals(3, catProps.size());
+    assertEquals(4, catProps.size());
     assertEquals("true", catProps.get("iceberg.rest-catalog.vended-credentials-enabled"));
     assertEquals("vended-credentials",
         catProps.get("header.X-Iceberg-Access-Delegation"));
+    // Planning-time reads go through the FileIO that applies the vended credentials.
+    assertEquals(VendedCredentialsFileIO.class.getName(), catProps.get("io-impl"));
+  }
+
+  @Test
+  public void testCredentialsEnabledKeepsExplicitFileIO() {
+    Properties props = new Properties();
+    props.setProperty("iceberg.rest-catalog.uri", "test-uri");
+    props.setProperty("iceberg.rest-catalog.vended-credentials-enabled", "true");
+    props.setProperty("io-impl", "org.example.CustomFileIO");
+
+    RESTCatalogProperties restProps = new RESTCatalogProperties(props);
+    assertEquals("org.example.CustomFileIO",
+        restProps.getCatalogProperties().get("io-impl"));
   }
 
   @Test

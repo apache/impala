@@ -105,7 +105,7 @@ FileHandleCache::Accessor::~Accessor() {
     VLOG_FILE << "hdfsUnbufferFile() fid=" << Get()->file();
     if (hdfsUnbufferFile(Get()->file()) != 0) {
       VLOG_FILE << "FS does not support file handle unbuffering, closing file="
-                << cache_accessor_.GetKey()->first;
+                << cache_accessor_.GetKey()->fname;
       Destroy();
     } else {
       // Calling explicit release to handle metrics
@@ -148,7 +148,7 @@ Status FileHandleCache::GetFileHandle(const hdfsFS& fs, std::string* fname, int6
   int index = HashUtil::Hash(fname->data(), fname->size(), 0) % cache_partitions_.size();
   FileHandleCachePartition& p = cache_partitions_[index];
 
-  auto cache_key = std::make_pair(*fname, mtime);
+  FileHandleCacheKey cache_key{*fname, mtime, fs};
 
   // If this requires a new handle, skip to the creation codepath. Otherwise,
   // find an unused entry with the same mtime
@@ -181,6 +181,15 @@ Status FileHandleCache::GetFileHandle(const hdfsFS& fs, std::string* fname, int6
   accessor->Set(std::move(accessor_tmp));
 
   return Status::OK();
+}
+
+size_t FileHandleCache::EvictHandles(const hdfsFS& fs) {
+  size_t num_in_use = 0;
+  for (FileHandleCachePartition& p : cache_partitions_) {
+    num_in_use +=
+        p.cache.EvictIf([&fs](const FileHandleCacheKey& key) { return key.fs == fs; });
+  }
+  return num_in_use;
 }
 
 void FileHandleCache::EvictHandlesLoop() {

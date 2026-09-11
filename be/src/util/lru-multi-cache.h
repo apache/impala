@@ -39,7 +39,9 @@ namespace impala {
 ///   - provides unique access to the freshest available stored object
 ///   - soft capacity to limit stored objects
 ///   - EvictOlderThan() function to age out unused objects
-///   - O(1) operations (except EvictOlderThan(), which can trigger multiple evictions)
+///   - EvictIf() function to drop the unused objects of selected keys
+///   - O(1) operations (except EvictOlderThan(), which can trigger multiple evictions,
+///   and EvictIf(), which visits every key)
 ///   - automatic release of objects with RAII accessor
 ///   - explicit release/destroy through accessor
 ///   - prevents aging by removing empty owning lists
@@ -117,6 +119,13 @@ class LruMultiCache {
 
   /// Evicts available objects with too old release time
   void EvictOlderThan(uint64_t oldest_allowed_timestamp);
+
+  /// Evicts every available object whose key satisfies 'key_predicate' and returns the
+  /// number of objects with such a key that are in use, which stay in the cache. O(n) in
+  /// the number of keys. Like the other evictions, it destroys the objects while holding
+  /// the cache's lock.
+  template <typename KeyPredicate>
+  size_t EvictIf(KeyPredicate&& key_predicate);
 
   /// Number of available objects, O(n) complexity, for testing purposes
   size_t NumberOfAvailableObjects();

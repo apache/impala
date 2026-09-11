@@ -67,6 +67,12 @@ SECONDARY_WRITE_TEST_CATALOG_LOCATION = \
     '/test-warehouse/iceberg_test/secondary_hadoop_catalog'
 UPDATE_TEST_NS = "impala_rest_update_test"
 MERGE_TEST_NS = "impala_rest_merge_test"
+# Enables credential vending against the HDFS-backed in-tree REST server (which vends
+# nothing), verifying the plumbing is a no-op for the common case.
+REST_VENDED_CREDENTIALS_IMPALAD_ARGS = """--use_local_catalog=true
+    --catalogd_deployed=false
+    --catalog_config_dir={}/testdata/configs/catalog_configs/iceberg_rest_vended_config"""\
+        .format(IMPALA_HOME)
 
 
 def RestServerProperties(*server_configs):
@@ -967,6 +973,16 @@ class TestIcebergRestCatalogNoHms(IcebergRestCatalogTests):
      start_args=NO_CATALOGD_STARTARGS)
   @pytest.mark.execute_serially
   def test_rest_catalog_basic(self, vector):
+    self.run_test_case('QueryTest/iceberg-rest-catalog', vector, use_db="ice")
+
+  @RestServerProperties({'port': 9084})
+  @CustomClusterTestSuite.with_args(
+     impalad_args=REST_VENDED_CREDENTIALS_IMPALAD_ARGS,
+     start_args=NO_CATALOGD_STARTARGS)
+  @pytest.mark.execute_serially
+  def test_rest_catalog_vended_credentials_enabled(self, vector):
+    # With vending enabled but no credentials actually vended, load and scan must still
+    # succeed via the normal path.
     self.run_test_case('QueryTest/iceberg-rest-catalog', vector, use_db="ice")
 
   @RestServerProperties(

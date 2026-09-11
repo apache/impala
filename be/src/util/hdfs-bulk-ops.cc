@@ -143,8 +143,9 @@ HdfsOpThreadPool* impala::CreateHdfsOpThreadPool(const string& name, uint32_t nu
       max_queue_length, &HdfsThreadPoolHelper);
 }
 
-HdfsOperationSet::HdfsOperationSet(HdfsFsCache::HdfsFsMap* connection_cache)
-    : connection_cache_(connection_cache) { }
+HdfsOperationSet::HdfsOperationSet(HdfsFsCache::HdfsFsMap* connection_cache,
+    QueryState* query_state)
+    : connection_cache_(connection_cache), query_state_(query_state) { }
 
 bool HdfsOperationSet::Execute(ThreadPool<HdfsOp>* pool, bool abort_on_error) {
   {
@@ -190,5 +191,6 @@ bool HdfsOperationSet::ShouldAbort() {
 
 Status HdfsOperationSet::GetHdfsFsConnection(const string& path, hdfsFS* fs) {
   lock_guard<mutex> l(connection_cache_lock_);
-  return HdfsFsCache::instance()->GetConnection(path, fs, connection_cache_);
+  return HdfsFsCache::instance()->GetConnection(
+      path, fs, connection_cache_, nullptr, query_state_);
 }

@@ -285,4 +285,32 @@ void LruMultiCache<KeyType, ValueType>::EvictOlderThan(
   }
 }
 
+template <typename KeyType, typename ValueType>
+template <typename KeyPredicate>
+size_t LruMultiCache<KeyType, ValueType>::EvictIf(KeyPredicate&& key_predicate) {
+  std::lock_guard<SpinLock> g(lock_);
+
+  size_t num_in_use = 0;
+  for (auto hash_table_it = hash_table_.begin(); hash_table_it != hash_table_.end();) {
+    // Evicting the last object of an owning list erases the list from the hash table,
+    // which invalidates the iterator to it, so step to the next one first.
+    auto current_it = hash_table_it++;
+    if (!key_predicate(current_it->first)) continue;
+
+    Container& container = current_it->second;
+
+    // All the available objects are in the front of the owning list. The number of
+    // remaining objects is tracked separately, because 'container' is gone once its last
+    // object is evicted.
+    size_t num_remaining = container.size();
+    while (num_remaining > 0 && container.front().IsAvailable()) {
+      EvictOne(container.front());
+      num_remaining--;
+    }
+    num_in_use += num_remaining;
+  }
+
+  return num_in_use;
+}
+
 } // namespace impala

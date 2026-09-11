@@ -468,7 +468,8 @@ Status PuffinWriter::LoadExistingDeletionVector(
   RoaringBitmap64 loaded_dv;
   Status load_status = dv_blob_reader_->Load(
       io_request_context_.get(), parent_->mem_tracker(), obj_pool_,
-      puffin_file_path, content_offset, content_size, &loaded_dv);
+      puffin_file_path, content_offset, content_size, &loaded_dv,
+      state_->query_state());
 
   if (!load_status.ok()) {
     return Status(strings::Substitute(

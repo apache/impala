@@ -75,6 +75,7 @@ add_library(Runtime
   mem-tracker.cc
   mem-pool.cc
   outbound-row-batch.cc
+  query-credentials.cc
   query-driver.cc
   query-exec-mgr.cc
   query-exec-params.cc
@@ -120,6 +121,7 @@ add_library(RuntimeTests STATIC
   mem-pool-test.cc
   mem-tracker-test.cc
   multi-precision-test.cc
+  query-credentials-test.cc
   raw-value-test.cc
   row-batch-serialize-test.cc
   runtime-filter-test.cc
@@ -159,6 +161,7 @@ ADD_UNIFIED_BE_LSAN_TEST(descriptors-test "DescriptorsTest.*")
 # Exception to unified be tests: Custom main function (initializes LLVM)
 ADD_BE_LSAN_TEST(buffered-tuple-stream-test)
 ADD_UNIFIED_BE_LSAN_TEST(hdfs-fs-cache-test "HdfsFsCacheTest.*")
+ADD_UNIFIED_BE_LSAN_TEST(query-credentials-test "QueryCredentialsTest.*")
 ADD_UNIFIED_BE_LSAN_TEST(tmp-file-mgr-test "TmpFileMgrTest.*")
 ADD_UNIFIED_BE_LSAN_TEST(tuple-cache-mgr-test "TupleCacheMgrTest.*")
 ADD_UNIFIED_BE_LSAN_TEST(row-batch-serialize-test "RowBatchSerializeTest.*")

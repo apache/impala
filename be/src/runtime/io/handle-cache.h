@@ -18,9 +18,13 @@
 #pragma once
 
 #include <array>
+#include <functional>
 #include <list>
 #include <map>
 #include <memory>
+#include <string>
+
+#include <boost/functional/hash.hpp>
 
 #include "common/hdfs.h"
 #include "common/status.h"
@@ -28,6 +32,42 @@
 #include "util/aligned-new.h"
 #include "util/lru-multi-cache.h"
 #include "util/thread.h"
+
+namespace impala {
+namespace io {
+
+/// Key of the file handle cache. 'fname' and 'mtime' identify a version of a file, and
+/// 'fs' is the connection the handle was opened on. A file handle belongs to its
+/// connection: it keeps using the configuration and the credentials of the connection
+/// (S3A signs the requests of a reopened stream with them), and it must be closed before
+/// the connection is. A handle is therefore only handed out to a reader that uses the
+/// same connection. Most files are only ever read through a single connection, the one
+/// HdfsFsCache keeps for their filesystem, so 'fs' does not partition their handles. It
+/// does for the files of a table with vended credentials, which are read through a
+/// connection built for the credential (see HdfsFsCache).
+struct FileHandleCacheKey {
+  std::string fname;
+  int64_t mtime;
+  hdfsFS fs;
+
+  bool operator==(const FileHandleCacheKey& other) const {
+    return mtime == other.mtime && fs == other.fs && fname == other.fname;
+  }
+};
+
+} // namespace io
+} // namespace impala
+
+/// Needed by the hash table of LruMultiCache.
+template <>
+struct std::hash<impala::io::FileHandleCacheKey> {
+  size_t operator()(const impala::io::FileHandleCacheKey& key) const noexcept {
+    size_t seed = std::hash<std::string>{}(key.fname);
+    boost::hash_combine(seed, key.mtime);
+    boost::hash_combine(seed, std::hash<hdfsFS>{}(key.fs));
+    return seed;
+  }
+};
 
 namespace impala {
 namespace io {
@@ -87,7 +127,10 @@ class ExclusiveHdfsFileHandle : public HdfsFileHandle {
 };
 
 /// The FileHandleCache is a data structure that owns HdfsFileHandles to share between
-/// threads. The HdfsFileHandles are hash partitioned across NUM_PARTITIONS partitions.
+/// threads. The handles are keyed by file name, mtime and the connection they were
+/// opened on (see FileHandleCacheKey), so a thread only gets a handle that was opened on
+/// the connection it reads the file through.
+/// The HdfsFileHandles are hash partitioned across NUM_PARTITIONS partitions.
 /// Each partition operates independently with its own locks, reducing contention
 /// between concurrent threads. The `capacity` is split between the partitions and is
 /// enforced independently.
@@ -119,10 +162,7 @@ class FileHandleCache {
   /// To avoid contention on the lock_ due to false sharing the partitions are
   /// aligned to cache line boundaries.
   struct FileHandleCachePartition : public CacheLineAligned {
-    // Cache key is a pair of filename and mtime
-    // Using std::pair to spare boilerplate of hash function
-    typedef LruMultiCache<std::pair<std::string, int64_t>, CachedHdfsFileHandle>
-        CacheType;
+    typedef LruMultiCache<FileHandleCacheKey, CachedHdfsFileHandle> CacheType;
     CacheType cache;
   };
 
@@ -168,19 +208,26 @@ class FileHandleCache {
   Status Init() WARN_UNUSED_RESULT;
 
   /// Get a file handle accessor from the cache for the specified filename (fname) and
-  /// last modification time (mtime). This will hash the filename to determine
-  /// which partition to use for this file handle.
+  /// last modification time (mtime), opened on the connection 'fs'. This will hash the
+  /// filename to determine which partition to use for this file handle.
   ///
-  /// If 'require_new_handle' is false and the partition contains an available handle,
-  /// an accessor is returned and cache_hit is set to true. Otherwise, the partition will
-  /// emplace file handle, an accessor to it will be returned with cache_hit set to false.
-  /// On failure, empty accessor will be returned. In either case, the partition may evict
-  /// a file handle to make room for the new file handle.
+  /// If 'require_new_handle' is false and the partition contains an available handle
+  /// that was opened on 'fs', an accessor is returned and cache_hit is set to true.
+  /// Otherwise, the partition will emplace file handle, an accessor to it will be
+  /// returned with cache_hit set to false. On failure, empty accessor will be returned.
+  /// In either case, the partition may evict a file handle to make room for the new file
+  /// handle.
   ///
   /// This obtains exclusive control over the returned file handle.
   Status GetFileHandle(const hdfsFS& fs, std::string* fname, int64_t mtime,
       bool require_new_handle, Accessor* accessor, bool* cache_hit,
       const OpenFileOptions& open_options = {}) WARN_UNUSED_RESULT;
+
+  /// Closes the cached file handles that were opened on the connection 'fs' and are not
+  /// in use. Returns the number of handles of 'fs' that are in use and therefore stay
+  /// in the cache. To be called before 'fs' is disconnected, when no reader uses it
+  /// anymore: a handle must not outlive its connection.
+  size_t EvictHandles(const hdfsFS& fs);
 
  private:
   /// Periodic check to evict unused file handles. Only executed by eviction_thread_.
