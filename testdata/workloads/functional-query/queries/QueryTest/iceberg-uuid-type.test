@@ -1,7 +1,7 @@
 ====
 ---- QUERY
 # Iceberg UUID Parquet read-path tests.
-# Casts, LIKE, and aggregates are not yet supported.
+# Aggregates are not yet supported.
 DESCRIBE iceberg_uuid_test
 ---- RESULTS: VERIFY_IS_SUBSET
 'id','int','','true'
@@ -76,6 +76,14 @@ SELECT id FROM iceberg_uuid_test WHERE uuid_col = (SELECT uuid_col FROM iceberg_
 INT
 ====
 ---- QUERY
+# Equality predicate with explicit string-to-UUID cast.
+SELECT id FROM iceberg_uuid_test WHERE uuid_col = CAST('12345678-1234-5678-1234-567812345678' AS UUID)
+---- RESULTS
+1
+---- TYPES
+INT
+====
+---- QUERY
 # Inequality predicate on two UUID-typed operands.
 SELECT id, name FROM iceberg_uuid_test
 WHERE uuid_col != (SELECT uuid_col FROM iceberg_uuid_test WHERE id = 3) AND id = 5
@@ -86,9 +94,32 @@ ORDER BY id
 INT,STRING
 ====
 ---- QUERY
+# Inequality predicate with explicit string-to-UUID cast.
+SELECT id, name FROM iceberg_uuid_test
+WHERE uuid_col != CAST('00000000-0000-0000-0000-000000000000' AS UUID) AND id = 5
+ORDER BY id
+---- RESULTS
+5,'max'
+---- TYPES
+INT,STRING
+====
+---- QUERY
 # IN predicate with a UUID-typed subquery.
 SELECT id FROM iceberg_uuid_test
 WHERE uuid_col IN (SELECT uuid_col FROM iceberg_uuid_test WHERE id IN (1, 2))
+ORDER BY id
+---- RESULTS
+1
+2
+---- TYPES
+INT
+====
+---- QUERY
+# IN predicate with explicit string-to-UUID casts.
+SELECT id FROM iceberg_uuid_test
+WHERE uuid_col IN (
+  CAST('12345678-1234-5678-1234-567812345678' AS UUID),
+  CAST('abcdefab-cdef-abcd-efab-cdefabcdefab' AS UUID))
 ORDER BY id
 ---- RESULTS
 1
@@ -109,10 +140,36 @@ ORDER BY id
 INT
 ====
 ---- QUERY
+# NOT IN predicate with explicit string-to-UUID casts.
+# Rows with NULL uuid_col are excluded (NULL NOT IN (...) is unknown).
+SELECT id FROM iceberg_uuid_test
+WHERE uuid_col NOT IN (
+  CAST('12345678-1234-5678-1234-567812345678' AS UUID),
+  CAST('abcdefab-cdef-abcd-efab-cdefabcdefab' AS UUID))
+ORDER BY id
+---- RESULTS
+3
+5
+---- TYPES
+INT
+====
+---- QUERY
 # Range comparison predicates on UUID-typed operands.
 SELECT id, name FROM iceberg_uuid_test
 WHERE uuid_col > (SELECT uuid_col FROM iceberg_uuid_test WHERE id = 3)
   AND uuid_col < (SELECT uuid_col FROM iceberg_uuid_test WHERE id = 5)
+ORDER BY uuid_col DESC
+---- RESULTS
+2,'bob'
+1,'alice'
+---- TYPES
+INT,STRING
+====
+---- QUERY
+# Range comparison predicates with explicit string-to-UUID casts.
+SELECT id, name FROM iceberg_uuid_test
+WHERE uuid_col > CAST('00000000-0000-0000-0000-000000000000' AS UUID)
+  AND uuid_col < CAST('ffffffff-ffff-ffff-ffff-ffffffffffff' AS UUID)
 ORDER BY uuid_col DESC
 ---- RESULTS
 2,'bob'
@@ -126,6 +183,19 @@ SELECT id FROM iceberg_uuid_test
 WHERE uuid_col BETWEEN
   (SELECT uuid_col FROM iceberg_uuid_test WHERE id = 1)
   AND (SELECT uuid_col FROM iceberg_uuid_test WHERE id = 2)
+ORDER BY id
+---- RESULTS
+1
+2
+---- TYPES
+INT
+====
+---- QUERY
+# BETWEEN predicate with explicit string-to-UUID casts.
+SELECT id FROM iceberg_uuid_test
+WHERE uuid_col BETWEEN
+  CAST('12345678-1234-5678-1234-567812345678' AS UUID)
+  AND CAST('abcdefab-cdef-abcd-efab-cdefabcdefab' AS UUID)
 ORDER BY id
 ---- RESULTS
 1
@@ -202,6 +272,16 @@ ORDER BY id
 INT
 ====
 ---- QUERY
+# IS NOT DISTINCT FROM on equal UUID values (null-safe equality).
+SELECT id FROM iceberg_uuid_test
+WHERE uuid_col IS NOT DISTINCT FROM CAST('12345678-1234-5678-1234-567812345678' AS UUID)
+ORDER BY id
+---- RESULTS
+1
+---- TYPES
+INT
+====
+---- QUERY
 # IS DISTINCT FROM on different UUID values.
 SELECT id FROM iceberg_uuid_test
 WHERE uuid_col IS DISTINCT FROM (SELECT uuid_col FROM iceberg_uuid_test WHERE id = 1) AND id != 1
@@ -215,7 +295,20 @@ ORDER BY id
 INT
 ====
 ---- QUERY
-# IS NOT DISTINCT FROM treats two NULL UUIDs as equal.
+# IS DISTINCT FROM on different UUID values.
+SELECT id FROM iceberg_uuid_test
+WHERE uuid_col IS DISTINCT FROM CAST('12345678-1234-5678-1234-567812345678' AS UUID) AND id != 1
+ORDER BY id
+---- RESULTS
+2
+3
+4
+5
+---- TYPES
+INT
+====
+---- QUERY
+# IS NOT DISTINCT FROM treats two NULL UUIDs as equal (scalar subquery).
 SELECT id FROM iceberg_uuid_test
 WHERE uuid_col IS NOT DISTINCT FROM (SELECT uuid_col FROM iceberg_uuid_test WHERE id = 4)
 ORDER BY id
@@ -225,9 +318,30 @@ ORDER BY id
 INT
 ====
 ---- QUERY
+# IS NOT DISTINCT FROM treats two NULL UUIDs as equal (CAST(NULL AS UUID)).
+SELECT id FROM iceberg_uuid_test WHERE uuid_col IS NOT DISTINCT FROM CAST(NULL AS UUID)
+---- RESULTS
+4
+---- TYPES
+INT
+====
+---- QUERY
 # IS DISTINCT FROM treats NULL and non-NULL UUIDs as distinct.
 SELECT id FROM iceberg_uuid_test
 WHERE uuid_col IS DISTINCT FROM (SELECT uuid_col FROM iceberg_uuid_test WHERE id = 1)
+ORDER BY id
+---- RESULTS
+2
+3
+4
+5
+---- TYPES
+INT
+====
+---- QUERY
+# IS DISTINCT FROM treats NULL and non-NULL UUIDs as distinct.
+SELECT id FROM iceberg_uuid_test
+WHERE uuid_col IS DISTINCT FROM CAST('12345678-1234-5678-1234-567812345678' AS UUID)
 ORDER BY id
 ---- RESULTS
 2
@@ -274,22 +388,158 @@ SELECT id FROM iceberg_uuid_test WHERE uuid_col LIKE 'ffffffff%'
 left operand of LIKE must be of type STRING
 ====
 ---- QUERY
-# Explicit CAST from UUID to STRING is not yet supported.
+# Explicit CAST from UUID to STRING.
 SELECT CAST(uuid_col AS STRING) FROM iceberg_uuid_test WHERE id = 1
----- CATCH
-Invalid type cast of uuid_col from UUID to STRING
+---- RESULTS
+'12345678-1234-5678-1234-567812345678'
+---- TYPES
+STRING
 ====
 ---- QUERY
-# Explicit CAST from STRING to UUID is not yet supported.
+# Explicit CAST from STRING to UUID.
 SELECT CAST('12345678-1234-5678-1234-567812345678' AS UUID)
+---- RESULTS
+'12345678-1234-5678-1234-567812345678'
+---- TYPES
+UUID
+---- HS2_TYPES
+STRING
+====
+---- QUERY
+# CAST from STRING to UUID rejects invalid canonical strings at runtime.
+SELECT CAST('invalid-uuid-format' AS UUID)
 ---- CATCH
-Invalid type cast of '12345678-1234-5678-1234-567812345678' from STRING to UUID
+String to UUID parse failed. Invalid string val: 'invalid-uuid-format'
+====
+---- QUERY
+# CAST from STRING to UUID rejects strings without dashes.
+SELECT CAST('12345678123456781234567812345678' AS UUID)
+---- CATCH
+String to UUID parse failed. Invalid string val: '12345678123456781234567812345678'
+====
+---- QUERY
+# CAST from STRING to UUID rejects brace-wrapped strings.
+SELECT CAST('{12345678-1234-5678-1234-567812345678}' AS UUID)
+---- CATCH
+String to UUID parse failed. Invalid string val: '{12345678-1234-5678-1234-567812345678}'
+====
+---- QUERY
+# CAST from STRING to UUID rejects leading or trailing whitespace.
+SELECT CAST(' 12345678-1234-5678-1234-567812345678 ' AS UUID)
+---- CATCH
+String to UUID parse failed. Invalid string val: ' 12345678-1234-5678-1234-567812345678 '
+====
+---- QUERY
+# CAST from STRING to UUID rejects empty strings.
+SELECT CAST('' AS UUID)
+---- CATCH
+String to UUID parse failed. Invalid string val: ''
+====
+---- QUERY
+# Uppercase UUID input is accepted and normalized to lowercase on output.
+SELECT CAST(CAST('ABCDEFAB-CDEF-ABCD-EFAB-CDEFABCDEFAB' AS UUID) AS STRING)
+---- RESULTS
+'abcdefab-cdef-abcd-efab-cdefabcdefab'
+---- TYPES
+STRING
+====
+---- QUERY
+# Non-constant STRING expression preserves UUID values.
+SELECT count(*) FROM iceberg_uuid_test WHERE CAST(CAST(uuid_col AS STRING) AS UUID) = uuid_col AND uuid_col IS NOT NULL
+---- RESULTS
+4
+---- TYPES
+BIGINT
+====
+---- QUERY
+# CAST from CHAR/VARCHAR literals to UUID.
+SELECT CAST(CAST('12345678-1234-5678-1234-567812345678' AS CHAR(36)) AS UUID)
+---- RESULTS
+'12345678-1234-5678-1234-567812345678'
+---- TYPES
+UUID
+---- HS2_TYPES
+STRING
+====
+---- QUERY
+SELECT CAST(CAST('12345678-1234-5678-1234-567812345678' AS VARCHAR(36)) AS UUID)
+---- RESULTS
+'12345678-1234-5678-1234-567812345678'
+---- TYPES
+UUID
+---- HS2_TYPES
+STRING
+====
+---- QUERY
+# CAST from UUID to CHAR is rejected; use CAST(uuid AS STRING) instead.
+SELECT CAST(uuid_col AS CHAR(36)) FROM iceberg_uuid_test WHERE id = 1
+---- CATCH
+Invalid type cast of uuid_col from UUID to CHAR(36)
+====
+---- QUERY
+# CAST from UUID to CHAR(N) for N != 36 is also rejected.
+SELECT CAST(uuid_col AS CHAR(30)) FROM iceberg_uuid_test WHERE id = 1
+---- CATCH
+Invalid type cast of uuid_col from UUID to CHAR(30)
+====
+---- QUERY
+# CAST from UUID to VARCHAR is rejected; use CAST(uuid AS STRING) instead.
+SELECT CAST(uuid_col AS VARCHAR(36)) FROM iceberg_uuid_test WHERE id = 1
+---- CATCH
+Invalid type cast of uuid_col from UUID to VARCHAR(36)
+====
+---- QUERY
+# Fixed-width CHAR output is available via an explicit UUID to STRING cast first.
+SELECT CAST(CAST(uuid_col AS STRING) AS CHAR(36)) FROM iceberg_uuid_test WHERE id = 1
+---- RESULTS
+'12345678-1234-5678-1234-567812345678'
+---- TYPES
+CHAR
+====
+---- QUERY
+# INSERT with an explicit UUID cast is still blocked on the write path.
+INSERT INTO iceberg_uuid_test
+VALUES (10, CAST('12345678-1234-5678-1234-567812345678' AS UUID), 'test')
+---- CATCH
+Impala does not support writing UUID columns
+====
+---- QUERY
+# CTAS producing UUID columns in Parquet is blocked (Iceberg-only type).
+CREATE TABLE uuid_cast_ctas_parquet
+STORED AS PARQUET
+AS SELECT CAST('12345678-1234-5678-1234-567812345678' AS UUID) AS u
+---- CATCH
+UUID type is only supported for Iceberg tables
+====
+---- QUERY
+# CTAS producing UUID columns in Iceberg is blocked on the write path.
+CREATE TABLE uuid_cast_ctas_iceberg
+STORED AS ICEBERG
+AS SELECT CAST('12345678-1234-5678-1234-567812345678' AS UUID) AS u
+---- CATCH
+Impala does not support writing UUID columns
 ====
 ---- QUERY
 # UUID cannot be cast to non-string types.
 SELECT CAST(uuid_col AS INT) FROM iceberg_uuid_test WHERE id = 1
 ---- CATCH
 Invalid type cast of uuid_col from UUID to INT
+====
+---- QUERY
+# CAST to STRING enables string functions on UUID columns.
+SELECT length(CAST(uuid_col AS STRING)) FROM iceberg_uuid_test WHERE id = 1
+---- RESULTS
+36
+---- TYPES
+INT
+====
+---- QUERY
+# LIKE requires an explicit UUID to STRING cast.
+SELECT id FROM iceberg_uuid_test WHERE CAST(uuid_col AS STRING) LIKE '12345678%'
+---- RESULTS
+1
+---- TYPES
+INT
 ====
 ---- QUERY
 # MIN() is not yet supported on UUID columns.

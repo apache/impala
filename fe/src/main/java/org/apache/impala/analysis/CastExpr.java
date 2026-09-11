@@ -53,6 +53,9 @@ public class CastExpr extends Expr {
   protected final static String CAST_FUNCTION_PREFIX = "castto";
   private final static String CAST_TO_CHAR_FN = "impala::CastFunctions::CastToChar";
   private final static String CAST_TO_VARCHAR_FN = "impala::CastFunctions::CastToVarchar";
+  private final static String CAST_TO_UUID_FN = "impala::CastFunctions::CastToUuid";
+  private final static String CAST_UUID_TO_STRING_FN =
+      "impala::CastFunctions::CastUuidToString";
 
   // Stores the value of the FORMAT clause.
   private final String castFormat_;
@@ -122,7 +125,19 @@ public class CastExpr extends Expr {
       if (fromType.isNull()) continue;
       for (Type toType : Type.getSupportedTypes()) {
         if (toType.isNull()) continue;
-        // TODO: Add UUID cast builtin support.
+        // Explicit STRING/VARCHAR/CHAR <-> UUID casts only.
+        if (toType.isUuid() && fromType.isStringType()) {
+          db.addBuiltin(ScalarFunction.createBuiltin(getFnName(Type.UUID),
+              Lists.newArrayList(fromType), false, Type.UUID, CAST_TO_UUID_FN,
+              null, null, true));
+          continue;
+        }
+        if (fromType.isUuid() && toType.isString()) {
+          db.addBuiltin(ScalarFunction.createBuiltin(getFnName(Type.STRING),
+              Lists.newArrayList((Type) Type.UUID), false, Type.STRING,
+              CAST_UUID_TO_STRING_FN, null, null, true));
+          continue;
+        }
         if (fromType.isUuid() || toType.isUuid()) continue;
         // Disable casting from string to boolean
         if (fromType.isStringType() && toType.isBoolean()) continue;
@@ -322,10 +337,12 @@ public class CastExpr extends Expr {
           "Unsupported cast to complex type: " + type_.toSql());
     }
 
+    // Skip UUID: no UUID->CHAR builtin is registered, so getFunction() below rejects it.
     boolean twoStepCastNeeded =
         type_.getPrimitiveType() == PrimitiveType.CHAR &&
         children_.get(0).getType().getPrimitiveType() != PrimitiveType.STRING &&
-        children_.get(0).getType().getPrimitiveType() != PrimitiveType.CHAR;
+        children_.get(0).getType().getPrimitiveType() != PrimitiveType.CHAR &&
+        !children_.get(0).getType().isUuid();
     if (twoStepCastNeeded) {
       // Back end functions only exist to cast string types to CHAR, there is not a cast
       // for every type since it is redundant with STRING. Casts to go through 2 casts:

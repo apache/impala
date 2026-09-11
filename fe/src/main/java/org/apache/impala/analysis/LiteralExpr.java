@@ -286,6 +286,11 @@ public abstract class LiteralExpr extends Expr implements Comparable<LiteralExpr
           result = new DateLiteral(val.int_val, val.getString_val());
         }
         break;
+      case UUID:
+        if (val.isSetString_val()) {
+          result = new StringLiteral(val.getString_val(), Type.UUID, false);
+        }
+        break;
       case DATETIME:
         return null;
       default:

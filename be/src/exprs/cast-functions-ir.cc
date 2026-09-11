@@ -35,6 +35,7 @@
 #include "runtime/timestamp-value.h"
 #include "runtime/timestamp-value.inline.h"
 #include "util/string-parser.h"
+#include "util/uuid-util.h"
 
 using namespace impala;
 using namespace impala_udf;
@@ -412,6 +413,39 @@ StringVal CastFunctions::CastToVarchar(FunctionContext* ctx, const StringVal& va
 // expression tree to be able to get the exact return type.
 StringVal CastFunctions::CastToStringVal(FunctionContext* ctx, const StringVal& val) {
   return val;
+}
+
+StringVal CastFunctions::CastToUuid(FunctionContext* ctx, const StringVal& val) {
+  if (val.is_null) return StringVal::null();
+
+  const FunctionContext::TypeDesc& type = ctx->GetReturnType();
+  DCHECK_EQ(type.type, FunctionContext::TYPE_UUID);
+  DCHECK_EQ(type.len, UUID_BYTE_LEN);
+  char* dest = reinterpret_cast<char*>(ctx->impl()->AllocateForResults(UUID_BYTE_LEN));
+  if (UNLIKELY(dest == NULL)) {
+    DCHECK(!ctx->impl()->state()->GetQueryStatus().ok());
+    return StringVal::null();
+  }
+  if (!ParseCanonicalUuidStringToBytes(reinterpret_cast<char*>(val.ptr), val.len,
+          reinterpret_cast<uint8_t*>(dest))) {
+    string invalid_val(reinterpret_cast<const char*>(val.ptr), val.len);
+    ctx->SetError(Substitute("String to UUID parse failed. Invalid string val: '$0'",
+        invalid_val).c_str());
+    return StringVal::null();
+  }
+  return StringVal(reinterpret_cast<uint8_t*>(dest), UUID_BYTE_LEN);
+}
+
+StringVal CastFunctions::CastUuidToString(FunctionContext* ctx, const StringVal& val) {
+  if (val.is_null) return StringVal::null();
+  DCHECK_EQ(val.len, UUID_BYTE_LEN);
+  char* dest = reinterpret_cast<char*>(ctx->impl()->AllocateForResults(UUID_STRING_LEN));
+  if (UNLIKELY(dest == NULL)) {
+    DCHECK(!ctx->impl()->state()->GetQueryStatus().ok());
+    return StringVal::null();
+  }
+  UuidBytesToString(val.ptr, dest);
+  return StringVal(reinterpret_cast<uint8_t*>(dest), UUID_STRING_LEN);
 }
 
 StringVal CastFunctions::CastToChar(FunctionContext* ctx, const StringVal& val) {

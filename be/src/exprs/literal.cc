@@ -31,6 +31,7 @@
 #include "runtime/runtime-state.h"
 #include "runtime/timestamp-parse-util.h"
 #include "util/decimal-util.h"
+#include "util/uuid-util.h"
 
 #include "common/names.h"
 
@@ -110,6 +111,16 @@ Literal::Literal(const TExprNode& node)
         str.replace(str_len, type_.len - str_len, type_.len - str_len, ' ');
       }
       value_.Init(str);
+      break;
+    }
+    case TYPE_UUID: {
+      DCHECK_EQ(node.node_type, TExprNodeType::STRING_LITERAL);
+      DCHECK(node.__isset.string_literal);
+      const string& str = node.string_literal.value;
+      uint8_t bytes[UUID_BYTE_LEN];
+      bool parsed = ParseCanonicalUuidStringToBytes(str.data(), str.size(), bytes);
+      CHECK(parsed) << "Invalid UUID literal: " << str;
+      value_.Init(string(reinterpret_cast<char*>(bytes), UUID_BYTE_LEN));
       break;
     }
     case TYPE_DECIMAL: {
@@ -287,7 +298,7 @@ DoubleVal Literal::GetDoubleValInterpreted(
 
 StringVal Literal::GetStringValInterpreted(
     ScalarExprEvaluator* eval, const TupleRow* row) const {
-  DCHECK(type_.IsStringType()) << type_;
+  DCHECK(type_.IsStringType() || type_.IsUuidType()) << type_;
   StringVal result;
   value_.string_val.ToStringVal(&result);
   return result;
@@ -420,6 +431,7 @@ Status Literal::GetCodegendComputeFnImpl(LlvmCodeGen* codegen, llvm::Function** 
     case TYPE_STRING:
     case TYPE_VARCHAR:
     case TYPE_CHAR:
+    case TYPE_UUID:
       v.SetLen(builder.getInt32(value_.string_val.Len()));
       v.SetPtr(codegen->GetStringConstant(
           &builder, value_.string_val.Ptr(), value_.string_val.Len()));

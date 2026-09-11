@@ -19,7 +19,7 @@ package org.apache.impala.catalog;
 
 import static org.apache.impala.catalog.Type.UUID;
 
-// UUID is incompatible with all other types until predicate/cast support is added.
+// UUID is incompatible with all other types except via explicit CAST.
 public class UuidCompatibility implements CompatibilityRule {
   @Override
   public void apply(PrimitiveType[][] matrix) {
