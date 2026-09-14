@@ -42,7 +42,11 @@ RUN apt-get update && \
 # Install impala-shell from pip.
 # TODO: consider if it would be better to use the latest impala-shell from the build
 # environment.
-RUN pip install impala-shell
+# The distro-provided pip is too old to build source dists (e.g. thrift) with modern
+# setuptools during PEP 517 build isolation, failing with
+# "FileNotFoundError: .../output.json". Upgrade pip first to avoid that.
+RUN pip install --upgrade pip && \
+    pip install impala-shell
 
 # Use a non-privileged impala user to run the daemons in the container.
 # That user should own everything in the /opt/impala and /var/lib/impala subdirectories
