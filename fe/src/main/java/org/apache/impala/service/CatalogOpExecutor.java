@@ -8316,8 +8316,14 @@ public class CatalogOpExecutor {
     Map<String, List<FileMetadata>> fileMetadata = Maps.newHashMap();
     int numFiles = 0;
     for (Map.Entry<String, TUpdatedPartition> e : updatedPartitions.entrySet()) {
-      numFiles += e.getValue().getFiles().size();
-      List<FileMetadata> files = new ArrayList<>(e.getValue().getFiles().size());
+      int numPartFiles = e.getValue().getFiles().size();
+      if (numPartFiles == 0) {
+        fileMetadata.put(e.getKey(), Collections.emptyList());
+        continue;
+      }
+      numFiles += numPartFiles;
+      List<FileMetadata> files = new ArrayList<>(numPartFiles);
+      fileMetadata.put(e.getKey(), files);
       for (String file : e.getValue().getFiles()) {
         loaders.add(new Pair<>(file, () -> {
           FileChecksum checksum = null;
@@ -8341,7 +8347,6 @@ public class CatalogOpExecutor {
           return new FileMetadata(file, checksum, acidDirPath);
         }));
         updaters.add((result) -> files.add((FileMetadata) result));
-        fileMetadata.put(e.getKey(), files);
       }
     }
 

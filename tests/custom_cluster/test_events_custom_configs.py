@@ -1954,6 +1954,18 @@ class TestEventProcessingCustomConfigs(TestEventProcessingCustomConfigsBase):
     _check_insert_events(tbl1, 4, skip_events=1, part='partition(year=2024)')
     _check_insert_events(tbl2, 4, skip_events=0)
 
+  @CustomClusterTestSuite.with_args(disable_log_buffering=True)
+  def test_insert_empty_result_set_nonpartitioned(self, unique_database):
+    self.execute_query("create table {}.tbl (i int)".format(unique_database))
+    # Insert empty result set to an empty table
+    self.execute_query("insert into {}.tbl select 1 from functional.alltypestiny limit 0"
+                       .format(unique_database))
+    self.execute_query("insert into {}.tbl select 1".format(unique_database))
+    # Insert empty result set to a non-empty table
+    self.execute_query("insert into {}.tbl select 1 from functional.alltypestiny limit 0"
+                       .format(unique_database))
+    # Asserts no errors by using expected_count=0
+    self.assert_catalogd_log_contains("INFO", "Failed to fire insert events for table", 0)
 
 @SkipIfFS.hive
 class TestEventProcessingWithImpala(TestEventProcessingCustomConfigsBase):
