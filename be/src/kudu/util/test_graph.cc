@@ -17,9 +17,9 @@
 
 #include "kudu/util/test_graph.h"
 
-#include <mutex>
 #include <ostream>
 #include <thread>
+#include <type_traits>
 #include <utility>
 
 #include <glog/logging.h>
@@ -36,17 +36,17 @@ using std::thread;
 namespace kudu {
 
 void TimeSeries::AddValue(double val) {
-  std::lock_guard<simple_spinlock> l(lock_);
+  std::lock_guard l(lock_);
   val_ += val;
 }
 
 void TimeSeries::SetValue(double val) {
-  std::lock_guard<simple_spinlock> l(lock_);
+  std::lock_guard l(lock_);
   val_ = val;
 }
 
 double TimeSeries::value() const {
-  std::lock_guard<simple_spinlock> l(lock_);
+  std::lock_guard l(lock_);
   return val_;
 }
 
@@ -57,7 +57,7 @@ TimeSeriesCollector::~TimeSeriesCollector() {
 }
 
 shared_ptr<TimeSeries> TimeSeriesCollector::GetTimeSeries(const string& key) {
-  MutexLock l(series_lock_);
+  std::lock_guard l_(series_lock_);
   SeriesMap::const_iterator it = series_map_.find(key);
   if (it != series_map_.end()) {
     return (*it).second;
@@ -103,7 +103,7 @@ void TimeSeriesCollector::DumperThread() {
 
 void TimeSeriesCollector::BuildMetricsString(
   WallTime time_since_start, faststring* dst_buf) const {
-  MutexLock l(series_lock_);
+  std::lock_guard l_(series_lock_);
 
   dst_buf->append(StringPrintf("{ \"scope\": \"%s\", \"time\": %.3f",
                                scope_.c_str(), time_since_start));

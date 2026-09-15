@@ -25,8 +25,8 @@
 namespace kudu {
 
 struct CacheMetrics {
-  virtual ~CacheMetrics() {
-  }
+  virtual ~CacheMetrics() = default;
+
   scoped_refptr<Counter> inserts;
   scoped_refptr<Counter> lookups;
   scoped_refptr<Counter> evictions;
@@ -36,6 +36,23 @@ struct CacheMetrics {
   scoped_refptr<Counter> cache_misses_caching;
 
   scoped_refptr<AtomicGauge<uint64_t>> cache_usage;
+};
+
+// TODO(mreddy): Calculate high-level cache metrics by using
+//  information from segment-level metrics.
+struct SLRUCacheMetrics : public CacheMetrics {
+  explicit SLRUCacheMetrics(const scoped_refptr<MetricEntity>& entity);
+
+  scoped_refptr<Histogram> upgrades_stats;
+  scoped_refptr<Histogram> downgrades_stats;
+
+  scoped_refptr<Counter> probationary_segment_inserts;
+  scoped_refptr<Counter> probationary_segment_evictions;
+  scoped_refptr<AtomicGauge<uint64_t>> probationary_segment_cache_usage;
+
+  scoped_refptr<Counter> protected_segment_inserts;
+  scoped_refptr<Counter> protected_segment_evictions;
+  scoped_refptr<AtomicGauge<uint64_t>> protected_segment_cache_usage;
 };
 
 } // namespace kudu

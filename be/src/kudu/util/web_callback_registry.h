@@ -27,15 +27,33 @@ namespace kudu {
 
 enum class HttpStatusCode {
   Ok, // 200
-  MovedTemporarily, // 302
-  TemporaryRedirect, // 307
+  Created, // 201
+  NoContent, // 204
+  TemporaryRedirect, //307
   BadRequest, // 400
   AuthenticationRequired, // 401
+  Forbidden, // 403
   NotFound, // 404
+  MethodNotAllowed, // 405
   LengthRequired, // 411
   RequestEntityTooLarge, // 413
   InternalServerError, // 500
   ServiceUnavailable, // 503
+  GatewayTimeout // 504
+};
+
+// StyleMode is an enumeration used to define the format of the server's response to the client.
+// This format determines how the response data is presented and interpreted by the client.
+enum class StyleMode {
+  // This mode includes additional styling elements in the response,
+  // such as CSS, navigation bar, etc.
+  STYLED,
+  // In this mode, the response is sent without any styling elements.
+  UNSTYLED,
+  // In rare cases when a binary data is sent as a response.
+  BINARY,
+  // This mode is used when the server response is in JSON format.
+  JSON
 };
 
 // Interface for registering webserver callbacks.
@@ -57,6 +75,9 @@ class WebCallbackRegistry {
     // The HTTP request headers.
     ArgumentMap request_headers;
 
+    // The authenticated username, if any.
+    std::string username;
+
     // The raw query string passed in the URL. May be empty.
     std::string query_string;
 
@@ -66,13 +87,8 @@ class WebCallbackRegistry {
     // In the case of a POST, the posted data.
     std::string post_data;
 
-    // The socket address of the requester, <host>:<port>.
-    // Define this variable for IMPALA-9182.
-    std::string source_socket;
-
-    // Authenticated user, or 'anonymous' if no auth used
-    // Define this variable for IMPALA-10779.
-    std::string source_user = "anonymous";
+    // Parameters extracted from the URL path.
+    ArgumentMap path_params;
   };
 
   // A response to an HTTP request whose body is rendered by template.
@@ -110,28 +126,28 @@ class WebCallbackRegistry {
   typedef std::function<void (const WebRequest& args, PrerenderedWebResponse* resp)>
       PrerenderedPathHandlerCallback;
 
-  virtual ~WebCallbackRegistry() {}
+  virtual ~WebCallbackRegistry() = default;
 
   // Register a callback for a URL path. Path should not include the
-  // http://hostname/ prefix. If is_styled is true, the page is meant to be for
+  // http://hostname/ prefix. If style_mode is StyleMode::STYLED, the page is meant to be for
   // people to look at and is styled.  If false, it is meant to be for machines to
   // scrape.  If is_on_nav_bar is true,  a link to this page is
   // printed in the navigation bar at the top of each debug page. Otherwise the
   // link does not appear, and the page is rendered without HTML headers and
   // footers.
-  // The first registration's choice of is_styled overrides all
+  // The first registration's choice of style_mode overrides all
   // subsequent registrations for that URL.
   // For each call to RegisterPathHandler(), the file $KUDU_HOME/www<path>.mustache
   // should exist.
   virtual void RegisterPathHandler(const std::string& path, const std::string& alias,
                                    const PathHandlerCallback& callback,
-                                   bool is_styled, bool is_on_nav_bar) = 0;
+                                   StyleMode style_mode, bool is_on_nav_bar) = 0;
 
   // Same as RegisterPathHandler(), except that callback produces prerendered HTML.
   // Use RegisterPathHandler() with a mustache template instead.
   virtual void RegisterPrerenderedPathHandler(const std::string& path, const std::string& alias,
                                               const PrerenderedPathHandlerCallback& callback,
-                                              bool is_styled,
+                                              StyleMode style_mode,
                                               bool is_on_nav_bar) = 0;
 
   // Register a callback for a URL path that returns binary data, a.k.a. octet
@@ -142,6 +158,13 @@ class WebCallbackRegistry {
       const std::string& path,
       const std::string& alias,
       const PrerenderedPathHandlerCallback& callback) = 0;
+
+  // Register a callback for a URL path that returns JSON.
+  virtual void RegisterJsonPathHandler(
+      const std::string& path,
+      const std::string& alias,
+      const PrerenderedPathHandlerCallback& callback,
+      bool is_on_nav_bar) = 0;
 
   // Returns true if 'req' was proxied via Knox, false otherwise.
   static bool IsProxiedViaKnox(const WebRequest& req);

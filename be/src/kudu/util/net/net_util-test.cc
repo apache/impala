@@ -40,6 +40,7 @@
 
 DECLARE_bool(fail_dns_resolution);
 DECLARE_string(fail_dns_resolution_hostports);
+DECLARE_string(ip_config_mode);
 
 using std::string;
 using std::vector;
@@ -67,13 +68,143 @@ class NetUtilTest : public KuduTest {
 
 TEST(SockaddrTest, Test) {
   Sockaddr addr;
-  ASSERT_OK(addr.ParseString("1.1.1.1:12345", 12345));
-  ASSERT_EQ(12345, addr.port());
-  ASSERT_EQ("1.1.1.1", addr.host());
+  Status s;
+
+  // Test cases with valid input.
+  ASSERT_OK(addr.ParseString("1.1.1.1", 12345));
+  EXPECT_EQ(12345, addr.port());
+  EXPECT_EQ("1.1.1.1", addr.host());
+
+  ASSERT_OK(addr.ParseString("1.1.1.1:12345", 0));
+  EXPECT_EQ(12345, addr.port());
+  EXPECT_EQ("1.1.1.1", addr.host());
+
+  ASSERT_OK(addr.ParseString("1:1:1:1:1:1:1:1", 12345));
+  EXPECT_EQ(12345, addr.port());
+  EXPECT_EQ("1:1:1:1:1:1:1:1", addr.host());
+
+  ASSERT_OK(addr.ParseString("[1:1:1:1:1:1:1:1]:1234", 0));
+  EXPECT_EQ(1234, addr.port());
+  EXPECT_EQ("1:1:1:1:1:1:1:1", addr.host());
+
+  ASSERT_OK(addr.ParseString("[1:1:1:1:1:1:1:1]", 12345));
+  EXPECT_EQ(12345, addr.port());
+  EXPECT_EQ("1:1:1:1:1:1:1:1", addr.host());
+
+  ASSERT_OK(addr.ParseString(" 1.1.1.1 ", 12345));
+  EXPECT_EQ(12345, addr.port());
+  EXPECT_EQ("1.1.1.1", addr.host());
+
+  ASSERT_OK(addr.ParseString(" 1.1.1.1:12345 ", 0));
+  EXPECT_EQ(12345, addr.port());
+  EXPECT_EQ("1.1.1.1", addr.host());
+
+  ASSERT_OK(addr.ParseString(" 1:1:1:1:1:1:1:1 ", 12345));
+  EXPECT_EQ(12345, addr.port());
+  EXPECT_EQ("1:1:1:1:1:1:1:1", addr.host());
+
+  ASSERT_OK(addr.ParseString(" [1:1:1:1:1:1:1:1]:1234 ", 0));
+  EXPECT_EQ(1234, addr.port());
+  EXPECT_EQ("1:1:1:1:1:1:1:1", addr.host());
+
+  ASSERT_OK(addr.ParseString("[::1]:1234", 0));
+  EXPECT_EQ(1234, addr.port());
+  EXPECT_EQ("::1", addr.host());
+
+  ASSERT_OK(addr.ParseString("[::]:1234", 0));
+  EXPECT_EQ(1234, addr.port());
+  EXPECT_EQ("::", addr.host());
+
+  ASSERT_OK(addr.ParseString("::", 1234));
+  EXPECT_EQ(1234, addr.port());
+  EXPECT_EQ("::", addr.host());
+
+  ASSERT_OK(addr.ParseString("2405:201:D01E:E861:4234:4A42:40E7:8E40", 0));
+  EXPECT_EQ("2405:201:d01e:e861:4234:4a42:40e7:8e40", addr.host());
+
+  ASSERT_OK(addr.ParseString("ABCD:EF00:ABCD:EF00:ABCD:EF00:ABCD:EF00", 0));
+  EXPECT_EQ("abcd:ef00:abcd:ef00:abcd:ef00:abcd:ef00", addr.host());
+
+  ASSERT_OK(addr.ParseString("Ab:201:d01e:e861:4234:4a42:40e7:Cd", 0));
+  EXPECT_EQ("ab:201:d01e:e861:4234:4a42:40e7:cd", addr.host());
+
+  // Test cases with invalid input.
+  s = addr.ParseString("", 0);
+  ASSERT_TRUE(s.IsInvalidArgument());
+  ASSERT_STR_MATCHES(s.ToString(), "invalid address");
+
+  s = addr.ParseString("1[::1]", 0);
+  ASSERT_TRUE(s.IsInvalidArgument());
+  ASSERT_STR_MATCHES(s.ToString(), "invalid address");
+
+  s = addr.ParseString("[[::1]]:1234", 0);
+  ASSERT_TRUE(s.IsInvalidArgument());
+  ASSERT_STR_MATCHES(s.ToString(), "invalid address");
+
+  s = addr.ParseString("[[::1]:1234", 0);
+  ASSERT_TRUE(s.IsInvalidArgument());
+  ASSERT_STR_MATCHES(s.ToString(), "invalid address");
+
+  s = addr.ParseString("[[::1]:1234]", 0);
+  ASSERT_TRUE(s.IsInvalidArgument());
+  ASSERT_STR_MATCHES(s.ToString(), "invalid address");
+
+  s = addr.ParseString("[::1]]:1234", 0);
+  ASSERT_TRUE(s.IsInvalidArgument());
+  ASSERT_STR_MATCHES(s.ToString(), "invalid address");
+
+  s = addr.ParseString("[::1]]", 0);
+  ASSERT_TRUE(s.IsInvalidArgument());
+  ASSERT_STR_MATCHES(s.ToString(), "invalid address");
+
+  s = addr.ParseString("1.1.1.1:1234567", 0);
+  ASSERT_TRUE(s.IsInvalidArgument());
+  ASSERT_STR_MATCHES(s.ToString(), "invalid port");
+
+  s = addr.ParseString("[1:1:1:1:1:1:1:1", 0);
+  ASSERT_TRUE(s.IsInvalidArgument());
+  ASSERT_STR_MATCHES(s.ToString(), "invalid address");
+
+  s = addr.ParseString("[1:1:1:1:1:1:1:1:12345", 0);
+  ASSERT_TRUE(s.IsInvalidArgument());
+  ASSERT_STR_MATCHES(s.ToString(), "invalid address");
+
+  s = addr.ParseString("[1:1:1:1:1:1:1:1:1234567", 0);
+  ASSERT_TRUE(s.IsInvalidArgument());
+  ASSERT_STR_MATCHES(s.ToString(), "invalid address");
+
+  s = addr.ParseString("[1:1:1:1:1:1:1:1]:1234567", 0);
+  ASSERT_TRUE(s.IsInvalidArgument());
+  ASSERT_STR_MATCHES(s.ToString(), "invalid port");
+
+  s = addr.ParseString("1:1:1:1:1:1:1:1]", 0);
+  ASSERT_TRUE(s.IsInvalidArgument());
+  ASSERT_STR_MATCHES(s.ToString(), "invalid address");
+
+  s = addr.ParseString("1:1:1:1:1:1:1:1]:12345", 0);
+  ASSERT_TRUE(s.IsInvalidArgument());
+  ASSERT_STR_MATCHES(s.ToString(), "invalid address");
+
+  s = addr.ParseString("[1:1:1:1:1:1:1:1]:1234567", 0);
+  ASSERT_TRUE(s.IsInvalidArgument());
+  ASSERT_STR_MATCHES(s.ToString(), "invalid port");
+
+  s = addr.ParseString("[::1]:1234567", 0);
+  ASSERT_TRUE(s.IsInvalidArgument());
+  ASSERT_STR_MATCHES(s.ToString(), "invalid port");
+
+  s = addr.ParseString("[:]1234567", 0);
+  ASSERT_TRUE(s.IsInvalidArgument());
+  ASSERT_STR_MATCHES(s.ToString(), "invalid address");
+
+  s = addr.ParseString(":12345", 0);
+  ASSERT_TRUE(s.IsInvalidArgument());
+  ASSERT_STR_MATCHES(s.ToString(), "invalid address");
 }
 
 TEST_F(NetUtilTest, TestParseAddresses) {
   string ret;
+  FLAGS_ip_config_mode = "dual";
   ASSERT_OK(DoParseBindAddresses("0.0.0.0:12345", &ret));
   ASSERT_EQ("0.0.0.0:12345", ret);
 
@@ -83,6 +214,12 @@ TEST_F(NetUtilTest, TestParseAddresses) {
   ASSERT_OK(DoParseBindAddresses("0.0.0.0:12345, 0.0.0.0:12346", &ret));
   ASSERT_EQ("0.0.0.0:12345,0.0.0.0:12346", ret);
 
+  ASSERT_OK(DoParseBindAddresses("[::]:1234, [::]:5678", &ret));
+  ASSERT_EQ("[::]:1234,[::]:5678", ret);
+
+  ASSERT_OK(DoParseBindAddresses("[::]:1234, 0.0.0.0:12346, [::]:5678", &ret));
+  ASSERT_EQ("0.0.0.0:12346,[::]:1234,[::]:5678", ret);
+
   // Test some invalid addresses.
   Status s = DoParseBindAddresses("0.0.0.0:xyz", &ret);
   ASSERT_STR_CONTAINS(s.ToString(), "invalid port");
@@ -91,6 +228,15 @@ TEST_F(NetUtilTest, TestParseAddresses) {
   ASSERT_STR_CONTAINS(s.ToString(), "invalid port");
 
   s = DoParseBindAddresses("0.0.0.0:", &ret);
+  ASSERT_STR_CONTAINS(s.ToString(), "invalid port");
+
+  s = DoParseBindAddresses("[::]:xyz", &ret);
+  ASSERT_STR_CONTAINS(s.ToString(), "invalid port");
+
+  s = DoParseBindAddresses("[::]:100000", &ret);
+  ASSERT_STR_CONTAINS(s.ToString(), "invalid port");
+
+  s = DoParseBindAddresses("[::]:", &ret);
   ASSERT_STR_CONTAINS(s.ToString(), "invalid port");
 }
 
@@ -134,9 +280,25 @@ TEST_F(NetUtilTest, TestParseAddressesWithScheme) {
   ASSERT_STR_CONTAINS(s.ToString(), "invalid scheme format");
 }
 
-TEST_F(NetUtilTest, TestInjectFailureToResolveAddresses) {
-  HostPort hp1("localhost", 12345);
-  HostPort hp2("localhost", 12346);
+class ResolveAddressTest : public NetUtilTest,
+                           public ::testing::WithParamInterface<IPMode> {
+public:
+  ResolveAddressTest() : hostname("localhost") {
+    FLAGS_ip_config_mode = IPModeToString(GetParam());
+  }
+protected:
+  string hostname;
+};
+
+
+// This is used to run all parameterized tests with different IP modes.
+INSTANTIATE_TEST_SUITE_P(Parameters, ResolveAddressTest,
+                         testing::Values(IPMode::IPV4, IPMode::IPV6, IPMode::DUAL));
+
+// Paramterize these tests for ipv4, ipv6 and dual as localhost can resolve to any of these.
+TEST_P(ResolveAddressTest, TestInjectFailureToResolveAddresses) {
+  HostPort hp1(hostname, 12345);
+  HostPort hp2(hostname, 12346);
   FLAGS_fail_dns_resolution_hostports = hp1.ToString();
   FLAGS_fail_dns_resolution = true;
 
@@ -167,14 +329,23 @@ TEST_F(NetUtilTest, TestInjectFailureToResolveAddresses) {
   ASSERT_TRUE(s.IsNetworkError()) << s.ToString();
 }
 
-TEST_F(NetUtilTest, TestResolveAddresses) {
-  HostPort hp("localhost", 12345);
+TEST_P(ResolveAddressTest, TestResolveAddresses) {
+  HostPort hp(hostname, 12345);
   vector<Sockaddr> addrs;
   ASSERT_OK(hp.ResolveAddresses(&addrs));
   ASSERT_TRUE(!addrs.empty());
   for (const Sockaddr& addr : addrs) {
     LOG(INFO) << "Address: " << addr.ToString();
-    EXPECT_TRUE(HasPrefixString(addr.ToString(), "127."));
+    switch (addr.family()) {
+      case AF_INET:
+        EXPECT_TRUE(HasPrefixString(addr.ToString(), "127."));
+        break;
+      case AF_INET6:
+        EXPECT_TRUE(HasPrefixString(addr.ToString(), "[::1]"));
+        break;
+      default:
+        FAIL() << "unexpected family:" << addr.family();
+    }
     EXPECT_TRUE(HasSuffixString(addr.ToString(), ":12345"));
     EXPECT_TRUE(addr.IsAnyLocalAddress());
   }
@@ -185,7 +356,9 @@ TEST_F(NetUtilTest, TestResolveAddresses) {
 TEST_F(NetUtilTest, TestWithinNetwork) {
   Sockaddr addr;
   Network network;
+  Status s;
 
+  // IPv4 tests.
   ASSERT_OK(addr.ParseString("10.0.23.0:12345", 0));
   ASSERT_OK(network.ParseCIDRString("10.0.0.0/8"));
   EXPECT_TRUE(network.WithinNetwork(addr));
@@ -205,6 +378,63 @@ TEST_F(NetUtilTest, TestWithinNetwork) {
   ASSERT_OK(addr.ParseString("192.169.0.23", 0));
   ASSERT_OK(network.ParseCIDRString("192.168.0.0/16"));
   EXPECT_FALSE(network.WithinNetwork(addr));
+
+  s = network.ParseCIDRString("192.168.0.0/abcd");
+  ASSERT_TRUE(s.IsNetworkError()) << s.ToString();
+
+  s = network.ParseCIDRString("192.168.0.0/48");
+  ASSERT_TRUE(s.IsNetworkError()) << s.ToString();
+
+  // IPv6 tests.
+  ASSERT_OK(addr.ParseString("[fd00:1234:5678:9abc::1]:1234", 0));
+  ASSERT_OK(network.ParseCIDRString("fd00::/8"));
+  EXPECT_TRUE(network.WithinNetwork(addr));
+
+  ASSERT_OK(addr.ParseString("fc00:cafe:f00d:dead::beef", 0));
+  ASSERT_OK(network.ParseCIDRString("fc00::/7"));
+  EXPECT_TRUE(network.WithinNetwork(addr));
+
+  ASSERT_OK(addr.ParseString("[fc00:cafe:f00d:dead::beef]:1234", 0));
+  ASSERT_OK(network.ParseCIDRString("fc00::/7"));
+  EXPECT_TRUE(network.WithinNetwork(addr));
+
+  ASSERT_OK(addr.ParseString("2001:0db8::1", 0));
+  ASSERT_OK(network.ParseCIDRString("fe80::/16"));
+  EXPECT_FALSE(network.WithinNetwork(addr));
+
+  ASSERT_OK(addr.ParseString("f001:0db8::1", 0));
+  ASSERT_OK(network.ParseCIDRString("fe80::/5"));
+  EXPECT_FALSE(network.WithinNetwork(addr));
+
+  ASSERT_OK(addr.ParseString("2405:201:d01e:e861:4234:4a42:40e7:8e40", 0));
+  ASSERT_OK(network.ParseCIDRString("2405:201:d01e:e861:fbaa:5ca4:2048:f5f5/64"));
+  EXPECT_TRUE(network.WithinNetwork(addr));
+
+  ASSERT_OK(addr.ParseString("fe80::abcd:1234", 0));
+  ASSERT_OK(network.ParseCIDRString("fe80::1/64"));
+  EXPECT_TRUE(network.WithinNetwork(addr));
+
+  ASSERT_OK(addr.ParseString("fd00:abcd:1234::1", 0));
+  ASSERT_OK(network.ParseCIDRString("fd00:abcd:5678::1/48"));
+  EXPECT_FALSE(network.WithinNetwork(addr));
+
+  ASSERT_OK(addr.ParseString("2001:0db8::1", 0));
+  ASSERT_OK(network.ParseCIDRString("fe80::2/64"));
+  EXPECT_FALSE(network.WithinNetwork(addr));
+
+  ASSERT_OK(addr.ParseString("2001:db8::1:0", 0));
+  ASSERT_OK(network.ParseCIDRString("2001:db8::2:0/63"));
+  EXPECT_TRUE(network.WithinNetwork(addr));
+
+  ASSERT_OK(addr.ParseString("fd00:1234:5678::1", 0));
+  ASSERT_OK(network.ParseCIDRString("fd00:1234:5678::1/128"));
+  EXPECT_TRUE(network.WithinNetwork(addr));
+
+  s = network.ParseCIDRString("fe80::/abcd");
+  ASSERT_TRUE(s.IsNetworkError()) << s.ToString();
+
+  s = network.ParseCIDRString("fe80::/256");
+  ASSERT_TRUE(s.IsNetworkError()) << s.ToString();
 }
 
 // Ensure that we are able to do a reverse DNS lookup on various IP addresses.

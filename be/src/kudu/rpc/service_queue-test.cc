@@ -18,7 +18,6 @@
 #include <atomic>
 #include <cstdint>
 #include <memory>
-#include <optional>
 #include <ostream>
 #include <string>
 #include <thread>
@@ -36,8 +35,9 @@
 #include "kudu/util/stopwatch.h"
 #include "kudu/util/test_util.h"
 
-using std::shared_ptr;
+using std::atomic;
 using std::string;
+using std::thread;
 using std::unique_ptr;
 using std::vector;
 
@@ -50,34 +50,42 @@ DEFINE_int32(num_consumers, 20,
 DEFINE_int32(max_queue_size, 50,
              "Max queue length");
 
+DEFINE_int32(consumer_delay_cycles, 0,
+             "Number of CPU yield cycles for a consumer thread to run after "
+             "each BlockingGet() call: this is to give the producer threads "
+             "a chance to fill up the queue");
+
 namespace kudu {
 namespace rpc {
 
-static std::atomic<uint32_t> inprogress;
+static atomic<uint32_t> inprogress;
 
-static std::atomic<uint32_t> total;
+static atomic<uint32_t> total;
 
 template <typename Queue>
 void ProducerThread(Queue* queue) {
-  int max_inprogress = FLAGS_max_queue_size - FLAGS_num_producers;
+  const int max_inprogress = FLAGS_max_queue_size - FLAGS_num_producers;
   while (true) {
-    while (inprogress > max_inprogress) {
+    // For atomics, std::memory_relaxed is enough since producer threads
+    // back off when hitting QUEUE_FULL anyway. As for the re-ordering concern,
+    // it's addressed by the presence of a lock in the Put() call below.
+    while (inprogress.load(std::memory_order_relaxed) > max_inprogress) {
       base::subtle::PauseCPU();
     }
-    inprogress++;
+    inprogress.fetch_add(1, std::memory_order_relaxed);
     InboundCall* call = new InboundCall(nullptr);
-    std::optional<InboundCall*> evicted;
+    InboundCall* evicted = nullptr;
     auto status = queue->Put(call, &evicted);
     if (status == QUEUE_FULL) {
-      LOG(INFO) << "queue full: producer exiting";
       delete call;
-      break;
+      base::subtle::PauseCPU();
+      continue;
     }
 
-    if (PREDICT_TRUE(evicted)) {
-      LOG(INFO) << "call evicted: producer exiting";
-      delete *evicted;
-      break;
+    if (PREDICT_FALSE(evicted != nullptr)) {
+      delete evicted;
+      base::subtle::PauseCPU();
+      continue;
     }
 
     if (PREDICT_TRUE(status == QUEUE_SHUTDOWN)) {
@@ -89,18 +97,22 @@ void ProducerThread(Queue* queue) {
 
 template <typename Queue>
 void ConsumerThread(Queue* queue) {
+  const int32_t delay_cycles = FLAGS_consumer_delay_cycles;
   unique_ptr<InboundCall> call;
   while (queue->BlockingGet(&call)) {
-    inprogress--;
-    total++;
+    inprogress.fetch_sub(1, std::memory_order_relaxed);
+    total.fetch_add(1, std::memory_order_relaxed);
     call.reset();
+    for (int32_t cnt = delay_cycles; cnt > 0; --cnt) {
+      base::subtle::PauseCPU();
+    }
   }
 }
 
 TEST(TestServiceQueue, LifoServiceQueuePerf) {
   LifoServiceQueue queue(FLAGS_max_queue_size);
-  vector<std::thread> producers;
-  vector<std::thread> consumers;
+  vector<thread> producers;
+  vector<thread> consumers;
 
   for (int i = 0; i < FLAGS_num_producers; i++) {
     producers.emplace_back(&ProducerThread<LifoServiceQueue>, &queue);
@@ -120,7 +132,7 @@ TEST(TestServiceQueue, LifoServiceQueuePerf) {
 
   for (int i = 0; i < seconds * 50; i++) {
     SleepFor(MonoDelta::FromMilliseconds(20));
-    total_sample++;
+    ++total_sample;
     total_queue_len += queue.estimated_queue_length();
     total_idle_workers += queue.estimated_idle_worker_count();
   }
@@ -129,11 +141,11 @@ TEST(TestServiceQueue, LifoServiceQueuePerf) {
   int32_t delta = total - before;
 
   queue.Shutdown();
-  for (int i = 0; i < FLAGS_num_producers; i++) {
-    producers[i].join();
+  for (auto& p : producers) {
+    p.join();
   }
-  for (int i = 0; i < FLAGS_num_consumers; i++) {
-    consumers[i].join();
+  for (auto& c : consumers) {
+    c.join();
   }
 
   float reqs_per_second = static_cast<float>(delta / sw.elapsed().wall_seconds());

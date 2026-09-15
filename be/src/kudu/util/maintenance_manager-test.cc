@@ -18,6 +18,7 @@
 #include "kudu/util/maintenance_manager.h"
 
 #include <algorithm>
+#include <array>
 #include <atomic>
 #include <cmath>
 #include <cstddef>
@@ -25,10 +26,10 @@
 #include <functional>
 #include <list>
 #include <memory>
-#include <mutex>
 #include <ostream>
 #include <string>
 #include <thread>
+#include <type_traits>
 #include <utility>
 #include <vector>
 
@@ -44,9 +45,13 @@
 #include "kudu/util/maintenance_manager_metrics.h"
 #include "kudu/util/metrics.h"
 #include "kudu/util/monotime.h"
+#include "kudu/util/random.h"
+#include "kudu/util/random_util.h"
 #include "kudu/util/scoped_cleanup.h"
+#include "kudu/util/status.h"
 #include "kudu/util/test_macros.h"
 #include "kudu/util/test_util.h"
+#include "kudu/util/thread.h"
 
 using std::list;
 using std::shared_ptr;
@@ -72,6 +77,10 @@ DECLARE_bool(enable_maintenance_manager);
 DECLARE_int64(log_target_replay_size_mb);
 DECLARE_double(maintenance_op_multiplier);
 DECLARE_int32(max_priority_range);
+DECLARE_double(run_non_memory_ops_prob);
+DECLARE_double(data_gc_prioritization_prob);
+DECLARE_int32(memory_pressure_percentage);
+DECLARE_int32(memory_limit_soft_percentage);
 namespace kudu {
 
 // Set this a bit bigger so that the manager could keep track of all possible completed ops.
@@ -89,6 +98,7 @@ class TestMaintenanceOp : public MaintenanceOp {
       start_stats_latch_(start_stats_latch),
       continue_stats_latch_(continue_stats_latch),
       ram_anchored_(500),
+      data_retained_bytes_(0),
       logs_retained_bytes_(0),
       perf_improvement_(0),
       metric_entity_(METRIC_ENTITY_test.Instantiate(&metric_registry_, "test")),
@@ -100,13 +110,19 @@ class TestMaintenanceOp : public MaintenanceOp {
       update_stats_time_(MonoDelta::FromSeconds(0)),
       priority_(priority),
       workload_score_(0),
-      update_stats_count_(0) {
+      update_stats_count_(0),
+      update_time_(MonoTime::Now()),
+      queue_time_(MonoDelta::FromSeconds(0)),
+      run_count_(0),
+      updated_(false),
+      register_self_(false) {
   }
 
   ~TestMaintenanceOp() override = default;
 
   bool Prepare() override {
-    std::lock_guard<simple_spinlock> guard(lock_);
+    queue_time_ += (MonoTime::Now() - update_time_);
+    std::lock_guard guard(lock_);
     if (remaining_runs_ == 0) {
       return false;
     }
@@ -118,7 +134,7 @@ class TestMaintenanceOp : public MaintenanceOp {
 
   void Perform() override {
     {
-      std::lock_guard<simple_spinlock> guard(lock_);
+      std::lock_guard guard(lock_);
       DLOG(INFO) << "Performing op " << name();
 
       // Ensure that we don't call Perform() more times than we returned
@@ -126,12 +142,21 @@ class TestMaintenanceOp : public MaintenanceOp {
       CHECK_GE(prepared_runs_, 1);
       prepared_runs_--;
     }
-
     SleepFor(sleep_time_);
-
     {
-      std::lock_guard<simple_spinlock> guard(lock_);
+      std::lock_guard guard(lock_);
+      run_count_++;
+      updated_ = false;
       completed_at_ = MonoTime::Now();
+    }
+    if (register_self_) {
+      scoped_refptr<kudu::Thread> thread;
+      // Re-register itself after 50ms.
+      CHECK_OK(kudu::Thread::Create("maintenance-test",
+                                    "self-register",
+                                    [this]() {
+                                      this->set_remaining_runs(1);
+                                    }, &thread));
     }
   }
 
@@ -149,49 +174,63 @@ class TestMaintenanceOp : public MaintenanceOp {
       }
     }
 
-    std::lock_guard<simple_spinlock> guard(lock_);
+    std::lock_guard guard(lock_);
     stats->set_runnable(remaining_runs_ > 0);
     stats->set_ram_anchored(ram_anchored_);
     stats->set_logs_retained_bytes(logs_retained_bytes_);
+    stats->set_data_retained_bytes(data_retained_bytes_);
     stats->set_perf_improvement(perf_improvement_);
     stats->set_workload_score(workload_score_);
-
+    if (remaining_runs_ > 0 && !updated_) {
+      update_time_ = MonoTime::Now();
+      updated_ = true;
+    }
     ++update_stats_count_;
   }
 
   void set_remaining_runs(int runs) {
-    std::lock_guard<simple_spinlock> guard(lock_);
+    std::lock_guard guard(lock_);
     remaining_runs_ = runs;
   }
 
   void set_sleep_time(MonoDelta time) {
-    std::lock_guard<simple_spinlock> guard(lock_);
+    std::lock_guard guard(lock_);
     sleep_time_ = time;
   }
 
   void set_update_stats_time(MonoDelta time) {
-    std::lock_guard<simple_spinlock> guard(lock_);
+    std::lock_guard guard(lock_);
     update_stats_time_ = time;
   }
 
   void set_ram_anchored(uint64_t ram_anchored) {
-    std::lock_guard<simple_spinlock> guard(lock_);
+    std::lock_guard guard(lock_);
     ram_anchored_ = ram_anchored;
   }
 
   void set_logs_retained_bytes(uint64_t logs_retained_bytes) {
-    std::lock_guard<simple_spinlock> guard(lock_);
+    std::lock_guard guard(lock_);
     logs_retained_bytes_ = logs_retained_bytes;
   }
 
+  void set_data_retained_bytes(uint64_t data_retained_bytes) {
+    std::lock_guard guard(lock_);
+    data_retained_bytes_ = data_retained_bytes;
+  }
+
   void set_perf_improvement(uint64_t perf_improvement) {
-    std::lock_guard<simple_spinlock> guard(lock_);
+    std::lock_guard guard(lock_);
     perf_improvement_ = perf_improvement;
   }
 
   void set_workload_score(uint64_t workload_score) {
-    std::lock_guard<simple_spinlock> guard(lock_);
+    std::lock_guard guard(lock_);
     workload_score_ = workload_score;
+  }
+
+  void set_register_self(bool register_self) {
+    std::lock_guard guard(lock_);
+    register_self_ = register_self;
   }
 
   scoped_refptr<Histogram> DurationHistogram() const override {
@@ -207,18 +246,26 @@ class TestMaintenanceOp : public MaintenanceOp {
   }
 
   int remaining_runs() const {
-    std::lock_guard<simple_spinlock> guard(lock_);
+    std::lock_guard guard(lock_);
     return remaining_runs_;
   }
 
   uint64_t update_stats_count() const {
-    std::lock_guard<simple_spinlock> guard(lock_);
+    std::lock_guard guard(lock_);
     return update_stats_count_;
   }
 
   MonoTime completed_at() const {
-    std::lock_guard<simple_spinlock> guard(lock_);
+    std::lock_guard guard(lock_);
     return completed_at_;
+  }
+
+  int64_t run_count() const {
+    return run_count_;
+  }
+
+  MonoDelta queue_time() const {
+    return queue_time_;
   }
 
  private:
@@ -233,6 +280,7 @@ class TestMaintenanceOp : public MaintenanceOp {
   CountDownLatch* continue_stats_latch_;
 
   uint64_t ram_anchored_;
+  uint64_t data_retained_bytes_;
   uint64_t logs_retained_bytes_;
   uint64_t perf_improvement_;
   MetricRegistry metric_registry_;
@@ -262,6 +310,18 @@ class TestMaintenanceOp : public MaintenanceOp {
 
   // Timestamp of the monotonous clock when the operation was completed.
   MonoTime completed_at_;
+
+  // Timestamp of updating status in FindBestOp.
+  MonoTime update_time_;
+  // Sum of scheduled time, which indicates how long this op has been
+  // scheduled after it could be run.
+  MonoDelta queue_time_;
+  // How many times the operation has been run.
+  int64_t run_count_;
+  // If the operation had been updated but has not been performed.
+  bool updated_;
+  // Whether re-register itself after performing.
+  bool register_self_;
 };
 
 class MaintenanceManagerTest : public KuduTest {
@@ -285,9 +345,20 @@ class MaintenanceManagerTest : public KuduTest {
     options.polling_interval_ms = 1;
     options.history_size = kHistorySize;
     manager_.reset(new MaintenanceManager(options, kFakeUuid, metric_entity_));
+    // Same logic with MaintenanceManager#ProceedWithFlush, but the memory usage is
+    // simulated.
     manager_->set_memory_pressure_func_for_tests(
         [&](double* /* consumption */) {
-          return indicate_memory_pressure_.load();
+          static const double pressure_threshold = FLAGS_memory_pressure_percentage;
+          static const double soft_limit = FLAGS_memory_limit_soft_percentage;
+          static const double pressure_diff = soft_limit - pressure_threshold;
+          if (memory_pressure_pct_.load() < pressure_threshold) {
+            return false;
+          }
+          const double used_diff = soft_limit - memory_pressure_pct_.load();
+          return pressure_diff <= 0 || used_diff <= 0 ||
+              Random(GetRandomSeed32()).NextDoubleFraction() * pressure_diff >=
+                  FLAGS_run_non_memory_ops_prob * used_diff;
         });
     ASSERT_OK(manager_->Start());
   }
@@ -317,7 +388,7 @@ class MaintenanceManagerTest : public KuduTest {
   scoped_refptr<MetricEntity> metric_entity_;
 
   shared_ptr<MaintenanceManager> manager_;
-  std::atomic<bool> indicate_memory_pressure_ { false };
+  std::atomic<double> memory_pressure_pct_ { 0.0 };
 };
 
 // Just create the MaintenanceManager and then shut it down, to make sure
@@ -379,15 +450,24 @@ TEST_F(MaintenanceManagerTest, TestRegisterUnregisterWithContention) {
 // Regression test for KUDU-1495: when an operation is being unregistered,
 // new instances of that operation should not be scheduled.
 TEST_F(MaintenanceManagerTest, TestNewOpsDontGetScheduledDuringUnregister) {
+  SKIP_IF_SLOW_NOT_ALLOWED();
+
+  // Set the op to run up to 10 times, and each time it sleeps for some time.
+  // The sleep time is set quite high to avoid flakiness due to scheduler
+  // anomalies when running this scenario on busy machines, especially if the
+  // binaries are instrumented by ASAN/TSAN. When all the avaiable maintenance
+  // worker threads are busy with running their first iteration of 'op1',
+  // if the main thread is scheduled off the CPU for a long time before
+  // unregistering the operation, the sleep time should provide enough margin
+  // for the main thread becoming active again and unregistering 'op1'.
   TestMaintenanceOp op1("1", MaintenanceOp::HIGH_IO_USAGE);
   op1.set_perf_improvement(10);
-
-  // Set the op to run up to 10 times, and each time should sleep for a second.
   op1.set_remaining_runs(10);
-  op1.set_sleep_time(MonoDelta::FromSeconds(1));
+  op1.set_sleep_time(MonoDelta::FromSeconds(5));
   manager_->RegisterOp(&op1);
 
-  // Wait until two instances of the ops start running, since we have two MM threads.
+  // Wait until two instances of the ops start running, since we have two
+  // maintenance worker threads.
   ASSERT_EVENTUALLY([&]() {
     ASSERT_EQ(op1.RunningGauge()->value(), 2);
   });
@@ -412,7 +492,7 @@ TEST_F(MaintenanceManagerTest, TestMemoryPressurePrioritizesMemory) {
   ASSERT_EQ(0, op.DurationHistogram()->TotalCount());
 
   // Fake that the server is under memory pressure.
-  indicate_memory_pressure_ = true;
+  memory_pressure_pct_ = 70;
 
   ASSERT_EVENTUALLY([&]() {
       ASSERT_EQ(op.DurationHistogram()->TotalCount(), 1);
@@ -433,7 +513,7 @@ TEST_F(MaintenanceManagerTest, TestMemoryPressurePerformsNoMemoryOp) {
 
   // Now fake that the server is under memory pressure and make our op runnable
   // by giving it a perf score.
-  indicate_memory_pressure_ = true;
+  memory_pressure_pct_ = 70;
   op.set_perf_improvement(1);
 
   // Even though we're under memory pressure, and even though our op doesn't
@@ -513,7 +593,7 @@ TEST_F(MaintenanceManagerTest, TestPrioritizeLogRetentionUnderMemoryPressure) {
   op3.set_logs_retained_bytes(99);
   op3.set_ram_anchored(101);
 
-  indicate_memory_pressure_ = true;
+  memory_pressure_pct_ = 70;
   manager_->RegisterOp(&op1);
   manager_->RegisterOp(&op2);
   manager_->RegisterOp(&op3);
@@ -538,32 +618,79 @@ TEST_F(MaintenanceManagerTest, TestPrioritizeLogRetentionUnderMemoryPressure) {
 }
 
 // Test retrieving a list of an op's running instances
-TEST_F(MaintenanceManagerTest, TestRunningInstances) {
+TEST_F(MaintenanceManagerTest, RunningInstances) {
   TestMaintenanceOp op("op", MaintenanceOp::HIGH_IO_USAGE);
   op.set_perf_improvement(10);
   op.set_remaining_runs(2);
   op.set_sleep_time(MonoDelta::FromSeconds(1));
+
   manager_->RegisterOp(&op);
+  auto unregistrant = MakeScopedCleanup([&] {
+    manager_->UnregisterOp(&op);
+  });
 
   // Check that running instances are added to the maintenance manager's collection,
-  // and fields are getting filled.
-  ASSERT_EVENTUALLY([&]() {
-      MaintenanceManagerStatusPB status_pb;
-      manager_->GetMaintenanceManagerStatusDump(&status_pb);
-      ASSERT_EQ(status_pb.running_operations_size(), 2);
-      const MaintenanceManagerStatusPB_OpInstancePB& instance1 = status_pb.running_operations(0);
-      const MaintenanceManagerStatusPB_OpInstancePB& instance2 = status_pb.running_operations(1);
-      ASSERT_EQ(instance1.name(), op.name());
-      ASSERT_NE(instance1.thread_id(), instance2.thread_id());
-    });
-
-  // Wait for instances to complete.
-  manager_->UnregisterOp(&op);
-
-  // Check that running instances are removed from collection after completion.
+  // and fields are populated.
   MaintenanceManagerStatusPB status_pb;
-  manager_->GetMaintenanceManagerStatusDump(&status_pb);
-  ASSERT_EQ(status_pb.running_operations_size(), 0);
+  std::array<const MaintenanceManagerStatusPB_OpInstancePB*, 2> instances{ nullptr, nullptr };
+  ASSERT_EVENTUALLY([&]() {
+    // Clear 'status_pb' if ASSERT_EVENTUALLY() retries:
+    // MaintenanceManager::GetMaintenanceManagerStatusDump() doesn't clear
+    // its output parameter, adding up more data instead.
+    status_pb.Clear();
+    manager_->GetMaintenanceManagerStatusDump(&status_pb);
+    const auto num_running = status_pb.running_operations_size();
+    ASSERT_GE(num_running, 0);
+    const auto num_completed = status_pb.completed_operations_size();
+    ASSERT_GE(num_completed, 0);
+
+    // Due to scheduler anomalies and other uncontrollable factors, the main
+    // thread might be put off CPU for some time, so one or even two operations
+    // may be completed already.
+    ASSERT_EQ(2, num_running + num_completed);
+    if (num_running == 2) {
+      instances[0] = &status_pb.running_operations(0);
+      instances[1] = &status_pb.running_operations(1);
+    } else if (num_completed == 2) {
+      instances[0] = &status_pb.completed_operations(0);
+      instances[1] = &status_pb.completed_operations(1);
+    } else {
+      instances[0] = &status_pb.running_operations(0);
+      instances[1] = &status_pb.completed_operations(0);
+    }
+  });
+  ASSERT_NE(nullptr, instances[0]);
+  ASSERT_NE(nullptr, instances[1]);
+  ASSERT_EQ(op.name(), instances[0]->name());
+  ASSERT_EQ(op.name(), instances[1]->name());
+  ASSERT_NE(instances[0]->thread_id(), instances[1]->thread_id());
+
+  // When unregistering operations, the maintenance manager waits for them
+  // to complete.
+  unregistrant.run();
+
+  // Check that running instances aren't present in the collection
+  // when the ops are no longer running.
+  {
+    MaintenanceManagerStatusPB status_pb;
+    manager_->GetMaintenanceManagerStatusDump(&status_pb);
+    ASSERT_EQ(0, status_pb.running_operations_size());
+  }
+
+  // The information on the completed tasks appears after waiting for each
+  // of them to wrap up and waking up the scheduler. So, there might be a race
+  // between this test thread which calls GetMaintenanceManagerStatusDump()
+  // and the MM worker threads that update the container with the information
+  // on the completed tasks. The ASSERT_EVENTUALLY() macro below helps
+  // to avoid flakiness in case of scheduler anomalies or when running this
+  // test scenario on a busy machine.
+  ASSERT_EVENTUALLY([&]() {
+    MaintenanceManagerStatusPB status_pb;
+    manager_->GetMaintenanceManagerStatusDump(&status_pb);
+    ASSERT_EQ(2, status_pb.completed_operations_size());
+    ASSERT_NE(status_pb.completed_operations(0).thread_id(),
+              status_pb.completed_operations(1).thread_id());
+  });
 }
 
 // Test adding operations and make sure that the history of recently completed
@@ -899,4 +1026,78 @@ TEST_F(MaintenanceManagerTest, TestUnregisterWhileScheduling) {
   op1.Unregister();
 }
 
+// Show which operation the @MaintenanceManager will pick in various workloads and
+// policies. This test would not assert anything since it tests the probability flags.
+TEST_F(MaintenanceManagerTest, ComprehensiveTest) {
+  SKIP_IF_SLOW_NOT_ALLOWED();
+
+  // Select policies here.
+  memory_pressure_pct_ = 60;
+  FLAGS_run_non_memory_ops_prob = 0.2;
+  FLAGS_data_gc_prioritization_prob = 0.5;
+
+  StopManager();
+
+  TestMaintenanceOp op1("perf_op", MaintenanceOp::HIGH_IO_USAGE);
+  op1.set_perf_improvement(10);
+  op1.set_remaining_runs(1);
+  op1.set_sleep_time(MonoDelta::FromMilliseconds(5));
+  op1.set_register_self(true);
+
+  TestMaintenanceOp op2("memory_op", MaintenanceOp::HIGH_IO_USAGE);
+  op2.set_ram_anchored(2000);
+  op2.set_remaining_runs(1);
+  op2.set_sleep_time(MonoDelta::FromMilliseconds(5));
+  op2.set_register_self(true);
+
+  TestMaintenanceOp op3("data_gc_op", MaintenanceOp::HIGH_IO_USAGE);
+  op3.set_data_retained_bytes(1024 * 1024);
+  op3.set_remaining_runs(1);
+  op3.set_sleep_time(MonoDelta::FromMilliseconds(5));
+  op3.set_register_self(true);
+
+  // Set maintenance manager num to 1 to get a clean vision of scheduling.
+  NO_FATALS(StartManager(1));
+  FLAGS_enable_maintenance_manager = false;
+  manager_->RegisterOp(&op1);
+  manager_->RegisterOp(&op2);
+  manager_->RegisterOp(&op3);
+  FLAGS_enable_maintenance_manager = true;
+  // Wait for the memory_op to run over 1000 times and then check the running times
+  // of other operations.
+  AssertEventually([&]() {
+    ASSERT_LE(1000, op2.DurationHistogram()->TotalCount());
+  }, MonoDelta::FromSeconds(60));
+  op1.set_register_self(false);
+  op2.set_register_self(false);
+  op3.set_register_self(false);
+  // Wait until all the operations are done.
+  SleepFor(MonoDelta::FromMilliseconds(100));
+
+  manager_->UnregisterOp(&op1);
+  manager_->UnregisterOp(&op2);
+  manager_->UnregisterOp(&op3);
+
+  // The expected running times of operations should be like:
+  //    other_ops_running_times = memory_op_running_times * probability_not_to_flush
+  // Since the memory usage is 60%, probability_not_to_flush is exactly
+  // FLAGS_run_non_memory_ops_prob. And also, the applying and registering might
+  // take time, so the other_ops_running_times might be greater than expected.
+  // Add some extra margin (about x3) for probability_not_to_flush
+  // to avoid flakiness.
+  const int64_t memory_op_running_times = op2.run_count();
+  const int64_t other_ops_running_times = op1.run_count() + op3.run_count();
+  ASSERT_LT(memory_op_running_times * 0.1, other_ops_running_times);
+  ASSERT_GT(memory_op_running_times * 0.6, other_ops_running_times);
+
+  LOG(INFO) << Substitute("op1: $0 perform count: $1 average schedule time: $2",
+                          op1.name(), op1.run_count(), op1.queue_time().ToMilliseconds()
+                          / op1.run_count());
+  LOG(INFO) << Substitute("op2: $0 perform count: $1 average schedule time: $2",
+                          op2.name(), op2.run_count(), op2.queue_time().ToMilliseconds()
+                          / op2.run_count());
+  LOG(INFO) << Substitute("op3: $0 perform count: $1 average schedule time: $2",
+                          op3.name(), op3.run_count(), op3.queue_time().ToMilliseconds()
+                          / op3.run_count());
+}
 } // namespace kudu

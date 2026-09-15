@@ -19,7 +19,6 @@
 
 #include <cstdint>
 #include <memory>
-#include <optional>
 #include <ostream>
 #include <string>
 #include <utility>
@@ -27,7 +26,6 @@
 
 #include <glog/logging.h>
 
-#include "kudu/gutil/basictypes.h"
 #include "kudu/gutil/port.h"
 #include "kudu/gutil/ref_counted.h"
 #include "kudu/gutil/strings/join.h"
@@ -90,7 +88,7 @@ ServicePool::~ServicePool() {
 Status ServicePool::Init(int num_threads) {
   for (int i = 0; i < num_threads; i++) {
     scoped_refptr<kudu::Thread> new_thread;
-    CHECK_OK(kudu::Thread::Create(
+    RETURN_NOT_OK(kudu::Thread::Create(
         Substitute("service pool $0", service_->service_name()),
         "rpc worker",
         [this]() { this->RunThread(); }, &new_thread));
@@ -102,10 +100,11 @@ Status ServicePool::Init(int num_threads) {
 void ServicePool::Shutdown() {
   service_queue_.Shutdown();
 
-  MutexLock lock(shutdown_lock_);
-  if (closing_) return;
-  closing_ = true;
-  // TODO: Use a proper thread pool implementation.
+  bool is_shut_down = false;
+  if (!closing_.compare_exchange_strong(is_shut_down, true)) {
+    return;
+  }
+  // TODO(mpercy): Use a proper thread pool implementation.
   for (scoped_refptr<kudu::Thread>& thread : threads_) {
     CHECK_OK(ThreadJoiner(thread.get()).Join());
   }
@@ -121,21 +120,20 @@ void ServicePool::Shutdown() {
 }
 
 void ServicePool::RejectTooBusy(InboundCall* c) {
-  string err_msg =
-      Substitute("$0 request on $1 from $2 dropped due to backpressure. "
-                 "The service queue is full; it has $3 items.",
-                 c->remote_method().method_name(),
-                 service_->service_name(),
-                 c->remote_address().ToString(),
-                 service_queue_.max_size());
   rpcs_queue_overflow_->Increment();
-  auto* minfo = c->method_info();
-  if (minfo) {
+  if (const auto* minfo = c->method_info(); minfo != nullptr) {
     minfo->queue_overflow_rejections->Increment();
   }
-  KLOG_EVERY_N_SECS(WARNING, 1) << err_msg << THROTTLE_MSG;
+  const string err_msg = Substitute(
+      "$0 request on $1 from $2 dropped due to backpressure: "
+      "service queue is full with $3 items",
+      c->remote_method().method_name(),
+      service_->service_name(),
+      c->remote_address().ToString(),
+      service_queue_.max_size());
   c->RespondFailure(ErrorStatusPB::ERROR_SERVER_TOO_BUSY,
                     Status::ServiceUnavailable(err_msg));
+  KLOG_EVERY_N_SECS(WARNING, 1) << err_msg << THROTTLE_MSG;
   DLOG(INFO) << err_msg << " Contents of service queue:\n"
              << service_queue_.ToString();
 
@@ -169,15 +167,15 @@ Status ServicePool::QueueInboundCall(unique_ptr<InboundCall> call) {
   TRACE_TO(c->trace(), "Inserting onto call queue");
 
   // Queue message on service queue
-  std::optional<InboundCall*> evicted;
-  auto queue_status = service_queue_.Put(c, &evicted);
+  InboundCall* evicted = nullptr;
+  const auto queue_status = service_queue_.Put(c, &evicted);
   if (queue_status == QUEUE_FULL) {
     RejectTooBusy(c);
     return Status::OK();
   }
 
-  if (PREDICT_TRUE(evicted)) {
-    RejectTooBusy(*evicted);
+  if (PREDICT_FALSE(evicted != nullptr)) {
+    RejectTooBusy(evicted);
   }
 
   if (PREDICT_TRUE(queue_status == QUEUE_SUCCESS)) {
@@ -201,7 +199,7 @@ Status ServicePool::QueueInboundCall(unique_ptr<InboundCall> call) {
 void ServicePool::RunThread() {
   while (true) {
     std::unique_ptr<InboundCall> incoming;
-    if (!service_queue_.BlockingGet(&incoming)) {
+    if (PREDICT_FALSE(!service_queue_.BlockingGet(&incoming))) {
       VLOG(1) << "ServicePool: messenger shutting down.";
       return;
     }
@@ -214,14 +212,12 @@ void ServicePool::RunThread() {
       rpcs_timed_out_in_queue_->Increment();
 
       // Respond as a failure, even though the client will probably ignore
-      // the response anyway.
-      incoming->RespondFailure(
+      // the response anyway. Must release the raw pointer since the
+      // RespondFailure() call below ends up taking ownership of the object.
+      incoming.release()->RespondFailure(
         ErrorStatusPB::ERROR_SERVER_TOO_BUSY,
         Status::TimedOut("Call waited in the queue past client deadline"));
 
-      // Must release since RespondFailure above ends up taking ownership
-      // of the object.
-      ignore_result(incoming.release());
       continue;
     }
 

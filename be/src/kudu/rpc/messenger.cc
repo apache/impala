@@ -17,10 +17,12 @@
 
 #include "kudu/rpc/messenger.h"
 
+#include <sys/socket.h>
+
 #include <cstdlib>
 #include <functional>
-#include <mutex>
 #include <ostream>
+#include <shared_mutex>
 #include <string>
 #include <type_traits>
 #include <utility>
@@ -43,20 +45,32 @@
 #include "kudu/rpc/sasl_common.h"
 #include "kudu/rpc/server_negotiation.h"
 #include "kudu/rpc/service_if.h"
+#include "kudu/rpc/transfer.h"
 #include "kudu/security/tls_context.h"
 #include "kudu/security/token_verifier.h"
 #include "kudu/util/flags.h"
+#include "kudu/util/logging.h"
 #include "kudu/util/metrics.h"
 #include "kudu/util/monotime.h"
+#include "kudu/util/net/net_util.h"
 #include "kudu/util/net/socket.h"
 #include "kudu/util/openssl_util.h"
 #include "kudu/util/status.h"
 #include "kudu/util/thread_restrictions.h"
 #include "kudu/util/threadpool.h"
 
+METRIC_DEFINE_gauge_int32(server, rpc_pending_connections,
+                          "Pending RPC Connections",
+                          kudu::MetricUnit::kUnits,
+                          "The current size of the longest backlog of pending "
+                          "connections among all the listening sockets "
+                          "of this RPC server",
+                          kudu::MetricLevel::kInfo);
+
 using kudu::security::RpcAuthentication;
 using kudu::security::RpcEncryption;
 using std::string;
+using std::shared_lock;
 using std::shared_ptr;
 using std::unique_ptr;
 using strings::Substitute;
@@ -69,7 +83,9 @@ const int64_t MessengerBuilder::kRpcNegotiationTimeoutMs = 3000;
 MessengerBuilder::MessengerBuilder(string name)
     : name_(std::move(name)),
       connection_keepalive_time_(MonoDelta::FromMilliseconds(65000)),
+      acceptor_listen_backlog_(AcceptorPool::kDefaultListenBacklog),
       num_reactors_(4),
+      rpc_max_message_size_(FLAGS_rpc_max_message_size),
       min_negotiation_threads_(0),
       max_negotiation_threads_(4),
       coarse_timer_granularity_(MonoDelta::FromMilliseconds(100)),
@@ -121,12 +137,11 @@ Status MessengerBuilder::Build(shared_ptr<Messenger>* msgr) {
       } else {
         RETURN_NOT_OK(tls_context->LoadCertificateAndPasswordProtectedKey(
             rpc_certificate_file_, rpc_private_key_file_,
-            [&](){
-              string ret;
-              WARN_NOT_OK(security::GetPasswordFromShellCommand(
-                  rpc_private_key_password_cmd_, &ret),
+            [&](string* password){
+              RETURN_NOT_OK_PREPEND(security::GetPasswordFromShellCommand(
+                  rpc_private_key_password_cmd_, password),
                   "could not get RPC password from configured command");
-              return ret;
+              return Status::OK();
             }
         ));
       }
@@ -138,6 +153,8 @@ Status MessengerBuilder::Build(shared_ptr<Messenger>* msgr) {
   *msgr = std::move(new_msgr);
   return Status::OK();
 }
+
+std::atomic<uint32_t> Messenger::kInstanceCount_ = 0;
 
 // See comment on Messenger::retain_self_ member.
 void Messenger::AllExternalReferencesDropped() {
@@ -154,6 +171,35 @@ void Messenger::AllExternalReferencesDropped() {
   // internal-facing references are dropped (ie those from reactor
   // threads).
   retain_self_.reset();
+}
+
+int32_t Messenger::GetPendingConnectionsNum() {
+  // This method might be called when the messenger is shutting down;
+  // making a copy of acceptor_pools_ is necessary to avoid data races.
+  decltype(acceptor_pools_) acceptor_pools;
+  {
+    std::lock_guard guard(lock_);
+    if (state_ == kClosing) {
+      return -1;
+    }
+    acceptor_pools.reserve(acceptor_pools_.size());
+    acceptor_pools = acceptor_pools_;
+  }
+
+  auto pool_reports_num = 0;
+  int32_t total_count = 0;
+  for (const auto& p : acceptor_pools) {
+    uint32_t count;
+    if (auto s = p->GetPendingConnectionsNum(&count); PREDICT_FALSE(!s.ok())) {
+      KLOG_EVERY_N_SECS(WARNING, 60) << Substitute(
+          "$0: no data on pending connections for acceptor pool at $1",
+          s.ToString(), p->bind_address().ToString()) << THROTTLE_MSG;
+      continue;
+    }
+    ++pool_reports_num;
+    total_count += static_cast<int32_t>(count);
+  }
+  return pool_reports_num == 0 ? -1 : total_count;
 }
 
 void Messenger::Shutdown() {
@@ -176,15 +222,15 @@ void Messenger::ShutdownInternal(ShutdownMode mode) {
   acceptor_vec_t pools_to_shutdown;
   RpcServicesMap services_to_release;
   {
-    std::lock_guard<percpu_rwlock> guard(lock_);
+    std::lock_guard guard(lock_);
     if (state_ == kClosing) {
       return;
     }
     VLOG(1) << "shutting down messenger " << name_;
     state_ = kClosing;
 
-    services_to_release = std::move(rpc_services_);
-    pools_to_shutdown = std::move(acceptor_pools_);
+    services_to_release.swap(rpc_services_);
+    pools_to_shutdown.swap(acceptor_pools_);
   }
 
   // Destroy state outside of the lock.
@@ -217,17 +263,45 @@ Status Messenger::AddAcceptorPool(const Sockaddr& accept_addr,
   Socket sock;
   RETURN_NOT_OK(sock.Init(accept_addr.family(), 0));
   RETURN_NOT_OK(sock.SetReuseAddr(true));
+  if (GetIPFamily() == AF_INET6) {
+    // IPV6_V6ONLY socket option is not applicable to Unix domain sockets.
+    if (PREDICT_FALSE(accept_addr.is_unix())) {
+      return Status::ConfigurationError(
+          "IPV6_V6ONLY socket option is not applicable to Unix domain sockets.");
+    }
+    RETURN_NOT_OK(sock.SetIPv6Only(true));
+  }
   if (reuseport_) {
+    // SO_REUSEPORT socket option is not applicable to Unix domain sockets.
+    if (PREDICT_FALSE(accept_addr.is_unix())) {
+      return Status::ConfigurationError(
+          "Port reuse is not applicable to Unix domain sockets.");
+    }
     RETURN_NOT_OK(sock.SetReusePort(true));
   }
   RETURN_NOT_OK(sock.Bind(accept_addr));
-  Sockaddr remote;
-  RETURN_NOT_OK(sock.GetSocketAddress(&remote));
-  auto acceptor_pool(std::make_shared<AcceptorPool>(this, &sock, remote));
+  Sockaddr addr;
+  RETURN_NOT_OK(sock.GetSocketAddress(&addr));
 
-  std::lock_guard<percpu_rwlock> guard(lock_);
-  acceptor_pools_.push_back(acceptor_pool);
-  pool->swap(acceptor_pool);
+  {
+    std::lock_guard guard(lock_);
+    acceptor_pools_.emplace_back(std::make_shared<AcceptorPool>(
+        this, &sock, addr, acceptor_listen_backlog_));
+    *pool = acceptor_pools_.back();
+
+#if defined(KUDU_HAS_DIAGNOSTIC_SOCKET)
+    if (acceptor_pools_.size() == 1) {
+      // 'rpc_pending_connections' metric is instantiated when the messenger
+      // contains exactly one acceptor pool: this metric makes sense
+      // only for server-side messengers, and it's enough to instantiate the
+      // metric only once.
+      METRIC_rpc_pending_connections.InstantiateFunctionGauge(
+          metric_entity_, [this]() { return this->GetPendingConnectionsNum(); })->
+          AutoDetachToLastValue(&metric_detacher_);
+    }
+#endif // #if defined(KUDU_HAS_DIAGNOSTIC_SOCKET) ...
+  }
+
   return Status::OK();
 }
 
@@ -235,7 +309,7 @@ Status Messenger::AddAcceptorPool(const Sockaddr& accept_addr,
 Status Messenger::RegisterService(const string& service_name,
                                   const scoped_refptr<RpcService>& service) {
   DCHECK(service);
-  std::lock_guard<percpu_rwlock> guard(lock_);
+  std::lock_guard guard(lock_);
   DCHECK_NE(kServicesUnregistered, state_);
   DCHECK_NE(kClosing, state_);
   if (InsertIfNotPresent(&rpc_services_, service_name, service)) {
@@ -247,8 +321,8 @@ Status Messenger::RegisterService(const string& service_name,
 void Messenger::UnregisterAllServices() {
   RpcServicesMap to_release;
   {
-    std::lock_guard<percpu_rwlock> guard(lock_);
-    to_release = std::move(rpc_services_);
+    std::lock_guard guard(lock_);
+    to_release.swap(rpc_services_);
     state_ = kServicesUnregistered;
   }
   // Release the map outside of the lock.
@@ -257,7 +331,7 @@ void Messenger::UnregisterAllServices() {
 Status Messenger::UnregisterService(const string& service_name) {
   scoped_refptr<RpcService> to_release;
   {
-    std::lock_guard<percpu_rwlock> guard(lock_);
+    std::lock_guard guard(lock_);
     to_release = EraseKeyReturnValuePtr(&rpc_services_, service_name);
     if (!to_release) {
       return Status::ServiceUnavailable(Substitute(
@@ -268,9 +342,8 @@ Status Messenger::UnregisterService(const string& service_name) {
   return Status::OK();
 }
 
-void Messenger::QueueOutboundCall(const shared_ptr<OutboundCall> &call) {
-  Reactor *reactor = RemoteToReactor(call->conn_id().remote());
-  reactor->QueueOutboundCall(call);
+void Messenger::QueueOutboundCall(const shared_ptr<OutboundCall>& call) {
+  RemoteToReactor(call->conn_id().remote())->QueueOutboundCall(call);
 }
 
 void Messenger::QueueInboundCall(unique_ptr<InboundCall> call) {
@@ -280,7 +353,7 @@ void Messenger::QueueInboundCall(unique_ptr<InboundCall> call) {
   // blocking operation and QueueInboundCall is called by the reactor thread.
   //
   // See KUDU-2946 for more details.
-  shared_lock<rw_spinlock> guard(lock_.get_lock());
+  shared_lock guard(lock_.get_lock());
   scoped_refptr<RpcService>* service = FindOrNull(rpc_services_,
                                                   call->remote_method().service_name());
   if (PREDICT_FALSE(!service)) {
@@ -303,17 +376,16 @@ void Messenger::QueueInboundCall(unique_ptr<InboundCall> call) {
   WARN_NOT_OK((*service)->QueueInboundCall(std::move(call)), "Unable to handle RPC call");
 }
 
-void Messenger::QueueCancellation(const shared_ptr<OutboundCall> &call) {
-  Reactor *reactor = RemoteToReactor(call->conn_id().remote());
+void Messenger::QueueCancellation(const shared_ptr<OutboundCall>& call) {
+  Reactor* reactor = RemoteToReactor(call->conn_id().remote());
   reactor->QueueCancellation(call);
 }
 
-void Messenger::RegisterInboundSocket(Socket *new_socket, const Sockaddr &remote) {
-  Reactor *reactor = RemoteToReactor(remote);
-  reactor->RegisterInboundSocket(new_socket, remote);
+void Messenger::RegisterInboundSocket(Socket* new_socket, const Sockaddr& remote) {
+  RemoteToReactor(remote)->RegisterInboundSocket(new_socket, remote);
 }
 
-Messenger::Messenger(const MessengerBuilder &bld)
+Messenger::Messenger(const MessengerBuilder& bld)
     : name_(bld.name_),
       state_(kStarted),
       authentication_(RpcAuthentication::REQUIRED),
@@ -327,10 +399,14 @@ Messenger::Messenger(const MessengerBuilder &bld)
       rpcz_store_(new RpczStore),
       metric_entity_(bld.metric_entity_),
       rpc_negotiation_timeout_ms_(bld.rpc_negotiation_timeout_ms_),
+      rpc_max_message_size_(bld.rpc_max_message_size_),
+      hostname_(bld.hostname_),
       sasl_proto_name_(bld.sasl_proto_name_),
       keytab_file_(bld.keytab_file_),
       reuseport_(bld.reuseport_),
+      acceptor_listen_backlog_(bld.acceptor_listen_backlog_),
       retain_self_(this) {
+  kInstanceCount_.fetch_add(1, std::memory_order_release);
   for (int i = 0; i < bld.num_reactors_; i++) {
     reactors_.push_back(new Reactor(retain_self_, i, bld));
   }
@@ -344,12 +420,25 @@ Messenger::Messenger(const MessengerBuilder &bld)
       .Build(&server_negotiation_pool_));
 }
 
+uint32_t Messenger::GetInstanceCount() {
+  return kInstanceCount_.load(std::memory_order_acquire);
+}
+
 Messenger::~Messenger() {
   CHECK_EQ(state_, kClosing) << "Should have already shut down";
   STLDeleteElements(&reactors_);
+
+  // KUDU(2439): kInstanceCount_'s zeroing is used as a criterion for the proper
+  //             timing of OPENSSL_clean() call; so, it's crucial to make sure
+  //             the sub-objects that call the OpenSSL API in their destructor
+  //             are already destroyed when the instance counter reaches zero
+  jwt_verifier_.reset();
+  token_verifier_.reset();
+  tls_context_.reset();
+  kInstanceCount_.fetch_sub(1, std::memory_order_release);
 }
 
-Reactor* Messenger::RemoteToReactor(const Sockaddr& remote) {
+Reactor* Messenger::RemoteToReactor(const Sockaddr& remote) const {
   // This is just a static partitioning; we could get a lot
   // fancier with assigning Sockaddrs to Reactors.
   return reactors_[remote.HashCode() % reactors_.size()];
@@ -388,15 +477,14 @@ void Messenger::ScheduleOnReactor(std::function<void(const Status&)> func,
     chosen = reactors_[rand() % reactors_.size()];
   }
 
-  DelayedTask* task = new DelayedTask(std::move(func), when);
-  chosen->ScheduleReactorTask(task);
+  chosen->ScheduleReactorTask(MakeDelayedTask(std::move(func), when));
 }
 
-const scoped_refptr<RpcService> Messenger::rpc_service(const string& service_name) const {
+scoped_refptr<RpcService> Messenger::rpc_service(const string& service_name) const {
   scoped_refptr<RpcService> service;
   {
-    shared_lock<rw_spinlock> guard(lock_.get_lock());
-    if (!FindCopy(rpc_services_, service_name, &service)) {
+    shared_lock guard(lock_.get_lock());
+    if (PREDICT_FALSE(!FindCopy(rpc_services_, service_name, &service))) {
       return scoped_refptr<RpcService>(nullptr);
     }
   }

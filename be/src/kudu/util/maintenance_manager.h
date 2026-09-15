@@ -23,7 +23,6 @@
 #include <functional>
 #include <map>
 #include <memory>
-#include <mutex>
 #include <string>
 #include <unordered_map>
 #include <utility>
@@ -330,7 +329,7 @@ class MaintenanceManager : public std::enable_shared_from_this<MaintenanceManage
   void GetMaintenanceManagerStatusDump(MaintenanceManagerStatusPB* out_pb);
 
   void set_memory_pressure_func_for_tests(std::function<bool(double*)> f) {
-    std::lock_guard<Mutex> guard(lock_);
+    std::lock_guard guard(lock_);
     memory_pressure_func_ = std::move(f);
   }
 
@@ -363,7 +362,9 @@ class MaintenanceManager : public std::enable_shared_from_this<MaintenanceManage
 
   void LaunchOp(MaintenanceOp* op);
 
-  std::string LogPrefix() const;
+  const std::string& LogPrefix() const {
+    return log_prefix_;
+  }
 
   bool HasFreeThreads();
 
@@ -376,7 +377,17 @@ class MaintenanceManager : public std::enable_shared_from_this<MaintenanceManage
   // 'lock_' is held.
   void MergePendingOpRegistrationsUnlocked();
 
+  /// Determine whether to run flush ops, depends on memory pressure and
+  /// the flag run_non_memory_ops_prob.
+  ///
+  /// @param [out] used_memory_percentage
+  ///    The memory usage for now.
+  ///
+  /// @return Should the maintenance manager find a flush operation to run.
+  bool ProceedWithFlush(double* used_memory_percentage);
+
   const std::string server_uuid_;
+  const std::string log_prefix_;
   const int32_t num_threads_;
   const MonoDelta polling_interval_;
 

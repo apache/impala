@@ -16,12 +16,13 @@
 // under the License.
 #pragma once
 
+#include <atomic>
 #include <cstdint>
 #include <vector>
 
-#include "kudu/gutil/atomicops.h"
 #include "kudu/gutil/macros.h"
 #include "kudu/gutil/ref_counted.h"
+#include "kudu/util/net/diagnostic_socket.h"
 #include "kudu/util/net/sockaddr.h"
 #include "kudu/util/net/socket.h"
 #include "kudu/util/status.h"
@@ -29,6 +30,7 @@
 namespace kudu {
 
 class Counter;
+class Histogram;
 class Thread;
 
 namespace rpc {
@@ -40,10 +42,17 @@ class Messenger;
 // shut down, if Shutdown() is called, or if the pool object is destructed.
 class AcceptorPool {
  public:
+  // Default size of the pending connections queue for a socket listened by
+  // AcceptorPool::Start().
+  static constexpr int kDefaultListenBacklog = 512;
+
   // Create a new acceptor pool.  Calls socket::Release to take ownership of the
   // socket.
   // 'socket' must be already bound, but should not yet be listening.
-  AcceptorPool(Messenger *messenger, Socket *socket, Sockaddr bind_address);
+  AcceptorPool(Messenger* messenger,
+               Socket* socket,
+               const Sockaddr& bind_address,
+               int listen_backlog = kDefaultListenBacklog);
   ~AcceptorPool();
 
   // Start listening and accepting connections.
@@ -62,17 +71,29 @@ class AcceptorPool {
   // Return the number of connections accepted by this messenger. Thread-safe.
   int64_t num_rpc_connections_accepted() const;
 
+  // Upon success, return Status::OK() and write the current size of the
+  // listening socket's RX queue into the 'result' out parameter. Otherwise,
+  // return corresponding status and leave the 'result' out parameter untouched.
+  Status GetPendingConnectionsNum(uint32_t* result) const;
+
  private:
   void RunThread();
 
-  Messenger *messenger_;
+  Messenger* messenger_;
   Socket socket_;
-  Sockaddr bind_address_;
-  std::vector<scoped_refptr<kudu::Thread> > threads_;
+  const Sockaddr bind_address_;
+  const int listen_backlog_;
+  std::vector<scoped_refptr<Thread>> threads_;
+#if defined(KUDU_HAS_DIAGNOSTIC_SOCKET)
+  DiagnosticSocket diag_socket_;
+#endif // #if defined(KUDU_HAS_DIAGNOSTIC_SOCKET) ...
 
+  std::atomic<bool> closing_;
+
+  // Metrics.
   scoped_refptr<Counter> rpc_connections_accepted_;
-
-  Atomic32 closing_;
+  scoped_refptr<Histogram> dispatch_times_;
+  scoped_refptr<Histogram> listen_socket_queue_size_;
 
   DISALLOW_COPY_AND_ASSIGN(AcceptorPool);
 };

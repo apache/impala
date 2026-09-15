@@ -31,8 +31,9 @@
 #include <cerrno>
 #include <cstring>
 #include <memory>
-#include <mutex>
+#include <shared_mutex>
 #include <sstream>
+#include <type_traits>
 #include <unordered_map>
 #include <utility>
 #include <vector>
@@ -45,7 +46,6 @@
 #include "kudu/gutil/dynamic_annotations.h"
 #include "kudu/gutil/map-util.h"
 #include "kudu/gutil/mathlimits.h"
-#include "kudu/gutil/once.h"
 #include "kudu/gutil/port.h"
 #include "kudu/gutil/strings/substitute.h"
 #include "kudu/util/easy_json.h"
@@ -64,8 +64,10 @@
 #include "kudu/util/web_callback_registry.h"
 
 using std::atomic;
+using std::function;
 using std::ostringstream;
 using std::pair;
+using std::shared_lock;
 using std::shared_ptr;
 using std::string;
 using std::vector;
@@ -163,31 +165,18 @@ static int32_t GetSchedulingPriority() {
   return prio;
 }
 
-class ThreadMgr;
-
-__thread Thread* Thread::tls_ = nullptr;
-
-// Singleton instance of ThreadMgr. Only visible in this file, used only by Thread.
-// The Thread class adds a reference to thread_manager while it is supervising a thread so
-// that a race between the end of the process's main thread (and therefore the destruction
-// of thread_manager) and the end of a thread that tries to remove itself from the
-// manager after the destruction can be avoided.
-static shared_ptr<ThreadMgr> thread_manager;
-
-// Controls the single (lazy) initialization of thread_manager.
-static GoogleOnceType once = GOOGLE_ONCE_INIT;
+thread_local Thread* Thread::tls_ = nullptr;
 
 // A singleton class that tracks all live threads, and groups them together for easy
 // auditing. Used only by Thread.
-class ThreadMgr {
+class ThreadMgr final {
  public:
   ThreadMgr()
       : threads_started_metric_(0),
         threads_running_metric_(0) {
   }
 
-  ~ThreadMgr() {
-  }
+  ~ThreadMgr() = default;
 
   static void SetThreadName(const string& name, int64_t tid);
 
@@ -210,9 +199,9 @@ class ThreadMgr {
 
  private:
   // Container class for any details we want to capture about a thread
-  // TODO: Add start-time.
-  // TODO: Track fragment ID.
-  class ThreadDescriptor {
+  // TODO(henry): Add start-time.
+  // TODO(henry): Track fragment ID.
+  class ThreadDescriptor final {
    public:
     ThreadDescriptor() { }
     ThreadDescriptor(string category, string name, int64_t thread_id)
@@ -335,7 +324,7 @@ Status ThreadMgr::StartInstrumentation(const scoped_refptr<MetricEntity>& metric
                                       WebCallbackRegistry::WebResponse* resp) {
           this->ThreadPathHandler(req, resp);
         },
-        /* is_styled= */ true,
+        StyleMode::STYLED,
         /* is_on_nav_bar= */ true);
   }
   return Status::OK();
@@ -371,7 +360,7 @@ void ThreadMgr::AddThread(const pthread_t& pthread_id, const string& name,
     //   global static container, but bind the container with the life cycle
     //   of some top-level object that uses the ThreadMgr as a singleton.
     {
-      std::lock_guard<decltype(lock_)> l(lock_);
+      std::lock_guard l(lock_);
       thread_categories_[category][pthread_id] = ThreadDescriptor(category, name, tid);
     }
     ++threads_running_metric_;
@@ -385,7 +374,7 @@ void ThreadMgr::RemoveThread(const pthread_t& pthread_id, const string& category
   ANNOTATE_IGNORE_SYNC_BEGIN();
   ANNOTATE_IGNORE_READS_AND_WRITES_BEGIN();
   {
-    std::lock_guard<decltype(lock_)> l(lock_);
+    std::lock_guard l(lock_);
     auto& threads = FindOrDie(thread_categories_, category);
     auto num_erased = threads.erase(pthread_id);
     CHECK_EQ(1, num_erased);
@@ -425,7 +414,7 @@ void ThreadMgr::ThreadPathHandler(const WebCallbackRegistry::WebRequest& req,
     // imposed on new threads that acquire the lock in write mode.
     vector<ThreadDescriptor> descriptors_to_print;
     if (!requested_all) {
-      shared_lock<decltype(lock_)> l(lock_);
+      shared_lock l(lock_);
       const auto* category = FindOrNull(thread_categories_, *category_name);
       if (!category) {
         return;
@@ -434,7 +423,7 @@ void ThreadMgr::ThreadPathHandler(const WebCallbackRegistry::WebRequest& req,
         descriptors_to_print.emplace_back(elem.second);
       }
     } else {
-      shared_lock<decltype(lock_)> l(lock_);
+      shared_lock l(lock_);
       for (const auto& category : thread_categories_) {
         for (const auto& elem : category.second) {
           descriptors_to_print.emplace_back(elem.second);
@@ -452,7 +441,7 @@ void ThreadMgr::ThreadPathHandler(const WebCallbackRegistry::WebRequest& req,
     vector<pair<string, uint64_t>> thread_categories_info;
     {
       // See comment above regarding short critical sections.
-      shared_lock<decltype(lock_)> l(lock_);
+      shared_lock l(lock_);
       thread_categories_info.reserve(thread_categories_.size());
       for (const auto& category : thread_categories_) {
         thread_categories_info.emplace_back(category.first, category.second.size());
@@ -483,14 +472,19 @@ void ThreadMgr::ThreadPathHandler(const WebCallbackRegistry::WebRequest& req,
   }
 }
 
-static void InitThreading() {
-  thread_manager.reset(new ThreadMgr());
+static shared_ptr<ThreadMgr> GetThreadManager() {
+  // Singleton instance of ThreadMgr, used only by the Thread class.
+  // A Thread instance has a reference to kThreadManager, so there isn't a race
+  // between the end of the process's main thread (and therefore the destruction
+  // of kThreadManager) and the end of a thread that tries to remove itself from
+  // the kThreadManager.
+  static shared_ptr<ThreadMgr> kThreadManager = std::make_shared<ThreadMgr>();
+  return kThreadManager;
 }
 
 Status StartThreadInstrumentation(const scoped_refptr<MetricEntity>& server_metrics,
                                   WebCallbackRegistry* web) {
-  GoogleOnceInit(&once, &InitThreading);
-  return thread_manager->StartInstrumentation(server_metrics, web);
+  return GetThreadManager()->StartInstrumentation(server_metrics, web);
 }
 
 ThreadJoiner::ThreadJoiner(Thread* thr)
@@ -572,8 +566,24 @@ Thread::~Thread() {
   }
 }
 
+void Thread::Join() {
+  WARN_NOT_OK(ThreadJoiner(this).Join(),
+              Substitute("$0 failed joining", ToString()));
+}
+
 string Thread::ToString() const {
   return Substitute("Thread $0 (name: \"$1\", category: \"$2\")", tid(), name_, category_);
+}
+
+Thread::Thread(string category, string name, function<void()> functor)
+    : thread_(0),
+      category_(std::move(category)),
+      name_(std::move(name)),
+      tid_(INVALID_TID),
+      functor_(std::move(functor)),
+      done_(1),
+      joinable_(false),
+      thread_manager_(GetThreadManager()) {
 }
 
 int64_t Thread::WaitForTid() const {
@@ -591,14 +601,13 @@ int64_t Thread::WaitForTid() const {
 Status Thread::StartThread(string category, string name,
                            std::function<void()> functor, uint64_t flags,
                            scoped_refptr<Thread>* holder) {
-  TRACE_COUNTER_INCREMENT("threads_started", 1);
+  constexpr const char* const TC_THREADS_STARTED = "threads_started";
+  TRACE_COUNTER_INCREMENT(TC_THREADS_STARTED, 1);
   TRACE_COUNTER_SCOPE_LATENCY_US("thread_start_us");
-  GoogleOnceInit(&once, &InitThreading);
 
   const string log_prefix = Substitute("$0 ($1) ", name, category);
   SCOPED_LOG_SLOW_EXECUTION_PREFIX(WARNING, 500 /* ms */, log_prefix, "starting thread");
 
-  // Temporary reference for the duration of this function.
   scoped_refptr<Thread> t(new Thread(
       std::move(category), std::move(name), std::move(functor)));
 
@@ -638,7 +647,7 @@ Status Thread::StartThread(string category, string name,
       if (ret == EAGAIN) {
         uint64_t rlimit_nproc = Env::Default()->GetResourceLimit(
             Env::ResourceLimitType::RUNNING_THREADS_PER_EUID);
-        uint64_t num_threads = thread_manager->ReadThreadsRunning();
+        uint64_t num_threads = t->thread_manager_->ReadThreadsRunning();
         msg = Substitute(" ($0 Kudu-managed threads running in this process, "
                          "$1 max processes allowed for current user)",
                          num_threads, rlimit_nproc);
@@ -664,11 +673,6 @@ void* Thread::SuperviseThread(void* arg) {
   int64_t system_tid = Thread::CurrentThreadId();
   PCHECK(system_tid != -1);
 
-  // Take an additional reference to the thread manager, which we'll need below.
-  ANNOTATE_IGNORE_SYNC_BEGIN();
-  shared_ptr<ThreadMgr> thread_mgr_ref = thread_manager;
-  ANNOTATE_IGNORE_SYNC_END();
-
   // Set up the TLS.
   //
   // We could store a scoped_refptr in the TLS itself, but as its
@@ -680,9 +684,9 @@ void* Thread::SuperviseThread(void* arg) {
   // WaitForTid().
   Release_Store(&t->tid_, system_tid);
 
-  string name = strings::Substitute("$0-$1", t->name(), system_tid);
-  thread_manager->SetThreadName(name, t->tid_);
-  thread_manager->AddThread(pthread_self(), name, t->category(), t->tid_);
+  const auto name = strings::Substitute("$0-$1", t->name(), system_tid);
+  ThreadMgr::SetThreadName(name, t->tid_);
+  t->thread_manager_->AddThread(pthread_self(), name, t->category(), t->tid_);
 
   // FinishThread() is guaranteed to run (even if functor_ throws an
   // exception) because pthread_cleanup_push() creates a scoped object
@@ -698,10 +702,8 @@ void Thread::FinishThread(void* arg) {
   Thread* t = static_cast<Thread*>(arg);
 
   // We're here either because of the explicit pthread_cleanup_pop() in
-  // SuperviseThread() or through pthread_exit(). In either case,
-  // thread_manager is guaranteed to be live because thread_mgr_ref in
-  // SuperviseThread() is still live.
-  thread_manager->RemoveThread(pthread_self(), t->category());
+  // SuperviseThread() or through pthread_exit().
+  t->thread_manager_->RemoveThread(pthread_self(), t->category());
 
   // Signal any Joiner that we're done.
   t->done_.CountDown();

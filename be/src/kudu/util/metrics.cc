@@ -16,6 +16,9 @@
 // under the License.
 #include "kudu/util/metrics.h"
 
+#include <algorithm>
+#include <array>
+#include <cstring>
 #include <iostream>
 #include <tuple>
 #include <utility>
@@ -25,13 +28,67 @@
 
 #include "kudu/gutil/map-util.h"
 #include "kudu/gutil/singleton.h"
+#include "kudu/gutil/strings/ascii_ctype.h"
 #include "kudu/gutil/strings/join.h"
+#include "kudu/gutil/strings/split.h"
 #include "kudu/gutil/strings/substitute.h"
 #include "kudu/util/flag_tags.h"
 #include "kudu/util/hdr_histogram.h"
 #include "kudu/util/histogram.pb.h"
+#include "kudu/util/logging.h"
 #include "kudu/util/status.h"
-#include "kudu/util/string_case.h"
+
+using std::string;
+using std::unordered_set;
+using std::vector;
+using strings::Substitute;
+using strings::SubstituteAndAppend;
+
+namespace {
+// The quantile lines a histogram exports in Prometheus format, in output order.
+// 'tag' is the value of the Prometheus 'quantile' label and the token accepted
+// by --metrics_prometheus_default_quantiles and the 'quantiles' query parameter.
+// The min ('0') and max ('1') export the exact recorded extrema; the others
+// export the value at 'percentile' (as passed to HdrHistogram::ValueAtPercentile).
+// This is the single canonical description of the preset quantiles.
+struct HistogramQuantile {
+  enum class Source {
+    kMinValue,    // exact recorded minimum, tagged '0'
+    kMaxValue,    // exact recorded maximum, tagged '1'
+    kPercentile,  // value at 'percentile'
+  };
+  const char* const tag;
+  const Source source;
+  const double percentile;  // only meaningful when source == kPercentile
+};
+constexpr HistogramQuantile kHistogramQuantiles[] = {
+  { "0",      HistogramQuantile::Source::kMinValue,   0.0   },
+  { "0.75",   HistogramQuantile::Source::kPercentile, 75.0  },
+  { "0.95",   HistogramQuantile::Source::kPercentile, 95.0  },
+  { "0.99",   HistogramQuantile::Source::kPercentile, 99.0  },
+  { "0.999",  HistogramQuantile::Source::kPercentile, 99.9  },
+  { "0.9999", HistogramQuantile::Source::kPercentile, 99.99 },
+  { "1",      HistogramQuantile::Source::kMaxValue,   0.0   },
+};
+static_assert(arraysize(kHistogramQuantiles) == kudu::kNumHistogramQuantiles,
+              "kNumHistogramQuantiles must match the kHistogramQuantiles table");
+
+bool IsKnownQuantileTag(const string& tag) {
+  for (const auto& q : kHistogramQuantiles) {
+    if (tag == q.tag) {
+      return true;
+    }
+  }
+  return false;
+}
+} // anonymous namespace
+
+// The canonical human-readable list of accepted quantile tags. Kept as a macro
+// (rather than a constexpr variable) so it can be spliced directly into the
+// adjacent string literals of the flag description and the warning messages
+// below, keeping all of them in sync with the kHistogramQuantiles table.
+#define KUDU_KNOWN_QUANTILE_TAGS \
+  "'0', '0.75', '0.95', '0.99', '0.999', '0.9999', '1'"
 
 DEFINE_int32(metrics_retirement_age_ms, 120 * 1000,
              "The minimum number of milliseconds a metric will be kept for after it is "
@@ -39,17 +96,137 @@ DEFINE_int32(metrics_retirement_age_ms, 120 * 1000,
 TAG_FLAG(metrics_retirement_age_ms, runtime);
 TAG_FLAG(metrics_retirement_age_ms, advanced);
 
+DEFINE_bool(metrics_prometheus_use_entity_labels, false,
+            "If true, entity attributes (type, id, table_id, table_name) "
+            "are exported as Prometheus labels and metric names have no entity prefix. "
+            "If false, entity IDs are embedded in metric names (legacy format).");
+TAG_FLAG(metrics_prometheus_use_entity_labels, runtime);
+
+DEFINE_bool(metrics_prometheus_export_hostname, true,
+            "If true and --metrics_prometheus_use_entity_labels is also true, "
+            "a 'hostname' label identifying the serving node is added to every "
+            "Prometheus metric line. Set to false to omit the hostname label, "
+            "e.g. when using Prometheus relabel_configs for custom labeling.");
+TAG_FLAG(metrics_prometheus_export_hostname, runtime);
+
+DEFINE_string(metrics_prometheus_default_merge_rules, "",
+              "The default entity merge rules applied by the '/metrics_prometheus' "
+              "endpoint when the request does not carry a 'merge_rules' query "
+              "parameter. The value is a comma-separated list of rules, each in the "
+              "form '<entity_type>|<merge_to>|<attribute_to_merge_by>'. For example, "
+              "'tablet|table|table_name' merges all tablet entities into table-level "
+              "entities keyed by their 'table_name' attribute, which drastically "
+              "reduces the number of exported time series on clusters with many "
+              "tablets. Empty by default, i.e. no merging is performed unless a "
+              "request asks for it.");
+TAG_FLAG(metrics_prometheus_default_merge_rules, advanced);
+TAG_FLAG(metrics_prometheus_default_merge_rules, runtime);
+TAG_FLAG(metrics_prometheus_default_merge_rules, evolving);
+DEFINE_validator(metrics_prometheus_default_merge_rules,
+                 [](const char* flag_name, const std::string& value) {
+  // An empty value disables default merging and is always valid. Otherwise
+  // warn about (but tolerate) malformed rules so that a typo surfaces in the
+  // logs instead of silently disabling aggregation. Well-formed rules in the
+  // same value are still applied; see GetPrometheusMergeRules().
+  if (value.empty()) {
+    return true;
+  }
+  std::vector<std::string> raw_merge_rules;
+  SplitStringUsing(value, ",", &raw_merge_rules);
+  for (const auto& raw_merge_rule : raw_merge_rules) {
+    std::vector<std::string> parts;
+    SplitStringUsing(raw_merge_rule, "|", &parts);
+    if (parts.size() != 3) {
+      LOG(WARNING) << strings::Substitute(
+          "ignoring malformed rule '$0' in --$1: expected the form "
+          "'<entity_type>|<merge_to>|<attribute_to_merge_by>'",
+          raw_merge_rule, flag_name);
+    }
+  }
+  return true;
+});
+
+DEFINE_string(metrics_prometheus_default_quantiles, "",
+              "The default set of histogram quantiles exported by the "
+              "'/metrics_prometheus' endpoint when the request does not carry a "
+              "'quantiles' query parameter. The value is a comma-separated list "
+              "of quantile tags, each one of " KUDU_KNOWN_QUANTILE_TAGS
+              " (where '0' and '1' are the min and max). "
+              "For example, '0.99,0.999' exports only the p99 and p999 lines, "
+              "which further reduces the number of exported time series on top "
+              "of entity merging. Empty by default, i.e. all quantiles are "
+              "exported. The '_sum' and '_count' lines are always exported "
+              "regardless of this setting.");
+TAG_FLAG(metrics_prometheus_default_quantiles, advanced);
+TAG_FLAG(metrics_prometheus_default_quantiles, runtime);
+TAG_FLAG(metrics_prometheus_default_quantiles, evolving);
+DEFINE_validator(metrics_prometheus_default_quantiles,
+                 [](const char* flag_name, const string& value) {
+  // An empty value exports all quantiles and is always valid. Otherwise warn
+  // about (but tolerate) unknown tags so that a typo surfaces in the logs
+  // instead of silently dropping quantiles. Known tags in the same value are
+  // still applied; see GetPrometheusQuantiles().
+  if (value.empty()) {
+    return true;
+  }
+  vector<string> raw_quantiles;
+  SplitStringUsing(value, ",", &raw_quantiles);
+  for (const auto& raw_quantile : raw_quantiles) {
+    if (!IsKnownQuantileTag(raw_quantile)) {
+      LOG(WARNING) << Substitute(
+          "ignoring unknown quantile '$0' in --$1: expected one of "
+          KUDU_KNOWN_QUANTILE_TAGS,
+          raw_quantile, flag_name);
+    }
+  }
+  return true;
+});
+
+DEFINE_string(metrics_prometheus_default_metrics, "",
+              "The default metric name allowlist applied by the "
+              "'/metrics_prometheus' endpoint when the request does not carry a "
+              "'metrics' query parameter. The value is a comma-separated list of "
+              "case-insensitive substrings; a metric is exported when its name "
+              "contains at least one of them, matching the semantics of the "
+              "'metrics' query parameter. For example, "
+              "'connections_accepted,raft_term' restricts the output to metrics "
+              "whose names contain either substring. This applies the allowlist "
+              "to every scrape, including parameter-less ones, rather than "
+              "relying on each consumer to pass 'metrics'. Empty by default, "
+              "i.e. no metric name filtering is performed unless a request asks "
+              "for it.");
+TAG_FLAG(metrics_prometheus_default_metrics, advanced);
+TAG_FLAG(metrics_prometheus_default_metrics, runtime);
+TAG_FLAG(metrics_prometheus_default_metrics, evolving);
+DEFINE_validator(metrics_prometheus_default_metrics,
+                 [](const char* flag_name, const string& value) {
+  // An empty value disables default filtering and is always valid. A metric
+  // name substring has no internal structure to validate, but warn about (but
+  // tolerate) a non-empty value that yields no usable token (e.g. only commas),
+  // which would silently export every metric instead of restricting the
+  // output; see GetPrometheusMetricsFilter(). Only this zero-token case is
+  // guarded: a value that yields a whitespace-only token (e.g. " " or "a, ")
+  // survives SplitStringUsing(), matches no metric name, and produces the
+  // opposite silent failure -- an empty scrape -- which is left unguarded here
+  // to match the 'metrics' query parameter and the sibling default flags.
+  if (value.empty()) {
+    return true;
+  }
+  vector<string> tokens;
+  SplitStringUsing(value, ",", &tokens);
+  if (tokens.empty()) {
+    LOG(WARNING) << Substitute(
+        "--$0 is set to '$1' but contains no usable metric name; no metric "
+        "name filtering will be applied", flag_name, value);
+  }
+  return true;
+});
+
 // Process/server-wide metrics should go into the 'server' entity.
 // More complex applications will define other entities.
 METRIC_DEFINE_entity(server);
 
 namespace kudu {
-
-using std::string;
-using std::unordered_set;
-using std::vector;
-using strings::Substitute;
-using strings::SubstituteAndAppend;
 
 template<typename Collection>
 void WriteMetricsToJson(JsonWriter* writer,
@@ -72,11 +249,13 @@ void WriteMetricsToJson(JsonWriter* writer,
 
 void WriteMetricsPrometheus(PrometheusWriter* writer,
                             const MetricEntity::MetricMap& metrics,
-                            const string& prefix) {
+                            const string& prefix,
+                            const string& labels,
+                            const MetricPrometheusOptions& opts) {
   for (const auto& [name, val] : metrics) {
-    WARN_NOT_OK(val->WriteAsPrometheus(writer, prefix),
+    WARN_NOT_OK(val->WriteAsPrometheus(writer, prefix, labels, opts),
                 Substitute("unable to write '$0' ($1) in Prometheus format",
-                           name, val->prototype()->description()));
+                           val->prototype()->name(), val->prototype()->description()));
   }
 }
 
@@ -98,6 +277,120 @@ void WriteToJson(JsonWriter* writer,
     WriteMetricsToJson(writer, entity_metrics.second, opts);
 
     writer->EndObject();
+  }
+}
+
+void WriteToPrometheus(PrometheusWriter* writer,
+                       const MergedEntityMetrics& merged_entity_metrics,
+                       const MetricPrometheusOptions& opts) {
+  // The hostname label, if any, is identical for every merged entity, so
+  // compute it once up front rather than per entity.
+  string hostname_label;
+  if (FLAGS_metrics_prometheus_export_hostname && !opts.hostname.empty()) {
+    hostname_label = ",hostname=\"" + EscapePrometheusLabelValue(opts.hostname) + "\"";
+  }
+  for (const auto& entity_metrics : merged_entity_metrics) {
+    if (entity_metrics.second.empty()) {
+      continue;
+    }
+    // A merged entity is always exported in the label-based format: the
+    // merged-to type and merged-by attribute value become 'type' and 'id'
+    // labels, so that the entity ID is not baked into the metric name.
+    string labels = BuildMergedPrometheusLabels(entity_metrics.first.type_,
+                                                entity_metrics.first.id_);
+    labels += hostname_label;
+    for (const auto& [prototype, metric] : entity_metrics.second) {
+      WARN_NOT_OK(metric->WriteAsPrometheus(writer, "kudu_", labels, opts),
+                  Substitute("unable to write '$0' ($1) in Prometheus format",
+                             prototype->name(), prototype->description()));
+    }
+  }
+}
+
+void ParseMergeRules(const vector<string>& raw_merge_rules,
+                     MetricMergeRules* merge_rules) {
+  for (const auto& raw_merge_rule : raw_merge_rules) {
+    vector<string> values;
+    SplitStringUsing(raw_merge_rule, "|", &values);
+    if (values.size() == 3) {
+      // Index 0: entity type to be merged.
+      // Index 1: 'merge_to' field of MergeAttributes.
+      // Index 2: 'attribute_to_merge_by' field of MergeAttributes.
+      EmplaceIfNotPresent(merge_rules, values[0], MergeAttributes(values[1], values[2]));
+    }
+  }
+}
+
+void GetPrometheusMergeRules(const vector<string>& request_merge_rules,
+                             MetricMergeRules* merge_rules) {
+  // A request's own 'merge_rules' take precedence over the server-side default.
+  if (!request_merge_rules.empty()) {
+    ParseMergeRules(request_merge_rules, merge_rules);
+    return;
+  }
+  if (!FLAGS_metrics_prometheus_default_merge_rules.empty()) {
+    vector<string> default_merge_rules;
+    SplitStringUsing(FLAGS_metrics_prometheus_default_merge_rules, ",", &default_merge_rules);
+    ParseMergeRules(default_merge_rules, merge_rules);
+  }
+}
+
+namespace {
+// Resolve the raw quantile tags into 'quantiles', keeping only known tags (see
+// kHistogramQuantiles) de-duplicated and in canonical output order. Unknown
+// tags are ignored with a warning, mirroring the lenient parsing of merge rules.
+void ParseQuantiles(const vector<string>& raw_quantiles,
+                    HistogramQuantiles* quantiles) {
+  for (const auto& raw_quantile : raw_quantiles) {
+    if (!IsKnownQuantileTag(raw_quantile)) {
+      // This runs for every request carrying a 'quantiles' parameter, so
+      // throttle the warning to avoid flooding the logs when a scraper is
+      // misconfigured to keep sending an unknown tag.
+      KLOG_EVERY_N_SECS(WARNING, 60) << Substitute(
+          "ignoring unknown quantile '$0'; expected one of "
+          KUDU_KNOWN_QUANTILE_TAGS, raw_quantile) << THROTTLE_MSG;
+    }
+  }
+  // Emit the requested known tags in canonical order; considering each preset
+  // exactly once de-duplicates the request by construction. At most
+  // kNumHistogramQuantiles distinct tags exist, so 'n' never overflows -- the
+  // DCHECK guards that invariant against future changes to the table.
+  size_t n = 0;
+  for (const auto& q : kHistogramQuantiles) {
+    if (std::find(raw_quantiles.begin(), raw_quantiles.end(), q.tag) != raw_quantiles.end()) {
+      DCHECK_LT(n, kNumHistogramQuantiles);
+      (*quantiles)[n++] = q.tag;
+    }
+  }
+}
+} // anonymous namespace
+
+#undef KUDU_KNOWN_QUANTILE_TAGS
+
+void GetPrometheusQuantiles(const vector<string>& request_quantiles,
+                            HistogramQuantiles* quantiles) {
+  quantiles->fill(nullptr);
+  // A request's own 'quantiles' take precedence over the server-side default.
+  if (!request_quantiles.empty()) {
+    ParseQuantiles(request_quantiles, quantiles);
+    return;
+  }
+  if (!FLAGS_metrics_prometheus_default_quantiles.empty()) {
+    vector<string> default_quantiles;
+    SplitStringUsing(FLAGS_metrics_prometheus_default_quantiles, ",", &default_quantiles);
+    ParseQuantiles(default_quantiles, quantiles);
+  }
+}
+
+void GetPrometheusMetricsFilter(vector<string>* entity_metrics) {
+  // A request-supplied 'metrics' allowlist (already parsed into
+  // 'entity_metrics') takes precedence over the server-side default. The value
+  // is used verbatim by MatchNameInList(), so no further parsing is needed.
+  if (!entity_metrics->empty()) {
+    return;
+  }
+  if (!FLAGS_metrics_prometheus_default_metrics.empty()) {
+    SplitStringUsing(FLAGS_metrics_prometheus_default_metrics, ",", entity_metrics);
   }
 }
 
@@ -231,21 +524,24 @@ void MetricEntity::CheckInstantiation(const MetricPrototype* proto) const {
 }
 
 scoped_refptr<Metric> MetricEntity::FindOrNull(const MetricPrototype& prototype) const {
-  std::lock_guard<simple_spinlock> l(lock_);
+  std::lock_guard l(lock_);
   return FindPtrOrNull(metric_map_, &prototype);
 }
 
 namespace {
 
 bool MatchName(const string& name, const string& other) {
-  string name_uc;
-  ToUpperCase(name, &name_uc);
-
-  string other_uc;
-  ToUpperCase(other, &other_uc);
-
-  // The parameter is a case-insensitive substring match of the metric name.
-  return name_uc.find(other_uc) != string::npos;
+  // A case-insensitive substring match of 'other' within 'name' that avoids
+  // allocating uppercased copies of either string (this runs once per metric
+  // per filter term, so it is on a hot path when scraping large clusters). An
+  // empty pattern matches everything, mirroring string::find("").
+  if (other.empty()) {
+    return true;
+  }
+  const auto it = std::search(
+      name.begin(), name.end(), other.begin(), other.end(),
+      [](char a, char b) { return ascii_toupper(a) == ascii_toupper(b); });
+  return it != name.end();
 }
 
 bool MatchNameInList(const string& name, const vector<string>& names) {
@@ -288,8 +584,8 @@ int MetricLevelNumeric(MetricLevel level) {
 Status MetricEntity::GetMetricsAndAttrs(const MetricFilters& filters,
                                         MetricMap* metrics,
                                         AttributeMap* attrs) const {
-  CHECK(metrics);
-  CHECK(attrs);
+  DCHECK(metrics);
+  DCHECK(attrs);
 
   // Filter the 'type'.
   if (!filters.entity_types.empty() && !MatchNameInList(prototype_->name(), filters.entity_types)) {
@@ -303,7 +599,7 @@ Status MetricEntity::GetMetricsAndAttrs(const MetricFilters& filters,
 
   {
     // Snapshot the metrics in this registry (not guaranteed to be a consistent snapshot)
-    std::lock_guard<simple_spinlock> l(lock_);
+    std::lock_guard l(lock_);
     *attrs = attributes_;
     *metrics = metric_map_;
   }
@@ -315,7 +611,7 @@ Status MetricEntity::GetMetricsAndAttrs(const MetricFilters& filters,
     for (int i = 0; i < filters.entity_attrs.size(); i += 2) {
       // The attr_key can't be found or the attr_val can't be matched.
       AttributeMap::const_iterator it = attrs->find(filters.entity_attrs[i]);
-      if (it == attrs->end() || !MatchNameInList(it->second, { filters.entity_attrs[i+1] })) {
+      if (it == attrs->end() || !MatchName(it->second, filters.entity_attrs[i+1])) {
         continue;
       }
       match_attrs = true;
@@ -404,49 +700,44 @@ Status MetricEntity::WriteAsJson(JsonWriter* writer, const MetricJsonOptions& op
   return Status::OK();
 }
 
-Status MetricEntity::WriteAsPrometheus(PrometheusWriter* writer) const {
-  static const string kIdMaster = "kudu.master";
-  static const string kIdTabletServer = "kudu.tabletserver";
-
-  if (strcmp(prototype_->name(), "server") != 0) {
-    // Only server-level metrics are emitted in Prometheus format as of now,
-    // non-server metric entities are currently silently skipped.
-    //
-    // TODO(KUDU-3563): output tablet-level metrics in Prometheus format as well
-    return Status::OK();
-  }
-
-  // Empty filters result in getting all the metrics for this MetricEntity.
-  //
-  // TODO(aserbin): instead of hard-coding, pass MetricFilters as a parameter
-  MetricFilters filters;
-  filters.entity_level = "debug";
-
+Status MetricEntity::WriteAsPrometheus(
+    PrometheusWriter* writer, const MetricPrometheusOptions& opts) const {
   MetricMap metrics;
   AttributeMap attrs;
-  const auto s = GetMetricsAndAttrs(filters, &metrics, &attrs);
+  const auto s = GetMetricsAndAttrs(opts.filters, &metrics, &attrs);
   if (s.IsNotFound()) {
     // Status::NotFound is returned when this entity has been filtered, treat it
     // as OK, and skip printing it.
     return Status::OK();
   }
   RETURN_NOT_OK(s);
-
-  if (id_ == kIdMaster) {
-    // Prefix all master metrics with 'kudu_master_'.
-    static const string kMasterPrefix = "kudu_master_";
-    WriteMetricsPrometheus(writer, metrics, kMasterPrefix);
-    return Status::OK();
-  }
-  if (id_ == kIdTabletServer) {
-    // Prefix all tablet server metrics with 'kudu_tserver_'.
-    static const string kTabletServerPrefix = "kudu_tserver_";
-    WriteMetricsPrometheus(writer, metrics, kTabletServerPrefix);
+  if (FLAGS_metrics_prometheus_use_entity_labels) {
+    string labels = BuildPrometheusLabels(prototype_->name(), id_, attrs);
+    // Append hostname label if available and not disabled via flag.
+    if (FLAGS_metrics_prometheus_export_hostname && !opts.hostname.empty()) {
+      labels += ",hostname=\"" + EscapePrometheusLabelValue(opts.hostname) + "\"";
+    }
+    WriteMetricsPrometheus(writer, metrics, "kudu_", labels, opts);
     return Status::OK();
   }
 
-  return Status::NotSupported(
-      Substitute("$0: unexpected server-level metric entity", id_));
+  // Legacy format: embed entity type/id in the metric name prefix.
+  if (strcmp(prototype_->name(), "server") == 0) {
+    string prefix;
+    if (id_ == kMetricEntityIdMaster) {
+      prefix = "kudu_master_";
+    } else if (id_ == kMetricEntityIdTabletServer) {
+      prefix = "kudu_tserver_";
+    } else {
+      return Status::NotSupported(
+          Substitute("$0: unexpected server-level metric entity", id_));
+    }
+    WriteMetricsPrometheus(writer, metrics, prefix, "", opts);
+    return Status::OK();
+  }
+  const string prefix = Substitute("kudu_$0_$1_", prototype_->name(), id_);
+  WriteMetricsPrometheus(writer, metrics, prefix, "", opts);
+  return Status::OK();
 }
 
 Status MetricEntity::CollectTo(MergedEntityMetrics* collections,
@@ -498,7 +789,7 @@ Status MetricEntity::CollectTo(MergedEntityMetrics* collections,
 void MetricEntity::RetireOldMetrics() {
   MonoTime now(MonoTime::Now());
 
-  std::lock_guard<simple_spinlock> l(lock_);
+  std::lock_guard l(lock_);
   for (auto it = metric_map_.begin(); it != metric_map_.end();) {
     const scoped_refptr<Metric>& metric = it->second;
 
@@ -540,17 +831,17 @@ void MetricEntity::RetireOldMetrics() {
 }
 
 void MetricEntity::NeverRetire(const scoped_refptr<Metric>& metric) {
-  std::lock_guard<simple_spinlock> l(lock_);
+  std::lock_guard l(lock_);
   never_retire_metrics_.push_back(metric);
 }
 
 void MetricEntity::SetAttributes(const AttributeMap& attrs) {
-  std::lock_guard<simple_spinlock> l(lock_);
+  std::lock_guard l(lock_);
   attributes_ = attrs;
 }
 
 void MetricEntity::SetAttribute(const string& key, const string& val) {
-  std::lock_guard<simple_spinlock> l(lock_);
+  std::lock_guard l(lock_);
   attributes_[key] = val;
 }
 
@@ -567,7 +858,7 @@ MetricRegistry::~MetricRegistry() {
 Status MetricRegistry::WriteAsJson(JsonWriter* writer, const MetricJsonOptions& opts) const {
   EntityMap entities;
   {
-    std::lock_guard<simple_spinlock> l(lock_);
+    std::lock_guard l(lock_);
     entities = entities_;
   }
 
@@ -597,15 +888,36 @@ Status MetricRegistry::WriteAsJson(JsonWriter* writer, const MetricJsonOptions& 
   return Status::OK();
 }
 
-Status MetricRegistry::WriteAsPrometheus(PrometheusWriter* writer) const {
+Status MetricRegistry::WriteAsPrometheus(
+    PrometheusWriter* writer, const MetricPrometheusOptions& opts) const {
   EntityMap entities;
   {
-    std::lock_guard<simple_spinlock> l(lock_);
+    std::lock_guard l(lock_);
     entities = entities_;
   }
-  for (const auto& e : entities) {
-    WARN_NOT_OK(e.second->WriteAsPrometheus(writer),
-                Substitute("Failed to write entity $0 as Prometheus", e.second->id()));
+  if (opts.merge_rules.empty()) {
+    for (const auto& e : entities) {
+      WARN_NOT_OK(e.second->WriteAsPrometheus(writer, opts),
+                  Substitute("Failed to write entity $0 as Prometheus", e.second->id()));
+    }
+  } else {
+    MergedEntityMetrics collections;
+    for (const auto& e : entities) {
+      // A merge rule only targets entities whose prototype name is one of its
+      // keys. Entities that are not targeted by any rule (e.g. 'table' or
+      // 'server' entities when only 'tablet' is being merged) are exported
+      // as-is via the regular per-entity path, which preserves their native
+      // attribute labels such as table_name/table_id. Only targeted entities
+      // are aggregated and exported with 'type'/'id' labels.
+      if (!ContainsKey(opts.merge_rules, e.second->prototype_->name())) {
+        WARN_NOT_OK(e.second->WriteAsPrometheus(writer, opts),
+                    Substitute("Failed to write entity $0 as Prometheus", e.second->id()));
+        continue;
+      }
+      WARN_NOT_OK(e.second->CollectTo(&collections, opts.filters, opts.merge_rules),
+                  Substitute("Failed to collect entity $0", e.second->id()));
+    }
+    WriteToPrometheus(writer, collections, opts);
   }
 
   entities.clear(); // necessary to deref metrics we just dumped before doing retirement scan.
@@ -614,7 +926,7 @@ Status MetricRegistry::WriteAsPrometheus(PrometheusWriter* writer) const {
 }
 
 void MetricRegistry::RetireOldMetrics() {
-  std::lock_guard<simple_spinlock> l(lock_);
+  std::lock_guard l(lock_);
   for (auto it = entities_.begin(); it != entities_.end();) {
     it->second->RetireOldMetrics();
 
@@ -640,17 +952,17 @@ MetricPrototypeRegistry* MetricPrototypeRegistry::get() {
 }
 
 void MetricPrototypeRegistry::AddMetric(const MetricPrototype* prototype) {
-  std::lock_guard<simple_spinlock> l(lock_);
+  std::lock_guard l(lock_);
   metrics_.push_back(prototype);
 }
 
 void MetricPrototypeRegistry::AddEntity(const MetricEntityPrototype* prototype) {
-  std::lock_guard<simple_spinlock> l(lock_);
+  std::lock_guard l(lock_);
   entities_.push_back(prototype);
 }
 
 void MetricPrototypeRegistry::WriteAsJson(JsonWriter* writer) const {
-  std::lock_guard<simple_spinlock> l(lock_);
+  std::lock_guard l(lock_);
   MetricJsonOptions opts;
   opts.include_schema_info = true;
   writer->StartObject();
@@ -689,7 +1001,7 @@ void MetricPrototypeRegistry::WriteAsJson() const {
 }
 
 void MetricPrototypeRegistry::WriteAsXML() const {
-  std::lock_guard<simple_spinlock> l(lock_);
+  std::lock_guard l(lock_);
   std::cout << "<?xml version=\"1.0\"?>" << "\n";
   // Add a root node for the document.
   std::cout << "<AllMetrics>" << "\n";
@@ -749,6 +1061,15 @@ void MetricPrototype::WriteFields(JsonWriter* writer,
 
 void MetricPrototype::WriteHelpAndType(PrometheusWriter* writer,
                                        const string& prefix) const {
+  // Deduplicate HELP/TYPE output: once metric names are shared across entities,
+  // we must only emit HELP/TYPE once per metric name. When using the legacy
+  // format (metrics_prometheus_use_entity_labels=false), each entity has a unique
+  // prefix so dedup never triggers, which is the correct behavior.
+  const string full_name = Substitute("$0$1", prefix, name());
+  if (!writer->ShouldWriteHelpAndType(full_name)) {
+    return;
+  }
+
   static constexpr const char* const kSummary = "summary";
 
   // The way how HdrHistogram-backed stats are presented in Kudu metrics
@@ -780,7 +1101,7 @@ scoped_refptr<MetricEntity> MetricRegistry::FindOrCreateEntity(
     const MetricEntityPrototype* prototype,
     const string& id,
     const MetricEntity::AttributeMap& initial_attrs) {
-  std::lock_guard<simple_spinlock> l(lock_);
+  std::lock_guard l(lock_);
   scoped_refptr<MetricEntity> e = FindPtrOrNull(entities_, id);
   if (!e) {
     e = new MetricEntity(prototype, id, initial_attrs);
@@ -801,7 +1122,7 @@ scoped_refptr<MetricEntity> MetricRegistry::FindOrCreateEntity(
 std::atomic<int64_t> Metric::g_epoch_;
 
 Metric::Metric(const MetricPrototype* prototype)
-    : prototype_(prototype),
+    : prototype_(DCHECK_NOTNULL(prototype)),
       m_epoch_(current_epoch()) {
 }
 
@@ -840,9 +1161,12 @@ Status Gauge::WriteAsJson(JsonWriter* writer,
   return Status::OK();
 }
 
-Status Gauge::WriteAsPrometheus(PrometheusWriter* writer, const string& prefix) const {
+Status Gauge::WriteAsPrometheus(PrometheusWriter* writer,
+                                const string& prefix,
+                                const string& labels,
+                                const MetricPrometheusOptions& /*opts*/) const {
   prototype_->WriteHelpAndType(writer, prefix);
-  WriteValue(writer, prefix);
+  WriteValue(writer, prefix, labels);
 
   return Status::OK();
 }
@@ -859,7 +1183,7 @@ StringGauge::StringGauge(const GaugePrototype<string>* proto,
       unique_values_(std::move(initial_unique_values)) {}
 
 scoped_refptr<Metric> StringGauge::snapshot() const {
-  std::lock_guard<simple_spinlock> l(lock_);
+  std::lock_guard l(lock_);
   auto p = new StringGauge(down_cast<const GaugePrototype<string>*>(prototype_),
                            value_,
                            unique_values_);
@@ -870,7 +1194,7 @@ scoped_refptr<Metric> StringGauge::snapshot() const {
 }
 
 string StringGauge::value() const {
-  std::lock_guard<simple_spinlock> l(lock_);
+  std::lock_guard l(lock_);
   if (PREDICT_TRUE(unique_values_.empty())) {
     return value_;
   }
@@ -884,14 +1208,14 @@ void StringGauge::FillUniqueValuesUnlocked() {
 }
 
 unordered_set<string> StringGauge::unique_values() {
-  std::lock_guard<simple_spinlock> l(lock_);
+  std::lock_guard l(lock_);
   FillUniqueValuesUnlocked();
   return unique_values_;
 }
 
 void StringGauge::set_value(const string& value) {
   UpdateModificationEpoch();
-  std::lock_guard<simple_spinlock> l(lock_);
+  std::lock_guard l(lock_);
   value_ = value;
   unique_values_.clear();
 }
@@ -909,7 +1233,7 @@ void StringGauge::MergeFrom(const scoped_refptr<Metric>& other) {
   scoped_refptr<StringGauge> other_ptr = down_cast<StringGauge*>(other.get());
   auto other_values = other_ptr->unique_values();
 
-  std::lock_guard<simple_spinlock> l(lock_);
+  std::lock_guard l(lock_);
   FillUniqueValuesUnlocked();
   unique_values_.insert(other_values.begin(), other_values.end());
 }
@@ -923,14 +1247,18 @@ void StringGauge::WriteValue(JsonWriter* writer) const {
 // (see https://prometheus.io/docs/instrumenting/exposition_formats/).
 // DCHECK() is added to make sure this method is not called from anywhere,
 // but overriding it is necessary since Gauge::WriteValue() is a pure virtual one.
-// An alternative could be defining a empty implementation for Gauge::WriteValue()
+// An alternative could be defining an empty implementation for Gauge::WriteValue()
 // virtual method and not adding this empty override here.
-void StringGauge::WriteValue(PrometheusWriter* writer, const std::string& prefix) const {
+void StringGauge::WriteValue(PrometheusWriter* /*writer*/,
+                             const string& /*prefix*/,
+                             const string& /*labels*/) const {
   DCHECK(false);
 }
 
 Status StringGauge::WriteAsPrometheus(PrometheusWriter* /*writer*/,
-                                      const std::string& /*prefix*/) const {
+                                      const string& /*prefix*/,
+                                      const string& /*labels*/,
+                                      const MetricPrometheusOptions& /*opts*/) const {
   // Prometheus doesn't support string gauges.
   // This function ensures that output written to Prometheus is empty.
   return Status::OK();
@@ -941,7 +1269,7 @@ Status StringGauge::WriteAsPrometheus(PrometheusWriter* /*writer*/,
 //
 
 scoped_refptr<Metric> MeanGauge::snapshot() const {
-  std::lock_guard<simple_spinlock> l(lock_);
+  std::lock_guard l(lock_);
   auto p = new MeanGauge(down_cast<const GaugePrototype<double>*>(prototype_));
   p->set_value(total_sum_, total_count_);
   p->m_epoch_.store(m_epoch_);
@@ -951,23 +1279,23 @@ scoped_refptr<Metric> MeanGauge::snapshot() const {
 }
 
 double MeanGauge::value() const {
-  std::lock_guard<simple_spinlock> l(lock_);
+  std::lock_guard l(lock_);
   return total_count_ > 0 ? total_sum_ / total_count_
                           : 0.0;
 }
 
 double MeanGauge::total_sum() const {
-  std::lock_guard<simple_spinlock> l(lock_);
+  std::lock_guard l(lock_);
   return total_sum_;
 }
 
 double MeanGauge::total_count() const {
-  std::lock_guard<simple_spinlock> l(lock_);
+  std::lock_guard l(lock_);
   return total_count_;
 }
 
 void MeanGauge::set_value(double total_sum, double total_count) {
-  std::lock_guard<simple_spinlock> l(lock_);
+  std::lock_guard l(lock_);
   total_sum_ = total_sum;
   total_count_ = total_count;
 }
@@ -983,7 +1311,7 @@ void MeanGauge::MergeFrom(const scoped_refptr<Metric>& other) {
 
   UpdateModificationEpoch();
   scoped_refptr<MeanGauge> other_ptr = down_cast<MeanGauge*>(other.get());
-  std::lock_guard<simple_spinlock> l(lock_);
+  std::lock_guard l(lock_);
   total_sum_ += other_ptr->total_sum();
   total_count_ += other_ptr->total_count();
 }
@@ -997,18 +1325,43 @@ void MeanGauge::WriteValue(JsonWriter* writer) const {
   writer->Double(total_count());
 }
 
-void MeanGauge::WriteValue(PrometheusWriter* writer, const string& prefix) const {
-  static constexpr const char* const kFmt = "$0$1$2{unit_type=\"$3\"} $4\n";
+void MeanGauge::WriteValue(PrometheusWriter* writer,
+                           const string& prefix,
+                           const string& labels) const {
+  static constexpr const char* const kFmt = "$0$1$2{$3unit_type=\"$4\"} $5\n";
+  static constexpr const char* const kHelpTypeFmt =
+      "# HELP $0$1$2 $3\n# TYPE $4$5$6 $7\n";
+
+  const string label_prefix = PrometheusLabelPrefixForInjection(labels);
 
   const char* const name = prototype_->name();
   DCHECK(name);
   const char* const unit = MetricUnit::Name(prototype_->unit());
   DCHECK(unit);
+  const char* const description = prototype_->description();
+  DCHECK(description);
 
   string out;
-  SubstituteAndAppend(&out, kFmt, prefix, name, "", unit, value());
-  SubstituteAndAppend(&out, kFmt, prefix, name, "_count", unit, total_count());
-  SubstituteAndAppend(&out, kFmt, prefix, name, "_sum", unit, total_sum());
+  SubstituteAndAppend(&out, kFmt, prefix, name, "", label_prefix, unit, value());
+
+  const string full_count_name = Substitute("$0$1_count", prefix, name);
+  if (writer->ShouldWriteHelpAndType(full_count_name)) {
+    const string count_help = Substitute("$0 (count)", prototype_->label());
+    SubstituteAndAppend(&out, kHelpTypeFmt,
+                        prefix, name, "_count", count_help,
+                        prefix, name, "_count", MetricType::Name(MetricType::kGauge));
+  }
+  SubstituteAndAppend(&out, kFmt, prefix, name, "_count", label_prefix,
+                      MetricUnit::Name(MetricUnit::kUnits), total_count());
+
+  const string full_sum_name = Substitute("$0$1_sum", prefix, name);
+  if (writer->ShouldWriteHelpAndType(full_sum_name)) {
+    const string sum_help = Substitute("$0 (sum)", description);
+    SubstituteAndAppend(&out, kHelpTypeFmt,
+                        prefix, name, "_sum", sum_help,
+                        prefix, name, "_sum", MetricType::Name(MetricType::kGauge));
+  }
+  SubstituteAndAppend(&out, kFmt, prefix, name, "_sum", label_prefix, unit, total_sum());
 
   writer->WriteEntry(out);
 }
@@ -1051,10 +1404,19 @@ Status Counter::WriteAsJson(JsonWriter* writer,
   return Status::OK();
 }
 
-Status Counter::WriteAsPrometheus(PrometheusWriter* writer, const string& prefix) const {
+Status Counter::WriteAsPrometheus(PrometheusWriter* writer,
+                                  const string& prefix,
+                                  const string& labels,
+                                  const MetricPrometheusOptions& /*opts*/) const {
   prototype_->WriteHelpAndType(writer, prefix);
-  writer->WriteEntry(Substitute("$0$1{unit_type=\"$2\"} $3\n", prefix, prototype_->name(),
-                                MetricUnit::Name(prototype_->unit()), value()));
+  const string label_prefix = PrometheusLabelPrefixForInjection(labels);
+  writer->WriteEntry(Substitute(
+      "$0$1{$2unit_type=\"$3\"} $4\n",
+      prefix,
+      prototype_->name(),
+      label_prefix,
+      MetricUnit::Name(prototype_->unit()),
+      value()));
   return Status::OK();
 }
 
@@ -1085,6 +1447,22 @@ scoped_refptr<Histogram> HistogramPrototype::Instantiate(
 // Histogram
 /////////////////////////////////////////////////
 
+
+void Histogram::HdrHistogramToPB(const HdrHistogram& snapshot,
+                                 HistogramSnapshotPB* snapshot_pb) {
+  snapshot_pb->set_total_count(snapshot.TotalCount());
+  snapshot_pb->set_total_sum(snapshot.TotalSum());
+  snapshot_pb->set_min(snapshot.MinValue());
+  snapshot_pb->set_mean(snapshot.MeanValue());
+  snapshot_pb->set_percentile_75(snapshot.ValueAtPercentile(75));
+  snapshot_pb->set_percentile_95(snapshot.ValueAtPercentile(95));
+  snapshot_pb->set_percentile_99(snapshot.ValueAtPercentile(99));
+  snapshot_pb->set_percentile_99_9(snapshot.ValueAtPercentile(99.9));
+  snapshot_pb->set_percentile_99_99(snapshot.ValueAtPercentile(99.99));
+  snapshot_pb->set_max(snapshot.MaxValue());
+  snapshot_pb->set_last(snapshot.LastValue());
+}
+
 Histogram::Histogram(const HistogramPrototype* proto)
   : Metric(proto),
     histogram_(new HdrHistogram(proto->max_trackable_value(), proto->num_sig_digits())) {
@@ -1114,38 +1492,136 @@ Status Histogram::WriteAsJson(JsonWriter* writer,
   return Status::OK();
 }
 
+namespace {
+// Whether the histogram quantile line tagged 'tag' is in the (non-empty)
+// selection 'quantiles'; the "export every quantile" default is handled by
+// callers. Compared by content, not pointer identity, since a selection may
+// hold a caller's own tag literals (e.g. in tests) whose addresses need not
+// match those in the kHistogramQuantiles table.
+bool IsQuantileSelected(const HistogramQuantiles& quantiles, const char* tag) {
+  return std::any_of(quantiles.begin(), quantiles.end(),
+                     [tag](const char* q) {
+                       return q != nullptr && strcmp(q, tag) == 0;
+                     });
+}
+
+// The exported value of the quantile line 'q' for the histogram snapshot 'h'.
+uint64_t HistogramQuantileValue(const HdrHistogram& h, const HistogramQuantile& q) {
+  switch (q.source) {
+    case HistogramQuantile::Source::kMinValue:   return h.MinValue();
+    case HistogramQuantile::Source::kMaxValue:   return h.MaxValue();
+    case HistogramQuantile::Source::kPercentile: return h.ValueAtPercentile(q.percentile);
+  }
+  return 0;  // not reached; all enumerators are handled above
+}
+} // anonymous namespace
+
 Status Histogram::WriteAsPrometheus(PrometheusWriter* writer,
-                                    const string& prefix) const {
-  static constexpr struct QuantileInfo {
-    const char* const tag;
-    const double quantile;
-  } kQuantiles[] = {
-    { "0.75",   75.0  },
-    { "0.95",   95.0  },
-    { "0.99",   99.0  },
-    { "0.999",  99.9  },
-    { "0.9999", 99.99 },
-  };
-  static constexpr const char* const kFmt =
-      "$0$1{unit_type=\"$2\", quantile=\"$3\"} $4\n";
+                                    const string& prefix,
+                                    const string& labels,
+                                    const MetricPrometheusOptions& opts) const {
+  static constexpr const char* const kHelpTypeFmt =
+      "# HELP $0$1 $2\n# TYPE $3$4 $5\n";
 
   const char* const name = prototype_->name();
   DCHECK(name);
   const char* const unit = MetricUnit::Name(prototype_->unit());
   DCHECK(unit);
 
+  // An all-empty selection exports every quantile (the default). The selection
+  // is filled contiguously from the first slot in canonical order (see
+  // ParseQuantiles()), so an empty first slot means nothing was selected. This
+  // is loop-invariant, so evaluate it once here rather than per quantile line.
+  const auto& quantiles = opts.quantiles;
+  const bool export_all = (quantiles[0] == nullptr);
+  // Guard the contiguous-fill invariant the shortcut above relies on: an empty
+  // first slot must imply an all-empty selection.
+  DCHECK(!export_all || std::all_of(quantiles.begin(), quantiles.end(),
+                                    [](const char* q) { return q == nullptr; }));
+
   // A snapshot is taken to have more consistent statistics while generating
   // the output.
   const HdrHistogram h(*histogram_);
   string out;
-  SubstituteAndAppend(&out, kFmt, prefix, name, unit, "0", h.MinValue());
-  for (const auto& [tag, q] : kQuantiles) {
-    SubstituteAndAppend(&out, kFmt, prefix, name, unit, tag, h.ValueAtPercentile(q));
-  }
-  SubstituteAndAppend(&out, kFmt, prefix, name, unit, "1", h.MaxValue());
+  // Use the label-based format when it is enabled globally, or whenever a
+  // non-empty label set is supplied (e.g. for merge_rules-aggregated output,
+  // which is always label-based regardless of the global flag). For all
+  // existing non-merged callers labels are empty whenever the flag is off, so
+  // this preserves the legacy behaviour in those cases.
+  if (FLAGS_metrics_prometheus_use_entity_labels || !labels.empty()) {
+    // New format: labels injected, no space after comma, _sum/_count carry unit_type.
+    static constexpr const char* const kFmt =
+        "$0$1{$2unit_type=\"$3\",quantile=\"$4\"} $5\n";
+    static constexpr const char* const kSumCountFmt =
+        "$0$1{$2unit_type=\"$3\"} $4\n";
 
-  SubstituteAndAppend(&out, "$0$1_sum $2\n", prefix, name, h.TotalSum());
-  SubstituteAndAppend(&out, "$0$1_count $2\n", prefix, name, h.TotalCount());
+    const string label_prefix = PrometheusLabelPrefixForInjection(labels);
+
+    for (const auto& q : kHistogramQuantiles) {
+      if (export_all || IsQuantileSelected(quantiles, q.tag)) {
+        SubstituteAndAppend(&out, kFmt, prefix, name, label_prefix, unit,
+                            q.tag, HistogramQuantileValue(h, q));
+      }
+    }
+
+    const string sum_name = Substitute("$0_sum", name);
+    const string count_name = Substitute("$0_count", name);
+    const string full_sum_name = Substitute("$0$1", prefix, sum_name);
+    if (writer->ShouldWriteHelpAndType(full_sum_name)) {
+      const string sum_help = Substitute("$0 (sum)", prototype_->description());
+      SubstituteAndAppend(&out, kHelpTypeFmt,
+                          prefix, sum_name, sum_help,
+                          prefix, sum_name, MetricType::Name(MetricType::kCounter));
+    }
+    SubstituteAndAppend(&out, kSumCountFmt,
+                        prefix, sum_name, label_prefix, unit, h.TotalSum());
+
+    const string full_count_name = Substitute("$0$1", prefix, count_name);
+    if (writer->ShouldWriteHelpAndType(full_count_name)) {
+      const string count_help = Substitute("$0 (count)", prototype_->label());
+      SubstituteAndAppend(&out, kHelpTypeFmt,
+                          prefix, count_name, count_help,
+                          prefix, count_name, MetricType::Name(MetricType::kCounter));
+    }
+    SubstituteAndAppend(&out, kSumCountFmt,
+                        prefix, count_name, label_prefix,
+                        MetricUnit::Name(MetricUnit::kUnits), h.TotalCount());
+  } else {
+    // Legacy format: no labels, space after comma, _sum/_count have no labels.
+    static constexpr const char* const kLegacyFmt =
+        "$0$1{unit_type=\"$2\", quantile=\"$3\"} $4\n";
+    static constexpr const char* const kLegacySumCountFmt =
+        "$0$1 $2\n";
+
+    for (const auto& q : kHistogramQuantiles) {
+      if (export_all || IsQuantileSelected(quantiles, q.tag)) {
+        SubstituteAndAppend(&out, kLegacyFmt, prefix, name, unit,
+                            q.tag, HistogramQuantileValue(h, q));
+      }
+    }
+
+    const string sum_name = Substitute("$0_sum", name);
+    const string count_name = Substitute("$0_count", name);
+    const string full_sum_name = Substitute("$0$1", prefix, sum_name);
+    if (writer->ShouldWriteHelpAndType(full_sum_name)) {
+      const string sum_help = Substitute("$0 (sum)", prototype_->description());
+      SubstituteAndAppend(&out, kHelpTypeFmt,
+                          prefix, sum_name, sum_help,
+                          prefix, sum_name, MetricType::Name(MetricType::kCounter));
+    }
+    SubstituteAndAppend(&out, kLegacySumCountFmt,
+                        prefix, sum_name, h.TotalSum());
+
+    const string full_count_name = Substitute("$0$1", prefix, count_name);
+    if (writer->ShouldWriteHelpAndType(full_count_name)) {
+      const string count_help = Substitute("$0 (count)", prototype_->label());
+      SubstituteAndAppend(&out, kHelpTypeFmt,
+                          prefix, count_name, count_help,
+                          prefix, count_name, MetricType::Name(MetricType::kCounter));
+    }
+    SubstituteAndAppend(&out, kLegacySumCountFmt,
+                        prefix, count_name, h.TotalCount());
+  }
 
   prototype_->WriteHelpAndType(writer, prefix);
   writer->WriteEntry(out);
@@ -1168,28 +1644,12 @@ Status Histogram::GetHistogramSnapshotPB(HistogramSnapshotPB* snapshot_pb,
   // when a histogram is tracking some information about a feature not in
   // use, for example.
   if (histogram_->TotalCount() == 0) {
-    snapshot_pb->set_total_count(0);
-    snapshot_pb->set_total_sum(0);
-    snapshot_pb->set_min(0);
-    snapshot_pb->set_mean(0);
-    snapshot_pb->set_percentile_75(0);
-    snapshot_pb->set_percentile_95(0);
-    snapshot_pb->set_percentile_99(0);
-    snapshot_pb->set_percentile_99_9(0);
-    snapshot_pb->set_percentile_99_99(0);
-    snapshot_pb->set_max(0);
+    // Use an empty histogram to output all zeros.
+    static const HdrHistogram kEmpty(2, 1);
+    HdrHistogramToPB(kEmpty, snapshot_pb);
   } else {
     HdrHistogram snapshot(*histogram_);
-    snapshot_pb->set_total_count(snapshot.TotalCount());
-    snapshot_pb->set_total_sum(snapshot.TotalSum());
-    snapshot_pb->set_min(snapshot.MinValue());
-    snapshot_pb->set_mean(snapshot.MeanValue());
-    snapshot_pb->set_percentile_75(snapshot.ValueAtPercentile(75));
-    snapshot_pb->set_percentile_95(snapshot.ValueAtPercentile(95));
-    snapshot_pb->set_percentile_99(snapshot.ValueAtPercentile(99));
-    snapshot_pb->set_percentile_99_9(snapshot.ValueAtPercentile(99.9));
-    snapshot_pb->set_percentile_99_99(snapshot.ValueAtPercentile(99.99));
-    snapshot_pb->set_max(snapshot.MaxValue());
+    HdrHistogramToPB(snapshot, snapshot_pb);
 
     if (opts.include_raw_histograms) {
       RecordedValuesIterator iter(&snapshot);

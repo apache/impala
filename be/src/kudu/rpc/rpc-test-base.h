@@ -16,11 +16,15 @@
 // under the License.
 #pragma once
 
+#include <netdb.h>
+
 #include <algorithm>
 #include <atomic>
 #include <memory>
 #include <string>
+#include <string_view>
 #include <thread>
+#include <utility>
 #include <vector>
 
 #include "kudu/gutil/walltime.h"
@@ -45,6 +49,7 @@
 #include "kudu/util/jwt.h"
 #include "kudu/util/mem_tracker.h"
 #include "kudu/util/monotime.h"
+#include "kudu/util/net/net_util.h"
 #include "kudu/util/net/sockaddr.h"
 #include "kudu/util/path_util.h"
 #include "kudu/util/pb_util.h"
@@ -84,8 +89,25 @@ using kudu::rpc_test::WhoAmIResponsePB;
 using kudu::rpc_test_diff_package::ReqDiffPackagePB;
 using kudu::rpc_test_diff_package::RespDiffPackagePB;
 
+// If host has no DNS record for a specific ip_config_mode, skip the test.
+// This helps avoid scenarios where getaddrinfo might return error for a
+// 'hostname' that resolves to only ipv4 address with desired family set
+// to ipv6 or the other way around.
+#define SKIP_IF_HOSTNAME_RESOLUTION_FAILURE_EXPECTED() \
+  do { \
+    string host; \
+    Status s = GetFQDN(&host); \
+    if (s.IsNetworkError() && s.posix_code() == EAI_NONAME) { \
+      GTEST_SKIP() << "GetFQDN() failed for this host. Skipping test."; \
+    } \
+  } while (false)
+
+
 namespace kudu {
 namespace rpc {
+
+constexpr const char* const TC_TEST_SLEEP_US = "test_sleep_us";
+constexpr const char* const TC_RELATED_TRACE_METRIC = "related_trace_metric";
 
 // Implementation of CalculatorService which just implements the generic
 // RPC handler (no generated code).
@@ -96,6 +118,7 @@ class GenericCalculatorService : public ServiceIf {
   static const std::string kSleepMethodName;
   static const std::string kSleepWithSidecarMethodName;
   static const std::string kPushStringsMethodName;
+  static const std::string kPushStringsFastMethodName;
   static const std::string kSendTwoStringsMethodName;
   static const std::string kAddExactlyOnce;
 
@@ -122,6 +145,8 @@ class GenericCalculatorService : public ServiceIf {
       DoSendTwoStrings(incoming);
     } else if (incoming->remote_method().method_name() == kPushStringsMethodName) {
       DoPushStrings(incoming);
+    } else if (incoming->remote_method().method_name() == kPushStringsFastMethodName) {
+      DoPushStringsFast(incoming);
     } else {
       incoming->RespondFailure(ErrorStatusPB::ERROR_NO_SUCH_METHOD,
                                Status::InvalidArgument("bad method"));
@@ -205,6 +230,24 @@ class GenericCalculatorService : public ServiceIf {
     CHECK_GT(incoming->GetTransferSize(), 0);
     incoming->DiscardTransfer();
     CHECK_EQ(0, incoming->GetTransferSize());
+    incoming->RespondSuccess(resp);
+  }
+
+  static void DoPushStringsFast(InboundCall* incoming) {
+    Slice param(incoming->serialized_request());
+    PushStringsRequestPB req;
+    if (!req.ParseFromArray(param.data(), param.size())) {
+      LOG(FATAL) << "couldn't parse: " << param.ToDebugString();
+    }
+
+    PushStringsResponsePB resp;
+    for (const auto& sidecar_idx : req.sidecar_indexes()) {
+      Slice sidecar;
+      CHECK_OK(incoming->GetInboundSidecar(sidecar_idx, &sidecar));
+      resp.add_sizes(sidecar.size());
+    }
+
+    CHECK_GT(incoming->GetTransferSize(), 0);
     incoming->RespondSuccess(resp);
   }
 
@@ -385,12 +428,12 @@ class CalculatorService : public CalculatorServiceIf {
  private:
   void DoSleep(const SleepRequestPB *req,
                RpcContext *context) {
-    TRACE_COUNTER_INCREMENT("test_sleep_us", req->sleep_micros());
+    TRACE_COUNTER_INCREMENT(TC_TEST_SLEEP_US, req->sleep_micros());
     if (Trace::CurrentTrace()) {
       scoped_refptr<Trace> child_trace(new Trace());
       Trace::CurrentTrace()->AddChildTrace("test_child", child_trace.get());
       ADOPT_TRACE(child_trace.get());
-      TRACE_COUNTER_INCREMENT("related_trace_metric", 1);
+      TRACE_COUNTER_INCREMENT(TC_RELATED_TRACE_METRIC, 1);
     }
 
     SleepFor(MonoDelta::FromMicroseconds(req->sleep_micros()));
@@ -407,6 +450,7 @@ const std::string GenericCalculatorService::kAddMethodName = "Add";
 const std::string GenericCalculatorService::kSleepMethodName = "Sleep";
 const std::string GenericCalculatorService::kSleepWithSidecarMethodName = "SleepWithSidecar";
 const std::string GenericCalculatorService::kPushStringsMethodName = "PushStrings";
+const std::string GenericCalculatorService::kPushStringsFastMethodName = "PushStringsFast";
 const std::string GenericCalculatorService::kSendTwoStringsMethodName = "SendTwoStrings";
 const std::string GenericCalculatorService::kAddExactlyOnce = "AddExactlyOnce";
 
@@ -419,16 +463,22 @@ class RpcTestBase : public KuduTest {
  public:
   RpcTestBase()
       : n_acceptor_pool_threads_(2),
+        n_negotiation_threads_(4),
         n_server_reactor_threads_(3),
         n_worker_threads_(3),
         keepalive_time_ms_(1000),
+        rpc_negotiation_timeout_ms_(3000),
         service_queue_length_(200),
         metric_entity_(METRIC_ENTITY_server.Instantiate(&metric_registry_, "test.rpc_test")) {
   }
 
   void TearDown() override {
     if (service_pool_) {
-      server_messenger_->UnregisterService(service_name_);
+      // NOTE: by design, the service might not be registered during this phase
+      //       in a few scenarios, but for the majority of them such outcome
+      //       isn't expected; at least, let's log about error, if any
+      WARN_NOT_OK(server_messenger_->UnregisterService(service_name_),
+                  "error unregistering service");
       service_pool_->Shutdown();
     }
     if (server_messenger_) {
@@ -445,7 +495,8 @@ class RpcTestBase : public KuduTest {
                          const std::string& rpc_certificate_file = "",
                          const std::string& rpc_private_key_file = "",
                          const std::string& rpc_ca_certificate_file = "",
-                         const std::string& rpc_private_key_password_cmd = "") {
+                         const std::string& rpc_private_key_password_cmd = "",
+                         int64_t rpc_max_message_size = FLAGS_rpc_max_message_size) {
     MessengerBuilder bld(name);
 
     if (enable_ssl) {
@@ -458,6 +509,7 @@ class RpcTestBase : public KuduTest {
     }
 
     bld.set_num_reactors(n_reactors);
+    bld.set_rpc_max_message_size(rpc_max_message_size);
     bld.set_connection_keepalive_time(MonoDelta::FromMilliseconds(keepalive_time_ms_));
     if (keepalive_time_ms_ >= 0) {
       // In order for the keepalive timing to be accurate, we need to scan connections
@@ -467,6 +519,14 @@ class RpcTestBase : public KuduTest {
           MonoDelta::FromMilliseconds(std::min(keepalive_time_ms_ / 5, 100)));
     }
     bld.set_metric_entity(metric_entity_);
+    bld.set_rpc_negotiation_timeout_ms(rpc_negotiation_timeout_ms_);
+    bld.set_min_negotiation_threads(n_negotiation_threads_);
+    bld.set_max_negotiation_threads(n_negotiation_threads_);
+
+    std::string hostname;
+    RETURN_NOT_OK(GetFQDN(&hostname));
+    bld.set_hostname(hostname);
+
     return bld.Build(messenger);
   }
 
@@ -513,6 +573,37 @@ static void DoTestSidecar(Proxy* p, int size1, int size2) {
     CHECK_EQ(Slice(expected), second);
   }
 
+static Status DoTestSidecarWithSizeLimits(Proxy* p, int size1, int size2) {
+    const uint32_t kSeed = 12345;
+
+    SendTwoStringsRequestPB req;
+    req.set_size1(size1);
+    req.set_size2(size2);
+    req.set_random_seed(kSeed);
+
+    SendTwoStringsResponsePB resp;
+    RpcController controller;
+    controller.set_timeout(MonoDelta::FromMilliseconds(10000));
+    Status status = p->SyncRequest(GenericCalculatorService::kSendTwoStringsMethodName,
+                                   req, &resp, &controller);
+    if (status.ok()) {
+      Slice first = GetSidecarPointer(controller, resp.sidecar1(), size1);
+      Slice second = GetSidecarPointer(controller, resp.sidecar2(), size2);
+      Random rng(kSeed);
+      faststring expected;
+
+      expected.resize(size1);
+      RandomString(expected.data(), size1, &rng);
+      CHECK_EQ(Slice(expected), first);
+
+      expected.resize(size2);
+      RandomString(expected.data(), size2, &rng);
+      CHECK_EQ(Slice(expected), second);
+    }
+
+    return status;
+  }
+
   static Status DoTestOutgoingSidecar(Proxy* p, int size1, int size2) {
     return DoTestOutgoingSidecar(p, {std::string(size1, 'a'), std::string(size2, 'b')});
   }
@@ -535,6 +626,36 @@ static void DoTestSidecar(Proxy* p, int size1, int size2) {
       CHECK_EQ(crc::Crc32c(strings[i].data(), strings[i].size()),
                resp.crcs(i));
     }
+
+    return Status::OK();
+  }
+
+  // This is similar to DoTestOutgoingSidecar, but without CRC32 computations
+  // and verifying only the total size of all the sidecars sent/received.
+  static Status DoTestOutgoingSidecarFast(
+      Proxy* p, const std::vector<std::string_view>& strings) {
+    PushStringsRequestPB request;
+    RpcController controller;
+
+    size_t ref_total_size = 0;
+    for (const auto& s : strings) {
+      ref_total_size += s.size();
+      int idx;
+      RETURN_NOT_OK(controller.AddOutboundSidecar(
+          RpcSidecar::FromSlice(Slice(s.data(), s.size())), &idx));
+      request.add_sidecar_indexes(idx);
+    }
+
+    PushStringsResponsePB resp;
+    KUDU_RETURN_NOT_OK(p->SyncRequest(
+        GenericCalculatorService::kPushStringsFastMethodName, request, &resp, &controller));
+    const size_t elem_num = resp.sizes_size();
+    CHECK_EQ(strings.size(), elem_num);
+    size_t total_size = 0;
+    for (size_t i = 0; i < elem_num; i++) {
+      total_size += resp.sizes(i);
+    }
+    CHECK_EQ(ref_total_size, total_size);
 
     return Status::OK();
   }
@@ -607,13 +728,15 @@ static void DoTestSidecar(Proxy* p, int size1, int size2) {
 
   // Start a simple socket listening on a local port, returning the address.
   // This isn't an RPC server -- just a plain socket which can be helpful for testing.
-  static Status StartFakeServer(Socket *listen_sock, Sockaddr *listen_addr) {
+  static Status StartFakeServer(Socket* listen_sock,
+                                Sockaddr* listen_addr,
+                                int listen_backlog = 1) {
     Sockaddr bind_addr = Sockaddr::Wildcard();
     bind_addr.set_port(0);
     RETURN_NOT_OK(listen_sock->Init(bind_addr.family(), 0));
-    RETURN_NOT_OK(listen_sock->BindAndListen(bind_addr, 1));
+    RETURN_NOT_OK(listen_sock->BindAndListen(bind_addr, listen_backlog));
     RETURN_NOT_OK(listen_sock->GetSocketAddress(listen_addr));
-    LOG(INFO) << "Bound to: " << listen_addr->ToString();
+    VLOG(1) << "Bound to: " << listen_addr->ToString();
     return Status::OK();
   }
 
@@ -664,9 +787,11 @@ static void DoTestSidecar(Proxy* p, int size1, int size2) {
 
  protected:
   int n_acceptor_pool_threads_;
+  int n_negotiation_threads_;
   int n_server_reactor_threads_;
   int n_worker_threads_;
   int keepalive_time_ms_;
+  int rpc_negotiation_timeout_ms_;
   int service_queue_length_;
 
   std::string service_name_;

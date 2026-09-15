@@ -226,6 +226,7 @@
 /////////////////////////////////////////////////////
 
 #include <algorithm>
+#include <array>
 #include <atomic>
 #include <cstddef>
 #include <cstdint>
@@ -233,7 +234,6 @@
 #include <functional>
 #include <limits>
 #include <memory>
-#include <mutex>
 #include <ostream>
 #include <string>
 #include <unordered_map>
@@ -250,7 +250,6 @@
 #include "kudu/gutil/port.h"
 #include "kudu/gutil/ref_counted.h"
 #include "kudu/gutil/strings/substitute.h"
-#include "kudu/util/atomic.h"
 #include "kudu/util/hdr_histogram.h"
 #include "kudu/util/jsonwriter.h" // IWYU pragma: keep
 #include "kudu/util/locks.h"
@@ -467,6 +466,52 @@ struct MergeAttributes {
 
 // Entity prototype name -> MergeAttributes.
 typedef std::unordered_map<std::string, MergeAttributes> MetricMergeRules;
+
+// Parse raw merge rules (each of the form
+// "<entity_type>|<merge_to>|<attribute_to_merge_by>") into 'merge_rules',
+// ignoring malformed rules (i.e. not exactly three '|'-separated parts). This
+// mirrors the lenient behaviour of the /metrics and /metrics_prometheus
+// endpoints.
+void ParseMergeRules(const std::vector<std::string>& raw_merge_rules,
+                     MetricMergeRules* merge_rules);
+
+// Resolve the effective merge rules for a /metrics_prometheus request into
+// 'merge_rules'. Rules supplied with the request ('request_merge_rules') take
+// precedence over the server-wide default configured via
+// --metrics_prometheus_default_merge_rules, which is applied only when the
+// request carries none. Malformed rules are ignored.
+void GetPrometheusMergeRules(const std::vector<std::string>& request_merge_rules,
+                             MetricMergeRules* merge_rules);
+
+// The number of preset histogram quantile lines a Kudu histogram can export in
+// the Prometheus format: the min ('0'), 0.75, 0.95, 0.99, 0.999, 0.9999, and
+// the max ('1'). This is the upper bound on a quantile selection; see the
+// canonical kHistogramQuantiles table in metrics.cc.
+constexpr size_t kNumHistogramQuantiles = 7;
+
+// A selection of preset histogram quantiles to export, in canonical output
+// order. Each non-null element points to one of the statically allocated tag
+// literals owned by the canonical kHistogramQuantiles table in metrics.cc, so
+// no strings are ever copied or allocated; any unused trailing slots are
+// nullptr. An all-nullptr selection means "export every quantile".
+typedef std::array<const char*, kNumHistogramQuantiles> HistogramQuantiles;
+
+// Resolve the effective histogram quantile selection for a /metrics_prometheus
+// request into 'quantiles'. Quantiles supplied with the request
+// ('request_quantiles') take precedence over the server-wide default configured
+// via --metrics_prometheus_default_quantiles, which is applied only when the
+// request carries none. Unknown quantile tags are ignored; the selected tags
+// are stored de-duplicated and in canonical output order.
+void GetPrometheusQuantiles(const std::vector<std::string>& request_quantiles,
+                            HistogramQuantiles* quantiles);
+
+// Apply the server-side default metric name allowlist for a /metrics_prometheus
+// request to 'entity_metrics'. A request-supplied 'metrics' allowlist (already
+// parsed into 'entity_metrics') takes precedence; the server-wide default
+// configured via --metrics_prometheus_default_metrics is applied only when
+// 'entity_metrics' is empty. An empty result means "export every metric".
+void GetPrometheusMetricsFilter(std::vector<std::string>* entity_metrics);
+
 struct MetricJsonOptions {
   MetricJsonOptions() :
     include_raw_histograms(false),
@@ -512,6 +557,52 @@ struct MetricJsonOptions {
   // NOTE: Entities whose prototype name is NOT in merge_rules's key set will
   // not be merged.
   MetricMergeRules merge_rules;
+};
+
+// Options to control the behavior of the metric end-points producing Kudu
+// metrics in the Prometheus format.
+struct MetricPrometheusOptions {
+  // Metrics are filtered per information in the 'filters' field,
+  // see the MetricFilters documentation for details. All filtering
+  // dimensions (entity type, entity ID, entity attributes, metric name
+  // substrings, and severity level) are applicable.
+  MetricFilters filters;
+
+  // The hostname of the node serving the metrics. Attached as hostname="..."
+  // label to every metric line when both --metrics_prometheus_use_entity_labels
+  // and --metrics_prometheus_export_hostname are true.
+  // Empty when hostname is unavailable.
+  std::string hostname;
+
+  // Entities whose prototype name is in merge_rules's key set will be merged
+  // into a new entity before being exported, following the same semantics as
+  // the JSON end-point (see struct MergeAttributes for details). A merged
+  // entity is exported with 'type' and 'id' Prometheus labels identifying the
+  // merged-to type and the value of the merged-by attribute, e.g. merging
+  // 'tablet' entities into 'table' by 'table_name' yields metric lines like
+  // kudu_on_disk_size{type="table",id="my_table",...}.
+  //
+  // Merging is the recommended way to cut down the number of exported time
+  // series on clusters with a large number of tablets. When merge_rules is
+  // empty, every entity is exported as-is.
+  //
+  // NOTE: merged entities are always exported in the label-based format,
+  //       regardless of --metrics_prometheus_use_entity_labels.
+  // NOTE: entities whose prototype name is NOT in merge_rules's key set are
+  //       exported as-is (without merging), preserving their native attribute
+  //       labels such as table_name/table_id. This matters e.g. on the master,
+  //       where 'table' entities must keep their table_name label even when a
+  //       'tablet' merge rule is supplied.
+  MetricMergeRules merge_rules;
+
+  // The set of histogram quantiles to export (see HistogramQuantiles). Only the
+  // selected quantile lines are emitted; the '_sum' and '_count' lines are
+  // always emitted, and the default selection exports every quantile.
+  //
+  // Trimming quantiles is a way to further cut the number of exported time
+  // series -- and thus scrape payload and TSDB cardinality -- on top of
+  // entity merging (see merge_rules above).
+  HistogramQuantiles quantiles{};
 };
 
 class MetricEntityPrototype {
@@ -560,6 +651,10 @@ class MetricPrototype {
         description_(description),
         level_(level),
         flags_(flags) {
+      DCHECK(entity_type);
+      DCHECK(name);
+      DCHECK(label);
+      DCHECK(description);
     }
 
     const char* const entity_type_;
@@ -588,8 +683,7 @@ class MetricPrototype {
                                 const std::string& prefix) const;
  protected:
   explicit MetricPrototype(CtorArgs args);
-  virtual ~MetricPrototype() {
-  }
+  virtual ~MetricPrototype() = default;
 
   const CtorArgs args_;
 
@@ -670,7 +764,8 @@ class MetricEntity : public RefCountedThreadSafe<MetricEntity> {
   // See MetricRegistry::WriteAsJson()
   Status WriteAsJson(JsonWriter* writer, const MetricJsonOptions& opts) const;
 
-  Status WriteAsPrometheus(PrometheusWriter* writer) const;
+  Status WriteAsPrometheus(PrometheusWriter* writer,
+                           const MetricPrometheusOptions& opts) const;
 
   // Collect metrics of this entity to 'collections'. Metrics will be filtered by 'filters',
   // and will be merged under the rule of 'merge_rules'.
@@ -700,19 +795,19 @@ class MetricEntity : public RefCountedThreadSafe<MetricEntity> {
   void SetAttribute(const std::string& key, const std::string& val);
 
   int num_metrics() const {
-    std::lock_guard<simple_spinlock> l(lock_);
+    std::lock_guard l(lock_);
     return metric_map_.size();
   }
 
   // Mark this entity as unpublished. This will cause the registry to retire its metrics
   // and unregister it.
   void Unpublish() {
-    std::lock_guard<simple_spinlock> l(lock_);
+    std::lock_guard l(lock_);
     published_ = false;
   }
 
   bool published() {
-    std::lock_guard<simple_spinlock> l(lock_);
+    std::lock_guard l(lock_);
     return published_;
   }
 
@@ -741,7 +836,7 @@ class MetricEntity : public RefCountedThreadSafe<MetricEntity> {
 
   mutable simple_spinlock lock_;
 
-  // Map from metric name to Metric object. Protected by lock_.
+  // Map from metric prototype pointer to Metric object. Protected by lock_.
   MetricMap metric_map_;
 
   // The key/value attributes. Protected by lock_.
@@ -764,7 +859,9 @@ class Metric : public RefCountedThreadSafe<Metric> {
   virtual Status WriteAsJson(JsonWriter* writer,
                              const MetricJsonOptions& opts) const = 0;
   // All metrics must be able to render themselves as Prometheus.
-  virtual Status WriteAsPrometheus(PrometheusWriter* writer, const std::string& prefix) const = 0;
+  virtual Status WriteAsPrometheus(PrometheusWriter* writer, const std::string& prefix,
+                                   const std::string& labels,
+                                   const MetricPrometheusOptions& opts) const = 0;
 
   const MetricPrototype* prototype() const { return prototype_; }
 
@@ -887,7 +984,8 @@ class MetricRegistry {
   Status WriteAsJson(JsonWriter* writer, const MetricJsonOptions& opts) const;
 
   // Writes metrics in this registry to given Prometheus 'writer'.
-  Status WriteAsPrometheus(PrometheusWriter* writer) const;
+  Status WriteAsPrometheus(PrometheusWriter* writer,
+                           const MetricPrometheusOptions& opts) const;
   // For each registered entity, retires orphaned metrics. If an entity has no more
   // metrics and there are no external references, entities are removed as well.
   //
@@ -896,12 +994,12 @@ class MetricRegistry {
 
   // Return the number of entities in this registry.
   int num_entities() const {
-    std::lock_guard<simple_spinlock> l(lock_);
+    std::lock_guard l(lock_);
     return entities_.size();
   }
 
  private:
-  typedef std::unordered_map<std::string, scoped_refptr<MetricEntity> > EntityMap;
+  typedef std::unordered_map<std::string, scoped_refptr<MetricEntity>> EntityMap;
   EntityMap entities_;
 
   mutable simple_spinlock lock_;
@@ -1008,12 +1106,11 @@ class GaugePrototype : public MetricPrototype {
     return gauge;
   }
 
-  virtual MetricType::Type type() const OVERRIDE {
+  MetricType::Type type() const override {
     if (args_.flags_ & EXPOSE_AS_COUNTER) {
       return MetricType::kCounter;
-    } else {
-      return MetricType::kGauge;
     }
+    return MetricType::kGauge;
   }
 
   void WriteHelpAndType(PrometheusWriter* writer,
@@ -1035,12 +1132,15 @@ class Gauge : public Metric {
     : Metric(prototype) {
   }
   ~Gauge() override {}
-  Status WriteAsJson(JsonWriter* w, const MetricJsonOptions& opts) const OVERRIDE;
+  Status WriteAsJson(JsonWriter* w, const MetricJsonOptions& opts) const override;
 
-  Status WriteAsPrometheus(PrometheusWriter* w, const std::string& prefix) const OVERRIDE;
+  Status WriteAsPrometheus(PrometheusWriter* w, const std::string& prefix,
+                           const std::string& labels,
+                           const MetricPrometheusOptions& opts) const override;
  protected:
   virtual void WriteValue(JsonWriter* writer) const = 0;
-  virtual void WriteValue(PrometheusWriter* writer, const std::string& prefix) const = 0;
+  virtual void WriteValue(PrometheusWriter* writer, const std::string& prefix,
+                          const std::string& labels) const = 0;
  private:
   DISALLOW_COPY_AND_ASSIGN(Gauge);
 };
@@ -1052,19 +1152,22 @@ class StringGauge : public Gauge {
               std::string initial_value,
               std::unordered_set<std::string> initial_unique_values
                   = std::unordered_set<std::string>());
-  scoped_refptr<Metric> snapshot() const OVERRIDE;
+  scoped_refptr<Metric> snapshot() const override;
   std::string value() const;
   void set_value(const std::string& value);
-  virtual bool IsUntouched() const override {
+  bool IsUntouched() const override {
     return false;
   }
   void MergeFrom(const scoped_refptr<Metric>& other) override;
-  Status WriteAsPrometheus(PrometheusWriter* w, const std::string& prefix) const override;
+  Status WriteAsPrometheus(PrometheusWriter* w, const std::string& prefix,
+                           const std::string& labels,
+                           const MetricPrometheusOptions& opts) const override;
  protected:
   FRIEND_TEST(MetricsTest, SimpleStringGaugeForMergeTest);
   FRIEND_TEST(MetricsTest, StringGaugeForPrometheus);
   void WriteValue(JsonWriter* writer) const override;
-  void WriteValue(PrometheusWriter* writer, const std::string& prefix) const override;
+  void WriteValue(PrometheusWriter* writer, const std::string& prefix,
+                  const std::string& labels) const override;
   void FillUniqueValuesUnlocked();
   std::unordered_set<std::string> unique_values();
  private:
@@ -1087,14 +1190,15 @@ class MeanGauge : public Gauge {
   double total_count() const;
   double total_sum() const;
   void set_value(double total_sum, double total_count);
-  virtual bool IsUntouched() const override {
+  bool IsUntouched() const override {
     return false;
   }
   void MergeFrom(const scoped_refptr<Metric>& other) override;
 
  protected:
   void WriteValue(JsonWriter* writer) const override;
-  void WriteValue(PrometheusWriter* writer, const std::string& prefix) const override;
+  void WriteValue(PrometheusWriter* writer, const std::string& prefix,
+                  const std::string& labels) const override;
  private:
   double total_sum_;
   double total_count_;
@@ -1106,23 +1210,26 @@ class MeanGauge : public Gauge {
 template<typename T>
 void WriteValuePrometheus(PrometheusWriter* writer,
                           const std::string& prefix,
+                          const std::string& labels,
                           const char* proto_name,
                           const char* unit_name,
                           const T& value) {
-  static constexpr const char* const kFmt = "$0$1{unit_type=\"$2\"} $3\n";
+  static constexpr const char* const kFmt = "$0$1{$2unit_type=\"$3\"} $4\n";
 
   if constexpr (!std::is_arithmetic_v<T>) {
     // Non-arithmetic gauges aren't supported by Prometheus.
     return;
   }
 
+  const std::string label_prefix = PrometheusLabelPrefixForInjection(labels);
+
   // For a boolean gauge, convert false/true to 0/1 for Prometheus.
   if constexpr (std::is_same_v<T, bool>) {
     return writer->WriteEntry(
-        strings::Substitute(kFmt, prefix, proto_name, unit_name, value ? 1 : 0));
+        strings::Substitute(kFmt, prefix, proto_name, label_prefix, unit_name, value ? 1 : 0));
   } else {
     return writer->WriteEntry(
-        strings::Substitute(kFmt, prefix, proto_name, unit_name, value));
+        strings::Substitute(kFmt, prefix, proto_name, label_prefix, unit_name, value));
   }
 }
 
@@ -1143,19 +1250,19 @@ class AtomicGauge : public Gauge {
     return scoped_refptr<Metric>(p);
   }
   T value() const {
-    return static_cast<T>(value_.Load(kMemOrderRelease));
+    return static_cast<T>(value_.load(std::memory_order_acquire));
   }
   void set_value(const T& value) {
     UpdateModificationEpoch();
-    value_.Store(static_cast<int64_t>(value), kMemOrderNoBarrier);
+    value_.store(static_cast<int64_t>(value), std::memory_order_relaxed);
   }
   void Increment() {
     UpdateModificationEpoch();
-    value_.IncrementBy(1, kMemOrderNoBarrier);
+    value_.fetch_add(1, std::memory_order_relaxed);
   }
   void IncrementBy(int64_t amount) {
     UpdateModificationEpoch();
-    value_.IncrementBy(amount, kMemOrderNoBarrier);
+    value_.fetch_add(amount, std::memory_order_relaxed);
   }
   void Decrement() {
     IncrementBy(-1);
@@ -1163,7 +1270,7 @@ class AtomicGauge : public Gauge {
   void DecrementBy(int64_t amount) {
     IncrementBy(-amount);
   }
-  virtual bool IsUntouched() const override {
+  bool IsUntouched() const override {
     return false;
   }
   void MergeFrom(const scoped_refptr<Metric>& other) override {
@@ -1191,19 +1298,21 @@ class AtomicGauge : public Gauge {
     }
   }
  protected:
-  void WriteValue(JsonWriter* writer) const OVERRIDE {
+  void WriteValue(JsonWriter* writer) const override {
     writer->Value(value());
   }
 
-  void WriteValue(PrometheusWriter* writer,const std::string& prefix) const override {
+  void WriteValue(PrometheusWriter* writer, const std::string& prefix,
+                  const std::string& labels) const override {
     return WriteValuePrometheus(writer,
                                 prefix,
+                                labels,
                                 prototype_->name(),
                                 MetricUnit::Name(prototype_->unit()),
                                 value());
   }
  private:
-  AtomicInt<int64_t> value_;
+  std::atomic<int64_t> value_;
   MergeType type_;
 
   DISALLOW_COPY_AND_ASSIGN(AtomicGauge);
@@ -1286,17 +1395,19 @@ class FunctionGauge : public Gauge {
   }
 
   T value() const {
-    std::lock_guard<simple_spinlock> l(lock_);
+    std::lock_guard l(lock_);
     return function_();
   }
 
-  void WriteValue(JsonWriter* writer) const OVERRIDE {
+  void WriteValue(JsonWriter* writer) const override {
     writer->Value(value());
   }
 
-  void WriteValue(PrometheusWriter* writer, const std::string& prefix) const override {
+  void WriteValue(PrometheusWriter* writer, const std::string& prefix,
+                  const std::string& labels) const override {
     return WriteValuePrometheus(writer,
                                 prefix,
+                                labels,
                                 prototype_->name(),
                                 MetricUnit::Name(prototype_->unit()),
                                 value());
@@ -1306,7 +1417,7 @@ class FunctionGauge : public Gauge {
   // This should be used during destruction. If you want a settable
   // Gauge, use a normal Gauge instead of a FunctionGauge.
   void DetachToConstant(T v) {
-    std::lock_guard<simple_spinlock> l(lock_);
+    std::lock_guard l(lock_);
     function_ = [v]() { return v; };
   }
 
@@ -1338,7 +1449,7 @@ class FunctionGauge : public Gauge {
     detacher->OnDestructor([self]() { self->DetachToCurrentValue(); });
   }
 
-  virtual bool IsUntouched() const override {
+  bool IsUntouched() const override {
     return false;
   }
 
@@ -1395,7 +1506,7 @@ class CounterPrototype : public MetricPrototype {
   }
   scoped_refptr<Counter> Instantiate(const scoped_refptr<MetricEntity>& entity);
 
-  virtual MetricType::Type type() const OVERRIDE { return MetricType::kCounter; }
+  MetricType::Type type() const override { return MetricType::kCounter; }
 
  private:
   DISALLOW_COPY_AND_ASSIGN(CounterPrototype);
@@ -1420,9 +1531,11 @@ class Counter : public Metric {
   int64_t value() const;
   void Increment();
   void IncrementBy(int64_t amount);
-  Status WriteAsJson(JsonWriter* w, const MetricJsonOptions& opts) const OVERRIDE;
+  Status WriteAsJson(JsonWriter* w, const MetricJsonOptions& opts) const override;
 
-  Status WriteAsPrometheus(PrometheusWriter* w, const std::string& prefix) const OVERRIDE;
+  Status WriteAsPrometheus(PrometheusWriter* w, const std::string& prefix,
+                           const std::string& labels,
+                           const MetricPrometheusOptions& opts) const override;
 
   bool IsUntouched() const override {
     return value() == 0;
@@ -1466,7 +1579,7 @@ class HistogramPrototype : public MetricPrototype {
 
   uint64_t max_trackable_value() const { return max_trackable_value_; }
   int num_sig_digits() const { return num_sig_digits_; }
-  virtual MetricType::Type type() const OVERRIDE { return MetricType::kHistogram; }
+  MetricType::Type type() const override { return MetricType::kHistogram; }
 
  private:
   const uint64_t max_trackable_value_;
@@ -1476,6 +1589,12 @@ class HistogramPrototype : public MetricPrototype {
 
 class Histogram : public Metric {
  public:
+  // Write HdrHistogram's data from the provided snapshot of HdrHistogram
+  // to 'snapshot_pb'. The data in 'snapshot' should not be changing behind
+  // the scenes while running this function.
+  static void HdrHistogramToPB(const HdrHistogram& snapshot,
+                               HistogramSnapshotPB* snapshot_pb);
+
   scoped_refptr<Metric> snapshot() const override {
     auto p = new Histogram(down_cast<const HistogramPrototype*>(prototype_), *histogram_);
     p->m_epoch_.store(m_epoch_);
@@ -1496,9 +1615,11 @@ class Histogram : public Metric {
   // or IncrementBy()).
   uint64_t TotalCount() const;
 
-  Status WriteAsJson(JsonWriter* w, const MetricJsonOptions& opts) const OVERRIDE;
+  Status WriteAsJson(JsonWriter* w, const MetricJsonOptions& opts) const override;
 
-  Status WriteAsPrometheus(PrometheusWriter* w, const std::string& prefix) const OVERRIDE;
+  Status WriteAsPrometheus(PrometheusWriter* w, const std::string& prefix,
+                           const std::string& labels,
+                           const MetricPrometheusOptions& opts) const override;
 
   // Returns a snapshot of this histogram including the bucketed values and counts.
   Status GetHistogramSnapshotPB(HistogramSnapshotPB* snapshot_pb,
@@ -1513,7 +1634,7 @@ class Histogram : public Metric {
   uint64_t MaxValueForTests() const;
   double MeanValueForTests() const;
 
-  virtual bool IsUntouched() const override {
+  bool IsUntouched() const override {
     return TotalCount() == 0;
   }
 
@@ -1563,7 +1684,7 @@ class ScopedLatencyMetric {
 inline scoped_refptr<Counter> MetricEntity::FindOrCreateCounter(
     const CounterPrototype* proto) {
   CheckInstantiation(proto);
-  std::lock_guard<simple_spinlock> l(lock_);
+  std::lock_guard l(lock_);
   scoped_refptr<Counter> m = down_cast<Counter*>(FindPtrOrNull(metric_map_, proto).get());
   if (!m) {
     m = new Counter(proto);
@@ -1575,7 +1696,7 @@ inline scoped_refptr<Counter> MetricEntity::FindOrCreateCounter(
 inline scoped_refptr<Histogram> MetricEntity::FindOrCreateHistogram(
     const HistogramPrototype* proto) {
   CheckInstantiation(proto);
-  std::lock_guard<simple_spinlock> l(lock_);
+  std::lock_guard l(lock_);
   scoped_refptr<Histogram> m = down_cast<Histogram*>(FindPtrOrNull(metric_map_, proto).get());
   if (!m) {
     m = new Histogram(proto);
@@ -1590,7 +1711,7 @@ inline scoped_refptr<AtomicGauge<T> > MetricEntity::FindOrCreateGauge(
     const T& initial_value,
     MergeType type) {
   CheckInstantiation(proto);
-  std::lock_guard<simple_spinlock> l(lock_);
+  std::lock_guard l(lock_);
   scoped_refptr<AtomicGauge<T> > m = down_cast<AtomicGauge<T>*>(
       FindPtrOrNull(metric_map_, proto).get());
   if (!m) {
@@ -1603,7 +1724,7 @@ inline scoped_refptr<AtomicGauge<T> > MetricEntity::FindOrCreateGauge(
 inline scoped_refptr<MeanGauge> MetricEntity::FindOrCreateMeanGauge(
     const GaugePrototype<double>* proto) {
   CheckInstantiation(proto);
-  std::lock_guard<simple_spinlock> l(lock_);
+  std::lock_guard l(lock_);
   scoped_refptr<MeanGauge> m = down_cast<MeanGauge*>(
       FindPtrOrNull(metric_map_, proto).get());
   if (!m) {
@@ -1619,7 +1740,7 @@ inline scoped_refptr<FunctionGauge<T> > MetricEntity::FindOrCreateFunctionGauge(
     std::function<T()> function,
     MergeType type) {
   CheckInstantiation(proto);
-  std::lock_guard<simple_spinlock> l(lock_);
+  std::lock_guard l(lock_);
   scoped_refptr<FunctionGauge<T> > m = down_cast<FunctionGauge<T>*>(
       FindPtrOrNull(metric_map_, proto).get());
   if (!m) {

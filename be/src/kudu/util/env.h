@@ -21,6 +21,7 @@
 #include <vector>
 
 #include "kudu/gutil/macros.h"
+#include "kudu/util/array_view.h" // IWYU pragma: keep
 #include "kudu/util/status.h"
 
 namespace kudu {
@@ -38,9 +39,6 @@ struct RandomAccessFileOptions;
 struct RWFileOptions;
 struct WritableFileOptions;
 struct SequentialFileOptions;
-
-template <typename T>
-class ArrayView;
 
 // Returned by Env::GetSpaceInfo().
 struct SpaceInfo {
@@ -66,7 +64,7 @@ class Env {
     MUST_EXIST
   };
 
-  Env() { }
+  Env() = default;
   virtual ~Env();
 
   // Return a default environment suitable for the current operating
@@ -80,6 +78,9 @@ class Env {
   // environment.  Unlike the default env, this is not owned by Kudu, and
   // must be destroyed when not used anymore.
   static std::unique_ptr<Env> NewEnv();
+  // Same as the usage of "NewEnv()", it also needs to be destroyed when
+  // no longer used.
+  static std::shared_ptr<Env> NewSharedEnv();
 
   // Create a brand new sequentially-readable file with the specified name.
   // On success, stores a pointer to the new file in *result and returns OK.
@@ -393,6 +394,9 @@ class Env {
   // Set the raw server encryption key. The key size is in bits.
   virtual void SetEncryptionKey(const uint8_t* key, size_t key_size) = 0;
 
+  // Used for manipulating the proc filesystem
+  virtual Status EchoToFile(const char* file_path, const char* data_ptr, int data_size) = 0;
+
  private:
   DISALLOW_COPY_AND_ASSIGN(Env);
 };
@@ -426,7 +430,7 @@ class Fifo : public File {
 
   // Initializes the default environment with encryption enabled using the
   // given AES key.
-  static Status InitializeEncryptedEnv(int key_size, uint8_t* server_key);
+  static Status InitializeEncryptedEnv(int key_size, uint8_t* encryption_key);
 
   // Returns the write fd, set when opened for writes. The fifo must have been
   // opened for writes before calling.
@@ -499,6 +503,52 @@ class RandomAccessFile : public File {
   //
   // Safe for concurrent use by multiple threads.
   virtual Status ReadV(uint64_t offset, ArrayView<Slice> results) const = 0;
+
+  // Reads "result.size" bytes starting at the raw on-disk byte offset
+  // 'raw_offset', WITHOUT applying any per-file decryption transform. For
+  // unencrypted files this is equivalent to Read(); for encrypted files this
+  // returns the ciphertext (and the offset is measured from the start of the
+  // physical file, including any encryption header).
+  //
+  // The default implementation forwards to Read(), which is correct for any
+  // implementation that does not perform on-the-fly decryption. Encrypted
+  // implementations must override this to bypass decryption.
+  //
+  // Safe for concurrent use by multiple threads.
+  virtual Status ReadRaw(uint64_t raw_offset, Slice result) const {
+    DCHECK_EQ(0, GetEncryptionHeaderSize())
+        << "RandomAccessFile::ReadRaw() default implementation is only valid "
+        << "for unencrypted files; encrypted implementations must override";
+    return Read(raw_offset, result);
+  }
+
+  // Decrypts the ciphertext slices in 'data' in place, as if they had been
+  // returned by ReadV(offset, data) on this file. 'offset' is the physical
+  // file offset of the first slice (same convention as Read()/ReadV(), i.e.
+  // measured from the start of the file and must be >= GetEncryptionHeaderSize()
+  // for encrypted files). Subsequent slices are assumed to be contiguous.
+  //
+  // NOTE: a single vectored Decrypt() call is only guaranteed to produce the
+  // same plaintext as decrypting each slice individually when no *interior*
+  // slice is all-zero ciphertext. Encrypted implementations may short-circuit
+  // all-zero slices (e.g. to preserve KUDU-2260's trailing-zero recovery
+  // without advancing the cipher keystream past them); an interior all-zero
+  // slice followed by a non-zero slice would therefore leave the keystream
+  // mis-aligned and mis-decrypt the later slice. Callers that need per-slice
+  // semantics in that case must invoke Decrypt() once per slice.
+  //
+  // The default implementation is a no-op, which is correct for any
+  // implementation that does not perform on-the-fly decryption. Encrypted
+  // implementations must override.
+  //
+  // Safe for concurrent use by multiple threads.
+  virtual Status Decrypt(uint64_t /*offset*/,
+                         ArrayView<Slice> /*data*/) const {
+    DCHECK_EQ(0, GetEncryptionHeaderSize())
+        << "RandomAccessFile::Decrypt() default implementation is only valid "
+        << "for unencrypted files; encrypted implementations must override";
+    return Status::OK();
+  }
 
   // Returns the size of the file
   virtual Status Size(uint64_t *size) const = 0;
@@ -594,8 +644,17 @@ struct RWFileOptions {
   // encrypted if encryption is enabled.
   bool is_sensitive;
 
+  // Whether the file is read at random offsets. If true, the kernel is advised
+  // (POSIX_FADV_RANDOM) not to read ahead when the file is read. Writes are not
+  // affected. Only has an effect on Linux; elsewhere it's ignored with a
+  // warning.
+  bool random_access;
+
   RWFileOptions()
-      : sync_on_close(false), mode(Env::CREATE_OR_OPEN_WITH_TRUNCATE), is_sensitive(false) {}
+      : sync_on_close(false),
+        mode(Env::CREATE_OR_OPEN_WITH_TRUNCATE),
+        is_sensitive(false),
+        random_access(false) {}
 };
 
 // A file abstraction for both reading and writing. No notion of a built-in
@@ -729,7 +788,7 @@ class RWFile : public File {
 // Identifies a locked file.
 class FileLock {
  public:
-  FileLock() { }
+  FileLock() = default;
   virtual ~FileLock();
  private:
   DISALLOW_COPY_AND_ASSIGN(FileLock);

@@ -23,6 +23,7 @@
 #include <memory>
 #include <string>
 #include <thread>
+#include <type_traits>
 #include <vector>
 
 #include <gflags/gflags_declare.h>
@@ -51,9 +52,6 @@ using std::string;
 using std::unique_ptr;
 using std::vector;
 using strings::Substitute;
-
-namespace {
-} // namespace
 
 namespace kudu {
 
@@ -269,7 +267,7 @@ TYPED_TEST(FileCacheTest, TestInvalidation) {
   // If we invalidate it from the cache and try again, it should crash because
   // the existing descriptor was invalidated.
   this->cache_->Invalidate(kFile1);
-  ASSERT_DEATH({ f->Size(&size); }, "invalidated");
+  ASSERT_DEATH({ ASSERT_OK(f->Size(&size)); }, "invalidated");
 
   // But if we re-open the path again, the new descriptor should read the
   // new data.
@@ -349,12 +347,15 @@ TYPED_TEST(FileCacheTest, TestNoRecursiveDeadlock) {
 class RandomAccessFileCacheTest :
   public FileCacheTest<RandomAccessFile>,
   public ::testing::WithParamInterface<bool> {
+ public:
+  RandomAccessFileCacheTest() {
+    SetEncryptionFlags(GetParam());
+  }
 };
 
 INSTANTIATE_TEST_SUITE_P(, RandomAccessFileCacheTest, ::testing::Values(false, true));
 
 TEST_P(RandomAccessFileCacheTest, TestMemoryFootprintDoesNotCrash) {
-  SetEncryptionFlags(GetParam());
   const string kFile = this->GetTestPath("foo");
   ASSERT_OK(this->WriteTestFile(kFile, "test data"));
 
@@ -369,12 +370,15 @@ TEST_P(RandomAccessFileCacheTest, TestMemoryFootprintDoesNotCrash) {
 class RWFileCacheTest :
   public FileCacheTest<RWFile>,
   public ::testing::WithParamInterface<bool> {
+ public:
+  RWFileCacheTest() {
+    SetEncryptionFlags(GetParam());
+  }
 };
 
 INSTANTIATE_TEST_SUITE_P(, RWFileCacheTest, ::testing::Values(false, true));
 
 TEST_P(RWFileCacheTest, TestOpenMustCreate) {
-  SetEncryptionFlags(GetParam());
   const string kFile1 = this->GetTestPath("foo");
   const string kFile2 = this->GetTestPath("bar");
 
@@ -404,7 +408,6 @@ TEST_P(RWFileCacheTest, TestOpenMustCreate) {
 }
 
 TEST_P(RWFileCacheTest, TestOpenCreateOrOpen) {
-  SetEncryptionFlags(GetParam());
   const string kFile1 = this->GetTestPath("foo");
   const string kFile2 = this->GetTestPath("bar");
 
@@ -429,12 +432,15 @@ TEST_P(RWFileCacheTest, TestOpenCreateOrOpen) {
 class MixedFileCacheTest :
   public KuduTest,
   public ::testing::WithParamInterface<bool> {
+ public:
+  MixedFileCacheTest() {
+    SetEncryptionFlags(GetParam());
+  }
 };
 
 INSTANTIATE_TEST_SUITE_P(, MixedFileCacheTest, ::testing::Values(false, true));
 
 TEST_P(MixedFileCacheTest, TestBothFileTypes) {
-  SetEncryptionFlags(GetParam());
   const string kFile1 = GetTestPath("foo");
   const string kData1 = "test data 1";
   const string kFile2 = GetTestPath("foo2");
@@ -482,10 +488,12 @@ TEST_P(MixedFileCacheTest, TestBothFileTypes) {
   shared_ptr<RandomAccessFile> raf2;
   ASSERT_OK(cache.OpenFile<Env::MUST_EXIST>(kFile2, &raf2));
 #ifndef NDEBUG
-  ASSERT_DEATH({ cache.OpenFile<Env::MUST_EXIST>(kFile1, &raf); },
-               "!FindDescriptorUnlocked");
-  ASSERT_DEATH({ cache.OpenFile<Env::MUST_EXIST>(kFile2, &rwf); },
-               "!FindDescriptorUnlocked");
+  ASSERT_DEATH(
+      { ASSERT_OK(cache.OpenFile<Env::MUST_EXIST>(kFile1, &raf)); },
+      "!FindDescriptorUnlocked");
+  ASSERT_DEATH(
+      { ASSERT_OK(cache.OpenFile<Env::MUST_EXIST>(kFile2, &rwf)); },
+      "!FindDescriptorUnlocked");
 #endif
 }
 

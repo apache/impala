@@ -34,6 +34,7 @@
 
 #include "kudu/gutil/basictypes.h"
 #include "kudu/gutil/map-util.h"
+#include "kudu/gutil/port.h"
 #include "kudu/gutil/stl_util.h"
 #include "kudu/gutil/strings/join.h"
 #include "kudu/gutil/strings/substitute.h"
@@ -217,6 +218,15 @@ Status ClientNegotiation::Negotiate(unique_ptr<ErrorStatusPB>* rpc_error) {
     tls_negotiated_ = true;
   }
 
+  // Diagnostic shortcut: when the caller only wants to observe the negotiated
+  // TLS parameters (e.g. `kudu diagnose tls_debug`), skip SASL/token/JWT
+  // authentication. The server will log an aborted negotiation when we
+  // disconnect, but the TLS-level info on the socket is fully populated.
+  if (skip_authn_) {
+    TRACE("Stopping negotiation before authentication (skip_authn mode)");
+    return Status::OK();
+  }
+
   // Step 4: Authentication
   switch (negotiated_authn_) {
     case AuthenticationType::SASL:
@@ -275,7 +285,7 @@ Status ClientNegotiation::RecvNegotiatePB(NegotiatePB* msg,
 Status ClientNegotiation::ParseError(const Slice& err_data,
                                      unique_ptr<ErrorStatusPB>* rpc_error) {
   unique_ptr<ErrorStatusPB> error(new ErrorStatusPB);
-  if (!error->ParseFromArray(err_data.data(), err_data.size())) {
+  if (PREDICT_FALSE(!error->ParseFromArray(err_data.data(), err_data.size()))) {
     return Status::IOError("invalid error response, missing fields",
                            error->InitializationErrorString());
   }
@@ -403,8 +413,8 @@ Status ClientNegotiation::HandleNegotiate(const NegotiatePB& response) {
     }
   }
 
-  if (encryption_ == RpcEncryption::REQUIRED &&
-      !ContainsKey(server_features_, RpcFeatureFlag::TLS)) {
+  if (PREDICT_FALSE(encryption_ == RpcEncryption::REQUIRED &&
+      !ContainsKey(server_features_, RpcFeatureFlag::TLS))) {
     return Status::NotAuthorized("server does not support required TLS encryption");
   }
 
@@ -469,8 +479,14 @@ Status ClientNegotiation::HandleNegotiate(const NegotiatePB& response) {
   //  * PLAIN
   if (ContainsKey(client_mechs, SaslMechanism::GSSAPI) &&
       ContainsKey(server_mechs, SaslMechanism::GSSAPI)) {
-    // Check that the client has local Kerberos credentials, and if not fall
+    // In skip_authn mode we never reach the SASL exchange, so skip the
+    // ticket-cache probe and let GSSAPI win mechanism selection. Otherwise
+    // check that the client has local Kerberos credentials, and if not fall
     // back to an alternate mechanism.
+    if (skip_authn_) {
+      negotiated_mech_ = SaslMechanism::GSSAPI;
+      return Status::OK();
+    }
     Status s = CheckGSSAPI();
     if (s.ok()) {
       negotiated_mech_ = SaslMechanism::GSSAPI;

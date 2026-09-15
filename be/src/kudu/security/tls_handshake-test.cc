@@ -17,8 +17,9 @@
 
 #include "kudu/security/tls_handshake.h"
 
-#include <openssl/crypto.h>
+#include <openssl/crypto.h> // IWYU pragma: keep
 #include <openssl/ssl.h>
+// IWYU pragma: no_include <openssl/prov_ssl.h>
 
 #include <atomic>
 #include <iostream>
@@ -31,6 +32,7 @@
 #include <glog/logging.h>
 #include <gtest/gtest.h>
 
+#include "kudu/gutil/basictypes.h"
 #include "kudu/security/ca/cert_management.h"
 #include "kudu/security/cert.h"
 #include "kudu/security/crypto.h"
@@ -135,8 +137,7 @@ class TestTlsHandshakeBase : public KuduTest {
   static void ReadAndCompare(SSL* ssl, const string& expected_data) {
     ASSERT_GT(expected_data.size(), 0);
     string result;
-    string buf;
-    buf.resize(expected_data.size());
+    string buf(expected_data.size(), string::value_type());
     int yet_to_read = expected_data.size();
     while (yet_to_read > 0) {
       auto bytes_read = SSL_read(ssl, buf.data(), yet_to_read);
@@ -181,8 +182,7 @@ class TestTlsHandshakeBase : public KuduTest {
     BIO* wbio = SSL_get_wbio(src);
     int pending_wr = BIO_ctrl_pending(wbio);
 
-    string data;
-    data.resize(pending_wr);
+    string data(pending_wr, string::value_type());
     auto bytes_read = BIO_read(wbio, &data[0], data.size());
     ASSERT_EQ(data.size(), bytes_read);
     ASSERT_EQ(0, BIO_ctrl_pending(wbio));
@@ -218,7 +218,8 @@ TEST_P(TestTlsHandshakeConcurrent, TestConcurrentAdoptCert) {
   for (int i = 0; i < kNumThreads; i++) {
     handshake_threads.emplace_back([&]() {
         while (!done) {
-          RunHandshake(TlsVerificationMode::VERIFY_NONE, TlsVerificationMode::VERIFY_NONE);
+          ignore_result(RunHandshake(TlsVerificationMode::VERIFY_NONE,
+                                     TlsVerificationMode::VERIFY_NONE));
         }
       });
   }

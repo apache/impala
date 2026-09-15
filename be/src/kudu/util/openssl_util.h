@@ -22,6 +22,8 @@
 #include <openssl/pem.h>
 #include <openssl/ssl.h>
 #if OPENSSL_VERSION_NUMBER >= 0x30000000L
+#include <openssl/param_build.h>
+#include <openssl/params.h>
 #include <openssl/types.h>
 #endif
 #include <openssl/x509.h>
@@ -33,13 +35,12 @@
 
 #include <glog/logging.h>
 
-#include "kudu/gutil/port.h"
 #include "kudu/util/status.h"
 
 namespace kudu {
 namespace security {
 namespace internal {
-struct ScopedCheckNoPendingSSLErrors;
+struct ScopedCheckNoPendingSSLErrors;  // IWYU pragma: keep
 }  // namespace internal
 }  // namespace security
 }  // namespace kudu
@@ -83,23 +84,50 @@ typedef struct x509_st X509;
 //      SCOPED_OPENSSL_NO_PENDING_ERRORS;
 //      ... use OpenSSL APIs ...
 //    }
-#define SCOPED_OPENSSL_NO_PENDING_ERRORS \
-  kudu::security::internal::ScopedCheckNoPendingSSLErrors _no_ssl_errors(__PRETTY_FUNCTION__)
+#if DCHECK_IS_ON()
+  #define SCOPED_OPENSSL_NO_PENDING_ERRORS \
+    const kudu::security::internal::ScopedCheckNoPendingSSLErrors \
+        _no_ssl_errors(__PRETTY_FUNCTION__)
+#else   // #if DCHECK_IS_ON() ...
+  #define SCOPED_OPENSSL_NO_PENDING_ERRORS  (void)0
+#endif  // #if DCHECK_IS_ON() ... #else ...
 
 namespace kudu {
 namespace security {
 
-using PasswordCallback = std::function<std::string(void)>;
+using PasswordCallback = std::function<Status(std::string*)>;
 
 // Disable initialization of OpenSSL. Must be called before
 // any call to InitializeOpenSSL().
-Status DisableOpenSSLInitialization() WARN_UNUSED_RESULT;
+Status DisableOpenSSLInitialization();
+
+// Set whether the OpenSSL library is initialized in the context of a standalone
+// application. This should be called only once during static initialization.
+void SetStandaloneInit(bool is_standalone);
 
 // Initializes static state required by the OpenSSL library.
 // This is a no-op if DisableOpenSSLInitialization() has been called.
 //
 // Safe to call multiple times.
 void InitializeOpenSSL();
+
+// Clean up the OpenSSL's library global state. This function essentially calls
+// OPENSSL_cleanup() with OpenSSL 1.1.1 and newer versions. This function
+// should be called called only by a standalone application right after exiting
+// its main() function.
+void FinalizeOpenSSL();
+
+// Check if the Kudu's runtime has already initialized the OpenSSL library.
+// This function is not thread safe, and its only expected use cases are:
+//   ** calls from DisableOpenSSLInitialization()
+//   ** calls from global's initializers before main()
+bool IsOpenSSLInitialized();
+
+// Whether the FIPS provider is enabled.
+//
+// See https://github.com/openssl/openssl/discussions/21797 for details on the
+// evolution of the FIPS-related terminology in the OpenSSL project.
+bool IsFIPSEnabled();
 
 // Fetches errors from the OpenSSL error error queue, and stringifies them.
 //
@@ -129,9 +157,16 @@ Status GetPasswordFromShellCommand(const std::string& cmd, std::string* password
 // TLS handshake is complete.
 std::string GetProtocolName(const SSL* ssl);
 
-// Retrive the description of the negotiated TLS cipher.
+// Retrieve the negotiated TLS cipher name. Only valid to call after the TLS
+// handshake is complete.
+std::string GetCipherName(const SSL* ssl);
+
+// Retrieve the description of the negotiated TLS cipher.
 // Only valid to call after the handshake is complete.
 std::string GetCipherDescription(const SSL* ssl);
+
+// Retrieve whether extended master secret is used.
+bool GetExtMS(SSL* ssl);
 
 // A generic wrapper for OpenSSL structures.
 template <typename T>
@@ -177,6 +212,14 @@ template<> struct SslTypeTraits<X509_REQ> {
 };
 template<> struct SslTypeTraits<EVP_PKEY> {
   static constexpr auto kFreeFunc = &EVP_PKEY_free;
+#if OPENSSL_VERSION_NUMBER >= 0x30000000L
+  static constexpr auto kWritePemFunc = &PEM_write_bio_PUBKEY;
+  static constexpr auto kWriteDerFunc = &i2d_PUBKEY_bio;
+#endif
+};
+// EVP_PKEY_CTX deleter for RAII management via ssl_make_unique
+template<> struct SslTypeTraits<EVP_PKEY_CTX> {
+  static constexpr auto kFreeFunc = &EVP_PKEY_CTX_free;
 };
 template<> struct SslTypeTraits<SSL_CTX> {
   static constexpr auto kFreeFunc = &SSL_CTX_free;
@@ -184,6 +227,17 @@ template<> struct SslTypeTraits<SSL_CTX> {
 template<> struct SslTypeTraits<BIO> {
   static constexpr auto kFreeFunc = &BIO_free;
 };
+
+#if OPENSSL_VERSION_NUMBER >= 0x30000000L
+// OSSL_PARAM_BLD deleter for RAII management
+template<> struct SslTypeTraits<OSSL_PARAM_BLD> {
+  static constexpr auto kFreeFunc = &OSSL_PARAM_BLD_free;
+};
+// OSSL_PARAM deleter for RAII management
+template<> struct SslTypeTraits<OSSL_PARAM> {
+  static constexpr auto kFreeFunc = &OSSL_PARAM_free;
+};
+#endif
 
 template<typename SSL_TYPE, typename Traits = SslTypeTraits<SSL_TYPE>>
 c_unique_ptr<SSL_TYPE> ssl_make_unique(SSL_TYPE* d) {
@@ -223,7 +277,7 @@ namespace internal {
 
 // Implementation of SCOPED_OPENSSL_NO_PENDING_ERRORS. Use the macro form
 // instead of directly instantiating the implementation class.
-struct ScopedCheckNoPendingSSLErrors {
+struct ScopedCheckNoPendingSSLErrors final {
  public:
   explicit ScopedCheckNoPendingSSLErrors(const char* func)
       : func_(func) {

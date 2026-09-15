@@ -23,12 +23,12 @@
 #include <openssl/x509.h>
 #include <openssl/x509v3.h>
 
-#include <algorithm>
 #include <cstdio>
 #include <functional>
 #include <memory>
 #include <mutex>
 #include <string>
+#include <utility>
 
 #include <glog/logging.h>
 
@@ -40,7 +40,6 @@
 #include "kudu/util/status.h"
 
 using std::lock_guard;
-using std::move;
 using std::string;
 using strings::Substitute;
 
@@ -84,6 +83,15 @@ Status CertRequestGeneratorBase::GenerateRequest(const PrivateKey& key,
   auto req = ssl_make_unique(X509_REQ_new());
   OPENSSL_RET_NOT_OK(X509_REQ_set_pubkey(req.get(), key.GetRawData()),
       "error setting X509 public key");
+
+#if OPENSSL_VERSION_NUMBER >= 0x30000000L
+  // Set the request version explicitly to make sure newer OpenSSL versions can
+  // handle it.
+  //
+  // https://github.com/openssl/openssl/pull/24677/
+  OPENSSL_RET_NOT_OK(X509_REQ_set_version(req.get(), X509_REQ_VERSION_1),
+      "error setting X509 version");
+#endif
 
   // Populate the subject field of the request.
   RETURN_NOT_OK(SetSubject(req.get()));
@@ -201,7 +209,7 @@ Status CaCertRequestGenerator::Init() {
   InitializeOpenSSL();
   SCOPED_OPENSSL_NO_PENDING_ERRORS;
 
-  lock_guard<simple_spinlock> guard(lock_);
+  lock_guard guard(lock_);
   if (is_initialized_) {
     return Status::OK();
   }
@@ -228,7 +236,7 @@ Status CaCertRequestGenerator::Init() {
 }
 
 bool CaCertRequestGenerator::Initialized() const {
-  lock_guard<simple_spinlock> guard(lock_);
+  lock_guard guard(lock_);
   return is_initialized_;
 }
 
@@ -288,9 +296,9 @@ CertSigner::CertSigner(const Cert* ca_cert,
 }
 
 Status CertSigner::Sign(const CertSignRequest& req, Cert* ret) const {
-  SCOPED_OPENSSL_NO_PENDING_ERRORS;
-  InitializeOpenSSL();
   CHECK(ret);
+  InitializeOpenSSL();
+  SCOPED_OPENSSL_NO_PENDING_ERRORS;
 
   // If we are not self-signing, then make sure that the provided CA
   // cert and key match each other. Technically this would be programmer
@@ -375,7 +383,9 @@ Status CertSigner::DigestSign(const EVP_MD* md, EVP_PKEY* pkey, X509* x) {
 Status CertSigner::GenerateSerial(c_unique_ptr<ASN1_INTEGER>* ret) {
   SCOPED_OPENSSL_NO_PENDING_ERRORS;
   auto btmp = ssl_make_unique(BN_new());
-  OPENSSL_RET_NOT_OK(BN_pseudo_rand(btmp.get(), 64, 0, 0),
+  // BN_pseudo_rand() is deprecated in OpenSSL 3.x; BN_rand() is the recommended replacement.
+  // top=0 sets the most significant bit (fixed bit length), bottom=0 allows even values.
+  OPENSSL_RET_NOT_OK(BN_rand(btmp.get(), 64, 0, 0),
       "error generating random number");
   auto serial = ssl_make_unique(ASN1_INTEGER_new());
   OPENSSL_RET_IF_NULL(BN_to_ASN1_INTEGER(btmp.get(), serial.get()),

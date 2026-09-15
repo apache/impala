@@ -23,12 +23,9 @@
 
 #include <glog/logging.h>
 
-#include "common/global-flags.h"
 #include "kudu/gutil/strings/escaping.h"
 #include "kudu/util/scoped_cleanup.h"
 #include "kudu/util/status.h"
-
-DECLARE_string(spnego_keytab_file);
 
 using std::string;
 

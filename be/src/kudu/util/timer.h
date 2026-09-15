@@ -59,6 +59,12 @@ class Timer {
     return (end_time_ != MonoTime::Min());
   }
 
+  // Returns true once Start() has been called at least once, regardless of
+  // whether Stop() has been called as well.
+  bool IsStarted() const {
+    return (start_time_ != MonoTime::Min());
+  }
+
  private:
   std::atomic<MonoTime> start_time_;
   std::atomic<MonoTime> end_time_;

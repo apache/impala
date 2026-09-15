@@ -49,6 +49,10 @@ struct RpcMethodInfo : public RefCountedThreadSafe<RpcMethodInfo> {
   scoped_refptr<Histogram> handler_latency_histogram;
   scoped_refptr<Counter> queue_overflow_rejections;
 
+  // The number of times the service sent back a response (both success and
+  // failure responses are counted in) past the deadline set by the client side.
+  scoped_refptr<Counter> timed_out_on_response;
+
   // Whether we should track this method's result, using ResultTracker.
   bool track_result;
 
@@ -104,7 +108,7 @@ class ServiceIf {
 // Base class for code-generated service classes.
 class GeneratedServiceIf : public ServiceIf {
  public:
-  virtual ~GeneratedServiceIf();
+  ~GeneratedServiceIf() override;
 
   // Looks up the appropriate method in 'methods_by_name_' and executes
   // it on the current thread.

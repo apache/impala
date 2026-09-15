@@ -73,14 +73,22 @@ DEFINE_bool(use_system_auth_to_local, kDefaultSystemAuthToLocal,
             "'kudu/foo.example.com@EXAMPLE' will map to 'kudu'.");
 TAG_FLAG(use_system_auth_to_local, advanced);
 
-// Defined in Impala in common/global-flags.cc
-DECLARE_string(principal);
+DEFINE_string(principal, "kudu/_HOST",
+              "Kerberos principal that this daemon will log in as. The special token "
+              "_HOST will be replaced with the FQDN of the local host.");
 TAG_FLAG(principal, advanced);
 TAG_FLAG(principal, stable);
 
-// Defined in Impala in common/global-flags.cc
-DECLARE_string(keytab_file);
+DEFINE_string(keytab_file, "",
+              "Path to the Kerberos Keytab file for this server. Specifying a "
+              "keytab file will cause the server to kinit, and enable Kerberos "
+              "to be used to authenticate RPC connections.");
 TAG_FLAG(keytab_file, stable);
+
+DEFINE_string(spnego_keytab_file, "",
+               "Absolute path to Kerberos keytab file "
+               "for HTTP SPNEGO. If it is empty, --keytab_file flag will be used.");
+TAG_FLAG(spnego_keytab_file, advanced);
 
 using std::mt19937;
 using std::nullopt;
@@ -100,15 +108,17 @@ KinitContext* g_kinit_ctx = nullptr;
 namespace {
 
 // Global context for usage of the Krb5 library.
-krb5_context g_krb5_ctx;
+krb5_context g_krb5_ctx = nullptr;
 
 // This lock is used to avoid a race while reacquiring the kerberos ticket.
 // The race can occur between the time we reinitialize the cache and the
 // time when we actually store the new credentials back in the cache.
-RWMutex* g_kerberos_reinit_lock;
+RWMutex* g_kerberos_reinit_lock = nullptr;
 
 Status Krb5CallToStatus(krb5_context ctx, krb5_error_code code) {
-  if (code == 0) return Status::OK();
+  if (code == 0) {
+    return Status::OK();
+  }
 
   std::unique_ptr<const char, std::function<void(const char*)>> err_msg(
       krb5_get_error_message(ctx, code),
@@ -142,12 +152,12 @@ void InitKrb5Ctx() {
 
 // Port of the data_eq() implementation from krb5/k5-int.h
 inline int data_eq(krb5_data d1, krb5_data d2) {
-    return (d1.length == d2.length && !memcmp(d1.data, d2.data, d1.length));
+  return (d1.length == d2.length && !memcmp(d1.data, d2.data, d1.length));
 }
 
 // Port of the data_eq_string() implementation from krb5/k5-int.h
-inline int data_eq_string(krb5_data d, const char *s) {
-    return (d.length == strlen(s) && !memcmp(d.data, s, d.length));
+inline int data_eq_string(krb5_data d, const char* s) {
+  return (d.length == strlen(s) && !memcmp(d.data, s, d.length));
 }
 
 Status Krb5UnparseName(krb5_principal princ, string* name) {
@@ -266,7 +276,7 @@ Status KinitContext::DoRenewalInternal(bool* found_in_cache) {
     // Acquire a new ticket using the keytab. This ticket will automatically be put into the
     // credential cache.
     {
-      std::lock_guard<RWMutex> l(*g_kerberos_reinit_lock);
+      std::lock_guard l(*g_kerberos_reinit_lock);
       KRB5_RETURN_NOT_OK_PREPEND(krb5_get_init_creds_keytab(g_krb5_ctx, &new_creds, principal_,
                                                             keytab_, 0 /* valid from now */,
                                                             nullptr /* TKT service name */,
@@ -309,12 +319,13 @@ Status KinitContext::Kinit(const string& keytab_path, const string& principal) {
 
   KRB5_RETURN_NOT_OK_PREPEND(krb5_get_init_creds_opt_alloc(g_krb5_ctx, &opts_),
                              "unable to allocate get_init_creds_opt struct");
-  RETURN_NOT_OK(KinitInternal());
+  RETURN_NOT_OK_PREPEND(KinitInternal(), "kinit failed");
 
   // Start the thread to renew and reacquire Kerberos tickets.
-  RETURN_NOT_OK(Thread::Create("kerberos", "reacquire thread",
-                               [this]() { this->RenewThread(); }, &reacquire_thread_));
-  return Status::OK();
+  return Thread::Create("kerberos",
+                        "reacquire thread",
+                        [this]() { this->RenewThread(); },
+                        &reacquire_thread_);
 }
 
 void KinitContext::Kdestroy() {
@@ -326,17 +337,22 @@ void KinitContext::Kdestroy() {
 
 Status KinitContext::KinitInternal() {
 #if defined(HAVE_KRB5_GET_INIT_CREDS_OPT_SET_OUT_CCACHE)
-  KRB5_RETURN_NOT_OK_PREPEND(krb5_get_init_creds_opt_set_out_ccache(g_krb5_ctx, opts_, ccache_),
-                             "unable to set init_creds options");
+  KRB5_RETURN_NOT_OK_PREPEND(
+      krb5_get_init_creds_opt_set_out_ccache(g_krb5_ctx, opts_, ccache_),
+      "unable to set init_creds options");
 #endif
 
   krb5_creds creds;
-  KRB5_RETURN_NOT_OK_PREPEND(krb5_get_init_creds_keytab(g_krb5_ctx, &creds, principal_, keytab_,
-                                                        0 /* valid from now */,
-                                                        nullptr /* TKT service name */, opts_),
-                             "unable to login from keytab");
-  SCOPED_CLEANUP({
-      krb5_free_cred_contents(g_krb5_ctx, &creds); });
+  KRB5_RETURN_NOT_OK_PREPEND(
+      krb5_get_init_creds_keytab(g_krb5_ctx,
+                                 &creds,
+                                 principal_,
+                                 keytab_,
+                                 0 /* valid from now */,
+                                 nullptr /* TKT service name */,
+                                 opts_),
+      "unable to login from keytab");
+  SCOPED_CLEANUP({ krb5_free_cred_contents(g_krb5_ctx, &creds); });
 
   ticket_end_timestamp_ = creds.times.endtime;
 
@@ -358,9 +374,8 @@ Status KinitContext::KinitInternal() {
   RETURN_NOT_OK_PREPEND(MapPrincipalToLocalName(principal_str_, &username_str_),
                         "could not map own logged-in principal to a short username");
 
-  LOG(INFO) << "Logged in from keytab as " << principal_str_
-            << " (short username " << username_str_ << ")";
-
+  LOG(INFO) << Substitute("Logged in from keytab as $0 (short username $1)",
+                          principal_str_, username_str_);
   return Status::OK();
 }
 
@@ -494,32 +509,35 @@ Status Krb5ParseName(const string& principal, string* service_name,
   return Status::OK();
 }
 
-Status InitKerberosForServer(const std::string& raw_principal, const std::string& keytab_file,
-    const std::string& krb5ccname, bool disable_krb5_replay_cache) {
-  if (keytab_file.empty()) return Status::OK();
+Status InitKerberosForServer(const std::string& raw_principal,
+                             const std::string& keytab_file,
+                             const std::string& krb5ccname,
+                             bool disable_krb5_replay_cache) {
+  if (keytab_file.empty()) {
+    return Status::OK();
+  }
 
-  setenv("KRB5CCNAME", krb5ccname.c_str(), 1);
-  setenv("KRB5_KTNAME", keytab_file.c_str(), 1);
+  PCHECK(setenv("KRB5CCNAME", krb5ccname.c_str(), 1) == 0);
+  PCHECK(setenv("KRB5_KTNAME", keytab_file.c_str(), 1) == 0);
 
   if (disable_krb5_replay_cache) {
     // KUDU-1897: disable the Kerberos replay cache. The KRPC protocol includes a
     // per-connection server-generated nonce to protect against replay attacks
     // when authenticating via Kerberos. The replay cache has many performance and
     // implementation issues.
-    setenv("KRB5RCACHETYPE", "none", 1);
+    PCHECK(setenv("KRB5RCACHETYPE", "none", 1) == 0);
   }
 
-  g_kinit_ctx = new KinitContext();
-  string configured_principal;
-  RETURN_NOT_OK(GetConfiguredPrincipal(raw_principal, &configured_principal));
-  RETURN_NOT_OK_PREPEND(g_kinit_ctx->Kinit(
-      keytab_file, configured_principal), "unable to kinit");
-
-  return Status::OK();
+  g_kinit_ctx = new KinitContext;
+  string principal;
+  RETURN_NOT_OK(GetConfiguredPrincipal(raw_principal, &principal));
+  return g_kinit_ctx->Kinit(keytab_file, principal);
 }
 
 void DestroyKerberosForServer() {
-  if (g_kinit_ctx == nullptr) return;
+  if (g_kinit_ctx == nullptr) {
+    return;
+  }
 
   delete g_kinit_ctx;
   g_kinit_ctx = nullptr;

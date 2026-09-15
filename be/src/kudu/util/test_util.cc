@@ -17,16 +17,18 @@
 
 #include "kudu/util/test_util.h"
 
-#include <limits.h>
 #include <unistd.h>
 
+#include <algorithm>
 #include <cerrno>
+#include <climits>
 #include <cstdlib>
 #include <limits>
 #include <map>
 #include <memory>
 #include <ostream>
 #include <string>
+#include <tuple>
 #include <utility>
 #include <vector>
 
@@ -62,14 +64,16 @@
 
 DEFINE_string(test_leave_files, "on_failure",
               "Whether to leave test files around after the test run. "
-              " Valid values are 'always', 'on_failure', or 'never'");
+              "Valid values are 'always', 'on_failure', or 'never'");
 
 DEFINE_int32(test_random_seed, 0, "Random seed to use for randomized tests");
 
 DECLARE_string(time_source);
+DECLARE_bool(enable_multi_tenancy);
 DECLARE_bool(encrypt_data_at_rest);
 
 using std::string;
+using std::unordered_map;
 using std::vector;
 using strings::Substitute;
 
@@ -88,9 +92,16 @@ static const uint8_t kEncryptionKey[kEncryptionKeySize] =
   {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 42};
 static const uint8_t kEncryptionKeyIv[kEncryptionKeySize] =
   {42, 14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0};
-static const char* const kEncryptionKeyVersion = "kuduclusterkey@0";
+static const char* const kEncryptionKeyVersion = "kudutenantkey@0";
+static const char* const kEncryptionTenantName = "default_tenant_kudu";
+static const char* const kEncryptionTenantID = "00000000000000000000000000000000";
 
 static const uint64_t kTestBeganAtMicros = Env::Default()->NowMicros();
+
+static const char* const kContentTypeTextPlain = "text/plain";
+static const char* const kContentTypeTextHtml = "text/html";
+static const char* const kContentTypeApplicationOctet = "application/octet-stream";
+static const char* const kContentTypeApplicationJson = "application/json";
 
 // Global which production code can check to see if it is running
 // in a GTest environment (assuming the test binary links in this module,
@@ -167,9 +178,9 @@ KuduTest::~KuduTest() {
   if (FLAGS_test_leave_files == "always") {
     LOG(INFO) << "-----------------------------------------------";
     LOG(INFO) << "--test_leave_files specified, leaving files in " << test_dir_;
-  } else if (FLAGS_test_leave_files == "on_failure" && HasFatalFailure()) {
+  } else if (FLAGS_test_leave_files == "on_failure" && HasFailure()) {
     LOG(INFO) << "-----------------------------------------------";
-    LOG(INFO) << "Had fatal failures, leaving test files at " << test_dir_;
+    LOG(INFO) << "Had failures, leaving test files at " << test_dir_;
   } else {
     VLOG(1) << "Cleaning up temporary test files...";
     WARN_NOT_OK(env_->DeleteRecursively(test_dir_),
@@ -196,9 +207,9 @@ void KuduTest::OverrideKrb5Environment() {
   //
   // NOTE: we don't simply *unset* the variables, because then we'd still pick up
   // the user's /etc/krb5.conf and other default locations.
-  setenv("KRB5_CONFIG", kInvalidPath, 1);
-  setenv("KRB5_KTNAME", kInvalidPath, 1);
-  setenv("KRB5CCNAME", kInvalidPath, 1);
+  PCHECK(setenv("KRB5_CONFIG", kInvalidPath, 1) == 0);
+  PCHECK(setenv("KRB5_KTNAME", kInvalidPath, 1) == 0);
+  PCHECK(setenv("KRB5CCNAME", kInvalidPath, 1) == 0);
 }
 
 void KuduTest::SetEncryptionFlags(bool enable_encryption) {
@@ -208,12 +219,21 @@ void KuduTest::SetEncryptionFlags(bool enable_encryption) {
   }
 }
 
-void KuduTest::GetEncryptionKey(string* key, string* iv, string* version) {
+void KuduTest::GetEncryptionKey(string* name, string* id, string* key, string* iv,
+                                string* version) {
   if (FLAGS_encrypt_data_at_rest) {
+    if (FLAGS_enable_multi_tenancy && name && id) {
+      *name = kEncryptionTenantName;
+      *id = kEncryptionTenantID;
+    }
     strings::b2a_hex(kEncryptionKey, key, kEncryptionKeySize);
     strings::b2a_hex(kEncryptionKeyIv, iv, kEncryptionKeySize);
     *version = kEncryptionKeyVersion;
   } else {
+    if (name && id) {
+      *name = "";
+      *id = "";
+    }
     *key = "";
     *iv = "";
     *version = "";
@@ -252,7 +272,7 @@ int SeedRandom() {
   } else {
     seed = FLAGS_test_random_seed;
   }
-  LOG(INFO) << "Using random seed: " << seed;
+  VLOG(1) << "Using random seed: " << seed;
   srand(seed);
   return seed;
 }
@@ -440,7 +460,8 @@ int CountOpenFds(Env* env, const string& path_pattern) {
 namespace {
 const vector<string> kWildcard = { "0.0.0.0" };
 
-Status WaitForBind(pid_t pid, uint16_t* port,
+Status WaitForBind(pid_t pid,
+                   uint16_t* port,
                    const vector<string>& addresses,
                    const char* kind,
                    MonoDelta timeout) {
@@ -454,7 +475,7 @@ Status WaitForBind(pid_t pid, uint16_t* port,
   RETURN_NOT_OK(FindExecutable("lsof", {"/sbin", "/usr/sbin"}, &lsof));
 
   const vector<string> cmd = {
-    lsof, "-wbnP", "-Ffn",
+    lsof, "-wnP", "-Ffn",
     "-p", std::to_string(pid),
     "-a", "-i", kind
   };
@@ -482,10 +503,10 @@ Status WaitForBind(pid_t pid, uint16_t* port,
   const auto& addresses_to_check = addresses.empty() ? kWildcard : addresses;
   for (int64_t i = 1; ; ++i) {
     for (const auto& addr : addresses_to_check) {
-      string addr_pattern = Substitute("n$0:", addr == "0.0.0.0" ? "*" : addr);
+      const string addr_pattern = Substitute("n$0:", addr == "0.0.0.0" ? "*" : addr);
       string lsof_out;
       int32_t p = -1;
-      Status s = Subprocess::Call(cmd, "", &lsof_out).AndThen([&] () {
+      const auto s = Subprocess::Call(cmd, "", &lsof_out).AndThen([&] () {
         StripTrailingNewline(&lsof_out);
         vector<string> lines = strings::Split(lsof_out, "\n");
         for (int index = 2; index < lines.size(); index += 2) {
@@ -494,18 +515,21 @@ Status WaitForBind(pid_t pid, uint16_t* port,
               !cur_line.contains("->")) {
             cur_line.remove_prefix(addr_pattern.size());
             if (!safe_strto32(cur_line.data(), cur_line.size(), &p)) {
-              return Status::RuntimeError("unexpected lsof output", lsof_out);
+              return Status::RuntimeError(Substitute(
+                  "could not parse port number in string '$0' from lsof output",
+                  string(cur_line.data(), cur_line.size())), lsof_out);
             }
 
             return Status::OK();
           }
         }
 
-        return Status::RuntimeError("unexpected lsof output", lsof_out);
+        return Status::NotFound(
+            "could not find pattern of a bound port in lsof output", lsof_out);
       });
 
       if (s.ok()) {
-        CHECK(p > 0 && p < std::numeric_limits<uint16_t>::max())
+        CHECK(p > 0 && p <= std::numeric_limits<uint16_t>::max())
             << "parsed invalid port: " << p;
         VLOG(1) << "Determined bound port: " << p;
         *port = static_cast<uint16_t>(p);
@@ -513,10 +537,15 @@ Status WaitForBind(pid_t pid, uint16_t* port,
         return Status::OK();
       }
       if (deadline < MonoTime::Now()) {
-        return s;
+        return Status::TimedOut(Substitute(
+            "process with PID $0 is not yet bound to any port at the specified "
+            "addresses; last attempt running lsof returned '$1'",
+            pid, s.ToString()));
       }
     }
-    SleepFor(MonoDelta::FromMilliseconds(i * 10));
+    auto time_left_ms = std::max<int64_t>(
+        (deadline - MonoTime::Now()).ToMilliseconds(), 0);
+    SleepFor(MonoDelta::FromMilliseconds(std::min<int64_t>(i * 10, time_left_ms)));
   }
 
   // Should not reach here.
@@ -530,7 +559,7 @@ Status WaitForBindAtPort(const vector<string>& addresses,
                          MonoDelta timeout) {
   string lsof;
   RETURN_NOT_OK(FindExecutable("lsof", {"/sbin", "/usr/sbin"}, &lsof));
-  const vector<string> cmd = { lsof, "-wbnP", "-Fpfn", "-a", "-i", kind };
+  const vector<string> cmd = { lsof, "-wnP", "-Fpfn", "-a", "-i", kind };
 
   // The '-Fpfn' flag gets lsof to output something like:
   //   p2133
@@ -562,7 +591,7 @@ Status WaitForBindAtPort(const vector<string>& addresses,
           "n$0:$1", addr == "0.0.0.0" ? "*" : addr, port);
       for (const auto& l : lines) {
         if (l.empty()) {
-          return Status::RuntimeError("unexpected lsof output", lsof_out);
+          return Status::RuntimeError("empty line in lsof output", lsof_out);
         }
         if (l[0] == 'p' || l[0] == 'f') {
           continue;
@@ -580,7 +609,9 @@ Status WaitForBindAtPort(const vector<string>& addresses,
     if (deadline < MonoTime::Now()) {
       break;
     }
-    SleepFor(MonoDelta::FromMilliseconds(i * 10));
+    auto time_left_ms = std::max<int64_t>(
+        (deadline - MonoTime::Now()).ToMilliseconds(), 0);
+    SleepFor(MonoDelta::FromMilliseconds(std::min<int64_t>(i * 10, time_left_ms)));
   }
 
   return Status::TimedOut(
@@ -626,6 +657,131 @@ Status FindHomeDir(const string& name, const string& bin_dir, string* home_dir) 
   }
   *home_dir = dir;
   return Status::OK();
+}
+
+const unordered_map<string, string>& GetCommonWebserverEndpoints() {
+  static const unordered_map<string, string> common_endpoints = {
+      {"logs", kContentTypeTextHtml},
+      {"varz", kContentTypeTextHtml},
+      {"config", kContentTypeTextHtml},
+      {"memz", kContentTypeTextHtml},
+      {"mem-trackers", kContentTypeTextHtml},
+      {"stacks", kContentTypeTextPlain},
+      {"version", kContentTypeTextPlain},
+      {"healthz", kContentTypeTextPlain},
+      {"metrics", kContentTypeApplicationJson},
+      {"jsonmetricz", kContentTypeApplicationJson},
+      {"metrics_prometheus", kContentTypeTextPlain},
+      {"rpcz", kContentTypeApplicationJson},
+      {"startup", kContentTypeTextHtml},
+      {"pprof/cmdline", kContentTypeTextPlain},
+      {"pprof/heap", kContentTypeTextPlain},
+      {"pprof/growth", kContentTypeTextPlain},
+      {"pprof/profile", kContentTypeTextPlain},
+      {"pprof/symbol", kContentTypeTextPlain},
+      {"pprof/contention", kContentTypeTextPlain},
+      {"tracing/json/begin_monitoring", kContentTypeApplicationJson},
+      {"tracing/json/end_monitoring", kContentTypeApplicationJson},
+      {"tracing/json/capture_monitoring", kContentTypeApplicationJson},
+      {"tracing/json/get_monitoring_status", kContentTypeApplicationJson},
+      {"tracing/json/categories", kContentTypeApplicationJson},
+      {"tracing/json/begin_recording", kContentTypeApplicationJson},
+      {"tracing/json/get_buffer_percent_full", kContentTypeApplicationJson},
+      {"tracing/json/end_recording", kContentTypeApplicationJson},
+      {"tracing/json/end_recording_compressed", kContentTypeApplicationJson},
+      {"tracing/json/simple_dump", kContentTypeApplicationJson}};
+  return common_endpoints;
+}
+
+// Add necessary query params to get 200 response in tests.
+const unordered_map<string, string>& GetTServerWebserverEndpoints(const string& tablet_id) {
+  static const unordered_map<string, string> tserver_endpoints = {
+      {"scans", kContentTypeTextHtml},
+      {"tablets", kContentTypeTextHtml},
+      {Substitute("tablet?id=$0", tablet_id), kContentTypeTextHtml},
+      {"transactions", kContentTypeTextHtml},
+      {Substitute("tablet-rowsetlayout-svg?id=$0", tablet_id), kContentTypeTextHtml},
+      {Substitute("tablet-consensus-status?id=$0", tablet_id), kContentTypeTextHtml},
+      {Substitute("log-anchors?id=$0", tablet_id), kContentTypeTextHtml},
+      {"dashboards", kContentTypeTextHtml},
+      {"maintenance-manager", kContentTypeTextHtml}};
+  return tserver_endpoints;
+}
+
+// Add necessary query params to get 200 response in tests.
+const unordered_map<string, string>& GetMasterWebserverEndpoints(const string& table_id) {
+  static unordered_map<string, string> master_endpoints = {
+      {"tablet-servers", kContentTypeTextHtml},
+      {"tables", kContentTypeTextHtml},
+      {Substitute("table?id=$0", table_id), kContentTypeTextHtml},
+      {"masters", kContentTypeTextHtml},
+      {"ipki-ca-cert", kContentTypeTextPlain},
+      {"ipki-ca-cert-pem", kContentTypeTextPlain},
+      {"ipki-ca-cert-der", kContentTypeApplicationOctet},
+      {"dump-entities", kContentTypeApplicationJson},
+      {"prometheus-sd", kContentTypeApplicationJson}};
+  return master_endpoints;
+}
+
+void CheckPrometheusOutput(const string& prometheus_output) {
+  vector<string> lines = strings::Split(prometheus_output, "\n", strings::SkipEmpty());
+
+  // Single-pass validation: collect HELP/TYPE declarations and verify that
+  // they appear before any corresponding value lines (Prometheus exposition
+  // format requires HELP/TYPE to precede metric values).
+  std::unordered_map<string, string> help_lines;
+  std::unordered_map<string, string> type_lines;
+  for (const auto& line : lines) {
+    if (HasPrefixString(line, "# HELP ")) {
+      vector<string> parts(strings::Split(line, " "));
+      ASSERT_GE(parts.size(), 3);
+      const string& name = parts[2];
+      ASSERT_TRUE(help_lines.emplace(name, line).second)
+          << "Duplicate HELP for metric: " << name;
+    } else if (HasPrefixString(line, "# TYPE ")) {
+      vector<string> parts(strings::Split(line, " "));
+      ASSERT_GE(parts.size(), 4);
+      const string& name = parts[2];
+      ASSERT_TRUE(type_lines.emplace(name, line).second)
+          << "Duplicate TYPE for metric: " << name;
+    } else if (!HasPrefixString(line, "#")) {
+      // This is a value line. Verify that HELP and TYPE have already been seen.
+      auto brace_pos = line.find('{');
+      auto space_pos = line.find(' ');
+      auto end_pos = std::min(brace_pos, space_pos);
+      ASSERT_NE(end_pos, string::npos) << "Malformed value line: " << line;
+      string metric_name = line.substr(0, end_pos);
+      ASSERT_TRUE(help_lines.count(metric_name) > 0)
+          << "Value line before or without HELP for metric: " << metric_name
+          << "\n  line: " << line;
+      ASSERT_TRUE(type_lines.count(metric_name) > 0)
+          << "Value line before or without TYPE for metric: " << metric_name
+          << "\n  line: " << line;
+    }
+  }
+
+  // Every HELP should have a corresponding TYPE and vice versa.
+  for (const auto& [name, _] : help_lines) {
+    ASSERT_TRUE(type_lines.count(name) > 0)
+        << "HELP without TYPE for: " << name;
+  }
+  for (const auto& [name, _] : type_lines) {
+    ASSERT_TRUE(help_lines.count(name) > 0)
+        << "TYPE without HELP for: " << name;
+  }
+}
+
+void CheckNoPrometheusValueLines(const string& prometheus_output) {
+  vector<string> lines = strings::Split(prometheus_output, "\n", strings::SkipEmpty());
+  for (const auto& line : lines) {
+    ASSERT_TRUE(HasPrefixString(line, "#"))
+        << "Unexpected metric value line: " << line;
+  }
+}
+
+std::ostream& operator<<(std::ostream& os, const IPMode& mode) {
+  os << IPModeToString(mode);
+  return os;
 }
 
 } // namespace kudu

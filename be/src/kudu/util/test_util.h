@@ -23,19 +23,20 @@
 
 #include <cstdint>
 #include <functional>
+#include <iosfwd>
 #include <memory>
 #include <string>
+#include <unordered_map>
 #include <vector>
 
 #include <gtest/gtest.h>
 
-#include "kudu/gutil/port.h"
 #include "kudu/util/monotime.h"
+#include "kudu/util/net/net_util.h"
 
 #define SKIP_IF_SLOW_NOT_ALLOWED() do { \
   if (!AllowSlowTests()) { \
-    LOG(WARNING) << "test is skipped; set KUDU_ALLOW_SLOW_TESTS=1 to run"; \
-    GTEST_SKIP(); \
+    GTEST_SKIP() << "test is skipped; set KUDU_ALLOW_SLOW_TESTS=1 to run"; \
   } \
 } while (0)
 
@@ -63,9 +64,9 @@ class KuduTest : public ::testing::Test {
  public:
   KuduTest();
 
-  virtual ~KuduTest();
+  ~KuduTest() override;
 
-  virtual void SetUp() OVERRIDE;
+  void SetUp() override;
 
   // Tests assume that they run with no outside-provided kerberos credentials, and if the
   // user happened to have some credentials available they might fail due to being already
@@ -73,10 +74,14 @@ class KuduTest : public ::testing::Test {
   // variables so that we don't pick up the user's credentials.
   static void OverrideKrb5Environment();
 
-  // Returns the encryption key, IV, and version used by the test.
-  static void GetEncryptionKey(std::string* key, std::string* iv, std::string* version);
+  // Returns the encryption tenant name, tenant id, key, IV, and version used by the test.
+  static void GetEncryptionKey(std::string* name, std::string* id,
+                               std::string* key, std::string* iv, std::string* version);
 
  protected:
+  // Sets the flags to enable encryption if 'enable_encryption' is true.
+  static void SetEncryptionFlags(bool enable_encryption);
+
   // Returns absolute path based on a unit test-specific work directory, given
   // a relative path. Useful for writing test files that should be deleted after
   // the test ends.
@@ -87,9 +92,6 @@ class KuduTest : public ::testing::Test {
   // Reset flags on every test. Allocated on the heap so it can be destroyed
   // (and the flags reset) before test_dir_ is deleted.
   std::unique_ptr<google::FlagSaver> flag_saver_;
-
-  // Sets the flags to enable encryption if 'enable_encryption' is true.
-  void SetEncryptionFlags(bool enable_encryption);
 
   std::string test_dir_;
 };
@@ -173,24 +175,24 @@ int CountOpenFds(Env* env, const std::string& path_pattern);
 // semantically mean the same.
 Status WaitForTcpBind(pid_t pid, uint16_t* port,
                       const std::vector<std::string>& addresses,
-                      MonoDelta timeout) WARN_UNUSED_RESULT;
+                      MonoDelta timeout);
 
 // Similar to above but binds to any listening UDP port.
 Status WaitForUdpBind(pid_t pid, uint16_t* port,
                       const std::vector<std::string>& addresses,
-                      MonoDelta timeout) WARN_UNUSED_RESULT;
+                      MonoDelta timeout);
 
 // Similar to WaitForTcpBind(), but when port is known beforehand
 // and the PID doesn't matter.
 Status WaitForTcpBindAtPort(const std::vector<std::string>& addresses,
                             uint16_t port,
-                            MonoDelta timeout) WARN_UNUSED_RESULT;
+                            MonoDelta timeout);
 
 // Similar to WaitForUdpBind(), but when port is known beforehand
 // and the PID doesn't matter.
 Status WaitForUdpBindAtPort(const std::vector<std::string>& addresses,
                             uint16_t port,
-                            MonoDelta timeout) WARN_UNUSED_RESULT;
+                            MonoDelta timeout);
 
 // Find the home directory of a Java-style application, e.g. JAVA_HOME or
 // HADOOP_HOME.
@@ -199,7 +201,33 @@ Status WaitForUdpBindAtPort(const std::vector<std::string>& addresses,
 // directory.
 Status FindHomeDir(const std::string& name,
                    const std::string& bin_dir,
-                   std::string* home_dir) WARN_UNUSED_RESULT;
+                   std::string* home_dir);
+
+// Contains the endpoints which are to be found on Master and TServer as well.
+// Key: endpoint name, value: content-type header for that particular endpoint.
+const std::unordered_map<std::string, std::string>& GetCommonWebserverEndpoints();
+
+// Contains the endpoints which are to be found on TServer only.
+// Key: endpoint name, value: content-type header for that particular endpoint.
+const std::unordered_map<std::string, std::string>& GetTServerWebserverEndpoints(
+    const std::string& tablet_id);
+
+// Contains the endpoints which are to be found on Master only.
+// Key: endpoint name, value: content-type header for that particular endpoint.
+const std::unordered_map<std::string, std::string>& GetMasterWebserverEndpoints(
+    const std::string& table_id);
+
+// Prometheus metrics output sanity check. This check is used in both the tablet_server-test
+// and the master-test, so it is placed here.
+void CheckPrometheusOutput(const std::string& prometheus_output);
+
+// Asserts that 'prometheus_output' contains no metric value lines (only comment/metadata
+// lines starting with '#' are allowed). Use after CheckPrometheusOutput() when the
+// expectation is that a filter produces an effectively empty result.
+void CheckNoPrometheusValueLines(const std::string& prometheus_output);
+
+// Beautifies test output if a test scenario fails.
+std::ostream& operator<<(std::ostream& os, const IPMode& mode);
 
 } // namespace kudu
 #endif

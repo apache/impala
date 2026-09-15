@@ -74,6 +74,7 @@ using std::set;
 using std::string;
 using std::unique_ptr;
 using std::vector;
+using strings::Substitute;
 
 // Fault injection flags.
 DEFINE_double(rpc_inject_invalid_authn_token_ratio, 0,
@@ -99,7 +100,8 @@ TAG_FLAG(rpc_send_channel_bindings, unsafe);
 DECLARE_bool(rpc_encrypt_loopback_connections);
 
 DEFINE_string(trusted_subnets,
-              "127.0.0.0/8,10.0.0.0/8,172.16.0.0/12,192.168.0.0/16,169.254.0.0/16",
+              "127.0.0.0/8,10.0.0.0/8,172.16.0.0/12,192.168.0.0/16,169.254.0.0/16,"
+              "::1/128,fe80::/10,fd00::/8",
               "A trusted subnet whitelist. If set explicitly, all unauthenticated "
               "or unencrypted connections are prohibited except the ones from the "
               "specified address blocks. Otherwise, private network (127.0.0.0/8, etc.) "
@@ -397,7 +399,7 @@ Status ServerNegotiation::SendError(ErrorStatusPB::RpcErrorCodePB code, const St
 Status ServerNegotiation::ValidateConnectionHeader(faststring* recv_buf) {
   TRACE("Waiting for connection header");
   size_t num_read;
-  const size_t conn_header_len = kMagicNumberLength + kHeaderFlagsLength;
+  static constexpr size_t conn_header_len = kMagicNumberLength + kHeaderFlagsLength;
   recv_buf->resize(conn_header_len);
   RETURN_NOT_OK(socket_->BlockingRecv(recv_buf->data(), conn_header_len, &num_read, deadline_));
   DCHECK_EQ(conn_header_len, num_read);
@@ -504,12 +506,18 @@ Status ServerNegotiation::HandleNegotiate(const NegotiatePB& request) {
             authn_types.insert(AuthenticationType::JWT);
           }
           break;
-        case AuthenticationTypePB::TYPE_NOT_SET: {
+        case AuthenticationTypePB::TYPE_NOT_SET:
+        default: {
           Sockaddr addr;
-          RETURN_NOT_OK(socket_->GetPeerAddress(&addr));
+          const auto s = socket_->GetPeerAddress(&addr);
+          WARN_NOT_OK(s, "unable to get peer address");
+          constexpr const char* const kFormat =
+              "client at $0 supports unknown authentication type $1, consider updating server";
           KLOG_EVERY_N_SECS(WARNING, 60)
-              << "client supports unknown authentication type, consider updating server, address: "
-              << addr.ToString();
+              << Substitute(kFormat,
+                            s.ok() ? addr.ToString() : "<unknown address>",
+                            static_cast<uint32_t>(type.type_case()))
+              << THROTTLE_MSG;
           break;
         }
       }
@@ -699,8 +707,8 @@ Status ServerNegotiation::AuthenticateBySasl(faststring* recv_buf) {
     // locally for the purposes of group mapping, ACLs, etc.
     string local_name;
     RETURN_NOT_OK_PREPEND(security::MapPrincipalToLocalName(principal, &local_name),
-                          strings::Substitute("could not map krb5 principal '$0' to username",
-                                              principal));
+                          Substitute("could not map krb5 principal '$0' to username",
+                                     principal));
     authenticated_user_.SetAuthenticatedByKerberos(std::move(local_name), std::move(principal));
   } else {
     authenticated_user_.SetUnauthenticated(c_username);

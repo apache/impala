@@ -16,13 +16,13 @@
 // under the License.
 #pragma once
 
+#include <cstddef>
 #include <memory>
-#include <optional>
 #include <string>
-#include <set>
 #include <vector>
 
 #include <glog/logging.h>
+#include <gtest/gtest_prod.h>
 
 #include "kudu/gutil/dynamic_annotations.h"
 #include "kudu/gutil/macros.h"
@@ -44,13 +44,8 @@ enum QueueStatus {
 
 // Blocking queue used for passing inbound RPC calls to the service handler pool.
 // Calls are dequeued in 'earliest-deadline first' order. The queue also maintains a
-// bounded number of calls. If the queue overflows, then calls with deadlines farthest
-// in the future are evicted.
-//
-// When calls do not provide deadlines, the RPC layer considers their deadline to
-// be infinitely in the future. This means that any call that does have a deadline
-// can evict any call that does not have a deadline. This incentivizes clients to
-// provide accurate deadlines for their calls.
+// bounded number of calls. If the queue is about to overflow, then one call
+// with the deadline later than the deadline of the call being added is evicted.
 //
 // In order to improve concurrent throughput, this class uses a LIFO design:
 // Each consumer thread has its own lock and condition variable. If a
@@ -70,27 +65,29 @@ enum QueueStatus {
 // NOTE: because of the use of thread-local consumer records, once a consumer
 // thread accesses one LifoServiceQueue, it becomes "bound" to that queue and
 // must never access any other instance.
-class LifoServiceQueue {
+class LifoServiceQueue final {
  public:
-  explicit LifoServiceQueue(int max_size);
-
+  explicit LifoServiceQueue(size_t max_size);
   ~LifoServiceQueue();
 
-  // Get an element from the queue.  Returns false if we were shut down prior to
-  // getting the element.
+  size_t max_size() const {
+    return max_queue_size_;
+  }
+
+  // Get an element from the queue. Returns false if the queue is shut down.
   bool BlockingGet(std::unique_ptr<InboundCall>* out);
 
   // Add a new call to the queue.
   // Returns:
   // - QUEUE_SHUTDOWN if Shutdown() has already been called.
-  // - QUEUE_FULL if the queue is full and 'call' has a later deadline than any
-  //   RPC already in the queue.
+  // - QUEUE_FULL if the queue is full and 'call' has a later deadline than most
+  //   of the RPCs already in the queue.
   // - QUEUE_SUCCESS if 'call' was enqueued.
   //
   // In the case of a 'QUEUE_SUCCESS' response, the new element may have bumped
   // another call out of the queue. In that case, *evicted will be set to the
   // call that was bumped.
-  QueueStatus Put(InboundCall* call, std::optional<InboundCall*>* evicted);
+  QueueStatus Put(InboundCall* call, InboundCall** evicted);
 
   // Shut down the queue.
   // When a blocking queue is shut down, no more elements can be added to it,
@@ -99,37 +96,14 @@ class LifoServiceQueue {
   // returning false.
   void Shutdown();
 
-  bool empty() const;
-
-  int max_size() const;
-
   std::string ToString() const;
 
-  // Return an estimate of the current queue length.
-  int estimated_queue_length() const {
-    ANNOTATE_IGNORE_READS_BEGIN();
-    // The C++ standard says that std::multiset::size must be constant time,
-    // so this method won't try to traverse any actual nodes of the underlying
-    // RB tree. Investigation of the libstdcxx implementation confirms that
-    // size() is a simple field access of the _Rb_tree structure.
-    int ret = queue_.size();
-    ANNOTATE_IGNORE_READS_END();
-    return ret;
-  }
-
-  // Return an estimate of the number of idle threads currently awaiting work.
-  int estimated_idle_worker_count() const {
-    ANNOTATE_IGNORE_READS_BEGIN();
-    // Size of a vector is a simple field access so this is safe.
-    int ret = waiting_consumers_.size();
-    ANNOTATE_IGNORE_READS_END();
-    return ret;
-  }
-
  private:
+  FRIEND_TEST(TestServiceQueue, LifoServiceQueuePerf);
+
   // Comparison function which orders calls by their deadlines.
-  static bool DeadlineLess(const InboundCall* a,
-                           const InboundCall* b) {
+  static bool DeadlineGreater(const InboundCall* a,
+                              const InboundCall* b) {
     auto time_a = a->GetClientDeadline();
     auto time_b = b->GetClientDeadline();
     if (time_a == time_b) {
@@ -138,21 +112,21 @@ class LifoServiceQueue {
       time_a = a->GetTimeReceived();
       time_b = b->GetTimeReceived();
     }
-    return time_a < time_b;
+    return time_a > time_b;
   }
 
-  // Struct functor wrapper for DeadlineLess.
-  struct DeadlineLessStruct {
-    bool operator()(const InboundCall* a, const InboundCall* b) const {
-      return DeadlineLess(a, b);
+  // Struct functor wrapper for DeadlineGreater.
+  static const struct DeadlineGreaterStruct {
+    bool operator()(const InboundCall* a, const InboundCall* b) const noexcept {
+      return DeadlineGreater(a, b);
     }
-  };
+  } kMinHeapCompare;
 
   // The thread-local record corresponding to a single consumer thread.
   // Threads push this record onto the waiting_consumers_ stack when
   // they are awaiting work. Producers pop the top waiting consumer and
   // post work using Post().
-  class ConsumerState {
+  class ConsumerState final {
    public:
     explicit ConsumerState(LifoServiceQueue* queue) :
         cond_(&lock_),
@@ -162,16 +136,16 @@ class LifoServiceQueue {
     }
 
     void Post(InboundCall* call) {
-      DCHECK(call_ == nullptr);
-      MutexLock l(lock_);
+      std::lock_guard l(lock_);
+      DCHECK(!call_);
       call_ = call;
       should_wake_ = true;
       cond_.Signal();
     }
 
     InboundCall* Wait() {
-      MutexLock l(lock_);
-      while (should_wake_ == false) {
+      std::lock_guard l(lock_);
+      while (!should_wake_) {
         cond_.Wait();
       }
       should_wake_ = false;
@@ -195,20 +169,42 @@ class LifoServiceQueue {
     LifoServiceQueue* bound_queue_;
   };
 
-  static __thread ConsumerState* tl_consumer_;
+  // Return an estimate of the current queue length.
+  size_t estimated_queue_length() const {
+    ANNOTATE_IGNORE_READS_BEGIN();
+    // Size of a vector is a simple field access so this is safe.
+    auto ret = queue_.size();
+    ANNOTATE_IGNORE_READS_END();
+    return ret;
+  }
 
+  // Return an estimate of the number of idle threads currently awaiting work.
+  size_t estimated_idle_worker_count() const {
+    ANNOTATE_IGNORE_READS_BEGIN();
+    // Size of a vector is a simple field access so this is safe.
+    auto ret = waiting_consumers_.size();
+    ANNOTATE_IGNORE_READS_END();
+    return ret;
+  }
+
+  static thread_local ConsumerState* tl_consumer_;
+
+  const size_t max_queue_size_;
   mutable simple_spinlock lock_;
   bool shutdown_;
-  int max_queue_size_;
 
   // Stack of consumer threads which are currently waiting for work.
   std::vector<ConsumerState*> waiting_consumers_;
 
-  // The actual queue. Work is only added to the queue when there were no
-  // consumers available for a "direct hand-off".
-  std::multiset<InboundCall*, DeadlineLessStruct> queue_;
+  // The container backing the queue. This is operated as a min priority queue.
+  // Items are only added into the queue when there aren't any consumers
+  // available for a "direct hand-off".
+  std::vector<InboundCall*> queue_;
 
   // The total set of consumers who have ever accessed this queue.
+  // This container is necessary to maintain proper lifecycle and ownership
+  // of the corresponding ConsumerState objects while their raw pointers
+  // are used elsewhere in this class (e.g., in 'waiting_consumers_').
   std::vector<std::unique_ptr<ConsumerState>> consumers_;
 
   DISALLOW_COPY_AND_ASSIGN(LifoServiceQueue);

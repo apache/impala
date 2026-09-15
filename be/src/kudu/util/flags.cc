@@ -81,8 +81,9 @@ DEFINE_bool(dump_metrics_xml, false,
 TAG_FLAG(dump_metrics_xml, hidden);
 
 #ifdef TCMALLOC_ENABLED
-// Defined in Impala in common/global-flags.cc
-DECLARE_bool(enable_process_lifetime_heap_profiling);
+DEFINE_bool(enable_process_lifetime_heap_profiling, false, "Enables heap "
+    "profiling for the lifetime of the process. Profile output will be stored in the "
+    "directory specified by -heap_profile_path.");
 TAG_FLAG(enable_process_lifetime_heap_profiling, stable);
 TAG_FLAG(enable_process_lifetime_heap_profiling, advanced);
 
@@ -95,10 +96,22 @@ DEFINE_int64(heap_sample_every_n_bytes, 0,
              "Enable heap occupancy sampling. If this flag is set to some positive "
              "value N, a memory allocation will be sampled approximately every N bytes. "
              "Lower values of N incur larger overhead but give more accurate results. "
-             "A value such as 524288 (512KB) is a reasonable choice with relatively "
-             "low overhead.");
+             "Warning: Setting this flag to a positive value increases lock contention "
+             "in tcmalloc; the lower the value, the higher the lock contention.");
 TAG_FLAG(heap_sample_every_n_bytes, advanced);
 TAG_FLAG(heap_sample_every_n_bytes, experimental);
+TAG_FLAG(heap_sample_every_n_bytes, unsafe);
+
+static bool ValidateHeapSample(const char* /*flagname*/, int64_t value) {
+  if (value > 0) {
+    LOG(WARNING) << "Flag heap_sample_every_n_bytes is set to a positive value, this may "
+                    "significantly increases lock contention in tcmalloc and degrade "
+                    "performance.";
+  }
+  return true;
+}
+
+DEFINE_validator(heap_sample_every_n_bytes, &ValidateHeapSample);
 #endif
 
 DEFINE_bool(disable_core_dumps, false, "Disable core dumps when this process crashes.");
@@ -403,10 +416,17 @@ bool CheckFlagsAndWarn(const string& tag, bool unlocked) {
 
   int use_count = 0;
   for (const auto& f : flags) {
-    if (f.is_default) continue;
+    // If the flag isn't set, or it is explicitly set to its default value
+    // (it's superfluous, but it's still possible), there isn't much to report.
+    if (f.is_default || f.default_value == f.current_value) {
+      continue;
+    }
     unordered_set<string> tags;
     GetFlagTags(f.name, &tags);
-    if (!ContainsKey(tags, tag)) continue;
+    if (!ContainsKey(tags, tag)) {
+      // No special tags provided for the flag: it's OK to modify its setting.
+      continue;
+    }
 
     if (unlocked) {
       LOG(WARNING) << "Enabled " << tag << " flag: --" << f.name << "=" << f.current_value;

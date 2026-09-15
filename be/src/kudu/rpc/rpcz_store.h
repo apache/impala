@@ -34,7 +34,7 @@ struct RpcMethodInfo;
 
 // Responsible for storing sampled traces associated with completed calls.
 // Before each call is responded to, it is added to this store.
-class RpczStore {
+class RpczStore final {
  public:
   RpczStore();
   ~RpczStore();
@@ -52,20 +52,20 @@ class RpczStore {
               DumpRpczStoreResponsePB* resp);
 
  private:
-  // Look up or create the particular MethodSampler instance which should
-  // store samples for this call.
-  MethodSampler* SamplerForCall(InboundCall* call);
-
   // Log a WARNING message if the RPC response was slow enough that the
   // client likely timed out. This is based on the client-provided timeout
   // value.
   // Also can be configured to log _all_ RPC traces for help debugging.
-  void LogTrace(InboundCall* call);
+  static void LogTrace(InboundCall* call);
+
+  // Look up or create the particular MethodSampler instance which should
+  // store samples for this call.
+  MethodSampler* SamplerForCall(InboundCall* call);
 
   percpu_rwlock samplers_lock_;
 
   // Protected by samplers_lock_.
-  std::unordered_map<RpcMethodInfo*, std::unique_ptr<MethodSampler>> method_samplers_;
+  std::unordered_map<const RpcMethodInfo*, std::unique_ptr<MethodSampler>> method_samplers_;
 
   DISALLOW_COPY_AND_ASSIGN(RpczStore);
 };

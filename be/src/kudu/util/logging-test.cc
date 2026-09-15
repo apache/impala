@@ -64,37 +64,128 @@ TEST(LoggingTest, TestThrottledLogging) {
   EXPECT_THAT(msgs[1], testing::ContainsRegex("\\[suppressed [0-9]{3,} similar messages\\]"));
 }
 
-TEST(LoggingTest, TestAdvancedThrottling) {
+TEST(LoggingTest, ThrottledLoggingNoThrottleMsg) {
+  SKIP_IF_SLOW_NOT_ALLOWED();
   StringVectorSink sink;
   ScopedRegisterSink srs(&sink);
 
-  logging::LogThrottler throttle_a;
-
-  // First, log only using a single tag and throttler.
-  for (int i = 0; i < 100000; i++) {
-    KLOG_EVERY_N_SECS_THROTTLER(INFO, 1, throttle_a, "tag_a") << "test" << THROTTLE_MSG;
+  for (int i = 0; i < 10000; i++) {
+    KLOG_EVERY_N_SECS(INFO, 1) << "test";
     SleepFor(MonoDelta::FromMilliseconds(1));
-    if (sink.logged_msgs().size() >= 2) break;
+    if (sink.logged_msgs().size() >= 2) {
+      break;
+    }
   }
-  auto& msgs = sink.logged_msgs();
+  const vector<string>& msgs = sink.logged_msgs();
   ASSERT_GE(msgs.size(), 2);
 
-  // The first log line shouldn't have a suppression count.
-  EXPECT_THAT(msgs[0], testing::ContainsRegex("test$"));
-  // The second one should have suppressed at least three digits worth of log messages.
-  EXPECT_THAT(msgs[1], testing::ContainsRegex("\\[suppressed [0-9]{3,} similar messages\\]"));
-  msgs.clear();
+  for (const auto& m: msgs) {
+    // All the lines should contain the message logged.
+    ASSERT_THAT(m, testing::ContainsRegex("test$"));
+    // Since the special THROTTLE_MSG isn't used, there isn't any report on
+    // suppressed messages.
+    ASSERT_STR_NOT_CONTAINS(m, "suppressed");
+  }
+}
 
-  // Now, try logging using two different tags in rapid succession. This should not
-  // throttle, because the tag is switching.
-  KLOG_EVERY_N_SECS_THROTTLER(INFO, 1, throttle_a, "tag_b") << "test b" << THROTTLE_MSG;
-  KLOG_EVERY_N_SECS_THROTTLER(INFO, 1, throttle_a, "tag_b") << "test b" << THROTTLE_MSG;
-  KLOG_EVERY_N_SECS_THROTTLER(INFO, 1, throttle_a, "tag_c") << "test c" << THROTTLE_MSG;
-  KLOG_EVERY_N_SECS_THROTTLER(INFO, 1, throttle_a, "tag_b") << "test b" << THROTTLE_MSG;
-  ASSERT_EQ(msgs.size(), 3);
-  EXPECT_THAT(msgs[0], testing::ContainsRegex("test b$"));
-  EXPECT_THAT(msgs[1], testing::ContainsRegex("test c$"));
-  EXPECT_THAT(msgs[2], testing::ContainsRegex("test b$"));
+// Test the KLOG_EVERY_N_SECS(...) macro with slow-paced messages, making sure
+// no messages are lost or suppressed if they come staggered by more than
+// the suppression time interval.
+TEST(LoggingTest, ThrottledLoggingLowFrequency) {
+  SKIP_IF_SLOW_NOT_ALLOWED();
+
+  StringVectorSink sink;
+  ScopedRegisterSink srs(&sink);
+
+  for (int i = 0; i < 5; ++i) {
+    KLOG_EVERY_N_SECS(INFO, 1) << "test " << i << THROTTLE_MSG;
+    SleepFor(MonoDelta::FromMilliseconds(1050));
+  }
+
+  const auto& msgs = sink.logged_msgs();
+  // Expecting the exact number: nothing more is logged from anywhere,
+  // and all the logged messages should be sent to the sink without any
+  // suppression.
+  ASSERT_EQ(5, msgs.size());
+
+  for (const auto& m: msgs) {
+    EXPECT_THAT(m, testing::ContainsRegex("test [0-4]$"));
+    // No messages should be suppressed.
+    ASSERT_STR_NOT_CONTAINS(m, "suppressed");
+  }
+}
+
+// A test scenario for KLOG_EVERY_N_SECS() where a short burst of messages
+// is sent through.
+//
+// This scenario sends many messages separated from each other by an interval
+// a few orders of magnitude shorter than the suppression interval,
+// and all the messages are sent within a single suppression time interval.
+//
+// Only the very first message is logged, and nothing is reported on the rest
+// that were suppresed. The information on the suppressed messages is output
+// only when another log message arrives, and it may never arrive or arrive
+// a long time after the original message burst.
+TEST(LoggingTest, ThrottledLoggingShortBurst) {
+  SKIP_IF_SLOW_NOT_ALLOWED();
+
+  StringVectorSink sink;
+  ScopedRegisterSink srs(&sink);
+  for (int i = 0; i < 2000; ++i) {
+    KLOG_EVERY_N_SECS(INFO, 1) << "test " << i << THROTTLE_MSG;
+    SleepFor(MonoDelta::FromMicroseconds(10));
+  }
+  // Just in case, sleep for two suppression intervals.
+  SleepFor(MonoDelta::FromMilliseconds(2000));
+
+  const auto& msgs = sink.logged_msgs();
+  // Only the very first message in the burst is accounted for.
+  ASSERT_EQ(1, msgs.size());
+  ASSERT_THAT(msgs[0], testing::ContainsRegex("test 0$"));
+
+  for (const auto& m: msgs) {
+    // No information on thousands of suppressed messages yet.
+    ASSERT_STR_NOT_CONTAINS(m, "suppressed");
+  }
+}
+
+TEST(LoggingTest, LogThrottleDestructorReport) {
+  SKIP_IF_SLOW_NOT_ALLOWED();
+
+  StringVectorSink sink;
+  ScopedRegisterSink srs(&sink);
+
+  {
+    logging::LogThrottler throttler(5, "in test");
+
+    for (int i = 0; i < 100; ++i) {
+      KLOG_THROTTLER(INFO, throttler) << "test " << i << THROTTLE_MSG;
+    }
+    // Sleep for a second to check for the proper timings reported in the
+    // summary output by the LogThrottler's destructor.
+    SleepFor(MonoDelta::FromMilliseconds(1000));
+
+    const auto& msgs = sink.logged_msgs();
+    // Only the very first message in the burst is accounted for.
+    ASSERT_EQ(1, msgs.size());
+    ASSERT_THAT(msgs.front(), testing::ContainsRegex("test 0$"));
+
+    for (const auto& m: msgs) {
+      // No information on suppressed messages yet.
+      ASSERT_STR_NOT_CONTAINS(m, "suppressed");
+    }
+  }
+
+  // The throttler should report on the suppressed but not yet logged messages
+  // in the destructor. To avoid flakiness due to scheduling anomalies on busy
+  // test nodes, the expected timing is flexible to accommodate for several
+  // extra seconds between the first message logged and the time when the
+  // LogThrottler's destructor has run.
+  const auto& msgs = sink.logged_msgs();
+  ASSERT_EQ(2, msgs.size());
+  ASSERT_THAT(msgs.back(), testing::ContainsRegex(
+      "suppressed but not reported on 99 messages "
+      "since previous log \\~[1-9] seconds ago"));
 }
 
 // Test Logger implementation that just counts the number of messages
@@ -257,8 +348,7 @@ TEST(LoggingTest, TestLogTiming) {
 // in hot code paths.
 TEST(LoggingTest, TestVlogDoesNotEvaluateMessage) {
   if (VLOG_IS_ON(1)) {
-    LOG(INFO) << "Test skipped: verbose level is at least 1";
-    return;
+    GTEST_SKIP() << "Test skipped: verbose level is at least 1";
   }
 
   int numVlogs = 0;

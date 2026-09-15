@@ -23,7 +23,6 @@
 #include <glog/logging.h>
 #include <gtest/gtest_prod.h>
 
-#include "kudu/gutil/port.h"
 #include "kudu/security/cert.h"
 #include "kudu/util/openssl_util.h"
 #include "kudu/util/status.h"
@@ -72,7 +71,7 @@ class TlsHandshake {
 
    // Initialize the instance for the specified type of handshake
    // using the given SSL handle.
-   Status Init(c_unique_ptr<SSL> s) WARN_UNUSED_RESULT;
+   Status Init(c_unique_ptr<SSL> s);
 
   // Set the verification mode for this handshake. The default verification mode
   // is VERIFY_REMOTE_CERT_AND_HOST.
@@ -102,7 +101,7 @@ class TlsHandshake {
   // round of messages.
   //
   // Returns any other status code on error.
-  Status Continue(const std::string& recv, std::string* send) WARN_UNUSED_RESULT;
+  Status Continue(const std::string& recv, std::string* send);
 
   // Whether an extra step of negotiation is needed at this point given the
   // return status of a prior call to the Continue() method.
@@ -123,23 +122,23 @@ class TlsHandshake {
   // Finishes the handshake, wrapping the provided socket in the negotiated TLS
   // channel. This 'TlsHandshake' instance should not be used again after
   // calling this.
-  Status Finish(std::unique_ptr<Socket>* socket) WARN_UNUSED_RESULT;
+  Status Finish(std::unique_ptr<Socket>* socket);
 
   // Finish the handshake, using the provided socket to verify the remote peer,
   // but without wrapping the socket.
-  Status FinishNoWrap(const Socket& socket) WARN_UNUSED_RESULT;
+  Status FinishNoWrap(const Socket& socket);
 
   // Retrieve the local certificate. This will return an error status if there
   // is no local certificate.
   //
   // May only be called after 'Finish' or 'FinishNoWrap'.
-  Status GetLocalCert(Cert* cert) const WARN_UNUSED_RESULT;
+  Status GetLocalCert(Cert* cert) const;
 
   // Retrieve the remote peer's certificate. This will return an error status if
   // there is no remote certificate.
   //
   // May only be called after 'Finish' or 'FinishNoWrap'.
-  Status GetRemoteCert(Cert* cert) const WARN_UNUSED_RESULT;
+  Status GetRemoteCert(Cert* cert) const;
 
   // Retrieve the negotiated cipher suite. Only valid to call after the
   // handshake is complete and before 'Finish()'.
@@ -153,6 +152,10 @@ class TlsHandshake {
   // Only valid to call after the handshake is complete and before 'Finish()'.
   std::string GetCipherDescription() const;
 
+  // Retrieve whether the extended master secret extension was negotiated.
+  // Only valid to call after the handshake is complete and before 'Finish()'.
+  bool GetExtMS() const;
+
  private:
   FRIEND_TEST(TestTlsHandshake, HandshakeSequenceNoTLSv1dot3);
   FRIEND_TEST(TestTlsHandshake, HandshakeSequenceTLSv1dot3);
@@ -165,10 +168,10 @@ class TlsHandshake {
   }
 
   // Populates local_cert_ and remote_cert_.
-  Status GetCerts() WARN_UNUSED_RESULT;
+  Status GetCerts();
 
   // Verifies that the handshake is valid for the provided socket.
-  Status Verify(const Socket& socket) const WARN_UNUSED_RESULT;
+  Status Verify(const Socket& socket) const;
 
   // The type of TLS handshake this wrapper represents: client or server.
   const TlsHandshakeType type_;

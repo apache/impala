@@ -24,7 +24,7 @@
 #include <cstdint>
 #include <iostream>
 #include <limits>
-#include <set>
+#include <memory>
 
 #include <boost/container/vector.hpp>
 #include <gflags/gflags.h>
@@ -43,7 +43,7 @@ DEFINE_bool(rpc_max_message_size_enable_validation, true,
             "This is a test-only flag.");
 TAG_FLAG(rpc_max_message_size_enable_validation, unsafe);
 
-DEFINE_int64_hidden(rpc_max_message_size, (50 * 1024 * 1024),
+DEFINE_int64(rpc_max_message_size, (50 * 1024 * 1024),
              "The maximum size of a message that any RPC that the server will accept. "
              "Must be at least 1MB.");
 TAG_FLAG(rpc_max_message_size, advanced);
@@ -67,13 +67,14 @@ static bool ValidateMaxMessageSize(const char* flagname, int64_t value) {
 }
 DEFINE_validator(rpc_max_message_size, &ValidateMaxMessageSize);
 
-namespace kudu {
-namespace rpc {
 
 using std::ostringstream;
-using std::set;
 using std::string;
+using std::unique_ptr;
 using strings::Substitute;
+
+namespace kudu {
+namespace rpc {
 
 #define RETURN_ON_ERROR_OR_SOCKET_NOT_READY(status)               \
   do {                                                            \
@@ -99,7 +100,9 @@ InboundTransfer::InboundTransfer(faststring initial_buf)
   buf_.resize(std::max<size_t>(kMsgLengthPrefixLength, buf_.size()));
 }
 
-Status InboundTransfer::ReceiveBuffer(Socket* socket, faststring* extra_4) {
+Status InboundTransfer::ReceiveBuffer(Socket* socket,
+                                      faststring* extra_4,
+                                      const int64_t rpc_max_message_size) {
   static constexpr int kExtraReadLength = kMsgLengthPrefixLength;
   if (total_length_ == 0) {
     // We haven't yet parsed the message length. It's possible that the
@@ -127,10 +130,10 @@ Status InboundTransfer::ReceiveBuffer(Socket* socket, faststring* extra_4) {
     // The length prefix doesn't include its own 4 bytes, so we have to
     // add that back in.
     total_length_ = NetworkByteOrder::Load32(&buf_[0]) + kMsgLengthPrefixLength;
-    if (PREDICT_FALSE(total_length_ > FLAGS_rpc_max_message_size)) {
+    if (PREDICT_FALSE(total_length_ > rpc_max_message_size)) {
       return Status::NetworkError(Substitute(
-          "RPC frame had a length of $0, but we only support messages up to $1 bytes "
-          "long.", total_length_, FLAGS_rpc_max_message_size));
+          "RPC frame had a length of $0, but we only support messages up to $1 bytes long.",
+          total_length_, rpc_max_message_size));
     }
     if (PREDICT_FALSE(total_length_ <= kMsgLengthPrefixLength)) {
       return Status::NetworkError(
@@ -182,24 +185,28 @@ string InboundTransfer::StatusAsString() const {
   return Substitute("$0/$1 bytes received", cur_offset_, total_length_);
 }
 
-OutboundTransfer* OutboundTransfer::CreateForCallRequest(int32_t call_id,
-                                                         TransferPayload payload,
-                                                         TransferCallbacks* callbacks) {
-  return new OutboundTransfer(call_id, std::move(payload), callbacks);
+unique_ptr<OutboundTransfer> OutboundTransfer::CreateForCallRequest(
+    int32_t call_id,
+    TransferPayload payload,
+    unique_ptr<TransferCallbacks> callbacks) {
+  return unique_ptr<OutboundTransfer>(new OutboundTransfer(
+      call_id, std::move(payload), std::move(callbacks)));
 }
 
-OutboundTransfer* OutboundTransfer::CreateForCallResponse(TransferPayload payload,
-                                                          TransferCallbacks* callbacks) {
-  return new OutboundTransfer(kInvalidCallId, std::move(payload), callbacks);
+unique_ptr<OutboundTransfer> OutboundTransfer::CreateForCallResponse(
+    TransferPayload payload,
+    unique_ptr<TransferCallbacks> callbacks) {
+  return unique_ptr<OutboundTransfer>(new OutboundTransfer(
+      kInvalidCallId, std::move(payload), std::move(callbacks)));
 }
 
 OutboundTransfer::OutboundTransfer(int32_t call_id,
                                    TransferPayload payload,
-                                   TransferCallbacks* callbacks)
+                                   unique_ptr<TransferCallbacks> callbacks)
     : payload_slices_(std::move(payload)),
       cur_slice_idx_(0),
       cur_offset_in_slice_(0),
-      callbacks_(callbacks),
+      callbacks_(std::move(callbacks)),
       call_id_(call_id),
       started_(false),
       aborted_(false) {
@@ -289,14 +296,6 @@ string OutboundTransfer::HexDump() const {
   string ret;
   for (const auto& s : payload_slices_) {
     ret.append(s.ToDebugString());
-  }
-  return ret;
-}
-
-size_t OutboundTransfer::TotalLength() const {
-  size_t ret = 0;
-  for (const auto& s : payload_slices_) {
-    ret += s.size();
   }
   return ret;
 }

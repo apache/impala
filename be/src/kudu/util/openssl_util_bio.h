@@ -33,7 +33,8 @@ namespace security {
 
 
 template<typename TYPE, typename Traits = SslTypeTraits<TYPE>>
-Status ToBIO(BIO* bio, DataFormat format, TYPE* obj) {
+Status ToBIO(BIO* bio, DataFormat format, TYPE* obj,
+    const PasswordCallback& /*cb*/ = PasswordCallback()) {
   CHECK(bio);
   CHECK(obj);
   switch (format) {
@@ -54,7 +55,12 @@ Status ToBIO(BIO* bio, DataFormat format, TYPE* obj) {
 // a password protected private key.
 inline int TLSPasswordCB(char* buf, int size, int /* rwflag */, void* userdata) {
   const auto* cb = reinterpret_cast<const PasswordCallback*>(userdata);
-  std::string pw = (*cb)();
+  std::string pw;
+  Status s = (*cb)(&pw);
+  if (!s.ok()) {
+    LOG(ERROR) << "Failed to obtain password: " << s.ToString();
+    return -1;
+  }
   if (pw.size() >= size) {
     LOG(ERROR) << "Provided key password is longer than maximum length "
                << size;
@@ -85,7 +91,8 @@ Status FromBIO(BIO* bio, DataFormat format, c_unique_ptr<TYPE>* ret,
 
 template<typename Type, typename Traits = SslTypeTraits<Type>>
 Status FromString(const std::string& data, DataFormat format,
-                  c_unique_ptr<Type>* ret) {
+                  c_unique_ptr<Type>* ret,
+                  const PasswordCallback& cb = PasswordCallback()) {
   const void* mdata = reinterpret_cast<const void*>(data.data());
   auto bio = ssl_make_unique(BIO_new_mem_buf(
 #if OPENSSL_VERSION_NUMBER < 0x10002000L
@@ -94,19 +101,20 @@ Status FromString(const std::string& data, DataFormat format,
       mdata,
 #endif
       data.size()));
-  RETURN_NOT_OK_PREPEND((FromBIO<Type, Traits>(bio.get(), format, ret)),
-                        "unable to load data from memory");
   OPENSSL_RET_IF_NULL(bio, "could not create memory BIO");
+  RETURN_NOT_OK_PREPEND((FromBIO<Type, Traits>(bio.get(), format, ret, cb)),
+                        "unable to load data from memory");
   return Status::OK();
 }
 
 template<typename Type, typename Traits = SslTypeTraits<Type>>
-Status ToString(std::string* data, DataFormat format, Type* obj) {
+Status ToString(std::string* data, DataFormat format, Type* obj,
+                const PasswordCallback& cb = PasswordCallback()) {
   CHECK(data);
   auto bio = ssl_make_unique(BIO_new(BIO_s_mem()));
-  RETURN_NOT_OK_PREPEND((ToBIO<Type, Traits>(bio.get(), format, obj)),
-                        "error serializing data");
   OPENSSL_RET_IF_NULL(bio, "could not create memory BIO");
+  RETURN_NOT_OK_PREPEND((ToBIO<Type, Traits>(bio.get(), format, obj, cb)),
+                        "error serializing data");
   BUF_MEM* membuf;
   OPENSSL_CHECK_OK(BIO_get_mem_ptr(bio.get(), &membuf));
   data->assign(membuf->data, membuf->length);

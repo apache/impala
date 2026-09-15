@@ -17,21 +17,31 @@
 
 #include "kudu/rpc/service_queue.h"
 
+#include <algorithm>
 #include <mutex>
-#include <optional>
 #include <ostream>
 
 #include "kudu/gutil/port.h"
 
+using std::lock_guard;
+using std::pop_heap;
+using std::push_heap;
+using std::string;
+using std::unique_lock;
+using std::unique_ptr;
+
 namespace kudu {
 namespace rpc {
 
-__thread LifoServiceQueue::ConsumerState* LifoServiceQueue::tl_consumer_ = nullptr;
+thread_local LifoServiceQueue::ConsumerState* LifoServiceQueue::tl_consumer_ = nullptr;
 
-LifoServiceQueue::LifoServiceQueue(int max_size)
-   : shutdown_(false),
-     max_queue_size_(max_size) {
-  CHECK_GT(max_queue_size_, 0);
+LifoServiceQueue::LifoServiceQueue(size_t max_size)
+    : max_queue_size_(max_size),
+      shutdown_(false) {
+  DCHECK_GT(max_queue_size_, 0);
+  // Reserving all the required memory upfront, no re-allocations are necessary
+  // during the lifecycle of the instance of this class.
+  queue_.reserve(max_queue_size_);
 }
 
 LifoServiceQueue::~LifoServiceQueue() {
@@ -39,27 +49,29 @@ LifoServiceQueue::~LifoServiceQueue() {
       << "ServiceQueue holds bare pointers at destruction time";
 }
 
-bool LifoServiceQueue::BlockingGet(std::unique_ptr<InboundCall>* out) {
-  auto consumer = tl_consumer_;
+bool LifoServiceQueue::BlockingGet(unique_ptr<InboundCall>* out) {
+  auto* consumer = tl_consumer_;
   if (PREDICT_FALSE(!consumer)) {
     consumer = tl_consumer_ = new ConsumerState(this);
-    std::lock_guard<simple_spinlock> l(lock_);
+    lock_guard l(lock_);
     consumers_.emplace_back(consumer);
   }
 
   while (true) {
     {
-      std::lock_guard<simple_spinlock> l(lock_);
+      lock_guard l(lock_);
       if (!queue_.empty()) {
-        auto it = queue_.begin();
-        out->reset(*it);
-        queue_.erase(it);
+        out->reset(queue_.front());
+        pop_heap(queue_.begin(), queue_.end(), kMinHeapCompare);
+        queue_.pop_back();
         return true;
       }
       if (PREDICT_FALSE(shutdown_)) {
         return false;
       }
+#if DCHECK_IS_ON()
       consumer->DCheckBoundInstance(this);
+#endif
       waiting_consumers_.push_back(consumer);
     }
     InboundCall* call = consumer->Wait();
@@ -72,45 +84,57 @@ bool LifoServiceQueue::BlockingGet(std::unique_ptr<InboundCall>* out) {
   }
 }
 
-QueueStatus LifoServiceQueue::Put(InboundCall* call,
-                                  std::optional<InboundCall*>* evicted) {
-  std::unique_lock<simple_spinlock> l(lock_);
+QueueStatus LifoServiceQueue::Put(InboundCall* call, InboundCall** evicted) {
+  unique_lock l(lock_);
   if (PREDICT_FALSE(shutdown_)) {
     return QUEUE_SHUTDOWN;
   }
 
-  DCHECK(!(waiting_consumers_.size() > 0 && queue_.size() > 0));
+  DCHECK(waiting_consumers_.empty() || queue_.empty());
 
   // fast path
-  if (queue_.empty() && waiting_consumers_.size() > 0) {
-    auto consumer = waiting_consumers_[waiting_consumers_.size() - 1];
+  if (queue_.empty() && !waiting_consumers_.empty()) {
+    auto* consumer = waiting_consumers_.back();
     waiting_consumers_.pop_back();
-    // Notify condition var(and wake up consumer thread) takes time,
+    // Notifying the condition and waking up the consumer thread takes time,
     // so put it out of spinlock scope.
     l.unlock();
     consumer->Post(call);
     return QUEUE_SUCCESS;
   }
 
-  if (PREDICT_FALSE(queue_.size() >= max_queue_size_)) {
-    // eviction
-    DCHECK_EQ(queue_.size(), max_queue_size_);
-    auto it = queue_.end();
-    --it;
-    if (DeadlineLess(*it, call)) {
-      return QUEUE_FULL;
-    }
+  if  (queue_.size() < max_queue_size_) {
+    queue_.push_back(call);
+    push_heap(queue_.begin(), queue_.end(), kMinHeapCompare);
+    return QUEUE_SUCCESS;
+  }
+  DCHECK_EQ(queue_.size(), max_queue_size_);
 
-    *evicted = *it;
-    queue_.erase(it);
+  // If the deadline of the new call is not earlier than the deadline of the
+  // call in the very end of the array backing the min heap, reject it with
+  // QUEUE_FULL status.
+  auto* back = queue_.back();
+  if (!DeadlineGreater(back, call)) {
+    return QUEUE_FULL;
   }
 
-  queue_.insert(call);
+  // Otherwise, replace the call in the very end of the container with the new
+  // one. The replaced call isn't guaranteed to be have the latest deadline
+  // among all the elements in the queue because it's a binary heap,
+  // not a sorted sequence. However, usually it's the latest one because most
+  // of the times the elements are added into the queue timestamped by their
+  // arrival time, and it increases monotonically. Removing the last element
+  // of the array representing a binary heap leaves the rest of the array still
+  // a binary heap, of one element smaller size, but with all the invariants
+  // of a binary heap preserved.
+  *evicted = back;
+  queue_.back() = call;
+  push_heap(queue_.begin(), queue_.end(), kMinHeapCompare);
   return QUEUE_SUCCESS;
 }
 
 void LifoServiceQueue::Shutdown() {
-  std::lock_guard<simple_spinlock> l(lock_);
+  lock_guard l(lock_);
   shutdown_ = true;
 
   // Post a nullptr to wake up any consumers which are waiting.
@@ -120,23 +144,20 @@ void LifoServiceQueue::Shutdown() {
   waiting_consumers_.clear();
 }
 
-bool LifoServiceQueue::empty() const {
-  std::lock_guard<simple_spinlock> l(lock_);
-  return queue_.empty();
-}
+string LifoServiceQueue::ToString() const {
+  string ret;
 
-int LifoServiceQueue::max_size() const {
-  return max_queue_size_;
-}
-
-std::string LifoServiceQueue::ToString() const {
-  std::string ret;
-
-  std::lock_guard<simple_spinlock> l(lock_);
-  for (const auto* t : queue_) {
-    ret.append(t->ToString());
-    ret.append("\n");
+  // It's necessary to take a lock while accessing InboundCall pointers
+  // in the queue. There isn't a guarantee the underlying memory stays valid
+  // and not freed otherwise.
+  lock_guard l(lock_);
+  decltype(queue_) tmp(queue_);
+  while (!tmp.empty()) {
+    ret += tmp.front()->ToString() + "\n";
+    pop_heap(tmp.begin(), tmp.end(), kMinHeapCompare);
+    tmp.pop_back();
   }
+
   return ret;
 }
 

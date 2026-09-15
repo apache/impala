@@ -18,7 +18,8 @@
 #include "kudu/util/jsonwriter.h"
 
 #include <new>
-#include <sstream>
+#include <ostream>  // IWYU pragma: keep
+#include <sstream>  // IWYU pragma: keep
 #include <string>
 #include <vector>
 
@@ -30,9 +31,9 @@
 // IWYU pragma: no_include <rapidjson/internal/../rapidjson.h>
 #include <rapidjson/prettywriter.h>
 #include <rapidjson/rapidjson.h>  // IWYU pragma: keep
+#include <rapidjson/stream.h>
 #include <rapidjson/writer.h>
 
-#include "kudu/gutil/port.h"
 #include "kudu/util/faststring.h"
 #include "kudu/util/logging.h"
 #include "kudu/util/pb_util.pb.h"
@@ -40,19 +41,18 @@
 using google::protobuf::FieldDescriptor;
 using google::protobuf::Message;
 using google::protobuf::Reflection;
-
+using std::ostream;
 using std::ostringstream;
 using std::string;
 using std::vector;
 
 namespace kudu {
 
-// Adapter to allow RapidJSON to write directly to a stringstream.
-// Since Squeasel exposes a stringstream as its interface, this is needed to avoid overcopying.
+// Adapter to allow RapidJSON to write directly to std::ostream.
 class UTF8StringStreamBuffer {
  public:
   typedef typename rapidjson::UTF8<>::Ch Ch;
-  explicit UTF8StringStreamBuffer(std::ostringstream* out);
+  explicit UTF8StringStreamBuffer(ostream* out);
   ~UTF8StringStreamBuffer();
 
   void Put(Ch c);
@@ -60,7 +60,7 @@ class UTF8StringStreamBuffer {
 
  private:
   faststring buf_;
-  std::ostringstream* out_;
+  ostream* out_;
 };
 
 // rapidjson doesn't provide any common interface between the PrettyWriter and
@@ -69,6 +69,8 @@ class UTF8StringStreamBuffer {
 // correspond to this subclass.
 class JsonWriterIf {
  public:
+  virtual ~JsonWriterIf() = default;
+
   virtual void Null() = 0;
   virtual void Bool(bool b) = 0;
   virtual void Int(int i) = 0;
@@ -78,14 +80,12 @@ class JsonWriterIf {
   virtual void Double(double d) = 0;
   virtual void String(const char* str, size_t length) = 0;
   virtual void String(const char* str) = 0;
-  virtual void String(const std::string& str) = 0;
+  virtual void String(const string& str) = 0;
 
   virtual void StartObject() = 0;
   virtual void EndObject() = 0;
   virtual void StartArray() = 0;
   virtual void EndArray() = 0;
-
-  virtual ~JsonWriterIf() {}
 };
 
 // Adapts the different rapidjson Writer implementations to our virtual
@@ -93,23 +93,23 @@ class JsonWriterIf {
 template<class T>
 class JsonWriterImpl : public JsonWriterIf {
  public:
-  explicit JsonWriterImpl(ostringstream* out);
+  explicit JsonWriterImpl(ostream* out);
 
-  virtual void Null() OVERRIDE;
-  virtual void Bool(bool b) OVERRIDE;
-  virtual void Int(int i) OVERRIDE;
-  virtual void Uint(unsigned u) OVERRIDE;
-  virtual void Int64(int64_t i64) OVERRIDE;
-  virtual void Uint64(uint64_t u64) OVERRIDE;
-  virtual void Double(double d) OVERRIDE;
-  virtual void String(const char* str, size_t length) OVERRIDE;
-  virtual void String(const char* str) OVERRIDE;
-  virtual void String(const std::string& str) OVERRIDE;
+  void Null() override;
+  void Bool(bool b) override;
+  void Int(int i) override;
+  void Uint(unsigned u) override;
+  void Int64(int64_t i64) override;
+  void Uint64(uint64_t u64) override;
+  void Double(double d) override;
+  void String(const char* str, size_t length) override;
+  void String(const char* str) override;
+  void String(const string& str) override;
 
-  virtual void StartObject() OVERRIDE;
-  virtual void EndObject() OVERRIDE;
-  virtual void StartArray() OVERRIDE;
-  virtual void EndArray() OVERRIDE;
+  void StartObject() override;
+  void EndObject() override;
+  void StartArray() override;
+  void EndArray() override;
 
  private:
   UTF8StringStreamBuffer stream_;
@@ -124,7 +124,7 @@ class JsonWriterImpl : public JsonWriterIf {
 typedef rapidjson::PrettyWriter<UTF8StringStreamBuffer> PrettyWriterClass;
 typedef rapidjson::Writer<UTF8StringStreamBuffer> CompactWriterClass;
 
-JsonWriter::JsonWriter(ostringstream* out, Mode m) {
+JsonWriter::JsonWriter(ostream* out, Mode m) {
   switch (m) {
     case PRETTY:
       impl_.reset(new JsonWriterImpl<PrettyWriterClass>(DCHECK_NOTNULL(out)));
@@ -292,7 +292,7 @@ string JsonWriter::ToJson(const Message& pb, Mode mode) {
 // UTF8StringStreamBuffer
 //
 
-UTF8StringStreamBuffer::UTF8StringStreamBuffer(std::ostringstream* out)
+UTF8StringStreamBuffer::UTF8StringStreamBuffer(ostream* out)
   : out_(DCHECK_NOTNULL(out)) {
 }
 UTF8StringStreamBuffer::~UTF8StringStreamBuffer() {
@@ -313,7 +313,7 @@ void UTF8StringStreamBuffer::Flush() {
 //
 
 template<class T>
-JsonWriterImpl<T>::JsonWriterImpl(ostringstream* out)
+JsonWriterImpl<T>::JsonWriterImpl(ostream* out)
   : stream_(DCHECK_NOTNULL(out)),
     writer_(stream_) {
 }

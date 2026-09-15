@@ -16,7 +16,6 @@
 // under the License.
 #pragma once
 
-#include <cstddef>
 #include <cstdint>
 #include <limits>
 #include <memory>
@@ -37,6 +36,7 @@
 #include "kudu/rpc/rpc_controller.h"
 #include "kudu/rpc/rpc_header.pb.h"
 #include "kudu/rpc/transfer.h"
+#include "kudu/util/hdr_histogram.h"
 #include "kudu/util/monotime.h"
 #include "kudu/util/net/sockaddr.h"
 #include "kudu/util/net/socket.h"
@@ -53,8 +53,6 @@ class OutboundCall;
 class ReactorThread;
 class RpcConnectionPB;
 class RpczStore;
-class SocketStatsPB;
-class TransportDetailsPB;
 
 enum class CredentialsPolicy;
 
@@ -84,16 +82,20 @@ class Connection : public RefCountedThreadSafe<Connection> {
     SERVER
   };
 
+  static constexpr const uint64_t kLatencyHistogramMaxValue = 5000000;
+  static constexpr const int kLatencyHistogramPrecisionDigits = 1;
+
   // Create a new Connection.
   // reactor_thread: the reactor that owns us.
   // remote: the address of the remote end
   // socket: the socket to take ownership of.
   // direction: whether we are the client or server side
-  Connection(ReactorThread *reactor_thread,
-             Sockaddr remote,
+  Connection(ReactorThread* reactor_thread,
+             const Sockaddr& remote,
              std::unique_ptr<Socket> socket,
              Direction direction,
-             CredentialsPolicy policy = CredentialsPolicy::ANY_CREDENTIALS);
+             CredentialsPolicy policy = CredentialsPolicy::ANY_CREDENTIALS,
+             bool collect_io_handler_latency_stats = false);
 
   // Set underlying socket to non-blocking (or blocking) mode.
   Status SetNonBlocking(bool enabled);
@@ -138,7 +140,7 @@ class Connection : public RefCountedThreadSafe<Connection> {
 
   // Cancel an outbound call by removing any reference to it by CallAwaitingResponse
   // in 'awaiting_responses_'.
-  void CancelOutboundCall(const std::shared_ptr<OutboundCall> &call);
+  void CancelOutboundCall(const std::shared_ptr<OutboundCall>& call);
 
   // The address of the remote end of the connection.
   const Sockaddr& remote() const { return remote_; }
@@ -184,10 +186,10 @@ class Connection : public RefCountedThreadSafe<Connection> {
   RpczStore* rpcz_store();
 
   // libev callback when data is available to read.
-  void ReadHandler(ev::io &watcher, int revents);
+  void ReadHandler(ev::io& watcher, int revents); // NOLINT(google-runtime-references)
 
   // libev callback when we may write to the socket.
-  void WriteHandler(ev::io &watcher, int revents);
+  void WriteHandler(ev::io& watcher, int revents);// NOLINT(google-runtime-references)
 
   enum ProcessOutboundTransfersResult {
     // All of the transfers in the queue have been sent successfully.
@@ -217,14 +219,14 @@ class Connection : public RefCountedThreadSafe<Connection> {
   Socket* socket() { return socket_.get(); }
 
   // Go through the process of transferring control of the underlying socket back to the Reactor.
-  void CompleteNegotiation(Status negotiation_status,
+  void CompleteNegotiation(const Status& negotiation_status,
                            std::unique_ptr<ErrorStatusPB> rpc_error);
 
   // Indicate that negotiation is complete and that the Reactor is now in control of the socket.
   void MarkNegotiationComplete();
 
   Status DumpPB(const DumpConnectionsRequestPB& req,
-                RpcConnectionPB* resp);
+                RpcConnectionPB* resp) const;
 
   ReactorThread* reactor_thread() const { return reactor_thread_; }
 
@@ -263,13 +265,8 @@ class Connection : public RefCountedThreadSafe<Connection> {
     scheduled_for_shutdown_ = true;
   }
 
-  size_t num_queued_outbound_transfers() const {
-    return outbound_transfers_.size();
-  }
-
  private:
   friend struct CallAwaitingResponse;
-  friend class QueueTransferTask;
   friend struct CallTransferCallbacks;
   friend struct ResponseTransferCallbacks;
 
@@ -279,9 +276,9 @@ class Connection : public RefCountedThreadSafe<Connection> {
     ~CallAwaitingResponse();
 
     // Notification from libev that the call has timed out.
-    void HandleTimeout(ev::timer &watcher, int revents);
+    void HandleTimeout(ev::timer& watcher, int revents);  // NOLINT(google-runtime-references)
 
-    Connection *conn;
+    Connection* conn;
     std::shared_ptr<OutboundCall> call;
     ev::timer timeout_timer;
 
@@ -312,7 +309,7 @@ class Connection : public RefCountedThreadSafe<Connection> {
 
   // The given CallAwaitingResponse has elapsed its user-defined timeout.
   // Set it to Failed.
-  void HandleOutboundCallTimeout(CallAwaitingResponse *car);
+  void HandleOutboundCallTimeout(CallAwaitingResponse* car);
 
   // Queue a transfer for sending on this connection.
   // We will take ownership of the transfer.
@@ -321,11 +318,7 @@ class Connection : public RefCountedThreadSafe<Connection> {
 
   // Internal test function for injecting cancellation request when 'call'
   // reaches state specified in 'FLAGS_rpc_inject_cancellation_state'.
-  void MaybeInjectCancellation(const std::shared_ptr<OutboundCall> &call);
-
-  Status GetSocketStatsPB(SocketStatsPB* pb) const;
-
-  Status GetTransportDetailsPB(TransportDetailsPB* pb) const;
+  void MaybeInjectCancellation(const std::shared_ptr<OutboundCall>& call);
 
   // The reactor thread that created this connection.
   ReactorThread* const reactor_thread_;
@@ -344,7 +337,7 @@ class Connection : public RefCountedThreadSafe<Connection> {
   RemoteUser remote_user_;
 
   // whether we are client or server
-  Direction direction_;
+  const Direction direction_;
 
   // The last time we read or wrote from the socket.
   MonoTime last_activity_time_;
@@ -402,6 +395,13 @@ class Connection : public RefCountedThreadSafe<Connection> {
   //   at the time of negotiation, the primary credentials were used,making the
   //   connection satisfying the PRIMARY_CREDENTIALS policy de facto.
   const CredentialsPolicy credentials_policy_;
+
+  // Whether to collect statistics on I/O handler invocation latency.
+  const bool collect_io_handler_latency_stats_;
+
+  // I/O handler latency metrics for this particular connection.
+  HdrHistogram rd_latency_histogram_;
+  HdrHistogram wr_latency_histogram_;
 
   // Whether we completed connection negotiation.
   bool negotiation_complete_;

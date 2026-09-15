@@ -17,6 +17,7 @@
 
 #include "kudu/util/metrics.h"
 
+#include <array>
 #include <cstdint>
 #include <functional>
 #include <map>
@@ -28,7 +29,7 @@
 #include <utility>
 #include <vector>
 
-#include <gflags/gflags_declare.h>
+#include <gflags/gflags.h>
 #include <glog/logging.h>
 #include <gtest/gtest.h>
 #include <rapidjson/document.h>
@@ -36,6 +37,8 @@
 #include "kudu/gutil/casts.h"
 #include "kudu/gutil/map-util.h"
 #include "kudu/gutil/ref_counted.h"
+#include "kudu/gutil/strings/split.h"
+#include "kudu/gutil/strings/util.h"
 #include "kudu/util/hdr_histogram.h"
 #include "kudu/util/jsonreader.h"
 #include "kudu/util/jsonwriter.h"
@@ -47,6 +50,7 @@
 #include "kudu/util/test_macros.h"
 #include "kudu/util/test_util.h"
 
+using std::array;
 using std::ostringstream;
 using std::string;
 using std::unordered_map;
@@ -54,12 +58,50 @@ using std::unordered_set;
 using std::vector;
 
 DECLARE_int32(metrics_retirement_age_ms);
-
-DECLARE_string(metrics_default_level);
+DECLARE_bool(metrics_prometheus_use_entity_labels);
+DECLARE_bool(metrics_prometheus_export_hostname);
+DECLARE_string(metrics_prometheus_default_merge_rules);
+DECLARE_string(metrics_prometheus_default_quantiles);
+DECLARE_string(metrics_prometheus_default_metrics);
 
 namespace kudu {
 
+namespace {
+// Collect the selected quantile tags (skipping the unused nullptr slots) into a
+// vector of strings, so that a selection can be compared by content in tests.
+vector<string> SelectedQuantileTags(const HistogramQuantiles& quantiles) {
+  vector<string> tags;
+  for (const char* tag : quantiles) {
+    if (tag != nullptr) {
+      tags.emplace_back(tag);
+    }
+  }
+  return tags;
+}
+} // anonymous namespace
+
 METRIC_DEFINE_entity(test_entity);
+
+METRIC_DEFINE_entity(tablet);
+METRIC_DEFINE_counter(tablet, tablet_test_counter,
+                      "Tablet-wise test counter label",
+                      kudu::MetricUnit::kBytes,
+                      "Tablet-wise test counter description.",
+                      kudu::MetricLevel::kDebug);
+
+METRIC_DEFINE_entity(table);
+METRIC_DEFINE_counter(table, table_test_counter,
+                      "Table-wise test counter label",
+                      kudu::MetricUnit::kBytes,
+                      "Table-wise test counter description.",
+                      kudu::MetricLevel::kDebug);
+
+METRIC_DEFINE_counter(server, server_test_counter,
+                      "Server-wise test counter label",
+                      kudu::MetricUnit::kBytes,
+                      "Server-wise test counter description.",
+                      kudu::MetricLevel::kDebug);
+
 
 class MetricsTest : public KuduTest {
  public:
@@ -133,12 +175,455 @@ TEST_F(MetricsTest, ResetCounter) {
   ASSERT_EQ(0, c->value());
 }
 
+TEST_F(MetricsTest, TableAndTabletPrometheusTest) {
+  google::FlagSaver saver;
+  FLAGS_metrics_prometheus_use_entity_labels = true;
+
+  // Use a dedicated registry so only tablet/table entities are present.
+  MetricRegistry registry;
+
+  // Simulate two tablets in the metric registry. Write out their metric data.
+  auto tablet_metric_entity = METRIC_ENTITY_tablet.Instantiate(&registry, "000000");
+  auto tablet_counter = METRIC_tablet_test_counter.Instantiate(tablet_metric_entity);
+  tablet_counter->IncrementBy(11);
+
+  auto tablet_metric_entity2 = METRIC_ENTITY_tablet.Instantiate(&registry, "1111111111");
+  auto tablet_counter2 = METRIC_tablet_test_counter.Instantiate(tablet_metric_entity2);
+  tablet_counter2->IncrementBy(2);
+
+  auto table_metric_entity = METRIC_ENTITY_table.Instantiate(&registry, "table1");
+  auto table1_counter = METRIC_table_test_counter.Instantiate(table_metric_entity);
+  table1_counter->IncrementBy(888);
+
+  auto table_metric_entity2 = METRIC_ENTITY_table.Instantiate(&registry, "table2");
+  auto table2_counter = METRIC_table_test_counter.Instantiate(table_metric_entity2);
+  table2_counter->Increment();
+
+  auto table_metric_entity3 = METRIC_ENTITY_table.Instantiate(
+      &registry, "55555555555555555555555555555555");
+  auto table3_counter = METRIC_table_test_counter.Instantiate(table_metric_entity3);
+  table3_counter->IncrementBy(5);
+
+  ostringstream output;
+  PrometheusWriter writer(&output);
+  ASSERT_OK(registry.WriteAsPrometheus(&writer, {}));
+
+  // The order of elements in the output depends on the ordering in hash-map
+  // of metric entities and might be different in different STL implementations.
+  const auto& out = output.str();
+  // With labels, the metric name no longer includes the entity ID.
+  // HELP/TYPE is emitted once per metric name (deduped).
+  ASSERT_STR_CONTAINS(out,
+      "# HELP kudu_tablet_test_counter Tablet-wise test counter description.\n"
+      "# TYPE kudu_tablet_test_counter counter\n"
+  );
+  ASSERT_STR_CONTAINS(out,
+      "kudu_tablet_test_counter{type=\"tablet\",id=\"000000\",unit_type=\"bytes\"} 11\n"
+  );
+  ASSERT_STR_CONTAINS(out,
+      "kudu_tablet_test_counter{type=\"tablet\",id=\"1111111111\",unit_type=\"bytes\"} 2\n"
+  );
+  ASSERT_STR_CONTAINS(out,
+      "# HELP kudu_table_test_counter Table-wise test counter description.\n"
+      "# TYPE kudu_table_test_counter counter\n"
+  );
+  ASSERT_STR_CONTAINS(out,
+      "kudu_table_test_counter{type=\"table\",id=\"table1\",unit_type=\"bytes\"} 888\n"
+  );
+  ASSERT_STR_CONTAINS(out,
+      "kudu_table_test_counter{type=\"table\",id=\"table2\",unit_type=\"bytes\"} 1\n"
+  );
+  ASSERT_STR_CONTAINS(out,
+      "kudu_table_test_counter{type=\"table\","
+          "id=\"55555555555555555555555555555555\",unit_type=\"bytes\"} 5\n"
+  );
+
+  // Verify that HELP/TYPE lines are emitted exactly once per metric name.
+  ASSERT_EQ(1, CountSubstring(out, "# HELP kudu_tablet_test_counter "));
+  ASSERT_EQ(1, CountSubstring(out, "# TYPE kudu_tablet_test_counter "));
+  ASSERT_EQ(1, CountSubstring(out, "# HELP kudu_table_test_counter "));
+  ASSERT_EQ(1, CountSubstring(out, "# TYPE kudu_table_test_counter "));
+
+  // 2 HELP/TYPE blocks (tablet + table) + 2 tablet values + 3 table values + trailing empty line.
+  const vector<string> lines = strings::Split(out, "\n");
+  ASSERT_EQ(2 + 2 + 2 + 3 + 1, lines.size());
+  ASSERT_TRUE(lines.back().empty());
+}
+
+TEST_F(MetricsTest, TableAndTabletLegacyPrometheusTest) {
+  google::FlagSaver saver;
+  // Verify the legacy format (flag off): entity IDs embedded in metric names.
+  FLAGS_metrics_prometheus_use_entity_labels = false;
+
+  // Use a dedicated registry so only tablet/table entities are present.
+  MetricRegistry registry;
+
+  auto tablet_entity = METRIC_ENTITY_tablet.Instantiate(&registry, "000000");
+  auto tablet_counter = METRIC_tablet_test_counter.Instantiate(tablet_entity);
+  tablet_counter->IncrementBy(11);
+
+  auto table_entity = METRIC_ENTITY_table.Instantiate(&registry, "table1");
+  auto table_counter = METRIC_table_test_counter.Instantiate(table_entity);
+  table_counter->IncrementBy(888);
+
+  ostringstream output;
+  PrometheusWriter writer(&output);
+  ASSERT_OK(registry.WriteAsPrometheus(&writer, {}));
+
+  const auto& out = output.str();
+  // Legacy format: entity ID is embedded in the metric name prefix.
+  ASSERT_STR_CONTAINS(out,
+      "# HELP kudu_tablet_000000_tablet_test_counter "
+      "Tablet-wise test counter description.\n"
+      "# TYPE kudu_tablet_000000_tablet_test_counter counter\n"
+      "kudu_tablet_000000_tablet_test_counter{unit_type=\"bytes\"} 11\n"
+  );
+  ASSERT_STR_CONTAINS(out,
+      "# HELP kudu_table_table1_table_test_counter "
+      "Table-wise test counter description.\n"
+      "# TYPE kudu_table_table1_table_test_counter counter\n"
+      "kudu_table_table1_table_test_counter{unit_type=\"bytes\"} 888\n"
+  );
+}
+
+// Merge several tablet entities into table-level entities in the Prometheus
+// output, mimicking the collector's 'merge_rules=tablet|table|table_name'.
+// Counter values are summed per table and the per-tablet time series collapse
+// into a single per-table series, which is the key cardinality win.
+TEST_F(MetricsTest, MergedTabletPrometheusTest) {
+  MetricRegistry registry;
+
+  auto tablet1 = METRIC_ENTITY_tablet.Instantiate(&registry, "tablet-1");
+  tablet1->SetAttribute("table_name", "table_a");
+  METRIC_tablet_test_counter.Instantiate(tablet1)->IncrementBy(11);
+
+  auto tablet2 = METRIC_ENTITY_tablet.Instantiate(&registry, "tablet-2");
+  tablet2->SetAttribute("table_name", "table_a");
+  METRIC_tablet_test_counter.Instantiate(tablet2)->IncrementBy(4);
+
+  auto tablet3 = METRIC_ENTITY_tablet.Instantiate(&registry, "tablet-3");
+  tablet3->SetAttribute("table_name", "table_b");
+  METRIC_tablet_test_counter.Instantiate(tablet3)->IncrementBy(100);
+
+  MetricPrometheusOptions opts;
+  opts.merge_rules.emplace("tablet", MergeAttributes("table", "table_name"));
+
+  ostringstream output;
+  PrometheusWriter writer(&output);
+  ASSERT_OK(registry.WriteAsPrometheus(&writer, opts));
+
+  const auto& out = output.str();
+  // HELP/TYPE is emitted exactly once even though several entities are merged.
+  ASSERT_EQ(1, CountSubstring(out, "# HELP kudu_tablet_test_counter "));
+  ASSERT_EQ(1, CountSubstring(out, "# TYPE kudu_tablet_test_counter "));
+  // table_a aggregates the two tablets: 11 + 4 = 15.
+  ASSERT_STR_CONTAINS(out,
+      "kudu_tablet_test_counter{type=\"table\",id=\"table_a\",unit_type=\"bytes\"} 15\n");
+  // table_b has a single tablet: 100.
+  ASSERT_STR_CONTAINS(out,
+      "kudu_tablet_test_counter{type=\"table\",id=\"table_b\",unit_type=\"bytes\"} 100\n");
+  // The individual tablet IDs must not leak into the merged output.
+  ASSERT_STR_NOT_CONTAINS(out, "id=\"tablet-1\"");
+  ASSERT_STR_NOT_CONTAINS(out, "id=\"tablet-2\"");
+  ASSERT_STR_NOT_CONTAINS(out, "id=\"tablet-3\"");
+  // Only two data lines (one per table) are exported for this metric.
+  ASSERT_EQ(2, CountSubstring(out, "kudu_tablet_test_counter{"));
+}
+
+// The hostname label is attached to merged output when hostname export is on,
+// and omitted otherwise. Merged output is label-based regardless of
+// --metrics_prometheus_use_entity_labels.
+TEST_F(MetricsTest, MergedPrometheusHostnameLabelTest) {
+  google::FlagSaver saver;
+
+  MetricRegistry registry;
+  auto tablet = METRIC_ENTITY_tablet.Instantiate(&registry, "tablet-1");
+  tablet->SetAttribute("table_name", "table_a");
+  METRIC_tablet_test_counter.Instantiate(tablet)->IncrementBy(7);
+
+  MetricPrometheusOptions opts;
+  opts.merge_rules.emplace("tablet", MergeAttributes("table", "table_name"));
+  opts.hostname = "host-a";
+
+  FLAGS_metrics_prometheus_export_hostname = true;
+  {
+    ostringstream output;
+    PrometheusWriter writer(&output);
+    ASSERT_OK(registry.WriteAsPrometheus(&writer, opts));
+    ASSERT_STR_CONTAINS(output.str(),
+        "kudu_tablet_test_counter{type=\"table\",id=\"table_a\","
+        "hostname=\"host-a\",unit_type=\"bytes\"} 7\n");
+  }
+
+  FLAGS_metrics_prometheus_export_hostname = false;
+  {
+    ostringstream output;
+    PrometheusWriter writer(&output);
+    ASSERT_OK(registry.WriteAsPrometheus(&writer, opts));
+    ASSERT_STR_CONTAINS(output.str(),
+        "kudu_tablet_test_counter{type=\"table\",id=\"table_a\",unit_type=\"bytes\"} 7\n");
+    ASSERT_STR_NOT_CONTAINS(output.str(), "hostname=");
+  }
+}
+
+// An entity that lacks the merge-by attribute is skipped (not merged and not
+// exported), consistent with the JSON endpoint, and must not crash.
+TEST_F(MetricsTest, MergedPrometheusMissingAttributeTest) {
+  MetricRegistry registry;
+
+  auto tablet1 = METRIC_ENTITY_tablet.Instantiate(&registry, "tablet-1");
+  tablet1->SetAttribute("table_name", "table_a");
+  METRIC_tablet_test_counter.Instantiate(tablet1)->IncrementBy(9);
+
+  // No 'table_name' attribute set on this tablet.
+  auto tablet2 = METRIC_ENTITY_tablet.Instantiate(&registry, "tablet-2");
+  METRIC_tablet_test_counter.Instantiate(tablet2)->IncrementBy(123);
+
+  MetricPrometheusOptions opts;
+  opts.merge_rules.emplace("tablet", MergeAttributes("table", "table_name"));
+
+  ostringstream output;
+  PrometheusWriter writer(&output);
+  ASSERT_OK(registry.WriteAsPrometheus(&writer, opts));
+
+  const auto& out = output.str();
+  ASSERT_STR_CONTAINS(out,
+      "kudu_tablet_test_counter{type=\"table\",id=\"table_a\",unit_type=\"bytes\"} 9\n");
+  // The value of the tablet without a 'table_name' attribute is dropped.
+  ASSERT_STR_NOT_CONTAINS(out, "123");
+  ASSERT_EQ(1, CountSubstring(out, "kudu_tablet_test_counter{"));
+}
+
+// An entity whose type is not targeted by any merge rule (e.g. a 'table'
+// entity on the master when only 'tablet' is merged) must be exported as-is,
+// preserving its native attribute labels such as table_name -- not collapsed
+// into the bare type/id label set used for merged entities.
+TEST_F(MetricsTest, MergedPrometheusPassThroughKeepsAttributesTest) {
+  google::FlagSaver saver;
+  FLAGS_metrics_prometheus_use_entity_labels = true;
+
+  MetricRegistry registry;
+
+  // A 'table' entity as present on the master, carrying a table_name attribute.
+  auto table = METRIC_ENTITY_table.Instantiate(&registry, "table-id-1");
+  table->SetAttribute("table_name", "my_table");
+  METRIC_table_test_counter.Instantiate(table)->IncrementBy(42);
+
+  // A 'tablet' entity which IS targeted by the rule and gets merged.
+  auto tablet = METRIC_ENTITY_tablet.Instantiate(&registry, "tablet-1");
+  tablet->SetAttribute("table_name", "my_table");
+  METRIC_tablet_test_counter.Instantiate(tablet)->IncrementBy(7);
+
+  MetricPrometheusOptions opts;
+  opts.merge_rules.emplace("tablet", MergeAttributes("table", "table_name"));
+
+  ostringstream output;
+  PrometheusWriter writer(&output);
+  ASSERT_OK(registry.WriteAsPrometheus(&writer, opts));
+
+  const auto& out = output.str();
+  // The pass-through 'table' entity keeps its full native label set (including
+  // table_name), even though a 'tablet' merge rule was supplied.
+  ASSERT_STR_CONTAINS(out,
+      "kudu_table_test_counter{type=\"table\",id=\"table-id-1\","
+      "table_name=\"my_table\",unit_type=\"bytes\"} 42\n");
+  // The targeted 'tablet' entity is still merged into a bare type/id series.
+  ASSERT_STR_CONTAINS(out,
+      "kudu_tablet_test_counter{type=\"table\",id=\"my_table\",unit_type=\"bytes\"} 7\n");
+  // The raw tablet ID must not leak.
+  ASSERT_STR_NOT_CONTAINS(out, "id=\"tablet-1\"");
+}
+
+// Aggregate tablet entities by their 'partition' attribute, as one would do for
+// a hash-partitioned table where each tablet carries a partition description.
+// Tablets sharing a partition value collapse into a single series, and the
+// (space/paren-containing) partition string is used verbatim as the 'id' label.
+TEST_F(MetricsTest, MergedPrometheusByPartitionAttributeTest) {
+  MetricRegistry registry;
+
+  auto tablet1 = METRIC_ENTITY_tablet.Instantiate(&registry, "tablet-1");
+  tablet1->SetAttribute("partition", "HASH (col_x) PARTITION 3");
+  METRIC_tablet_test_counter.Instantiate(tablet1)->IncrementBy(8);
+
+  auto tablet2 = METRIC_ENTITY_tablet.Instantiate(&registry, "tablet-2");
+  tablet2->SetAttribute("partition", "HASH (col_x) PARTITION 3");
+  METRIC_tablet_test_counter.Instantiate(tablet2)->IncrementBy(2);
+
+  auto tablet3 = METRIC_ENTITY_tablet.Instantiate(&registry, "tablet-3");
+  tablet3->SetAttribute("partition", "HASH (col_x) PARTITION 5");
+  METRIC_tablet_test_counter.Instantiate(tablet3)->IncrementBy(1);
+
+  MetricPrometheusOptions opts;
+  opts.merge_rules.emplace("tablet", MergeAttributes("partition", "partition"));
+
+  ostringstream output;
+  PrometheusWriter writer(&output);
+  ASSERT_OK(registry.WriteAsPrometheus(&writer, opts));
+
+  const auto& out = output.str();
+  // The two tablets in 'PARTITION 3' aggregate to 10; the odd one is on its own.
+  ASSERT_STR_CONTAINS(out,
+      "kudu_tablet_test_counter{type=\"partition\","
+      "id=\"HASH (col_x) PARTITION 3\",unit_type=\"bytes\"} 10\n");
+  ASSERT_STR_CONTAINS(out,
+      "kudu_tablet_test_counter{type=\"partition\","
+      "id=\"HASH (col_x) PARTITION 5\",unit_type=\"bytes\"} 1\n");
+  ASSERT_STR_NOT_CONTAINS(out, "id=\"tablet-1\"");
+  ASSERT_EQ(2, CountSubstring(out, "kudu_tablet_test_counter{"));
+}
+
+// The server-wide --metrics_prometheus_default_merge_rules is applied when a
+// request carries no 'merge_rules' of its own.
+TEST_F(MetricsTest, PrometheusDefaultMergeRulesFromFlagTest) {
+  google::FlagSaver saver;
+  FLAGS_metrics_prometheus_default_merge_rules = "tablet|table|table_name";
+
+  MetricRegistry registry;
+  auto tablet1 = METRIC_ENTITY_tablet.Instantiate(&registry, "tablet-1");
+  tablet1->SetAttribute("table_name", "table_a");
+  METRIC_tablet_test_counter.Instantiate(tablet1)->IncrementBy(3);
+  auto tablet2 = METRIC_ENTITY_tablet.Instantiate(&registry, "tablet-2");
+  tablet2->SetAttribute("table_name", "table_a");
+  METRIC_tablet_test_counter.Instantiate(tablet2)->IncrementBy(4);
+
+  // No per-request rules: the flag default drives the aggregation.
+  MetricPrometheusOptions opts;
+  GetPrometheusMergeRules(/*request_merge_rules=*/{}, &opts.merge_rules);
+
+  ostringstream output;
+  PrometheusWriter writer(&output);
+  ASSERT_OK(registry.WriteAsPrometheus(&writer, opts));
+
+  const auto& out = output.str();
+  ASSERT_STR_CONTAINS(out,
+      "kudu_tablet_test_counter{type=\"table\",id=\"table_a\",unit_type=\"bytes\"} 7\n");
+  ASSERT_STR_NOT_CONTAINS(out, "id=\"tablet-1\"");
+}
+
+// Rules supplied with the request take precedence over the flag default.
+TEST_F(MetricsTest, PrometheusRequestMergeRulesOverrideFlagTest) {
+  google::FlagSaver saver;
+  // The flag would merge tablets into 'table' entities by 'table_name'...
+  FLAGS_metrics_prometheus_default_merge_rules = "tablet|table|table_name";
+
+  MetricRegistry registry;
+  auto tablet1 = METRIC_ENTITY_tablet.Instantiate(&registry, "tablet-1");
+  tablet1->SetAttribute("table_name", "table_a");
+  tablet1->SetAttribute("partition", "p0");
+  METRIC_tablet_test_counter.Instantiate(tablet1)->IncrementBy(5);
+  auto tablet2 = METRIC_ENTITY_tablet.Instantiate(&registry, "tablet-2");
+  tablet2->SetAttribute("table_name", "table_a");
+  tablet2->SetAttribute("partition", "p0");
+  METRIC_tablet_test_counter.Instantiate(tablet2)->IncrementBy(6);
+
+  // ...but the request merges into 'partition' entities by 'partition' instead.
+  MetricPrometheusOptions opts;
+  GetPrometheusMergeRules(/*request_merge_rules=*/{"tablet|partition|partition"},
+                          &opts.merge_rules);
+
+  ostringstream output;
+  PrometheusWriter writer(&output);
+  ASSERT_OK(registry.WriteAsPrometheus(&writer, opts));
+
+  const auto& out = output.str();
+  ASSERT_STR_CONTAINS(out,
+      "kudu_tablet_test_counter{type=\"partition\",id=\"p0\",unit_type=\"bytes\"} 11\n");
+  // The flag's 'table' merge target must not appear.
+  ASSERT_STR_NOT_CONTAINS(out, "type=\"table\"");
+}
+
+// A malformed --metrics_prometheus_default_merge_rules yields no rules, so no
+// aggregation is attempted; a well-formed rule sharing the value still applies.
+TEST_F(MetricsTest, PrometheusMalformedDefaultMergeRulesFlagTest) {
+  google::FlagSaver saver;
+
+  // Malformed value (only two '|'-separated parts): no rules are resolved.
+  FLAGS_metrics_prometheus_default_merge_rules = "tablet|table";
+  MetricMergeRules rules;
+  GetPrometheusMergeRules(/*request_merge_rules=*/{}, &rules);
+  ASSERT_TRUE(rules.empty());
+
+  // A malformed rule alongside a valid one: only the valid rule survives.
+  FLAGS_metrics_prometheus_default_merge_rules = "garbage,tablet|table|table_name";
+  rules.clear();
+  GetPrometheusMergeRules(/*request_merge_rules=*/{}, &rules);
+  ASSERT_EQ(1, rules.size());
+  ASSERT_TRUE(ContainsKey(rules, "tablet"));
+}
+
+// The server-wide --metrics_prometheus_default_metrics allowlist is applied
+// when a request carries no 'metrics' filter of its own.
+TEST_F(MetricsTest, PrometheusDefaultMetricsFromFlagTest) {
+  google::FlagSaver saver;
+  FLAGS_metrics_prometheus_default_metrics = "test_counter";
+
+  // No per-request allowlist: the flag default seeds the filter.
+  vector<string> entity_metrics;
+  GetPrometheusMetricsFilter(&entity_metrics);
+  ASSERT_EQ(vector<string>{"test_counter"}, entity_metrics);
+}
+
+// A request's own 'metrics' allowlist takes precedence over the flag default.
+TEST_F(MetricsTest, PrometheusRequestMetricsOverrideFlagTest) {
+  google::FlagSaver saver;
+  FLAGS_metrics_prometheus_default_metrics = "test_counter";
+
+  // The request-supplied allowlist is left untouched by the flag default.
+  vector<string> entity_metrics = {"raft_term"};
+  GetPrometheusMetricsFilter(&entity_metrics);
+  ASSERT_EQ(vector<string>{"raft_term"}, entity_metrics);
+}
+
+// A --metrics_prometheus_default_metrics value with no usable token (e.g. only
+// commas) yields an empty allowlist, so no metric name filtering is performed.
+TEST_F(MetricsTest, PrometheusNoUsableDefaultMetricsFlagTest) {
+  google::FlagSaver saver;
+
+  // Empty flag and empty request: nothing to filter by.
+  FLAGS_metrics_prometheus_default_metrics = "";
+  vector<string> entity_metrics;
+  GetPrometheusMetricsFilter(&entity_metrics);
+  ASSERT_TRUE(entity_metrics.empty());
+
+  // Only commas: SplitStringUsing() skips the empty tokens, so the allowlist
+  // stays empty rather than degrading to an all-matching empty substring.
+  FLAGS_metrics_prometheus_default_metrics = ",,";
+  entity_metrics.clear();
+  GetPrometheusMetricsFilter(&entity_metrics);
+  ASSERT_TRUE(entity_metrics.empty());
+}
+
+// The server-wide --metrics_prometheus_default_metrics allowlist restricts the
+// exported metrics end-to-end when a request carries no 'metrics' filter.
+TEST_F(MetricsTest, PrometheusDefaultMetricsFilterAppliedTest) {
+  google::FlagSaver saver;
+  FLAGS_metrics_prometheus_default_metrics = "tablet_test_counter";
+
+  MetricRegistry registry;
+  auto tablet = METRIC_ENTITY_tablet.Instantiate(&registry, "tablet-1");
+  METRIC_tablet_test_counter.Instantiate(tablet)->IncrementBy(7);
+  auto table = METRIC_ENTITY_table.Instantiate(&registry, "table-1");
+  METRIC_table_test_counter.Instantiate(table)->IncrementBy(9);
+
+  // No per-request allowlist: the flag default restricts the output.
+  MetricPrometheusOptions opts;
+  GetPrometheusMetricsFilter(&opts.filters.entity_metrics);
+
+  ostringstream output;
+  PrometheusWriter writer(&output);
+  ASSERT_OK(registry.WriteAsPrometheus(&writer, opts));
+
+  const auto& out = output.str();
+  ASSERT_STR_CONTAINS(out, "tablet_test_counter");
+  ASSERT_STR_NOT_CONTAINS(out, "table_test_counter");
+}
+
 TEST_F(MetricsTest, CounterPrometheusTest) {
   scoped_refptr<Counter> requests(new Counter(&METRIC_test_counter));
 
   ostringstream output;
   PrometheusWriter writer(&output);
-  ASSERT_OK(requests->WriteAsPrometheus(&writer, {}));
+  ASSERT_OK(requests->WriteAsPrometheus(&writer, "", "", {}));
 
   const string expected_output = "# HELP test_counter Description of test counter\n"
                                  "# TYPE test_counter counter\n"
@@ -208,7 +693,7 @@ TEST_F(MetricsTest, StringGaugeForPrometheus) {
 
   ostringstream output;
   PrometheusWriter writer(&output);
-  ASSERT_OK(state->WriteAsPrometheus(&writer, {}));
+  ASSERT_OK(state->WriteAsPrometheus(&writer, "", "", {}));
   // String-based gauges are not consumable by Prometheus.
   ASSERT_EQ("", output.str());
 
@@ -217,14 +702,14 @@ TEST_F(MetricsTest, StringGaugeForPrometheus) {
     const Metric* g = state.get();
     ostringstream output;
     PrometheusWriter writer(&output);
-    ASSERT_OK(g->WriteAsPrometheus(&writer, {}));
+    ASSERT_OK(g->WriteAsPrometheus(&writer, "", "", {}));
     ASSERT_EQ("", output.str());
   }
   {
     const Metric* m = state.get();
     ostringstream output;
     PrometheusWriter writer(&output);
-    ASSERT_OK(m->WriteAsPrometheus(&writer, {}));
+    ASSERT_OK(m->WriteAsPrometheus(&writer, "", "", {}));
     ASSERT_EQ("", output.str());
   }
 }
@@ -245,7 +730,7 @@ TEST_F(MetricsTest, StringFunctionGaugeForPrometheus) {
 
   ostringstream output;
   PrometheusWriter writer(&output);
-  ASSERT_OK(gauge->WriteAsPrometheus(&writer, {}));
+  ASSERT_OK(gauge->WriteAsPrometheus(&writer, "", "", {}));
   // String-based gauges are not consumable by Prometheus.
   ASSERT_EQ("", output.str());
 }
@@ -331,15 +816,47 @@ TEST_F(MetricsTest, MeanGaugePrometheusTest) {
 
   ostringstream output;
   PrometheusWriter writer(&output);
-  ASSERT_OK(average_usage->WriteAsPrometheus(&writer, {}));
+  ASSERT_OK(average_usage->WriteAsPrometheus(&writer, "", "", {}));
 
   const string expected_output = "# HELP test_mean_gauge Description of mean Gauge\n"
                                  "# TYPE test_mean_gauge gauge\n"
                                  "test_mean_gauge{unit_type=\"units\"} 0\n"
+                                 "# HELP test_mean_gauge_count Test mean Gauge (count)\n"
+                                 "# TYPE test_mean_gauge_count gauge\n"
                                  "test_mean_gauge_count{unit_type=\"units\"} 0\n"
+                                 "# HELP test_mean_gauge_sum Description of mean Gauge (sum)\n"
+                                 "# TYPE test_mean_gauge_sum gauge\n"
                                  "test_mean_gauge_sum{unit_type=\"units\"} 0\n";
 
   ASSERT_EQ(expected_output, output.str());
+}
+
+// Define a MeanGauge with a non-"units" unit to verify that _count always
+// reports unit_type="units" while _sum keeps the original unit.
+METRIC_DEFINE_gauge_double(test_entity, test_mean_gauge_bytes, "Test mean Gauge bytes",
+                           MetricUnit::kBytes, "Description of mean Gauge in bytes",
+                           kudu::MetricLevel::kInfo);
+
+TEST_F(MetricsTest, MeanGaugePrometheusCountUnitTest) {
+  scoped_refptr<MeanGauge> gauge =
+    METRIC_test_mean_gauge_bytes.InstantiateMeanGauge(entity_);
+  gauge->set_value(1024.0, 4.0);
+
+  ostringstream output;
+  PrometheusWriter writer(&output);
+  ASSERT_OK(gauge->WriteAsPrometheus(&writer, "", "", {}));
+
+  const string& result = output.str();
+  // The main metric and _sum should carry the original unit ("bytes").
+  ASSERT_STR_CONTAINS(result, "test_mean_gauge_bytes{unit_type=\"bytes\"} 256");
+  ASSERT_STR_CONTAINS(result, "test_mean_gauge_bytes_sum{unit_type=\"bytes\"} 1024");
+  // _count must carry "units", not "bytes".
+  ASSERT_STR_CONTAINS(result, "test_mean_gauge_bytes_count{unit_type=\"units\"} 4");
+  ASSERT_STR_NOT_CONTAINS(result, "test_mean_gauge_bytes_count{unit_type=\"bytes\"}");
+  // The HELP line of _count should use the metric label, not the description
+  // which may mention the unit (e.g. "...in bytes").
+  ASSERT_STR_CONTAINS(result, "# HELP test_mean_gauge_bytes_count Test mean Gauge bytes (count)");
+  ASSERT_STR_NOT_CONTAINS(result, "# HELP test_mean_gauge_bytes_count Description of mean Gauge in bytes");
 }
 
 METRIC_DEFINE_gauge_uint64(test_entity, test_gauge, "Test uint64 Gauge",
@@ -415,7 +932,7 @@ TEST_F(MetricsTest, AtomicGaugePrometheusTest) {
 
   ostringstream output;
   PrometheusWriter writer(&output);
-  ASSERT_OK(mem_usage->WriteAsPrometheus(&writer, {}));
+  ASSERT_OK(mem_usage->WriteAsPrometheus(&writer, "", "", {}));
 
   const string expected_output = "# HELP test_gauge Description of Test Gauge\n"
                                  "# TYPE test_gauge gauge\n"
@@ -430,7 +947,7 @@ TEST_F(MetricsTest, AtomicGaugeBooleanPrometheusTest) {
 
   ostringstream output;
   PrometheusWriter writer(&output);
-  ASSERT_OK(clock_extrapolating->WriteAsPrometheus(&writer, {}));
+  ASSERT_OK(clock_extrapolating->WriteAsPrometheus(&writer, "", "", {}));
 
   const string expected_output = "# HELP test_gauge_bool Description of Test boolean Gauge\n"
                                  "# TYPE test_gauge_bool gauge\n"
@@ -586,7 +1103,7 @@ TEST_F(MetricsTest, FunctionGaugePrometheusTest) {
 
   ostringstream output;
   PrometheusWriter writer(&output);
-  ASSERT_OK(gauge->WriteAsPrometheus(&writer, {}));
+  ASSERT_OK(gauge->WriteAsPrometheus(&writer, "", "", {}));
 
   const string expected_output = "# HELP test_func_gauge Test Gauge 2\n"
                                  "# TYPE test_func_gauge gauge\n"
@@ -631,11 +1148,13 @@ TEST_F(MetricsTest, SimpleHistogramMergeTest) {
   ASSERT_EQ(2, hist->histogram()->MinValue());
   ASSERT_EQ(4, hist->histogram()->MeanValue());
   ASSERT_EQ(6, hist->histogram()->MaxValue());
+  ASSERT_EQ(6, hist->histogram()->LastValue());
   ASSERT_EQ(2, hist->histogram()->TotalCount());
   ASSERT_EQ(8, hist->histogram()->TotalSum());
   ASSERT_EQ(1, hist_for_merge->histogram()->MinValue());
   ASSERT_EQ(3, hist_for_merge->histogram()->MeanValue());
   ASSERT_EQ(6, hist_for_merge->histogram()->MaxValue());
+  ASSERT_EQ(6, hist_for_merge->histogram()->LastValue());
   ASSERT_EQ(6, hist_for_merge->histogram()->TotalCount());
   ASSERT_EQ(18, hist_for_merge->histogram()->TotalSum());
   ASSERT_EQ(1, hist_for_merge->histogram()->ValueAtPercentile(20.0));
@@ -649,6 +1168,84 @@ TEST_F(MetricsTest, SimpleHistogramMergeTest) {
 }
 
 TEST_F(MetricsTest, HistogramPrometheusTest) {
+  google::FlagSaver saver;
+  FLAGS_metrics_prometheus_use_entity_labels = true;
+
+  constexpr const char* const kExpectedOutput =
+      "# HELP test_hist foo\n"
+      "# TYPE test_hist summary\n"
+      "test_hist{unit_type=\"milliseconds\",quantile=\"0\"} 1\n"
+      "test_hist{unit_type=\"milliseconds\",quantile=\"0.75\"} 2\n"
+      "test_hist{unit_type=\"milliseconds\",quantile=\"0.95\"} 3\n"
+      "test_hist{unit_type=\"milliseconds\",quantile=\"0.99\"} 4\n"
+      "test_hist{unit_type=\"milliseconds\",quantile=\"0.999\"} 5\n"
+      "test_hist{unit_type=\"milliseconds\",quantile=\"0.9999\"} 5\n"
+      "test_hist{unit_type=\"milliseconds\",quantile=\"1\"} 5\n"
+  "# HELP test_hist_sum foo (sum)\n"
+  "# TYPE test_hist_sum counter\n"
+      "test_hist_sum{unit_type=\"milliseconds\"} 1460\n"
+  "# HELP test_hist_count Test Histogram (count)\n"
+  "# TYPE test_hist_count counter\n"
+      "test_hist_count{unit_type=\"units\"} 1000\n";
+
+  scoped_refptr<Histogram> hist = METRIC_test_hist.Instantiate(entity_);
+  hist->IncrementBy(1, 700);
+  hist->IncrementBy(2, 200);
+  hist->IncrementBy(3, 50);
+  hist->IncrementBy(4, 40);
+  hist->IncrementBy(5, 10);
+
+  ostringstream output;
+  PrometheusWriter writer(&output);
+  ASSERT_OK(hist->WriteAsPrometheus(&writer, "", "", {}));
+  ASSERT_EQ(kExpectedOutput, output.str());
+}
+
+// Verify that when the histogram uses a non-trivial unit (e.g. milliseconds),
+// the _count metric reports unit_type="units" (dimensionless) while _sum
+// keeps the original unit. Uses non-empty entity labels to match the real-world
+// scenario (e.g. tablet entities) reported in code review.
+TEST_F(MetricsTest, HistogramPrometheusCountUnitTest) {
+  google::FlagSaver saver;
+  FLAGS_metrics_prometheus_use_entity_labels = true;
+
+  scoped_refptr<Histogram> hist = METRIC_test_hist.Instantiate(entity_);
+  hist->IncrementBy(10, 5);
+
+  ostringstream output;
+  PrometheusWriter writer(&output);
+  // Pass entity labels to simulate a real tablet entity context, e.g.:
+  //   kudu_test_hist_count{type="tablet",id="abc123",...,unit_type="units"} 5
+  ASSERT_OK(hist->WriteAsPrometheus(
+      &writer, "kudu_", "type=\"tablet\",id=\"abc123\"", {}));
+
+  const string& result = output.str();
+  // The quantile lines should carry the original unit.
+  ASSERT_STR_CONTAINS(result,
+      "type=\"tablet\",id=\"abc123\",unit_type=\"milliseconds\",quantile=");
+  // _sum should carry the original unit.
+  ASSERT_STR_CONTAINS(result,
+      "kudu_test_hist_sum{type=\"tablet\",id=\"abc123\","
+      "unit_type=\"milliseconds\"}");
+  // _count must carry "units", not the histogram's native unit.
+  ASSERT_STR_CONTAINS(result,
+      "kudu_test_hist_count{type=\"tablet\",id=\"abc123\","
+      "unit_type=\"units\"}");
+  // Make sure _count does NOT carry the histogram's native unit.
+  ASSERT_STR_NOT_CONTAINS(result,
+      "test_hist_count{type=\"tablet\",id=\"abc123\","
+      "unit_type=\"milliseconds\"}");
+  // The HELP line of _count should use the metric label, not the description
+  // which may include unit-specific wording (e.g. "Microseconds spent on...").
+  ASSERT_STR_CONTAINS(result, "# HELP kudu_test_hist_count Test Histogram (count)");
+  ASSERT_STR_NOT_CONTAINS(result, "# HELP kudu_test_hist_count foo");
+}
+
+TEST_F(MetricsTest, HistogramLegacyPrometheusTest) {
+  google::FlagSaver saver;
+  // Verify legacy histogram format: space after comma, _sum/_count have no labels.
+  FLAGS_metrics_prometheus_use_entity_labels = false;
+
   constexpr const char* const kExpectedOutput =
       "# HELP test_hist foo\n"
       "# TYPE test_hist summary\n"
@@ -659,7 +1256,11 @@ TEST_F(MetricsTest, HistogramPrometheusTest) {
       "test_hist{unit_type=\"milliseconds\", quantile=\"0.999\"} 5\n"
       "test_hist{unit_type=\"milliseconds\", quantile=\"0.9999\"} 5\n"
       "test_hist{unit_type=\"milliseconds\", quantile=\"1\"} 5\n"
+      "# HELP test_hist_sum foo (sum)\n"
+      "# TYPE test_hist_sum counter\n"
       "test_hist_sum 1460\n"
+      "# HELP test_hist_count Test Histogram (count)\n"
+      "# TYPE test_hist_count counter\n"
       "test_hist_count 1000\n";
 
   scoped_refptr<Histogram> hist = METRIC_test_hist.Instantiate(entity_);
@@ -671,8 +1272,148 @@ TEST_F(MetricsTest, HistogramPrometheusTest) {
 
   ostringstream output;
   PrometheusWriter writer(&output);
-  ASSERT_OK(hist->WriteAsPrometheus(&writer, {}));
+  ASSERT_OK(hist->WriteAsPrometheus(&writer, "", "", {}));
   ASSERT_EQ(kExpectedOutput, output.str());
+}
+
+// Histograms are merged by combining the underlying HdrHistogram data, so the
+// aggregated _sum and _count are exact (unlike aggregating pre-computed
+// quantiles on the Prometheus server side).
+TEST_F(MetricsTest, MergedHistogramPrometheusTest) {
+  // entity_ and entity_same_attr_ share attr_for_merge="same_attr";
+  // entity_diff_attr_ has attr_for_merge="diff_attr".
+  scoped_refptr<Histogram> hist1 = METRIC_test_hist.Instantiate(entity_);
+  hist1->IncrementBy(10, 2);  // sum 20, count 2
+  scoped_refptr<Histogram> hist2 = METRIC_test_hist.Instantiate(entity_same_attr_);
+  hist2->IncrementBy(30, 3);  // sum 90, count 3
+  scoped_refptr<Histogram> hist3 = METRIC_test_hist.Instantiate(entity_diff_attr_);
+  hist3->IncrementBy(5, 4);   // sum 20, count 4
+
+  MetricPrometheusOptions opts;
+  opts.merge_rules.emplace("test_entity",
+                           MergeAttributes("merged_entity", "attr_for_merge"));
+
+  ostringstream output;
+  PrometheusWriter writer(&output);
+  ASSERT_OK(registry_.WriteAsPrometheus(&writer, opts));
+
+  const auto& out = output.str();
+  ASSERT_EQ(1, CountSubstring(out, "# TYPE kudu_test_hist summary\n"));
+  // same_attr aggregates entity_ and entity_same_attr_: sum 110, count 5.
+  ASSERT_STR_CONTAINS(out,
+      "kudu_test_hist_sum{type=\"merged_entity\",id=\"same_attr\","
+      "unit_type=\"milliseconds\"} 110\n");
+  ASSERT_STR_CONTAINS(out,
+      "kudu_test_hist_count{type=\"merged_entity\",id=\"same_attr\","
+      "unit_type=\"units\"} 5\n");
+  // diff_attr has a single entity: sum 20, count 4.
+  ASSERT_STR_CONTAINS(out,
+      "kudu_test_hist_sum{type=\"merged_entity\",id=\"diff_attr\","
+      "unit_type=\"milliseconds\"} 20\n");
+  ASSERT_STR_CONTAINS(out,
+      "kudu_test_hist_count{type=\"merged_entity\",id=\"diff_attr\","
+      "unit_type=\"units\"} 4\n");
+}
+
+// Only the selected quantiles are exported; the '_sum' and '_count' lines are
+// always exported regardless of the selection.
+TEST_F(MetricsTest, HistogramPrometheusSelectedQuantilesTest) {
+  google::FlagSaver saver;
+  FLAGS_metrics_prometheus_use_entity_labels = true;
+
+  scoped_refptr<Histogram> hist = METRIC_test_hist.Instantiate(entity_);
+  hist->IncrementBy(1, 700);
+  hist->IncrementBy(2, 200);
+  hist->IncrementBy(3, 50);
+  hist->IncrementBy(4, 40);
+  hist->IncrementBy(5, 10);
+
+  MetricPrometheusOptions opts;
+  opts.quantiles = {"0.99", "0.999"};
+
+  ostringstream output;
+  PrometheusWriter writer(&output);
+  ASSERT_OK(hist->WriteAsPrometheus(&writer, "", "", opts));
+
+  const string& out = output.str();
+  // The two selected quantiles are present.
+  ASSERT_STR_CONTAINS(out, "test_hist{unit_type=\"milliseconds\",quantile=\"0.99\"} 4\n");
+  ASSERT_STR_CONTAINS(out, "test_hist{unit_type=\"milliseconds\",quantile=\"0.999\"} 5\n");
+  // The unselected quantiles, including the min ('0') and max ('1'), are absent.
+  ASSERT_STR_NOT_CONTAINS(out, "quantile=\"0\"");
+  ASSERT_STR_NOT_CONTAINS(out, "quantile=\"0.75\"");
+  ASSERT_STR_NOT_CONTAINS(out, "quantile=\"0.95\"");
+  ASSERT_STR_NOT_CONTAINS(out, "quantile=\"0.9999\"");
+  ASSERT_STR_NOT_CONTAINS(out, "quantile=\"1\"");
+  ASSERT_EQ(2, CountSubstring(out, ",quantile="));
+  // The _sum and _count lines are always exported.
+  ASSERT_STR_CONTAINS(out, "test_hist_sum{unit_type=\"milliseconds\"} 1460\n");
+  ASSERT_STR_CONTAINS(out, "test_hist_count{unit_type=\"units\"} 1000\n");
+}
+
+// The server-wide --metrics_prometheus_default_quantiles is applied when a
+// request carries no 'quantiles' of its own.
+TEST_F(MetricsTest, PrometheusDefaultQuantilesFromFlagTest) {
+  google::FlagSaver saver;
+  FLAGS_metrics_prometheus_use_entity_labels = true;
+  FLAGS_metrics_prometheus_default_quantiles = "0.99,0.999";
+
+  scoped_refptr<Histogram> hist = METRIC_test_hist.Instantiate(entity_);
+  hist->IncrementBy(1, 700);
+  hist->IncrementBy(2, 200);
+  hist->IncrementBy(3, 50);
+  hist->IncrementBy(4, 40);
+  hist->IncrementBy(5, 10);
+
+  // No per-request quantiles: the flag default drives the selection.
+  MetricPrometheusOptions opts;
+  GetPrometheusQuantiles(/*request_quantiles=*/{}, &opts.quantiles);
+  ASSERT_EQ((vector<string>{"0.99", "0.999"}), SelectedQuantileTags(opts.quantiles));
+
+  ostringstream output;
+  PrometheusWriter writer(&output);
+  ASSERT_OK(hist->WriteAsPrometheus(&writer, "", "", opts));
+
+  const string& out = output.str();
+  ASSERT_EQ(2, CountSubstring(out, ",quantile="));
+  ASSERT_STR_CONTAINS(out, "quantile=\"0.99\"");
+  ASSERT_STR_CONTAINS(out, "quantile=\"0.999\"");
+}
+
+// Quantiles supplied with the request take precedence over the flag default.
+TEST_F(MetricsTest, PrometheusRequestQuantilesOverrideFlagTest) {
+  google::FlagSaver saver;
+  // The flag would export only p75...
+  FLAGS_metrics_prometheus_default_quantiles = "0.75";
+
+  // ...but the request asks for p99 instead.
+  HistogramQuantiles quantiles{};
+  GetPrometheusQuantiles(/*request_quantiles=*/{"0.99"}, &quantiles);
+  ASSERT_EQ((vector<string>{"0.99"}), SelectedQuantileTags(quantiles));
+}
+
+// Unknown quantile tags are dropped and duplicates are collapsed; when every
+// tag is unknown the result is empty, which means "export all quantiles".
+TEST_F(MetricsTest, PrometheusUnknownQuantilesFlagTest) {
+  google::FlagSaver saver;
+
+  // A bogus tag alongside valid ones: only the valid tags survive, in order.
+  FLAGS_metrics_prometheus_default_quantiles = "0.99,bogus,0.999";
+  HistogramQuantiles quantiles{};
+  GetPrometheusQuantiles(/*request_quantiles=*/{}, &quantiles);
+  ASSERT_EQ((vector<string>{"0.99", "0.999"}), SelectedQuantileTags(quantiles));
+
+  // Duplicate tags are collapsed.
+  FLAGS_metrics_prometheus_default_quantiles = "0.99,0.99";
+  quantiles = {};
+  GetPrometheusQuantiles(/*request_quantiles=*/{}, &quantiles);
+  ASSERT_EQ((vector<string>{"0.99"}), SelectedQuantileTags(quantiles));
+
+  // All tags unknown: no selection is resolved, so all quantiles are exported.
+  FLAGS_metrics_prometheus_default_quantiles = "bogus";
+  quantiles = {};
+  GetPrometheusQuantiles(/*request_quantiles=*/{}, &quantiles);
+  ASSERT_EQ((vector<string>{}), SelectedQuantileTags(quantiles));
 }
 
 TEST_F(MetricsTest, JsonPrintTest) {
@@ -975,7 +1716,7 @@ TEST_F(MetricsTest, TestDumpJsonPrototypes) {
   int num_entities = d["entities"].Size();
   LOG(INFO) << "Parsed " << num_metrics << " metrics and " << num_entities << " entities";
   ASSERT_GT(num_metrics, 5);
-  ASSERT_EQ(num_entities, 2);
+  ASSERT_EQ(num_entities, 4);
 
   // Spot-check that some metrics were properly registered and that the JSON was properly
   // formed.
@@ -1052,6 +1793,10 @@ TEST_F(MetricsTest, TestDontDumpUntouched) {
 METRIC_DEFINE_counter(test_entity, warn_counter, "Warn Metric", MetricUnit::kRequests,
                       "Description of warn metric",
                       kudu::MetricLevel::kWarn);
+
+METRIC_DEFINE_counter(test_entity, info_counter, "Info Metric", MetricUnit::kRequests,
+                      "Description of info metric",
+                      kudu::MetricLevel::kInfo);
 
 METRIC_DEFINE_counter(test_entity, debug_counter, "Debug Metric", MetricUnit::kRequests,
                       "Description of debug metric",
@@ -1231,6 +1976,439 @@ TEST_F(MetricsTest, TestFilter) {
     d.Parse<0>(out.str().c_str());
     ASSERT_EQ(kNum + kEntityCount + 2, d.Size());
   }
+}
+
+// Exercises the case-insensitive, allocation-free substring matching that backs
+// metric filtering (MatchName), with emphasis on the edge cases relied upon by
+// the zero-allocation implementation: empty patterns, multi-term lists, and
+// attribute-value matching.
+TEST_F(MetricsTest, TestFilterMatchNameSemantics) {
+  scoped_refptr<Counter> test_counter = METRIC_test_counter.Instantiate(entity_);
+  test_counter->Increment();
+  scoped_refptr<AtomicGauge<uint64_t>> test_gauge = METRIC_test_gauge.Instantiate(entity_, 0);
+  test_gauge->IncrementBy(2);
+
+  const string counter_name = METRIC_test_counter.name();
+  const string gauge_name = METRIC_test_gauge.name();
+
+  auto filtered = [&](const MetricJsonOptions& opts) {
+    std::ostringstream out;
+    JsonWriter writer(&out, JsonWriter::PRETTY);
+    CHECK_OK(entity_->WriteAsJson(&writer, opts));
+    return out.str();
+  };
+
+  // Exact metric-name match keeps only that metric.
+  {
+    MetricJsonOptions opts;
+    opts.filters.entity_metrics = { counter_name };
+    const string out = filtered(opts);
+    ASSERT_STR_CONTAINS(out, counter_name);
+    ASSERT_STR_NOT_CONTAINS(out, gauge_name);
+  }
+
+  // A leading substring of the counter name still matches the counter.
+  {
+    MetricJsonOptions opts;
+    opts.filters.entity_metrics = { "test_coun" };
+    const string out = filtered(opts);
+    ASSERT_STR_CONTAINS(out, counter_name);
+    ASSERT_STR_NOT_CONTAINS(out, gauge_name);
+  }
+
+  // Mixed-case substring matches (matching is case-insensitive).
+  {
+    MetricJsonOptions opts;
+    opts.filters.entity_metrics = { "TeSt_GaUgE" };
+    const string out = filtered(opts);
+    ASSERT_STR_CONTAINS(out, gauge_name);
+    ASSERT_STR_NOT_CONTAINS(out, counter_name);
+  }
+
+  // A list with several terms matches if any single term matches.
+  {
+    MetricJsonOptions opts;
+    opts.filters.entity_metrics = { "no_such_metric", "GAUGE" };
+    const string out = filtered(opts);
+    ASSERT_STR_CONTAINS(out, gauge_name);
+    ASSERT_STR_NOT_CONTAINS(out, counter_name);
+  }
+
+  // An empty pattern matches every metric (mirrors string::find("")).
+  {
+    MetricJsonOptions opts;
+    opts.filters.entity_metrics = { "" };
+    const string out = filtered(opts);
+    ASSERT_STR_CONTAINS(out, counter_name);
+    ASSERT_STR_CONTAINS(out, gauge_name);
+  }
+
+  // A non-matching pattern filters the whole entity out.
+  {
+    MetricJsonOptions opts;
+    opts.filters.entity_metrics = { "definitely_not_here" };
+    ASSERT_EQ("", filtered(opts));
+  }
+
+  // Attribute-value matching is a case-insensitive substring match as well.
+  // The fixture sets attr_for_merge="same_attr" on entity_.
+  {
+    MetricJsonOptions opts;
+    opts.filters.entity_attrs = { "attr_for_merge", "SAME" };
+    ASSERT_STR_CONTAINS(filtered(opts), counter_name);
+  }
+
+  // A non-matching attribute value filters the entity out.
+  {
+    MetricJsonOptions opts;
+    opts.filters.entity_attrs = { "attr_for_merge", "no_match" };
+    ASSERT_EQ("", filtered(opts));
+  }
+}
+
+// Test that when --metrics_prometheus_use_entity_labels is true and hostname is
+// set in MetricPrometheusOptions, the hostname label is appended to every
+// metric line for all entity types (tablet, table, server).
+TEST_F(MetricsTest, PrometheusHostnameLabelTest) {
+  google::FlagSaver saver;
+  FLAGS_metrics_prometheus_use_entity_labels = true;
+
+  MetricRegistry registry;
+
+  auto tablet_entity = METRIC_ENTITY_tablet.Instantiate(&registry, "t1");
+  auto tablet_counter = METRIC_tablet_test_counter.Instantiate(tablet_entity);
+  tablet_counter->IncrementBy(42);
+
+  auto table_entity = METRIC_ENTITY_table.Instantiate(&registry, "tbl1");
+  auto table_counter = METRIC_table_test_counter.Instantiate(table_entity);
+  table_counter->IncrementBy(888);
+
+  auto server_entity = METRIC_ENTITY_server.Instantiate(
+      &registry, kMetricEntityIdTabletServer);
+  auto server_counter = METRIC_server_test_counter.Instantiate(server_entity);
+  server_counter->IncrementBy(777);
+
+  ostringstream output;
+  PrometheusWriter writer(&output);
+  MetricPrometheusOptions opts;
+  opts.hostname = "ts-01.example.com";
+  ASSERT_OK(registry.WriteAsPrometheus(&writer, opts));
+
+  const auto& out = output.str();
+  // Tablet entity should contain hostname label.
+  ASSERT_STR_CONTAINS(out,
+      "kudu_tablet_test_counter{type=\"tablet\",id=\"t1\","
+      "hostname=\"ts-01.example.com\",unit_type=\"bytes\"} 42\n");
+  // Table entity should contain hostname label.
+  ASSERT_STR_CONTAINS(out,
+      "kudu_table_test_counter{type=\"table\",id=\"tbl1\","
+      "hostname=\"ts-01.example.com\",unit_type=\"bytes\"} 888\n");
+  // Server entity should contain hostname label.
+  ASSERT_STR_CONTAINS(out,
+      "kudu_server_test_counter{type=\"tserver\","
+      "hostname=\"ts-01.example.com\",unit_type=\"bytes\"} 777\n");
+}
+
+// Test that when --metrics_prometheus_use_entity_labels is false (legacy mode),
+// the hostname label is NOT emitted even if opts.hostname is set.
+TEST_F(MetricsTest, PrometheusHostnameLabelLegacyNoEffect) {
+  google::FlagSaver saver;
+  FLAGS_metrics_prometheus_use_entity_labels = false;
+
+  MetricRegistry registry;
+
+  auto tablet_entity = METRIC_ENTITY_tablet.Instantiate(&registry, "t1");
+  auto tablet_counter = METRIC_tablet_test_counter.Instantiate(tablet_entity);
+  tablet_counter->IncrementBy(42);
+
+  auto table_entity = METRIC_ENTITY_table.Instantiate(&registry, "tbl1");
+  auto table_counter = METRIC_table_test_counter.Instantiate(table_entity);
+  table_counter->IncrementBy(888);
+
+  auto server_entity = METRIC_ENTITY_server.Instantiate(
+      &registry, kMetricEntityIdTabletServer);
+  auto server_counter = METRIC_server_test_counter.Instantiate(server_entity);
+  server_counter->IncrementBy(777);
+
+  ostringstream output;
+  PrometheusWriter writer(&output);
+  MetricPrometheusOptions opts;
+  opts.hostname = "ts-01.example.com";
+  ASSERT_OK(registry.WriteAsPrometheus(&writer, opts));
+
+  const auto& out = output.str();
+  // Legacy format: no hostname label, entity ID in prefix.
+  ASSERT_STR_NOT_CONTAINS(out, "hostname=");
+  ASSERT_STR_CONTAINS(out,
+      "kudu_tablet_t1_tablet_test_counter{unit_type=\"bytes\"} 42\n");
+  ASSERT_STR_CONTAINS(out,
+      "kudu_table_tbl1_table_test_counter{unit_type=\"bytes\"} 888\n");
+  ASSERT_STR_CONTAINS(out,
+      "kudu_tserver_server_test_counter{unit_type=\"bytes\"} 777\n");
+}
+
+// Test that when --metrics_prometheus_export_hostname is false, the hostname
+// label is NOT emitted even if entity labels are enabled and hostname is set.
+TEST_F(MetricsTest, PrometheusHostnameExportFlagOff) {
+  google::FlagSaver saver;
+  FLAGS_metrics_prometheus_use_entity_labels = true;
+  FLAGS_metrics_prometheus_export_hostname = false;
+
+  MetricRegistry registry;
+
+  auto tablet_entity = METRIC_ENTITY_tablet.Instantiate(&registry, "t1");
+  auto tablet_counter = METRIC_tablet_test_counter.Instantiate(tablet_entity);
+  tablet_counter->IncrementBy(1);
+
+  ostringstream output;
+  PrometheusWriter writer(&output);
+  MetricPrometheusOptions opts;
+  opts.hostname = "ts-01.example.com";
+  ASSERT_OK(registry.WriteAsPrometheus(&writer, opts));
+
+  const auto& out = output.str();
+  // hostname label must not appear when the export flag is off.
+  ASSERT_STR_NOT_CONTAINS(out, "hostname=");
+  // Entity labels should still be present.
+  ASSERT_STR_CONTAINS(out,
+      "kudu_tablet_test_counter{type=\"tablet\",id=\"t1\",unit_type=\"bytes\"} 1\n");
+}
+
+// Test that when --metrics_prometheus_use_entity_labels is true but hostname
+// is empty, no hostname label is emitted (no trailing comma or empty value).
+TEST_F(MetricsTest, PrometheusEmptyHostnameLabel) {
+  google::FlagSaver saver;
+  FLAGS_metrics_prometheus_use_entity_labels = true;
+
+  MetricRegistry registry;
+
+  auto tablet_entity = METRIC_ENTITY_tablet.Instantiate(&registry, "t1");
+  auto tablet_counter = METRIC_tablet_test_counter.Instantiate(tablet_entity);
+  tablet_counter->IncrementBy(1);
+
+  ostringstream output;
+  PrometheusWriter writer(&output);
+  MetricPrometheusOptions opts;
+  // hostname is empty (default).
+  ASSERT_OK(registry.WriteAsPrometheus(&writer, opts));
+
+  const auto& out = output.str();
+  // No hostname label should appear.
+  ASSERT_STR_NOT_CONTAINS(out, "hostname=");
+  // Output should match the format from the prior patch (entity labels, no hostname).
+  ASSERT_STR_CONTAINS(out,
+      "kudu_tablet_test_counter{type=\"tablet\",id=\"t1\",unit_type=\"bytes\"} 1\n");
+}
+
+// Tests for Prometheus-format filtering via MetricPrometheusOptions::filters.
+// All filtering tests below, including PrometheusFilterByEntityLevel, use the
+// entity-labels format. PrometheusFilterByEntityLevel uses test_entity -- not
+// one of the "server"/"table"/"tablet" entity types -- which is safe now that
+// BuildPrometheusLabels() handles arbitrary entity types (KUDU-3775). See
+// PrometheusEntityLabelsArbitraryEntityType below for a dedicated test of the
+// label-format output itself
+
+TEST_F(MetricsTest, PrometheusFilterByEntityLevel) {
+  // Explicitly pin the flag (rather than relying on its default) so this
+  // test's behavior doesn't silently change if the default changes later.
+  google::FlagSaver saver;
+  FLAGS_metrics_prometheus_use_entity_labels = true;
+
+  MetricRegistry registry;
+  auto entity  = METRIC_ENTITY_test_entity.Instantiate(&registry, "level-test");
+  auto warn_m  = METRIC_warn_counter.Instantiate(entity);
+  auto info_m  = METRIC_info_counter.Instantiate(entity);
+  auto debug_m = METRIC_debug_counter.Instantiate(entity);
+
+  {
+    // "warn" level: only warn metric should appear.
+    ostringstream out;
+    PrometheusWriter writer(&out);
+    MetricPrometheusOptions opts;
+    opts.filters.entity_level = "warn";
+    ASSERT_OK(registry.WriteAsPrometheus(&writer, opts));
+    ASSERT_STR_CONTAINS(out.str(), "warn_counter");
+    ASSERT_STR_NOT_CONTAINS(out.str(), "info_counter");
+    ASSERT_STR_NOT_CONTAINS(out.str(), "debug_counter");
+  }
+  {
+    // "info" level: warn and info metrics should appear, debug should not.
+    ostringstream out;
+    PrometheusWriter writer(&out);
+    MetricPrometheusOptions opts;
+    opts.filters.entity_level = "info";
+    ASSERT_OK(registry.WriteAsPrometheus(&writer, opts));
+    ASSERT_STR_CONTAINS(out.str(), "warn_counter");
+    ASSERT_STR_CONTAINS(out.str(), "info_counter");
+    ASSERT_STR_NOT_CONTAINS(out.str(), "debug_counter");
+  }
+  {
+    // "debug" level: all three metrics should appear.
+    ostringstream out;
+    PrometheusWriter writer(&out);
+    MetricPrometheusOptions opts;
+    opts.filters.entity_level = "debug";
+    ASSERT_OK(registry.WriteAsPrometheus(&writer, opts));
+    ASSERT_STR_CONTAINS(out.str(), "warn_counter");
+    ASSERT_STR_CONTAINS(out.str(), "info_counter");
+    ASSERT_STR_CONTAINS(out.str(), "debug_counter");
+  }
+}
+
+// Regression test for KUDU-3775: BuildPrometheusLabels() must handle entity
+// types other than "server"/"table"/"tablet" -- e.g. test_entity -- instead
+// of DCHECKing on them. This isolates label-format correctness from filter
+// behavior, which PrometheusFilterByEntityLevel covers separately.
+TEST_F(MetricsTest, PrometheusEntityLabelsArbitraryEntityType) {
+  // Explicitly pin the flag (rather than relying on its default) so this
+  // test's behavior doesn't silently change if the default changes later.
+  google::FlagSaver saver;
+  FLAGS_metrics_prometheus_use_entity_labels = true;
+
+  MetricRegistry registry;
+  auto entity = METRIC_ENTITY_test_entity.Instantiate(&registry, "level-test");
+  auto warn_m = METRIC_warn_counter.Instantiate(entity);
+  warn_m->Increment();
+
+  ostringstream out;
+  PrometheusWriter writer(&out);
+  MetricPrometheusOptions opts;
+  ASSERT_OK(registry.WriteAsPrometheus(&writer, opts));
+  ASSERT_STR_CONTAINS(out.str(),
+      "kudu_warn_counter{type=\"test_entity\",id=\"level-test\",unit_type=\"requests\"} 1\n");
+}
+
+TEST_F(MetricsTest, PrometheusFilterByEntityType) {
+  google::FlagSaver saver;
+  FLAGS_metrics_prometheus_use_entity_labels = true;
+
+  MetricRegistry registry;
+  auto tablet_entity = METRIC_ENTITY_tablet.Instantiate(&registry, "t1");
+  METRIC_tablet_test_counter.Instantiate(tablet_entity);
+
+  auto table_entity = METRIC_ENTITY_table.Instantiate(&registry, "tbl1");
+  METRIC_table_test_counter.Instantiate(table_entity);
+
+  {
+    // Filter to "tablet" type only: table counter must not appear.
+    ostringstream out;
+    PrometheusWriter writer(&out);
+    MetricPrometheusOptions opts;
+    opts.filters.entity_types = { "tablet" };
+    ASSERT_OK(registry.WriteAsPrometheus(&writer, opts));
+    ASSERT_STR_CONTAINS(out.str(), "type=\"tablet\"");
+    ASSERT_STR_NOT_CONTAINS(out.str(), "type=\"table\"");
+  }
+  // TODO(KUDU-3774): add a "table" filter case here that asserts only
+  // type="table" appears and type="tablet" does not. Currently blocked because
+  // MatchName() does substring matching, so "table" also matches "tablet".
+  {
+    // Non-existent type: no metrics should appear.
+    ostringstream out;
+    PrometheusWriter writer(&out);
+    MetricPrometheusOptions opts;
+    opts.filters.entity_types = { "nonexistent_type" };
+    ASSERT_OK(registry.WriteAsPrometheus(&writer, opts));
+    ASSERT_STR_NOT_CONTAINS(out.str(), "type=\"tablet\"");
+    ASSERT_STR_NOT_CONTAINS(out.str(), "type=\"table\"");
+  }
+}
+
+TEST_F(MetricsTest, PrometheusFilterByEntityId) {
+  google::FlagSaver saver;
+  FLAGS_metrics_prometheus_use_entity_labels = true;
+
+  MetricRegistry registry;
+  auto e_keep = METRIC_ENTITY_tablet.Instantiate(&registry, "tablet-keep");
+  auto e_drop = METRIC_ENTITY_tablet.Instantiate(&registry, "tablet-drop");
+  METRIC_tablet_test_counter.Instantiate(e_keep);
+  METRIC_tablet_test_counter.Instantiate(e_drop);
+
+  ostringstream out;
+  PrometheusWriter writer(&out);
+  MetricPrometheusOptions opts;
+  opts.filters.entity_ids = { "tablet-keep" };
+  ASSERT_OK(registry.WriteAsPrometheus(&writer, opts));
+  const auto& str = out.str();
+  ASSERT_STR_CONTAINS(str, "id=\"tablet-keep\"");
+  ASSERT_STR_NOT_CONTAINS(str, "id=\"tablet-drop\"");
+}
+
+TEST_F(MetricsTest, PrometheusFilterByMetricName) {
+  google::FlagSaver saver;
+  FLAGS_metrics_prometheus_use_entity_labels = true;
+
+  MetricRegistry registry;
+  auto entity = METRIC_ENTITY_tablet.Instantiate(&registry, "t1");
+  METRIC_tablet_test_counter.Instantiate(entity);
+
+  {
+    // Matching substring: the metric should appear.
+    ostringstream out;
+    PrometheusWriter writer(&out);
+    MetricPrometheusOptions opts;
+    opts.filters.entity_metrics = { "tablet_test_counter" };
+    ASSERT_OK(registry.WriteAsPrometheus(&writer, opts));
+    ASSERT_STR_CONTAINS(out.str(), "kudu_tablet_test_counter");
+  }
+  {
+    // Non-matching substring: no metrics should appear.
+    ostringstream out;
+    PrometheusWriter writer(&out);
+    MetricPrometheusOptions opts;
+    opts.filters.entity_metrics = { "nonexistent_metric" };
+    ASSERT_OK(registry.WriteAsPrometheus(&writer, opts));
+    ASSERT_STR_NOT_CONTAINS(out.str(), "kudu_tablet_test_counter");
+  }
+}
+
+TEST_F(MetricsTest, PrometheusFilterByEntityAttributes) {
+  google::FlagSaver saver;
+  FLAGS_metrics_prometheus_use_entity_labels = true;
+
+  MetricRegistry registry;
+
+  // Two tablet entities belonging to different tables.
+  auto e_a = METRIC_ENTITY_tablet.Instantiate(
+      &registry, "tablet-a", {{"table_name", "table_a"}});
+  auto e_b = METRIC_ENTITY_tablet.Instantiate(
+      &registry, "tablet-b", {{"table_name", "table_b"}});
+  METRIC_tablet_test_counter.Instantiate(e_a);
+  METRIC_tablet_test_counter.Instantiate(e_b);
+
+  // Filter to table_a: only tablet-a should appear.
+  ostringstream out;
+  PrometheusWriter writer(&out);
+  MetricPrometheusOptions opts;
+  opts.filters.entity_attrs = { "table_name", "table_a" };
+  ASSERT_OK(registry.WriteAsPrometheus(&writer, opts));
+  const auto& str = out.str();
+  ASSERT_STR_CONTAINS(str, "id=\"tablet-a\"");
+  ASSERT_STR_NOT_CONTAINS(str, "id=\"tablet-b\"");
+}
+
+// Unrecognized ?level= values (e.g. a typo) fall through to the default
+// "debug" behaviour so that all metrics are included rather than silently
+// dropping everything.
+TEST_F(MetricsTest, PrometheusFilterUnrecognizedLevel) {
+  google::FlagSaver saver;
+  FLAGS_metrics_prometheus_use_entity_labels = false;
+
+  MetricRegistry registry;
+  auto entity = METRIC_ENTITY_test_entity.Instantiate(&registry, "level-test");
+  METRIC_warn_counter.Instantiate(entity);
+  METRIC_info_counter.Instantiate(entity);
+  METRIC_debug_counter.Instantiate(entity);
+
+  ostringstream out;
+  PrometheusWriter writer(&out);
+  MetricPrometheusOptions opts;
+  opts.filters.entity_level = "not_a_real_level";
+  ASSERT_OK(registry.WriteAsPrometheus(&writer, opts));
+  const auto& str = out.str();
+  ASSERT_STR_CONTAINS(str, "warn_counter");
+  ASSERT_STR_CONTAINS(str, "info_counter");
+  ASSERT_STR_CONTAINS(str, "debug_counter");
 }
 
 } // namespace kudu

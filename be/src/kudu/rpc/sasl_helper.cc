@@ -113,11 +113,13 @@ bool SaslHelper::IsPlainEnabled() const {
 
 Status SaslHelper::CheckNegotiateCallId(int32_t call_id) const {
   if (call_id != kNegotiateCallId) {
-    Status s = Status::IllegalState(strings::Substitute(
+    // The call-id comes from untrusted network input. A misbehaving or
+    // malicious peer can send any value, so this must be a regular error
+    // path — not LOG(DFATAL) — otherwise debug builds would crash on
+    // arbitrary client input.
+    return Status::IllegalState(strings::Substitute(
         "Received illegal call-id during negotiation; expected: $0, received: $1",
         kNegotiateCallId, call_id));
-    LOG(DFATAL) << tag_ << ": " << s.ToString();
-    return s;
   }
   return Status::OK();
 }

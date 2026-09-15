@@ -16,11 +16,12 @@
 // under the License.
 #pragma once
 
+#include <atomic>
 #include <cstdint>
 #include <functional>
 #include <memory>
-#include <mutex>
 #include <optional>
+#include <shared_mutex> // IWYU pragma: keep
 #include <string>
 #include <unordered_map>
 #include <utility>
@@ -97,10 +98,21 @@ class MessengerBuilder {
     return *this;
   }
 
+  MessengerBuilder& set_acceptor_listen_backlog(int max_queue_len) {
+    acceptor_listen_backlog_ = max_queue_len;
+    return *this;
+  }
+
   // Set the number of reactor threads that will be used for sending and
   // receiving.
   MessengerBuilder& set_num_reactors(int num_reactors) {
     num_reactors_ = num_reactors;
+    return *this;
+  }
+
+  // Set the maximum size of RPC message for sending and receiving.
+  MessengerBuilder& set_rpc_max_message_size(int64_t rpc_max_message_size) {
+    rpc_max_message_size_ = rpc_max_message_size;
     return *this;
   }
 
@@ -141,6 +153,12 @@ class MessengerBuilder {
   // Set the timeout for negotiating an RPC connection.
   MessengerBuilder& set_rpc_negotiation_timeout_ms(int64_t time_in_ms) {
     rpc_negotiation_timeout_ms_ = time_in_ms;
+    return *this;
+  }
+
+  // Set the name of the node where the result messenger will be running.
+  MessengerBuilder& set_hostname(const std::string& hostname) {
+    hostname_ = hostname;
     return *this;
   }
 
@@ -192,7 +210,7 @@ class MessengerBuilder {
   // list and
   // https://www.openssl.org/docs/man1.1.1/man3/SSL_CTX_set_ciphersuites.html
   // for SSL_CTX_set_ciphersuites() API details.
-  MessengerBuilder &set_rpc_tls_ciphersuites(
+  MessengerBuilder& set_rpc_tls_ciphersuites(
       const std::string& rpc_tls_ciphersuites) {
     rpc_tls_ciphersuites_ = rpc_tls_ciphersuites;
     return *this;
@@ -200,7 +218,7 @@ class MessengerBuilder {
 
   // Set the minimum protocol version to allow when for securing RPC connections
   // with TLS. May be one of 'TLSv1', 'TLSv1.1', 'TLSv1.2', 'TLSv1.3'.
-  MessengerBuilder &set_rpc_tls_min_protocol(
+  MessengerBuilder& set_rpc_tls_min_protocol(
       const std::string& rpc_tls_min_protocol) {
     rpc_tls_min_protocol_ = rpc_tls_min_protocol;
     return *this;
@@ -264,12 +282,15 @@ class MessengerBuilder {
  private:
   const std::string name_;
   MonoDelta connection_keepalive_time_;
+  int acceptor_listen_backlog_;
   int num_reactors_;
+  int64_t rpc_max_message_size_;
   int min_negotiation_threads_;
   int max_negotiation_threads_;
   MonoDelta coarse_timer_granularity_;
   scoped_refptr<MetricEntity> metric_entity_;
   int64_t rpc_negotiation_timeout_ms_;
+  std::string hostname_;
   std::string sasl_proto_name_;
   std::string rpc_authentication_;
   std::string rpc_encryption_;
@@ -298,16 +319,15 @@ class MessengerBuilder {
 // one as a singleton, and then make calls using Proxy objects.
 //
 // See rpc-test.cc and rpc-bench.cc for example usages.
-class Messenger {
+class Messenger final {
  public:
-  friend class MessengerBuilder;
-  friend class Proxy;
-  friend class Reactor;
-  friend class ReactorThread;
   typedef std::vector<std::shared_ptr<AcceptorPool> > acceptor_vec_t;
   typedef std::unordered_map<std::string, scoped_refptr<RpcService> > RpcServicesMap;
 
-  static const uint64_t UNKNOWN_CALL_ID = 0;
+  static constexpr const uint64_t UNKNOWN_CALL_ID = 0;
+
+  // TODO(KUDU-2439): remove this stop-gap method once the issue is addressed
+  static uint32_t GetInstanceCount();
 
   ~Messenger();
 
@@ -387,20 +407,20 @@ class Messenger {
   JwtVerifier* mutable_jwt_verifier() { return jwt_verifier_.get(); }
 
   std::optional<security::SignedTokenPB> authn_token() const {
-    std::lock_guard<simple_spinlock> l(authn_token_lock_);
+    std::lock_guard l(authn_token_lock_);
     return authn_token_;
   }
   void set_authn_token(const security::SignedTokenPB& token) {
-    std::lock_guard<simple_spinlock> l(authn_token_lock_);
+    std::lock_guard l(authn_token_lock_);
     authn_token_ = token;
   }
 
   std::optional<security::JwtRawPB> jwt() const {
-    std::lock_guard<simple_spinlock> l(authn_token_lock_);
+    std::lock_guard l(authn_token_lock_);
     return jwt_;
   }
   void set_jwt(const security::JwtRawPB& token) {
-    std::lock_guard<simple_spinlock> l(authn_token_lock_);
+    std::lock_guard l(authn_token_lock_);
     jwt_ = token;
   }
 
@@ -419,12 +439,12 @@ class Messenger {
   }
 
   void SetServicesRegistered() {
-    std::lock_guard<percpu_rwlock> guard(lock_);
+    std::lock_guard guard(lock_);
     state_ = kServicesRegistered;
   }
 
   bool closing() const {
-    shared_lock<rw_spinlock> l(lock_.get_lock());
+    std::shared_lock l(lock_.get_lock());
     return state_ == kClosing;
   }
 
@@ -434,15 +454,29 @@ class Messenger {
     return rpc_negotiation_timeout_ms_;
   }
 
+  int64_t rpc_max_message_size() const { return rpc_max_message_size_; }
+
+  // The name of the node where this Messenger is running. The best case is
+  // FQDN retrieved using getaddrinfo(), but it might be just local hostname
+  // retrived by gethostname(). It can also be empty if Messenger has been
+  // created without setting the hostname.
+  const std::string& hostname() const {
+    return hostname_;
+  }
+
   const std::string& sasl_proto_name() const {
     return sasl_proto_name_;
   }
 
   const std::string& keytab_file() const { return keytab_file_; }
 
-  const scoped_refptr<RpcService> rpc_service(const std::string& service_name) const;
+  scoped_refptr<RpcService> rpc_service(const std::string& service_name) const;
 
  private:
+  friend class MessengerBuilder;
+  friend class Proxy;
+  friend class Reactor;
+  friend class ReactorThread;
   FRIEND_TEST(TestRpc, TestConnectionKeepalive);
   FRIEND_TEST(TestRpc, TestConnectionAlwaysKeepalive);
   FRIEND_TEST(TestRpc, TestClientConnectionsMetrics);
@@ -452,10 +486,8 @@ class Messenger {
 
   explicit Messenger(const MessengerBuilder& bld);
 
-  Reactor* RemoteToReactor(const Sockaddr& remote);
+  Reactor* RemoteToReactor(const Sockaddr& remote) const;
   Status Init();
-  void RunTimeoutThread();
-  void UpdateCurTime();
 
   // Shuts down the messenger.
   //
@@ -469,6 +501,15 @@ class Messenger {
   // Called by external-facing shared_ptr when the user no longer holds
   // any references. See 'retain_self_' for more info.
   void AllExternalReferencesDropped();
+
+  // TODO(KUDU-2439): remove this stop-gap field once the issue is addressed
+  static std::atomic<uint32_t> kInstanceCount_;
+
+  // Get the total number of currently pending connections across all the RPC
+  // endpoints this messenger is bound to. This utility method returns -1
+  // if the information on the listened socket's backlog cannot be retrieved
+  // from all of the RPC endpoints.
+  int32_t GetPendingConnectionsNum();
 
   const std::string name_;
 
@@ -535,6 +576,12 @@ class Messenger {
   // Timeout in milliseconds after which an incomplete connection negotiation will timeout.
   const int64_t rpc_negotiation_timeout_ms_;
 
+  // Maximum RPC message size (in bytes) set by MessengerBuilder.
+  int64_t rpc_max_message_size_;
+
+  // The name of the node where this messenger is running.
+  const std::string hostname_;
+
   // The SASL protocol name that is used for the SASL negotiation.
   const std::string sasl_proto_name_;
 
@@ -542,7 +589,12 @@ class Messenger {
   const std::string keytab_file_;
 
   // Whether to set SO_REUSEPORT on the listening sockets.
-  bool reuseport_;
+  const bool reuseport_;
+
+  // Acceptor's listened socket backlog: the capacity of the queue to
+  // accommodate incoming (but not accepted yet) connection requests to the
+  // messenger's listening sockets.
+  const int acceptor_listen_backlog_;
 
   // The ownership of the Messenger object is somewhat subtle. The pointer graph
   // looks like this:
@@ -588,6 +640,8 @@ class Messenger {
   // reactor threads, which deadlocks if the user destructs the Messenger from
   // within a Reactor thread itself.
   std::shared_ptr<Messenger> retain_self_;
+
+  FunctionGaugeDetacher metric_detacher_;
 
   DISALLOW_COPY_AND_ASSIGN(Messenger);
 };

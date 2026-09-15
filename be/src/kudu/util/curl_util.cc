@@ -133,8 +133,11 @@ EasyCurl::EasyCurl()
   curl_ = curl_easy_init();
   CHECK(curl_) << "Could not init curl";
 
-  // Ensure the curl error buffer is large enough.
+  // Set the error buffer to enhance error messages with more details, when
+  // available.
   static_assert(kErrBufSize >= CURL_ERROR_SIZE, "kErrBufSize is too small");
+  const auto code = curl_easy_setopt(curl_, CURLOPT_ERRORBUFFER, errbuf_);
+  CHECK_EQ(CURLE_OK, code);
 }
 
 EasyCurl::~EasyCurl() {
@@ -187,46 +190,15 @@ Status EasyCurl::DoRequest(const string& url,
                            const vector<string>& headers) {
   CHECK_NOTNULL(dst)->clear();
 
-  // Reset all options to default values to ensure settings do not leak
-  // across calls.
-  curl_easy_reset(curl_);
-
-  // Set the error buffer to enhance error messages with more details, when
-  // available.
-  CURL_RETURN_NOT_OK(curl_easy_setopt(curl_, CURLOPT_ERRORBUFFER, errbuf_));
-
   // Mark the error buffer as cleared.
   errbuf_[0] = 0;
 
-  if (verify_peer_) {
-    CURL_RETURN_NOT_OK(curl_easy_setopt(curl_, CURLOPT_SSL_VERIFYHOST, 2));
-    CURL_RETURN_NOT_OK(curl_easy_setopt(curl_, CURLOPT_SSL_VERIFYPEER, 1));
-
-    CURL_RETURN_NOT_OK(curl_easy_setopt(curl_, CURLOPT_PROXY_SSL_VERIFYHOST, 2));
-    CURL_RETURN_NOT_OK(curl_easy_setopt(curl_, CURLOPT_PROXY_SSL_VERIFYPEER, 1));
-
-    if (!FLAGS_trusted_certificate_file.empty()) {
-      CURL_RETURN_NOT_OK(curl_easy_setopt(curl_, CURLOPT_CAINFO,
-            FLAGS_trusted_certificate_file.c_str()));
-      CURL_RETURN_NOT_OK(curl_easy_setopt(curl_, CURLOPT_PROXY_CAINFO,
-            FLAGS_trusted_certificate_file.c_str()));
-    }
-  } else {
+  if (!verify_peer_) {
     CURL_RETURN_NOT_OK(curl_easy_setopt(curl_, CURLOPT_SSL_VERIFYHOST, 0));
     CURL_RETURN_NOT_OK(curl_easy_setopt(curl_, CURLOPT_SSL_VERIFYPEER, 0));
-    CURL_RETURN_NOT_OK(curl_easy_setopt(curl_, CURLOPT_PROXY_SSL_VERIFYHOST, 0));
-    CURL_RETURN_NOT_OK(curl_easy_setopt(curl_, CURLOPT_PROXY_SSL_VERIFYPEER, 0));
-  }
-  if (!ca_certificates_.empty()) {
-    CURL_RETURN_NOT_OK(curl_easy_setopt(curl_, CURLOPT_CAINFO, ca_certificates_.c_str()));
-  }
-  if (!proxy_ca_certificates_.empty()) {
-    CURL_RETURN_NOT_OK(curl_easy_setopt(
-        curl_, CURLOPT_PROXY_CAINFO, proxy_ca_certificates_.c_str()));
-  }
-  if (!proxy_pinned_public_key_.empty()) {
-    CURL_RETURN_NOT_OK(curl_easy_setopt(
-        curl_, CURLOPT_PROXY_PINNEDPUBLICKEY, proxy_pinned_public_key_.c_str()));
+  } else if (!FLAGS_trusted_certificate_file.empty()) {
+    CURL_RETURN_NOT_OK(curl_easy_setopt(curl_, CURLOPT_CAINFO,
+                                        FLAGS_trusted_certificate_file.c_str()));
   }
 
   switch (auth_type_) {
@@ -261,6 +233,47 @@ Status EasyCurl::DoRequest(const string& url,
     CURL_RETURN_NOT_OK(curl_easy_setopt(curl_, CURLOPT_FAILONERROR, 1));
   }
 
+  uint16_t tls_min_version;
+  switch (tls_min_version_) {
+    case TlsVersion::TLSv1:
+      tls_min_version = CURL_SSLVERSION_TLSv1_0;
+      break;
+    case TlsVersion::TLSv1_1:
+      tls_min_version = CURL_SSLVERSION_TLSv1_1;
+      break;
+    case TlsVersion::TLSv1_2:
+      tls_min_version = CURL_SSLVERSION_TLSv1_2;
+      break;
+    case TlsVersion::TLSv1_3:
+      tls_min_version = CURL_SSLVERSION_TLSv1_3;
+      break;
+    case TlsVersion::ANY:
+      tls_min_version = CURL_SSLVERSION_DEFAULT;
+      break;
+  }
+  CURL_RETURN_NOT_OK(curl_easy_setopt(curl_, CURLOPT_SSLVERSION, tls_min_version));
+
+  uint64_t tls_max_version;
+  switch (tls_max_version_) {
+    case TlsVersion::TLSv1:
+      tls_max_version = CURL_SSLVERSION_MAX_TLSv1_0;
+      break;
+    case TlsVersion::TLSv1_1:
+      tls_max_version = CURL_SSLVERSION_MAX_TLSv1_1;
+      break;
+    case TlsVersion::TLSv1_2:
+      tls_max_version = CURL_SSLVERSION_MAX_TLSv1_2;
+      break;
+    case TlsVersion::TLSv1_3:
+      tls_max_version = CURL_SSLVERSION_MAX_TLSv1_3;
+      break;
+    case TlsVersion::ANY:
+      tls_max_version = CURL_SSLVERSION_MAX_DEFAULT;
+      break;
+  }
+  CURL_RETURN_NOT_OK(curl_easy_setopt(curl_, CURLOPT_SSLVERSION, tls_max_version));
+
+
   // Add headers if specified.
   struct curl_slist* curl_headers = nullptr;
   auto clean_up_curl_slist = MakeScopedCleanup([&]() {
@@ -292,9 +305,6 @@ Status EasyCurl::DoRequest(const string& url,
         curl_, CURLOPT_CUSTOMREQUEST, custom_method_.c_str()));
   }
 
-  if (!proxy_.empty()) {
-    CURL_RETURN_NOT_OK(curl_easy_setopt(curl_, CURLOPT_PROXY, proxy_.c_str()));
-  }
   if (!noproxy_.empty()) {
     CURL_RETURN_NOT_OK(curl_easy_setopt(curl_, CURLOPT_NOPROXY, noproxy_.c_str()));
   }

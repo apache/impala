@@ -17,7 +17,9 @@
 
 #include "kudu/rpc/inbound_call.h"
 
+#include <algorithm>
 #include <cstdint>
+#include <iterator>
 #include <limits>
 #include <memory>
 #include <ostream>
@@ -50,6 +52,8 @@ class FieldDescriptor;
 using google::protobuf::ArenaOptions;
 using google::protobuf::FieldDescriptor;
 using google::protobuf::MessageLite;
+using google::protobuf::RepeatedFieldBackInserter;
+using std::copy;
 using std::string;
 using std::unique_ptr;
 using std::vector;
@@ -97,8 +101,9 @@ Status InboundCall::ParseFrom(unique_ptr<InboundTransfer> transfer) {
     deadline_ = timing_.time_received + MonoDelta::FromMilliseconds(header_.timeout_millis());
   }
 
-  if (header_.sidecar_offsets_size() > TransferLimits::kMaxSidecars) {
-    return Status::Corruption(strings::Substitute(
+  if (PREDICT_FALSE(header_.sidecar_offsets_size() >
+        TransferLimits::kMaxSidecars)) {
+    return Status::Corruption(Substitute(
             "Received $0 additional payload slices, expected at most %d",
             header_.sidecar_offsets_size(), TransferLimits::kMaxSidecars));
   }
@@ -125,9 +130,8 @@ void InboundCall::RespondUnsupportedFeature(const vector<uint32_t>& unsupported_
   ErrorStatusPB err;
   err.set_message("unsupported feature flags");
   err.set_code(ErrorStatusPB::ERROR_INVALID_REQUEST);
-  for (uint32_t feature : unsupported_features) {
-    err.add_unsupported_feature_flags(feature);
-  }
+  copy(unsupported_features.begin(), unsupported_features.end(),
+       RepeatedFieldBackInserter(err.mutable_unsupported_feature_flags()));
 
   Respond(err, false);
 }
@@ -224,12 +228,12 @@ Status InboundCall::AddOutboundSidecar(unique_ptr<RpcSidecar> car, int* idx) {
   // Check that the number of sidecars does not exceed the number of payload
   // slices that are free (two are used up by the header and main message
   // protobufs).
-  if (outbound_sidecars_.size() > TransferLimits::kMaxSidecars) {
+  if (PREDICT_FALSE(outbound_sidecars_.size() > TransferLimits::kMaxSidecars)) {
     return Status::ServiceUnavailable("All available sidecars already used");
   }
   size_t sidecar_bytes = car->TotalSize();
-  if (outbound_sidecars_total_bytes_ >
-      TransferLimits::kMaxTotalSidecarBytes - sidecar_bytes) {
+  if (PREDICT_FALSE(outbound_sidecars_total_bytes_ + sidecar_bytes >
+        TransferLimits::kMaxTotalSidecarBytes)) {
     return Status::RuntimeError(Substitute("Total size of sidecars $0 would exceed limit $1",
         static_cast<int64_t>(outbound_sidecars_total_bytes_) + sidecar_bytes,
         TransferLimits::kMaxTotalSidecarBytes));
@@ -306,6 +310,13 @@ void InboundCall::RecordHandlingCompleted() {
   DCHECK(!timing_.time_completed.Initialized());  // Protect against multiple calls.
   timing_.time_completed = MonoTime::Now();
 
+  // If it's now past the deadline defined by the client, the yet-to-be-sent
+  // response is already late and the RPC will be declared as "timed out"
+  // (if detected) when it arrives to the client side.
+  if (method_info_ && timing_.time_completed > deadline_) {
+    method_info_->timed_out_on_response->Increment();
+  }
+
   if (!timing_.time_handled.Initialized()) {
     // Sometimes we respond to a call before we begin handling it (e.g. due to queue
     // overflow, etc). These cases should not be counted against the histogram.
@@ -333,17 +344,16 @@ MonoTime InboundCall::GetTimeHandled() const {
 }
 
 vector<uint32_t> InboundCall::GetRequiredFeatures() const {
+  const auto& ff = header_.required_feature_flags();
   vector<uint32_t> features;
-  for (uint32_t feature : header_.required_feature_flags()) {
-    features.push_back(feature);
-  }
+  copy(ff.begin(), ff.end(), std::back_inserter(features));
   return features;
 }
 
 Status InboundCall::GetInboundSidecar(int idx, Slice* sidecar) const {
   DCHECK(transfer_) << "Sidecars have been discarded";
-  if (idx < 0 || idx >= header_.sidecar_offsets_size()) {
-    return Status::InvalidArgument(strings::Substitute(
+  if (PREDICT_FALSE(idx < 0 || idx >= header_.sidecar_offsets_size())) {
+    return Status::InvalidArgument(Substitute(
             "Index $0 does not reference a valid sidecar", idx));
   }
   *sidecar = inbound_sidecar_slices_[idx];
@@ -354,8 +364,10 @@ void InboundCall::DiscardTransfer() {
   transfer_.reset();
 }
 
-size_t InboundCall::GetTransferSize() {
-  if (!transfer_) return 0;
+size_t InboundCall::GetTransferSize() const {
+  if (PREDICT_FALSE(!transfer_)) {
+    return 0;
+  }
   return transfer_->data().size();
 }
 

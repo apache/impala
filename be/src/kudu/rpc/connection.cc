@@ -17,10 +17,6 @@
 
 #include "kudu/rpc/connection.h"
 
-#include <netinet/in.h>
-#include <netinet/tcp.h>
-#include <string.h>
-
 #include <algorithm>
 #include <cerrno>
 #include <iostream>
@@ -28,6 +24,7 @@
 #include <set>
 #include <string>
 
+#include <boost/function.hpp>
 #include <boost/intrusive/detail/list_iterator.hpp>
 #include <boost/intrusive/list.hpp>
 #include <ev.h>
@@ -37,6 +34,8 @@
 #include "kudu/gutil/port.h"
 #include "kudu/gutil/strings/human_readable.h"
 #include "kudu/gutil/strings/substitute.h"
+#include "kudu/gutil/sysinfo.h"
+#include "kudu/gutil/walltime.h"
 #include "kudu/rpc/inbound_call.h"
 #include "kudu/rpc/messenger.h"
 #include "kudu/rpc/outbound_call.h"
@@ -45,23 +44,20 @@
 #include "kudu/rpc/rpc_header.pb.h"
 #include "kudu/rpc/rpc_introspection.pb.h"
 #include "kudu/rpc/transfer.h"
-#include "kudu/security/tls_socket.h"
-#include "kudu/util/errno.h"
 #include "kudu/util/faststring.h"
+#include "kudu/util/histogram.pb.h"
+#include "kudu/util/metrics.h"
 #include "kudu/util/net/sockaddr.h"
 #include "kudu/util/net/socket.h"
+#include "kudu/util/scoped_cleanup.h"
 #include "kudu/util/slice.h"
 #include "kudu/util/status.h"
 
-#include <sys/socket.h>
-#ifdef __linux__
-#include <sys/ioctl.h>
-#endif
 
-using kudu::security::TlsSocket;
 using std::includes;
 using std::set;
 using std::shared_ptr;
+using std::string;
 using std::unique_ptr;
 using strings::Substitute;
 
@@ -70,140 +66,15 @@ namespace rpc {
 
 typedef OutboundCall::Phase Phase;
 
-namespace {
-
-// tcp_info struct duplicated from linux/tcp.h.
-//
-// This allows us to decouple the compile-time Linux headers from the
-// runtime Linux kernel. The compile-time headers (and kernel) might be
-// older than the runtime kernel, in which case an ifdef-based approach
-// wouldn't allow us to get all of the info available.
-//
-// NOTE: this struct has been annotated with some local notes about the
-// contents of each field.
-struct tcp_info {
-  // Various state-tracking information.
-  // ------------------------------------------------------------
-  uint8_t    tcpi_state;
-  uint8_t    tcpi_ca_state;
-  uint8_t    tcpi_retransmits;
-  uint8_t    tcpi_probes;
-  uint8_t    tcpi_backoff;
-  uint8_t    tcpi_options;
-  uint8_t    tcpi_snd_wscale : 4, tcpi_rcv_wscale : 4;
-  uint8_t    tcpi_delivery_rate_app_limited:1;
-
-  // Configurations.
-  // ------------------------------------------------------------
-  uint32_t   tcpi_rto;
-  uint32_t   tcpi_ato;
-  uint32_t   tcpi_snd_mss;
-  uint32_t   tcpi_rcv_mss;
-
-  // Counts of packets in various states in the outbound queue.
-  // At first glance one might think these are monotonic counters, but
-  // in fact they are instantaneous counts of queued packets and thus
-  // not very useful for our purposes.
-  // ------------------------------------------------------------
-  // Number of packets outstanding that haven't been acked.
-  uint32_t   tcpi_unacked;
-
-  // Number of packets outstanding that have been selective-acked.
-  uint32_t   tcpi_sacked;
-
-  // Number of packets outstanding that have been deemed lost (a SACK arrived
-  // for a later packet)
-  uint32_t   tcpi_lost;
-
-  // Number of packets in the queue that have been retransmitted.
-  uint32_t   tcpi_retrans;
-
-  // The number of packets towards the highest SACKed sequence number
-  // (some measure of reording, removed in later Linux versions by
-  // 737ff314563ca27f044f9a3a041e9d42491ef7ce)
-  uint32_t   tcpi_fackets;
-
-  // Times when various events occurred.
-  // ------------------------------------------------------------
-  uint32_t   tcpi_last_data_sent;
-  uint32_t   tcpi_last_ack_sent;     /* Not remembered, sorry. */
-  uint32_t   tcpi_last_data_recv;
-  uint32_t   tcpi_last_ack_recv;
-
-  // Path MTU.
-  uint32_t   tcpi_pmtu;
-
-  // Receiver slow start threshold.
-  uint32_t   tcpi_rcv_ssthresh;
-
-  // Smoothed RTT estimate and variance based on the time between sending data and receiving
-  // corresponding ACK. See https://tools.ietf.org/html/rfc2988 for details.
-  uint32_t   tcpi_rtt;
-  uint32_t   tcpi_rttvar;
-
-  // Slow start threshold.
-  uint32_t   tcpi_snd_ssthresh;
-  // Sender congestion window (in number of MSS-sized packets)
-  uint32_t   tcpi_snd_cwnd;
-  // Advertised MSS.
-  uint32_t   tcpi_advmss;
-  // Amount of packet reordering allowed.
-  uint32_t   tcpi_reordering;
-
-  // Receiver-side RTT estimate per the Dynamic Right Sizing algorithm:
-  //
-  // "A system that is only transmitting acknowledgements can still estimate the round-trip
-  // time by observing the time between when a byte is first acknowledged and the receipt of
-  // data that is at least one window beyond the sequence number that was acknowledged. If the
-  // sender is being throttled by the network, this estimate will be valid. However, if the
-  // sending application did not have any data to send, the measured time could be much larger
-  // than the actual round-trip time. Thus this measurement acts only as an upper-bound on the
-  // round-trip time and should be be used only when it is the only source of round-trip time
-  // information."
-  uint32_t   tcpi_rcv_rtt;
-  uint32_t   tcpi_rcv_space;
-
-  // Total number of retransmitted packets.
-  uint32_t   tcpi_total_retrans;
-
-  // Pacing-related metrics.
-  uint64_t   tcpi_pacing_rate;
-  uint64_t   tcpi_max_pacing_rate;
-
-  // Total bytes ACKed by remote peer.
-  uint64_t   tcpi_bytes_acked;    /* RFC4898 tcpEStatsAppHCThruOctetsAcked */
-  // Total bytes received (for which ACKs have been sent out).
-  uint64_t   tcpi_bytes_received; /* RFC4898 tcpEStatsAppHCThruOctetsReceived */
-  // Segments sent and received.
-  uint32_t   tcpi_segs_out;       /* RFC4898 tcpEStatsPerfSegsOut */
-  uint32_t   tcpi_segs_in;        /* RFC4898 tcpEStatsPerfSegsIn */
-
-  // The following metrics are quite new and not in el7.
-  // ------------------------------------------------------------
-  uint32_t   tcpi_notsent_bytes;
-  uint32_t   tcpi_min_rtt;
-  uint32_t   tcpi_data_segs_in;      /* RFC4898 tcpEStatsDataSegsIn */
-  uint32_t   tcpi_data_segs_out;     /* RFC4898 tcpEStatsDataSegsOut */
-
-  // Calculated rate at which data was delivered.
-  uint64_t   tcpi_delivery_rate;
-
-  // Timers for various states.
-  uint64_t   tcpi_busy_time;      /* Time (usec) busy sending data */
-  uint64_t   tcpi_rwnd_limited;   /* Time (usec) limited by receive window */
-  uint64_t   tcpi_sndbuf_limited; /* Time (usec) limited by send buffer */
-};
-
-} // anonymous namespace
-
 ///
 /// Connection
 ///
-Connection::Connection(ReactorThread *reactor_thread,
-                       Sockaddr remote,
+Connection::Connection(ReactorThread* reactor_thread,
+                       const Sockaddr& remote,
                        unique_ptr<Socket> socket,
                        Direction direction,
-                       CredentialsPolicy policy)
+                       CredentialsPolicy policy,
+                       bool collect_io_handler_latency_stats)
     : reactor_thread_(reactor_thread),
       remote_(remote),
       socket_(std::move(socket)),
@@ -212,6 +83,9 @@ Connection::Connection(ReactorThread *reactor_thread,
       is_epoll_registered_(false),
       call_id_(std::numeric_limits<int32_t>::max()),
       credentials_policy_(policy),
+      collect_io_handler_latency_stats_(collect_io_handler_latency_stats),
+      rd_latency_histogram_(kLatencyHistogramMaxValue, kLatencyHistogramPrecisionDigits),
+      wr_latency_histogram_(kLatencyHistogramMaxValue, kLatencyHistogramPrecisionDigits),
       negotiation_complete_(false),
       is_confidential_(false),
       scheduled_for_shutdown_(false) {
@@ -231,7 +105,7 @@ Status Connection::SetTcpKeepAlive(int idle_time_s, int retry_time_s, int num_re
 
 void Connection::EpollRegister(ev::loop_ref& loop) {
   DCHECK(reactor_thread_->IsCurrentThread());
-  DVLOG(4) << "Registering connection for epoll: " << ToString();
+  DVLOG(4) << Substitute("registering connection for epoll: $0", ToString());
   write_io_.set(loop);
   write_io_.set(socket_->GetFd(), ev::WRITE);
   write_io_.set<Connection, &Connection::WriteHandler>(this);
@@ -259,7 +133,7 @@ Connection::~Connection() {
 bool Connection::Idle() const {
   DCHECK(reactor_thread_->IsCurrentThread());
   // check if we're in the middle of receiving something
-  InboundTransfer *transfer = inbound_.get();
+  InboundTransfer* transfer = inbound_.get();
   if (transfer && (transfer->TransferStarted())) {
     return false;
   }
@@ -284,7 +158,7 @@ bool Connection::Idle() const {
   return true;
 }
 
-void Connection::Shutdown(const Status &status,
+void Connection::Shutdown(const Status& status,
                           unique_ptr<ErrorStatusPB> rpc_error) {
   DCHECK(reactor_thread_->IsCurrentThread());
   shutdown_status_ = status.CloneAndPrepend("RPC connection failed");
@@ -292,16 +166,17 @@ void Connection::Shutdown(const Status &status,
   if (inbound_ && inbound_->TransferStarted()) {
     double secs_since_active =
         (reactor_thread_->cur_time() - last_activity_time_).ToSeconds();
-    LOG(WARNING) << "Shutting down " << ToString()
-                 << " with pending inbound data ("
-                 << inbound_->StatusAsString() << ", last active "
-                 << HumanReadableElapsedTime::ToShortString(secs_since_active)
-                 << " ago, status=" << status.ToString() << ")";
+    LOG(WARNING) << Substitute(
+        "shutting down $0 with pending inbound data: "
+        "$1; last active $2 ago: status $3",
+        ToString(),
+        inbound_->StatusAsString(),
+        HumanReadableElapsedTime::ToShortString(secs_since_active),
+        status.ToString());
   }
 
   // Clear any calls which have been sent and were awaiting a response.
-  for (const car_map_t::value_type &v : awaiting_response_) {
-    CallAwaitingResponse *c = v.second;
+  for (const auto& [_, c] : awaiting_response_) {
     if (c->call) {
       // Make sure every awaiting call receives the error info, if any.
       unique_ptr<ErrorStatusPB> error;
@@ -320,7 +195,7 @@ void Connection::Shutdown(const Status &status,
 
   // Clear any outbound transfers.
   while (!outbound_transfers_.empty()) {
-    OutboundTransfer *t = &outbound_transfers_.front();
+    auto* t = &outbound_transfers_.front();
     outbound_transfers_.pop_front();
     delete t;
   }
@@ -331,19 +206,32 @@ void Connection::Shutdown(const Status &status,
   if (socket_) {
     WARN_NOT_OK(socket_->Close(), "Error closing socket");
   }
+
+  if (collect_io_handler_latency_stats_) {
+    // Report stats on the highest observed read and write handler latencies
+    // for this connection.
+    if (auto& h = reactor_thread_->max_read_latency_histogram_;
+        h && rd_latency_histogram_.TotalCount() != 0) {
+      h->Increment(rd_latency_histogram_.MaxValue());
+    }
+    if (auto& h = reactor_thread_->max_write_latency_histogram_;
+        h && wr_latency_histogram_.TotalCount() != 0) {
+      h->Increment(wr_latency_histogram_.MaxValue());
+    }
+  }
 }
 
 void Connection::QueueOutbound(unique_ptr<OutboundTransfer> transfer) {
   DCHECK(reactor_thread_->IsCurrentThread());
 
-  if (!shutdown_status_.ok()) {
+  if (PREDICT_FALSE(!shutdown_status_.ok())) {
     // If we've already shut down, then we just need to abort the
     // transfer rather than bothering to queue it.
     transfer->Abort(shutdown_status_);
     return;
   }
 
-  DVLOG(3) << "Queueing transfer: " << transfer->HexDump();
+  DVLOG(3) << Substitute("queueing transfer: $0", transfer->HexDump());
 
   outbound_transfers_.push_back(*transfer.release());
 
@@ -360,14 +248,16 @@ Connection::CallAwaitingResponse::~CallAwaitingResponse() {
   DCHECK(conn->reactor_thread_->IsCurrentThread());
 }
 
-void Connection::CallAwaitingResponse::HandleTimeout(ev::timer &watcher, int revents) {
+void Connection::CallAwaitingResponse::HandleTimeout(ev::timer& watcher,
+                                                     int /*revents*/) {
   if (remaining_timeout > 0) {
-    if (watcher.remaining() < -1.0) {
-      LOG(WARNING) << "RPC call timeout handler was delayed by "
-                   << -watcher.remaining() << "s! This may be due to a process-wide "
-                   << "pause such as swapping, logging-related delays, or allocator lock "
-                   << "contention. Will allow an additional "
-                   << remaining_timeout << "s for a response.";
+    const auto rem = watcher.remaining();
+    if (PREDICT_FALSE(rem < -1.0)) {
+      LOG(WARNING) << Substitute(
+          "RPC call timeout handler was delayed by $0s: this may be due "
+          "to a process-wide pause such as swapping, logging-related delays, "
+          "or allocator lock contention. Will allow extra $1s for a response",
+          rem, remaining_timeout);
     }
 
     watcher.set(remaining_timeout, 0);
@@ -379,7 +269,7 @@ void Connection::CallAwaitingResponse::HandleTimeout(ev::timer &watcher, int rev
   conn->HandleOutboundCallTimeout(this);
 }
 
-void Connection::HandleOutboundCallTimeout(CallAwaitingResponse *car) {
+void Connection::HandleOutboundCallTimeout(CallAwaitingResponse* car) {
   DCHECK(reactor_thread_->IsCurrentThread());
   if (!car->call) {
     // The RPC may have been cancelled before the timeout was hit.
@@ -407,7 +297,7 @@ void Connection::HandleOutboundCallTimeout(CallAwaitingResponse *car) {
   // already timed out.
 }
 
-void Connection::CancelOutboundCall(const shared_ptr<OutboundCall> &call) {
+void Connection::CancelOutboundCall(const shared_ptr<OutboundCall>& call) {
   CallAwaitingResponse* car = FindPtrOrNull(awaiting_response_, call->call_id());
   if (car != nullptr) {
     // car->call may be NULL if the call has timed out already.
@@ -423,7 +313,7 @@ Status Connection::GetLocalAddress(Sockaddr* addr) const {
 }
 
 // Inject a cancellation when 'call' is in state 'FLAGS_rpc_inject_cancellation_state'.
-void inline Connection::MaybeInjectCancellation(const shared_ptr<OutboundCall> &call) {
+void inline Connection::MaybeInjectCancellation(const shared_ptr<OutboundCall>& call) {
   if (PREDICT_FALSE(call->ShouldInjectCancellation())) {
     reactor_thread_->reactor()->messenger()->QueueCancellation(call);
   }
@@ -432,14 +322,18 @@ void inline Connection::MaybeInjectCancellation(const shared_ptr<OutboundCall> &
 // Callbacks after sending a call on the wire.
 // This notifies the OutboundCall object to change its state to SENT once it
 // has been fully transmitted.
-struct CallTransferCallbacks : public TransferCallbacks {
+struct CallTransferCallbacks final : public TransferCallbacks {
  public:
   explicit CallTransferCallbacks(shared_ptr<OutboundCall> call,
-                                 Connection *conn)
-      : call_(std::move(call)), conn_(conn) {}
+                                 Connection* conn)
+      : call_(std::move(call)),
+        conn_(conn),
+        notified_(false) {
+  }
 
-  virtual void NotifyTransferFinished() OVERRIDE {
-    // TODO: would be better to cancel the transfer while it is still on the queue if we
+  void NotifyTransferFinished() override {
+    DCHECK(!notified_);
+    // TODO(mpercy): would be better to cancel the transfer while it is still on the queue if we
     // timed out before the transfer started, but there is still a race in the case of
     // a partial send that we have to handle here
     if (call_->IsFinished()) {
@@ -449,18 +343,20 @@ struct CallTransferCallbacks : public TransferCallbacks {
       // Test cancellation when 'call_' is in 'SENT' state.
       conn_->MaybeInjectCancellation(call_);
     }
-    delete this;
+    notified_ = true;
   }
 
-  virtual void NotifyTransferAborted(const Status &status) OVERRIDE {
-    VLOG(1) << "Transfer of RPC call " << call_->ToString() << " aborted: "
-            << status.ToString();
-    delete this;
+  void NotifyTransferAborted(const Status& status) override {
+    DCHECK(!notified_);
+    notified_ = true;
+    VLOG(1) << Substitute(
+        "transfer of $0 aborted: $1", call_->ToString(), status.ToString());
   }
 
  private:
   shared_ptr<OutboundCall> call_;
   Connection* conn_;
+  bool notified_;
 };
 
 void Connection::QueueOutboundCall(shared_ptr<OutboundCall> call) {
@@ -484,7 +380,7 @@ void Connection::QueueOutboundCall(shared_ptr<OutboundCall> call) {
   DCHECK(!call->cancellation_requested());
 
   // Assign the call ID.
-  int32_t call_id = GetNextCallId();
+  const int32_t call_id = GetNextCallId();
   call->set_call_id(call_id);
 
   // Serialize the actual bytes to be put on the wire.
@@ -501,7 +397,7 @@ void Connection::QueueOutboundCall(shared_ptr<OutboundCall> call) {
   car->call = call;
 
   // Set up the timeout timer.
-  const MonoDelta &timeout = call->controller()->timeout();
+  const auto& timeout = call->controller()->timeout();
   if (timeout.Initialized()) {
     reactor_thread_->RegisterTimeout(&car->timeout_timer);
     car->timeout_timer.set<CallAwaitingResponse, // NOLINT(*)
@@ -544,67 +440,51 @@ void Connection::QueueOutboundCall(shared_ptr<OutboundCall> call) {
     car->timeout_timer.start();
   }
 
-  TransferCallbacks *cb = new CallTransferCallbacks(std::move(call), this);
+  unique_ptr<TransferCallbacks> cb(new CallTransferCallbacks(std::move(call), this));
   awaiting_response_[call_id] = car.release();
-  QueueOutbound(unique_ptr<OutboundTransfer>(
-      OutboundTransfer::CreateForCallRequest(call_id, tmp_slices, cb)));
+  QueueOutbound(OutboundTransfer::CreateForCallRequest(call_id,
+                                             std::move(tmp_slices),
+                                             std::move(cb)));
 }
 
 // Callbacks for sending an RPC call response from the server.
 // This takes ownership of the InboundCall object so that, once it has
 // been responded to, we can free up all of the associated memory.
-struct ResponseTransferCallbacks : public TransferCallbacks {
+struct ResponseTransferCallbacks final : public TransferCallbacks {
  public:
-  ResponseTransferCallbacks(unique_ptr<InboundCall> call,
-                            Connection *conn) :
-    call_(std::move(call)),
-    conn_(conn)
-  {}
+  ResponseTransferCallbacks(unique_ptr<InboundCall> call, Connection* conn)
+      : call_(std::move(call)),
+        conn_(conn),
+        notified_(false) {
+  }
 
-  ~ResponseTransferCallbacks() {
-    // Remove the call from the map.
-    InboundCall *call_from_map = EraseKeyReturnValuePtr(
-      &conn_->calls_being_handled_, call_->call_id());
+  void NotifyTransferFinished() override {
+    MarkTransferComplete();
+  }
+
+  void NotifyTransferAborted(const Status& /*status*/) override {
+    LOG(WARNING) << Substitute(
+        "$0 torn down before $1 could send its response",
+        conn_->ToString(), call_->ToString());
+    MarkTransferComplete();
+  }
+
+ private:
+  // Mark the transfer as complete with the underlying connection.
+  void MarkTransferComplete() {
+    DCHECK(!notified_);
+
+    // Remove the call from the connection's map.
+    [[maybe_unused]] auto* call_from_map = EraseKeyReturnValuePtr(
+        &conn_->calls_being_handled_, call_->call_id());
     DCHECK_EQ(call_from_map, call_.get());
+
+    notified_ = true;
   }
 
-  virtual void NotifyTransferFinished() OVERRIDE {
-    delete this;
-  }
-
-  virtual void NotifyTransferAborted(const Status &status) OVERRIDE {
-    LOG(WARNING) << "Connection torn down before " <<
-      call_->ToString() << " could send its response";
-    delete this;
-  }
-
- private:
   unique_ptr<InboundCall> call_;
-  Connection *conn_;
-};
-
-// Reactor task which puts a transfer on the outbound transfer queue.
-class QueueTransferTask : public ReactorTask {
- public:
-  QueueTransferTask(unique_ptr<OutboundTransfer> transfer,
-                    Connection *conn)
-    : transfer_(std::move(transfer)),
-      conn_(conn)
-  {}
-
-  virtual void Run(ReactorThread *thr) OVERRIDE {
-    conn_->QueueOutbound(std::move(transfer_));
-    delete this;
-  }
-
-  virtual void Abort(const Status &status) OVERRIDE {
-    transfer_->Abort(status);
-    delete this;
-  }
-
- private:
-  unique_ptr<OutboundTransfer> transfer_;
-  Connection *conn_;
+  Connection* conn_;
+  bool notified_;
 };
 
 void Connection::QueueResponseForCall(unique_ptr<InboundCall> call) {
@@ -621,15 +501,25 @@ void Connection::QueueResponseForCall(unique_ptr<InboundCall> call) {
   TransferPayload tmp_slices;
   call->SerializeResponseTo(&tmp_slices);
 
-  TransferCallbacks *cb = new ResponseTransferCallbacks(std::move(call), this);
+  unique_ptr<TransferCallbacks> cb(new ResponseTransferCallbacks(std::move(call), this));
   // After the response is sent, can delete the InboundCall object.
   // We set a dummy call ID and required feature set, since these are not needed
   // when sending responses.
-  unique_ptr<OutboundTransfer> t(
-      OutboundTransfer::CreateForCallResponse(tmp_slices, cb));
 
-  QueueTransferTask *task = new QueueTransferTask(std::move(t), this);
-  reactor_thread_->reactor()->ScheduleReactorTask(task);
+  auto t(OutboundTransfer::CreateForCallResponse(std::move(tmp_slices), std::move(cb)));
+  // Move capture couldn't help since it's necessary to pass the pointer
+  // to both lambdas.
+  auto* t_raw = t.release();
+  ReactorTask task{
+    [this, t_raw](ReactorThread* /*rt*/) {
+      this->QueueOutbound(unique_ptr<OutboundTransfer>(t_raw));
+    },
+    [t_raw](const Status& s) {
+      t_raw->Abort(s);
+      delete t_raw;
+    },
+  };
+  reactor_thread_->reactor()->ScheduleReactorTask(std::move(task));
 }
 
 void Connection::set_confidential(bool is_confidential) {
@@ -646,44 +536,66 @@ RpczStore* Connection::rpcz_store() {
   return reactor_thread_->reactor()->messenger()->rpcz_store();
 }
 
-void Connection::ReadHandler(ev::io &watcher, int revents) {
+void Connection::ReadHandler(ev::io& /*watcher*/, int revents) {
+  // Pre-compute the duration of a single CPU cycle.
+  static const double cycle_duration_us = 1000000.0 / base::CyclesPerSecond();
+
   DCHECK(reactor_thread_->IsCurrentThread());
 
-  DVLOG(3) << ToString() << " ReadHandler(revents=" << revents << ")";
-  if (revents & EV_ERROR) {
+  DVLOG(3) << Substitute("$0 ReadHandler(revents=$1)", ToString(), revents);
+  if (PREDICT_FALSE(revents & EV_ERROR)) {
     reactor_thread_->DestroyConnection(this, Status::NetworkError(ToString() +
                                      ": ReadHandler encountered an error"));
     return;
   }
   last_activity_time_ = reactor_thread_->cur_time();
 
+  if (collect_io_handler_latency_stats_) {
+    // Update the read latency histogram: register how long it's been since
+    // the reactor received notification on I/O event in this epoll loop.
+    const int64_t latency_cycles =
+        CycleClock::Now() - reactor_thread_->cycle_clock_after_poll_;
+    rd_latency_histogram_.Increment(latency_cycles * cycle_duration_us);
+  }
+
+  const int64_t rpc_max_size = reactor_thread_->reactor()->messenger()->rpc_max_message_size();
   faststring extra_buf;
   while (true) {
     if (!inbound_) {
+      // Initialize the maximum RPC message size set by caller.
       inbound_.reset(new InboundTransfer());
     }
-    Status status = inbound_->ReceiveBuffer(socket_.get(), &extra_buf);
+    Status status = inbound_->ReceiveBuffer(socket_.get(), &extra_buf, rpc_max_size);
     if (PREDICT_FALSE(!status.ok())) {
       if (status.posix_code() == ESHUTDOWN) {
-        VLOG(1) << ToString() << " shut down by remote end.";
+        VLOG(1) << Substitute("$0 shut down by remote end", ToString());
       } else {
-        LOG(WARNING) << ToString() << " recv error: " << status.ToString();
+        LOG(WARNING) << Substitute("$0 recv error: $1",
+                                   ToString(), status.ToString());
       }
       reactor_thread_->DestroyConnection(this, status);
       return;
     }
     if (!inbound_->TransferFinished()) {
-      DVLOG(3) << ToString() << ": read is not yet finished yet.";
+      DVLOG(3) << Substitute("$0: read is not yet finished yet", ToString());
       return;
     }
-    DVLOG(3) << ToString() << ": finished reading " << inbound_->data().size() << " bytes";
+    DVLOG(3) << Substitute("$0: finished reading $1 bytes",
+                           ToString(), inbound_->data().size());
 
-    if (direction_ == CLIENT) {
-      HandleCallResponse(std::move(inbound_));
-    } else if (direction_ == SERVER) {
-      HandleIncomingCall(std::move(inbound_));
-    } else {
-      LOG(FATAL) << "Invalid direction: " << direction_;
+    switch (direction_) {
+      case CLIENT:
+        HandleCallResponse(std::move(inbound_));
+        break;
+
+      case SERVER:
+        HandleIncomingCall(std::move(inbound_));
+        break;
+
+      default:
+        LOG(DFATAL) << Substitute("$0: invalid direction",
+                                  static_cast<uint16_t>(direction_));
+        break;
     }
 
     if (extra_buf.size() > 0) {
@@ -699,19 +611,24 @@ void Connection::HandleIncomingCall(unique_ptr<InboundTransfer> transfer) {
 
   unique_ptr<InboundCall> call(new InboundCall(this));
   Status s = call->ParseFrom(std::move(transfer));
-  if (!s.ok()) {
-    LOG(WARNING) << ToString() << ": received bad data: " << s.ToString();
-    // TODO: shutdown? probably, since any future stuff on this socket will be
-    // "unsynchronized"
+  if (PREDICT_FALSE(!s.ok())) {
+    LOG(WARNING) << Substitute("$0: received bad data: '$1'",
+                             ToString(), s.ToString());
+    // Shutting down down the connection since there is a high risk of receiving
+    // "unsynchronized" data on this socket after this error.
+    Shutdown(s);
     return;
   }
 
-  if (!InsertIfNotPresent(&calls_being_handled_, call->call_id(), call.get())) {
-    LOG(WARNING) << ToString() << ": received call ID " << call->call_id() <<
-      " but was already processing this ID! Ignoring";
+  if (PREDICT_FALSE(!InsertIfNotPresent(&calls_being_handled_,
+                                        call->call_id(),
+                                        call.get()))) {
+    LOG(WARNING) << Substitute(
+        "$0: received call ID $1 but was already processing this ID, ignoring",
+        ToString(), call->call_id());
     reactor_thread_->DestroyConnection(
-      this, Status::RuntimeError("Received duplicate call id",
-                                 Substitute("$0", call->call_id())));
+        this, Status::RuntimeError("Received duplicate call id",
+                                   Substitute("$0", call->call_id())));
     return;
   }
 
@@ -720,14 +637,15 @@ void Connection::HandleIncomingCall(unique_ptr<InboundTransfer> transfer) {
 
 void Connection::HandleCallResponse(unique_ptr<InboundTransfer> transfer) {
   DCHECK(reactor_thread_->IsCurrentThread());
-  unique_ptr<CallResponse> resp(new CallResponse);
-  CHECK_OK(resp->ParseFrom(std::move(transfer)));
+  CallResponse resp;
+  CHECK_OK(resp.ParseFrom(std::move(transfer)));
 
-  CallAwaitingResponse *car_ptr =
-    EraseKeyReturnValuePtr(&awaiting_response_, resp->call_id());
+  CallAwaitingResponse* car_ptr = EraseKeyReturnValuePtr(
+      &awaiting_response_, resp.call_id());
   if (PREDICT_FALSE(car_ptr == nullptr)) {
-    LOG(WARNING) << ToString() << ": Got a response for call id " << resp->call_id() << " which "
-                 << "was not pending! Ignoring.";
+    LOG(WARNING) << Substitute(
+        "$0: got a response for call id $1 which was not pending, ignoring",
+        ToString(), resp.call_id());
     return;
   }
 
@@ -736,8 +654,9 @@ void Connection::HandleCallResponse(unique_ptr<InboundTransfer> transfer) {
 
   if (PREDICT_FALSE(!car->call)) {
     // The call already failed due to a timeout.
-    VLOG(1) << "Got response to call id " << resp->call_id() << " after client "
-            << "already timed out or cancelled";
+    VLOG(1) << Substitute(
+        "got response to call id $0 after client already timed out or cancelled",
+         resp.call_id());
     return;
   }
 
@@ -747,19 +666,31 @@ void Connection::HandleCallResponse(unique_ptr<InboundTransfer> transfer) {
   MaybeInjectCancellation(car->call);
 }
 
-void Connection::WriteHandler(ev::io &watcher, int revents) {
+void Connection::WriteHandler(ev::io& /*watcher*/, int revents) {
+  // Pre-compute the duration of a single CPU cycle.
+  static const double cycle_duration_us = 1000000.0 / base::CyclesPerSecond();
+
   DCHECK(reactor_thread_->IsCurrentThread());
 
-  if (revents & EV_ERROR) {
+  if (PREDICT_FALSE(revents & EV_ERROR)) {
     reactor_thread_->DestroyConnection(this, Status::NetworkError(ToString() +
           ": writeHandler encountered an error"));
     return;
   }
-  DVLOG(3) << ToString() << ": writeHandler: revents = " << revents;
+  DVLOG(3) << Substitute("$0: writeHandler: revents=$1", ToString(), revents);
 
-  if (outbound_transfers_.empty()) {
-    LOG(WARNING) << ToString() << " got a ready-to-write callback, but there is "
-      "nothing to write.";
+  if (collect_io_handler_latency_stats_) {
+    // Update the write latency histogram: register how long it's been since
+    // the reactor received notification on I/O event in this epoll loop.
+    const int64_t latency_cycles =
+        CycleClock::Now() - reactor_thread_->cycle_clock_after_poll_;
+    wr_latency_histogram_.Increment(latency_cycles * cycle_duration_us);
+  }
+
+  if (PREDICT_FALSE(outbound_transfers_.empty())) {
+    LOG(WARNING) << Substitute(
+        "$0 got a ready-to-write callback, but there is nothing to write",
+        ToString());
     write_io_.stop();
     return;
   }
@@ -769,18 +700,40 @@ void Connection::WriteHandler(ev::io &watcher, int revents) {
 }
 
 Connection::ProcessOutboundTransfersResult Connection::ProcessOutboundTransfers() {
-  while (!outbound_transfers_.empty()) {
-    OutboundTransfer* transfer = &(outbound_transfers_.front());
+  decltype(outbound_transfers_) recycled_transfers;  // NOLINT(*)
+  SCOPED_CLEANUP({
+    // Perform recycling of the resources registered by the completed transfers
+    // only upon returning from the function. This is to help sending out
+    // as much data as possible without the risk of being stuck on the lock in
+    // the tcmalloc's free list. Compare this with invoking OutboundTransfer's
+    // destructor after calling OutboundTransfer::SendBuffer() for each of the
+    // completed transfers on the connection.
+    //
+    // The memory deallocation might be susceptible to lock contention in case
+    // of high concurrent activity in tcmalloc if per-thread caches aren't
+    // sized properly [1] and because of the allocation/deallocation pattern
+    // among different reactor threads.
+    //
+    // [1] https://gperftools.github.io/gperftools/tcmalloc.html
+    while (!recycled_transfers.empty()) {
+      auto* transfer_ptr = &recycled_transfers.front();
+      recycled_transfers.pop_front();
+      delete transfer_ptr;
+    }
+  });
 
-    if (!transfer->TransferStarted()) {
-      if (transfer->is_for_outbound_call()) {
-        CallAwaitingResponse* car = FindOrDie(awaiting_response_, transfer->call_id());
+  while (!outbound_transfers_.empty()) {
+    OutboundTransfer& transfer = outbound_transfers_.front();
+
+    if (!transfer.TransferStarted()) {
+      if (transfer.is_for_outbound_call()) {
+        CallAwaitingResponse* car = FindOrDie(awaiting_response_, transfer.call_id());
         if (!car->call) {
           // If the call has already timed out or has already been cancelled, the 'call'
           // field would be set to NULL. In that case, don't bother sending it.
           outbound_transfers_.pop_front();
-          transfer->Abort(Status::Aborted("already timed out or cancelled"));
-          delete transfer;
+          recycled_transfers.push_back(transfer);
+          transfer.Abort(Status::Aborted("already timed out or cancelled"));
           continue;
         }
 
@@ -792,14 +745,14 @@ Connection::ProcessOutboundTransfersResult Connection::ProcessOutboundTransfers(
         if (!includes(remote_features_.begin(), remote_features_.end(),
                       required_features.begin(), required_features.end())) {
           outbound_transfers_.pop_front();
+          recycled_transfers.push_back(transfer);
           Status s = Status::NotSupported("server does not support the required RPC features");
-          transfer->Abort(s);
+          transfer.Abort(s);
           Phase phase = negotiation_complete_ ? Phase::REMOTE_CALL : Phase::CONNECTION_NEGOTIATION;
           car->call->SetFailed(std::move(s), phase);
           // Test cancellation when 'call_' is in 'FINISHED_ERROR' state.
           MaybeInjectCancellation(car->call);
           car->call.reset();
-          delete transfer;
           continue;
         }
 
@@ -811,72 +764,56 @@ Connection::ProcessOutboundTransfersResult Connection::ProcessOutboundTransfers(
     }
 
     last_activity_time_ = reactor_thread_->cur_time();
-    Status status = transfer->SendBuffer(socket_.get());
+    Status status = transfer.SendBuffer(socket_.get());
     if (PREDICT_FALSE(!status.ok())) {
-      LOG(WARNING) << ToString() << " send error: " << status.ToString();
+      LOG(WARNING) << Substitute(
+          "$0 send error: $1", ToString(), status.ToString());
+      // ReactorThread::DestroyConnection() invokes Connection::Shutdown() which
+      // takes care of cleaning up the 'outbound_transfers_' list.
       reactor_thread_->DestroyConnection(this, status);
       return kConnectionDestroyed;
     }
 
-    if (!transfer->TransferFinished()) {
-      DVLOG(3) << ToString() << ": writeHandler: xfer not finished.";
+    if (!transfer.TransferFinished()) {
+      DVLOG(3) << Substitute("$0: writeHandler: xfer not finished", ToString());
       return kMoreToSend;
     }
 
     outbound_transfers_.pop_front();
-    delete transfer;
+    recycled_transfers.push_back(transfer);
   }
 
   return kNoMoreToSend;
 }
 
-std::string Connection::ToString() const {
+string Connection::ToString() const {
   // This may be called from other threads, so we cannot
   // include anything in the output about the current state,
   // which might concurrently change from another thread.
-  return strings::Substitute(
-    "$0 $1",
-    direction_ == SERVER ? "server connection from" : "client connection to",
-    remote_.ToString());
+  return Substitute("$0 $1",
+                    direction_ == SERVER
+                        ? "server connection from"
+                        : "client connection to", remote_.ToString());
 }
 
-// Reactor task that transitions this Connection from connection negotiation to
-// regular RPC handling. Destroys Connection on negotiation error.
-class NegotiationCompletedTask : public ReactorTask {
- public:
-  NegotiationCompletedTask(Connection* conn,
-                           Status negotiation_status,
-                           std::unique_ptr<ErrorStatusPB> rpc_error)
-    : conn_(conn),
-      negotiation_status_(std::move(negotiation_status)),
-      rpc_error_(std::move(rpc_error)) {
-  }
-
-  virtual void Run(ReactorThread *rthread) OVERRIDE {
-    rthread->CompleteConnectionNegotiation(conn_,
-                                           negotiation_status_,
-                                           std::move(rpc_error_));
-    delete this;
-  }
-
-  virtual void Abort(const Status &status) OVERRIDE {
-    DCHECK(conn_->reactor_thread()->reactor()->closing());
-    VLOG(1) << "Failed connection negotiation due to shut down reactor thread: "
-            << status.ToString();
-    delete this;
-  }
-
- private:
-  scoped_refptr<Connection> conn_;
-  const Status negotiation_status_;
-  std::unique_ptr<ErrorStatusPB> rpc_error_;
-};
-
-void Connection::CompleteNegotiation(Status negotiation_status,
+void Connection::CompleteNegotiation(const Status& negotiation_status,
                                      unique_ptr<ErrorStatusPB> rpc_error) {
-  auto task = new NegotiationCompletedTask(
-      this, std::move(negotiation_status), std::move(rpc_error));
-  reactor_thread_->reactor()->ScheduleReactorTask(task);
+  // The lambdas below need to hold a reference to the connection in case
+  // it has been closed before the task gets scheduled/aborted.
+  scoped_refptr<Connection> reffed_this(this);
+  auto* rpc_error_raw = rpc_error.release();
+  ReactorTask task{
+    [=](ReactorThread* rt) {
+      rt->CompleteConnectionNegotiation(reffed_this.get(),
+                                        negotiation_status,
+                                        unique_ptr<ErrorStatusPB>(rpc_error_raw));
+    },
+    [=](const Status& /*s*/) {
+      DCHECK(reffed_this->reactor_thread()->reactor()->closing());
+      delete rpc_error_raw;
+    },
+  };
+  reactor_thread_->reactor()->ScheduleReactorTask(std::move(task));
 }
 
 void Connection::MarkNegotiationComplete() {
@@ -885,7 +822,7 @@ void Connection::MarkNegotiationComplete() {
 }
 
 Status Connection::DumpPB(const DumpConnectionsRequestPB& req,
-                          RpcConnectionPB* resp) {
+                          RpcConnectionPB* resp) const {
   DCHECK(reactor_thread_->IsCurrentThread());
   resp->set_remote_ip(remote_.ToString());
   if (negotiation_complete_) {
@@ -894,150 +831,69 @@ Status Connection::DumpPB(const DumpConnectionsRequestPB& req,
     resp->set_state(RpcConnectionPB::NEGOTIATING);
   }
 
-  if (direction_ == CLIENT) {
-    for (const car_map_t::value_type& entry : awaiting_response_) {
-      CallAwaitingResponse* c = entry.second;
-      if (c->call) {
-        c->call->DumpPB(req, resp->add_calls_in_flight());
+  switch (direction_) {
+    case CLIENT:
+      for (const auto& [_, c]: awaiting_response_) {
+        if (c->call) {
+          c->call->DumpPB(req, resp->add_calls_in_flight());
+        }
       }
-    }
+      resp->set_outbound_queue_size(outbound_transfers_.size());
+      break;
 
-    resp->set_outbound_queue_size(num_queued_outbound_transfers());
-  } else if (direction_ == SERVER) {
-    if (negotiation_complete_) {
-      // It's racy to dump credentials while negotiating, since the Connection
-      // object is owned by the negotiation thread at that point.
-      resp->set_remote_user_credentials(remote_user_.ToString());
-    }
-    for (const inbound_call_map_t::value_type& entry : calls_being_handled_) {
-      InboundCall* c = entry.second;
-      c->DumpPB(req, resp->add_calls_in_flight());
-    }
-  } else {
-    LOG(FATAL);
+    case SERVER:
+      if (negotiation_complete_) {
+        // It's racy to dump credentials while negotiating, since the Connection
+        // object is owned by the negotiation thread at that point.
+        resp->set_remote_user_credentials(remote_user_.ToString());
+      }
+      for (const auto& [_, c]: calls_being_handled_) {
+        c->DumpPB(req, resp->add_calls_in_flight());
+      }
+      break;
+
+    default:
+      LOG(DFATAL) << Substitute("$0: invalid direction",
+                                static_cast<uint16_t>(direction_));
+      break;
   }
-#ifdef __linux__
+#if defined(__linux__)
   if (negotiation_complete_ && remote_.is_ip()) {
     // TODO(todd): it's a little strange to not set socket level stats during
     // negotiation, but we don't have access to the socket here until negotiation
     // is complete.
-    WARN_NOT_OK(GetSocketStatsPB(resp->mutable_socket_stats()),
+    WARN_NOT_OK(socket_->GetStats(resp->mutable_socket_stats()),
                 "could not fill in TCP info for RPC connection");
   }
-#endif // __linux__
+#endif // #if defined(__linux__) ...
+
+  // Provide information on I/O handler invocation latency, if enabled.
+  if (collect_io_handler_latency_stats_) {
+    HistogramSnapshotsListPB* histograms = resp->mutable_ev_loop_latencies();
+    {
+      HistogramSnapshotPB* rd_latency_pb = histograms->add_histograms();
+      rd_latency_pb->set_type(MetricType::Name(MetricType::kHistogram));
+      rd_latency_pb->set_unit(MetricUnit::Name(MetricUnit::kMicroseconds));
+      rd_latency_pb->set_description("read I/O latency");
+      rd_latency_pb->set_max_trackable_value(kLatencyHistogramMaxValue);
+      rd_latency_pb->set_num_significant_digits(kLatencyHistogramPrecisionDigits);
+      Histogram::HdrHistogramToPB(HdrHistogram(rd_latency_histogram_), rd_latency_pb);
+    }
+    {
+      HistogramSnapshotPB* wr_latency_pb = histograms->add_histograms();
+      wr_latency_pb->set_type(MetricType::Name(MetricType::kHistogram));
+      wr_latency_pb->set_unit(MetricUnit::Name(MetricUnit::kMicroseconds));
+      wr_latency_pb->set_description("write I/O latency");
+      wr_latency_pb->set_max_trackable_value(kLatencyHistogramMaxValue);
+      wr_latency_pb->set_num_significant_digits(kLatencyHistogramPrecisionDigits);
+      Histogram::HdrHistogramToPB(HdrHistogram(wr_latency_histogram_), wr_latency_pb);
+    }
+  }
 
   if (negotiation_complete_ && remote_.is_ip()) {
-    WARN_NOT_OK(GetTransportDetailsPB(resp->mutable_transport_details()),
+    WARN_NOT_OK(socket_->GetTransportDetails(resp->mutable_transport_details()),
                 "could not fill in transport info for RPC connection");
   }
-  return Status::OK();
-}
-
-#ifdef __linux__
-Status Connection::GetSocketStatsPB(SocketStatsPB* pb) const {
-  DCHECK(reactor_thread_->IsCurrentThread());
-  int fd = socket_->GetFd();
-  CHECK_GE(fd, 0);
-
-  // Fetch TCP_INFO statistics from the kernel.
-  tcp_info ti;
-  memset(&ti, 0, sizeof(ti));
-  socklen_t len = sizeof(ti);
-  int rc = getsockopt(fd, IPPROTO_TCP, TCP_INFO, &ti, &len);
-  if (rc == 0) {
-#   define HAS_FIELD(field_name) \
-        (len >= offsetof(tcp_info, field_name) + sizeof(ti.field_name))
-    if (!HAS_FIELD(tcpi_total_retrans)) {
-      // All the fields up through tcpi_total_retrans were present since very old
-      // kernel versions, beyond our minimal supported. So, we can just bail if we
-      // don't get sufficient data back.
-      return Status::NotSupported("bad length returned for TCP_INFO");
-    }
-
-    pb->set_rtt(ti.tcpi_rtt);
-    pb->set_rttvar(ti.tcpi_rttvar);
-    pb->set_snd_cwnd(ti.tcpi_snd_cwnd);
-    pb->set_total_retrans(ti.tcpi_total_retrans);
-
-    // The following fields were added later in kernel development history.
-    // In RHEL6 they were backported starting in 6.8. Even though they were
-    // backported all together as a group, we'll just be safe and check for
-    // each individually.
-    if (HAS_FIELD(tcpi_pacing_rate)) {
-      pb->set_pacing_rate(ti.tcpi_pacing_rate);
-    }
-    if (HAS_FIELD(tcpi_max_pacing_rate)) {
-      pb->set_max_pacing_rate(ti.tcpi_max_pacing_rate);
-    }
-    if (HAS_FIELD(tcpi_bytes_acked)) {
-      pb->set_bytes_acked(ti.tcpi_bytes_acked);
-    }
-    if (HAS_FIELD(tcpi_bytes_received)) {
-      pb->set_bytes_received(ti.tcpi_bytes_received);
-    }
-    if (HAS_FIELD(tcpi_segs_out)) {
-      pb->set_segs_out(ti.tcpi_segs_out);
-    }
-    if (HAS_FIELD(tcpi_segs_in)) {
-      pb->set_segs_in(ti.tcpi_segs_in);
-    }
-
-    // Calculate sender bandwidth based on the same logic used by the 'ss' utility.
-    if (ti.tcpi_rtt > 0 && ti.tcpi_snd_mss && ti.tcpi_snd_cwnd) {
-      // Units:
-      //  rtt = usec
-      //  cwnd = number of MSS-size packets
-      //  mss = bytes / packet
-      //
-      // Dimensional analysis:
-      //   packets * bytes/packet * usecs/sec / usec -> bytes/sec
-      static constexpr int kUsecsPerSec = 1000000;
-      pb->set_send_bytes_per_sec(static_cast<int64_t>(ti.tcpi_snd_cwnd) *
-                                 ti.tcpi_snd_mss * kUsecsPerSec / ti.tcpi_rtt);
-    }
-  }
-
-  // Fetch the queue sizes.
-  int queue_len = 0;
-  rc = ioctl(fd, TIOCOUTQ, &queue_len);
-  if (rc == 0) {
-    pb->set_send_queue_bytes(queue_len);
-  }
-  rc = ioctl(fd, FIONREAD, &queue_len);
-  if (rc == 0) {
-    pb->set_receive_queue_bytes(queue_len);
-  }
-  return Status::OK();
-}
-#endif // __linux__
-
-Status Connection::GetTransportDetailsPB(TransportDetailsPB* pb) const {
-  DCHECK(reactor_thread_->IsCurrentThread());
-  DCHECK(pb);
-
-  // As for the dynamic_cast below: this is not very elegant or performant code,
-  // but introducing a generic virtual method with vague semantics into the base
-  // Socket class doesn't look like a good choice either. Also, the
-  // GetTransportDetailsPB() method isn't supposed to be a part of any hot path.
-  const TlsSocket* tls_socket = dynamic_cast<TlsSocket*>(socket_.get());
-  if (tls_socket) {
-    auto* tls = pb->mutable_tls();
-    tls->set_protocol(tls_socket->GetProtocolName());
-    tls->set_cipher_suite(tls_socket->GetCipherDescription());
-  }
-
-  int fd = socket_->GetFd();
-  CHECK_GE(fd, 0);
-  int32_t max_seg_size = 0;
-  socklen_t optlen = sizeof(max_seg_size);
-  int ret = ::getsockopt(fd, IPPROTO_TCP, TCP_MAXSEG, &max_seg_size, &optlen);
-  if (ret) {
-    int err = errno;
-    return Status::NetworkError(
-        "getsockopt(TCP_MAXSEG) failed", ErrnoToString(err), err);
-  }
-  pb->mutable_tcp()->set_max_segment_size(max_seg_size);
-
   return Status::OK();
 }
 

@@ -16,11 +16,10 @@
 // under the License.
 #pragma once
 
-#include "kudu/gutil/macros.h"
-
 #include <cstdint>
 #include <ctime>
 #include <memory>
+#include <mutex>  // IWYU pragma: keep
 #include <string>
 #include <thread>
 #include <utility>
@@ -28,6 +27,7 @@
 
 #include <glog/logging.h>
 
+#include "kudu/gutil/macros.h"
 #include "kudu/util/condition_variable.h"
 #include "kudu/util/mutex.h"
 
@@ -58,11 +58,11 @@ namespace kudu {
 // NOTE: the logger limits the total amount of buffer space, so if the underlying
 // log blocks for too long, eventually the threads generating the log messages
 // will block as well. This prevents runaway memory usage.
-class AsyncLogger : public google::base::Logger {
+class AsyncLogger final : public google::base::Logger {
  public:
   AsyncLogger(google::base::Logger* wrapped,
-              int max_buffer_bytes);
-  ~AsyncLogger();
+              size_t max_buffer_bytes);
+  ~AsyncLogger() override = default;
 
   void Start();
 
@@ -100,7 +100,7 @@ class AsyncLogger : public google::base::Logger {
   // blocked due to the buffers being full and the writer thread
   // not keeping up.
   int app_threads_blocked_count_for_tests() const {
-    MutexLock l(lock_);
+    std::lock_guard l(lock_);
     return app_threads_blocked_count_for_tests_;
   }
 
@@ -126,7 +126,7 @@ class AsyncLogger : public google::base::Logger {
     std::vector<Msg> messages;
 
     // Estimate of the size of 'messages'.
-    int size = 0;
+    size_t size = 0;
 
     // Whether this buffer needs an explicit flush of the
     // underlying logger.
@@ -158,7 +158,7 @@ class AsyncLogger : public google::base::Logger {
   void RunThread();
 
   // The maximum number of bytes used by the entire class.
-  const int max_buffer_bytes_;
+  const size_t max_buffer_bytes_;
   google::base::Logger* const wrapped_;
   std::thread thread_;
 

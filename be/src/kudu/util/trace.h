@@ -98,17 +98,22 @@ class Trace;
 
 // Construct a constant C string counter name which acts as a sort of
 // coarse-grained histogram for trace metrics.
-#define BUCKETED_COUNTER_NAME(prefix, duration_us)      \
-  [=]() {                                               \
-    if (duration_us >= 100 * 1000) {                    \
-      return prefix "_gt_100_ms";                       \
-    } else if (duration_us >= 10 * 1000) {              \
-      return prefix "_10-100_ms";                       \
-    } else if (duration_us >= 1000) {                   \
-      return prefix "_1-10_ms";                         \
-    } else {                                            \
-      return prefix "_lt_1ms";                          \
-    }                                                   \
+#define BUCKETED_COUNTER_NAME(prefix, duration_us)                \
+  [=]() constexpr {                                               \
+    constexpr const char* const CT_GT_100  = prefix "_gt_100_ms"; \
+    constexpr const char* const CT_10_100  = prefix "_10-100_ms"; \
+    constexpr const char* const CT_1_10    = prefix "_1-10_ms";   \
+    constexpr const char* const CT_LT_1    = prefix "_lt_1ms";    \
+    if ((duration_us) >= 100 * 1000) {                            \
+      return CT_GT_100;                                           \
+    }                                                             \
+    if ((duration_us) >= 10 * 1000) {                             \
+      return CT_10_100;                                           \
+    }                                                             \
+    if ((duration_us) >= 1000) {                                  \
+      return CT_1_10;                                             \
+    }                                                             \
+    return CT_LT_1;                                               \
   }()
 
 namespace kudu {
@@ -125,7 +130,7 @@ struct TraceEntry;
 // be used such that file/line numbers are automatically included, etc.
 //
 // This class is thread-safe.
-class Trace : public RefCountedThreadSafe<Trace> {
+class Trace final : public RefCountedThreadSafe<Trace> {
  public:
   Trace();
 
@@ -158,19 +163,23 @@ class Trace : public RefCountedThreadSafe<Trace> {
                           const strings::internal::SubstituteArg& arg9 =
                             strings::internal::SubstituteArg::kNoArg);
 
-  // Dump the trace buffer to the given output stream.
-  //
+  // Bitmask-style flags controlling what extra information Dump() includes
+  // in its output.
   enum {
+    // Output only the original information submitted to the trace context.
     NO_FLAGS = 0,
 
     // If set, calculate and print the difference between successive trace messages.
     INCLUDE_TIME_DELTAS = 1 << 0,
+
     // If set, include a 'Metrics' line showing any attached trace metrics.
     INCLUDE_METRICS =     1 << 1,
 
     INCLUDE_ALL = INCLUDE_TIME_DELTAS | INCLUDE_METRICS
   };
-  void Dump(std::ostream* out, int flags) const;
+
+  // Dump the trace buffer to the given output stream.
+  void Dump(std::ostream* out, int flags = INCLUDE_ALL) const;
 
   // Dump the trace buffer as a string.
   std::string DumpToString(int flags = INCLUDE_ALL) const;
@@ -212,7 +221,7 @@ class Trace : public RefCountedThreadSafe<Trace> {
   // The current trace for this thread. Threads should only set this using
   // using ScopedAdoptTrace, which handles reference counting the underlying
   // object.
-  static __thread Trace* threadlocal_trace_;
+  static thread_local Trace* threadlocal_trace_;
 
   // Allocate a new entry from the arena, with enough space to hold a
   // message of length 'len'.
@@ -238,6 +247,17 @@ class Trace : public RefCountedThreadSafe<Trace> {
 
   DISALLOW_COPY_AND_ASSIGN(Trace);
 };
+
+// Dump the trace directly to the output stream without intermediate
+// string allocation. An example of usage:
+//   LOG(INFO) << "Trace:\n" << Trace::CurrentTrace();
+std::ostream& operator<<(std::ostream& os, const Trace* t);
+
+// Similar to the above, but works on references.
+std::ostream& operator<<(std::ostream& os, const Trace& t);
+
+// Similar to the above, but works with scoped_refptr wrapper.
+std::ostream& operator<<(std::ostream& os, const scoped_refptr<Trace>& t);
 
 // Adopt a Trace object into the current thread for the duration
 // of this object.

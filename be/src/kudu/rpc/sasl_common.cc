@@ -34,7 +34,6 @@
 #include "kudu/rpc/constants.h"
 #include "kudu/security/init.h"
 #include "kudu/util/mutex.h"
-#include "kudu/util/net/sockaddr.h"
 #include "kudu/util/rw_mutex.h"
 #include "kudu/util/stopwatch.h"
 #include "kudu/util/string_case.h"
@@ -57,7 +56,7 @@ const char* const kSaslMechGSSAPI = "GSSAPI";
 extern const size_t kSaslMaxBufSize = 1024;
 
 // See WrapSaslCall().
-static __thread string* g_auth_failure_capture = nullptr;
+static thread_local string* g_auth_failure_capture = nullptr;
 
 // Determine whether initialization was ever called
 static Status sasl_init_status = Status::OK();
@@ -138,7 +137,7 @@ static int SaslGetOption(void* context, const char* plugin_name, const char* opt
       // The library's contract for this method is that the caller gets to keep
       // the returned buffer until the next call by the same thread, so we use a
       // threadlocal for the buffer.
-      static __thread char buf[4];
+      static thread_local char buf[4];
       snprintf(buf, arraysize(buf), "%d", level);
       *result = buf;
       if (len != nullptr) *len = strlen(buf);
@@ -403,15 +402,6 @@ Status SaslDecode(sasl_conn_t* conn, Slice ciphertext, Slice* plaintext) {
   }, kDesc), string(kDesc) + " failed");
   *plaintext = Slice(out, out_len);
   return Status::OK();
-}
-
-string SaslIpPortString(const Sockaddr& addr) {
-  string addr_str = addr.ToString();
-  size_t colon_pos = addr_str.find(':');
-  if (colon_pos != string::npos) {
-    addr_str[colon_pos] = ';';
-  }
-  return addr_str;
 }
 
 set<SaslMechanism::Type> SaslListAvailableMechs() {

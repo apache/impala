@@ -22,7 +22,6 @@
 #include <functional>
 #include <limits>
 #include <memory>
-#include <mutex>
 #include <string>
 #include <unordered_set>
 #include <utility>
@@ -169,7 +168,7 @@ void RequestPayload::PopulateRequestPayload(const Message& req,
     vector<unique_ptr<RpcSidecar>>&& sidecars) {
   DCHECK_EQ(-1, sidecar_byte_size_);
 
-  sidecars_ = move(sidecars);
+  sidecars_ = std::move(sidecars);
   DCHECK_LE(sidecars_.size(), TransferLimits::kMaxSidecars);
 
   // Compute total size of sidecar payload so that extra space can be reserved as part of
@@ -193,12 +192,12 @@ void OutboundCall::SetRequestPayload(const Message& req,
 }
 
 Status OutboundCall::status() const {
-  std::lock_guard<simple_spinlock> l(lock_);
+  std::lock_guard l(lock_);
   return status_;
 }
 
 const ErrorStatusPB* OutboundCall::error_pb() const {
-  std::lock_guard<simple_spinlock> l(lock_);
+  std::lock_guard l(lock_);
   return error_pb_.get();
 }
 
@@ -231,12 +230,12 @@ string OutboundCall::StateName(State state) {
 }
 
 void OutboundCall::set_state(State new_state) {
-  std::lock_guard<simple_spinlock> l(lock_);
+  std::lock_guard l(lock_);
   set_state_unlocked(new_state);
 }
 
 OutboundCall::State OutboundCall::state() const {
-  std::lock_guard<simple_spinlock> l(lock_);
+  std::lock_guard l(lock_);
   return state_;
 }
 
@@ -324,15 +323,15 @@ void OutboundCall::CallCallback() {
   }
 }
 
-void OutboundCall::SetResponse(unique_ptr<CallResponse> resp) {
+void OutboundCall::SetResponse(CallResponse&& resp) {
   call_response_ = std::move(resp);
-  Slice r(call_response_->serialized_response());
+  Slice r(call_response_.serialized_response());
 
-  if (call_response_->is_success()) {
+  if (call_response_.is_success()) {
     // TODO: here we're deserializing the call response within the reactor thread,
     // which isn't great, since it would block processing of other RPCs in parallel.
     // Should look into a way to avoid this.
-    if (!response_->ParseFromArray(r.data(), r.size())) {
+    if (PREDICT_FALSE(!response_->ParseFromArray(r.data(), r.size()))) {
       SetFailed(Status::IOError("invalid RPC response, missing fields",
                                 response_->InitializationErrorString()));
       return;
@@ -390,7 +389,7 @@ void OutboundCall::SetFailed(Status status,
   DCHECK(!status.ok());
   DCHECK(phase == Phase::CONNECTION_NEGOTIATION || phase == Phase::REMOTE_CALL);
   {
-    std::lock_guard<simple_spinlock> l(lock_);
+    std::lock_guard l(lock_);
     status_ = std::move(status);
     error_pb_ = std::move(err_pb);
     set_state_unlocked(phase == Phase::CONNECTION_NEGOTIATION
@@ -410,7 +409,7 @@ void OutboundCall::SetTimedOut(Phase phase) {
   // order inversion between this class and RpcController.
   const MonoDelta timeout = controller_->timeout();
   {
-    std::lock_guard<simple_spinlock> l(lock_);
+    std::lock_guard l(lock_);
     status_ = Status::TimedOut(
         Substitute((phase == Phase::REMOTE_CALL) ? kErrMsgCall : kErrMsgNegotiation,
                    remote_method_.method_name(),
@@ -425,7 +424,7 @@ void OutboundCall::SetTimedOut(Phase phase) {
 void OutboundCall::SetCancelled() {
   DCHECK(!IsFinished());
   {
-    std::lock_guard<simple_spinlock> l(lock_);
+    std::lock_guard l(lock_);
     status_ = Status::Aborted(
         Substitute("$0 RPC to $1 is cancelled in state $2",
                    remote_method_.method_name(),
@@ -437,7 +436,7 @@ void OutboundCall::SetCancelled() {
 }
 
 bool OutboundCall::IsTimedOut() const {
-  std::lock_guard<simple_spinlock> l(lock_);
+  std::lock_guard l(lock_);
   switch (state_) {
     case NEGOTIATION_TIMED_OUT:       // fall-through
     case TIMED_OUT:
@@ -448,12 +447,12 @@ bool OutboundCall::IsTimedOut() const {
 }
 
 bool OutboundCall::IsCancelled() const {
-  std::lock_guard<simple_spinlock> l(lock_);
+  std::lock_guard l(lock_);
   return state_ == CANCELLED;
 }
 
 bool OutboundCall::IsNegotiationError() const {
-  std::lock_guard<simple_spinlock> l(lock_);
+  std::lock_guard l(lock_);
   switch (state_) {
     case FINISHED_NEGOTIATION_ERROR:  // fall-through
     case NEGOTIATION_TIMED_OUT:
@@ -464,7 +463,7 @@ bool OutboundCall::IsNegotiationError() const {
 }
 
 bool OutboundCall::IsFinished() const {
-  std::lock_guard<simple_spinlock> l(lock_);
+  std::lock_guard l(lock_);
   switch (state_) {
     case READY:
     case SENDING:
@@ -490,7 +489,7 @@ string OutboundCall::ToString() const {
 
 void OutboundCall::DumpPB(const DumpConnectionsRequestPB& req,
                           RpcCallInProgressPB* resp) {
-  std::lock_guard<simple_spinlock> l(lock_);
+  std::lock_guard l(lock_);
   resp->mutable_header()->CopyFrom(payload_->header_);
   resp->set_micros_elapsed((MonoTime::Now() - start_time_).ToMicroseconds());
 
@@ -533,13 +532,9 @@ void OutboundCall::DumpPB(const DumpConnectionsRequestPB& req,
 /// CallResponse
 ///
 
-CallResponse::CallResponse()
- : parsed_(false) {
-}
-
 Status CallResponse::GetSidecar(int idx, Slice* sidecar) const {
   DCHECK(parsed_);
-  if (idx < 0 || idx >= header_.sidecar_offsets_size()) {
+  if (PREDICT_FALSE(idx < 0 || idx >= header_.sidecar_offsets_size())) {
     return Status::InvalidArgument(strings::Substitute(
         "Index $0 does not reference a valid sidecar", idx));
   }
@@ -548,7 +543,7 @@ Status CallResponse::GetSidecar(int idx, Slice* sidecar) const {
 }
 
 Status CallResponse::ParseFrom(unique_ptr<InboundTransfer> transfer) {
-  CHECK(!parsed_);
+  DCHECK(!parsed_);
   RETURN_NOT_OK(serialization::ParseMessage(transfer->data(), &header_,
                                             &serialized_response_));
 

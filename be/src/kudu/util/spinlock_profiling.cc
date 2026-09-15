@@ -59,6 +59,8 @@ using base::SpinLockHolder;
 
 namespace kudu {
 
+constexpr const char* const TC_SPINLOCK_WAIT_CYCLES = "spinlock_wait_cycles";
+
 static const double kMicrosPerSecond = 1000000.0;
 
 static LongAdder* g_contended_cycles = nullptr;
@@ -142,32 +144,32 @@ Atomic32 g_profiling_enabled = 0;
 ContentionStacks* g_contention_stacks = nullptr;
 
 void ContentionStacks::AddStack(const StackTrace& s, int64_t cycles) {
-  uint64_t hash = s.HashCode();
+  const uint64_t hash = s.HashCode();
 
   // Linear probe up to 4 attempts before giving up
   for (int i = 0; i < kNumLinearProbeAttempts; i++) {
-    Entry* e = &entries_[(hash + i) % kNumEntries];
-    if (!e->lock.TryLock()) {
+    Entry& e = entries_[(hash + i) % kNumEntries];
+    if (!e.lock.TryLock()) {
       // If we fail to lock it, we can safely just use a different slot.
       // It's OK if a single stack shows up multiple times, because pprof
       // aggregates them in the end anyway.
       continue;
     }
 
-    if (e->trip_count == 0) {
+    if (e.trip_count == 0) {
       // It's an un-claimed slot. Claim it.
-      e->hash = hash;
-      e->trace.CopyFrom(s);
-    } else if (e->hash != hash || !e->trace.Equals(s)) {
+      e.hash = hash;
+      e.trace.CopyFrom(s);
+    } else if (e.hash != hash || e.trace != s) {
       // It's claimed by a different stack trace.
-      e->lock.Unlock();
+      e.lock.Unlock();
       continue;
     }
 
     // Contribute to the stats for this stack.
-    e->cycle_count += cycles;
-    e->trip_count++;
-    e->lock.Unlock();
+    e.cycle_count += cycles;
+    ++e.trip_count;
+    e.lock.Unlock();
     return;
   }
 
@@ -213,7 +215,7 @@ bool ContentionStacks::CollectSample(uint64_t* iterator, StackTrace* s, int64_t*
 
 
 void SubmitSpinLockProfileData(const void *contendedlock, int64_t wait_cycles) {
-  TRACE_COUNTER_INCREMENT("spinlock_wait_cycles", wait_cycles);
+  TRACE_COUNTER_INCREMENT(TC_SPINLOCK_WAIT_CYCLES, wait_cycles);
   bool profiling_enabled = base::subtle::Acquire_Load(&g_profiling_enabled);
   bool long_wait_time = wait_cycles > FLAGS_lock_contention_trace_threshold_cycles;
   // Short circuit this function quickly in the common case.
@@ -221,7 +223,7 @@ void SubmitSpinLockProfileData(const void *contendedlock, int64_t wait_cycles) {
     return;
   }
 
-  static __thread bool in_func = false;
+  static thread_local bool in_func = false;
   if (in_func) return; // non-re-entrant
   in_func = true;
 

@@ -10,7 +10,6 @@
 #include <glog/logging.h>
 
 #include "kudu/gutil/dynamic_annotations.h"
-#include "kudu/gutil/port.h"
 #include "kudu/gutil/singleton.h"
 
 namespace {
@@ -31,7 +30,7 @@ class TraceEventSyntheticDelayRegistry : public TraceEventSyntheticDelayClock {
   void ResetAllDelays();
 
   // TraceEventSyntheticDelayClock implementation.
-  virtual MonoTime Now() OVERRIDE;
+  MonoTime Now() override;
 
  private:
   TraceEventSyntheticDelayRegistry();
@@ -65,19 +64,19 @@ void TraceEventSyntheticDelay::Initialize(
 }
 
 void TraceEventSyntheticDelay::SetTargetDuration(const MonoDelta& target_duration) {
-  MutexLock lock(lock_);
+  std::lock_guard lock(lock_);
   target_duration_ = target_duration;
   trigger_count_ = 0;
   begin_count_ = 0;
 }
 
 void TraceEventSyntheticDelay::SetMode(Mode mode) {
-  MutexLock lock(lock_);
+  std::lock_guard lock(lock_);
   mode_ = mode;
 }
 
 void TraceEventSyntheticDelay::SetClock(TraceEventSyntheticDelayClock* clock) {
-  MutexLock lock(lock_);
+  std::lock_guard lock(lock_);
   clock_ = clock;
 }
 
@@ -93,7 +92,7 @@ void TraceEventSyntheticDelay::Begin() {
 
   MonoTime start_time = clock_->Now();
   {
-    MutexLock lock(lock_);
+    std::lock_guard lock(lock_);
     if (++begin_count_ != 1)
       return;
     end_time_ = CalculateEndTimeLocked(start_time);
@@ -110,7 +109,7 @@ void TraceEventSyntheticDelay::BeginParallel(MonoTime* out_end_time) {
 
   MonoTime start_time = clock_->Now();
   {
-    MutexLock lock(lock_);
+    std::lock_guard lock(lock_);
     *out_end_time = CalculateEndTimeLocked(start_time);
   }
 }
@@ -123,7 +122,7 @@ void TraceEventSyntheticDelay::End() {
 
   MonoTime end_time;
   {
-    MutexLock lock(lock_);
+    std::lock_guard lock(lock_);
     if (!begin_count_ || --begin_count_ != 0)
       return;
     end_time = end_time_;
@@ -171,7 +170,7 @@ TraceEventSyntheticDelay* TraceEventSyntheticDelayRegistry::GetOrCreateDelay(
       return &delays_[i];
   }
 
-  MutexLock lock(lock_);
+  std::lock_guard lock(lock_);
   delay_count = base::subtle::Acquire_Load(&delay_count_);
   for (int i = 0; i < delay_count; ++i) {
     if (!strcmp(name, delays_[i].name_.c_str()))
@@ -193,7 +192,7 @@ MonoTime TraceEventSyntheticDelayRegistry::Now() {
 }
 
 void TraceEventSyntheticDelayRegistry::ResetAllDelays() {
-  MutexLock lock(lock_);
+  std::lock_guard lock(lock_);
   int delay_count = base::subtle::Acquire_Load(&delay_count_);
   for (int i = 0; i < delay_count; ++i) {
     delays_[i].SetTargetDuration(MonoDelta());

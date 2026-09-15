@@ -29,6 +29,7 @@
 #include <vector>
 
 #include <glog/logging.h>
+#include <glog/raw_logging.h>
 
 #include "kudu/gutil/strings/split.h"
 #include "kudu/gutil/strings/strip.h"
@@ -48,6 +49,17 @@
 #include "kudu/util/thread.h"
 #endif
 
+// Some ancient Linux distros have a strange arrangement with the actual version
+// of the OpenSSL library reported both by the library runtime and the actual
+// contents of the header files under /usr/include/openssl. In particular,
+// Ubuntu 18.04.1 LTS has OpenSSL of version 1.1.1-1ubuntu2.1~18.04.13 which
+// openssl's binary outputs 'OpenSSL 1.1.1  11 Sep 2018' when running
+// 'openssl version', but the header files do not have OPENSSL_INIT_NO_ATEXIT
+// macro defined.
+#if OPENSSL_VERSION_NUMBER >= 0x10101000L && !defined(OPENSSL_INIT_NO_ATEXIT)
+#define OPENSSL_INIT_NO_ATEXIT  0x00080000L
+#endif
+
 using std::ostringstream;
 using std::string;
 using std::vector;
@@ -61,7 +73,7 @@ namespace {
 //
 // Thread safety:
 // - written by DoInitializeOpenSSL (single-threaded, due to std::call_once)
-// - read by DisableOpenSSLInitialization (must not be concurrent with above)
+// - read by IsOpenSSLInitialized (must not be concurrent with above)
 bool g_ssl_is_initialized = false;
 
 // If true, then we expect someone else has initialized SSL.
@@ -70,6 +82,14 @@ bool g_ssl_is_initialized = false;
 // - read by DoInitializeOpenSSL (single-threaded, due to std::call_once)
 // - written by DisableOpenSSLInitialization (must not be concurrent with above)
 bool g_disable_ssl_init = false;
+
+// Whether the OpenSSL library is used in the context of a standalone
+// application that controls what happens before and after its main() function.
+// Kudu servers and the 'kudu' CLI utility are examples of such. This affects
+// how the initialization and shutdown of the OpenSSL library are performed.
+// Essentially, this is to decide whether to add OPENSSL_INIT_NO_ATEXIT option
+// for OPENSSL_init_ssl(), and call OPENSSL_cleanup() in DoFinalizeOpenSSL().
+bool g_is_standalone_init = false;
 
 // Array of locks used by OpenSSL.
 // We use an intentionally-leaked C-style array here to avoid non-POD static data.
@@ -104,10 +124,10 @@ void CheckFIPSMode() {
   // check if FIPS approved mode is enabled. If not, we crash the process.
   // As this is used in clients as well, we can't use gflags to set this.
   if (GetBooleanEnvironmentVariable("KUDU_REQUIRE_FIPS_MODE")) {
-    CHECK(fips_mode) << "FIPS mode required by environment variable "
-                        "KUDU_REQUIRE_FIPS_MODE, but it is not enabled.";
+    // NOTE: using RAW_CHECK() because this might be called before main()
+    RAW_CHECK(fips_mode, "FIPS mode required by environment variable "
+                         "KUDU_REQUIRE_FIPS_MODE, but it is not enabled");
   }
-  VLOG(2) << "FIPS mode is " << (fips_mode ? "enabled" : "disabled.");
 }
 
 Status CheckOpenSSLInitialized() {
@@ -134,6 +154,7 @@ Status CheckOpenSSLInitialized() {
   if (!CRYPTO_get_locking_callback()) {
     return Status::RuntimeError("Locking callback not initialized");
   }
+
   auto ctx = ssl_make_unique(SSL_CTX_new(SSLv23_method()));
   if (!ctx) {
     ERR_clear_error();
@@ -146,14 +167,58 @@ Status CheckOpenSSLInitialized() {
 }
 
 void DoInitializeOpenSSL() {
-  // In case the user's thread has left some error around, clear it.
-  ERR_clear_error();
-  SCOPED_OPENSSL_NO_PENDING_ERRORS;
+  // If running in standalone mode, do not call _anything_ from the OpenSSL
+  // library prior to initializing it with the necessary custom options below.
+  // Otherwise, that might lead to OPENSSL_init_crypto()/OPENSSL_init_ssl()
+  // being called from within the library itself, initializing it with
+  // the default or other undesirable set of options. Doing so might result
+  // in registering unnecessary atexit() handlers and other unexpected behavior.
+  // See [1] and [2] for more details:
+  //
+  //   Numerous internal OpenSSL functions call OPENSSL_init_crypto().
+  //   Therefore, in order to perform nondefault initialisation,
+  //   OPENSSL_init_crypto() MUST be called by application code
+  //   prior to any other OpenSSL function calls.
+  //
+  //   Numerous internal OpenSSL functions call OPENSSL_init_ssl().
+  //   Therefore, in order to perform nondefault initialisation,
+  //   OPENSSL_init_ssl() MUST be called by application code
+  //   prior to any other OpenSSL function calls.
+  //
+  // [1] https://docs.openssl.org/1.1.1/man3/OPENSSL_init_crypto/
+  // [2] https://docs.openssl.org/1.1.1/man3/OPENSSL_init_ssl/
+  if (!g_is_standalone_init) {
+    // In non-standalone mode (e.g., running as the Kudu C++ client library
+    // in a user application), if the user's thread has left some error
+    // around, clear it to avoid reporting unrelated 'ghost' errors later on.
+    ERR_clear_error();
+    SCOPED_OPENSSL_NO_PENDING_ERRORS;
+  }
   if (g_disable_ssl_init) {
-    VLOG(2) << "Not initializing OpenSSL (disabled by application)";
     return;
   }
+
 #if OPENSSL_VERSION_NUMBER >= 0x10100000L
+  // Set custom options for the OpenSSL library:
+  // automatic loading of the libcrypto and the libssl error strings. That are
+  // the default options, but their presence guarantees that any (unexpected)
+  // follow-up requests to change the behavior by specifying
+  // OPENSSL_INIT_NO_LOAD_CRYPTO_STRINGS and/or OPENSSL_INIT_NO_LOAD_SSL_STRINGS
+  // will be ignored.
+  int init_opt =
+      OPENSSL_INIT_LOAD_CRYPTO_STRINGS |
+      OPENSSL_INIT_LOAD_SSL_STRINGS;
+
+#if OPENSSL_VERSION_NUMBER >= 0x10101000L
+  // KUDU-3635: add OPENSSL_INIT_NO_ATEXIT option for fine-grained control
+  // over the OpenSSL library's lifecycle to prevent races with finalization
+  // of the tcmalloc library's runtime. The OPENSSL_INIT_NO_ATEXIT option was
+  // introduced in OpenSSL 1.1.1.
+  if (g_is_standalone_init) {
+    init_opt |= OPENSSL_INIT_NO_ATEXIT;
+  }
+#endif  // #if OPENSSL_VERSION_NUMBER >= 0x10101000L ...
+
   // The OPENSSL_init_ssl manpage [1] says "As of version 1.1.0 OpenSSL will
   // automatically allocate all resources it needs so no explicit initialisation
   // is required." However, eliding library initialization leads to a memory
@@ -166,23 +231,27 @@ void DoInitializeOpenSSL() {
   // Rather than determine whether this particular OpenSSL instance is
   // leak-free, we'll initialize the library explicitly.
   //
-  // 1. https://www.openssl.org/docs/man1.1.0/ssl/OPENSSL_init_ssl.html
+  // 1. https://docs.openssl.org/1.1.1/man3/OPENSSL_init_ssl/
   // 2. https://github.com/openssl/openssl/issues/5899
-  CHECK_EQ(1, OPENSSL_init_ssl(0, nullptr));
-#else
+  //
+  // NOTE: using RAW_CHECK() because this might be called before main().
+  RAW_CHECK(1 == OPENSSL_init_ssl(init_opt, nullptr),
+            "failed to initialize OpenSSL");
+#else   // #if OPENSSL_VERSION_NUMBER >= 0x10100000L ...
   // Check that OpenSSL isn't already initialized. If it is, it's likely
   // we are embedded in (or embedding) another application/library which
   // initializes OpenSSL, and we risk installing conflicting callbacks
   // or crashing due to concurrent initialization attempts. In that case,
   // log a warning.
+  // Probe whether OpenSSL has been initialized already by attempting to create SSL_CTX.
   auto ctx = ssl_make_unique(SSL_CTX_new(SSLv23_method()));
   if (ctx) {
-    LOG(WARNING) << "It appears that OpenSSL has been previously initialized by "
-                    "code outside of Kudu. Please first properly initialize "
-                    "OpenSSL for multi-threaded usage (setting thread callback "
-                    "functions for OpenSSL of versions earlier than 1.1.0) and "
-                    "then call kudu::client::DisableOpenSSLInitialization() "
-                    "to avoid potential crashes due to conflicting initialization.";
+    RAW_LOG(WARNING, "It appears that OpenSSL has been previously initialized by "
+                     "code outside of Kudu. Please first properly initialize "
+                     "OpenSSL for multi-threaded usage (setting thread callback "
+                     "functions for OpenSSL of versions earlier than 1.1.0) and "
+                     "then call kudu::client::DisableOpenSSLInitialization() "
+                     "to avoid potential crashes due to conflicting initialization");
     // Continue anyway; all of the below is idempotent, except for the locking callback,
     // which we check before overriding. They aren't thread-safe, however -- that's why
     // we try to get embedding applications to do the right thing here rather than risk a
@@ -203,7 +272,7 @@ void DoInitializeOpenSSL() {
     // LSAN warnings.
     debug::ScopedLeakCheckDisabler d;
     int num_locks = CRYPTO_num_locks();
-    CHECK(!kCryptoLocks);
+    RAW_CHECK(!kCryptoLocks, "crypto locks are already initialized");
     kCryptoLocks = new Mutex[num_locks];
 
     // Callbacks used by OpenSSL required in a multi-threaded setting.
@@ -211,9 +280,36 @@ void DoInitializeOpenSSL() {
 
     CRYPTO_THREADID_set_callback(ThreadIdCB);
   }
-#endif
+#endif // #if OPENSSL_VERSION_NUMBER >= 0x10100000L ... #else ...
   CheckFIPSMode();
   g_ssl_is_initialized = true;
+}
+
+void DoFinalizeOpenSSL() {
+  if (!g_ssl_is_initialized) {
+    // If we haven't yet initialized the library, don't try to finalize it.
+    return;
+  }
+
+  // In case the user's thread has left some error around, clear it.
+  // Do so only in release builds, but catch corresponding programming errors
+  // if anything is left on the error stack otherwise.
+  {
+#ifdef NDEBUG
+    ERR_clear_error();
+#endif
+    // NOTE: it's important to call ScopedCheckNoPendingSSLErrors' destructor
+    // before OPENSSL_cleanup() is invoked because the latter cleans up the
+    // global state of the OpenSSL library, along with error stacks.
+    SCOPED_OPENSSL_NO_PENDING_ERRORS;
+  }
+#if OPENSSL_VERSION_NUMBER >= 0x10101000L
+  if (g_is_standalone_init) {
+    // If OPENSSL_INIT_NO_ATEXIT option was used for OPENSSL_init_ssl() or
+    // OPENSSL_init_crypto(), it's time to perform the necessary cleanup.
+    OPENSSL_cleanup();
+  }
+#endif
 }
 
 } // anonymous namespace
@@ -283,19 +379,45 @@ void free_STACK_OF_X509(STACK_OF(X509)* sk) {
 }
 
 Status DisableOpenSSLInitialization() {
-  if (g_disable_ssl_init) return Status::OK();
-  if (g_ssl_is_initialized) {
-    return Status::IllegalState("SSL already initialized. Initialization can only be disabled "
-                                "before first usage.");
+  if (g_disable_ssl_init) {
+    return Status::OK();
+  }
+  if (IsOpenSSLInitialized()) {
+    return Status::IllegalState(
+        "OpenSSL is already initialized. Initialization can only be disabled "
+        "before first usage.");
   }
   RETURN_NOT_OK(CheckOpenSSLInitialized());
   g_disable_ssl_init = true;
   return Status::OK();
 }
 
+void SetStandaloneInit(bool is_standalone) {
+  // No synchronization is necessary since this function is should be called
+  // only during static initialization phase.
+  g_is_standalone_init = is_standalone;
+}
+
 void InitializeOpenSSL() {
   static std::once_flag ssl_once;
   std::call_once(ssl_once, DoInitializeOpenSSL);
+}
+
+void FinalizeOpenSSL() {
+  static std::once_flag flag;
+  std::call_once(flag, DoFinalizeOpenSSL);
+}
+
+bool IsOpenSSLInitialized() {
+  return g_ssl_is_initialized;
+}
+
+bool IsFIPSEnabled() {
+#if OPENSSL_VERSION_NUMBER < 0x30000000L
+  return FIPS_mode() != 0;
+#else
+  return EVP_default_properties_is_fips_enabled(nullptr) != 0;
+#endif
 }
 
 string GetOpenSSLErrors() {
@@ -304,7 +426,12 @@ string GetOpenSSLErrors() {
   int line, flags;
   const char *file, *data;
   bool is_first = true;
+#if OPENSSL_VERSION_NUMBER >= 0x30000000L
+  const char* func = nullptr;
+  while ((l = ERR_get_error_all(&file, &line, &func, &data, &flags)) != 0) {
+#else
   while ((l = ERR_get_error_line_data(&file, &line, &data, &flags)) != 0) {
+#endif
     if (is_first) {
       is_first = false;
     } else {
@@ -314,6 +441,11 @@ string GetOpenSSLErrors() {
     char buf[256];
     ERR_error_string_n(l, buf, sizeof(buf));
     serr << buf << ":" << file << ":" << line;
+#if OPENSSL_VERSION_NUMBER >= 0x30000000L
+    if (func && *func) {
+      serr << ":" << func;
+    }
+#endif
     if (flags & ERR_TXT_STRING) {
       serr << ":" << data;
     }
@@ -376,6 +508,11 @@ string GetProtocolName(const SSL* ssl) {
   return SSL_get_version(ssl);
 }
 
+string GetCipherName(const SSL* ssl) {
+  SCOPED_OPENSSL_NO_PENDING_ERRORS;
+  return SSL_get_cipher_name(ssl);
+}
+
 string GetCipherDescription(const SSL* ssl) {
   SCOPED_OPENSSL_NO_PENDING_ERRORS;
   const SSL_CIPHER* cipher = SSL_get_current_cipher(ssl);
@@ -391,6 +528,15 @@ string GetCipherDescription(const SSL* ssl) {
   StripTrailingNewline(&ret);
   StripDupCharacters(&ret, ' ', 0);
   return ret;
+}
+
+bool GetExtMS(SSL* ssl) {
+  SCOPED_OPENSSL_NO_PENDING_ERRORS;
+#if OPENSSL_VERSION_NUMBER >= 0x10100000L
+  return SSL_get_extms_support(ssl) == 1;
+#else
+  return false;
+#endif
 }
 
 } // namespace security

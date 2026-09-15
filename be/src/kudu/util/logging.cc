@@ -19,6 +19,8 @@
 
 #include <unistd.h>
 
+#include <atomic>
+#include <cstddef>
 #include <cstdint>
 #include <cstdio>
 #include <cstdlib>
@@ -35,7 +37,8 @@
 #include <glog/logging.h>
 
 #include "kudu/gutil/basictypes.h"
-#include "kudu/gutil/port.h"
+#include "kudu/gutil/casts.h"
+#include "kudu/gutil/macros.h"
 #include "kudu/gutil/spinlock.h"
 #include "kudu/gutil/stringprintf.h"
 #include "kudu/gutil/strings/substitute.h"
@@ -49,8 +52,9 @@
 #include "kudu/util/signal.h"
 #include "kudu/util/status.h"
 
-// Defined in Impala.
-DECLARE_string(log_filename);
+DEFINE_string(log_filename, "",
+    "Prefix of log filename - "
+    "full path is <log_dir>/<log_filename>.[INFO|WARN|ERROR|FATAL]");
 TAG_FLAG(log_filename, stable);
 
 DEFINE_bool(log_async, true,
@@ -58,13 +62,14 @@ DEFINE_bool(log_async, true,
             "latency and stability.");
 TAG_FLAG(log_async, hidden);
 
-DEFINE_int32(log_async_buffer_bytes_per_level, 2 * 1024 * 1024,
-             "The number of bytes of buffer space used by each log "
-             "level. Only relevant when --log_async is enabled.");
+DEFINE_uint32(log_async_buffer_bytes_per_level, 2 * 1024 * 1024,
+              "The number of bytes of buffer space used by each log "
+              "level. Only relevant when --log_async is enabled.");
 TAG_FLAG(log_async_buffer_bytes_per_level, hidden);
 
-// Defined in Impala.
-DECLARE_int32(max_log_files);
+DEFINE_int32(max_log_files, 10,
+    "Maximum number of log files to retain per severity level. The most recent "
+    "log files are retained. If set to 0, all log files are retained.");
 TAG_FLAG(max_log_files, runtime);
 TAG_FLAG(max_log_files, stable);
 
@@ -72,6 +77,7 @@ TAG_FLAG(max_log_files, stable);
 
 bool logging_initialized = false;
 
+using strings::Substitute;
 using base::SpinLock;
 using base::SpinLockHolder;
 using boost::uuids::random_generator;
@@ -82,7 +88,7 @@ using std::ostringstream;
 
 namespace kudu {
 
-__thread bool tls_redact_user_data = true;
+thread_local bool tls_redact_user_data = true;
 kudu::RedactContext g_should_redact;
 const char* const kRedactionMessage = "<redacted>";
 
@@ -92,13 +98,15 @@ class SimpleSink : public google::LogSink {
  public:
   explicit SimpleSink(LoggingCallback cb) : cb_(std::move(cb)) {}
 
-  virtual ~SimpleSink() OVERRIDE {
-  }
+  ~SimpleSink() override = default;
 
-  virtual void send(google::LogSeverity severity, const char* full_filename,
-                    const char* base_filename, int line,
-                    const struct ::tm* tm_time,
-                    const char* message, size_t message_len) OVERRIDE {
+  void send(google::LogSeverity severity,
+            const char* full_filename,
+            const char* /*base_filename*/,
+            int line,
+            const struct ::tm* tm_time,
+            const char* message,
+            size_t message_len) override {
     LogSeverity kudu_severity;
     switch (severity) {
       case google::INFO:
@@ -138,19 +146,6 @@ SimpleSink* registered_sink = nullptr;
 // Protected by 'logging_mutex'.
 int initial_stderr_severity;
 
-void EnableAsyncLogging() {
-  debug::ScopedLeakCheckDisabler leaky;
-
-  // Enable Async for every level except for FATAL. Fatal should be synchronous
-  // to ensure that we get the fatal log message written before exiting.
-  for (auto level : { google::INFO, google::WARNING, google::ERROR }) {
-    auto* orig = google::base::GetLogger(level);
-    auto* async = new AsyncLogger(orig, FLAGS_log_async_buffer_bytes_per_level);
-    async->Start();
-    google::base::SetLogger(level, async);
-  }
-}
-
 void UnregisterLoggingCallbackUnlocked() {
   CHECK(logging_mutex.IsHeld());
   CHECK(registered_sink);
@@ -162,11 +157,21 @@ void UnregisterLoggingCallbackUnlocked() {
   delete registered_sink;
   registered_sink = nullptr;
 }
+} // anonymous namespace
+
+// The Kudu client library doesn't invoke InitGoogleLoggingSafe(...) function,
+// but the function invokes BlockSigUSR1() which is defined in minidump-related
+// code, which in its turn requires compiling breakpad from the 3rd-party.
+// So, by excluding InitGoogleLoggingSafe(...), it's possible to get rid of
+// breakpad dependency and save CPU cycles while exclusively compiling
+// the Kudu client library.
+#if !defined(KUDU_CLIENT_ONLY)
+namespace {
 
 void FlushCoverageOnExit() {
   // Coverage flushing is not re-entrant, but this might be called from a
   // crash signal context, so avoid re-entrancy.
-  static __thread bool in_call = false;
+  static thread_local bool in_call = false;
   if (in_call) return;
   in_call = true;
 
@@ -197,6 +202,19 @@ void FailureWriterWithCoverage(const char* data, size_t size) {
   }
 }
 
+void EnableAsyncLogging() {
+  debug::ScopedLeakCheckDisabler leaky;
+
+  // Enable Async for every level except for FATAL. Fatal should be synchronous
+  // to ensure that we get the fatal log message written before exiting.
+  for (auto level : { google::INFO, google::WARNING, google::ERROR }) {
+    auto* orig = google::base::GetLogger(level);
+    auto* async = new AsyncLogger(orig, FLAGS_log_async_buffer_bytes_per_level);
+    async->Start();
+    google::base::SetLogger(level, async);
+  }
+}
+
 // GLog "failure function". This is called in the case of LOG(FATAL) to
 // ensure that we flush coverage even on crashes.
 //
@@ -205,6 +223,7 @@ void FlushCoverageAndAbort() {
   FlushCoverageOnExit();
   exit(1);
 }
+
 } // anonymous namespace
 
 void InitGoogleLoggingSafe(const char* arg) {
@@ -275,15 +294,18 @@ void InitGoogleLoggingSafe(const char* arg) {
   IgnoreSigPipe();
 
   // For minidump support. Must be called before logging threads started.
-  // Disabled by Impala, which does not link Kudu's minidump library.
-  //CHECK_OK(BlockSigUSR1());
+  CHECK_OK(BlockSigUSR1());
 
   if (FLAGS_log_async) {
     EnableAsyncLogging();
+  } else {
+    LOG(WARNING) <<
+        "disabling asynchronous logging adversely affects Kudu's performance";
   }
 
   logging_initialized = true;
 }
+#endif // #if !defined(KUDU_CLIENT_ONLY) ...
 
 void InitGoogleLoggingSafeBasic(const char* arg) {
   SpinLockHolder l(&logging_mutex);
@@ -383,8 +405,8 @@ Status DeleteExcessLogFiles(Env* env) {
   for (int severity = 0; severity < google::NUM_SEVERITIES; ++severity) {
     // Build glob pattern for input
     // e.g. /var/log/kudu/kudu-master.*.INFO.*
-    string pattern = strings::Substitute("$0/$1.*.$2.*", FLAGS_log_dir, FLAGS_log_filename,
-                                         google::GetLogSeverityName(severity));
+    string pattern = Substitute("$0/$1.*.$2.*", FLAGS_log_dir, FLAGS_log_filename,
+                                google::GetLogSeverityName(severity));
 
     // Keep the 'max_log_files' most recent log files, as compared by
     // modification time. Glog files contain a second-granularity timestamp in
@@ -397,18 +419,34 @@ Status DeleteExcessLogFiles(Env* env) {
   return Status::OK();
 }
 
+namespace logging {
+
+LogThrottler::~LogThrottler() {
+  const auto num_not_reported = num_suppressed_.load(std::memory_order_acquire);
+  if (num_not_reported > 0) {
+    const auto ts = GetMonoTimeMicros() - last_ts_.load(std::memory_order_acquire);
+    string instance_info = "LogThrottler";
+    if (string_id_) {
+      instance_info += " ";
+      instance_info += string_id_;
+      if (num_id_ > 0) {
+        instance_info += ":" + std::to_string(num_id_);
+      }
+    }
+    LOG(INFO) << Substitute("$0: suppressed but not reported on $1 messages "
+                            "since previous log ~$2 seconds ago",
+                            instance_info, num_not_reported, ts / 1000000);
+  }
+}
+
+} // namespace logging
+
 // Support for the special THROTTLE_MSG token in a log message stream.
-ostream& operator<<(ostream &os, const PRIVATE_ThrottleMsg& /*unused*/) {
+ostream& operator<<(ostream& os, const PRIVATE_ThrottleMsg& /*unused*/) {
   using google::LogMessage;
-#ifdef DISABLE_RTTI
-  LogMessage::LogStream *log = static_cast<LogMessage::LogStream*>(&os);
-#else
-  LogMessage::LogStream *log = dynamic_cast<LogMessage::LogStream*>(&os);
-#endif
-  CHECK(log && log == log->self())
-      << "You must not use COUNTER with non-glog ostream";
-  size_t ctr = log->ctr();
-  if (ctr > 0) {
+  LogMessage::LogStream* log = down_cast<LogMessage::LogStream*>(&os);
+  DCHECK(log && log == log->self()) << "COUNTER is for glog LogStream only";
+  if (auto ctr = log->ctr(); ctr > 0) {
     os << " [suppressed " << ctr << " similar messages]";
   }
   return os;

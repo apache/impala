@@ -20,10 +20,8 @@
 #include <openssl/ssl.h>
 
 #include <cstdint>
-#include <memory>
 #include <string>
 
-#include "kudu/gutil/port.h"
 #include "kudu/util/faststring.h"
 #include "kudu/util/net/socket.h"
 #include "kudu/util/openssl_util.h" // IWYU pragma: keep
@@ -34,6 +32,9 @@ struct iovec;
 typedef struct ssl_st SSL;
 
 namespace kudu {
+
+class TransportDetailsPB;
+
 namespace security {
 
 class TlsSocket : public Socket {
@@ -41,21 +42,29 @@ class TlsSocket : public Socket {
 
   ~TlsSocket() override;
 
-  Status Write(const uint8_t *buf, int32_t amt, int32_t *nwritten) override WARN_UNUSED_RESULT;
+  Status Write(const uint8_t *buf, int32_t amt, int32_t *nwritten) override;
 
   Status Writev(const struct ::iovec *iov,
                 int iov_len,
-                int64_t *nwritten) override WARN_UNUSED_RESULT;
+                int64_t *nwritten) override;
 
-  Status Recv(uint8_t *buf, int32_t amt, int32_t *nread) override WARN_UNUSED_RESULT;
+  Status Recv(uint8_t *buf, int32_t amt, int32_t *nread) override;
 
-  Status Close() override WARN_UNUSED_RESULT;
+  Status Close() override;
+
+  Status GetTransportDetails(TransportDetailsPB* pb) const override;
 
   // Get the name of the negotiated TLS protocol for the connection.
   std::string GetProtocolName() const;
 
+  // Get the name of the negotiated TLS cipher suite for the connection.
+  std::string GetCipherName() const;
+
   // Get the description of the negotiated TLS cipher suite for the connection.
   std::string GetCipherDescription() const;
+
+  // Get whether extended master secret is used for the connection.
+  bool GetExtMS() const;
 
  private:
 

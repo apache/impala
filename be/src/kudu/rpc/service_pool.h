@@ -16,6 +16,7 @@
 // under the License.
 #pragma once
 
+#include <atomic>
 #include <cstddef>
 #include <functional>
 #include <memory>
@@ -27,7 +28,6 @@
 #include "kudu/gutil/ref_counted.h"
 #include "kudu/rpc/rpc_service.h"
 #include "kudu/rpc/service_queue.h"
-#include "kudu/util/mutex.h"
 #include "kudu/util/status.h"
 
 namespace kudu {
@@ -51,7 +51,7 @@ class ServicePool : public RpcService {
   ServicePool(std::unique_ptr<ServiceIf> service,
               const scoped_refptr<MetricEntity>& metric_entity,
               size_t service_queue_length);
-  virtual ~ServicePool();
+  ~ServicePool() override;
 
   // Set a hook function to be called when any RPC gets rejected because
   // the service queue is full.
@@ -99,8 +99,7 @@ class ServicePool : public RpcService {
   scoped_refptr<Counter> rpcs_timed_out_in_queue_;
   scoped_refptr<Counter> rpcs_queue_overflow_;
 
-  mutable Mutex shutdown_lock_;
-  bool closing_;
+  std::atomic<bool> closing_;
 
   std::function<void(void)> too_busy_hook_;
 

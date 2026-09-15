@@ -21,6 +21,7 @@
 #include <iterator>
 #include <mutex>
 #include <ostream>
+#include <shared_mutex>
 #include <string>
 #include <utility>
 #include <vector>
@@ -28,18 +29,20 @@
 #include <glog/logging.h>
 
 #include "kudu/gutil/map-util.h"
+#include "kudu/gutil/strings/substitute.h"
 #include "kudu/gutil/walltime.h"
 #include "kudu/security/token.pb.h"
 #include "kudu/security/token_signing_key.h"
-#include "kudu/util/locks.h"
 #include "kudu/util/logging.h"
 #include "kudu/util/status.h"
 
 using std::lock_guard;
+using std::shared_lock;
 using std::string;
 using std::transform;
 using std::unique_ptr;
 using std::vector;
+using strings::Substitute;
 
 namespace kudu {
 namespace security {
@@ -51,7 +54,7 @@ TokenVerifier::~TokenVerifier() {
 }
 
 int64_t TokenVerifier::GetMaxKnownKeySequenceNumber() const {
-  shared_lock<RWMutex> l(lock_);
+  shared_lock l(lock_);
   if (keys_by_seq_.empty()) {
     return -1;
   }
@@ -83,7 +86,7 @@ Status TokenVerifier::ImportKeys(const vector<TokenSigningPublicKeyPB>& keys) {
     RETURN_NOT_OK(tsks.back()->Init());
   }
 
-  lock_guard<RWMutex> l(lock_);
+  lock_guard l(lock_);
   for (auto&& tsk_ptr : tsks) {
     keys_by_seq_.emplace(tsk_ptr->pb().key_seq_num(), std::move(tsk_ptr));
   }
@@ -93,7 +96,7 @@ Status TokenVerifier::ImportKeys(const vector<TokenSigningPublicKeyPB>& keys) {
 std::vector<TokenSigningPublicKeyPB> TokenVerifier::ExportKeys(
     int64_t after_sequence_number) const {
   vector<TokenSigningPublicKeyPB> ret;
-  shared_lock<RWMutex> l(lock_);
+  shared_lock l(lock_);
   ret.reserve(keys_by_seq_.size());
   transform(keys_by_seq_.upper_bound(after_sequence_number),
             keys_by_seq_.end(),
@@ -123,14 +126,16 @@ TokenVerificationResult TokenVerifier::VerifyTokenSignature(
 
   for (auto flag : token->incompatible_features()) {
     if (!TokenPB::Feature_IsValid(flag)) {
-      KLOG_EVERY_N_SECS(WARNING, 60) << "received token with unknown feature; "
-                                        "server needs to be updated";
+      constexpr const char* const kFormat =
+          "received token with unknown feature $0; consider updating server";
+      KLOG_EVERY_N_SECS(WARNING, 60) << Substitute(
+          kFormat, static_cast<uint32_t>(flag)) << THROTTLE_MSG;
       return TokenVerificationResult::INCOMPATIBLE_FEATURE;
     }
   }
 
   {
-    shared_lock<RWMutex> l(lock_);
+    shared_lock l(lock_);
     auto* tsk = FindPointeeOrNull(keys_by_seq_, signed_token.signing_key_seq_num());
     if (!tsk) {
       return TokenVerificationResult::UNKNOWN_SIGNING_KEY;

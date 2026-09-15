@@ -22,7 +22,6 @@
 #include <cmath>
 #include <cstdint>
 #include <memory>
-#include <mutex>
 #include <sstream>
 #include <string>
 #include <type_traits>
@@ -44,6 +43,7 @@
 #include "kudu/util/logging.h"
 #include "kudu/util/maintenance_manager.pb.h"
 #include "kudu/util/metrics.h"
+#include "kudu/util/monotime.h"
 #include "kudu/util/process_memory.h"
 #include "kudu/util/random_util.h"
 #include "kudu/util/scoped_cleanup.h"
@@ -79,6 +79,7 @@ DEFINE_bool(enable_maintenance_manager, true,
             "Enable the maintenance manager, which runs flush, compaction, "
             "and garbage collection operations on tablets.");
 TAG_FLAG(enable_maintenance_manager, unsafe);
+TAG_FLAG(enable_maintenance_manager, runtime);
 
 DEFINE_int64(log_target_replay_size_mb, 1024,
              "The target maximum size of logs to be replayed at startup. If a tablet "
@@ -99,6 +100,18 @@ DEFINE_double(data_gc_prioritization_prob, 0.5,
              "such as delta compaction.");
 TAG_FLAG(data_gc_prioritization_prob, experimental);
 
+DEFINE_double(run_non_memory_ops_prob, 0,
+              "The probability that the tablet server will not flush DRS or MRS "
+              "while under memory pressure. This is useful when the server is under "
+              "memory pressure for a long time and there are non-memory operations "
+              "waiting to be run. The higher value means higher probability to "
+              "do other ops instead of flushing ops. This might be needed to turn "
+              "on if system admin found that the tablet server is under memory "
+              "pressure for a long time and there is a significant degradation in "
+              "performance.");
+TAG_FLAG(run_non_memory_ops_prob, experimental);
+TAG_FLAG(run_non_memory_ops_prob, runtime);
+
 DEFINE_double(maintenance_op_multiplier, 1.1,
               "Multiplier applied on different priority levels, table maintenance OPs on level N "
               "has multiplier of FLAGS_maintenance_op_multiplier^N, the last score will be "
@@ -118,6 +131,20 @@ DEFINE_int32(maintenance_manager_inject_latency_ms, 0,
              "Injects latency into maintenance thread. For use in tests only.");
 TAG_FLAG(maintenance_manager_inject_latency_ms, runtime);
 TAG_FLAG(maintenance_manager_inject_latency_ms, unsafe);
+
+DECLARE_int32(memory_pressure_percentage);
+DECLARE_int32(memory_limit_soft_percentage);
+
+static bool ValidateProbability(const char* flagname, double value) {
+  if (value >= 0.0 && value <= 1.0) {
+    return true;
+  }
+  LOG(ERROR) << Substitute("$0 must be a probability from 0 to 1,"
+                           " value $1 is invalid", flagname, value);
+  return false;
+}
+DEFINE_validator(run_non_memory_ops_prob, &ValidateProbability);
+DEFINE_validator(data_gc_prioritization_prob, &ValidateProbability);
 
 namespace kudu {
 
@@ -176,6 +203,7 @@ MaintenanceManager::MaintenanceManager(
     string server_uuid,
     const scoped_refptr<MetricEntity>& metric_entity)
     : server_uuid_(std::move(server_uuid)),
+      log_prefix_(Substitute("P $0: ", server_uuid_)),
       num_threads_(options.num_threads > 0
                    ? options.num_threads
                    : FLAGS_maintenance_manager_num_threads),
@@ -186,18 +214,19 @@ MaintenanceManager::MaintenanceManager(
       cond_(&lock_),
       shutdown_(false),
       running_ops_(0),
+      completed_ops_(options.history_size
+                         ? options.history_size
+                         : FLAGS_maintenance_manager_history_size),
       completed_ops_count_(0),
       rand_(GetRandomSeed32()),
-      memory_pressure_func_(&process_memory::UnderMemoryPressure),
+      memory_pressure_func_([&](double* consumption) {
+        return this->ProceedWithFlush(consumption);
+      }),
       metrics_(CHECK_NOTNULL(metric_entity)) {
   CHECK_OK(ThreadPoolBuilder("MaintenanceMgr")
                .set_min_threads(num_threads_)
                .set_max_threads(num_threads_)
                .Build(&thread_pool_));
-  uint32_t history_size = options.history_size == 0 ?
-                          FLAGS_maintenance_manager_history_size :
-                          options.history_size;
-  completed_ops_.resize(history_size);
 }
 
 MaintenanceManager::~MaintenanceManager() {
@@ -213,7 +242,7 @@ Status MaintenanceManager::Start() {
 
 void MaintenanceManager::Shutdown() {
   {
-    std::lock_guard<Mutex> guard(lock_);
+    std::lock_guard guard(lock_);
     if (shutdown_) {
       return;
     }
@@ -236,7 +265,7 @@ void MaintenanceManager::MergePendingOpRegistrationsUnlocked() {
   lock_.AssertAcquired();
   OpMapType ops_to_register;
   {
-    std::lock_guard<simple_spinlock> l(registration_lock_);
+    std::lock_guard l(registration_lock_);
     ops_to_register = std::move(ops_pending_registration_);
     ops_pending_registration_.clear();
   }
@@ -251,7 +280,7 @@ void MaintenanceManager::MergePendingOpRegistrationsUnlocked() {
 void MaintenanceManager::RegisterOp(MaintenanceOp* op) {
   CHECK(op);
   {
-    std::lock_guard<simple_spinlock> l(registration_lock_);
+    std::lock_guard l(registration_lock_);
     CHECK(!op->manager_) << "Tried to register " << op->name()
                         << ", but it is already registered.";
     EmplaceOrDie(&ops_pending_registration_, op, MaintenanceOpStats());
@@ -271,7 +300,7 @@ void MaintenanceManager::UnregisterOp(MaintenanceOp* op) {
 
   // While the op is running, wait for it to be finished.
   {
-    std::lock_guard<Mutex> guard(running_instances_lock_);
+    std::lock_guard guard(running_instances_lock_);
     if (op->running_ > 0) {
       VLOG_AND_TRACE_WITH_PREFIX("maintenance", 1)
           << Substitute("Waiting for op $0 to finish so we can unregister it", op->name());
@@ -284,9 +313,9 @@ void MaintenanceManager::UnregisterOp(MaintenanceOp* op) {
   // Remove the op from 'ops_', and if it wasn't there, erase it from
   // 'ops_pending_registration_'.
   {
-    std::lock_guard<Mutex> guard(lock_);
+    std::lock_guard guard(lock_);
     if (ops_.erase(op) == 0) {
-      std::lock_guard<simple_spinlock> l(registration_lock_);
+      std::lock_guard l(registration_lock_);
       const auto num_erased_ops = ops_pending_registration_.erase(op);
       CHECK_GT(num_erased_ops, 0);
     }
@@ -302,19 +331,27 @@ bool MaintenanceManager::disabled_for_tests() const {
 }
 
 void MaintenanceManager::RunSchedulerThread() {
-  if (!FLAGS_enable_maintenance_manager) {
-    LOG(INFO) << "Maintenance manager is disabled. Stopping thread.";
-    return;
-  }
-
   // Set to true if the scheduler runs and finds that there is no work to do.
   bool prev_iter_found_no_work = false;
 
   while (true) {
+    if (PREDICT_FALSE(!FLAGS_enable_maintenance_manager)) {
+      {
+        std::lock_guard guard(lock_);
+        if (shutdown_) {
+          VLOG_AND_TRACE_WITH_PREFIX("maintenance", 1) << "Shutting down maintenance manager.";
+          return;
+        }
+      }
+      KLOG_EVERY_N_SECS(INFO, 300)
+          << "Maintenance manager is disabled (check --enable_maintenance_manager).";
+      SleepFor(polling_interval_);
+      continue;
+    }
     MaintenanceOp* op = nullptr;
     string op_note;
     {
-      std::unique_lock<Mutex> guard(lock_);
+      std::lock_guard guard(lock_);
       // Upon each iteration, we should have dropped and reacquired 'lock_'.
       // Register any ops that may have been buffered for registration while the
       // lock was last held.
@@ -352,7 +389,7 @@ void MaintenanceManager::RunSchedulerThread() {
         // whether the op is cancelled. This ensures that we don't attempt to
         // launch an op that has been destructed in UnregisterOp(). See
         // KUDU-3268 for more details.
-        std::lock_guard<Mutex> guard(running_instances_lock_);
+        std::lock_guard guard(running_instances_lock_);
         if (op->cancelled()) {
           VLOG_AND_TRACE_WITH_PREFIX("maintenance", 2)
               << "picked maintenance operation that has been cancelled";
@@ -374,7 +411,7 @@ void MaintenanceManager::RunSchedulerThread() {
       LOG_WITH_PREFIX(INFO) << "Prepare failed for " << op->name()
                             << ". Re-running scheduler.";
       metrics_.SubmitOpPrepareFailed();
-      std::lock_guard<Mutex> guard(running_instances_lock_);
+      std::lock_guard guard(running_instances_lock_);
       DecreaseOpCountAndNotifyWaiters(op);
       continue;
     }
@@ -495,6 +532,9 @@ pair<MaintenanceOp*, string> MaintenanceManager::FindBestOp() {
   // are anchoring WALs. Choosing the op that frees the most WALs ensures that
   // all ops that anchor memory (and also anchor WALs) will eventually be
   // performed.
+  //
+  // Do not always flush MRS/DMS even under memory pressure, some perf improvement
+  // ops might be more important than freeing memory even if under memory pressure.
   double capacity_pct;
   if (memory_pressure_func_(&capacity_pct) && most_logs_retained_bytes_ram_anchored_op) {
     DCHECK_GT(most_logs_retained_bytes_ram_anchored, 0);
@@ -559,7 +599,7 @@ void MaintenanceManager::LaunchOp(MaintenanceOp* op) {
   op_instance.start_mono_time = MonoTime::Now();
   op->RunningGauge()->Increment();
   {
-    std::lock_guard<Mutex> lock(running_instances_lock_);
+    std::lock_guard lock(running_instances_lock_);
     InsertOrDie(&running_instances_, thread_id, &op_instance);
   }
 
@@ -571,7 +611,7 @@ void MaintenanceManager::LaunchOp(MaintenanceOp* op) {
 
     op->RunningGauge()->Decrement();
     {
-      std::lock_guard<Mutex> lock(running_instances_lock_);
+      std::lock_guard lock(running_instances_lock_);
       running_instances_.erase(thread_id);
 
       op_instance.duration = now - op_instance.start_mono_time;
@@ -583,7 +623,7 @@ void MaintenanceManager::LaunchOp(MaintenanceOp* op) {
 
     // Add corresponding entry into the completed_ops_ container.
     {
-      std::lock_guard<simple_spinlock> lock(completed_ops_lock_);
+      std::lock_guard lock(completed_ops_lock_);
       completed_ops_[completed_ops_count_ % completed_ops_.size()] =
           std::move(op_instance);
       ++completed_ops_count_;
@@ -609,7 +649,7 @@ void MaintenanceManager::LaunchOp(MaintenanceOp* op) {
 void MaintenanceManager::GetMaintenanceManagerStatusDump(
     MaintenanceManagerStatusPB* out_pb) {
   DCHECK(out_pb != nullptr);
-  std::lock_guard<Mutex> guard(lock_);
+  std::lock_guard guard(lock_);
   MergePendingOpRegistrationsUnlocked();
   for (const auto& val : ops_) {
     auto* op_pb = out_pb->add_registered_operations();
@@ -635,7 +675,7 @@ void MaintenanceManager::GetMaintenanceManagerStatusDump(
   }
 
   {
-    std::lock_guard<Mutex> lock(running_instances_lock_);
+    std::lock_guard lock(running_instances_lock_);
     for (const auto& running_instance : running_instances_) {
       *out_pb->add_running_operations() = running_instance.second->DumpToPB();
     }
@@ -643,7 +683,7 @@ void MaintenanceManager::GetMaintenanceManagerStatusDump(
 
   // The latest completed op will be dumped at first.
   {
-    std::lock_guard<simple_spinlock> lock(completed_ops_lock_);
+    std::lock_guard lock(completed_ops_lock_);
     for (int n = 1; n <= completed_ops_.size(); ++n) {
       if (completed_ops_count_ < n) {
         break;
@@ -656,10 +696,6 @@ void MaintenanceManager::GetMaintenanceManagerStatusDump(
       }
     }
   }
-}
-
-string MaintenanceManager::LogPrefix() const {
-  return Substitute("P $0: ", server_uuid_);
 }
 
 bool MaintenanceManager::HasFreeThreads() {
@@ -684,4 +720,17 @@ void MaintenanceManager::DecreaseOpCountAndNotifyWaiters(MaintenanceOp* op) {
   op->cond_->Signal();
 }
 
+bool MaintenanceManager::ProceedWithFlush(double* used_memory_percentage) {
+  if (!process_memory::UnderMemoryPressure(used_memory_percentage)) {
+    return false;
+  }
+
+  static const double pressure_threshold = FLAGS_memory_pressure_percentage;
+  static const double soft_limit = FLAGS_memory_limit_soft_percentage;
+  static const double pressure_diff = soft_limit - pressure_threshold;
+  const double used_diff = soft_limit - *used_memory_percentage;
+  return pressure_diff <= 0 || used_diff <= 0 ||
+      rand_.NextDoubleFraction() * pressure_diff >=
+          FLAGS_run_non_memory_ops_prob * used_diff;
+}
 } // namespace kudu

@@ -15,9 +15,6 @@
 # specific language governing permissions and limitations
 # under the License.
 
-# Target including all protobuf-generated code.
-add_custom_target(kudu-util-proto-deps)
-
 #######################################
 # block_bloom_filter_proto
 #######################################
@@ -31,8 +28,6 @@ ADD_EXPORTABLE_LIBRARY(block_bloom_filter_proto
   SRCS ${BLOCK_BLOOM_FILTER_PROTO_SRCS}
   DEPS hash_proto pb_util_proto protobuf
   NONLINK_DEPS ${BLOCK_BLOOM_FILTER_PROTO_TGTS})
-
-add_dependencies(kudu-util-proto-deps ${BLOCK_BLOOM_FILTER_PROTO_TGTS})
 
 #######################################
 # util_compression_proto
@@ -48,10 +43,6 @@ ADD_EXPORTABLE_LIBRARY(util_compression_proto
   DEPS protobuf
   NONLINK_DEPS ${UTIL_COMPRESSION_PROTO_TGTS})
 
-add_dependencies(kudu-util-proto-deps ${UTIL_COMPRESSION_PROTO_TGTS})
-
-add_definitions(-DKUDU_HEADERS_USE_SHORT_STATUS_MACROS)
-
 #######################################
 # hash_proto
 #######################################
@@ -65,8 +56,6 @@ ADD_EXPORTABLE_LIBRARY(hash_proto
   SRCS ${HASH_PROTO_SRCS}
   DEPS protobuf
   NONLINK_DEPS ${HASH_PROTO_TGTS})
-
-add_dependencies(kudu-util-proto-deps ${HASH_PROTO_TGTS})
 
 #######################################
 # histogram_proto
@@ -82,8 +71,6 @@ ADD_EXPORTABLE_LIBRARY(histogram_proto
   DEPS protobuf
   NONLINK_DEPS ${HISTOGRAM_PROTO_TGTS})
 
-add_dependencies(kudu-util-proto-deps ${HISTOGRAM_PROTO_TGTS})
-
 #######################################
 # maintenance_manager_proto
 #######################################
@@ -97,8 +84,6 @@ ADD_EXPORTABLE_LIBRARY(maintenance_manager_proto
   SRCS ${MAINTENANCE_MANAGER_PROTO_SRCS}
   DEPS protobuf
   NONLINK_DEPS ${MAINTENANCE_MANAGER_PROTO_TGTS})
-
-add_dependencies(kudu-util-proto-deps ${MAINTENANCE_MANAGER_PROTO_TGTS})
 
 #######################################
 # mem_tracker_proto
@@ -114,8 +99,6 @@ ADD_EXPORTABLE_LIBRARY(mem_tracker_proto
   DEPS protobuf
   NONLINK_DEPS ${MEM_TRACKER_PROTO_TGTS})
 
-add_dependencies(kudu-util-proto-deps ${MEM_TRACKER_PROTO_TGTS})
-
 #######################################
 # pb_util_proto
 #######################################
@@ -130,7 +113,19 @@ ADD_EXPORTABLE_LIBRARY(pb_util_proto
   DEPS protobuf
   NONLINK_DEPS ${PB_UTIL_PROTO_TGTS})
 
-add_dependencies(kudu-util-proto-deps ${PB_UTIL_PROTO_TGTS})
+#######################################
+# socket_info_proto
+#######################################
+
+PROTOBUF_GENERATE_CPP(
+  SOCKET_INFO_PROTO_SRCS SOCKET_INFO_PROTO_HDRS SOCKET_INFO_PROTO_TGTS
+  SOURCE_ROOT ${CMAKE_CURRENT_SOURCE_DIR}/../..
+  BINARY_ROOT ${CMAKE_CURRENT_BINARY_DIR}/../..
+  PROTO_FILES net/socket_info.proto)
+ADD_EXPORTABLE_LIBRARY(socket_info_proto
+  SRCS ${SOCKET_INFO_PROTO_SRCS}
+  DEPS protobuf
+  NONLINK_DEPS ${SOCKET_INFO_PROTO_TGTS})
 
 #######################################
 # version_info_proto
@@ -145,8 +140,6 @@ ADD_EXPORTABLE_LIBRARY(version_info_proto
   SRCS ${VERSION_INFO_PROTO_SRCS}
   DEPS protobuf
   NONLINK_DEPS ${VERSION_INFO_PROTO_TGTS})
-
-add_dependencies(kudu-util-proto-deps ${VERSION_INFO_PROTO_TGTS})
 
 ############################################################
 # Version stamp
@@ -179,18 +172,14 @@ else ()
 endif()
 
 set(UTIL_SRCS
-  async_logger.cc
   atomic.cc
   bitmap.cc
-  block_cache_metrics.cc
   block_bloom_filter.cc
   bloom_filter.cc
   cache.cc
-  # Skipped in Impala builds.
-  #char_util.cc
+  char_util.cc
   coding.cc
   condition_variable.cc
-  cow_object.cc
   crc.cc
   debug-util.cc
   decimal_util.cc
@@ -203,24 +192,17 @@ set(UTIL_SRCS
   errno.cc
   faststring.cc
   fault_injection.cc
-  # Skipped in Impala builds.
-  #file_cache.cc
-  file_cache_metrics.cc
   flags.cc
   flag_tags.cc
   flag_validators.cc
-  group_varint.cc
   pstack_watcher.cc
   hdr_histogram.cc
   hexdump.cc
   init.cc
-  jsonreader.cc
   jsonwriter.cc
   kernel_stack_watchdog.cc
   locks.cc
   logging.cc
-  maintenance_manager.cc
-  maintenance_manager_metrics.cc
   malloc.cc
   memcmpable_varint.cc
   memory/arena.cc
@@ -228,8 +210,6 @@ set(UTIL_SRCS
   memory/overwrite.cc
   mem_tracker.cc
   metrics.cc
-  # Skipped in Impala builds.
-  #minidump.cc
   monotime.cc
   mutex.cc
   net/dns_resolver.cc
@@ -247,7 +227,6 @@ set(UTIL_SRCS
   process_memory.cc
   prometheus_writer.cc
   random_util.cc
-  rolling_log.cc
   rw_mutex.cc
   rwc_lock.cc
   ${SEMAPHORE_CC}
@@ -264,21 +243,38 @@ set(UTIL_SRCS
   threadlocal.cc
   threadpool.cc
   thread_restrictions.cc
-  throttler.cc
   trace.cc
   trace_metrics.cc
   user.cc
   url-coding.cc
-  # Remove from compilation, as it depends on generated method calls. Replaced by
-  # kudu_version.cc in Impala's common library.
-  #version_info.cc
+  version_info.cc
   version_util.cc
   web_callback_registry.cc
-  website_util.cc
-  # Skipped in Impala builds.
-  #yamlreader.cc
-  zlib.cc
 )
+
+if (NOT KUDU_CLIENT_ONLY)
+  set(UTIL_SRCS ${UTIL_SRCS}
+    async_logger.cc
+    block_cache_metrics.cc
+    cow_object.cc
+    file_cache.cc
+    file_cache_metrics.cc
+    group_varint.cc
+    jsonreader.cc
+    maintenance_manager.cc
+    maintenance_manager_metrics.cc
+    minidump.cc
+    rolling_log.cc
+    slru_cache.cc
+    throttler.cc
+    website_util.cc
+    yamlreader.cc
+    zlib.cc)
+endif()
+
+if (KUDU_HAS_DIAGNOSTIC_SOCKET)
+  set(UTIL_SRCS ${UTIL_SRCS} net/diagnostic_socket.cc)
+endif()
 
 if(NOT NO_TESTS)
   set(UTIL_SRCS ${UTIL_SRCS} test_graph.cc)
@@ -289,9 +285,17 @@ endif()
 # optimized regardless of the default optimization options.
 set_source_files_properties(memory/overwrite.cc PROPERTIES COMPILE_FLAGS "-O3")
 
+# Detect AVX2 support
+execute_process(
+  COMMAND echo
+  COMMAND ${CMAKE_CXX_COMPILER} -mavx2 -dM -E -
+  COMMAND awk "$2 == \"__AVX2__\" { print $3 }"
+  ERROR_QUIET
+  OUTPUT_VARIABLE AVX2_SUPPORT
+  OUTPUT_STRIP_TRAILING_WHITESPACE
+)
+
 # block_bloom_filter_avx2.cc uses AVX2 operations.
-# NOTE: This is modified from the Kudu source code. As other Impala code needs AVX2
-# detection, it has been centralized in be/CMakeLists.txt
 if (AVX2_SUPPORT)
   list(APPEND UTIL_SRCS block_bloom_filter_avx2.cc)
   set_source_files_properties(block_bloom_filter_avx2.cc PROPERTIES COMPILE_FLAGS "-mavx2")
@@ -300,10 +304,40 @@ if (AVX2_SUPPORT)
   # instead of relying on __AVX2__ defined by compiler with -mavx2.
   set_source_files_properties(block_bloom_filter_avx2.cc block_bloom_filter.cc
                               PROPERTIES COMPILE_DEFINITIONS "USE_AVX2=1")
-  message("Compiler supports AVX2 (be/src/kudu/util)")
+  message("Compiler supports AVX2")
 else()
-  message("Compiler does not support AVX2 (be/src/kudu/util)")
+  message("Compiler does not support AVX2")
 endif()
+
+# See the comment in sanitizer_options.cc for details on this library's usage.
+# The top-level CMakeLists sets a ${SANITIZER_OPTIONS_OVERRIDE} variable which
+# should be linked first into all Kudu binaries.
+
+#######################################
+# sanitizer_options
+#######################################
+if ("${KUDU_USE_ASAN}" OR "${KUDU_USE_TSAN}" OR "${KUDU_USE_UBSAN}")
+  add_library(sanitizer_options STATIC sanitizer_options.cc)
+  target_link_libraries(sanitizer_options gutil)
+  # By default the sanitizers use addr2line utility to symbolize reports.
+  # llvm-symbolizer is faster, consumes less memory and produces much better reports.
+  # We set KUDU_EXTERNAL_SYMBOLIZER_PATH which is used in sanitizer_options.cc
+  # to set the default external_symbolizer_path.
+  SET(KUDU_LLVM_SYMBOLIZER_PATH ${THIRDPARTY_INSTALL_UNINSTRUMENTED_DIR}/bin/llvm-symbolizer)
+  if (EXISTS ${KUDU_LLVM_SYMBOLIZER_PATH})
+    target_compile_definitions(sanitizer_options PRIVATE KUDU_EXTERNAL_SYMBOLIZER_PATH=${KUDU_LLVM_SYMBOLIZER_PATH})
+  else()
+    message(SEND_ERROR
+      "Could not find llvm-symbolizer required for sanitizer builds at ${KUDU_LLVM_SYMBOLIZER_PATH}")
+  endif()
+endif()
+
+#######################################
+# protoc-gen-insertions
+#######################################
+
+add_executable(protoc-gen-insertions protoc-gen-insertions.cc)
+target_link_libraries(protoc-gen-insertions gutil protobuf protoc ${KUDU_BASE_LIBS})
 
 set(UTIL_LIBS
   block_bloom_filter_proto
@@ -320,12 +354,15 @@ set(UTIL_LIBS
   protobuf
   openssl_crypto
   openssl_ssl
+  socket_info_proto
   version_info_proto
-  # Skipped in Impala builds.
-  #yaml
   zlib)
 
-if(NOT APPLE)
+if(NOT KUDU_CLIENT_ONLY)
+  set(UTIL_LIBS ${UTIL_LIBS} yaml)
+endif()
+
+if(NOT APPLE AND NOT KUDU_CLIENT_ONLY)
   set(UTIL_LIBS
     ${UTIL_LIBS}
     breakpad_client
@@ -365,8 +402,7 @@ ADD_EXPORTABLE_LIBRARY(kudu_util_compression
 # Define LZ4_DISABLE_DEPRECATE_WARNINGS to mute warnings like:
 # "'int LZ4_compress(const char*, char*, int)' is deprecated".
 target_compile_definitions(kudu_util_compression PUBLIC LZ4_DISABLE_DEPRECATE_WARNINGS)
-# Skipped in Impala builds.
-#target_compile_definitions(kudu_util_compression_exported PUBLIC LZ4_DISABLE_DEPRECATE_WARNINGS)
+target_compile_definitions(kudu_util_compression_exported PUBLIC LZ4_DISABLE_DEPRECATE_WARNINGS)
 
 #######################################
 # kudu_curl_util
@@ -379,32 +415,34 @@ target_link_libraries(kudu_curl_util
   glog
   gutil)
 
+if (KUDU_CLIENT_ONLY)
+  return()
+endif()
+
 #######################################
 # kudu_cloud_util
 #######################################
-# Skipped in Impala builds as Impala doesn't use it.
-# add_library(kudu_cloud_util
-#   cloud/instance_detector.cc
-#   cloud/instance_metadata.cc)
-# target_link_libraries(kudu_cloud_util
-#   kudu_curl_util)
+add_library(kudu_cloud_util
+  cloud/instance_detector.cc
+  cloud/instance_metadata.cc)
+target_link_libraries(kudu_cloud_util
+  kudu_curl_util)
 
 #######################################
 # kudu_jwt_util
 #######################################
-# Note: JWT support is already available in Impala so we use that.
-#add_library(kudu_jwt_util jwt-util.cc)
-#target_link_libraries(kudu_jwt_util
-#  gutil
-#  security
-#  kudu_curl_util
-#  kudu_util)
+add_library(kudu_jwt_util jwt-util.cc)
+target_link_libraries(kudu_jwt_util
+  gutil
+  security
+  kudu_curl_util
+  kudu_util)
 
 #######################################
 # mini_oidc
 #######################################
 # The mini_oidc is used only for tests.
-if (KUDU_CLI_TEST_TOOL_ENABLED)
+if (KUDU_CLI_TEST_TOOL_ENABLED AND NOT KUDU_CLIENT_ONLY)
   add_library(mini_oidc mini_oidc.cc)
   target_link_libraries(mini_oidc
     server_process
@@ -412,6 +450,25 @@ if (KUDU_CLI_TEST_TOOL_ENABLED)
     kudu_test_util
     kudu_util
     jwt_test_certs)
+endif()
+
+#######################################
+# mini_prometheus
+#######################################
+# Link the Prometheus home directory so it can be found via
+# test_util::FindHomeDir in MiniPrometheus::Start.
+execute_process(COMMAND ln -nsf
+                "${THIRDPARTY_DIR}/installed/common/opt/prometheus"
+                "${EXECUTABLE_OUTPUT_PATH}/prometheus-home")
+
+# The mini_prometheus is used only for tests.
+if (KUDU_CLI_TEST_TOOL_ENABLED)
+  add_library(mini_prometheus mini_prometheus.cc)
+  target_link_libraries(mini_prometheus
+    gutil
+    kudu_curl_util
+    kudu_test_util
+    kudu_util)
 endif()
 
 #######################################
@@ -424,71 +481,34 @@ if (KUDU_CLI_TEST_TOOL_ENABLED)
     kudu_jwt_util)
 endif()
 
-# See the comment in sanitizer_options.cc for details on this library's usage.
-# The top-level CMakeLists sets a ${SANITIZER_OPTIONS_OVERRIDE} variable which
-# should be linked first into all Kudu binaries.
-
-#######################################
-# sanitizer_options
-#######################################
-if ("${KUDU_USE_ASAN}" OR "${KUDU_USE_TSAN}" OR "${KUDU_USE_UBSAN}")
-  add_library(sanitizer_options STATIC sanitizer_options.cc)
-  target_link_libraries(sanitizer_options gutil)
-  # By default the sanitizers use addr2line utility to symbolize reports.
-  # llvm-symbolizer is faster, consumes less memory and produces much better reports.
-  # We set KUDU_EXTERNAL_SYMBOLIZER_PATH which is used in sanitizer_options.cc
-  # to set the default external_symbolizer_path.
-  SET(KUDU_LLVM_SYMBOLIZER_PATH ${THIRDPARTY_INSTALL_UNINSTRUMENTED_DIR}/bin/llvm-symbolizer)
-  if (EXISTS ${KUDU_LLVM_SYMBOLIZER_PATH})
-    target_compile_definitions(sanitizer_options PRIVATE KUDU_EXTERNAL_SYMBOLIZER_PATH=${KUDU_LLVM_SYMBOLIZER_PATH})
-  else()
-    message(SEND_ERROR
-      "Could not find llvm-symbolizer required for sanitizer builds at ${KUDU_LLVM_SYMBOLIZER_PATH}")
-  endif()
-endif()
-
-#######################################
-# protoc-gen-insertions
-#######################################
-
-add_executable(protoc-gen-insertions protoc-gen-insertions.cc)
-# Impala needs some extra dependency libs compared to Kudu.
-# Note that the order is important.
-target_link_libraries(protoc-gen-insertions gutil glog gflags protoc protobuf  ${KUDU_BASE_LIBS})
-# Impala - run at build time, so needs rpath to the toolchain's libstdc++.
-set_target_properties(protoc-gen-insertions PROPERTIES LINK_FLAGS
-  "${TOOLCHAIN_LINK_FLAGS}")
-
 #######################################
 # kudu_test_util
 #######################################
 # The kudu_test_util is used only for tests.
-# Note: Impala needs this.
-#if (KUDU_CLI_TEST_TOOL_ENABLED)
+if (KUDU_CLI_TEST_TOOL_ENABLED)
   add_library(kudu_test_util
     test_util.cc)
   target_link_libraries(kudu_test_util
     gflags
     glog
-    # Impala doesn't have gmock in its toolchain
-    #gmock
+    gmock
     gtest
     kudu_util)
-#endif()
+endif()
 
 #######################################
 # kudu_test_main
 #######################################
 if(NOT NO_TESTS)
-  add_library(kudu_test_main
+  add_library(kudu_test_main STATIC
     test_main.cc)
   target_link_libraries(kudu_test_main
+    kudu_util
     ${KRB5_REALM_OVERRIDE}
     gflags
     glog
     gmock
     gtest
-    kudu_util
     kudu_test_util)
 
   if(NOT APPLE)
@@ -588,6 +608,7 @@ ADD_KUDU_TEST(rwc_lock-test RUN_SERIAL true)
 ADD_KUDU_TEST(safe_math-test)
 ADD_KUDU_TEST(scoped_cleanup-test)
 ADD_KUDU_TEST(slice-test)
+ADD_KUDU_TEST(slru_cache-test)
 ADD_KUDU_TEST(sorted_disjoint_interval_list-test)
 ADD_KUDU_TEST(spinlock_profiling-test)
 ADD_KUDU_TEST(stack_watchdog-test PROCESSORS 2)
@@ -607,6 +628,10 @@ ADD_KUDU_TEST(yamlreader-test)
 
 if (NOT APPLE)
   ADD_KUDU_TEST(minidump-test)
+endif()
+
+if (KUDU_HAS_DIAGNOSTIC_SOCKET)
+  ADD_KUDU_TEST(net/diagnostic_socket-test)
 endif()
 
 #######################################
@@ -673,6 +698,10 @@ if(NOT NO_TESTS)
   target_link_libraries(compression-test
     cfile
     kudu_util_compression)
+  if(NOT NO_ROCKSDB)
+    target_link_libraries(compression-test
+      rocksdb)
+  endif()
 endif()
 
 #######################################
@@ -685,6 +714,16 @@ if(NOT NO_TESTS)
 endif()
 
 #######################################
+# mini_prometheus-test
+#######################################
+ADD_KUDU_TEST(mini_prometheus-test)
+if(NOT NO_TESTS)
+  target_link_libraries(mini_prometheus-test
+    mini_prometheus
+    server_process)
+endif()
+
+#######################################
 # jwt-util-test
 #######################################
 ADD_KUDU_TEST(jwt-util-test)
@@ -693,14 +732,27 @@ if(NOT NO_TESTS)
     mini_oidc
     server_process
     jwt_test_certs)
+  if(NOT NO_ROCKSDB)
+    target_link_libraries(jwt-util-test
+      rocksdb
+      snappy)
+  endif()
 endif()
 
 #######################################
 # instance_detector-test
 #######################################
-# Impala doesn't need it.
-#ADD_KUDU_TEST(cloud/instance_detector-test)
-#if(NOT NO_TESTS)
-#  target_link_libraries(instance_detector-test
-#    kudu_cloud_util)
-#endif()
+ADD_KUDU_TEST(cloud/instance_detector-test)
+if(NOT NO_TESTS)
+  target_link_libraries(instance_detector-test
+    kudu_cloud_util)
+endif()
+
+#######################################
+# zlib-test
+#######################################
+ADD_KUDU_TEST(zlib-test)
+if(NOT NO_TESTS)
+  target_link_libraries(zlib-test
+    zlib)
+endif()

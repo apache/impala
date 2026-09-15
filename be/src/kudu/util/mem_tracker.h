@@ -20,12 +20,14 @@
 #include <list>
 #include <memory>
 #include <string>
+#include <type_traits>
 #include <utility>
 #include <vector>
 
 #include <glog/logging.h>
 
 #include "kudu/util/high_water_mark.h"
+#include "kudu/util/make_shared.h"
 #include "kudu/util/mutex.h"
 
 namespace kudu {
@@ -56,7 +58,8 @@ class MemTrackerPB;
 // the tracker itself or to one of its descendants.
 //
 // This class is thread-safe.
-class MemTracker : public std::enable_shared_from_this<MemTracker> {
+class MemTracker : public std::enable_shared_from_this<MemTracker>,
+                   public enable_make_shared<MemTracker> {
  public:
   ~MemTracker();
 
@@ -70,7 +73,7 @@ class MemTracker : public std::enable_shared_from_this<MemTracker> {
   static std::shared_ptr<MemTracker> CreateTracker(
       int64_t byte_limit,
       const std::string& id,
-      std::shared_ptr<MemTracker> parent = std::shared_ptr<MemTracker>());
+      std::shared_ptr<MemTracker> parent = {});
 
   // If a tracker with the specified 'id' and 'parent' exists in the tree, sets
   // 'tracker' to reference that instance. Returns false if no such tracker
@@ -83,7 +86,7 @@ class MemTracker : public std::enable_shared_from_this<MemTracker> {
   static bool FindTracker(
       const std::string& id,
       std::shared_ptr<MemTracker>* tracker,
-      const std::shared_ptr<MemTracker>& parent = std::shared_ptr<MemTracker>());
+      const std::shared_ptr<MemTracker>& parent = {});
 
   // If a global tracker with the specified 'id' exists in the tree, returns a
   // shared_ptr to that instance. Otherwise, creates a new MemTracker with the
@@ -124,12 +127,12 @@ class MemTracker : public std::enable_shared_from_this<MemTracker> {
 
   // Returns true if a valid limit of this tracker or one of its ancestors is
   // exceeded.
-  bool AnyLimitExceeded();
+  bool AnyLimitExceeded() const;
 
   // If this tracker has a limit, checks the limit and attempts to free up some memory if
   // the limit is exceeded by calling any added GC functions. Returns true if the limit is
   // exceeded after calling the GC functions. Returns false if there is no limit.
-  bool LimitExceeded() {
+  bool LimitExceeded() const {
     return limit_ >= 0 && limit_ < consumption();
   }
 
@@ -157,17 +160,12 @@ class MemTracker : public std::enable_shared_from_this<MemTracker> {
   // guaranteed) to be globally unique.
   std::string ToString() const;
 
- private:
+ protected:
   // byte_limit < 0 means no limit
   // 'id' is the label for LogUsage() and web UI.
   MemTracker(int64_t byte_limit, const std::string& id, std::shared_ptr<MemTracker> parent);
 
-  // Further initializes the tracker.
-  void Init();
-
-  // Adds tracker to child_trackers_.
-  void AddChildTracker(const std::shared_ptr<MemTracker>& tracker);
-
+ private:
   // Variant of FindTracker() that must be called with a non-NULL parent.
   static bool FindTrackerInternal(
       const std::string& id,
@@ -177,7 +175,13 @@ class MemTracker : public std::enable_shared_from_this<MemTracker> {
   // Creates the root tracker.
   static void CreateRootTracker();
 
-  int64_t limit_;
+  // Further initializes the tracker.
+  void Init();
+
+  // Adds tracker to child_trackers_.
+  void AddChildTracker(const std::shared_ptr<MemTracker>& tracker);
+
+  const int64_t limit_;
   const std::string id_;
   const std::string descr_;
   std::shared_ptr<MemTracker> parent_;
@@ -205,9 +209,9 @@ class MemTracker : public std::enable_shared_from_this<MemTracker> {
 template<typename T, typename Alloc = std::allocator<T> >
 class MemTrackerAllocator : public Alloc {
  public:
-  typedef typename Alloc::pointer pointer;
-  typedef typename Alloc::const_pointer const_pointer;
-  typedef typename Alloc::size_type size_type;
+  typedef typename std::allocator_traits<Alloc>::pointer pointer;
+  typedef typename std::allocator_traits<Alloc>::const_pointer const_pointer;
+  typedef typename std::allocator_traits<Alloc>::size_type size_type;
 
   explicit MemTrackerAllocator(std::shared_ptr<MemTracker> mem_tracker)
       : mem_tracker_(std::move(mem_tracker)) {}

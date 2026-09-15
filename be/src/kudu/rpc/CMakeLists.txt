@@ -15,9 +15,6 @@
 # specific language governing permissions and limitations
 # under the License.
 
-# Target including all protobuf-generated code.
-add_custom_target(kudu-rpc-proto-deps)
-
 #### Global header protobufs
 PROTOBUF_GENERATE_CPP(
   RPC_HEADER_PROTO_SRCS RPC_HEADER_PROTO_HDRS RPC_HEADER_PROTO_TGTS
@@ -29,24 +26,20 @@ ADD_EXPORTABLE_LIBRARY(rpc_header_proto
   DEPS protobuf pb_util_proto token_proto
   NONLINK_DEPS ${RPC_HEADER_PROTO_TGTS})
 
-add_dependencies(kudu-rpc-proto-deps ${RPC_HEADER_PROTO_TGTS})
-
 PROTOBUF_GENERATE_CPP(
   RPC_INTROSPECTION_PROTO_SRCS RPC_INTROSPECTION_PROTO_HDRS RPC_INTROSPECTION_PROTO_TGTS
   SOURCE_ROOT ${CMAKE_CURRENT_SOURCE_DIR}/../..
   BINARY_ROOT ${CMAKE_CURRENT_BINARY_DIR}/../..
   PROTO_FILES rpc_introspection.proto)
 set(RPC_INTROSPECTION_PROTO_LIBS
+  histogram_proto
+  protobuf
   rpc_header_proto
-  protobuf)
+  socket_info_proto)
 ADD_EXPORTABLE_LIBRARY(rpc_introspection_proto
   SRCS ${RPC_INTROSPECTION_PROTO_SRCS}
   DEPS ${RPC_INTROSPECTION_PROTO_LIBS}
   NONLINK_DEPS ${RPC_INTROSPECTION_PROTO_TGTS})
-
-add_dependencies(kudu-rpc-proto-deps ${RPC_INTROSPECTION_PROTO_TGTS})
-
-add_definitions(-DKUDU_HEADERS_USE_SHORT_STATUS_MACROS)
 
 ### RPC library
 set(KRPC_SRCS
@@ -92,25 +85,22 @@ set(KRPC_LIBS
   libev
   rpc_header_proto
   rpc_introspection_proto
-  security)
+  security
+  socket_info_proto
+)
 
 ADD_EXPORTABLE_LIBRARY(krpc
   SRCS ${KRPC_SRCS}
   DEPS ${KRPC_LIBS})
 
 ### RPC generator tool
-add_executable(protoc-gen-krpc protoc-gen-krpc.cc
-  # Impala - add stub for kudu::VersionInfo
-  ${CMAKE_CURRENT_SOURCE_DIR}/../../common/kudu_version.cc
-  # Impala - add definition for any flag names shared between Impala / Kudu.
-  # TODO: Consider either removing code that depends on these flags, or namespacing them
-  # somehow.
-  ${CMAKE_CURRENT_SOURCE_DIR}/../../common/global-flags.cc)
-# IMPALA-8642: kudu_version.cc depends on gen-cpp/Status_types.h in target thrift-deps
-add_dependencies(protoc-gen-krpc thrift-deps)
-target_link_libraries(protoc-gen-krpc gutil glog gflags protoc protobuf rpc_header_proto ${KUDU_BASE_LIBS})
-# Impala - run at build time, so needs rpath to the toolchain's libstdc++.
-set_target_properties(protoc-gen-krpc PROPERTIES LINK_FLAGS "${TOOLCHAIN_LINK_FLAGS}")
+add_executable(protoc-gen-krpc protoc-gen-krpc.cc)
+target_link_libraries(protoc-gen-krpc
+    ${KUDU_BASE_LIBS}
+    rpc_header_proto
+    protoc
+    protobuf
+    gutil)
 
 ### RPC test
 if(NOT NO_TESTS)

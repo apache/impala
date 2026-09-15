@@ -18,6 +18,10 @@
 #include "kudu/security/tls_context.h"
 
 #include <openssl/crypto.h>
+#if OPENSSL_VERSION_NUMBER >= 0x30000000L
+#include <openssl/prov_ssl.h>
+#include <openssl/types.h>
+#endif
 #ifndef OPENSSL_NO_ECDH
 #include <openssl/ec.h> // IWYU pragma: keep
 #endif
@@ -28,9 +32,10 @@
 #include <openssl/x509v3.h>
 
 #include <algorithm>
-#include <mutex>
-#include <ostream>
+#include <functional>
+#include <memory>
 #include <optional>
+#include <ostream>
 #include <string>
 #include <type_traits>
 #include <vector>
@@ -88,8 +93,8 @@
 using kudu::security::ca::CertRequestGenerator;
 using std::nullopt;
 using std::optional;
+using std::shared_lock;
 using std::string;
-using std::unique_lock;
 using std::vector;
 using strings::Substitute;
 
@@ -125,7 +130,12 @@ Status CheckMaxSupportedTlsVersion(int tls_version, const char* tls_version_str)
   // OpenSSL 1.1.1 and newer supports all of the TLS versions we care about, so
   // the below check is only necessary in older versions of OpenSSL.
 #if OPENSSL_VERSION_NUMBER < 0x10101000L
+  // Prefer TLS_method() where available (>=1.1.0). Fall back to SSLv23_method otherwise.
+#if OPENSSL_VERSION_NUMBER >= 0x10100000L
+  auto max_supported_tls_version = TLS_method()->version;
+#else
   auto max_supported_tls_version = SSLv23_method()->version;
+#endif
   DCHECK_GE(max_supported_tls_version, TLS1_VERSION);
 
   if (max_supported_tls_version < tls_version) {
@@ -174,7 +184,14 @@ Status TlsContext::Init() {
   // We explicitly disable SSLv2 and SSLv3 below so that only TLS methods remain.
   // See the discussion on https://trac.torproject.org/projects/tor/ticket/11598 for more
   // info.
+  // Use generic TLS_method() on OpenSSL >= 1.1.0. Older versions use SSLv23_method()
+  // which, despite its name, enables all protocol versions; we'll disable legacy
+  // protocols explicitly below via SSL_OP_* flags.
+#if OPENSSL_VERSION_NUMBER >= 0x10100000L
+  ctx_ = ssl_make_unique(SSL_CTX_new(TLS_method()));
+#else
   ctx_ = ssl_make_unique(SSL_CTX_new(SSLv23_method()));
+#endif
   if (!ctx_) {
     return Status::RuntimeError("failed to create TLS context", GetOpenSSLErrors());
   }
@@ -365,7 +382,7 @@ Status TlsContext::UseCertificateAndKey(const Cert& cert, const PrivateKey& key)
   // Verify that the cert and key match.
   RETURN_NOT_OK(cert.CheckKeyMatch(key));
 
-  std::unique_lock<RWMutex> lock(lock_);
+  std::lock_guard lock(lock_);
 
   // Verify that the appropriate CA certs have been loaded into the context
   // before we adopt a cert. Otherwise, client connections without the CA cert
@@ -402,7 +419,7 @@ Status TlsContext::AddTrustedCertificate(const Cert& cert) {
     CHECK_OK(cert.GetPublicKey(&k));
   }
 
-  unique_lock<RWMutex> lock(lock_);
+  std::lock_guard lock(lock_);
   auto* cert_store = SSL_CTX_get_cert_store(ctx_.get());
 
   // Iterate through the certificate chain and add each individual certificate to the store.
@@ -427,7 +444,7 @@ Status TlsContext::AddTrustedCertificate(const Cert& cert) {
 
 Status TlsContext::DumpTrustedCerts(vector<string>* cert_ders) const {
   SCOPED_OPENSSL_NO_PENDING_ERRORS;
-  shared_lock<RWMutex> lock(lock_);
+  shared_lock lock(lock_);
 
   vector<string> ret;
   auto* cert_store = SSL_CTX_get_cert_store(ctx_.get());
@@ -526,7 +543,7 @@ Status TlsContext::GenerateSelfSignedCertAndKey() {
   ERR_clear_error(); // in case it left anything on the queue.
 
   // Step 4: Adopt the new key and cert.
-  unique_lock<RWMutex> lock(lock_);
+  std::lock_guard lock(lock_);
   CHECK(!has_cert_);
   OPENSSL_RET_NOT_OK(SSL_CTX_use_PrivateKey(ctx_.get(), key.GetRawData()),
                      "failed to use private key");
@@ -539,7 +556,7 @@ Status TlsContext::GenerateSelfSignedCertAndKey() {
 
 optional<CertSignRequest> TlsContext::GetCsrIfNecessary() const {
   SCOPED_OPENSSL_NO_PENDING_ERRORS;
-  shared_lock<RWMutex> lock(lock_);
+  shared_lock lock(lock_);
   if (csr_) {
     return csr_->Clone();
   }
@@ -548,7 +565,7 @@ optional<CertSignRequest> TlsContext::GetCsrIfNecessary() const {
 
 Status TlsContext::AdoptSignedCert(const Cert& cert) {
   SCOPED_OPENSSL_NO_PENDING_ERRORS;
-  unique_lock<RWMutex> lock(lock_);
+  std::lock_guard lock(lock_);
 
   if (!csr_) {
     // A signed cert has already been adopted.
@@ -627,7 +644,7 @@ Status TlsContext::InitiateHandshake(TlsHandshake* handshake) const {
   {
     // This lock is to protect against concurrent change of certificates
     // while calling SSL_new() here.
-    shared_lock<RWMutex> lock(lock_);
+    shared_lock lock(lock_);
     ssl = ssl_make_unique(SSL_new(ctx_.get()));
   }
   if (!ssl) {
@@ -643,6 +660,15 @@ Status TlsContext::InitiateHandshake(TlsHandshake* handshake) const {
   ssl->s3->flags |= SSL3_FLAGS_NO_RENEGOTIATE_CIPHERS;
 #endif
   return handshake->Init(std::move(ssl));
+}
+
+const char* TlsContext::GetEngineVersionInfo() const {
+  CHECK(ctx_);
+#if OPENSSL_VERSION_NUMBER < 0x10100000L
+  return CHECK_NOTNULL(SSLeay_version(SSLEAY_VERSION));
+#else
+  return CHECK_NOTNULL(OpenSSL_version(OPENSSL_VERSION));
+#endif
 }
 
 } // namespace security

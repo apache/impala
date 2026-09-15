@@ -29,8 +29,6 @@
 
 using std::string;
 using strings::Substitute;
-using YAML::Node;
-using YAML::NodeType;
 
 namespace kudu {
 
@@ -46,11 +44,11 @@ Status YamlReader::Init() {
   return Status::OK();
 }
 
-Status YamlReader::ExtractMap(const Node* node,
+Status YamlReader::ExtractMap(const YAML::Node* node,
                               const string& field,
-                              Node* result) {
+                              YAML::Node* result) {
   CHECK(result);
-  Node val;
+  YAML::Node val;
   RETURN_NOT_OK(ExtractField(node, field, &val));
   if (PREDICT_FALSE(!val.IsMap())) {
     return Status::Corruption(Substitute(
@@ -61,9 +59,9 @@ Status YamlReader::ExtractMap(const Node* node,
   return Status::OK();
 }
 
-Status YamlReader::ExtractField(const Node* node,
+Status YamlReader::ExtractField(const YAML::Node* node,
                                 const string& field,
-                                Node* result) {
+                                YAML::Node* result) {
   if (PREDICT_FALSE(!node->IsDefined() || !node->IsMap())) {
     return Status::Corruption("node is not map type");
   }
@@ -79,17 +77,17 @@ Status YamlReader::ExtractField(const Node* node,
   return Status::OK();
 }
 
-const char* YamlReader::TypeToString(NodeType::value t) {
+const char* YamlReader::TypeToString(YAML::NodeType::value t) {
   switch (t) {
-    case NodeType::Undefined:
+    case YAML::NodeType::Undefined:
       return "undefined";
-    case NodeType::Null:
+    case YAML::NodeType::Null:
       return "null";
-    case NodeType::Scalar:
+    case YAML::NodeType::Scalar:
       return "scalar";
-    case NodeType::Sequence:
+    case YAML::NodeType::Sequence:
       return "sequence";
-    case NodeType::Map:
+    case YAML::NodeType::Map:
       return "map";
     default:
       LOG(FATAL) << "unexpected type: " << t;

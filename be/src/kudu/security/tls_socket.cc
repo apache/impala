@@ -23,17 +23,18 @@
 
 #include <cerrno>
 #include <cstddef>
-#include <functional>
 #include <string>
 #include <utility>
 
 #include <glog/logging.h>
 
 #include "kudu/gutil/basictypes.h"
+#include "kudu/gutil/port.h"
 #include "kudu/gutil/strings/substitute.h"
 #include "kudu/util/errno.h"
 #include "kudu/util/net/sockaddr.h"
 #include "kudu/util/net/socket.h"
+#include "kudu/util/net/socket_info.pb.h"
 #include "kudu/util/openssl_util.h"
 
 using std::string;
@@ -257,14 +258,30 @@ Status TlsSocket::Close() {
   return ssl_shutdown;
 }
 
+Status TlsSocket::GetTransportDetails(TransportDetailsPB* pb) const {
+  DCHECK(pb);
+  auto* tls = pb->mutable_tls();
+  tls->set_protocol(GetProtocolName());
+  tls->set_cipher_suite(GetCipherDescription());
+  tls->set_ext_ms(GetExtMS());
+  return Socket::GetTransportDetails(pb);
+}
+
 string TlsSocket::GetProtocolName() const {
   return ::kudu::security::GetProtocolName(ssl_.get());
+}
+
+string TlsSocket::GetCipherName() const {
+  return ::kudu::security::GetCipherName(ssl_.get());
 }
 
 string TlsSocket::GetCipherDescription() const {
   return ::kudu::security::GetCipherDescription(ssl_.get());
 }
 
+bool TlsSocket::GetExtMS() const {
+  return ::kudu::security::GetExtMS(ssl_.get());
+}
 
 } // namespace security
 } // namespace kudu

@@ -23,6 +23,7 @@
 #include <string>
 #include <vector>
 
+#include <boost/container/small_vector.hpp>
 #include <gflags/gflags_declare.h>
 #include <glog/logging.h>
 #include <gtest/gtest_prod.h>
@@ -52,7 +53,6 @@ class Message;
 namespace kudu {
 namespace rpc {
 
-class CallResponse;
 class DumpConnectionsRequestPB;
 class RpcCallInProgressPB;
 class RpcController;
@@ -92,6 +92,69 @@ class RequestPayload {
   // Total size in bytes of all sidecars in 'sidecars_'. Set in SetRequestPayload().
   // This cannot exceed TransferLimits::kMaxTotalSidecarBytes.
   int32_t sidecar_byte_size_ = -1;
+};
+
+// A response to a call, on the client side.
+// Upon receiving a response, this is allocated in the reactor thread and filled
+// into the OutboundCall instance via OutboundCall::SetResponse.
+//
+// This may either be a success or error response.
+//
+// This class takes care of separating out the distinct payload slices sent
+// over.
+class CallResponse final {
+ public:
+  CallResponse()
+      : parsed_(false) {
+  }
+
+  CallResponse& operator=(CallResponse&& other) noexcept = default;
+
+  // Parse the response received from a call. This must be called before any
+  // other methods on this object.
+  Status ParseFrom(std::unique_ptr<InboundTransfer> transfer);
+
+  // Return true if the call succeeded.
+  bool is_success() const {
+    DCHECK(parsed_);
+    return !header_.is_error();
+  }
+
+  // Return the call ID that this response is related to.
+  int32_t call_id() const {
+    DCHECK(parsed_);
+    return header_.call_id();
+  }
+
+  // Return the serialized response data. This is just the response "body" --
+  // either a serialized ErrorStatusPB, or the serialized user response protobuf.
+  const Slice &serialized_response() const {
+    DCHECK(parsed_);
+    return serialized_response_;
+  }
+
+  // See RpcController::GetSidecar()
+  Status GetSidecar(int idx, Slice* sidecar) const;
+
+ private:
+  // True once ParseFrom() is called.
+  bool parsed_;
+
+  // The parsed header.
+  ResponseHeader header_;
+
+  // The slice of data for the encoded protobuf response.
+  // This slice refers to memory allocated by transfer_
+  Slice serialized_response_;
+
+  // Slices of data for rpc sidecars. They point into memory owned by transfer_.
+  SidecarSliceVector sidecar_slices_;
+
+  // The incoming transfer data - retained because serialized_response_
+  // and sidecar_slices_ refer into its data.
+  std::unique_ptr<InboundTransfer> transfer_;
+
+  DISALLOW_COPY_AND_ASSIGN(CallResponse);
 };
 
 // Tracks the status of a call on the client side.
@@ -193,7 +256,7 @@ class OutboundCall {
   bool IsFinished() const;
 
   // Fill in the call response.
-  void SetResponse(std::unique_ptr<CallResponse> resp);
+  void SetResponse(CallResponse&& resp);
 
   const std::set<RpcFeatureFlag>& required_rpc_features() const {
     return required_rpc_features_;
@@ -319,72 +382,12 @@ class OutboundCall {
   std::unique_ptr<RequestPayload> payload_;
 
   // Once a response has been received for this call, contains that response.
-  // Otherwise NULL.
-  std::unique_ptr<CallResponse> call_response_;
+  CallResponse call_response_;
 
   // True if cancellation was requested on this call.
   bool cancellation_requested_;
 
   DISALLOW_COPY_AND_ASSIGN(OutboundCall);
-};
-
-// A response to a call, on the client side.
-// Upon receiving a response, this is allocated in the reactor thread and filled
-// into the OutboundCall instance via OutboundCall::SetResponse.
-//
-// This may either be a success or error response.
-//
-// This class takes care of separating out the distinct payload slices sent
-// over.
-class CallResponse {
- public:
-  CallResponse();
-
-  // Parse the response received from a call. This must be called before any
-  // other methods on this object.
-  Status ParseFrom(std::unique_ptr<InboundTransfer> transfer);
-
-  // Return true if the call succeeded.
-  bool is_success() const {
-    DCHECK(parsed_);
-    return !header_.is_error();
-  }
-
-  // Return the call ID that this response is related to.
-  int32_t call_id() const {
-    DCHECK(parsed_);
-    return header_.call_id();
-  }
-
-  // Return the serialized response data. This is just the response "body" --
-  // either a serialized ErrorStatusPB, or the serialized user response protobuf.
-  const Slice &serialized_response() const {
-    DCHECK(parsed_);
-    return serialized_response_;
-  }
-
-  // See RpcController::GetSidecar()
-  Status GetSidecar(int idx, Slice* sidecar) const;
-
- private:
-  // True once ParseFrom() is called.
-  bool parsed_;
-
-  // The parsed header.
-  ResponseHeader header_;
-
-  // The slice of data for the encoded protobuf response.
-  // This slice refers to memory allocated by transfer_
-  Slice serialized_response_;
-
-  // Slices of data for rpc sidecars. They point into memory owned by transfer_.
-  SidecarSliceVector sidecar_slices_;
-
-  // The incoming transfer data - retained because serialized_response_
-  // and sidecar_slices_ refer into its data.
-  std::unique_ptr<InboundTransfer> transfer_;
-
-  DISALLOW_COPY_AND_ASSIGN(CallResponse);
 };
 
 } // namespace rpc

@@ -101,7 +101,7 @@ Status MiniOidc::Start() {
   // we've been configured to server.
   WebserverOptions jwks_opts;
   jwks_opts.port = 0;
-  jwks_opts.bind_interface = "localhost";
+  jwks_opts.bind_interface = "127.0.0.1";
   jwks_opts.certificate_file = options_.server_certificate;
   jwks_opts.private_key_file = options_.private_key_file;
 
@@ -111,7 +111,7 @@ Status MiniOidc::Start() {
 
   // For clients with oidc discovery
   for (const auto& [account_id, valid] : options_.account_ids) {
-    jwks_server_->RegisterPrerenderedPathHandler(
+    jwks_server_->RegisterJsonPathHandler(
         Substitute("/jwks/$0", account_id),
         account_id,
         [account_id = account_id, valid = valid](const Webserver::WebRequest&  /*req*/,
@@ -126,12 +126,11 @@ Status MiniOidc::Start() {
                                      kRsaInvalidPubKeyJwkN, kRsaPubKeyJwkE),
               resp->status_code = HttpStatusCode::Ok;
         },
-        /*is_styled*/ false,
         /*is_on_nav_bar*/ false);
   }
 
   // for clients without oidc discovery
-  jwks_server_->RegisterPrerenderedPathHandler(
+  jwks_server_->RegisterJsonPathHandler(
       "/jwks.json",
       "jwks",
       [&](const Webserver::WebRequest&  /*req*/, Webserver::PrerenderedWebResponse* resp) {
@@ -146,7 +145,6 @@ Status MiniOidc::Start() {
                                    kRsaPubKeyJwkE),
         resp->status_code = HttpStatusCode::Ok;
       },
-      /*is_styled*/ false,
       /*is_on_nav_bar*/ false);
 
   LOG(INFO) << "Starting JWKS server";
@@ -172,9 +170,9 @@ Status MiniOidc::Start() {
   // Now start the OIDC Discovery server that points to the JWKS endpoints.
   WebserverOptions oidc_opts;
   oidc_opts.port = 0;
-  oidc_opts.bind_interface = "localhost";
+  oidc_opts.bind_interface = "127.0.0.1";
   oidc_server_.reset(new Webserver(oidc_opts));
-  oidc_server_->RegisterPrerenderedPathHandler(
+  oidc_server_->RegisterJsonPathHandler(
       "/.well-known/openid-configuration",
       "openid-configuration",
       // Pass the 'accountId' query arguments to return a response that
@@ -183,7 +181,6 @@ Status MiniOidc::Start() {
                            Webserver::PrerenderedWebResponse* resp) {
         OidcDiscoveryHandler(req, resp, discovery_jwks_url);
       },
-      /*is_styled*/ false,
       /*is_on_nav_bar*/ false);
 
   LOG(INFO) << "Starting OIDC Discovery server";

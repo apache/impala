@@ -17,10 +17,13 @@
 
 #include "kudu/util/bitmap.h"
 
+#include <algorithm>
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
+#include <initializer_list>
 #include <set>
+#include <string>
 #include <vector>
 
 #include <gtest/gtest.h>
@@ -377,6 +380,104 @@ TEST(TestBitMap, TestCopy) {
     ASSERT_TRUE(BitmapTest(res, 0));
     ASSERT_TRUE(BitmapTest(res, kNumBits - 1));
     ASSERT_TRUE(BitmapIsAllZero(res, 1, kNumBits - 2));
+  }
+}
+
+TEST(TestBitMap, BitmapToVector) {
+  constexpr size_t kNumBytes = 8;
+  constexpr size_t kNumBits = kNumBytes * 8;
+  constexpr uint8_t kAllZeroes[kNumBytes] = { 0x00 };
+  constexpr uint8_t kAllOnes[kNumBytes] =
+      { 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff };
+
+  {
+    const auto v = BitmapToVector(kAllZeroes, kNumBits);
+    ASSERT_EQ(kNumBits, v.size());
+    ASSERT_TRUE(std::all_of(v.begin(), v.end(), [](bool e) { return !e; }));
+
+    ASSERT_EQ(kNumBytes, BitmapSize(kNumBits));
+    uint8_t buf[BitmapSize(kNumBits)] = { 0xff };
+    ASSERT_EQ(kNumBits, VectorToBitmap(v, buf));
+    ASSERT_EQ(0, memcmp(kAllZeroes, buf, sizeof(kAllZeroes)));
+  }
+  {
+    uint8_t input[kNumBytes];
+    BitmapCopy(input, 0, kAllZeroes, 0, kNumBits);
+
+    BitmapChangeBits(input, 0, kNumBits, true);
+    const auto v = BitmapToVector(input, kNumBits);
+    ASSERT_EQ(kNumBits, v.size());
+    ASSERT_TRUE(std::all_of(v.begin(), v.end(), [](bool e) { return e; }));
+
+    ASSERT_EQ(kNumBytes, BitmapSize(kNumBits));
+    uint8_t buf[BitmapSize(kNumBits)] = { 0x00 };
+    ASSERT_EQ(kNumBits, VectorToBitmap(v, buf));
+    ASSERT_EQ(0, memcmp(kAllOnes, buf, sizeof(kAllOnes)));
+  }
+  {
+    uint8_t input[kNumBytes];
+    BitmapCopy(input, 0, kAllZeroes, 0, kNumBits);
+
+    BitmapChangeBits(input, 0, kNumBits / 2, true);
+    const auto v = BitmapToVector(input, kNumBits);
+    ASSERT_EQ(kNumBits, v.size());
+    auto it_half = v.begin() + (v.size() / 2);
+    ASSERT_TRUE(std::all_of(v.begin(), it_half, [](bool e) { return e; }));
+    ASSERT_TRUE(std::all_of(it_half, v.end(), [](bool e) { return !e; }));
+
+    uint8_t output[kNumBytes] = { 0 };
+    ASSERT_EQ(kNumBits, VectorToBitmap(v, output));
+    ASSERT_EQ(0, memcmp(input, output, kNumBytes));
+  }
+  {
+    uint8_t input[1] = { 0b00000001 };
+    const auto v = BitmapToVector(input, 1);
+    ASSERT_EQ(1, v.size());
+    ASSERT_TRUE(v.front());
+
+    ASSERT_EQ(1, BitmapSize(1));
+    uint8_t output[1] = { 0x00 };
+    ASSERT_EQ(1, VectorToBitmap(v, output));
+    ASSERT_EQ(0, memcmp(input, output, 1));
+  }
+  {
+    uint8_t input[1] = { 0b10000001 };
+    const auto v = BitmapToVector(input, 8);
+    ASSERT_EQ(8, v.size());
+    ASSERT_TRUE(v.front());
+    ASSERT_TRUE(v.back());
+    ASSERT_TRUE(std::all_of(v.begin() + 1, v.end() - 1, [](bool e) { return !e; }));
+
+    ASSERT_EQ(1, BitmapSize(8));
+    uint8_t output[1] = { 0x00 };
+    ASSERT_EQ(8, VectorToBitmap(v, output));
+    ASSERT_EQ(0, memcmp(input, output, 1));
+  }
+}
+
+TEST(TestBitMap, EmptyBitset) {
+  const uint8_t* kNull = nullptr;
+  const uint8_t kEmpty[] = {};
+  for (const uint8_t* buf : { kNull, kEmpty }) {
+    for (bool initial_value : { false, true }) {
+      BitmapIterator bit(buf, 0);
+      bool value = initial_value;
+      const auto next = bit.Next(&value);
+      ASSERT_EQ(0, next);
+      // The output parameter is untouched.
+      ASSERT_EQ(initial_value, value);
+    }
+  }
+}
+
+TEST(TestBitMap, BitmapIteratorOnNullBitmap) {
+  for (const size_t num_bits : { 1, 5, 8, 10, 64 }) {
+    SCOPED_TRACE(std::to_string(num_bits));
+    BitmapIterator bit(nullptr, num_bits);
+    bool value = false;
+    const auto next = bit.Next(&value);
+    ASSERT_EQ(num_bits, next);
+    ASSERT_TRUE(value);
   }
 }
 

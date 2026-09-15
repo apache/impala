@@ -36,7 +36,6 @@
 #include <glog/logging.h>
 #include <gtest/gtest.h>
 
-#include "kudu/gutil/macros.h"
 #include "kudu/gutil/strings/substitute.h"
 #include "kudu/util/barrier.h"
 #include "kudu/util/env.h"
@@ -70,8 +69,7 @@ TEST_F(SubprocessTest, TestSimplePipe) {
   fprintf(out, "hello world\n");
   // We have to close 'out' or else tr won't write any output, since
   // it enters a buffered mode if it detects that its input is a FIFO.
-  int err;
-  RETRY_ON_EINTR(err, fclose(out));
+  ASSERT_EQ(0, fclose(out));
 
   char buf[1024];
   ASSERT_EQ(buf, fgets(buf, sizeof(buf), in));
@@ -94,8 +92,7 @@ TEST_F(SubprocessTest, TestErrPipe) {
   fprintf(out, "Hello, World\n");
 
   // Same reasoning as above, flush to prevent tee buffering.
-  int err;
-  RETRY_ON_EINTR(err, fclose(out));
+  ASSERT_EQ(0, fclose(out));
 
   FILE* in = fdopen(p.from_child_stderr_fd(), "r");
   PCHECK(in);
@@ -149,6 +146,250 @@ TEST_F(SubprocessTest, TestReadFromStdoutAndStderr) {
 
   // Reset the alarm when the test is done
   SCOPED_CLEANUP({ alarm(0); });
+}
+
+// WaitAndCollect() drains both streams and reaps a fast child within the
+// deadline: no timeout, output captured, clean exit status.
+TEST_F(SubprocessTest, TestWaitAndCollect) {
+  alarm(60);
+  SCOPED_CLEANUP({ alarm(0); });
+
+  Subprocess p({ "/bin/bash", "-c", "echo out; echo err 1>&2" });
+  p.ShareParentStdin(false);
+  p.ShareParentStdout(false);
+  p.ShareParentStderr(false);
+  ASSERT_OK(p.Start());
+  const int stdin_fd = p.ReleaseChildStdinFd();
+  if (stdin_fd >= 0) {
+    close(stdin_fd);
+  }
+
+  string out, err;
+  bool timed_out;
+  int wait_status;
+  ASSERT_OK(p.WaitAndCollect(MonoDelta::FromSeconds(60),
+                             &out, &err, &timed_out, &wait_status));
+
+  ASSERT_FALSE(timed_out);
+  ASSERT_EQ("out\n", out);
+  ASSERT_EQ("err\n", err);
+  ASSERT_TRUE(WIFEXITED(wait_status));
+  ASSERT_EQ(0, WEXITSTATUS(wait_status));
+}
+
+// An uninitialized timeout means "no timeout": WaitAndCollect() behaves like a
+// draining Wait().
+TEST_F(SubprocessTest, TestWaitAndCollectNoDeadline) {
+  alarm(60);
+  SCOPED_CLEANUP({ alarm(0); });
+
+  Subprocess p({ "/bin/echo", "-n", "hello" });
+  p.ShareParentStdin(false);
+  p.ShareParentStdout(false);
+  ASSERT_OK(p.Start());
+  const int stdin_fd = p.ReleaseChildStdinFd();
+  if (stdin_fd >= 0) {
+    close(stdin_fd);
+  }
+
+  string out;
+  bool timed_out;
+  int wait_status;
+  // Uninitialized MonoDelta -> no timeout. Only stdout is collected.
+  ASSERT_OK(p.WaitAndCollect(MonoDelta(), &out, /*stderr_out=*/nullptr,
+                             &timed_out, &wait_status));
+
+  ASSERT_FALSE(timed_out);
+  ASSERT_EQ("hello", out);
+  ASSERT_TRUE(WIFEXITED(wait_status));
+  ASSERT_EQ(0, WEXITSTATUS(wait_status));
+}
+
+// A child that runs past the deadline is killed and reaped, with '*timed_out'
+// set rather than blocking WaitAndCollect() forever.
+TEST_F(SubprocessTest, TestWaitAndCollectTimeout) {
+  alarm(60);
+  SCOPED_CLEANUP({ alarm(0); });
+
+  Subprocess p({ "/bin/sleep", "1000" });
+  p.ShareParentStdin(false);
+  p.ShareParentStdout(false);
+  p.ShareParentStderr(false);
+  ASSERT_OK(p.Start());
+  const int stdin_fd = p.ReleaseChildStdinFd();
+  if (stdin_fd >= 0) {
+    close(stdin_fd);
+  }
+
+  string out, err;
+  bool timed_out;
+  int wait_status;
+  const MonoTime start = MonoTime::Now();
+  // A genuine server-side failure would be non-OK; a timeout is a normal
+  // return with '*timed_out' set.
+  ASSERT_OK(p.WaitAndCollect(MonoDelta::FromMilliseconds(200),
+                             &out, &err, &timed_out, &wait_status));
+
+  ASSERT_TRUE(timed_out);
+  ASSERT_EQ("", out);
+  ASSERT_EQ("", err);
+  // The child was SIGKILLed and reaped; wait_status is disregarded on timeout
+  // but should reflect the kill signal.
+  ASSERT_TRUE(WIFSIGNALED(wait_status));
+  // We should have returned near the deadline, not after sleep(1000).
+  ASSERT_LT((MonoTime::Now() - start).ToSeconds(), 30);
+}
+
+// A child that writes to both streams and then blocks past the deadline: the
+// data written before the timeout must still be collected and returned, with
+// WaitAndCollect() returning OK and '*timed_out' set.
+TEST_F(SubprocessTest, TestWaitAndCollectTimeoutWithOutput) {
+  alarm(60);
+  SCOPED_CLEANUP({ alarm(0); });
+
+  Subprocess p({ "/bin/bash", "-c", "echo out; echo err 1>&2; sleep 1000" });
+  p.ShareParentStdin(false);
+  p.ShareParentStdout(false);
+  p.ShareParentStderr(false);
+  ASSERT_OK(p.Start());
+  const int stdin_fd = p.ReleaseChildStdinFd();
+  if (stdin_fd >= 0) {
+    close(stdin_fd);
+  }
+
+  string out, err;
+  bool timed_out;
+  int wait_status;
+  // A generous deadline relative to the (immediate) writes ensures the output
+  // is drained before the timer fires and kills the still-sleeping child.
+  ASSERT_OK(p.WaitAndCollect(MonoDelta::FromSeconds(1),
+                             &out, &err, &timed_out, &wait_status));
+
+  ASSERT_TRUE(timed_out);
+  ASSERT_EQ("out\n", out);
+  ASSERT_EQ("err\n", err);
+  ASSERT_TRUE(WIFSIGNALED(wait_status));
+}
+
+// A child that continuously spews to both streams so there is always pending
+// data in the pipes when the deadline strikes. The point is not the content
+// but that the readers unwind cleanly: WaitAndCollect() must still return OK
+// (not an error) with '*timed_out' set despite the unread data.
+TEST_F(SubprocessTest, TestWaitAndCollectTimeoutStreaming) {
+  alarm(60);
+  SCOPED_CLEANUP({ alarm(0); });
+
+  Subprocess p({ "/bin/bash", "-c",
+                 "while true; do echo out; echo err 1>&2; done" });
+  p.ShareParentStdin(false);
+  p.ShareParentStdout(false);
+  p.ShareParentStderr(false);
+  ASSERT_OK(p.Start());
+  const int stdin_fd = p.ReleaseChildStdinFd();
+  if (stdin_fd >= 0) {
+    close(stdin_fd);
+  }
+
+  string out, err;
+  bool timed_out;
+  int wait_status;
+  // Content is nondeterministic here, so only the timeout semantics are
+  // asserted; the child is killed while output is still in flight.
+  ASSERT_OK(p.WaitAndCollect(MonoDelta::FromMilliseconds(200),
+                             &out, &err, &timed_out, &wait_status));
+
+  ASSERT_TRUE(timed_out);
+  ASSERT_TRUE(WIFSIGNALED(wait_status));
+}
+
+// With a per-stream byte cap, only the first 'max_bytes_per_stream' bytes of
+// each stream are kept and '*truncated' is set, but the rest is still drained:
+// the child is not blocked on a full pipe and exits normally (no timeout).
+TEST_F(SubprocessTest, TestWaitAndCollectTruncatesOutput) {
+  alarm(60);
+  SCOPED_CLEANUP({ alarm(0); });
+
+  // ~1 MiB on stdout, far more than a pipe buffer, plus a short stderr.
+  Subprocess p({ "/bin/bash", "-c",
+                 "head -c 1048576 /dev/zero | tr '\\0' x; echo err 1>&2" });
+  p.ShareParentStdin(false);
+  p.ShareParentStdout(false);
+  p.ShareParentStderr(false);
+  ASSERT_OK(p.Start());
+  const int stdin_fd = p.ReleaseChildStdinFd();
+  if (stdin_fd >= 0) {
+    close(stdin_fd);
+  }
+
+  string out, err;
+  bool timed_out;
+  bool truncated;
+  int wait_status;
+  ASSERT_OK(p.WaitAndCollect(MonoDelta::FromSeconds(30), &out, &err,
+                             &timed_out, &wait_status,
+                             /*max_bytes_per_stream=*/100, &truncated));
+  ASSERT_FALSE(timed_out);
+  ASSERT_TRUE(truncated);
+  ASSERT_EQ(string(100, 'x'), out);
+  ASSERT_EQ("err\n", err);
+  ASSERT_TRUE(WIFEXITED(wait_status));
+  ASSERT_EQ(0, WEXITSTATUS(wait_status));
+}
+
+// Output under the cap is returned whole and is not reported as truncated.
+TEST_F(SubprocessTest, TestWaitAndCollectUnderCapNotTruncated) {
+  Subprocess p({ "/bin/bash", "-c", "echo out" });
+  p.ShareParentStdin(false);
+  p.ShareParentStdout(false);
+  ASSERT_OK(p.Start());
+  const int stdin_fd = p.ReleaseChildStdinFd();
+  if (stdin_fd >= 0) {
+    close(stdin_fd);
+  }
+
+  string out;
+  bool timed_out;
+  bool truncated = true;
+  int wait_status;
+  ASSERT_OK(p.WaitAndCollect(MonoDelta::FromSeconds(30), &out,
+                             /*stderr_out=*/nullptr, &timed_out, &wait_status,
+                             /*max_bytes_per_stream=*/100, &truncated));
+  ASSERT_FALSE(truncated);
+  ASSERT_EQ("out\n", out);
+}
+
+// A deadline that has already expired, expressed as a non-positive timeout --
+// what a caller computing 'deadline - now' produces when the deadline is
+// already in the past. The drain must not block waiting on a long-running
+// child: the timer fires on the loop's first iteration (std::max(., 0) clamp),
+// so this behaves like TestWaitAndCollectTimeout.
+TEST_F(SubprocessTest, TestWaitAndCollectExpiredDeadline) {
+  alarm(60);
+  SCOPED_CLEANUP({ alarm(0); });
+
+  Subprocess p({ "/bin/sleep", "1000" });
+  p.ShareParentStdin(false);
+  p.ShareParentStdout(false);
+  p.ShareParentStderr(false);
+  ASSERT_OK(p.Start());
+  const int stdin_fd = p.ReleaseChildStdinFd();
+  if (stdin_fd >= 0) {
+    close(stdin_fd);
+  }
+
+  string out, err;
+  bool timed_out;
+  int wait_status;
+  const MonoTime start = MonoTime::Now();
+  ASSERT_OK(p.WaitAndCollect(MonoDelta::FromSeconds(-1),
+                             &out, &err, &timed_out, &wait_status));
+
+  ASSERT_TRUE(timed_out);
+  ASSERT_EQ("", out);
+  ASSERT_EQ("", err);
+  ASSERT_TRUE(WIFSIGNALED(wait_status));
+  // Returned promptly rather than blocking on sleep(1000).
+  ASSERT_LT((MonoTime::Now() - start).ToSeconds(), 30);
 }
 
 // Test that environment variables can be passed to the subprocess.
@@ -221,6 +462,16 @@ TEST_F(SubprocessTest, TestGetExitStatusExitSuccess) {
   ASSERT_OK(p.GetExitStatus(&exit_status, &exit_info));
   ASSERT_EQ(0, exit_status);
   ASSERT_STR_CONTAINS(exit_info, "process successfully exited");
+}
+
+TEST_F(SubprocessTest, TestMultiThreadWait) {
+  Subprocess p({ "/bin/sh", "-c", "sleep 1; exit 0" });
+  ASSERT_OK(p.Start());
+  thread subprocess_thread([&]() {
+    ASSERT_OK(p.Wait());
+  });
+  SCOPED_CLEANUP({ subprocess_thread.join(); });
+  ASSERT_OK(p.Wait());
 }
 
 TEST_F(SubprocessTest, TestGetExitStatusExitFailure) {

@@ -17,8 +17,8 @@
 #pragma once
 
 #include <climits>
-#include <cstddef>
 #include <cstdint>
+#include <memory>
 #include <string>
 
 #include <boost/container/small_vector.hpp>
@@ -76,7 +76,7 @@ class InboundTransfer {
   // after this call returns OK), up to 4 extra bytes may have been read
   // from the socket and stored in 'extra_4'. In that case, any previous content of
   // 'extra_4' is replaced by this extra bytes.
-  Status ReceiveBuffer(Socket* socket, faststring* extra_4);
+  Status ReceiveBuffer(Socket* socket, faststring* extra_4, int64_t rpc_max_message_size);
 
   // Return true if any bytes have yet been sent.
   bool TransferStarted() const;
@@ -109,7 +109,7 @@ class InboundTransfer {
 // the next pending transfer in the queue.
 //
 // Upon completion of the transfer, a callback is triggered.
-class OutboundTransfer : public boost::intrusive::list_base_hook<> {
+class OutboundTransfer final : public boost::intrusive::list_base_hook<> {
  public:
   // Factory methods for creating transfers associated with call requests
   // or responses. The 'payload' slices will be concatenated and
@@ -125,14 +125,16 @@ class OutboundTransfer : public boost::intrusive::list_base_hook<> {
   // ------------------------------------------------------------
 
   // Create an outbound transfer for a call request.
-  static OutboundTransfer* CreateForCallRequest(int32_t call_id,
-                                                TransferPayload payload,
-                                                TransferCallbacks* callbacks);
+  static std::unique_ptr<OutboundTransfer> CreateForCallRequest(
+      int32_t call_id,
+      TransferPayload payload,
+      std::unique_ptr<TransferCallbacks> callbacks);
 
   // Create an outbound transfer for a call response.
   // See above for details.
-  static OutboundTransfer* CreateForCallResponse(TransferPayload payload,
-                                                 TransferCallbacks* callbacks);
+  static std::unique_ptr<OutboundTransfer> CreateForCallResponse(
+      TransferPayload payload,
+      std::unique_ptr<TransferCallbacks> callbacks);
 
   // Destruct the transfer. A transfer object should never be deallocated
   // before it has either (a) finished transferring, or (b) been Abort()ed.
@@ -151,9 +153,6 @@ class OutboundTransfer : public boost::intrusive::list_base_hook<> {
   // Return true if the entire transfer has been sent.
   bool TransferFinished() const;
 
-  // Return the total number of bytes to be sent (including those already sent).
-  size_t TotalLength() const;
-
   std::string HexDump() const;
 
   bool is_for_outbound_call() const {
@@ -170,7 +169,7 @@ class OutboundTransfer : public boost::intrusive::list_base_hook<> {
  private:
   OutboundTransfer(int32_t call_id,
                    TransferPayload payload,
-                   TransferCallbacks* callbacks);
+                   std::unique_ptr<TransferCallbacks> callbacks);
 
   // Slices to send.
   TransferPayload payload_slices_;
@@ -180,7 +179,7 @@ class OutboundTransfer : public boost::intrusive::list_base_hook<> {
   // The number of bytes in the above slice which has already been sent.
   int32_t cur_offset_in_slice_;
 
-  TransferCallbacks* callbacks_;
+  std::unique_ptr<TransferCallbacks> callbacks_;
 
   // In the case of outbound calls, the associated call ID.
   // In the case of call responses, kInvalidCallId
@@ -199,7 +198,7 @@ class OutboundTransfer : public boost::intrusive::list_base_hook<> {
 // Callbacks made after a transfer completes.
 struct TransferCallbacks {
  public:
-  virtual ~TransferCallbacks() {}
+  virtual ~TransferCallbacks() = default;
 
   // The transfer finished successfully.
   virtual void NotifyTransferFinished() = 0;

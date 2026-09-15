@@ -22,7 +22,9 @@
 #include <map>
 #include <memory>
 #include <mutex>
+#include <shared_mutex>
 #include <string>
+#include <type_traits>
 #include <utility>
 #include <vector>
 
@@ -36,7 +38,6 @@
 #include "kudu/security/token_signing_key.h"
 #include "kudu/security/token_verifier.h"
 #include "kudu/util/flag_tags.h"
-#include "kudu/util/locks.h"
 #include "kudu/util/status.h"
 
 DEFINE_int32(tsk_num_rsa_bits, 2048,
@@ -45,6 +46,7 @@ TAG_FLAG(tsk_num_rsa_bits, experimental);
 
 using std::lock_guard;
 using std::map;
+using std::shared_lock;
 using std::shared_ptr;
 using std::string;
 using std::unique_lock;
@@ -58,7 +60,8 @@ namespace security {
 TokenSigner::TokenSigner(int64_t authn_token_validity_seconds,
                          int64_t authz_token_validity_seconds,
                          int64_t key_rotation_seconds,
-                         shared_ptr<TokenVerifier> verifier)
+                         shared_ptr<TokenVerifier> verifier,
+                         string private_key_password)
     : verifier_(verifier ? std::move(verifier)
                          : std::make_shared<TokenVerifier>()),
       authn_token_validity_seconds_(authn_token_validity_seconds),
@@ -67,7 +70,8 @@ TokenSigner::TokenSigner(int64_t authn_token_validity_seconds,
       // The TSK propagation interval is equal to the rotation interval.
       key_validity_seconds_(2 * key_rotation_seconds_ +
           std::max(authn_token_validity_seconds_, authz_token_validity_seconds)),
-      last_key_seq_num_(-1) {
+      last_key_seq_num_(-1),
+      private_key_password_(std::move(private_key_password)) {
   CHECK_GE(key_rotation_seconds_, 0);
   CHECK_GE(authn_token_validity_seconds_, 0);
   CHECK_GE(authz_token_validity_seconds_, 0);
@@ -78,7 +82,7 @@ TokenSigner::~TokenSigner() {
 }
 
 Status TokenSigner::ImportKeys(const vector<TokenSigningPrivateKeyPB>& keys) {
-  lock_guard<RWMutex> l(lock_);
+  lock_guard l(lock_);
 
   const int64_t now = WallTime_Now();
   map<int64_t, unique_ptr<TokenSigningPrivateKey>> tsk_by_seq;
@@ -91,7 +95,7 @@ Status TokenSigner::ImportKeys(const vector<TokenSigningPrivateKeyPB>& keys) {
     CHECK(key.has_rsa_key_der());
 
     const int64_t key_seq_num = key.key_seq_num();
-    unique_ptr<TokenSigningPrivateKey> tsk(new TokenSigningPrivateKey(key));
+    unique_ptr<TokenSigningPrivateKey> tsk(new TokenSigningPrivateKey(key, private_key_password_));
 
     // Advance the key sequence number, if needed. For the use case when the
     // history of keys sequence numbers is important, the generated keys are
@@ -182,7 +186,7 @@ Status TokenSigner::GenerateAuthnToken(string username,
 
 Status TokenSigner::SignToken(SignedTokenPB* token) const {
   CHECK(token);
-  shared_lock<RWMutex> l(lock_);
+  shared_lock l(lock_);
   if (tsk_deque_.empty()) {
     return Status::IllegalState("no token signing key");
   }
@@ -192,7 +196,7 @@ Status TokenSigner::SignToken(SignedTokenPB* token) const {
 }
 
 bool TokenSigner::IsCurrentKeyValid() const {
-  shared_lock<RWMutex> l(lock_);
+  shared_lock l(lock_);
   if (tsk_deque_.empty()) {
     return false;
   }
@@ -203,7 +207,7 @@ Status TokenSigner::CheckNeedKey(unique_ptr<TokenSigningPrivateKey>* tsk) const 
   CHECK(tsk);
   const int64_t now = WallTime_Now();
 
-  unique_lock<RWMutex> l(lock_);
+  unique_lock l(lock_);
   if (tsk_deque_.empty()) {
     // No active key: need a new one.
     const int64_t key_seq_num = last_key_seq_num_ + 1;
@@ -211,7 +215,7 @@ Status TokenSigner::CheckNeedKey(unique_ptr<TokenSigningPrivateKey>* tsk) const 
     // Generation of cryptographically strong key takes many CPU cycles;
     // do not want to block other parallel activity.
     l.unlock();
-    return GenerateSigningKey(key_seq_num, key_expiration, tsk);
+    return GenerateSigningKey(key_seq_num, key_expiration, private_key_password_, tsk);
   }
 
   if (tsk_deque_.size() >= 2) {
@@ -244,7 +248,7 @@ Status TokenSigner::CheckNeedKey(unique_ptr<TokenSigningPrivateKey>* tsk) const 
     // Generation of cryptographically strong key takes many CPU cycles:
     // do not want to block other parallel activity.
     l.unlock();
-    return GenerateSigningKey(key_seq_num, key_expiration, tsk);
+    return GenerateSigningKey(key_seq_num, key_expiration, private_key_password_, tsk);
   }
 
   // It's not yet time to generate a new key.
@@ -259,7 +263,7 @@ Status TokenSigner::AddKey(unique_ptr<TokenSigningPrivateKey> tsk) {
     return Status::InvalidArgument("key has already expired");
   }
 
-  lock_guard<RWMutex> l(lock_);
+  lock_guard l(lock_);
   if (key_seq_num < last_key_seq_num_ + 1) {
     // The AddKey() method is designed for adding new keys: that should be done
     // using CheckNeedKey()/AddKey() sequence. Use the ImportKeys() method
@@ -280,7 +284,7 @@ Status TokenSigner::AddKey(unique_ptr<TokenSigningPrivateKey> tsk) {
 }
 
 Status TokenSigner::TryRotateKey(bool* has_rotated) {
-  lock_guard<RWMutex> l(lock_);
+  lock_guard l(lock_);
   if (has_rotated) {
     *has_rotated = false;
   }
@@ -310,6 +314,7 @@ Status TokenSigner::TryRotateKey(bool* has_rotated) {
 
 Status TokenSigner::GenerateSigningKey(int64_t key_seq_num,
                                        int64_t key_expiration,
+                                       const string& password,
                                        unique_ptr<TokenSigningPrivateKey>* tsk) {
   unique_ptr<PrivateKey> key(new PrivateKey());
   RETURN_NOT_OK_PREPEND(
@@ -317,7 +322,8 @@ Status TokenSigner::GenerateSigningKey(int64_t key_seq_num,
       "could not generate new RSA token-signing key");
   tsk->reset(new TokenSigningPrivateKey(key_seq_num,
                                         key_expiration,
-                                        std::move(key)));
+                                        std::move(key),
+                                        password));
   return Status::OK();
 }
 

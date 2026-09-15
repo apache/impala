@@ -15,6 +15,8 @@
 // specific language governing permissions and limitations
 // under the License.
 
+#include <sys/socket.h>
+#include <sys/un.h>
 #include <unistd.h>
 
 #include <cerrno>
@@ -23,12 +25,12 @@
 #include <cstring>
 #include <functional>
 #include <limits>
+#include <map>
 #include <memory>
 #include <ostream>
 #include <set>
 #include <string>
 #include <thread>
-#include <tuple>
 #include <type_traits>
 #include <unordered_map>
 #include <utility>
@@ -56,14 +58,18 @@
 #include "kudu/rpc/rpc_sidecar.h"
 #include "kudu/rpc/rtest.pb.h"
 #include "kudu/rpc/serialization.h"
+#include "kudu/rpc/service_pool.h"
 #include "kudu/rpc/transfer.h"
 #include "kudu/security/test/test_certs.h"
 #include "kudu/util/countdown_latch.h"
 #include "kudu/util/env.h"
 #include "kudu/util/metrics.h"
 #include "kudu/util/monotime.h"
+#include "kudu/util/net/diagnostic_socket.h"
+#include "kudu/util/net/net_util.h"
 #include "kudu/util/net/sockaddr.h"
 #include "kudu/util/net/socket.h"
+#include "kudu/util/net/socket_info.pb.h"
 #include "kudu/util/random.h"
 #include "kudu/util/random_util.h"
 #include "kudu/util/scoped_cleanup.h"
@@ -80,43 +86,112 @@ class AcceptorPool;
 }  // namespace kudu
 
 METRIC_DECLARE_counter(queue_overflow_rejections_kudu_rpc_test_CalculatorService_Sleep);
+METRIC_DECLARE_counter(timed_out_on_response_kudu_rpc_test_CalculatorService_Sleep);
+METRIC_DECLARE_gauge_int32(rpc_pending_connections);
+METRIC_DECLARE_histogram(acceptor_dispatch_times);
 METRIC_DECLARE_histogram(handler_latency_kudu_rpc_test_CalculatorService_Sleep);
 METRIC_DECLARE_histogram(rpc_incoming_queue_time);
+METRIC_DECLARE_histogram(rpc_listen_socket_rx_queue_size);
 
 DECLARE_bool(rpc_reopen_outbound_connections);
+DECLARE_bool(rpc_suppress_negotiation_trace);
+DECLARE_int32(rpc_listen_socket_stats_every_log2);
 DECLARE_int32(rpc_negotiation_inject_delay_ms);
 DECLARE_int32(tcp_keepalive_probe_period_s);
 DECLARE_int32(tcp_keepalive_retry_period_s);
 DECLARE_int32(tcp_keepalive_retry_count);
+DECLARE_string(ip_config_mode);
 
-using std::tuple;
+using std::map;
 using std::shared_ptr;
 using std::string;
 using std::thread;
 using std::unique_ptr;
 using std::unordered_map;
 using std::vector;
-
-namespace kudu {
-
 using strings::Substitute;
 
+namespace kudu {
 namespace rpc {
 
 // RPC proxies require a hostname to be passed. In this test we're just connecting to
 // the wildcard, so we'll hard-code this hostname instead.
 static const char* const kRemoteHostName = "localhost";
 
-class TestRpc : public RpcTestBase, public ::testing::WithParamInterface<tuple<bool,bool>> {
- protected:
-  TestRpc() {
-  }
+enum RpcSocketMode {
+  TCP_IPv4_SSL,
+  TCP_IPv4_NOSSL,
+  TCP_IPv6_SSL,
+  TCP_IPv6_NOSSL,
+  UNIX_SSL,
+  UNIX_NOSSL,
+  INVALID_MODE
+};
 
-  bool enable_ssl() const {
-    return std::get<0>(GetParam());
+string ModeEnumToString(enum RpcSocketMode mode) {
+  string test;
+  switch (mode) {
+    case TCP_IPv4_SSL:
+      test = Substitute("TCP_IPv4_SSL");
+      break;
+    case TCP_IPv4_NOSSL:
+      test = Substitute("TCP_IPv4_NoSSL");
+      break;
+    case TCP_IPv6_SSL:
+      test = Substitute("TCP_IPv6_SSL");
+      break;
+    case TCP_IPv6_NOSSL:
+      test = Substitute("TCP_IPv6_NoSSL");
+      break;
+    case UNIX_SSL:
+      test = Substitute("UnixSocket_SSL");
+      break;
+    case UNIX_NOSSL:
+      test = Substitute("UnixSocket_NoSSL");
+      break;
+    default:
+      test = Substitute("Invalid_Mode");
+      break;
   }
-  bool use_unix_socket() const {
-    return std::get<1>(GetParam());
+  return test;
+}
+
+class TestRpc: public RpcTestBase,
+               public ::testing::WithParamInterface<RpcSocketMode> {
+protected:
+  static bool enable_ssl() {
+    switch (GetParam()) {
+      case TCP_IPv4_SSL:
+      case TCP_IPv6_SSL:
+      case UNIX_SSL:
+        return true;
+      default:
+        break;
+    }
+    return false;
+  }
+  static bool use_unix_socket() {
+    switch (GetParam()) {
+      case UNIX_SSL:
+      case UNIX_NOSSL:
+        return true;
+      default:
+        break;
+    }
+    return false;
+  }
+  static sa_family_t ip_family() {
+    switch (GetParam()) {
+      case TCP_IPv4_SSL:
+      case TCP_IPv4_NOSSL:
+        return AF_INET;
+      case TCP_IPv6_SSL:
+      case TCP_IPv6_NOSSL:
+        return AF_INET6;
+      default:
+        break;
+    }
+    return AF_UNSPEC;
   }
   Sockaddr bind_addr() const {
     if (use_unix_socket()) {
@@ -127,7 +202,7 @@ class TestRpc : public RpcTestBase, public ::testing::WithParamInterface<tuple<b
       CHECK_OK(addr.ParseUnixDomainPath(socket_path_));
       return addr;
     }
-    return Sockaddr::Wildcard();
+    return Sockaddr::Wildcard(ip_family());
   }
   static string expected_remote_str(const Sockaddr& bound_addr) {
     if (bound_addr.is_ip()) {
@@ -144,15 +219,14 @@ class TestRpc : public RpcTestBase, public ::testing::WithParamInterface<tuple<b
   std::string socket_path_ = GetTestSocketPath("rpc-test");
 };
 
-// This is used to run all parameterized tests with and without SSL, on Unix sockets
-// and TCP.
+// This is used to run all parameterized tests with and without SSL,
+// on Unix sockets and TCP.
 INSTANTIATE_TEST_SUITE_P(Parameters, TestRpc,
-                         testing::Combine(testing::Values(false, true),
-                                          testing::Values(false, true)),
-                         [](const testing::TestParamInfo<tuple<bool, bool>>& info) {
-                           return Substitute("$0_$1",
-                                             std::get<0>(info.param) ? "SSL" : "NoSSL",
-                                             std::get<1>(info.param) ? "UnixSocket" : "TCP");
+                         testing::Values(TCP_IPv4_SSL, TCP_IPv4_NOSSL,
+                                         TCP_IPv6_SSL, TCP_IPv6_NOSSL,
+                                         UNIX_SSL, UNIX_NOSSL),
+                         [] (const testing::TestParamInfo<enum RpcSocketMode>& info) {
+                           return ModeEnumToString(info.param);
                          });
 
 
@@ -241,7 +315,9 @@ TEST_P(TestRpc, TestCall) {
 // Test for KUDU-2091 and KUDU-2220.
 TEST_P(TestRpc, TestCallWithChainCertAndChainCA) {
   // We're only interested in running this test with TLS enabled.
-  if (!enable_ssl()) return;
+  if (!enable_ssl()) {
+    GTEST_SKIP();
+  }
 
   string rpc_certificate_file;
   string rpc_private_key_file;
@@ -272,7 +348,9 @@ TEST_P(TestRpc, TestCallWithChainCertAndChainCA) {
 // Test for KUDU-2041.
 TEST_P(TestRpc, TestCallWithChainCertAndRootCA) {
   // We're only interested in running this test with TLS enabled.
-  if (!enable_ssl()) return;
+  if (!enable_ssl()) {
+    GTEST_SKIP();
+  }
 
   string rpc_certificate_file;
   string rpc_private_key_file;
@@ -304,7 +382,9 @@ TEST_P(TestRpc, TestCallWithChainCertAndRootCA) {
 // private key.
 TEST_P(TestRpc, TestCallWithPasswordProtectedKey) {
   // We're only interested in running this test with TLS enabled.
-  if (!enable_ssl()) return;
+  if (!enable_ssl()) {
+    GTEST_SKIP();
+  }
 
   string rpc_certificate_file;
   string rpc_private_key_file;
@@ -340,7 +420,9 @@ TEST_P(TestRpc, TestCallWithPasswordProtectedKey) {
 // the wrong password for that private key, causes a server startup failure.
 TEST_P(TestRpc, TestCallWithBadPasswordProtectedKey) {
   // We're only interested in running this test with TLS enabled.
-  if (!enable_ssl()) return;
+  if (!enable_ssl()) {
+    GTEST_SKIP();
+  }
 
   string rpc_certificate_file;
   string rpc_private_key_file;
@@ -436,8 +518,7 @@ TEST_P(TestRpc, TestHighFDs) {
   const int kNumFakeFiles = 3500;
   const int kMinUlimit = kNumFakeFiles + 100;
   if (env_->GetResourceLimit(Env::ResourceLimitType::OPEN_FILES_PER_PROCESS) < kMinUlimit) {
-    LOG(INFO) << "Test skipped: must increase ulimit -n to at least " << kMinUlimit;
-    return;
+    GTEST_SKIP() << "Test skipped: must increase ulimit -n to at least " << kMinUlimit;
   }
 
   // Open a bunch of fds just to increase our fd count.
@@ -615,8 +696,7 @@ TEST_P(TestRpc, TestClientConnectionMetrics) {
 #endif
 
     // Unblock all of the calls and wait for them to finish.
-    latch.Wait();
-    cleanup.cancel();
+    cleanup.run();
 
     // Verify that all the RPCs have finished.
     for (const auto& controller : controllers) {
@@ -864,6 +944,61 @@ TEST_P(TestRpc, TestTCPKeepalive) {
       req, &resp, &controller));
 }
 
+// Test that the RpcSidecar transfers the messages within RPC max message
+// size limit and errors out when limit is crossed.
+TEST_P(TestRpc, TestRpcSidecarWithSizeLimits) {
+  int64_t rpc_message_size = 30 * 1024 * 1024; // 30 MB
+  map<std::pair<int64_t, int64_t>, string> rpc_max_message_server_and_client;
+
+  // 1. Set the rpc max size to:
+  // Server: 50 MB,
+  // Client: 70 MB,
+  // so that client is able to accommodate the response size of 60 MB.
+  EmplaceIfNotPresent(&rpc_max_message_server_and_client,
+                      std::make_pair((50 * 1024 * 1024), (70 * 1024 * 1024)),
+                      "OK");
+
+  // 2. Set the rpc max size to:
+  // Server: 50 MB,
+  // Client: 20 MB,
+  // so that client rejects the inbound message of size 60 MB.
+  EmplaceIfNotPresent(&rpc_max_message_server_and_client,
+                      std::make_pair((50 * 1024 * 1024), (20 * 1024 * 1024)),
+                      "Network error: RPC frame had a length of");
+
+  for (auto const& rpc_max_message_size : rpc_max_message_server_and_client) {
+    // Set rpc_max_message_size.
+    int64_t server_rpc_max_size = rpc_max_message_size.first.first;
+    int64_t client_rpc_max_size = rpc_max_message_size.first.second;
+
+    // Set up server.
+    Sockaddr server_addr = bind_addr();
+
+    MessengerBuilder mb("TestRpc.TestRpcSidecarWithSizeLimits");
+    mb.set_rpc_max_message_size(server_rpc_max_size)
+      .set_metric_entity(metric_entity_);
+    if (enable_ssl()) mb.enable_inbound_tls();
+
+    shared_ptr<Messenger> messenger;
+    ASSERT_OK(mb.Build(&messenger));
+
+    ASSERT_OK(StartTestServerWithCustomMessenger(&server_addr, messenger, enable_ssl()));
+
+    // Set up client.
+    shared_ptr<Messenger> client_messenger;
+    ASSERT_OK(CreateMessenger("Client", &client_messenger,
+                              1, enable_ssl(), "", "", "", "", client_rpc_max_size));
+    Proxy p(client_messenger, server_addr, kRemoteHostName,
+            GenericCalculatorService::static_service_name());
+
+    Status status = DoTestSidecarWithSizeLimits(&p, rpc_message_size, rpc_message_size);
+
+    // OK: If size of payload is within max rpc message size limit.
+    // Close connection: If size of payload is beyond max message size limit.
+    ASSERT_STR_CONTAINS(status.ToString(), rpc_max_message_size.second);
+  }
+}
+
 // Test that the RpcSidecar transfers the expected messages.
 TEST_P(TestRpc, TestRpcSidecar) {
   // Set up server.
@@ -923,8 +1058,9 @@ TEST_P(TestRpc, TestRpcSidecarLimits) {
       ASSERT_OK(controller.AddOutboundSidecar(RpcSidecar::FromSlice(Slice(s)), &idx));
     }
 
-    ASSERT_TRUE(controller.AddOutboundSidecar(
-        RpcSidecar::FromSlice(Slice(s)), &idx).IsRuntimeError());
+    const auto result = controller.AddOutboundSidecar(
+        RpcSidecar::FromSlice(Slice(s)), &idx);
+    ASSERT_TRUE(result.IsRuntimeError()) << result.ToString();
   }
 
   // Construct a string to use as a maximal payload in following tests
@@ -1234,6 +1370,271 @@ TEST_P(TestRpc, TestRpcHandlerLatencyMetric) {
   ASSERT_TRUE(FindOrDie(metric_map, &METRIC_rpc_incoming_queue_time));
 }
 
+// Set of basic test scenarios for the per-RPC 'timed_out_on_response' metric.
+TEST_P(TestRpc, TimedOutOnResponseMetric) {
+  constexpr uint64_t kSleepMicros = 50 * 1000;
+  const string kMethodName = "Sleep";
+
+  // Set RPC connection negotiation timeout to be very high to avoid flakiness
+  // if name resolution is very slow.
+  rpc_negotiation_timeout_ms_ = 60 * 1000;
+
+  Sockaddr server_addr = bind_addr();
+  ASSERT_OK(StartTestServerWithGeneratedCode(&server_addr, enable_ssl()));
+
+  shared_ptr<Messenger> cm;
+  ASSERT_OK(CreateMessenger("client", &cm, 1/*n_reactors*/, enable_ssl()));
+  Proxy p(cm, server_addr, kRemoteHostName, CalculatorService::static_service_name());
+
+  // Get references to the metrics map and a couple of relevant metrics.
+  const auto& mm = server_messenger_->metric_entity()->UnsafeMetricsMapForTests();
+  const auto* latency_histogram = down_cast<Histogram*>(FindOrDie(
+      mm, &METRIC_handler_latency_kudu_rpc_test_CalculatorService_Sleep).get());
+  const auto* timed_out_on_response = down_cast<Counter*>(FindOrDie(
+      mm, &METRIC_timed_out_on_response_kudu_rpc_test_CalculatorService_Sleep).get());
+  const auto* timed_out_in_queue = service_pool_->RpcsTimedOutInQueueMetricForTests();
+
+  ASSERT_EQ(0, latency_histogram->TotalCount());
+  ASSERT_EQ(0, timed_out_on_response->value());
+  ASSERT_EQ(0, timed_out_in_queue->value());
+
+  // Make a dry-run call to avoid flakiness in this test scenario if name
+  // resolution is slow. This primes the DNS resolver and its cache.
+  {
+    SleepRequestPB req;
+    req.set_sleep_micros(kSleepMicros);
+    SleepResponsePB resp;
+    RpcController ctl;
+    ASSERT_OK(p.SyncRequest(kMethodName, req, &resp, &ctl));
+    ASSERT_EQ(1, latency_histogram->TotalCount());
+    ASSERT_EQ(0, timed_out_on_response->value());
+  }
+
+  // Run the sequence of sub-scenarios where the requests successfully complete
+  // at the server side, but the client might mark them as timed out.
+  SleepRequestPB req;
+  req.set_sleep_micros(kSleepMicros);
+
+  // Client side doesn't set the timeout for the RPC at all.
+  {
+    RpcController ctl;
+    SleepResponsePB resp;
+    ASSERT_OK(p.SyncRequest(kMethodName, req, &resp, &ctl));
+    ASSERT_EQ(2, latency_histogram->TotalCount());
+    ASSERT_EQ(0, timed_out_on_response->value());
+  }
+
+  // Set the timeout for the RPC much higher than the request would take
+  // to process (assuming scheduler anomalies does not spill over 30 seconds).
+  {
+    RpcController ctl;
+    ctl.set_timeout(MonoDelta::FromSeconds(30));
+    SleepResponsePB resp;
+    ASSERT_OK(p.SyncRequest(kMethodName, req, &resp, &ctl));
+    ASSERT_EQ(3, latency_histogram->TotalCount());
+    ASSERT_EQ(0, timed_out_on_response->value());
+  }
+
+  // Set the timeout for the RPC very low to make sure the request times out
+  // because of the explicitly requested sleep interval but keep it high enough
+  // to avoid timing out the request in the RPC queue if a scheduler anomaly
+  // hapens.
+  {
+    RpcController ctl;
+    ctl.set_timeout(MonoDelta::FromMicroseconds(kSleepMicros / 2));
+    SleepResponsePB resp;
+    const auto s = p.SyncRequest(kMethodName, req, &resp, &ctl);
+    ASSERT_TRUE(s.IsTimedOut()) << s.ToString();
+    ASSERT_STR_CONTAINS(s.ToString(), "Timed out: Sleep RPC");
+    ASSERT_EVENTUALLY([&] {
+      ASSERT_EQ(4, latency_histogram->TotalCount());
+    });
+    ASSERT_EQ(1, timed_out_on_response->value());
+  }
+
+  // Set the timeout for the RPC to be close to the time it takes to process
+  // the request.
+  {
+    RpcController ctl;
+    ctl.set_timeout(MonoDelta::FromMicroseconds(kSleepMicros));
+    SleepResponsePB resp;
+    const auto s = p.SyncRequest(kMethodName, req, &resp, &ctl);
+    ASSERT_TRUE(s.IsTimedOut()) << s.ToString();
+    ASSERT_STR_CONTAINS(s.ToString(), "Timed out: Sleep RPC");
+    ASSERT_EVENTUALLY([&] {
+      ASSERT_EQ(5, latency_histogram->TotalCount());
+    });
+    ASSERT_EQ(2, timed_out_on_response->value());
+  }
+
+  // Not a single RPC times out in the service queue -- all the RPCs have been
+  // successfully processed by the server, just a couple of them were responded
+  // after the client-defined deadline.
+  ASSERT_EQ(0, timed_out_in_queue->value());
+}
+
+// A special scenario for the per-RPC 'timed_out_on_response' metric when an
+// RPC times out while waiting in the queue, so it's not actually processed.
+TEST_P(TestRpc, TimedOutOnResponseMetricServiceQueue) {
+  constexpr uint64_t kSleepMicros = 200 * 1000;
+  const string kMethodName = "Sleep";
+
+  // Set RPC connection negotiation timeout to be very high to avoid flakiness
+  // if name resolution is very slow.
+  rpc_negotiation_timeout_ms_ = 60 * 1000;
+
+  // Limit the capacity of the service's thread pool, so requests are processed
+  // sequentially by a single worker thread.
+  n_worker_threads_ = 1;
+
+  Sockaddr server_addr = bind_addr();
+  ASSERT_OK(StartTestServerWithGeneratedCode(&server_addr, enable_ssl()));
+
+  shared_ptr<Messenger> cm;
+  ASSERT_OK(CreateMessenger("client", &cm, 1/*n_reactors*/, enable_ssl()));
+  Proxy p(cm, server_addr, kRemoteHostName, CalculatorService::static_service_name());
+
+  // Get the reference to the metrics map and create handles to the needed metrics.
+  const auto& mm = server_messenger_->metric_entity()->UnsafeMetricsMapForTests();
+
+  const auto* latency_histogram = down_cast<Histogram*>(FindOrDie(
+      mm, &METRIC_handler_latency_kudu_rpc_test_CalculatorService_Sleep).get());
+  const auto* timed_out_on_response = down_cast<Counter*>(FindOrDie(
+      mm, &METRIC_timed_out_on_response_kudu_rpc_test_CalculatorService_Sleep).get());
+  const auto* timed_out_in_queue = service_pool_->RpcsTimedOutInQueueMetricForTests();
+
+  // In the beginning, all the related metrics should be zeroed.
+  ASSERT_EQ(0, latency_histogram->TotalCount());
+  ASSERT_EQ(0, timed_out_on_response->value());
+  ASSERT_EQ(0, timed_out_in_queue->value());
+
+  // Make a dry-run call to avoid flakiness in this test scenario if name
+  // resolution is slow. This primes the DNS resolver and its cache.
+  {
+    SleepRequestPB req;
+    req.set_sleep_micros(kSleepMicros);
+    SleepResponsePB resp;
+    RpcController ctl;
+    ASSERT_OK(p.SyncRequest(kMethodName, req, &resp, &ctl));
+  }
+  ASSERT_EQ(1, latency_histogram->TotalCount());
+  ASSERT_EQ(0, timed_out_on_response->value());
+  ASSERT_EQ(0, timed_out_in_queue->value());
+
+  CountDownLatch latch(2);
+
+  // The first RPC should be successful: sleep for the specified time.
+  SleepRequestPB req0;
+  req0.set_sleep_micros(kSleepMicros);
+  SleepResponsePB resp0;
+  RpcController ctl0;
+  p.AsyncRequest(kMethodName, req0, &resp0, &ctl0,
+                 [&latch]() { latch.CountDown(); });
+
+  // The second RPC should wait in the RPC queue while the first is being
+  // processed by the only thread in the RPC service thread pool.  Eventually,
+  // it should time out.
+  SleepRequestPB req1;
+  req1.set_sleep_micros(0);
+  req1.set_return_app_error(true);
+  SleepResponsePB resp1;
+  RpcController ctl1;
+  // Add an extra margin for the timeout setting to avoid flakiness
+  // due to scheduler anomalies and off-by-one differences in timestamps.
+  ctl1.set_timeout(MonoDelta::FromMicroseconds(kSleepMicros / 2));
+  p.AsyncRequest(kMethodName, req1, &resp1, &ctl1,
+                 [&latch]() { latch.CountDown(); });
+
+  // Wait for the completion of both requests sent asynchronously above.
+  latch.Wait();
+
+  // The Histogram::TotalCount() metric is read in lock-free/no-barrier manner,
+  // so ASSERT_EVENTUALLY helps in very rare cases when TotalCount() reads
+  // something less than 3 in the very first pass.
+  ASSERT_EVENTUALLY([&]{
+    // There were three requests in total: the warm-up one and req0, req1.
+    ASSERT_EQ(3, latency_histogram->TotalCount());
+  });
+
+  // The first RPC should return OK.
+  ASSERT_OK(ctl0.status());
+
+  // The second RPC should time out while waiting in the queue
+  // and the corresponding metrics should be incremented.
+  const auto& s = ctl1.status();
+  ASSERT_TRUE(s.IsTimedOut()) << s.ToString();
+  ASSERT_STR_CONTAINS(s.ToString(), "Timed out: Sleep RPC");
+  ASSERT_EQ(1, timed_out_on_response->value());
+  ASSERT_EQ(1, timed_out_in_queue->value());
+}
+
+// Basic verification for the numbers reported by 'acceptor_dispatch_times'.
+TEST_P(TestRpc, AcceptorDispatchingTimesMetric) {
+  Sockaddr server_addr;
+  ASSERT_OK(StartTestServer(&server_addr));
+
+  {
+    Socket socket;
+    ASSERT_OK(socket.Init(server_addr.family(), /*flags=*/0));
+    ASSERT_OK(socket.Connect(server_addr));
+  }
+
+  scoped_refptr<Histogram> dispatch_times =
+      METRIC_acceptor_dispatch_times.Instantiate(server_messenger_->metric_entity());
+  // Using ASSERT_EVENTUALLY below because of relaxed memory ordering when
+  // fetching metrics' values. Eventually, metrics reports readings that are
+  // consistent with the expected numbers.
+  ASSERT_EVENTUALLY([&] {
+    ASSERT_EQ(1, dispatch_times->TotalCount());
+    ASSERT_GT(dispatch_times->MaxValueForTests(), 0);
+  });
+}
+
+// Basic verification of the 'rpc_pending_connections' metric.
+// The number of pending connections is properly reported on Linux; on other
+// platforms that don't support sock_diag() netlink facility (e.g., macOS)
+// the metric should report -1.
+TEST_P(TestRpc, RpcPendingConnectionsMetric) {
+  Sockaddr server_addr;
+  ASSERT_OK(StartTestServer(&server_addr));
+
+  // Get the reference to already registered metric with the proper callback
+  // to fetch the necessary information. The { 'return -3'; } fake callback
+  // is to make sure the actual gauge returns a proper value,
+  // which is verified below.
+  auto pending_connections_gauge =
+      METRIC_rpc_pending_connections.InstantiateFunctionGauge(
+          server_messenger_->metric_entity(), []() { return -3; });
+
+  // No connection attempts have been made yet.
+#if defined(KUDU_HAS_DIAGNOSTIC_SOCKET)
+  ASSERT_EQ(0, pending_connections_gauge->value());
+#else
+  ASSERT_EQ(-3, pending_connections_gauge->value());
+#endif // #if defined(KUDU_HAS_DIAGNOSTIC_SOCKET) ...
+
+  {
+    Socket socket;
+    ASSERT_OK(socket.Init(server_addr.family(), /*flags=*/0));
+    ASSERT_OK(socket.Connect(server_addr));
+  }
+
+  // At this point, there should be no connection pending: the only received
+  // connection request has already been handled above.
+#if defined(KUDU_HAS_DIAGNOSTIC_SOCKET)
+  // It's not clear why the sock_diag() netlink facility sometimes reports stale
+  // data for a short period of time. That's rare, but it happens. Emprically,
+  // it's about 10 to 20 milliseconds when data might be still stale.
+  // AssertEventually helps in preventing flakiness of this scenario
+  // in such rare cases.
+  AssertEventually([&] {
+    ASSERT_EQ(0, pending_connections_gauge->value());
+  }, MonoDelta::FromMilliseconds(250));
+#else
+  ASSERT_EQ(-3, pending_connections_gauge->value());
+#endif // #if defined(KUDU_HAS_DIAGNOSTIC_SOCKET) ...
+}
+
 static void DestroyMessengerCallback(shared_ptr<Messenger>* messenger,
                                      CountDownLatch* latch) {
   messenger->reset();
@@ -1389,10 +1790,14 @@ TEST_P(TestRpc, TestCancellation) {
       case OutboundCall::READY:
       case OutboundCall::ON_OUTBOUND_QUEUE:
       case OutboundCall::SENDING:
-      case OutboundCall::SENT:
-        ASSERT_TRUE(DoTestOutgoingSidecar(&p, 0, 0).IsAborted());
-        ASSERT_TRUE(DoTestOutgoingSidecar(&p, 123, 456).IsAborted());
-        ASSERT_TRUE(DoTestOutgoingSidecar(&p, 3000 * 1024, 2000 * 1024).IsAborted());
+      case OutboundCall::SENT: {
+          const auto s0 = DoTestOutgoingSidecar(&p, 0, 0);
+          ASSERT_TRUE(s0.IsAborted()) << s0.ToString();
+          const auto s1 = DoTestOutgoingSidecar(&p, 123, 456);
+          ASSERT_TRUE(s1.IsAborted()) << s1.ToString();
+          const auto s2 = DoTestOutgoingSidecar(&p, 3000 * 1024, 2000 * 1024);
+          ASSERT_TRUE(s2.IsAborted()) << s2.ToString();
+        }
         DoTestExpectTimeout(&p, MonoDelta::FromMilliseconds(timeout_ms), true);
         break;
       case OutboundCall::NEGOTIATION_TIMED_OUT:
@@ -1482,7 +1887,8 @@ TEST_P(TestRpc, TestCancellationAsync) {
     if (i > 0) SleepFor(MonoDelta::FromMicroseconds(rand.Uniform64(i * 30)));
     controller.Cancel();
     latch.Wait();
-    ASSERT_TRUE(controller.status().IsAborted() || controller.status().ok());
+    ASSERT_TRUE(controller.status().IsAborted() || controller.status().ok())
+        << controller.status().ToString();
     controller.Reset();
   }
   client_messenger->Shutdown();
@@ -1584,7 +1990,7 @@ TEST_P(TestRpc, TestPerformanceBySocketType) {
     Stopwatch sw(Stopwatch::ALL_THREADS);
     sw.start();
     for (int i = 0; i < kNumMb / kMbPerRpc; i++) {
-      DoTestOutgoingSidecar(&p, sidecars);
+      ASSERT_OK(DoTestOutgoingSidecar(&p, sidecars));
     }
     sw.stop();
     LOG(INFO) << strings::Substitute(
@@ -1622,6 +2028,311 @@ TEST_P(TestRpc, TestCallId) {
     ASSERT_EQ(i, controller.call_id());
   }
 }
+
+#if defined(KUDU_HAS_DIAGNOSTIC_SOCKET)
+// A test to verify collecting information on the RX queue size of a listening
+// socket using the DiagnosticSocket wrapper.
+class TestRpcSocketTxRxQueue : public TestRpc {
+ protected:
+  TestRpcSocketTxRxQueue() = default;
+
+  Status RunAndGetSocketInfo(int listen_backlog,
+                             size_t num_clients,
+                             DiagnosticSocket::TcpSocketInfo* info) {
+    // Limit the backlog for the socket being listened to.
+    Sockaddr s_addr = bind_addr();
+    Socket s_sock;
+    RETURN_NOT_OK(StartFakeServer(&s_sock, &s_addr, listen_backlog));
+
+    vector<shared_ptr<Messenger>> c_messengers(num_clients);
+    vector<unique_ptr<Proxy>> proxies(num_clients);
+    vector<AddRequestPB> requests(num_clients);
+    vector<AddResponsePB> responses(num_clients);
+    vector<RpcController> ctls(num_clients);
+
+    for (auto i = 0; i < num_clients; ++i) {
+      RETURN_NOT_OK(CreateMessenger("client" + std::to_string(i), &c_messengers[i]));
+      proxies[i].reset(new Proxy(c_messengers[i],
+                                 s_addr,
+                                 kRemoteHostName,
+                                 GenericCalculatorService::static_service_name()));
+      requests[i].set_x(2 * i);
+      requests[i].set_y(2 * i + 1);
+      proxies[i]->AsyncRequest(GenericCalculatorService::kAddMethodName,
+                               requests[i],
+                               &responses[i],
+                               &ctls[i],
+                               []() {});
+    }
+
+    // Let the messengers to send connect() requests.
+    // TODO(aserbin): find a more reliable way to track this.
+    SleepFor(MonoDelta::FromMilliseconds(250));
+
+    DiagnosticSocket ds;
+    RETURN_NOT_OK(ds.Init());
+
+    DiagnosticSocket::TcpSocketInfo result;
+    RETURN_NOT_OK(ds.Query(s_sock, &result));
+    *info = result;
+
+    // Close the socket explicitly to allow the connecting clients receiving
+    // RST on the connection to end up the connection negotiation attempts fast.
+    return s_sock.Close();
+  }
+};
+// All the tests run without SSL on TCP sockets: TestRpcSocketTxRxQueue inherits
+// from TestRpc, and the latter is parameterized. Running with SSL doesn't make
+// much sense since it's the same in this context: all the action happens
+// at the TCP level, and RPC connection negotiation doesn't happen.
+INSTANTIATE_TEST_SUITE_P(Parameters, TestRpcSocketTxRxQueue,
+                         testing::Values(TCP_IPv4_NOSSL,
+                                         TCP_IPv6_NOSSL),
+                         [] (const testing::TestParamInfo<enum RpcSocketMode>& info) {
+                           return ModeEnumToString(info.param);
+                         });
+
+// This test scenario verifies the reported socket's stats when it's more than
+// enough space in the listening socket's RX queue to accommodate all the
+// incoming requests.
+TEST_P(TestRpcSocketTxRxQueue, UnderCapacity) {
+  constexpr int kListenBacklog = 16;
+  constexpr size_t kClientsNum = 5;
+
+  DiagnosticSocket::TcpSocketInfo info;
+  ASSERT_OK(RunAndGetSocketInfo(kListenBacklog, kClientsNum, &info));
+
+  // Since the fake server isn't handling incoming requests at all and even not
+  // accepting the corresponding TCP connections, all the connetions request
+  // end up in the RX queue.
+  ASSERT_EQ(kClientsNum, info.rx_queue_size);
+
+  // The TX queue size for a listening socket set to the size of the backlog
+  // as specified by the second parameter of the listen() system call, capped
+  // by the system-wide limit in /proc/sys/net/core/somaxconn).
+  ASSERT_EQ(kListenBacklog, info.tx_queue_size);
+}
+
+// This scenario is similar to the TestRpcSocketTxRxQueue.UnderCapacity scenario
+// above, but in this case the listening socket's backlog length equals
+// to the number of pending client TCP connections.
+TEST_P(TestRpcSocketTxRxQueue, AtCapacity) {
+  constexpr int kListenBacklog = 8;
+  constexpr size_t kClientsNum = 8;
+
+  DiagnosticSocket::TcpSocketInfo info;
+  ASSERT_OK(RunAndGetSocketInfo(kListenBacklog, kClientsNum, &info));
+
+  ASSERT_EQ(kClientsNum, info.rx_queue_size);
+  ASSERT_EQ(kListenBacklog, info.tx_queue_size);
+}
+
+// This scenario is similar to the couple of scenarios above, but it's not
+// enough space in the socket's RX queue to accommodate all the pending TCP
+// connections.
+TEST_P(TestRpcSocketTxRxQueue, OverCapacity) {
+  constexpr int kListenBacklog = 5;
+  constexpr size_t kClientsNum = 16;
+
+  DiagnosticSocket::TcpSocketInfo info;
+  ASSERT_OK(RunAndGetSocketInfo(kListenBacklog, kClientsNum, &info));
+
+  // Even if there are many more connection requests than the backlog of the
+  // listening socket can accommodate, the size of the socket's RX queue
+  // reflects only the requests that are fit into the backlog plus one extra.
+  // The rest of the incoming TCP packets do not affect the size of the RX
+  // queue as seen via the sock_diag netlink facility. Same behavior can also be
+  // observed via /proc/self/net/tcp, 'netstat', and 'ss' system utilities.
+  //
+  // On Linux, with the default setting of the net.ipv4.tcp_abort_on_overflow
+  // sysctl variable (see [1] for more details), the server's TCP stack just
+  // drops overflow packets, so the client's TCP stack retries sending initial
+  // SYN packet to re-attempt the TCP connection. That's exactly what the
+  // following paragraph from [2] refers to:
+  //
+  //   The backlog argument defines the maximum length to which the
+  //   queue of pending connections for sockfd may grow.  If a
+  //   connection request arrives when the queue is full, the client may
+  //   receive an error with an indication of ECONNREFUSED or, if the
+  //   underlying protocol supports retransmission, the request may be
+  //   ignored so that a later reattempt at connection succeeds.
+  //
+  // [1] https://sysctl-explorer.net/net/ipv4/tcp_abort_on_overflow/
+  // [2] https://man7.org/linux/man-pages/man2/listen.2.html
+  //
+  ASSERT_EQ(kListenBacklog + 1, info.rx_queue_size);
+  ASSERT_EQ(kListenBacklog, info.tx_queue_size);
+}
+
+// Basic verification for the numbers reported by the
+// 'rpc_listen_socket_rx_queue_size' histogram metric.
+TEST_P(TestRpcSocketTxRxQueue, AcceptorRxQueueSizeMetric) {
+  // Capture listening socket's metrics upon every accepted connection.
+  FLAGS_rpc_listen_socket_stats_every_log2 = 0;
+
+  Sockaddr server_addr;
+  ASSERT_OK(StartTestServer(&server_addr));
+
+  {
+    Socket socket;
+    ASSERT_OK(socket.Init(server_addr.family(), /*flags=*/0));
+    ASSERT_OK(socket.Connect(server_addr));
+  }
+
+  const auto& metric_entity = server_messenger_->metric_entity();
+  scoped_refptr<Histogram> rx_queue_size =
+      METRIC_rpc_listen_socket_rx_queue_size.Instantiate(metric_entity);
+
+  // Using ASSERT_EVENTUALLY below because of relaxed memory ordering when
+  // fetching metrics' values. Eventually, metrics reports readings that are
+  // consistent with the expected numbers.
+  ASSERT_EVENTUALLY([&] {
+    ASSERT_EQ(1, rx_queue_size->TotalCount());
+    // The metric had been sampled after the only pending connection was
+    // accepted, so the maximum metric's value should be 0.
+    ASSERT_GE(rx_queue_size->MaxValueForTests(), 0);
+  });
+}
+
+TEST_P(TestRpcSocketTxRxQueue, DisableAcceptorRxQueueSampling) {
+  n_acceptor_pool_threads_ = 1;
+
+  // Disable listening RPC socket's statistics sampling.
+  FLAGS_rpc_listen_socket_stats_every_log2 = -1;
+
+  Sockaddr server_addr;
+  ASSERT_OK(StartTestServer(&server_addr));
+
+  for (auto i = 0; i < 100; ++i) {
+    Socket socket;
+    ASSERT_OK(socket.Init(server_addr.family(), /*flags=*/0));
+    ASSERT_OK(socket.Connect(server_addr));
+  }
+
+  const auto& metric_entity = server_messenger_->metric_entity();
+  scoped_refptr<Histogram> rx_queue_size =
+      METRIC_rpc_listen_socket_rx_queue_size.Instantiate(metric_entity);
+  ASSERT_EQ(0, rx_queue_size->TotalCount());
+}
+
+TEST_P(TestRpcSocketTxRxQueue, CustomAcceptorRxQueueSamplingFrequency) {
+  n_acceptor_pool_threads_ = 1;
+
+  // Sampling the listening socket's stats every 8th request.
+  FLAGS_rpc_listen_socket_stats_every_log2 = 3;
+  Sockaddr server_addr;
+  ASSERT_OK(StartTestServer(&server_addr));
+
+  for (auto i = 0; i < 16; ++i) {
+    Socket socket;
+    ASSERT_OK(socket.Init(server_addr.family(), /*flags=*/0));
+    ASSERT_OK(socket.Connect(server_addr));
+  }
+
+  const auto& metric_entity = server_messenger_->metric_entity();
+  scoped_refptr<Histogram> rx_queue_size =
+      METRIC_rpc_listen_socket_rx_queue_size.Instantiate(metric_entity);
+  // Using ASSERT_EVENTUALLY below because of relaxed memory ordering when
+  // fetching metrics' values. Eventually, metrics reports readings that are
+  // consistent with the expected numbers.
+  ASSERT_EVENTUALLY([&] {
+    ASSERT_EQ(2, rx_queue_size->TotalCount());
+  });
+}
+
+class TestRpcWithIpModes: public RpcTestBase,
+                          public ::testing::WithParamInterface<string> {
+protected:
+  void SetUp() override {
+    RpcTestBase::SetUp();
+    FLAGS_ip_config_mode = GetParam();
+    ASSERT_OK(ParseIPModeFlag(FLAGS_ip_config_mode, &mode_));
+  }
+  Sockaddr bind_ip_addr() const {
+    switch (mode_) {
+      case IPMode::IPV6:
+      case IPMode::DUAL:
+        return Sockaddr::Wildcard(AF_INET6);
+      default:
+        return Sockaddr::Wildcard(AF_INET);
+    }
+  }
+
+  IPMode mode_;
+};
+
+// This is used to run all parameterized tests with every
+// possible ip_config_mode options.
+INSTANTIATE_TEST_SUITE_P(Parameters, TestRpcWithIpModes,
+                         testing::Values("ipv4", "ipv6", "dual"));
+
+TEST_P(TestRpcWithIpModes, TestRpcWithDifferentIpConfigModes) {
+  // Set up server with wildcard address.
+  Sockaddr server_addr = bind_ip_addr();
+  // Request OS to choose port.
+  server_addr.set_port(0);
+
+  MessengerBuilder mb("TestRpc.TestRpcWithDifferentIpConfigModes");
+  mb.set_metric_entity(metric_entity_);
+
+  shared_ptr<Messenger> messenger;
+  ASSERT_OK(mb.Build(&messenger));
+
+  // Start server on IP address based on ip_config_mode flag.
+  ASSERT_OK(StartTestServerWithCustomMessenger(&server_addr, messenger));
+
+  // IPv4 socket client tests.
+  {
+    Socket s4;
+    ASSERT_OK(s4.Init(AF_INET, 0));
+
+    // Target address is required mainly for dual mode. This is required to rule out
+    // any possibility of 'connect' call failing due to invalid target address.
+    Sockaddr target_addr = server_addr;
+
+    // Determine the specific target address based on the server's mode.
+    // For DUAL mode, we explicitly target the IPv4 loopback (127.0.0.1) for clarity.
+    if (mode_ == IPMode::DUAL) {
+      target_addr = Sockaddr::Loopback(AF_INET);
+      target_addr.set_port(server_addr.port());
+    }
+
+    Status s = s4.Connect(target_addr);
+
+    if (mode_ == IPMode::IPV6) {
+      // IPv4 socket's connect call to 'IPv6 only' server should fail.
+      ASSERT_TRUE(s.IsNetworkError()) << s.ToString();
+      ASSERT_STR_CONTAINS(s.ToString(), "Address family not supported by protocol");
+    } else {
+      ASSERT_OK(s);
+    }
+  }
+
+  // IPv6 socket client tests.
+  {
+    Socket s6;
+    ASSERT_OK(s6.Init(AF_INET6, 0));
+
+    // Determine the specific target address based on the server's mode.
+    // For DUAL mode, we explicitly target the IPv6 loopback (::1) for clarity.
+    Sockaddr target_addr = server_addr;
+    if (mode_ == IPMode::DUAL) {
+        target_addr = Sockaddr::Loopback(AF_INET6);
+        target_addr.set_port(server_addr.port());
+    }
+
+    Status s = s6.Connect(target_addr);
+    if (mode_ == IPMode::IPV4) {
+      // IPv6 socket's connect call to 'IPv4 only' server should fail.
+      ASSERT_TRUE(s.IsNetworkError()) << s.ToString();
+      ASSERT_STR_CONTAINS(s.ToString(), "Invalid argument");
+    } else {
+      ASSERT_OK(s);
+    }
+  }
+}
+
+#endif // #if defined(KUDU_HAS_DIAGNOSTIC_SOCKET) ...
 
 } // namespace rpc
 } // namespace kudu

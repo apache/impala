@@ -62,10 +62,11 @@ using kudu::MiniOidc;
 
 /// Utility class for creating a file that will be automatically deleted upon test
 /// completion.
-class TempTestDataFile {
+class TempTestDataFile final {
  public:
   // Creates a temporary file with the specified contents.
   explicit TempTestDataFile(const std::string& contents);
+  ~TempTestDataFile();
 
   /// Returns the absolute path to the file.
   const std::string& Filename() const { return name_; }
@@ -75,23 +76,35 @@ class TempTestDataFile {
   std::unique_ptr<WritableFile> tmp_file_;
 };
 
-TempTestDataFile::TempTestDataFile(const std::string& contents)
-  : name_("/tmp/jwks_XXXXXX") {
-  string created_filename;
+TempTestDataFile::TempTestDataFile(const std::string& contents) {
+  static const string cNamePattern = "/tmp/jwks_XXXXXX";
   WritableFileOptions opts;
   opts.is_sensitive = false;
-  Status status;
-  status = Env::Default()->NewTempWritableFile(opts, &name_[0], &created_filename, &tmp_file_);
-  if (!status.ok()) {
-    std::cerr << Substitute("Error creating temp file: $0", created_filename);
+  string fname;
+  if (auto s = Env::Default()->NewTempWritableFile(
+          opts, cNamePattern, &fname, &tmp_file_); !s.ok()) {
+    std::cerr << Substitute("error creating temp file '$0': $1",
+                            fname, s.ToString());
   }
 
-  status = WriteStringToFile(Env::Default(), contents, created_filename);
-  if (!status.ok()) {
-    std::cerr << Substitute("Error writing contents to temp file: $0", created_filename);
+  if (auto s = WriteStringToFile(Env::Default(), contents, fname);
+      !s.ok()) {
+    std::cerr << Substitute("error writing into temp file '$0': $1",
+                            fname, s.ToString());
   }
 
-  name_ = created_filename;
+  name_ = fname;
+}
+
+TempTestDataFile::~TempTestDataFile() {
+  if (tmp_file_) {
+    // Remove the temporary file from the filesystem. The destructor
+    // of the 'tmp_file_' field takes care of closing the file.
+    if (auto s = Env::Default()->DeleteFile(name_); !s.ok()) {
+      std::cerr << Substitute("error removing temp file '$0': $1",
+                              name_, s.ToString());
+    }
+  }
 }
 
 TEST(JwtUtilTest, LoadJwksFile) {
@@ -850,8 +863,8 @@ class JWKSMockServer {
     opts.port = 0;
     opts.bind_interface = "127.0.0.1";
     webserver_.reset(new Webserver(opts));
-    webserver_->RegisterPrerenderedPathHandler("/jwks", "JWKS", SimpleJWKSHandler,
-                                               /*is_styled*/false, /*is_on_nav_bar*/false);
+    webserver_->RegisterJsonPathHandler("/jwks", "JWKS", SimpleJWKSHandler,
+                                               /*is_on_nav_bar*/false);
     RETURN_NOT_OK(webserver_->Start());
     vector<Sockaddr> addrs;
     RETURN_NOT_OK(webserver_->GetBoundAddresses(&addrs));
@@ -870,13 +883,13 @@ class JWKSMockServer {
     for (const auto& ar : account_id_to_resp) {
       const auto& account_id = ar.first;
       const auto& jwks = ar.second;
-      webserver_->RegisterPrerenderedPathHandler(Substitute("/jwks/$0", account_id), account_id,
+      webserver_->RegisterJsonPathHandler(Substitute("/jwks/$0", account_id), account_id,
           [account_id, jwks] (const Webserver::WebRequest& /*req*/,
                               Webserver::PrerenderedWebResponse* resp) {
             resp->output << jwks;
             resp->status_code = HttpStatusCode::Ok;
           },
-          /*is_styled*/false, /*is_on_nav_bar*/false);
+          /*is_on_nav_bar*/false);
     }
     RETURN_NOT_OK(webserver_->Start());
     vector<Sockaddr> addrs;

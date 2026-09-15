@@ -38,6 +38,7 @@
 #include <glog/logging.h>
 #include <gtest/gtest.h>
 
+#include "kudu/gutil/basictypes.h"
 #include "kudu/gutil/ref_counted.h"
 #include "kudu/gutil/strings/join.h"
 #include "kudu/gutil/strings/substitute.h"
@@ -270,7 +271,7 @@ TEST_P(TestNegotiation, TestNegotiation) {
 
   unique_ptr<Socket> client_socket(new Socket());
   ASSERT_OK(client_socket->Init(server_addr.family(), 0));
-  client_socket->Connect(server_addr);
+  ASSERT_OK(client_socket->Connect(server_addr));
 
   unique_ptr<Socket> server_socket(desc.use_test_socket ?
                                    new NegotiationTestSocket() :
@@ -332,7 +333,7 @@ TEST_P(TestNegotiation, TestNegotiation) {
         // Create the server principal and keytab.
         string kt_path;
         ASSERT_OK(kdc.CreateServiceKeytab("kudu/127.0.0.1", &kt_path));
-        CHECK_ERR(setenv("KRB5_KTNAME", kt_path.c_str(), 1 /*replace*/));
+        PCHECK(setenv("KRB5_KTNAME", kt_path.c_str(), 1 /*replace*/) == 0);
         server_negotiation.set_server_fqdn("127.0.0.1");
         ASSERT_OK(server_negotiation.EnableGSSAPI());
         break;
@@ -348,7 +349,7 @@ TEST_P(TestNegotiation, TestNegotiation) {
       ADOPT_TRACE(t.get());
       client_status = client_negotiation.Negotiate();
       // Close the socket so that the server will not block forever on error.
-      client_negotiation.socket()->Close();
+      ignore_result(client_negotiation.socket()->Close());
 
       if (FLAGS_rpc_trace_negotiation || !client_status.ok()) {
         string msg = Trace::CurrentTrace()->DumpToString();
@@ -364,7 +365,7 @@ TEST_P(TestNegotiation, TestNegotiation) {
       ADOPT_TRACE(t.get());
       server_status = server_negotiation.Negotiate();
       // Close the socket so that the client will not block forever on error.
-      server_negotiation.socket()->Close();
+      ignore_result(server_negotiation.socket()->Close());
 
       if (FLAGS_rpc_trace_negotiation || !server_status.ok()) {
         string msg = Trace::CurrentTrace()->DumpToString();
@@ -381,8 +382,8 @@ TEST_P(TestNegotiation, TestNegotiation) {
   // Check the negotiation outcome against the expected outcome.
   EXPECT_EQ(desc.client_status.CodeAsString(), client_status.CodeAsString());
   EXPECT_EQ(desc.server_status.CodeAsString(), server_status.CodeAsString());
-  ASSERT_STR_MATCHES(client_status.ToString(), desc.client_status.ToString());
-  ASSERT_STR_MATCHES(server_status.ToString(), desc.server_status.ToString());
+  EXPECT_STR_MATCHES(client_status.ToString(), desc.client_status.ToString());
+  EXPECT_STR_MATCHES(server_status.ToString(), desc.server_status.ToString());
 
   if (client_status.ok()) {
     EXPECT_TRUE(server_status.ok());
@@ -1434,7 +1435,7 @@ TEST_F(TestNegotiation, TestGSSAPIInvalidNegotiation) {
   // Create the server principal and keytab.
   string kt_path;
   ASSERT_OK(kdc.CreateServiceKeytab("kudu/127.0.0.1", &kt_path));
-  CHECK_ERR(setenv("KRB5_KTNAME", kt_path.c_str(), 1 /*replace*/));
+  PCHECK(setenv("KRB5_KTNAME", kt_path.c_str(), 1 /*replace*/) == 0);
 
   // Try to negotiate with no krb5 credentials on the client. It should fail on both
   // sides.
@@ -1469,7 +1470,7 @@ TEST_F(TestNegotiation, TestGSSAPIInvalidNegotiation) {
   // credentials.
   // Authentication should now fail.
   ASSERT_OK(kdc.CreateServiceKeytab("otherservice/127.0.0.1", &kt_path));
-  CHECK_ERR(setenv("KRB5_KTNAME", kt_path.c_str(), 1 /*replace*/));
+  PCHECK(setenv("KRB5_KTNAME", kt_path.c_str(), 1 /*replace*/) == 0);
 
   RunNegotiationTest(
       [](unique_ptr<Socket> socket) {
@@ -1517,7 +1518,7 @@ TEST_F(TestNegotiation, TestPreflight) {
   ASSERT_OK(kdc.SetKrb5Environment());
   string kt_path;
   ASSERT_OK(kdc.CreateServiceKeytab("kudu/127.0.0.1", &kt_path));
-  CHECK_ERR(setenv("KRB5_KTNAME", kt_path.c_str(), 1 /*replace*/));
+  PCHECK(setenv("KRB5_KTNAME", kt_path.c_str(), 1 /*replace*/) == 0);
 
   ASSERT_OK(ServerNegotiation::PreflightCheckGSSAPI("kudu"));
 
@@ -1530,14 +1531,14 @@ TEST_F(TestNegotiation, TestPreflight) {
   } else {
     ASSERT_FALSE(s.ok()) << s.ToString();
 #ifndef KRB5_VERSION_LE_1_10
-    ASSERT_STR_MATCHES(s.ToString(), "error accessing keytab: Permission denied");
+    ASSERT_STR_MATCHES(s.ToString(), "Permission denied");
 #endif
   }
   CHECK_ERR(unlink(kt_path.c_str()));
 
   // Try with a keytab that has the wrong credentials.
   ASSERT_OK(kdc.CreateServiceKeytab("wrong-service/127.0.0.1", &kt_path));
-  CHECK_ERR(setenv("KRB5_KTNAME", kt_path.c_str(), 1 /*replace*/));
+  PCHECK(setenv("KRB5_KTNAME", kt_path.c_str(), 1 /*replace*/) == 0);
   s = ServerNegotiation::PreflightCheckGSSAPI("kudu");
   ASSERT_FALSE(s.ok());
 #ifndef KRB5_VERSION_LE_1_10

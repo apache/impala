@@ -18,26 +18,20 @@
 #include "kudu/util/mem_tracker.h"
 
 #include <algorithm>
-#include <cstddef>
 #include <deque>
 #include <limits>
 #include <list>
 #include <memory>
+#include <mutex>
 #include <ostream>
 #include <stack>
 #include <type_traits>
 
-#include "kudu/gutil/once.h"
 #include "kudu/gutil/port.h"
 #include "kudu/gutil/strings/substitute.h"
 #include "kudu/util/mem_tracker.pb.h"
 #include "kudu/util/mutex.h"
 #include "kudu/util/process_memory.h"
-
-namespace kudu {
-
-// NOTE: this class has been adapted from Impala, so the code style varies
-// somewhat from kudu.
 
 using std::deque;
 using std::stack;
@@ -46,28 +40,18 @@ using std::shared_ptr;
 using std::string;
 using std::vector;
 using std::weak_ptr;
-
 using strings::Substitute;
 
-// The ancestor for all trackers. Every tracker is visible from the root down.
-static shared_ptr<MemTracker> root_tracker;
-static GoogleOnceType root_tracker_once = GOOGLE_ONCE_INIT;
+namespace kudu {
 
-void MemTracker::CreateRootTracker() {
-  root_tracker.reset(new MemTracker(-1, "root", shared_ptr<MemTracker>()));
-  root_tracker->Init();
-}
+// NOTE: this class has been adapted from Impala, so the code style varies
+// somewhat from kudu.
 
 shared_ptr<MemTracker> MemTracker::CreateTracker(int64_t byte_limit,
                                                  const string& id,
                                                  shared_ptr<MemTracker> parent) {
-  shared_ptr<MemTracker> real_parent;
-  if (parent) {
-    real_parent = std::move(parent);
-  } else {
-    real_parent = GetRootTracker();
-  }
-  shared_ptr<MemTracker> tracker(new MemTracker(byte_limit, id, real_parent));
+  shared_ptr<MemTracker> real_parent = parent ? std::move(parent) : GetRootTracker();
+  shared_ptr<MemTracker> tracker(MemTracker::make_shared(byte_limit, id, real_parent));
   real_parent->AddChildTracker(tracker);
   tracker->Init();
 
@@ -90,7 +74,7 @@ MemTracker::~MemTracker() {
         << " has unreleased consumption " << consumption();
     parent_->Release(consumption());
 
-    MutexLock l(parent_->child_trackers_lock_);
+    std::lock_guard l(parent_->child_trackers_lock_);
     if (child_tracker_it_ != parent_->child_trackers_.end()) {
       parent_->child_trackers_.erase(child_tracker_it_);
       child_tracker_it_ = parent_->child_trackers_.end();
@@ -120,11 +104,11 @@ bool MemTracker::FindTracker(const string& id,
 bool MemTracker::FindTrackerInternal(const string& id,
                                      shared_ptr<MemTracker>* tracker,
                                      const shared_ptr<MemTracker>& parent) {
-  DCHECK(parent != NULL);
+  DCHECK(parent);
 
   list<weak_ptr<MemTracker>> children;
   {
-    MutexLock l(parent->child_trackers_lock_);
+    std::lock_guard l(parent->child_trackers_lock_);
     children = parent->child_trackers_;
   }
 
@@ -162,7 +146,7 @@ shared_ptr<MemTracker> MemTracker::FindOrCreateGlobalTracker(
   // globally-visible MemTrackers which are the exception rather than the rule,
   // it's reasonable to synchronize their creation on a singleton lock.
   static Mutex find_or_create_lock;
-  MutexLock l(find_or_create_lock);
+  std::lock_guard l(find_or_create_lock);
 
   shared_ptr<MemTracker> found;
   if (FindTrackerInternal(id, &found, GetRootTracker())) {
@@ -181,7 +165,7 @@ void MemTracker::ListTrackers(vector<shared_ptr<MemTracker>>* trackers) {
 
     trackers->push_back(t);
     {
-      MutexLock l(t->child_trackers_lock_);
+      std::lock_guard l(t->child_trackers_lock_);
       for (const auto& child_weak : t->child_trackers_) {
         shared_ptr<MemTracker> child = child_weak.lock();
         if (child) {
@@ -193,9 +177,9 @@ void MemTracker::ListTrackers(vector<shared_ptr<MemTracker>>* trackers) {
 }
 
 void MemTracker::TrackersToPb(MemTrackerPB* pb) {
-  CHECK(pb);
+  DCHECK(pb);
   stack<std::pair<shared_ptr<MemTracker>, MemTrackerPB*>> to_process;
-  to_process.emplace(std::make_pair(GetRootTracker(), pb));
+  to_process.emplace(GetRootTracker(), pb);
   while (!to_process.empty()) {
     auto tracker_and_pb = std::move(to_process.top());
     to_process.pop();
@@ -209,16 +193,27 @@ void MemTracker::TrackersToPb(MemTrackerPB* pb) {
     tracker_pb->set_current_consumption(tracker->consumption());
     tracker_pb->set_peak_consumption(tracker->peak_consumption());
     {
-      MutexLock l(tracker->child_trackers_lock_);
+      std::lock_guard l(tracker->child_trackers_lock_);
       for (const auto& child_weak : tracker->child_trackers_) {
         shared_ptr<MemTracker> child = child_weak.lock();
         if (child) {
           auto* child_pb = tracker_pb->add_child_trackers();
-          to_process.emplace(std::make_pair(std::move(child), child_pb));
+          to_process.emplace(std::move(child), child_pb);
         }
       }
     }
   }
+}
+
+shared_ptr<MemTracker> MemTracker::GetRootTracker() {
+  // The ancestor for all trackers. Every tracker is visible from the root down.
+  static shared_ptr<MemTracker> root_tracker;
+  static std::once_flag once;
+  std::call_once(once, [&] {
+    root_tracker = MemTracker::make_shared(-1, "root", std::shared_ptr<MemTracker>());
+    root_tracker->Init();
+  });
+  return root_tracker;
 }
 
 void MemTracker::Consume(int64_t bytes) {
@@ -292,13 +287,12 @@ void MemTracker::Release(int64_t bytes) {
   process_memory::MaybeGCAfterRelease(bytes);
 }
 
-bool MemTracker::AnyLimitExceeded() {
-  for (const auto& tracker : limit_trackers_) {
-    if (tracker->LimitExceeded()) {
-      return true;
-    }
-  }
-  return false;
+bool MemTracker::AnyLimitExceeded() const {
+  return std::any_of(limit_trackers_.cbegin(),
+                     limit_trackers_.cend(),
+                     [](const auto& tracker) {
+                       return tracker->LimitExceeded();
+                     });
 }
 
 int64_t MemTracker::SpareCapacity() const {
@@ -316,7 +310,9 @@ void MemTracker::Init() {
   MemTracker* tracker = this;
   while (tracker) {
     all_trackers_.push_back(tracker);
-    if (tracker->has_limit()) limit_trackers_.push_back(tracker);
+    if (tracker->has_limit()) {
+      limit_trackers_.push_back(tracker);
+    }
     tracker = tracker->parent_.get();
   }
   DCHECK_GT(all_trackers_.size(), 0);
@@ -324,13 +320,8 @@ void MemTracker::Init() {
 }
 
 void MemTracker::AddChildTracker(const shared_ptr<MemTracker>& tracker) {
-  MutexLock l(child_trackers_lock_);
+  std::lock_guard l(child_trackers_lock_);
   tracker->child_tracker_it_ = child_trackers_.insert(child_trackers_.end(), tracker);
-}
-
-shared_ptr<MemTracker> MemTracker::GetRootTracker() {
-  GoogleOnceInit(&root_tracker_once, &MemTracker::CreateRootTracker);
-  return root_tracker;
 }
 
 } // namespace kudu

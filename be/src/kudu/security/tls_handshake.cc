@@ -162,9 +162,11 @@ Status TlsHandshake::Continue(const string& recv, string* send) {
   }
 
   if (rc == 1) {
-    // SSL_do_handshake() must have read all the pending data.
-    DCHECK_EQ(0, BIO_ctrl_pending(rbio));
-    VLOG(2) << Substitute("TSL Handshake complete");
+    // At the client side, SSL_do_handshake() must have read all the pending
+    // data at this point. At the server side, it may be encrypted application
+    // data already pending at 'rbio' right after completion of the handshake.
+    DCHECK(type_ == TlsHandshakeType::SERVER || BIO_ctrl_pending(rbio) == 0);
+    VLOG(2) << Substitute("TLS Handshake complete");
     return Status::OK();
   }
   return Status::Incomplete("TLS Handshake incomplete");
@@ -379,6 +381,16 @@ string TlsHandshake::GetCipherDescription() const {
   StripTrailingNewline(&ret);
   StripDupCharacters(&ret, ' ', 0);
   return ret;
+}
+
+bool TlsHandshake::GetExtMS() const {
+  SCOPED_OPENSSL_NO_PENDING_ERRORS;
+  CHECK(has_started_);
+#if OPENSSL_VERSION_NUMBER >= 0x10100000L
+  return SSL_get_extms_support(ssl_.get()) == 1;
+#else
+  return false;
+#endif
 }
 
 } // namespace security

@@ -72,6 +72,12 @@ DEFINE_bool(rpc_encrypt_loopback_connections, false,
             "an attacker.");
 TAG_FLAG(rpc_encrypt_loopback_connections, advanced);
 
+DEFINE_bool(rpc_suppress_negotiation_trace, false,
+            "Whether to suppress all negotiation traces: do not dump trace "
+            "of a connection negotiation into the log, even for a failed one. "
+            "For testing only!");
+TAG_FLAG(rpc_suppress_negotiation_trace, unsafe);
+
 using kudu::security::RpcAuthentication;
 using kudu::security::RpcEncryption;
 using std::string;
@@ -124,20 +130,19 @@ static Status WaitForClientConnect(Socket* socket, const MonoTime& deadline) {
 #endif
     if (ready == -1) {
       int err = errno;
-      if (err == EINTR) {
-        // We were interrupted by a signal, let's go again.
-        continue;
-      } else {
+      if (PREDICT_FALSE(err != EINTR)) {
         return Status::NetworkError("Error from ppoll() while waiting to connect",
             ErrnoToString(err), err);
       }
-    } else if (ready == 0) {
+      // We were interrupted by a signal, let's go again.
+      continue;
+    }
+    if (ready == 0) {
       // Timeout exceeded. Loop back to the top to our impending doom.
       continue;
-    } else {
-      // Success.
-      break;
     }
+    // Success.
+    break;
   }
 
   // Connect finished, but this doesn't mean that we connected successfully.
@@ -145,7 +150,7 @@ static Status WaitForClientConnect(Socket* socket, const MonoTime& deadline) {
   int so_error = 0;
   socklen_t socklen = sizeof(so_error);
   int rc = getsockopt(fd, SOL_SOCKET, SO_ERROR, &so_error, &socklen);
-  if (rc != 0) {
+  if (PREDICT_FALSE(rc != 0)) {
     return Status::NetworkError("Unable to check connected socket for errors",
                                 ErrnoToString(errno),
                                 errno);
@@ -251,15 +256,12 @@ static Status DoServerNegotiation(Connection* conn,
                                   bool encrypt_loopback,
                                   const MonoTime& deadline) {
   auto* messenger = conn->reactor_thread()->reactor()->messenger();
-  if (authentication == RpcAuthentication::REQUIRED &&
-      messenger->keytab_file().empty() &&
-      !messenger->tls_context().is_external_cert()) {
-    return Status::InvalidArgument("RPC authentication (--rpc_authentication) may not be "
-                                   "required unless Kerberos (--keytab_file) or external PKI "
-                                   "(--rpc_certificate_file et al) are configured");
-  }
+  DCHECK(authentication != RpcAuthentication::REQUIRED ||
+      !messenger->keytab_file().empty() ||
+      messenger->tls_context().is_external_cert())
+      << "misconfiguration: check ValidateRpcAuthnFlags() for details";
 
-  if (FLAGS_rpc_negotiation_inject_delay_ms > 0) {
+  if (PREDICT_FALSE(FLAGS_rpc_negotiation_inject_delay_ms > 0)) {
     LOG(WARNING) << "Injecting " << FLAGS_rpc_negotiation_inject_delay_ms
                  << "ms delay in negotiation";
     SleepFor(MonoDelta::FromMilliseconds(FLAGS_rpc_negotiation_inject_delay_ms));
@@ -273,7 +275,9 @@ static Status DoServerNegotiation(Connection* conn,
                                        encryption,
                                        encrypt_loopback,
                                        messenger->sasl_proto_name());
-
+  if (!messenger->hostname().empty()) {
+    server_negotiation.set_server_fqdn(messenger->hostname());
+  }
   if (authentication != RpcAuthentication::DISABLED && !messenger->keytab_file().empty()) {
     RETURN_NOT_OK(server_negotiation.EnableGSSAPI());
   }
@@ -325,19 +329,22 @@ void Negotiation::RunNegotiation(const scoped_refptr<Connection>& conn,
       (s.IsNetworkError() && s.posix_code() == ECONNREFUSED) ||
       s.IsNotAuthorized());
 
-  if (is_bad || FLAGS_rpc_trace_negotiation) {
-    string msg = Trace::CurrentTrace()->DumpToString();
+  if ((is_bad || FLAGS_rpc_trace_negotiation) &&
+      PREDICT_TRUE(!FLAGS_rpc_suppress_negotiation_trace)) {
+    DCHECK(Trace::CurrentTrace());
     if (is_bad) {
-      LOG(WARNING) << "Failed RPC negotiation. Trace:\n" << msg;
+      LOG(WARNING) << "Failed RPC negotiation. Trace:\n"
+          << Trace::CurrentTrace();
     } else {
-      LOG(INFO) << "RPC negotiation tracing enabled. Trace:\n" << msg;
+      LOG(INFO) << "RPC negotiation tracing enabled. Trace:\n"
+          << Trace::CurrentTrace();
     }
   }
 
   if (conn->direction() == Connection::SERVER && s.IsNotAuthorized()) {
     LOG(WARNING) << "Unauthorized connection attempt: " << s.message().ToString();
   }
-  conn->CompleteNegotiation(std::move(s), std::move(rpc_error));
+  conn->CompleteNegotiation(s, std::move(rpc_error));
 }
 
 

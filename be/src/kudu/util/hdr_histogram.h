@@ -54,7 +54,6 @@
 
 #include "kudu/gutil/atomicops.h"
 #include "kudu/gutil/macros.h"
-#include "kudu/gutil/port.h"
 
 namespace kudu {
 
@@ -152,6 +151,9 @@ class HdrHistogram {
   // Get the exact maximum value (may lie outside the histogram).
   uint64_t MaxValue() const;
 
+  // Get the most recent (last seen) value.
+  uint64_t LastValue() const;
+
   // Get the exact mean value of all recorded values in the histogram.
   double MeanValue() const;
 
@@ -203,6 +205,7 @@ class HdrHistogram {
   base::subtle::Atomic64 total_sum_;
   base::subtle::Atomic64 min_value_;
   base::subtle::Atomic64 max_value_;
+  base::subtle::Atomic64 last_value_;
   std::unique_ptr<base::subtle::Atomic64[]> counts_;
 
   HdrHistogram& operator=(const HdrHistogram& other); // Disable assignment operator.
@@ -253,8 +256,7 @@ class AbstractHistogramIterator {
   // Create iterator with new histogram.
   // The histogram must not be mutated while the iterator is in use.
   explicit AbstractHistogramIterator(const HdrHistogram* histogram);
-  virtual ~AbstractHistogramIterator() {
-  }
+  virtual ~AbstractHistogramIterator() = default;
 
   // Returns true if the iteration has more elements.
   virtual bool HasNext() const;
@@ -315,8 +317,8 @@ class RecordedValuesIterator : public AbstractHistogramIterator {
   explicit RecordedValuesIterator(const HdrHistogram* histogram);
 
  protected:
-  virtual void IncrementIterationLevel() OVERRIDE;
-  virtual bool ReachedIterationLevel() const OVERRIDE;
+  void IncrementIterationLevel() override;
+  bool ReachedIterationLevel() const override;
 
  private:
   int visited_sub_bucket_index_;
@@ -336,16 +338,16 @@ class RecordedValuesIterator : public AbstractHistogramIterator {
 // This class is not thread-safe.
 class PercentileIterator : public AbstractHistogramIterator {
  public:
-  // TODO: Explain percentile_ticks_per_half_distance.
+  // TODO(mpercy): Explain percentile_ticks_per_half_distance.
   PercentileIterator(const HdrHistogram* histogram,
                      int percentile_ticks_per_half_distance);
-  virtual bool HasNext() const OVERRIDE;
-  virtual double PercentileIteratedTo() const OVERRIDE;
-  virtual double PercentileIteratedFrom() const OVERRIDE;
+  bool HasNext() const override;
+  double PercentileIteratedTo() const override;
+  double PercentileIteratedFrom() const override;
 
  protected:
-  virtual void IncrementIterationLevel() OVERRIDE;
-  virtual bool ReachedIterationLevel() const OVERRIDE;
+  void IncrementIterationLevel() override;
+  bool ReachedIterationLevel() const override;
 
  private:
   int percentile_ticks_per_half_distance_;

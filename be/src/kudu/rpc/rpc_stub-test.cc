@@ -18,6 +18,7 @@
 #include <algorithm>
 #include <atomic>
 #include <csignal>
+#include <cstdint>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
@@ -27,6 +28,7 @@
 #include <ostream>
 #include <string>
 #include <thread>
+#include <type_traits>
 #include <vector>
 
 #include <gflags/gflags.h>
@@ -34,9 +36,7 @@
 #include <glog/stl_logging.h>
 #include <gtest/gtest.h>
 
-#include "kudu/gutil/atomicops.h"
 #include "kudu/gutil/ref_counted.h"
-#include "kudu/rpc/messenger.h"
 #include "kudu/rpc/proxy.h"
 #include "kudu/rpc/rpc-test-base.h"
 #include "kudu/rpc/rpc_controller.h"
@@ -62,6 +62,9 @@
 #include "kudu/util/user.h"
 
 DEFINE_bool(is_panic_test_child, false, "Used by TestRpcPanic");
+
+DECLARE_bool(rpc_connection_collect_io_handler_latency);
+DECLARE_bool(rpc_reopen_outbound_connections);
 DECLARE_bool(socket_inject_short_recvs);
 
 using kudu::pb_util::SecureDebugString;
@@ -69,10 +72,11 @@ using std::shared_ptr;
 using std::string;
 using std::unique_ptr;
 using std::vector;
-using base::subtle::NoBarrier_Load;
 
 namespace kudu {
 namespace rpc {
+
+class Messenger;
 
 class RpcStubTest : public RpcTestBase {
  public:
@@ -123,10 +127,9 @@ TEST_F(RpcStubTest, TestShortRecvs) {
 // IO threads can deal with read/write calls that don't succeed
 // in sending the entire data in one go.
 TEST_F(RpcStubTest, TestBigCallData) {
-  const int kNumSentAtOnce = 20;
-  const size_t kMessageSize = 5 * 1024 * 1024;
-  string data;
-  data.resize(kMessageSize);
+  constexpr int kNumSentAtOnce = 20;
+  constexpr size_t kMessageSize = 5 * 1024 * 1024;
+  string data(kMessageSize, string::value_type());
 
   CalculatorServiceProxy p(client_messenger_, server_addr_, server_addr_.host());
 
@@ -297,12 +300,6 @@ TEST_F(RpcStubTest, TestCallWithInvalidParam) {
                       "missing fields: y");
 }
 
-// Wrapper around AtomicIncrement, since AtomicIncrement returns the 'old'
-// value, and our callback needs to be a void function.
-static void DoIncrement(Atomic32* count) {
-  base::subtle::Barrier_AtomicIncrement(count, 1);
-}
-
 // Test sending a PB parameter with a missing field on the client side.
 // This also ensures that the async callback is only called once
 // (regression test for a previously-encountered bug).
@@ -314,13 +311,13 @@ TEST_F(RpcStubTest, TestCallWithMissingPBFieldClientSide) {
   req.set_x(10);
   // Request is missing the 'y' field.
   AddResponsePB resp;
-  Atomic32 callback_count = 0;
-  p.AddAsync(req, &resp, &controller, [&callback_count]() { DoIncrement(&callback_count); });
-  while (NoBarrier_Load(&callback_count) == 0) {
+  std::atomic<uint32_t> callback_count(0);
+  p.AddAsync(req, &resp, &controller, [&callback_count]() { ++callback_count; });
+  while (callback_count == 0) {
     SleepFor(MonoDelta::FromMicroseconds(10));
   }
   SleepFor(MonoDelta::FromMicroseconds(100));
-  ASSERT_EQ(1, NoBarrier_Load(&callback_count));
+  ASSERT_EQ(1, callback_count);
   ASSERT_STR_CONTAINS(controller.status().ToString(),
                       "Invalid argument: invalid parameter for call "
                       "kudu.rpc_test.CalculatorService.Add: missing fields: y");
@@ -431,7 +428,7 @@ TEST_F(RpcStubTest, TestRpcPanic) {
     RpcController controller;
     PanicRequestPB req;
     PanicResponsePB resp;
-    p.Panic(req, &resp, &controller);
+    CHECK_OK(p.Panic(req, &resp, &controller));
   }
 }
 
@@ -740,6 +737,89 @@ TEST_F(RpcStubTest, DontTimeOutWhenReactorIsBlocked) {
   req.set_sleep_micros(800 * 1000);
   controller.set_timeout(MonoDelta::FromMilliseconds(1200));
   ASSERT_OK(p.Sleep(req, &resp, &controller));
+}
+
+class RpcStatsTest : public RpcTestBase {
+ public:
+  void SetUp() override {
+    RpcTestBase::SetUp();
+    ASSERT_OK(StartTestServer(&server_addr_));
+    ASSERT_OK(CreateMessenger("Client", &client_messenger_));
+  }
+
+ protected:
+  Sockaddr server_addr_;
+  shared_ptr<Messenger> client_messenger_;
+};
+
+// This test scenario verifies the presence of per-connection reactor I/O
+// latency histograms for active RPC connections depending on the
+// --rpc_connection_collect_io_handler_latency flag setting.
+TEST_F(RpcStatsTest, PerConnectionReactorLatency) {
+  constexpr const int sSideCarSize = 1024 * 1024;
+  constexpr const char* const kHostName = "localhost";
+
+  // Collecting per-connection I/O handler latency metrics is disabled
+  // by default.
+  {
+    Proxy p(client_messenger_, server_addr_, kHostName,
+            GenericCalculatorService::static_service_name());
+
+    DoTestSidecar(&p, sSideCarSize, sSideCarSize);
+
+    // Dump the information on the currently open RPC connections.
+    DumpConnectionsResponsePB rpc_connections;
+    ASSERT_OK(server_messenger_->DumpConnections({}, &rpc_connections));
+    const auto& contents_str = SecureDebugString(rpc_connections);
+    ASSERT_STR_NOT_CONTAINS(contents_str, "ev_loop_latencies");
+    ASSERT_STR_NOT_CONTAINS(contents_str, "read I/O latency");
+    ASSERT_STR_NOT_CONTAINS(contents_str, "write I/O latency");
+  }
+
+  // Let the server's reactor close idle RPC connections: the sub-scenario
+  // below needs newly open RPC connections once modifying the setting
+  // for the --rpc_connection_collect_io_handler_latency flag.
+  ASSERT_EVENTUALLY([&] {
+    // Make sure all the RPC connections have been closed: if the server metrics
+    // have accumulated information on maximum latencies RPC connections,
+    // it would be then detectable by the histogram's sample count.
+    DumpConnectionsResponsePB srv_con_pb;
+    ASSERT_OK(server_messenger_->DumpConnections({}, &srv_con_pb));
+    ASSERT_EQ(0, srv_con_pb.outbound_connections_size());
+    ASSERT_EQ(0, srv_con_pb.inbound_connections_size());
+  });
+
+  {
+    google::FlagSaver flag_saver;
+    FLAGS_rpc_connection_collect_io_handler_latency = true;
+
+    Proxy p(client_messenger_, server_addr_, kHostName,
+            GenericCalculatorService::static_service_name());
+
+    DoTestSidecar(&p, sSideCarSize, sSideCarSize);
+
+    // Dump the information on the currently open RPC connections.
+    DumpConnectionsResponsePB rpc_connections;
+    ASSERT_OK(server_messenger_->DumpConnections({}, &rpc_connections));
+    const auto& contents_str = SecureDebugString(rpc_connections);
+    ASSERT_STR_CONTAINS(contents_str,
+                        "  ev_loop_latencies {\n"
+                        "    histograms {\n"
+                        "      type: \"histogram\"\n"
+                        "      description: \"read I/O latency\"\n"
+                        "      unit: \"microseconds\"\n"
+                        "      max_trackable_value: 5000000\n"
+                        "      num_significant_digits: 1\n"
+                        "      total_count: ");
+    ASSERT_STR_CONTAINS(contents_str,
+                        "    histograms {\n"
+                        "      type: \"histogram\"\n"
+                        "      description: \"write I/O latency\"\n"
+                        "      unit: \"microseconds\"\n"
+                        "      max_trackable_value: 5000000\n"
+                        "      num_significant_digits: 1\n"
+                        "      total_count: ");
+  }
 }
 
 } // namespace rpc

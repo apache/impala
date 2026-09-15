@@ -28,7 +28,7 @@
 
 #include <glog/logging.h>
 
-#include "kudu/gutil/macros.h"
+#include "kudu/gutil/port.h"
 #include "kudu/gutil/strings/numbers.h"
 #include "kudu/gutil/strings/split.h"
 #include "kudu/gutil/strings/strip.h"
@@ -60,7 +60,7 @@ PstackWatcher::~PstackWatcher() {
 
 void PstackWatcher::Shutdown() {
   {
-    MutexLock guard(lock_);
+    std::lock_guard guard(lock_);
     running_ = false;
     cond_.Broadcast();
   }
@@ -71,19 +71,19 @@ void PstackWatcher::Shutdown() {
 }
 
 bool PstackWatcher::IsRunning() const {
-  MutexLock guard(lock_);
+  std::lock_guard guard(lock_);
   return running_;
 }
 
 void PstackWatcher::Wait() const {
-  MutexLock lock(lock_);
+  std::lock_guard guard(lock_);
   while (running_) {
     cond_.Wait();
   }
 }
 
 void PstackWatcher::Run() {
-  MutexLock guard(lock_);
+  std::lock_guard guard(lock_);
   if (!running_) return;
   cond_.WaitFor(timeout_);
   if (!running_) return;
@@ -250,11 +250,13 @@ Status PstackWatcher::RunStackDump(const vector<string>& argv) {
   }
   Subprocess pstack_proc(argv);
   RETURN_NOT_OK_PREPEND(pstack_proc.Start(), "RunStackDump proc.Start() failed");
-  int ret;
-  RETRY_ON_EINTR(ret, ::close(pstack_proc.ReleaseChildStdinFd()));
-  if (ret == -1) {
-    return Status::IOError("Unable to close child stdin", ErrnoToString(errno), errno);
+
+  const int fd = pstack_proc.ReleaseChildStdinFd();
+  if (PREDICT_FALSE(::close(fd) != 0)) {
+    const int err = errno;
+    return Status::IOError("unable to close child stdin", ErrnoToString(err), err);
   }
+
   RETURN_NOT_OK_PREPEND(pstack_proc.Wait(), "RunStackDump proc.Wait() failed");
   int exit_code;
   string exit_info;

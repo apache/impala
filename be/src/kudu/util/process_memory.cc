@@ -18,9 +18,11 @@
 #include <cstddef>
 #include <memory>
 #include <ostream>
+#include <type_traits>
 
 #include <gflags/gflags.h>
 #include <glog/logging.h>
+#include <glog/raw_logging.h>
 #ifdef TCMALLOC_ENABLED
 #include <gperftools/malloc_extension.h>  // IWYU pragma: keep
 #endif
@@ -64,6 +66,12 @@ DEFINE_int32(memory_limit_warn_threshold_percentage, 98,
              "Percentage of the hard memory limit that this daemon may "
              "consume before WARNING level messages are periodically logged.");
 TAG_FLAG(memory_limit_warn_threshold_percentage, advanced);
+
+// TODO(araina): Remove this flag when compaction logic starts honoring hard limit memory setting.
+DEFINE_double(memory_limit_compact_usage_warn_threshold_percentage, 105.0,
+              "Percentage of the hard memory limit that this daemon may consume before WARNING "
+              "level messages are periodically logged during an ongoing compaction op.");
+TAG_FLAG(memory_limit_compact_usage_warn_threshold_percentage, experimental);
 
 #ifdef TCMALLOC_ENABLED
 DEFINE_bool(disable_tcmalloc_gc_by_memory_tracker_for_testing, false,
@@ -127,9 +135,9 @@ DEFINE_validator(tcmalloc_max_free_bytes_percentage, &ValidatePercentage);
 // ------------------------------------------------------------
 #ifdef TCMALLOC_ENABLED
 static int64_t GetTCMallocProperty(const char* prop) {
-  size_t value;
+  size_t value = 0;
   if (!MallocExtension::instance()->GetNumericProperty(prop, &value)) {
-    LOG(DFATAL) << "Failed to get tcmalloc property " << prop;
+    RAW_LOG(ERROR, "failed to get tcmalloc property '%s'; returning 0", prop);
   }
   return value;
 }
@@ -169,10 +177,7 @@ void DoInitLimits() {
   int64_t limit = FLAGS_memory_limit_hard_bytes;
   if (limit == 0) {
     // If no limit is provided, we'll use 80% of system RAM.
-    int64_t total_ram;
-    CHECK_OK(Env::Default()->GetTotalRAMBytes(&total_ram));
-    limit = total_ram * 4;
-    limit /= 5;
+    limit = MaxMemoryAvailable();
   }
   g_hard_limit = limit;
   g_soft_limit = FLAGS_memory_limit_soft_percentage * g_hard_limit / 100;
@@ -215,9 +220,26 @@ int64_t CurrentConsumption() {
 #endif
 }
 
+int64_t MaxMemoryAvailable() {
+  int64_t total_ram;
+  CHECK_OK(Env::Default()->GetTotalRAMBytes(&total_ram));
+  // We will use 80% of system RAM to align with default hard limit.
+  total_ram = total_ram * 4;
+  total_ram /= 5;
+
+  return total_ram;
+}
+
 int64_t HardLimit() {
   InitLimits();
   return g_hard_limit;
+}
+
+bool OverHardLimitThreshold() {
+  InitLimits();
+  int64_t over_hard_limit_threshold =
+      g_hard_limit * FLAGS_memory_limit_compact_usage_warn_threshold_percentage / 100;
+  return CurrentConsumption() > over_hard_limit_threshold;
 }
 
 int64_t SoftLimit() {

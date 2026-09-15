@@ -45,7 +45,7 @@ class TokenSigningPublicKey {
   }
 
   // Initialize the object. Should be called only once.
-  Status Init() WARN_UNUSED_RESULT;
+  Status Init();
 
   // Verify the signature in a given token.
   // This method is thread-safe.
@@ -65,14 +65,16 @@ class TokenSigningPublicKey {
 // number and expiration date.
 class TokenSigningPrivateKey {
  public:
-  explicit TokenSigningPrivateKey(const TokenSigningPrivateKeyPB& pb);
+  TokenSigningPrivateKey(const TokenSigningPrivateKeyPB& pb,
+                         const std::string& password = "");
   TokenSigningPrivateKey(int64_t key_seq_num,
                          int64_t expire_time,
-                         std::unique_ptr<PrivateKey> key);
+                         std::unique_ptr<PrivateKey> key,
+                         const std::string& password = "");
   ~TokenSigningPrivateKey();
 
   // Sign a token, and store the signature and signing key's sequence number.
-  Status Sign(SignedTokenPB* token) const WARN_UNUSED_RESULT;
+  Status Sign(SignedTokenPB* token) const;
 
   // Export data into corresponding PB structure.
   void ExportPB(TokenSigningPrivateKeyPB* pb) const;

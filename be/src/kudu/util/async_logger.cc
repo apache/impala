@@ -17,9 +17,11 @@
 
 #include "kudu/util/async_logger.h"
 
+#include <mutex>
 #include <string>
 #include <thread>
 
+#include "kudu/gutil/port.h"
 #include "kudu/util/monotime.h"
 
 using std::string;
@@ -27,7 +29,7 @@ using std::string;
 namespace kudu {
 
 AsyncLogger::AsyncLogger(google::base::Logger* wrapped,
-                         int max_buffer_bytes) :
+                         size_t max_buffer_bytes) :
     max_buffer_bytes_(max_buffer_bytes),
     wrapped_(DCHECK_NOTNULL(wrapped)),
     wake_flusher_cond_(&lock_),
@@ -38,18 +40,16 @@ AsyncLogger::AsyncLogger(google::base::Logger* wrapped,
   DCHECK_GT(max_buffer_bytes_, 0);
 }
 
-AsyncLogger::~AsyncLogger() {}
-
 void AsyncLogger::Start() {
-  CHECK_EQ(state_, INITTED);
+  DCHECK_EQ(state_, INITTED);
   state_ = RUNNING;
   thread_ = std::thread(&AsyncLogger::RunThread, this);
 }
 
 void AsyncLogger::Stop() {
   {
-    MutexLock l(lock_);
-    CHECK_EQ(state_, RUNNING);
+    std::lock_guard l(lock_);
+    DCHECK_EQ(state_, RUNNING);
     state_ = STOPPED;
     wake_flusher_cond_.Signal();
   }
@@ -63,7 +63,7 @@ void AsyncLogger::Write(bool force_flush,
                         const char* message,
                         size_t message_len) {
   {
-    MutexLock l(lock_);
+    std::lock_guard l(lock_);
     DCHECK_EQ(state_, RUNNING);
     while (BufferFull(*active_buf_)) {
       app_threads_blocked_count_for_tests_++;
@@ -86,13 +86,13 @@ void AsyncLogger::Write(bool force_flush,
   //
   // Unfortunately, the underlying log level isn't passed through to this interface, so we
   // have to use this hack: messages from FATAL errors start with the character 'F'.
-  if (message_len > 0 && message[0] == 'F') {
+  if (PREDICT_FALSE(message_len > 0 && message[0] == 'F')) {
     Flush();
   }
 }
 
 void AsyncLogger::Flush() {
-  MutexLock l(lock_);
+  std::lock_guard l(lock_);
   DCHECK_EQ(state_, RUNNING);
 
   // Wake up the writer thread at least twice.
@@ -111,7 +111,7 @@ uint32_t AsyncLogger::LogSize() {
 }
 
 void AsyncLogger::RunThread() {
-  MutexLock l(lock_);
+  std::unique_lock l(lock_);
   while (state_ == RUNNING || active_buf_->needs_flush_or_write()) {
     while (!active_buf_->needs_flush_or_write() && state_ == RUNNING) {
       if (!wake_flusher_cond_.WaitFor(MonoDelta::FromSeconds(FLAGS_logbufsecs))) {
@@ -127,7 +127,7 @@ void AsyncLogger::RunThread() {
     if (BufferFull(*flushing_buf_)) {
       free_buffer_cond_.Broadcast();
     }
-    l.Unlock();
+    l.unlock();
 
     for (const auto& msg : flushing_buf_->messages) {
       wrapped_->Write(false, msg.ts, msg.message.data(), msg.message.size());
@@ -137,7 +137,7 @@ void AsyncLogger::RunThread() {
     }
     flushing_buf_->clear();
 
-    l.Lock();
+    l.lock();
     flush_count_++;
     flush_complete_cond_.Broadcast();
   }

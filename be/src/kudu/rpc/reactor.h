@@ -17,12 +17,14 @@
 #pragma once
 
 #include <cstdint>
+#include <deque>
 #include <functional>
 #include <list>
 #include <memory>
 #include <string>
 #include <unordered_map>
 
+#include <boost/function.hpp>
 #include <boost/intrusive/list.hpp>
 #include <boost/intrusive/list_hook.hpp>
 #include <ev++.h>
@@ -72,46 +74,36 @@ struct ReactorMetrics {
 };
 
 // A task which can be enqueued to run on the reactor thread.
-class ReactorTask : public boost::intrusive::list_base_hook<> {
- public:
-  ReactorTask();
+struct ReactorTask final {
+  // NOTE: boost::function avoids heap allocations for most small functions,
+  // whereas std::function only does so for the smallest ones: e.g., the latter
+  // performs heap allocations even for 16 bytes of lambda's call context.
+  // With that, the SOO threshold in boost::function seems to be higher than
+  // in std::function at least with GCC 11.5.0 STL implementation. Using
+  // boost::function instead of std::function helps to avoid the asymmetry
+  // in allocation/deallocation of the corresponding function objects
+  // in per-thread tcmalloc caches -- a well known anti-pattern which is
+  // especially detrimental for hot paths where ReactorTask objects are used.
 
-  // Run the task. 'reactor' is guaranteed to be the current thread.
-  virtual void Run(ReactorThread* reactor) = 0;
+  // The functor to run the task, the parameter is guaranteed to represent
+  // the current thread.
+  boost::function<void(ReactorThread*)> run_func;
 
-  // Abort the task, in the case that the reactor shut down before the
-  // task could be processed. This may or may not run on the reactor thread
-  // itself.
+  // The functor to abort the task, in the case that the reactor shut down
+  // before the task could be processed. This may or may not run on the reactor
+  // thread itself.
   //
-  // The Reactor guarantees that the Reactor lock is free when this
-  // method is called.
-  virtual void Abort(const Status& abort_status) {}
-
-  virtual ~ReactorTask();
-
- private:
-  DISALLOW_COPY_AND_ASSIGN(ReactorTask);
+  // The Reactor guarantees that the Reactor lock is free when this function
+  // is called.
+  boost::function<void(const Status&)> abort_func;
 };
 
-// A ReactorTask that is scheduled to run at some point in the future.
-//
-// Semantically it works like RunFunctionTask with a few key differences:
-// 1. The user function is called during Abort. Put another way, the
-//    user function is _always_ invoked, even during reactor shutdown.
-// 2. To differentiate between Abort and non-Abort, the user function
-//    receives a Status as its first argument.
-class DelayedTask : public ReactorTask {
- public:
-  DelayedTask(std::function<void(const Status&)> func, MonoDelta when);
+struct DelayedTask : public boost::intrusive::list_base_hook<> {
+  DelayedTask(std::function<void(const Status&)> func,
+              MonoDelta when);
 
-  // Schedules the task for running later but doesn't actually run it yet.
-  void Run(ReactorThread* thread) override;
-
-  // Behaves like ReactorTask::Abort.
-  void Abort(const Status& abort_status) override;
-
- private:
-  // libev callback for when the registered timer fires.
+  void Run(ReactorThread* thread);
+  void Abort(const Status& abort_status);
   void TimerHandler(ev::timer& watcher, int revents);
 
   // User function to invoke when timer fires or when task is aborted.
@@ -126,6 +118,14 @@ class DelayedTask : public ReactorTask {
   // libev timer. Set when Run() is invoked.
   ev::timer timer_;
 };
+
+// A ReactorTask that is scheduled to run at some point in the future.
+//
+// 1. The user function is called during Abort. Put another way, the
+//    user function is _always_ invoked, even during reactor shutdown.
+// 2. To differentiate between Abort and non-Abort, the user function
+//    receives a Status as its first argument.
+ReactorTask MakeDelayedTask(std::function<void(const Status &)> func, MonoDelta when);
 
 // A ReactorThread is a libev event handler thread which manages I/O
 // on a list of sockets.
@@ -173,12 +173,12 @@ class ReactorThread {
   void RegisterTimeout(ev::timer* watcher);
 
   // This may be called from another thread.
-  const std::string &name() const;
+  const std::string& name() const;
 
   MonoTime cur_time() const;
 
   // This may be called from another thread.
-  Reactor *reactor();
+  Reactor* reactor();
 
   // Return true if this reactor thread is the thread currently
   // running. Should be used in DCHECK assertions.
@@ -196,13 +196,11 @@ class ReactorThread {
 
   // Collect metrics.
   // Must be called from the reactor thread.
-  Status GetMetrics(ReactorMetrics *metrics);
+  Status GetMetrics(ReactorMetrics* metrics);
 
  private:
-  friend class AssignOutboundCallTask;
-  friend class CancellationTask;
-  friend class RegisterConnectionTask;
-  friend class DelayedTask;
+  friend class Reactor;
+  friend struct DelayedTask;
 
   // Run the main event loop of the reactor.
   void RunThread();
@@ -302,7 +300,7 @@ class ReactorThread {
   // List of current connections coming into the server.
   conn_list_t server_conns_;
 
-  Reactor *reactor_;
+  Reactor* reactor_;
 
   // If a connection has been idle for this much time, it is torn down.
   const MonoDelta connection_keepalive_time_;
@@ -313,6 +311,8 @@ class ReactorThread {
   // Metrics.
   scoped_refptr<Histogram> invoke_us_histogram_;
   scoped_refptr<Histogram> load_percent_histogram_;
+  scoped_refptr<Histogram> max_read_latency_histogram_;
+  scoped_refptr<Histogram> max_write_latency_histogram_;
 
   // Total number of client connections opened during Reactor's lifetime.
   uint64_t total_client_conns_cnt_;
@@ -323,6 +323,12 @@ class ReactorThread {
   // Set prior to calling epoll and then reset back to -1 after each invocation
   // completes. Used for accounting total_poll_cycles_.
   int64_t cycle_clock_before_poll_ = -1;
+
+  // This field is updated after returning from epoll invocation and before
+  // invoking any of the registered I/O hanlders/callbacks. The field is used
+  // to account for the latency of I/O handler invocations in a single libev
+  // loop after receiving the notification on I/O events.
+  int64_t cycle_clock_after_poll_ = -1;
 
   // The total number of cycles spent in epoll_wait() since this thread
   // started.
@@ -373,21 +379,17 @@ class Reactor {
   void QueueOutboundCall(std::shared_ptr<OutboundCall> call);
 
   // Queue a new reactor task to cancel an outbound call.
-  void QueueCancellation(std::shared_ptr<OutboundCall> call);
+  void QueueCancellation(const std::shared_ptr<OutboundCall>& call);
 
-  // Schedule the given task's Run() method to be called on the
-  // reactor thread.
-  // If the reactor shuts down before it is run, the Abort method will be
-  // called.
-  // Does _not_ take ownership of 'task' -- the task should take care of
-  // deleting itself after running if it is allocated on the heap.
-  void ScheduleReactorTask(ReactorTask* task);
+  // Schedule the given task's 'run_func' to be called on the reactor thread.
+  // If the reactor shuts down before it is run, the 'abort_func' is called.
+  void ScheduleReactorTask(ReactorTask task);
 
   Status RunOnReactorThread(std::function<Status()> f);
 
   // If the Reactor is closing, returns false.
-  // Otherwise, drains the pending_tasks_ queue into the provided list.
-  bool DrainTaskQueue(boost::intrusive::list<ReactorTask>* tasks);
+  // Otherwise, drains the pending_tasks_ queue into the provided output parameter.
+  bool DrainTaskQueue(std::deque<ReactorTask>* tasks);
 
   Messenger* messenger() const {
     return messenger_.get();
@@ -405,8 +407,7 @@ class Reactor {
 
  private:
   friend class ReactorThread;
-  typedef simple_spinlock LockType;
-  mutable LockType lock_;
+  mutable simple_spinlock lock_;
 
   // parent messenger
   std::shared_ptr<Messenger> messenger_;
@@ -419,7 +420,7 @@ class Reactor {
 
   // Tasks to be run within the reactor thread.
   // Guarded by lock_.
-  boost::intrusive::list<ReactorTask> pending_tasks_; // NOLINT(build/include_what_you_use)
+  std::deque<ReactorTask> pending_tasks_;
 
   ReactorThread thread_;
 

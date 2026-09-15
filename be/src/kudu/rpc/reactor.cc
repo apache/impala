@@ -27,6 +27,7 @@
 #include <mutex>
 #include <ostream>
 #include <string>
+#include <type_traits>
 #include <utility>
 
 #include <boost/intrusive/list.hpp>
@@ -47,9 +48,10 @@
 #include "kudu/rpc/outbound_call.h"
 #include "kudu/rpc/rpc_controller.h"
 #include "kudu/rpc/rpc_introspection.pb.h"
-#include "kudu/util/countdown_latch.h"
+#include "kudu/util/async_util.h"
 #include "kudu/util/debug/sanitizer_scopes.h"
 #include "kudu/util/flag_tags.h"
+#include "kudu/util/flags.h"
 #include "kudu/util/metrics.h"
 #include "kudu/util/monotime.h"
 #include "kudu/util/net/sockaddr.h"
@@ -70,6 +72,8 @@ static const int kDefaultLibEvFlags = ev::KQUEUE;
 static const int kDefaultLibEvFlags = ev::AUTO;
 #endif
 
+using std::deque;
+using std::function;
 using std::string;
 using std::shared_ptr;
 using std::unique_ptr;
@@ -101,6 +105,16 @@ TAG_FLAG(tcp_keepalive_probe_period_s, advanced);
 TAG_FLAG(tcp_keepalive_retry_period_s, advanced);
 TAG_FLAG(tcp_keepalive_retry_count, advanced);
 
+DEFINE_bool(rpc_connection_collect_io_handler_latency, false,
+            "Whether to collect I/O handler invocation latency stats per RPC "
+            "connection. When enabled, per-connection stats for currently open "
+            "connections are avaiable via the '/rpcz' endpoint of the embedded "
+            "webserver, and the stats on the maximum I/O handler latency "
+            "across already closed RPC connections are reported by the "
+            "reactor_ev_loop_max_{read,writer}_latency_us histogram-type "
+            "metrics.");
+TAG_FLAG(rpc_connection_collect_io_handler_latency, runtime);
+
 METRIC_DEFINE_histogram(server, reactor_load_percent,
                         "Reactor Thread Load Percentage",
                         kudu::MetricUnit::kUnits,
@@ -120,6 +134,36 @@ METRIC_DEFINE_histogram(server, reactor_active_latency_us,
                         "to the latency of both inbound and outbound RPCs.",
                         kudu::MetricLevel::kInfo,
                         1000000, 2);
+
+METRIC_DEFINE_histogram(server, reactor_ev_loop_max_read_latency_us,
+                        "I/O Event Loop Maximum Read Handler Latency",
+                        kudu::MetricUnit::kMicroseconds,
+                        "Histogram of the maximum read handler latency for "
+                        "all served and already closed RPC connections; gated "
+                        "by --rpc_connection_collect_io_handler_latency flag. "
+                        "Per-connection maximum latency is recorded into "
+                        "the histogram upon shutting down an RPC connection. "
+                        "Histograms of the read handler latency for currently "
+                        "open connections are available at the /rpcz "
+                        "endpoint of the embedded webserver.",
+                        kudu::MetricLevel::kDebug,
+                        kudu::rpc::Connection::kLatencyHistogramMaxValue,
+                        kudu::rpc::Connection::kLatencyHistogramPrecisionDigits);
+
+METRIC_DEFINE_histogram(server, reactor_ev_loop_max_write_latency_us,
+                        "I/O Event Loop Maximum Write Handler Latency",
+                        kudu::MetricUnit::kMicroseconds,
+                        "Histogram of the maximum write handler latency for "
+                        "all served and already closed RPC connections; gated "
+                        "by --rpc_connection_collect_io_handler_latency flag. "
+                        "Per-connection maximum latency is recorded into "
+                        "the histogram upon shutting down an RPC connection. "
+                        "Histograms of the write handler latency for currently "
+                        "open connections are available at the /rpcz "
+                        "endpoint of the embedded webserver.",
+                        kudu::MetricLevel::kDebug,
+                        kudu::rpc::Connection::kLatencyHistogramMaxValue,
+                        kudu::rpc::Connection::kLatencyHistogramPrecisionDigits);
 
 namespace kudu {
 namespace rpc {
@@ -149,6 +193,63 @@ void DoInitLibEv() {
 
 } // anonymous namespace
 
+
+DelayedTask::DelayedTask(std::function<void(const Status&)> func,
+                         MonoDelta when)
+    : func_(std::move(func)),
+      when_(when),
+      thread_(nullptr) {
+}
+
+void DelayedTask::Run(ReactorThread* thread) {
+  DCHECK(thread_ == nullptr) << "Task has already been scheduled";
+  DCHECK(thread->IsCurrentThread());
+
+  // Schedule the task to run later.
+  thread_ = thread;
+  timer_.set(thread->loop_);
+  timer_.set<DelayedTask, &DelayedTask::TimerHandler>(this);
+  timer_.start(when_.ToSeconds(), // after
+               0);                // repeat
+  thread_->scheduled_tasks_.push_back(*this);
+}
+
+void DelayedTask::Abort(const Status& abort_status) {
+  func_(abort_status);
+  delete this;
+}
+
+void DelayedTask::TimerHandler(ev::timer& /*watcher*/, int revents) {
+  constexpr const char* const kMsg = "Delayed task got an error in its timer handler";
+
+  // We will free this task's memory.
+  thread_->scheduled_tasks_.erase(thread_->scheduled_tasks_.iterator_to(*this));
+
+  if (EV_ERROR & revents) {
+    LOG(WARNING) << kMsg;
+    Abort(Status::Aborted(kMsg)); // calls 'delete this'
+  } else {
+    func_(Status::OK());
+    delete this;
+  }
+}
+
+ReactorTask MakeDelayedTask(std::function<void(const Status &)> func,
+                            MonoDelta when) {
+  DelayedTask* dt = new DelayedTask(std::move(func), when);
+  // Move capture couldn't help since it's necessary to pass the pointer
+  // to both lambdas.
+  ReactorTask task{
+    [=](ReactorThread* rt){
+      dt->Run(rt);
+    },
+    [=](const Status& s) {
+      dt->Abort(s);
+    },
+  };
+  return task;
+}
+
 ReactorThread::ReactorThread(Reactor* reactor, const MessengerBuilder& bld)
   : loop_(kDefaultLibEvFlags),
     cur_time_(MonoTime::Now()),
@@ -165,6 +266,10 @@ ReactorThread::ReactorThread(Reactor* reactor, const MessengerBuilder& bld)
         METRIC_reactor_active_latency_us.Instantiate(bld.metric_entity_);
     load_percent_histogram_ =
         METRIC_reactor_load_percent.Instantiate(bld.metric_entity_);
+    max_read_latency_histogram_ =
+        METRIC_reactor_ev_loop_max_read_latency_us.Instantiate(bld.metric_entity_);
+    max_write_latency_histogram_ =
+        METRIC_reactor_ev_loop_max_write_latency_us.Instantiate(bld.metric_entity_);
   }
 }
 
@@ -195,17 +300,20 @@ Status ReactorThread::Init() {
 }
 
 void ReactorThread::InvokePendingCb(struct ev_loop* loop) {
+  // Pre-compute the duration of a single CPU cycle.
+  static const double cycle_duration_us = 1000000.0 / base::CyclesPerSecond();
+
   // Calculate the number of cycles spent calling our callbacks.
   // This is called quite frequently so we use CycleClock rather than MonoTime
   // since it's a bit faster.
   int64_t start = CycleClock::Now();
   ev_invoke_pending(loop);
-  int64_t dur_cycles = CycleClock::Now() - start;
+  int64_t cycles_spent = CycleClock::Now() - start;
 
   // Contribute this to our histogram.
   ReactorThread* thr = static_cast<ReactorThread*>(ev_userdata(loop));
   if (thr->invoke_us_histogram_) {
-    thr->invoke_us_histogram_->Increment(dur_cycles * 1000000 / base::CyclesPerSecond());
+    thr->invoke_us_histogram_->Increment(cycles_spent * cycle_duration_us);
   }
 }
 
@@ -218,20 +326,22 @@ void ReactorThread::AboutToPollCb(struct ev_loop* loop) noexcept {
 
 void ReactorThread::PollCompleteCb(struct ev_loop* loop) noexcept {
   // First things first, capture the time, so that this is as accurate as possible
-  int64_t cycle_clock_after_poll = CycleClock::Now();
+  const int64_t cycle_clock_after_poll = CycleClock::Now();
 
   // Record it in our accounting.
   ReactorThread* thr = static_cast<ReactorThread*>(ev_userdata(loop));
   DCHECK_NE(thr->cycle_clock_before_poll_, -1)
       << "PollCompleteCb called without corresponding AboutToPollCb";
+  DCHECK_GE(cycle_clock_after_poll, thr->cycle_clock_after_poll_);
 
+  thr->cycle_clock_after_poll_ = cycle_clock_after_poll;
   int64_t poll_cycles = cycle_clock_after_poll - thr->cycle_clock_before_poll_;
   thr->cycle_clock_before_poll_ = -1;
   thr->total_poll_cycles_ += poll_cycles;
 }
 
 void ReactorThread::Shutdown(Messenger::ShutdownMode mode) {
-  CHECK(reactor_->closing()) << "Should be called after setting closing_ flag";
+  DCHECK(reactor_->closing()) << "Should be called after setting closing_ flag";
 
   VLOG(1) << name() << ": shutting down Reactor thread.";
   WakeThread();
@@ -239,7 +349,11 @@ void ReactorThread::Shutdown(Messenger::ShutdownMode mode) {
   if (mode == Messenger::ShutdownMode::SYNC) {
     // Join() will return a bad status if asked to join on the currently
     // running thread.
-    CHECK_OK(ThreadJoiner(thread_.get()).Join());
+    const auto s = ThreadJoiner(thread_.get()).Join();
+    if (PREDICT_FALSE(!s.ok())) {
+      LOG(DFATAL) << Substitute(
+          "$0: failed to join $1", s.ToString(), thread_->ToString());
+    }
   }
 }
 
@@ -285,11 +399,6 @@ void ReactorThread::ShutdownInternal() {
 #endif
 }
 
-ReactorTask::ReactorTask() {
-}
-ReactorTask::~ReactorTask() {
-}
-
 Status ReactorThread::GetMetrics(ReactorMetrics* metrics) {
   DCHECK(IsCurrentThread());
   metrics->num_client_connections_ = client_conns_.size();
@@ -333,13 +442,12 @@ void ReactorThread::AsyncHandler(ev::async& /*watcher*/, int /*revents*/) {
     return;
   }
 
-  boost::intrusive::list<ReactorTask> tasks;
+  deque<ReactorTask> tasks;
   reactor_->DrainTaskQueue(&tasks);
 
   while (!tasks.empty()) {
-    ReactorTask& task = tasks.front();
+    tasks.front().run_func(this);
     tasks.pop_front();
-    task.Run(this);
   }
 }
 
@@ -403,7 +511,7 @@ void ReactorThread::CancelOutboundCall(const shared_ptr<OutboundCall>& call) {
 //
 void ReactorThread::TimerHandler(ev::timer& /*watcher*/, int revents) {
   DCHECK(IsCurrentThread());
-  if (EV_ERROR & revents) {
+  if (PREDICT_FALSE(EV_ERROR & revents)) {
     LOG(WARNING) << "Reactor " << name() << " got an error in "
       "the timer handler.";
     return;
@@ -576,13 +684,17 @@ Status ReactorThread::FindOrStartConnection(const ConnectionId& conn_id,
   unique_ptr<Socket> new_socket(new Socket(sock.Release()));
 
   // Register the new connection in our map.
-  *conn = new Connection(
-      this, conn_id.remote(), std::move(new_socket), Connection::CLIENT, cred_policy);
+  *conn = new Connection(this,
+                         conn_id.remote(),
+                         std::move(new_socket),
+                         Connection::CLIENT,
+                         cred_policy,
+                         FLAGS_rpc_connection_collect_io_handler_latency);
   (*conn)->set_outbound_connection_id(conn_id);
 
   // Kick off blocking client connection negotiation.
   Status s = StartConnectionNegotiation(*conn);
-  if (s.IsIllegalState()) {
+  if (PREDICT_FALSE(s.IsIllegalState())) {
     // Return a nicer error message to the user indicating -- if we just
     // forward the status we'd get something generic like "ThreadPool is closing".
     return Status::ServiceUnavailable("Client RPC Messenger shutting down");
@@ -606,7 +718,16 @@ Status ReactorThread::StartConnectionNegotiation(const scoped_refptr<Connection>
 
   scoped_refptr<Trace> trace(new Trace());
   ADOPT_TRACE(trace.get());
-  TRACE("Submitting negotiation task for $0", conn->ToString());
+  string local_addr_str;
+  {
+    Sockaddr local_addr;
+    if (auto s = conn->GetLocalAddress(&local_addr); PREDICT_FALSE(!s.ok())) {
+      WARN_NOT_OK(s, "failed to retrieve information on local address");
+    } else {
+      local_addr_str = Substitute(" (local address $0)", local_addr.ToString());
+    }
+  }
+  TRACE("Submitting negotiation task for $0$1", conn->ToString(), local_addr_str);
   auto authentication = reactor()->messenger()->authentication();
   auto encryption = reactor()->messenger()->encryption();
   auto loopback_encryption = reactor()->messenger()->loopback_encryption();
@@ -696,7 +817,8 @@ void ReactorThread::DestroyConnection(Connection* conn,
   // Unlink connection from lists.
   if (conn->direction() == Connection::CLIENT) {
     const auto range = client_conns_.equal_range(conn->outbound_connection_id());
-    CHECK(range.first != range.second) << "Couldn't find connection " << conn->ToString();
+    DCHECK(range.first != range.second)
+        << "couldn't find connection " << conn->ToString();
     // The client_conns_ container is a multi-map.
     for (auto it = range.first; it != range.second;) {
       if (it->second.get() == conn) {
@@ -717,47 +839,6 @@ void ReactorThread::DestroyConnection(Connection* conn,
   }
 }
 
-DelayedTask::DelayedTask(std::function<void(const Status&)> func,
-                         MonoDelta when)
-    : func_(std::move(func)),
-      when_(when),
-      thread_(nullptr) {
-}
-
-void DelayedTask::Run(ReactorThread* thread) {
-  DCHECK(thread_ == nullptr) << "Task has already been scheduled";
-  DCHECK(thread->IsCurrentThread());
-  DCHECK(!is_linked()) << "Should not be linked on pending_tasks_ anymore";
-
-  // Schedule the task to run later.
-  thread_ = thread;
-  timer_.set(thread->loop_);
-  timer_.set<DelayedTask, &DelayedTask::TimerHandler>(this); // NOLINT(*)
-  timer_.start(when_.ToSeconds(), // after
-               0);                // repeat
-  thread_->scheduled_tasks_.push_back(*this);
-}
-
-void DelayedTask::Abort(const Status& abort_status) {
-  func_(abort_status);
-  delete this;
-}
-
-void DelayedTask::TimerHandler(ev::timer& /*watcher*/, int revents) {
-  DCHECK(is_linked()) << "should be linked on scheduled_tasks_";
-  // We will free this task's memory.
-  thread_->scheduled_tasks_.erase(thread_->scheduled_tasks_.iterator_to(*this));
-
-  if (EV_ERROR & revents) {
-    string msg = "Delayed task got an error in its timer handler";
-    LOG(WARNING) << msg;
-    Abort(Status::Aborted(msg)); // Will delete 'this'.
-  } else {
-    func_(Status::OK());
-    delete this;
-  }
-}
-
 Reactor::Reactor(shared_ptr<Messenger> messenger,
                  int index, const MessengerBuilder& bld)
     : messenger_(std::move(messenger)),
@@ -775,7 +856,7 @@ Status Reactor::Init() {
 
 void Reactor::Shutdown(Messenger::ShutdownMode mode) {
   {
-    std::lock_guard<LockType> l(lock_);
+    std::lock_guard l(lock_);
     if (closing_) {
       return;
     }
@@ -788,9 +869,8 @@ void Reactor::Shutdown(Messenger::ShutdownMode mode) {
   // because ScheduleReactorTask() tests the closing_ flag set above.
   Status aborted = ShutdownError(true);
   while (!pending_tasks_.empty()) {
-    ReactorTask& task = pending_tasks_.front();
+    pending_tasks_.front().abort_func(aborted);
     pending_tasks_.pop_front();
-    task.Abort(aborted);
   }
 }
 
@@ -803,46 +883,26 @@ const string& Reactor::name() const {
 }
 
 bool Reactor::closing() const {
-  std::lock_guard<LockType> l(lock_);
+  std::lock_guard l(lock_);
   return closing_;
 }
-
-// Task to call an arbitrary function within the reactor thread.
-class RunFunctionTask : public ReactorTask {
- public:
-  explicit RunFunctionTask(std::function<Status()> f)
-      : function_(std::move(f)), latch_(1) {}
-
-  void Run(ReactorThread* /*reactor*/) override {
-    status_ = function_();
-    latch_.CountDown();
-  }
-  void Abort(const Status& status) override {
-    status_ = status;
-    latch_.CountDown();
-  }
-
-  // Wait until the function has completed, and return the Status
-  // returned by the function.
-  Status Wait() {
-    latch_.Wait();
-    return status_;
-  }
-
- private:
-  const std::function<Status()> function_;
-  Status status_;
-  CountDownLatch latch_;
-};
 
 Status Reactor::GetMetrics(ReactorMetrics* metrics) {
   return RunOnReactorThread([&]() { return this->thread_.GetMetrics(metrics); });
 }
 
-Status Reactor::RunOnReactorThread(std::function<Status()> f) {
-  RunFunctionTask task(std::move(f));
-  ScheduleReactorTask(&task);
-  return task.Wait();
+Status Reactor::RunOnReactorThread(function<Status()> f) {
+  Synchronizer sync;
+  ReactorTask task{
+    [&](ReactorThread* /*rt*/) {
+      sync.StatusCB(f());
+    },
+    [&](const Status& s) {
+      sync.StatusCB(s);
+    },
+  };
+  ScheduleReactorTask(std::move(task));
+  return sync.Wait();
 }
 
 Status Reactor::DumpConnections(const DumpConnectionsRequestPB& req,
@@ -850,58 +910,31 @@ Status Reactor::DumpConnections(const DumpConnectionsRequestPB& req,
   return RunOnReactorThread([&]() { return this->thread_.DumpConnections(req, resp); });
 }
 
-class RegisterConnectionTask : public ReactorTask {
- public:
-  explicit RegisterConnectionTask(scoped_refptr<Connection> conn)
-      : conn_(std::move(conn)) {
-  }
-
-  void Run(ReactorThread* reactor) override {
-    reactor->RegisterConnection(std::move(conn_));
-    delete this;
-  }
-
-  void Abort(const Status& /*status*/) override {
-    // We don't need to Shutdown the connection since it was never registered.
-    // This is only used for inbound connections, and inbound connections will
-    // never have any calls added to them until they've been registered.
-    delete this;
-  }
-
- private:
-  const scoped_refptr<Connection> conn_;
-};
-
 void Reactor::RegisterInboundSocket(Socket* socket, const Sockaddr& remote) {
   VLOG(3) << name_ << ": new inbound connection to " << remote.ToString();
   unique_ptr<Socket> new_socket(new Socket(socket->Release()));
-  auto task = new RegisterConnectionTask(
-      new Connection(&thread_, remote, std::move(new_socket), Connection::SERVER));
-  ScheduleReactorTask(task);
+  scoped_refptr<Connection> conn(new Connection(
+      &thread_,
+      remote,
+      std::move(new_socket),
+      Connection::SERVER,
+      CredentialsPolicy::ANY_CREDENTIALS,
+      FLAGS_rpc_connection_collect_io_handler_latency));
+
+  ReactorTask task{
+    [=](ReactorThread* rt) mutable {
+      rt->RegisterConnection(std::move(conn));
+    },
+    [=](const Status& /*s*/) {
+      // Dummy function to avoid a runtime error.
+      // No abort_func implementation: we don't need to Shutdown the connection
+      // since it was never registered. This is only used for inbound connections,
+      // and inbound connections will never have any calls added to them until
+      // they've been registered.
+    },
+  };
+  ScheduleReactorTask(std::move(task));
 }
-
-// Task which runs in the reactor thread to assign an outbound call
-// to a connection.
-class AssignOutboundCallTask : public ReactorTask {
- public:
-  explicit AssignOutboundCallTask(shared_ptr<OutboundCall> call)
-      : call_(std::move(call)) {}
-
-  void Run(ReactorThread* reactor) override {
-    reactor->AssignOutboundCall(std::move(call_));
-    delete this;
-  }
-
-  void Abort(const Status& status) override {
-    // It doesn't matter what is the actual phase of the OutboundCall: just set
-    // it to Phase::REMOTE_CALL to finalize the state of the call.
-    call_->SetFailed(status, OutboundCall::Phase::REMOTE_CALL);
-    delete this;
-  }
-
- private:
-  const shared_ptr<OutboundCall> call_;
-};
 
 void Reactor::QueueOutboundCall(shared_ptr<OutboundCall> call) {
   DVLOG(3) << name_ << ": queueing outbound call "
@@ -910,52 +943,49 @@ void Reactor::QueueOutboundCall(shared_ptr<OutboundCall> call) {
   if (PREDICT_FALSE(call->ShouldInjectCancellation())) {
     QueueCancellation(call);
   }
-  ScheduleReactorTask(new AssignOutboundCallTask(std::move(call)));
+  ReactorTask task{
+    [=](ReactorThread* rt) mutable {
+      rt->AssignOutboundCall(std::move(call));
+    },
+    [=](const Status& s) {
+      call->SetFailed(s);
+    },
+  };
+  ScheduleReactorTask(std::move(task));
 }
 
-class CancellationTask : public ReactorTask {
- public:
-  explicit CancellationTask(shared_ptr<OutboundCall> call)
-      : call_(std::move(call)) {}
-
-  void Run(ReactorThread* reactor) override {
-    reactor->CancelOutboundCall(call_);
-    delete this;
-  }
-
-  void Abort(const Status& /*status*/) override {
-    delete this;
-  }
-
- private:
-  const shared_ptr<OutboundCall> call_;
-};
-
-void Reactor::QueueCancellation(shared_ptr<OutboundCall> call) {
-  ScheduleReactorTask(new CancellationTask(std::move(call)));
+void Reactor::QueueCancellation(const shared_ptr<OutboundCall>& call) {
+  ReactorTask task{
+    [=](ReactorThread* rt) {
+      rt->CancelOutboundCall(call);
+    },
+    [=](const Status& /*s*/) {
+    },
+  };
+  ScheduleReactorTask(std::move(task));
 }
 
-void Reactor::ScheduleReactorTask(ReactorTask* task) {
+void Reactor::ScheduleReactorTask(ReactorTask task) {
   bool was_empty;
   {
-    std::unique_lock<LockType> l(lock_);
-    if (closing_) {
+    std::unique_lock l(lock_);
+    if (PREDICT_FALSE(closing_)) {
       // We guarantee the reactor lock is not taken when calling Abort().
       l.unlock();
-      task->Abort(ShutdownError(false));
+      task.abort_func(ShutdownError(false));
       return;
     }
     was_empty = pending_tasks_.empty();
-    pending_tasks_.push_back(*task);
+    pending_tasks_.emplace_back(std::move(task));
   }
   if (was_empty) {
     thread_.WakeThread();
   }
 }
 
-bool Reactor::DrainTaskQueue(boost::intrusive::list<ReactorTask>* tasks) { // NOLINT(*)
-  std::lock_guard<LockType> l(lock_);
-  if (closing_) {
+bool Reactor::DrainTaskQueue(std::deque<ReactorTask>* tasks) {
+  std::lock_guard l(lock_);
+  if (PREDICT_FALSE(closing_)) {
     return false;
   }
   tasks->swap(pending_tasks_);

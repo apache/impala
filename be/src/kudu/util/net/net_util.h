@@ -16,12 +16,16 @@
 // under the License.
 #pragma once
 
+#include <sys/un.h>
+
 #include <cstddef>
 #include <cstdint>
 #include <string>
+#include <string_view>
 #include <unordered_set>
 #include <vector>
 
+#include "kudu/util/int128.h"
 #include "kudu/util/status.h"
 
 namespace kudu {
@@ -33,7 +37,7 @@ extern const int kServersMaxNum;
 static constexpr const char* const kWildcardIpAddr = "0.0.0.0";
 static constexpr const char* const kLoopbackIpAddr = "127.0.0.1";
 
-// A container for a host:port pair.
+// A container for a host:port pair. IPv4 and IPv6 are supported.
 class HostPort {
  public:
   HostPort();
@@ -47,7 +51,13 @@ class HostPort {
   // Parse a <host>:<port> pair into this object.
   // If there is no port specified in the string, then 'default_port' is used.
   //
-  // Note that <host> cannot be in IPv6 address notation.
+  // The <str> can be IPv4 and IPv6 (with or without port).
+  //  - host
+  //  - host:port
+  //  - xxx.xxx.xxx.xxx
+  //  - xxx.xxx.xxx.xxx:port
+  //  - xxxx:xxxx:xxxx:xxxx:xxxx:xxxx:xxxx:xxxx
+  //  - [xxxx:xxxx:xxxx:xxxx:xxxx:xxxx:xxxx:xxxx]:port
   Status ParseString(const std::string& str, uint16_t default_port);
 
   // Similar to above but allow the address to have scheme and path, e.g.
@@ -63,7 +73,8 @@ class HostPort {
   //
   // 'addresses' may be NULL, in which case this function simply checks that
   // the host/port pair can be resolved, without returning anything.
-  Status ResolveAddresses(std::vector<Sockaddr>* addresses) const;
+  Status ResolveAddresses(
+      std::vector<Sockaddr>* addresses) const;
 
   std::string ToString() const;
 
@@ -72,6 +83,11 @@ class HostPort {
 
   uint16_t port() const { return port_; }
   void set_port(uint16_t port) { port_ = port; }
+
+  void SetHostAndPort(const std::string_view host, uint16_t port) {
+    host_ = host;
+    port_ = port;
+  }
 
   size_t HashCode() const;
 
@@ -96,11 +112,17 @@ class HostPort {
   // "inverse" of ParseStrings().
   static std::string ToCommaSeparatedString(const std::vector<HostPort>& hostports);
 
-  // Returns true if addr is within 127.0.0.0/8 range.
-  static bool IsLoopback(uint32_t addr);
+  // Returns true if addr is within "127.0.0.0/8" or "::1" range.
+  static bool IsLoopback(uint128_t addr, sa_family_t family);
 
-  // Returns dotted-decimal ('1.2.3.4') representation of IP address in addr.
-  static std::string AddrToString(uint32_t addr);
+  // Returns dotted-decimal ('1.2.3.4') representation of IPv4 address or hexadecimal
+  // with colons ('2001:0db8:85a3::1') representation of IPv6 address in addr.
+  //
+  // REQUIRES: addr should be in big-endian byte order.
+  static std::string AddrToString(const void* addr, sa_family_t family);
+
+  // Encloses hostname in square brackets if required, returns in out parameter.
+  static Status ToIpInterface(const std::string& host, std::string* out);
 
  private:
   std::string host_;
@@ -129,22 +151,19 @@ struct HostPortEqualityPredicate {
 typedef std::unordered_set<HostPort, HostPortHasher, HostPortEqualityPredicate>
     UnorderedHostPortSet;
 
-// A container for addr:mask pair.
+// A container for addr/mask pair.
 // Both addr and netmask are in big-endian byte order
 // (same as network byte order).
 class Network {
  public:
   Network();
-  Network(uint32_t addr, uint32_t netmask);
-
-  uint32_t addr() const { return addr_; }
-
-  uint32_t netmask() const { return netmask_; }
+  Network(sa_family_t family, uint128_t addr, uint128_t netmask);
 
   // Returns true if the address is within network.
   bool WithinNetwork(const Sockaddr& addr) const;
 
-  // Returns true if the network is within 127.0.0.0/8 range.
+  // Returns true if the network is within 127.0.0.0/8 range for IPv4
+  // and ::1 (short for 0000:0000:0000:0000:0000:0000:0000:0001) for IPv6.
   bool IsLoopback() const;
 
   // Returns addr part of addr:mask pair as string.
@@ -158,8 +177,9 @@ class Network {
   static Status ParseCIDRStrings(
       const std::string& comma_sep_addrs, std::vector<Network>* res);
  private:
-  uint32_t addr_;
-  uint32_t netmask_;
+  uint128_t addr_;
+  uint128_t netmask_;
+  sa_family_t family_;
 };
 
 // Parse and resolve the given comma-separated list of addresses.
@@ -251,6 +271,24 @@ enum class BindMode {
   WILDCARD,
   LOOPBACK
 };
+
+enum class IPMode {
+  IPV4,
+  IPV6,
+  DUAL,
+};
+
+// This is a helper function to parse a flag that has three possible values:
+// "ipv4", "ipv6", "dual"
+Status ParseIPModeFlag(const std::string& flag_value, IPMode* mode);
+
+// This is a helper function to return corresponding ip_config_mode string
+// for a given IPMode value:
+// IPMode::IPV4, IPMode::IPV6, IPMode::DUAL
+const char* IPModeToString(IPMode mode);
+
+// Return appropriate sa_family_t based on ip_config_mode flag value.
+sa_family_t GetIPFamily();
 
 // Gets a random port from the ephemeral range by binding to port 0 on address
 // 'address' and letting the kernel choose an unused one from the ephemeral port

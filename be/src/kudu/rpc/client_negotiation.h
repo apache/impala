@@ -29,7 +29,6 @@
 
 #include <glog/logging.h>
 
-#include "kudu/gutil/port.h"
 #include "kudu/rpc/negotiation.h"
 #include "kudu/rpc/rpc_header.pb.h"
 #include "kudu/rpc/sasl_common.h"
@@ -97,14 +96,8 @@ class ClientNegotiation {
   }
 
   // Returns the set of RPC system features supported by the remote server.
-  // Must be called before Negotiate().
-  std::set<RpcFeatureFlag> server_features() const {
-    return server_features_;
-  }
-
-  // Returns the set of RPC system features supported by the remote server.
   // Must be called after Negotiate().
-  // Subsequent calls to this method or server_features() will return an empty set.
+  // Subsequent calls to this method will return an empty set.
   std::set<RpcFeatureFlag> take_server_features() {
     return std::move(server_features_);
   }
@@ -115,6 +108,19 @@ class ClientNegotiation {
 
   // Set deadline for connection negotiation.
   void set_deadline(const MonoTime& deadline);
+
+  // If true, Negotiate() returns immediately after the TLS handshake step
+  // (or, when --disable_tls is set, after SASL mechanism selection), without
+  // performing SASL/token/JWT authentication. The GSSAPI ticket-cache probe
+  // that normally drops Kerberos when no credentials are available is also
+  // skipped so a Kerberos-only server still progresses through mechanism
+  // selection. The resulting socket cannot be used for RPCs: the server's
+  // ServerNegotiation never reaches the SASL exchange, no authenticated user
+  // is established, and anything subsequently sent over the socket is
+  // refused. Intended for diagnostic tools that only need to observe the
+  // negotiated TLS parameters (e.g. `kudu diagnose tls_debug`). Must be
+  // called before Negotiate().
+  void set_skip_authn(bool skip_authn) { skip_authn_ = skip_authn; }
 
   Socket* socket() { return socket_.get(); }
 
@@ -143,72 +149,71 @@ class ClientNegotiation {
   int SecretCb(sasl_conn_t* conn, int id, sasl_secret_t** psecret);
 
   // Check that GSSAPI/Kerberos credentials are available.
-  static Status CheckGSSAPI() WARN_UNUSED_RESULT;
+  static Status CheckGSSAPI();
 
  private:
+  // Parse error status message from raw bytes of an ErrorStatusPB.
+  static Status ParseError(const Slice& err_data,
+                           std::unique_ptr<ErrorStatusPB>* rpc_error);
 
   // Encode and send the specified negotiate request message to the server.
-  Status SendNegotiatePB(const NegotiatePB& msg) WARN_UNUSED_RESULT;
+  Status SendNegotiatePB(const NegotiatePB& msg);
 
   // Receive a negotiate response message from the server, deserializing it into 'msg'.
   // Validates that the response is not an error.
   Status RecvNegotiatePB(NegotiatePB* msg,
                          faststring* buffer,
-                         std::unique_ptr<ErrorStatusPB>* rpc_error) WARN_UNUSED_RESULT;
+                         std::unique_ptr<ErrorStatusPB>* rpc_error);
 
-  // Parse error status message from raw bytes of an ErrorStatusPB.
-  Status ParseError(const Slice& err_data,
-                    std::unique_ptr<ErrorStatusPB>* rpc_error) WARN_UNUSED_RESULT;
-
-  Status SendConnectionHeader() WARN_UNUSED_RESULT;
+  Status SendConnectionHeader();
 
   // Initialize the SASL client negotiation instance.
-  Status InitSaslClient() WARN_UNUSED_RESULT;
+  Status InitSaslClient();
 
   // Send a NEGOTIATE step message to the server.
-  Status SendNegotiate() WARN_UNUSED_RESULT;
+  Status SendNegotiate();
 
   // Handle NEGOTIATE step response from the server.
-  Status HandleNegotiate(const NegotiatePB& response) WARN_UNUSED_RESULT;
+  Status HandleNegotiate(const NegotiatePB& response);
 
   // Send a TLS_HANDSHAKE request message to the server with the provided token.
-  Status SendTlsHandshake(std::string tls_token) WARN_UNUSED_RESULT;
+  Status SendTlsHandshake(std::string tls_token);
 
   // Handle a TLS_HANDSHAKE response message from the server.
-  Status HandleTlsHandshake(const NegotiatePB& response) WARN_UNUSED_RESULT;
+  Status HandleTlsHandshake(const NegotiatePB& response);
 
   // Authenticate to the server using SASL.
   // 'recv_buf' allows a receive buffer to be reused.
   Status AuthenticateBySasl(faststring* recv_buf,
-                            std::unique_ptr<ErrorStatusPB>* rpc_error) WARN_UNUSED_RESULT;
+                            std::unique_ptr<ErrorStatusPB>* rpc_error);
 
   // Authenticate to the server using a token.
   // 'recv_buf' allows a receive buffer to be reused.
   Status AuthenticateByToken(faststring* recv_buf,
-                             std::unique_ptr<ErrorStatusPB> *rpc_error) WARN_UNUSED_RESULT;
+                             std::unique_ptr<ErrorStatusPB> *rpc_error);
 
   Status AuthenticateByJwt(faststring* recv_buf,
-                           std::unique_ptr<ErrorStatusPB>* rpc_error) WARN_UNUSED_RESULT;
+                           std::unique_ptr<ErrorStatusPB>* rpc_error);
 
   // Send an SASL_INITIATE message to the server.
   // Returns:
   //  Status::OK if the SASL_SUCCESS message is expected next.
   //  Status::Incomplete if the SASL_CHALLENGE message is expected next.
   //  Any other status indicates an error.
-  Status SendSaslInitiate() WARN_UNUSED_RESULT;
+  Status SendSaslInitiate();
 
   // Send a SASL_RESPONSE message to the server.
-  Status SendSaslResponse(const char* resp_msg, unsigned resp_msg_len) WARN_UNUSED_RESULT;
+  Status SendSaslResponse(const char* resp_msg, unsigned resp_msg_len);
 
   // Handle case when server sends SASL_CHALLENGE response.
   // Returns:
   //  Status::OK if a SASL_SUCCESS message is expected next.
   //  Status::Incomplete if another SASL_CHALLENGE message is expected.
   //  Any other status indicates an error.
-  Status HandleSaslChallenge(const NegotiatePB& response) WARN_UNUSED_RESULT;
+  Status HandleSaslChallenge(const NegotiatePB& response);
 
   // Handle case when server sends SASL_SUCCESS response.
-  Status HandleSaslSuccess(const NegotiatePB& response) WARN_UNUSED_RESULT;
+  Status HandleSaslSuccess(const NegotiatePB& response);
 
   // Perform a client-side step of the SASL negotiation.
   // Input is what came from the server. Output is what we will send back to the server.
@@ -216,9 +221,9 @@ class ClientNegotiation {
   //   Status::OK if sasl_client_step returns SASL_OK.
   //   Status::Incomplete if sasl_client_step returns SASL_CONTINUE
   // otherwise returns an appropriate error status.
-  Status DoSaslStep(const std::string& in, const char** out, unsigned* out_len) WARN_UNUSED_RESULT;
+  Status DoSaslStep(const std::string& in, const char** out, unsigned* out_len);
 
-  Status SendConnectionContext() WARN_UNUSED_RESULT;
+  Status SendConnectionContext();
 
   // The socket to the remote server.
   std::unique_ptr<Socket> socket_;
@@ -264,6 +269,11 @@ class ClientNegotiation {
 
   // Negotiation timeout deadline.
   MonoTime deadline_;
+
+  // If true, Negotiate() returns after the TLS handshake step (or after
+  // mechanism selection when TLS is disabled) and skips the GSSAPI
+  // ticket-cache probe in HandleNegotiate(). See set_skip_authn().
+  bool skip_authn_ = false;
 };
 
 } // namespace rpc
