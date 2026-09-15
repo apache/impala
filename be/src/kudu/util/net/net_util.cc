@@ -872,6 +872,7 @@ string GetBindIpForDaemon(int index, BindMode bind_mode) {
       return kLoopbackIpAddr;
     default:
       LOG(FATAL) << "unknown bind mode";
+      return "";
   }
 }
 

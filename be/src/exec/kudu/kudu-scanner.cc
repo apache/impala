@@ -243,7 +243,8 @@ Status KuduScanner::OpenNextScanToken(const string& scan_token, bool* eos) {
   if (!timestamp_slots_.empty()) {
     uint64_t row_format_flags =
         kudu::client::KuduScanner::PAD_UNIXTIME_MICROS_TO_16_BYTES;
-    scanner_->SetRowFormatFlags(row_format_flags);
+    KUDU_RETURN_IF_ERROR(scanner_->SetRowFormatFlags(row_format_flags),
+        BuildErrorString("Unable to set row format flags"));
   }
 
   if (scan_node_->filter_ctxs_.size() > 0) {

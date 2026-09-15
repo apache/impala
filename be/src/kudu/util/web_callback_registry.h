@@ -29,6 +29,7 @@ enum class HttpStatusCode {
   Ok, // 200
   Created, // 201
   NoContent, // 204
+  MovedTemporarily, // 302
   TemporaryRedirect, //307
   BadRequest, // 400
   AuthenticationRequired, // 401
@@ -89,6 +90,14 @@ class WebCallbackRegistry {
 
     // Parameters extracted from the URL path.
     ArgumentMap path_params;
+
+    // The socket address of the requester, <host>:<port>.
+    // Define this variable for IMPALA-9182.
+    std::string source_socket;
+
+    // Authenticated user, or 'anonymous' if no auth used
+    // Define this variable for IMPALA-10779.
+    std::string source_user = "anonymous";
   };
 
   // A response to an HTTP request whose body is rendered by template.

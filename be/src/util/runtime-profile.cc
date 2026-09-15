@@ -18,6 +18,7 @@
 #include "util/runtime-profile-counters.h"
 
 #include <algorithm>
+#include <atomic>
 #include <charconv>
 #include <functional>
 #include <iomanip>
@@ -36,11 +37,11 @@
 
 #include "common/object-pool.h"
 #include "gutil/strings/strip.h"
-#include "kudu/util/logging.h"
 #include "runtime/summary-stats.h"
 #include "util/container-util.h"
 #include "util/pretty-printer.h"
 #include "util/redactor.h"
+#include "util/time.h"
 #include "util/ubsan.h"
 #include "gutil/strings/strcat.h"
 
@@ -1913,7 +1914,15 @@ void RuntimeProfile::ChunkedTimeSeriesCounter::AddSampleLocked(
   // this should only happen very infrequently and we rely on contiguous storage in
   // GetSamplesLocked*().
   if (max_size_ > 0 && values_.size() == max_size_) {
-    KLOG_EVERY_N_SECS(WARNING, 60) << "ChunkedTimeSeriesCounter reached maximum size";
+    // Avoid kudu/util/logging.h's KLOG_EVERY_N_SECS: it would pull in kudu_util (for
+    // LogThrottler's out-of-line dtor), which impala-profile-tool deliberately avoids.
+    static std::atomic<int64_t> last_log_time_ms(0);
+    int64_t now_ms = MonotonicMillis();
+    int64_t prev_ms = last_log_time_ms.load(std::memory_order_relaxed);
+    if (now_ms - prev_ms >= 60000 &&
+        last_log_time_ms.compare_exchange_strong(prev_ms, now_ms)) {
+      LOG(WARNING) << "ChunkedTimeSeriesCounter reached maximum size";
+    }
     values_.erase(values_.begin(), values_.begin() + 1);
   }
   DCHECK_LT(values_.size(), max_size_);

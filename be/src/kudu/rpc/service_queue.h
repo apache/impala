@@ -32,6 +32,10 @@
 #include "kudu/util/monotime.h"
 #include "kudu/util/mutex.h"
 
+namespace impala {
+class ImpalaServicePool;
+} // namespace impala
+
 namespace kudu {
 namespace rpc {
 
@@ -99,6 +103,9 @@ class LifoServiceQueue final {
   std::string ToString() const;
 
  private:
+  // Impala reports these as service pool metrics; upstream Kudu no longer
+  // exposes them outside of tests.
+  friend class impala::ImpalaServicePool;
   FRIEND_TEST(TestServiceQueue, LifoServiceQueuePerf);
 
   // Comparison function which orders calls by their deadlines.

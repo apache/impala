@@ -237,7 +237,7 @@ TEST(Auth, LdapKerbAuthCustomFiltersNotAllowed) {
   // Initialize the mini kdc.
   kudu::MiniKdc kdc(kudu::MiniKdcOptions{});
   KUDU_ASSERT_OK(kdc.Start());
-  kdc.SetKrb5Environment();
+  KUDU_ASSERT_OK(kdc.SetKrb5Environment());
   string kt_path;
   KUDU_ASSERT_OK(kdc.CreateServiceKeytab("HTTP/127.0.0.1", &kt_path));
   CHECK_ERR(setenv("KRB5_KTNAME", kt_path.c_str(), 1));

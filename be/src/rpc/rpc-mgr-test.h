@@ -139,7 +139,7 @@ class RpcMgrTest : public testing::TestWithParam<bool> {
     for (int i = 0; i < PAYLOAD_SIZE / sizeof(int32_t); ++i) payload_[i] = pattern;
     int idx;
     Slice slice(reinterpret_cast<const uint8_t*>(payload_), PAYLOAD_SIZE);
-    controller->AddOutboundSidecar(RpcSidecar::FromSlice(slice), &idx);
+    KUDU_ASSERT_OK(controller->AddOutboundSidecar(RpcSidecar::FromSlice(slice), &idx));
     request->set_pattern(pattern);
     request->set_sidecar_idx(idx);
   }

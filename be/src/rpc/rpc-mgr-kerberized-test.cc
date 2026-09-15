@@ -237,7 +237,7 @@ TEST_P(RpcMgrKerberizedTest, KinitWhenIncomingAuthDisabled) {
   Status status = InitAuth(CURRENT_EXECUTABLE_PATH);
   EXPECT_FALSE(status.ok());
   EXPECT_STR_CONTAINS(status.GetDetail(), "Could not init kerberos: Runtime error: "
-      "unable to kinit: unable to login from keytab: Keytab contains no suitable keys "
+      "kinit failed: unable to login from keytab: Keytab contains no suitable keys "
       "for non-existent-principal/host@realm");
 
   FLAGS_principal = FLAGS_be_principal = "MALFORMEDPRINCIPAL//@";
@@ -245,7 +245,7 @@ TEST_P(RpcMgrKerberizedTest, KinitWhenIncomingAuthDisabled) {
   status = InitAuth(CURRENT_EXECUTABLE_PATH);
   EXPECT_FALSE(status.ok());
   EXPECT_STR_CONTAINS(status.GetDetail(), "Could not init kerberos: Runtime error: "
-      "unable to kinit: unable to login from keytab:");
+      "kinit failed: unable to login from keytab:");
 }
 
 // This test confirms that auth is bypassed on KRPC services when

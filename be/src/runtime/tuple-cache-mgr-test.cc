@@ -541,7 +541,7 @@ TEST_F(TupleCacheMgrTest, TestSyncToDisk) {
   kudu::Status s = kudu::Env::Default()->NewWritableFile(file_path, &cache_file);
   EXPECT_TRUE(s.ok());
   std::string data("data");
-  cache_file->Append(Slice(data));
+  EXPECT_TRUE(cache_file->Append(Slice(data)).ok());
   cache.CompleteWrite(move(handle), 100);
   // Sleep a bit to let the thread pool process the entry
   SleepForMs(100);
@@ -573,7 +573,7 @@ TEST_F(TupleCacheMgrTest, TestDroppedSyncs) {
       kudu::Status s = kudu::Env::Default()->NewWritableFile(file_path, &cache_file);
       EXPECT_TRUE(s.ok());
       std::string data("data");
-      cache_file->Append(Slice(data));
+      EXPECT_TRUE(cache_file->Append(Slice(data)).ok());
       cache.CompleteWrite(move(handle), 100);
       // CompleteWrite doesn't return status, so we can only tell if the sync failed
       // by looking up the entry.

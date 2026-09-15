@@ -224,6 +224,10 @@ string HttpStatusCodeToString(HttpStatusCode code) {
   switch (code) {
     case HttpStatusCode::Ok:
       return "200 OK";
+    case HttpStatusCode::Created:
+      return "201 Created";
+    case HttpStatusCode::NoContent:
+      return "204 No Content";
     case HttpStatusCode::MovedTemporarily:
       return "302 Moved Temporarily";
     case HttpStatusCode::TemporaryRedirect:
@@ -232,8 +236,12 @@ string HttpStatusCodeToString(HttpStatusCode code) {
       return "400 Bad Request";
     case HttpStatusCode::AuthenticationRequired:
       return "401 Authentication Required";
+    case HttpStatusCode::Forbidden:
+      return "403 Forbidden";
     case HttpStatusCode::NotFound:
       return "404 Not Found";
+    case HttpStatusCode::MethodNotAllowed:
+      return "405 Method Not Allowed";
     case HttpStatusCode::LengthRequired:
       return "411 Length Required";
     case HttpStatusCode::RequestEntityTooLarge:
@@ -242,6 +250,8 @@ string HttpStatusCodeToString(HttpStatusCode code) {
       return "500 Internal Server Error";
     case HttpStatusCode::ServiceUnavailable:
       return "503 Service Unavailable";
+    case HttpStatusCode::GatewayTimeout:
+      return "504 Gateway Timeout";
   }
   LOG(FATAL) << "Unexpected HTTP response code";
   return "";
@@ -251,6 +261,10 @@ int16_t HttpStatusCodeToInt(HttpStatusCode code) {
   switch (code) {
     case HttpStatusCode::Ok:
       return 200;
+    case HttpStatusCode::Created:
+      return 201;
+    case HttpStatusCode::NoContent:
+      return 204;
     case HttpStatusCode::MovedTemporarily:
       return 302;
     case HttpStatusCode::TemporaryRedirect:
@@ -259,8 +273,12 @@ int16_t HttpStatusCodeToInt(HttpStatusCode code) {
       return 400;
     case HttpStatusCode::AuthenticationRequired:
       return 401;
+    case HttpStatusCode::Forbidden:
+      return 403;
     case HttpStatusCode::NotFound:
       return 404;
+    case HttpStatusCode::MethodNotAllowed:
+      return 405;
     case HttpStatusCode::LengthRequired:
       return 411;
     case HttpStatusCode::RequestEntityTooLarge:
@@ -269,6 +287,8 @@ int16_t HttpStatusCodeToInt(HttpStatusCode code) {
       return 500;
     case HttpStatusCode::ServiceUnavailable:
       return 503;
+    case HttpStatusCode::GatewayTimeout:
+      return 504;
   }
   LOG(FATAL) << "Unexpected HTTP response code";
   return -1;

@@ -320,7 +320,8 @@ void RpcMgr::ToJson(Document* document) {
 
   // Add messenger metrics.
   DumpConnectionsResponsePB response;
-  messenger_->DumpConnections(DumpConnectionsRequestPB(), &response);
+  KUDU_WARN_NOT_OK(messenger_->DumpConnections(DumpConnectionsRequestPB(), &response),
+      "Failed to dump connections");
 
   int64_t num_inbound_calls_in_flight = 0;
   // Add per connection metrics for inbound connections.

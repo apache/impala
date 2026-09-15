@@ -421,7 +421,8 @@ Status FileSystemUtil::CheckHolePunch(const string& path) {
 
   // Delete file on exit from the function.
   auto delete_file = MakeScopeExitTrigger([&filename]() {
-      kudu::Env::Default()->DeleteFile(filename);
+      KUDU_WARN_NOT_OK(kudu::Env::Default()->DeleteFile(filename),
+          Substitute("Failed to delete file $0", filename));
   });
 
   const int buffer_size = 4096 * 4;

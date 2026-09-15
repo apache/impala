@@ -96,6 +96,12 @@ class EasyCurl {
     verify_peer_ = verify;
   }
 
+ // Sets a file path for a PEM bundle of certificates to trust when making a request over
+ // HTTPS.  Can be either CA certificates or the actual server certificate.
+  void set_ca_certificates(const std::string& ca_certificates) {
+    ca_certificates_ = ca_certificates;
+  }
+
   void set_return_headers(bool v) {
     return_headers_ = v;
   }
@@ -149,6 +155,32 @@ class EasyCurl {
     noproxy_ = std::move(noproxy);
   }
 
+  // Sets the proxy to send requests through, e.g. "http://host:3128",
+  // "https://host:3129" or "socks5h://host:1080". See 'man CURLOPT_PROXY' for the
+  // supported formats. Hosts matching the noproxy setting bypass the proxy, so the
+  // default noproxy setting of "*" must be cleared with set_noproxy("") for the proxy
+  // to be used. If no proxy is set, EasyCurl automatically reads the proxy from the
+  // 'http_proxy' and 'https_proxy' environment variables. The TLS certificate of an
+  // HTTPS proxy is verified according to set_verify_peer() and
+  // set_proxy_ca_certificates(). An empty string "" clears the setting.
+  void set_proxy(std::string proxy) {
+    proxy_ = std::move(proxy);
+  }
+
+  // Sets the path to a PEM file of CA certificates used to verify the TLS certificate
+  // of an HTTPS proxy. If not set, --trusted_certificate_file or the default CA bundle
+  // is used.
+  void set_proxy_ca_certificates(std::string proxy_ca_certificates) {
+    proxy_ca_certificates_ = std::move(proxy_ca_certificates);
+  }
+
+  // Sets the public key that the TLS certificate of an HTTPS proxy must match, either
+  // as a path to a PEM or DER file or as "sha256//<base64 hash>[;sha256//...]". See
+  // 'man CURLOPT_PROXY_PINNEDPUBLICKEY'. An empty string "" clears the setting.
+  void set_proxy_pinned_public_key(std::string proxy_pinned_public_key) {
+    proxy_pinned_public_key_ = std::move(proxy_pinned_public_key);
+  }
+
   // Whether to return an error if server responds with HTTP code >= 400.
   // By default, curl returns the returned content and the response code
   // since it's handy in case of auth-related HTTP response codes such as
@@ -187,8 +219,18 @@ class EasyCurl {
 
   std::string noproxy_;
 
+  std::string proxy_;
+
+  std::string proxy_ca_certificates_;
+
+  std::string proxy_pinned_public_key_;
+
   // Whether to verify the server certificate.
   bool verify_peer_ = true;
+
+  // File path to a pem encoded bundle of certs to trust when calling to a server
+  // over https
+  std::string ca_certificates_;
 
   // Whether to return the HTTP headers with the response.
   bool return_headers_ = false;

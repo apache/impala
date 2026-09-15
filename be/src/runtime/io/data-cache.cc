@@ -21,6 +21,7 @@
 #include <fcntl.h>
 #include <functional>
 #include <mutex>
+#include <shared_mutex>
 #include <string.h>
 #include <unistd.h>
 #include <sstream>
@@ -249,7 +250,7 @@ class DataCache::CacheFile {
     int64_t current_offset = current_offset_.Load();
     DCHECK_EQ(current_offset % PAGE_SIZE, 0);
     // Hold the lock in shared mode to check if 'file_' is not closed already.
-    kudu::shared_lock<rw_spinlock> lock(lock_.get_lock());
+    std::shared_lock<rw_spinlock> lock(lock_.get_lock());
     if (!allow_append_ || (current_offset + len > FLAGS_data_cache_file_max_size_bytes &&
             current_offset > 0)) {
       allow_append_ = false;
@@ -267,7 +268,7 @@ class DataCache::CacheFile {
   bool Read(int64_t offset, uint8_t* buffer, int64_t bytes_to_read) {
     DCHECK_EQ(offset % PAGE_SIZE, 0);
     // Hold the lock in shared mode to check if 'file_' is not closed already.
-    kudu::shared_lock<rw_spinlock> lock(lock_.get_lock());
+    std::shared_lock<rw_spinlock> lock(lock_.get_lock());
     if (UNLIKELY(!file_)) return false;
     DCHECK_LE(offset + bytes_to_read, current_offset_.Load());
     kudu::Status status = file_->Read(offset, Slice(buffer, bytes_to_read));
@@ -287,7 +288,7 @@ class DataCache::CacheFile {
     DCHECK_LE(offset, current_offset_.Load());
     if (UNLIKELY(readonly_.Load())) return false;
     // Hold the lock in shared mode to check if 'file_' is not closed already.
-    kudu::shared_lock<rw_spinlock> lock(lock_.get_lock());
+    std::shared_lock<rw_spinlock> lock(lock_.get_lock());
     if (UNLIKELY(!file_ || readonly_.Load())) return false;
     DCHECK_LE(offset + buffer_len, current_offset_.Load());
     kudu::Status status = file_->Write(offset, Slice(buffer, buffer_len));
@@ -304,7 +305,7 @@ class DataCache::CacheFile {
     DCHECK_EQ(hole_size % PAGE_SIZE, 0);
     if (UNLIKELY(readonly_.Load())) return;
     // Hold the lock in shared mode to check if 'file_' is not closed already.
-    kudu::shared_lock<rw_spinlock> lock(lock_.get_lock());
+    std::shared_lock<rw_spinlock> lock(lock_.get_lock());
     if (UNLIKELY(!file_ || readonly_.Load())) return;
     DCHECK_LE(offset + hole_size, current_offset_.Load());
     kudu::Status status = file_->PunchHole(offset, hole_size);
@@ -1494,7 +1495,7 @@ bool DataCache::StoreInternal(const CacheKey& key, const uint8_t* buffer,
   // Here, a shared lock is acquired with try_to_lock, while a unique lock is acquired in
   // SetDataCacheReadOnly(). Therefore, when setting the read-only status, the lock
   // acquisition here can quickly fail, then return.
-  kudu::shared_lock<shared_mutex> lock(readonly_lock_, std::try_to_lock);
+  std::shared_lock<shared_mutex> lock(readonly_lock_, std::try_to_lock);
   if (UNLIKELY(!lock.owns_lock() || readonly_.Load())) return false;
 
   int idx = key.Hash() % partitions_.size();

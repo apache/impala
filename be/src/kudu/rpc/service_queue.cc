@@ -35,13 +35,24 @@ namespace rpc {
 
 thread_local LifoServiceQueue::ConsumerState* LifoServiceQueue::tl_consumer_ = nullptr;
 
+namespace {
+// Some callers (e.g. Impala's ImpalaServicePool users) pass a 'max_size' of
+// INT32_MAX to mean the queue is effectively unbounded in item count and is
+// instead bounded by memory-tracker-based backpressure, not to imply that
+// many elements are ever expected. Cap the eager reservation below so such
+// callers don't try to reserve tens of GB of pointers upfront; the vector
+// still grows normally (and safely) past this if actually needed.
+constexpr size_t kMaxEagerReserve = 1 << 16;
+} // anonymous namespace
+
 LifoServiceQueue::LifoServiceQueue(size_t max_size)
     : max_queue_size_(max_size),
       shutdown_(false) {
   DCHECK_GT(max_queue_size_, 0);
-  // Reserving all the required memory upfront, no re-allocations are necessary
-  // during the lifecycle of the instance of this class.
-  queue_.reserve(max_queue_size_);
+  // Reserving upfront avoids re-allocations while the queue is in use, but the
+  // reservation is capped (see kMaxEagerReserve) to avoid a pathological
+  // upfront allocation when 'max_size' is very large.
+  queue_.reserve(std::min(max_queue_size_, kMaxEagerReserve));
 }
 
 LifoServiceQueue::~LifoServiceQueue() {

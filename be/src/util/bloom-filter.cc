@@ -141,7 +141,7 @@ void BloomFilter::Or(const BloomFilter& other) {
   if (other.AlwaysFalse()) return;
   DCHECK_EQ(
       block_bloom_filter_.log_space_bytes(), other.block_bloom_filter_.log_space_bytes());
-  block_bloom_filter_.Or(other.block_bloom_filter_);
+  KUDU_DCHECK_OK(block_bloom_filter_.Or(other.block_bloom_filter_));
 }
 
 void BloomFilter::RawOr(const BloomFilter& other) {
@@ -151,8 +151,8 @@ void BloomFilter::RawOr(const BloomFilter& other) {
       block_bloom_filter_.log_space_bytes(), other.block_bloom_filter_.log_space_bytes());
   kudu::Slice target_slice = block_bloom_filter_.directory();
   kudu::Slice input_slice = other.block_bloom_filter_.directory();
-  kudu::BlockBloomFilter::OrEqualArray(
-      target_slice.size(), input_slice.data(), const_cast<uint8_t*>(target_slice.data()));
+  KUDU_DCHECK_OK(kudu::BlockBloomFilter::OrEqualArray(target_slice.size(),
+      input_slice.data(), const_cast<uint8_t*>(target_slice.data())));
 }
 
 void BloomFilter::Or(const BloomFilterPB& in, const kudu::Slice& input_slice) {
@@ -162,8 +162,8 @@ void BloomFilter::Or(const BloomFilterPB& in, const kudu::Slice& input_slice) {
   DCHECK_EQ(in.log_bufferpool_space(), block_bloom_filter_.log_space_bytes());
   kudu::Slice target_slice = block_bloom_filter_.directory();
   DCHECK_EQ(input_slice.size(), target_slice.size());
-  kudu::BlockBloomFilter::OrEqualArray(
-      target_slice.size(), input_slice.data(), const_cast<uint8_t*>(target_slice.data()));
+  KUDU_DCHECK_OK(kudu::BlockBloomFilter::OrEqualArray(target_slice.size(),
+      input_slice.data(), const_cast<uint8_t*>(target_slice.data())));
 }
 
 void BloomFilter::Or(const BloomFilterPB& in, const uint8_t* directory_in,
@@ -177,7 +177,8 @@ void BloomFilter::Or(const BloomFilterPB& in, const uint8_t* directory_in,
   DCHECK(!in.always_true());
   if (in.always_false()) return;
   DCHECK_EQ(in.log_bufferpool_space(), out->log_bufferpool_space());
-  kudu::BlockBloomFilter::OrEqualArray(directory_size, directory_in, directory_out);
+  KUDU_DCHECK_OK(
+      kudu::BlockBloomFilter::OrEqualArray(directory_size, directory_in, directory_out));
 }
 
 } // namespace impala

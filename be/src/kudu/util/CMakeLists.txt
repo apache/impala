@@ -15,6 +15,9 @@
 # specific language governing permissions and limitations
 # under the License.
 
+# Target including all protobuf-generated code.
+add_custom_target(kudu-util-proto-deps)
+
 #######################################
 # block_bloom_filter_proto
 #######################################
@@ -28,6 +31,8 @@ ADD_EXPORTABLE_LIBRARY(block_bloom_filter_proto
   SRCS ${BLOCK_BLOOM_FILTER_PROTO_SRCS}
   DEPS hash_proto pb_util_proto protobuf
   NONLINK_DEPS ${BLOCK_BLOOM_FILTER_PROTO_TGTS})
+
+add_dependencies(kudu-util-proto-deps ${BLOCK_BLOOM_FILTER_PROTO_TGTS})
 
 #######################################
 # util_compression_proto
@@ -43,6 +48,10 @@ ADD_EXPORTABLE_LIBRARY(util_compression_proto
   DEPS protobuf
   NONLINK_DEPS ${UTIL_COMPRESSION_PROTO_TGTS})
 
+add_dependencies(kudu-util-proto-deps ${UTIL_COMPRESSION_PROTO_TGTS})
+
+add_definitions(-DKUDU_HEADERS_USE_SHORT_STATUS_MACROS)
+
 #######################################
 # hash_proto
 #######################################
@@ -56,6 +65,8 @@ ADD_EXPORTABLE_LIBRARY(hash_proto
   SRCS ${HASH_PROTO_SRCS}
   DEPS protobuf
   NONLINK_DEPS ${HASH_PROTO_TGTS})
+
+add_dependencies(kudu-util-proto-deps ${HASH_PROTO_TGTS})
 
 #######################################
 # histogram_proto
@@ -71,6 +82,8 @@ ADD_EXPORTABLE_LIBRARY(histogram_proto
   DEPS protobuf
   NONLINK_DEPS ${HISTOGRAM_PROTO_TGTS})
 
+add_dependencies(kudu-util-proto-deps ${HISTOGRAM_PROTO_TGTS})
+
 #######################################
 # maintenance_manager_proto
 #######################################
@@ -84,6 +97,8 @@ ADD_EXPORTABLE_LIBRARY(maintenance_manager_proto
   SRCS ${MAINTENANCE_MANAGER_PROTO_SRCS}
   DEPS protobuf
   NONLINK_DEPS ${MAINTENANCE_MANAGER_PROTO_TGTS})
+
+add_dependencies(kudu-util-proto-deps ${MAINTENANCE_MANAGER_PROTO_TGTS})
 
 #######################################
 # mem_tracker_proto
@@ -99,6 +114,8 @@ ADD_EXPORTABLE_LIBRARY(mem_tracker_proto
   DEPS protobuf
   NONLINK_DEPS ${MEM_TRACKER_PROTO_TGTS})
 
+add_dependencies(kudu-util-proto-deps ${MEM_TRACKER_PROTO_TGTS})
+
 #######################################
 # pb_util_proto
 #######################################
@@ -112,6 +129,8 @@ ADD_EXPORTABLE_LIBRARY(pb_util_proto
   SRCS ${PB_UTIL_PROTO_SRCS}
   DEPS protobuf
   NONLINK_DEPS ${PB_UTIL_PROTO_TGTS})
+
+add_dependencies(kudu-util-proto-deps ${PB_UTIL_PROTO_TGTS})
 
 #######################################
 # socket_info_proto
@@ -127,6 +146,8 @@ ADD_EXPORTABLE_LIBRARY(socket_info_proto
   DEPS protobuf
   NONLINK_DEPS ${SOCKET_INFO_PROTO_TGTS})
 
+add_dependencies(kudu-util-proto-deps ${SOCKET_INFO_PROTO_TGTS})
+
 #######################################
 # version_info_proto
 #######################################
@@ -140,6 +161,8 @@ ADD_EXPORTABLE_LIBRARY(version_info_proto
   SRCS ${VERSION_INFO_PROTO_SRCS}
   DEPS protobuf
   NONLINK_DEPS ${VERSION_INFO_PROTO_TGTS})
+
+add_dependencies(kudu-util-proto-deps ${VERSION_INFO_PROTO_TGTS})
 
 ############################################################
 # Version stamp
@@ -177,7 +200,8 @@ set(UTIL_SRCS
   block_bloom_filter.cc
   bloom_filter.cc
   cache.cc
-  char_util.cc
+  # Skipped in Impala builds.
+  #char_util.cc
   coding.cc
   condition_variable.cc
   crc.cc
@@ -247,7 +271,9 @@ set(UTIL_SRCS
   trace_metrics.cc
   user.cc
   url-coding.cc
-  version_info.cc
+  # Remove from compilation, as it depends on generated method calls. Replaced by
+  # kudu_version.cc in Impala's common library.
+  #version_info.cc
   version_util.cc
   web_callback_registry.cc
 )
@@ -257,18 +283,21 @@ if (NOT KUDU_CLIENT_ONLY)
     async_logger.cc
     block_cache_metrics.cc
     cow_object.cc
-    file_cache.cc
+    # Skipped in Impala builds.
+    #file_cache.cc
     file_cache_metrics.cc
     group_varint.cc
     jsonreader.cc
     maintenance_manager.cc
     maintenance_manager_metrics.cc
-    minidump.cc
+    # Skipped in Impala builds.
+    #minidump.cc
     rolling_log.cc
     slru_cache.cc
     throttler.cc
     website_util.cc
-    yamlreader.cc
+    # Skipped in Impala builds.
+    #yamlreader.cc
     zlib.cc)
 endif()
 
@@ -285,17 +314,11 @@ endif()
 # optimized regardless of the default optimization options.
 set_source_files_properties(memory/overwrite.cc PROPERTIES COMPILE_FLAGS "-O3")
 
-# Detect AVX2 support
-execute_process(
-  COMMAND echo
-  COMMAND ${CMAKE_CXX_COMPILER} -mavx2 -dM -E -
-  COMMAND awk "$2 == \"__AVX2__\" { print $3 }"
-  ERROR_QUIET
-  OUTPUT_VARIABLE AVX2_SUPPORT
-  OUTPUT_STRIP_TRAILING_WHITESPACE
-)
-
 # block_bloom_filter_avx2.cc uses AVX2 operations.
+# NOTE: This is modified from the Kudu source code. As other Impala code needs AVX2
+# detection, it has been centralized in be/CMakeLists.txt
+# NOTE: This is modified from the Kudu source code. As other Impala code needs AVX2
+# detection, it has been centralized in be/CMakeLists.txt
 if (AVX2_SUPPORT)
   list(APPEND UTIL_SRCS block_bloom_filter_avx2.cc)
   set_source_files_properties(block_bloom_filter_avx2.cc PROPERTIES COMPILE_FLAGS "-mavx2")
@@ -304,9 +327,9 @@ if (AVX2_SUPPORT)
   # instead of relying on __AVX2__ defined by compiler with -mavx2.
   set_source_files_properties(block_bloom_filter_avx2.cc block_bloom_filter.cc
                               PROPERTIES COMPILE_DEFINITIONS "USE_AVX2=1")
-  message("Compiler supports AVX2")
+  message("Compiler supports AVX2 (be/src/kudu/util)")
 else()
-  message("Compiler does not support AVX2")
+  message("Compiler does not support AVX2 (be/src/kudu/util)")
 endif()
 
 # See the comment in sanitizer_options.cc for details on this library's usage.
@@ -337,7 +360,12 @@ endif()
 #######################################
 
 add_executable(protoc-gen-insertions protoc-gen-insertions.cc)
-target_link_libraries(protoc-gen-insertions gutil protobuf protoc ${KUDU_BASE_LIBS})
+# Impala needs some extra dependency libs compared to Kudu.
+# Note that the order is important.
+target_link_libraries(protoc-gen-insertions gutil glog gflags protoc protobuf ${KUDU_BASE_LIBS})
+# Impala - run at build time, so needs rpath to the toolchain's libstdc++.
+set_target_properties(protoc-gen-insertions PROPERTIES LINK_FLAGS
+  "${TOOLCHAIN_LINK_FLAGS}")
 
 set(UTIL_LIBS
   block_bloom_filter_proto
@@ -358,9 +386,10 @@ set(UTIL_LIBS
   version_info_proto
   zlib)
 
-if(NOT KUDU_CLIENT_ONLY)
-  set(UTIL_LIBS ${UTIL_LIBS} yaml)
-endif()
+# Skipped in Impala builds; Impala's toolchain does not provide a 'yaml' target.
+#if(NOT KUDU_CLIENT_ONLY)
+#  set(UTIL_LIBS ${UTIL_LIBS} yaml)
+#endif()
 
 if(NOT APPLE AND NOT KUDU_CLIENT_ONLY)
   set(UTIL_LIBS
@@ -402,7 +431,8 @@ ADD_EXPORTABLE_LIBRARY(kudu_util_compression
 # Define LZ4_DISABLE_DEPRECATE_WARNINGS to mute warnings like:
 # "'int LZ4_compress(const char*, char*, int)' is deprecated".
 target_compile_definitions(kudu_util_compression PUBLIC LZ4_DISABLE_DEPRECATE_WARNINGS)
-target_compile_definitions(kudu_util_compression_exported PUBLIC LZ4_DISABLE_DEPRECATE_WARNINGS)
+# Skipped in Impala builds.
+#target_compile_definitions(kudu_util_compression_exported PUBLIC LZ4_DISABLE_DEPRECATE_WARNINGS)
 
 #######################################
 # kudu_curl_util
@@ -422,21 +452,23 @@ endif()
 #######################################
 # kudu_cloud_util
 #######################################
-add_library(kudu_cloud_util
-  cloud/instance_detector.cc
-  cloud/instance_metadata.cc)
-target_link_libraries(kudu_cloud_util
-  kudu_curl_util)
+# Skipped in Impala builds as Impala doesn't use it.
+# add_library(kudu_cloud_util
+#   cloud/instance_detector.cc
+#   cloud/instance_metadata.cc)
+# target_link_libraries(kudu_cloud_util
+#   kudu_curl_util)
 
 #######################################
 # kudu_jwt_util
 #######################################
-add_library(kudu_jwt_util jwt-util.cc)
-target_link_libraries(kudu_jwt_util
-  gutil
-  security
-  kudu_curl_util
-  kudu_util)
+# Note: JWT support is already available in Impala so we use that.
+#add_library(kudu_jwt_util jwt-util.cc)
+#target_link_libraries(kudu_jwt_util
+#  gutil
+#  security
+#  kudu_curl_util
+#  kudu_util)
 
 #######################################
 # mini_oidc
@@ -455,11 +487,11 @@ endif()
 #######################################
 # mini_prometheus
 #######################################
-# Link the Prometheus home directory so it can be found via
-# test_util::FindHomeDir in MiniPrometheus::Start.
-execute_process(COMMAND ln -nsf
-                "${THIRDPARTY_DIR}/installed/common/opt/prometheus"
-                "${EXECUTABLE_OUTPUT_PATH}/prometheus-home")
+# Skipped in Impala builds: Impala doesn't build the mini_prometheus test tool,
+# and EXECUTABLE_OUTPUT_PATH isn't set up the way Kudu's own build expects.
+#execute_process(COMMAND ln -nsf
+#                "${THIRDPARTY_DIR}/installed/common/opt/prometheus"
+#                "${EXECUTABLE_OUTPUT_PATH}/prometheus-home")
 
 # The mini_prometheus is used only for tests.
 if (KUDU_CLI_TEST_TOOL_ENABLED)
@@ -485,16 +517,18 @@ endif()
 # kudu_test_util
 #######################################
 # The kudu_test_util is used only for tests.
-if (KUDU_CLI_TEST_TOOL_ENABLED)
+# Note: Impala needs this.
+#if (KUDU_CLI_TEST_TOOL_ENABLED)
   add_library(kudu_test_util
     test_util.cc)
   target_link_libraries(kudu_test_util
     gflags
     glog
-    gmock
+    # Impala doesn't have gmock in its toolchain
+    #gmock
     gtest
     kudu_util)
-endif()
+#endif()
 
 #######################################
 # kudu_test_main
@@ -742,11 +776,12 @@ endif()
 #######################################
 # instance_detector-test
 #######################################
-ADD_KUDU_TEST(cloud/instance_detector-test)
-if(NOT NO_TESTS)
-  target_link_libraries(instance_detector-test
-    kudu_cloud_util)
-endif()
+# Impala doesn't need it.
+#ADD_KUDU_TEST(cloud/instance_detector-test)
+#if(NOT NO_TESTS)
+#  target_link_libraries(instance_detector-test
+#    kudu_cloud_util)
+#endif()
 
 #######################################
 # zlib-test

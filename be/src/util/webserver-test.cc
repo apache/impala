@@ -605,7 +605,7 @@ void EmptyCallback(const Webserver::WebRequest& req, Document* document) { }
 TEST(Webserver, TestGetWithSpnego) {
   MiniKdc kdc(MiniKdcOptions{});
   KUDU_ASSERT_OK(kdc.Start());
-  kdc.SetKrb5Environment();
+  KUDU_ASSERT_OK(kdc.SetKrb5Environment());
 
   string kt_path;
   KUDU_ASSERT_OK(kdc.CreateServiceKeytab("HTTP/127.0.0.1", &kt_path));
@@ -664,7 +664,7 @@ TEST(Webserver, TestGetWithSpnego) {
 TEST(Webserver, TestPostWithSpnego) {
   MiniKdc kdc(MiniKdcOptions{});
   KUDU_ASSERT_OK(kdc.Start());
-  kdc.SetKrb5Environment();
+  KUDU_ASSERT_OK(kdc.SetKrb5Environment());
 
   string kt_path;
   KUDU_ASSERT_OK(kdc.CreateServiceKeytab("HTTP/127.0.0.1", &kt_path));
