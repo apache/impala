@@ -145,8 +145,6 @@ set_dep_root(LZ4)
 set_dep_root(ZSTD)
 set_dep_root(OPENLDAP)
 set_dep_root(PROTOBUF)
-set(PROTOBUF_CLANG_ROOT
-    $ENV{IMPALA_TOOLCHAIN_PACKAGES_HOME}/protobuf-$ENV{IMPALA_PROTOBUF_CLANG_VERSION})
 set_dep_root(RE2)
 set_dep_root(RAPIDJSON)
 set_dep_root(SNAPPY)
@@ -378,15 +376,6 @@ find_package(Cctz REQUIRED)
 IMPALA_ADD_THIRDPARTY_LIB(cctz ${CCTZ_INCLUDE_DIR} ${CCTZ_STATIC_LIB} "")
 
 # find protobuf headers, libs and compiler
-if ("${CMAKE_BUILD_TYPE}" STREQUAL "ADDRESS_SANITIZER"
-    OR "${CMAKE_BUILD_TYPE}" STREQUAL "TIDY"
-    OR "${CMAKE_BUILD_TYPE}" STREQUAL "UBSAN"
-    OR "${CMAKE_BUILD_TYPE}" STREQUAL "UBSAN_FULL"
-    OR "${CMAKE_BUILD_TYPE}" STREQUAL "TSAN"
-    OR "${CMAKE_BUILD_TYPE}" STREQUAL "TSAN_FULL")
-  # Use the protobuf library with patches for Clang builds.
-  set(PROTOBUF_ROOT ${PROTOBUF_CLANG_ROOT})
-endif()
 message(STATUS "PROTOBUF_ROOT: " ${PROTOBUF_ROOT})
 
 find_package(Protobuf REQUIRED)
