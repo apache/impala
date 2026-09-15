@@ -233,12 +233,12 @@ public class DistributedPlanner {
    * its data into the table sink of the given 'insertStmt'. The decision obeys
    * the shuffle/noshuffle plan hints if present unless MAX_FS_WRITERS
    * or COMPUTE_PROCESSING_COST query option is used where the noshuffle hint is
-   * ignored. The decision is based on a number of factors including, whether the target
-   * table is partitioned or unpartitioned, the input fragment and the target table's
-   * partition expressions, expected number of output partitions, num of nodes on which
-   * the input partition will run, whether MAX_FS_WRITERS or COMPUTE_PROCESSING_COST
-   * query option is used. If this functions ends up creating a new fragment, appends
-   * that to 'fragments'.
+   * ignored. The decision is based on a number of factors including, whether
+   * the target table is partitioned or unpartitioned, the input fragment and the target
+   * table's partition expressions, expected number of output partitions, num of nodes
+   * on which the input partition will run, whether MAX_FS_WRITERS or
+   * COMPUTE_PROCESSING_COST query option is used. If this functions ends up creating a
+   * new fragment, appends that to 'fragments'.
    */
   public PlanFragment createDmlFragment(
       PlanFragment inputFragment, DmlStatementBase dmlStmt, Analyzer analyzer,
@@ -247,8 +247,14 @@ public class DistributedPlanner {
     boolean isComputeCost = analyzer.getQueryOptions().isCompute_processing_cost();
     boolean enforceHdfsWriterLimit = dmlStmt.getTargetTable() instanceof FeFsTable
         && (analyzer.getQueryOptions().getMax_fs_writers() > 0 || isComputeCost);
+    // The Kudu writer limit is applied on the KUDU-partitioned exchange.
+    boolean enforceKuduWriterLimit = dmlStmt.getTargetTable() instanceof FeKuduTable
+        && (analyzer.getQueryOptions().getMax_fs_writers() > 0 || isComputeCost);
 
-    if (dmlStmt.hasNoShuffleHint() && !enforceHdfsWriterLimit) return inputFragment;
+    if (dmlStmt.hasNoShuffleHint() && !enforceHdfsWriterLimit
+        && !enforceKuduWriterLimit) {
+      return inputFragment;
+    }
 
     List<Expr> shuffleExprs = new ArrayList<>(dmlStmt.getShuffleExprs());
     boolean enforceShuffle = !shuffleExprs.isEmpty();
@@ -271,7 +277,7 @@ public class DistributedPlanner {
     }
 
     long numPartitions = getNumDistinctValues(exchangeExprs);
-    int maxHdfsWriters = analyzer.getQueryOptions().getMax_fs_writers();
+    int maxFsWriters = analyzer.getQueryOptions().getMax_fs_writers();
     // We also consider fragments containing union nodes along with scan fragments
     // (leaf fragments) since they are either a part of those scan fragments or are
     // co-located with them to maintain parallelism.
@@ -283,7 +289,7 @@ public class DistributedPlanner {
     boolean hasHdfsScanORUnion = !hdfsScanNodes.isEmpty() || !unionNodes.isEmpty();
 
     int expectedNumInputInstance = inputFragment.getNumInstances();
-    if (enforceHdfsWriterLimit && isComputeCost) {
+    if ((enforceHdfsWriterLimit || enforceKuduWriterLimit) && isComputeCost) {
       // Default to minParallelism * numNodes if cardinality or average row size is
       // unknown.
       int minInstances = IntMath.saturatedMultiply(
@@ -301,23 +307,24 @@ public class DistributedPlanner {
             root.getCardinality(), root.getAvgRowSize());
       }
 
-      if (maxHdfsWriters > 0) {
+      if (maxFsWriters > 0) {
         // Pick min between MAX_FS_WRITER option and costBasedMaxWriter.
-        maxHdfsWriters = Math.min(maxHdfsWriters, costBasedMaxWriter);
+        maxFsWriters = Math.min(maxFsWriters, costBasedMaxWriter);
       } else {
         // User does not set MAX_FS_WRITER option.
-        maxHdfsWriters = costBasedMaxWriter;
+        maxFsWriters = costBasedMaxWriter;
       }
       LOG.trace("isPartitioned={} numDistinctPartition={} costBasedMaxWriter={} "
-              + "maxHdfsWriters={} inputCardinality={}",
-          isPartitioned, numPartitions, costBasedMaxWriter, maxHdfsWriters,
+              + "maxFsWriters={} inputCardinality={}",
+          isPartitioned, numPartitions, costBasedMaxWriter, maxFsWriters,
           root.getCardinality());
-      Preconditions.checkState(maxHdfsWriters > 0);
-      dmlStmt.setMaxTableSinks(maxHdfsWriters);
+      Preconditions.checkState(maxFsWriters > 0);
+      // Kudu applies the limit only if a KUDU-partitioned exchange is added below.
+      if (enforceHdfsWriterLimit) dmlStmt.setMaxTableSinks(maxFsWriters);
       // At this point, parallelism of writer fragment is fixed and will not be adjusted
       // by costing phase.
 
-      if (!hdfsScanNodes.isEmpty() && fragments.size() == 1) {
+      if (enforceHdfsWriterLimit && !hdfsScanNodes.isEmpty() && fragments.size() == 1) {
         // If input fragment have HdfsScanNode, and input fragment is the only fragment in
         // the plan, and the scan cost is low, expectedNumInputInstance can be lowered
         // down. This can increase chance to  colocate scan nodes and table sinks
@@ -345,11 +352,9 @@ public class DistributedPlanner {
       if (dmlStmt.getTargetTable() instanceof FeKuduTable) {
         // If the table is unpartitioned or all of the partition exprs are constants,
         // don't insert the exchange.
-        // TODO: make a more sophisticated decision here for partitioned tables and when
-        // we have info about tablet locations.
         if (exchangeExprs.isEmpty()) return inputFragment;
       } else if (!enforceHdfsWriterLimit || !hasHdfsScanORUnion
-          || (expectedNumInputInstance <= maxHdfsWriters)) {
+          || (expectedNumInputInstance <= maxFsWriters)) {
         // Only consider skipping the addition of an exchange node if
         // 1. The hdfs writer limit does not apply
         // 2. Writer limit applies and there are no hdfs scan or union nodes. In this
@@ -365,9 +370,9 @@ public class DistributedPlanner {
         int inputInstances = expectedNumInputInstance;
         if (enforceHdfsWriterLimit && !hasHdfsScanORUnion) {
           // For an internal fragment we enforce an upper limit based on the
-          // resulting maxHdfsWriters.
-          Preconditions.checkState(maxHdfsWriters > 0);
-          inputInstances = Math.min(inputInstances, maxHdfsWriters);
+          // resulting maxFsWriters.
+          Preconditions.checkState(maxFsWriters > 0);
+          inputInstances = Math.min(inputInstances, maxFsWriters);
         }
         // If the existing partition exprs are a subset of the table partition exprs,
         // check if it is distributed across all nodes. If so, don't repartition.
@@ -414,6 +419,8 @@ public class DistributedPlanner {
                dmlStmt.getTargetTable() instanceof FeKuduTable) {
       partition = DataPartition.kuduPartitioned(
           KuduUtil.createPartitionExpr((InsertStmt)dmlStmt, ctx_.getRootAnalyzer()));
+      dmlStmt.setMaxTableSinks(
+          getKuduWriterLimit((FeKuduTable) dmlStmt.getTargetTable(), maxFsWriters));
     } else {
       partition = DataPartition.hashPartitioned(exchangeExprs);
     }
@@ -423,6 +430,32 @@ public class DistributedPlanner {
     inputFragment.setOutputPartition(partition);
     fragments.add(fragment);
     return fragment;
+  }
+
+  /**
+   * Returns the max number of writer instances for a DML into 'kuduTable' fed by a
+   * KUDU-partitioned exchange, or 0 if unbounded. The exchange routes rows to a channel
+   * by (partition index % num_channels), so instances beyond the tablet count never
+   * receive rows. Issues an RPC to a Kudu master, except for CTAS where the target
+   * doesn't exist in Kudu yet and the count is estimated from its partitioning.
+   * 'maxWriters' (from MAX_FS_WRITERS or the cost-based estimate, <= 0 if unset) also
+   * applies, even when the tablet count is unknown.
+   */
+  private int getKuduWriterLimit(FeKuduTable kuduTable, int maxWriters) {
+    long kuduTabletCount = -1;
+    try {
+      kuduTabletCount = ctx_.isCtas()
+          ? FeKuduTable.Utils.estimateNumPartitions(kuduTable.getPartitionBy())
+          : FeKuduTable.Utils.getNumPartitions(kuduTable);
+    } catch (ImpalaException e) {
+      LOG.warn("Could not determine the tablet count of {}, not capping writers "
+          + "by it.", kuduTable.getFullName(), e);
+    }
+    int cap = maxWriters;
+    if (kuduTabletCount > 0 && kuduTabletCount <= Integer.MAX_VALUE) {
+      cap = cap > 0 ? (int) Math.min(cap, kuduTabletCount) : (int) kuduTabletCount;
+    }
+    return cap;
   }
 
   /**

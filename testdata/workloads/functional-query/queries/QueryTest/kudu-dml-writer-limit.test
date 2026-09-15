@@ -1,0 +1,399 @@
+====
+---- QUERY
+# INSERT/UPSERT into a partitioned Kudu table shuffle rows by Kudu partition, so the
+# number of KUDU WRITER instances is capped at the table's tablet count (and at
+# MAX_FS_WRITERS if that is lower), even though MT_DOP would otherwise scale the writer
+# fragment past it. The KUDU WRITER row of the exec summary in the profile has the
+# columns "#Hosts #Inst".
+create table hash3 (id int primary key, int_col int)
+  partition by hash (id) partitions 3 stored as kudu
+---- RESULTS
+'Table has been created.'
+====
+---- QUERY
+create table range2 (id int primary key, int_col int)
+  partition by range (id) (partition values < 3650, partition 3650 <= values)
+  stored as kudu
+---- RESULTS
+'Table has been created.'
+====
+---- QUERY
+create table hash_range6 (id int, string_col string, int_col int,
+  primary key (id, string_col))
+  partition by hash (id) partitions 3, range (string_col)
+  (partition values < '5', partition '5' <= values)
+  stored as kudu
+---- RESULTS
+'Table has been created.'
+====
+---- QUERY
+# 3 hash buckets -> 3 tablets.
+SET MT_DOP=10;
+SET MAX_FS_WRITERS=0;
+insert into hash3 select id, int_col from functional_parquet.alltypes
+---- RUNTIME_PROFILE
+NumModifiedRows: 7300
+NumRowErrors: 0
+row_regex: .*F\d+:KUDU WRITER\s+\d+\s+3\s+.*
+====
+---- QUERY
+select count(*) from hash3
+---- RESULTS
+7300
+---- TYPES
+BIGINT
+====
+---- QUERY
+# 2 range partitions -> 2 tablets.
+SET MT_DOP=10;
+SET MAX_FS_WRITERS=0;
+insert into range2 select id, int_col from functional_parquet.alltypes
+---- RUNTIME_PROFILE
+NumModifiedRows: 7300
+NumRowErrors: 0
+row_regex: .*F\d+:KUDU WRITER\s+\d+\s+2\s+.*
+====
+---- QUERY
+select count(*) from range2
+---- RESULTS
+7300
+---- TYPES
+BIGINT
+====
+---- QUERY
+# 3 hash buckets x 2 range partitions -> 6 tablets.
+SET MT_DOP=10;
+SET MAX_FS_WRITERS=0;
+insert into hash_range6 select id, string_col, int_col from functional_parquet.alltypes
+---- RUNTIME_PROFILE
+NumModifiedRows: 7300
+NumRowErrors: 0
+row_regex: .*F\d+:KUDU WRITER\s+\d+\s+6\s+.*
+====
+---- QUERY
+select count(*) from hash_range6
+---- RESULTS
+7300
+---- TYPES
+BIGINT
+====
+---- QUERY
+# The lower of MAX_FS_WRITERS and the tablet count applies.
+create table hash3_limit2 (id int primary key, int_col int)
+  partition by hash (id) partitions 3 stored as kudu
+---- RESULTS
+'Table has been created.'
+====
+---- QUERY
+SET MT_DOP=10;
+SET MAX_FS_WRITERS=2;
+insert into hash3_limit2 select id, int_col from functional_parquet.alltypes
+---- RUNTIME_PROFILE
+NumModifiedRows: 7300
+NumRowErrors: 0
+row_regex: .*F\d+:KUDU WRITER\s+\d+\s+2\s+.*
+====
+---- QUERY
+create table hash3_limit30 (id int primary key, int_col int)
+  partition by hash (id) partitions 3 stored as kudu
+---- RESULTS
+'Table has been created.'
+====
+---- QUERY
+SET MT_DOP=10;
+SET MAX_FS_WRITERS=30;
+insert into hash3_limit30 select id, int_col from functional_parquet.alltypes
+---- RUNTIME_PROFILE
+NumModifiedRows: 7300
+NumRowErrors: 0
+row_regex: .*F\d+:KUDU WRITER\s+\d+\s+3\s+.*
+====
+---- QUERY
+# UPSERT is capped the same way as INSERT. The tables already contain these rows, so
+# the row count must not change.
+SET MT_DOP=10;
+SET MAX_FS_WRITERS=0;
+upsert into hash3 select id, int_col from functional_parquet.alltypes
+---- RUNTIME_PROFILE
+NumModifiedRows: 7300
+NumRowErrors: 0
+row_regex: .*F\d+:KUDU WRITER\s+\d+\s+3\s+.*
+====
+---- QUERY
+SET MT_DOP=10;
+SET MAX_FS_WRITERS=0;
+upsert into range2 select id, int_col from functional_parquet.alltypes
+---- RUNTIME_PROFILE
+NumModifiedRows: 7300
+NumRowErrors: 0
+row_regex: .*F\d+:KUDU WRITER\s+\d+\s+2\s+.*
+====
+---- QUERY
+SET MT_DOP=10;
+SET MAX_FS_WRITERS=0;
+upsert into hash_range6 select id, string_col, int_col from functional_parquet.alltypes
+---- RUNTIME_PROFILE
+NumModifiedRows: 7300
+NumRowErrors: 0
+row_regex: .*F\d+:KUDU WRITER\s+\d+\s+6\s+.*
+====
+---- QUERY
+SET MT_DOP=10;
+SET MAX_FS_WRITERS=2;
+upsert into hash3 select id, int_col from functional_parquet.alltypes
+---- RUNTIME_PROFILE
+NumModifiedRows: 7300
+NumRowErrors: 0
+row_regex: .*F\d+:KUDU WRITER\s+\d+\s+2\s+.*
+====
+---- QUERY
+SET MT_DOP=10;
+SET MAX_FS_WRITERS=30;
+upsert into hash3 select id, int_col from functional_parquet.alltypes
+---- RUNTIME_PROFILE
+NumModifiedRows: 7300
+NumRowErrors: 0
+row_regex: .*F\d+:KUDU WRITER\s+\d+\s+3\s+.*
+====
+---- QUERY
+select count(*) from hash3
+---- RESULTS
+7300
+---- TYPES
+BIGINT
+====
+---- QUERY
+# UPDATE and DELETE have no KUDU-partitioned exchange, so the writer runs in the Kudu
+# scan fragment (one instance per host with a tablet) and neither the tablet count nor
+# MAX_FS_WRITERS applies.
+SET MT_DOP=10;
+SET MAX_FS_WRITERS=1;
+update hash3 set int_col = -1 where id > 5
+---- RUNTIME_PROFILE
+NumModifiedRows: 7294
+NumRowErrors: 0
+row_regex: .*F\d+:KUDU WRITER\s+3\s+3\s+.*
+====
+---- QUERY
+select count(*) from hash3 where int_col = -1
+---- RESULTS
+7294
+---- TYPES
+BIGINT
+====
+---- QUERY
+SET MT_DOP=10;
+SET MAX_FS_WRITERS=1;
+delete from hash3 where id > 5
+---- RUNTIME_PROFILE
+NumModifiedRows: 7294
+NumRowErrors: 0
+row_regex: .*F\d+:KUDU WRITER\s+3\s+3\s+.*
+====
+---- QUERY
+select count(*) from hash3
+---- RESULTS
+6
+---- TYPES
+BIGINT
+====
+---- QUERY
+# The target table of a CTAS does not exist in Kudu at planning time, so its tablet
+# count is estimated from the PARTITION BY clause of the statement.
+SET MT_DOP=10;
+SET MAX_FS_WRITERS=0;
+create table ctas_hash3 primary key (id) partition by hash (id) partitions 3
+  stored as kudu as select id, int_col from functional_parquet.alltypes
+---- RUNTIME_PROFILE
+NumModifiedRows: 7300
+NumRowErrors: 0
+row_regex: .*F\d+:KUDU WRITER\s+\d+\s+3\s+.*
+====
+---- QUERY
+select count(*) from ctas_hash3
+---- RESULTS
+7300
+---- TYPES
+BIGINT
+====
+---- QUERY
+# The lower of MAX_FS_WRITERS and the estimated tablet count applies.
+SET MT_DOP=10;
+SET MAX_FS_WRITERS=2;
+create table ctas_hash3_limit2 primary key (id) partition by hash (id) partitions 3
+  stored as kudu as select id, int_col from functional_parquet.alltypes
+---- RUNTIME_PROFILE
+NumModifiedRows: 7300
+NumRowErrors: 0
+row_regex: .*F\d+:KUDU WRITER\s+\d+\s+2\s+.*
+====
+---- QUERY
+select count(*) from ctas_hash3_limit2
+---- RESULTS
+7300
+---- TYPES
+BIGINT
+====
+---- QUERY
+SET MT_DOP=10;
+SET MAX_FS_WRITERS=0;
+create table ctas_range2 primary key (id)
+  partition by range (id) (partition values < 3650, partition 3650 <= values)
+  stored as kudu as select id, int_col from functional_parquet.alltypes
+---- RUNTIME_PROFILE
+NumModifiedRows: 7300
+NumRowErrors: 0
+row_regex: .*F\d+:KUDU WRITER\s+\d+\s+2\s+.*
+====
+---- QUERY
+select count(*) from ctas_range2
+---- RESULTS
+7300
+---- TYPES
+BIGINT
+====
+---- QUERY
+SET MT_DOP=10;
+SET MAX_FS_WRITERS=0;
+create table ctas_hash_range6 primary key (id, string_col)
+  partition by hash (id) partitions 3, range (string_col)
+  (partition values < '5', partition '5' <= values)
+  stored as kudu as select id, string_col, int_col from functional_parquet.alltypes
+---- RUNTIME_PROFILE
+NumModifiedRows: 7300
+NumRowErrors: 0
+row_regex: .*F\d+:KUDU WRITER\s+\d+\s+6\s+.*
+====
+---- QUERY
+select count(*) from ctas_hash_range6
+---- RESULTS
+7300
+---- TYPES
+BIGINT
+====
+---- QUERY
+# Per-range hash schemas: 3 (table-wide) + 2 + 4 = 9 tablets.
+SET MT_DOP=10;
+SET MAX_FS_WRITERS=0;
+create table ctas_custom_hash9 primary key (id, string_col)
+  partition by hash (id) partitions 3, range (string_col)
+  (
+    partition values < '3'
+    , partition '3' <= values < '6' hash partitions 2
+    , partition '6' <= values hash (id) partitions 4
+  )
+  stored as kudu as select id, string_col, int_col from functional_parquet.alltypes
+---- RUNTIME_PROFILE
+NumModifiedRows: 7300
+NumRowErrors: 0
+row_regex: .*F\d+:KUDU WRITER\s+\d+\s+9\s+.*
+====
+---- QUERY
+select count(*) from ctas_custom_hash9
+---- RESULTS
+7300
+---- TYPES
+BIGINT
+====
+---- QUERY
+# A shuffle hint still adds the KUDU-partitioned exchange, so the cap applies.
+create table hint_hash3 (id int primary key, int_col int)
+  partition by hash (id) partitions 3 stored as kudu
+---- RESULTS
+'Table has been created.'
+====
+---- QUERY
+SET MT_DOP=10;
+SET MAX_FS_WRITERS=0;
+insert into hint_hash3 /* +shuffle */ select id, int_col from functional_parquet.alltypes
+---- RUNTIME_PROFILE
+NumModifiedRows: 7300
+NumRowErrors: 0
+row_regex: .*F\d+:KUDU WRITER\s+\d+\s+3\s+.*
+====
+---- QUERY
+SET MT_DOP=10;
+SET MAX_FS_WRITERS=2;
+upsert into hint_hash3 /* +shuffle */ select id, int_col from functional_parquet.alltypes
+---- RUNTIME_PROFILE
+NumModifiedRows: 7300
+NumRowErrors: 0
+row_regex: .*F\d+:KUDU WRITER\s+\d+\s+2\s+.*
+====
+---- QUERY
+# MAX_FS_WRITERS overrides a noshuffle hint, as for HDFS tables.
+SET MT_DOP=10;
+SET MAX_FS_WRITERS=2;
+upsert into hint_hash3 /* +noshuffle */
+select id, int_col from functional_parquet.alltypes
+---- RUNTIME_PROFILE
+NumModifiedRows: 7300
+NumRowErrors: 0
+row_regex: .*F\d+:KUDU WRITER\s+\d+\s+2\s+.*
+====
+---- QUERY
+select count(*) from hint_hash3
+---- RESULTS
+7300
+---- TYPES
+BIGINT
+====
+---- QUERY
+# As with HDFS tables, COMPUTE_PROCESSING_COST estimates the writer count from the input
+# size, which is small enough here for a single writer.
+create table cost_hash_range6 (id int, string_col string, int_col int,
+  primary key (id, string_col))
+  partition by hash (id) partitions 3, range (string_col)
+  (partition values < '5', partition '5' <= values)
+  stored as kudu
+---- RESULTS
+'Table has been created.'
+====
+---- QUERY
+SET MT_DOP=0;
+SET MAX_FS_WRITERS=0;
+SET COMPUTE_PROCESSING_COST=true;
+SET PROCESSING_COST_MIN_THREADS=10;
+SET MAX_FRAGMENT_INSTANCES_PER_NODE=10;
+insert into cost_hash_range6
+select id, string_col, int_col from functional_parquet.alltypes
+---- RUNTIME_PROFILE
+NumModifiedRows: 7300
+NumRowErrors: 0
+row_regex: .*F\d+:KUDU WRITER\s+1\s+1\s+.*
+====
+---- QUERY
+# COMPUTE_PROCESSING_COST overrides a noshuffle hint, as for HDFS tables.
+SET MT_DOP=0;
+SET MAX_FS_WRITERS=0;
+SET COMPUTE_PROCESSING_COST=true;
+SET PROCESSING_COST_MIN_THREADS=10;
+SET MAX_FRAGMENT_INSTANCES_PER_NODE=10;
+upsert into cost_hash_range6 /* +noshuffle */
+select id, string_col, int_col from functional_parquet.alltypes
+---- RUNTIME_PROFILE
+NumModifiedRows: 7300
+NumRowErrors: 0
+row_regex: .*EXCHANGE \[KUDU\(KuduPartition.*
+row_regex: .*F\d+:KUDU WRITER\s+1\s+1\s+.*
+====
+---- QUERY
+SET MT_DOP=0;
+SET MAX_FS_WRITERS=0;
+SET COMPUTE_PROCESSING_COST=true;
+SET PROCESSING_COST_MIN_THREADS=10;
+SET MAX_FRAGMENT_INSTANCES_PER_NODE=10;
+create table cost_ctas_hash3 primary key (id) partition by hash (id) partitions 3
+  stored as kudu as select id, int_col from functional_parquet.alltypes
+---- RUNTIME_PROFILE
+NumModifiedRows: 7300
+NumRowErrors: 0
+row_regex: .*F\d+:KUDU WRITER\s+1\s+1\s+.*
+====
+---- QUERY
+select count(*) from cost_hash_range6
+---- RESULTS
+7300
+---- TYPES
+BIGINT
+====

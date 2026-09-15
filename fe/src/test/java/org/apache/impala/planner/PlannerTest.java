@@ -387,6 +387,13 @@ public class PlannerTest extends PlannerTestBase {
   }
 
   @Test
+  public void testKuduInsertWriterLimit() {
+    runPlannerTestFile("kudu-insert-writer-limit",
+        ImmutableSet.of(PlannerTestOption.EXTENDED_EXPLAIN,
+            PlannerTestOption.DO_NOT_VALIDATE_ROWCOUNT_ESTIMATION_FOR_PARTITIONS));
+  }
+
+  @Test
   public void testHdfs() {
     runPlannerTestFile("hdfs");
   }

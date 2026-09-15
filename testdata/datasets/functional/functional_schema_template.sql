@@ -4979,6 +4979,26 @@ PARTITION BY HASH (tkey) PARTITIONS 3 STORED AS KUDU;
 ---- DATASET
 functional
 ---- BASE_TABLE_NAME
+hash_range_partitioned
+---- COLUMNS
+id int
+name string
+zip int
+---- CREATE_KUDU
+DROP TABLE IF EXISTS {db_name}{db_suffix}.{table_name};
+CREATE TABLE {db_name}{db_suffix}.{table_name} (
+  id INT,
+  name STRING,
+  zip INT,
+  PRIMARY KEY (id, name)
+)
+PARTITION BY HASH (id) PARTITIONS 3,
+RANGE (name) (PARTITION VALUES <= 'b', PARTITION 'b' < VALUES)
+STORED AS KUDU;
+====
+---- DATASET
+functional
+---- BASE_TABLE_NAME
 timestamp_with_tz_str
 ---- COLUMNS
 id INT

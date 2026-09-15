@@ -59,13 +59,21 @@ public class KuduTableSink extends TableSink {
   // Indicate whether Kudu cluster supports IGNORE write operations or not.
   private boolean supportsIgnoreOperations_ = false;
 
+  // Upper limit on the number of instances of the fragment containing this sink.
+  // <= 0 means unbounded. Used to avoid scheduling more writer instances than the
+  // target table's Kudu partition count, since the KUDU-partitioned exchange feeding
+  // this sink routes rows to a channel by partition index modulo channel count, so
+  // any instance beyond the partition count never receives rows.
+  private final int maxKuduSinks_;
+
   public KuduTableSink(FeTable targetTable, Op sinkOp, List<Integer> referencedColumns,
-      List<Expr> outputExprs, java.nio.ByteBuffer txnToken) {
+      List<Expr> outputExprs, java.nio.ByteBuffer txnToken, int maxTableSinks) {
     super(targetTable, sinkOp, outputExprs);
     targetColIdxs_ = referencedColumns != null
         ? Lists.newArrayList(referencedColumns) : null;
     txnToken_ =
         txnToken != null ? org.apache.thrift.TBaseHelper.copyBinary(txnToken) : null;
+    maxKuduSinks_ = maxTableSinks;
 
     // Check if Kudu cluster supports IGNORE write operations.
     Preconditions.checkState(targetTable instanceof FeKuduTable);
@@ -92,6 +100,37 @@ public class KuduTableSink extends TableSink {
   @Override
   protected String getLabel() {
     return "KUDU WRITER";
+  }
+
+  /** Returns true if the fragment's instance count is capped by 'maxKuduSinks_'. */
+  public boolean hasInstanceLimit() { return maxKuduSinks_ > 0; }
+
+  /**
+   * Return an estimate of the number of nodes the fragment with this sink will run on.
+   * Bounded above by 'maxKuduSinks_', if set.
+   */
+  public int getNumNodes() {
+    int numNodes = getFragment().getPlanRoot().getNumNodes();
+    if (hasInstanceLimit()) numNodes = Math.min(numNodes, getNumInstances());
+    return numNodes;
+  }
+
+  /**
+   * Return an estimate of the number of instances the fragment with this sink will run
+   * on. Bounded above by 'maxKuduSinks_', if set.
+   */
+  public int getNumInstances() {
+    int numInstances = getFragment().getPlanRoot().getNumInstances();
+    if (hasInstanceLimit()) numInstances = Math.min(numInstances, maxKuduSinks_);
+    return numInstances;
+  }
+
+  @Override
+  public void computeRowConsumptionAndProductionToCost() {
+    super.computeRowConsumptionAndProductionToCost();
+    if (hasInstanceLimit()) {
+      fragment_.setFixedInstanceCount(getNumInstances());
+    }
   }
 
   @Override

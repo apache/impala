@@ -562,7 +562,7 @@ enum TImpalaQueryOptions {
   SORT_RUN_BYTES_LIMIT = 106
 
   // Sets an upper limit on the number of fs writer instances to be scheduled during
-  // insert. Currently this limit only applies to HDFS inserts.
+  // insert. This limit applies to HDFS inserts and Kudu inserts/upserts.
   MAX_FS_WRITERS = 107
 
   // When this query option is set, a refresh table statement will detect existing

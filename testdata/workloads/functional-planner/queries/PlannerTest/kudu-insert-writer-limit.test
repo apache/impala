@@ -1,0 +1,1212 @@
+# insert into a HASH-partitioned Kudu table. Writer instance count is capped at the
+# table's tablet count (3), even though mt_dop would otherwise scale the writer fragment
+# past that.
+insert into functional_kudu.alltypes select * from functional_parquet.alltypes;
+---- QUERYOPTIONS
+mt_dop=10
+---- DISTRIBUTEDPLAN
+F01:PLAN FRAGMENT [KUDU(KuduPartition(functional_parquet.alltypes.id))] hosts=3 instances=3
+|  Per-Instance Resources: mem-estimate=26.28MB mem-reservation=4.00MB thread-reservation=1
+INSERT INTO KUDU [functional_kudu.alltypes]
+|  output exprs: id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month
+|  mem-estimate=20.00MB mem-reservation=0B thread-reservation=0
+|
+02:PARTIAL SORT
+|  order by: KuduPartition(functional_parquet.alltypes.id) ASC NULLS LAST, id ASC NULLS LAST
+|  materialized: KuduPartition(functional_parquet.alltypes.id)
+|  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
+|  tuple-ids=2 row-size=84B cardinality=12.10K
+|  in pipelines: 00(GETNEXT)
+|
+01:EXCHANGE [KUDU(KuduPartition(functional_parquet.alltypes.id))]
+|  mem-estimate=2.28MB mem-reservation=0B thread-reservation=0
+|  tuple-ids=0 row-size=80B cardinality=12.10K
+|  in pipelines: 00(GETNEXT)
+|
+F00:PLAN FRAGMENT [RANDOM] hosts=3 instances=24
+Per-Instance Resources: mem-estimate=16.98MB mem-reservation=88.00KB thread-reservation=1
+00:SCAN HDFS [functional_parquet.alltypes, RANDOM]
+   HDFS partitions=24/24 files=24 size=190.27KB
+   stored statistics:
+     table: rows=unavailable size=unavailable
+     partitions: 0/24 rows=12.10K
+     columns missing stats: id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col
+   extrapolated-rows=disabled max-scan-range-rows=unavailable
+   mem-estimate=16.00MB mem-reservation=88.00KB thread-reservation=0
+   tuple-ids=0 row-size=80B cardinality=12.10K
+   in pipelines: 00(GETNEXT)
+====
+# Same as above, but with max_fs_writers set below the table's hash bucket count. The
+# lower of the two limits applies.
+insert into functional_kudu.alltypes select * from functional_parquet.alltypes;
+---- QUERYOPTIONS
+mt_dop=10
+max_fs_writers=2
+---- DISTRIBUTEDPLAN
+F01:PLAN FRAGMENT [KUDU(KuduPartition(functional_parquet.alltypes.id))] hosts=2 instances=2
+|  Per-Instance Resources: mem-estimate=26.28MB mem-reservation=4.00MB thread-reservation=1
+INSERT INTO KUDU [functional_kudu.alltypes]
+|  output exprs: id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month
+|  mem-estimate=20.00MB mem-reservation=0B thread-reservation=0
+|
+02:PARTIAL SORT
+|  order by: KuduPartition(functional_parquet.alltypes.id) ASC NULLS LAST, id ASC NULLS LAST
+|  materialized: KuduPartition(functional_parquet.alltypes.id)
+|  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
+|  tuple-ids=2 row-size=84B cardinality=12.10K
+|  in pipelines: 00(GETNEXT)
+|
+01:EXCHANGE [KUDU(KuduPartition(functional_parquet.alltypes.id))]
+|  mem-estimate=2.28MB mem-reservation=0B thread-reservation=0
+|  tuple-ids=0 row-size=80B cardinality=12.10K
+|  in pipelines: 00(GETNEXT)
+|
+F00:PLAN FRAGMENT [RANDOM] hosts=3 instances=24
+Per-Instance Resources: mem-estimate=16.66MB mem-reservation=88.00KB thread-reservation=1
+00:SCAN HDFS [functional_parquet.alltypes, RANDOM]
+   HDFS partitions=24/24 files=24 size=190.27KB
+   stored statistics:
+     table: rows=unavailable size=unavailable
+     partitions: 0/24 rows=12.10K
+     columns missing stats: id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col
+   extrapolated-rows=disabled max-scan-range-rows=unavailable
+   mem-estimate=16.00MB mem-reservation=88.00KB thread-reservation=0
+   tuple-ids=0 row-size=80B cardinality=12.10K
+   in pipelines: 00(GETNEXT)
+====
+# insert into a RANGE-partitioned (no HASH) Kudu table. Writer instance count is capped
+# at the table's tablet count (3 range partitions), queried live from Kudu.
+insert into functional_kudu.testtbl (id, name, zip)
+select cast(id as bigint), string_col, int_col from functional_parquet.alltypes;
+---- QUERYOPTIONS
+mt_dop=10
+---- DISTRIBUTEDPLAN
+F01:PLAN FRAGMENT [KUDU(KuduPartition(CAST(id AS BIGINT)))] hosts=3 instances=3
+|  Per-Instance Resources: mem-estimate=24.64MB mem-reservation=4.00MB thread-reservation=1
+INSERT INTO KUDU [functional_kudu.testtbl]
+|  output exprs: CAST(id AS BIGINT), string_col, int_col
+|  mem-estimate=20.00MB mem-reservation=0B thread-reservation=0
+|
+02:PARTIAL SORT
+|  order by: KuduPartition(CAST(id AS BIGINT)) ASC NULLS LAST, CAST(id AS BIGINT) ASC NULLS LAST
+|  materialized: KuduPartition(CAST(id AS BIGINT))
+|  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
+|  tuple-ids=2 row-size=24B cardinality=12.10K
+|  in pipelines: 00(GETNEXT)
+|
+01:EXCHANGE [KUDU(KuduPartition(CAST(id AS BIGINT)))]
+|  mem-estimate=654.80KB mem-reservation=0B thread-reservation=0
+|  tuple-ids=0 row-size=20B cardinality=12.10K
+|  in pipelines: 00(GETNEXT)
+|
+F00:PLAN FRAGMENT [RANDOM] hosts=3 instances=24
+Per-Instance Resources: mem-estimate=16.28MB mem-reservation=24.00KB thread-reservation=1
+00:SCAN HDFS [functional_parquet.alltypes, RANDOM]
+   HDFS partitions=24/24 files=24 size=190.27KB
+   stored statistics:
+     table: rows=unavailable size=unavailable
+     partitions: 0/24 rows=12.10K
+     columns: unavailable
+   extrapolated-rows=disabled max-scan-range-rows=unavailable
+   mem-estimate=16.00MB mem-reservation=24.00KB thread-reservation=0
+   tuple-ids=0 row-size=20B cardinality=12.10K
+   in pipelines: 00(GETNEXT)
+====
+# insert into a Kudu table partitioned by both HASH and RANGE. Writer instance count is
+# capped at the table's tablet count (3 hash buckets x 2 range partitions = 6 tablets),
+# queried live from Kudu.
+insert into functional_kudu.hash_range_partitioned (id, name, zip)
+select id, string_col, int_col from functional_parquet.alltypes;
+---- QUERYOPTIONS
+mt_dop=10
+---- DISTRIBUTEDPLAN
+F01:PLAN FRAGMENT [KUDU(KuduPartition(id, string_col))] hosts=3 instances=6
+|  Per-Instance Resources: mem-estimate=24.64MB mem-reservation=4.00MB thread-reservation=1
+INSERT INTO KUDU [functional_kudu.hash_range_partitioned]
+|  output exprs: id, string_col, int_col
+|  mem-estimate=20.00MB mem-reservation=0B thread-reservation=0
+|
+02:PARTIAL SORT
+|  order by: KuduPartition(id, string_col) ASC NULLS LAST, id ASC NULLS LAST, string_col ASC NULLS LAST
+|  materialized: KuduPartition(id, string_col)
+|  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
+|  tuple-ids=2 row-size=24B cardinality=12.10K
+|  in pipelines: 00(GETNEXT)
+|
+01:EXCHANGE [KUDU(KuduPartition(id, string_col))]
+|  mem-estimate=654.80KB mem-reservation=0B thread-reservation=0
+|  tuple-ids=0 row-size=20B cardinality=12.10K
+|  in pipelines: 00(GETNEXT)
+|
+F00:PLAN FRAGMENT [RANDOM] hosts=3 instances=24
+Per-Instance Resources: mem-estimate=16.56MB mem-reservation=24.00KB thread-reservation=1
+00:SCAN HDFS [functional_parquet.alltypes, RANDOM]
+   HDFS partitions=24/24 files=24 size=190.27KB
+   stored statistics:
+     table: rows=unavailable size=unavailable
+     partitions: 0/24 rows=12.10K
+     columns: unavailable
+   extrapolated-rows=disabled max-scan-range-rows=unavailable
+   mem-estimate=16.00MB mem-reservation=24.00KB thread-reservation=0
+   tuple-ids=0 row-size=20B cardinality=12.10K
+   in pipelines: 00(GETNEXT)
+====
+# UPSERT into a HASH-partitioned Kudu table. Writer instance count is capped at the
+# table's tablet count (3), even though mt_dop would otherwise scale the writer
+# fragment past that.
+upsert into functional_kudu.alltypes select * from functional_parquet.alltypes;
+---- QUERYOPTIONS
+mt_dop=10
+---- DISTRIBUTEDPLAN
+F01:PLAN FRAGMENT [KUDU(KuduPartition(functional_parquet.alltypes.id))] hosts=3 instances=3
+|  Per-Instance Resources: mem-estimate=26.28MB mem-reservation=4.00MB thread-reservation=1
+UPSERT INTO KUDU [functional_kudu.alltypes]
+|  output exprs: id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month
+|  mem-estimate=20.00MB mem-reservation=0B thread-reservation=0
+|
+02:PARTIAL SORT
+|  order by: KuduPartition(functional_parquet.alltypes.id) ASC NULLS LAST, id ASC NULLS LAST
+|  materialized: KuduPartition(functional_parquet.alltypes.id)
+|  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
+|  tuple-ids=2 row-size=84B cardinality=12.10K
+|  in pipelines: 00(GETNEXT)
+|
+01:EXCHANGE [KUDU(KuduPartition(functional_parquet.alltypes.id))]
+|  mem-estimate=2.28MB mem-reservation=0B thread-reservation=0
+|  tuple-ids=0 row-size=80B cardinality=12.10K
+|  in pipelines: 00(GETNEXT)
+|
+F00:PLAN FRAGMENT [RANDOM] hosts=3 instances=24
+Per-Instance Resources: mem-estimate=16.98MB mem-reservation=88.00KB thread-reservation=1
+00:SCAN HDFS [functional_parquet.alltypes, RANDOM]
+   HDFS partitions=24/24 files=24 size=190.27KB
+   stored statistics:
+     table: rows=unavailable size=unavailable
+     partitions: 0/24 rows=12.10K
+     columns missing stats: id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col
+   extrapolated-rows=disabled max-scan-range-rows=unavailable
+   mem-estimate=16.00MB mem-reservation=88.00KB thread-reservation=0
+   tuple-ids=0 row-size=80B cardinality=12.10K
+   in pipelines: 00(GETNEXT)
+====
+# UPSERT with max_fs_writers set below the table's tablet count. The lower of the two
+# limits applies.
+upsert into functional_kudu.alltypes select * from functional_parquet.alltypes;
+---- QUERYOPTIONS
+mt_dop=10
+max_fs_writers=2
+---- DISTRIBUTEDPLAN
+F01:PLAN FRAGMENT [KUDU(KuduPartition(functional_parquet.alltypes.id))] hosts=2 instances=2
+|  Per-Instance Resources: mem-estimate=26.28MB mem-reservation=4.00MB thread-reservation=1
+UPSERT INTO KUDU [functional_kudu.alltypes]
+|  output exprs: id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month
+|  mem-estimate=20.00MB mem-reservation=0B thread-reservation=0
+|
+02:PARTIAL SORT
+|  order by: KuduPartition(functional_parquet.alltypes.id) ASC NULLS LAST, id ASC NULLS LAST
+|  materialized: KuduPartition(functional_parquet.alltypes.id)
+|  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
+|  tuple-ids=2 row-size=84B cardinality=12.10K
+|  in pipelines: 00(GETNEXT)
+|
+01:EXCHANGE [KUDU(KuduPartition(functional_parquet.alltypes.id))]
+|  mem-estimate=2.28MB mem-reservation=0B thread-reservation=0
+|  tuple-ids=0 row-size=80B cardinality=12.10K
+|  in pipelines: 00(GETNEXT)
+|
+F00:PLAN FRAGMENT [RANDOM] hosts=3 instances=24
+Per-Instance Resources: mem-estimate=16.66MB mem-reservation=88.00KB thread-reservation=1
+00:SCAN HDFS [functional_parquet.alltypes, RANDOM]
+   HDFS partitions=24/24 files=24 size=190.27KB
+   stored statistics:
+     table: rows=unavailable size=unavailable
+     partitions: 0/24 rows=12.10K
+     columns missing stats: id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col
+   extrapolated-rows=disabled max-scan-range-rows=unavailable
+   mem-estimate=16.00MB mem-reservation=88.00KB thread-reservation=0
+   tuple-ids=0 row-size=80B cardinality=12.10K
+   in pipelines: 00(GETNEXT)
+====
+# UPSERT into a Kudu table partitioned by both HASH and RANGE (6 tablets).
+upsert into functional_kudu.hash_range_partitioned (id, name, zip)
+select id, string_col, int_col from functional_parquet.alltypes;
+---- QUERYOPTIONS
+mt_dop=10
+---- DISTRIBUTEDPLAN
+F01:PLAN FRAGMENT [KUDU(KuduPartition(id, string_col))] hosts=3 instances=6
+|  Per-Instance Resources: mem-estimate=24.64MB mem-reservation=4.00MB thread-reservation=1
+UPSERT INTO KUDU [functional_kudu.hash_range_partitioned]
+|  output exprs: id, string_col, int_col
+|  mem-estimate=20.00MB mem-reservation=0B thread-reservation=0
+|
+02:PARTIAL SORT
+|  order by: KuduPartition(id, string_col) ASC NULLS LAST, id ASC NULLS LAST, string_col ASC NULLS LAST
+|  materialized: KuduPartition(id, string_col)
+|  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
+|  tuple-ids=2 row-size=24B cardinality=12.10K
+|  in pipelines: 00(GETNEXT)
+|
+01:EXCHANGE [KUDU(KuduPartition(id, string_col))]
+|  mem-estimate=654.80KB mem-reservation=0B thread-reservation=0
+|  tuple-ids=0 row-size=20B cardinality=12.10K
+|  in pipelines: 00(GETNEXT)
+|
+F00:PLAN FRAGMENT [RANDOM] hosts=3 instances=24
+Per-Instance Resources: mem-estimate=16.56MB mem-reservation=24.00KB thread-reservation=1
+00:SCAN HDFS [functional_parquet.alltypes, RANDOM]
+   HDFS partitions=24/24 files=24 size=190.27KB
+   stored statistics:
+     table: rows=unavailable size=unavailable
+     partitions: 0/24 rows=12.10K
+     columns: unavailable
+   extrapolated-rows=disabled max-scan-range-rows=unavailable
+   mem-estimate=16.00MB mem-reservation=24.00KB thread-reservation=0
+   tuple-ids=0 row-size=20B cardinality=12.10K
+   in pipelines: 00(GETNEXT)
+====
+# UPDATE of a Kudu table. The planner adds no KUDU-partitioned exchange, so the writer
+# runs in the scan fragment and no tablet-count cap applies.
+update functional_kudu.alltypes set int_col = 1 where id > 5;
+---- QUERYOPTIONS
+mt_dop=10
+---- DISTRIBUTEDPLAN
+F00:PLAN FRAGMENT [RANDOM] hosts=3 instances=3
+|  Per-Instance Resources: mem-estimate=20.75MB mem-reservation=0B thread-reservation=1
+UPDATE KUDU [functional_kudu.alltypes]
+|  output exprs: functional_kudu.alltypes.id, CAST(1 AS INT)
+|  mem-estimate=20.00MB mem-reservation=0B thread-reservation=0
+|
+00:SCAN KUDU [functional_kudu.alltypes]
+   predicates: int_col IS DISTINCT FROM CAST(1 AS INT)
+   kudu predicates: id > CAST(5 AS INT)
+   mem-estimate=768.00KB mem-reservation=0B thread-reservation=0
+   tuple-ids=0 row-size=8B cardinality=693
+   in pipelines: 00(GETNEXT)
+====
+# UPDATE of a Kudu table with a broadcast join against another table. There is still no
+# exchange to the writer, so the writer stays in the fragment that produces the rows.
+update a set a.int_col = b.int_col
+from functional_parquet.alltypes b join /* +broadcast */ functional_kudu.alltypes a
+on a.id = b.id;
+---- QUERYOPTIONS
+mt_dop=10
+---- DISTRIBUTEDPLAN
+F00:PLAN FRAGMENT [RANDOM] hosts=3 instances=24
+|  Per-Host Shared Resources: mem-estimate=1.00MB mem-reservation=1.00MB thread-reservation=0 runtime-filters-memory=1.00MB
+|  Per-Instance Resources: mem-estimate=36.00MB mem-reservation=16.00KB thread-reservation=1
+UPDATE KUDU [functional_kudu.alltypes]
+|  output exprs: a.id, b.int_col
+|  mem-estimate=20.00MB mem-reservation=0B thread-reservation=0
+|
+02:HASH JOIN [INNER JOIN, BROADCAST]
+|  hash-table-id=00
+|  hash predicates: b.id = a.id
+|  fk/pk conjuncts: assumed fk/pk
+|  other predicates: a.int_col IS DISTINCT FROM b.int_col
+|  mem-estimate=0B mem-reservation=0B spill-buffer=64.00KB thread-reservation=0
+|  tuple-ids=0,1 row-size=16B cardinality=12.10K
+|  in pipelines: 00(GETNEXT), 01(OPEN)
+|
+|--F02:PLAN FRAGMENT [RANDOM] hosts=3 instances=3
+|  |  Per-Instance Resources: mem-estimate=20.47MB mem-reservation=20.38MB thread-reservation=1 runtime-filters-memory=1.00MB
+|  JOIN BUILD
+|  |  join-table-id=00 plan-id=01 cohort-id=01
+|  |  build expressions: a.id
+|  |  runtime filters: RF000[bloom] <- a.id
+|  |  mem-estimate=19.38MB mem-reservation=19.38MB spill-buffer=64.00KB thread-reservation=0
+|  |
+|  03:EXCHANGE [BROADCAST]
+|  |  mem-estimate=93.03KB mem-reservation=0B thread-reservation=0
+|  |  tuple-ids=1 row-size=8B cardinality=7.30K
+|  |  in pipelines: 01(GETNEXT)
+|  |
+|  F01:PLAN FRAGMENT [RANDOM] hosts=3 instances=3
+|  Per-Instance Resources: mem-estimate=816.00KB mem-reservation=0B thread-reservation=1
+|  01:SCAN KUDU [functional_kudu.alltypes a]
+|     mem-estimate=768.00KB mem-reservation=0B thread-reservation=0
+|     tuple-ids=1 row-size=8B cardinality=7.30K
+|     in pipelines: 01(GETNEXT)
+|
+00:SCAN HDFS [functional_parquet.alltypes b, RANDOM]
+   HDFS partitions=24/24 files=24 size=190.27KB
+   runtime filters: RF000[bloom] -> b.id
+   stored statistics:
+     table: rows=unavailable size=unavailable
+     partitions: 0/24 rows=12.10K
+     columns: unavailable
+   extrapolated-rows=disabled max-scan-range-rows=unavailable
+   mem-estimate=16.00MB mem-reservation=16.00KB thread-reservation=0
+   tuple-ids=0 row-size=8B cardinality=12.10K
+   in pipelines: 00(GETNEXT)
+====
+# DELETE from a Kudu table. The planner adds no KUDU-partitioned exchange, so the
+# writer runs in the scan fragment and no tablet-count cap applies.
+delete from functional_kudu.alltypes where id > 5;
+---- QUERYOPTIONS
+mt_dop=10
+---- DISTRIBUTEDPLAN
+F00:PLAN FRAGMENT [RANDOM] hosts=3 instances=3
+|  Per-Instance Resources: mem-estimate=20.38MB mem-reservation=0B thread-reservation=1
+DELETE FROM KUDU [functional_kudu.alltypes]
+|  output exprs: functional_kudu.alltypes.id
+|  mem-estimate=20.00MB mem-reservation=0B thread-reservation=0
+|
+00:SCAN KUDU [functional_kudu.alltypes]
+   kudu predicates: id > CAST(5 AS INT)
+   mem-estimate=384.00KB mem-reservation=0B thread-reservation=0
+   tuple-ids=0 row-size=4B cardinality=730
+   in pipelines: 00(GETNEXT)
+====
+# DELETE from a Kudu table with a broadcast join against another table.
+delete a from functional_parquet.alltypes b join /* +broadcast */ functional_kudu.alltypes a
+on a.id = b.id;
+---- QUERYOPTIONS
+mt_dop=10
+---- DISTRIBUTEDPLAN
+F00:PLAN FRAGMENT [RANDOM] hosts=3 instances=24
+|  Per-Host Shared Resources: mem-estimate=1.00MB mem-reservation=1.00MB thread-reservation=0 runtime-filters-memory=1.00MB
+|  Per-Instance Resources: mem-estimate=36.00MB mem-reservation=16.00KB thread-reservation=1
+DELETE FROM KUDU [functional_kudu.alltypes]
+|  output exprs: a.id
+|  mem-estimate=20.00MB mem-reservation=0B thread-reservation=0
+|
+02:HASH JOIN [INNER JOIN, BROADCAST]
+|  hash-table-id=00
+|  hash predicates: b.id = a.id
+|  fk/pk conjuncts: assumed fk/pk
+|  mem-estimate=0B mem-reservation=0B spill-buffer=64.00KB thread-reservation=0
+|  tuple-ids=0,1 row-size=8B cardinality=12.10K
+|  in pipelines: 00(GETNEXT), 01(OPEN)
+|
+|--F02:PLAN FRAGMENT [RANDOM] hosts=3 instances=3
+|  |  Per-Instance Resources: mem-estimate=20.43MB mem-reservation=20.38MB thread-reservation=1 runtime-filters-memory=1.00MB
+|  JOIN BUILD
+|  |  join-table-id=00 plan-id=01 cohort-id=01
+|  |  build expressions: a.id
+|  |  runtime filters: RF000[bloom] <- a.id
+|  |  mem-estimate=19.38MB mem-reservation=19.38MB spill-buffer=64.00KB thread-reservation=0
+|  |
+|  03:EXCHANGE [BROADCAST]
+|  |  mem-estimate=52.52KB mem-reservation=0B thread-reservation=0
+|  |  tuple-ids=1 row-size=4B cardinality=7.30K
+|  |  in pipelines: 01(GETNEXT)
+|  |
+|  F01:PLAN FRAGMENT [RANDOM] hosts=3 instances=3
+|  Per-Instance Resources: mem-estimate=416.00KB mem-reservation=0B thread-reservation=1
+|  01:SCAN KUDU [functional_kudu.alltypes a]
+|     mem-estimate=384.00KB mem-reservation=0B thread-reservation=0
+|     tuple-ids=1 row-size=4B cardinality=7.30K
+|     in pipelines: 01(GETNEXT)
+|
+00:SCAN HDFS [functional_parquet.alltypes b, RANDOM]
+   HDFS partitions=24/24 files=24 size=190.27KB
+   runtime filters: RF000[bloom] -> b.id
+   stored statistics:
+     table: rows=unavailable size=unavailable
+     partitions: 0/24 rows=12.10K
+     columns: unavailable
+   extrapolated-rows=disabled max-scan-range-rows=unavailable
+   mem-estimate=16.00MB mem-reservation=16.00KB thread-reservation=0
+   tuple-ids=0 row-size=4B cardinality=12.10K
+   in pipelines: 00(GETNEXT)
+====
+# CTAS into a partitioned Kudu table. The target table does not exist in Kudu at
+# planning time, so its tablet count (3) is estimated from the partitioning in the
+# statement.
+create table kudu_ctas primary key (id) partition by hash (id) partitions 3
+stored as kudu as select id, string_col from functional_parquet.alltypes;
+---- QUERYOPTIONS
+mt_dop=10
+---- DISTRIBUTEDPLAN
+F01:PLAN FRAGMENT [KUDU(KuduPartition(id))] hosts=3 instances=3
+|  Per-Instance Resources: mem-estimate=24.53MB mem-reservation=4.00MB thread-reservation=1
+INSERT INTO KUDU [default.kudu_ctas]
+|  output exprs: id, string_col
+|  mem-estimate=20.00MB mem-reservation=0B thread-reservation=0
+|
+02:PARTIAL SORT
+|  order by: KuduPartition(id) ASC NULLS LAST, id ASC NULLS LAST
+|  materialized: KuduPartition(id)
+|  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
+|  tuple-ids=2 row-size=20B cardinality=12.10K
+|  in pipelines: 00(GETNEXT)
+|
+01:EXCHANGE [KUDU(KuduPartition(id))]
+|  mem-estimate=543.04KB mem-reservation=0B thread-reservation=0
+|  tuple-ids=0 row-size=16B cardinality=12.10K
+|  in pipelines: 00(GETNEXT)
+|
+F00:PLAN FRAGMENT [RANDOM] hosts=3 instances=24
+Per-Instance Resources: mem-estimate=16.23MB mem-reservation=16.00KB thread-reservation=1
+00:SCAN HDFS [functional_parquet.alltypes, RANDOM]
+   HDFS partitions=24/24 files=24 size=190.27KB
+   stored statistics:
+     table: rows=unavailable size=unavailable
+     partitions: 0/24 rows=12.10K
+     columns: unavailable
+   extrapolated-rows=disabled max-scan-range-rows=unavailable
+   mem-estimate=16.00MB mem-reservation=16.00KB thread-reservation=0
+   tuple-ids=0 row-size=16B cardinality=12.10K
+   in pipelines: 00(GETNEXT)
+====
+# CTAS into a partitioned Kudu table with max_fs_writers set below the estimated tablet
+# count. The lower of the two limits applies.
+create table kudu_ctas primary key (id) partition by hash (id) partitions 3
+stored as kudu as select id, string_col from functional_parquet.alltypes;
+---- QUERYOPTIONS
+mt_dop=10
+max_fs_writers=2
+---- DISTRIBUTEDPLAN
+F01:PLAN FRAGMENT [KUDU(KuduPartition(id))] hosts=2 instances=2
+|  Per-Instance Resources: mem-estimate=24.53MB mem-reservation=4.00MB thread-reservation=1
+INSERT INTO KUDU [default.kudu_ctas]
+|  output exprs: id, string_col
+|  mem-estimate=20.00MB mem-reservation=0B thread-reservation=0
+|
+02:PARTIAL SORT
+|  order by: KuduPartition(id) ASC NULLS LAST, id ASC NULLS LAST
+|  materialized: KuduPartition(id)
+|  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
+|  tuple-ids=2 row-size=20B cardinality=12.10K
+|  in pipelines: 00(GETNEXT)
+|
+01:EXCHANGE [KUDU(KuduPartition(id))]
+|  mem-estimate=543.04KB mem-reservation=0B thread-reservation=0
+|  tuple-ids=0 row-size=16B cardinality=12.10K
+|  in pipelines: 00(GETNEXT)
+|
+F00:PLAN FRAGMENT [RANDOM] hosts=3 instances=24
+Per-Instance Resources: mem-estimate=16.16MB mem-reservation=16.00KB thread-reservation=1
+00:SCAN HDFS [functional_parquet.alltypes, RANDOM]
+   HDFS partitions=24/24 files=24 size=190.27KB
+   stored statistics:
+     table: rows=unavailable size=unavailable
+     partitions: 0/24 rows=12.10K
+     columns: unavailable
+   extrapolated-rows=disabled max-scan-range-rows=unavailable
+   mem-estimate=16.00MB mem-reservation=16.00KB thread-reservation=0
+   tuple-ids=0 row-size=16B cardinality=12.10K
+   in pipelines: 00(GETNEXT)
+====
+# CTAS into a Kudu table partitioned by RANGE only. The estimate is the number of range
+# partitions (2).
+create table kudu_ctas primary key (id)
+partition by range (id) (partition values < 3650, partition 3650 <= values)
+stored as kudu as select id, string_col from functional_parquet.alltypes;
+---- QUERYOPTIONS
+mt_dop=10
+---- DISTRIBUTEDPLAN
+F01:PLAN FRAGMENT [KUDU(KuduPartition(id))] hosts=2 instances=2
+|  Per-Instance Resources: mem-estimate=24.53MB mem-reservation=4.00MB thread-reservation=1
+INSERT INTO KUDU [default.kudu_ctas]
+|  output exprs: id, string_col
+|  mem-estimate=20.00MB mem-reservation=0B thread-reservation=0
+|
+02:PARTIAL SORT
+|  order by: KuduPartition(id) ASC NULLS LAST, id ASC NULLS LAST
+|  materialized: KuduPartition(id)
+|  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
+|  tuple-ids=2 row-size=20B cardinality=12.10K
+|  in pipelines: 00(GETNEXT)
+|
+01:EXCHANGE [KUDU(KuduPartition(id))]
+|  mem-estimate=543.04KB mem-reservation=0B thread-reservation=0
+|  tuple-ids=0 row-size=16B cardinality=12.10K
+|  in pipelines: 00(GETNEXT)
+|
+F00:PLAN FRAGMENT [RANDOM] hosts=3 instances=24
+Per-Instance Resources: mem-estimate=16.16MB mem-reservation=16.00KB thread-reservation=1
+00:SCAN HDFS [functional_parquet.alltypes, RANDOM]
+   HDFS partitions=24/24 files=24 size=190.27KB
+   stored statistics:
+     table: rows=unavailable size=unavailable
+     partitions: 0/24 rows=12.10K
+     columns: unavailable
+   extrapolated-rows=disabled max-scan-range-rows=unavailable
+   mem-estimate=16.00MB mem-reservation=16.00KB thread-reservation=0
+   tuple-ids=0 row-size=16B cardinality=12.10K
+   in pipelines: 00(GETNEXT)
+====
+# CTAS into a Kudu table partitioned by both HASH and RANGE. The estimate is 3 hash
+# buckets x 2 range partitions = 6 tablets.
+create table kudu_ctas primary key (id, string_col)
+partition by hash (id) partitions 3, range (string_col)
+(partition values < '5', partition '5' <= values)
+stored as kudu as select id, string_col from functional_parquet.alltypes;
+---- QUERYOPTIONS
+mt_dop=10
+---- DISTRIBUTEDPLAN
+F01:PLAN FRAGMENT [KUDU(KuduPartition(id, string_col))] hosts=3 instances=6
+|  Per-Instance Resources: mem-estimate=24.53MB mem-reservation=4.00MB thread-reservation=1
+INSERT INTO KUDU [default.kudu_ctas]
+|  output exprs: id, string_col
+|  mem-estimate=20.00MB mem-reservation=0B thread-reservation=0
+|
+02:PARTIAL SORT
+|  order by: KuduPartition(id, string_col) ASC NULLS LAST, id ASC NULLS LAST, string_col ASC NULLS LAST
+|  materialized: KuduPartition(id, string_col)
+|  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
+|  tuple-ids=2 row-size=20B cardinality=12.10K
+|  in pipelines: 00(GETNEXT)
+|
+01:EXCHANGE [KUDU(KuduPartition(id, string_col))]
+|  mem-estimate=543.04KB mem-reservation=0B thread-reservation=0
+|  tuple-ids=0 row-size=16B cardinality=12.10K
+|  in pipelines: 00(GETNEXT)
+|
+F00:PLAN FRAGMENT [RANDOM] hosts=3 instances=24
+Per-Instance Resources: mem-estimate=16.47MB mem-reservation=16.00KB thread-reservation=1
+00:SCAN HDFS [functional_parquet.alltypes, RANDOM]
+   HDFS partitions=24/24 files=24 size=190.27KB
+   stored statistics:
+     table: rows=unavailable size=unavailable
+     partitions: 0/24 rows=12.10K
+     columns: unavailable
+   extrapolated-rows=disabled max-scan-range-rows=unavailable
+   mem-estimate=16.00MB mem-reservation=16.00KB thread-reservation=0
+   tuple-ids=0 row-size=16B cardinality=12.10K
+   in pipelines: 00(GETNEXT)
+====
+# CTAS into a Kudu table with per-range hash schemas. The estimate is the sum of the
+# ranges' bucket counts: 3 (table-wide) + 2 + 4 = 9 tablets.
+create table kudu_ctas primary key (id, string_col)
+partition by hash (id) partitions 3, range (string_col)
+(
+  partition values < '3'
+  , partition '3' <= values < '6' hash partitions 2
+  , partition '6' <= values hash (id) partitions 4
+)
+stored as kudu as select id, string_col from functional_parquet.alltypes;
+---- QUERYOPTIONS
+mt_dop=10
+---- DISTRIBUTEDPLAN
+F01:PLAN FRAGMENT [KUDU(KuduPartition(id, string_col))] hosts=3 instances=9
+|  Per-Instance Resources: mem-estimate=24.53MB mem-reservation=4.00MB thread-reservation=1
+INSERT INTO KUDU [default.kudu_ctas]
+|  output exprs: id, string_col
+|  mem-estimate=20.00MB mem-reservation=0B thread-reservation=0
+|
+02:PARTIAL SORT
+|  order by: KuduPartition(id, string_col) ASC NULLS LAST, id ASC NULLS LAST, string_col ASC NULLS LAST
+|  materialized: KuduPartition(id, string_col)
+|  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
+|  tuple-ids=2 row-size=20B cardinality=12.10K
+|  in pipelines: 00(GETNEXT)
+|
+01:EXCHANGE [KUDU(KuduPartition(id, string_col))]
+|  mem-estimate=543.04KB mem-reservation=0B thread-reservation=0
+|  tuple-ids=0 row-size=16B cardinality=12.10K
+|  in pipelines: 00(GETNEXT)
+|
+F00:PLAN FRAGMENT [RANDOM] hosts=3 instances=24
+Per-Instance Resources: mem-estimate=16.70MB mem-reservation=16.00KB thread-reservation=1
+00:SCAN HDFS [functional_parquet.alltypes, RANDOM]
+   HDFS partitions=24/24 files=24 size=190.27KB
+   stored statistics:
+     table: rows=unavailable size=unavailable
+     partitions: 0/24 rows=12.10K
+     columns: unavailable
+   extrapolated-rows=disabled max-scan-range-rows=unavailable
+   mem-estimate=16.00MB mem-reservation=16.00KB thread-reservation=0
+   tuple-ids=0 row-size=16B cardinality=12.10K
+   in pipelines: 00(GETNEXT)
+====
+# insert with a shuffle hint. The hint forces the KUDU-partitioned exchange, so the
+# writer instance count is still capped at the table's tablet count (3).
+insert into functional_kudu.alltypes /* +shuffle */
+select * from functional_parquet.alltypes;
+---- QUERYOPTIONS
+mt_dop=10
+---- DISTRIBUTEDPLAN
+F01:PLAN FRAGMENT [KUDU(KuduPartition(functional_parquet.alltypes.id))] hosts=3 instances=3
+|  Per-Instance Resources: mem-estimate=26.28MB mem-reservation=4.00MB thread-reservation=1
+INSERT INTO KUDU [functional_kudu.alltypes]
+|  output exprs: id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month
+|  mem-estimate=20.00MB mem-reservation=0B thread-reservation=0
+|
+02:PARTIAL SORT
+|  order by: KuduPartition(functional_parquet.alltypes.id) ASC NULLS LAST, id ASC NULLS LAST
+|  materialized: KuduPartition(functional_parquet.alltypes.id)
+|  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
+|  tuple-ids=2 row-size=84B cardinality=12.10K
+|  in pipelines: 00(GETNEXT)
+|
+01:EXCHANGE [KUDU(KuduPartition(functional_parquet.alltypes.id))]
+|  mem-estimate=2.28MB mem-reservation=0B thread-reservation=0
+|  tuple-ids=0 row-size=80B cardinality=12.10K
+|  in pipelines: 00(GETNEXT)
+|
+F00:PLAN FRAGMENT [RANDOM] hosts=3 instances=24
+Per-Instance Resources: mem-estimate=16.98MB mem-reservation=88.00KB thread-reservation=1
+00:SCAN HDFS [functional_parquet.alltypes, RANDOM]
+   HDFS partitions=24/24 files=24 size=190.27KB
+   stored statistics:
+     table: rows=unavailable size=unavailable
+     partitions: 0/24 rows=12.10K
+     columns missing stats: id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col
+   extrapolated-rows=disabled max-scan-range-rows=unavailable
+   mem-estimate=16.00MB mem-reservation=88.00KB thread-reservation=0
+   tuple-ids=0 row-size=80B cardinality=12.10K
+   in pipelines: 00(GETNEXT)
+====
+# UPSERT with a shuffle hint and max_fs_writers below the tablet count.
+upsert into functional_kudu.alltypes /* +shuffle */
+select * from functional_parquet.alltypes;
+---- QUERYOPTIONS
+mt_dop=10
+max_fs_writers=2
+---- DISTRIBUTEDPLAN
+F01:PLAN FRAGMENT [KUDU(KuduPartition(functional_parquet.alltypes.id))] hosts=2 instances=2
+|  Per-Instance Resources: mem-estimate=26.28MB mem-reservation=4.00MB thread-reservation=1
+UPSERT INTO KUDU [functional_kudu.alltypes]
+|  output exprs: id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month
+|  mem-estimate=20.00MB mem-reservation=0B thread-reservation=0
+|
+02:PARTIAL SORT
+|  order by: KuduPartition(functional_parquet.alltypes.id) ASC NULLS LAST, id ASC NULLS LAST
+|  materialized: KuduPartition(functional_parquet.alltypes.id)
+|  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
+|  tuple-ids=2 row-size=84B cardinality=12.10K
+|  in pipelines: 00(GETNEXT)
+|
+01:EXCHANGE [KUDU(KuduPartition(functional_parquet.alltypes.id))]
+|  mem-estimate=2.28MB mem-reservation=0B thread-reservation=0
+|  tuple-ids=0 row-size=80B cardinality=12.10K
+|  in pipelines: 00(GETNEXT)
+|
+F00:PLAN FRAGMENT [RANDOM] hosts=3 instances=24
+Per-Instance Resources: mem-estimate=16.66MB mem-reservation=88.00KB thread-reservation=1
+00:SCAN HDFS [functional_parquet.alltypes, RANDOM]
+   HDFS partitions=24/24 files=24 size=190.27KB
+   stored statistics:
+     table: rows=unavailable size=unavailable
+     partitions: 0/24 rows=12.10K
+     columns missing stats: id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col
+   extrapolated-rows=disabled max-scan-range-rows=unavailable
+   mem-estimate=16.00MB mem-reservation=88.00KB thread-reservation=0
+   tuple-ids=0 row-size=80B cardinality=12.10K
+   in pipelines: 00(GETNEXT)
+====
+# insert with a noshuffle hint. There is no KUDU-partitioned exchange, so the writer
+# runs in the scan fragment and no tablet-count cap applies.
+insert into functional_kudu.alltypes /* +noshuffle */
+select * from functional_parquet.alltypes;
+---- QUERYOPTIONS
+mt_dop=10
+---- DISTRIBUTEDPLAN
+F00:PLAN FRAGMENT [RANDOM] hosts=3 instances=24
+|  Per-Instance Resources: mem-estimate=40.00MB mem-reservation=4.09MB thread-reservation=1
+INSERT INTO KUDU [functional_kudu.alltypes]
+|  output exprs: id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month
+|  mem-estimate=20.00MB mem-reservation=0B thread-reservation=0
+|
+01:PARTIAL SORT
+|  order by: KuduPartition(functional_parquet.alltypes.id) ASC NULLS LAST, id ASC NULLS LAST
+|  materialized: KuduPartition(functional_parquet.alltypes.id)
+|  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
+|  tuple-ids=2 row-size=84B cardinality=12.10K
+|  in pipelines: 00(GETNEXT)
+|
+00:SCAN HDFS [functional_parquet.alltypes, RANDOM]
+   HDFS partitions=24/24 files=24 size=190.27KB
+   stored statistics:
+     table: rows=unavailable size=unavailable
+     partitions: 0/24 rows=12.10K
+     columns missing stats: id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col
+   extrapolated-rows=disabled max-scan-range-rows=unavailable
+   mem-estimate=16.00MB mem-reservation=88.00KB thread-reservation=0
+   tuple-ids=0 row-size=80B cardinality=12.10K
+   in pipelines: 00(GETNEXT)
+====
+# insert with a noshuffle hint and max_fs_writers. As with HDFS tables, MAX_FS_WRITERS
+# overrides the hint, so the KUDU-partitioned exchange is added and capped.
+insert into functional_kudu.alltypes /* +noshuffle */
+select * from functional_parquet.alltypes;
+---- QUERYOPTIONS
+mt_dop=10
+max_fs_writers=2
+---- DISTRIBUTEDPLAN
+F01:PLAN FRAGMENT [KUDU(KuduPartition(functional_parquet.alltypes.id))] hosts=2 instances=2
+|  Per-Instance Resources: mem-estimate=26.28MB mem-reservation=4.00MB thread-reservation=1
+INSERT INTO KUDU [functional_kudu.alltypes]
+|  output exprs: id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month
+|  mem-estimate=20.00MB mem-reservation=0B thread-reservation=0
+|
+02:PARTIAL SORT
+|  order by: KuduPartition(functional_parquet.alltypes.id) ASC NULLS LAST, id ASC NULLS LAST
+|  materialized: KuduPartition(functional_parquet.alltypes.id)
+|  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
+|  tuple-ids=2 row-size=84B cardinality=12.10K
+|  in pipelines: 00(GETNEXT)
+|
+01:EXCHANGE [KUDU(KuduPartition(functional_parquet.alltypes.id))]
+|  mem-estimate=2.28MB mem-reservation=0B thread-reservation=0
+|  tuple-ids=0 row-size=80B cardinality=12.10K
+|  in pipelines: 00(GETNEXT)
+|
+F00:PLAN FRAGMENT [RANDOM] hosts=3 instances=24
+Per-Instance Resources: mem-estimate=16.66MB mem-reservation=88.00KB thread-reservation=1
+00:SCAN HDFS [functional_parquet.alltypes, RANDOM]
+   HDFS partitions=24/24 files=24 size=190.27KB
+   stored statistics:
+     table: rows=unavailable size=unavailable
+     partitions: 0/24 rows=12.10K
+     columns missing stats: id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col
+   extrapolated-rows=disabled max-scan-range-rows=unavailable
+   mem-estimate=16.00MB mem-reservation=88.00KB thread-reservation=0
+   tuple-ids=0 row-size=80B cardinality=12.10K
+   in pipelines: 00(GETNEXT)
+====
+# insert with COMPUTE_PROCESSING_COST. As with HDFS tables, the writer count is
+# estimated from the input size, which is small enough here for a single writer.
+# Cost lines use regexes that match only the number of digits of each cost.
+insert into functional_kudu.alltypes select * from functional_parquet.alltypes;
+---- QUERYOPTIONS
+compute_processing_cost=true
+processing_cost_min_threads=10
+max_fragment_instances_per_node=10
+---- DISTRIBUTEDPLAN
+F01:PLAN FRAGMENT [KUDU(KuduPartition(functional_parquet.alltypes.id))] hosts=1 instances=1
+|  Per-Instance Resources: mem-estimate=24.55MB mem-reservation=4.00MB thread-reservation=1
+regex:\|  max-parallelism=1 segment-costs=\[\d{6}\]
+INSERT INTO KUDU [functional_kudu.alltypes]
+|  output exprs: id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month
+regex:\|  mem-estimate= mem-reservation= thread-reservation= cost=\d{6}
+|
+02:PARTIAL SORT
+|  order by: KuduPartition(functional_parquet.alltypes.id) ASC NULLS LAST, id ASC NULLS LAST
+|  materialized: KuduPartition(functional_parquet.alltypes.id)
+|  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
+regex:\|  tuple-ids=2 row-size= cardinality= cost=\d{5}
+|  in pipelines: 00(GETNEXT)
+|
+01:EXCHANGE [KUDU(KuduPartition(functional_parquet.alltypes.id))]
+|  mem-estimate=567.21KB mem-reservation=0B thread-reservation=0
+regex:\|  tuple-ids=0 row-size= cardinality= cost=\d{4}
+|  in pipelines: 00(GETNEXT)
+|
+F00:PLAN FRAGMENT [RANDOM] hosts=3 instances=3 (adjusted from 24)
+Per-Instance Resources: mem-estimate=16.33MB mem-reservation=88.00KB thread-reservation=1
+regex:max-parallelism=3 segment-costs=\[\d{5}\]
+00:SCAN HDFS [functional_parquet.alltypes, RANDOM]
+   HDFS partitions=24/24 files=24 size=190.27KB
+   stored statistics:
+     table: rows=unavailable size=unavailable
+     partitions: 0/24 rows=12.10K
+     columns missing stats: id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col
+   extrapolated-rows=disabled max-scan-range-rows=unavailable
+   mem-estimate=16.00MB mem-reservation=88.00KB thread-reservation=0
+regex:\s{3}tuple-ids=0 row-size= cardinality= cost=\d{5}
+   in pipelines: 00(GETNEXT)
+====
+# insert with COMPUTE_PROCESSING_COST and a noshuffle hint. As with HDFS tables,
+# COMPUTE_PROCESSING_COST overrides the hint, so the KUDU-partitioned exchange is added.
+insert into functional_kudu.alltypes /* +noshuffle */
+select * from functional_parquet.alltypes;
+---- QUERYOPTIONS
+compute_processing_cost=true
+processing_cost_min_threads=10
+max_fragment_instances_per_node=10
+---- DISTRIBUTEDPLAN
+F01:PLAN FRAGMENT [KUDU(KuduPartition(functional_parquet.alltypes.id))] hosts=1 instances=1
+|  Per-Instance Resources: mem-estimate=24.55MB mem-reservation=4.00MB thread-reservation=1
+regex:\|  max-parallelism=1 segment-costs=\[\d{6}\]
+INSERT INTO KUDU [functional_kudu.alltypes]
+|  output exprs: id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month
+regex:\|  mem-estimate= mem-reservation= thread-reservation= cost=\d{6}
+|
+02:PARTIAL SORT
+|  order by: KuduPartition(functional_parquet.alltypes.id) ASC NULLS LAST, id ASC NULLS LAST
+|  materialized: KuduPartition(functional_parquet.alltypes.id)
+|  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
+regex:\|  tuple-ids=2 row-size= cardinality= cost=\d{5}
+|  in pipelines: 00(GETNEXT)
+|
+01:EXCHANGE [KUDU(KuduPartition(functional_parquet.alltypes.id))]
+|  mem-estimate=567.21KB mem-reservation=0B thread-reservation=0
+regex:\|  tuple-ids=0 row-size= cardinality= cost=\d{4}
+|  in pipelines: 00(GETNEXT)
+|
+F00:PLAN FRAGMENT [RANDOM] hosts=3 instances=3 (adjusted from 24)
+Per-Instance Resources: mem-estimate=16.33MB mem-reservation=88.00KB thread-reservation=1
+regex:max-parallelism=3 segment-costs=\[\d{5}\]
+00:SCAN HDFS [functional_parquet.alltypes, RANDOM]
+   HDFS partitions=24/24 files=24 size=190.27KB
+   stored statistics:
+     table: rows=unavailable size=unavailable
+     partitions: 0/24 rows=12.10K
+     columns missing stats: id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col
+   extrapolated-rows=disabled max-scan-range-rows=unavailable
+   mem-estimate=16.00MB mem-reservation=88.00KB thread-reservation=0
+regex:\s{3}tuple-ids=0 row-size= cardinality= cost=\d{5}
+   in pipelines: 00(GETNEXT)
+====
+# insert with COMPUTE_PROCESSING_COST and a shuffle hint.
+insert into functional_kudu.alltypes /* +shuffle */
+select * from functional_parquet.alltypes;
+---- QUERYOPTIONS
+compute_processing_cost=true
+processing_cost_min_threads=10
+max_fragment_instances_per_node=10
+---- DISTRIBUTEDPLAN
+F01:PLAN FRAGMENT [KUDU(KuduPartition(functional_parquet.alltypes.id))] hosts=1 instances=1
+|  Per-Instance Resources: mem-estimate=24.55MB mem-reservation=4.00MB thread-reservation=1
+regex:\|  max-parallelism=1 segment-costs=\[\d{6}\]
+INSERT INTO KUDU [functional_kudu.alltypes]
+|  output exprs: id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month
+regex:\|  mem-estimate= mem-reservation= thread-reservation= cost=\d{6}
+|
+02:PARTIAL SORT
+|  order by: KuduPartition(functional_parquet.alltypes.id) ASC NULLS LAST, id ASC NULLS LAST
+|  materialized: KuduPartition(functional_parquet.alltypes.id)
+|  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
+regex:\|  tuple-ids=2 row-size= cardinality= cost=\d{5}
+|  in pipelines: 00(GETNEXT)
+|
+01:EXCHANGE [KUDU(KuduPartition(functional_parquet.alltypes.id))]
+|  mem-estimate=567.21KB mem-reservation=0B thread-reservation=0
+regex:\|  tuple-ids=0 row-size= cardinality= cost=\d{4}
+|  in pipelines: 00(GETNEXT)
+|
+F00:PLAN FRAGMENT [RANDOM] hosts=3 instances=3 (adjusted from 24)
+Per-Instance Resources: mem-estimate=16.33MB mem-reservation=88.00KB thread-reservation=1
+regex:max-parallelism=3 segment-costs=\[\d{5}\]
+00:SCAN HDFS [functional_parquet.alltypes, RANDOM]
+   HDFS partitions=24/24 files=24 size=190.27KB
+   stored statistics:
+     table: rows=unavailable size=unavailable
+     partitions: 0/24 rows=12.10K
+     columns missing stats: id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col
+   extrapolated-rows=disabled max-scan-range-rows=unavailable
+   mem-estimate=16.00MB mem-reservation=88.00KB thread-reservation=0
+regex:\s{3}tuple-ids=0 row-size= cardinality= cost=\d{5}
+   in pipelines: 00(GETNEXT)
+====
+# insert a large input with COMPUTE_PROCESSING_COST. The size-based writer estimate
+# exceeds the table's tablet count (3), so the tablet count applies.
+insert into functional_kudu.testtbl (id, name, zip)
+select cast(a.id as bigint), a.string_col, b.int_col
+from functional.alltypes a, functional.alltypes b, functional.alltypes c;
+---- QUERYOPTIONS
+compute_processing_cost=true
+processing_cost_min_threads=10
+max_fragment_instances_per_node=10
+---- DISTRIBUTEDPLAN
+F03:PLAN FRAGMENT [KUDU(KuduPartition(CAST(a.id AS BIGINT)))] hosts=3 instances=3
+|  Per-Instance Resources: mem-estimate=158.77MB mem-reservation=4.00MB thread-reservation=1
+regex:\|  max-parallelism=3 segment-costs=\[\d{13}\] cpu-comparison-result=27 \[max\(27 \(self\) vs 12 \(sum children\)\)\]
+INSERT INTO KUDU [functional_kudu.testtbl]
+|  output exprs: CAST(id AS BIGINT), string_col, int_col
+regex:\|  mem-estimate= mem-reservation= thread-reservation= cost=\d{13}
+|
+08:PARTIAL SORT
+|  order by: KuduPartition(CAST(a.id AS BIGINT)) ASC NULLS LAST, CAST(id AS BIGINT) ASC NULLS LAST
+|  materialized: KuduPartition(CAST(a.id AS BIGINT))
+|  mem-estimate=128.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
+regex:\|  tuple-ids=3 row-size= cardinality= cost=\d{12}
+|  in pipelines: 00(GETNEXT)
+|
+07:EXCHANGE [KUDU(KuduPartition(CAST(a.id AS BIGINT)))]
+|  mem-estimate=10.77MB mem-reservation=0B thread-reservation=0
+regex:\|  tuple-ids=0,1,2 row-size= cardinality= cost=\d{12}
+|  in pipelines: 00(GETNEXT)
+|
+F00:PLAN FRAGMENT [RANDOM] hosts=3 instances=24
+Per-Instance Resources: mem-estimate=16.39MB mem-reservation=32.00KB thread-reservation=1
+regex:max-parallelism=24 segment-costs=\[\d{13}\]
+04:NESTED LOOP JOIN [CROSS JOIN, BROADCAST]
+|  join table id: 00
+|  mem-estimate=0B mem-reservation=0B thread-reservation=0
+regex:\|  tuple-ids=0,1,2 row-size= cardinality= cost=\d{11}
+|  in pipelines: 00(GETNEXT), 02(OPEN)
+|
+|--F04:PLAN FRAGMENT [RANDOM] hosts=3 instances=3
+|  |  Per-Instance Resources: mem-estimate=16.00KB mem-reservation=0B thread-reservation=1
+regex:\|  \|  max-parallelism=3 segment-costs=\[\d{4}\]
+|  JOIN BUILD
+|  |  join-table-id=00 plan-id=01 cohort-id=01
+|  |  mem-estimate=0B mem-reservation=0B thread-reservation=0 cost=0
+|  |
+|  06:EXCHANGE [BROADCAST]
+|  |  mem-estimate=16.00KB mem-reservation=0B thread-reservation=0
+regex:\|  \|  tuple-ids=2 row-size= cardinality= cost=\d{4}
+|  |  in pipelines: 02(GETNEXT)
+|  |
+|  F02:PLAN FRAGMENT [RANDOM] hosts=3 instances=3 (adjusted from 24)
+|  Per-Instance Resources: mem-estimate=16.02MB mem-reservation=32.00KB thread-reservation=1
+regex:\|  max-parallelism=3 segment-costs=\[\d{5}\]
+|  02:SCAN HDFS [functional.alltypes c, RANDOM]
+|     HDFS partitions=24/24 files=24 size=478.45KB
+|     stored statistics:
+|       table: rows=7.30K size=478.45KB
+|       partitions: 24/24 rows=7.30K
+|       columns: all
+|     extrapolated-rows=disabled max-scan-range-rows=310
+|     mem-estimate=16.00MB mem-reservation=32.00KB thread-reservation=0
+regex:\|     tuple-ids=2 row-size= cardinality= cost=\d{5}
+|     in pipelines: 02(GETNEXT)
+|
+03:NESTED LOOP JOIN [CROSS JOIN, BROADCAST]
+|  join table id: 01
+|  mem-estimate=0B mem-reservation=0B thread-reservation=0
+regex:\|  tuple-ids=0,1 row-size= cardinality= cost=\d{7}
+|  in pipelines: 00(GETNEXT), 01(OPEN)
+|
+|--F05:PLAN FRAGMENT [RANDOM] hosts=3 instances=3
+|  |  Per-Instance Resources: mem-estimate=81.03KB mem-reservation=0B thread-reservation=1
+regex:\|  \|  max-parallelism=3 segment-costs=\[\d{4}\]
+|  JOIN BUILD
+|  |  join-table-id=01 plan-id=02 cohort-id=01
+|  |  mem-estimate=28.52KB mem-reservation=0B thread-reservation=0 cost=0
+|  |
+|  05:EXCHANGE [BROADCAST]
+|  |  mem-estimate=52.52KB mem-reservation=0B thread-reservation=0
+regex:\|  \|  tuple-ids=1 row-size= cardinality= cost=\d{4}
+|  |  in pipelines: 01(GETNEXT)
+|  |
+|  F01:PLAN FRAGMENT [RANDOM] hosts=3 instances=3 (adjusted from 24)
+|  Per-Instance Resources: mem-estimate=16.03MB mem-reservation=32.00KB thread-reservation=1
+regex:\|  max-parallelism=3 segment-costs=\[\d{5}\]
+|  01:SCAN HDFS [functional.alltypes b, RANDOM]
+|     HDFS partitions=24/24 files=24 size=478.45KB
+|     stored statistics:
+|       table: rows=7.30K size=478.45KB
+|       partitions: 24/24 rows=7.30K
+|       columns: all
+|     extrapolated-rows=disabled max-scan-range-rows=310
+|     mem-estimate=16.00MB mem-reservation=32.00KB thread-reservation=0
+regex:\|     tuple-ids=1 row-size= cardinality= cost=\d{5}
+|     in pipelines: 01(GETNEXT)
+|
+00:SCAN HDFS [functional.alltypes a, RANDOM]
+   HDFS partitions=24/24 files=24 size=478.45KB
+   stored statistics:
+     table: rows=7.30K size=478.45KB
+     partitions: 24/24 rows=7.30K
+     columns: all
+   extrapolated-rows=disabled max-scan-range-rows=310
+   mem-estimate=16.00MB mem-reservation=32.00KB thread-reservation=0
+regex:\s{3}tuple-ids=0 row-size= cardinality= cost=\d{5}
+   in pipelines: 00(GETNEXT)
+====
+# Same as above, with max_fs_writers below the tablet count.
+insert into functional_kudu.testtbl (id, name, zip)
+select cast(a.id as bigint), a.string_col, b.int_col
+from functional.alltypes a, functional.alltypes b, functional.alltypes c;
+---- QUERYOPTIONS
+compute_processing_cost=true
+processing_cost_min_threads=10
+max_fragment_instances_per_node=10
+max_fs_writers=2
+---- DISTRIBUTEDPLAN
+F03:PLAN FRAGMENT [KUDU(KuduPartition(CAST(a.id AS BIGINT)))] hosts=2 instances=2
+|  Per-Instance Resources: mem-estimate=158.77MB mem-reservation=4.00MB thread-reservation=1
+regex:\|  max-parallelism=2 segment-costs=\[\d{13}\] cpu-comparison-result=26 \[max\(26 \(self\) vs 12 \(sum children\)\)\]
+INSERT INTO KUDU [functional_kudu.testtbl]
+|  output exprs: CAST(id AS BIGINT), string_col, int_col
+regex:\|  mem-estimate= mem-reservation= thread-reservation= cost=\d{13}
+|
+08:PARTIAL SORT
+|  order by: KuduPartition(CAST(a.id AS BIGINT)) ASC NULLS LAST, CAST(id AS BIGINT) ASC NULLS LAST
+|  materialized: KuduPartition(CAST(a.id AS BIGINT))
+|  mem-estimate=128.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
+regex:\|  tuple-ids=3 row-size= cardinality= cost=\d{12}
+|  in pipelines: 00(GETNEXT)
+|
+07:EXCHANGE [KUDU(KuduPartition(CAST(a.id AS BIGINT)))]
+|  mem-estimate=10.77MB mem-reservation=0B thread-reservation=0
+regex:\|  tuple-ids=0,1,2 row-size= cardinality= cost=\d{12}
+|  in pipelines: 00(GETNEXT)
+|
+F00:PLAN FRAGMENT [RANDOM] hosts=3 instances=24
+Per-Instance Resources: mem-estimate=16.26MB mem-reservation=32.00KB thread-reservation=1
+regex:max-parallelism=24 segment-costs=\[\d{13}\]
+04:NESTED LOOP JOIN [CROSS JOIN, BROADCAST]
+|  join table id: 00
+|  mem-estimate=0B mem-reservation=0B thread-reservation=0
+regex:\|  tuple-ids=0,1,2 row-size= cardinality= cost=\d{11}
+|  in pipelines: 00(GETNEXT), 02(OPEN)
+|
+|--F04:PLAN FRAGMENT [RANDOM] hosts=3 instances=3
+|  |  Per-Instance Resources: mem-estimate=16.00KB mem-reservation=0B thread-reservation=1
+regex:\|  \|  max-parallelism=3 segment-costs=\[\d{4}\]
+|  JOIN BUILD
+|  |  join-table-id=00 plan-id=01 cohort-id=01
+|  |  mem-estimate=0B mem-reservation=0B thread-reservation=0 cost=0
+|  |
+|  06:EXCHANGE [BROADCAST]
+|  |  mem-estimate=16.00KB mem-reservation=0B thread-reservation=0
+regex:\|  \|  tuple-ids=2 row-size= cardinality= cost=\d{4}
+|  |  in pipelines: 02(GETNEXT)
+|  |
+|  F02:PLAN FRAGMENT [RANDOM] hosts=3 instances=3 (adjusted from 24)
+|  Per-Instance Resources: mem-estimate=16.02MB mem-reservation=32.00KB thread-reservation=1
+regex:\|  max-parallelism=3 segment-costs=\[\d{5}\]
+|  02:SCAN HDFS [functional.alltypes c, RANDOM]
+|     HDFS partitions=24/24 files=24 size=478.45KB
+|     stored statistics:
+|       table: rows=7.30K size=478.45KB
+|       partitions: 24/24 rows=7.30K
+|       columns: all
+|     extrapolated-rows=disabled max-scan-range-rows=310
+|     mem-estimate=16.00MB mem-reservation=32.00KB thread-reservation=0
+regex:\|     tuple-ids=2 row-size= cardinality= cost=\d{5}
+|     in pipelines: 02(GETNEXT)
+|
+03:NESTED LOOP JOIN [CROSS JOIN, BROADCAST]
+|  join table id: 01
+|  mem-estimate=0B mem-reservation=0B thread-reservation=0
+regex:\|  tuple-ids=0,1 row-size= cardinality= cost=\d{7}
+|  in pipelines: 00(GETNEXT), 01(OPEN)
+|
+|--F05:PLAN FRAGMENT [RANDOM] hosts=3 instances=3
+|  |  Per-Instance Resources: mem-estimate=81.03KB mem-reservation=0B thread-reservation=1
+regex:\|  \|  max-parallelism=3 segment-costs=\[\d{4}\]
+|  JOIN BUILD
+|  |  join-table-id=01 plan-id=02 cohort-id=01
+|  |  mem-estimate=28.52KB mem-reservation=0B thread-reservation=0 cost=0
+|  |
+|  05:EXCHANGE [BROADCAST]
+|  |  mem-estimate=52.52KB mem-reservation=0B thread-reservation=0
+regex:\|  \|  tuple-ids=1 row-size= cardinality= cost=\d{4}
+|  |  in pipelines: 01(GETNEXT)
+|  |
+|  F01:PLAN FRAGMENT [RANDOM] hosts=3 instances=3 (adjusted from 24)
+|  Per-Instance Resources: mem-estimate=16.03MB mem-reservation=32.00KB thread-reservation=1
+regex:\|  max-parallelism=3 segment-costs=\[\d{5}\]
+|  01:SCAN HDFS [functional.alltypes b, RANDOM]
+|     HDFS partitions=24/24 files=24 size=478.45KB
+|     stored statistics:
+|       table: rows=7.30K size=478.45KB
+|       partitions: 24/24 rows=7.30K
+|       columns: all
+|     extrapolated-rows=disabled max-scan-range-rows=310
+|     mem-estimate=16.00MB mem-reservation=32.00KB thread-reservation=0
+regex:\|     tuple-ids=1 row-size= cardinality= cost=\d{5}
+|     in pipelines: 01(GETNEXT)
+|
+00:SCAN HDFS [functional.alltypes a, RANDOM]
+   HDFS partitions=24/24 files=24 size=478.45KB
+   stored statistics:
+     table: rows=7.30K size=478.45KB
+     partitions: 24/24 rows=7.30K
+     columns: all
+   extrapolated-rows=disabled max-scan-range-rows=310
+   mem-estimate=16.00MB mem-reservation=32.00KB thread-reservation=0
+regex:\s{3}tuple-ids=0 row-size= cardinality= cost=\d{5}
+   in pipelines: 00(GETNEXT)
+====
+# CTAS of a large input with COMPUTE_PROCESSING_COST. The size-based writer estimate
+# exceeds the tablet count (9) estimated from the statement's partitioning.
+create table kudu_ctas primary key (id, string_col)
+partition by hash (id) partitions 3, range (string_col)
+(
+  partition values < '3'
+  , partition '3' <= values < '6' hash partitions 2
+  , partition '6' <= values hash (id) partitions 4
+)
+stored as kudu as
+select a.id, a.string_col
+from functional.alltypes a, functional.alltypes b, functional.alltypes c;
+---- QUERYOPTIONS
+compute_processing_cost=true
+processing_cost_min_threads=10
+max_fragment_instances_per_node=10
+---- DISTRIBUTEDPLAN
+F03:PLAN FRAGMENT [KUDU(KuduPartition(a.id, a.string_col))] hosts=3 instances=9
+|  Per-Instance Resources: mem-estimate=158.68MB mem-reservation=4.00MB thread-reservation=1
+regex:\|  max-parallelism=9 segment-costs=\[\d{13}\] cpu-comparison-result=33 \[max\(33 \(self\) vs 12 \(sum children\)\)\]
+INSERT INTO KUDU [default.kudu_ctas]
+|  output exprs: id, string_col
+regex:\|  mem-estimate= mem-reservation= thread-reservation= cost=\d{12}
+|
+08:PARTIAL SORT
+|  order by: KuduPartition(a.id, a.string_col) ASC NULLS LAST, id ASC NULLS LAST, string_col ASC NULLS LAST
+|  materialized: KuduPartition(a.id, a.string_col)
+|  mem-estimate=128.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
+regex:\|  tuple-ids=3 row-size= cardinality= cost=\d{12}
+|  in pipelines: 00(GETNEXT)
+|
+07:EXCHANGE [KUDU(KuduPartition(a.id, a.string_col))]
+|  mem-estimate=10.68MB mem-reservation=0B thread-reservation=0
+regex:\|  tuple-ids=0,1,2 row-size= cardinality= cost=\d{12}
+|  in pipelines: 00(GETNEXT)
+|
+F00:PLAN FRAGMENT [RANDOM] hosts=3 instances=24
+Per-Instance Resources: mem-estimate=17.02MB mem-reservation=32.00KB thread-reservation=1
+regex:max-parallelism=24 segment-costs=\[\d{13}\]
+04:NESTED LOOP JOIN [CROSS JOIN, BROADCAST]
+|  join table id: 00
+|  mem-estimate=0B mem-reservation=0B thread-reservation=0
+regex:\|  tuple-ids=0,1,2 row-size= cardinality= cost=\d{11}
+|  in pipelines: 00(GETNEXT), 02(OPEN)
+|
+|--F04:PLAN FRAGMENT [RANDOM] hosts=3 instances=3
+|  |  Per-Instance Resources: mem-estimate=16.00KB mem-reservation=0B thread-reservation=1
+regex:\|  \|  max-parallelism=3 segment-costs=\[\d{4}\]
+|  JOIN BUILD
+|  |  join-table-id=00 plan-id=01 cohort-id=01
+|  |  mem-estimate=0B mem-reservation=0B thread-reservation=0 cost=0
+|  |
+|  06:EXCHANGE [BROADCAST]
+|  |  mem-estimate=16.00KB mem-reservation=0B thread-reservation=0
+regex:\|  \|  tuple-ids=2 row-size= cardinality= cost=\d{4}
+|  |  in pipelines: 02(GETNEXT)
+|  |
+|  F02:PLAN FRAGMENT [RANDOM] hosts=3 instances=3 (adjusted from 24)
+|  Per-Instance Resources: mem-estimate=16.02MB mem-reservation=32.00KB thread-reservation=1
+regex:\|  max-parallelism=3 segment-costs=\[\d{5}\]
+|  02:SCAN HDFS [functional.alltypes c, RANDOM]
+|     HDFS partitions=24/24 files=24 size=478.45KB
+|     stored statistics:
+|       table: rows=7.30K size=478.45KB
+|       partitions: 24/24 rows=7.30K
+|       columns: all
+|     extrapolated-rows=disabled max-scan-range-rows=310
+|     mem-estimate=16.00MB mem-reservation=32.00KB thread-reservation=0
+regex:\|     tuple-ids=2 row-size= cardinality= cost=\d{5}
+|     in pipelines: 02(GETNEXT)
+|
+03:NESTED LOOP JOIN [CROSS JOIN, BROADCAST]
+|  join table id: 01
+|  mem-estimate=0B mem-reservation=0B thread-reservation=0
+regex:\|  tuple-ids=0,1 row-size= cardinality= cost=\d{7}
+|  in pipelines: 00(GETNEXT), 01(OPEN)
+|
+|--F05:PLAN FRAGMENT [RANDOM] hosts=3 instances=3
+|  |  Per-Instance Resources: mem-estimate=16.00KB mem-reservation=0B thread-reservation=1
+regex:\|  \|  max-parallelism=3 segment-costs=\[\d{4}\]
+|  JOIN BUILD
+|  |  join-table-id=01 plan-id=02 cohort-id=01
+|  |  mem-estimate=0B mem-reservation=0B thread-reservation=0 cost=0
+|  |
+|  05:EXCHANGE [BROADCAST]
+|  |  mem-estimate=16.00KB mem-reservation=0B thread-reservation=0
+regex:\|  \|  tuple-ids=1 row-size= cardinality= cost=\d{4}
+|  |  in pipelines: 01(GETNEXT)
+|  |
+|  F01:PLAN FRAGMENT [RANDOM] hosts=3 instances=3 (adjusted from 24)
+|  Per-Instance Resources: mem-estimate=16.02MB mem-reservation=32.00KB thread-reservation=1
+regex:\|  max-parallelism=3 segment-costs=\[\d{5}\]
+|  01:SCAN HDFS [functional.alltypes b, RANDOM]
+|     HDFS partitions=24/24 files=24 size=478.45KB
+|     stored statistics:
+|       table: rows=7.30K size=478.45KB
+|       partitions: 24/24 rows=7.30K
+|       columns: all
+|     extrapolated-rows=disabled max-scan-range-rows=310
+|     mem-estimate=16.00MB mem-reservation=32.00KB thread-reservation=0
+regex:\|     tuple-ids=1 row-size= cardinality= cost=\d{5}
+|     in pipelines: 01(GETNEXT)
+|
+00:SCAN HDFS [functional.alltypes a, RANDOM]
+   HDFS partitions=24/24 files=24 size=478.45KB
+   stored statistics:
+     table: rows=7.30K size=478.45KB
+     partitions: 24/24 rows=7.30K
+     columns: all
+   extrapolated-rows=disabled max-scan-range-rows=310
+   mem-estimate=16.00MB mem-reservation=32.00KB thread-reservation=0
+regex:\s{3}tuple-ids=0 row-size= cardinality= cost=\d{5}
+   in pipelines: 00(GETNEXT)
+====

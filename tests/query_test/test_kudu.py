@@ -123,6 +123,97 @@ class TestKuduBasicDML(KuduTestSuite):
       use_db=unique_database)
 
 
+@SkipIfNotHdfsMinicluster.tuned_for_minicluster
+class TestKuduDmlWriterLimit(KuduTestSuite):
+  """
+  Verifies the number of KUDU WRITER instances scheduled for Kudu DML. INSERT and UPSERT
+  into a partitioned table shuffle rows by Kudu partition, so the writer instance count
+  is capped at the table's tablet count (and at MAX_FS_WRITERS if lower). UPDATE and
+  DELETE have no such exchange, so the writer runs alongside the scan. CTAS targets do
+  not exist in Kudu at planning time, so their tablet count is estimated from the
+  statement's PARTITION BY clause.
+  """
+
+  @classmethod
+  def add_test_dimensions(cls):
+    super(TestKuduDmlWriterLimit, cls).add_test_dimensions()
+    # The default read mode of READ_LATEST does not provide high enough consistency for
+    # the row count checks.
+    add_mandatory_exec_option(cls, "kudu_read_mode", "READ_AT_SNAPSHOT")
+
+  @SkipIfKudu.no_hybrid_clock()
+  def test_kudu_dml_writer_limit(self, vector, unique_database):
+    # The planner and the scheduler must both see all 3 executors.
+    self.impalad_test_service.wait_for_metric_value(
+        "cluster-membership.backends.total", 3)
+    self.run_test_case('QueryTest/kudu-dml-writer-limit', vector, use_db=unique_database)
+
+  @staticmethod
+  def _exchange_rows_returned(profile):
+    """Returns RowsReturned of each per-instance EXCHANGE_NODE in 'profile'."""
+    rows = []
+    node_indent = None
+    for line in profile.splitlines():
+      if not line.strip(): continue
+      indent = len(line) - len(line.lstrip())
+      if node_indent is not None and indent <= node_indent: node_indent = None
+      if node_indent is None:
+        # The aggregated node has an "[N instances]" suffix and doesn't match.
+        if re.match(r'\s*EXCHANGE_NODE \(id=\d+\):', line): node_indent = indent
+        continue
+      m = re.match(r'\s*- RowsReturned: \S+ \((\d+)\)', line)
+      if m:
+        rows.append(int(m.group(1)))
+        node_indent = None
+    return rows
+
+  @SkipIfKudu.no_hybrid_clock()
+  def test_kudu_dml_all_writers_receive_rows(self, vector, unique_database):  # noqa: U100
+    """Every instance of the KUDU-partitioned exchange feeding the writers receives rows,
+    i.e. no writer instance is idle."""
+    self.impalad_test_service.wait_for_metric_value(
+        "cluster-membership.backends.total", 3)
+    self.client.set_configuration_option("mt_dop", 10)
+    src = "functional_parquet.alltypes"
+    hash_range = ("partition by hash (id) partitions 3, range (string_col) "
+        "(partition values < '5', partition '5' <= values)")
+    custom_hash = ("partition by hash (id) partitions 3, range (string_col) "
+        "(partition values < '3', partition '3' <= values < '6' hash partitions 2, "
+        "partition '6' <= values hash (id) partitions 4)")
+    tables = [
+      ("hash3", "id int primary key, int_col int",
+          "partition by hash (id) partitions 3", "id, int_col"),
+      ("range2", "id int primary key, int_col int",
+          "partition by range (id) (partition values < 3650, partition 3650 <= values)",
+          "id, int_col"),
+      ("hash_range6", "id int, string_col string, primary key (id, string_col)",
+          hash_range, "id, string_col"),
+      ("custom_hash9", "id int, string_col string, primary key (id, string_col)",
+          custom_hash, "id, string_col"),
+    ]
+    stmts = []
+    for name, cols, partitioning, select_list in tables:
+      tbl = "{0}.{1}".format(unique_database, name)
+      self.execute_query_expect_success(self.client,
+          "create table {0} ({1}) {2} stored as kudu".format(tbl, cols, partitioning))
+      for verb in ["insert into", "upsert into"]:
+        stmts.append(("{0} {1} select {2} from {3}".format(verb, tbl, select_list, src),
+            0))
+    # A MAX_FS_WRITERS below the tablet count leaves fewer instances, all receiving rows.
+    stmts.append(("upsert into {0}.hash3 select id, int_col from {1}".format(
+        unique_database, src), 2))
+    # CTAS estimates the tablet count from its PARTITION BY clause.
+    stmts.append(("create table {0}.ctas_custom_hash9 primary key (id, string_col) {1} "
+        "stored as kudu as select id, string_col from {2}".format(
+            unique_database, custom_hash, src), 0))
+    for stmt, max_fs_writers in stmts:
+      self.client.set_configuration_option("max_fs_writers", max_fs_writers)
+      result = self.client.execute(stmt)
+      rows = self._exchange_rows_returned(result.runtime_profile)
+      assert len(rows) > 1 and all(r > 0 for r in rows), \
+          "{0}: {1}\n{2}".format(stmt, rows, result.runtime_profile)
+
+
 class TestKuduTimestampConvert(KuduTestSuite):
   """
   This suite tests converts UTC timestamps read from kudu table to local time.

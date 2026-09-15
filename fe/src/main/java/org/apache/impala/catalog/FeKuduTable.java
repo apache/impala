@@ -24,6 +24,7 @@ import java.util.List;
 import javax.xml.bind.DatatypeConverter;
 
 import org.apache.impala.analysis.KuduPartitionParam;
+import org.apache.impala.analysis.RangePartition;
 import org.apache.impala.common.ImpalaRuntimeException;
 import org.apache.impala.service.BackendConfig;
 import org.apache.impala.thrift.TColumn;
@@ -34,6 +35,7 @@ import org.apache.impala.util.TResultRowBuilder;
 import org.apache.kudu.ColumnSchema;
 import org.apache.kudu.Schema;
 import org.apache.kudu.client.KuduClient;
+import org.apache.kudu.client.KuduPartitioner;
 import org.apache.kudu.client.LocatedTablet;
 import org.apache.kudu.client.PartitionSchema;
 import org.apache.kudu.client.PartitionSchema.HashBucketSchema;
@@ -148,6 +150,59 @@ public interface FeKuduTable extends FeTable {
       ret.add(KuduPartitionParam.createRangeParam(columnNames, null));
 
       return ret;
+    }
+
+    /**
+     * Returns the number of partitions 'table' is split into. Requires an RPC to a Kudu
+     * master, since the number of partitions are not cached in Impala's catalog metadata.
+     */
+    public static long getNumPartitions(FeKuduTable table) throws ImpalaRuntimeException {
+      KuduClient client = KuduUtil.getKuduClient(table.getKuduMasterHosts());
+      try {
+        // Call openTable to ensure we get the latest metadata for the Kudu table.
+        org.apache.kudu.client.KuduTable kuduTable =
+            client.openTable(table.getKuduTableName());
+        KuduPartitioner partitioner =
+            new KuduPartitioner.KuduPartitionerBuilder(kuduTable)
+                .buildTimeout(BackendConfig.INSTANCE.getKuduClientTimeoutMs()).build();
+        return partitioner.numPartitions();
+      } catch (Exception e) {
+        throw new ImpalaRuntimeException("Error accessing Kudu for tablet locations.",
+            e);
+      }
+    }
+
+    /**
+     * Returns the number of partitions a table created with the given partitioning will
+     * have: the sum over its range partitions of their hash bucket counts, where a range
+     * without its own hash schema uses the table-wide one. Used for CTAS targets, which
+     * don't exist in Kudu yet.
+     */
+    public static long estimateNumPartitions(List<KuduPartitionParam> partitionBy) {
+      long tableBuckets = 1;
+      List<RangePartition> ranges = null;
+      for (KuduPartitionParam param: partitionBy) {
+        if (param.getType() == KuduPartitionParam.Type.HASH) {
+          tableBuckets *= param.getNumHashPartitions();
+        } else {
+          ranges = param.getRangePartitions();
+        }
+      }
+      if (ranges == null || ranges.isEmpty()) return tableBuckets;
+      long numTablets = 0;
+      for (RangePartition range: ranges) {
+        List<KuduPartitionParam> hashSpec = range.getHashSpec();
+        if (hashSpec == null || hashSpec.isEmpty()) {
+          numTablets += tableBuckets;
+          continue;
+        }
+        long rangeBuckets = 1;
+        for (KuduPartitionParam param: hashSpec) {
+          rangeBuckets *= param.getNumHashPartitions();
+        }
+        numTablets += rangeBuckets;
+      }
+      return numTablets;
     }
 
     public static TResultSet getTableStats(FeKuduTable table)

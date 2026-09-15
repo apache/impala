@@ -227,4 +227,13 @@ public class KuduPartitionParam extends StmtNode {
   }
 
   public Type getType() { return type_; }
+
+  /** Number of hash buckets; only valid for HASH partitioning. */
+  public int getNumHashPartitions() {
+    Preconditions.checkState(type_ == Type.HASH);
+    return numHashPartitions_;
+  }
+
+  /** Explicit range partitions of a RANGE partitioning; may be null. */
+  public List<RangePartition> getRangePartitions() { return rangePartitions_; }
 }

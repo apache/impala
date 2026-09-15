@@ -324,6 +324,9 @@ public class RangePartition extends StmtNode {
     return output.toString();
   }
 
+  /** Hash schema overriding the table-wide one for this range; may be null. */
+  public List<KuduPartitionParam> getHashSpec() { return hashSpec_; }
+
   public TRangePartition toThrift() {
     TRangePartition tRangePartition = new TRangePartition();
     for (Expr literal: lowerBound_) {

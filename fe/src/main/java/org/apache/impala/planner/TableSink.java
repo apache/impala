@@ -164,7 +164,7 @@ public abstract class TableSink extends DataSink {
       // Sort columns are not supported for Kudu tables.
       Preconditions.checkState(sortProperties.first.isEmpty());
       return new KuduTableSink(
-          table, sinkAction, referencedColumns, outputExprs, kuduTxnToken);
+          table, sinkAction, referencedColumns, outputExprs, kuduTxnToken, maxTableSinks);
     } else {
       throw new UnsupportedOperationException(
           "Cannot create data sink into table of type: " + table.getClass().getName());

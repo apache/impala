@@ -310,6 +310,7 @@ table_name:timestamp_at_dst_changes, constraint:only, table_format:kudu/none/non
 table_name:binary_tbl, constraint:only, table_format:kudu/none/none
 table_name:binary_tbl_big, constraint:only, table_format:kudu/none/none
 table_name:timestamp_primary_key, constraint:only, table_format:kudu/none/none
+table_name:hash_range_partitioned, constraint:only, table_format:kudu/none/none
 
 # Skipping header lines is only effective with text tables
 table_name:table_with_header, constraint:restrict_to, table_format:text/none/none
@@ -440,6 +441,8 @@ table_name:timestamp_at_dst_changes, constraint:restrict_to, table_format:text/n
 table_name:timestamp_at_dst_changes, constraint:restrict_to, table_format:kudu/none/none
 
 table_name:timestamp_primary_key, constraint:restrict_to, table_format:kudu/none/none
+
+table_name:hash_range_partitioned, constraint:restrict_to, table_format:kudu/none/none
 
 # Table where all column values are unique but have some NULLs.
 # Depends on functional.alltypessmall.

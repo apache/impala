@@ -557,6 +557,8 @@ public class PlanFragment extends TreeNode<PlanFragment> {
       return ((JoinBuildSink)sink_).getNumNodes();
     } else if (sink_ instanceof HdfsTableSink) {
       return ((HdfsTableSink)sink_).getNumNodes();
+    } else if (sink_ instanceof KuduTableSink) {
+      return ((KuduTableSink)sink_).getNumNodes();
     } else {
       return planRoot_.getNumNodes();
     }
@@ -592,6 +594,8 @@ public class PlanFragment extends TreeNode<PlanFragment> {
       return ((JoinBuildSink)sink_).getNumInstances();
     } else if (sink_ instanceof HdfsTableSink) {
       return ((HdfsTableSink)sink_).getNumInstances();
+    } else if (sink_ instanceof KuduTableSink) {
+      return ((KuduTableSink)sink_).getNumInstances();
     } else {
       if (originalInstanceCount_ > -1) {
         int adjustedCount = getAdjustedInstanceCount();
@@ -678,6 +682,10 @@ public class PlanFragment extends TreeNode<PlanFragment> {
     result.setThread_reservation(perInstanceResourceProfile_.getThreadReservation());
     if (hasAdjustedInstanceCount()) {
       result.setEffective_instance_count(adjustedInstanceCount_);
+    } else if (sink_ instanceof KuduTableSink
+        && ((KuduTableSink) sink_).hasInstanceLimit()) {
+      // The scheduler doesn't know a Kudu table's tablet count, so tell it the cap.
+      result.setEffective_instance_count(getNumInstances());
     }
     result.setIs_coordinator_only(coordinatorOnly_);
     result.setIs_dominant(isDominantFragment_);
