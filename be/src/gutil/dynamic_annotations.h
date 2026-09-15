@@ -602,6 +602,11 @@ void __asan_poison_memory_region(void const volatile *addr, size_t size);
 void __asan_unpoison_memory_region(void const volatile *addr, size_t size);
 
 // User code should use macros instead of functions.
+// Protobuf includes <sanitizer/asan_interface.h> when ADDRESS_SANITIZER is defined. In
+// the IR build (-DADDRESS_SANITIZER without -fsanitize=address) that header defines
+// these as no-ops, which would conflict with the definitions below.
+#undef ASAN_POISON_MEMORY_REGION
+#undef ASAN_UNPOISON_MEMORY_REGION
 #define ASAN_POISON_MEMORY_REGION(addr, size)   \
   __asan_poison_memory_region((addr), (size))
 #define ASAN_UNPOISON_MEMORY_REGION(addr, size) \

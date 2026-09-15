@@ -588,7 +588,7 @@ Status KrpcDataStreamSender::Channel::DoTransmitDataRpc() {
       std::bind(&KrpcDataStreamSender::Channel::TransmitDataCompleteCb, this));
   // 'req' took ownership of 'header'. Need to release its ownership or 'header' will be
   // deleted by destructor.
-  req.release_row_batch_header();
+  (void)req.release_row_batch_header();
   return Status::OK();
 }
 

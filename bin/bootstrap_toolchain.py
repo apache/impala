@@ -482,9 +482,6 @@ def get_toolchain_downloads():
   toolchain_packages += [gtest_package]
   toolchain_packages += get_unique_toolchain_downloads(
       ["thrift:cpp", "thrift:java", "thrift:py"])
-  protobuf_package_clang = ToolchainPackage(
-      "protobuf", explicit_version=os.environ.get("IMPALA_PROTOBUF_CLANG_VERSION"))
-  toolchain_packages += [protobuf_package_clang]
   if platform.machine() == 'aarch64':
     toolchain_packages.append(ToolchainPackage("hadoop-client"))
   # Check whether this platform is supported (or whether a valid custom toolchain
