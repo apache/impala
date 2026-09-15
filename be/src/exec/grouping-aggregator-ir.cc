@@ -328,7 +328,7 @@ int GroupingAggregator::CopyGroupingValuesStringSlot(Tuple* intermediate_tuple,
   // ptr and len were already copied to the fixed-len part of string value
   StringValue* sv = reinterpret_cast<StringValue*>(
       intermediate_tuple->GetSlot(tuple_offset));
-  if (sv->IsSmall()) return 0;
+  if (sv->Smallify()) return 0;
   memcpy(buffer, sv->Ptr(), sv->Len());
   sv->SetPtr(reinterpret_cast<char*>(buffer));
   return sv->Len();

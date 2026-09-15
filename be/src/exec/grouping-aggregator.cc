@@ -534,7 +534,9 @@ int GroupingAggregator::GroupingExprsVarlenSize() {
   for (int expr_idx : string_grouping_exprs_) {
     StringValue* sv = reinterpret_cast<StringValue*>(ht_ctx_->ExprValue(expr_idx));
     // Avoid branching by multiplying length by null bit.
-    varlen_size += sv->Len() * !ht_ctx_->ExprValueNull(expr_idx);
+    // Do not allocate memory for small strings, as they will be smallified upon copy.
+    varlen_size += sv->ExternalLen(true /*assume_smallify*/)
+        * !ht_ctx_->ExprValueNull(expr_idx);
   }
   return varlen_size;
 }
