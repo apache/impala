@@ -77,6 +77,15 @@ under the License.
         see the <xref keyref="release_notes_40">release notes for <keyword
         keyref="impala40"/></xref>.
       </p>
+      <p>
+        <ul>
+          <li rev="4.0.0 IMPALA-9690">On x86-64 CPUs, the Impala daemons do not start
+            without the AVX2 instruction set. Earlier releases required only SSSE3.
+            On machines that support AVX but not AVX2, start the daemons with the
+              <codeph>--enable_legacy_avx_support=true</codeph> startup flag. See <xref
+              href="impala_prereqs.xml#prereqs_cpu"/> for details.</li>
+        </ul>
+      </p>
     </conbody>
   </concept>
   <concept id="incompatible_changes_340x">
