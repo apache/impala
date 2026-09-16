@@ -229,6 +229,7 @@ void AggFnEvaluator::SetDstSlot(const AnyVal* src, const SlotDescriptor& dst_slo
       return;
     case TYPE_CHAR:
     case TYPE_FIXED_UDA_INTERMEDIATE:
+    case TYPE_UUID:
       if (UNLIKELY(slot != reinterpret_cast<const StringVal*>(src)->ptr)) {
         agg_fn_ctx_->SetError(Substitute("UDA should not set pointer of $0 intermediate",
               dst_slot_desc.type().DebugString()).c_str());
@@ -283,7 +284,8 @@ void AggFnEvaluator::Init(Tuple* dst) {
 
   const ColumnType& type = intermediate_type();
   const SlotDescriptor& slot_desc = intermediate_slot_desc();
-  if (type.type == TYPE_CHAR || type.type == TYPE_FIXED_UDA_INTERMEDIATE) {
+  if (type.type == TYPE_CHAR || type.type == TYPE_FIXED_UDA_INTERMEDIATE
+      || type.type == TYPE_UUID) {
     // The intermediate value is represented as a fixed-length buffer inline in the tuple.
     // The aggregate function writes to this buffer directly. staging_intermediate_val_
     // is a StringVal with a pointer to the slot and the length of the slot.
@@ -302,9 +304,22 @@ void AggFnEvaluator::Init(Tuple* dst) {
 
 static void SetAnyVal(const SlotDescriptor& desc, Tuple* tuple, AnyVal* dst) {
   bool is_null = tuple->IsNull(desc.null_indicator_offset());
+  const ColumnType& type = desc.type();
+  if (type.type == TYPE_CHAR || type.type == TYPE_FIXED_UDA_INTERMEDIATE
+      || type.type == TYPE_UUID) {
+    // The value is a fixed-length buffer inline in the tuple and aggregate functions
+    // write to it in place, even if the current value is NULL (e.g. MIN(UUID)). 'dst' is
+    // reused for every tuple, so it must always point to the slot of 'tuple', otherwise
+    // the aggregate function would write to the slot of the previously used tuple.
+    StringVal* sv = reinterpret_cast<StringVal*>(dst);
+    sv->is_null = is_null;
+    sv->ptr = reinterpret_cast<uint8_t*>(tuple->GetSlot(desc.tuple_offset()));
+    sv->len = type.len;
+    return;
+  }
   void* slot = nullptr;
   if (!is_null) slot = tuple->GetSlot(desc.tuple_offset());
-  AnyValUtil::SetAnyVal(slot, desc.type(), dst);
+  AnyValUtil::SetAnyVal(slot, type, dst);
 }
 
 void AggFnEvaluator::Update(const TupleRow* row, Tuple* dst, void* fn) {
@@ -487,7 +502,8 @@ void AggFnEvaluator::SerializeOrFinalize(Tuple* src,
       break;
     }
     case TYPE_CHAR:
-    case TYPE_FIXED_UDA_INTERMEDIATE: {
+    case TYPE_FIXED_UDA_INTERMEDIATE:
+    case TYPE_UUID: {
       // Serialize() or Finalize() may rewrite the data in place, but must return the
       // same pointer.
       typedef StringVal(*Fn)(FunctionContext*, AnyVal*);

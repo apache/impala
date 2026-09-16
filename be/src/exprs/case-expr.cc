@@ -308,6 +308,7 @@ void CaseExpr::GetChildVal(int child_idx, ScalarExprEvaluator* eval,
       *reinterpret_cast<TimestampVal*>(dst) = child->GetTimestampVal(eval, row);
       break;
     case TYPE_STRING:
+    case TYPE_UUID:
       *reinterpret_cast<StringVal*>(dst) = child->GetStringVal(eval, row);
       break;
     case TYPE_DECIMAL:
@@ -349,6 +350,7 @@ bool CaseExpr::AnyValEq(
       return AnyValUtil::Equals(type, *reinterpret_cast<const TimestampVal*>(v1),
                                 *reinterpret_cast<const TimestampVal*>(v2));
     case TYPE_STRING:
+    case TYPE_UUID:
       return AnyValUtil::Equals(type, *reinterpret_cast<const StringVal*>(v1),
                                 *reinterpret_cast<const StringVal*>(v2));
     case TYPE_DECIMAL:

@@ -116,6 +116,9 @@ table_name:iceberg_v2_equality_delete_schema_evolution, constraint:restrict_to, 
 table_name:iceberg_query_metadata, constraint:restrict_to, table_format:parquet/none/none
 table_name:iceberg_metadata_alltypes, constraint:restrict_to, table_format:parquet/none/none
 table_name:iceberg_view, constraint:restrict_to, table_format:parquet/none/none
+table_name:iceberg_uuid_test, constraint:restrict_to, table_format:parquet/none/none
+table_name:iceberg_uuid_test_orc, constraint:restrict_to, table_format:parquet/none/none
+table_name:iceberg_uuid_test_avro, constraint:restrict_to, table_format:parquet/none/none
 
 # TODO: Support Avro. Data loading currently fails for Avro because complex types
 # cannot be converted to the corresponding Avro types yet.

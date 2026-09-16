@@ -356,6 +356,8 @@ public class BuiltinsDb extends Db {
             "9HllUpdateIN10impala_udf9DoubleValEEEvPNS2_15FunctionContextERKT_PNS2_9StringValE")
         .put(Type.STRING,
             "9HllUpdateIN10impala_udf9StringValEEEvPNS2_15FunctionContextERKT_PS3_")
+        .put(Type.UUID,
+            "9HllUpdateIN10impala_udf9StringValEEEvPNS2_15FunctionContextERKT_PS3_")
         .put(Type.TIMESTAMP,
             "9HllUpdateIN10impala_udf12TimestampValEEEvPNS2_15FunctionContextERKT_PNS2_9StringValE")
         .put(Type.DECIMAL,
@@ -382,6 +384,8 @@ public class BuiltinsDb extends Db {
         .put(Type.DOUBLE,
              "9HllUpdateIN10impala_udf9DoubleValEEEvPNS2_15FunctionContextERKT_RKNS2_6IntValEPNS2_9StringValE")
         .put(Type.STRING,
+             "9HllUpdateIN10impala_udf9StringValEEEvPNS2_15FunctionContextERKT_RKNS2_6IntValEPS3_")
+        .put(Type.UUID,
              "9HllUpdateIN10impala_udf9StringValEEEvPNS2_15FunctionContextERKT_RKNS2_6IntValEPS3_")
         .put(Type.TIMESTAMP,
              "9HllUpdateIN10impala_udf12TimestampValEEEvPNS2_15FunctionContextERKT_RKNS2_6IntValEPNS2_9StringValE")
@@ -460,6 +464,8 @@ public class BuiltinsDb extends Db {
             "16SampledNdvUpdateIN10impala_udf9DoubleValEEEvPNS2_15FunctionContextERKT_RKS3_PNS2_9StringValE")
         .put(Type.STRING,
             "16SampledNdvUpdateIN10impala_udf9StringValEEEvPNS2_15FunctionContextERKT_RKNS2_9DoubleValEPS3_")
+        .put(Type.UUID,
+            "16SampledNdvUpdateIN10impala_udf9StringValEEEvPNS2_15FunctionContextERKT_RKNS2_9DoubleValEPS3_")
         .put(Type.TIMESTAMP,
             "16SampledNdvUpdateIN10impala_udf12TimestampValEEEvPNS2_15FunctionContextERKT_RKNS2_9DoubleValEPNS2_9StringValE")
         .put(Type.DECIMAL,
@@ -486,6 +492,8 @@ public class BuiltinsDb extends Db {
             "11AggIfUpdateIN10impala_udf9DoubleValEEEvPNS2_15FunctionContextERKNS2_10BooleanValERKT_PS9_")
         .put(Type.STRING,
             "11AggIfUpdateIN10impala_udf9StringValEEEvPNS2_15FunctionContextERKNS2_10BooleanValERKT_PS9_")
+        .put(Type.UUID,
+            "15AggIfUpdateUuidEPN10impala_udf15FunctionContextERKNS1_10BooleanValERKNS1_9StringValEPS7_")
         .put(Type.TIMESTAMP,
             "11AggIfUpdateIN10impala_udf12TimestampValEEEvPNS2_15FunctionContextERKNS2_10BooleanValERKT_PS9_")
         .put(Type.DECIMAL,
@@ -512,6 +520,8 @@ public class BuiltinsDb extends Db {
             "10AggIfMergeIN10impala_udf9DoubleValEEEvPNS2_15FunctionContextERKT_PS6_")
         .put(Type.STRING,
             "10AggIfMergeIN10impala_udf9StringValEEEvPNS2_15FunctionContextERKT_PS6_")
+        .put(Type.UUID,
+            "14AggIfMergeUuidEPN10impala_udf15FunctionContextERKNS1_9StringValEPS4_")
         .put(Type.TIMESTAMP,
             "10AggIfMergeIN10impala_udf12TimestampValEEEvPNS2_15FunctionContextERKT_PS6_")
         .put(Type.DECIMAL,
@@ -618,6 +628,8 @@ public class BuiltinsDb extends Db {
             "3MinIN10impala_udf9StringValEEEvPNS2_15FunctionContextERKT_PS6_")
         .put(Type.BINARY,
             "3MinIN10impala_udf9StringValEEEvPNS2_15FunctionContextERKT_PS6_")
+        .put(Type.UUID,
+            "7MinUuidEPN10impala_udf15FunctionContextERKNS1_9StringValEPS4_")
         .put(Type.TIMESTAMP,
             "3MinIN10impala_udf12TimestampValEEEvPNS2_15FunctionContextERKT_PS6_")
         .put(Type.DECIMAL,
@@ -646,6 +658,8 @@ public class BuiltinsDb extends Db {
             "3MaxIN10impala_udf9StringValEEEvPNS2_15FunctionContextERKT_PS6_")
         .put(Type.BINARY,
             "3MaxIN10impala_udf9StringValEEEvPNS2_15FunctionContextERKT_PS6_")
+        .put(Type.UUID,
+            "7MaxUuidEPN10impala_udf15FunctionContextERKNS1_9StringValEPS4_")
         .put(Type.TIMESTAMP,
             "3MaxIN10impala_udf12TimestampValEEEvPNS2_15FunctionContextERKT_PS6_")
         .put(Type.DECIMAL,
@@ -972,6 +986,85 @@ public class BuiltinsDb extends Db {
         false, true);
   }
 
+  // Registers ndv(), ndv(precision), ndv_no_finalize(), and sampled_ndv() for type t.
+  private void registerHllNdvBuiltins(Db db, String prefix, Type t) {
+    // NDV
+    // Setup the intermediate type based on the default precision in the template
+    // function in the db. This type is useful when the default precision is all
+    // needed in the ndv().
+    Type defaultHllIntermediateType =
+        ScalarType.createFixedUdaIntermediateType(HLL_INTERMEDIATE_SIZE);
+
+    // Single input argument version
+    db.addBuiltin(AggregateFunction.createBuiltin(db, "ndv", Lists.newArrayList(t),
+        Type.BIGINT, defaultHllIntermediateType,
+        prefix + "7HllInitEPN10impala_udf15FunctionContextEPNS1_9StringValE",
+        prefix + HLL_UPDATE_SYMBOL.get(t),
+        prefix + "8HllMergeEPN10impala_udf15FunctionContextERKNS1_9StringValEPS4_",
+        null,
+        prefix + "11HllFinalizeEPN10impala_udf15FunctionContextERKNS1_9StringValE",
+        true, false, true));
+
+    // Double input argument version, with the unique HllUpdate function symbols.
+    // Take an intermediate data type with the default length for now. During the
+    // analysis phase, the data type will be resolved to the correct template, based
+    // on the the value in the 2nd argument.
+    db.addBuiltin(createTemplateAggregateFunctionForNDVWith2Args(
+        db, prefix, t, defaultHllIntermediateType));
+
+    // For each type t, populate the hash map of AggregateFunctions with
+    // all known intermediate data types.
+    List<AggregateFunction> ndvList = new ArrayList<AggregateFunction>();
+    for (int size : hll_intermediate_sizes) {
+      Type hllIntermediateType = ScalarType.createFixedUdaIntermediateType(size);
+      ndvList.add(createTemplateAggregateFunctionForNDVWith2Args(
+          db, prefix, t, hllIntermediateType));
+    }
+    builtinNDVs_.put(t, ndvList);
+
+    // Used in stats computation. Will take a single input argument only.
+    db.addBuiltin(AggregateFunction.createBuiltin(db, "ndv_no_finalize",
+        Lists.newArrayList(t), Type.STRING, defaultHllIntermediateType,
+        prefix + "7HllInitEPN10impala_udf15FunctionContextEPNS1_9StringValE",
+        prefix + HLL_UPDATE_SYMBOL.get(t),
+        prefix + "8HllMergeEPN10impala_udf15FunctionContextERKNS1_9StringValEPS4_",
+        null,
+        "_Z20IncrementNdvFinalizePN10impala_udf15FunctionContextERKNS_9StringValE",
+        true, false, true));
+
+    // SAMPLED_NDV.
+    // Size needs to be kept in sync with SampledNdvState in the BE.
+    int numHllBuckets = 32;
+    int sampledIntermediateSize = 16 + numHllBuckets * (8 + HLL_INTERMEDIATE_SIZE);
+    Type sampledIntermediateType =
+        ScalarType.createFixedUdaIntermediateType(sampledIntermediateSize);
+    db.addBuiltin(AggregateFunction.createBuiltin(db, "sampled_ndv",
+        Lists.newArrayList(t, Type.DOUBLE), Type.BIGINT, sampledIntermediateType,
+        prefix + "14SampledNdvInitEPN10impala_udf15FunctionContextEPNS1_9StringValE",
+        prefix + SAMPLED_NDV_UPDATE_SYMBOL.get(t),
+        prefix + "15SampledNdvMergeEPN10impala_udf15FunctionContextERKNS1_9StringValEPS4_",
+        null,
+        prefix + "18SampledNdvFinalizeEPN10impala_udf15FunctionContextERKNS1_9StringValE",
+        true, false, true));
+  }
+
+  // Registers aggif() for type t. UUID uses inline intermediate slots (initNull, not
+  // initNullString) and dedicated BE update/merge symbols. UUID has no finalize function.
+  // AggFnEvaluator copies inline slots via RawValue::Write when finalize is null.
+  private void registerAggIfBuiltins(Db db, String prefix, Type t, String initNull,
+      String initNullString) {
+    String init = t.isStringType() ? initNullString : initNull;
+    String finalize = t.isUuid() ? null : prefix + AGGIF_FINALIZE_SYMBOL.get(t);
+    db.addBuiltin(AggregateFunction.createBuiltin(db, "aggif",
+        Lists.newArrayList(ScalarType.BOOLEAN, t), t, t,
+        init,
+        prefix + AGGIF_UPDATE_SYMBOL.get(t),
+        prefix + AGGIF_MERGE_SYMBOL.get(t),
+        null,
+        finalize,
+        true, false, false));
+  }
+
   // Populate all the aggregate builtins in the catalog.
   // null symbols indicate the function does not need that step of the evaluation.
   // An empty symbol indicates a TODO for the BE to implement the function.
@@ -1002,8 +1095,6 @@ public class BuiltinsDb extends Db {
       if (t.isNull()) continue; // NULL is handled through type promotion.
       if (t.isScalarType(PrimitiveType.CHAR)) continue; // promoted to STRING
       if (t.isScalarType(PrimitiveType.VARCHAR)) continue; // promoted to STRING
-      // TODO: Add UUID builtin support.
-      if (t.isUuid()) continue;
 
       // Count
       db.addBuiltin(AggregateFunction.createBuiltin(db, "count",
@@ -1046,6 +1137,10 @@ public class BuiltinsDb extends Db {
       // sample/appx_median or other analytic aggregates below.
       if (t.isBinary() || !t.supportsComparison()) continue;
 
+      registerHllNdvBuiltins(db, prefix, t);
+      registerAggIfBuiltins(db, prefix, t, initNull, initNullString);
+      if (t.isUuid()) continue;
+
       // Sample
       db.addBuiltin(AggregateFunction.createBuiltin(db, "sample",
           Lists.newArrayList(t), Type.STRING, Type.STRING,
@@ -1075,50 +1170,6 @@ public class BuiltinsDb extends Db {
           prefix + SAMPLE_SERIALIZE_SYMBOL.get(t),
           prefix + HISTOGRAM_FINALIZE_SYMBOL.get(t),
           false, false, true));
-
-      // NDV
-      // Setup the intermediate type based on the default precision in the template
-      // function in the db. This type is useful when the default precision is all
-      // needed in the ndv().
-      Type defaultHllIntermediateType =
-          ScalarType.createFixedUdaIntermediateType(HLL_INTERMEDIATE_SIZE);
-
-      // Single input argument version
-      db.addBuiltin(AggregateFunction.createBuiltin(db, "ndv", Lists.newArrayList(t),
-          Type.BIGINT, defaultHllIntermediateType,
-          prefix + "7HllInitEPN10impala_udf15FunctionContextEPNS1_9StringValE",
-          prefix + HLL_UPDATE_SYMBOL.get(t),
-          prefix + "8HllMergeEPN10impala_udf15FunctionContextERKNS1_9StringValEPS4_",
-          null,
-          prefix + "11HllFinalizeEPN10impala_udf15FunctionContextERKNS1_9StringValE",
-          true, false, true));
-
-      // Double input argument version, with the unique HllUpdate function symbols.
-      // Take an intermediate data type with the default length for now. During the
-      // analysis phase, the data type will be resolved to the correct template, based
-      // on the the value in the 2nd argument.
-      db.addBuiltin(createTemplateAggregateFunctionForNDVWith2Args(
-          db, prefix, t, defaultHllIntermediateType));
-
-      // For each type t, populate the hash map of AggregateFunctions with
-      // all known intermediate data types.
-      List<AggregateFunction> ndvList = new ArrayList<AggregateFunction>();
-      for (int size : hll_intermediate_sizes) {
-        Type hllIntermediateType = ScalarType.createFixedUdaIntermediateType(size);
-        ndvList.add(createTemplateAggregateFunctionForNDVWith2Args(
-            db, prefix, t, hllIntermediateType));
-      }
-      builtinNDVs_.put(t, ndvList);
-
-      // Used in stats computation. Will take a single input argument only.
-      db.addBuiltin(AggregateFunction.createBuiltin(db, "ndv_no_finalize",
-          Lists.newArrayList(t), Type.STRING, defaultHllIntermediateType,
-          prefix + "7HllInitEPN10impala_udf15FunctionContextEPNS1_9StringValE",
-          prefix + HLL_UPDATE_SYMBOL.get(t),
-          prefix + "8HllMergeEPN10impala_udf15FunctionContextERKNS1_9StringValEPS4_",
-          null,
-          "_Z20IncrementNdvFinalizePN10impala_udf15FunctionContextERKNS_9StringValE",
-          true, false, true));
 
       // DataSketches HLL
       if (DS_HLL_UPDATE_SYMBOL.containsKey(t)) {
@@ -1200,29 +1251,6 @@ public class BuiltinsDb extends Db {
         db.addBuiltin(AggregateFunction.createUnsupportedBuiltin(db, "ds_theta_sketch",
                 Lists.newArrayList(t), Type.BINARY, Type.BINARY));
       }
-
-      // SAMPLED_NDV.
-      // Size needs to be kept in sync with SampledNdvState in the BE.
-      int NUM_HLL_BUCKETS = 32;
-      int size = 16 + NUM_HLL_BUCKETS * (8 + HLL_INTERMEDIATE_SIZE);
-      Type sampledIntermediateType = ScalarType.createFixedUdaIntermediateType(size);
-      db.addBuiltin(AggregateFunction.createBuiltin(db, "sampled_ndv",
-          Lists.newArrayList(t, Type.DOUBLE), Type.BIGINT, sampledIntermediateType,
-          prefix + "14SampledNdvInitEPN10impala_udf15FunctionContextEPNS1_9StringValE",
-          prefix + SAMPLED_NDV_UPDATE_SYMBOL.get(t),
-          prefix + "15SampledNdvMergeEPN10impala_udf15FunctionContextERKNS1_9StringValEPS4_",
-          null,
-          prefix + "18SampledNdvFinalizeEPN10impala_udf15FunctionContextERKNS1_9StringValE",
-          true, false, true));
-
-      db.addBuiltin(AggregateFunction.createBuiltin(db, "aggif",
-          Lists.newArrayList(ScalarType.BOOLEAN, t), t, t,
-          t.isStringType() ? initNullString : initNull,
-          prefix + AGGIF_UPDATE_SYMBOL.get(t),
-          prefix + AGGIF_MERGE_SYMBOL.get(t),
-          null,
-          prefix + AGGIF_FINALIZE_SYMBOL.get(t),
-          true, false, false));
 
       Type pcIntermediateType =
           ScalarType.createFixedUdaIntermediateType(PC_INTERMEDIATE_SIZE);

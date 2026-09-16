@@ -164,6 +164,7 @@ void Aggregator::InitAggSlots(
     const AggFn::AggregationOp agg_op = agg_fn->agg_op();
     if ((agg_op == AggFn::MIN || agg_op == AggFn::MAX)
         && !agg_fn->intermediate_type().IsStringType()
+        && !agg_fn->intermediate_type().IsUuidType()
         && !agg_fn->intermediate_type().IsTimestampType()) {
       ExprValue default_value;
       void* default_value_ptr = nullptr;
@@ -419,6 +420,7 @@ Status AggregatorConfig::CodegenUpdateSlot(LlvmCodeGen* codegen, int agg_fn_idx,
     // SUM) that we get the right result if UpdateSlot() pretends that the NULL bit of
     // 'dst' is unset. Empirically this optimisation makes TPC-H Q1 5-10% faster.
     bool special_null_handling = !agg_fn->intermediate_type().IsStringType()
+        && !agg_fn->intermediate_type().IsUuidType()
         && !agg_fn->intermediate_type().IsTimestampType()
         && (agg_op == AggFn::MIN || agg_op == AggFn::MAX || agg_op == AggFn::SUM
                || agg_op == AggFn::AVG || agg_op == AggFn::NDV);
@@ -445,9 +447,9 @@ Status AggregatorConfig::CodegenUpdateSlot(LlvmCodeGen* codegen, int agg_fn_idx,
     CodegenAnyVal updated_dst_val;
     RETURN_IF_ERROR(CodegenCallUda(
         codegen, &builder, agg_fn, agg_fn_ctx_val, input_vals, dst, &updated_dst_val));
-    // Copy the value back to the slot. In the FIXED_UDA_INTERMEDIATE case, the
+    // Copy the value back to the slot. In the FIXED_UDA_INTERMEDIATE and UUID case, the
     // UDA function writes directly to the slot so there is nothing to copy.
-    if (dst_type.type != TYPE_FIXED_UDA_INTERMEDIATE) {
+    if (dst_type.type != TYPE_FIXED_UDA_INTERMEDIATE && dst_type.type != TYPE_UUID) {
       SlotDescriptor::CodegenStoreNonNullAnyVal(updated_dst_val, dst_slot_ptr);
     }
 

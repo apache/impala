@@ -662,7 +662,8 @@ llvm::Value* CodegenAnyVal::Eq(CodegenAnyVal* other) {
       return builder_->CreateFCmpOEQ(GetVal(), other->GetVal(), "eq");
     case TYPE_STRING:
     case TYPE_VARCHAR:
-    case TYPE_FIXED_UDA_INTERMEDIATE: {
+    case TYPE_FIXED_UDA_INTERMEDIATE:
+    case TYPE_UUID: {
       llvm::Function* eq_fn =
           codegen_->GetFunction(IRFunction::CODEGEN_ANYVAL_STRING_VAL_EQ, false);
       return builder_->CreateCall(eq_fn,

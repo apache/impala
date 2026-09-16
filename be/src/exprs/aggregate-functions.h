@@ -190,6 +190,15 @@ class AggregateFunctions {
   template <typename T>
   static void Max(FunctionContext*, const T& src, T* dst);
 
+  /// Min/Max for TYPE_UUID
+  static void MinUuid(FunctionContext*, const StringVal& src, StringVal* dst);
+  static void MaxUuid(FunctionContext*, const StringVal& src, StringVal* dst);
+
+  /// AggIfUpdate/AggIfMerge for TYPE_UUID
+  static void AggIfUpdateUuid(FunctionContext*, const BooleanVal& cond,
+      const StringVal& src, StringVal* dst);
+  static void AggIfMergeUuid(FunctionContext*, const StringVal& src, StringVal* dst);
+
   /// String concat
   static void StringConcatUpdate(FunctionContext*,
       const StringVal& src, StringVal* result);

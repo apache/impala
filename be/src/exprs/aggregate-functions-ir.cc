@@ -48,6 +48,7 @@
 #include "util/arithmetic-util.h"
 #include "util/mpfit-util.h"
 #include "util/pretty-printer.h"
+#include "util/uuid-util.h"
 
 #include "common/names.h"
 
@@ -1308,6 +1309,8 @@ void AggregateFunctions::Min(FunctionContext* ctx, const StringVal& src, StringV
   }
 }
 
+// TODO(IMPALA-15431): When src.len == dst->len, overwrite dst in place instead of
+// Free() + CopyStringVal().
 template<>
 void AggregateFunctions::Max(FunctionContext* ctx, const StringVal& src, StringVal* dst) {
   if (src.is_null) return;
@@ -1315,6 +1318,26 @@ void AggregateFunctions::Max(FunctionContext* ctx, const StringVal& src, StringV
       StringValue::FromStringVal(src) > StringValue::FromStringVal(*dst)) {
     if (!dst->is_null) ctx->Free(dst->ptr);
     CopyStringVal(ctx, src, dst);
+  }
+}
+
+void AggregateFunctions::MinUuid(FunctionContext*, const StringVal& src, StringVal* dst) {
+  if (src.is_null) return;
+  DCHECK_EQ(src.len, UUID_BYTE_LEN);
+  if (dst->is_null || memcmp(src.ptr, dst->ptr, UUID_BYTE_LEN) < 0) {
+    memcpy(dst->ptr, src.ptr, UUID_BYTE_LEN);
+    dst->len = UUID_BYTE_LEN;
+    dst->is_null = false;
+  }
+}
+
+void AggregateFunctions::MaxUuid(FunctionContext*, const StringVal& src, StringVal* dst) {
+  if (src.is_null) return;
+  DCHECK_EQ(src.len, UUID_BYTE_LEN);
+  if (dst->is_null || memcmp(src.ptr, dst->ptr, UUID_BYTE_LEN) > 0) {
+    memcpy(dst->ptr, src.ptr, UUID_BYTE_LEN);
+    dst->len = UUID_BYTE_LEN;
+    dst->is_null = false;
   }
 }
 
@@ -3287,6 +3310,24 @@ template <>
 void AggregateFunctions::AggIfUpdate(
     FunctionContext* ctx, const BooleanVal& cond, const StringVal& src, StringVal* dst) {
   if (!cond.is_null && cond.val) CopyStringVal(ctx, src, dst);
+}
+
+void AggregateFunctions::AggIfUpdateUuid(FunctionContext*, const BooleanVal& cond,
+    const StringVal& src, StringVal* dst) {
+  if (cond.is_null || !cond.val || src.is_null) return;
+  DCHECK_EQ(src.len, UUID_BYTE_LEN);
+  memcpy(dst->ptr, src.ptr, UUID_BYTE_LEN);
+  dst->len = UUID_BYTE_LEN;
+  dst->is_null = false;
+}
+
+void AggregateFunctions::AggIfMergeUuid(FunctionContext*, const StringVal& src,
+    StringVal* dst) {
+  if (src.is_null) return;
+  DCHECK_EQ(src.len, UUID_BYTE_LEN);
+  memcpy(dst->ptr, src.ptr, UUID_BYTE_LEN);
+  dst->len = UUID_BYTE_LEN;
+  dst->is_null = false;
 }
 
 template <typename T>

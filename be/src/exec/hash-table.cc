@@ -737,8 +737,10 @@ static void CodegenAssignNullValue(LlvmCodeGen* codegen, LlvmBuilder* builder,
         dst = builder->CreateBitCast(dst, codegen->ptr_type());
         null_value = codegen->GetI8Constant(fnv_seed);
         break;
-      case TYPE_TIMESTAMP: {
-        // Cast 'dst' to 'i128*'
+      case TYPE_TIMESTAMP:
+      case TYPE_UUID: {
+        // Both are stored as a 16-byte inline buffer. Cast 'dst' to 'i128*' and store the
+        // seed pattern across all 16 bytes.
         DCHECK_EQ(byte_size, 16);
         llvm::PointerType* fnv_seed_ptr_type =
             codegen->GetPtrType(llvm::Type::getIntNTy(codegen->context(), byte_size * 8));
@@ -875,8 +877,8 @@ Status HashTableCtx::CodegenEvalRow(LlvmCodeGen* codegen, bool build_row,
   const ScalarExprsResultsRowLayout& result_row_layout =
       config.build_exprs_results_row_layout;
   for (int i = 0; i < exprs.size(); ++i) {
-    // Disable codegen for CHAR and UUID
-    if (exprs[i]->type().type == TYPE_CHAR || exprs[i]->type().type == TYPE_UUID) {
+    // Disable codegen for CHAR
+    if (exprs[i]->type().type == TYPE_CHAR) {
       return Status("HashTableCtx::CodegenEvalRow(): CHAR NYI");
     }
   }
@@ -1029,8 +1031,8 @@ Status HashTableCtx::CodegenHashRow(LlvmCodeGen* codegen, bool use_murmur,
   const ScalarExprsResultsRowLayout& result_row_layout =
       config.build_exprs_results_row_layout;
   for (int i = 0; i < exprs.size(); ++i) {
-    // Disable codegen for CHAR and UUID
-    if (exprs[i]->type().type == TYPE_CHAR || exprs[i]->type().type == TYPE_UUID) {
+    // Disable codegen for CHAR
+    if (exprs[i]->type().type == TYPE_CHAR) {
       return Status("HashTableCtx::CodegenHashRow(): CHAR NYI");
     }
   }
@@ -1244,8 +1246,8 @@ Status HashTableCtx::CodegenEquals(LlvmCodeGen* codegen, bool inclusive_equality
     const HashTableConfig& config, llvm::Function** fn) {
   const std::vector<ScalarExpr*>& exprs = config.build_exprs;
   for (int i = 0; i < exprs.size(); ++i) {
-    // Disable codegen for CHAR and UUID
-    if (exprs[i]->type().type == TYPE_CHAR || exprs[i]->type().type == TYPE_UUID) {
+    // Disable codegen for CHAR
+    if (exprs[i]->type().type == TYPE_CHAR) {
       return Status("HashTableCtx::CodegenEquals(): CHAR NYI");
     }
   }

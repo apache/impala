@@ -1,7 +1,6 @@
 ====
 ---- QUERY
 # Iceberg UUID Parquet read-path tests.
-# Aggregates are not yet supported.
 DESCRIBE iceberg_uuid_test
 ---- RESULTS: VERIFY_IS_SUBSET
 'id','int','','true'
@@ -542,22 +541,102 @@ SELECT id FROM iceberg_uuid_test WHERE CAST(uuid_col AS STRING) LIKE '12345678%'
 INT
 ====
 ---- QUERY
-# MIN() is not yet supported on UUID columns.
-SELECT MIN(uuid_col) FROM iceberg_uuid_test
----- CATCH
-No matching function with signature: min(UUID)
+# MIN() on UUID columns uses RFC 4122 byte ordering.
+SELECT MIN(uuid_col) FROM iceberg_uuid_test WHERE uuid_col IS NOT NULL
+---- RESULTS
+'00000000-0000-0000-0000-000000000000'
+---- TYPES
+UUID
+---- HS2_TYPES
+STRING
 ====
 ---- QUERY
-# MAX() is not yet supported on UUID columns.
-SELECT MAX(uuid_col) FROM iceberg_uuid_test
----- CATCH
-No matching function with signature: max(UUID)
+# MAX() on UUID columns uses RFC 4122 byte ordering.
+SELECT MAX(uuid_col) FROM iceberg_uuid_test WHERE uuid_col IS NOT NULL
+---- RESULTS
+'ffffffff-ffff-ffff-ffff-ffffffffffff'
+---- TYPES
+UUID
+---- HS2_TYPES
+STRING
 ====
 ---- QUERY
-# COUNT(uuid_col) is not yet supported on UUID columns.
+# COUNT() on UUID columns ignores NULL values.
 SELECT COUNT(uuid_col) FROM iceberg_uuid_test
----- CATCH
-No matching function with signature: count(UUID)
+---- RESULTS
+4
+---- TYPES
+BIGINT
+====
+---- QUERY
+# COUNT(DISTINCT) on UUID columns.
+SELECT COUNT(DISTINCT uuid_col) FROM iceberg_uuid_test
+---- RESULTS
+4
+---- TYPES
+BIGINT
+====
+---- QUERY
+# GROUP BY with UUID and other aggregate functions.
+SELECT
+  uuid_col,
+  COUNT(*) as cnt,
+  MIN(name) as min_name,
+  MAX(name) as max_name
+FROM iceberg_uuid_test
+WHERE uuid_col IS NOT NULL
+GROUP BY uuid_col
+ORDER BY uuid_col
+---- RESULTS
+'00000000-0000-0000-0000-000000000000',1,'zeros','zeros'
+'12345678-1234-5678-1234-567812345678',1,'alice','alice'
+'abcdefab-cdef-abcd-efab-cdefabcdefab',1,'bob','bob'
+'ffffffff-ffff-ffff-ffff-ffffffffffff',1,'max','max'
+---- TYPES
+UUID,BIGINT,STRING,STRING
+---- HS2_TYPES
+STRING,BIGINT,STRING,STRING
+====
+---- QUERY
+# NDV() on UUID columns.
+SELECT NDV(uuid_col) FROM iceberg_uuid_test
+---- RESULTS
+4
+---- TYPES
+BIGINT
+====
+---- QUERY
+# NDV() with precision on UUID columns.
+SELECT NDV(uuid_col, 10) FROM iceberg_uuid_test
+---- RESULTS
+4
+---- TYPES
+BIGINT
+====
+---- QUERY
+# sampled_ndv() on UUID columns (100% sample on small fixture).
+SELECT sampled_ndv(uuid_col, 1.0) FROM iceberg_uuid_test
+---- RESULTS
+4
+---- TYPES
+BIGINT
+====
+---- QUERY
+# MIN/MAX in SELECT list with GROUP BY uuid_col.
+SELECT uuid_col, MIN(uuid_col), MAX(uuid_col)
+FROM iceberg_uuid_test
+WHERE uuid_col IS NOT NULL
+GROUP BY uuid_col
+ORDER BY uuid_col
+---- RESULTS
+'00000000-0000-0000-0000-000000000000','00000000-0000-0000-0000-000000000000','00000000-0000-0000-0000-000000000000'
+'12345678-1234-5678-1234-567812345678','12345678-1234-5678-1234-567812345678','12345678-1234-5678-1234-567812345678'
+'abcdefab-cdef-abcd-efab-cdefabcdefab','abcdefab-cdef-abcd-efab-cdefabcdefab','abcdefab-cdef-abcd-efab-cdefabcdefab'
+'ffffffff-ffff-ffff-ffff-ffffffffffff','ffffffff-ffff-ffff-ffff-ffffffffffff','ffffffff-ffff-ffff-ffff-ffffffffffff'
+---- TYPES
+UUID,UUID,UUID
+---- HS2_TYPES
+STRING,STRING,STRING
 ====
 ---- QUERY
 # COUNT(*) works on tables with UUID columns (doesn't require aggregate on UUID).
@@ -622,8 +701,45 @@ UUID,BIGINT
 STRING,BIGINT
 ====
 ---- QUERY
+# HAVING with a valid UUID aggregate expression.
+SELECT uuid_col FROM iceberg_uuid_test
+GROUP BY uuid_col
+HAVING COUNT(uuid_col) > 0
+ORDER BY uuid_col
+---- RESULTS
+'00000000-0000-0000-0000-000000000000'
+'12345678-1234-5678-1234-567812345678'
+'abcdefab-cdef-abcd-efab-cdefabcdefab'
+'ffffffff-ffff-ffff-ffff-ffffffffffff'
+---- TYPES
+UUID
+---- HS2_TYPES
+STRING
+====
+---- QUERY
 # HAVING with a non-boolean UUID expression is rejected at analysis time.
 SELECT uuid_col FROM iceberg_uuid_test GROUP BY uuid_col HAVING uuid_col
 ---- CATCH
 HAVING clause 'uuid_col' requires return type 'BOOLEAN'. Actual type is 'UUID'.
+====
+---- QUERY
+# COMPUTE STATS skips UUID columns; stats are computed for the other columns.
+COMPUTE STATS iceberg_uuid_test
+---- RESULTS
+'Updated 1 partition(s) and 2 column(s).'
+---- TYPES
+STRING
+====
+---- QUERY
+COMPUTE STATS iceberg_uuid_test (uuid_col)
+---- CATCH
+COMPUTE STATS not supported for UUID column uuid_col of table iceberg_uuid_test
+====
+---- QUERY
+# COMPUTE STATS on a non-UUID column is allowed when the table has UUID columns.
+COMPUTE STATS iceberg_uuid_test (id)
+---- RESULTS
+'Updated 1 partition(s) and 1 column(s).'
+---- TYPES
+STRING
 ====

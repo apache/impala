@@ -1,0 +1,155 @@
+====
+---- QUERY
+# MIN()/MAX() of a group whose first value is NULL and whose first non-NULL value arrives
+# only after another group was initialized. The ORDER BY ... LIMIT in the inline view
+# feeds the rows to the aggregation in this order:
+#   (k=1, NULL), (k=2, 12345678-...), (k=1, abcdefab-...), (k=2, 00000000-...),
+#   (k=1, ffffffff-...)
+# Regression test for MinUuid()/MaxUuid() writing through a stale 'dst->ptr' in the
+# interpreted path: it used to overwrite the intermediate value of group k=2 and fail
+# with "UDA should not set pointer of UUID intermediate".
+SELECT k, MIN(uuid_col), MAX(uuid_col) FROM (
+  SELECT CASE WHEN id IN (2, 4, 5) THEN 1 ELSE 2 END AS k, uuid_col
+  FROM iceberg_uuid_test
+  ORDER BY CASE id WHEN 4 THEN 0 ELSE id END
+  LIMIT 10) v
+GROUP BY k
+ORDER BY k
+---- RESULTS
+1,'abcdefab-cdef-abcd-efab-cdefabcdefab','ffffffff-ffff-ffff-ffff-ffffffffffff'
+2,'00000000-0000-0000-0000-000000000000','12345678-1234-5678-1234-567812345678'
+---- TYPES
+TINYINT,UUID,UUID
+---- HS2_TYPES
+TINYINT,STRING,STRING
+====
+---- QUERY
+# MIN()/MAX() of a group that only has NULL values is NULL (id=4).
+SELECT id, MIN(uuid_col), MAX(uuid_col) FROM iceberg_uuid_test GROUP BY id ORDER BY id
+---- RESULTS
+1,'12345678-1234-5678-1234-567812345678','12345678-1234-5678-1234-567812345678'
+2,'abcdefab-cdef-abcd-efab-cdefabcdefab','abcdefab-cdef-abcd-efab-cdefabcdefab'
+3,'00000000-0000-0000-0000-000000000000','00000000-0000-0000-0000-000000000000'
+4,'NULL','NULL'
+5,'ffffffff-ffff-ffff-ffff-ffffffffffff','ffffffff-ffff-ffff-ffff-ffffffffffff'
+---- TYPES
+INT,UUID,UUID
+---- HS2_TYPES
+INT,STRING,STRING
+====
+---- QUERY
+# UUID aggregates next to multiple DISTINCT aggregates. The planner transposes every
+# aggregate of a multi-class aggregation through AGGIF(), e.g.
+# aggif(valid_tid(2,4,5) = 5, min(uuid_col)), so AGGIF() needs a UUID overload.
+SELECT MIN(uuid_col), MAX(uuid_col), COUNT(DISTINCT id), COUNT(DISTINCT name)
+FROM iceberg_uuid_test
+---- RESULTS
+'00000000-0000-0000-0000-000000000000','ffffffff-ffff-ffff-ffff-ffffffffffff',5,5
+---- TYPES
+UUID,UUID,BIGINT,BIGINT
+---- HS2_TYPES
+STRING,STRING,BIGINT,BIGINT
+====
+---- QUERY
+# UUID aggregates with grouping sets. The planner wraps the aggregates as
+# aggif(valid_tid(1,2) IN (1, 2), CASE valid_tid(1,2) WHEN 1 THEN min(uuid_col) ... END),
+# so both AGGIF() and CASE need UUID overloads.
+SELECT id, MIN(uuid_col), MAX(uuid_col) FROM iceberg_uuid_test
+GROUP BY ROLLUP(id)
+ORDER BY id
+---- RESULTS
+1,'12345678-1234-5678-1234-567812345678','12345678-1234-5678-1234-567812345678'
+2,'abcdefab-cdef-abcd-efab-cdefabcdefab','abcdefab-cdef-abcd-efab-cdefabcdefab'
+3,'00000000-0000-0000-0000-000000000000','00000000-0000-0000-0000-000000000000'
+4,'NULL','NULL'
+5,'ffffffff-ffff-ffff-ffff-ffffffffffff','ffffffff-ffff-ffff-ffff-ffffffffffff'
+NULL,'00000000-0000-0000-0000-000000000000','ffffffff-ffff-ffff-ffff-ffffffffffff'
+---- TYPES
+INT,UUID,UUID
+---- HS2_TYPES
+INT,STRING,STRING
+====
+---- QUERY
+# COUNT(DISTINCT uuid_col) next to another DISTINCT aggregate. The UUID column becomes
+# a grouping expr of a multi-class aggregation, whose partition exprs are built with
+# murmur_hash(<grouping expr>), so murmur_hash() needs a UUID overload as well.
+SELECT COUNT(DISTINCT uuid_col), COUNT(DISTINCT id) FROM iceberg_uuid_test
+---- RESULTS
+4,5
+---- TYPES
+BIGINT,BIGINT
+====
+---- QUERY
+# Grouping sets over a UUID grouping key: needs murmur_hash(UUID) and CASE over UUID.
+# This used to fail with an IllegalStateException ("No matching function with signature:
+# murmur_hash(UUID)") even without any aggregate function on the UUID column.
+SELECT uuid_col, COUNT(*) FROM iceberg_uuid_test
+GROUP BY ROLLUP(uuid_col)
+ORDER BY uuid_col, 2
+---- RESULTS
+'00000000-0000-0000-0000-000000000000',1
+'12345678-1234-5678-1234-567812345678',1
+'abcdefab-cdef-abcd-efab-cdefabcdefab',1
+'ffffffff-ffff-ffff-ffff-ffffffffffff',1
+'NULL',1
+'NULL',5
+---- TYPES
+UUID,BIGINT
+---- HS2_TYPES
+STRING,BIGINT
+====
+---- QUERY
+# The builtins the planner relies on above can be used directly as well.
+# CASE that returns UUID.
+SELECT id, CASE WHEN id % 2 = 1 THEN uuid_col END FROM iceberg_uuid_test ORDER BY id
+---- RESULTS
+1,'12345678-1234-5678-1234-567812345678'
+2,'NULL'
+3,'00000000-0000-0000-0000-000000000000'
+4,'NULL'
+5,'ffffffff-ffff-ffff-ffff-ffffffffffff'
+---- TYPES
+INT,UUID
+---- HS2_TYPES
+INT,STRING
+====
+---- QUERY
+# CASE that compares UUIDs. A NULL case expr matches nothing.
+SELECT id,
+  CASE uuid_col
+    WHEN CAST('12345678-1234-5678-1234-567812345678' AS UUID) THEN 'alice'
+    WHEN CAST('ffffffff-ffff-ffff-ffff-ffffffffffff' AS UUID) THEN 'max'
+    ELSE 'other' END
+FROM iceberg_uuid_test ORDER BY id
+---- RESULTS
+1,'alice'
+2,'other'
+3,'other'
+4,'other'
+5,'max'
+---- TYPES
+INT,STRING
+====
+---- QUERY
+# DECODE() over UUID: unlike CASE, NULL matches NULL.
+SELECT id, DECODE(uuid_col, CAST(NULL AS UUID), 'null',
+    CAST('00000000-0000-0000-0000-000000000000' AS UUID), 'zeros', 'other')
+FROM iceberg_uuid_test ORDER BY id
+---- RESULTS
+1,'other'
+2,'other'
+3,'zeros'
+4,'null'
+5,'other'
+---- TYPES
+INT,STRING
+====
+---- QUERY
+# murmur_hash() over UUID: distinct UUIDs hash differently, NULL hashes to NULL.
+SELECT COUNT(DISTINCT murmur_hash(uuid_col)), COUNT(murmur_hash(uuid_col)), COUNT(*)
+FROM iceberg_uuid_test
+---- RESULTS
+4,4,5
+---- TYPES
+BIGINT,BIGINT,BIGINT
+====

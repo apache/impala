@@ -441,6 +441,10 @@ public class ComputeStatsStmt extends StatementBase implements SingleTableStmt {
           throw new AnalysisException("COMPUTE STATS not supported for hidden column " +
               col.getName() + " of table " + table_.getName());
         }
+        if (col.getType().isUuid()) {
+          throw new AnalysisException("COMPUTE STATS not supported for UUID column " +
+              col.getName() + " of table " + table_.getName());
+        }
         if (table_ instanceof FeFsTable && table_.isClusteringColumn(col)) {
           throw new AnalysisException("COMPUTE STATS not supported for partitioning " +
               "column " + col.getName() + " of HDFS table.");
@@ -956,13 +960,14 @@ public class ComputeStatsStmt extends StatementBase implements SingleTableStmt {
 
   /**
    * Returns true if the given column should be ignored for the purpose of computing
-   * column stats. Columns with an invalid/unsupported/complex type are ignored.
+   * column stats. Columns with an invalid/unsupported/complex/UUID type are ignored.
    * For example, complex types in an HBase-backed table will appear as invalid types.
+   * TODO: Remove UUID from this list once stats gathering is validated.
    */
   private boolean ignoreColumn(Column c) {
     Type t = c.getType();
     return !t.isValid() || !t.isSupported() || t.isComplexOrVariantType()
-        || c.isHidden();
+        || t.isUuid() || c.isHidden();
   }
 
   public double getEffectiveSamplingPerc() { return effectiveSamplePerc_; }

@@ -799,6 +799,8 @@ visible_functions = [
    '_ZN6impala16UtilityFunctions16MurmurHashStringEPN10impala_udf15FunctionContextERKNS1_9StringValE'],
   [['murmur_hash'], 'BIGINT', ['BINARY'],
    '_ZN6impala16UtilityFunctions16MurmurHashStringEPN10impala_udf15FunctionContextERKNS1_9StringValE'],
+  [['murmur_hash'], 'BIGINT', ['UUID'],
+   '_ZN6impala16UtilityFunctions16MurmurHashStringEPN10impala_udf15FunctionContextERKNS1_9StringValE'],
   [['murmur_hash'], 'BIGINT', ['TIMESTAMP'],
    '_ZN6impala16UtilityFunctions19MurmurHashTimestampEPN10impala_udf15FunctionContextERKNS1_12TimestampValE'],
   [['murmur_hash'], 'BIGINT', ['DECIMAL'],

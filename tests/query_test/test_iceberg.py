@@ -84,17 +84,9 @@ class TestIcebergTable(IcebergTestSuite):
   def test_iceberg_binary_type(self, vector, unique_database):
     self.run_test_case('QueryTest/iceberg-binary-type', vector, use_db=unique_database)
 
-  def test_iceberg_uuid_type(self, vector, unique_database):
-    create_iceberg_table_from_directory(self.client, unique_database,
-        "iceberg_uuid_test", "parquet",
-        table_location="${IMPALA_HOME}/testdata/data/iceberg_test/iceberg_uuid")
-    create_iceberg_table_from_directory(self.client, unique_database,
-        "iceberg_uuid_test_orc", "orc",
-        table_location="${IMPALA_HOME}/testdata/data/iceberg_test/iceberg_uuid")
-    create_iceberg_table_from_directory(self.client, unique_database,
-        "iceberg_uuid_test_avro", "avro",
-        table_location="${IMPALA_HOME}/testdata/data/iceberg_test/iceberg_uuid")
-    self.run_test_case('QueryTest/iceberg-uuid-type', vector, use_db=unique_database)
+  def test_iceberg_uuid_type(self, vector):
+    self.run_test_case('QueryTest/iceberg-uuid-type', vector,
+        use_db="functional_parquet")
 
   def test_utf8_string_validation(self, unique_database):
     """IMPALA-12675: Iceberg always annotates STRING as UTF-8, so writing non-UTF-8 bytes
@@ -2748,6 +2740,22 @@ class TestIcebergV3Table(IcebergTestSuite):
   def test_v3_merge(self, vector, unique_database):
     """MERGE INTO a table that was created as V2 then upgraded to V3."""
     self.run_test_case('QueryTest/iceberg-v3-merge', vector, unique_database)
+
+
+class TestIcebergUuidAggregates(IcebergTestSuite):
+  """Iceberg UUID aggregate tests."""
+
+  @classmethod
+  def add_test_dimensions(cls):
+    super(TestIcebergUuidAggregates, cls).add_test_dimensions()
+    cls.ImpalaTestMatrix.add_dimension(create_exec_option_dimension(
+        disable_codegen_options=[False, True]))
+    cls.ImpalaTestMatrix.add_constraint(
+        lambda v: v.get_value('table_format').file_format == 'parquet')
+
+  def test_iceberg_uuid_aggregates(self, vector):
+    self.run_test_case('QueryTest/iceberg-uuid-aggregates', vector,
+        use_db="functional_parquet")
 
 
 # Tests to exercise the DIRECTED distribution mode for V2 Iceberg tables. Note, that most
