@@ -18,7 +18,8 @@
 function getReadableSize(value_p, precision = 2) {
   const units = ["B", "KB", "MB", "GB", "TB", "PB"];
   let current_unit = 0;
-  let value = value_p;
+  // value_p is a string. Explicitly cast it to a number.
+  let value = Number(value_p);
   while( value >= 1e3 ) {
     value = value / 1e3;
     ++current_unit;
@@ -109,4 +110,11 @@ function getQueryID() {
     return query_id.substring(0, query_id.indexOf("&"));
   }
   return undefined;
+}
+
+// Exported for unit tests (tests/webui/js_tests). In the browser this file is
+// loaded as a classic <script> where 'module' is undefined, so these functions
+// stay global. The guard keeps that path free of a ReferenceError.
+if (typeof module !== "undefined" && module.exports) {
+  module.exports = {getReadableSize, renderSize};
 }
