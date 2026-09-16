@@ -30,6 +30,5 @@ add_library(ThriftSaslTransport
     TSasl.cpp
     TSaslServerTransport.cpp
     TSaslTransport.cpp
-    undef.cpp
   )
 add_dependencies(ThriftSaslTransport gen-deps)
