@@ -44,7 +44,7 @@ prettytable == 2.5.0
 prometheus-client == 0.24.1
 psutil == 7.2.1
 pyparsing == 3.3.2
-pytest == 6.2.5
+pytest == 9.0.3
   attrs == 19.2.0
   iniconfig == 1.1.1
   pluggy == 1.6.0
