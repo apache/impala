@@ -46,6 +46,8 @@ class CpuInfo {
   static const int64_t AVX       = (1 << 5);
   static const int64_t AVX2      = (1 << 6);
   static const int64_t PCLMULQDQ = (1 << 7);
+  /// ARMv8 CRC32 extension (aarch64 only).
+  static const int64_t CRC32     = (1 << 8);
 
   /// Cache enums for L1 (data), L2 and L3
   enum CacheLevel {

@@ -75,6 +75,7 @@ const int64_t CpuInfo::POPCNT;
 const int64_t CpuInfo::AVX;
 const int64_t CpuInfo::AVX2;
 const int64_t CpuInfo::PCLMULQDQ;
+const int64_t CpuInfo::CRC32;
 
 bool CpuInfo::initialized_ = false;
 int64_t CpuInfo::hardware_flags_ = 0;
@@ -99,7 +100,8 @@ static struct {
   { "popcnt",    CpuInfo::POPCNT },
   { "avx",       CpuInfo::AVX },
   { "avx2",      CpuInfo::AVX2 },
-  { "pclmulqdq", CpuInfo::PCLMULQDQ }
+  { "pclmulqdq", CpuInfo::PCLMULQDQ },
+  { "crc32",     CpuInfo::CRC32 }
 };
 static const long num_flags = sizeof(flag_mappings) / sizeof(flag_mappings[0]);
 
@@ -135,7 +137,9 @@ void CpuInfo::Init() {
       value = line.substr(colon + 1, string::npos);
       trim(name);
       trim(value);
-      if (name.compare("flags") == 0) {
+      // The CPU flags are listed under 'flags' on x86_64 and under 'Features' on
+      // aarch64.
+      if (name.compare("flags") == 0 || name.compare("Features") == 0) {
         hardware_flags_ |= ParseCPUFlags(value);
       } else if (name.compare("cpu MHz") == 0) {
         // Every core will report a different speed.  We'll take the max, assuming
@@ -253,8 +257,7 @@ void CpuInfo::InitNumaNodeToCores() {
 }
 
 Status CpuInfo::EnforceCpuRequirements() {
-  // This imposes a CPU requirement for x86_64. This function may later be modified
-  // to impose a similar requirement for other platforms.
+  // This imposes a CPU requirement for x86_64 and aarch64.
 #ifdef __x86_64__
   if (!CpuInfo::IsSupported(CpuInfo::AVX)) {
     return Status("This machine does not meet the minimum requirements for Impala "
@@ -268,6 +271,14 @@ Status CpuInfo::EnforceCpuRequirements() {
                   "functionality. The CPU does not support AVX2 (Advanced Vector "
                   "Extensions 2). To run in legacy mode with only AVX support, "
                   "set enable_legacy_avx_support=true.");
+  }
+#elif defined(__aarch64__)
+  // Impala is built with -march=armv8-a+crc and uses CRC32 instructions for hashing
+  // without checking for them at runtime. The CRC32 extension is optional in ARMv8.0
+  // (and mandatory from ARMv8.1), so verify that the CPU supports it.
+  if (!CpuInfo::IsSupported(CpuInfo::CRC32)) {
+    return Status("This machine does not meet the minimum requirements for Impala "
+                  "functionality. The CPU does not support the ARMv8 CRC32 extension.");
   }
 #endif
   return Status::OK();
