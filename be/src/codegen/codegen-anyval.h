@@ -57,9 +57,11 @@ class CodegenAnyValReadWriteInfo;
 /// TYPE_DECIMAL/DecimalVal (isn't lowered):
 /// %"struct.impala_udf::DecimalVal" { {i8}, [15 x i8], {i128} }
 /// TYPE_DATE/DateVal: i64
-//
-/// TODO:
-/// - unit tests
+/// TYPE_VARIANT/VariantVal (isn't lowered):
+/// %"struct.impala_udf::VariantVal" { {i8}, %StringVal, %StringVal } where %StringVal is
+/// the unlowered %"struct.impala_udf::StringVal" { {i8}, i32, i8* }. VariantVals are
+/// opaque in codegen: only 'is_null' can be accessed, the value is passed by pointer to
+/// cross-compiled functions.
 class CodegenAnyVal {
  public:
   static const char* LLVM_ANYVAL_NAME;
@@ -75,10 +77,14 @@ class CodegenAnyVal {
   static const char* LLVM_DECIMALVAL_NAME;
   static const char* LLVM_DATEVAL_NAME;
   static const char* LLVM_COLLECTIONVAL_NAME;
+  static const char* LLVM_VARIANTVAL_NAME;
 
   /// Creates a call to 'fn', which should return a (lowered) *Val, and returns the result.
   /// This abstracts over the x64 calling convention, in particular for functions returning
-  /// a DecimalVal, which pass the return value as an output argument.
+  /// a DecimalVal or a VariantVal, which pass the return value as an output argument.
+  /// The output argument of functions returning a VariantVal must have the sret attribute
+  /// with the VariantVal type, like Clang emits it for cross-compiled functions. Other
+  /// functions with an output argument return a DecimalVal.
   //
   /// If 'result_ptr' is non-NULL, it should be a pointer to the lowered return type of
   /// 'fn' (e.g. if 'fn' returns a BooleanVal, 'result_ptr' should have type i16*). The
@@ -107,6 +113,12 @@ class CodegenAnyVal {
   /// Returns the unlowered AnyVal type associated with 'type'.
   /// E.g.: TYPE_BOOLEAN => %"struct.impala_udf::BooleanVal"
   static llvm::Type* GetUnloweredType(LlvmCodeGen* cg, const ColumnType& type);
+
+  /// Returns true if 'type' is the IR type of a *Val that is never lowered, i.e.
+  /// DecimalVal or VariantVal. Natively compiled and cross-compiled functions return
+  /// these via an extra first output argument, while the IR functions we generate return
+  /// them by value.
+  static bool IsUnloweredValType(llvm::Type* type);
 
   /// Return the constant type-lowered value corresponding to a null *Val.
   /// E.g.: passing TYPE_DOUBLE (corresponding to the lowered DoubleVal { i8, double })

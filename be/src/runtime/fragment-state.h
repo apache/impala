@@ -179,7 +179,9 @@ class FragmentState {
       const std::string& extra_info = "", const std::string& extra_label = "");
 
  private:
-  bool ScalarExprIsWithinStruct(const ScalarExpr* expr) const;
+  /// Returns true if 'expr' is a SlotRef to a member of a STRUCT or to the 'metadata' or
+  /// 'value' child of a VARIANT. Their tuple is the children tuple of the parent slot.
+  bool ScalarExprIsWithinStructOrVariant(const ScalarExpr* expr) const;
 
   ObjectPool obj_pool_;
 

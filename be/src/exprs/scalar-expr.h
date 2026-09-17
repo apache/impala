@@ -357,12 +357,6 @@ class ScalarExpr : public Expr {
   /// and the properties of this ScalarExpr node.
   bool ShouldCodegen(const FragmentState* state) const;
 
-  /// Returns true if this node's type or any descendant's type is VARIANT. Codegen for
-  /// VARIANT values is not implemented (TYPE_VARIANT is absent from CodegenAnyVal), so
-  /// any expression tree containing a VARIANT node must run entirely on the interpreted
-  /// path.
-  bool InvolvesVariantType() const;
-
   /// Return true if it is possible to evaluate this expression node without codegen.
   /// The vast majority of exprs support interpretation, so default to true. Scalars
   /// that are not always interpretable must override this function.

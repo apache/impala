@@ -247,6 +247,8 @@ ir_functions = [
   ["GET_CHILD_EVALUATOR", "_ZN6impala19ScalarExprEvaluator17GetChildEvaluatorEPS0_i"],
   ["STORE_RESULT_IN_EVALUATOR",
   "_ZN6impala19ScalarExprEvaluator11StoreResultERKN10impala_udf6AnyValERKNS_10ColumnTypeE"],
+  ["SLOT_REF_READ_VARIANT_VAL",
+  "_ZN6impala9SlotRefIr14ReadVariantValEPKNS_8TupleRowEibNS_19NullIndicatorOffsetEi"],
   ["FN_CTX_ALLOCATE_FOR_RESULTS",
   "_Z23FnCtxAllocateForResultsPN10impala_udf15FunctionContextEl"],
   ["GET_JNI_CONTEXT",

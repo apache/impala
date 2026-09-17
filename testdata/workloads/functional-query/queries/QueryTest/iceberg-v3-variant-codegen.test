@@ -1,0 +1,145 @@
+====
+---- QUERY
+# IS [NOT] NULL on a VARIANT column is codegen'd. Only SQL NULL (id 0) is NULL, a variant
+# null (id 1) is not.
+SELECT id, v IS NOT NULL FROM trino_variant WHERE v IS NULL OR id = 1 ORDER BY id;
+---- RESULTS
+0,false
+1,true
+---- TYPES
+INT, BOOLEAN
+---- RUNTIME_PROFILE
+row_regex: .*PARQUET Codegen Enabled
+!row_regex: .*PARQUET Codegen Disabled
+====
+---- QUERY
+# Typed variant_get() conjuncts are codegen'd.
+SELECT id FROM trino_variant
+WHERE variant_get(v, '$.age', 'int') > 25
+  AND variant_get(v, '$.name', 'string') = 'Alice'
+ORDER BY id;
+---- RESULTS
+31
+32
+---- TYPES
+INT
+---- RUNTIME_PROFILE
+row_regex: .*PARQUET Codegen Enabled
+!row_regex: .*PARQUET Codegen Disabled
+====
+---- QUERY
+# Chained calls: the VARIANT result of the inner call is the argument of the outer call.
+SELECT id FROM trino_variant
+WHERE variant_get(variant_get(v, '$.context'), '$.retries', 'int') = 3
+  AND try_variant_get(try_variant_get(v, '$.context'), '$.page', 'string') = 'home';
+---- RESULTS
+35
+---- TYPES
+INT
+---- RUNTIME_PROFILE
+row_regex: .*PARQUET Codegen Enabled
+!row_regex: .*PARQUET Codegen Disabled
+====
+---- QUERY
+# variant_to_json() conjunct.
+SELECT id FROM trino_variant
+WHERE id BETWEEN 20 AND 40 AND variant_to_json(v) LIKE '%Alice%'
+ORDER BY id;
+---- RESULTS
+20
+31
+32
+35
+---- TYPES
+INT
+---- RUNTIME_PROFILE
+row_regex: .*PARQUET Codegen Enabled
+!row_regex: .*PARQUET Codegen Disabled
+====
+---- QUERY
+# Typed extractions as the keys of a shuffle join: they are evaluated by the scans
+# (conjunct), the senders (partition exprs) and both sides of the join.
+SELECT STRAIGHT_JOIN a.id, b.id
+FROM trino_variant a JOIN /* +SHUFFLE */ trino_variant b
+  ON variant_get(a.v, '$.age', 'int') = variant_get(b.v, '$.age', 'int')
+WHERE variant_get(a.v, '$.active', 'boolean')
+ORDER BY a.id, b.id;
+---- RESULTS
+32,31
+32,32
+---- TYPES
+INT, INT
+---- RUNTIME_PROFILE
+!row_regex: .*Codegen Disabled
+row_regex: .*PARQUET Codegen Enabled
+row_regex: .*Build Side Codegen Enabled
+row_regex: .*Probe Side Codegen Enabled
+row_regex: .*Hash Partitioned Sender Codegen Enabled
+====
+---- QUERY
+# VARIANT read from the nullable tuple of an outer join by a conjunct of the join and by
+# the aggregation above it.
+SELECT STRAIGHT_JOIN count(*), count(variant_get(b.v, '$.name', 'string')),
+       max(variant_get(b.v, '$.age', 'int'))
+FROM trino_variant a LEFT JOIN trino_variant b ON a.id = b.id AND b.id IN (31, 32)
+WHERE variant_get(b.v, '$.active', 'boolean') IS NULL;
+---- RESULTS
+54,1,30
+---- TYPES
+BIGINT, BIGINT, INT
+---- RUNTIME_PROFILE
+!row_regex: .*Codegen Disabled
+row_regex: .*Probe Side Codegen Enabled
+====
+---- QUERY
+# Typed extractions as grouping expression and as the input of an aggregate function.
+SELECT variant_get(v, '$.age', 'int') AS age, count(*),
+       max(variant_get(v, '$.name', 'string'))
+FROM trino_variant
+GROUP BY age
+ORDER BY age NULLS LAST;
+---- RESULTS
+30,2,'Alice'
+NULL,53,'NULL'
+---- TYPES
+INT, BIGINT, STRING
+---- RUNTIME_PROFILE
+!row_regex: .*Codegen Disabled
+row_regex: .*PARQUET Codegen Enabled
+====
+---- QUERY
+# The output tuple of the TOP-N has a VARIANT slot, so the whole TOP-N node falls back to
+# the interpreted path (Tuple::CodegenMaterializeExprs() NYI); the scan stays codegen'd.
+SELECT id, v, variant_get(v, '$.name', 'string')
+FROM trino_variant
+WHERE variant_get(v, '$.age', 'int') = 30
+ORDER BY id DESC LIMIT 1;
+---- RESULTS
+32,'{"active":true,"age":30,"name":"Alice"}','Alice'
+---- TYPES
+INT, STRING, STRING
+---- RUNTIME_PROFILE
+row_regex: .*PARQUET Codegen Enabled
+row_regex: .*Codegen Disabled: CodegenMaterializeExprs\(\) VARIANT type NYI
+====
+---- QUERY
+# Same for a UNION ALL that materializes VARIANT values returned by functions.
+SELECT id + 0 AS id, variant_get(v, '$.context') AS c FROM trino_variant WHERE id = 35
+UNION ALL
+SELECT id + 100, variant_get(v, '$.name') FROM trino_variant WHERE id IN (0, 31);
+---- RESULTS
+35,'{"page":"home","retries":3}'
+100,'NULL'
+131,'"Alice"'
+---- TYPES
+BIGINT, STRING
+---- RUNTIME_PROFILE
+row_regex: .*PARQUET Codegen Enabled
+row_regex: .*Codegen Disabled: CodegenMaterializeExprs\(\) VARIANT type NYI
+====
+---- QUERY
+# An error raised by a codegen'd conjunct is reported like on the interpreted path.
+SELECT count(*) FROM trino_variant WHERE variant_get(v, '$.name', 'int') = 1;
+---- CATCH
+not convertible to an integer type
+====

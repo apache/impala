@@ -30,5 +30,6 @@ void dummy(impala_udf::FunctionContext*, impala_udf::BooleanVal*, impala_udf::Ti
     impala_udf::SmallIntVal*, impala_udf::IntVal*, impala_udf::BigIntVal*,
     impala_udf::FloatVal*, impala_udf::DoubleVal*, impala_udf::StringVal*,
     impala_udf::TimestampVal*, impala_udf::DecimalVal*, impala_udf::DateVal*,
-    impala_udf::CollectionVal*, impala::ScalarExprEvaluator*) { }
+    impala_udf::CollectionVal*, impala_udf::VariantVal*,
+    impala::ScalarExprEvaluator*) { }
 #endif

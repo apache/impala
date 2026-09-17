@@ -40,6 +40,7 @@ const char* CodegenAnyVal::LLVM_TIMESTAMPVAL_NAME = "struct.impala_udf::Timestam
 const char* CodegenAnyVal::LLVM_DECIMALVAL_NAME   = "struct.impala_udf::DecimalVal";
 const char* CodegenAnyVal::LLVM_DATEVAL_NAME      = "struct.impala_udf::DateVal";
 const char* CodegenAnyVal::LLVM_COLLECTIONVAL_NAME = "struct.impala_udf::CollectionVal";
+const char* CodegenAnyVal::LLVM_VARIANTVAL_NAME = "struct.impala_udf::VariantVal";
 
 bool CodegenAnyVal::IsSimpleType(const ColumnType& type) {
   switch (type.type) {
@@ -106,6 +107,9 @@ llvm::Type* CodegenAnyVal::GetLoweredType(LlvmCodeGen* cg, const ColumnType& typ
       return cg->GetNamedType(LLVM_DECIMALVAL_NAME);
     case TYPE_DATE: // i64
       return cg->i64_type();
+    case TYPE_VARIANT: // %"struct.impala_udf::VariantVal" (isn't lowered)
+                       // = { {i8}, %StringVal, %StringVal }
+      return cg->GetNamedType(LLVM_VARIANTVAL_NAME);
     default:
       DCHECK(false) << "Unsupported type: " << type;
       return NULL;
@@ -156,6 +160,9 @@ llvm::Type* CodegenAnyVal::GetUnloweredType(LlvmCodeGen* cg, const ColumnType& t
     case TYPE_MAP:
       result = cg->GetNamedType(LLVM_COLLECTIONVAL_NAME);
       break;
+    case TYPE_VARIANT:
+      result = cg->GetNamedType(LLVM_VARIANTVAL_NAME);
+      break;
     default:
       DCHECK(false) << "Unsupported type: " << type;
       return NULL;
@@ -164,17 +171,37 @@ llvm::Type* CodegenAnyVal::GetUnloweredType(LlvmCodeGen* cg, const ColumnType& t
   return result;
 }
 
+bool CodegenAnyVal::IsUnloweredValType(llvm::Type* type) {
+  // Compare the names instead of using LlvmCodeGen::GetNamedType(): modules that were not
+  // created from Impala's cross-compiled IR (e.g. in tests) may not contain all the *Val
+  // types. Literal struct types (e.g. the lowered StringVal) don't have names.
+  if (!type->isStructTy()) return false;
+  llvm::StructType* struct_type = llvm::cast<llvm::StructType>(type);
+  if (!struct_type->hasName()) return false;
+  return struct_type->getName() == LLVM_DECIMALVAL_NAME
+      || struct_type->getName() == LLVM_VARIANTVAL_NAME;
+}
+
 llvm::Value* CodegenAnyVal::CreateCall(LlvmCodeGen* cg, LlvmBuilder* builder,
     llvm::Function* fn, llvm::ArrayRef<llvm::Value*> args, const char* name,
     llvm::Value* result_ptr) {
   if (fn->getReturnType()->isVoidTy()) {
-    // Void return type indicates that this function returns a DecimalVal via the first
-    // argument (which should be a DecimalVal*).
+    // Void return type indicates that this function returns a DecimalVal or a VariantVal
+    // via the first argument (which should be a DecimalVal* or a VariantVal*).
     llvm::Function::arg_iterator ret_arg = fn->arg_begin();
     DCHECK(ret_arg->getType()->isPointerTy());
-    llvm::Type* ret_type = cg->GetNamedType(LLVM_DECIMALVAL_NAME);
+    // The pointer is opaque, so a VariantVal is recognized by the sret attribute that
+    // Clang sets on cross-compiled functions. Anything else returns a DecimalVal. Use
+    // Impala's DecimalVal type for it instead of the sret type: an IR UDF can have its
+    // own copy of DecimalVal after linking.
+    auto* sret_struct =
+        llvm::dyn_cast_or_null<llvm::StructType>(fn->getParamStructRetType(0));
+    bool returns_variant = sret_struct != nullptr && sret_struct->hasName()
+        && sret_struct->getName() == LLVM_VARIANTVAL_NAME;
+    llvm::Type* ret_type =
+        cg->GetNamedType(returns_variant ? LLVM_VARIANTVAL_NAME : LLVM_DECIMALVAL_NAME);
 
-    // We need to pass a DecimalVal pointer to 'fn' that will be populated with the result
+    // We need to pass a *Val pointer to 'fn' that will be populated with the result
     // value. Use 'result_ptr' if specified, otherwise alloca one.
     llvm::Value* ret_ptr = (result_ptr == NULL) ?
         cg->CreateEntryBlockAlloca(*builder, ret_type, name) :
@@ -191,7 +218,7 @@ llvm::Value* CodegenAnyVal::CreateCall(LlvmCodeGen* cg, LlvmBuilder* builder,
     return builder->CreateLoad(ret_type, ret_ptr, name);
   } else {
     // Function returns *Val normally (note that it could still be returning a
-    // DecimalVal, since we generate non-compliant functions).
+    // DecimalVal or a VariantVal, since we generate non-compliant functions).
     // Bitcasting the args is often necessary when calling an IR UDF because the types
     // in the IR module may have been renamed while linking. Bitcasting them avoids a
     // type assertion.
@@ -235,7 +262,8 @@ llvm::Value* CodegenAnyVal::GetIsNull(const char* name) const {
 #endif
       return builder_->CreateTrunc(is_null, codegen_->bool_type(), name);
     }
-    case TYPE_DECIMAL: {
+    case TYPE_DECIMAL:
+    case TYPE_VARIANT: {
       // Lowered type is of the form { {i8}, ... }
       uint32_t idxs[] = {0, 0};
       llvm::Value* is_null_i8 = builder_->CreateExtractValue(value_, idxs);
@@ -286,9 +314,10 @@ void CodegenAnyVal::SetIsNull(llvm::Value* is_null) {
       value_ = builder_->CreateInsertValue(value_, is_null_ext, 0, name_);
       break;
     }
-    case TYPE_DECIMAL: {
-      // Lowered type is of form { {i8}, [15 x i8], {i128} }. Set the i8 value to
-      // 'is_null'.
+    case TYPE_DECIMAL:
+    case TYPE_VARIANT: {
+      // Lowered type is of form { {i8}, [15 x i8], {i128} } (DecimalVal) or
+      // { {i8}, %StringVal, %StringVal } (VariantVal). Set the i8 value to 'is_null'.
       llvm::Value* is_null_ext =
           builder_->CreateZExt(is_null, codegen_->i8_type(), "is_null_ext");
       // Index into the {i8} struct as well as the outer struct.
@@ -350,6 +379,8 @@ llvm::Value* CodegenAnyVal::GetVal(const char* name) {
       << "Use GetPtr and GetLen for CollectionVal";
   DCHECK(!type_.IsStructType())
       << "Use GetPtr and GetLen for StructVal";
+  DCHECK(!type_.IsVariantType())
+      << "VariantVals are opaque in codegen, pass them by pointer";
   switch(type_.type) {
     case TYPE_BOOLEAN:
     case TYPE_TINYINT:
@@ -406,6 +437,7 @@ void CodegenAnyVal::SetVal(llvm::Value* val) {
       << "Use SetDate and SetTimeOfDay for TimestampVals";
   DCHECK(!type_.IsCollectionType()) << "Use SetPtr and SetLen for CollectionVal";
   DCHECK(!type_.IsStructType()) << "Use SetPtr and SetLen for StructVal";
+  DCHECK(!type_.IsVariantType()) << "VariantVals cannot be constructed in codegen";
   switch(type_.type) {
     case TYPE_BOOLEAN:
     case TYPE_TINYINT:
@@ -760,7 +792,9 @@ llvm::Value* CodegenAnyVal::GetNullVal(LlvmCodeGen* codegen, llvm::Type* val_typ
   if (val_type->isStructTy()) {
     llvm::StructType* struct_type = llvm::cast<llvm::StructType>(val_type);
     if (struct_type->getNumElements() == 3) {
-      DCHECK_EQ(val_type, codegen->GetNamedType(LLVM_DECIMALVAL_NAME));
+      // DecimalVal ({ {i8}, [15 x i8], {i128} }) or VariantVal
+      // ({ {i8}, %StringVal, %StringVal }).
+      DCHECK(IsUnloweredValType(val_type)) << LlvmCodeGen::Print(val_type);
       // Return the struct { {1}, 0, 0 } (the 'is_null' byte, i.e. the first value's first
       // byte, is set to 1, the other bytes don't matter)
       llvm::StructType* anyval_struct_type =
@@ -906,6 +940,7 @@ CodegenAnyVal CodegenAnyVal::CreateFromReadWriteInfo(
   LlvmCodeGen* codegen = read_write_info.codegen();
   LlvmBuilder* builder = read_write_info.builder();
   const ColumnType& type = read_write_info.type();
+  DCHECK(!type.IsVariantType()) << "CodegenAnyValReadWriteInfo: VARIANT type NYI";
 
   llvm::LLVMContext& context = codegen->context();
   llvm::Function* fn = read_write_info.non_null_block()->getParent();
@@ -993,6 +1028,7 @@ CodegenAnyVal CodegenAnyVal::CreateFromReadWriteInfo(
 }
 
 CodegenAnyValReadWriteInfo CodegenAnyVal::ToReadWriteInfo() {
+  DCHECK(!type_.IsVariantType()) << "CodegenAnyValReadWriteInfo: VARIANT type NYI";
   llvm::IRBuilderBase::InsertPoint ip = builder_->saveIP();
 
   llvm::LLVMContext& context = codegen_->context();

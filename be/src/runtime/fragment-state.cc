@@ -218,9 +218,10 @@ Status FragmentState::CreateCodegen() {
 Status FragmentState::CodegenScalarExprs() {
   for (auto& item : scalar_exprs_to_codegen_) {
     ScalarExpr* expr = item.first;
-    // We don't need to codegen GetSlotRef() for struct children because the struct takes
+    // We don't need to codegen GetSlotRef() for struct children (or for the
+    // 'metadata'/'value' children of a VARIANT slot) because the parent SlotRef takes
     // care of its members.
-    if (!ScalarExprIsWithinStruct(expr)) {
+    if (!ScalarExprIsWithinStructOrVariant(expr)) {
       llvm::Function* fn;
       RETURN_IF_ERROR(expr->GetCodegendComputeFn(codegen_.get(), item.second, &fn));
     }
@@ -243,7 +244,7 @@ std::string FragmentState::GenerateCodegenMsg(bool codegen_enabled,
   return str.str();
 }
 
-bool FragmentState::ScalarExprIsWithinStruct(const ScalarExpr* expr) const {
+bool FragmentState::ScalarExprIsWithinStructOrVariant(const ScalarExpr* expr) const {
   if (!expr->IsSlotRef()) return false;
   const SlotRef* slot_ref_expr = static_cast<const SlotRef*>(expr);
   const SlotDescriptor* slot_desc = desc_tbl().GetSlotDescriptor(

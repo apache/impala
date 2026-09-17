@@ -335,19 +335,13 @@ bool ScalarExpr::ShouldCodegen(const FragmentState* state) const {
   // 3. there is an optimization hint to disable codegen and the expr can be interpreted.
   // 4. Optimizer decided to disable codegen. Example: const expressions in VALUES()
   //    which are evaluated only once.
-  // 5. The expression produces or consumes a VARIANT value. Codegen for VARIANT is not
-  //    implemented, so it must use the interpreted path.
+  // 5. The expression returns a VARIANT. Native code only consumes VARIANT values on
+  //    interpreted paths (e.g. result sinks, Tuple::MaterializeExprs()), so such an
+  //    expression does not need a codegen'd entry point. It is still codegen'd via
+  //    GetCodegendComputeFn() when it is the child of a codegen'd expression.
   return state != nullptr && !state->CodegenDisabledByQueryOption()
       && !((state->CodegenHasDisableHint() || is_codegen_disabled_) && IsInterpretable())
-      && !InvolvesVariantType();
-}
-
-bool ScalarExpr::InvolvesVariantType() const {
-  if (type_.IsVariantType()) return true;
-  for (const ScalarExpr* child : children_) {
-    if (child->InvolvesVariantType()) return true;
-  }
-  return false;
+      && !type_.IsVariantType();
 }
 
 int ScalarExpr::GetSlotIds(vector<SlotId>* slot_ids) const {
@@ -374,13 +368,6 @@ Status ScalarExpr::GetCodegendComputeFn(
   if (ir_compute_fn_ != nullptr) {
     *fn = ir_compute_fn_;
   } else {
-    // Codegen for VARIANT is not implemented. ShouldCodegen() keeps such expressions from
-    // being registered as codegen entry points, but exec nodes also call this function
-    // directly (e.g. for conjuncts, hash/sort keys, partition exprs). They fall back to
-    // interpretation on a non-OK status.
-    if (InvolvesVariantType()) {
-      return Status::Expected("Codegen for expressions involving VARIANT NYI");
-    }
     RETURN_IF_ERROR(GetCodegendComputeFnImpl(codegen, fn));
     ir_compute_fn_ = *fn;
   }

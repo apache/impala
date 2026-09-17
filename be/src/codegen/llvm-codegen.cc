@@ -1585,18 +1585,18 @@ void LlvmCodeGen::AddFunctionToJit(llvm::Function* fn, CodegenFnPtrBase* fn_ptr)
   DCHECK(finalized_functions_.find(fn) != finalized_functions_.end())
       << "Attempted to add a non-finalized function to Jit: " << fn->getName().str();
   DCHECK(!is_compiled_);
-  llvm::Type* decimal_val_type = GetNamedType(CodegenAnyVal::LLVM_DECIMALVAL_NAME);
-  if (fn->getReturnType() == decimal_val_type) {
-    // Per the x86 calling convention ABI, DecimalVals should be returned via an extra
-    // first DecimalVal* argument. We generate non-compliant functions that return the
-    // DecimalVal directly, which we can call from generated code, but not from compiled
-    // native code.  To avoid accidentally calling a non-compliant function from native
-    // code, call 'function' from an ABI-compliant wrapper.
+  llvm::Type* ret_type = fn->getReturnType();
+  if (CodegenAnyVal::IsUnloweredValType(ret_type)) {
+    // Per the x86 calling convention ABI, DecimalVals and VariantVals should be returned
+    // via an extra first DecimalVal*/VariantVal* argument. We generate non-compliant
+    // functions that return the *Val directly, which we can call from generated code, but
+    // not from compiled native code.  To avoid accidentally calling a non-compliant
+    // function from native code, call 'function' from an ABI-compliant wrapper.
     stringstream name;
     name << fn->getName().str() << "ABIWrapper";
     LlvmCodeGen::FnPrototype prototype(this, name.str(), void_type_);
     // Add return argument
-    prototype.AddArgument(NamedVariable("result", decimal_val_type->getPointerTo()));
+    prototype.AddArgument(NamedVariable("result", ptr_type()));
     // Add regular arguments
     for (llvm::Function::arg_iterator arg = fn->arg_begin(); arg != fn->arg_end();
          ++arg) {
@@ -1608,15 +1608,17 @@ void LlvmCodeGen::AddFunctionToJit(llvm::Function* fn, CodegenFnPtrBase* fn_ptr)
     fn_wrapper->addFnAttr(llvm::Attribute::AlwaysInline);
     // Mark first argument as sret
     fn_wrapper->addAttributeAtIndex(1,
-        llvm::Attribute::getWithStructRetType(context(), decimal_val_type));
+        llvm::Attribute::getWithStructRetType(context(), ret_type));
     // Native callers only guarantee alignof(DecimalVal), which is 8, not the i128 ABI
     // alignment of 16 that LLVM would otherwise assume for the sret pointer.
+    // alignof(VariantVal) is 8 as well.
     fn_wrapper->addParamAttr(0, llvm::Attribute::getWithAlignment(context(),
         llvm::Align(8)));
     // Call 'fn' and store the result in the result argument
     llvm::Value* result = builder.CreateCall(
         fn, llvm::ArrayRef<llvm::Value*>({&args[1], fn->arg_size()}), "result");
-    // The native caller only guarantees alignof(DecimalVal), which is 8.
+    // The native caller only guarantees alignof(DecimalVal) / alignof(VariantVal), which
+    // is 8.
     builder.CreateAlignedStore(result, args[0], llvm::Align(8));
     builder.CreateRetVoid();
     fn = FinalizeFunction(fn_wrapper);

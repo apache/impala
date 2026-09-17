@@ -2978,8 +2978,8 @@ class TestIcebergV3Table(IcebergTestSuite):
     # Table with VARIANT nested inside ARRAY/MAP/STRUCT; used by the negative cases
     # that assert nested VARIANT is rejected (only top-level VARIANT is queryable).
     self.load_table(unique_database, "trino_nested_variant")
-    # Tables with VARIANT in Avro / ORC / mixed Parquet and Avro data files, written by
-    # testdata/bin/generate-iceberg-v3-variant-formats.java.
+    # Tables with VARIANT in Avro / ORC / mixed Parquet and Avro data files, see
+    # testdata/data/README.
     self.load_table(unique_database, "iceberg_v3_variant_avro", format="avro")
     self.load_table(unique_database, "iceberg_v3_variant_orc", format="orc")
     self.load_table(unique_database, "iceberg_v3_variant_mixed")
@@ -3013,7 +3013,6 @@ class TestIcebergV3Table(IcebergTestSuite):
         "from {0}.iceberg_v3_spark_variant".format(unique_database))
     assert result.data == ["21\t14"], result.data
     assert "UDF WARNING" not in (result.log or ""), result.log
-
 
   def test_v3_default_values(self, vector, unique_database):
     """Test Iceberg V3 initial-default and write-default values."""
@@ -3199,6 +3198,26 @@ class TestIcebergAvroStruct(IcebergTestSuite):
     result = self.execute_query(query, vector.get_value('exec_option'))
     expected = "Codegen enabled: {0} out of 1".format(0 if disable_codegen else 1)
     assert expected in result.runtime_profile, result.runtime_profile
+
+
+class TestIcebergV3VariantCodegen(IcebergTestSuite):
+  """Tests that queries on Iceberg V3 VARIANT columns are codegen'd. The test file has
+  assertions on the codegen status in the runtime profile, so it only runs with codegen
+  enabled."""
+
+  @classmethod
+  def add_test_dimensions(cls):
+    super(TestIcebergV3VariantCodegen, cls).add_test_dimensions()
+    cls.ImpalaTestMatrix.add_constraint(
+      lambda v: v.get_value('table_format').file_format == 'parquet')
+    cls.ImpalaTestMatrix.add_dimension(create_exec_option_dimension(
+        batch_sizes=[19, 1024], disable_codegen_options=[False]))
+
+  def test_v3_variant_codegen(self, vector, unique_database):
+    create_iceberg_table_from_directory(self.client, unique_database, "trino_variant",
+        "parquet", table_location="${IMPALA_HOME}/testdata/data/iceberg_test/iceberg_v3",
+        warehouse_prefix=os.getenv("FILESYSTEM_PREFIX"))
+    self.run_test_case('QueryTest/iceberg-v3-variant-codegen', vector, unique_database)
 
 
 class TestIcebergUuidAggregates(IcebergTestSuite):

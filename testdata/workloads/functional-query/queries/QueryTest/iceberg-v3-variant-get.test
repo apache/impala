@@ -624,3 +624,79 @@ BIGINT, INT
 ---- RUNTIME_PROFILE
 !row_regex: .*disabled due to optimization hints
 ====
+---- QUERY
+# VARIANT slot of the nullable tuple of an outer join materialized into the sort tuple,
+# then read from the sort tuple by the output exprs.
+SELECT a.id, variant_get(b.v, '$.name', 'string'), variant_get(b.v, '$.age')
+FROM trino_variant a LEFT JOIN trino_variant b ON a.id = b.id AND b.id = 31
+WHERE a.id IN (30, 31)
+ORDER BY a.id;
+---- RESULTS
+30,'NULL','NULL'
+31,'Alice','30'
+---- TYPES
+INT, STRING, STRING
+====
+---- QUERY
+# VARIANT read from the nullable tuple of an outer join by a conjunct of the join and by
+# the aggregation above it.
+SELECT STRAIGHT_JOIN count(*), count(variant_get(b.v, '$.name', 'string')),
+       max(variant_get(b.v, '$.age', 'int'))
+FROM trino_variant a LEFT JOIN trino_variant b ON a.id = b.id AND b.id IN (31, 32)
+WHERE variant_get(b.v, '$.active', 'boolean') IS NULL;
+---- RESULTS
+54,1,30
+---- TYPES
+BIGINT, BIGINT, INT
+====
+---- QUERY
+# The strict variant_get() fails for values that are not convertible to the target type.
+# AND/OR do not guarantee that it is only evaluated for the rows selected by the other
+# operand, but CASE does.
+SELECT id FROM trino_variant
+WHERE CASE WHEN descr LIKE 'int%' THEN variant_get(v, '$', 'bigint') > 1000
+      ELSE false END
+ORDER BY id;
+---- RESULTS
+9
+10
+12
+---- TYPES
+INT
+====
+---- QUERY
+# SQL NULL (id 0) and variant null (id 1) inputs through every VARIANT consumer.
+SELECT id, variant_get(v, '$.a'), try_variant_get(v, '$', 'int'), variant_to_json(v)
+FROM trino_variant WHERE id IN (0, 1)
+ORDER BY id;
+---- RESULTS
+0,'NULL',NULL,'NULL'
+1,'NULL',NULL,'null'
+---- TYPES
+INT, STRING, INT, STRING
+====
+---- QUERY
+# variant_to_json() in a predicate evaluated for many rows.
+SELECT id, variant_to_json(v) FROM trino_variant
+WHERE id BETWEEN 20 AND 40 AND variant_to_json(v) LIKE '%Alice%'
+ORDER BY id;
+---- RESULTS
+20,'"Alice"'
+31,'{"age":30,"name":"Alice"}'
+32,'{"active":true,"age":30,"name":"Alice"}'
+35,'{"context":{"page":"home","retries":3},"device":"mobile","int_array":[1,2,3,4,10],"user":"Alice"}'
+---- TYPES
+INT, STRING
+====
+---- QUERY
+# UNION ALL that materializes VARIANT values returned by functions into the union tuple.
+SELECT id + 0 AS id, variant_get(v, '$.context') AS c FROM trino_variant WHERE id = 35
+UNION ALL
+SELECT id + 100, variant_get(v, '$.name') FROM trino_variant WHERE id IN (0, 31);
+---- RESULTS
+35,'{"page":"home","retries":3}'
+100,'NULL'
+131,'"Alice"'
+---- TYPES
+BIGINT, STRING
+====

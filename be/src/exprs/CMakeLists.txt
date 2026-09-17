@@ -48,6 +48,7 @@ add_library(ExprsIr
   operators-ir.cc
   scalar-expr-ir.cc
   scalar-expr-evaluator-ir.cc
+  slot-ref-ir.cc
   string-functions-ir.cc
   timestamp-functions-ir.cc
   tuple-is-null-predicate-ir.cc

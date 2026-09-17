@@ -23,6 +23,7 @@
 #include "codegen/codegen-anyval.h"
 #include "codegen/llvm-codegen.h"
 #include "exprs/scalar-expr-evaluator.h"
+#include "exprs/slot-ref-ir.h"
 #include "gen-cpp/Exprs_types.h"
 #include "llvm/IR/BasicBlock.h"
 #include "runtime/collection-value.h"
@@ -374,7 +375,7 @@ CodegenAnyValReadWriteInfo SlotRef::CodegenReadSlot(LlvmCodeGen* codegen,
 
   // This is not used for structs because the child expressions have their own slot
   // pointers and we only read through those, not through the struct slot pointer.
-  llvm::Value* val_ptr = (type_.IsStructType() || type_.IsVariantType()) ? nullptr :
+  llvm::Value* val_ptr = type_.IsStructType() ? nullptr :
       builder->CreateInBoundsGEP(codegen->i8_type(), tuple_ptr, slot_offset, "slot_addr");
 
   // For structs the code that reads the value consists of multiple basic blocks, so the
@@ -388,7 +389,7 @@ CodegenAnyValReadWriteInfo SlotRef::CodegenReadSlot(LlvmCodeGen* codegen,
   // *Val. The optimizer does a better job when there is a phi node for each value, rather
   // than having read_slot_block generate an AnyVal and having a single phi node over
   // that.
-  if (type_.IsStructType() || type_.IsVariantType()) {
+  if (type_.IsStructType()) {
     llvm::Function* fn = builder->GetInsertBlock()->getParent();
     std::size_t num_children = children_.size();
     for (std::size_t i = 0; i < num_children; ++i) {
@@ -470,14 +471,51 @@ CodegenAnyValReadWriteInfo SlotRef::CodegenReadSlot(LlvmCodeGen* codegen,
 CodegenAnyVal SlotRef::CodegenValue(LlvmCodeGen* codegen, LlvmBuilder* builder,
     llvm::Function* fn, llvm::Value* eval_ptr, llvm::Value* row_ptr,
     llvm::BasicBlock* entry_block) {
+  if (type_.IsVariantType()) {
+    return CodegenVariantValue(codegen, builder, fn, row_ptr, entry_block);
+  }
   CodegenAnyValReadWriteInfo read_write_info = CreateCodegenAnyValReadWriteInfo(codegen,
       builder, fn, eval_ptr, row_ptr, entry_block);
   return CodegenAnyVal::CreateFromReadWriteInfo(read_write_info);
 }
 
+// Resulting IR for a VARIANT slotref (before inlining SlotRefIr::ReadVariantVal()):
+//
+// define %"struct.impala_udf::VariantVal" @GetSlotRef(ptr %eval, ptr %row) {
+// entry:
+//   %variant_val = alloca %"struct.impala_udf::VariantVal", align 8
+//   call void @SlotRefIr::ReadVariantVal(ptr %variant_val, ptr %row, i32 0, i1 false,
+//       i64 4294967320, i32 0)
+//   %variant_val1 = load %"struct.impala_udf::VariantVal", ptr %variant_val, align 8
+//   ret %"struct.impala_udf::VariantVal" %variant_val1
+// }
+CodegenAnyVal SlotRef::CodegenVariantValue(LlvmCodeGen* codegen, LlvmBuilder* builder,
+    llvm::Function* fn, llvm::Value* row_ptr, llvm::BasicBlock* entry_block) {
+  DCHECK(type_.IsVariantType());
+  if (entry_block == nullptr) {
+    entry_block = llvm::BasicBlock::Create(codegen->context(), "entry", fn);
+  }
+  builder->SetInsertPoint(entry_block);
+  llvm::Function* read_variant_fn =
+      codegen->GetFunction(IRFunction::SLOT_REF_READ_VARIANT_VAL, false);
+  DCHECK(read_variant_fn != nullptr);
+  // Only constants are passed besides 'row_ptr', so the generated code does not depend on
+  // addresses of this process. The by-value NullIndicatorOffset parameter is an i64 in
+  // IR.
+  llvm::Value* read_variant_args[] = {row_ptr, codegen->GetI32Constant(tuple_idx_),
+      codegen->GetBoolConstant(tuple_is_nullable_),
+      null_indicator_offset_.ToIRPacked(codegen), codegen->GetI32Constant(slot_offset_)};
+  // 'read_variant_fn' returns the VariantVal via an output argument. CreateCall() takes
+  // care of that and returns the loaded value.
+  llvm::Value* variant_val = CodegenAnyVal::CreateCall(
+      codegen, builder, read_variant_fn, read_variant_args, "variant_val");
+  return CodegenAnyVal(codegen, builder, type_, variant_val, "variant_val");
+}
+
 CodegenAnyValReadWriteInfo SlotRef::CreateCodegenAnyValReadWriteInfo(
     LlvmCodeGen* codegen, LlvmBuilder* builder, llvm::Function* fn,
     llvm::Value* eval_ptr, llvm::Value* row_ptr, llvm::BasicBlock* entry_block) {
+  DCHECK(!type_.IsVariantType()) << "VARIANT is read by CodegenVariantValue()";
   llvm::IRBuilderBase::InsertPoint ip = builder->saveIP();
 
   llvm::Value* tuple_offset = codegen->GetI32Constant(tuple_idx_);
@@ -630,16 +668,9 @@ StructVal SlotRef::GetStructValInterpreted(
 VariantVal SlotRef::GetVariantValInterpreted(
     ScalarExprEvaluator* eval, const TupleRow* row) const {
   DCHECK(type_.IsVariantType());
-  Tuple* t = row->GetTuple(tuple_idx_);
-  if (t == nullptr || t->IsNull(null_indicator_offset_)) return VariantVal::null();
-  const uint8_t* slot = reinterpret_cast<const uint8_t*>(t->GetSlot(slot_offset_));
-  const StringValue* meta_sv = reinterpret_cast<const StringValue*>(slot);
-  const StringValue* val_sv =
-      reinterpret_cast<const StringValue*>(slot + sizeof(StringValue));
-  VariantVal result;
-  meta_sv->ToStringVal(&result.metadata);
-  val_sv->ToStringVal(&result.value);
-  return result;
+  // Like the other Get*ValInterpreted() functions, always check the tuple pointer.
+  return SlotRefIr::ReadVariantVal(row, tuple_idx_, /* tuple_is_nullable */ true,
+      null_indicator_offset_, slot_offset_);
 }
 
 const TupleDescriptor* SlotRef::GetCollectionTupleDesc() const {

@@ -18,16 +18,22 @@
 #include <memory>
 #include <string>
 #include <boost/thread/thread.hpp>
+#include <llvm/ExecutionEngine/ExecutionEngine.h>
 
 #include "testutil/gtest-util.h"
+#include "codegen/codegen-anyval.h"
 #include "codegen/llvm-codegen.h"
 #include "common/init.h"
 #include "common/object-pool.h"
 #include "runtime/fragment-state.h"
+#include "runtime/mem-pool.h"
+#include "runtime/mem-tracker.h"
 #include "runtime/query-state.h"
 #include "runtime/string-value.h"
 #include "runtime/test-env.h"
+#include "runtime/types.h"
 #include "service/fe-support.h"
+#include "udf/udf-internal.h"
 #include "util/cpu-info.h"
 #include "util/filesystem-util.h"
 #include "util/hash-util.h"
@@ -495,6 +501,179 @@ TEST_F(LlvmCodeGenTest, MemcpyTest) {
 
   EXPECT_EQ(memcmp(src, dst, 4), 0);
   codegen->Close();
+}
+
+// ColumnType has no factory for VARIANT: it is always deserialized from thrift.
+static ColumnType CreateVariantType() {
+  ColumnType type;
+  type.type = TYPE_VARIANT;
+  type.children.push_back(ColumnType::CreateBinaryType());
+  type.children.push_back(ColumnType::CreateBinaryType());
+  type.field_names = {"metadata", "value"};
+  type.field_ids = {-1, -1};
+  return type;
+}
+
+// Tests that the IR VariantVal struct matches the C++ struct, and that 'is_null' can be
+// read and written in codegen without touching the rest of the value.
+TEST_F(LlvmCodeGenTest, VariantValNull) {
+  scoped_ptr<LlvmCodeGen> codegen;
+  ASSERT_OK(LlvmCodeGen::CreateImpalaCodegen(fragment_state_, NULL, "test", &codegen));
+  ASSERT_TRUE(codegen.get() != NULL);
+  const auto close_codegen = MakeScopeExitTrigger([&codegen]() { codegen->Close(); });
+
+  const ColumnType variant_type = CreateVariantType();
+  // VariantVal isn't lowered.
+  llvm::Type* val_type = CodegenAnyVal::GetLoweredType(codegen.get(), variant_type);
+  ASSERT_EQ(val_type, CodegenAnyVal::GetUnloweredType(codegen.get(), variant_type));
+  ASSERT_TRUE(CodegenAnyVal::IsUnloweredValType(val_type));
+  EXPECT_FALSE(CodegenAnyVal::IsUnloweredValType(
+      CodegenAnyVal::GetLoweredType(codegen.get(), ColumnType(TYPE_STRING))));
+  ASSERT_TRUE(val_type->isStructTy());
+  llvm::StructType* struct_type = llvm::cast<llvm::StructType>(val_type);
+  ASSERT_EQ(3, struct_type->getNumElements());
+  const llvm::DataLayout& data_layout = codegen->execution_engine()->getDataLayout();
+  const llvm::StructLayout* layout = data_layout.getStructLayout(struct_type);
+  EXPECT_EQ(sizeof(impala_udf::VariantVal), layout->getSizeInBytes());
+  EXPECT_EQ(offsetof(impala_udf::VariantVal, metadata), layout->getElementOffset(1));
+  EXPECT_EQ(offsetof(impala_udf::VariantVal, value), layout->getElementOffset(2));
+  // A VARIANT slot is two StringValues.
+  EXPECT_EQ(variant_type.GetSlotSize(),
+      data_layout.getTypeAllocSize(codegen->GetSlotType(variant_type)));
+
+  // void VariantNullTest(VariantVal* null_val, VariantVal* val, bool* was_null):
+  // Stores a NULL VariantVal to 'null_val', returns val->is_null in 'was_null' and
+  // negates val->is_null.
+  LlvmCodeGen::FnPrototype prototype(
+      codegen.get(), "VariantNullTest", codegen->void_type());
+  prototype.AddArgument("null_val", codegen->ptr_type());
+  prototype.AddArgument("val", codegen->ptr_type());
+  prototype.AddArgument("was_null", codegen->ptr_type());
+  LlvmBuilder builder(codegen->context());
+  llvm::Value* args[3];
+  llvm::Function* fn = prototype.GeneratePrototype(&builder, &args[0]);
+  builder.CreateStore(CodegenAnyVal::GetNullVal(codegen.get(), variant_type), args[0]);
+  CodegenAnyVal val(
+      codegen.get(), &builder, variant_type, builder.CreateLoad(val_type, args[1], "val"),
+      "val");
+  llvm::Value* is_null = val.GetIsNull();
+  builder.CreateStore(builder.CreateZExt(is_null, codegen->i8_type()), args[2]);
+  val.SetIsNull(builder.CreateNot(is_null, "negated_is_null"));
+  builder.CreateStore(val.GetLoweredValue(), args[1]);
+  builder.CreateRetVoid();
+  fn = codegen->FinalizeFunction(fn);
+  ASSERT_TRUE(fn != NULL);
+
+  typedef void (*VariantNullTestFn)(
+      impala_udf::VariantVal*, impala_udf::VariantVal*, bool*);
+  CodegenFnPtr<VariantNullTestFn> jitted_fn;
+  LlvmCodeGenTest::AddFunctionToJit(codegen.get(), fn, &jitted_fn);
+  ASSERT_OK(LlvmCodeGenTest::FinalizeModule(codegen.get()));
+  ASSERT_TRUE(jitted_fn.load() != nullptr);
+  VariantNullTestFn test_fn = jitted_fn.load();
+
+  uint8_t metadata[] = {0x11, 0x00, 0x00};
+  uint8_t value[] = {0x0C, 0x07};
+  impala_udf::VariantVal null_val;
+  impala_udf::VariantVal val_arg(impala_udf::StringVal(metadata, sizeof(metadata)),
+      impala_udf::StringVal(value, sizeof(value)));
+  bool was_null = true;
+  test_fn(&null_val, &val_arg, &was_null);
+  EXPECT_TRUE(null_val.is_null);
+  EXPECT_FALSE(was_null);
+  EXPECT_TRUE(val_arg.is_null);
+  // Only 'is_null' was modified.
+  EXPECT_EQ(metadata, val_arg.metadata.ptr);
+  EXPECT_EQ(sizeof(metadata), val_arg.metadata.len);
+  EXPECT_EQ(value, val_arg.value.ptr);
+  EXPECT_EQ(sizeof(value), val_arg.value.len);
+  test_fn(&null_val, &val_arg, &was_null);
+  EXPECT_TRUE(was_null);
+  EXPECT_FALSE(val_arg.is_null);
+}
+
+// Tests the calling conventions of VariantVal: cross-compiled functions return it via an
+// output argument, generated functions return it by value, and AddFunctionToJit() wraps
+// generated functions so that native code can call them.
+TEST_F(LlvmCodeGenTest, VariantValCallingConvention) {
+  scoped_ptr<LlvmCodeGen> codegen;
+  ASSERT_OK(LlvmCodeGen::CreateImpalaCodegen(fragment_state_, NULL, "test", &codegen));
+  ASSERT_TRUE(codegen.get() != NULL);
+  const auto close_codegen = MakeScopeExitTrigger([&codegen]() { codegen->Close(); });
+
+  const ColumnType variant_type = CreateVariantType();
+  llvm::Type* val_type = CodegenAnyVal::GetLoweredType(codegen.get(), variant_type);
+
+  // The cross-compiled VariantFunctions::VariantGet(FunctionContext*, const VariantVal&,
+  // const StringVal&).
+  llvm::Function* variant_get_fn = codegen->GetFunction(
+      "_ZN6impala16VariantFunctions10VariantGetEPN10impala_udf15FunctionContextERKNS1_10"
+      "VariantValERKNS1_9StringValE", false);
+  ASSERT_TRUE(variant_get_fn != NULL);
+  // Returns the VariantVal via an extra first output argument.
+  // CodegenAnyVal::CreateCall() recognizes it by its sret attribute.
+  ASSERT_TRUE(variant_get_fn->getReturnType()->isVoidTy());
+  ASSERT_EQ(4, variant_get_fn->arg_size());
+  ASSERT_EQ(val_type, variant_get_fn->getParamStructRetType(0));
+
+  // VariantVal VariantGetByValue(FunctionContext* ctx, VariantVal* v, StringVal* path)
+  LlvmCodeGen::FnPrototype prototype(codegen.get(), "VariantGetByValue", val_type);
+  prototype.AddArgument("ctx", codegen->ptr_type());
+  prototype.AddArgument("v", codegen->ptr_type());
+  prototype.AddArgument("path", codegen->ptr_type());
+  LlvmBuilder builder(codegen->context());
+  llvm::Value* args[3];
+  llvm::Function* fn = prototype.GeneratePrototype(&builder, &args[0]);
+  llvm::Value* result = CodegenAnyVal::CreateCall(
+      codegen.get(), &builder, variant_get_fn, {args[0], args[1], args[2]}, "result");
+  builder.CreateRet(result);
+  fn = codegen->FinalizeFunction(fn);
+  ASSERT_TRUE(fn != NULL);
+
+  typedef impala_udf::VariantVal (*VariantGetByValueFn)(impala_udf::FunctionContext*,
+      const impala_udf::VariantVal&, const impala_udf::StringVal&);
+  CodegenFnPtr<VariantGetByValueFn> jitted_fn;
+  // Don't bypass LlvmCodeGen::AddFunctionToJit(): it has to generate an ABI-compliant
+  // wrapper. Check the wrapper explicitly, because LLVM may happen to lower the by-value
+  // return in an ABI-compliant way even without it.
+  codegen->AddFunctionToJit(fn, &jitted_fn);
+  llvm::Function* wrapper_fn = codegen->GetFunction("VariantGetByValueABIWrapper", false);
+  ASSERT_TRUE(wrapper_fn != NULL);
+  EXPECT_TRUE(wrapper_fn->getReturnType()->isVoidTy());
+  EXPECT_EQ(4, wrapper_fn->arg_size());
+  EXPECT_EQ(val_type, wrapper_fn->getParamStructRetType(0));
+  ASSERT_OK(LlvmCodeGenTest::FinalizeModule(codegen.get()));
+  ASSERT_TRUE(jitted_fn.load() != nullptr);
+  VariantGetByValueFn test_fn = jitted_fn.load();
+
+  MemTracker tracker;
+  MemPool pool(&tracker);
+  impala_udf::FunctionContext::TypeDesc type_desc;
+  type_desc.type = impala_udf::FunctionContext::TYPE_STRING;
+  vector<impala_udf::FunctionContext::TypeDesc> arg_types(2, type_desc);
+  impala_udf::FunctionContext* ctx =
+      FunctionContextImpl::CreateContext(nullptr, &pool, &pool, type_desc, arg_types);
+
+  // The variant {"a": 7}. Metadata: version 1, sorted, 1-byte offsets, dictionary ["a"].
+  // Value: object with 1 field (id 0, offset 0) holding the int8 7.
+  uint8_t metadata[] = {0x11, 0x01, 0x00, 0x01, 'a'};
+  uint8_t value[] = {0x02, 0x01, 0x00, 0x00, 0x02, 0x0C, 0x07};
+  impala_udf::VariantVal variant(impala_udf::StringVal(metadata, sizeof(metadata)),
+      impala_udf::StringVal(value, sizeof(value)));
+  impala_udf::VariantVal field = test_fn(ctx, variant, impala_udf::StringVal("$.a"));
+  EXPECT_FALSE(field.is_null);
+  // The result shares the metadata and points into the value of the parent.
+  EXPECT_EQ(metadata, field.metadata.ptr);
+  EXPECT_EQ(sizeof(metadata), field.metadata.len);
+  EXPECT_EQ(value + 5, field.value.ptr);
+  EXPECT_EQ(2, field.value.len);
+  EXPECT_TRUE(test_fn(ctx, variant, impala_udf::StringVal("$.b")).is_null);
+  EXPECT_TRUE(
+      test_fn(ctx, impala_udf::VariantVal::null(), impala_udf::StringVal("$.a")).is_null);
+
+  ctx->impl()->Close();
+  delete ctx;
+  pool.FreeAll();
 }
 
 // Test codegen for hash
