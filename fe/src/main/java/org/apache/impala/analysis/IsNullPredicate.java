@@ -58,7 +58,8 @@ public class IsNullPredicate extends Predicate {
   public boolean isNotNull() { return isNotNull_; }
 
   public static void initBuiltins(Db db) {
-    for (Type t: Type.getSupportedTypes()) {
+    // For VARIANT, a variant null is a regular value, only SQL NULLs are NULL.
+    for (Type t: Type.getIsNullPredicateTypes()) {
       if (t.isNull()) continue;
       String isNullSymbol;
       if (t.isBoolean()) {
@@ -128,11 +129,9 @@ public class IsNullPredicate extends Predicate {
       uncheckedCastChild(ScalarType.BOOLEAN, 0);
     }
 
-    if (getChild(0).getType().isComplexOrVariantType()) {
-      String typeStr =
-          getChild(0).getType().isVariantType() ? "VARIANT type" : "complex types";
+    if (getChild(0).getType().isComplexType()) {
       String errorMsg = (isNotNull_ ? "IS NOT NULL" : "IS NULL") +
-         " predicate does not support " + typeStr + ": ";
+         " predicate does not support complex types: ";
       throw new AnalysisException(errorMsg + toSqlImpl());
     }
 

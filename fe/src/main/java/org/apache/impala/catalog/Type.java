@@ -83,6 +83,7 @@ public abstract class Type {
   private static List<ScalarType> integerTypes;
   private static List<ScalarType> numericTypes;
   private static List<ScalarType> supportedTypes;
+  private static List<Type> isNullPredicateTypes;
   private static List<ScalarType> unsupportedTypes;
 
   static {
@@ -120,6 +121,9 @@ public abstract class Type {
     supportedTypes.add(UUID);
     supportedTypes.add(GEOMETRY);
 
+    isNullPredicateTypes = new ArrayList<>(supportedTypes);
+    isNullPredicateTypes.add(VARIANT);
+
     unsupportedTypes = new ArrayList<>();
     unsupportedTypes.add(DATETIME);
   }
@@ -132,6 +136,15 @@ public abstract class Type {
   }
   public static List<ScalarType> getSupportedTypes() {
     return supportedTypes;
+  }
+  /**
+   * Returns the argument types of the IS [NOT] NULL builtins: the supported scalar types
+   * and VARIANT. VARIANT is not a scalar type, but unlike the complex types, a VARIANT
+   * value is passed to builtins as a self-contained value (VariantVal, see
+   * Function.getUdfType()), so it can be NULL-checked like a scalar value.
+   */
+  public static List<Type> getIsNullPredicateTypes() {
+    return isNullPredicateTypes;
   }
   public static List<ScalarType> getUnsupportedTypes() {
     return unsupportedTypes;

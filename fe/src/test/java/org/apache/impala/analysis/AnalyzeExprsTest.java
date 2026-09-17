@@ -695,6 +695,15 @@ public class AnalyzeExprsTest extends AnalyzerTest {
     AnalyzesOk("select * from functional.alltypes where string_col is not null");
     AnalyzesOk("select * from functional.binary_tbl where binary_col is null");
     AnalyzesOk("select * from functional.alltypes where null is not null");
+    // VARIANT values can be NULL-checked, also when they are returned by a function.
+    AnalyzesOk("select id from functional_parquet.trino_variant where v is null");
+    AnalyzesOk("select v is not null from functional_parquet.trino_variant");
+    AnalyzesOk("select id from functional_parquet.trino_variant " +
+        "where variant_get(v, '$.name') is not null");
+    AnalyzesOk("select if(v is null, 0, 1), nvl2(v, 1, 0), " +
+        "case when v is null then 'null' else 'not null' end, " +
+        "count(case when v is null then 1 else null end) " +
+        "from functional_parquet.trino_variant group by 1, 2, 3");
 
     AnalysisError("select 1 from functional.allcomplextypes where int_map_col is null",
         "IS NULL predicate does not support complex types: int_map_col IS NULL");

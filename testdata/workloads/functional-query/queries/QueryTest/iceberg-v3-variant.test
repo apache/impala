@@ -354,8 +354,85 @@ INT, STRING
 aggregation(SUM, TotalMergesPerformed)> 0
 ====
 ---- QUERY
-# Negative cases: VARIANT is not comparable/orderable/hashable and can only be a
-# pass-through SlotRef, so these must raise a clean AnalysisException (never crash/NPE).
+# IS NULL on a variant.
+SELECT id FROM functional_parquet.trino_variant WHERE v IS NULL;
+---- RESULTS
+0
+---- TYPES
+INT
+====
+---- QUERY
+SELECT count(*) FROM functional_parquet.trino_variant WHERE v IS NOT NULL;
+---- RESULTS
+54
+---- TYPES
+BIGINT
+====
+---- QUERY
+# A variant null (id 1) is a regular value, it is not SQL NULL.
+SELECT id, v, v IS NULL, v IS NOT NULL FROM functional_parquet.trino_variant
+WHERE id IN (0, 1, 2) ORDER BY id;
+---- RESULTS
+0,'NULL',true,false
+1,'null',false,true
+2,'true',false,true
+---- TYPES
+INT, STRING, BOOLEAN, BOOLEAN
+====
+---- QUERY
+# IS NULL in aggregates and in conditional functions.
+SELECT nvl2(v, 'not null', 'null'), count(*),
+    count(CASE WHEN v IS NULL THEN 1 ELSE NULL END), sum(if(v IS NOT NULL, 1, 0))
+FROM functional_parquet.trino_variant GROUP BY 1 ORDER BY 1;
+---- RESULTS
+'not null',54,0,54
+'null',1,1,0
+---- TYPES
+STRING, BIGINT, BIGINT, BIGINT
+====
+---- QUERY
+# IS NULL on the variant of the nullable side of an outer join.
+SELECT a.id, b.v IS NULL
+FROM functional_parquet.trino_variant a
+    LEFT JOIN functional_parquet.trino_variant b ON a.id = b.id + 1
+WHERE a.id < 3 ORDER BY a.id;
+---- RESULTS
+0,true
+1,true
+2,false
+---- TYPES
+INT, BOOLEAN
+====
+---- QUERY
+# IS NULL evaluated on top of TOP-N and UNION ALL, i.e. on materialized variants.
+SELECT id, v IS NULL FROM (
+    SELECT id, v FROM functional_parquet.trino_variant WHERE id < 2
+    UNION ALL
+    (SELECT id + 100, v FROM functional_parquet.trino_variant ORDER BY 1 LIMIT 2)) u
+ORDER BY id;
+---- RESULTS
+0,true
+1,false
+100,true
+101,false
+---- TYPES
+BIGINT, BOOLEAN
+====
+---- QUERY
+# A sub-value returned by variant_get() is NULL if the path is missing ($.nope), and also
+# if there is a variant null at the path ($.a, or $ of id 1), unlike the variant null in
+# the column itself.
+SELECT id, variant_get(v, '$') IS NULL, variant_get(v, '$.a') IS NULL,
+    variant_get(v, '$.d') IS NULL, variant_get(v, '$.nope') IS NULL, v IS NULL
+FROM functional_parquet.trino_variant WHERE id IN (1, 40) ORDER BY id;
+---- RESULTS
+1,true,true,true,true,false
+40,false,true,false,true,false
+---- TYPES
+INT, BOOLEAN, BOOLEAN, BOOLEAN, BOOLEAN, BOOLEAN
+====
+---- QUERY
+# Negative cases: VARIANT is not comparable/orderable/hashable.
 # ORDER BY a variant.
 SELECT id FROM functional_parquet.trino_variant ORDER BY v;
 ---- CATCH
@@ -414,12 +491,6 @@ ORDER BY expression 'v' with type 'VARIANT' is not supported.
 SELECT count(DISTINCT v) FROM functional_parquet.trino_variant;
 ---- CATCH
 DISTINCT aggregate parameter 'v' with type 'VARIANT' is not supported.
-====
----- QUERY
-# IS NULL on a variant.
-SELECT id FROM functional_parquet.trino_variant WHERE v IS NULL;
----- CATCH
-IS NULL predicate does not support VARIANT type: v IS NULL
 ====
 ---- QUERY
 # INSERT into a table that has a variant column.

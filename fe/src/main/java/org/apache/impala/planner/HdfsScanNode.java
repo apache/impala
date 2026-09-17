@@ -895,6 +895,8 @@ public class HdfsScanNode extends ScanNode {
     Preconditions.checkState(slotRef.getDesc().isScanSlot());
     // Skip the slot ref if it refers to an array's "pos" field.
     if (slotRef.getDesc().isArrayPosRef()) return;
+    // Only primitive types can be pushed down to the ORC reader.
+    if (slotRef.getDesc().getType().isVariantType()) return;
     addStatsOriginalConjunct(slotRef.getDesc().getParent(), isNullPred);
     SlotDescriptor slotDesc = analyzer.getDescTbl().copySlotDescriptor(statsTuple_,
         slotRef.getDesc());
