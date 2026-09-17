@@ -823,7 +823,8 @@ Status AnalyticEvalNode::GetNext(RuntimeState* state, RowBatch* row_batch, bool*
     *eos = true;
   } else if (prev_pool_last_result_idx_ != -1 &&
       prev_pool_last_result_idx_ < input_stream_->rows_returned() &&
-      prev_pool_last_window_idx_ < window_tuples_.front().first) {
+      (window_tuples_.empty() ||
+       prev_pool_last_window_idx_ < window_tuples_.front().first)) {
     // Transfer resources to the output row batch if enough have accumulated and they're
     // no longer needed by output rows to be returned later.
     VLOG_FILE << id() << " Transfer prev pool to output batch, "
