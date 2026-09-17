@@ -1,0 +1,69 @@
+====
+---- QUERY
+# The table was written by Flink and has equality delete files in both of its partitions.
+# Each partition holds two data files and two equality delete files.
+SELECT `partition`.d, content, count(*), sum(record_count)
+FROM $DATABASE.iceberg_v2_delete_equality_partitioned.`files` GROUP BY 1, 2;
+---- RESULTS
+2023-12-24,0,2,5
+2023-12-24,2,2,5
+2023-12-25,0,2,3
+2023-12-25,2,2,3
+---- TYPES
+DATE,INT,BIGINT,BIGINT
+====
+---- QUERY
+SELECT * FROM iceberg_v2_delete_equality_partitioned;
+---- RESULTS
+1,'str1',2023-12-24
+1,'str1',2023-12-25
+2,'str2',2023-12-24
+4,'str4',2023-12-24
+222,'str2',2023-12-25
+333333,'str3',2023-12-24
+---- TYPES
+INT,STRING,DATE
+====
+---- QUERY
+# OPTIMIZE of a single partition merges the equality deletes that apply to that
+# partition's data into one data file: 2023-12-25 goes from two data files holding three
+# records to one file holding the two records that are left. The other partition keeps all
+# of its files, since an equality delete file belongs to a single partition and so cannot
+# affect the rows of another one.
+# One equality delete file of 2023-12-25 remains. It applies to no data file of the
+# snapshot, so no scan task references it and it is never selected for rewriting; a full
+# table OPTIMIZE leaves such a file behind as well.
+OPTIMIZE TABLE iceberg_v2_delete_equality_partitioned PARTITION (d = '2023-12-25');
+SELECT `partition`.d, content, count(*), sum(record_count)
+FROM $DATABASE.iceberg_v2_delete_equality_partitioned.`files` GROUP BY 1, 2;
+---- RESULTS
+2023-12-24,0,2,5
+2023-12-24,2,2,5
+2023-12-25,0,1,2
+2023-12-25,2,1,2
+---- TYPES
+DATE,INT,BIGINT,BIGINT
+====
+---- QUERY
+# Both partitions still return the same rows: the deletes of 2023-12-25 were applied while
+# rewriting it, those of 2023-12-24 are still applied on read.
+SELECT * FROM iceberg_v2_delete_equality_partitioned;
+---- RESULTS
+1,'str1',2023-12-24
+1,'str1',2023-12-25
+2,'str2',2023-12-24
+4,'str4',2023-12-24
+222,'str2',2023-12-25
+333333,'str3',2023-12-24
+---- TYPES
+INT,STRING,DATE
+====
+---- QUERY
+# Equality deletes on a table with multiple partition specs are rejected for every query
+# on such a table, so a partition-scoped OPTIMIZE is rejected as well. The statement fails
+# while planning, before anything is written.
+OPTIMIZE TABLE functional_parquet.iceberg_v2_delete_equality_partition_evolution
+  PARTITION (d = '2023-12-24');
+---- CATCH
+ImpalaRuntimeException: Equality delete files are not supported for tables with multiple partition specs
+====

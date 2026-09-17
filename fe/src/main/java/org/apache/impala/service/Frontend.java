@@ -3545,8 +3545,7 @@ public class Frontend {
     TIcebergOptimizeParams optimizeParams = new TIcebergOptimizeParams();
     optimizeParams.setMode(optimizeStmt.getOptimizationMode());
     if (optimizeStmt.getOptimizationMode() == TIcebergOptimizationMode.PARTIAL) {
-      optimizeParams.setSelected_data_files_without_deletes(
-          optimizeStmt.getSelectedIcebergFilePaths());
+      optimizeParams.setFiles_to_replace(optimizeStmt.getFilesToReplace());
     }
     iceFinalizeParams.setOptimize_params(optimizeParams);
     finalizeParams.setIceberg_params(iceFinalizeParams);

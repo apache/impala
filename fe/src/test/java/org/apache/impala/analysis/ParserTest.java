@@ -1979,6 +1979,15 @@ public class ParserTest extends FrontendTestBase {
     ParserError("optimize t");
     ParserError("optimize table t for system_time as of now()");
     ParserError("optimize table t for system_version as of 12345");
+    ParsesOk("optimize table t partition (p = 1)");
+    ParsesOk("optimize table t partition (p1 = 1, p2 = 'a')");
+    ParsesOk("optimize table t partition (year(ts) = 2024)");
+    ParsesOk("optimize table t partition (p = 1) (file_size_threshold_mb=10)");
+    ParserError("optimize table t partition");
+    ParserError("optimize table t partition ()");
+    ParserError("optimize table t partition (p = 1) file_size_threshold_mb=10");
+    ParserError("optimize table t (file_size_threshold_mb=10) partition (p = 1)");
+    ParserError("optimize table t partition (p = 1) (file_size_threshold_mb=-1)");
   }
 
   @Test

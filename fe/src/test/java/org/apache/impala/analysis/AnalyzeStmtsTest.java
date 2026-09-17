@@ -41,6 +41,7 @@ import org.apache.impala.service.BackendConfig;
 import org.apache.impala.service.FeSupport;
 import org.apache.impala.thrift.TAdminRequestType;
 import org.apache.impala.thrift.TFunctionCategory;
+import org.apache.impala.thrift.TIcebergOptimizationMode;
 import org.junit.Assert;
 import org.junit.Test;
 
@@ -4883,7 +4884,7 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
     testNumberOfMembers(ValuesStmt.class, 0);
 
     // Also check TableRefs.
-    testNumberOfMembers(TableRef.class, 33);
+    testNumberOfMembers(TableRef.class, 32);
     testNumberOfMembers(BaseTableRef.class, 0);
     testNumberOfMembers(InlineViewRef.class, 10);
   }
@@ -5491,5 +5492,66 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
         "optimize table iceberg_v2_no_deletes (file_size_threshold_mb=256)", ctx);
     assertTrue(stmt.isNoOp());
     assertEquals("The table is already optimized.", stmt.getNoopSummary().get(0));
+
+    // A zero threshold selects no data file, and this table has no deletes to merge, so
+    // the statement is a no-op. It only saw the files of the selected partition, so it
+    // must not claim that the whole table is optimized.
+    stmt = (OptimizeStmt) AnalyzesOk("optimize table iceberg_partition_evolution "
+        + "partition (year = 2009) (file_size_threshold_mb=0)", ctx);
+    assertTrue(stmt.isNoOp());
+    assertEquals("The selected partition(s) are already optimized.",
+        stmt.getNoopSummary().get(0));
+  }
+
+  @Test
+  public void TestOptimizePartition() throws AnalysisException {
+    AnalysisContext ctx = createAnalysisCtx("functional_parquet");
+    // A matching partition runs in PARTIAL mode and selects the partition's files.
+    OptimizeStmt stmt = (OptimizeStmt) AnalyzesOk(
+        "optimize table iceberg_partition_evolution partition (year = 2009)", ctx);
+    assertFalse(stmt.isNoOp());
+    assertEquals(TIcebergOptimizationMode.PARTIAL, stmt.getOptimizationMode());
+    Set<String> paths2009 = stmt.getFilesToReplace();
+    assertFalse(paths2009.isEmpty());
+    // Every replaced file comes from the selected partition; the other partitions of the
+    // table are left alone.
+    assertTrue(paths2009.stream().allMatch(p -> p.contains("/year=2009/")));
+
+    // A partial OPTIMIZE names every file it rewrites. Each partition of this table
+    // holds one data file plus the position delete file applying to it.
+    stmt = (OptimizeStmt) AnalyzesOk("optimize table "
+        + "iceberg_v2_partitioned_position_deletes partition (action = 'click')", ctx);
+    assertEquals(TIcebergOptimizationMode.PARTIAL, stmt.getOptimizationMode());
+    Set<String> selectedPaths = stmt.getFilesToReplace();
+    assertEquals(2, selectedPaths.size());
+    assertEquals(1, selectedPaths.stream().filter(p -> p.contains("-delete-")).count());
+
+    // Multiple matching partitions, IN predicate, and a FILE_SIZE_THRESHOLD_MB clause
+    // following the PARTITION clause.
+    AnalyzesOk("optimize table iceberg_partition_evolution "
+        + "partition (year = 2009 or year = 2010)", ctx);
+    AnalyzesOk("optimize table iceberg_partition_evolution "
+        + "partition (year in (2009, 2010))", ctx);
+    AnalyzesOk("optimize table iceberg_partition_evolution "
+        + "partition (year = 2009) (file_size_threshold_mb=256)", ctx);
+
+    AnalysisError(
+        "optimize table iceberg_partition_evolution partition (year = 1999)", ctx,
+        "No matching partition(s) found");
+    AnalysisError(
+        "optimize table iceberg_partition_evolution partition (int_col = 1)", ctx,
+        "Partition exprs cannot contain non-partition column(s): int_col");
+    AnalysisError(
+        "optimize table iceberg_partition_evolution partition (year = year)", ctx,
+        "Invalid partition filtering expression: `year` = `year`");
+    // Predicate that only partially converts: the table is partitioned by
+    // truncate(4, date_string_col), so the trailing pattern cannot be pushed down and
+    // the predicate would match whole partitions it does not select.
+    AnalysisError("optimize table iceberg_partition_evolution "
+        + "partition (date_string_col LIKE '0101%0101')", ctx,
+        "Predicate 'date_string_col LIKE '0101%0101'' can only be partially converted "
+        + "to Iceberg expression");
+    AnalysisError("optimize table iceberg_v2_no_deletes partition (i = 1)", ctx,
+        "Table is not partitioned: functional_parquet.iceberg_v2_no_deletes");
   }
 }

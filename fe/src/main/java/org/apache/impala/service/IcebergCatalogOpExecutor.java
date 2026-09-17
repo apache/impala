@@ -26,6 +26,8 @@ import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ExecutorService;
+import java.util.function.Predicate;
+import java.util.stream.Collectors;
 
 import org.apache.iceberg.AppendFiles;
 import org.apache.iceberg.BaseTable;
@@ -80,6 +82,7 @@ import org.apache.impala.thrift.TIcebergCatalog;
 import org.apache.impala.thrift.TIcebergOperationParam;
 import org.apache.impala.thrift.TIcebergPartitionSpec;
 import org.apache.impala.thrift.TRollbackType;
+import org.apache.impala.util.Hash128;
 import org.apache.impala.util.IcebergSchemaConverter;
 import org.apache.impala.util.IcebergUtil;
 import org.apache.thrift.TException;
@@ -740,34 +743,28 @@ public class IcebergCatalogOpExecutor {
       throw new ImpalaRuntimeException(e.getMessage(), e);
     }
     RewriteFiles rewrite = txn.newRewrite();
-    // Delete current data files from table if the operation is a full table rewrite.
-    // If there was file filtering, keep the data files without deletes that were not
-    // selected, and delete only the selected, rewritten files.
-    if (icebergOp.isSetReplaced_data_files_without_deletes()) {
-      for (DataFile dataFile : contentFiles.dataFilesWithoutDeletes) {
-        if (icebergOp.replaced_data_files_without_deletes.contains(dataFile.location())) {
-          rewrite.deleteFile(dataFile);
-        }
+    if (icebergOp.isSetFiles_to_replace()) {
+      // Partial OPTIMIZE: the coordinator listed every file it scanned, so delete exactly
+      // those and nothing else.
+      Set<String> toReplace = icebergOp.getFiles_to_replace();
+      Set<String> matched =
+          deleteReplacedFiles(rewrite, contentFiles, toReplace::contains);
+      // 'contentFiles' is the whole table as of the same snapshot the coordinator planned
+      // over, so every listed path must have been found to avoid data corruption.
+      if (matched.size() != toReplace.size()) {
+        List<String> notFound = toReplace.stream()
+            .filter(p -> !matched.contains(p)).sorted().collect(Collectors.toList());
+        throw new ImpalaRuntimeException(String.format(
+            "OPTIMIZE cannot replace %d of the %d files it selected in table '%s': the " +
+            "following files were not found in snapshot %d: %s", notFound.size(),
+            toReplace.size(), feIcebergTable.getFullName(),
+            icebergOp.getInitial_snapshot_id(), notFound));
       }
     } else {
-      for (DataFile dataFile : contentFiles.dataFilesWithoutDeletes) {
-        rewrite.deleteFile(dataFile);
-      }
+      // Full table rewrite: delete every file.
+      deleteReplacedFiles(rewrite, contentFiles, p -> true);
     }
-    for (DataFile dataFile : contentFiles.dataFilesWithDeletes) {
-      rewrite.deleteFile(dataFile);
-    }
-    // Delete current delete files from table.
-    for (DeleteFile deleteFile : contentFiles.positionDeleteFiles) {
-      rewrite.deleteFile(deleteFile);
-    }
-    for (DeleteFile dvDeleteFile : contentFiles.dataFileToDV.values()) {
-      rewrite.deleteFile(dvDeleteFile);
-    }
-    for (DeleteFile deleteFile : contentFiles.equalityDeleteFiles) {
-      rewrite.deleteFile(deleteFile);
-    }
-    // Add newly written files to the table.
+    // Add the newly written files to the table.
     List<ByteBuffer> dataFilesToAdd = icebergOp.getIceberg_data_files_fb();
     for (ByteBuffer buf : dataFilesToAdd) {
       DataFile dataFile = createDataFile(feIcebergTable, buf);
@@ -775,6 +772,58 @@ public class IcebergCatalogOpExecutor {
     }
     rewrite.validateFromSnapshot(icebergOp.getInitial_snapshot_id());
     rewrite.commit();
+  }
+
+  /**
+   * Marks for deletion on 'rewrite' the files an OPTIMIZE commit replaces. 'files' holds
+   * the whole table as of the operation's initial snapshot, and 'replaced' selects by
+   * location the ones to remove. Returns the locations that were matched, so that the
+   * caller can verify that every file it listed was found.
+   *
+   * Deletion vectors are not selected by location: a single Puffin file can hold the
+   * deletion vectors of data files in several partitions, so removing every vector stored
+   * in it would drop deletes of data files that are not being rewritten. A vector is
+   * removed iff the data file it belongs to is replaced, which is also what makes it
+   * unnecessary to list the Puffin files in the replaced set.
+   */
+  private static Set<String> deleteReplacedFiles(RewriteFiles rewrite,
+      GroupedContentFiles files, Predicate<String> replaced) {
+    Set<String> matched = new HashSet<>();
+    for (DataFile f : files.dataFilesWithoutDeletes) {
+      if (replaced.test(f.location())) {
+        rewrite.deleteFile(f);
+        matched.add(f.location());
+      }
+    }
+    for (DeleteFile f : files.positionDeleteFiles) {
+      if (replaced.test(f.location())) {
+        rewrite.deleteFile(f);
+        matched.add(f.location());
+      }
+    }
+    for (DeleteFile f : files.equalityDeleteFiles) {
+      if (replaced.test(f.location())) {
+        rewrite.deleteFile(f);
+        matched.add(f.location());
+      }
+    }
+    // Path hashes of the replaced data files that may have a deletion vector. These are
+    // the keys of 'dataFileToDV', which is built from the same scan tasks as
+    // 'dataFilesWithDeletes', so matching on them needs no path comparison at all.
+    Set<Hash128> replacedDataFilesWithDeletes = new HashSet<>();
+    for (DataFile f : files.dataFilesWithDeletes) {
+      if (replaced.test(f.location())) {
+        rewrite.deleteFile(f);
+        matched.add(f.location());
+        replacedDataFilesWithDeletes.add(IcebergUtil.getFilePathHash(f));
+      }
+    }
+    for (Map.Entry<Hash128, DeleteFile> entry : files.dataFileToDV.entrySet()) {
+      if (replacedDataFilesWithDeletes.contains(entry.getKey())) {
+        rewrite.deleteFile(entry.getValue());
+      }
+    }
+    return matched;
   }
 
   /**

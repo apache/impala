@@ -1037,12 +1037,10 @@ struct TPlanExecInfo {
       per_node_scan_ranges
 }
 
-// Determines the type of the OPTIMIZE operation. Based on the number of files selected
-// for compaction, it can be
-// 1. a full table rewrite, or
-// 2. a partial optimization with file filtering.
-// The no-op case (no files selected) is not a mode here: it is handled entirely in the
-// frontend as a no-op statement and is never sent to the backend.
+// Determines the mode of the OPTIMIZE operation. It is either
+// 1. a full table compaction, rewriting every file of the table, or
+// 2. a partial optimization rewriting only a subset of the files, selected by a PARTITION
+//    clause, a FILE_SIZE_THRESHOLD_MB clause, or both.
 enum TIcebergOptimizationMode {
   REWRITE_ALL = 0
   PARTIAL = 1
@@ -1051,10 +1049,10 @@ enum TIcebergOptimizationMode {
 struct TIcebergOptimizeParams {
   1: required TIcebergOptimizationMode mode;
 
-  // Stores the file paths to the data files without deletes that are targeted by the
-  // OPTIMIZE operation. Set only if the mode is PARTIAL, which means that data files are
-  // filtered (by size).
-  2: optional set<string> selected_data_files_without_deletes;
+  // The paths of the selected data and delete files that a partial OPTIMIZE operation
+  // scanned and will replace, excluding deletion vectors.
+  // Set iff the mode is PARTIAL.
+  2: optional set<string> files_to_replace;
 }
 
 struct TIcebergDmlFinalizeParams {

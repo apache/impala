@@ -2335,7 +2335,23 @@ class TestIcebergV2Table(IcebergTestSuite):
             tbl_name, snapshot_before_last.get_snapshot_id()))
     assert result_after_opt.data.sort() == result_time_travel.data.sort()
 
+  def test_optimize_partition_equality_deletes(self, vector, unique_database):
+    """A partition-scoped OPTIMIZE on a table with Flink-written equality delete files
+    merges the deletes of the selected partition and leaves the delete files of the other
+    partition in place. The table has to be copied from a directory because Impala cannot
+    write equality deletes."""
+    create_iceberg_table_from_directory(self.client, unique_database,
+        "iceberg_v2_delete_equality_partitioned", "parquet",
+        table_location="${IMPALA_HOME}/testdata/data/iceberg_test/hadoop_catalog/ice",
+        warehouse_prefix=os.getenv("FILESYSTEM_PREFIX"))
+    self.run_test_case('QueryTest/iceberg-optimize-partition-equality-delete', vector,
+        unique_database)
+
   def _check_file_filtering(self, tbl_name, threshold_mb, mode, had_partition_evolution):
+    """Runs OPTIMIZE on the whole table and verifies the resulting file set. 'mode' is the
+    expected outcome: REWRITE_ALL and PARTIAL are TIcebergOptimizationMode values, NO_OP
+    means the statement short-circuits before planning, which is signalled by
+    TStmtType.NO_OP instead of an optimization mode."""
     threshold_bytes = threshold_mb * 1024 * 1024
     DATA_FILE = "0"
     DELETE_FILE = "1"
@@ -2393,7 +2409,7 @@ class TestIcebergV2Table(IcebergTestSuite):
     new_files = files_after - unchanged_files
     assert new_files == files_after - files_before
 
-    if mode == "NOOP":
+    if mode == "NO_OP":
       assert selected_files == set([])
       assert files_after == files_before
     elif mode == "REWRITE_ALL":
@@ -2403,6 +2419,8 @@ class TestIcebergV2Table(IcebergTestSuite):
       assert selected_files < files_before and selected_files != set([])
       assert unchanged_files < files_after and unchanged_files != set([])
       assert unchanged_files == files_after.intersection(files_before)
+    else:
+      assert False, "Unknown optimization mode: {0}".format(mode)
 
     # Check that all delete files were merged.
     for file in files_after:
@@ -2432,12 +2450,12 @@ class TestIcebergV2Table(IcebergTestSuite):
                        WHERE l_quantity>=10 AND l_quantity<=12;""".format(tbl_name))
     # There are no delete files in the table, so this should be a no-op. Check that no new
     # snapshot was created.
-    self._check_file_filtering(tbl_name, 0, "NOOP", False)
+    self._check_file_filtering(tbl_name, 0, "NO_OP", False)
     assert len(get_snapshots(self.client, tbl_name)) == 2
     self._check_file_filtering(tbl_name, 5, "PARTIAL", False)
     self._check_file_filtering(tbl_name, 50, "PARTIAL", False)
     # Check that the following is a no-op, since the table is already in a compact form.
-    self._check_file_filtering(tbl_name, 100, "NOOP", False)
+    self._check_file_filtering(tbl_name, 100, "NO_OP", False)
     self.execute_query("""UPDATE {0} SET l_linenumber=7 WHERE l_linenumber>4 AND
                        l_linestatus='F';""".format(tbl_name))
     self._check_file_filtering(tbl_name, 6, "PARTIAL", False)
@@ -2739,6 +2757,16 @@ class TestIcebergV3Table(IcebergTestSuite):
 
   def test_v3_optimize(self, vector, unique_database):
     self.run_test_case('QueryTest/iceberg-v3-optimize', vector, unique_database)
+
+  def test_v3_optimize_shared_puffin(self, vector, unique_database):
+    """A partition-scoped OPTIMIZE must remove only the deletion vectors of the data
+    files it rewrites, even when another partition's vector is stored in the same Puffin
+    file. Impala writes one Puffin file per partition, so the table is copied from a
+    directory generated with Iceberg's own DV writer, the one engines like Spark use; see
+    testdata/data/README."""
+    self.load_table(unique_database, "iceberg_v3_dv_multi_partition")
+    self.run_test_case('QueryTest/iceberg-v3-optimize-shared-puffin', vector,
+        unique_database)
 
   def test_v3_variant(self, vector, unique_database):
     """Test reading Iceberg V3 VARIANT values (written by Trino). The base table

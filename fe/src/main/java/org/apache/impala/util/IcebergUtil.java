@@ -86,6 +86,7 @@ import org.apache.impala.analysis.Expr;
 import org.apache.impala.analysis.FunctionCallExpr;
 import org.apache.impala.analysis.FunctionName;
 import org.apache.impala.analysis.FunctionParams;
+import org.apache.impala.analysis.IcebergPartitionExpressionRewriter;
 import org.apache.impala.analysis.IcebergPartitionField;
 import org.apache.impala.analysis.IcebergPartitionSpec;
 import org.apache.impala.analysis.IcebergPartitionTransform;
@@ -118,6 +119,8 @@ import org.apache.impala.catalog.iceberg.IcebergHadoopTables;
 import org.apache.impala.catalog.iceberg.IcebergHiveCatalog;
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.common.FileSystemUtil;
+import org.apache.impala.common.IcebergPartitionPredicateConverter;
+import org.apache.impala.common.IcebergPredicateConverter;
 import org.apache.impala.common.ImpalaRuntimeException;
 import org.apache.impala.common.Pair;
 import org.apache.impala.fb.FbFileMetadata;
@@ -671,6 +674,116 @@ public class IcebergUtil {
     }
 
     return scan.planFiles();
+  }
+
+  /**
+   * Result of resolving a set of partition predicate expressions into concrete Iceberg
+   * files. 'fileScanTasks' holds the scan tasks of the files that fully belong to the
+   * selected partition(s) (i.e. the Iceberg scan residual is 'alwaysTrue'), and
+   * 'numPartitions' is the number of distinct partitions those files belong to. Each
+   * caller derives what it needs from the tasks, e.g. the content files to rewrite or the
+   * paths of the files to drop.
+   */
+  public static class PartitionFilesResult {
+    public final List<FileScanTask> fileScanTasks;
+    public final int numPartitions;
+
+    public PartitionFilesResult(List<FileScanTask> fileScanTasks, int numPartitions) {
+      this.fileScanTasks = fileScanTasks;
+      this.numPartitions = numPartitions;
+    }
+  }
+
+  /**
+   * Resolves the given partition predicate expressions into the scan tasks of the
+   * Iceberg files that fully belong to the selected partition(s). The expressions are
+   * rewritten to Iceberg partition transforms, converted to Iceberg expressions, and used
+   * to plan files. Only files whose scan residual is 'alwaysTrue' are returned,
+   * guaranteeing that the predicate aligns to whole partitions (no row-level residual).
+   * Predicates that cannot be fully converted to an Iceberg expression are rejected,
+   * since a partial conversion could match more partitions than intended.
+   * Used by ALTER TABLE ... DROP PARTITION and OPTIMIZE TABLE ... PARTITION, which select
+   * partitions the same way.
+   */
+  public static PartitionFilesResult planPartitionFiles(FeIcebergTable table,
+      List<Expr> partitionExprs, Analyzer analyzer) throws AnalysisException {
+    // Rewrites transforms and column references.
+    IcebergPartitionExpressionRewriter rewriter = new IcebergPartitionExpressionRewriter(
+        analyzer, table.getIcebergApiTable().spec());
+    // Converts Impala expressions to Iceberg expressions.
+    IcebergPredicateConverter converter =
+        new IcebergPartitionPredicateConverter(table, analyzer);
+
+    List<Expression> icebergPredicates = new ArrayList<>();
+    for (Expr expr : partitionExprs) {
+      expr = rewriter.rewrite(expr);
+      expr.analyze(analyzer);
+      analyzer.getConstantFolder().rewrite(expr, analyzer);
+
+      IcebergPredicateConverter.ConverterResult result = converter.convert(expr);
+
+      if (result.isFailed()) {
+        throw new AnalysisException(String.format(
+            "Invalid partition filtering expression: %s. %s",
+            expr.toSql(), result.getErrorMessage()));
+      }
+
+      if (result.isPartiallyConverted()) {
+        throw new AnalysisException(String.format(
+            "Predicate '%s' can only be partially converted to Iceberg expression: " +
+            "'%s'. Partially converted predicates are not allowed as they could match " +
+            "more partitions than intended. Use a fully convertible predicate instead.",
+            expr.toSql(), result.getIcebergExpression()));
+      }
+
+      icebergPredicates.add(result.getIcebergExpression());
+    }
+
+    List<FileScanTask> matchedTasks = new ArrayList<>();
+    Set<String> partitionSummary = new HashSet<>();
+    try (CloseableIterable<FileScanTask> fileScanTasks =
+        planFiles(table, icebergPredicates, null, null)) {
+      for (FileScanTask fileScanTask : fileScanTasks) {
+        if (fileScanTask.residual().isEquivalentTo(Expressions.alwaysTrue())) {
+          partitionSummary.add(fileScanTask.file().partition().toString());
+          matchedTasks.add(fileScanTask);
+        }
+      }
+    } catch (IOException | TableLoadingException e) {
+      throw new AnalysisException("Error loading metadata for Iceberg table", e);
+    }
+    return new PartitionFilesResult(matchedTasks, partitionSummary.size());
+  }
+
+  /**
+   * Returns a delete file in 'files' that Iceberg can also apply to data files outside
+   * the partitions 'files' covers, or null if there is none. 'specsById' must be the
+   * table's partition specs by spec id, i.e. Table.specs().
+   *
+   * An operation that rewrites whole partitions may only remove a delete file if every
+   * data file the delete file applies to is rewritten with it. Iceberg's DeleteFileIndex
+   * decides that scope:
+   * - an equality delete file written with an unpartitioned spec is a global delete: it
+   *   applies to every data file with a lower sequence number, in any partition, so
+   *   removing it along with one partition would drop deletes that still apply elsewhere.
+   *   This is the case reported here;
+   * - all other equality delete files are looked up by (spec id, partition) and so only
+   *   apply within their own partition;
+   * - position delete files are looked up by referenced data file if they name one, and
+   *   by the data file's own (spec id, partition) otherwise, so they never reach beyond a
+   *   single partition either;
+   * - a deletion vector belongs to exactly one data file, which a selection that contains
+   *   the vector also contains.
+   * A delete file whose spec id is unknown is reported too, since its scope cannot be
+   * established.
+   */
+  public static DeleteFile findGlobalDeleteFile(
+      Map<Integer, PartitionSpec> specsById, GroupedContentFiles files) {
+    for (DeleteFile file : files.equalityDeleteFiles) {
+      PartitionSpec spec = specsById.get(file.specId());
+      if (spec == null || spec.isUnpartitioned()) return file;
+    }
+    return null;
   }
 
   /**

@@ -39,10 +39,13 @@ import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableMap;
 
 import org.apache.hadoop.hive.metastore.api.Table;
 import org.apache.iceberg.DataFile;
 import org.apache.iceberg.DataFiles;
+import org.apache.iceberg.DeleteFile;
+import org.apache.iceberg.FileMetadata;
 import org.apache.iceberg.PartitionSpec;
 import org.apache.iceberg.Schema;
 import org.apache.iceberg.catalog.TableIdentifier;
@@ -54,6 +57,7 @@ import org.apache.impala.catalog.HdfsFileFormat;
 import org.apache.impala.catalog.IcebergColumn;
 import org.apache.impala.catalog.IcebergTable;
 import org.apache.impala.catalog.Type;
+import org.apache.impala.catalog.iceberg.GroupedContentFiles;
 import org.apache.impala.catalog.iceberg.IcebergCatalog;
 import org.apache.impala.catalog.iceberg.IcebergCatalogUtil;
 import org.apache.impala.catalog.iceberg.IcebergHadoopCatalog;
@@ -516,5 +520,71 @@ public class IcebergUtilTest {
     TreeMap<Integer, Long> map =
         IcebergUtil.ComputeStatsSnapshotPropertyConverter.stringToMap(property);
     return IcebergUtil.ComputeStatsSnapshotPropertyConverter.mapToString(map);
+  }
+
+  // An unpartitioned spec and a partitioned one, under distinct spec ids, as a table with
+  // partition evolution would have.
+  private static final PartitionSpec UNPARTITIONED_SPEC =
+      PartitionSpec.builderFor(SCHEMA).withSpecId(0).build();
+  private static final PartitionSpec PARTITIONED_SPEC =
+      PartitionSpec.builderFor(SCHEMA).identity("id").withSpecId(1).build();
+  private static final Map<Integer, PartitionSpec> SPECS_BY_ID = ImmutableMap.of(
+      UNPARTITIONED_SPEC.specId(), UNPARTITIONED_SPEC,
+      PARTITIONED_SPEC.specId(), PARTITIONED_SPEC);
+
+  private static DeleteFile buildDeleteFile(PartitionSpec spec, boolean equalityDeletes,
+      String path, String partitionPath) {
+    FileMetadata.Builder builder = FileMetadata.deleteFileBuilder(spec)
+        .withPath(path)
+        .withFileSizeInBytes(10)
+        .withRecordCount(1);
+    builder = equalityDeletes
+        ? builder.ofEqualityDeletes(3) : builder.ofPositionDeletes();
+    // An unpartitioned spec holds no partition data.
+    if (partitionPath != null) builder.withPartitionPath(partitionPath);
+    return builder.build();
+  }
+
+  /**
+   * A partition-scoped OPTIMIZE may only remove a delete file if it rewrites every data
+   * file the delete file applies to. findGlobalDeleteFile() reports the one kind of
+   * delete file that reaches beyond its own partition.
+   */
+  @Test
+  public void testFindGlobalDeleteFile() {
+    assertNull(IcebergUtil.findGlobalDeleteFile(SPECS_BY_ID, new GroupedContentFiles()));
+
+    // Delete files that belong to a partition are never reported.
+    GroupedContentFiles partitionScoped = new GroupedContentFiles();
+    partitionScoped.equalityDeleteFiles.add(buildDeleteFile(
+        PARTITIONED_SPEC, true, "/path/to/eq-delete.parquet", "id=1"));
+    partitionScoped.positionDeleteFiles.add(buildDeleteFile(
+        PARTITIONED_SPEC, false, "/path/to/pos-delete.parquet", "id=1"));
+    assertNull(IcebergUtil.findGlobalDeleteFile(SPECS_BY_ID, partitionScoped));
+
+    // An equality delete file written with an unpartitioned spec applies to every data
+    // file with a lower sequence number, in any partition, so it is reported.
+    GroupedContentFiles globalEqualityDelete = new GroupedContentFiles();
+    globalEqualityDelete.equalityDeleteFiles.add(buildDeleteFile(
+        UNPARTITIONED_SPEC, true, "/path/to/global-eq-delete.parquet", null));
+    DeleteFile found =
+        IcebergUtil.findGlobalDeleteFile(SPECS_BY_ID, globalEqualityDelete);
+    assertNotNull(found);
+    assertEquals("/path/to/global-eq-delete.parquet", found.location());
+
+    // A position delete file is looked up by referenced data file or by the data file's
+    // own partition, so it stays within one partition even with an unpartitioned spec.
+    GroupedContentFiles unpartitionedPositionDelete = new GroupedContentFiles();
+    unpartitionedPositionDelete.positionDeleteFiles.add(buildDeleteFile(
+        UNPARTITIONED_SPEC, false, "/path/to/global-pos-delete.parquet", null));
+    assertNull(IcebergUtil.findGlobalDeleteFile(
+        SPECS_BY_ID, unpartitionedPositionDelete));
+
+    // The scope of a delete file whose spec is unknown cannot be established.
+    GroupedContentFiles unknownSpec = new GroupedContentFiles();
+    unknownSpec.equalityDeleteFiles.add(buildDeleteFile(
+        PartitionSpec.builderFor(SCHEMA).identity("id").withSpecId(42).build(), true,
+        "/path/to/unknown-spec-delete.parquet", "id=1"));
+    assertNotNull(IcebergUtil.findGlobalDeleteFile(SPECS_BY_ID, unknownSpec));
   }
 }

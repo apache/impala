@@ -17,14 +17,12 @@
 
 package org.apache.impala.util;
 
-import com.google.common.base.Preconditions;
 import org.apache.iceberg.DataFile;
 import org.apache.iceberg.DataFiles;
 import org.apache.iceberg.PartitionSpec;
 import org.apache.iceberg.Schema;
 import org.apache.iceberg.types.Types;
 import org.apache.impala.catalog.iceberg.GroupedContentFiles;
-import org.apache.impala.thrift.TIcebergOptimizationMode;
 import org.junit.Test;
 
 import java.util.Arrays;
@@ -35,6 +33,7 @@ import java.util.Set;
 
 import static org.apache.iceberg.types.Types.NestedField.required;
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
 public class IcebergFileFilterTest {
@@ -73,23 +72,25 @@ public class IcebergFileFilterTest {
   }
 
   private void checkFiltering(GroupedContentFiles contentFiles, int fileSizeThreshold,
-      TIcebergOptimizationMode expectedMode, Set<String> expectedPaths) {
+      boolean expectedAllFilesSelected, Set<String> expectedPaths) {
     IcebergOptimizeFileFilter.FileFilteringResult result =
         IcebergOptimizeFileFilter.filterFilesBySize(
             new IcebergOptimizeFileFilter.FilterArgs(contentFiles, fileSizeThreshold));
-    assertTrue(!result.isNoOp());
-    assertEquals(result.getSelectedFilesWithoutDeletes().size(),
-        expectedPaths != null ? expectedPaths.size() : 0);
-    assertEquals(result.getOptimizationMode(), expectedMode);
-    if (expectedMode == TIcebergOptimizationMode.PARTIAL) {
-      Preconditions.checkState(expectedPaths != null);
-      for (DataFile df : result.getSelectedFilesWithoutDeletes()) {
-        assertTrue(expectedPaths.contains(df.location()));
-      }
-    } else {
-      Preconditions.checkState(expectedPaths == null);
-      assertTrue(result.getSelectedFilesWithoutDeletes().isEmpty());
+    assertFalse(result.isNoOp());
+    assertEquals(expectedAllFilesSelected, result.allFilesSelected());
+    Set<String> selectedPaths = new HashSet<>();
+    for (DataFile df : result.getSelectedFilesWithoutDeletes()) {
+      selectedPaths.add(df.location());
     }
+    assertEquals(expectedPaths, selectedPaths);
+  }
+
+  // The paths of the data files that the single-partition tests below build, i.e. the
+  // full selection when the size threshold narrows nothing.
+  private static Set<String> allPathsInPartitionA1() {
+    Set<String> paths = new HashSet<>();
+    for (int fileSize : fileSizes) paths.add("a=1/size_" + fileSize + ".parquet");
+    return paths;
   }
 
   @Test
@@ -107,8 +108,37 @@ public class IcebergFileFilterTest {
     Set<String> filePaths = new HashSet<>();
     Collections.addAll(filePaths,
         "a=1/size_2.parquet", "a=1/size_10.parquet", "a=1/size_11.parquet");
-    checkFiltering(contentFiles, 100, TIcebergOptimizationMode.PARTIAL, filePaths);
-    checkFiltering(contentFiles, 500, TIcebergOptimizationMode.REWRITE_ALL, null);
+    checkFiltering(contentFiles, 100, false, filePaths);
+    // A threshold above every file size selects all of them.
+    checkFiltering(contentFiles, 500, true, allPathsInPartitionA1());
+  }
+
+  /**
+   * Without a FILE_SIZE_THRESHOLD_MB clause the filter selects every data file without
+   * deletes. It has to work on its own copy and not on the caller's list, which the
+   * caller still needs in order to build the scoped file store and collect the paths of
+   * the replaced files.
+   */
+  @Test
+  public void testNoThreshold() {
+    GroupedContentFiles contentFiles = new GroupedContentFiles();
+    for (long fileSize : fileSizes) {
+      contentFiles.dataFilesWithoutDeletes.add(
+          buildDataFile(fileSize, "a=1", "size_" + fileSize));
+    }
+
+    checkFiltering(contentFiles, -1, true, allPathsInPartitionA1());
+    assertEquals(fileSizes.size(), contentFiles.dataFilesWithoutDeletes.size());
+
+    // A data file with deletes does not change the verdict: every data file without
+    // deletes is still selected.
+    contentFiles.dataFilesWithDeletes.add(buildDataFile(10, "a=1", "d10"));
+    checkFiltering(contentFiles, -1, true, allPathsInPartitionA1());
+    assertEquals(fileSizes.size(), contentFiles.dataFilesWithoutDeletes.size());
+    assertEquals(1, contentFiles.dataFilesWithDeletes.size());
+
+    // An empty table is a no-op even without a threshold.
+    checkNoOp(new GroupedContentFiles(), -1);
   }
 
   @Test
@@ -146,24 +176,24 @@ public class IcebergFileFilterTest {
     // No data files without deletes were selected, but there are data files with deletes,
     // so this is not a NOOP. Delete files should be merged with corresponding data files.
     Set<String> filePaths = new HashSet<>();
-    checkFiltering(contentFiles, 0, TIcebergOptimizationMode.PARTIAL, filePaths);
+    checkFiltering(contentFiles, 0, false, filePaths);
 
     // Data files without deletes selected: a=0/size_2, a=1/size_10, a=2/size_11.
     // There is another data file with deletes in a=1 (d10), so they will be merged, but
     // the other 2 files will not be rewritten since they are the only data files in their
     // partition.
     filePaths.add("a=1/size_10.parquet");
-    checkFiltering(contentFiles, 12, TIcebergOptimizationMode.PARTIAL, filePaths);
+    checkFiltering(contentFiles, 12, false, filePaths);
 
     // a=2/size_11 and a=3/size_100 are the only files in their partitions, so they will
     // not be selected.
     Collections.addAll(filePaths, "a=0/size_2.parquet", "a=0/size_100.parquet",
         "a=1/size_101.parquet", "a=4/size_120.parquet");
-    checkFiltering(contentFiles, 200, TIcebergOptimizationMode.PARTIAL, filePaths);
+    checkFiltering(contentFiles, 200, false, filePaths);
 
     // a=3/size_100 is the only file in the a=3 partition, so it will not be selected.
     Collections.addAll(filePaths, "a=0/size_222.parquet", "a=1/size_250.parquet",
         "a=2/size_11.parquet", "a=2/size_200.parquet");
-    checkFiltering(contentFiles, 500, TIcebergOptimizationMode.PARTIAL, filePaths);
+    checkFiltering(contentFiles, 500, false, filePaths);
   }
 }

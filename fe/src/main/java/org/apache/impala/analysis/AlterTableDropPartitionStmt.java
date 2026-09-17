@@ -18,26 +18,17 @@
 package org.apache.impala.analysis;
 
 import com.google.common.base.Preconditions;
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.HashSet;
 import java.util.List;
-import java.util.Set;
 import java.util.stream.Collectors;
 import org.apache.iceberg.DeleteFile;
 import org.apache.iceberg.FileScanTask;
-import org.apache.iceberg.expressions.Expression;
-import org.apache.iceberg.expressions.Expressions;
-import org.apache.iceberg.io.CloseableIterable;
 import org.apache.impala.authorization.Privilege;
 import org.apache.impala.catalog.FeIcebergTable;
 import org.apache.impala.catalog.FeKuduTable;
 import org.apache.impala.catalog.FeTable;
-import org.apache.impala.catalog.TableLoadingException;
 import org.apache.impala.common.AnalysisException;
-import org.apache.impala.common.IcebergPartitionPredicateConverter;
-import org.apache.impala.common.IcebergPredicateConverter;
 import org.apache.impala.common.ImpalaRuntimeException;
 import org.apache.impala.thrift.TAlterTableDropPartitionParams;
 import org.apache.impala.thrift.TAlterTableParams;
@@ -143,61 +134,27 @@ public class AlterTableDropPartitionStmt extends AlterTableStmt {
     }
 
     FeIcebergTable table = (FeIcebergTable) table_;
-    // To rewrite transforms and column references
-    IcebergPartitionExpressionRewriter rewriter =
-        new IcebergPartitionExpressionRewriter(analyzer,
-            table.getIcebergApiTable().spec());
-    // For Impala expression to Iceberg expression conversion
-    IcebergPredicateConverter converter =
-        new IcebergPartitionPredicateConverter(table, analyzer);
-
-    List<Expression> icebergPartitionExprs = new ArrayList<>();
-    for (Expr expr : partitionSet_.getPartitionExprs()) {
-      expr = rewriter.rewrite(expr);
-      expr.analyze(analyzer);
-      analyzer.getConstantFolder().rewrite(expr, analyzer);
-
-      IcebergPredicateConverter.ConverterResult result = converter.convert(expr);
-
-      if (result.isFailed()) {
-        throw new AnalysisException(String.format(
-            "Invalid partition filtering expression: %s. %s",
-            expr.toSql(), result.getErrorMessage()));
+    // Resolve the partition predicate(s) to the files that fully belong to the selected
+    // partition(s).
+    IcebergUtil.PartitionFilesResult result = IcebergUtil.planPartitionFiles(
+        table, partitionSet_.getPartitionExprs(), analyzer);
+    numberOfIcebergPartitions_ = result.numPartitions;
+    icebergFilePaths_ = new ArrayList<>();
+    for (FileScanTask fileScanTask : result.fileScanTasks) {
+      List<DeleteFile> deleteFiles = fileScanTask.deletes();
+      if (!deleteFiles.isEmpty()) {
+        icebergFilePaths_.addAll(deleteFiles.stream()
+            .map(DeleteFile::location).collect(Collectors.toSet()));
       }
-
-      if (result.isPartiallyConverted()) {
-        throw new AnalysisException(String.format(
-            "Predicate '%s' can only be partially converted to Iceberg expression: " +
-            "'%s'. Partially converted predicates are not allowed in DROP PARTITION as " +
-            "they could drop more partitions than intended. Use a fully convertible " +
-            "predicate instead.", expr.toSql(), result.getIcebergExpression()));
-      }
-
-      icebergPartitionExprs.add(result.getIcebergExpression());
+      icebergFilePaths_.add(fileScanTask.file().location());
     }
-
-    try (CloseableIterable<FileScanTask> fileScanTasks = IcebergUtil.planFiles(table,
-        icebergPartitionExprs, null, null)) {
-      icebergFilePaths_ = new ArrayList<>();
-      Set<String> icebergPartitionSummary = new HashSet<>();
-      for (FileScanTask fileScanTask : fileScanTasks) {
-        if (fileScanTask.residual().isEquivalentTo(Expressions.alwaysTrue())) {
-          icebergPartitionSummary.add(fileScanTask.file().partition().toString());
-          List<DeleteFile> deleteFiles = fileScanTask.deletes();
-          if (!deleteFiles.isEmpty()) {
-            icebergFilePaths_.addAll(deleteFiles.stream()
-                .map(DeleteFile::location).collect(Collectors.toSet()));
-          }
-          icebergFilePaths_.add(fileScanTask.file().location());
-        }
-      }
-      numberOfIcebergPartitions_ = icebergPartitionSummary.size();
+    try {
       if (icebergFilePaths_.size() == FeIcebergTable.Utils.getTotalNumberOfFiles(table,
           null)) {
         isIcebergTruncate_ = true;
         icebergFilePaths_ = Collections.emptyList();
       }
-    } catch (IOException | TableLoadingException | ImpalaRuntimeException e) {
+    } catch (ImpalaRuntimeException e) {
       throw new AnalysisException("Error loading metadata for Iceberg table", e);
     }
     if (numberOfIcebergPartitions_ == 0 && !ifExists_) {

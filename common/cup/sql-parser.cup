@@ -1171,6 +1171,11 @@ optimize_stmt ::=
   | KW_OPTIMIZE KW_TABLE table_name:table LPAREN KW_FILE_SIZE_THRESHOLD_MB EQUAL
     INTEGER_LITERAL:size RPAREN
   {: RESULT = new OptimizeStmt(table, size.intValue()); :}
+  | KW_OPTIMIZE KW_TABLE table_name:table partition_set:parts
+  {: RESULT = new OptimizeStmt(table, parts); :}
+  | KW_OPTIMIZE KW_TABLE table_name:table partition_set:parts LPAREN
+    KW_FILE_SIZE_THRESHOLD_MB EQUAL INTEGER_LITERAL:size RPAREN
+  {: RESULT = new OptimizeStmt(table, parts, size.intValue()); :}
   ;
 
 opt_query_stmt ::=

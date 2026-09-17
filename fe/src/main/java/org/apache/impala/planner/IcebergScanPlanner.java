@@ -62,6 +62,7 @@ import org.apache.impala.analysis.Expr;
 import org.apache.impala.analysis.IcebergExpressionCollector;
 import org.apache.impala.analysis.JoinOperator;
 import org.apache.impala.analysis.MultiAggregateInfo;
+import org.apache.impala.analysis.OptimizeStmt;
 import org.apache.impala.analysis.Path;
 import org.apache.impala.analysis.SlotDescriptor;
 import org.apache.impala.analysis.SlotId;
@@ -254,15 +255,25 @@ public class IcebergScanPlanner {
           " fully loaded due to unavailable files: %s Check ImpalaD/CatalogD logs for" +
           " details.", getIceTable().getFullName(), fileStore.getMissingFiles()));
     }
-    if (tblRef_.getSelectedDataFilesForOptimize() != null) {
-      dataFilesWithoutDeletes_ = tblRef_.getSelectedDataFilesForOptimize();
-    } else {
-      dataFilesWithoutDeletes_ = fileStore.getDataFilesWithoutDeletes();
+    // A PARTIAL OPTIMIZE restricts the scan to the files selected during analysis, which
+    // are read here from the OptimizeStmt. For every other query (including a full-table
+    // OPTIMIZE) the table's whole file store is scanned.
+    IcebergContentFileStore scopedStore = null;
+    if (ctx_.isOptimize()) {
+      // The selection is only honored on this code path: filterFileDescriptors() does not
+      // consult ctx_.isOptimize() and would silently discard it.
+      Preconditions.checkState(!needIcebergForPlanning());
+      OptimizeStmt optimizeStmt = ctx_.getAnalysisResult().getOptimizeStmt();
+      scopedStore = optimizeStmt.getScopedFileStoreForScan();
+      Preconditions.checkState(scopedStore == null || !scopedStore.hasMissingFile(),
+          "Scoped file store of a partial OPTIMIZE has missing files");
     }
-    dataFilesWithDeletes_ = fileStore.getDataFilesWithDeletes();
-    positionDeleteFiles_ = new HashSet<>(fileStore.getPositionDeleteFiles());
-    dataFileToDV_ = fileStore.getDataFileToDV();
-    initEqualityIds(fileStore.getEqualityDeleteFiles());
+    IcebergContentFileStore scanStore = scopedStore != null ? scopedStore : fileStore;
+    dataFilesWithoutDeletes_ = scanStore.getDataFilesWithoutDeletes();
+    dataFilesWithDeletes_ = scanStore.getDataFilesWithDeletes();
+    positionDeleteFiles_ = new HashSet<>(scanStore.getPositionDeleteFiles());
+    dataFileToDV_ = scanStore.getDataFileToDV();
+    initEqualityIds(scanStore.getEqualityDeleteFiles());
 
     updateDeleteStatistics();
   }

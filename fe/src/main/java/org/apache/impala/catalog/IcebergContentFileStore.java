@@ -130,6 +130,12 @@ public class IcebergContentFileStore {
       return decode(fileDescMap_.get(pathHash));
     }
 
+    // Returns the descriptor in its encoded form, without decoding it. Used when copying
+    // entries into another store, where decoding only to re-encode would be wasted work.
+    EncodedFileDescriptor getEncoded(Hash128 pathHash) {
+      return fileDescMap_.get(pathHash);
+    }
+
     public long getNumFiles() {
       return fileDescList_.size();
     }
@@ -305,6 +311,82 @@ public class IcebergContentFileStore {
     ret.hasOrc_ = hasOrc_;
     ret.hasParquet_ = hasParquet_;
     return ret;
+  }
+
+  /**
+   * Creates a store that holds exactly the files of 'icebergFiles', which must be a
+   * subset of the files of 'this'. Used to restrict a scan to a selection of the table's
+   * files, e.g. the partition(s) a partial OPTIMIZE rewrites.
+   *
+   * The descriptors are taken from 'this' in their encoded form, so only the selected
+   * files are touched: unlike the loading constructor, this neither decodes the table's
+   * descriptors nor builds a path map over all of them. The partitions and the file
+   * format flags describe the table rather than the selection and are shared with 'this'.
+   *
+   * A file of 'icebergFiles' that 'this' has no descriptor for is recorded in
+   * getMissingFiles(), exactly as during loading, so callers can keep checking
+   * hasMissingFile().
+   */
+  public IcebergContentFileStore createScopedStore(GroupedContentFiles icebergFiles) {
+    Preconditions.checkNotNull(icebergFiles);
+    Preconditions.checkState(partitionMap_ != null,
+        "Cannot create a scoped store from a store that has not been loaded");
+
+    IcebergContentFileStore ret = new IcebergContentFileStore();
+    // Immutable members that belong to the table, not to the selection.
+    ret.partitionMap_ = partitionMap_;
+    ret.partitionList_ = partitionList_;
+    ret.hasAvro_ = hasAvro_;
+    ret.hasOrc_ = hasOrc_;
+    ret.hasParquet_ = hasParquet_;
+
+    for (DataFile dataFile : icebergFiles.dataFilesWithoutDeletes) {
+      ret.copyFileFrom(dataFile, getEncodedDataFd(dataFile),
+          ret.dataFilesWithoutDeletes_);
+    }
+    for (DataFile dataFile : icebergFiles.dataFilesWithDeletes) {
+      ret.copyFileFrom(dataFile, getEncodedDataFd(dataFile), ret.dataFilesWithDeletes_);
+    }
+    for (DeleteFile deleteFile : icebergFiles.positionDeleteFiles) {
+      ret.copyFileFrom(deleteFile, getEncodedDeleteFd(deleteFile),
+          ret.positionDeleteFiles_);
+    }
+    for (DeleteFile deleteFile : icebergFiles.equalityDeleteFiles) {
+      ret.copyFileFrom(deleteFile, getEncodedDeleteFd(deleteFile),
+          ret.equalityDeleteFiles_);
+    }
+    // Deletion vectors are built from the DeleteFile itself, with no descriptor lookup,
+    // so there is nothing to copy and nothing that can go missing.
+    for (Map.Entry<Hash128, DeleteFile> entry : icebergFiles.dataFileToDV.entrySet()) {
+      ret.dataFileToDV_.put(entry.getKey(),
+          IcebergUtil.createTIcebergDeletionVector(entry.getValue()));
+    }
+    return ret;
+  }
+
+  // Looks up a data file's encoded descriptor in either data file container, mirroring
+  // getDataFileDescriptor().
+  private EncodedFileDescriptor getEncodedDataFd(DataFile dataFile) {
+    Hash128 pathHash = IcebergUtil.getFilePathHash(dataFile);
+    EncodedFileDescriptor fd = dataFilesWithoutDeletes_.getEncoded(pathHash);
+    return fd != null ? fd : dataFilesWithDeletes_.getEncoded(pathHash);
+  }
+
+  // Looks up a delete file's encoded descriptor in either delete file container,
+  // mirroring getDeleteFileDescriptor().
+  private EncodedFileDescriptor getEncodedDeleteFd(DeleteFile deleteFile) {
+    Hash128 pathHash = IcebergUtil.getFilePathHash(deleteFile);
+    EncodedFileDescriptor fd = positionDeleteFiles_.getEncoded(pathHash);
+    return fd != null ? fd : equalityDeleteFiles_.getEncoded(pathHash);
+  }
+
+  private void copyFileFrom(ContentFile<?> contentFile, EncodedFileDescriptor fd,
+      MapListContainer container) {
+    if (fd == null) {
+      missingFiles_.add(contentFile.location());
+      return;
+    }
+    container.add(IcebergUtil.getFilePathHash(contentFile), fd);
   }
 
   /**

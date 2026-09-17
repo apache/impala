@@ -319,3 +319,567 @@ SELECT count(*) FROM $DATABASE.ice_tpch_many_parts.`files`;
 ---- TYPES
 BIGINT
 ====
+---- QUERY
+# OPTIMIZE with a PARTITION clause compacts only the selected partition, leaving the
+# files of the other partitions untouched.
+CREATE TABLE ice_optimize_partition (i int, s string)
+PARTITIONED BY SPEC(i)
+STORED BY ICEBERG
+TBLPROPERTIES ('format-version'='2');
+====
+---- QUERY
+# Write multiple small files: two in partition i=1, two in i=2, one in i=3.
+INSERT INTO ice_optimize_partition VALUES (1, 'a');
+INSERT INTO ice_optimize_partition VALUES (1, 'b');
+INSERT INTO ice_optimize_partition VALUES (2, 'c');
+INSERT INTO ice_optimize_partition VALUES (2, 'd');
+INSERT INTO ice_optimize_partition VALUES (3, 'e');
+SHOW FILES IN ice_optimize_partition;
+---- LABELS
+Path,Size,Partition,EC Policy
+---- RESULTS: VERIFY_IS_EQUAL
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_optimize_partition/data/i=1/.*.0.parq','.*','','$ERASURECODE_POLICY'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_optimize_partition/data/i=1/.*.0.parq','.*','','$ERASURECODE_POLICY'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_optimize_partition/data/i=2/.*.0.parq','.*','','$ERASURECODE_POLICY'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_optimize_partition/data/i=2/.*.0.parq','.*','','$ERASURECODE_POLICY'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_optimize_partition/data/i=3/.*.0.parq','.*','','$ERASURECODE_POLICY'
+---- TYPES
+STRING, STRING, STRING, STRING
+====
+---- QUERY
+# Only partition i=1 is compacted (its two files become one). Partitions i=2 (two
+# files) and i=3 (one file) are left exactly as they were.
+OPTIMIZE TABLE ice_optimize_partition PARTITION (i = 1);
+SHOW FILES IN ice_optimize_partition;
+---- LABELS
+Path,Size,Partition,EC Policy
+---- RESULTS: VERIFY_IS_EQUAL
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_optimize_partition/data/i=1/.*.0.parq','.*','','$ERASURECODE_POLICY'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_optimize_partition/data/i=2/.*.0.parq','.*','','$ERASURECODE_POLICY'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_optimize_partition/data/i=2/.*.0.parq','.*','','$ERASURECODE_POLICY'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_optimize_partition/data/i=3/.*.0.parq','.*','','$ERASURECODE_POLICY'
+---- TYPES
+STRING, STRING, STRING, STRING
+====
+---- QUERY
+# All rows are still present and correct after the partition-scoped OPTIMIZE.
+SELECT * FROM ice_optimize_partition;
+---- RESULTS
+1,'a'
+1,'b'
+2,'c'
+2,'d'
+3,'e'
+---- TYPES
+INT,STRING
+====
+---- QUERY
+# Without FILE_SIZE_THRESHOLD_MB every file of the selected partition is selected, but
+# the operation is still restricted to that partition: i=3 is rewritten while i=2 keeps
+# both of its files instead of being compacted into one.
+OPTIMIZE TABLE ice_optimize_partition PARTITION (i = 3);
+SHOW FILES IN ice_optimize_partition;
+---- LABELS
+Path,Size,Partition,EC Policy
+---- RESULTS: VERIFY_IS_EQUAL
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_optimize_partition/data/i=1/.*.0.parq','.*','','$ERASURECODE_POLICY'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_optimize_partition/data/i=2/.*.0.parq','.*','','$ERASURECODE_POLICY'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_optimize_partition/data/i=2/.*.0.parq','.*','','$ERASURECODE_POLICY'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_optimize_partition/data/i=3/.*.0.parq','.*','','$ERASURECODE_POLICY'
+---- TYPES
+STRING, STRING, STRING, STRING
+====
+---- QUERY
+SELECT * FROM ice_optimize_partition;
+---- RESULTS
+1,'a'
+1,'b'
+2,'c'
+2,'d'
+3,'e'
+---- TYPES
+INT,STRING
+====
+---- QUERY
+# OPTIMIZE with both a PARTITION clause and FILE_SIZE_THRESHOLD_MB: only the selected
+# partition is considered, and the size filter is applied within that partition.
+CREATE TABLE ice_optimize_partition_threshold (i int, s string)
+PARTITIONED BY SPEC(i)
+STORED BY ICEBERG
+TBLPROPERTIES ('format-version'='2');
+====
+---- QUERY
+# Write multiple small files: two in partition i=1, two in i=2, one in i=3.
+INSERT INTO ice_optimize_partition_threshold VALUES (1, 'a');
+INSERT INTO ice_optimize_partition_threshold VALUES (1, 'b');
+INSERT INTO ice_optimize_partition_threshold VALUES (2, 'c');
+INSERT INTO ice_optimize_partition_threshold VALUES (2, 'd');
+INSERT INTO ice_optimize_partition_threshold VALUES (3, 'e');
+SHOW FILES IN ice_optimize_partition_threshold;
+---- LABELS
+Path,Size,Partition,EC Policy
+---- RESULTS: VERIFY_IS_EQUAL
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_optimize_partition_threshold/data/i=1/.*.0.parq','.*','','$ERASURECODE_POLICY'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_optimize_partition_threshold/data/i=1/.*.0.parq','.*','','$ERASURECODE_POLICY'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_optimize_partition_threshold/data/i=2/.*.0.parq','.*','','$ERASURECODE_POLICY'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_optimize_partition_threshold/data/i=2/.*.0.parq','.*','','$ERASURECODE_POLICY'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_optimize_partition_threshold/data/i=3/.*.0.parq','.*','','$ERASURECODE_POLICY'
+---- TYPES
+STRING, STRING, STRING, STRING
+====
+---- QUERY
+# Both files in partition i=1 are below the threshold and the partition has more than
+# one file, so they are compacted into one. Partitions i=2 and i=3 stay untouched.
+OPTIMIZE TABLE ice_optimize_partition_threshold
+  PARTITION (i = 1) (FILE_SIZE_THRESHOLD_MB=100);
+SHOW FILES IN ice_optimize_partition_threshold;
+---- LABELS
+Path,Size,Partition,EC Policy
+---- RESULTS: VERIFY_IS_EQUAL
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_optimize_partition_threshold/data/i=1/.*.0.parq','.*','','$ERASURECODE_POLICY'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_optimize_partition_threshold/data/i=2/.*.0.parq','.*','','$ERASURECODE_POLICY'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_optimize_partition_threshold/data/i=2/.*.0.parq','.*','','$ERASURECODE_POLICY'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_optimize_partition_threshold/data/i=3/.*.0.parq','.*','','$ERASURECODE_POLICY'
+---- TYPES
+STRING, STRING, STRING, STRING
+====
+---- QUERY
+# Partition i=3 has a single file, so the threshold excludes it (rewriting one file
+# would be redundant) and the statement is a no-op even with the partition clause.
+OPTIMIZE TABLE ice_optimize_partition_threshold
+  PARTITION (i = 3) (FILE_SIZE_THRESHOLD_MB=100);
+---- RESULTS
+'The selected partition(s) are already optimized.'
+====
+---- QUERY
+# The no-op above left every partition untouched.
+SHOW FILES IN ice_optimize_partition_threshold;
+---- LABELS
+Path,Size,Partition,EC Policy
+---- RESULTS: VERIFY_IS_EQUAL
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_optimize_partition_threshold/data/i=1/.*.0.parq','.*','','$ERASURECODE_POLICY'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_optimize_partition_threshold/data/i=2/.*.0.parq','.*','','$ERASURECODE_POLICY'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_optimize_partition_threshold/data/i=2/.*.0.parq','.*','','$ERASURECODE_POLICY'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_optimize_partition_threshold/data/i=3/.*.0.parq','.*','','$ERASURECODE_POLICY'
+---- TYPES
+STRING, STRING, STRING, STRING
+====
+---- QUERY
+# All rows are still present and correct after the mixed-mode OPTIMIZE.
+SELECT * FROM ice_optimize_partition_threshold;
+---- RESULTS
+1,'a'
+1,'b'
+2,'c'
+2,'d'
+3,'e'
+---- TYPES
+INT,STRING
+====
+---- QUERY
+# OPTIMIZE with a PARTITION clause on a table that has position delete files: the
+# deletes of the selected partition are merged into the data, the deletes of the other
+# partitions are left untouched.
+CREATE TABLE ice_optimize_partition_deletes (i int, s string)
+PARTITIONED BY SPEC(i)
+STORED BY ICEBERG
+TBLPROPERTIES ('format-version'='2');
+====
+---- QUERY
+# One data file and one position delete file per partition.
+INSERT INTO ice_optimize_partition_deletes VALUES (1, 'a'), (1, 'b');
+INSERT INTO ice_optimize_partition_deletes VALUES (2, 'c'), (2, 'd');
+DELETE FROM ice_optimize_partition_deletes WHERE s = 'b';
+DELETE FROM ice_optimize_partition_deletes WHERE s = 'd';
+SELECT `partition`.i, content, count(*)
+FROM $DATABASE.ice_optimize_partition_deletes.`files`
+GROUP BY 1, 2;
+---- RESULTS
+1,0,1
+1,1,1
+2,0,1
+2,1,1
+---- TYPES
+INT,INT,BIGINT
+====
+---- QUERY
+# Partition i=1 has no data file that is free of deletes, but its single data file has
+# deletes to merge, so the statement is not a no-op. Afterwards i=1 holds one data file
+# and no delete file, while i=2 still has both of its files.
+OPTIMIZE TABLE ice_optimize_partition_deletes PARTITION (i = 1);
+SELECT `partition`.i, content, count(*)
+FROM $DATABASE.ice_optimize_partition_deletes.`files`
+GROUP BY 1, 2;
+---- RESULTS
+1,0,1
+2,0,1
+2,1,1
+---- TYPES
+INT,INT,BIGINT
+====
+---- QUERY
+# The compacted data file was written to the partition it belongs to, and the delete
+# file of partition i=1 is gone.
+SHOW FILES IN ice_optimize_partition_deletes;
+---- LABELS
+Path,Size,Partition,EC Policy
+---- RESULTS: VERIFY_IS_SUBSET
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_optimize_partition_deletes/data/i=1/.*.0.parq','.*','','$ERASURECODE_POLICY'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_optimize_partition_deletes/data/i=2/.*.0.parq','.*','','$ERASURECODE_POLICY'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_optimize_partition_deletes/data/i=2/delete-.*parq','.*','','$ERASURECODE_POLICY'
+---- RESULTS: VERIFY_IS_NOT_IN
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_optimize_partition_deletes/data/i=1/delete-.*parq','.*','','$ERASURECODE_POLICY'
+---- TYPES
+STRING, STRING, STRING, STRING
+====
+---- QUERY
+# The deleted rows are still gone from both partitions: the merged delete of i=1 was
+# applied when the data was rewritten, and the delete of i=2 is still applied on read.
+SELECT * FROM ice_optimize_partition_deletes;
+---- RESULTS
+1,'a'
+2,'c'
+---- TYPES
+INT,STRING
+====
+---- QUERY
+# OPTIMIZE ... PARTITION is not restricted to identity specs. bucket(2, i) places i=1 and
+# i=2 into bucket 0 and i=3 into bucket 1.
+CREATE TABLE ice_optimize_part_bucket (i int, s string)
+PARTITIONED BY SPEC (bucket(2, i))
+STORED BY ICEBERG
+TBLPROPERTIES ('format-version'='2');
+INSERT INTO ice_optimize_part_bucket VALUES (1, 'a');
+INSERT INTO ice_optimize_part_bucket VALUES (2, 'b');
+INSERT INTO ice_optimize_part_bucket VALUES (3, 'c');
+SELECT `partition`.i_bucket, count(*)
+FROM $DATABASE.ice_optimize_part_bucket.`files` GROUP BY 1;
+---- RESULTS
+0,2
+1,1
+---- TYPES
+INT,BIGINT
+====
+---- QUERY
+# Only bucket 0 is compacted; bucket 1 keeps its own file.
+OPTIMIZE TABLE ice_optimize_part_bucket PARTITION (bucket(2, i) = 0);
+SELECT `partition`.i_bucket, count(*)
+FROM $DATABASE.ice_optimize_part_bucket.`files` GROUP BY 1;
+---- RESULTS
+0,1
+1,1
+---- TYPES
+INT,BIGINT
+====
+---- QUERY
+SELECT * FROM ice_optimize_part_bucket;
+---- RESULTS
+1,'a'
+2,'b'
+3,'c'
+---- TYPES
+INT,STRING
+====
+---- QUERY
+# A truncate spec: 'impala' and 'implicit' share the partition s_trunc=im, 'iceberg' is in
+# s_trunc=ic.
+CREATE TABLE ice_optimize_part_truncate (i int, s string)
+PARTITIONED BY SPEC (truncate(2, s))
+STORED BY ICEBERG
+TBLPROPERTIES ('format-version'='2');
+INSERT INTO ice_optimize_part_truncate VALUES (1, 'impala');
+INSERT INTO ice_optimize_part_truncate VALUES (2, 'implicit');
+INSERT INTO ice_optimize_part_truncate VALUES (3, 'iceberg');
+OPTIMIZE TABLE ice_optimize_part_truncate PARTITION (truncate(2, s) = 'im');
+SHOW FILES IN ice_optimize_part_truncate;
+---- LABELS
+Path,Size,Partition,EC Policy
+---- RESULTS: VERIFY_IS_EQUAL
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_optimize_part_truncate/data/s_trunc=ic/.*.0.parq','.*','','$ERASURECODE_POLICY'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_optimize_part_truncate/data/s_trunc=im/.*.0.parq','.*','','$ERASURECODE_POLICY'
+---- TYPES
+STRING, STRING, STRING, STRING
+====
+---- QUERY
+SELECT * FROM ice_optimize_part_truncate;
+---- RESULTS
+1,'impala'
+2,'implicit'
+3,'iceberg'
+---- TYPES
+INT,STRING
+====
+---- QUERY
+# A time transform. The partition value is given the way Iceberg prints it.
+CREATE TABLE ice_optimize_part_month (i int, d date)
+PARTITIONED BY SPEC (month(d))
+STORED BY ICEBERG
+TBLPROPERTIES ('format-version'='2');
+INSERT INTO ice_optimize_part_month VALUES (1, '2024-01-05');
+INSERT INTO ice_optimize_part_month VALUES (2, '2024-01-20');
+INSERT INTO ice_optimize_part_month VALUES (3, '2024-02-07');
+OPTIMIZE TABLE ice_optimize_part_month PARTITION (month(d) = '2024-01');
+SHOW FILES IN ice_optimize_part_month;
+---- LABELS
+Path,Size,Partition,EC Policy
+---- RESULTS: VERIFY_IS_EQUAL
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_optimize_part_month/data/d_month=2024-01/.*.0.parq','.*','','$ERASURECODE_POLICY'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_optimize_part_month/data/d_month=2024-02/.*.0.parq','.*','','$ERASURECODE_POLICY'
+---- TYPES
+STRING, STRING, STRING, STRING
+====
+---- QUERY
+SELECT * FROM ice_optimize_part_month;
+---- RESULTS
+1,2024-01-05
+2,2024-01-20
+3,2024-02-07
+---- TYPES
+INT,DATE
+====
+---- QUERY
+# A predicate on the partition column of a transformed spec does not align to whole
+# partitions, so nothing is selected.
+OPTIMIZE TABLE ice_optimize_part_month PARTITION (d = '2024-01-05');
+---- CATCH
+AnalysisException: No matching partition(s) found
+====
+---- QUERY
+# The PARTITION clause accepts the same predicates as ALTER TABLE ... DROP PARTITION, not
+# only equality.
+CREATE TABLE ice_optimize_part_pred (i int, s string)
+PARTITIONED BY SPEC (i)
+STORED BY ICEBERG
+TBLPROPERTIES ('format-version'='2');
+INSERT INTO ice_optimize_part_pred VALUES (1, 'a');
+INSERT INTO ice_optimize_part_pred VALUES (1, 'b');
+INSERT INTO ice_optimize_part_pred VALUES (2, 'c');
+INSERT INTO ice_optimize_part_pred VALUES (2, 'd');
+INSERT INTO ice_optimize_part_pred VALUES (3, 'e');
+INSERT INTO ice_optimize_part_pred VALUES (3, 'f');
+SELECT `partition`.i, count(*) FROM $DATABASE.ice_optimize_part_pred.`files` GROUP BY 1;
+---- RESULTS
+1,2
+2,2
+3,2
+---- TYPES
+INT,BIGINT
+====
+---- QUERY
+# A range predicate compacts every matching partition and leaves i=1 alone.
+OPTIMIZE TABLE ice_optimize_part_pred PARTITION (i > 1);
+SELECT `partition`.i, count(*) FROM $DATABASE.ice_optimize_part_pred.`files` GROUP BY 1;
+---- RESULTS
+1,2
+2,1
+3,1
+---- TYPES
+INT,BIGINT
+====
+---- QUERY
+# IN selects several partitions: i=1 and the newly appended file of i=2 are compacted.
+INSERT INTO ice_optimize_part_pred VALUES (2, 'g');
+OPTIMIZE TABLE ice_optimize_part_pred PARTITION (i IN (1, 2));
+SELECT `partition`.i, count(*) FROM $DATABASE.ice_optimize_part_pred.`files` GROUP BY 1;
+---- RESULTS
+1,1
+2,1
+3,1
+---- TYPES
+INT,BIGINT
+====
+---- QUERY
+# BETWEEN covers a range of partitions, including values that have no partition.
+INSERT INTO ice_optimize_part_pred VALUES (3, 'h');
+OPTIMIZE TABLE ice_optimize_part_pred PARTITION (i BETWEEN 3 AND 4);
+SELECT `partition`.i, count(*) FROM $DATABASE.ice_optimize_part_pred.`files` GROUP BY 1;
+---- RESULTS
+1,1
+2,1
+3,1
+---- TYPES
+INT,BIGINT
+====
+---- QUERY
+# None of the above lost or duplicated a row.
+SELECT * FROM ice_optimize_part_pred;
+---- RESULTS
+1,'a'
+1,'b'
+2,'c'
+2,'d'
+2,'g'
+3,'e'
+3,'f'
+3,'h'
+---- TYPES
+INT,STRING
+====
+---- QUERY
+# A data file above FILE_SIZE_THRESHOLD_MB stays in place while the small files of the
+# same partition are compacted. MAX_FS_WRITERS is set for the large INSERT only, so that
+# it writes a single file and the sizes below are deterministic.
+CREATE TABLE ice_optimize_part_threshold_keep (i int, s string)
+PARTITIONED BY SPEC (i)
+STORED BY ICEBERG
+TBLPROPERTIES ('format-version'='2');
+SET MAX_FS_WRITERS=1;
+INSERT INTO ice_optimize_part_threshold_keep
+SELECT 1, l_comment FROM tpch_parquet.lineitem LIMIT 150000;
+SET MAX_FS_WRITERS=0;
+INSERT INTO ice_optimize_part_threshold_keep VALUES (1, 'small-a');
+INSERT INTO ice_optimize_part_threshold_keep VALUES (1, 'small-b');
+INSERT INTO ice_optimize_part_threshold_keep VALUES (2, 'other-a');
+INSERT INTO ice_optimize_part_threshold_keep VALUES (2, 'other-b');
+SELECT `partition`.i, count(*), sum(cast(file_size_in_bytes > 1048576 as int))
+FROM $DATABASE.ice_optimize_part_threshold_keep.`files` GROUP BY 1;
+---- RESULTS
+1,3,1
+2,2,0
+---- TYPES
+INT,BIGINT,BIGINT
+====
+---- QUERY
+# The large file is not selected; the two small ones become one. The two small files of
+# i=2 are below the threshold too, so only the PARTITION clause keeps them in place.
+OPTIMIZE TABLE ice_optimize_part_threshold_keep
+  PARTITION (i = 1) (FILE_SIZE_THRESHOLD_MB=1);
+SELECT `partition`.i, count(*), sum(cast(file_size_in_bytes > 1048576 as int))
+FROM $DATABASE.ice_optimize_part_threshold_keep.`files` GROUP BY 1;
+---- RESULTS
+1,2,1
+2,2,0
+---- TYPES
+INT,BIGINT,BIGINT
+====
+---- QUERY
+# The kept file still holds exactly the rows it was written with, so it was not rewritten.
+SELECT record_count FROM $DATABASE.ice_optimize_part_threshold_keep.`files`
+WHERE file_size_in_bytes > 1048576;
+---- RESULTS
+150000
+---- TYPES
+BIGINT
+====
+---- QUERY
+SELECT count(*) FROM ice_optimize_part_threshold_keep;
+---- RESULTS
+150004
+---- TYPES
+BIGINT
+====
+---- QUERY
+# Partition evolution: a file written under an older spec is selected if the predicate
+# resolves against that spec's partition tuple as well. Here i=1 does, so all three files
+# are rewritten, and the new file is written with the latest spec, i.e. under i=1/j=10.
+CREATE TABLE ice_optimize_part_evolution (i int, j int, s string)
+PARTITIONED BY SPEC (i)
+STORED BY ICEBERG
+TBLPROPERTIES ('format-version'='2');
+INSERT INTO ice_optimize_part_evolution VALUES (1, 10, 'a');
+INSERT INTO ice_optimize_part_evolution VALUES (1, 10, 'b');
+ALTER TABLE ice_optimize_part_evolution SET PARTITION SPEC (i, j);
+INSERT INTO ice_optimize_part_evolution VALUES (1, 10, 'c');
+OPTIMIZE TABLE ice_optimize_part_evolution PARTITION (i = 1);
+SHOW FILES IN ice_optimize_part_evolution;
+---- LABELS
+Path,Size,Partition,EC Policy
+---- RESULTS: VERIFY_IS_EQUAL
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_optimize_part_evolution/data/i=1/j=10/.*.0.parq','.*','','$ERASURECODE_POLICY'
+---- TYPES
+STRING, STRING, STRING, STRING
+====
+---- QUERY
+SELECT * FROM ice_optimize_part_evolution;
+---- RESULTS
+1,10,'a'
+1,10,'b'
+1,10,'c'
+---- TYPES
+INT,INT,STRING
+====
+---- QUERY
+# The other direction: the predicate names a field that the older spec does not have, so
+# that spec's files are left untouched even though their rows match the predicate. The
+# row (1, 20) below stays in its i=1 file while the two j=20 files are compacted. A full
+# table OPTIMIZE is needed to bring such files to the latest spec.
+CREATE TABLE ice_optimize_part_evolution_skip (i int, j int)
+PARTITIONED BY SPEC (i)
+STORED BY ICEBERG
+TBLPROPERTIES ('format-version'='2');
+INSERT INTO ice_optimize_part_evolution_skip VALUES (1, 20);
+ALTER TABLE ice_optimize_part_evolution_skip SET PARTITION SPEC (j);
+INSERT INTO ice_optimize_part_evolution_skip VALUES (2, 20);
+INSERT INTO ice_optimize_part_evolution_skip VALUES (3, 20);
+OPTIMIZE TABLE ice_optimize_part_evolution_skip PARTITION (j = 20);
+SHOW FILES IN ice_optimize_part_evolution_skip;
+---- LABELS
+Path,Size,Partition,EC Policy
+---- RESULTS: VERIFY_IS_EQUAL
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_optimize_part_evolution_skip/data/i=1/.*.0.parq','.*','','$ERASURECODE_POLICY'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_optimize_part_evolution_skip/data/j=20/.*.0.parq','.*','','$ERASURECODE_POLICY'
+---- TYPES
+STRING, STRING, STRING, STRING
+====
+---- QUERY
+SELECT * FROM ice_optimize_part_evolution_skip;
+---- RESULTS
+1,20
+2,20
+3,20
+---- TYPES
+INT,INT
+====
+---- QUERY
+# The partition clause is resolved against the current spec, so a field that only an
+# older spec had cannot be named.
+OPTIMIZE TABLE ice_optimize_part_evolution_skip PARTITION (i = 1);
+---- CATCH
+AnalysisException: Partition exprs cannot contain non-partition column(s): i
+====
+---- QUERY
+# OPTIMIZE always shuffles the rows on the partition keys, so each partition is written by
+# a single writer. With column stats the planner knows that the partition column has few
+# distinct values and would otherwise skip the shuffle, in which case every scan instance
+# writes its own file into the same partition. Each INSERT below writes one file.
+CREATE TABLE ice_optimize_shuffle (i int, s string)
+PARTITIONED BY SPEC (i)
+STORED BY ICEBERG
+TBLPROPERTIES ('format-version'='2');
+INSERT INTO ice_optimize_shuffle VALUES (1, 'a');
+INSERT INTO ice_optimize_shuffle VALUES (1, 'b');
+INSERT INTO ice_optimize_shuffle VALUES (1, 'c');
+INSERT INTO ice_optimize_shuffle VALUES (2, 'd');
+INSERT INTO ice_optimize_shuffle VALUES (2, 'e');
+INSERT INTO ice_optimize_shuffle VALUES (2, 'f');
+COMPUTE STATS ice_optimize_shuffle;
+SELECT `partition`.i, count(*)
+FROM $DATABASE.ice_optimize_shuffle.`files` GROUP BY 1;
+---- RESULTS
+1,3
+2,3
+---- TYPES
+INT,BIGINT
+====
+---- QUERY
+# Partition mode: the three files of i=1 become one, those of i=2 are left untouched.
+OPTIMIZE TABLE ice_optimize_shuffle PARTITION (i = 1);
+SELECT `partition`.i, count(*)
+FROM $DATABASE.ice_optimize_shuffle.`files` GROUP BY 1;
+---- RESULTS
+1,1
+2,3
+---- TYPES
+INT,BIGINT
+====
+---- QUERY
+# Full table mode: the three files of i=2 become one as well.
+OPTIMIZE TABLE ice_optimize_shuffle;
+SELECT `partition`.i, count(*)
+FROM $DATABASE.ice_optimize_shuffle.`files` GROUP BY 1;
+---- RESULTS
+1,1
+2,1
+---- TYPES
+INT,BIGINT
+====

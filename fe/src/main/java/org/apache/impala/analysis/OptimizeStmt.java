@@ -19,12 +19,13 @@ package org.apache.impala.analysis;
 
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
-import org.apache.iceberg.DataFile;
+import org.apache.iceberg.ContentFile;
+import org.apache.iceberg.DeleteFile;
+import org.apache.iceberg.io.CloseableIterable;
 import org.apache.impala.authorization.Privilege;
 import org.apache.impala.catalog.Column;
 import org.apache.impala.catalog.FeIcebergTable;
 import org.apache.impala.catalog.IcebergContentFileStore;
-import org.apache.impala.catalog.IcebergFileDescriptor;
 import org.apache.impala.catalog.iceberg.GroupedContentFiles;
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.common.ByteUnits;
@@ -39,11 +40,9 @@ import org.apache.impala.util.ExprUtil;
 import org.apache.impala.util.IcebergOptimizeFileFilter;
 import org.apache.impala.util.IcebergUtil;
 
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -56,17 +55,19 @@ import java.util.Set;
  * - compacting small files,
  * - merging delete deltas,
  * - rewriting the table according to the latest partition spec and schema.
- * 2. Partial table compaction: This mode has an additional parameter,
- * 'FILE_SIZE_THRESHOLD_MB', that puts an upper limit on the size of data files without
- * deletes to be selected for compaction. The operation executes the following tasks:
- * - compacting data files without deletes that are smaller than the given threshold,
- * - merging all delete deltas and compacting all data files with deletes,
- * - rewriting the selected files according to the latest partition spec and schema.
- * Note that the use of the latest schema and partition spec for the entire table is not
- * guaranteed in partial compaction mode.
+ * 2. Partial table compaction: only a subset of the table's files is rewritten, all
+ * others remain unchanged. The subset is narrowed by either or both of:
+ * - 'FILE_SIZE_THRESHOLD_MB', which puts an upper limit on the size of the data files
+ *   without deletes to be selected for compaction, and
+ * - a PARTITION clause, which restricts the operation to the selected partition(s).
+ * Within that scope all delete files and all data files with deletes are also rewritten,
+ * since the delete deltas have to be merged. Note that the use of the latest schema and
+ * partition spec for the entire table is not guaranteed in partial compaction mode.
  * 3. No-operation: covers every case when there is no change made to the table:
  * - the table is empty, or
  * - there were no files that qualified for the selection criteria in partial mode.
+ * In partial mode the coordinator sends the catalog the complete set of files it scanned
+ * and the catalog removes exactly those from the manifest. See OptimizeMode.
  */
 public class OptimizeStmt extends DmlStatementBase {
   // Target table name as seen by the parser.
@@ -75,6 +76,9 @@ public class OptimizeStmt extends DmlStatementBase {
   // from delete files.
   // The value comes from FILE_SIZE_THRESHOLD_MB, but is converted to bytes.
   private final long fileSizeThreshold_;
+  // Optional PARTITION clause. When set, only the selected partition(s) are compacted
+  // and the operation runs in PARTIAL mode. Null if no PARTITION clause was specified.
+  private final PartitionSet partitionSet_;
 
   /////////////////////////////////////////
   // BEGIN: Members that need to be reset()
@@ -100,36 +104,120 @@ public class OptimizeStmt extends DmlStatementBase {
   private TSortingOrder sortingOrder_ = TSortingOrder.LEXICAL;;
   // Exprs corresponding to the partition fields of the table.
   protected List<Expr> partitionKeyExprs_ = new ArrayList<>();
-  // Iceberg file path strings of data files without deletes selected for compaction after
-  // file size filtering.
-  private Set<String> selectedIcebergFilePaths_ = new HashSet<>();
-  // Describes the mode of this OPTIMIZE operation. Decided during analysis. Null if the
-  // operation is a no-op (see isNoOp()), i.e. the table was empty or no files were
-  // selected for compaction, so the operation has no effect.
-  // PARTIAL: In this mode only the selected files are compacted, all others will remain
-  // unchanged. Files that will be selected:
-  // - data files without deletes that are smaller than fileSizeThreshold_,
-  // - all delete files,
-  // - all data files with deletes.
-  // Possible only if FILE_SIZE_THRESHOLD_MB is set.
-  // REWRITE_ALL: Rewrite all files of the table. This will ensure that the optimized
-  // table has the latest schema and partition spec. Possible if FILE_SIZE_THRESHOLD_MB is
-  // not set in the SQL command or large enough that all files get selected.
-  private TIcebergOptimizationMode mode_;
+  // Describes the mode of this OPTIMIZE operation. Decided during analysis in
+  // selectFiles(). Null if the operation is a no-op (see isNoOp()), i.e. the table was
+  // empty or no files were selected for compaction, so the operation has no effect.
+  // Otherwise it is a RewriteAll or a Partial instance; see OptimizeMode:
+  // - RewriteAll (REWRITE_ALL): rewrite all files of the table, ensuring the optimized
+  //   table has the latest schema and partition spec. Used if neither
+  //   FILE_SIZE_THRESHOLD_MB nor a PARTITION clause is set in the SQL command, or the
+  //   threshold is large enough that all files get selected.
+  // - Partial (PARTIAL): rewrite only the selected files, all others remain unchanged.
+  //   Used if FILE_SIZE_THRESHOLD_MB or a PARTITION clause, or both, narrow the scope.
+  private OptimizeMode mode_;
 
   // END: Members that need to be reset()
   /////////////////////////////////////////
 
+  /**
+   * Represents the mode of an OPTIMIZE operation that has an effect on the table. It is
+   * decided during analysis, once the set of files to rewrite is known (see
+   * selectFiles()), which is why it is modeled as an object instantiated at that point
+   * rather than as a flag set at construction time.
+   *
+   * The mode also owns the data that is specific to it: only {@link Partial} restricts
+   * the operation to a subset of the table, so only it carries the scoped file store the
+   * scan reads and the paths of the files the commit replaces. This keeps the "a
+   * selection exists only in PARTIAL mode" invariant type-enforced instead of spread
+   * across nullable fields and mode checks.
+   *
+   * The NOOP case is not represented here; it is tracked by
+   * {@link StatementBase#isNoOp()} and leaves mode_ null.
+   */
+  private abstract static class OptimizeMode {
+    abstract TIcebergOptimizationMode toThrift();
+
+    // Iceberg file path strings of the selected files this mode replaces: data files with
+    // and without deletes, position delete files and equality delete files.
+    // Deletion vectors are deliberately not listed. A DV lives in a Puffin file that may
+    // also hold the DVs of data files in other partitions, so the catalog cannot remove
+    // DVs by location; it removes a DV iff the data file it belongs to is replaced, and
+    // that data file is in this set by construction.
+    abstract Set<String> getFilesToReplace();
+
+    // File store the compaction scan should read, holding exactly the selected files.
+    // Null for RewriteAll, in which case the scan reads the table's own file store.
+    IcebergContentFileStore getScopedFileStoreForScan() { return null; }
+  }
+
+  /**
+   * Rewrites all files of the table, ensuring the optimized table has the latest schema
+   * and partition spec. Used when neither FILE_SIZE_THRESHOLD_MB nor a PARTITION clause
+   * narrows the operation, or when the threshold is large enough that all files get
+   * selected.
+   */
+  private static final class RewriteAll extends OptimizeMode {
+    @Override
+    TIcebergOptimizationMode toThrift() { return TIcebergOptimizationMode.REWRITE_ALL; }
+
+    // RewriteAll replaces the whole table, so no need to define the file selection.
+    @Override
+    Set<String> getFilesToReplace() { return Collections.emptySet(); }
+  }
+
+  /**
+   * Rewrites only the selected files, leaving all others unchanged. The scope is narrowed
+   * by a PARTITION clause (to the files of the selected partition(s)), by
+   * FILE_SIZE_THRESHOLD_MB (to the data files without deletes below the threshold), or by
+   * both. Within that scope all delete files and all data files with deletes are always
+   * rewritten so that the delete deltas get merged. Note that the use of the latest
+   * schema and partition spec for the entire table is not guaranteed in this mode.
+   */
+  private static final class Partial extends OptimizeMode {
+    // File store the compaction scan reads. Holds exactly the selected files, in all
+    // content file categories.
+    private final IcebergContentFileStore scopedFileStore_;
+    // Iceberg locations of the files the commit must remove by path.
+    // Deletion vectors are not included; see OptimizeMode.getFilesToReplace().
+    private final Set<String> filesToReplace_;
+
+    Partial(IcebergContentFileStore scopedFileStore, Set<String> filesToReplace) {
+      scopedFileStore_ = scopedFileStore;
+      filesToReplace_ = filesToReplace;
+    }
+
+    @Override
+    TIcebergOptimizationMode toThrift() { return TIcebergOptimizationMode.PARTIAL; }
+
+    @Override
+    IcebergContentFileStore getScopedFileStoreForScan() { return scopedFileStore_; }
+
+    @Override
+    Set<String> getFilesToReplace() { return filesToReplace_; }
+  }
+
   public OptimizeStmt(TableName tableName) {
-    tableName_ = tableName;
-    originalTableName_ = tableName_;
-    fileSizeThreshold_ = -1;
+    this(tableName, -1, null);
   }
 
   public OptimizeStmt(TableName tableName, int fileSizeMb) {
+    this(tableName, ((long) fileSizeMb) * ByteUnits.MEGABYTE, null);
+  }
+
+  public OptimizeStmt(TableName tableName, PartitionSet partitionSet) {
+    this(tableName, -1, partitionSet);
+  }
+
+  public OptimizeStmt(TableName tableName, PartitionSet partitionSet, int fileSizeMb) {
+    this(tableName, ((long) fileSizeMb) * ByteUnits.MEGABYTE, partitionSet);
+  }
+
+  private OptimizeStmt(TableName tableName, long fileSizeThreshold,
+      PartitionSet partitionSet) {
     tableName_ = tableName;
     originalTableName_ = tableName_;
-    fileSizeThreshold_ = ((long) fileSizeMb) * ByteUnits.MEGABYTE;
+    fileSizeThreshold_ = fileSizeThreshold;
+    partitionSet_ = partitionSet;
   }
 
   private OptimizeStmt(OptimizeStmt other) {
@@ -137,6 +225,7 @@ public class OptimizeStmt extends DmlStatementBase {
     tableName_ = other.tableName_;
     originalTableName_ = other.originalTableName_;
     fileSizeThreshold_ = other.fileSizeThreshold_;
+    partitionSet_ = other.partitionSet_;
     tableRef_ = other.tableRef_;
     sourceStmt_ = other.sourceStmt_;
     resultExprs_ = other.resultExprs_;
@@ -144,7 +233,6 @@ public class OptimizeStmt extends DmlStatementBase {
     sortColumns_ = other.sortColumns_;
     sortingOrder_ = other.sortingOrder_;
     partitionKeyExprs_ = other.partitionKeyExprs_;
-    selectedIcebergFilePaths_ = other.selectedIcebergFilePaths_;
     mode_ = other.mode_;
   }
 
@@ -178,7 +266,13 @@ public class OptimizeStmt extends DmlStatementBase {
               "version %d", iceTable.getFormatVersion()));
     }
 
-    selectFiles(iceTable);
+    if (partitionSet_ != null) {
+      partitionSet_.setTableName(tableName_);
+      partitionSet_.setPrivilegeRequirement(Privilege.ALL);
+      partitionSet_.analyze(analyzer);
+    }
+
+    selectFiles(iceTable, analyzer);
     if (isNoOp()) return;
 
     prepareExpressions(analyzer);
@@ -202,8 +296,10 @@ public class OptimizeStmt extends DmlStatementBase {
     sortExprs_.clear();
     sortingOrder_ = TSortingOrder.LEXICAL;
     partitionKeyExprs_.clear();
-    selectedIcebergFilePaths_.clear();
     mode_ = null;
+    if (partitionSet_ != null) {
+      for (Expr e : partitionSet_.getPartitionExprs()) e.reset();
+    }
     if (isNoOp()) return;
     sourceStmt_.reset();
     sortColumns_.clear();
@@ -217,10 +313,24 @@ public class OptimizeStmt extends DmlStatementBase {
     return tableSink;
   }
 
-  private void selectFiles(FeIcebergTable iceTable) throws AnalysisException {
+  // First applies the PARTITION clause if present.
+  // Then applies the FILE_SIZE_THRESHOLD_MB on the files narrowed by the first step.
+  private void selectFiles(FeIcebergTable iceTable, Analyzer analyzer)
+      throws AnalysisException {
     try {
-      GroupedContentFiles contentFiles = IcebergUtil.getIcebergFiles(
-          iceTable, Lists.newArrayList(), null);
+      GroupedContentFiles contentFiles;
+      if (partitionSet_ != null) {
+        // Restrict the candidate files to the selected partition(s).
+        IcebergUtil.PartitionFilesResult partitionResult = IcebergUtil.planPartitionFiles(
+            iceTable, partitionSet_.getPartitionExprs(), analyzer);
+        if (partitionResult.numPartitions == 0) {
+          throw new AnalysisException("No matching partition(s) found");
+        }
+        contentFiles = new GroupedContentFiles(
+            CloseableIterable.withNoopClose(partitionResult.fileScanTasks));
+      } else {
+        contentFiles = IcebergUtil.getIcebergFiles(iceTable, Lists.newArrayList(), null);
+      }
       if (contentFiles.isEmpty()) {
         setIsNoOp();
         return;
@@ -233,42 +343,76 @@ public class OptimizeStmt extends DmlStatementBase {
         setIsNoOp();
         return;
       }
-      mode_ = filterResult.getOptimizationMode();
-
-      if (mode_ == TIcebergOptimizationMode.PARTIAL) {
-        List<DataFile> selectedDataFiles = filterResult.getSelectedFilesWithoutDeletes();
-        tableRef_.setSelectedDataFilesForOptimize(
-            dataFilesWithoutDeletesToFileDescriptors(selectedDataFiles, iceTable));
-        for (DataFile dataFile : selectedDataFiles) {
-          selectedIcebergFilePaths_.add(dataFile.location());
-        }
-      }
+      // Only a query that restricts neither the partitions nor the file sizes rewrites
+      // the whole table; a partition-scoped query that selects all of its partitions'
+      // files is still a partial operation.
+      boolean rewriteWholeTable =
+          partitionSet_ == null && filterResult.allFilesSelected();
+      mode_ = rewriteWholeTable ?
+          new RewriteAll() : buildPartialMode(iceTable, contentFiles, filterResult);
+    } catch (AnalysisException e) {
+      throw e;
     } catch (Exception e) {
       throw new AnalysisException(e);
     }
   }
 
   /**
-   * Converts the given data files without deletes to file descriptors. Throws if any of
-   * them has no matching file descriptor: IcebergContentFileStore silently drops such a
-   * content file (see storeFile()/missingFiles_), and sending the path of a file that is
-   * not scanned and rewritten would remove live data at commit time.
+   * Builds the PARTIAL-mode selection from the files that are in scope: the whole table
+   * for an OPTIMIZE that only has FILE_SIZE_THRESHOLD_MB, or the selected partition(s)
+   * for one with a PARTITION clause. The data files without deletes to rewrite are the
+   * size-filtered subset of those; all other file categories (data files with deletes
+   * and delete files) are always rewritten. The scan is restricted via a scoped file
+   * store, and the exact set of replaced files is collected for the commit.
    */
-  private List<IcebergFileDescriptor> dataFilesWithoutDeletesToFileDescriptors(
-      List<DataFile> contentFiles, FeIcebergTable iceTable)
-      throws IOException, ImpalaRuntimeException {
-    GroupedContentFiles selectedContentFiles = new GroupedContentFiles();
-    selectedContentFiles.dataFilesWithoutDeletes = contentFiles;
-    IcebergContentFileStore selectedFiles =
-        new IcebergContentFileStore(iceTable.getIcebergApiTable(),
-            iceTable.getContentFileStore().getDataFilesWithoutDeletes(),
-            selectedContentFiles, new HashMap<>());
-    if (selectedFiles.hasMissingFile()) {
+  private Partial buildPartialMode(FeIcebergTable iceTable,
+      GroupedContentFiles filesInScope,
+      IcebergOptimizeFileFilter.FileFilteringResult filterResult)
+      throws AnalysisException, ImpalaRuntimeException {
+    GroupedContentFiles scopedFiles = new GroupedContentFiles();
+    // The filter owns its selection: it does not modify 'filesInScope'.
+    scopedFiles.dataFilesWithoutDeletes = filterResult.getSelectedFilesWithoutDeletes();
+    scopedFiles.dataFilesWithDeletes = filesInScope.dataFilesWithDeletes;
+    scopedFiles.positionDeleteFiles = filesInScope.positionDeleteFiles;
+    scopedFiles.equalityDeleteFiles = filesInScope.equalityDeleteFiles;
+    scopedFiles.dataFileToDV = filesInScope.dataFileToDV;
+
+    // Check for delete files out of partition.
+    if (partitionSet_ != null) {
+      DeleteFile globalDelete = IcebergUtil.findGlobalDeleteFile(
+          iceTable.getIcebergApiTable().specs(), scopedFiles);
+      if (globalDelete != null) {
+        throw new AnalysisException(String.format(
+            "Cannot OPTIMIZE selected partition(s) of Iceberg table '%s': delete file " +
+            "'%s' is not restricted to a partition and may apply to data outside the " +
+            "selection. Run OPTIMIZE TABLE on the whole table instead.",
+            iceTable.getFullName(), globalDelete.location()));
+      }
+    }
+
+    // The scan reads all file categories from this store. The descriptors are reused from
+    // the table's content file store, which is neither reloaded nor decoded.
+    IcebergContentFileStore scopedStore =
+        iceTable.getContentFileStore().createScopedStore(scopedFiles);
+    // A content file the table's store has no descriptor for is dropped from the scoped
+    // store and recorded as missing instead (see createScopedStore()). Such a file would
+    // not be scanned, but its path would still be reported as replaced, removing live
+    // data at commit time. Deletion vectors need no check: they are built straight
+    // from the DeleteFile, with no descriptor lookup.
+    if (scopedStore.hasMissingFile()) {
       throw new ImpalaRuntimeException(String.format("Cannot OPTIMIZE Iceberg table" +
           " '%s' due to unavailable files: %s.",
-          iceTable.getFullName(), selectedFiles.getMissingFiles()));
+          iceTable.getFullName(), scopedStore.getMissingFiles()));
     }
-    return selectedFiles.getDataFilesWithoutDeletes();
+    // Iceberg's own path strings are used so they match the files re-planned at commit
+    // time by IcebergCatalogOpExecutor. getAllContentFiles() covers every category the
+    // catalog removes by path and omits the deletion vectors, which it must not remove by
+    // path; see OptimizeMode.getFilesToReplace().
+    Set<String> filesToReplace = new HashSet<>();
+    for (ContentFile<?> file : scopedFiles.getAllContentFiles()) {
+      filesToReplace.add(file.location());
+    }
+    return new Partial(scopedStore, filesToReplace);
   }
 
   private void createSourceStmt(Analyzer analyzer) throws AnalysisException {
@@ -315,15 +459,24 @@ public class OptimizeStmt extends DmlStatementBase {
 
   @Override
   public String toSql(ToSqlOptions options) {
-    if (options == ToSqlOptions.DEFAULT) {
-      return "OPTIMIZE TABLE" + originalTableName_.toSql();
+    StringBuilder sb = new StringBuilder("OPTIMIZE TABLE");
+    sb.append(options == ToSqlOptions.DEFAULT ?
+        originalTableName_.toSql() : tableName_.toSql());
+    if (partitionSet_ != null) {
+      sb.append(" ").append(partitionSet_.toSql(options));
     }
-    return "OPTIMIZE TABLE" + tableName_.toSql();
+    if (fileSizeThreshold_ >= 0) {
+      sb.append(" (FILE_SIZE_THRESHOLD_MB=")
+          .append(fileSizeThreshold_ / ByteUnits.MEGABYTE).append(")");
+    }
+    return sb.toString();
   }
 
   @Override
   public List<String> getNoopSummary() throws AnalysisException {
-    return Collections.singletonList("The table is already optimized.");
+    return Collections.singletonList(partitionSet_ == null ?
+        "The table is already optimized." :
+        "The selected partition(s) are already optimized.");
   }
 
   public QueryStmt getQueryStmt() {
@@ -348,18 +501,37 @@ public class OptimizeStmt extends DmlStatementBase {
   @Override
   public List<Expr> getPartitionKeyExprs() { return partitionKeyExprs_; }
 
+  /**
+   * Always hash-partitions the rows on the partition keys, so that each partition is
+   * written by a single writer. Otherwise the planner may skip the shuffle, e.g. when the
+   * partition columns have few distinct values, and every scan instance then writes its
+   * own file into the same partition, leaving it as fragmented as before.
+   */
+  @Override
+  public List<Expr> getShuffleExprs() { return partitionKeyExprs_; }
+
   @Override
   public List<Expr> getResultExprs() { return resultExprs_; }
 
   public TIcebergOptimizationMode getOptimizationMode() {
     Preconditions.checkState(isAnalyzed());
     Preconditions.checkState(!isNoOp());
-    return mode_;
+    return mode_.toThrift();
   }
 
-  public Set<String> getSelectedIcebergFilePaths() {
+  public Set<String> getFilesToReplace() {
     Preconditions.checkState(isAnalyzed());
-    return selectedIcebergFilePaths_;
+    return mode_ == null ? Collections.emptySet() : mode_.getFilesToReplace();
+  }
+
+  /**
+   * Returns the file store the compaction scan should read, or null if the whole table
+   * should be scanned (i.e. not PARTIAL mode). Read by the planner via the analysis
+   * result to build the Iceberg scan.
+   */
+  public IcebergContentFileStore getScopedFileStoreForScan() {
+    Preconditions.checkState(isAnalyzed());
+    return mode_ == null ? null : mode_.getScopedFileStoreForScan();
   }
 
   @Override

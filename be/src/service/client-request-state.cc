@@ -1930,9 +1930,8 @@ bool ClientRequestState::CreateIcebergCatalogOps(
       const TIcebergOptimizeParams& opt = ice_params.optimize_params;
       cat_ice_op->__set_iceberg_data_files_fb(dml->CreateIcebergDataFilesVector());
       if (opt.mode == TIcebergOptimizationMode::PARTIAL) {
-        DCHECK(opt.__isset.selected_data_files_without_deletes);
-        cat_ice_op->__set_replaced_data_files_without_deletes(
-            opt.selected_data_files_without_deletes);
+        DCHECK(opt.__isset.files_to_replace);
+        cat_ice_op->__set_files_to_replace(opt.files_to_replace);
       }
       has_data_files = true;
       break;

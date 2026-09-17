@@ -222,3 +222,48 @@ FROM optimize_upgraded;
 ---- TYPES
 BIGINT,BIGINT,BIGINT,STRING,BIGINT,BIGINT,BIGINT,STRING,INT
 ====
+---- QUERY
+# A partition-scoped OPTIMIZE on a V3 table merges the deletion vectors of the selected
+# partition only. Each partition here holds one data file and the deletion vector that
+# applies to it.
+CREATE TABLE optimize_part_dv (p int, i int)
+PARTITIONED BY SPEC (p)
+STORED BY ICEBERG
+TBLPROPERTIES('format-version'='3');
+INSERT INTO optimize_part_dv VALUES (1, 10), (1, 11);
+INSERT INTO optimize_part_dv VALUES (2, 20), (2, 21);
+DELETE FROM optimize_part_dv WHERE i = 11;
+DELETE FROM optimize_part_dv WHERE i = 21;
+SELECT `partition`.p, content, file_format, count(*)
+FROM $DATABASE.optimize_part_dv.`files` GROUP BY 1, 2, 3;
+---- RESULTS
+1,0,'PARQUET',1
+1,1,'PUFFIN',1
+2,0,'PARQUET',1
+2,1,'PUFFIN',1
+---- TYPES
+INT,INT,STRING,BIGINT
+====
+---- QUERY
+# p=1 is rewritten with its delete applied and its deletion vector is gone, while p=2
+# keeps both its data file and its deletion vector.
+OPTIMIZE TABLE optimize_part_dv PARTITION (p = 1);
+SELECT `partition`.p, content, file_format, count(*)
+FROM $DATABASE.optimize_part_dv.`files` GROUP BY 1, 2, 3;
+---- RESULTS
+1,0,'PARQUET',1
+2,0,'PARQUET',1
+2,1,'PUFFIN',1
+---- TYPES
+INT,INT,STRING,BIGINT
+====
+---- QUERY
+# The deleted rows are gone from both partitions: p=1 had its delete merged into the
+# rewritten data, p=2 still has its delete applied on read.
+SELECT * FROM optimize_part_dv;
+---- RESULTS
+1,10
+2,20
+---- TYPES
+INT,INT
+====

@@ -1,0 +1,56 @@
+====
+---- QUERY
+# A single Puffin file holds the deletion vectors of data files in two different
+# partitions, which is what engines that write one Puffin file per writer task produce.
+SELECT `partition`.p, content, file_format, count(*)
+FROM $DATABASE.iceberg_v3_dv_multi_partition.`files` GROUP BY 1, 2, 3;
+---- RESULTS
+1,0,'PARQUET',1
+1,1,'PUFFIN',1
+2,0,'PARQUET',1
+2,1,'PUFFIN',1
+---- TYPES
+INT,INT,STRING,BIGINT
+====
+---- QUERY
+# Both deletion vectors are stored in that one file, each referencing its own data file.
+SELECT count(distinct file_path), count(distinct referenced_data_file)
+FROM $DATABASE.iceberg_v3_dv_multi_partition.`files` WHERE content = 1;
+---- RESULTS
+1,2
+---- TYPES
+BIGINT,BIGINT
+====
+---- QUERY
+# One row is deleted in each partition.
+SELECT * FROM iceberg_v3_dv_multi_partition;
+---- RESULTS
+1,10,'a'
+2,20,'c'
+---- TYPES
+INT,INT,STRING
+====
+---- QUERY
+# Compacting p=1 merges the deletion vector of p=1's data file into the rewritten data and
+# removes that vector. The vector of p=2 is stored in the same Puffin file, but it belongs
+# to a data file that is not rewritten, so it has to survive.
+OPTIMIZE TABLE iceberg_v3_dv_multi_partition PARTITION (p = 1);
+SELECT `partition`.p, content, file_format, count(*)
+FROM $DATABASE.iceberg_v3_dv_multi_partition.`files` GROUP BY 1, 2, 3;
+---- RESULTS
+1,0,'PARQUET',1
+2,0,'PARQUET',1
+2,1,'PUFFIN',1
+---- TYPES
+INT,INT,STRING,BIGINT
+====
+---- QUERY
+# Had the commit removed every vector stored in the shared Puffin file, the deleted row of
+# p=2 would reappear here.
+SELECT * FROM iceberg_v3_dv_multi_partition;
+---- RESULTS
+1,10,'a'
+2,20,'c'
+---- TYPES
+INT,INT,STRING
+====

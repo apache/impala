@@ -27,7 +27,7 @@ import org.apache.impala.rewrite.BetweenToCompoundRule;
 import org.apache.impala.thrift.TIcebergPartitionTransformType;
 import org.apache.impala.util.IcebergUtil;
 
-class IcebergPartitionExpressionRewriter {
+public class IcebergPartitionExpressionRewriter {
   private final Analyzer analyzer_;
   private final org.apache.iceberg.PartitionSpec partitionSpec_;
 

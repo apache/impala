@@ -1299,6 +1299,19 @@ This table tests that Impala correctly applies initial-default values for all su
 primitive types when reading legacy data files. The BINARY column tests rejection of
 binary defaults.
 
+testdata/data/iceberg_test/iceberg_v3/iceberg_v3_dv_multi_partition
+Iceberg V3 table in which a single Puffin file holds the deletion vectors of data files
+in two different partitions. Engines that write one Puffin file per writer task, e.g.
+Spark, produce this layout; Impala writes one Puffin file per partition, so it cannot
+create this table. Written as a 'hadoop.tables' table with the Iceberg 1.11.0 Java API:
+  1. Schema (p INT NOT NULL, i INT NOT NULL, s STRING), partitioned by identity(p)
+  2. Appended one Parquet data file per partition:
+     p=1: (1, 10, 'a'), (1, 11, 'b'); p=2: (2, 20, 'c'), (2, 21, 'd')
+  3. A single BaseDVFileWriter deleted position 1 of both data files, and the two
+     deletion vectors were committed in one RowDelta
+The visible rows are (1, 10, 'a') and (2, 20, 'c'). The table location contains
+'/test-warehouse/', from which tests/util/iceberg_metadata_util.py rewrites the paths.
+
 testdata/data/iceberg_test/iceberg_v3/iceberg_v3_row_lineage(_orc):
 Iceberg V3 table created by Spark 4.0.2, see above (iceberg_v3_deletion_vectors).
 sql("create table iceberg_v3_row_lineage (i int) using iceberg options('format-version'='3')").collect()

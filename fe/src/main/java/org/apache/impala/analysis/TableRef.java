@@ -36,7 +36,6 @@ import org.apache.impala.catalog.FeFsTable;
 import org.apache.impala.catalog.FeKuduTable;
 import org.apache.impala.catalog.FeTable;
 import org.apache.impala.catalog.FeView;
-import org.apache.impala.catalog.IcebergFileDescriptor;
 import org.apache.impala.catalog.MaterializedViewHdfsTable;
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.common.InternalException;
@@ -174,10 +173,6 @@ public class TableRef extends StmtNode {
   // FOR SYSTEM_TIME AS OF <timestamp> or FOR SYSTEM_TIME AS OF <version> clause.
   protected TimeTravelSpec timeTravelSpec_;
 
-  // Iceberg data files without deletes selected for OPTIMIZE from this table ref.
-  // Used only in PARTIAL optimization mode, otherwise it is null.
-  private List<IcebergFileDescriptor> selectedDataFilesWithoutDeletesForOptimize_;
-
   // True if IcebergScanPlanner can do count(*) optimization for this table ref.
   private boolean optimizeCountStarForIcebergV2_ = false;
 
@@ -283,8 +278,6 @@ public class TableRef extends StmtNode {
     columns_ = new LinkedHashMap<>(other.columns_);
     isHidden_ = other.isHidden_;
     zippingUnnestType_ = other.zippingUnnestType_;
-    selectedDataFilesWithoutDeletesForOptimize_ =
-        other.selectedDataFilesWithoutDeletesForOptimize_;
     optimizeCountStarForIcebergV2_ = other.optimizeCountStarForIcebergV2_;
   }
 
@@ -860,7 +853,6 @@ public class TableRef extends StmtNode {
     correlatedTupleIds_.clear();
     desc_ = null;
     if (timeTravelSpec_ != null) timeTravelSpec_.reset();
-    selectedDataFilesWithoutDeletesForOptimize_ = null;
     optimizeCountStarForIcebergV2_ = false;
   }
 
@@ -898,14 +890,6 @@ public class TableRef extends StmtNode {
     Preconditions.checkState(res.size() == columns_.size(),
         "missing columns: " + res.size() + " != " + columns_.size());
     return res;
-  }
-
-  public void setSelectedDataFilesForOptimize(List<IcebergFileDescriptor> fileDescs) {
-    selectedDataFilesWithoutDeletesForOptimize_ = fileDescs;
-  }
-
-  public List<IcebergFileDescriptor> getSelectedDataFilesForOptimize() {
-    return selectedDataFilesWithoutDeletesForOptimize_;
   }
 
   // This method is called after the slot descriptor of this TableRef is registered in
