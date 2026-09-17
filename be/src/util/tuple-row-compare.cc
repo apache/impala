@@ -235,7 +235,7 @@ Status TupleRowComparatorConfig::CodegenLexicalCompare(
     LlvmCodeGen* codegen, llvm::Function** fn) {
   llvm::LLVMContext& context = codegen->context();
   const vector<ScalarExpr*>& ordering_exprs = ordering_exprs_;
-  llvm::Function* key_fns[ordering_exprs.size()];
+  vector<llvm::Function*> key_fns(ordering_exprs.size());
   for (int i = 0; i < ordering_exprs.size(); ++i) {
     Status status = ordering_exprs[i]->GetCodegendComputeFn(codegen, false, &key_fns[i]);
     if (!status.ok()) {

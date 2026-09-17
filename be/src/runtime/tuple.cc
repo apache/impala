@@ -416,7 +416,7 @@ Status Tuple::CodegenMaterializeExprs(LlvmCodeGen* codegen, bool collect_varlen_
   llvm::LLVMContext& context = codegen->context();
 
   // Codegen each compute function from slot_materialize_exprs
-  llvm::Function* materialize_expr_fns[slot_materialize_exprs.size()];
+  vector<llvm::Function*> materialize_expr_fns(slot_materialize_exprs.size());
   for (int i = 0; i < slot_materialize_exprs.size(); ++i) {
     Status status = slot_materialize_exprs[i]->GetCodegendComputeFn(
         codegen, false, &materialize_expr_fns[i]);
