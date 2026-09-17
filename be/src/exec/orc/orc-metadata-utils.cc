@@ -186,6 +186,10 @@ Status OrcSchemaResolver::ResolveColumnByName(const SchemaPath& col_path,
   if (col_path.empty()) return Status::OK();
   SchemaPath table_path, file_path;
   TranslateColPaths(col_path, &table_path, &file_path);
+  // TranslateColPaths() can legitimately return empty paths, e.g. when 'col_path'
+  // refers to the synthetic ACID "row" column and the file is not in full ACID
+  // format: there's no corresponding node in either schema. *node stays root_.
+  if (table_path.empty()) return Status::OK();
 
   int i = 0;
 
