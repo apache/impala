@@ -377,6 +377,13 @@ Status ScalarExpr::GetCodegendComputeFn(
   if (ir_compute_fn_ != nullptr) {
     *fn = ir_compute_fn_;
   } else {
+    // Codegen for VARIANT is not implemented. ShouldCodegen() keeps such expressions from
+    // being registered as codegen entry points, but exec nodes also call this function
+    // directly (e.g. for conjuncts, hash/sort keys, partition exprs). They fall back to
+    // interpretation on a non-OK status.
+    if (InvolvesVariantType()) {
+      return Status::Expected("Codegen for expressions involving VARIANT NYI");
+    }
     RETURN_IF_ERROR(GetCodegendComputeFnImpl(codegen, fn));
     ir_compute_fn_ = *fn;
   }

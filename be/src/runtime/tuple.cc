@@ -407,7 +407,8 @@ Status Tuple::CodegenMaterializeExprs(LlvmCodeGen* codegen, bool collect_varlen_
   }
   // VARIANT slot writes are not codegen'd yet; fall back to the interpreted path
   // (Tuple::MaterializeExprs -> RawValue::WriteVariant). Without this, codegen would
-  // reach GetLlvmStruct/GetSlotType for TYPE_VARIANT and DCHECK.
+  // reach CodegenAnyVal::ToReadWriteInfo() and SlotDescriptor::CodegenWriteToSlot(),
+  // which do not support TYPE_VARIANT.
   for (const SlotDescriptor* slot : desc.slots()) {
     if (slot->type().IsVariantType()) {
       return Status::Expected("CodegenMaterializeExprs() VARIANT type NYI");

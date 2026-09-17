@@ -605,6 +605,9 @@ llvm::Type* LlvmCodeGen::GetSlotType(const ColumnType& type) {
     case TYPE_ARRAY:
     case TYPE_MAP:
       return collection_value_type_;
+    case TYPE_VARIANT:
+      // A VARIANT slot is two consecutive StringValues: 'metadata' followed by 'value'.
+      return llvm::ArrayType::get(string_value_type_, 2);
     default:
       DCHECK(false) << "Invalid type: " << type;
       return NULL;

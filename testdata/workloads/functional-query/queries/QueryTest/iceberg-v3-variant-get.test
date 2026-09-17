@@ -602,3 +602,25 @@ SELECT variant_get(v, '$', 'string') FROM trino_variant WHERE id = 59;
 ---- TYPES
 STRING
 ====
+---- QUERY
+# IMPALA-15141: scanning a VARIANT column does not disable codegen for the whole query.
+EXPLAIN SELECT id, v FROM trino_variant WHERE variant_get(v, '$.age', 'int') > 25;
+---- RESULTS: VERIFY_IS_NOT_IN
+'Codegen disabled by planner'
+---- TYPES
+STRING
+====
+---- QUERY
+# Conjuncts with typed extractions over the whole table, next to a join and an aggregation
+# that do not involve VARIANT.
+SELECT count(*), max(a.id)
+FROM trino_variant a JOIN trino_variant b ON a.id = b.id
+WHERE variant_get(a.v, '$.age', 'int') > 25
+  AND variant_get(b.v, '$.name', 'string') = 'Alice';
+---- RESULTS
+2,32
+---- TYPES
+BIGINT, INT
+---- RUNTIME_PROFILE
+!row_regex: .*disabled due to optimization hints
+====

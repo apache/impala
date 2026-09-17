@@ -1311,6 +1311,18 @@ map_v MAP<STRING,VARIANT>, struct_v STRUCT<a:VARIANT, b:INT>,
 arr_struct_v ARRAY<STRUCT<v:VARIANT>>. The top-level top_v column reads normally; the
 arr_v/map_v/struct_v/arr_struct_v columns exercise the nested-VARIANT rejection paths.
 
+testdata/data/iceberg_test/iceberg_v3/iceberg_v3_variant_avro
+testdata/data/iceberg_test/iceberg_v3/iceberg_v3_variant_orc
+testdata/data/iceberg_test/iceberg_v3/iceberg_v3_variant_mixed
+Iceberg V3 tables with a VARIANT column in non-Parquet data files, used to test that
+Impala rejects scans that read VARIANT from Avro or ORC files. Schema: id INT, p INT,
+v VARIANT. iceberg_v3_variant_avro has one Avro data file, iceberg_v3_variant_orc has
+one ORC data file. iceberg_v3_variant_mixed is partitioned by identity(p) and has a
+Parquet data file in p=1 and an Avro data file in p=2. Each data file has five rows whose
+v is 42, "hello", {"age":30,"name":"Alice"}, a variant null and a SQL NULL.
+Generated with a custom Java program (written by Claude Opus 5.5) using the Iceberg
+1.11 Java library.
+
 arrays_big.parq:
 Generated with RandomNestedDataGenerator.java from the following schema:
 {

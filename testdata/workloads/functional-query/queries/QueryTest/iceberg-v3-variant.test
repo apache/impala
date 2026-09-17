@@ -560,3 +560,50 @@ row_regex:(?s).*"v":\s*\{.*
 ---- TYPES
 STRING
 ====
+---- QUERY
+# VARIANT can only be read from Parquet data files.
+SELECT id, v FROM iceberg_v3_variant_avro;
+---- CATCH
+Reading VARIANT columns from AVRO format is not yet supported.
+====
+---- QUERY
+SELECT id FROM iceberg_v3_variant_avro
+WHERE variant_get(v, '$.name', 'string') = 'Alice';
+---- CATCH
+Reading VARIANT columns from AVRO format is not yet supported.
+====
+---- QUERY
+SELECT id, v FROM iceberg_v3_variant_orc;
+---- CATCH
+Reading VARIANT columns from ORC format is not yet supported.
+====
+---- QUERY
+# Columns other than VARIANT can be read.
+SELECT id, p FROM iceberg_v3_variant_orc ORDER BY id;
+---- RESULTS
+1,1
+2,1
+3,1
+4,1
+5,1
+---- TYPES
+INT, INT
+====
+---- QUERY
+# The check is based on the formats of the scanned data files, not on the default file
+# format of the table (Parquet). p=1 has a Parquet data file, p=2 has an Avro data file.
+SELECT id, v FROM iceberg_v3_variant_mixed;
+---- CATCH
+Reading VARIANT columns from AVRO format is not yet supported.
+====
+---- QUERY
+SELECT id, v FROM iceberg_v3_variant_mixed WHERE p = 1 ORDER BY id;
+---- RESULTS
+1,'42'
+2,'"hello"'
+3,'{"age":30,"name":"Alice"}'
+4,'null'
+5,'NULL'
+---- TYPES
+INT, STRING
+====

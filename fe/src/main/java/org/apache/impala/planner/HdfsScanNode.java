@@ -487,6 +487,7 @@ public class HdfsScanNode extends ScanNode {
     checkSamplingAndCountStar(analyzer);
     checkForSupportedFileFormats();
     checkUuidReadSupported();
+    checkVariantReadSupported();
 
     assignCollectionConjuncts(analyzer);
 
@@ -511,15 +512,6 @@ public class HdfsScanNode extends ScanNode {
     }
 
     computeMemLayout(analyzer);
-
-    // Disable codegen for scans involving VARIANT columns (not yet fully supported).
-    // TODO(IMPALA-15141): Enable codegen for VARIANTs.
-    for (SlotDescriptor slot : desc_.getSlots()) {
-      if (slot.isMaterialized() && slot.getType().isVariantType()) {
-        analyzer.getQueryCtx().disable_codegen_hint = true;
-        break;
-      }
-    }
 
     // This is towards the end, so that it can take all conjuncts, scan ranges and mem
     // layout into account.
@@ -701,6 +693,30 @@ public class HdfsScanNode extends ScanNode {
     if (!readsUuid) return;
 
     ((FeIcebergTable) table).validateUuidReadSupported(fileFormats_);
+  }
+
+  /**
+   * Validates that the VARIANT columns read by this scan can be read from the file
+   * formats present in this scan. Only Parquet is supported. For Iceberg tables
+   * 'fileFormats_' contains the formats of the scanned data files, which can differ from
+   * the default file format of the table.
+   */
+  private void checkVariantReadSupported() throws NotImplementedException {
+    boolean readsVariant = false;
+    for (SlotDescriptor slot : desc_.getSlots()) {
+      if (slot.isMaterialized() && slot.getType().isVariantType()) {
+        readsVariant = true;
+        break;
+      }
+    }
+    if (!readsVariant) return;
+
+    // Iterate in enum order to report the same format if there are more than one.
+    for (HdfsFileFormat format : HdfsFileFormat.values()) {
+      if (format == HdfsFileFormat.PARQUET || !fileFormats_.contains(format)) continue;
+      throw new NotImplementedException(String.format(
+          "Reading VARIANT columns from %s format is not yet supported.", format));
+    }
   }
 
   /**

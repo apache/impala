@@ -2601,6 +2601,11 @@ class TestIcebergV3Table(IcebergTestSuite):
     # Table with VARIANT nested inside ARRAY/MAP/STRUCT; used by the negative cases
     # that assert nested VARIANT is rejected (only top-level VARIANT is queryable).
     self.load_table(unique_database, "trino_nested_variant")
+    # Tables with VARIANT in Avro / ORC / mixed Parquet and Avro data files, written by
+    # testdata/bin/generate-iceberg-v3-variant-formats.java.
+    self.load_table(unique_database, "iceberg_v3_variant_avro", format="avro")
+    self.load_table(unique_database, "iceberg_v3_variant_orc", format="orc")
+    self.load_table(unique_database, "iceberg_v3_variant_mixed")
     self.run_test_case('QueryTest/iceberg-v3-variant', vector, unique_database)
 
   def test_v3_variant_shell(self, vector):
