@@ -105,6 +105,14 @@ template<typename INT_T>
 int ParquetDeltaEncoder<INT_T>::FinalizePage() {
   DCHECK(IsInitialized());
 
+  // A page with no values is empty: there is no header to write (this matches
+  // 'WorstCaseOutputSize(0)', which returns 0, and 'first_value_' was never set since
+  // 'Put()' was never called).
+  if (total_value_count_ == 0) {
+    SetOutputBuffer(nullptr, 0);
+    return 0;
+  }
+
   // Write the last block.
   const bool flushing_succeeded = FlushBlock();
   DCHECK(flushing_succeeded);
