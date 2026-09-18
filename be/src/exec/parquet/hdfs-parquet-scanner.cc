@@ -277,12 +277,16 @@ void HdfsParquetScanner::DivideFilterAndNonFilterColumnReaders(
     vector<ParquetColumnReader*>* non_filter_readers) const {
   filter_readers->clear();
   non_filter_readers->clear();
+  auto is_conjunct_slot = [this](const SlotDescriptor* slot_desc) {
+    return slot_desc != nullptr
+        && std::find(conjunct_slot_ids_.begin(), conjunct_slot_ids_.end(),
+               slot_desc->id()) != conjunct_slot_ids_.end();
+  };
   for (auto column_reader : column_readers) {
-    auto slot_desc = column_reader->slot_desc();
-    if (slot_desc != nullptr
-        && std::find(
-               conjunct_slot_ids_.begin(), conjunct_slot_ids_.end(), slot_desc->id())
-            != conjunct_slot_ids_.end()) {
+    // The reader that writes the file position slot must be a filter reader if a
+    // conjunct reads that slot, otherwise the conjunct runs before the slot is written.
+    if (is_conjunct_slot(column_reader->slot_desc())
+        || is_conjunct_slot(column_reader->file_pos_slot_desc())) {
       filter_readers->push_back(column_reader);
     } else {
       non_filter_readers->push_back(column_reader);

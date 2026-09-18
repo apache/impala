@@ -277,3 +277,24 @@ select file__position, l_shipdate from customer_nested_multiblock_multipage c, c
 ---- TYPES
 BIGINT, STRING
 ====
+---- QUERY
+# IMPALA-15375: string_col writes the file position slot here. Before the fix it was a
+# non-filter reader, so the conjunct saw an unwritten slot and this returned no rows with
+# late materialization enabled.
+select string_col, file__position from alltypes_tiny_pages
+where id = 6285 and file__position = 7000;
+---- RESULTS
+'5',7000
+---- TYPES
+STRING, BIGINT
+====
+---- QUERY
+# The same with a second non-filter column, so late materialization stays enabled once
+# the file position owner moves to the filter readers.
+select string_col, int_col, file__position from alltypes_tiny_pages
+where id = 6285 and file__position = 7000;
+---- RESULTS
+'5',5,7000
+---- TYPES
+STRING, INT, BIGINT
+====
