@@ -49,12 +49,14 @@ public:
 
   virtual bool HasStructReader() const override;
 
-  /// This is called once for each row group in the file.
-  void Reset() {
+  /// This is called once for each row group in the file. 'row_group_first_row' is used
+  /// to report file positions.
+  void Reset(int64_t row_group_first_row) {
     def_level_ = ParquetLevel::INVALID_LEVEL;
     rep_level_ = ParquetLevel::INVALID_LEVEL;
     pos_current_value_ = ParquetLevel::INVALID_POS;
     next_levels_consumed_ = false;
+    row_group_first_row_ = row_group_first_row;
   }
 
   bool next_levels_consumed() const { return next_levels_consumed_; }

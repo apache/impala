@@ -1006,7 +1006,7 @@ Status HdfsParquetScanner::NextRowGroup() {
       }
     }
 
-    InitComplexColumns();
+    InitComplexColumns(row_group_first_row);
     RETURN_IF_ERROR(InitScalarColumns(row_group_first_row));
 
     // Start scanning dictionary filtering column readers, so we can read the dictionary
@@ -3095,9 +3095,9 @@ Status HdfsParquetScanner::CreateCountingReader(const SchemaPath& parent_path,
   return Status::OK();
 }
 
-void HdfsParquetScanner::InitComplexColumns() {
+void HdfsParquetScanner::InitComplexColumns(int64_t row_group_first_row) {
   for (ComplexColumnReader* col_reader: complex_readers_) {
-    col_reader->Reset();
+    col_reader->Reset(row_group_first_row);
   }
 }
 

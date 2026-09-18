@@ -836,8 +836,9 @@ class HdfsParquetScanner : public HdfsColumnarScanner {
   /// row in this row group, it is used to track the file position of the rows.
   Status InitScalarColumns(int64_t row_group_first_row) WARN_UNUSED_RESULT;
 
-  /// Initializes the column readers in complex_readers_.
-  void InitComplexColumns();
+  /// Initializes the column readers in complex_readers_. 'row_group_first_row' is used
+  /// to report file positions.
+  void InitComplexColumns(int64_t row_group_first_row);
 
   /// Initialize dictionaries for all column readers
   Status InitDictionaries(const std::vector<BaseScalarColumnReader*>& column_readers)

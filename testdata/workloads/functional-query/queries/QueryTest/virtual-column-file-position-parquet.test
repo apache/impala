@@ -265,17 +265,38 @@ BIGINT, STRING, STRING, SMALLINT, STRING, DECIMAL, STRING, STRING, STRING
 ---- QUERY
 select file__position, l_shipdate from customer_nested_multiblock_multipage c, c.c_orders.o_lineitems where l_shipdate='1998-11-26';
 ---- RESULTS
-80,'1998-11-26'
+280,'1998-11-26'
 ---- TYPES
 BIGINT, STRING
 ====
 ---- QUERY
 select file__position, l_shipdate from customer_nested_multiblock_multipage c, c.c_orders.o_lineitems where l_partkey = 199994;
 ---- RESULTS
-51,'1993-05-13'
-82,'1994-01-17'
+151,'1993-05-13'
+282,'1994-01-17'
 ---- TYPES
 BIGINT, STRING
+====
+---- QUERY
+# IMPALA-15373: the collection reader fills the file position slot here. 3 row groups of
+# 100 rows, c_custkey == file__position + 1. Before the fix only the first row group
+# matched.
+select count(*), sum(if(file__position = c_custkey - 1, 1, 0))
+from customer_nested_multiblock_multipage c, c.c_orders o;
+---- RESULTS
+2925,2925
+---- TYPES
+BIGINT, BIGINT
+====
+---- QUERY
+# IMPALA-15373: same on a file with 2 row groups (100 + 99 rows). Before the fix the
+# position restarted at 0 in the second row group, so the maximum was 99.
+select count(*), min(file__position), max(file__position)
+from functional_parquet.customer_multiblock c, c.c_orders o;
+---- RESULTS
+1940,0,198
+---- TYPES
+BIGINT, BIGINT, BIGINT
 ====
 ---- QUERY
 # IMPALA-15375: string_col writes the file position slot here. Before the fix it was a
