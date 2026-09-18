@@ -1393,6 +1393,20 @@ public class PlannerTest extends PlannerTestBase {
   }
 
   /**
+   * Check that aggregation estimates include the reservoir samples of sample(),
+   * appx_median() and histogram().
+   */
+  @Test
+  public void testReservoirSampleAgg() {
+    TQueryOptions options = defaultQueryOptions();
+    options.setExplain_level(TExplainLevel.EXTENDED);
+    runPlannerTestFile("reservoir-sample-agg", "tpch_parquet", options,
+        ImmutableSet.of(PlannerTestOption.INCLUDE_EXPLAIN_HEADER,
+            PlannerTestOption.VALIDATE_CARDINALITY,
+            PlannerTestOption.VALIDATE_RESOURCES));
+  }
+
+  /**
    * Check conversion of predicates to conjunctive normal form.
    */
   @Test

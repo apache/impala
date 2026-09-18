@@ -25,6 +25,7 @@ import org.apache.impala.analysis.QueryStmt;
 import org.apache.impala.common.IdGenerator;
 import org.apache.impala.thrift.TQueryCtx;
 import org.apache.impala.thrift.TQueryOptions;
+import org.apache.impala.util.BitUtil;
 import org.apache.impala.util.EventSequence;
 
 import com.google.common.collect.Lists;
@@ -44,6 +45,11 @@ public class PlannerContext {
   public final static double SIZE_OF_BUCKET = 12;
   // DuplicateNode is defined in the be/src/exec/hash-table.h
   public final static double SIZE_OF_DUPLICATENODE = 16;
+  // FunctionContext::Allocate() in UDFs and UDAs goes through FreePool, which rounds
+  // every allocation up to a power of two and adds an 8-byte header. FreePool takes
+  // these blocks from a MemPool, whose chunks grow to MemPool::MAX_CHUNK_SIZE.
+  private final static long FREE_POOL_HEADER_BYTES = 8;
+  private final static long MEM_POOL_MAX_CHUNK_BYTES = 512 * 1024;
 
   private final IdGenerator<PlanNodeId> nodeIdGenerator_ = PlanNodeId.createGenerator();
   private final IdGenerator<PlanFragmentId> fragmentIdGenerator_ =
@@ -120,4 +126,16 @@ public class PlannerContext {
   public boolean isUpdate() { return analysisResult_.isUpdateStmt(); }
   public boolean isDelete() { return analysisResult_.isDeleteStmt(); }
   public boolean isMerge() { return analysisResult_.isMergeStmt(); }
+
+  /**
+   * Returns the MemPool memory behind a FreePool allocation of 'bytes'. FreePool blocks
+   * are a power of two plus the header, so they don't tile a MemPool chunk, and each
+   * chunk ends with a tail too short for another block. A block larger than a chunk
+   * gets a chunk of its own.
+   */
+  public static long calculateFreePoolBytes(long bytes) {
+    long blockBytes = BitUtil.roundUpToPowerOf2(bytes) + FREE_POOL_HEADER_BYTES;
+    if (blockBytes > MEM_POOL_MAX_CHUNK_BYTES) return blockBytes;
+    return MEM_POOL_MAX_CHUNK_BYTES / (MEM_POOL_MAX_CHUNK_BYTES / blockBytes);
+  }
 }

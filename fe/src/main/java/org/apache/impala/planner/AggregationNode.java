@@ -40,6 +40,7 @@ import org.apache.impala.analysis.SlotRef;
 import org.apache.impala.analysis.TupleDescriptor;
 import org.apache.impala.analysis.TupleId;
 import org.apache.impala.analysis.ValidTupleIdExpr;
+import org.apache.impala.catalog.Type;
 import org.apache.impala.common.InternalException;
 import org.apache.impala.common.ThriftSerializationCtx;
 import org.apache.impala.thrift.QueryConstants;
@@ -78,6 +79,15 @@ public class AggregationNode extends PlanNode implements SpillableOperator {
   // Non-grouping aggregation class always results in one group even if there are
   // zero input rows.
   private final static long NON_GROUPING_AGG_NUM_GROUPS = 1;
+
+  // These mirror ReservoirSampleState<T> in be/src/exprs/aggregate-functions-ir.cc,
+  // the state of sample(), appx_median() and histogram(): its size and the capacities of
+  // its sample array, which static asserts there check. The state and the array are
+  // allocated by FunctionContext::Allocate() outside the reservation, so running short
+  // of this memory doesn't make the aggregation spill (IMPALA-3304).
+  private final static long RESERVOIR_STATE_BYTES = 48;
+  private final static long RESERVOIR_INIT_CAPACITY = 16;
+  private final static long RESERVOIR_MAX_CAPACITY = 20000;
 
   private final MultiAggregateInfo multiAggInfo_;
   private final AggPhase aggPhase_;
@@ -641,11 +651,19 @@ public class AggregationNode extends PlanNode implements SpillableOperator {
     if (multiAggInfo_.getIsGroupingSet() && aggPhase_ == AggPhase.TRANSPOSE) {
       return inputCardinality;
     }
+    return Math.min(inputCardinality, getFirstPhaseInputCardinality());
+  }
+
+  /**
+   * Returns the input cardinality of the FIRST phase aggregation that this node belongs
+   * to. Unlike getFirstAggInputCardinality(), it is not capped by the input of this node.
+   */
+  private long getFirstPhaseInputCardinality() {
     AggregationNode firstAgg = this;
     while (firstAgg.getAggPhase() != AggPhase.FIRST) {
       firstAgg = getPrevAggNode(firstAgg);
     }
-    return Math.min(inputCardinality, firstAgg.getChild(0).getCardinality());
+    return firstAgg.getChild(0).getCardinality();
   }
 
   private AggregationNode getPrevAggNode(AggregationNode aggNode) {
@@ -1033,6 +1051,7 @@ public class AggregationNode extends PlanNode implements SpillableOperator {
     boolean estimatePreaggDuplicate = queryOptions.isEstimate_duplicate_in_preagg();
     AggregationNode prevAggNode = getPreAggNodeChild();
     int aggIdx = 0;
+    long reservoirBytes = 0;
     for (AggregateInfo aggInfo : aggInfos_) {
       long inputCardinality = aggInputCardinality_;
       if (prevAggNode != null) {
@@ -1042,8 +1061,12 @@ public class AggregationNode extends PlanNode implements SpillableOperator {
         inputCardinality = MathUtil.smallestValidCardinality(
             inputCardinality, aggClassOutputCardinality);
       }
-      resourceProfiles_.add(computeAggClassResourceProfile(
-          queryOptions, aggInfo, inputCardinality, maxMemoryEstimatePerInstance));
+      ResourceProfile aggClassProfile = computeAggClassResourceProfile(
+          queryOptions, aggInfo, inputCardinality, maxMemoryEstimatePerInstance);
+      resourceProfiles_.add(aggClassProfile);
+      reservoirBytes = MathUtil.saturatingAdd(reservoirBytes,
+          estimatePerInstanceReservoirBytes(aggInfo, inputCardinality,
+              aggClassProfile.getMaxMemReservationBytes()));
       aggIdx++;
     }
     ResourceProfile totalResource = ResourceProfile.noReservation(0);
@@ -1074,9 +1097,119 @@ public class AggregationNode extends PlanNode implements SpillableOperator {
     } else {
       nodeResourceProfile_ = totalResource;
     }
+    // The caps on the estimate assume that the aggregation spills to stay within them.
+    // Running short of reservoir memory doesn't trigger a spill, so it is added after.
+    if (reservoirBytes > 0) {
+      nodeResourceProfile_ =
+          nodeResourceProfile_.combine(ResourceProfile.noReservation(reservoirBytes));
+    }
   }
 
-  private long estimatePerInstanceDataBytes(
+  /**
+   * Returns the per-instance memory of the reservoir sample states of the sample(),
+   * appx_median() and histogram() calls in 'aggInfo', or 0 if there are no such calls or
+   * no estimate of the groups. The groups of one instance are counted as for the hash
+   * table, but no more than fit in 'maxMemReservationBytes' for a streaming
+   * preaggregation. A merge phase gathers the samples that the earlier phases collected,
+   * so a group holds at most as many samples as it had input rows in the FIRST phase.
+   */
+  private long estimatePerInstanceReservoirBytes(
+      AggregateInfo aggInfo, long inputCardinality, long maxMemReservationBytes) {
+    List<Type> argTypes = new ArrayList<>();
+    for (FunctionCallExpr aggExpr : aggInfo.getMaterializedAggregateExprs()) {
+      if (aggExpr.isReservoirSampleAggFn()) argTypes.add(aggExpr.getFn().getArgs()[0]);
+    }
+    if (argTypes.isEmpty()) return 0;
+
+    long perInstanceNumGroups = NON_GROUPING_AGG_NUM_GROUPS;
+    if (!aggInfo.getGroupingExprs().isEmpty()) {
+      long perInstanceCardinality =
+          fragment_.getPerInstanceNdv(aggInfo.getGroupingExprs(), false);
+      // computeAggClassResourceProfile() uses DEFAULT_PER_INSTANCE_MEM in this case.
+      if (perInstanceCardinality == -1) return 0;
+      perInstanceNumGroups =
+          estimatePerInstanceNumGroups(perInstanceCardinality, inputCardinality);
+      // A streaming preaggregation passes rows through once it can't grow its
+      // reservation, which PREAGG_BYTES_LIMIT caps, and each group it keeps takes at
+      // least its fixed-length tuple and one bucket of it. It also stops growing its
+      // hash tables when its input barely reduces, but the planner assumes that every
+      // instance sees all groups and can't predict the reduction of one instance.
+      if (useStreamingPreagg_ && maxMemReservationBytes < Long.MAX_VALUE) {
+        long minBytesPerGroup = aggInfo.getIntermediateTupleDesc().getByteSize()
+            + (long) PlannerContext.SIZE_OF_BUCKET;
+        perInstanceNumGroups =
+            Math.min(perInstanceNumGroups, maxMemReservationBytes / minBytesPerGroup);
+      }
+    }
+    if (perInstanceNumGroups == 0) return 0;
+
+    long rowsPerGroup = 1;
+    long firstPhaseInputCardinality = getFirstPhaseInputCardinality();
+    if (firstPhaseInputCardinality > 0) {
+      long numInstances = Math.max(fragment_.getNumInstances(), 1);
+      rowsPerGroup = (long) Math.ceil(
+          (double) firstPhaseInputCardinality / numInstances / perInstanceNumGroups);
+    }
+    long bytesPerGroup = 0;
+    for (Type argType : argTypes) {
+      bytesPerGroup += estimateReservoirStateBytes(argType, rowsPerGroup);
+    }
+    return MathUtil.saturatingMultiply(perInstanceNumGroups, bytesPerGroup);
+  }
+
+  /**
+   * Returns the memory that one ReservoirSampleState holds after 'numRows' input rows of
+   * 'argType'. The array of samples doubles in size until it reaches
+   * RESERVOIR_MAX_CAPACITY. An outgrown array goes back to FreePool's free list, where
+   * only an allocation of the same size can reuse it, so this counts the arrays of every
+   * size along the way. That is exact when groups grow side by side, and an upper bound
+   * when they grow one after another.
+   */
+  private static long estimateReservoirStateBytes(Type argType, long numRows) {
+    long sampleBytes = getReservoirSampleBytes(argType);
+    long targetCapacity = Math.min(numRows, RESERVOIR_MAX_CAPACITY);
+    long capacity = RESERVOIR_INIT_CAPACITY;
+    long arrayBytes = BitUtil.roundUpToPowerOf2(capacity * sampleBytes);
+    long totalBytes = PlannerContext.calculateFreePoolBytes(RESERVOIR_STATE_BYTES)
+        + PlannerContext.calculateFreePoolBytes(arrayBytes);
+    while (capacity < targetCapacity) {
+      capacity = Math.min(capacity * 2, RESERVOIR_MAX_CAPACITY);
+      // FreePool::Reallocate() keeps the array if its rounded-up size already fits.
+      if (capacity * sampleBytes <= arrayBytes) continue;
+      arrayBytes = BitUtil.roundUpToPowerOf2(capacity * sampleBytes);
+      totalBytes += PlannerContext.calculateFreePoolBytes(arrayBytes);
+    }
+    return totalBytes;
+  }
+
+  /**
+   * Returns sizeof(ReservoirSample<T>), one sample value with its double key, for
+   * arguments of 'argType'.
+   */
+  private static long getReservoirSampleBytes(Type argType) {
+    switch (argType.getPrimitiveType()) {
+      case BOOLEAN:
+      case TINYINT:
+      case SMALLINT:
+      case INT:
+      case FLOAT:
+      case DATE:
+        return 16;
+      case DECIMAL:
+        // DecimalVal occupies 32 bytes with 8-byte alignment for every precision.
+        return 40;
+      default:
+        // BIGINT, DOUBLE, TIMESTAMP and STRING. A STRING sample keeps at most 10 bytes
+        // of the value, and CHAR and VARCHAR arguments are cast to STRING.
+        return 24;
+    }
+  }
+
+  /**
+   * Returns the number of groups that one fragment instance is expected to hold, given
+   * 'perInstanceCardinality', the NDV of the grouping exprs for one instance.
+   */
+  private long estimatePerInstanceNumGroups(
       long perInstanceCardinality, long inputCardinality) {
     Preconditions.checkArgument(perInstanceCardinality > -1);
     // Per-instance cardinality cannot be greater than the total input cardinality
@@ -1115,10 +1248,17 @@ public class AggregationNode extends PlanNode implements SpillableOperator {
             Math.min(perInstanceCardinality, perInstanceInputCardinality);
       }
     }
+    return perInstanceCardinality;
+  }
+
+  private long estimatePerInstanceDataBytes(
+      long perInstanceCardinality, long inputCardinality) {
+    long perInstanceNumGroups =
+        estimatePerInstanceNumGroups(perInstanceCardinality, inputCardinality);
     // The memory of the data stored in hash table and the memory of the
     // hash table‘s structure
     long perInstanceDataBytes = (long) Math.ceil(
-        perInstanceCardinality * (avgRowSize_ + PlannerContext.SIZE_OF_BUCKET));
+        perInstanceNumGroups * (avgRowSize_ + PlannerContext.SIZE_OF_BUCKET));
     return perInstanceDataBytes;
   }
 

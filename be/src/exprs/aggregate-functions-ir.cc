@@ -1944,6 +1944,9 @@ class ReservoirSampleState {
   // Maximum capacity of the samples array.
   const static int MAX_CAPACITY = NUM_BUCKETS * NUM_SAMPLES_PER_BUCKET;
 
+  static_assert(INIT_CAPACITY == 16 && MAX_CAPACITY == 20000,
+      "Update RESERVOIR_INIT_CAPACITY and RESERVOIR_MAX_CAPACITY in AggregationNode");
+
   // Number of collected samples.
   int num_samples_;
 
@@ -1991,6 +1994,23 @@ class ReservoirSampleState {
     return dist(rng_);
   }
 };
+
+// AggregationNode in the frontend estimates the memory of reservoir samples from these
+// sizes. The size of the state doesn't depend on T.
+static_assert(sizeof(ReservoirSampleState<BigIntVal>) == 48,
+    "Update RESERVOIR_STATE_BYTES in AggregationNode");
+static_assert(sizeof(ReservoirSample<BooleanVal>) == 16
+    && sizeof(ReservoirSample<TinyIntVal>) == 16
+    && sizeof(ReservoirSample<SmallIntVal>) == 16
+    && sizeof(ReservoirSample<IntVal>) == 16
+    && sizeof(ReservoirSample<FloatVal>) == 16
+    && sizeof(ReservoirSample<DateVal>) == 16
+    && sizeof(ReservoirSample<BigIntVal>) == 24
+    && sizeof(ReservoirSample<DoubleVal>) == 24
+    && sizeof(ReservoirSample<TimestampVal>) == 24
+    && sizeof(ReservoirSample<StringVal>) == 24
+    && sizeof(ReservoirSample<DecimalVal>) == 40,
+    "Update getReservoirSampleBytes() in AggregationNode");
 
 template <typename T>
 void AggregateFunctions::ReservoirSampleInit(FunctionContext* ctx, StringVal* dst) {

@@ -62,6 +62,9 @@ public class FunctionCallExpr extends Expr {
 
   public static final Set<String> NON_DETERMINISTIC_FNS =
       ImmutableSet.of("rand", "random", "uuid");
+  // Builtin aggregate functions whose intermediate value is a ReservoirSampleState.
+  private static final Set<String> RESERVOIR_SAMPLE_AGG_FNS =
+      ImmutableSet.of("appx_median", "histogram", "sample");
   // cache prior shouldConvertToCNF checks to avoid repeat tree walking
   // omitted from clone in case cloner plans to mutate the expr
   protected Optional<Boolean> shouldConvertToCNF_ = Optional.empty();
@@ -385,6 +388,15 @@ public class FunctionCallExpr extends Expr {
    */
   public boolean isNondeterministicBuiltinFn() {
     return functionNameInBuiltinSet(fnName_, NON_DETERMINISTIC_FNS);
+  }
+
+  /**
+   * Returns true if this calls a builtin aggregate function that keeps a reservoir
+   * sample of its input. Also true for the merge calls of such a function.
+   */
+  public boolean isReservoirSampleAggFn() {
+    return fnName_.isBuiltin()
+        && functionNameInBuiltinSet(fnName_, RESERVOIR_SAMPLE_AGG_FNS);
   }
 
   /**

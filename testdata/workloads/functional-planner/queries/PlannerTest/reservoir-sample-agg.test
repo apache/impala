@@ -1,0 +1,530 @@
+# IMPALA-13052: sample(), appx_median() and histogram() keep a reservoir sample of up
+# to 20000 values per group outside the tuple. Without grouping, each instance here
+# gets more than 20000 rows and fills the reservoir, and so does the merge.
+select sample(l_orderkey), appx_median(l_orderkey), histogram(l_orderkey)
+from lineitem
+---- DISTRIBUTEDPLAN
+Max Per-Host Resource Reservation: Memory=4.00MB Threads=3
+Per-Host Resource Estimates: Memory=88MB
+Analyzed query: SELECT sample(l_orderkey), appx_median(l_orderkey),
+histogram(l_orderkey) FROM tpch_parquet.lineitem
+
+F01:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
+|  Per-Host Resources: mem-estimate=3.94MB mem-reservation=0B thread-reservation=1
+PLAN-ROOT SINK
+|  output exprs: sample(l_orderkey), appx_median(l_orderkey), histogram(l_orderkey)
+|  mem-estimate=0B mem-reservation=0B thread-reservation=0
+|
+03:AGGREGATE [FINALIZE]
+|  output: sample:merge(l_orderkey), appx_median:merge(l_orderkey), histogram:merge(l_orderkey)
+|  mem-estimate=3.92MB mem-reservation=0B spill-buffer=2.00MB thread-reservation=0
+|  tuple-ids=2 row-size=32B cardinality=1
+|  in pipelines: 03(GETNEXT), 01(OPEN)
+|
+02:EXCHANGE [UNPARTITIONED]
+|  mem-estimate=16.00KB mem-reservation=0B thread-reservation=0
+|  tuple-ids=1 row-size=32B cardinality=3
+|  in pipelines: 01(GETNEXT)
+|
+F00:PLAN FRAGMENT [RANDOM] hosts=3 instances=3
+Per-Host Resources: mem-estimate=83.92MB mem-reservation=4.00MB thread-reservation=2
+01:AGGREGATE
+|  output: sample(l_orderkey), appx_median(l_orderkey), histogram(l_orderkey)
+|  mem-estimate=3.92MB mem-reservation=0B spill-buffer=2.00MB thread-reservation=0
+|  tuple-ids=1 row-size=32B cardinality=3
+|  in pipelines: 01(GETNEXT), 00(OPEN)
+|
+00:SCAN HDFS [tpch_parquet.lineitem, RANDOM]
+   HDFS partitions=1/1 files=3 size=193.99MB
+   stored statistics:
+     table: rows=6.00M size=193.99MB
+     columns: all
+   extrapolated-rows=disabled max-scan-range-rows=2.14M
+   mem-estimate=80.00MB mem-reservation=4.00MB thread-reservation=1
+   tuple-ids=0 row-size=8B cardinality=6.00M
+   in pipelines: 00(GETNEXT)
+====
+# IMPALA-13052: with about four rows per group, the state of the reservoir sample
+# dominates the memory of the aggregation.
+select appx_median(l_shipmode) from lineitem group by l_orderkey order by 1 limit 1
+---- PLAN
+Max Per-Host Resource Reservation: Memory=44.00MB Threads=2
+Per-Host Resource Estimates: Memory=1.06GB
+Analyzed query: SELECT appx_median(l_shipmode) FROM tpch_parquet.lineitem GROUP
+BY l_orderkey ORDER BY CAST(1 AS TINYINT) ASC LIMIT CAST(1 AS TINYINT)
+
+F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
+|  Per-Host Resources: mem-estimate=1.06GB mem-reservation=44.00MB thread-reservation=2
+PLAN-ROOT SINK
+|  output exprs: appx_median(l_shipmode)
+|  mem-estimate=0B mem-reservation=0B thread-reservation=0
+|
+02:TOP-N [LIMIT=1]
+|  order by: appx_median(l_shipmode) ASC
+|  mem-estimate=12B mem-reservation=0B thread-reservation=0
+|  tuple-ids=2 row-size=12B cardinality=1
+|  in pipelines: 02(GETNEXT), 01(OPEN)
+|
+01:AGGREGATE [FINALIZE]
+|  output: appx_median(l_shipmode)
+|  group by: l_orderkey
+|  mem-estimate=930.39MB mem-reservation=36.00MB spill-buffer=2.00MB thread-reservation=0
+|  tuple-ids=1 row-size=20B cardinality=1.56M
+|  in pipelines: 01(GETNEXT), 00(OPEN)
+|
+00:SCAN HDFS [tpch_parquet.lineitem]
+   HDFS partitions=1/1 files=3 size=193.99MB
+   stored statistics:
+     table: rows=6.00M size=193.99MB
+     columns: all
+   extrapolated-rows=disabled max-scan-range-rows=2.14M
+   mem-estimate=160.00MB mem-reservation=8.00MB thread-reservation=1
+   tuple-ids=0 row-size=24B cardinality=6.00M
+   in pipelines: 00(GETNEXT)
+---- DISTRIBUTEDPLAN
+Max Per-Host Resource Reservation: Memory=60.00MB Threads=4
+Per-Host Resource Estimates: Memory=1.34GB
+Analyzed query: SELECT appx_median(l_shipmode) FROM tpch_parquet.lineitem GROUP
+BY l_orderkey ORDER BY CAST(1 AS TINYINT) ASC LIMIT CAST(1 AS TINYINT)
+
+F02:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
+|  Per-Host Resources: mem-estimate=16.00KB mem-reservation=0B thread-reservation=1
+PLAN-ROOT SINK
+|  output exprs: appx_median(l_shipmode)
+|  mem-estimate=0B mem-reservation=0B thread-reservation=0
+|
+05:MERGING-EXCHANGE [UNPARTITIONED]
+|  order by: appx_median(l_shipmode) ASC
+|  limit: 1
+|  mem-estimate=16.00KB mem-reservation=0B thread-reservation=0
+|  tuple-ids=2 row-size=12B cardinality=1
+|  in pipelines: 02(GETNEXT)
+|
+F01:PLAN FRAGMENT [HASH(l_orderkey)] hosts=3 instances=3
+Per-Host Resources: mem-estimate=322.30MB mem-reservation=18.00MB thread-reservation=1
+02:TOP-N [LIMIT=1]
+|  order by: appx_median(l_shipmode) ASC
+|  mem-estimate=12B mem-reservation=0B thread-reservation=0
+|  tuple-ids=2 row-size=12B cardinality=1
+|  in pipelines: 02(GETNEXT), 04(OPEN)
+|
+04:AGGREGATE [FINALIZE]
+|  output: appx_median:merge(l_shipmode)
+|  group by: l_orderkey
+|  mem-estimate=312.23MB mem-reservation=18.00MB spill-buffer=1.00MB thread-reservation=0
+|  tuple-ids=1 row-size=20B cardinality=1.56M
+|  in pipelines: 04(GETNEXT), 00(OPEN)
+|
+03:EXCHANGE [HASH(l_orderkey)]
+|  mem-estimate=10.07MB mem-reservation=0B thread-reservation=0
+|  tuple-ids=1 row-size=20B cardinality=3.39M
+|  in pipelines: 00(GETNEXT)
+|
+F00:PLAN FRAGMENT [RANDOM] hosts=3 instances=3
+Per-Host Resources: mem-estimate=1.03GB mem-reservation=42.00MB thread-reservation=2
+01:AGGREGATE [STREAMING]
+|  output: appx_median(l_shipmode)
+|  group by: l_orderkey
+|  mem-estimate=892.82MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
+|  tuple-ids=1 row-size=20B cardinality=3.39M
+|  in pipelines: 00(GETNEXT)
+|
+00:SCAN HDFS [tpch_parquet.lineitem, RANDOM]
+   HDFS partitions=1/1 files=3 size=193.99MB
+   stored statistics:
+     table: rows=6.00M size=193.99MB
+     columns: all
+   extrapolated-rows=disabled max-scan-range-rows=2.14M
+   mem-estimate=160.00MB mem-reservation=8.00MB thread-reservation=1
+   tuple-ids=0 row-size=24B cardinality=6.00M
+   in pipelines: 00(GETNEXT)
+====
+# Few groups with many rows each: the sample array grows to its maximum capacity. The
+# rounded DECIMAL sample arrays use twice the memory of BIGINT arrays.
+select l_shipmode, appx_median(l_extendedprice), appx_median(l_orderkey)
+from lineitem group by l_shipmode
+---- DISTRIBUTEDPLAN
+Max Per-Host Resource Reservation: Memory=24.00MB Threads=4
+Per-Host Resource Estimates: Memory=297MB
+Analyzed query: SELECT l_shipmode, appx_median(l_extendedprice),
+appx_median(l_orderkey) FROM tpch_parquet.lineitem GROUP BY l_shipmode
+
+F02:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
+|  Per-Host Resources: mem-estimate=4.02MB mem-reservation=4.00MB thread-reservation=1
+PLAN-ROOT SINK
+|  output exprs: l_shipmode, appx_median(l_extendedprice), appx_median(l_orderkey)
+|  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
+|
+04:EXCHANGE [UNPARTITIONED]
+|  mem-estimate=16.00KB mem-reservation=0B thread-reservation=0
+|  tuple-ids=2 row-size=32B cardinality=7
+|  in pipelines: 03(GETNEXT)
+|
+F01:PLAN FRAGMENT [HASH(l_shipmode)] hosts=3 instances=3
+Per-Host Resources: mem-estimate=17.35MB mem-reservation=2.00MB thread-reservation=1
+03:AGGREGATE [FINALIZE]
+|  output: appx_median:merge(l_extendedprice), appx_median:merge(l_orderkey)
+|  group by: l_shipmode
+|  mem-estimate=17.21MB mem-reservation=2.00MB spill-buffer=64.00KB thread-reservation=0
+|  tuple-ids=2 row-size=32B cardinality=7
+|  in pipelines: 03(GETNEXT), 00(OPEN)
+|
+02:EXCHANGE [HASH(l_shipmode)]
+|  mem-estimate=16.00KB mem-reservation=0B thread-reservation=0
+|  tuple-ids=1 row-size=32B cardinality=21
+|  in pipelines: 00(GETNEXT)
+|
+F00:PLAN FRAGMENT [RANDOM] hosts=3 instances=3
+Per-Host Resources: mem-estimate=275.66MB mem-reservation=18.00MB thread-reservation=2
+01:AGGREGATE [STREAMING]
+|  output: appx_median(l_extendedprice), appx_median(l_orderkey)
+|  group by: l_shipmode
+|  mem-estimate=35.24MB mem-reservation=2.00MB spill-buffer=64.00KB thread-reservation=0
+|  tuple-ids=1 row-size=32B cardinality=21
+|  in pipelines: 00(GETNEXT)
+|
+00:SCAN HDFS [tpch_parquet.lineitem, RANDOM]
+   HDFS partitions=1/1 files=3 size=193.99MB
+   stored statistics:
+     table: rows=6.00M size=193.99MB
+     columns: all
+   extrapolated-rows=disabled max-scan-range-rows=2.14M
+   mem-estimate=240.00MB mem-reservation=16.00MB thread-reservation=1
+   tuple-ids=0 row-size=32B cardinality=6.00M
+   in pipelines: 00(GETNEXT)
+====
+# COUNT(DISTINCT) makes the first phase group by the distinct columns too, here into
+# about one row per group, so appx_median() is updated in many small groups and merged
+# into the few groups of the second phase.
+select l_returnflag, l_linestatus, count(distinct l_orderkey, l_linenumber),
+  count(*), appx_median(l_quantity),
+  appx_median(case when l_discount > 0 then l_quantity end),
+  appx_median(l_extendedprice / l_quantity),
+  appx_median(case when l_discount > 0 then l_extendedprice / l_quantity end)
+from lineitem
+group by l_returnflag, l_linestatus
+---- DISTRIBUTEDPLAN
+Max Per-Host Resource Reservation: Memory=94.00MB Threads=5
+Per-Host Resource Estimates: Memory=15.36GB
+Analyzed query: SELECT l_returnflag, l_linestatus, count(DISTINCT l_orderkey,
+l_linenumber), count(*), appx_median(l_quantity), appx_median(CASE WHEN
+l_discount > CAST(0 AS DECIMAL(3,0)) THEN l_quantity END),
+appx_median(l_extendedprice / l_quantity), appx_median(CASE WHEN l_discount >
+CAST(0 AS DECIMAL(3,0)) THEN l_extendedprice / l_quantity END) FROM
+tpch_parquet.lineitem GROUP BY l_returnflag, l_linestatus
+
+F03:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
+|  Per-Host Resources: mem-estimate=4.02MB mem-reservation=4.00MB thread-reservation=1
+PLAN-ROOT SINK
+|  output exprs: l_returnflag, l_linestatus, count(if(l_orderkey IS NULL, NULL, l_linenumber)), count(*), appx_median(l_quantity), appx_median(CASE WHEN l_discount > 0 THEN l_quantity END), appx_median(l_extendedprice / l_quantity), appx_median(CASE WHEN l_discount > 0 THEN l_extendedprice / l_quantity END)
+|  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
+|
+07:EXCHANGE [UNPARTITIONED]
+|  mem-estimate=16.00KB mem-reservation=0B thread-reservation=0
+|  tuple-ids=4 row-size=90B cardinality=6
+|  in pipelines: 06(GETNEXT)
+|
+F02:PLAN FRAGMENT [HASH(l_returnflag,l_linestatus)] hosts=3 instances=3
+Per-Host Resources: mem-estimate=28.79MB mem-reservation=2.00MB thread-reservation=1
+06:AGGREGATE [FINALIZE]
+|  output: count:merge(if(l_orderkey IS NULL, NULL, l_linenumber)), count:merge(*), appx_median:merge(l_quantity), appx_median:merge(CASE WHEN l_discount > 0 THEN l_quantity END), appx_median:merge(l_extendedprice / l_quantity), appx_median:merge(CASE WHEN l_discount > 0 THEN l_extendedprice / l_quantity END)
+|  group by: l_returnflag, l_linestatus
+|  mem-estimate=28.42MB mem-reservation=2.00MB spill-buffer=64.00KB thread-reservation=0
+|  tuple-ids=4 row-size=90B cardinality=6
+|  in pipelines: 06(GETNEXT), 04(OPEN)
+|
+05:EXCHANGE [HASH(l_returnflag,l_linestatus)]
+|  mem-estimate=16.00KB mem-reservation=0B thread-reservation=0
+|  tuple-ids=3 row-size=90B cardinality=18
+|  in pipelines: 04(GETNEXT)
+|
+F01:PLAN FRAGMENT [HASH(l_returnflag,l_linestatus,l_orderkey,l_linenumber)] hosts=3 instances=3
+Per-Host Resources: mem-estimate=8.46GB mem-reservation=38.00MB thread-reservation=1
+02:AGGREGATE [STREAMING]
+|  output: count(if(l_orderkey IS NULL, NULL, l_linenumber)), count:merge(*), appx_median:merge(l_quantity), appx_median:merge(CASE WHEN l_discount > 0 THEN l_quantity END), appx_median:merge(l_extendedprice / l_quantity), appx_median:merge(CASE WHEN l_discount > 0 THEN l_extendedprice / l_quantity END)
+|  group by: l_returnflag, l_linestatus
+|  mem-estimate=28.42MB mem-reservation=2.00MB spill-buffer=64.00KB thread-reservation=0
+|  tuple-ids=3 row-size=90B cardinality=18
+|  in pipelines: 04(GETNEXT)
+|
+04:AGGREGATE
+|  output: count:merge(*), appx_median:merge(l_quantity), appx_median:merge(CASE WHEN l_discount > 0 THEN l_quantity END), appx_median:merge(l_extendedprice / l_quantity), appx_median:merge(CASE WHEN l_discount > 0 THEN l_extendedprice / l_quantity END)
+|  group by: l_returnflag, l_linestatus, l_orderkey, l_linenumber
+|  mem-estimate=8.42GB mem-reservation=36.00MB spill-buffer=2.00MB thread-reservation=0
+|  tuple-ids=1 row-size=94B cardinality=6.00M
+|  in pipelines: 04(GETNEXT), 00(OPEN)
+|
+03:EXCHANGE [HASH(l_returnflag,l_linestatus,l_orderkey,l_linenumber)]
+|  mem-estimate=10.29MB mem-reservation=0B thread-reservation=0
+|  tuple-ids=1 row-size=94B cardinality=6.00M
+|  in pipelines: 00(GETNEXT)
+|
+F00:PLAN FRAGMENT [RANDOM] hosts=3 instances=3
+Per-Host Resources: mem-estimate=6.87GB mem-reservation=50.00MB thread-reservation=2
+01:AGGREGATE [STREAMING]
+|  output: count(*), appx_median(l_quantity), appx_median(CASE WHEN l_discount > CAST(0 AS DECIMAL(3,0)) THEN l_quantity END), appx_median(l_extendedprice / l_quantity), appx_median(CASE WHEN l_discount > CAST(0 AS DECIMAL(3,0)) THEN l_extendedprice / l_quantity END)
+|  group by: l_returnflag, l_linestatus, l_orderkey, l_linenumber
+|  mem-estimate=6.32GB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
+|  tuple-ids=1 row-size=94B cardinality=6.00M
+|  in pipelines: 00(GETNEXT)
+|
+00:SCAN HDFS [tpch_parquet.lineitem, RANDOM]
+   HDFS partitions=1/1 files=3 size=193.99MB
+   stored statistics:
+     table: rows=6.00M size=193.99MB
+     columns: all
+   extrapolated-rows=disabled max-scan-range-rows=2.14M
+   mem-estimate=560.00MB mem-reservation=16.00MB thread-reservation=1
+   tuple-ids=0 row-size=62B cardinality=6.00M
+   in pipelines: 00(GETNEXT)
+====
+# With MEM_ESTIMATE_SCALE_FOR_SPILLING_OPERATOR set, the estimate of the memory that
+# can be spilled is capped by the per-instance share of MEM_LIMIT. The reservoir
+# samples are added after the cap.
+select appx_median(l_shipmode) from lineitem group by l_orderkey order by 1 limit 1
+---- QUERYOPTIONS
+MEM_ESTIMATE_SCALE_FOR_SPILLING_OPERATOR=1.0
+MEM_LIMIT=40m
+---- DISTRIBUTEDPLAN
+Max Per-Host Resource Reservation: Memory=60.00MB Threads=4
+Per-Host Resource Estimates: Memory=1.34GB
+Analyzed query: SELECT appx_median(l_shipmode) FROM tpch_parquet.lineitem GROUP
+BY l_orderkey ORDER BY CAST(1 AS TINYINT) ASC LIMIT CAST(1 AS TINYINT)
+
+F02:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
+|  Per-Host Resources: mem-estimate=16.00KB mem-reservation=0B thread-reservation=1
+PLAN-ROOT SINK
+|  output exprs: appx_median(l_shipmode)
+|  mem-estimate=0B mem-reservation=0B thread-reservation=0
+|
+05:MERGING-EXCHANGE [UNPARTITIONED]
+|  order by: appx_median(l_shipmode) ASC
+|  limit: 1
+|  mem-estimate=16.00KB mem-reservation=0B thread-reservation=0
+|  tuple-ids=2 row-size=12B cardinality=1
+|  in pipelines: 02(GETNEXT)
+|
+F01:PLAN FRAGMENT [HASH(l_orderkey)] hosts=3 instances=3
+Per-Host Resources: mem-estimate=322.30MB mem-reservation=18.00MB thread-reservation=1
+02:TOP-N [LIMIT=1]
+|  order by: appx_median(l_shipmode) ASC
+|  mem-estimate=12B mem-reservation=0B thread-reservation=0
+|  tuple-ids=2 row-size=12B cardinality=1
+|  in pipelines: 02(GETNEXT), 04(OPEN)
+|
+04:AGGREGATE [FINALIZE]
+|  output: appx_median:merge(l_shipmode)
+|  group by: l_orderkey
+|  mem-estimate=312.23MB mem-reservation=18.00MB spill-buffer=1.00MB thread-reservation=0
+|  tuple-ids=1 row-size=20B cardinality=1.56M
+|  in pipelines: 04(GETNEXT), 00(OPEN)
+|
+03:EXCHANGE [HASH(l_orderkey)]
+|  mem-estimate=10.07MB mem-reservation=0B thread-reservation=0
+|  tuple-ids=1 row-size=20B cardinality=3.39M
+|  in pipelines: 00(GETNEXT)
+|
+F00:PLAN FRAGMENT [RANDOM] hosts=3 instances=3
+Per-Host Resources: mem-estimate=1.02GB mem-reservation=42.00MB thread-reservation=2
+01:AGGREGATE [STREAMING]
+|  output: appx_median(l_shipmode)
+|  group by: l_orderkey
+|  mem-estimate=887.03MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
+|  tuple-ids=1 row-size=20B cardinality=3.39M
+|  in pipelines: 00(GETNEXT)
+|
+00:SCAN HDFS [tpch_parquet.lineitem, RANDOM]
+   HDFS partitions=1/1 files=3 size=193.99MB
+   stored statistics:
+     table: rows=6.00M size=193.99MB
+     columns: all
+   extrapolated-rows=disabled max-scan-range-rows=2.14M
+   mem-estimate=160.00MB mem-reservation=8.00MB thread-reservation=1
+   tuple-ids=0 row-size=24B cardinality=6.00M
+   in pipelines: 00(GETNEXT)
+====
+# PREAGG_BYTES_LIMIT, 40MB as in IMPALA-13052, caps the reservation of the streaming
+# preaggregation, which keeps only the groups that fit there and passes other rows
+# through. Its reservoir samples are counted for those groups only.
+select appx_median(l_shipmode) from lineitem group by l_orderkey order by 1 limit 1
+---- QUERYOPTIONS
+PREAGG_BYTES_LIMIT=40m
+---- DISTRIBUTEDPLAN
+Max Per-Host Resource Reservation: Memory=60.00MB Threads=4
+Per-Host Resource Estimates: Memory=1.21GB
+Analyzed query: SELECT appx_median(l_shipmode) FROM tpch_parquet.lineitem GROUP
+BY l_orderkey ORDER BY CAST(1 AS TINYINT) ASC LIMIT CAST(1 AS TINYINT)
+
+F02:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
+|  Per-Host Resources: mem-estimate=16.00KB mem-reservation=0B thread-reservation=1
+PLAN-ROOT SINK
+|  output exprs: appx_median(l_shipmode)
+|  mem-estimate=0B mem-reservation=0B thread-reservation=0
+|
+05:MERGING-EXCHANGE [UNPARTITIONED]
+|  order by: appx_median(l_shipmode) ASC
+|  limit: 1
+|  mem-estimate=16.00KB mem-reservation=0B thread-reservation=0
+|  tuple-ids=2 row-size=12B cardinality=1
+|  in pipelines: 02(GETNEXT)
+|
+F01:PLAN FRAGMENT [HASH(l_orderkey)] hosts=3 instances=3
+Per-Host Resources: mem-estimate=322.30MB mem-reservation=18.00MB thread-reservation=1
+02:TOP-N [LIMIT=1]
+|  order by: appx_median(l_shipmode) ASC
+|  mem-estimate=12B mem-reservation=0B thread-reservation=0
+|  tuple-ids=2 row-size=12B cardinality=1
+|  in pipelines: 02(GETNEXT), 04(OPEN)
+|
+04:AGGREGATE [FINALIZE]
+|  output: appx_median:merge(l_shipmode)
+|  group by: l_orderkey
+|  mem-estimate=312.23MB mem-reservation=18.00MB spill-buffer=1.00MB thread-reservation=0
+|  tuple-ids=1 row-size=20B cardinality=1.56M
+|  in pipelines: 04(GETNEXT), 00(OPEN)
+|
+03:EXCHANGE [HASH(l_orderkey)]
+|  mem-estimate=10.07MB mem-reservation=0B thread-reservation=0
+|  tuple-ids=1 row-size=20B cardinality=3.39M
+|  in pipelines: 00(GETNEXT)
+|
+F00:PLAN FRAGMENT [RANDOM] hosts=3 instances=3
+Per-Host Resources: mem-estimate=917.86MB mem-reservation=42.00MB thread-reservation=2
+01:AGGREGATE [STREAMING]
+|  output: appx_median(l_shipmode)
+|  group by: l_orderkey
+|  mem-estimate=757.58MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
+|  tuple-ids=1 row-size=20B cardinality=3.39M
+|  in pipelines: 00(GETNEXT)
+|
+00:SCAN HDFS [tpch_parquet.lineitem, RANDOM]
+   HDFS partitions=1/1 files=3 size=193.99MB
+   stored statistics:
+     table: rows=6.00M size=193.99MB
+     columns: all
+   extrapolated-rows=disabled max-scan-range-rows=2.14M
+   mem-estimate=160.00MB mem-reservation=8.00MB thread-reservation=1
+   tuple-ids=0 row-size=24B cardinality=6.00M
+   in pipelines: 00(GETNEXT)
+====
+# Without stats the number of groups is unknown and the aggregation gets the default
+# estimate, to which nothing is added for the reservoir samples. The sizes of these
+# Parquet files differ between data loads, so the no-stats cases turn off the row
+# estimate from the file sizes and split every file into three scan ranges.
+select appx_median(int_col) from functional_parquet.alltypes group by bigint_col
+---- QUERYOPTIONS
+DISABLE_HDFS_NUM_ROWS_ESTIMATE=1
+MAX_SCAN_RANGE_LENGTH=3000
+---- DISTRIBUTEDPLAN
+Max Per-Host Resource Reservation: Memory=74.02MB Threads=4
+Per-Host Resource Estimates: Memory=318MB
+WARNING: The following tables are missing relevant table and/or column statistics.
+functional_parquet.alltypes
+Analyzed query: SELECT appx_median(int_col) FROM functional_parquet.alltypes
+GROUP BY bigint_col
+
+F02:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
+|  Per-Host Resources: mem-estimate=20.05MB mem-reservation=4.00MB thread-reservation=1
+PLAN-ROOT SINK
+|  output exprs: appx_median(int_col)
+|  mem-estimate=10.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
+|
+04:EXCHANGE [UNPARTITIONED]
+|  mem-estimate=10.05MB mem-reservation=0B thread-reservation=0
+|  tuple-ids=2 row-size=12B cardinality=unavailable
+|  in pipelines: 03(GETNEXT)
+|
+F01:PLAN FRAGMENT [HASH(bigint_col)] hosts=3 instances=3
+Per-Host Resources: mem-estimate=138.05MB mem-reservation=36.00MB thread-reservation=1
+03:AGGREGATE [FINALIZE]
+|  output: appx_median:merge(int_col)
+|  group by: bigint_col
+|  mem-estimate=128.00MB mem-reservation=36.00MB spill-buffer=2.00MB thread-reservation=0
+|  tuple-ids=2 row-size=12B cardinality=unavailable
+|  in pipelines: 03(GETNEXT), 00(OPEN)
+|
+02:EXCHANGE [HASH(bigint_col)]
+|  mem-estimate=10.05MB mem-reservation=0B thread-reservation=0
+|  tuple-ids=1 row-size=12B cardinality=unavailable
+|  in pipelines: 00(GETNEXT)
+|
+F00:PLAN FRAGMENT [RANDOM] hosts=3 instances=3
+Per-Host Resources: mem-estimate=160.19MB mem-reservation=34.02MB thread-reservation=2
+01:AGGREGATE [STREAMING]
+|  output: appx_median(int_col)
+|  group by: bigint_col
+|  mem-estimate=128.00MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
+|  tuple-ids=1 row-size=12B cardinality=unavailable
+|  in pipelines: 00(GETNEXT)
+|
+00:SCAN HDFS [functional_parquet.alltypes, RANDOM]
+   HDFS partitions=24/24 files=24 size=187.89KB
+   stored statistics:
+     table: rows=unavailable size=unavailable
+     partitions: 0/24 rows=unavailable
+     columns: unavailable
+   extrapolated-rows=disabled max-scan-range-rows=unavailable
+   mem-estimate=32.00MB mem-reservation=16.00KB thread-reservation=1
+   tuple-ids=0 row-size=12B cardinality=unavailable
+   in pipelines: 00(GETNEXT)
+====
+# The number of groups is known from the partitions, but the input rows are not, so
+# each group is assumed to hold one row and only the initial state is counted.
+select year, month, appx_median(int_col) from functional_parquet.alltypes
+group by year, month
+---- QUERYOPTIONS
+DISABLE_HDFS_NUM_ROWS_ESTIMATE=1
+MAX_SCAN_RANGE_LENGTH=3000
+---- DISTRIBUTEDPLAN
+Max Per-Host Resource Reservation: Memory=8.01MB Threads=4
+Per-Host Resource Estimates: Memory=40MB
+WARNING: The following tables are missing relevant table and/or column statistics.
+functional_parquet.alltypes
+Analyzed query: SELECT `year`, `month`, appx_median(int_col) FROM
+functional_parquet.alltypes GROUP BY `year`, `month`
+
+F02:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
+|  Per-Host Resources: mem-estimate=4.02MB mem-reservation=4.00MB thread-reservation=1
+PLAN-ROOT SINK
+|  output exprs: `year`, `month`, appx_median(int_col)
+|  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
+|
+04:EXCHANGE [UNPARTITIONED]
+|  mem-estimate=16.00KB mem-reservation=0B thread-reservation=0
+|  tuple-ids=2 row-size=12B cardinality=24
+|  in pipelines: 03(GETNEXT)
+|
+F01:PLAN FRAGMENT [HASH(`year`,`month`)] hosts=3 instances=3
+Per-Host Resources: mem-estimate=10.07MB mem-reservation=2.00MB thread-reservation=1
+03:AGGREGATE [FINALIZE]
+|  output: appx_median:merge(int_col)
+|  group by: `year`, `month`
+|  mem-estimate=10.00MB mem-reservation=2.00MB spill-buffer=64.00KB thread-reservation=0
+|  tuple-ids=2 row-size=12B cardinality=24
+|  in pipelines: 03(GETNEXT), 00(OPEN)
+|
+02:EXCHANGE [HASH(`year`,`month`)]
+|  mem-estimate=16.00KB mem-reservation=0B thread-reservation=0
+|  tuple-ids=1 row-size=12B cardinality=24
+|  in pipelines: 00(GETNEXT)
+|
+F00:PLAN FRAGMENT [RANDOM] hosts=3 instances=3
+Per-Host Resources: mem-estimate=26.20MB mem-reservation=2.01MB thread-reservation=2
+01:AGGREGATE [STREAMING]
+|  output: appx_median(int_col)
+|  group by: `year`, `month`
+|  mem-estimate=10.01MB mem-reservation=2.00MB spill-buffer=64.00KB thread-reservation=0
+|  tuple-ids=1 row-size=12B cardinality=24
+|  in pipelines: 00(GETNEXT)
+|
+00:SCAN HDFS [functional_parquet.alltypes, RANDOM]
+   HDFS partitions=24/24 files=24 size=187.89KB
+   stored statistics:
+     table: rows=unavailable size=unavailable
+     partitions: 0/24 rows=unavailable
+     columns missing stats: int_col
+   extrapolated-rows=disabled max-scan-range-rows=unavailable
+   mem-estimate=16.00MB mem-reservation=8.00KB thread-reservation=1
+   tuple-ids=0 row-size=12B cardinality=unavailable
+   in pipelines: 00(GETNEXT)
+====
