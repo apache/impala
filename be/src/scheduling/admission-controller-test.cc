@@ -1465,6 +1465,23 @@ TEST_F(AdmissionControllerTest, Config) {
   CheckPoolConfig(request_pool_service, QUEUE_C, 10, 128L * MEGABYTE, 30000, true);
 }
 
+TEST_F(AdmissionControllerTest, ResolveRequestPoolJniError) {
+  FLAGS_fair_scheduler_allocation_path = GetResourceFile("fair-scheduler-test2.xml");
+  FLAGS_llama_site_path = GetResourceFile("llama-site-test2.xml");
+
+  MetricGroup metric_group("impala-metrics");
+  RequestPoolService request_pool_service(&metric_group);
+  TQueryCtx query_ctx;
+  query_ctx.session.__set_connected_user("user@");
+  query_ctx.client_request.query_options.__set_request_pool(QUEUE_A);
+
+  string resolved_pool;
+  Status status = request_pool_service.ResolveRequestPool(query_ctx, &resolved_pool);
+  ASSERT_FALSE(status.ok());
+  EXPECT_STR_CONTAINS(status.GetDetail(), "Malformed Kerberos name");
+  ASSERT_TRUE(resolved_pool.empty());
+}
+
 /// Unit test for PoolStats
 TEST_F(AdmissionControllerTest, PoolStats) {
   AdmissionController* admission_controller = MakeAdmissionController();

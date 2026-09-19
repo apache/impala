@@ -175,6 +175,7 @@ Status RequestPoolService::ResolveRequestPool(const TQueryCtx& ctx,
   Status status = JniUtil::CallJniMethod(
       jni_request_pool_service_, resolve_request_pool_id_, params, &result);
   resolve_pool_ms_metric_->Update(MonotonicMillis() - start_time);
+  RETURN_IF_ERROR(status);
 
   if (result.status.status_code != TErrorCode::OK) {
     return Status(boost::algorithm::join(result.status.error_msgs, "; "));
