@@ -607,7 +607,6 @@ public class ColumnStats {
       case SMALLINT:
       case INT:
       case BIGINT:
-      case TIMESTAMP: // Hive and Impala use LongColumnStatsData for timestamps.
         isCompatible = statsData.isSetLongStats();
         if (isCompatible) {
           LongColumnStatsData longStats = statsData.getLongStats();
@@ -615,10 +614,20 @@ public class ColumnStats {
               longStats.getNumDVs());
           numNulls_ = normalizeValue(colName, StatsKey.NUM_NULLS,
               longStats.getNumNulls());
-          if (colType.getPrimitiveType() != PrimitiveType.TIMESTAMP) {
-            // Low/high value handling is not yet implemented for timestamps.
-            setLowAndHighValue(colType.getPrimitiveType(), longStats);
-          }
+          setLowAndHighValue(colType.getPrimitiveType(), longStats);
+        }
+        break;
+      case TIMESTAMP:
+        // Impala writes LongColumnStatsData for timestamps, while Hive 4 returns
+        // TimestampColumnStatsData. The shim normalizes both representations.
+        LongColumnStatsData timestampStats =
+            MetastoreShim.getCompatibleTimestampStats(statsData);
+        isCompatible = timestampStats != null;
+        if (isCompatible) {
+          numDistinctValues_ = normalizeValue(colName, StatsKey.NUM_DISTINCT_VALUES,
+              timestampStats.getNumDVs());
+          numNulls_ = normalizeValue(colName, StatsKey.NUM_NULLS,
+              timestampStats.getNumNulls());
         }
         break;
       case DATE:

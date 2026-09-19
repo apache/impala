@@ -36,6 +36,7 @@ import org.apache.hadoop.hive.metastore.IMetaStoreClient;
 import org.apache.hadoop.hive.metastore.RetryingMetaStoreClient;
 import org.apache.hadoop.hive.metastore.api.AlreadyExistsException;
 import org.apache.hadoop.hive.metastore.api.ColumnStatistics;
+import org.apache.hadoop.hive.metastore.api.ColumnStatisticsData;
 import org.apache.hadoop.hive.metastore.api.ColumnStatisticsObj;
 import org.apache.hadoop.hive.metastore.api.Database;
 import org.apache.hadoop.hive.metastore.api.FireEventRequest;
@@ -44,6 +45,7 @@ import org.apache.hadoop.hive.metastore.api.InsertEventRequestData;
 import org.apache.hadoop.hive.metastore.api.InvalidInputException;
 import org.apache.hadoop.hive.metastore.api.InvalidObjectException;
 import org.apache.hadoop.hive.metastore.api.InvalidOperationException;
+import org.apache.hadoop.hive.metastore.api.LongColumnStatsData;
 import org.apache.hadoop.hive.metastore.api.MetaException;
 import org.apache.hadoop.hive.metastore.api.NoSuchObjectException;
 import org.apache.hadoop.hive.metastore.api.NotificationEvent;
@@ -157,6 +159,12 @@ public class MetastoreShim extends Hive2MetastoreShimBase {
   public static ColumnStatistics createNewHiveColStats() {
     ColumnStatistics colStats = new ColumnStatistics();
     return colStats;
+  }
+
+  /** Returns TIMESTAMP statistics in the representation used by Impala. */
+  public static LongColumnStatsData getCompatibleTimestampStats(
+      ColumnStatisticsData statsData) {
+    return statsData.isSetLongStats() ? statsData.getLongStats() : null;
   }
 
   /**
