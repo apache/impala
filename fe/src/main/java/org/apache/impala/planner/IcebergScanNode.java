@@ -180,7 +180,7 @@ public class IcebergScanNode extends HdfsScanNode {
       for (Type t : desc_.getPath().getMatchedTypes()) {
         if (t.isCollectionType()) {
           cardinality_ = MathUtil.multiplyCardinalities(
-              cardinality_, PlannerContext.AVG_COLLECTION_SIZE);
+              cardinality_, analyzer.getQueryOptions().getAvg_collection_size());
         }
       }
     }

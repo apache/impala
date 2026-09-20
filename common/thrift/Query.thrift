@@ -832,6 +832,9 @@ struct TQueryOptions {
 
   // See comment in ImpalaService.thrift
   206: optional i32 cte_threshold = -1;
+
+  // See comment in ImpalaService.thrift
+  207: optional i32 avg_collection_size = 10;
 }
 
 // Impala currently has three types of sessions: Beeswax, HiveServer2 and external

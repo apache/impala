@@ -161,7 +161,7 @@ public class UnnestNode extends PlanNode {
   @Override
   public void computeStats(Analyzer analyzer) {
     super.computeStats(analyzer);
-    cardinality_ = PlannerContext.AVG_COLLECTION_SIZE;
+    cardinality_ = analyzer.getQueryOptions().getAvg_collection_size();
     // The containing SubplanNode has not yet been initialized, so get the number
     // of nodes from the SubplanNode's input.
     numNodes_ = containingSubplanNode_.getChild(0).getNumNodes();

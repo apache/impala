@@ -1,0 +1,42 @@
+select unnest(int_array) from functional_parquet.complextypestbl;
+---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
+05:EXCHANGE [UNPARTITIONED]
+|
+01:SUBPLAN
+|  row-size=16B cardinality=440.00K
+|
+|--04:NESTED LOOP JOIN [CROSS JOIN]
+|  |  row-size=16B cardinality=100
+|  |
+|  |--02:SINGULAR ROW SRC
+|  |     row-size=12B cardinality=1
+|  |
+|  03:UNNEST [functional_parquet.complextypestbl.int_array int_array]
+|     row-size=0B cardinality=100
+|
+00:SCAN HDFS [functional_parquet.complextypestbl]
+   HDFS partitions=1/1 files=2 size=6.92KB
+   row-size=12B cardinality=4.40K
+====
+select * from functional_parquet.complextypestbl.int_array;
+---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
+01:EXCHANGE [UNPARTITIONED]
+|
+00:SCAN HDFS [functional_parquet.complextypestbl.int_array]
+   HDFS partitions=1/1 files=2 size=6.92KB
+   row-size=4B cardinality=440.00K
+====
+select * from functional_parquet.complextypestbl.int_array_array.item;
+---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
+01:EXCHANGE [UNPARTITIONED]
+|
+00:SCAN HDFS [functional_parquet.complextypestbl.int_array_array.item]
+   HDFS partitions=1/1 files=2 size=6.92KB
+   row-size=4B cardinality=44.00M
+====

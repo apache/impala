@@ -1105,6 +1105,18 @@ enum TImpalaQueryOptions {
   // Occurrence threshold for using CTEs. CTEs are only used if occurrences are greater
   // than the threshold. Defaults to -1; negative values disable CTE planning.
   CTE_THRESHOLD = 205
+
+  // Assumed average number of items in a nested collection, since we currently have no
+  // statistics on nested fields. The motivation for this constant is to avoid
+  // pathological plan choices that could result from a SubplanNode having an unknown
+  // cardinality (due to UnnestNodes not knowing their cardinality), or from a ScanNode
+  // significantly underestimating its output cardinality because intermediate collections
+  // are not accounted for at all. For example, we will place a table ref plan with a
+  // SubplanNode on the build side of a join due to an unknown cardinality if the other
+  // input is a base table scan with stats.
+  // The constant value was chosen arbitrarily to not be "too high" or "too low".
+  // TODO: Compute stats for nested types and pick them up.
+  AVG_COLLECTION_SIZE = 206
 }
 
 // The summary of a DML statement.

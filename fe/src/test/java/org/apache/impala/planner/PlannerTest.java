@@ -415,6 +415,17 @@ public class PlannerTest extends PlannerTestBase {
   }
 
   @Test
+  public void testAvgCollectionSize() {
+    TQueryOptions options = defaultQueryOptions();
+    options.setAvg_collection_size(0);
+    runPlannerTestFile("avg-collection-size", options,
+        ImmutableSet.of(PlannerTestOption.VALIDATE_CARDINALITY));
+    options.setAvg_collection_size(100);
+    runPlannerTestFile("avg-collection-size-non-zero", options,
+        ImmutableSet.of(PlannerTestOption.VALIDATE_CARDINALITY));
+  }
+
+  @Test
   public void testJoins() {
     TQueryOptions options = defaultQueryOptions();
     options.setDisable_hdfs_num_rows_estimate(false);
