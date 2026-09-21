@@ -54,6 +54,7 @@ public:
     def_level_ = ParquetLevel::INVALID_LEVEL;
     rep_level_ = ParquetLevel::INVALID_LEVEL;
     pos_current_value_ = ParquetLevel::INVALID_POS;
+    next_levels_consumed_ = false;
   }
 
   bool next_levels_consumed() const { return next_levels_consumed_; }
