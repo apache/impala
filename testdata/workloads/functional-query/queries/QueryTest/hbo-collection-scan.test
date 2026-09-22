@@ -513,3 +513,72 @@ PLAN-ROOT SINK
    predicates: item > 0, pos > 1
    row-size=12B cardinality=3 (from HBO)
 ====
+---- QUERY
+EXPLAIN SELECT count(*) FROM functional_parquet.complextypestbl c, c.int_array a
+WHERE a.item > 1
+---- PLAN
+PLAN-ROOT SINK
+|
+07:AGGREGATE [FINALIZE]
+|  output: count:merge(*)
+|  row-size=8B cardinality=1
+|
+06:EXCHANGE [UNPARTITIONED]
+|
+05:AGGREGATE
+|  output: count(*)
+|  row-size=8B cardinality=2
+|
+01:SUBPLAN
+|  row-size=16B cardinality=20
+|
+|--04:NESTED LOOP JOIN [CROSS JOIN]
+|  |  row-size=16B cardinality=10
+|  |
+|  |--02:SINGULAR ROW SRC
+|  |     row-size=12B cardinality=1
+|  |
+|  03:UNNEST [c.int_array a]
+|     row-size=0B cardinality=10
+|
+00:SCAN HDFS [functional_parquet.complextypestbl c]
+   HDFS partitions=1/1 files=2 size=6.92KB
+   predicates: !empty(c.int_array)
+   predicates on a: a.item > 1
+   row-size=12B cardinality=2 (from HBO)
+====
+---- QUERY
+# Other conjuncts on the collection items, so no stats from HBO (IMPALA-15394).
+EXPLAIN SELECT count(*) FROM functional_parquet.complextypestbl c, c.int_array a
+WHERE a.item > 100
+---- PLAN
+PLAN-ROOT SINK
+|
+07:AGGREGATE [FINALIZE]
+|  output: count:merge(*)
+|  row-size=8B cardinality=1
+|
+06:EXCHANGE [UNPARTITIONED]
+|
+05:AGGREGATE
+|  output: count(*)
+|  row-size=8B cardinality=2
+|
+01:SUBPLAN
+|  row-size=16B cardinality=44.00K
+|
+|--04:NESTED LOOP JOIN [CROSS JOIN]
+|  |  row-size=16B cardinality=10
+|  |
+|  |--02:SINGULAR ROW SRC
+|  |     row-size=12B cardinality=1
+|  |
+|  03:UNNEST [c.int_array a]
+|     row-size=0B cardinality=10
+|
+00:SCAN HDFS [functional_parquet.complextypestbl c]
+   HDFS partitions=1/1 files=2 size=6.92KB
+   predicates: !empty(c.int_array)
+   predicates on a: a.item > 100
+   row-size=12B cardinality=4.40K
+====

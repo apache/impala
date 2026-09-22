@@ -1,0 +1,37 @@
+====
+---- QUERY
+EXPLAIN SELECT DISTINCT year, month FROM functional.alltypes WHERE month > 10
+---- PLAN
+PLAN-ROOT SINK
+|
+04:EXCHANGE [UNPARTITIONED]
+|
+03:AGGREGATE [FINALIZE]
+|  group by: `year`, `month`
+|  row-size=8B cardinality=4 (from HBO)
+|
+02:EXCHANGE [HASH(`year`,`month`)]
+|
+01:AGGREGATE [STREAMING]
+|  group by: `year`, `month`
+|  row-size=8B cardinality=4 (from HBO)
+|
+00:SCAN HDFS [functional.alltypes]
+   partition predicates: `month` > 10
+   HDFS partitions=4/24 files=4 size=80.14KB
+   partition key scan
+   row-size=8B cardinality=4 (from HBO)
+====
+---- QUERY
+# The regular scan must not get the cardinality of the partition key scan (IMPALA-15394).
+EXPLAIN SELECT id FROM functional.alltypes WHERE month > 10
+---- PLAN
+PLAN-ROOT SINK
+|
+01:EXCHANGE [UNPARTITIONED]
+|
+00:SCAN HDFS [functional.alltypes]
+   partition predicates: `month` > 10
+   HDFS partitions=4/24 files=4 size=80.14KB
+   row-size=4B cardinality=1.22K
+====

@@ -234,7 +234,26 @@ class TestHBO(ImpalaTestSuite):
       where = " WHERE " + where_expr if len(where_expr) > 0 else ""
       # Run query to populate HBO stats
       self.execute_query(stmt % "count(*)" + where)
+    # Conjuncts on the items of a joined collection also filter the rows of the table
+    # scan, so "a.item > 100" must not get the stats of "a.item > 1".
+    self.execute_query("SELECT count(*) FROM functional_parquet.complextypestbl c, "
+        "c.int_array a WHERE a.item > 1")
     self._run_hbo_explains('QueryTest/hbo-collection-scan')
+
+  def test_count_star_scan_cardinality(self):
+    self.client.set_configuration(QUERY_OPTIONS)
+    # An optimized count(*) scan returns one row per file, so a regular scan of the same
+    # table and conjuncts must not get its cardinality. Use a parquet table with stats.
+    self.execute_query("SELECT count(*) FROM tpch_parquet.orders")
+    self._run_hbo_explains('QueryTest/hbo-count-star-scan')
+
+  def test_partition_key_scan_cardinality(self):
+    self.client.set_configuration(QUERY_OPTIONS)
+    # A partition key scan returns one row per scan range, so a regular scan of the same
+    # table and conjuncts must not get its cardinality.
+    self.execute_query(
+        "SELECT DISTINCT year, month FROM functional.alltypes WHERE month > 10")
+    self._run_hbo_explains('QueryTest/hbo-partition-key-scan')
 
   def test_iceberg_scan_cardinality(self):
     self.client.set_configuration(QUERY_OPTIONS)

@@ -136,6 +136,69 @@ public class HboKeyStringTest extends FrontendTestBase {
     assertEquals(expectedIgnorePartConstKey, ignorePartConstkey);
   }
 
+  /**
+   * Returns the key of the scan in a query with a single scan, which is plan node 0.
+   */
+  private String singleScanKey(String query) throws ImpalaException {
+    return collectPlanNodesInDistributedPlan(query).get(0).generateHboKeyString(
+        THboStatsType.CARDINALITY, CanonicalizationStrategy.EXPR_REWRITE);
+  }
+
+  /**
+   * An optimized count(*) scan outputs one row per file or row group, so it must not
+   * share a key with a regular scan of the same table and conjuncts.
+   */
+  @Test
+  public void testCountStarScanNodeKey() throws ImpalaException {
+    assertEquals("CARDINALITY:ScanNode:functional_parquet.alltypes|<COUNT_STAR>|" +
+        "`year` = 2009", singleScanKey(
+            "SELECT count(*) FROM functional_parquet.alltypes WHERE year = 2009"));
+    assertEquals("CARDINALITY:ScanNode:functional_parquet.alltypes|`year` = 2009",
+        singleScanKey(
+            "SELECT max(id) FROM functional_parquet.alltypes WHERE year = 2009"));
+  }
+
+  /**
+   * A partition key scan outputs one row per scan range and a sampled scan reads only
+   * part of the files, so neither may share a key with a regular scan of the same table
+   * and conjuncts.
+   */
+  @Test
+  public void testPartitionKeyAndSampledScanNodeKeys() throws ImpalaException {
+    String alltypesKey = "CARDINALITY:ScanNode:functional_parquet.alltypes";
+    assertEquals(alltypesKey,
+        singleScanKey("SELECT year FROM functional_parquet.alltypes"));
+    assertEquals(alltypesKey + "|<PARTITION_KEY_SCAN>",
+        singleScanKey("SELECT DISTINCT year FROM functional_parquet.alltypes"));
+    assertEquals(alltypesKey + "|<SAMPLE:10>", singleScanKey("SELECT year FROM " +
+        "functional_parquet.alltypes TABLESAMPLE SYSTEM(10) REPEATABLE(1)"));
+
+    String icebergKey = "CARDINALITY:ScanNode:functional_parquet.iceberg_partitioned";
+    assertEquals(icebergKey,
+        singleScanKey("SELECT id FROM functional_parquet.iceberg_partitioned"));
+    assertEquals(icebergKey + "|<SAMPLE:10>", singleScanKey("SELECT id FROM " +
+        "functional_parquet.iceberg_partitioned TABLESAMPLE SYSTEM(10) REPEATABLE(1)"));
+  }
+
+  /**
+   * With an IsNotEmptyPredicate, conjuncts on the items of a collection also filter the
+   * rows of the scan, so they are part of its key. The collection is named by its path,
+   * not by its alias.
+   */
+  @Test
+  public void testCollectionConjunctsInScanNodeKey() throws ImpalaException {
+    String tblKey =
+        "CARDINALITY:ScanNode:functional_parquet.complextypestbl|!empty(int_array)";
+    assertEquals(tblKey, singleScanKey("SELECT c.id FROM " +
+        "functional_parquet.complextypestbl c, c.int_array a"));
+    assertEquals(tblKey + "|functional_parquet.complextypestbl.int_array:[item > 1]",
+        singleScanKey("SELECT c.id FROM functional_parquet.complextypestbl c, " +
+            "c.int_array a WHERE a.item > 1"));
+    assertEquals(tblKey + "|functional_parquet.complextypestbl.int_array:[item > 100]",
+        singleScanKey("SELECT t.id FROM functional_parquet.complextypestbl t, " +
+            "t.int_array x WHERE x.item > 100"));
+  }
+
   @Test
   public void testAggregationNodeKeys() throws ImpalaException {
     String query = "SELECT month, count(id) FROM functional.alltypes " +

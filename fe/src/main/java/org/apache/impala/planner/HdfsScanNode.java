@@ -1954,6 +1954,15 @@ public class HdfsScanNode extends ScanNode {
     } else {
       sb.append(tbl_.getFullName());
     }
+    // An optimized count(*) scan returns one row per file or row group, and a partition
+    // key scan returns one row per scan range, not the table's rows, while their input
+    // stats are those of a regular scan of the same table. A sampled scan reads only
+    // part of the files. So none of them may share a key with a regular scan.
+    if (countStarSlot_ != null) sb.append("|<COUNT_STAR>");
+    if (isPartitionKeyScan_) sb.append("|<PARTITION_KEY_SCAN>");
+    if (sampleParams_ != null) {
+      sb.append("|<SAMPLE:").append(sampleParams_.getPercentBytes()).append(">");
+    }
 
     // Canonicalize partition conjuncts and regular conjuncts.
     List<String> partConjStrings =
@@ -1969,6 +1978,17 @@ public class HdfsScanNode extends ScanNode {
       sb.append("|").append(s);
       LOG.trace("HBO CONJUNCT STR ({}, {}): {}", statsType, strategy, s);
     }
+    // Conjuncts on collection items filter the items, and with an IsNotEmptyPredicate
+    // also the rows of this scan.
+    List<String> collConjStrings = new ArrayList<>();
+    for (Map.Entry<TupleDescriptor, List<Expr>> entry : collectionConjuncts_.entrySet()) {
+      String path = String.join(".", entry.getKey().getPath().getCanonicalPath());
+      List<String> itemConjStrings = ExprCanonicalizer.canonicalizeScanConjuncts(
+          entry.getValue(), tbl_, strategy);
+      collConjStrings.add(path + ":[" + String.join(",", itemConjStrings) + "]");
+    }
+    Collections.sort(collConjStrings);
+    for (String s: collConjStrings) sb.append("|").append(s);
     return sb.toString();
   }
 

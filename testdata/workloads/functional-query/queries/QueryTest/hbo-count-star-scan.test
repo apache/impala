@@ -1,0 +1,26 @@
+====
+---- QUERY
+EXPLAIN SELECT count(*) FROM tpch_parquet.orders
+---- PLAN
+PLAN-ROOT SINK
+|
+01:AGGREGATE [FINALIZE]
+|  output: sum_init_zero(tpch_parquet.orders.stats: num_rows)
+|  row-size=8B cardinality=1 (from HBO)
+|
+00:SCAN HDFS [tpch_parquet.orders]
+   HDFS partitions=1/1 files=2 size=54.21MB
+   row-size=8B cardinality=2 (from HBO)
+====
+---- QUERY
+# The regular scan must not get the cardinality of the count(*) scan (IMPALA-15394).
+EXPLAIN SELECT o_orderkey FROM tpch_parquet.orders
+---- PLAN
+PLAN-ROOT SINK
+|
+01:EXCHANGE [UNPARTITIONED]
+|
+00:SCAN HDFS [tpch_parquet.orders]
+   HDFS partitions=1/1 files=2 size=54.21MB
+   row-size=8B cardinality=1.50M
+====
