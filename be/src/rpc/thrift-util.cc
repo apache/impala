@@ -168,10 +168,15 @@ std::shared_ptr<SSLContext> createSslContext(SSLProtocol min_version) {
       SSL_CTX_free(ctx);
       throw TSSLException("SSLContext: unsupported SSL/TLS protocol");
   }
-  if (SSL_CTX_set_min_proto_version(ctx, min_proto_version) != 1) {
-    const string errors = kudu::security::GetOpenSSLErrors();
-    SSL_CTX_free(ctx);
-    throw TSSLException("SSL_CTX_set_min_proto_version: " + errors);
+  // Only raise the minimum protocol version, never lower it. This is consistent
+  // with earlier logic (before the Thrift 0.24 bump IMPALA-15354) that disallowed
+  // lower versions by setting options like SSL_OP_NO_TLSv1.
+  if (min_proto_version > SSL_CTX_get_min_proto_version(ctx)) {
+    if (SSL_CTX_set_min_proto_version(ctx, min_proto_version) != 1) {
+      const string errors = kudu::security::GetOpenSSLErrors();
+      SSL_CTX_free(ctx);
+      throw TSSLException("SSL_CTX_set_min_proto_version: " + errors);
+    }
   }
   // IMPALA-11195: disable TLS renegotiation. SSL_OP_NO_RENEGOTIATION exists since OpenSSL
   // 1.1.0h.

@@ -598,7 +598,7 @@ class ThriftServerBuilder {
 
   bool enable_ssl_ = false;
   apache::thrift::transport::SSLProtocol version_ =
-      apache::thrift::transport::SSLProtocol::TLSv1_0;
+      apache::thrift::transport::SSLProtocol::TLSv1_2;
   std::string certificate_;
   std::string private_key_;
   std::string pem_password_cmd_;
