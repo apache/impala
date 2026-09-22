@@ -18,13 +18,11 @@
 #include "exprs/aggregate-functions.h"
 
 #include <algorithm>
+#include <cmath>
 #include <map>
+#include <random>
 #include <sstream>
 #include <utility>
-#include <cmath>
-
-#include <boost/random/mersenne_twister.hpp>
-#include <boost/random/uniform_int.hpp>
 
 #include "codegen/impala-ir.h"
 #include "common/logging.h"
@@ -46,14 +44,13 @@
 #include "thirdparty/datasketches/theta_union.hpp"
 #include "thirdparty/datasketches/theta_intersection.hpp"
 #include "thirdparty/datasketches/kll_sketch.hpp"
+#include "thirdparty/pcg-cpp-0.98/include/pcg_random.hpp"
 #include "util/arithmetic-util.h"
 #include "util/mpfit-util.h"
 #include "util/pretty-printer.h"
 
 #include "common/names.h"
 
-using boost::uniform_int;
-using boost::mt19937_64;
 using std::make_pair;
 using std::map;
 using std::min_element;
@@ -62,6 +59,7 @@ using std::pop_heap;
 using std::push_heap;
 using std::string;
 using std::stringstream;
+using std::uniform_int_distribution;
 
 namespace {
 // Threshold for each precision where it's better to use linear counting instead
@@ -1923,10 +1921,8 @@ class ReservoirSampleState {
   // Number of values over which the samples were collected.
   int64_t source_size_;
 
-  // Random number generator for generating 64-bit integers
-  // Replace ranlux64_3 with mt19937_64 for better performance. See boost benchmark at
-  // https://www.boost.org/doc/libs/1_74_0/doc/html/boost_random/performance.html
-  mt19937_64 rng_;
+  // Random number generator used to select samples from the input stream.
+  pcg32 rng_;
 
   // True if the array of samples is in the same memory allocation as this object. If
   // false, this object is responsible for freeing the memory.
@@ -1959,7 +1955,7 @@ class ReservoirSampleState {
 
   // Returns a random integer in the range [0, max].
   int64_t GetNext64(int64_t max) {
-    uniform_int<int64_t> dist(0, max);
+    uniform_int_distribution<int64_t> dist(0, max);
     return dist(rng_);
   }
 };
