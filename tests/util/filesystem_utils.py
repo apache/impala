@@ -37,7 +37,7 @@ IS_OSS = FILESYSTEM == "oss"
 IS_OBS = FILESYSTEM == "obs"
 IS_OZONE = FILESYSTEM == "ozone"
 IS_EC = os.getenv("ERASURE_CODING") == "true"
-IS_ENCRYPTED = os.getenv("USE_OZONE_ENCRYPTION") == "true"
+IS_ENCRYPTED = os.getenv("USE_OZONE_ENCRYPTION") == "true" or IS_S3
 # This condition satisfies both the states where one can assume a default fs
 #   - The environment variable is set to an empty string.
 #   - Tne environment variables is unset ( None )
