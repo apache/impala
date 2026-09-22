@@ -1,0 +1,116 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+Licensed to the Apache Software Foundation (ASF) under one
+or more contributor license agreements.  See the NOTICE file
+distributed with this work for additional information
+regarding copyright ownership.  The ASF licenses this file
+to you under the Apache License, Version 2.0 (the
+"License"); you may not use this file except in compliance
+with the License.  You may obtain a copy of the License at
+
+  http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing,
+software distributed under the License is distributed on an
+"AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+KIND, either express or implied.  See the License for the
+specific language governing permissions and limitations
+under the License.
+-->
+<!DOCTYPE concept PUBLIC "-//OASIS//DTD DITA Concept//EN" "concept.dtd">
+<concept id="clear_hbo_stats">
+
+  <title>CLEAR_HBO_STATS Statement</title>
+
+  <titlealts audience="PDF">
+
+    <navtitle>CLEAR_HBO_STATS</navtitle>
+
+  </titlealts>
+
+  <prolog>
+    <metadata>
+      <data name="Category" value="Impala"/>
+      <data name="Category" value="SQL"/>
+      <data name="Category" value="Performance"/>
+      <data name="Category" value="Developers"/>
+    </metadata>
+  </prolog>
+
+  <conbody>
+
+    <p>
+      The <codeph>CLEAR_HBO_STATS</codeph> statement removes the history-based
+      optimization (HBO) statistics that a coordinator has stored. HBO records what
+      earlier runs of a plan node read and returned, and the planner uses those records
+      in place of its own estimates. After the statement, queries are planned from table
+      statistics again until new runs are stored.
+    </p>
+
+    <p conref="../shared/impala_common.xml#common/syntax_blurb"/>
+
+<codeblock>:CLEAR_HBO_STATS()</codeblock>
+
+    <p conref="../shared/impala_common.xml#common/usage_notes_blurb"/>
+
+    <ul>
+      <li>
+        The statement takes no arguments.
+      </li>
+
+      <li>
+        Impala stores runs only for queries that set the <codeph>STORE_HBO_STATS</codeph>
+        query option, and the planner uses them only when <codeph>USE_HBO_STATS</codeph>
+        is set. Both options are <codeph>false</codeph> by default.
+      </li>
+
+      <li>
+        Run it when the stored runs no longer describe the data, and in tests that check
+        which statistics a query stores.
+      </li>
+
+      <li>
+        The statement clears the cache of the coordinator that runs it. With the
+        in-memory cache, every coordinator keeps its own statistics, so run it on each
+        coordinator whose statistics you want to remove.
+      </li>
+
+      <li>
+        Clearing is best effort: a query that is already running can store its runs
+        right after the statement returns.
+      </li>
+    </ul>
+
+    <p conref="../shared/impala_common.xml#common/cancel_blurb_no"/>
+
+    <p conref="../shared/impala_common.xml#common/privileges_blurb"/>
+
+    <p>
+      With authorization enabled, the <codeph>ALL</codeph> privilege is required on the
+      server.
+    </p>
+
+    <p conref="../shared/impala_common.xml#common/permissions_blurb_no"/>
+
+    <p conref="../shared/impala_common.xml#common/example_blurb"/>
+
+    <p>
+      The following statement removes the HBO statistics of the coordinator that runs
+      it, so the next queries are planned without them:
+    </p>
+
+<codeblock>:clear_hbo_stats();</codeblock>
+
+    <p>
+      <b>Added in:</b> <keyword keyref="impala50"/>
+    </p>
+
+    <p conref="../shared/impala_common.xml#common/related_info"/>
+
+    <p>
+      <xref href="impala_perf_stats.xml#perf_stats"/>
+    </p>
+
+  </conbody>
+
+</concept>

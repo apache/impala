@@ -141,6 +141,7 @@ under the License.
       <topicref href="topics/impala_alter_database.xml"/>
       <topicref href="topics/impala_alter_table.xml"/>
       <topicref href="topics/impala_alter_view.xml"/>
+      <topicref rev="5.0.0" href="topics/impala_clear_hbo_stats.xml"/>
       <topicref href="topics/impala_comment.xml"/>
       <topicref href="topics/impala_compute_stats.xml"/>
       <topicref audience="hidden" href="topics/impala_create_data_source.xml"/>
