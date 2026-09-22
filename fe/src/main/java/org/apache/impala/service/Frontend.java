@@ -2291,6 +2291,21 @@ public class Frontend {
     // Executor groups exist in the cluster. Identify those that can be used.
     RequestPoolService poolService = RequestPoolService.getInstance();
     for (TExecutorGroupSet e : executorGroupSets) {
+      // Handle the default executor group (which has an empty prefix).
+      // If the query doesn't specify a pool, keep the default group as an
+      // unrestricted candidate.
+      // If the query specifies a pool, skip the default group so unknown pools
+      // get rejected.
+      if (StringUtils.isEmpty(e.getExec_group_name_prefix())) {
+        if (StringUtils.isNotEmpty(request_pool)) continue;
+        TExecutorGroupSet default_entry = new TExecutorGroupSet(e);
+        // The prefix may be unset; the sort below compares prefixes.
+        default_entry.setExec_group_name_prefix("");
+        default_entry.setMax_mem_limit(Long.MAX_VALUE);
+        default_entry.setNum_cores_per_executor(Integer.MAX_VALUE);
+        result.add(default_entry);
+        continue;
+      }
       // If defined, request_pool can be a suffix of the group name prefix. For example
       //   group_set_prefix = root.queue1
       //   request_pool = queue1
@@ -2923,7 +2938,9 @@ public class Frontend {
       boolean clientSetRequestPool, TExecRequest req, TExecutorGroupSet group_set) {
     // Set the group name prefix in both the returned query options and
     // the query context for non default group setup.
-    if (!default_executor_group) {
+    // We skip the default group because it has no prefix.
+    if (!default_executor_group
+        && StringUtils.isNotEmpty(group_set.getExec_group_name_prefix())) {
       String namePrefix = group_set.getExec_group_name_prefix();
       req.query_options.setRequest_pool(namePrefix);
       req.setRequest_pool_set_by_frontend(!clientSetRequestPool);

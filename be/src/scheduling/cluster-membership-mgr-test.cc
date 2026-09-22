@@ -973,6 +973,48 @@ TEST(ClusterMembershipMgrUnitTest, PopulateExecutorMembershipRequest) {
     EXPECT_EQ(update_req.exec_group_sets[1].exec_group_name_prefix, "bar");
     snapshot_ptr->executor_groups.clear();
   }
+
+  // Case 3: Both default executor group and custom executor group exist.
+  {
+    ExecutorGroup default_group(ImpalaServer::DEFAULT_EXECUTOR_GROUP_NAME, 1);
+    default_group.AddExecutor(MakeBackendDescriptor(1, default_group, 0));
+    snapshot_ptr->executor_groups.insert({default_group.name(), default_group});
+
+    ExecutorGroup exec_group2("foo-group1", 1);
+    exec_group2.AddExecutor(MakeBackendDescriptor(2, exec_group2, 1));
+    snapshot_ptr->executor_groups.insert({exec_group2.name(), exec_group2});
+
+    ClusterMembershipMgr::SnapshotPtr ptr = snapshot_ptr;
+
+    update_req.hostnames.clear();
+    update_req.ip_addresses.clear();
+    update_req.exec_group_sets.clear();
+
+    PopulateExecutorMembershipRequest(ptr, populated_exec_group_sets, update_req);
+
+    // We have three groups, [0] is default, [1] is foo, [2] is bar.
+    EXPECT_EQ(update_req.exec_group_sets.size(), 3);
+
+    // Verify the Default Group.
+    EXPECT_EQ(update_req.exec_group_sets[0].curr_num_executors, 1);
+    EXPECT_EQ(update_req.exec_group_sets[0].expected_num_executors,
+        FLAGS_num_expected_executors);
+    EXPECT_FALSE(update_req.exec_group_sets[0].__isset.exec_group_name_prefix);
+    EXPECT_EQ(update_req.hostnames.size(), 1);
+    EXPECT_EQ(update_req.ip_addresses.size(), 1);
+
+    // Verify the custom group "foo".
+    EXPECT_EQ(update_req.exec_group_sets[1].curr_num_executors, 1);
+    EXPECT_EQ(update_req.exec_group_sets[1].expected_num_executors, 2);
+    EXPECT_EQ(update_req.exec_group_sets[1].exec_group_name_prefix, "foo");
+
+    // Verify the custom group "bar".
+    EXPECT_EQ(update_req.exec_group_sets[2].curr_num_executors, 0);
+    EXPECT_EQ(update_req.exec_group_sets[2].expected_num_executors, 10);
+    EXPECT_EQ(update_req.exec_group_sets[2].exec_group_name_prefix, "bar");
+
+    snapshot_ptr->executor_groups.clear();
+  }
 }
 
 template <class T>

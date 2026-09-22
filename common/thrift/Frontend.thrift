@@ -920,7 +920,9 @@ struct TExecutorGroupSet {
   // The name of the request pool associated with this executor group type. All
   // executor groups that match this prefix will be included as a part of this set.
   // Note: this will be empty when 'default' executor group is used or
-  // 'expected_executor_group_sets' startup flag is not specified.
+  // 'expected_executor_group_sets' startup flag is not specified. An empty prefix marks
+  // the default executor group rather than a request pool, and can be sent alongside
+  // the custom executor group sets.
   3: string exec_group_name_prefix
 
   // The optional max_mem_limit to determine which executor group set to run for a query.

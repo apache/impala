@@ -763,7 +763,8 @@ void PopulateExecutorMembershipRequest(const ClusterMembershipMgr::SnapshotPtr& 
   vector<TExecutorGroupSet> exec_group_sets;
   auto default_it =
       snapshot->executor_groups.find(ImpalaServer::DEFAULT_EXECUTOR_GROUP_NAME);
-  if (default_it != snapshot->executor_groups.end()) {
+  bool default_exists = default_it != snapshot->executor_groups.end();
+  if (default_exists) {
     exec_group_sets.emplace_back();
     exec_group_sets.back().__set_expected_num_executors(FLAGS_num_expected_executors);
     const ExecutorGroup* group = &(default_it->second);
@@ -774,43 +775,56 @@ void PopulateExecutorMembershipRequest(const ClusterMembershipMgr::SnapshotPtr& 
         exec_group_sets.back().curr_num_executors++;
       }
     }
-  } else {
-    if (expected_exec_group_sets.empty()) {
-      // Add a default exec group set if no expected group sets were specified.
-      exec_group_sets.emplace_back();
-      exec_group_sets.back().__set_expected_num_executors(FLAGS_num_expected_executors);
-    } else {
-      exec_group_sets.insert(exec_group_sets.begin(), expected_exec_group_sets.begin(),
-          expected_exec_group_sets.end());
+  }
+
+  int num_custom_groups = snapshot->executor_groups.size() - (default_exists ? 1 : 0);
+  DCHECK_GE(num_custom_groups, 0);
+
+  vector<TExecutorGroupSet> custom_expected_sets;
+  if (expected_exec_group_sets.empty()) {
+    if (!default_exists) {
+      // Create the wildcard if no group exists.
+      custom_expected_sets.emplace_back();
+      custom_expected_sets.back().__set_expected_num_executors(
+          FLAGS_num_expected_executors);
     }
+  } else {
+    if (!default_exists || num_custom_groups > 0) {
+      custom_expected_sets = expected_exec_group_sets;
+    }
+  }
+
+  if (!custom_expected_sets.empty()) {
     int matching_exec_groups_found = 0;
-    for (auto& set : exec_group_sets) {
+    for (const auto& expected_set : custom_expected_sets) {
+      StringPiece prefix(expected_set.exec_group_name_prefix);
       int max_num_executors = -1;
-      StringPiece prefix(set.exec_group_name_prefix);
-      DCHECK(!prefix.empty() || exec_group_sets.size() == 1)
-          << "An empty group set prefix can only exist if no executor group sets are "
-             "specified";
       for (const auto& it : snapshot->executor_groups) {
+        if (it.first == ImpalaServer::DEFAULT_EXECUTOR_GROUP_NAME) continue;
         StringPiece name(it.first);
         if (!prefix.empty() && !name.starts_with(prefix)) continue;
         matching_exec_groups_found++;
         if (!it.second.IsHealthy()) continue;
         int num_executors = it.second.NumExecutors();
-        if (num_executors > max_num_executors) {
-          max_num_executors = num_executors;
-          set.curr_num_executors = num_executors;
-        }
+        if (num_executors > max_num_executors) max_num_executors = num_executors;
       }
+
+      TExecutorGroupSet result_set = expected_set;
+      result_set.__set_curr_num_executors(std::max(0, max_num_executors));
+      exec_group_sets.push_back(result_set);
     }
-    if (matching_exec_groups_found != snapshot->executor_groups.size()) {
+
+    if (matching_exec_groups_found != num_custom_groups) {
       vector<string> group_sets;
-      group_sets.reserve(exec_group_sets.size());
-      for (const auto& set : exec_group_sets) {
+      group_sets.reserve(custom_expected_sets.size());
+      for (const auto& set : custom_expected_sets) {
         group_sets.push_back(set.exec_group_name_prefix);
       }
       vector<string> group_names;
       for (const auto& it : snapshot->executor_groups) {
-        group_names.push_back(it.first);
+        if (it.first != ImpalaServer::DEFAULT_EXECUTOR_GROUP_NAME) {
+          group_names.push_back(it.first);
+        }
       }
       LOG(WARNING) << "Some executor groups either do not match expected group sets or "
                    "match to more than one set. Expected group sets: "
