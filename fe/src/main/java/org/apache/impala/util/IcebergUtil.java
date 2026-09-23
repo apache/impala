@@ -788,7 +788,7 @@ public class IcebergUtil {
    * Use ContentFile path to generate 128-bit XXH128 hash as map key, cached in memory
    */
   public static Hash128 getFilePathHash(ContentFile contentFile) {
-    return getFilePathHash(contentFile.path().toString());
+    return getFilePathHash(contentFile.location());
   }
 
   public static Hash128 getFilePathHash(String path) {

@@ -1092,7 +1092,7 @@ public interface FeIcebergTable extends FeFsTable {
         boolean requiresDataFilesInTableLocation,
         ListMap<TNetworkAddress> hostIndex) throws IOException {
       Path fileLoc = FileSystemUtil.createFullyQualifiedPath(
-          new Path(contentFile.path().toString()));
+          new Path(contentFile.location()));
       FileSystem fsForPath = FileSystemUtil.getFileSystemForPath(fileLoc);
       FileStatus fileStatus;
       if (FileSystemUtil.supportsStorageIds(fsForPath)) {

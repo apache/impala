@@ -935,7 +935,7 @@ public class IcebergScanPlanner {
       throw new ImpalaRuntimeException(String.format("Cannot find file: %s in" +
           " Iceberg table %s (snapshot id: %d) It's possibly missing from storage." +
           " Check ImpalaD/CatalogD logs for details. List of all missing files: %s",
-          cf.path(), getIceTable().getFullName(), getIceTable().snapshotId(),
+          cf.location(), getIceTable().getFullName(), getIceTable().snapshotId(),
           fileStore.getMissingFiles()));
     }
     // We can still find the file descriptor among the old file descriptors.
@@ -952,11 +952,11 @@ public class IcebergScanPlanner {
           getIceTable().getHostIndex());
       if (hdfsFileDesc == null) {
         throw new ImpalaRuntimeException(
-            "Cannot load file descriptor for: " + cf.path());
+            "Cannot load file descriptor for: " + cf.location());
       }
     } catch (IOException ex) {
       throw new ImpalaRuntimeException(
-          "Cannot load file descriptor for " + cf.path(), ex);
+          "Cannot load file descriptor for " + cf.location(), ex);
     }
 
     Preconditions.checkNotNull(hdfsFileDesc);

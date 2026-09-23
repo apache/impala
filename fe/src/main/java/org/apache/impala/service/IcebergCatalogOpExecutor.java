@@ -733,7 +733,7 @@ public class IcebergCatalogOpExecutor {
     // selected, and delete only the selected, rewritten files.
     if (icebergOp.isSetReplaced_data_files_without_deletes()) {
       for (DataFile dataFile : contentFiles.dataFilesWithoutDeletes) {
-        if (icebergOp.replaced_data_files_without_deletes.contains(dataFile.path())) {
+        if (icebergOp.replaced_data_files_without_deletes.contains(dataFile.location())) {
           rewrite.deleteFile(dataFile);
         }
       }

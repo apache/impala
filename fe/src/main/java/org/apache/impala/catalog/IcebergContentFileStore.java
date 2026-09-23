@@ -349,7 +349,7 @@ public class IcebergContentFileStore {
     if (pathHashAndFd.second != null) {
       container.add(pathHashAndFd.first, pathHashAndFd.second);
     } else {
-      missingFiles_.add(contentFile.path().toString());
+      missingFiles_.add(contentFile.location());
     }
   }
 

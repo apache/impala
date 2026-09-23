@@ -198,14 +198,14 @@ public class ShowFilesStmt extends StatementBase implements SingleTableStmt {
         if (fileScanTask.residual().isEquivalentTo(Expressions.alwaysTrue())) {
           // Add delete files
           for (DeleteFile deleteFile : fileScanTask.deletes()) {
-            String path = deleteFile.path().toString();
+            String path = deleteFile.location();
             if (uniquePaths.add(path)) {
               filePaths.add(path);
             }
           }
 
           // Add data file
-          String dataFilePath = fileScanTask.file().path().toString();
+          String dataFilePath = fileScanTask.file().location();
           if (uniquePaths.add(dataFilePath)) {
             filePaths.add(dataFilePath);
           }

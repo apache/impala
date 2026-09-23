@@ -186,10 +186,9 @@ public class AlterTableDropPartitionStmt extends AlterTableStmt {
           List<DeleteFile> deleteFiles = fileScanTask.deletes();
           if (!deleteFiles.isEmpty()) {
             icebergFilePaths_.addAll(deleteFiles.stream()
-                .map(deleteFile -> deleteFile.path().toString()).collect(
-                    Collectors.toSet()));
+                .map(DeleteFile::location).collect(Collectors.toSet()));
           }
-          icebergFilePaths_.add(fileScanTask.file().path().toString());
+          icebergFilePaths_.add(fileScanTask.file().location());
         }
       }
       numberOfIcebergPartitions_ = icebergPartitionSummary.size();

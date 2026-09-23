@@ -100,8 +100,8 @@ public class OptimizeStmt extends DmlStatementBase {
   private TSortingOrder sortingOrder_ = TSortingOrder.LEXICAL;;
   // Exprs corresponding to the partition fields of the table.
   protected List<Expr> partitionKeyExprs_ = new ArrayList<>();
-  // File paths of data files without deletes selected for compaction after file size
-  // filtering.
+  // Iceberg file path strings of data files without deletes selected for compaction after
+  // file size filtering.
   private Set<String> selectedIcebergFilePaths_ = new HashSet<>();
   // Describes the mode of this OPTIMIZE operation. Decided during analysis. Null if the
   // operation is a no-op (see isNoOp()), i.e. the table was empty or no files were
@@ -236,17 +236,24 @@ public class OptimizeStmt extends DmlStatementBase {
       mode_ = filterResult.getOptimizationMode();
 
       if (mode_ == TIcebergOptimizationMode.PARTIAL) {
-        List<IcebergFileDescriptor> selectedDataFilesWithoutDeletes =
-            dataFilesWithoutDeletesToFileDescriptors(
-                filterResult.getSelectedFilesWithoutDeletes(), iceTable);
-        tableRef_.setSelectedDataFilesForOptimize(selectedDataFilesWithoutDeletes);
-        collectAbsolutePaths(selectedDataFilesWithoutDeletes);
+        List<DataFile> selectedDataFiles = filterResult.getSelectedFilesWithoutDeletes();
+        tableRef_.setSelectedDataFilesForOptimize(
+            dataFilesWithoutDeletesToFileDescriptors(selectedDataFiles, iceTable));
+        for (DataFile dataFile : selectedDataFiles) {
+          selectedIcebergFilePaths_.add(dataFile.location());
+        }
       }
     } catch (Exception e) {
       throw new AnalysisException(e);
     }
   }
 
+  /**
+   * Converts the given data files without deletes to file descriptors. Throws if any of
+   * them has no matching file descriptor: IcebergContentFileStore silently drops such a
+   * content file (see storeFile()/missingFiles_), and sending the path of a file that is
+   * not scanned and rewritten would remove live data at commit time.
+   */
   private List<IcebergFileDescriptor> dataFilesWithoutDeletesToFileDescriptors(
       List<DataFile> contentFiles, FeIcebergTable iceTable)
       throws IOException, ImpalaRuntimeException {
@@ -256,15 +263,12 @@ public class OptimizeStmt extends DmlStatementBase {
         new IcebergContentFileStore(iceTable.getIcebergApiTable(),
             iceTable.getContentFileStore().getDataFilesWithoutDeletes(),
             selectedContentFiles, new HashMap<>());
-    return selectedFiles.getDataFilesWithoutDeletes();
-  }
-
-  private void collectAbsolutePaths(List<IcebergFileDescriptor> selectedFiles) {
-    for (IcebergFileDescriptor fileDesc : selectedFiles) {
-      org.apache.hadoop.fs.Path path = new org.apache.hadoop.fs.Path(
-          fileDesc.getAbsolutePath(((FeIcebergTable) table_).getHdfsBaseDir()));
-      selectedIcebergFilePaths_.add(path.toUri().toString());
+    if (selectedFiles.hasMissingFile()) {
+      throw new ImpalaRuntimeException(String.format("Cannot OPTIMIZE Iceberg table" +
+          " '%s' due to unavailable files: %s.",
+          iceTable.getFullName(), selectedFiles.getMissingFiles()));
     }
+    return selectedFiles.getDataFilesWithoutDeletes();
   }
 
   private void createSourceStmt(Analyzer analyzer) throws AnalysisException {

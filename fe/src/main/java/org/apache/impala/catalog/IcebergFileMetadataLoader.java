@@ -156,7 +156,7 @@ public class IcebergFileMetadataLoader extends FileMetadataLoader {
       // If requiresDataFilesInTableLocation_ is true, we assume that the file system
       // for all ContentFiles is the same as fsForTable
       if (!requiresDataFilesInTableLocation_) {
-        Path path = new Path(contentFile.path().toString());
+        Path path = new Path(contentFile.location());
         fsForPath = path.toUri().getScheme() != null ?
             FileSystemUtil.getFileSystemForPath(path) : defaultFs;
       }
@@ -245,7 +245,7 @@ public class IcebergFileMetadataLoader extends FileMetadataLoader {
       ContentFile<?> contentFile, Path partPath, AtomicLong numUnknownDiskIds)
       throws CatalogException, IOException {
     Path fileLoc = FileSystemUtil.createFullyQualifiedPath(
-        new Path(contentFile.path().toString()));
+        new Path(contentFile.location()));
     // For OSS service (e.g. S3A, COS, OSS, etc), we create FileStatus ourselves.
     FileStatus stat = Utils.createFileStatus(contentFile, fileLoc);
 
@@ -342,7 +342,7 @@ public class IcebergFileMetadataLoader extends FileMetadataLoader {
     long startTime = clock.getTick();
     Map<Path, List<ContentFile<?>>> ret = contentFiles.stream()
         .collect(Collectors.groupingBy(
-            cf -> new Path(String.valueOf(cf.path())).getParent(),
+            cf -> new Path(cf.location()).getParent(),
             HashMap::new,
             Collectors.toList()
         ));
@@ -374,12 +374,12 @@ public class IcebergFileMetadataLoader extends FileMetadataLoader {
     List<IcebergFileDescriptor> ret = new ArrayList<>();
     for (ContentFile<?> contentFile : contentFiles) {
       Path path = FileSystemUtil.createFullyQualifiedPath(
-          new Path(contentFile.path().toString()));
+          new Path(contentFile.location()));
       FileStatus stat = pathToFileStatus.get(path);
       if (stat == null) {
         LOG.warn(String.format(
             "Failed to load Iceberg content file: '%s', Not found on storage",
-            contentFile.path().toString()));
+            contentFile.location()));
         continue;
       }
       ret.add(createLocatedFd(fs, contentFile, stat, tablePath_, numUnknownDiskIds));

@@ -84,7 +84,7 @@ public class IcebergFileFilterTest {
     if (expectedMode == TIcebergOptimizationMode.PARTIAL) {
       Preconditions.checkState(expectedPaths != null);
       for (DataFile df : result.getSelectedFilesWithoutDeletes()) {
-        assertTrue(expectedPaths.contains(df.path()));
+        assertTrue(expectedPaths.contains(df.location()));
       }
     } else {
       Preconditions.checkState(expectedPaths == null);

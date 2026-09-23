@@ -2316,6 +2316,34 @@ class TestIcebergV2Table(IcebergTestSuite):
     # All partitions have delete files, therefore the entire table is rewritten.
     self._check_file_filtering(tbl_name, 100, "REWRITE_ALL", True)
 
+  def test_optimize_special_char_partitions(self, unique_database):
+    """IMPALA-15409: Partial OPTIMIZE has to send Iceberg's own file paths to the
+    catalog. Iceberg percent-encodes partition values that contain characters like '/',
+    '"' or '=', so these paths must not be re-encoded on the way."""
+    tbl_name = unique_database + ".ice_optimize_special_chars"
+    self.execute_query("""CREATE TABLE {0} (i INT, s STRING)
+                       PARTITIONED BY SPEC (s) STORED BY ICEBERG
+                       TBLPROPERTIES ('format-version'='2');""".format(tbl_name))
+    # Partition values that Iceberg percent-encodes in the file paths, plus a plain one;
+    # each of these partitions holds 2 small files, so all files are selected.
+    rewritten_partitions = ['11/27/21', '11"27"21', '11=27=21', 'plain']
+    for batch in range(2):
+      values = ", ".join("({0}, '{1}')".format(batch, part)
+                         for part in rewritten_partitions)
+      self.execute_query("INSERT INTO {0} VALUES {1};".format(tbl_name, values))
+    # This partition is left with a single data file, which is skipped as a redundant
+    # rewrite and should remain untouched, therefore this is a PARTIAL compaction.
+    self.execute_query("INSERT INTO {0} VALUES (2, 'single/file');".format(tbl_name))
+    show_files = self.execute_query("SHOW FILES IN {0};".format(tbl_name))
+    for encoded_dir in ['s=11%2F27%2F21', 's=11%2227%2221', 's=11%3D27%3D21',
+                        's=single%2Ffile']:
+      assert any(encoded_dir in line for line in show_files.data), show_files.data
+    self._check_file_filtering(tbl_name, 64, "PARTIAL", False)
+    result = self.execute_query(
+        "SELECT s, count(*) FROM {0} GROUP BY s ORDER BY s;".format(tbl_name))
+    assert result.data == ['11"27"21\t2', '11/27/21\t2', '11=27=21\t2', 'plain\t2',
+                           'single/file\t1'], result.data
+
   def test_merge(self, vector, unique_database):
     udf_location = get_fs_path('/test-warehouse/libTestUdfs.so')
     self.run_test_case('QueryTest/iceberg-merge', vector, unique_database,
