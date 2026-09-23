@@ -144,4 +144,19 @@ TEST(OAuthServersManagerTest, VerifyFailsWhenOnlyWrongJwksConfigured) {
   EXPECT_NE(string::npos, status.GetDetail().find("no matching key"));
 }
 
+TEST(OAuthServersManagerTest, AuthFailMessageRemovesTrailingCrLf) {
+  OAuthServersManager fixture;
+  Status stat("error message\n\r");
+  EXPECT_EQ("WWW-Authenticate: Bearer error=\"invalid_token\","
+      "error_description=\"error message\"",
+      OAuthServersManager::BearerAuthFailureHeader(stat));
+}
+
+TEST(OAuthServersManagerTest, AuthFailMessageEmpty) {
+  OAuthServersManager fixture;
+  Status stat("");
+  EXPECT_EQ("WWW-Authenticate: Bearer error=\"invalid_token\"," "error_description=\"\"",
+      OAuthServersManager::BearerAuthFailureHeader(stat));
+}
+
 } // namespace impala
