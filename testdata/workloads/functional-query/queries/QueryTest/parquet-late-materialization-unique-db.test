@@ -63,7 +63,7 @@ aggregation(SUM, NumTopLevelValuesSkipped): 17
 # Selects the last row in a row group and then skips the first row in the next
 # row group.
 select count(o_orderkey)
-from customer_nested_multiblock_multipage t
+from functional_parquet.customer_nested_multiblock_multipage t
 left join t.c_orders
 where cast(c_custkey as string) like '100';
 ---- RESULTS
@@ -79,7 +79,7 @@ aggregation(SUM, NumTopLevelValuesSkipped): 299
 # order's key. The file has 3 row groups of 100 rows and pages of 20 rows. No
 # predicate, so no rows are skipped.
 select count(*), count(o.o_orderkey), sum(o.o_orderkey)
-from customer_nested_multiblock_multipage c
+from functional_parquet.customer_nested_multiblock_multipage c
 left join c.c_orders o
 left join o.o_lineitems l;
 ---- RESULTS

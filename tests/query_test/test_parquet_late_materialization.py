@@ -15,6 +15,8 @@
 # specific language governing permissions and limitations
 # under the License.
 
+from copy import deepcopy
+
 from tests.common.impala_test_suite import ImpalaTestSuite
 from tests.common.file_utils import create_table_from_parquet
 
@@ -33,10 +35,24 @@ class TestParquetLateMaterialization(ImpalaTestSuite):
   def test_parquet_late_materialization(self, vector):
     self.run_test_case('QueryTest/parquet-late-materialization', vector)
 
+  def test_parquet_late_materialization_collections(self, vector):
+    """IMPALA-15374: the row counter of a collection column reader must stay in sync
+    when rows are skipped. The page index decides which symptom shows up, so run with it
+    on and off."""
+    new_vector = deepcopy(vector)
+    # A small batch size makes whole scratch batches get filtered out between surviving
+    # ones, which is what triggers the skip.
+    new_vector.get_value('exec_option')['batch_size'] = 4
+    for late_mat in [-1, 1]:
+      new_vector.get_value('exec_option')['parquet_late_materialization_threshold'] = \
+          late_mat
+      for page_index in ['true', 'false']:
+        new_vector.get_value('exec_option')['parquet_read_page_index'] = page_index
+        self.run_test_case('QueryTest/parquet-late-materialization-collections',
+            new_vector)
+
   def test_parquet_late_materialization_unique_db(self, vector, unique_database):
     create_table_from_parquet(self.client, unique_database, 'decimals_1_10')
     create_table_from_parquet(self.client, unique_database, 'nested_decimals')
-    create_table_from_parquet(
-        self.client, unique_database, 'customer_nested_multiblock_multipage')
     self.run_test_case('QueryTest/parquet-late-materialization-unique-db', vector,
         unique_database)

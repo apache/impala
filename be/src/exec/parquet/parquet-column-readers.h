@@ -445,11 +445,13 @@ class BaseScalarColumnReader : public ParquetColumnReader {
   /// Metadata for the column for the current row group.
   const parquet::ColumnMetaData* metadata_ = nullptr;
 
-  /// Index of the current top-level row within the row group. It is updated together
-  /// with the rep/def levels.
-  /// When updated, and its value is N, it means that we already processed the Nth row
-  /// completely, hence the initial value is '-1', because '0' would mean that we already
-  /// processed the first (zeroeth) row.
+  /// Index of the current top-level row within the row group. When its value is N, it
+  /// means that we already processed the Nth row completely, hence the initial value is
+  /// '-1', because '0' would mean that we already processed the first (zeroeth) row.
+  /// It is only maintained where it is observed: when we filter pages, when the reader
+  /// fills a position or file position slot, and on the non-batched path. Otherwise its
+  /// value is unreliable: some paths still advance it, e.g. row skipping, while others
+  /// do not, so it can stay -1 or lag behind the rows already read.
   int64_t current_row_ = -1;
 
   /// This flag is needed for the proper tracking of the last processed row.
@@ -604,6 +606,10 @@ class BaseScalarColumnReader : public ParquetColumnReader {
       DCHECK_NE(rep_level_, ParquetLevel::INVALID_LEVEL);
       rep_levels_.CachePrev();
       def_levels_.CachePrev();
+      // Roll back 'current_row_' too, under the same condition NextLevels() advances
+      // it. Evaluated before 'rep_level_' is invalidated below. At the end of a row
+      // group 'rep_level_' is ROW_GROUP_END, where nothing was advanced.
+      if (max_rep_level() == 0 || rep_level_ == 0) --current_row_;
       rep_level_ = ParquetLevel::INVALID_LEVEL;
       def_level_ = ParquetLevel::INVALID_LEVEL;
       ++num_buffered_values_;

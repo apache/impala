@@ -1,0 +1,32 @@
+# IMPALA-15374: skipping rows for a collection column reader must keep its row counter in
+# sync. Run with late materialization and the page index on and off; all combinations
+# must return the same rows.
+====
+---- QUERY
+# The collection reader fills the file position slot here. Before the fix the position
+# drifted by one per skipped range: 1, 4, 7, 0 instead of 1, 3, 5, 0, and 7 is past the
+# end of the 7 row file.
+select file__position, int_array, id
+from functional_parquet.complextypestbl where id % 2 = 0 order by id;
+---- RESULTS
+1,'[null,1,2,null,3,null]',2
+3,'NULL',4
+5,'NULL',6
+0,'[-1]',8
+---- TYPES
+BIGINT, STRING, BIGINT
+====
+---- QUERY
+# With the page index the same drift moves the reader itself, pairing rows with the wrong
+# collection value. Before the fix customer 290 got customer 289's orders and customer 299
+# got none.
+select c_custkey, count(o.o_orderkey), min(o.o_orderkey)
+from functional_parquet.customer_nested_multiblock_multipage c left join c.c_orders o
+where c_custkey > 280 and c_custkey % 9 = 2 group by c_custkey order by c_custkey;
+---- RESULTS
+281,11,228356
+290,4,3562656
+299,9,465957
+---- TYPES
+BIGINT, BIGINT, BIGINT
+====

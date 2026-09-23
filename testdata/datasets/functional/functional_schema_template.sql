@@ -2894,6 +2894,25 @@ LOAD DATA LOCAL INPATH '{impala_home}/testdata/CustomerMultiBlock/customer_multi
 OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name};
 ====
 ---- DATASET
+-- Same schema as customer_multiblock, but with multiple row groups and multiple pages
+-- per column chunk. Used by tests that need to cross row group and page boundaries.
+---- BASE_TABLE_NAME
+customer_nested_multiblock_multipage
+---- COLUMNS
+C_CUSTKEY BIGINT
+C_NAME STRING
+C_ADDRESS STRING
+C_NATIONKEY SMALLINT
+C_PHONE STRING
+C_ACCTBAL DECIMAL(12, 2)
+C_MKTSEGMENT STRING
+C_COMMENT STRING
+C_ORDERS ARRAY<STRUCT<O_ORDERKEY: BIGINT, O_ORDERSTATUS: STRING, O_TOTALPRICE: DECIMAL(12, 2), O_ORDERDATE: STRING, O_ORDERPRIORITY: STRING, O_CLERK: STRING, O_SHIPPRIORITY: INT, O_COMMENT: STRING, O_LINEITEMS: ARRAY<STRUCT<L_PARTKEY: BIGINT, L_SUPPKEY: BIGINT, L_LINENUMBER: INT, L_QUANTITY: DECIMAL(12, 2), L_EXTENDEDPRICE: DECIMAL(12, 2), L_DISCOUNT: DECIMAL(12, 2), L_TAX: DECIMAL(12, 2), L_RETURNFLAG: STRING, L_LINESTATUS: STRING, L_SHIPDATE: STRING, L_COMMITDATE: STRING, L_RECEIPTDATE: STRING, L_SHIPINSTRUCT: STRING, L_SHIPMODE: STRING, L_COMMENT: STRING>>>>
+---- DEPENDENT_LOAD_HIVE
+LOAD DATA LOCAL INPATH '{impala_home}/testdata/data/customer_nested_multiblock_multipage.parquet'
+OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name};
+====
+---- DATASET
 functional
 ---- BASE_TABLE_NAME
 bzip2_tbl
