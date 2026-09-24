@@ -46,7 +46,7 @@ void CodegenCallGraph::FindGlobalUsers(
       users->push_back(inst->getFunction());
     } else if (llvm::isa<llvm::GlobalVariable>(user)) {
       llvm::GlobalVariable* gv = llvm::cast<llvm::GlobalVariable>(user);
-      string val_name = gv->getName();
+      llvm::StringRef val_name = gv->getName();
       // We strip global ctors and dtors out of the modules as they are not run.
       if (val_name.find("llvm.global_ctors") == string::npos &&
           val_name.find("llvm.global_dtors") == string::npos) {
@@ -65,7 +65,7 @@ void CodegenCallGraph::Init(llvm::Module* module) {
   // Create a mapping of functions to their referenced functions.
   for (llvm::Function& fn : module->functions()) {
     if (fn.isIntrinsic() || fn.isDeclaration()) continue;
-    string fn_name = fn.getName();
+    string fn_name = fn.getName().str();
     // Create an entry for a function if it doesn't exist already.
     // This creates entries for functions which don't have any callee.
     if (call_graph_.find(fn_name) == call_graph_.end()) {
@@ -74,7 +74,7 @@ void CodegenCallGraph::Init(llvm::Module* module) {
     vector<llvm::GlobalObject*> users;
     FindGlobalUsers(&fn, &users);
     for (llvm::GlobalValue* val : users) {
-      const string& caller_name = val->getName();
+      const string& caller_name = val->getName().str();
       DCHECK(llvm::isa<llvm::GlobalVariable>(val) || llvm::isa<llvm::Function>(val));
       // 'call_graph_' contains functions which need to be materialized when a certain
       // IR Function is materialized. We choose to include functions referenced by

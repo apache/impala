@@ -307,22 +307,20 @@ Status ScalarFnCall::GetCodegendComputeFnImpl(LlvmCodeGen* codegen, llvm::Functi
 
   // First argument is always FunctionContext*.
   // Index into our registered offset in the ScalarFnEvaluator.
-  llvm::Value* eval_gep = builder.CreateStructGEP(NULL, eval, 1, "eval_gep");
-  llvm::Value* fn_ctxs_base = builder.CreateLoad(eval_gep, "fn_ctxs_base");
-  // Use GEP to add our index to the base pointer
-  llvm::Value* fn_ctx_ptr =
-      builder.CreateConstGEP1_32(fn_ctxs_base, fn_ctx_idx_, "fn_ctx_ptr");
-  llvm::Value* fn_ctx = builder.CreateLoad(fn_ctx_ptr, "fn_ctx");
+  llvm::Function* get_fn_ctx_fn = codegen->GetFunction(
+      IRFunction::GET_FUNCTION_CTX, false);
+  llvm::Value* fn_ctx = builder.CreateCall(
+      get_fn_ctx_fn, {eval, codegen->GetI32Constant(fn_ctx_idx_)}, "fn_ctx");
   udf_args.push_back(fn_ctx);
 
   // Allocate a varargs array. The array's entry type is the appropriate AnyVal subclass.
   // E.g. if the vararg type is STRING, and the function is called with 10 arguments, we
   // allocate a StringVal[10] array. We allocate the buffer with Alloca so that LLVM can
   // optimise out the buffer once the function call is inlined.
-  llvm::Value* varargs_buffer = NULL;
+  llvm::Type* unlowered_varargs_type = nullptr;
+  llvm::Value* varargs_buffer = nullptr;
   if (vararg_start_idx_ != -1) {
-    llvm::Type* unlowered_varargs_type =
-        CodegenAnyVal::GetUnloweredType(codegen, VarArgsType());
+    unlowered_varargs_type = CodegenAnyVal::GetUnloweredType(codegen, VarArgsType());
     varargs_buffer = codegen->CreateEntryBlockAlloca(builder, unlowered_varargs_type,
         NumVarArgs(), FunctionContextImpl::VARARGS_BUFFER_ALIGNMENT, "varargs_buffer");
   }
@@ -340,63 +338,26 @@ Status ScalarFnCall::GetCodegendComputeFnImpl(LlvmCodeGen* codegen, llvm::Functi
     DCHECK(child_fn != NULL);
     llvm::Type* arg_type = CodegenAnyVal::GetUnloweredType(codegen, children_[i]->type());
     llvm::Value* arg_val_ptr;
-#ifdef __aarch64__
     PrimitiveType col_type = children_[i]->type().type;
-#endif
     if (i < NumFixedArgs()) {
-#ifndef __aarch64__
       // Allocate space to store 'child_fn's result so we can pass the pointer to the UDF.
-      arg_val_ptr = codegen->CreateEntryBlockAlloca(builder, arg_type, "arg_val_ptr");
-      udf_args.push_back(arg_val_ptr);
-#else
-      if (col_type != TYPE_BOOLEAN and col_type != TYPE_TINYINT
-          and col_type != TYPE_SMALLINT) {
+      if (col_type == TYPE_BOOLEAN or col_type == TYPE_TINYINT
+          or col_type == TYPE_SMALLINT) {
+        arg_val_ptr = codegen->CreateEntryBlockAlloca(builder,
+            CodegenAnyVal::GetLoweredType(codegen, children_[i]->type()), 1,
+            FunctionContextImpl::VARARGS_BUFFER_ALIGNMENT, "aligned_arg_val_ptr");
+      } else {
         arg_val_ptr = codegen->CreateEntryBlockAlloca(builder, arg_type, "arg_val_ptr");
-        udf_args.push_back(arg_val_ptr);
       }
-#endif
+      udf_args.push_back(arg_val_ptr);
     } else {
       // Store the result of 'child_fn' in varargs_buffer[i].
-      arg_val_ptr =
-          builder.CreateConstGEP1_32(varargs_buffer, i - NumFixedArgs(), "arg_val_ptr");
+      arg_val_ptr = builder.CreateConstGEP1_32(unlowered_varargs_type, varargs_buffer,
+              i - NumFixedArgs(), "arg_val_ptr");
     }
-#ifndef __aarch64__
-    DCHECK_EQ(arg_val_ptr->getType(), arg_type->getPointerTo());
-    // The result of the call must be stored in a lowered AnyVal
-    llvm::Value* lowered_arg_val_ptr = builder.CreateBitCast(arg_val_ptr,
-        CodegenAnyVal::GetLoweredPtrType(codegen, children_[i]->type()),
-        "lowered_arg_val_ptr");
-#else
-    llvm::Value* lowered_arg_val_ptr;
-    if (col_type == TYPE_BOOLEAN or col_type == TYPE_TINYINT
-        or col_type == TYPE_SMALLINT) {
-      lowered_arg_val_ptr = codegen->CreateEntryBlockAlloca(builder,
-          CodegenAnyVal::GetLoweredType(codegen, children_[i]->type()), 1,
-          FunctionContextImpl::VARARGS_BUFFER_ALIGNMENT, "lowered_arg_val_ptr");
-    } else {
-      lowered_arg_val_ptr = builder.CreateBitCast(arg_val_ptr,
-          CodegenAnyVal::GetLoweredPtrType(codegen, children_[i]->type()),
-          "lowered_arg_val_ptr");
-    }
-#endif
+    DCHECK(arg_val_ptr->getType()->isPointerTy());
     CodegenAnyVal::CreateCall(
-        codegen, &builder, child_fn, child_fn_args, "arg_val", lowered_arg_val_ptr);
-#ifdef __aarch64__
-    if (col_type == TYPE_BOOLEAN or col_type == TYPE_TINYINT
-        or col_type == TYPE_SMALLINT) {
-      if (i < NumFixedArgs()) {
-        arg_val_ptr = builder.CreateTruncOrBitCast(lowered_arg_val_ptr,
-            CodegenAnyVal::GetUnloweredPtrType(codegen, children_[i]->type()),
-            "arg_val_ptr");
-        udf_args.push_back(arg_val_ptr);
-      } else {
-        llvm::Value* tmp_ptr = builder.CreateTruncOrBitCast(lowered_arg_val_ptr,
-            CodegenAnyVal::GetUnloweredPtrType(codegen, children_[i]->type()),
-            "tmp_ptr");
-        builder.CreateStore(builder.CreateLoad(tmp_ptr), arg_val_ptr);
-      }
-    }
-#endif
+        codegen, &builder, child_fn, child_fn_args, "arg_val", arg_val_ptr);
   }
 
   if (vararg_start_idx_ != -1) {
@@ -406,9 +367,7 @@ Status ScalarFnCall::GetCodegendComputeFnImpl(LlvmCodeGen* codegen, llvm::Functi
     // Add the number of varargs
     udf_args.push_back(codegen->GetI32Constant(NumVarArgs()));
     // Add all the accumulated vararg inputs as one input argument.
-    llvm::PointerType* vararg_type =
-        CodegenAnyVal::GetUnloweredPtrType(codegen, VarArgsType());
-    udf_args.push_back(builder.CreateBitCast(varargs_buffer, vararg_type, "varargs"));
+    udf_args.push_back(varargs_buffer);
   }
 
   // Call UDF

@@ -230,8 +230,7 @@ void Coordinator::InitFragmentStats() {
 
   RuntimeProfileBase::Type profile_type = aggregated_profile?
       RuntimeProfileBase::Type::AGGREGATED : RuntimeProfileBase::Type::UNAGGREGATED;
-  query_profile_->AddInfoString("Profile Type",
-      static_cast<stringstream&>(stringstream() << profile_type).str());
+  query_profile_->AddInfoString("Profile Type", (stringstream() << profile_type).str());
 
   int32_t profile_version = aggregated_profile? 2: 1;
   query_profile_->AddInfoString("Profile Version", std::to_string(profile_version));

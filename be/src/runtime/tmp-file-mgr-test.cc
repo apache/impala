@@ -1141,7 +1141,7 @@ TEST_F(TmpFileMgrTest, TestDirectoryLimitParsingRemotePath) {
 
     // Parse successfully, but the parsed HDFS path is unable to connect.
     // These cases would fail the initialization of TmpFileMgr.
-    for (const string& unreachable_path : {
+    for (string unreachable_path : {
       "hdfs://localhost:1/tmp::1", "hdfs://localhost:/tmp::", "hdfs://localhost/tmp::1",
       "hdfs://localhost/tmp:1", "hdfs://localhost/tmp", "hdfs://localhost/:1",
       "hdfs://localhost:1 ", "hdfs://localhost/ "

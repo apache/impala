@@ -732,7 +732,17 @@ inline std::ostream& operator<<(std::ostream& os, const StringVal& val) {
   return os.write(reinterpret_cast<const char*>(val.ptr), val.len);
 }
 
+// __int128_t has 16-byte alignment, but a DecimalVal can be embedded in UDA state
+// structs allocated from 8-byte aligned buffers (FreePool/MemPool), where aligned SSE
+// accesses (movaps) would fault. Lowering val16's alignment to 8 avoids that while
+// keeping the layout (size 32, val16 at offset 16) that UDFs compiled against earlier
+// releases expect.
+typedef __int128_t int128_align8_t __attribute__((aligned(8)));
+
 struct DecimalVal : public impala_udf::AnyVal {
+  // Explicit padding so val16 stays at offset 16 now that its alignment is 8.
+  char padding_[15];
+
   /// Decimal data is stored as an unscaled integer value. For example, the decimal 1.00
   /// (precision 3, scale 2) is stored as 100. The byte size necessary to store the
   /// decimal depends on the precision, which determines which field of the union should
@@ -749,7 +759,7 @@ struct DecimalVal : public impala_udf::AnyVal {
   union {
     int32_t val4;
     int64_t val8;
-    __int128_t val16;
+    int128_align8_t val16;
   };
 
   DecimalVal() : val16(0) {}
@@ -776,6 +786,12 @@ struct DecimalVal : public impala_udf::AnyVal {
     *this = other;
   }
 };
+
+// static_assert needs C++11, but this header must also build as C++98.
+#if __cplusplus >= 201103L
+static_assert(sizeof(DecimalVal) == 32, "DecimalVal size is part of the UDF ABI");
+static_assert(alignof(DecimalVal) == 8, "DecimalVal must not require 16-byte alignment");
+#endif
 
 typedef uint8_t* BufferVal;
 

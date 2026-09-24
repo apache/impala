@@ -362,11 +362,8 @@ llvm::Function* ScalarExpr::CreateIrFunctionPrototype(
     const string& name, LlvmCodeGen* codegen, llvm::Value* (*args)[2]) {
   llvm::Type* return_type = CodegenAnyVal::GetLoweredType(codegen, type());
   LlvmCodeGen::FnPrototype prototype(codegen, name, return_type);
-  prototype.AddArgument(
-      LlvmCodeGen::NamedVariable(
-          "eval", codegen->GetStructPtrType<ScalarExprEvaluator>()));
-  prototype.AddArgument(LlvmCodeGen::NamedVariable(
-      "row", codegen->GetStructPtrType<TupleRow>()));
+  prototype.AddArgument(LlvmCodeGen::NamedVariable("eval", codegen->ptr_type()));
+  prototype.AddArgument(LlvmCodeGen::NamedVariable("row", codegen->ptr_type()));
   llvm::Function* function = prototype.GeneratePrototype(NULL, args[0]);
   DCHECK(function != NULL);
   return function;

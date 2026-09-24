@@ -101,7 +101,6 @@ void MemInfo::ParseOvercommit() {
 }
 
 bool MemInfo::HaveSmaps() {
-  MappedMemInfo result;
   ifstream smaps("/proc/self/smaps", ios::in);
   return smaps.good();
 }

@@ -18,8 +18,12 @@
 #ifndef STATESTORE_STATESTORE_SERVICE_CLIENT_WRAPPER_H
 #define STATESTORE_STATESTORE_SERVICE_CLIENT_WRAPPER_H
 
+// GCC reports -Woverloaded-virtual at the base declaration in the generated headers.
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Woverloaded-virtual"
 #include "gen-cpp/StatestoreHaService.h"
 #include "gen-cpp/StatestoreService.h"
+#pragma GCC diagnostic pop
 
 namespace impala {
 

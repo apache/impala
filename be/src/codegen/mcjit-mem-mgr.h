@@ -19,7 +19,7 @@
 #ifndef IMPALA_CODEGEN_MCJIT_MEM_MGR_H
 #define IMPALA_CODEGEN_MCJIT_MEM_MGR_H
 
-#include "thirdparty/llvm/SectionMemoryManager.h"
+#include <llvm/ExecutionEngine/SectionMemoryManager.h>
 
 extern void *__dso_handle __attribute__ ((__visibility__ ("hidden")));
 
@@ -34,9 +34,10 @@ namespace impala {
 /// which come from global variables with destructors.
 ///
 /// We also use it to track how much memory is allocated for compiled code.
-class ImpalaMCJITMemoryManager : public SectionMemoryManager {
+class ImpalaMCJITMemoryManager : public llvm::SectionMemoryManager {
  public:
-  ImpalaMCJITMemoryManager() : bytes_allocated_(0), bytes_tracked_(0){}
+  ImpalaMCJITMemoryManager() : SectionMemoryManager(nullptr, true),
+      bytes_allocated_(0), bytes_tracked_(0){}
 
   virtual uint64_t getSymbolAddress(const std::string& name) override {
     if (name == "__dso_handle") return reinterpret_cast<uint64_t>(&__dso_handle);

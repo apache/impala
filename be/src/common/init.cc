@@ -19,6 +19,7 @@
 
 #include <csignal>
 #include <regex>
+#include <string_view>
 #include <boost/filesystem.hpp>
 #include <third_party/lss/linux_syscall_support.h>
 
@@ -68,6 +69,7 @@
 
 #include "common/names.h"
 
+using std::string_view;
 using namespace impala;
 namespace filesystem = boost::filesystem;
 
@@ -381,7 +383,7 @@ static Status JavaAddOpens() {
     val_out << current_val_c;
   }
 
-  for (const string& param : {
+  for (const string_view param : {
     // Needed for jamm to access lambdas.
     "--add-opens=java.base/java.lang=ALL-UNNAMED",
     "--add-opens=java.base/java.nio=ALL-UNNAMED",
@@ -733,6 +735,10 @@ extern "C" const char* __tsan_default_options() {
 // Default UBSAN_OPTIONS. Override by setting environment variable $UBSAN_OPTIONS.
 #if defined(UNDEFINED_SANITIZER)
 extern "C" const char *__ubsan_default_options() {
-  return "print_stacktrace=1 suppressions=" UNDEFINED_SANITIZER_SUPPRESSIONS;
+  // handle_segv=0: don't hijack SIGSEGV from the JVM, which relies on it for
+  // implicit null-check/safepoint traps in JIT-compiled code (see the analogous
+  // __asan_default_options() above, IMPALA-2746).
+  return "handle_segv=0 print_stacktrace=1 suppressions="
+      UNDEFINED_SANITIZER_SUPPRESSIONS;
 }
 #endif

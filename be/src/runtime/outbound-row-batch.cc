@@ -108,20 +108,14 @@ Status OutboundRowBatch::CodegenAppendRowWithDedup(LlvmCodeGen* codegen,
   //  Make a copy of AppendTupleWithDedup, with calls to Tuple::TryDeepCopy replaced
   //  with a codegen'd TryDeepCopy generated from the Tuple's Descriptor
 
-  llvm::Type* this_ptr_type = codegen->GetStructPtrType<OutboundRowBatch>();
-  llvm::Type* status_ptr_type = codegen->GetStructPtrType<Status>();
-  llvm::Type* tuple_row_ptr_type = codegen->GetStructPtrType<TupleRow>();
-  llvm::Type* dedup_map_ptr_type = codegen->GetStructPtrType<DedupMap>();
-  llvm::Type* row_descriptor_ptr_type = codegen->GetStructPtrType<RowDescriptor>();
-
   LlvmCodeGen::FnPrototype prototype(codegen, "AppendRowWithDedup", codegen->void_type());
-  prototype.AddArgument(LlvmCodeGen::NamedVariable("status", status_ptr_type));
-  prototype.AddArgument(LlvmCodeGen::NamedVariable("this", this_ptr_type));
-  prototype.AddArgument(LlvmCodeGen::NamedVariable("row", tuple_row_ptr_type));
-  prototype.AddArgument(LlvmCodeGen::NamedVariable("prev_row", tuple_row_ptr_type));
+  prototype.AddArgument(LlvmCodeGen::NamedVariable("status", codegen->ptr_type()));
+  prototype.AddArgument(LlvmCodeGen::NamedVariable("this", codegen->ptr_type()));
+  prototype.AddArgument(LlvmCodeGen::NamedVariable("row", codegen->ptr_type()));
+  prototype.AddArgument(LlvmCodeGen::NamedVariable("prev_row", codegen->ptr_type()));
   prototype.AddArgument(
-      LlvmCodeGen::NamedVariable("distinct_tuples", dedup_map_ptr_type));
-  prototype.AddArgument(LlvmCodeGen::NamedVariable("row_desc", row_descriptor_ptr_type));
+      LlvmCodeGen::NamedVariable("distinct_tuples", codegen->ptr_type()));
+  prototype.AddArgument(LlvmCodeGen::NamedVariable("row_desc", codegen->ptr_type()));
 
   llvm::LLVMContext& context = codegen->context();
   LlvmBuilder builder(context);
@@ -129,7 +123,8 @@ Status OutboundRowBatch::CodegenAppendRowWithDedup(LlvmCodeGen* codegen,
   *fn = prototype.GeneratePrototype(&builder, args);
   // Mark the first argument explicitly as sret, so the generated function's prototype
   // matches that of OutboundRowBatch::AppendRowWithDedup (returning Status as a struct).
-  (*fn)->addAttribute(1, llvm::Attribute::StructRet);
+  llvm::Type* status_type = codegen->GetNamedType(Status::LLVM_CLASS_NAME);
+  (*fn)->addParamAttr(0, llvm::Attribute::getWithStructRetType(context, status_type));
   llvm::Value* status = args[0];
   llvm::Value* this_ptr = args[1];
   llvm::Value* row = args[2];

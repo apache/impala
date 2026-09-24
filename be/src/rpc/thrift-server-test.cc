@@ -18,7 +18,6 @@
 #include <atomic>
 #include <string>
 
-#include "gen-cpp/StatestoreService.h"
 #include "gutil/strings/substitute.h"
 #include "rpc/authentication.h"
 #include "rpc/thrift-client.h"

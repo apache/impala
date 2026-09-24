@@ -100,20 +100,9 @@ class CodegenAnyVal {
   /// E.g.: TYPE_BOOLEAN (which corresponds to a BooleanVal) => i16
   static llvm::Type* GetLoweredType(LlvmCodeGen* cg, const ColumnType& type);
 
-  /// Returns the lowered AnyVal pointer type associated with 'type'.
-  /// E.g.: TYPE_BOOLEAN => i16*
-  static llvm::PointerType* GetLoweredPtrType(LlvmCodeGen* cg, const ColumnType& type);
-
   /// Returns the unlowered AnyVal type associated with 'type'.
   /// E.g.: TYPE_BOOLEAN => %"struct.impala_udf::BooleanVal"
   static llvm::Type* GetUnloweredType(LlvmCodeGen* cg, const ColumnType& type);
-
-  /// Returns the unlowered AnyVal pointer type associated with 'type'.
-  /// E.g.: TYPE_BOOLEAN => %"struct.impala_udf::BooleanVal"*
-  static llvm::PointerType* GetUnloweredPtrType(LlvmCodeGen* cg, const ColumnType& type);
-
-  /// Returns the pointer type to the AnyVal base class (AnyVal*).
-  static llvm::PointerType* GetAnyValPtrType(LlvmCodeGen* cg);
 
   /// Return the constant type-lowered value corresponding to a null *Val.
   /// E.g.: passing TYPE_DOUBLE (corresponding to the lowered DoubleVal { i8, double })
@@ -192,17 +181,9 @@ class CodegenAnyVal {
   void SetDate(llvm::Value* date);
   void SetTimeOfDay(llvm::Value* time_of_day);
 
-  /// Stores this value in an alloca allocation, and returns the pointer, which has the
-  /// lowered type. This *Val should be non-null. The output variable is called 'name'.
-  llvm::Value* GetLoweredPtr(const std::string& name = "") const;
-
-  /// Stores this value in an alloca allocation, and returns the pointer, which has the
-  /// unlowered type. This *Val should be non-null. The output variable is called 'name'.
-  llvm::Value* GetUnloweredPtr(const std::string& name = "") const;
-
-  /// Stores this value in an alloca allocation, and returns the pointer, which has the
-  /// type 'AnyVal*'. This *Val should be non-null. The output variable is called 'name'.
-  llvm::Value* GetAnyValPtr(const std::string& name = "") const;
+  /// Stores this value in an alloca allocation, and returns the pointer. This *Val should
+  /// be non-null. The output variable is called 'name'.
+  llvm::Value* GetPtrTo(const std::string& name = "") const;
 
   /// Rewrites the bit values of a value in a canonical form. Floating point values may be
   /// "NaN". Nominally, NaN != NaN, but for grouping purposes we want that to not be the

@@ -1029,15 +1029,10 @@ Status BufferedTupleStream::CodegenDeepCopy(LlvmCodeGen* codegen,
     const RowDescriptor* desc, llvm::Function** fn) {
   DCHECK(desc != nullptr);
 
-  llvm::PointerType* this_ptr_type = codegen->GetStructPtrType<BufferedTupleStream>();
-  llvm::PointerType* tuple_row_ptr_type = codegen->GetStructPtrType<TupleRow>();
-  llvm::PointerType* tuple_ptr_type = codegen->GetStructPtrType<Tuple>();
-
   LlvmCodeGen::FnPrototype prototype(codegen, "DeepCopy", codegen->bool_type());
-  prototype.AddArgument(LlvmCodeGen::NamedVariable("this_ptr", this_ptr_type));
-  prototype.AddArgument(LlvmCodeGen::NamedVariable("row", tuple_row_ptr_type));
-  prototype.AddArgument(LlvmCodeGen::NamedVariable("data", codegen->GetPtrType(
-      codegen->ptr_type())));
+  prototype.AddArgument(LlvmCodeGen::NamedVariable("this_ptr", codegen->ptr_type()));
+  prototype.AddArgument(LlvmCodeGen::NamedVariable("row", codegen->ptr_type()));
+  prototype.AddArgument(LlvmCodeGen::NamedVariable("data", codegen->ptr_type()));
   prototype.AddArgument(LlvmCodeGen::NamedVariable("data_end", codegen->ptr_type()));
 
   llvm::LLVMContext& context = codegen->context();
@@ -1054,7 +1049,8 @@ Status BufferedTupleStream::CodegenDeepCopy(LlvmCodeGen* codegen,
   llvm::BasicBlock* return_block = llvm::BasicBlock::Create(context, "return", *fn);
 
   // uint8_t* data_start = *data;
-  llvm::Value* data_start = builder.CreateLoad(data_arg, "data_start");
+  llvm::Value* data_start = builder.CreateLoad(
+      codegen->ptr_type(), data_arg, "data_start");
 
   if (has_nullable_tuple) {
     // bool result = CopyTupleNullIndicators(row, num_tuples, data, data_end);
@@ -1105,7 +1101,7 @@ Status BufferedTupleStream::CodegenDeepCopy(LlvmCodeGen* codegen,
       // if (tuple == nullptr) continue;
       continue_block = llvm::BasicBlock::Create(context, "continue", *fn);
 
-      llvm::Value* null_ptr = llvm::ConstantPointerNull::get(tuple_ptr_type);
+      llvm::Value* null_ptr = llvm::ConstantPointerNull::get(codegen->ptr_type());
       llvm::Value* is_null = builder.CreateICmpEQ(tuple, null_ptr, "is_null");
 
       llvm::BasicBlock* process_tuple_block = llvm::BasicBlock::Create(context,

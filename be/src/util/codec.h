@@ -19,6 +19,7 @@
 
 #include <cstdint>
 #include <map>
+#include <optional>
 #include <string>
 
 #include <boost/scoped_ptr.hpp>

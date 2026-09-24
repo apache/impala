@@ -126,15 +126,11 @@ IntVal KuduPartitionExpr::GetIntValInterpreted(
 void CodegenGetKuduPartialRowAndPartitioner(LlvmCodeGen* codegen, LlvmBuilder* builder,
     llvm::Value* eval, int fn_ctx_idx,
     llvm::Value** kudu_row_ptr, llvm::Value** kudu_partitioner_ptr) {
-  llvm::Type* const kudu_row_ptr_type =
-      codegen->GetNamedPtrType("class.kudu::KuduPartialRow");
   llvm::Value* const kudu_row_ptr_ptr = codegen->CreateEntryBlockAlloca(
-      *builder, kudu_row_ptr_type, "kudu_row_ptr_ptr");
+      *builder, codegen->ptr_type(), "kudu_row_ptr_ptr");
 
-  llvm::Type* const kudu_partitioner_ptr_type =
-      codegen->GetNamedPtrType("class.kudu::client::KuduPartitioner");
   llvm::Value* const kudu_partitioner_ptr_ptr = codegen->CreateEntryBlockAlloca(*builder,
-      kudu_partitioner_ptr_type, "kudu_partitioner_ptr_ptr");
+      codegen->ptr_type(), "kudu_partitioner_ptr_ptr");
 
   llvm::Function* const set_kudu_partial_row_and_partitioner_fn =
       codegen->GetFunction(IRFunction::SET_KUDU_PARTIAL_ROW_AND_PARTITIONER, false);
@@ -142,9 +138,10 @@ void CodegenGetKuduPartialRowAndPartitioner(LlvmCodeGen* codegen, LlvmBuilder* b
       {eval, codegen->GetI32Constant(fn_ctx_idx),
       kudu_row_ptr_ptr, kudu_partitioner_ptr_ptr});
 
-  *kudu_row_ptr = builder->CreateLoad(kudu_row_ptr_ptr, "kudu_row_ptr");
+  *kudu_row_ptr = builder->CreateLoad(
+      codegen->ptr_type(), kudu_row_ptr_ptr, "kudu_row_ptr");
   *kudu_partitioner_ptr = builder->CreateLoad(
-      kudu_partitioner_ptr_ptr, "kudu_partitioner_ptr");
+      codegen->ptr_type(), kudu_partitioner_ptr_ptr, "kudu_partitioner_ptr");
 }
 
 void CodegenCallWriteKuduValue(LlvmCodeGen* codegen, LlvmBuilder* builder, int col,
@@ -157,14 +154,12 @@ void CodegenCallWriteKuduValue(LlvmCodeGen* codegen, LlvmBuilder* builder, int c
       status_type, "status_ptr");
 
   llvm::Value* const col_type_ptr = codegen->GetPtrTo(builder, type.ToIR(codegen));
-  llvm::Value* const child_i8 = builder->CreateBitCast(
-      child_native_val, codegen->i8_type()->getPointerTo());
 
   // This can only fail if we set a col to an incorrect type, which would be a bug in
   // planning, so we could DCHECK but in codegen code we can't so we do not check it.
   builder->CreateCall(write_kudu_fn,
       {status_ptr, codegen->GetI32Constant(col), col_type_ptr,
-      child_i8, codegen->GetBoolConstant(false), kudu_row_ptr});
+      child_native_val, codegen->GetBoolConstant(false), kudu_row_ptr});
 }
 
 /// Sample IR:

@@ -958,10 +958,8 @@ Status KrpcDataStreamSenderConfig::CodegenHashRow(
 
   LlvmCodeGen::FnPrototype prototype(
       codegen, "KrpcDataStreamSenderHashRow", codegen->i64_type());
-  prototype.AddArgument(LlvmCodeGen::NamedVariable(
-      "this", codegen->GetNamedPtrType(KrpcDataStreamSender::LLVM_CLASS_NAME)));
-  prototype.AddArgument(
-      LlvmCodeGen::NamedVariable("row", codegen->GetStructPtrType<TupleRow>()));
+  prototype.AddArgument(LlvmCodeGen::NamedVariable("this", codegen->ptr_type()));
+  prototype.AddArgument(LlvmCodeGen::NamedVariable("row", codegen->ptr_type()));
   prototype.AddArgument(LlvmCodeGen::NamedVariable("seed", codegen->i64_type()));
 
   llvm::Value* args[3];
@@ -1004,7 +1002,6 @@ Status KrpcDataStreamSenderConfig::CodegenHashRow(
     // Saves 'partition_val' on the stack and passes a pointer to it to the hash function
     builder.SetInsertPoint(rwi.non_null_block());
     llvm::Value* native_ptr = SlotDescriptor::CodegenStoreNonNullAnyValToNewAlloca(rwi);
-    native_ptr = builder.CreatePointerCast(native_ptr, codegen->ptr_type(), "native_ptr");
     builder.CreateBr(hash_val_block);
 
     // Picks the input value to hash function

@@ -92,10 +92,6 @@ Status IsNotEmptyPredicate::GetCodegendComputeFnImpl(
   RETURN_IF_ERROR(child->GetCodegendComputeFn(codegen, false, &get_collection_val_fn));
   DCHECK(get_collection_val_fn != nullptr);
 
-  // Find type for the CollectionVal struct.
-  llvm::Type* collection_type = codegen->GetNamedType("struct.impala_udf::CollectionVal");
-  DCHECK(collection_type->isStructTy());
-
   // Construct the call to the evaluation method, and return the result.
   CodegenAnyVal coll_val = CodegenAnyVal::CreateCallWrapped(codegen, &builder,
       child->type(), get_collection_val_fn, args, "coll_val");

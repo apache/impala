@@ -31,10 +31,7 @@
 
 #include "common/atomic.h"
 #include "common/status.h"
-#include "gen-cpp/StatestoreHaService.h"
-#include "gen-cpp/StatestoreService.h"
 #include "gen-cpp/StatestoreService_types.h"
-#include "gen-cpp/StatestoreSubscriber.h"
 #include "gen-cpp/Types_types.h"
 #include "rpc/thrift-client.h"
 #include "runtime/client-cache.h"

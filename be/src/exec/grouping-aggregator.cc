@@ -1300,13 +1300,11 @@ Status GroupingAggregatorConfig::CodegenAddBatchStreamingImpl(
  // }
 Status GroupingAggregatorConfig::CodegenCopyGroupingValues(LlvmCodeGen* codegen,
       llvm::Function** fn) {
-  llvm::PointerType* this_ptr_type = codegen->GetStructPtrType<GroupingAggregator>();
-  llvm::PointerType* tuple_ptr_type = codegen->GetStructPtrType<Tuple>();
   LlvmCodeGen::FnPrototype prototype(codegen, "CopyGroupingValues",
       codegen->void_type());
-  prototype.AddArgument(LlvmCodeGen::NamedVariable("this_ptr", this_ptr_type));
+  prototype.AddArgument(LlvmCodeGen::NamedVariable("this_ptr", codegen->ptr_type()));
   prototype.AddArgument(
-      LlvmCodeGen::NamedVariable("intermediate_tuple", tuple_ptr_type));
+      LlvmCodeGen::NamedVariable("intermediate_tuple", codegen->ptr_type()));
   prototype.AddArgument(LlvmCodeGen::NamedVariable("buffer", codegen->ptr_type()));
 
   llvm::LLVMContext& context = codegen->context();
@@ -1349,7 +1347,7 @@ Status GroupingAggregatorConfig::CodegenCopyGroupingValues(LlvmCodeGen* codegen,
         {this_ptr, intermediate_tuple, idx, tuple_offset, buffer}, "bytes_copied");
 
     // increase buffer by bytes copied
-    buffer = builder.CreateGEP(buffer, bytes_copied, "buffer");
+    buffer = builder.CreateGEP(codegen->i8_type(), buffer, bytes_copied, "buffer");
   }
 
   builder.CreateRetVoid();

@@ -538,7 +538,7 @@ class ExprTest : public testing::TestWithParam<std::tuple<bool, bool>> {
     TestIsNull("next_day(NULL ,'sunDAY')", TYPE_TIMESTAMP);
 
     // Invalid input: wrong weekday parameter
-    for (const string& day: { "s", "SA", "satu", "not-a-day" }) {
+    for (string day: { "s", "SA", "satu", "not-a-day" }) {
       const string expr = "next_day('2013-12-25','" + day + "')";
       TestError(expr);
     }
@@ -8082,7 +8082,7 @@ TEST_P(ExprTest, TimestampFunctions) {
 TEST_P(ExprTest, TruncForDateTest) {
   // trunc(date, string unit)
   // Truncate date to year
-  for (const string& unit: { "SYYYY", "YYYY", "YEAR", "SYEAR", "YYY", "YY", "Y" }) {
+  for (string unit: { "SYYYY", "YYYY", "YEAR", "SYEAR", "YYY", "YY", "Y" }) {
     const string expr = "trunc(date'2014-04-01', '" + unit + "')";
     TestDateValue(expr, DateValue(2014, 1, 1));
   }
@@ -8103,7 +8103,7 @@ TEST_P(ExprTest, TruncForDateTest) {
   TestDateValue("trunc(date'2000-12-01', 'Q')", DateValue(2000, 10, 1));
 
   // Truncate date to month
-  for (const string& unit: { "MONTH", "MON", "MM", "RM" }) {
+  for (string unit: { "MONTH", "MON", "MM", "RM" }) {
     const string expr = "trunc(date'2001-02-05', '" + unit + "')";
     TestDateValue(expr, DateValue(2001, 2, 1));
   }
@@ -8129,13 +8129,13 @@ TEST_P(ExprTest, TruncForDateTest) {
   TestDateValue("trunc(date'2014-02-24', 'W')", DateValue(2014, 2, 22));
 
   // Truncate to day, i.e. leave the date intact
-  for (const string& unit: { "DDD", "DD", "J" }) {
+  for (string unit: { "DDD", "DD", "J" }) {
     const string expr = "trunc(date'2014-01-08', '" + unit + "')";
     TestDateValue(expr, DateValue(2014, 1, 8));
   }
 
   // Truncate date to starting day of the week
-  for (const string& unit: { "DAY", "DY", "D" }) {
+  for (string unit: { "DAY", "DY", "D" }) {
     const string expr = "trunc(date'2012-09-10', '" + unit + "')";
     TestDateValue(expr, DateValue(2012, 9, 10));
   }
@@ -8169,13 +8169,13 @@ TEST_P(ExprTest, TruncForDateTest) {
   TestDateValue("trunc(date'0001-01-08', 'DAY')", DateValue(1, 1, 8));
 
   // Truncating date to hour or minute returns an error
-  for (const string& unit: { "HH", "HH12", "HH24", "MI" }) {
+  for (string unit: { "HH", "HH12", "HH24", "MI" }) {
     const string expr = "trunc(date'2012-09-10', '" + unit + "')";
     TestNonOkStatus(expr);  // Unsupported Truncate Unit
   }
 
   // Invalid trunc unit
-  for (const string& unit: { "MIN", "XXYYZZ", "" }) {
+  for (string unit: { "MIN", "XXYYZZ", "" }) {
     const string expr = "trunc(date'2012-09-10', '" + unit + "')";
     TestNonOkStatus(expr);  // Invalid Truncate Unit
   }
@@ -8239,14 +8239,13 @@ TEST_P(ExprTest, DateTruncForDateTest) {
 
   // Test invalid input.
   // Truncating date to hour or minute returns an error
-  for (const string& unit: { "HOUR", "MINUTE", "SECOND", "MILLISECONDS",
-      "MICROSECONDS" }) {
+  for (string unit: { "HOUR", "MINUTE", "SECOND", "MILLISECONDS", "MICROSECONDS" }) {
     const string expr = "date_trunc('" + unit + "', date '2012-09-10')";
     TestNonOkStatus(expr);  // Unsupported Date Truncate Unit
   }
 
   // Invalid trunc unit
-  for (const string& unit: { "YEARR", "XXYYZZ", "" }) {
+  for (string unit: { "YEARR", "XXYYZZ", "" }) {
     const string expr = "date_trunc('" + unit + "', date '2012-09-10')";
     TestNonOkStatus(expr);  // Invalid Date Truncate Unit
   }
@@ -8283,13 +8282,13 @@ TEST_P(ExprTest, ExtractAndDatePartForDateTest) {
   TestValue("extract(DAY from date '0001-01-01')", TYPE_BIGINT, 1);
 
   // Time of day extract fields are not supported
-  for (const string& field: { "MINUTE", "SECOND", "MILLISECOND", "EPOCH" }) {
+  for (string field: { "MINUTE", "SECOND", "MILLISECOND", "EPOCH" }) {
     const string expr = "extract(date '2012-09-10', '" + field + "')";
     TestNonOkStatus(expr);  // Unsupported Extract Field
   }
 
   // Invalid extract fields
-  for (const string& field: { "foo", "SSECOND", "" }) {
+  for (string field: { "foo", "SSECOND", "" }) {
     const string expr = "extract(date '2012-09-10', '" + field + "')";
     TestNonOkStatus(expr);  // Invalid Extract Field
   }
@@ -8318,14 +8317,14 @@ TEST_P(ExprTest, ExtractAndDatePartForDateTest) {
   TestValue("date_part('DAY', date '0001-01-01')", TYPE_BIGINT, 1);
 
   // Time of day extract fields are not supported
-  for (const string& field: { "MINUTE", "SECOND", "MILLISECOND", "EPOCH" }) {
+  for (string field: { "MINUTE", "SECOND", "MILLISECOND", "EPOCH" }) {
     const string expr = "date_part('" + field + "', date '2012-09-10')";
     // Unsupported Date Part Field
     TestNonOkStatus(expr);
   }
 
   // Invalid extract fields
-  for (const string& field: { "foo", "SSECOND", "" }) {
+  for (string field: { "foo", "SSECOND", "" }) {
     const string expr = "date_part('" + field + "', date '2012-09-10')";
     TestNonOkStatus(expr);  // Invalid Date Part Field
   }

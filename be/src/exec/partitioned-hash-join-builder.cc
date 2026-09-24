@@ -1565,14 +1565,12 @@ Status PhjBuilderConfig::CodegenInsertRuntimeFilters(
   LlvmBuilder builder(context);
 
   *fn = nullptr;
-  llvm::Type* this_type = codegen->GetStructPtrType<PhjBuilder>();
-  llvm::PointerType* filters_ctx_arr_type = codegen->GetStructPtrType<FilterContext>();
-  llvm::PointerType* tuple_row_ptr_type = codegen->GetStructPtrType<TupleRow>();
+  llvm::StructType* filters_ctx_type = codegen->GetStructType<FilterContext>();
   LlvmCodeGen::FnPrototype prototype(
       codegen, "InsertRuntimeFilters", codegen->void_type());
-  prototype.AddArgument(LlvmCodeGen::NamedVariable("this", this_type));
-  prototype.AddArgument(LlvmCodeGen::NamedVariable("filter_ctxs", filters_ctx_arr_type));
-  prototype.AddArgument(LlvmCodeGen::NamedVariable("row", tuple_row_ptr_type));
+  prototype.AddArgument(LlvmCodeGen::NamedVariable("this", codegen->ptr_type()));
+  prototype.AddArgument(LlvmCodeGen::NamedVariable("filter_ctxs", codegen->ptr_type()));
+  prototype.AddArgument(LlvmCodeGen::NamedVariable("row", codegen->ptr_type()));
 
   llvm::Value* args[3];
   llvm::Function* insert_runtime_filters_fn = prototype.GeneratePrototype(&builder, args);
@@ -1584,7 +1582,8 @@ Status PhjBuilderConfig::CodegenInsertRuntimeFilters(
     llvm::Function* insert_fn;
     RETURN_IF_ERROR(FilterContext::CodegenInsert(
         codegen, filter_exprs[i], filter_descs_[i], &insert_fn));
-    llvm::Value* filter_context_ptr = builder.CreateConstGEP1_32(filter_ctxs, i);
+    llvm::Value* filter_context_ptr =
+        builder.CreateConstGEP1_32(filters_ctx_type, filter_ctxs, i);
     llvm::Value* insert_args[] = {filter_context_ptr, row_arg};
     builder.CreateCall(insert_fn, insert_args);
   }

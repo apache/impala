@@ -18,7 +18,11 @@
 #ifndef CATALOG_CATALOG_SERVICE_CLIENT_WRAPPER_H
 #define CATALOG_CATALOG_SERVICE_CLIENT_WRAPPER_H
 
+// GCC reports -Woverloaded-virtual at the base declaration in the generated header.
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Woverloaded-virtual"
 #include "gen-cpp/CatalogService.h"
+#pragma GCC diagnostic pop
 
 namespace impala {
 

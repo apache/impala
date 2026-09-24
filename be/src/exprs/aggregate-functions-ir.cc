@@ -1099,7 +1099,8 @@ IR_ALWAYS_INLINE void AggregateFunctions::DecimalAvgAddOrRemove(FunctionContext*
       break;
     case 16:
       if (UNLIKELY(decimal_v2 && (avg->sum_val16 >= 0) == (src.val16 >= 0) &&
-          abs(avg->sum_val16) > MAX_UNSCALED_DECIMAL16 - abs(src.val16))) {
+          abs(avg->sum_val16) > MAX_UNSCALED_DECIMAL16 -
+              abs(static_cast<__int128_t>(src.val16)))) {
         // We can't check for overflow after performing the addition like in the other
         // cases because the result may not fit into int128.
         ctx->SetError("Avg computation overflowed");
@@ -1138,7 +1139,13 @@ DecimalVal AggregateFunctions::DecimalAvgGetValue(FunctionContext* ctx,
     const StringVal& src) {
   DecimalAvgState* val_struct = reinterpret_cast<DecimalAvgState*>(src.ptr);
   if (val_struct->count == 0) return DecimalVal::null();
-  Decimal16Value sum(val_struct->sum_val16);
+  // Copy out of the packed struct instead of binding a reference to sum_val16
+  // directly: the compiler may otherwise assume 16-byte alignment for the i128
+  // constructor argument and emit an aligned SIMD load, but tuple slots have no
+  // alignment guarantee.
+  __int128_t sum_val16;
+  memcpy(&sum_val16, &val_struct->sum_val16, sizeof(sum_val16));
+  Decimal16Value sum(sum_val16);
   Decimal16Value count(val_struct->count);
 
   int output_precision =
@@ -1234,7 +1241,8 @@ IR_ALWAYS_INLINE void AggregateFunctions::SumDecimalAddOrSubtract(FunctionContex
     }
   } else {
     if (UNLIKELY(decimal_v2 && (dst->val16 >= 0) == (src.val16 >= 0) &&
-        abs(dst->val16) > MAX_UNSCALED_DECIMAL16 - abs(src.val16))) {
+        abs(dst->val16) > MAX_UNSCALED_DECIMAL16 -
+            abs(static_cast<__int128_t>(src.val16)))) {
       // We can't check for overflow after performing the addition like in the other
       // cases because the result may not fit into int128.
       ctx->SetError("Sum computation overflowed");
@@ -1249,7 +1257,8 @@ void AggregateFunctions::SumDecimalMerge(FunctionContext* ctx,
   if (dst->is_null) InitZero<DecimalVal>(ctx, dst);
   bool decimal_v2 = ctx->impl()->GetConstFnAttr(FunctionContextImpl::DECIMAL_V2);
   bool overflow = decimal_v2 &&
-      abs(dst->val16) > MAX_UNSCALED_DECIMAL16 - abs(src.val16);
+      abs(dst->val16) > MAX_UNSCALED_DECIMAL16 -
+          abs(static_cast<__int128_t>(src.val16));
   if (UNLIKELY(overflow)) ctx->SetError("Sum computation overflowed");
   dst->val16 = ArithmeticUtil::AsUnsigned<std::plus>(dst->val16, src.val16);
 }
@@ -2046,7 +2055,7 @@ template <>
 void PrintSample(const ReservoirSample<DecimalVal>& v, ostream* os) {
   // Also handles val4 and val8 - the DecimalVal memory layout ensures the least
   // significant bits overlap in memory.
-  *os << v.val.val16;
+  *os << static_cast<__int128_t>(v.val.val16);
 }
 
 template <>
@@ -3543,6 +3552,10 @@ struct LastValIgnoreNullsState {
 template <typename T>
 void AggregateFunctions::LastValIgnoreNullsInit(FunctionContext* ctx, StringVal* dst) {
   AllocBuffer(ctx, dst, sizeof(LastValIgnoreNullsState<T>));
+  if (UNLIKELY(dst->is_null)) {
+    DCHECK(!ctx->impl()->state()->GetQueryStatus().ok());
+    return;
+  }
   LastValIgnoreNullsState<T>* state =
       reinterpret_cast<LastValIgnoreNullsState<T>*>(dst->ptr);
   state->last_val = T::null();

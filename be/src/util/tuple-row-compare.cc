@@ -256,17 +256,12 @@ Status TupleRowComparatorConfig::CodegenLexicalCompare(
   //     ScalarExprEvaluator** ordering_expr_evals_rhs,
   //     TupleRow* lhs, TupleRow* rhs)
   //
-  llvm::PointerType* tuple_row_comparator_type =
-      codegen->GetStructPtrType<TupleRowComparator>();
-  llvm::PointerType* expr_evals_type =
-      codegen->GetStructPtrPtrType<ScalarExprEvaluator>();
-  llvm::PointerType* tuple_row_type = codegen->GetStructPtrType<TupleRow>();
   LlvmCodeGen::FnPrototype prototype(codegen, "Compare", codegen->i32_type());
-  prototype.AddArgument("tuple_row_comparator_type", tuple_row_comparator_type);
-  prototype.AddArgument("ordering_expr_evals_lhs", expr_evals_type);
-  prototype.AddArgument("ordering_expr_evals_rhs", expr_evals_type);
-  prototype.AddArgument("lhs", tuple_row_type);
-  prototype.AddArgument("rhs", tuple_row_type);
+  prototype.AddArgument("tuple_row_comparator_type", codegen->ptr_type());
+  prototype.AddArgument("ordering_expr_evals_lhs", codegen->ptr_type());
+  prototype.AddArgument("ordering_expr_evals_rhs", codegen->ptr_type());
+  prototype.AddArgument("lhs", codegen->ptr_type());
+  prototype.AddArgument("rhs", codegen->ptr_type());
 
   LlvmBuilder builder(context);
   llvm::Value* args[5];
@@ -284,13 +279,15 @@ Status TupleRowComparatorConfig::CodegenLexicalCompare(
     llvm::BasicBlock* next_key_block = llvm::BasicBlock::Create(context, "next_key", *fn);
 
     // Call key_fns[i](ordering_expr_evals_lhs[i], lhs_arg)
-    llvm::Value* lhs_eval = codegen->CodegenArrayAt(&builder, lhs_evals_arg, i);
+    llvm::Value* lhs_eval =
+        codegen->CodegenArrayAt(&builder, lhs_evals_arg, codegen->ptr_type(), i);
     llvm::Value* lhs_args[] = {lhs_eval, lhs_arg};
     CodegenAnyVal lhs_value = CodegenAnyVal::CreateCallWrapped(codegen, &builder,
         ordering_exprs[i]->type(), key_fns[i], lhs_args, "lhs_value");
 
     // Call key_fns[i](ordering_expr_evals_rhs[i], rhs_arg)
-    llvm::Value* rhs_eval = codegen->CodegenArrayAt(&builder, rhs_evals_arg, i);
+    llvm::Value* rhs_eval =
+        codegen->CodegenArrayAt(&builder, rhs_evals_arg, codegen->ptr_type(), i);
     llvm::Value* rhs_args[] = {rhs_eval, rhs_arg};
     CodegenAnyVal rhs_value = CodegenAnyVal::CreateCallWrapped(codegen, &builder,
         ordering_exprs[i]->type(), key_fns[i], rhs_args, "rhs_value");

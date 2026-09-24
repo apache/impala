@@ -50,8 +50,8 @@ DEFINE_bool_hidden(codegen_symbol_emitter_log_successful_destruction_test_only, 
 namespace impala {
 
 SpinLock CodegenSymbolEmitter::perf_map_lock_;
-unordered_map<const void*, vector<CodegenSymbolEmitter::PerfMapEntry>>
-    CodegenSymbolEmitter::perf_map_;
+unordered_map<llvm::JITEventListener::ObjectKey,
+    vector<CodegenSymbolEmitter::PerfMapEntry>> CodegenSymbolEmitter::perf_map_;
 
 CodegenSymbolEmitter::~CodegenSymbolEmitter() {
   if (non_freed_objects_ != 0) {
@@ -66,7 +66,8 @@ CodegenSymbolEmitter::~CodegenSymbolEmitter() {
   }
 }
 
-void CodegenSymbolEmitter::NotifyObjectEmitted(const llvm::object::ObjectFile& obj,
+void CodegenSymbolEmitter::notifyObjectLoaded(llvm::JITEventListener::ObjectKey K,
+    const llvm::object::ObjectFile& obj,
     const llvm::RuntimeDyld::LoadedObjectInfo& loaded_obj) {
   non_freed_objects_++;
   vector<PerfMapEntry> perf_map_entries;
@@ -84,12 +85,13 @@ void CodegenSymbolEmitter::NotifyObjectEmitted(const llvm::object::ObjectFile& o
   llvm::object::OwningBinary<llvm::object::ObjectFile> debug_obj_owner =
       loaded_obj.getObjectForDebug(obj);
   const llvm::object::ObjectFile& debug_obj = *debug_obj_owner.getBinary();
-  llvm::DWARFContextInMemory dwarf_ctx(debug_obj);
+  unique_ptr<llvm::DWARFContext> dwarf_ctx = llvm::DWARFContext::create(debug_obj);
 
   // Use symbol info to iterate functions in the object.
   for (const std::pair<llvm::object::SymbolRef, uint64_t>& pair :
       computeSymbolSizes(debug_obj)) {
-    ProcessSymbol(&dwarf_ctx, pair.first, pair.second, &perf_map_entries, asm_file);
+    ProcessSymbol(dwarf_ctx.get(), debug_obj, pair.first, pair.second,
+                  &perf_map_entries, asm_file);
   }
 
   if (asm_file.is_open()) {
@@ -100,23 +102,24 @@ void CodegenSymbolEmitter::NotifyObjectEmitted(const llvm::object::ObjectFile& o
   ofstream perf_map_file;
   if (emit_perf_map_) {
     lock_guard<SpinLock> perf_map_lock(perf_map_lock_);
-    DCHECK(perf_map_.find(obj.getData().data()) == perf_map_.end());
-    perf_map_[obj.getData().data()] = std::move(perf_map_entries);
+    DCHECK(perf_map_.find(K) == perf_map_.end());
+    perf_map_[K] = std::move(perf_map_entries);
     WritePerfMapLocked();
   }
 }
 
-void CodegenSymbolEmitter::NotifyFreeingObject(const llvm::object::ObjectFile& obj) {
+void CodegenSymbolEmitter::notifyFreeingObject(llvm::JITEventListener::ObjectKey K) {
   non_freed_objects_--;
   if (emit_perf_map_) {
     lock_guard<SpinLock> perf_map_lock(perf_map_lock_);
-    DCHECK(perf_map_.find(obj.getData().data()) != perf_map_.end());
-    perf_map_.erase(obj.getData().data());
+    DCHECK(perf_map_.find(K) != perf_map_.end());
+    perf_map_.erase(K);
     WritePerfMapLocked();
   }
 }
 
 void CodegenSymbolEmitter::ProcessSymbol(llvm::DIContext* debug_ctx,
+    const llvm::object::ObjectFile& debug_obj,
     const llvm::object::SymbolRef& symbol, uint64_t size,
     vector<PerfMapEntry>* perf_map_entries, ofstream& asm_file) {
   llvm::Expected<llvm::object::SymbolRef::Type> symType = symbol.getType();
@@ -126,20 +129,28 @@ void CodegenSymbolEmitter::ProcessSymbol(llvm::DIContext* debug_ctx,
   llvm::Expected<uint64_t> addr_or_err = symbol.getAddress();
   if (!name_or_err || !addr_or_err) return;
 
-  uint64_t addr = addr_or_err.get();
+  llvm::object::SectionedAddress saddr;
+  saddr.Address = addr_or_err.get();
+  auto sect_or_err = symbol.getSection();
+  if (sect_or_err) {
+    if (sect_or_err.get() != debug_obj.section_end()) {
+      saddr.SectionIndex = sect_or_err.get()->getIndex();
+    }
+  }
+
   // Append id to symbol to disambiguate different instances of jitted functions.
   string fn_symbol = Substitute("$0:$1", name_or_err.get().data(), id_);
 
   if (emit_perf_map_) {
     PerfMapEntry entry;
     entry.symbol = fn_symbol;
-    entry.addr = addr;
+    entry.saddr = saddr;
     entry.size = size;
     perf_map_entries->push_back(entry);
   }
 
   if (asm_file.is_open()) {
-    EmitFunctionAsm(debug_ctx, fn_symbol, addr, size, asm_file);
+    EmitFunctionAsm(debug_ctx, fn_symbol, saddr, size, asm_file);
   }
 }
 
@@ -160,10 +171,10 @@ void CodegenSymbolEmitter::WritePerfMapLocked() {
     return;
   }
 
-  for (pair<const void*, vector<PerfMapEntry>> entries: perf_map_) {
+  for (pair<llvm::JITEventListener::ObjectKey, vector<PerfMapEntry>> entries: perf_map_) {
     for (PerfMapEntry& entry: entries.second) {
       // Write perf.map file. Each line has format <address> <size> <label>
-      tmp_perf_map_file << hex << entry.addr << " " << entry.size << " "
+      tmp_perf_map_file << hex << entry.saddr.Address << " " << entry.size << " "
                         << entry.symbol << "\n";
     }
   }
@@ -178,10 +189,12 @@ void CodegenSymbolEmitter::WritePerfMapLocked() {
 }
 
 void CodegenSymbolEmitter::EmitFunctionAsm(llvm::DIContext* debug_ctx,
-    const string& fn_symbol, uint64_t addr, uint64_t size, ofstream& asm_file) {
+    const string& fn_symbol, llvm::object::SectionedAddress saddr, uint64_t size,
+    ofstream& asm_file) {
   DCHECK(asm_file.is_open());
-  llvm::DILineInfoTable di_lines = debug_ctx->getLineInfoForAddressRange(addr, size);
+  llvm::DILineInfoTable di_lines = debug_ctx->getLineInfoForAddressRange(saddr, size);
   auto di_line_it = di_lines.begin();
+  int64_t addr = saddr.Address;
 
   // LLVM's C disassembler API is much simpler than the C++ API, so let's use it.
   string triple = llvm::sys::getProcessTriple();

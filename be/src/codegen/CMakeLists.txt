@@ -40,7 +40,6 @@ add_library(CodeGen
   llvm-codegen-cache.cc
   llvm-codegen-object-cache.cc
   instruction-counter.cc
-  ${THIRDPARTY_LLVM_SRC_DIR}/SectionMemoryManager.cpp
   ${IR_O1_C_FILE}
   ${IR_O2_C_FILE}
   ${IR_Os_C_FILE}
@@ -116,11 +115,21 @@ add_custom_target(test-loop.bc
   SOURCES ${CMAKE_SOURCE_DIR}/testdata/llvm/test-loop.cc
 )
 
-# Provide "unoptimized" output. Clang O0 adds attributes to everything which prevents us
-# doing optimizations in the test, so use O1 instead.
+# Provide "unoptimized" output. Recent LLVM versions inline at O1, so we use clang to
+# produce LLVM IR then strip out noinline attributes to get a function we can optimize.
+add_custom_command(
+  OUTPUT ${CMAKE_SOURCE_DIR}/llvm-ir/test-opt.ll
+  COMMAND ${LLVM_CLANG_EXECUTABLE} -S -emit-llvm ${CMAKE_SOURCE_DIR}/testdata/llvm/test-opt.cc -o ${CMAKE_SOURCE_DIR}/llvm-ir/test-opt.ll
+  DEPENDS ${CMAKE_SOURCE_DIR}/testdata/llvm/test-opt.cc
+)
+add_custom_command(
+  OUTPUT ${CMAKE_SOURCE_DIR}/llvm-ir/test-opt-inline.ll
+  COMMAND sed -E 's/noinline|optnone//g' ${CMAKE_SOURCE_DIR}/llvm-ir/test-opt.ll > ${CMAKE_SOURCE_DIR}/llvm-ir/test-opt-inline.ll
+  DEPENDS ${CMAKE_SOURCE_DIR}/llvm-ir/test-opt.ll
+)
 add_custom_target(test-opt.bc
-  COMMAND ${LLVM_CLANG_EXECUTABLE} ${CLANG_IR_CXX_FLAGS} -O1 ${CLANG_INCLUDE_FLAGS} ${CMAKE_SOURCE_DIR}/testdata/llvm/test-opt.cc -o ${CMAKE_SOURCE_DIR}/llvm-ir/test-opt.bc
-  SOURCES ${CMAKE_SOURCE_DIR}/testdata/llvm/test-opt.cc
+  COMMAND ${LLVM_AS_EXECUTABLE} ${CMAKE_SOURCE_DIR}/llvm-ir/test-opt-inline.ll -o ${CMAKE_SOURCE_DIR}/llvm-ir/test-opt.bc
+  DEPENDS ${CMAKE_SOURCE_DIR}/llvm-ir/test-opt-inline.ll
 )
 
 # Exception to unified be tests: custom main initializes LLVM

@@ -308,8 +308,13 @@ bool HdfsAvroScanner::ReadAvroDecimal(int slot_byte_size, uint8_t** data,
         break;
       }
       case 16: {
-        __int128_t* decimal = reinterpret_cast<__int128_t*>(slot);
-        *decimal >>= bytes_to_fill * 8;
+        // 'slot' is tuple memory and may only be 8-byte aligned, so avoid
+        // dereferencing it directly as __int128_t* (would emit an aligned SIMD
+        // load/store and can SIGSEGV). Round-trip through a local instead.
+        __int128_t decimal;
+        memcpy(&decimal, slot, sizeof(decimal));
+        decimal >>= bytes_to_fill * 8;
+        memcpy(slot, &decimal, sizeof(decimal));
         break;
       }
       default:

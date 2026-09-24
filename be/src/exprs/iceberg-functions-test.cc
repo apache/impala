@@ -18,6 +18,7 @@
 #include "exprs/iceberg-functions.h"
 #include "thirdparty/murmurhash/MurmurHash3.h"
 
+#include <cstring>
 #include <limits>
 #include <string>
 #include <vector>
@@ -59,11 +60,11 @@ FunctionContext* CreateFunctionContext() {
 // for both the min and the max value. This function gives the min value for 128 byte
 // int.
 __int128_t GetMinForInt128() {
-  __int128_t num = -1;
-  for (int i = 0; i < 126; ++i) {
-    num <<= 1;
-    num -= 1;
-  }
+  // Left-shifting a negative signed value (or shifting a 1 into the sign bit) is
+  // undefined behavior, so compute the bit pattern in unsigned space and copy it over.
+  __uint128_t bits = static_cast<__uint128_t>(1) << 127;
+  __int128_t num;
+  memcpy(&num, &bits, sizeof(num));
   return num;
 }
 
@@ -314,7 +315,11 @@ void IcebergTruncatePartitionTransformTests::TestDecimal() {
 
   __int128_t int128_max_value = std::numeric_limits<__int128_t>::max();
   ret_val = IcebergFunctions::TruncateDecimal(nullptr, int128_max_value, 50, 16);
-  EXPECT_EQ(int128_max_value - (int128_max_value % 50), ret_val.val16);
+  // Copy val16 (a packed, potentially unaligned __int128_t member) into a local
+  // variable before comparing: binding a reference straight to it can make gtest's
+  // templated EXPECT_EQ emit an aligned SIMD load, which faults on odd alignment.
+  __int128_t actual128 = ret_val.val16;
+  EXPECT_EQ(int128_max_value - (int128_max_value % 50), actual128);
 
   // Test the minimum limit for each representation size.
   // Note, decimal type represent int32 min in 8 bytes, int64 min in 16 bytes.
@@ -328,7 +333,8 @@ void IcebergTruncatePartitionTransformTests::TestDecimal() {
   ret_val = IcebergFunctions::TruncateDecimal(nullptr, int64_min_value, width, 16);
   __int128_t expected128 =
       (__int128_t)int64_min_value - (width + (int64_min_value % width));
-  EXPECT_EQ(expected128, ret_val.val16);
+  actual128 = ret_val.val16;
+  EXPECT_EQ(expected128, actual128);
 
   // Truncation from int128 minimum value causes an overflow.
   ctx = CreateFunctionContext();

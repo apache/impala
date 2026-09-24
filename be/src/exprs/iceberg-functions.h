@@ -94,8 +94,8 @@ private:
       const BigIntVal& width, int decimal_size);
 
   template<typename T>
-  static DecimalVal TruncatePartitionTransformDecimalImpl(const T& decimal_val,
-      int64_t width);
+  static DecimalVal TruncatePartitionTransformDecimalImpl(FunctionContext* ctx,
+      T decimal_val, int64_t width);
 
   template<typename T, typename W>
   static IntVal BucketPartitionTransformNumericImpl(FunctionContext* ctx, const T& input,

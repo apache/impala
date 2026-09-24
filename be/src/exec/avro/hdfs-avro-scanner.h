@@ -243,15 +243,16 @@ class HdfsAvroScanner : public BaseSequenceScanner {
   static Status CodegenReadRecord(const SchemaPath& path, const AvroSchemaElement& record,
       int child_start, int child_end, const HdfsScanPlanNode* node, LlvmCodeGen* codegen,
       void* builder, llvm::Function* fn, llvm::BasicBlock* insert_before,
-      llvm::BasicBlock* bail_out, llvm::Value* this_val, llvm::Value* pool_val,
-      llvm::Value* tuple_val, llvm::Value* data_val,
+      llvm::BasicBlock* bail_out, llvm::Type* tuple_type, llvm::Value* this_val,
+      llvm::Value* pool_val, llvm::Value* tuple_val, llvm::Value* data_val,
       llvm::Value* data_end_val) WARN_UNUSED_RESULT;
 
   /// Creates the IR for reading an Avro scalar at builder's current insert point.
   static Status CodegenReadScalar(const AvroSchemaElement& element,
       SlotDescriptor* slot_desc, LlvmCodeGen* codegen, void* void_builder,
-      llvm::Value* this_val, llvm::Value* pool_val, llvm::Value* tuple_val,
-      llvm::Value* data_val, llvm::Value* data_end_val, llvm::Value** ret_val)
+      llvm::Type* tuple_type, llvm::Value* this_val, llvm::Value* pool_val,
+      llvm::Value* tuple_val, llvm::Value* data_val, llvm::Value* data_end_val,
+      llvm::Value** ret_val)
       WARN_UNUSED_RESULT;
 
   /// The following are cross-compiled functions for parsing a serialized Avro primitive

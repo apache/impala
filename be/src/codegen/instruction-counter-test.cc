@@ -47,10 +47,10 @@ class InstructionCounterTest : public testing:: Test {
 // then returns the result.
 llvm::Module* CodegenMulAdd(llvm::LLVMContext* context) {
   llvm::Module* mod = new llvm::Module("test", *context);
-  llvm::Constant* c = mod->getOrInsertFunction("mul_add",
+  llvm::FunctionCallee c = mod->getOrInsertFunction("mul_add",
       llvm::IntegerType::get(*context, 32), llvm::IntegerType::get(*context, 32),
       llvm::IntegerType::get(*context, 32), llvm::IntegerType::get(*context, 32));
-  llvm::Function* mul_add = llvm::cast<llvm::Function>(c);
+  llvm::Function* mul_add = llvm::cast<llvm::Function>(c.getCallee());
   mul_add->setCallingConv(llvm::CallingConv::C);
   llvm::Function::arg_iterator args = mul_add->arg_begin();
   llvm::Value* x = &*args;
@@ -113,10 +113,10 @@ TEST_F(InstructionCounterTest, Count) {
 // }
 llvm::Module* CodegenGcd(llvm::LLVMContext* context) {
   llvm::Module* mod = new llvm::Module("gcd", *context);
-  llvm::Constant* c = mod->getOrInsertFunction("gcd",
+  llvm::FunctionCallee c = mod->getOrInsertFunction("gcd",
       llvm::IntegerType::get(*context, 32), llvm::IntegerType::get(*context, 32),
       llvm::IntegerType::get(*context, 32));
-  llvm::Function* gcd = llvm::cast<llvm::Function>(c);
+  llvm::Function* gcd = llvm::cast<llvm::Function>(c.getCallee());
   llvm::Function::arg_iterator args = gcd->arg_begin();
   llvm::Value* x = &*args;
   ++args;

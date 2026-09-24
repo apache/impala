@@ -47,7 +47,7 @@ DecimalVal DecimalFunctions::Abs(FunctionContext* ctx, const DecimalVal& val) {
     case 8:
       return DecimalVal(abs(val.val8));
     case 16:
-      return DecimalVal(abs(val.val16));
+      return DecimalVal(abs(static_cast<__int128_t>(val.val16)));
     default:
       DCHECK(false);
       return DecimalVal::null();

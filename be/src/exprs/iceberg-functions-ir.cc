@@ -26,6 +26,7 @@
 #include "runtime/timestamp-value.inline.h"
 #include "thirdparty/murmurhash/MurmurHash3.h"
 #include "udf/udf-internal.h"
+#include "util/arithmetic-util.h"
 #include "util/bit-util.h"
 
 namespace impala {
@@ -73,18 +74,13 @@ DecimalVal IcebergFunctions::TruncateDecimal(FunctionContext* ctx,
         ctx->SetError(TRUNCATE_OVERFLOW_ERROR_MSG.c_str());
         return DecimalVal::null();
       }
-      return TruncatePartitionTransformDecimalImpl<int32_t>(input.val4, width.val);
+      return TruncatePartitionTransformDecimalImpl<int32_t>(ctx, input.val4, width.val);
     }
     case 8: {
-      return TruncatePartitionTransformDecimalImpl<int64_t>(input.val8, width.val);
+      return TruncatePartitionTransformDecimalImpl<int64_t>(ctx, input.val8, width.val);
     }
     case 16: {
-      DecimalVal result = TruncatePartitionTransformDecimalImpl(input.val16, width.val);
-      if (input.val16 < 0 && result.val16 > 0) {
-        ctx->SetError(TRUNCATE_OVERFLOW_ERROR_MSG.c_str());
-        return DecimalVal::null();
-      }
-      return result;
+      return TruncatePartitionTransformDecimalImpl(ctx, input.val16, width.val);
     }
     default:
       return DecimalVal::null();
@@ -92,11 +88,22 @@ DecimalVal IcebergFunctions::TruncateDecimal(FunctionContext* ctx,
 }
 
 template<typename T>
-DecimalVal IcebergFunctions::TruncatePartitionTransformDecimalImpl(const T& decimal_val,
-    int64_t width) {
+DecimalVal IcebergFunctions::TruncatePartitionTransformDecimalImpl(FunctionContext* ctx,
+    T decimal_val, int64_t width) {
   DCHECK(width > 0);
   if (decimal_val > 0) return decimal_val - (decimal_val % width);
-  return decimal_val - (((decimal_val % width) + width) % width);
+  auto remainder = ((decimal_val % width) + width) % width;
+  // Detect the underflow before it happens: 'decimal_val - remainder' is undefined
+  // behavior (and can be optimized away by the compiler) if it goes below the min
+  // representable value of the arithmetic type used for this computation. Avoid
+  // std::numeric_limits<__int128_t>::min(), which is broken (returns 0) for that type.
+  using ArithT = decltype(remainder);
+  ArithT min_value = -ArithmeticUtil::Max<ArithT>() - 1;
+  if (UNLIKELY(decimal_val < min_value + remainder)) {
+    ctx->SetError(TRUNCATE_OVERFLOW_ERROR_MSG.c_str());
+    return DecimalVal::null();
+  }
+  return decimal_val - remainder;
 }
 
 template<bool is_binary>
@@ -124,12 +131,17 @@ T IcebergFunctions::TruncatePartitionTransformNumericImpl(FunctionContext* ctx,
     const T& input, const W& width) {
   if (!CheckInputsAndSetError(ctx, input, width)) return T::null();
   if (input.val >= 0) return input.val - (input.val % width.val);
-  T result = input.val - (((input.val % width.val) + width.val) % width.val);
-  if (UNLIKELY(result.val > 0)) {
+  typename T::underlying_type_t remainder =
+      ((input.val % width.val) + width.val) % width.val;
+  // Detect the underflow before it happens: 'input.val - remainder' is undefined
+  // behavior (and can be optimized away by the compiler) if it goes below the min
+  // representable value of the underlying type.
+  if (UNLIKELY(input.val < numeric_limits<typename T::underlying_type_t>::min()
+      + remainder)) {
     ctx->SetError(TRUNCATE_OVERFLOW_ERROR_MSG.c_str());
     return T::null();
   }
-  return result;
+  return input.val - remainder;
 }
 
 IntVal IcebergFunctions::BucketPartitionTransform(FunctionContext* ctx,

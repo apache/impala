@@ -29,7 +29,6 @@ namespace impala {
 
 TEST(RoaringBitmap64Test, Empty) {
   RoaringBitmap64 rbm;
-  RoaringBitmap64::BulkContext context;
   ASSERT_TRUE(rbm.IsEmpty());
   ASSERT_EQ(rbm.Max(), numeric_limits<uint64_t>::min());
   ASSERT_EQ(rbm.Min(), numeric_limits<uint64_t>::max());

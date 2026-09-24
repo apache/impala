@@ -705,7 +705,7 @@ TEST(QueryOptions, CompressionCodec) {
     Substitute("BZIP2:$0", bzip_max_clevel + 1), &options, nullptr).ok());
 
   // Test compression levels for LZ4 / LZ4_BLOCKED
-  for (const string& lz4_codec : {"lz4", "lz4_blocked"}) {
+  for (string lz4_codec : {"lz4", "lz4_blocked"}) {
     // LZ4's default behavior is considered level 1 (and is tested above).
     // LZ4's high compression API is used for levels between LZ4HC_CLEVEL_MIN (3) and
     // LZ4HC_CLEVEL_MAX (12)

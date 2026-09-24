@@ -261,24 +261,61 @@ TEST(UdfTest, TestDecimalVal) {
   DecimalVal null2 = DecimalVal::null();
 
   // TODO: replace these manual comparisons with a DecimalVal equality function
+  // Copy val16 (a packed, potentially unaligned __int128_t member) into local
+  // variables before comparing: binding a reference straight to it can make gtest's
+  // templated EXPECT_EQ/EXPECT_NE emit an aligned SIMD load, which faults on odd
+  // alignment.
+  __int128_t d1_val16 = d1.val16;
+  __int128_t d2_val16 = d2.val16;
+  __int128_t d3_val16 = d3.val16;
+  __int128_t d4_val16 = d4.val16;
+  __int128_t d5_val16 = d5.val16;
+  __int128_t d6_val16 = d6.val16;
+
   // 1 != -1
-  EXPECT_NE(d1.val16, d2.val16);
-  EXPECT_NE(d3.val16, d4.val16);
-  EXPECT_NE(d5.val16, d6.val16);
+  EXPECT_NE(d1_val16, d2_val16);
+  EXPECT_NE(d3_val16, d4_val16);
+  EXPECT_NE(d5_val16, d6_val16);
 
   // 1 == 1
-  EXPECT_EQ(d1.val16, d3.val16);
-  EXPECT_EQ(d1.val16, d5.val16);
-  EXPECT_EQ(d3.val16, d5.val16);
+  EXPECT_EQ(d1_val16, d3_val16);
+  EXPECT_EQ(d1_val16, d5_val16);
+  EXPECT_EQ(d3_val16, d5_val16);
 
   // -1 == -1
-  EXPECT_EQ(d2.val16, d4.val16);
-  EXPECT_EQ(d2.val16, d6.val16);
-  EXPECT_EQ(d4.val16, d6.val16);
+  EXPECT_EQ(d2_val16, d4_val16);
+  EXPECT_EQ(d2_val16, d6_val16);
+  EXPECT_EQ(d4_val16, d6_val16);
 
   // nulls
   EXPECT_EQ(null1.is_null, null2.is_null);
   EXPECT_NE(null1.is_null, d1.is_null);
+}
+
+// Pins the DecimalVal layout that compiled UDFs depend on; changing it requires
+// recompiling UDFs and updating CodegenAnyVal.
+TEST(UdfTest, TestDecimalValLayout) {
+  EXPECT_EQ(32u, sizeof(DecimalVal));
+  EXPECT_EQ(8u, alignof(DecimalVal));
+  DecimalVal args[2] = {DecimalVal(static_cast<int64_t>(1)),
+      DecimalVal(static_cast<int64_t>(2))};
+  // Compare addresses as integers; subtracting pointers to different members is UB.
+  const uintptr_t base = reinterpret_cast<uintptr_t>(&args[0]);
+  EXPECT_EQ(0u, reinterpret_cast<uintptr_t>(&args[0].is_null) - base);
+  EXPECT_EQ(16u, reinterpret_cast<uintptr_t>(&args[0].val16) - base);
+  // Array stride matters for UDFs that take varargs of DecimalVal.
+  EXPECT_EQ(32u, reinterpret_cast<uintptr_t>(&args[1]) - base);
+}
+
+// A DecimalVal at an address that is 8-byte but not 16-byte aligned, as in tuple slots.
+TEST(UdfTest, TestDecimalValMisaligned) {
+  alignas(16) char buf[80] = {};
+  DecimalVal* a = reinterpret_cast<DecimalVal*>(buf + 8);
+  DecimalVal* b = reinterpret_cast<DecimalVal*>(buf + 40);
+  a->val16 = 5;
+  a->val16 += 1;
+  b->val16 = a->val16;
+  EXPECT_EQ(6, static_cast<int>(b->val16));
 }
 
 TEST(UdfTest, TestFloatVal) {

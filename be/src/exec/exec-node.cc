@@ -652,15 +652,12 @@ Status ExecNode::CodegenEvalConjuncts(LlvmCodeGen* codegen,
 
   // Construct function signature to match
   // bool EvalConjuncts(ScalarExprEvaluator**, int, TupleRow*)
-  llvm::PointerType* tuple_row_ptr_type = codegen->GetStructPtrType<TupleRow>();
-  llvm::Type* eval_type = codegen->GetStructType<ScalarExprEvaluator>();
-
   LlvmCodeGen::FnPrototype prototype(codegen, name, codegen->bool_type());
   prototype.AddArgument(
-      LlvmCodeGen::NamedVariable("evals", codegen->GetPtrPtrType(eval_type)));
+      LlvmCodeGen::NamedVariable("evals", codegen->ptr_type()));
   prototype.AddArgument(
       LlvmCodeGen::NamedVariable("num_evals", codegen->i32_type()));
-  prototype.AddArgument(LlvmCodeGen::NamedVariable("row", tuple_row_ptr_type));
+  prototype.AddArgument(LlvmCodeGen::NamedVariable("row", codegen->ptr_type()));
 
   LlvmBuilder builder(codegen->context());
   llvm::Value* args[3];
@@ -676,8 +673,9 @@ Status ExecNode::CodegenEvalConjuncts(LlvmCodeGen* codegen,
       llvm::BasicBlock* true_block =
           llvm::BasicBlock::Create(context, "continue", *fn, false_block);
       llvm::Value* eval_arg_ptr = builder.CreateInBoundsGEP(
-          NULL, evals_arg, codegen->GetI32Constant(i), "eval_ptr");
-      llvm::Value* eval_arg = builder.CreateLoad(eval_arg_ptr, "eval");
+          codegen->ptr_type(), evals_arg, codegen->GetI32Constant(i), "eval_ptr");
+      llvm::Value* eval_arg = builder.CreateLoad(
+          codegen->ptr_type(), eval_arg_ptr, "eval");
 
       // Call conjunct_fns[i]
       CodegenAnyVal result = CodegenAnyVal::CreateCallWrapped(codegen, &builder,

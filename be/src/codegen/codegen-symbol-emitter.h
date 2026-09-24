@@ -51,11 +51,12 @@ class CodegenSymbolEmitter : public llvm::JITEventListener {
   static void WritePerfMap();
 
   /// Called whenever MCJIT module code is emitted.
-  void NotifyObjectEmitted(const llvm::object::ObjectFile &obj,
+  void notifyObjectLoaded(llvm::JITEventListener::ObjectKey K,
+     const llvm::object::ObjectFile &obj,
      const llvm::RuntimeDyld::LoadedObjectInfo &loaded_obj) override;
 
   /// Called whenever MCJIT module code is freed.
-  void NotifyFreeingObject(const llvm::object::ObjectFile &obj) override;
+  void notifyFreeingObject(llvm::JITEventListener::ObjectKey K) override;
 
   void set_emit_perf_map(bool emit_perf_map) { emit_perf_map_ = emit_perf_map; }
 
@@ -64,14 +65,16 @@ class CodegenSymbolEmitter : public llvm::JITEventListener {
  private:
   struct PerfMapEntry {
     std::string symbol;
-    uint64_t addr;
+    llvm::object::SectionedAddress saddr;
     uint64_t size;
   };
 
   /// Process the given 'symbol' with 'size'. For function symbols, append to
   /// 'perf_map_entries' if 'emit_perf_map_' is true and write disassembly to 'asm_file'
   /// if it is open.
-  void ProcessSymbol(llvm::DIContext* debug_ctx, const llvm::object::SymbolRef& symbol,
+  void ProcessSymbol(llvm::DIContext* debug_ctx,
+      const llvm::object::ObjectFile& debug_obj,
+      const llvm::object::SymbolRef& symbol,
       uint64_t size, std::vector<PerfMapEntry>* perf_map_entries,
       std::ofstream& asm_file);
 
@@ -81,7 +84,7 @@ class CodegenSymbolEmitter : public llvm::JITEventListener {
   /// Emit disassembly for the function. If symbols are present for the code object,
   /// the symbols will be interleaved with the disassembly.
   void EmitFunctionAsm(llvm::DIContext* debug_ctx, const std::string& fn_symbol,
-      uint64_t addr, uint64_t size, std::ofstream& asm_file);
+      llvm::object::SectionedAddress addr, uint64_t size, std::ofstream& asm_file);
 
   /// Identifier to append to symbols, e.g. a fragment instance id. The identifier is
   /// passed by the caller when the CodegenSymbolEmitter is constructed. Without this
@@ -108,7 +111,8 @@ class CodegenSymbolEmitter : public llvm::JITEventListener {
 
   /// All current entries that should be emitted into the perf map file.
   /// Maps the address of each ObjectFile's data to the symbols in the object.
-  static boost::unordered_map<const void*, std::vector<PerfMapEntry>> perf_map_;
+  static boost::unordered_map<llvm::JITEventListener::ObjectKey,
+    std::vector<PerfMapEntry>> perf_map_;
 };
 
 }

@@ -127,16 +127,13 @@ Status ValidTupleIdExpr::GetCodegendComputeFnImpl(
 
   // Unroll the loop.
   for (uint32_t i = 0; i < tuple_ids_.size(); i++) {
-    // Get the i'th Tuple* from the row.
-    llvm::Value* tuple_row_ptr =
-        builder.CreateInBoundsGEP(row_ptr, codegen->GetI32Constant(i), "tuple_row_ptr");
-    // Cast to Tuple**
-    llvm::Type* tuple_ptr_ptr_type =
-        codegen->GetPtrType(codegen->GetNamedPtrType(Tuple::LLVM_CLASS_NAME));
-    llvm::Value* tuple_ptr_ptr =
-        builder.CreateBitCast(tuple_row_ptr, tuple_ptr_ptr_type, "tuple_ptr_ptr");
-    // Get the Tuple* and compare to nullptr.
-    llvm::Value* tuple_ptr = builder.CreateLoad(tuple_ptr_ptr, "tuple_ptr");
+    // Get the i'th Tuple*; TupleRow is an array of pointers, stride by ptr size.
+    llvm::Value* tuple_row_ptr = builder.CreateInBoundsGEP(
+        codegen->ptr_type(),
+        row_ptr, codegen->GetI32Constant(i), "tuple_row_ptr");
+    // Load the Tuple* and compare to nullptr.
+    llvm::Value* tuple_ptr =
+        builder.CreateLoad(codegen->ptr_type(), tuple_row_ptr, "tuple_ptr");
     llvm::Value* is_not_null = builder.CreateIsNotNull(tuple_ptr, "is_not_null");
 
     // Create a conditional on the result.

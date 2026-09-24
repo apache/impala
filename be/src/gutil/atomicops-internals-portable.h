@@ -122,8 +122,15 @@ inline void NoBarrier_Store(volatile Atomic32* ptr, Atomic32 value) {
   ((AtomicLocation32)ptr)->store(value, std::memory_order_relaxed);
 }
 
+// std::atomic::store() only accepts relaxed/release/seq_cst orders (passing
+// acquire is a precondition violation that aborts when libstdc++'s
+// _GLIBCXX_ASSERTIONS is enabled, e.g. in -O0 builds). Emulate the store
+// with "no later access can be reordered ahead of it" semantics using a
+// relaxed store followed by a full fence, matching the historical x86
+// NoBarrier_Store()+MemoryBarrier() implementation.
 inline void Acquire_Store(volatile Atomic32* ptr, Atomic32 value) {
-  ((AtomicLocation32)ptr)->store(value, std::memory_order_acquire);
+  ((AtomicLocation32)ptr)->store(value, std::memory_order_relaxed);
+  std::atomic_thread_fence(std::memory_order_seq_cst);
 }
 
 inline void Release_Store(volatile Atomic32* ptr, Atomic32 value) {
@@ -138,8 +145,12 @@ inline Atomic32 Acquire_Load(volatile const Atomic32* ptr) {
   return ((AtomicLocation32)ptr)->load(std::memory_order_acquire);
 }
 
+// std::atomic::load() disallows release/acq_rel orders for the same reason
+// as above. Emulate the "no earlier access can be reordered past it" load
+// semantics with a full fence followed by a relaxed load.
 inline Atomic32 Release_Load(volatile const Atomic32* ptr) {
-  return ((AtomicLocation32)ptr)->load(std::memory_order_release);
+  std::atomic_thread_fence(std::memory_order_seq_cst);
+  return ((AtomicLocation32)ptr)->load(std::memory_order_relaxed);
 }
 
 typedef volatile std::atomic<Atomic64>* AtomicLocation64;
@@ -223,7 +234,8 @@ inline void NoBarrier_Store(volatile Atomic64* ptr, Atomic64 value) {
 }
 
 inline void Acquire_Store(volatile Atomic64* ptr, Atomic64 value) {
-  ((AtomicLocation64)ptr)->store(value, std::memory_order_acquire);
+  ((AtomicLocation64)ptr)->store(value, std::memory_order_relaxed);
+  std::atomic_thread_fence(std::memory_order_seq_cst);
 }
 
 inline void Release_Store(volatile Atomic64* ptr, Atomic64 value) {
@@ -239,7 +251,8 @@ inline Atomic64 Acquire_Load(volatile const Atomic64* ptr) {
 }
 
 inline Atomic64 Release_Load(volatile const Atomic64* ptr) {
-  return ((AtomicLocation64)ptr)->load(std::memory_order_release);
+  std::atomic_thread_fence(std::memory_order_seq_cst);
+  return ((AtomicLocation64)ptr)->load(std::memory_order_relaxed);
 }
 
 inline void MemoryBarrier() {

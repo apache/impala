@@ -435,34 +435,22 @@ Status Tuple::CodegenMaterializeExprs(LlvmCodeGen* codegen, bool collect_varlen_
   //     CodegenTypes::CollValuePtrAndSizeVecType* non_null_collection_values,
   //     int* total_varlen_lengths, int* num_non_null_string_values,
   //     int* num_non_null_collection_values);
-  llvm::PointerType* opaque_tuple_type = codegen->GetStructPtrType<Tuple>();
-  llvm::PointerType* row_type = codegen->GetStructPtrType<TupleRow>();
-  llvm::PointerType* desc_type = codegen->GetStructPtrType<TupleDescriptor>();
-  llvm::PointerType* expr_evals_type =
-      codegen->GetStructPtrPtrType<ScalarExprEvaluator>();
-  llvm::PointerType* pool_type = codegen->GetStructPtrType<MemPool>();
-  llvm::Type* string_values_type =
-      CodegenTypes::getStringValuePtrVecType(codegen)->getPointerTo();
-  llvm::Type* coll_values_and_sizes_type =
-      CodegenTypes::getCollValuePtrAndSizeVecType(codegen)->getPointerTo();
-  llvm::PointerType* int_ptr_type = codegen->i32_ptr_type();
-
   LlvmCodeGen::FnPrototype prototype(codegen, "MaterializeExprs", codegen->void_type());
-  prototype.AddArgument("opaque_tuple", opaque_tuple_type);
-  prototype.AddArgument("row", row_type);
-  prototype.AddArgument("desc", desc_type);
-  prototype.AddArgument("slot_materialize_expr_evals", expr_evals_type);
-  prototype.AddArgument("pool", pool_type);
-  prototype.AddArgument("non_null_string_values", string_values_type);
-  prototype.AddArgument("non_null_collection_values", coll_values_and_sizes_type);
-  prototype.AddArgument("total_varlen_lengths", int_ptr_type);
-  prototype.AddArgument("num_non_null_string_values", int_ptr_type);
-  prototype.AddArgument("num_non_null_collection_values", int_ptr_type);
+  prototype.AddArgument("opaque_tuple", codegen->ptr_type());
+  prototype.AddArgument("row", codegen->ptr_type());
+  prototype.AddArgument("desc", codegen->ptr_type());
+  prototype.AddArgument("slot_materialize_expr_evals", codegen->ptr_type());
+  prototype.AddArgument("pool", codegen->ptr_type());
+  prototype.AddArgument("non_null_string_values", codegen->ptr_type());
+  prototype.AddArgument("non_null_collection_values", codegen->ptr_type());
+  prototype.AddArgument("total_varlen_lengths", codegen->ptr_type());
+  prototype.AddArgument("num_non_null_string_values", codegen->ptr_type());
+  prototype.AddArgument("num_non_null_collection_values", codegen->ptr_type());
 
   LlvmBuilder builder(context);
   llvm::Value* args[10];
   *fn = prototype.GeneratePrototype(&builder, args);
-  llvm::Value* opaque_tuple_arg = args[0];
+  llvm::Value* tuple_arg = args[0];
   llvm::Value* row_arg = args[1];
   // llvm::Value* desc_arg = args[2]; // unused
   llvm::Value* expr_evals_arg = args[3];
@@ -475,14 +463,11 @@ Status Tuple::CodegenMaterializeExprs(LlvmCodeGen* codegen, bool collect_varlen_
   // llvm::Value* num_non_null_collection_values_arg = args[9]; // unused
 
   // Cast the opaque Tuple* argument to the generated struct type
-  llvm::Type* tuple_struct_type = desc.GetLlvmStruct(codegen);
+  llvm::StructType* tuple_struct_type = desc.GetLlvmStruct(codegen);
   DCHECK(tuple_struct_type != nullptr);
 
-  llvm::PointerType* tuple_type = codegen->GetPtrType(tuple_struct_type);
-  llvm::Value* tuple = builder.CreateBitCast(opaque_tuple_arg, tuple_type, "tuple");
-
   // Clear tuple's null bytes
-  codegen->CodegenClearNullBits(&builder, tuple, desc);
+  codegen->CodegenClearNullBits(&builder, tuple_arg, desc);
 
   // Evaluate the slot_materialize_exprs and place the results in the tuple.
   for (int i = 0; i < desc.slots().size(); ++i) {
@@ -491,8 +476,8 @@ Status Tuple::CodegenMaterializeExprs(LlvmCodeGen* codegen, bool collect_varlen_
         || slot_desc->type() == slot_materialize_exprs[i]->type());
 
     // Call materialize_expr_fns[i](slot_materialize_exprs[i], row)
-    llvm::Value* expr_eval =
-        codegen->CodegenArrayAt(&builder, expr_evals_arg, i, "expr_eval");
+    llvm::Value* expr_eval = codegen->CodegenArrayAt(&builder, expr_evals_arg,
+        codegen->ptr_type(), i, "expr_eval");
     llvm::Value* expr_args[] = {expr_eval, row_arg};
     CodegenAnyVal src = CodegenAnyVal::CreateCallWrapped(codegen, &builder,
         slot_materialize_exprs[i]->type(), materialize_expr_fns[i], expr_args, "src");
@@ -500,7 +485,7 @@ Status Tuple::CodegenMaterializeExprs(LlvmCodeGen* codegen, bool collect_varlen_
     // Write expr result 'src' to slot
     CodegenAnyValReadWriteInfo read_write_info = src.ToReadWriteInfo();
     slot_desc->CodegenWriteToSlot(
-        read_write_info, tuple, use_mem_pool ? pool_arg : nullptr);
+        read_write_info, tuple_arg, tuple_struct_type, use_mem_pool ? pool_arg : nullptr);
   }
   builder.CreateRetVoid();
   // TODO: if pool != NULL, OptimizeFunctionWithExprs() is inlining the Allocate()
@@ -514,20 +499,15 @@ Status Tuple::CodegenMaterializeExprs(LlvmCodeGen* codegen, bool collect_varlen_
 
 Status Tuple::CodegenCopyStrings(
     LlvmCodeGen* codegen, const TupleDescriptor& desc, llvm::Function** copy_strings_fn) {
-  llvm::PointerType* opaque_tuple_type = codegen->GetStructPtrType<Tuple>();
-  llvm::PointerType* runtime_state_type = codegen->GetStructPtrType<RuntimeState>();
-  llvm::StructType* slot_offsets_type = codegen->GetStructType<SlotOffsets>();
-  llvm::PointerType* pool_type = codegen->GetStructPtrType<MemPool>();
-  llvm::PointerType* status_type = codegen->GetStructPtrType<Status>();
   LlvmCodeGen::FnPrototype prototype(
       codegen, "CopyStringsWrapper", codegen->bool_type());
-  prototype.AddArgument("opaque_tuple", opaque_tuple_type);
+  prototype.AddArgument("opaque_tuple", codegen->ptr_type());
   prototype.AddArgument("err_ctx", codegen->ptr_type());
-  prototype.AddArgument("state", runtime_state_type);
-  prototype.AddArgument("slot_offsets", codegen->GetPtrType(slot_offsets_type));
+  prototype.AddArgument("state", codegen->ptr_type());
+  prototype.AddArgument("slot_offsets", codegen->ptr_type());
   prototype.AddArgument("num_string_slots", codegen->i32_type());
-  prototype.AddArgument("pool", pool_type);
-  prototype.AddArgument("status", status_type);
+  prototype.AddArgument("pool", codegen->ptr_type());
+  prototype.AddArgument("status", codegen->ptr_type());
 
   LlvmBuilder builder(codegen->context());
   llvm::Value* args[7];
@@ -549,12 +529,15 @@ Status Tuple::CodegenCopyStrings(
     SlotOffsets offsets = {slot_desc->null_indicator_offset(), slot_desc->tuple_offset()};
     slot_offset_ir_constants.push_back(offsets.ToIR(codegen));
   }
+  llvm::StructType* slot_offsets_type = codegen->GetStructType<SlotOffsets>();
   llvm::Constant* constant_slot_offsets = codegen->ConstantsToGVArrayPtr(
       slot_offsets_type, slot_offset_ir_constants, "slot_offsets");
   llvm::Constant* num_string_slots = codegen->GetI32Constant(desc.string_slots().size());
   // Get SlotOffsets* pointer to the first element of the constant array.
+  llvm::ArrayType* array_type =
+      llvm::ArrayType::get(slot_offsets_type, slot_offset_ir_constants.size());
   llvm::Value* constant_slot_offsets_first_element_ptr =
-      builder.CreateConstGEP2_64(constant_slot_offsets, 0, 0);
+      builder.CreateConstGEP2_64(array_type, constant_slot_offsets, 0, 0);
 
   llvm::Value* result_val = builder.CreateCall(cross_compiled_fn,
       {opaque_tuple_arg, err_ctx_arg, state_arg, constant_slot_offsets_first_element_ptr,
@@ -570,16 +553,12 @@ Status Tuple::CodegenCopyStrings(
 
 Status Tuple::CodegenTryDeepCopy(LlvmCodeGen* codegen, const TupleDescriptor* tuple_desc,
     llvm::Function** fn) {
-  llvm::Type* this_ptr_type = codegen->GetStructPtrType<Tuple>();
-  llvm::Type* tuple_descriptor_type = codegen->GetStructPtrType<TupleDescriptor>();
-
   LlvmCodeGen::FnPrototype prototype(codegen, "TryDeepCopy", codegen->bool_type());
-  prototype.AddArgument(LlvmCodeGen::NamedVariable("this", this_ptr_type));
-  prototype.AddArgument(LlvmCodeGen::NamedVariable("data",
-      codegen->GetPtrType(codegen->ptr_type())));
+  prototype.AddArgument(LlvmCodeGen::NamedVariable("this", codegen->ptr_type()));
+  prototype.AddArgument(LlvmCodeGen::NamedVariable("data", codegen->ptr_type()));
   prototype.AddArgument(LlvmCodeGen::NamedVariable("data_end", codegen->ptr_type()));
-  prototype.AddArgument(LlvmCodeGen::NamedVariable("offset", codegen->i32_ptr_type()));
-  prototype.AddArgument(LlvmCodeGen::NamedVariable("desc", tuple_descriptor_type));
+  prototype.AddArgument(LlvmCodeGen::NamedVariable("offset", codegen->ptr_type()));
+  prototype.AddArgument(LlvmCodeGen::NamedVariable("desc", codegen->ptr_type()));
 
   llvm::LLVMContext& context = codegen->context();
   LlvmBuilder builder(context);
@@ -592,10 +571,9 @@ Status Tuple::CodegenTryDeepCopy(LlvmCodeGen* codegen, const TupleDescriptor* tu
   llvm::Value* desc = args[4];
 
   // Save current value of data and offset, so it can be reset if running out of memory
-  llvm::Value* data_start = builder.CreateLoad(data, "data_start");
-  llvm::Value* offset_start = builder.CreateLoad(offset, "offset_start");
-
-  llvm::Value* dst_tuple = builder.CreateBitCast(data_start, this_ptr_type);
+  llvm::Value* data_start = builder.CreateLoad(codegen->ptr_type(), data, "data_start");
+  llvm::Value* offset_start = builder.CreateLoad(
+      codegen->i32_type(), offset, "offset_start");
 
   llvm::BasicBlock* return_block = llvm::BasicBlock::Create(context, "return", *fn);
 
@@ -620,7 +598,7 @@ Status Tuple::CodegenTryDeepCopy(LlvmCodeGen* codegen, const TupleDescriptor* tu
     llvm::Constant* tuple_offset = codegen->GetI32Constant(slot->tuple_offset());
     llvm::Value* string_copy_result = codegen->CodegenCallFunction(&builder,
         IRFunction::TUPLE_TRY_DEEP_COPY_STRING_SLOT,
-        {dst_tuple, data, data_end, offset, null_indicator_offset, tuple_offset},
+        {data_start, data, data_end, offset, null_indicator_offset, tuple_offset},
         "string_copy_result");
 
     // return if didn't succeed
@@ -634,7 +612,7 @@ Status Tuple::CodegenTryDeepCopy(LlvmCodeGen* codegen, const TupleDescriptor* tu
     // call interpreted function to copy collection slots
     llvm::Value* collections_copy_result = codegen->CodegenCallFunction(&builder,
         IRFunction::TUPLE_TRY_DEEP_COPY_COLLECTIONS,
-        {dst_tuple, data, data_end, offset, desc}, "collections_copy_result");
+        {data_start, data, data_end, offset, desc}, "collections_copy_result");
 
     // return if didn't succeed
     continue_block = llvm::BasicBlock::Create(context, "continue", *fn);

@@ -375,32 +375,23 @@ Status HdfsScanner::CodegenWriteCompleteTuple(const HdfsScanPlanNode* node,
   vector<int> materialize_order;
   node->ComputeSlotMaterializationOrder(state->desc_tbl(), &materialize_order);
 
-  // Get types to construct matching function signature to WriteCompleteTuple
-  llvm::PointerType* uint8_ptr_type = codegen->i8_ptr_type();
-
-  llvm::PointerType* field_loc_ptr_type = codegen->GetStructPtrType<FieldLocation>();
-  llvm::PointerType* tuple_opaque_ptr_type = codegen->GetStructPtrType<Tuple>();
-  llvm::PointerType* tuple_row_ptr_type = codegen->GetStructPtrType<TupleRow>();
-  llvm::PointerType* mem_pool_ptr_type = codegen->GetStructPtrType<MemPool>();
-  llvm::PointerType* hdfs_scanner_ptr_type = codegen->GetStructPtrType<HdfsScanner>();
-
   // Generate the typed llvm struct for the output tuple
   llvm::StructType* tuple_type = tuple_desc->GetLlvmStruct(codegen);
   if (tuple_type == NULL) return Status("Could not generate tuple struct.");
-  llvm::PointerType* tuple_ptr_type = llvm::PointerType::get(tuple_type, 0);
+  llvm::PointerType* tuple_ptr_type = codegen->ptr_type();
 
   // Initialize the function prototype.  This needs to match
   // HdfsScanner::WriteCompleteTuple's signature identically.
   LlvmCodeGen::FnPrototype prototype(
       codegen, "WriteCompleteTuple", codegen->bool_type());
-  prototype.AddArgument(LlvmCodeGen::NamedVariable("this", hdfs_scanner_ptr_type));
-  prototype.AddArgument(LlvmCodeGen::NamedVariable("pool", mem_pool_ptr_type));
-  prototype.AddArgument(LlvmCodeGen::NamedVariable("fields", field_loc_ptr_type));
-  prototype.AddArgument(LlvmCodeGen::NamedVariable("tuple", tuple_opaque_ptr_type));
-  prototype.AddArgument(LlvmCodeGen::NamedVariable("tuple_row", tuple_row_ptr_type));
-  prototype.AddArgument(LlvmCodeGen::NamedVariable("template", tuple_opaque_ptr_type));
-  prototype.AddArgument(LlvmCodeGen::NamedVariable("error_fields", uint8_ptr_type));
-  prototype.AddArgument(LlvmCodeGen::NamedVariable("error_in_row", uint8_ptr_type));
+  prototype.AddArgument(LlvmCodeGen::NamedVariable("this", codegen->ptr_type()));
+  prototype.AddArgument(LlvmCodeGen::NamedVariable("pool", codegen->ptr_type()));
+  prototype.AddArgument(LlvmCodeGen::NamedVariable("fields", codegen->ptr_type()));
+  prototype.AddArgument(LlvmCodeGen::NamedVariable("tuple", codegen->ptr_type()));
+  prototype.AddArgument(LlvmCodeGen::NamedVariable("tuple_row", codegen->ptr_type()));
+  prototype.AddArgument(LlvmCodeGen::NamedVariable("template", codegen->ptr_type()));
+  prototype.AddArgument(LlvmCodeGen::NamedVariable("error_fields", codegen->ptr_type()));
+  prototype.AddArgument(LlvmCodeGen::NamedVariable("error_in_row", codegen->ptr_type()));
 
   llvm::LLVMContext& context = codegen->context();
   LlvmBuilder builder(context);
@@ -414,9 +405,7 @@ Status HdfsScanner::CodegenWriteCompleteTuple(const HdfsScanPlanNode* node,
   llvm::Value* this_arg = args[0];
   llvm::Value* mem_pool_arg = args[1];
   llvm::Value* fields_arg = args[2];
-  llvm::Value* opaque_tuple_arg = args[3];
-  llvm::Value* tuple_arg =
-      builder.CreateBitCast(opaque_tuple_arg, tuple_ptr_type, "tuple_ptr");
+  llvm::Value* tuple_arg = args[3];
   llvm::Value* tuple_row_arg = args[4];
   llvm::Value* opaque_template_arg = args[5];
   llvm::Value* errors_arg = args[6];
@@ -427,14 +416,12 @@ Status HdfsScanner::CodegenWriteCompleteTuple(const HdfsScanPlanNode* node,
 
   llvm::Function* init_tuple_fn;
   RETURN_IF_ERROR(CodegenInitTuple(node, codegen, &init_tuple_fn));
-  builder.CreateCall(init_tuple_fn, {this_arg, opaque_template_arg, opaque_tuple_arg});
+  builder.CreateCall(init_tuple_fn, {this_arg, opaque_template_arg, tuple_arg});
 
   // Put tuple in tuple_row
-  llvm::Value* tuple_row_typed =
-      builder.CreateBitCast(tuple_row_arg, llvm::PointerType::get(tuple_ptr_type, 0));
   llvm::Value* tuple_row_idxs[] = {codegen->GetI32Constant(0)};
   llvm::Value* tuple_in_row_addr =
-      builder.CreateInBoundsGEP(tuple_row_typed, tuple_row_idxs);
+      builder.CreateInBoundsGEP(tuple_ptr_type, tuple_row_arg, tuple_row_idxs);
   builder.CreateStore(tuple_arg, tuple_in_row_addr);
   builder.CreateBr(parse_block);
 
@@ -471,13 +458,16 @@ Status HdfsScanner::CodegenWriteCompleteTuple(const HdfsScanPlanNode* node,
       llvm::Value* error_idxs[] = {
           codegen->GetI32Constant(slot_idx),
       };
+      llvm::Type* field_loc_struct = codegen->GetStructType<FieldLocation>();
       llvm::Value* data_ptr =
-          builder.CreateInBoundsGEP(fields_arg, data_idxs, "data_ptr");
-      llvm::Value* len_ptr = builder.CreateInBoundsGEP(fields_arg, len_idxs, "len_ptr");
+          builder.CreateInBoundsGEP(field_loc_struct, fields_arg, data_idxs, "data_ptr");
+      llvm::Value* len_ptr =
+          builder.CreateInBoundsGEP(field_loc_struct, fields_arg, len_idxs, "len_ptr");
       llvm::Value* error_ptr =
-          builder.CreateInBoundsGEP(errors_arg, error_idxs, "slot_error_ptr");
-      llvm::Value* data = builder.CreateLoad(data_ptr, "data");
-      llvm::Value* len = builder.CreateLoad(len_ptr, "len");
+         builder.CreateInBoundsGEP(codegen->i8_type(), errors_arg, error_idxs,
+             "slot_error_ptr");
+      llvm::Value* data = builder.CreateLoad(codegen->ptr_type(), data_ptr, "data");
+      llvm::Value* len = builder.CreateLoad(codegen->i32_type(), len_ptr, "len");
 
       // Convert length to positive if it is negative. Negative lengths are assigned to
       // slots that contain escape characters.
@@ -507,7 +497,7 @@ Status HdfsScanner::CodegenWriteCompleteTuple(const HdfsScanPlanNode* node,
         DCHECK(interpreted_slot_fn != nullptr);
 
         slot_parsed = builder.CreateCall(interpreted_slot_fn,
-            {this_arg, slot_idx_value, opaque_tuple_arg, data, len, mem_pool_arg});
+            {this_arg, slot_idx_value, tuple_arg, data, len, mem_pool_arg});
       }
 
       llvm::Value* slot_error = builder.CreateNot(slot_parsed, "slot_parse_error");
@@ -666,12 +656,10 @@ Status HdfsScanner::CodegenEvalRuntimeFilters(
   LlvmBuilder builder(context);
 
   *fn = nullptr;
-  llvm::Type* this_type = codegen->GetStructPtrType<HdfsScanner>();
-  llvm::PointerType* tuple_row_ptr_type = codegen->GetStructPtrType<TupleRow>();
   LlvmCodeGen::FnPrototype prototype(codegen, "EvalRuntimeFilters",
                                      codegen->bool_type());
-  prototype.AddArgument(LlvmCodeGen::NamedVariable("this", this_type));
-  prototype.AddArgument(LlvmCodeGen::NamedVariable("row", tuple_row_ptr_type));
+  prototype.AddArgument(LlvmCodeGen::NamedVariable("this", codegen->ptr_type()));
+  prototype.AddArgument(LlvmCodeGen::NamedVariable("row", codegen->ptr_type()));
 
   llvm::Value* args[2];
   llvm::Function* eval_runtime_filters_fn = prototype.GeneratePrototype(&builder, args);

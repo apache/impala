@@ -39,7 +39,11 @@
 #include "util/runtime-profile-counters.h"
 #include "util/spinlock.h"
 
+// GCC reports -Woverloaded-virtual at the base declaration in the generated header.
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Woverloaded-virtual"
 #include "gen-cpp/StatestoreService.h" // for TPoolStats
+#pragma GCC diagnostic pop
 #include "gen-cpp/Types_types.h" // for TUniqueId
 #include <gtest/gtest_prod.h> // for FRIEND_TEST
 

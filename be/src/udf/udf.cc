@@ -114,8 +114,8 @@ class RuntimeState {
     return false;
   }
 
-  const std::string connected_user() const { return user_string_; }
-  const std::string GetEffectiveUser() const { return user_string_; }
+  const std::string& connected_user() const { return user_string_; }
+  const std::string& GetEffectiveUser() const { return user_string_; }
 
  private:
   const std::string user_string_ = "";

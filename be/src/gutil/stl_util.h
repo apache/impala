@@ -41,7 +41,6 @@ using std::swap;
 #include <deque>
 using std::deque;
 #include <functional>
-using std::binary_function;
 using std::less;
 #include <iterator>
 using std::back_insert_iterator;
@@ -447,11 +446,11 @@ class BaseDeleter {
 template<class STLContainer>
 class TemplatedElementDeleter : public BaseDeleter {
  public:
-  explicit TemplatedElementDeleter<STLContainer>(STLContainer *ptr)
+  explicit TemplatedElementDeleter(STLContainer *ptr)
       : container_ptr_(ptr) {
   }
 
-  virtual ~TemplatedElementDeleter<STLContainer>() {
+  virtual ~TemplatedElementDeleter() {
     STLDeleteElements(container_ptr_);
   }
 
@@ -487,11 +486,11 @@ class ElementDeleter {
 template<class STLContainer>
 class TemplatedValueDeleter : public BaseDeleter {
  public:
-  explicit TemplatedValueDeleter<STLContainer>(STLContainer *ptr)
+  explicit TemplatedValueDeleter(STLContainer *ptr)
       : container_ptr_(ptr) {
   }
 
-  virtual ~TemplatedValueDeleter<STLContainer>() {
+  virtual ~TemplatedValueDeleter() {
     STLDeleteValues(container_ptr_);
   }
 
@@ -530,16 +529,16 @@ class ValueDeleter {
 
 template<class STLContainer> class STLElementDeleter {
  public:
-  STLElementDeleter<STLContainer>(STLContainer *ptr) : container_ptr_(ptr) {}
-  ~STLElementDeleter<STLContainer>() { STLDeleteElements(container_ptr_); }
+  STLElementDeleter(STLContainer *ptr) : container_ptr_(ptr) {}
+  ~STLElementDeleter() { STLDeleteElements(container_ptr_); }
  private:
   STLContainer *container_ptr_;
 };
 
 template<class STLContainer> class STLValueDeleter {
  public:
-  STLValueDeleter<STLContainer>(STLContainer *ptr) : container_ptr_(ptr) {}
-  ~STLValueDeleter<STLContainer>() { STLDeleteValues(container_ptr_); }
+  STLValueDeleter(STLContainer *ptr) : container_ptr_(ptr) {}
+  ~STLValueDeleter() { STLDeleteValues(container_ptr_); }
  private:
   STLContainer *container_ptr_;
 };
@@ -696,8 +695,7 @@ bool STLIncludes(const SortedSTLContainerA &a,
 // the contents of an STL map. For other sample usage, see the unittest.
 
 template<typename Pair, typename UnaryOp>
-class UnaryOperateOnFirst
-    : public std::unary_function<Pair, typename UnaryOp::result_type> {
+class UnaryOperateOnFirst {
  public:
   UnaryOperateOnFirst() {
   }
@@ -719,8 +717,7 @@ UnaryOperateOnFirst<Pair, UnaryOp> UnaryOperate1st(const UnaryOp& f) {
 }
 
 template<typename Pair, typename UnaryOp>
-class UnaryOperateOnSecond
-    : public std::unary_function<Pair, typename UnaryOp::result_type> {
+class UnaryOperateOnSecond {
  public:
   UnaryOperateOnSecond() {
   }
@@ -742,8 +739,7 @@ UnaryOperateOnSecond<Pair, UnaryOp> UnaryOperate2nd(const UnaryOp& f) {
 }
 
 template<typename Pair, typename BinaryOp>
-class BinaryOperateOnFirst
-    : public std::binary_function<Pair, Pair, typename BinaryOp::result_type> {
+class BinaryOperateOnFirst {
  public:
   BinaryOperateOnFirst() {
   }
@@ -767,8 +763,7 @@ BinaryOperateOnFirst<Pair, BinaryOp> BinaryOperate1st(const BinaryOp& f) {
 }
 
 template<typename Pair, typename BinaryOp>
-class BinaryOperateOnSecond
-    : public std::binary_function<Pair, Pair, typename BinaryOp::result_type> {
+class BinaryOperateOnSecond {
  public:
   BinaryOperateOnSecond() {
   }
@@ -804,9 +799,7 @@ BinaryOperateOnSecond<Pair, BinaryOp> BinaryOperate2nd(const BinaryOp& f) {
 // F has to be a model of AdaptableBinaryFunction.
 // G1 and G2 have to be models of AdabtableUnaryFunction.
 template<typename F, typename G1, typename G2>
-class BinaryComposeBinary : public binary_function<typename G1::argument_type,
-                                                   typename G2::argument_type,
-                                                   typename F::result_type> {
+class BinaryComposeBinary {
  public:
   BinaryComposeBinary(F f, G1 g1, G2 g2) : f_(f), g1_(g1), g2_(g2) { }
 

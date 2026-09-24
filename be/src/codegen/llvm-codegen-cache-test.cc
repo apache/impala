@@ -35,8 +35,11 @@ DECLARE_string(codegen_cache_capacity);
 namespace impala {
 
 // The object cache size for an engine containing a single compiled
-// function in our test case. The value is in bytes.
-const int ENGINE_CACHE_SIZE = 1100;
+// function in our test case. The value is in bytes. This is sized with
+// margin above the actual compiled object size (which depends on the
+// LLVM/GCC toolchain version and target architecture) so the capacity
+// computed from it comfortably fits one entry but not two.
+const int ENGINE_CACHE_SIZE = 3072;
 // Capacity for large codegen cache. 256KB.
 const int64_t CODEGEN_CACHE_CAPACITY = 256 * 1024;
 

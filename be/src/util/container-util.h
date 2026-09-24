@@ -164,18 +164,6 @@ struct hash<impala::NetworkAddressPB> {
 
 namespace impala {
 
-struct HashTNetworkAddressPtr : public std::unary_function<TNetworkAddress*, size_t> {
-  size_t operator()(const TNetworkAddress* const& p) const { return hash_value(*p); }
-};
-
-struct TNetworkAddressPtrEquals : public std::unary_function<TNetworkAddress*, bool> {
-  bool operator()(const TNetworkAddress* const& p1,
-                  const TNetworkAddress* const& p2) const {
-    return p1->hostname == p2->hostname && p1->port == p2->port;
-  }
-};
-
-
 struct pair_hash {
   template <class T1, class T2>
   std::size_t operator () (const std::pair<T1, T2> &p) const {

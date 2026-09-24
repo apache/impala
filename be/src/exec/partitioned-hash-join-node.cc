@@ -1330,31 +1330,20 @@ string PartitionedHashJoinNode::NodeDebugString() const {
 // }
 Status PartitionedHashJoinPlanNode::CodegenCreateOutputRow(
     LlvmCodeGen* codegen, llvm::Function** fn) {
-  llvm::PointerType* tuple_row_ptr_type = codegen->GetStructPtrType<TupleRow>();
-
-  llvm::PointerType* this_ptr_type = codegen->GetStructPtrType<BlockingJoinNode>();
-
-  // TupleRows are really just an array of pointers.  Easier to work with them
-  // this way.
-  llvm::PointerType* tuple_row_working_type = codegen->ptr_ptr_type();
-
   // Construct function signature to match CreateOutputRow()
   LlvmCodeGen::FnPrototype prototype(codegen, "CreateOutputRow", codegen->void_type());
-  prototype.AddArgument(LlvmCodeGen::NamedVariable("this_ptr", this_ptr_type));
-  prototype.AddArgument(LlvmCodeGen::NamedVariable("out_arg", tuple_row_ptr_type));
-  prototype.AddArgument(LlvmCodeGen::NamedVariable("probe_arg", tuple_row_ptr_type));
-  prototype.AddArgument(LlvmCodeGen::NamedVariable("build_arg", tuple_row_ptr_type));
+  prototype.AddArgument(LlvmCodeGen::NamedVariable("this_ptr", codegen->ptr_type()));
+  prototype.AddArgument(LlvmCodeGen::NamedVariable("out_arg", codegen->ptr_type()));
+  prototype.AddArgument(LlvmCodeGen::NamedVariable("probe_arg", codegen->ptr_type()));
+  prototype.AddArgument(LlvmCodeGen::NamedVariable("build_arg", codegen->ptr_type()));
 
   llvm::LLVMContext& context = codegen->context();
   LlvmBuilder builder(context);
   llvm::Value* args[4];
   *fn = prototype.GeneratePrototype(&builder, args);
-  llvm::Value* out_row_arg =
-      builder.CreateBitCast(args[1], tuple_row_working_type, "out");
-  llvm::Value* probe_row_arg =
-      builder.CreateBitCast(args[2], tuple_row_working_type, "probe");
-  llvm::Value* build_row_arg =
-      builder.CreateBitCast(args[3], tuple_row_working_type, "build");
+  llvm::Value* out_row_arg = args[1];
+  llvm::Value* probe_row_arg = args[2];
+  llvm::Value* build_row_arg = args[3];
 
   int num_probe_tuples = probe_row_desc().tuple_descriptors().size();
   int num_build_tuples = build_row_desc().tuple_descriptors().size();
@@ -1364,8 +1353,8 @@ Status PartitionedHashJoinPlanNode::CodegenCreateOutputRow(
   // Copy probe row
   codegen->CodegenMemcpy(&builder, out_row_arg, probe_row_arg, probe_tuple_row_size);
   llvm::Value* build_row_idx[] = {codegen->GetI32Constant(num_probe_tuples)};
-  llvm::Value* build_row_dst =
-      builder.CreateInBoundsGEP(out_row_arg, build_row_idx, "build_dst_ptr");
+  llvm::Value* build_row_dst = builder.CreateInBoundsGEP(codegen->ptr_type(),
+      out_row_arg, build_row_idx, "build_dst_ptr");
 
   // Copy build row.
   llvm::BasicBlock* build_not_null_block =
@@ -1387,8 +1376,8 @@ Status PartitionedHashJoinPlanNode::CodegenCreateOutputRow(
     for (int i = 0; i < num_build_tuples; ++i) {
       llvm::Value* array_idx[] = {
           codegen->GetI32Constant(i + num_probe_tuples)};
-      llvm::Value* dst =
-          builder.CreateInBoundsGEP(out_row_arg, array_idx, "dst_tuple_ptr");
+      llvm::Value* dst = builder.CreateInBoundsGEP(codegen->ptr_type(), out_row_arg,
+          array_idx, "dst_tuple_ptr");
       builder.CreateStore(codegen->null_ptr_value(), dst);
     }
     builder.CreateRetVoid();

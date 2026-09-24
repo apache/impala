@@ -56,13 +56,8 @@ namespace llvm {
   class NoFolder;
   class PointerType;
   class StructType;
-  class TargetData;
   class Type;
   class Value;
-  namespace legacy {
-    class FunctionPassManager;
-    class PassManager;
-  }
 
   template<typename T, typename I>
   class IRBuilder;
@@ -97,6 +92,24 @@ class CodeGenCacheKey;
 /// Define builder subclass in case we want to change the template arguments later
 class LlvmBuilder : public llvm::IRBuilder<> {
   using llvm::IRBuilder<>::IRBuilder;
+
+ public:
+  // i128 defaults to align-16 since LLVM 18, but tuple slots are packed and can have any
+  // alignment.
+  llvm::LoadInst* CreateAnyValLoad(llvm::Type* ty, llvm::Value* ptr,
+      const ColumnType& col_type, const llvm::Twine& name = "") {
+    auto* load = llvm::IRBuilder<>::CreateLoad(ty, ptr, name);
+    if (col_type.type == TYPE_DECIMAL && col_type.GetByteSize() == 16)
+      load->setAlignment(llvm::Align(1));
+    return load;
+  }
+  llvm::StoreInst* CreateAnyValStore(llvm::Value* val, llvm::Value* ptr,
+      const ColumnType& col_type) {
+    auto* store = llvm::IRBuilder<>::CreateStore(val, ptr);
+    if (col_type.type == TYPE_DECIMAL && col_type.GetByteSize() == 16)
+      store->setAlignment(llvm::Align(1));
+    return store;
+  }
 };
 
 /// LLVM code generator.  This is the top level object to generate jitted code.
@@ -262,21 +275,9 @@ class LlvmCodeGen {
   /// Returns whether or not this cpu feature is supported.
   static bool IsCPUFeatureEnabled(int64_t flag);
 
-  /// Return a pointer type to 'type'
-  llvm::PointerType* GetPtrType(llvm::Type* type);
-
-  /// Return a pointer to pointer type to 'type'.
-  llvm::PointerType* GetPtrPtrType(llvm::Type* type);
-
-  /// Return a pointer to pointer type for 'name' type.
-  llvm::PointerType* GetNamedPtrPtrType(const std::string& name);
-
   /// Returns llvm type for Impala's internal representation of this column type,
   /// i.e. the way Impala represents this type in a Tuple.
   llvm::Type* GetSlotType(const ColumnType& type);
-
-  /// Return a pointer type to 'type' (e.g. int16_t*)
-  llvm::PointerType* GetSlotPtrType(const ColumnType& type);
 
   /// Returns the type with 'name'.  This is used to pull types from clang
   /// compiled IR.  The types we generate at runtime are unnamed.
@@ -285,23 +286,12 @@ class LlvmCodeGen {
   /// "class.impala::AggregationNode"
   llvm::Type* GetNamedType(const std::string& name);
 
-  /// Returns the pointer type of the type returned by GetNamedType(name)
-  llvm::PointerType* GetNamedPtrType(const std::string& name);
-
   /// Template versions of GetNamed*Type functions that expect the llvm name of
   /// type T to be T::LLVM_CLASS_NAME. T must be a struct/class, so GetStructType
   /// can return llvm::StructType* to avoid casting on the caller side.
   template<class T>
   llvm::StructType* GetStructType() {
     return llvm::cast<llvm::StructType>(GetNamedType(T::LLVM_CLASS_NAME));
-  }
-
-  template<class T>
-  llvm::PointerType* GetStructPtrType() { return GetNamedPtrType(T::LLVM_CLASS_NAME); }
-
-  template<class T>
-  llvm::PointerType* GetStructPtrPtrType() {
-    return GetNamedPtrPtrType(T::LLVM_CLASS_NAME);
   }
 
   /// Alloca's an instance of the appropriate pointer type and sets it to point at 'v'
@@ -428,10 +418,6 @@ class LlvmCodeGen {
   /// Returns a copy of fn. The copy is added to the module.
   llvm::Function* CloneFunction(llvm::Function* fn);
 
-  /// Replace all uses of the instruction 'from' with the value 'to', and delete
-  /// 'from'. This is a wrapper around llvm::ReplaceInstWithValue().
-  void ReplaceInstWithValue(llvm::Instruction* from, llvm::Value* to);
-
   /// Returns the i-th argument of fn.
   llvm::Argument* GetArgument(llvm::Function* fn, int i);
 
@@ -455,10 +441,6 @@ class LlvmCodeGen {
   /// Only functions registered with AddFunctionToJit() and their dependencies are
   /// compiled by FinalizeModule(): other functions are considered dead code and will
   /// be removed during optimization.
-  ///
-  /// This will also wrap functions returning DecimalVals in an ABI-compliant wrapper (see
-  /// the comment in the .cc file for details). This is so we don't accidentally try to
-  /// call non-compliant code from native code.
   void AddFunctionToJit(llvm::Function* fn, CodegenFnPtrBase* fn_ptr);
 
   /// This will generate a printf call instruction to output 'message' at the builder's
@@ -503,7 +485,6 @@ class LlvmCodeGen {
   /// work for that number of bytes.  It is invalid to call that function with a
   /// different 'len'. Functions returned by these methods have already been finalized.
   llvm::Function* GetHashFunction(int num_bytes = -1);
-  llvm::Function* GetFnvHashFunction(int num_bytes = -1);
   llvm::Function* GetMurmurHashFunction(int num_bytes = -1);
 
   /// Set the NoInline attribute on 'function' and remove the AlwaysInline and InlineHint
@@ -574,23 +555,17 @@ class LlvmCodeGen {
   llvm::PointerType* ptr_type() { return ptr_type_; }
   llvm::Type* void_type() { return void_type_; }
 
-  llvm::PointerType* i8_ptr_type() { return GetPtrType(i8_type()); }
-  llvm::PointerType* i16_ptr_type() { return GetPtrType(i16_type()); }
-  llvm::PointerType* i32_ptr_type() { return GetPtrType(i32_type()); }
-  llvm::PointerType* i64_ptr_type() { return GetPtrType(i64_type()); }
-  llvm::PointerType* float_ptr_type() { return GetPtrType(float_type()); }
-  llvm::PointerType* double_ptr_type() { return GetPtrType(double_type()); }
-  llvm::PointerType* ptr_ptr_type() { return GetPtrType(ptr_type_); }
-
   llvm::Constant* GetBoolConstant(bool val) { return val ? true_value_ : false_value_; }
+  // The explicit narrowing casts keep the value within the requested bit width; LLVM
+  // >= 20 asserts instead of implicitly truncating.
   llvm::Constant* GetI8Constant(uint64_t val) {
-    return llvm::ConstantInt::get(context(), llvm::APInt(8, val));
+    return llvm::ConstantInt::get(context(), llvm::APInt(8, static_cast<uint8_t>(val)));
   }
   llvm::Constant* GetI16Constant(uint64_t val) {
-    return llvm::ConstantInt::get(context(), llvm::APInt(16, val));
+    return llvm::ConstantInt::get(context(), llvm::APInt(16, static_cast<uint16_t>(val)));
   }
   llvm::Constant* GetI32Constant(uint64_t val) {
-    return llvm::ConstantInt::get(context(), llvm::APInt(32, val));
+    return llvm::ConstantInt::get(context(), llvm::APInt(32, static_cast<uint32_t>(val)));
   }
   llvm::Constant* GetI64Constant(uint64_t val) {
     return llvm::ConstantInt::get(context(), llvm::APInt(64, val));
@@ -628,8 +603,8 @@ class LlvmCodeGen {
   /// Codegens IR to load array[idx] and returns the loaded value. 'array' should be a
   /// C-style array (e.g. i32*) or an IR array (e.g. [10 x i32]). This function does not
   /// do bounds checking.
-  llvm::Value* CodegenArrayAt(
-      LlvmBuilder*, llvm::Value* array, int idx, const char* name = "");
+  llvm::Value* CodegenArrayAt(LlvmBuilder*, llvm::Value* array, llvm::Type* elementType,
+      int idx, const char* name = "");
 
   /// Codegens IR to call the function corresponding to 'ir_type' with argument 'args'
   /// and returns the value.
@@ -798,6 +773,17 @@ class LlvmCodeGen {
   /// Generate and store the hash code of all the function names. Will be used to
   /// codegen cache only.
   void GenerateFunctionNamesHashCode();
+
+  /// Get type for CollectionValue. Under LLVM 19+ opaque pointers it may not be emitted
+  /// as a named type when only accessed via pointer; create it from its known layout.
+  /// Field layout mirrors what CodegenReadingStringOrCollectionVal uses: { ptr, i32 }.
+  llvm::StructType* GetCollectionValueType();
+
+  /// Get type for FilterContext. Create if absent. It has 6 pointer fields:
+  /// { ScalarExprEvaluator*, RuntimeFilter*, FilterStats*, BloomFilter*,
+  ///   MinMaxFilter*, InListFilter* }
+  /// Field indices match those used in filter-context.cc CodegenEval/CodegenInsert.
+  llvm::StructType* GetFilterContextType();
 
   /// Disable CPU attributes in 'cpu_attrs' that are not present in
   /// the '--llvm_cpu_attr_whitelist' flag. The same attributes in the input are
@@ -1025,7 +1011,7 @@ class LlvmCodeGen {
     /// Handler function that sets the state on an instance of this class which is
     /// accessible via the LlvmCodeGen object passed to it using the 'context'
     /// input parameter.
-    static void DiagnosticHandlerFn(const llvm::DiagnosticInfo &info, void *context);
+    static void DiagnosticHandlerFn(const llvm::DiagnosticInfo *info, void *context);
 
    private:
     /// Contains the last error that was reported via DiagnosticHandlerFn().

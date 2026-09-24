@@ -291,7 +291,7 @@ class shared_lock {
 
  private:
   Mutex* m_;
-  DISALLOW_COPY_AND_ASSIGN(shared_lock<Mutex>);
+  DISALLOW_COPY_AND_ASSIGN(shared_lock);
 };
 
 } // namespace kudu

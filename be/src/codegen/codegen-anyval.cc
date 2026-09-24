@@ -44,23 +44,11 @@ const char* CodegenAnyVal::LLVM_COLLECTIONVAL_NAME = "struct.impala_udf::Collect
 llvm::Type* CodegenAnyVal::GetLoweredType(LlvmCodeGen* cg, const ColumnType& type) {
   switch (type.type) {
     case TYPE_BOOLEAN: // i16
-#ifndef __aarch64__
       return cg->i16_type();
-#else
-      return cg->i64_type();
-#endif
     case TYPE_TINYINT: // i16
-#ifndef __aarch64__
       return cg->i16_type();
-#else
-      return cg->i64_type();
-#endif
     case TYPE_SMALLINT: // i32
-#ifndef __aarch64__
       return cg->i32_type();
-#else
-      return cg->i64_type();
-#endif
     case TYPE_INT: // i64
       return cg->i64_type();
     case TYPE_BIGINT: // { i8, i64 }
@@ -105,11 +93,6 @@ llvm::Type* CodegenAnyVal::GetLoweredType(LlvmCodeGen* cg, const ColumnType& typ
       DCHECK(false) << "Unsupported type: " << type;
       return NULL;
   }
-}
-
-llvm::PointerType* CodegenAnyVal::GetLoweredPtrType(
-    LlvmCodeGen* cg, const ColumnType& type) {
-  return GetLoweredType(cg, type)->getPointerTo();
 }
 
 llvm::Type* CodegenAnyVal::GetUnloweredType(LlvmCodeGen* cg, const ColumnType& type) {
@@ -164,15 +147,6 @@ llvm::Type* CodegenAnyVal::GetUnloweredType(LlvmCodeGen* cg, const ColumnType& t
   return result;
 }
 
-llvm::PointerType* CodegenAnyVal::GetUnloweredPtrType(
-    LlvmCodeGen* cg, const ColumnType& type) {
-  return GetUnloweredType(cg, type)->getPointerTo();
-}
-
-llvm::PointerType* CodegenAnyVal::GetAnyValPtrType(LlvmCodeGen* cg) {
-  return cg->GetNamedType(LLVM_ANYVAL_NAME)->getPointerTo();
-}
-
 llvm::Value* CodegenAnyVal::CreateCall(LlvmCodeGen* cg, LlvmBuilder* builder,
     llvm::Function* fn, llvm::ArrayRef<llvm::Value*> args, const char* name,
     llvm::Value* result_ptr) {
@@ -181,8 +155,7 @@ llvm::Value* CodegenAnyVal::CreateCall(LlvmCodeGen* cg, LlvmBuilder* builder,
     // argument (which should be a DecimalVal*).
     llvm::Function::arg_iterator ret_arg = fn->arg_begin();
     DCHECK(ret_arg->getType()->isPointerTy());
-    llvm::Type* ret_type = ret_arg->getType()->getPointerElementType();
-    DCHECK_EQ(ret_type, cg->GetNamedType(LLVM_DECIMALVAL_NAME));
+    llvm::Type* ret_type = cg->GetNamedType(LLVM_DECIMALVAL_NAME);
 
     // We need to pass a DecimalVal pointer to 'fn' that will be populated with the result
     // value. Use 'result_ptr' if specified, otherwise alloca one.
@@ -198,7 +171,7 @@ llvm::Value* CodegenAnyVal::CreateCall(LlvmCodeGen* cg, LlvmBuilder* builder,
 
     // If 'result_ptr' was specified, we're done. Otherwise load and return the result.
     if (result_ptr != NULL) return NULL;
-    return builder->CreateLoad(ret_ptr, name);
+    return builder->CreateLoad(ret_type, ret_ptr, name);
   } else {
     // Function returns *Val normally (note that it could still be returning a
     // DecimalVal, since we generate non-compliant functions).
@@ -226,7 +199,7 @@ CodegenAnyVal::CodegenAnyVal(LlvmCodeGen* codegen, LlvmBuilder* builder,
   if (value_ == NULL) {
     // No Value* was specified, so allocate one on the stack and load it.
     llvm::Value* ptr = codegen_->CreateEntryBlockAlloca(*builder, value_type);
-    value_ = builder_->CreateLoad(ptr, name_);
+    value_ = builder_->CreateLoad(value_type, ptr, name_);
   }
   DCHECK_EQ(value_->getType(), value_type);
 }
@@ -391,13 +364,8 @@ llvm::Value* CodegenAnyVal::GetVal(const char* name) {
       return val;
     }
     case TYPE_DECIMAL: {
-#ifdef __aarch64__
-      // On aarch64, the Lowered type is of form { {i8}, {i128} }. No padding add.
-      uint32_t idxs[] = {1, 0};
-#else
-      // On x86-64, Lowered type is of form { {i8}, [15 x i8], {i128} }.
+      // The Lowered type is of form { {i8}, [15 x i8], {i128} }.
       uint32_t idxs[] = {2, 0};
-#endif
       // Get the i128 value and truncate it to the correct size.
       // (The {i128} corresponds to the union of the different width int types.)
       llvm::Value* val = builder_->CreateExtractValue(value_, idxs, name);
@@ -452,13 +420,8 @@ void CodegenAnyVal::SetVal(llvm::Value* val) {
       //  (The {i128} corresponds to the union of the different width int types.)
       DCHECK_EQ(val->getType()->getIntegerBitWidth(), type_.GetByteSize() * 8);
       val = builder_->CreateSExt(val, llvm::Type::getIntNTy(codegen_->context(), 128));
-#ifdef __aarch64__
-      // On aarch64, the Lowered type is of form { {i8}, {i128} }. No padding add.
-      uint32_t idxs[] = {1, 0};
-#else
-      // On X86-64, the Lowered type is of the form { {i8}, [15 x i8], {i128} }
+      // The Lowered type is of form { {i8}, [15 x i8], {i128} }.
       uint32_t idxs[] = {2, 0};
-#endif
       value_ = builder_->CreateInsertValue(value_, val, idxs, name_);
       break;
     }
@@ -623,26 +586,8 @@ llvm::Value* CodegenAnyVal::ConvertToPositiveZero(LlvmBuilder* builder,
                 llvm::ConstantFP::get(val->getType(), 0.0), val);
 }
 
-llvm::Value* CodegenAnyVal::GetLoweredPtr(const string& name) const {
-  llvm::Value* lowered_ptr =
-      codegen_->CreateEntryBlockAlloca(*builder_, value_->getType(), name.c_str());
-  builder_->CreateStore(GetLoweredValue(), lowered_ptr);
-  return lowered_ptr;
-}
-
-llvm::Value* CodegenAnyVal::GetUnloweredPtr(const string& name) const {
-  // Get an unlowered pointer by creating a lowered pointer then bitcasting it.
-  // TODO: if the original value was unlowered, this generates roundabout code that
-  // lowers the value and casts it back. Generally LLVM's optimiser can reason
-  // about what's going on and undo our shenanigans to generate sane code, but it
-  // would be nice to just emit reasonable code in the first place.
-  return builder_->CreateBitCast(
-      GetLoweredPtr(), GetUnloweredPtrType(codegen_, type_), name);
-}
-
-llvm::Value* CodegenAnyVal::GetAnyValPtr(const std::string& name) const {
-  return builder_->CreateBitCast(
-      GetLoweredPtr(), GetAnyValPtrType(codegen_), name);
+llvm::Value* CodegenAnyVal::GetPtrTo(const string& name) const {
+  return codegen_->GetPtrTo(builder_, value_, name.c_str());
 }
 
 llvm::Value* CodegenAnyVal::Eq(CodegenAnyVal* other) {
@@ -667,14 +612,14 @@ llvm::Value* CodegenAnyVal::Eq(CodegenAnyVal* other) {
       llvm::Function* eq_fn =
           codegen_->GetFunction(IRFunction::CODEGEN_ANYVAL_STRING_VAL_EQ, false);
       return builder_->CreateCall(eq_fn,
-          llvm::ArrayRef<llvm::Value*>({GetUnloweredPtr(), other->GetUnloweredPtr()}),
+          llvm::ArrayRef<llvm::Value*>({GetPtrTo(), other->GetPtrTo()}),
           "eq");
     }
     case TYPE_TIMESTAMP: {
       llvm::Function* eq_fn =
           codegen_->GetFunction(IRFunction::CODEGEN_ANYVAL_TIMESTAMP_VAL_EQ, false);
       return builder_->CreateCall(eq_fn,
-          llvm::ArrayRef<llvm::Value*>({GetUnloweredPtr(), other->GetUnloweredPtr()}),
+          llvm::ArrayRef<llvm::Value*>({GetPtrTo(), other->GetPtrTo()}),
           "eq");
     }
     default:
@@ -687,7 +632,7 @@ llvm::Value* CodegenAnyVal::EqToNativePtr(llvm::Value* native_ptr,
     bool inclusive_equality) {
   llvm::Value* val = NULL;
   if (!type_.IsStringType()) {
-     val = builder_->CreateLoad(native_ptr);
+    val = builder_->CreateAnyValLoad(codegen_->GetSlotType(type_), native_ptr, type_);
   }
   switch (type_.type) {
     case TYPE_NULL:
@@ -722,21 +667,19 @@ llvm::Value* CodegenAnyVal::EqToNativePtr(llvm::Value* native_ptr,
       llvm::Function* eq_fn =
           codegen_->GetFunction(IRFunction::CODEGEN_ANYVAL_STRING_VALUE_EQ, false);
       return builder_->CreateCall(eq_fn,
-          llvm::ArrayRef<llvm::Value*>({GetUnloweredPtr(), native_ptr}), "cmp_raw");
+          llvm::ArrayRef<llvm::Value*>({GetPtrTo(), native_ptr}), "cmp_raw");
     }
     case TYPE_UUID: {
-      llvm::Value* slot_ptr = builder_->CreateBitCast(
-          native_ptr, codegen_->ptr_type(), "uuid_slot_ptr");
       llvm::Function* eq_fn =
           codegen_->GetFunction(IRFunction::CODEGEN_ANYVAL_UUID_INLINE_BYTES_EQ, false);
       return builder_->CreateCall(eq_fn,
-          llvm::ArrayRef<llvm::Value*>({GetUnloweredPtr(), slot_ptr}), "cmp_raw");
+          llvm::ArrayRef<llvm::Value*>({GetPtrTo(), native_ptr}), "cmp_raw");
     }
     case TYPE_TIMESTAMP: {
       llvm::Function* eq_fn =
           codegen_->GetFunction(IRFunction::CODEGEN_ANYVAL_TIMESTAMP_VALUE_EQ, false);
       return builder_->CreateCall(eq_fn,
-          llvm::ArrayRef<llvm::Value*>({GetUnloweredPtr(), native_ptr}), "cmp_raw");
+          llvm::ArrayRef<llvm::Value*>({GetPtrTo(), native_ptr}), "cmp_raw");
     }
     default:
       DCHECK(false) << "NYI: " << type_.DebugString();
@@ -747,9 +690,7 @@ llvm::Value* CodegenAnyVal::EqToNativePtr(llvm::Value* native_ptr,
 llvm::Value* CodegenAnyVal::Compare(CodegenAnyVal* other, const char* name) {
   DCHECK_EQ(type_, other->type_);
   llvm::Value* v1 = SlotDescriptor::CodegenStoreNonNullAnyValToNewAlloca(*this);
-  llvm::Value* void_v1 = builder_->CreateBitCast(v1, codegen_->ptr_type());
   llvm::Value* v2 = SlotDescriptor::CodegenStoreNonNullAnyValToNewAlloca(*other);
-  llvm::Value* void_v2 = builder_->CreateBitCast(v2, codegen_->ptr_type());
   // Create a global constant of the values' ColumnType. It needs to be a constant
   // for constant propagation and dead code elimination in 'compare_fn'.
   llvm::Type* col_type = codegen_->GetStructType<ColumnType>();
@@ -757,7 +698,7 @@ llvm::Value* CodegenAnyVal::Compare(CodegenAnyVal* other, const char* name) {
       codegen_->ConstantToGVPtr(col_type, type_.ToIR(codegen_), "type");
   llvm::Function* compare_fn =
       codegen_->GetFunction(IRFunction::RAW_VALUE_COMPARE, false);
-  llvm::Value* args[] = {void_v1, void_v2, type_ptr};
+  llvm::Value* args[] = {v1, v2, type_ptr};
   return builder_->CreateCall(compare_fn, args, name);
 }
 
@@ -771,9 +712,7 @@ void CodegenAnyVal::CodegenBranchIfNull(
 }
 
 llvm::Value* CodegenAnyVal::GetHighBits(int num_bits, llvm::Value* v, const char* name) {
-#ifndef __aarch64__
   DCHECK_EQ(v->getType()->getIntegerBitWidth(), num_bits * 2);
-#endif
   llvm::Value* shifted = builder_->CreateAShr(v, num_bits);
   return builder_->CreateTrunc(
       shifted, llvm::IntegerType::get(codegen_->context(), num_bits));
@@ -787,14 +726,9 @@ llvm::Value* CodegenAnyVal::GetHighBits(int num_bits, llvm::Value* v, const char
 llvm::Value* CodegenAnyVal::SetHighBits(
     int num_bits, llvm::Value* src, llvm::Value* dst, const char* name) {
   DCHECK_LE(src->getType()->getIntegerBitWidth(), num_bits);
-#ifndef __aarch64__
   DCHECK_EQ(dst->getType()->getIntegerBitWidth(), num_bits * 2);
   llvm::Value* extended_src = builder_->CreateZExt(
       src, llvm::IntegerType::get(codegen_->context(), num_bits * 2));
-#else
-  llvm::Value* extended_src = builder_->CreateZExt(src,
-        llvm::IntegerType::get(codegen_->context(), 64));
-#endif
   llvm::Value* shifted_src = builder_->CreateShl(extended_src, num_bits);
   llvm::Value* masked_dst = builder_->CreateAnd(dst, (1LL << num_bits) - 1);
   return builder_->CreateOr(masked_dst, shifted_src, name);
@@ -822,8 +756,10 @@ llvm::Value* CodegenAnyVal::GetNullVal(LlvmCodeGen* codegen, llvm::Type* val_typ
       return llvm::ConstantStruct::get(struct_type, null_anyval,
           llvm::Constant::getNullValue(type2), llvm::Constant::getNullValue(type3));
     }
-#ifdef __aarch64__
-    else if (struct_type->getElementType(0)->isStructTy()) {
+    // Two-element struct: either { {i8}, T } (DecimalVal in LLVM 19+, or aarch64)
+    // or { integer, T } (BigIntVal, DoubleVal, StringVal, etc.).
+    if (struct_type->getElementType(0)->isStructTy()) {
+      DCHECK_EQ(val_type, codegen->GetNamedType(LLVM_DECIMALVAL_NAME));
       llvm::StructType* anyval_struct_type =
           llvm::cast<llvm::StructType>(struct_type->getElementType(0));
       llvm::Type* is_null_type = anyval_struct_type->getElementType(0);
@@ -833,7 +769,6 @@ llvm::Value* CodegenAnyVal::GetNullVal(LlvmCodeGen* codegen, llvm::Type* val_typ
       return llvm::ConstantStruct::get(struct_type, null_anyval,
           llvm::Constant::getNullValue(type1));
     }
-#endif
     // Return the struct { 1, 0 } (the 'is_null' byte, i.e. the first value's first byte,
     // is set to 1, the other bytes don't matter)
     DCHECK_EQ(struct_type->getNumElements(), 2);
@@ -895,10 +830,8 @@ llvm::BasicBlock* CodegenAnyVal::CreateStructValFromReadWriteInfo(
   llvm::Value* children_ptrs_buffer = builder->CreateCall(allocate_for_results_fn,
       {fn_ctx, codegen->GetI64Constant(num_children * sizeof(uint8_t*))},
       "children_ptrs_buffer");
-  llvm::Value* cast_children_ptrs_buffer = builder->CreateBitCast(
-      children_ptrs_buffer, codegen->ptr_ptr_type(), "cast_children_ptrs_buffer");
   llvm::Value* buffer_is_null = builder->CreateIsNull(
-      cast_children_ptrs_buffer, "buffer_is_null");
+      children_ptrs_buffer, "buffer_is_null");
 
   // Branch based on 'buffer_is_null'.
   read_write_info.children()[0].entry_block().BranchToIfNot(builder, buffer_is_null,
@@ -915,19 +848,18 @@ llvm::BasicBlock* CodegenAnyVal::CreateStructValFromReadWriteInfo(
         *builder, child_type_ir->getType(), "child_type_ptr");
     builder->CreateStore(child_type_ir, child_type_ir_ptr);
 
-    llvm::Value* child_any_val_ptr = child_any_val.GetAnyValPtr("child_ptr");
+    llvm::Value* child_ptr = child_any_val.GetPtrTo("child_ptr");
 
     // Convert and store the child in the corresponding ScalarExprEvaluator - this takes
     // care of the lifetime of the object.
     llvm::Value* stored_child_ptr = builder->CreateCall(store_result_in_eval_fn,
-        {child_codegen_value_read_write_info.GetEval(), child_any_val_ptr,
-        child_type_ir_ptr},
+        {child_codegen_value_read_write_info.GetEval(), child_ptr, child_type_ir_ptr},
         "stored_value");
 
     // The address where the child pointer should be written. This is in the pointer list
     // of the StructVal.
-    llvm::Value* dst_child_ptr_addr = builder->CreateInBoundsGEP(
-        cast_children_ptrs_buffer, codegen->GetI32Constant(i), "child_ptr_addr");
+    llvm::Value* dst_child_ptr_addr = builder->CreateInBoundsGEP(codegen->ptr_type(),
+        children_ptrs_buffer, codegen->GetI32Constant(i), "child_ptr_addr");
     builder->CreateStore(stored_child_ptr, dst_child_ptr_addr);
 
     if (i < num_children - 1) {
@@ -939,7 +871,7 @@ llvm::BasicBlock* CodegenAnyVal::CreateStructValFromReadWriteInfo(
   llvm::BasicBlock* last_block = builder->GetInsertBlock();
   builder->CreateBr(struct_produce_value_block);
   builder->SetInsertPoint(struct_produce_value_block);
-  *ptr = builder->CreateBitCast(children_ptrs_buffer, codegen->ptr_type());
+  *ptr = children_ptrs_buffer;
   *len = codegen->GetI32Constant(num_children);
   return last_block;
 }
@@ -1083,17 +1015,11 @@ void CodegenAnyVal::StructChildToReadWriteInfo(
   // 'AnyVal's). As this code deals with values in 'AnyVal's, for BOOLEANS we use i8,
   // which is the LLVM type corresponding to 'bool', and for other types we use the slot
   // type.
-  llvm::Type* child_type = type.type == TYPE_BOOLEAN
-      || type.type == TYPE_CHAR || type.type == TYPE_UUID ?
-    codegen->i8_type() : slot_type;
-  llvm::Value* cast_child_ptr = builder->CreateBitCast(child_ptr,
-      child_type->getPointerTo(), "cast_child_ptr");
-
   switch (type.type) {
     case TYPE_CHAR:
     case TYPE_UUID: {
       llvm::Value* len = codegen->GetI32Constant(type.len);
-      read_write_info->SetPtrAndLen(cast_child_ptr, len);
+      read_write_info->SetPtrAndLen(child_ptr, len);
       break;
     }
     case TYPE_STRING:
@@ -1101,25 +1027,25 @@ void CodegenAnyVal::StructChildToReadWriteInfo(
       llvm::Function* str_ptr_fn = codegen->GetFunction(
             IRFunction::STRING_VALUE_PTR, false);
       llvm::Value* ptr = builder->CreateCall(str_ptr_fn,
-            llvm::ArrayRef<llvm::Value*>({cast_child_ptr}), "ptr");
+            llvm::ArrayRef<llvm::Value*>({child_ptr}), "ptr");
 
       llvm::Function* str_len_fn = codegen->GetFunction(
           IRFunction::STRING_VALUE_LEN, false);
       llvm::Value* len = builder->CreateCall(str_len_fn,
-          llvm::ArrayRef<llvm::Value*>({cast_child_ptr}), "len");
+          llvm::ArrayRef<llvm::Value*>({child_ptr}), "len");
       read_write_info->SetPtrAndLen(ptr, len);
       break;
     }
     case TYPE_ARRAY:
     case TYPE_MAP: { // Arrays and maps have the same memory layout.
       llvm::Value* ptr_addr = builder->CreateStructGEP(
-          nullptr, cast_child_ptr, 0, "ptr_addr");
-      llvm::Value* ptr = builder->CreateLoad(ptr_addr, "ptr");
+          slot_type, child_ptr, 0, "ptr_addr");
+      llvm::Value* ptr = builder->CreateLoad(codegen->ptr_type(), ptr_addr, "ptr");
 
       llvm::Value* len;
       llvm::Value* len_addr = builder->CreateStructGEP(
-          nullptr, cast_child_ptr, 1, "len_addr");
-      len = builder->CreateLoad(len_addr, "len");
+          slot_type, child_ptr, 1, "len_addr");
+      len = builder->CreateLoad(codegen->i32_type(), len_addr, "len");
       read_write_info->SetPtrAndLen(ptr, len);
       break;
     }
@@ -1129,17 +1055,13 @@ void CodegenAnyVal::StructChildToReadWriteInfo(
       break;
     case TYPE_TIMESTAMP: {
       llvm::Value* time_of_day_addr = builder->CreateStructGEP(
-          nullptr, cast_child_ptr, 0, "time_of_day_addr");
-      llvm::Value* time_of_day_addr_lowered = builder->CreateBitCast(
-          time_of_day_addr, codegen->i64_ptr_type(), "time_of_day_addr");
+          slot_type, child_ptr, 0, "time_of_day_addr");
       llvm::Value* time_of_day = builder->CreateLoad(
-          time_of_day_addr_lowered, "time_of_day");
+          codegen->i64_type(), time_of_day_addr, "time_of_day");
 
       llvm::Value* date_addr = builder->CreateStructGEP(
-          nullptr, cast_child_ptr, 1, "date_addr");
-      llvm::Value* date_addr_lowered = builder->CreateBitCast(
-          date_addr, codegen->i32_ptr_type(), "date_addr_lowered");
-      llvm::Value* date = builder->CreateLoad(date_addr_lowered, "date");
+          slot_type, child_ptr, 1, "date_addr");
+      llvm::Value* date = builder->CreateLoad(codegen->i32_type(), date_addr, "date");
       read_write_info->SetTimeAndDate(time_of_day, date);
       break;
     }
@@ -1153,7 +1075,10 @@ void CodegenAnyVal::StructChildToReadWriteInfo(
     case TYPE_DECIMAL:
     case TYPE_DATE: {
       // The representations of the types match - just take the value.
-      llvm::Value* child = builder->CreateLoad(child_type, cast_child_ptr, "child");
+      llvm::Type* child_type = type.type == TYPE_BOOLEAN
+          || type.type == TYPE_CHAR || type.type == TYPE_UUID ?
+        codegen->i8_type() : slot_type;
+      llvm::Value* child = builder->CreateLoad(child_type, child_ptr, "child");
       read_write_info->SetSimpleVal(child);
       break;
     }
@@ -1174,9 +1099,6 @@ void CodegenAnyVal::StructToReadWriteInfo(
   LlvmBuilder* builder = read_write_info->builder();
   llvm::Function* fn = builder->GetInsertBlock()->getParent();
 
-  llvm::Value* cast_children_ptr = builder->CreateBitCast(
-      children_ptr, codegen->ptr_ptr_type(), "cast_children_ptr");
-
   for (int i = 0; i < type.children.size(); ++i) {
     const ColumnType& child_type = type.children[i];
     CodegenAnyValReadWriteInfo child_read_write_info(codegen, builder, child_type);
@@ -1184,8 +1106,8 @@ void CodegenAnyVal::StructToReadWriteInfo(
     llvm::BasicBlock* child_entry_block = llvm::BasicBlock::Create(context, "entry", fn);
 
     builder->SetInsertPoint(child_entry_block);
-    llvm::Value* child_ptr_addr = builder->CreateInBoundsGEP(cast_children_ptr,
-        codegen->GetI32Constant(i), "child_ptr_addr");
+    llvm::Value* child_ptr_addr = builder->CreateInBoundsGEP(codegen->ptr_type(),
+        children_ptr, codegen->GetI32Constant(i), "child_ptr_addr");
     llvm::Value* child_ptr = builder->CreateLoad(codegen->ptr_type(), child_ptr_addr,
         "child_ptr");
 
@@ -1200,9 +1122,8 @@ void CodegenAnyVal::StructToReadWriteInfo(
     builder->SetInsertPoint(non_null_block);
 
     if (child_type.IsStructType()) {
-      llvm::Value* child_struct_ptr = builder->CreateBitCast(
-          child_ptr, GetLoweredPtrType(codegen, child_type), "child_struct_ptr");
-      llvm::Value* child_struct = builder->CreateLoad(child_struct_ptr, "child_struct");
+      llvm::Value* child_struct = builder->CreateLoad(
+          GetLoweredType(codegen, child_type), child_ptr, "child_struct");
       CodegenAnyVal child_anyval = CodegenAnyVal(
           codegen, builder, child_type, child_struct);
       llvm::Value* child_children_ptr = child_anyval.GetPtr();

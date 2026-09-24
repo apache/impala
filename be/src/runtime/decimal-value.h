@@ -51,9 +51,13 @@ class __attribute__ ((packed)) DecimalValue {
   typedef T StorageType;
 
   DecimalValue() : value_(0) { }
-  DecimalValue(const T& s) : value_(s) { }
+  // Take 's' by value, not by reference: 's' is frequently an lvalue sourced from
+  // a packed/tuple-backed struct (e.g. DecimalVal::val16), and binding a reference
+  // to it can lose the "packed" provenance through inlining, causing the compiler
+  // to emit an aligned SIMD load/store that segfaults on unaligned memory.
+  DecimalValue(T s) : value_(s) { }
 
-  DecimalValue& operator=(const T& s) {
+  DecimalValue& operator=(T s) {
     value_ = s;
     return *this;
   }

@@ -194,7 +194,8 @@ Status CodeGenCache::Store(const CodeGenCacheKey& cache_key, LlvmCodeGen* codege
   DCHECK(cache_ != nullptr);
   DCHECK(codegen != nullptr);
   Status status = Status::OK();
-  pair<unordered_set<CodeGenCacheKey::HashCode>::iterator, bool> key_to_insert_it;
+  pair<unordered_set<CodeGenCacheKey::HashCode, CodeGenCacheKey::HashCodeHash>::iterator,
+      bool> key_to_insert_it;
   {
     // The Cache::Insert() suggests the caller to avoid multiple handles for the same
     // key to insert because it can be inefficient to keep the entry from being evicted.

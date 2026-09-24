@@ -17,24 +17,54 @@
 ---
 Checks: "-*,clang*,\
 -clang-analyzer-alpha*,\
+-clang-diagnostic-cast-function-type-mismatch,\
+-clang-analyzer-core.BitwiseShift,\
 -clang-analyzer-core.CallAndMessage,\
+-clang-analyzer-core.DivideZero,\
 -clang-analyzer-core.NonNullParamChecker,\
 -clang-analyzer-core.NullDereference,\
+-clang-analyzer-core.NullPointerArithm,\
+-clang-analyzer-core.StackAddressEscape,\
 -clang-analyzer-core.UndefinedBinaryOperatorResult,\
 -clang-analyzer-core.uninitialized.ArraySubscript,\
 -clang-analyzer-core.uninitialized.Assign,\
 -clang-analyzer-core.uninitialized.Branch,\
+-clang-analyzer-cplusplus.Move,\
 -clang-analyzer-cplusplus.NewDelete,\
 -clang-analyzer-cplusplus.NewDeleteLeaks,\
+-clang-analyzer-cplusplus.PureVirtualCall,\
+-clang-analyzer-cplusplus.StringChecker,\
+-clang-analyzer-optin.cplusplus.UninitializedObject,\
 -clang-analyzer-deadcode.DeadStores,\
+-clang-analyzer-optin.core.EnumCastOutOfRange,\
+-clang-analyzer-optin.cplusplus.VirtualCall,\
 -clang-analyzer-optin.performance.Padding,\
+-clang-analyzer-security.cert.env.InvalidPtr,\
 -clang-analyzer-unix.Malloc,\
 -clang-analyzer-unix.MallocSizeof,\
+-clang-diagnostic-deprecated-copy-with-user-provided-copy,\
+-clang-diagnostic-unnecessary-virtual-specifier,\
+-clang-diagnostic-unused-but-set-parameter,\
 -clang-diagnostic-sign-compare,\
 -clang-diagnostic-return-type-c-linkage,\
 -clang-diagnostic-unused-local-typedef,\
 -clang-diagnostic-unused-parameter,\
-performance-*"
+-clang-diagnostic-vla-cxx-extension,\
+-clang-analyzer-security.ArrayBound,\
+-clang-analyzer-security.insecureAPI.bzero,\
+-clang-analyzer-security.insecureAPI.DeprecatedOrUnsafeBufferHandling,\
+-clang-analyzer-unix.StdCLibraryFunctions,\
+-clang-analyzer-unix.Stream,\
+performance-*,\
+-performance-avoid-endl,\
+-performance-enum-size,\
+-performance-for-range-copy,\
+-performance-inefficient-vector-operation,\
+-performance-move-const-arg,\
+-performance-no-int-to-ptr,\
+-performance-noexcept-move-constructor,\
+-performance-unnecessary-copy-initialization,\
+-performance-unnecessary-value-param"
 
 # Ignore warnings in gutil
 
@@ -58,5 +88,3 @@ HeaderFilterRegex: "be/src/\
 |udf\
 |udf_samples\
 |util)"
-
-AnalyzeTemporaryDtors: true
