@@ -87,6 +87,23 @@ under the License.
             write path. To store such data, use a <codeph>BINARY</codeph> column
             instead.</note>
           </li>
+          <li>The DataSketches sketch-producing functions
+              (<codeph>ds_hll_sketch()</codeph>, <codeph>ds_cpc_sketch()</codeph>,
+              <codeph>ds_theta_sketch()</codeph>, and <codeph>ds_kll_sketch()</codeph>) now
+            return <codeph>BINARY</codeph> instead of <codeph>STRING</codeph>, and the
+            functions that consume serialized sketches (for example
+              <codeph>ds_hll_estimate()</codeph>, <codeph>ds_hll_union()</codeph>,
+              <codeph>ds_cpc_estimate()</codeph>, <codeph>ds_theta_estimate()</codeph>, and
+            the <codeph>ds_kll_*()</codeph> query functions) now accept
+              <codeph>BINARY</codeph> instead of <codeph>STRING</codeph>.<p>As a result, a
+              query that passes a <codeph>STRING</codeph> sketch to one of these functions now
+              fails at analysis time with a <codeph>No matching function</codeph> error, and
+              sketches stored in <codeph>STRING</codeph> columns can no longer be read by these
+              functions directly.</p><p>To migrate, retype the sketch column in place with
+              <codeph>ALTER TABLE ... CHANGE COLUMN</codeph> from <codeph>STRING</codeph> to
+              <codeph>BINARY</codeph>; the on-disk bytes are unchanged. Alternatively, store
+              sketches in <codeph>BINARY</codeph> columns, or wrap the column with
+              <codeph>CAST(sketch_col AS BINARY)</codeph> at the call site.</p></li>
         </ul>
       </p>
     </conbody>

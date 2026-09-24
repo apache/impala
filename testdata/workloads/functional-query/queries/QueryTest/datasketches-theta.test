@@ -106,11 +106,9 @@ from functional_parquet.emptytable;
 BIGINT,BIGINT,BIGINT,BIGINT
 ====
 ---- QUERY
-# Write sketches to a table as string and get an estimate from the written sketch.
-# Note, the plan is to write sketches as binary instead of strings. For this we have to
-# wait for the binary support (IMPALA-9482).
+# Write sketches to a table as binary and get an estimate from the written sketch.
 create table sketch_store
-    (year int, month int, date_sketch string, float_sketch string)
+    (year int, month int, date_sketch binary, float_sketch binary)
 stored as parquet;
 insert into sketch_store
     select
@@ -135,14 +133,20 @@ from sketch_store order by month;
 INT,INT,BIGINT,BIGINT
 ====
 ---- QUERY
-# Check that ds_theta_estimate returns error for strings that are not serialized sketches.
+# Check that ds_theta_estimate rejects STRING sketch inputs.
 select ds_theta_estimate(date_string_col) from functional_parquet.alltypestiny;
+---- CATCH
+AnalysisException: No matching function with signature: ds_theta_estimate(STRING)
+====
+---- QUERY
+# Check that ds_theta_estimate returns an error for non-sketch bytes cast to BINARY.
+select ds_theta_estimate(CAST(date_string_col AS BINARY)) from functional_parquet.alltypestiny;
 ---- CATCH
 UDF ERROR: Unable to deserialize sketch: sketch type mismatch: expected 3, actual 47
 ====
 ---- QUERY
 # Check that ds_theta_estimate returns error for HLL serialized sketches.
-create table hll_sketch_store (date_sketch string) stored as parquet;
+create table hll_sketch_store (date_sketch binary) stored as parquet;
 insert into hll_sketch_store
     select ds_hll_sketch(date_string_col)
     from functional_parquet.alltypessmall;
@@ -152,7 +156,7 @@ UDF ERROR: Unable to deserialize sketch: sketch type mismatch: expected 3, actua
 ====
 ---- QUERY
 # Check that ds_theta_estimate returns null for null and empty string inputs.
-select ds_theta_estimate(b), ds_theta_estimate(c) from functional_parquet.nulltable;
+select ds_theta_estimate(CAST(b AS BINARY)), ds_theta_estimate(CAST(c AS BINARY)) from functional_parquet.nulltable;
 ---- RESULTS
 0,0
 ---- TYPES
@@ -190,23 +194,29 @@ BIGINT,BIGINT
 ====
 ---- QUERY
 # Checks that ds_theta_union() produces NULL for an empty dataset.
-select ds_theta_union(field) from functional_parquet.emptytable;
+select ds_theta_union(CAST(field AS BINARY)) from functional_parquet.emptytable;
 ---- TYPES
-STRING
+BINARY
 ---- RESULTS
 'NULL'
 ====
 ---- QUERY
 # Checks that ds_theta_union() produces NULL for NULL inputs.
-select ds_theta_union(null_str) from functional_parquet.nullrows;
+select ds_theta_union(CAST(null_str AS BINARY)) from functional_parquet.nullrows;
 ---- TYPES
-STRING
+BINARY
 ---- RESULTS
 'NULL'
 ====
 ---- QUERY
-# ds_theta_union() returns an error if it receives an invalid serialized sketch.
+# Check that ds_theta_union rejects STRING sketch inputs.
 select ds_theta_union(date_string_col) from functional_parquet.alltypestiny where id=1;
+---- CATCH
+AnalysisException: No matching function with signature: ds_theta_union(STRING)
+====
+---- QUERY
+# ds_theta_union() returns an error if it receives an invalid serialized sketch.
+select ds_theta_union(CAST(date_string_col AS BINARY)) from functional_parquet.alltypestiny where id=1;
 ---- CATCH
 UDF ERROR: Unable to deserialize sketch: sketch type mismatch: expected 3, actual 47
 ====
@@ -246,23 +256,30 @@ BIGINT,BIGINT
 ====
 ---- QUERY
 # Checks that ds_theta_intersect() produces NULL for an empty dataset.
-select ds_theta_intersect(field) from functional_parquet.emptytable;
+select ds_theta_intersect(CAST(field AS BINARY)) from functional_parquet.emptytable;
 ---- TYPES
-STRING
+BINARY
 ---- RESULTS
 'NULL'
 ====
 ---- QUERY
 # Checks that ds_theta_intersect() produces NULL for NULL inputs.
-select ds_theta_intersect(null_str) from functional_parquet.nullrows;
+select ds_theta_intersect(CAST(null_str AS BINARY)) from functional_parquet.nullrows;
 ---- TYPES
-STRING
+BINARY
 ---- RESULTS
 'NULL'
 ====
 ---- QUERY
-# ds_theta_intersect() returns an error if it receives an invalid serialized sketch.
+# Check that ds_theta_intersect rejects STRING sketch inputs.
 select ds_theta_intersect(date_string_col) from functional_parquet.alltypestiny
+where id=1;
+---- CATCH
+AnalysisException: No matching function with signature: ds_theta_intersect(STRING)
+====
+---- QUERY
+# ds_theta_intersect() returns an error if it receives an invalid serialized sketch.
+select ds_theta_intersect(CAST(date_string_col AS BINARY)) from functional_parquet.alltypestiny
 where id=1;
 ---- CATCH
 UDF ERROR: Unable to deserialize sketch: sketch type mismatch: expected 3, actual 47
@@ -308,10 +325,10 @@ BIGINT,BIGINT,BIGINT,BIGINT,BIGINT,BIGINT,BIGINT,BIGINT,BIGINT
 ---- QUERY
 # A and B refer to the two input sketches in the order A-not-B.
 # Checks that ds_theta_exclude() returns an null sketch for A, B is NULL inputs.
-select ds_theta_exclude(null_str, some_nulls) from functional_parquet.nullrows
+select ds_theta_exclude(CAST(null_str AS BINARY), CAST(some_nulls AS BINARY)) from functional_parquet.nullrows
 where id='b';
 ---- TYPES
-STRING
+BINARY
 ---- RESULTS
 'NULL'
 ====
@@ -322,7 +339,7 @@ select null null_str, ds_theta_sketch(some_nulls) sketch from functional_parquet
 where id='a'
 ) t;
 ---- TYPES
-STRING
+BINARY
 ---- RESULTS
 'NULL'
 ====
@@ -339,7 +356,7 @@ BIGINT
 # Check that ds_theta_exclude() returns an null sketch When A is null and B is empty.
 select ds_theta_exclude(null, ds_theta_sketch(f2)) from functional_parquet.emptytable;
 ---- TYPES
-STRING
+BINARY
 ---- RESULTS
 'NULL'
 ====
@@ -353,8 +370,15 @@ BIGINT
 0
 ====
 ---- QUERY
-# ds_theta_exclude() returns an error if it receives an invalid serialized sketch.
+# Check that ds_theta_exclude rejects STRING sketch inputs.
 select ds_theta_exclude(date_string_col, date_string_col) from functional_parquet.alltypestiny
+where id=1;
+---- CATCH
+AnalysisException: No matching function with signature: ds_theta_exclude(STRING, STRING)
+====
+---- QUERY
+# ds_theta_exclude() returns an error if it receives an invalid serialized sketch.
+select ds_theta_exclude(CAST(date_string_col AS BINARY), CAST(date_string_col AS BINARY)) from functional_parquet.alltypestiny
 where id=1;
 ---- CATCH
 UDF ERROR: Unable to deserialize sketch: sketch type mismatch: expected 3, actual 47
@@ -363,10 +387,10 @@ UDF ERROR: Unable to deserialize sketch: sketch type mismatch: expected 3, actua
 # Get the same sketches from Impala and Hive and put them into the same table (different
 # column prefix). The estimate in sketch A but not in sketch B is 0.
 create table theta_sketches_impala_hive2 (
-i_ti string,i_i string,i_bi string,i_f string,i_d string,i_s string,i_c string,i_v string,
-i_nc string,
-h_ti string,h_i string,h_bi string,h_f string,h_d string,h_s string,h_c string,h_v string,
-h_nc string) stored as parquet;
+i_ti binary,i_i binary,i_bi binary,i_f binary,i_d binary,i_s binary,i_c binary,i_v binary,
+i_nc binary,
+h_ti binary,h_i binary,h_bi binary,h_f binary,h_d binary,h_s binary,h_c binary,h_v binary,
+h_nc binary) stored as parquet;
 insert overwrite theta_sketches_impala_hive2 select
 i.ti i_ti, i.i i_i, i.bi i_bi, i.f i_f, i.d i_d, i.s i_s, i.c i_c, i.v i_v,i.nc i_nc,
 h.ti h_ti, h.i h_i, h.bi h_bi, h.f h_f, h.d h_d, h.s h_s, h.c h_c, h.v h_v,h.nc h_nc
@@ -392,7 +416,7 @@ BIGINT,BIGINT,BIGINT,BIGINT,BIGINT,BIGINT,BIGINT,BIGINT,BIGINT
 create table sketch_input (id1 int, id2 int);
 insert into table sketch_input values
   (1, 2), (2, 4), (3, 6), (4, 8), (5, 10), (6, 12), (7, 14), (8, 16), (9, 18), (10, 20);
-create table sketch_intermediate (sketch1 string, sketch2 string) stored as parquet;
+create table sketch_intermediate (sketch1 binary, sketch2 binary) stored as parquet;
 insert overwrite sketch_intermediate
   select ds_theta_sketch(id1), ds_theta_sketch(id2) from sketch_input;
 select ds_theta_estimate(ds_theta_exclude(sketch1, sketch2)) from sketch_intermediate;
@@ -427,7 +451,7 @@ BIGINT
 ====
 ---- QUERY
 # Checks that ds_theta_union_f() returns an empty sketch for NULL inputs.
-select ds_theta_estimate(ds_theta_union_f(null_str, some_nulls)) from
+select ds_theta_estimate(ds_theta_union_f(CAST(null_str AS BINARY), CAST(some_nulls AS BINARY))) from
 functional_parquet.nullrows where id='b';
 ---- TYPES
 BIGINT
@@ -435,15 +459,29 @@ BIGINT
 0
 ====
 ---- QUERY
-# ds_theta_union_f() returns an error if it receives an invalid serialized sketch.
+# ds_theta_union_f() rejects STRING sketch inputs.
 select ds_theta_union_f(null, date_string_col) from functional_parquet.alltypestiny
+where id=1;
+---- CATCH
+AnalysisException: No matching function with signature: ds_theta_union_f(NULL_TYPE, STRING)
+====
+---- QUERY
+# ds_theta_union_f() returns an error if it receives an invalid serialized sketch.
+select ds_theta_union_f(null, CAST(date_string_col AS BINARY)) from functional_parquet.alltypestiny
 where id=1;
 ---- CATCH
 UDF ERROR: Unable to deserialize sketch: sketch type mismatch: expected 3, actual 47
 ====
 ---- QUERY
-# ds_theta_union_f() returns an error if it receives an invalid serialized sketch.
+# ds_theta_union_f() rejects STRING sketch inputs.
 select ds_theta_union_f(date_string_col, null) from functional_parquet.alltypestiny
+where id=1;
+---- CATCH
+AnalysisException: No matching function with signature: ds_theta_union_f(STRING, NULL_TYPE)
+====
+---- QUERY
+# ds_theta_union_f() returns an error if it receives an invalid serialized sketch.
+select ds_theta_union_f(CAST(date_string_col AS BINARY), null) from functional_parquet.alltypestiny
 where id=1;
 ---- CATCH
 UDF ERROR: Unable to deserialize sketch: sketch type mismatch: expected 3, actual 47
@@ -501,7 +539,7 @@ BIGINT
 ====
 ---- QUERY
 # Checks that ds_theta_intersect_f() returns an null sketch for 2 null inputs.
-select ds_theta_estimate(ds_theta_intersect_f(null_str, some_nulls)) from
+select ds_theta_estimate(ds_theta_intersect_f(CAST(null_str AS BINARY), CAST(some_nulls AS BINARY))) from
 functional_parquet.nullrows where id='b';
 ---- TYPES
 BIGINT
@@ -509,16 +547,32 @@ BIGINT
 0
 ====
 ---- QUERY
-# ds_theta_intersect_f() returns an error if it receives an invalid serialized sketch.
+# ds_theta_intersect_f() rejects STRING sketch inputs.
 select ds_theta_intersect_f(date_string_col, null) from functional_parquet.alltypestiny
+where id=1;
+---- CATCH
+AnalysisException: No matching function with signature: ds_theta_intersect_f(STRING, NULL_TYPE)
+====
+---- QUERY
+# ds_theta_intersect_f() returns an error if it receives an invalid serialized sketch.
+select ds_theta_intersect_f(CAST(date_string_col AS BINARY), null) from functional_parquet.alltypestiny
 where id=1;
 ---- CATCH
 UDF ERROR: Unable to deserialize sketch: sketch type mismatch: expected 3, actual 47
 ====
 ---- QUERY
-# ds_theta_intersect_f() returns an error if it receives an invalid serialized sketch.
+# ds_theta_intersect_f() rejects STRING sketch inputs.
 select ds_theta_intersect_f(sketch1, sketch2) from (
 select ds_theta_sketch(float_col) sketch1, max(date_string_col) sketch2 from
+functional_parquet.alltypestiny
+) t
+---- CATCH
+AnalysisException: No matching function with signature: ds_theta_intersect_f(BINARY, STRING)
+====
+---- QUERY
+# ds_theta_intersect_f() returns an error if it receives an invalid serialized sketch.
+select ds_theta_intersect_f(sketch1, sketch2) from (
+select ds_theta_sketch(float_col) sketch1, CAST(max(date_string_col) AS BINARY) sketch2 from
 functional_parquet.alltypestiny
 ) t
 ---- CATCH

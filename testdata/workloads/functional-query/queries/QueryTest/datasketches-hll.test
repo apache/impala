@@ -106,11 +106,9 @@ NULL,NULL,NULL,NULL
 BIGINT,BIGINT,BIGINT,BIGINT
 ====
 ---- QUERY
-# Write sketches to a table as string and get an estimate from the written sketch.
-# Note, the plan is to write sketches as binary instead of strings. For this we have to
-# wait for the binary support (IMPALA-9482).
+# Write sketches to a table as binary and get an estimate from the written sketch.
 create table sketch_store
-    (year int, month int, date_sketch string, float_sketch string)
+    (year int, month int, date_sketch binary, float_sketch binary)
 stored as parquet;
 insert into sketch_store
     select
@@ -135,14 +133,20 @@ from sketch_store;
 INT,INT,BIGINT,BIGINT
 ====
 ---- QUERY
-# Check that ds_hll_estimate returns error for strings that are not serialized sketches.
+# Check that ds_hll_estimate rejects STRING sketch inputs.
 select ds_hll_estimate(date_string_col) from functional_parquet.alltypestiny;
+---- CATCH
+AnalysisException: No matching function with signature: ds_hll_estimate(STRING)
+====
+---- QUERY
+# Check that ds_hll_estimate returns an error for non-sketch bytes cast to BINARY.
+select ds_hll_estimate(CAST(date_string_col AS BINARY)) from functional_parquet.alltypestiny;
 ---- CATCH
 UDF ERROR: Unable to deserialize sketch: Attempt to deserialize unknown object type
 ====
 ---- QUERY
-# Check that ds_hll_estimate returns null for null and empty string inputs.
-select ds_hll_estimate(b), ds_hll_estimate(c) from functional_parquet.nulltable;
+# Check that ds_hll_estimate returns null for null and empty binary inputs.
+select ds_hll_estimate(CAST(b AS BINARY)), ds_hll_estimate(CAST(c AS BINARY)) from functional_parquet.nulltable;
 ---- RESULTS
 NULL,NULL
 ---- TYPES
@@ -180,23 +184,29 @@ BIGINT,BIGINT
 ====
 ---- QUERY
 # Checks that ds_hll_union() produces NULL for an empty dataset.
-select ds_hll_union(field) from functional_parquet.emptytable;
+select ds_hll_union(CAST(field AS BINARY)) from functional_parquet.emptytable;
 ---- TYPES
-STRING
+BINARY
 ---- RESULTS
 'NULL'
 ====
 ---- QUERY
 # Checks that ds_hll_union() produces NULL for NULL inputs.
-select ds_hll_union(null_str) from functional_parquet.nullrows;
+select ds_hll_union(CAST(null_str AS BINARY)) from functional_parquet.nullrows;
 ---- TYPES
-STRING
+BINARY
 ---- RESULTS
 'NULL'
 ====
 ---- QUERY
-# ds_hll_union() returns an error if it receives an invalid serialized sketch.
+# Check that ds_hll_union rejects STRING sketch inputs.
 select ds_hll_union(date_string_col) from functional_parquet.alltypestiny where id=1;
+---- CATCH
+AnalysisException: No matching function with signature: ds_hll_union(STRING)
+====
+---- QUERY
+# ds_hll_union() returns an error if it receives an invalid serialized sketch.
+select ds_hll_union(CAST(date_string_col AS BINARY)) from functional_parquet.alltypestiny where id=1;
 ---- CATCH
 UDF ERROR: Unable to deserialize sketch: Attempt to deserialize unknown object type
 ====
@@ -259,15 +269,21 @@ STRING
 ====
 ---- QUERY
 # Check that ds_hll_stringify() returns null for a null input.
-select ds_hll_stringify(c) from functional_parquet.nulltable;
+select ds_hll_stringify(CAST(c AS BINARY)) from functional_parquet.nulltable;
 ---- RESULTS
 'NULL'
 ---- TYPES
 STRING
 ====
 ---- QUERY
-# Check that ds_hll_stringify() returns error for strings that are not serialized sketches.
+# Check that ds_hll_stringify rejects STRING sketch inputs.
 select ds_hll_stringify(date_string_col) from functional_parquet.alltypestiny;
+---- CATCH
+AnalysisException: No matching function with signature: ds_hll_stringify(STRING)
+====
+---- QUERY
+# Check that ds_hll_stringify() returns error for BINARY that is not a serialized sketch.
+select ds_hll_stringify(CAST(date_string_col AS BINARY)) from functional_parquet.alltypestiny;
 ---- CATCH
 UDF ERROR: Unable to deserialize sketch
 ====
@@ -287,15 +303,27 @@ row_regex: .*### HLL sketch summary:.*Log Config K.*Hll Target.*Current Mode.*LB
 STRING
 ====
 ---- QUERY
-# Check that ds_hll_estimate_bounds_as_string() returns error for strings that are not
-# serialized sketches.
+# Check that ds_hll_estimate_bounds_as_string() rejects STRING sketch inputs.
 select ds_hll_estimate_bounds_as_string(date_string_col) from functional_parquet.alltypestiny;
+---- CATCH
+AnalysisException: No matching function with signature: ds_hll_estimate_bounds_as_string(STRING)
+====
+---- QUERY
+# Check that ds_hll_estimate_bounds_as_string() returns error for BINARY that is not a
+# serialized sketch.
+select ds_hll_estimate_bounds_as_string(CAST(date_string_col AS BINARY)) from functional_parquet.alltypestiny;
 ---- CATCH
 UDF ERROR: Unable to deserialize sketch: Attempt to deserialize unknown object type
 ====
 ---- QUERY
+# Check that ds_hll_estimate_bounds_as_string() with two args rejects STRING sketch inputs.
+select ds_hll_estimate_bounds_as_string(date_string_col, 2) from functional_parquet.alltypestiny;
+---- CATCH
+AnalysisException: No matching function with signature: ds_hll_estimate_bounds_as_string(STRING, TINYINT)
+====
+---- QUERY
 # Check that ds_hll_estimate_bounds_as_string() returns error for kappa is not 1, 2, 3.
-select ds_hll_estimate_bounds_as_string(date_string_col, 4) from functional_parquet.alltypestiny;
+select ds_hll_estimate_bounds_as_string(CAST(date_string_col AS BINARY), 4) from functional_parquet.alltypestiny;
 ---- CATCH
 UDF ERROR: Kappa must be 1, 2 or 3
 ====
@@ -367,7 +395,7 @@ BIGINT
 ====
 ---- QUERY
 # Checks that ds_hll_union_f() returns an empty sketch for NULL inputs.
-select ds_hll_estimate(ds_hll_union_f(null_str, some_nulls)) from functional_parquet.nullrows
+select ds_hll_estimate(ds_hll_union_f(CAST(null_str AS BINARY), CAST(some_nulls AS BINARY))) from functional_parquet.nullrows
 where id='b';
 ---- TYPES
 BIGINT
@@ -375,15 +403,29 @@ BIGINT
 0
 ====
 ---- QUERY
-# ds_hll_union_f() returns an error if it receives an invalid serialized sketch.
+# ds_hll_union_f() rejects STRING sketch inputs.
 select ds_hll_union_f(null, date_string_col) from functional_parquet.alltypestiny
+where id=1;
+---- CATCH
+AnalysisException: No matching function with signature: ds_hll_union_f(NULL_TYPE, STRING)
+====
+---- QUERY
+# ds_hll_union_f() returns an error if it receives an invalid serialized sketch.
+select ds_hll_union_f(null, CAST(date_string_col AS BINARY)) from functional_parquet.alltypestiny
 where id=1;
 ---- CATCH
 UDF ERROR: Unable to deserialize sketch: Attempt to deserialize unknown object type
 ====
 ---- QUERY
-# ds_hll_union_f() returns an error if it receives an invalid serialized sketch.
+# ds_hll_union_f() rejects STRING sketch inputs.
 select ds_hll_union_f(date_string_col, null) from functional_parquet.alltypestiny
+where id=1;
+---- CATCH
+AnalysisException: No matching function with signature: ds_hll_union_f(STRING, NULL_TYPE)
+====
+---- QUERY
+# ds_hll_union_f() returns an error if it receives an invalid serialized sketch.
+select ds_hll_union_f(CAST(date_string_col AS BINARY), null) from functional_parquet.alltypestiny
 where id=1;
 ---- CATCH
 UDF ERROR: Unable to deserialize sketch: Attempt to deserialize unknown object type
@@ -396,10 +438,10 @@ UDF ERROR: Unable to deserialize sketch: Attempt to deserialize unknown object t
 # of the difference between how Impala and Hive uses these types. See IMPALA-9939 for further
 # details.
 create table hll_sketches_impala_hive2 (
-i_ti string,i_i string,i_bi string,i_f string,i_d string,i_s string,i_c string,i_v string,
-i_nc string,
-h_ti string,h_i string,h_bi string,h_f string,h_d string,h_s string,h_c string,h_v string,
-h_nc string) stored as parquet;
+i_ti binary,i_i binary,i_bi binary,i_f binary,i_d binary,i_s binary,i_c binary,i_v binary,
+i_nc binary,
+h_ti binary,h_i binary,h_bi binary,h_f binary,h_d binary,h_s binary,h_c binary,h_v binary,
+h_nc binary) stored as parquet;
 insert overwrite hll_sketches_impala_hive2 select
 i.ti i_ti, i.i i_i, i.bi i_bi, i.f i_f, i.d i_d, i.s i_s, i.c i_c, i.v i_v,i.nc i_nc,
 h.ti h_ti, h.i h_i, h.bi h_bi, h.f h_f, h.d h_d, h.s h_s, h.c h_c, h.v h_v,h.nc h_nc

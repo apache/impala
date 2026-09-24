@@ -1,0 +1,49 @@
+====
+---- HIVE_QUERY
+# Hive's ds_hll_sketch() returns BINARY and writes BINARY to ORC and HMS.
+# Impala's ds_hll_estimate() must accept BINARY input.
+create table $DATABASE.hive_hll_orc stored as orc as
+select int_col, ds_hll_sketch(id) as sketch
+from functional.alltypestiny
+group by int_col
+====
+---- QUERY
+invalidate metadata hive_hll_orc
+====
+---- QUERY
+# Step 1: Before adding BINARY support to ORC (as part of IMPALA-9482) reading
+# an ORC BINARY column as STRING would result in:
+#   "Type mismatch: table column STRING is map to column binary in ORC file"
+# (The WHERE clause forces Impala to open and validate the sketch column in ORC.)
+select count(*) from hive_hll_orc where sketch is not null
+---- RESULTS
+2
+---- TYPES
+BIGINT
+====
+---- QUERY
+# Step 2: Sketch estimation on the BINARY column returns the distinct count.
+# Without the function fix (IMPALA-9821) this fails at analysis with:
+#   "No matching function with signature: ds_hll_estimate(BINARY)"
+# Each int_col group holds 4 distinct id values, so the estimate is 4.
+select int_col, ds_hll_estimate(sketch)
+from hive_hll_orc
+order by int_col
+---- RESULTS
+0,4
+1,4
+---- TYPES
+INT,BIGINT
+====
+---- HIVE_QUERY
+# Impala's ds_hll_estimate matches Hive's. Hive returns DOUBLE, so cast to BIGINT to
+# compare exactly with Impala (and absorb the HLL floating-point approximation).
+select int_col, cast(ds_hll_estimate(sketch) as bigint)
+from $DATABASE.hive_hll_orc
+order by int_col
+---- RESULTS
+0,4
+1,4
+---- TYPES
+INT,BIGINT
+====

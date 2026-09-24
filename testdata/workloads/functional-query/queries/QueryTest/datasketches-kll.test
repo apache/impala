@@ -1,7 +1,13 @@
 ====
 ---- QUERY
-# Check that ds_kll_quantile returns error for strings that are not serialized sketches.
+# Check that ds_kll_quantile rejects STRING sketch inputs.
 select ds_kll_quantile(date_string_col, 0.5) from functional_parquet.alltypestiny;
+---- CATCH
+AnalysisException: No matching function with signature: ds_kll_quantile(STRING, DECIMAL(1,1))
+====
+---- QUERY
+# Check that ds_kll_quantile returns error for BINARY that is not a serialized sketch.
+select ds_kll_quantile(CAST(date_string_col AS BINARY), 0.5) from functional_parquet.alltypestiny;
 ---- CATCH
 UDF ERROR: Error while getting quantile from DataSketches KLL. Message: Possible corruption: M must be 8: 48
 ====
@@ -80,7 +86,7 @@ AnalysisException: No matching function with signature: ds_kll_sketch(DATE)
 ====
 ---- QUERY
 # Check that ds_kll_quantile() returns null for null inputs.
-select ds_kll_quantile(c, 0.5) from functional_parquet.nulltable;
+select ds_kll_quantile(CAST(c AS BINARY), 0.5) from functional_parquet.nulltable;
 ---- RESULTS
 NULL
 ---- TYPES
@@ -92,7 +98,7 @@ select ds_kll_sketch(d) from functional_parquet.nulltable;
 ---- RESULTS
 'NULL'
 ---- TYPES
-STRING
+BINARY
 ====
 ---- QUERY
 # Check that ds_kll_sketch() returns null for empty input.
@@ -100,14 +106,12 @@ select ds_kll_sketch(f2) from functional_parquet.emptytable;
 ---- RESULTS
 'NULL'
 ---- TYPES
-STRING
+BINARY
 ====
 ---- QUERY
-# Write sketches to a table as string and get an estimate from the written sketch.
-# Note, the plan is to write sketches as binary instead of strings. For this we have to
-# wait for the binary support (IMPALA-9482).
+# Write sketches to a table as binary and get an estimate from the written sketch.
 create table sketch_store
-    (year int, month int, id_sketch string, float_sketch string)
+    (year int, month int, id_sketch binary, float_sketch binary)
 stored as parquet;
 insert into sketch_store
     select
@@ -156,15 +160,21 @@ BIGINT
 ====
 ---- QUERY
 # Check that ds_kll_n() returns null for a null input.
-select ds_kll_n(c) from functional_parquet.nulltable;
+select ds_kll_n(CAST(c AS BINARY)) from functional_parquet.nulltable;
 ---- RESULTS
 NULL
 ---- TYPES
 BIGINT
 ====
 ---- QUERY
-# Check that ds_kll_n() returns error for strings that are not serialized sketches.
+# Check that ds_kll_n() rejects STRING sketch inputs.
 select ds_kll_n(date_string_col) from functional_parquet.alltypestiny;
+---- CATCH
+AnalysisException: No matching function with signature: ds_kll_n(STRING)
+====
+---- QUERY
+# Check that ds_kll_n() returns error for BINARY that is not a serialized sketch.
+select ds_kll_n(CAST(date_string_col AS BINARY)) from functional_parquet.alltypestiny;
 ---- CATCH
 UDF ERROR: Unable to deserialize sketch
 ====
@@ -206,15 +216,21 @@ DOUBLE
 ====
 ---- QUERY
 # Check that ds_kll_rank() returns null for a null input.
-select ds_kll_rank(c, 10.0) from functional_parquet.nulltable;
+select ds_kll_rank(CAST(c AS BINARY), 10.0) from functional_parquet.nulltable;
 ---- RESULTS
 NULL
 ---- TYPES
 DOUBLE
 ====
 ---- QUERY
-# Check that ds_kll_rank() returns error for strings that are not serialized sketches.
+# Check that ds_kll_rank() rejects STRING sketch inputs.
 select ds_kll_rank(date_string_col, 10.0) from functional_parquet.alltypestiny;
+---- CATCH
+AnalysisException: No matching function with signature: ds_kll_rank(STRING, DECIMAL(3,1))
+====
+---- QUERY
+# Check that ds_kll_rank() returns error for BINARY that is not a serialized sketch.
+select ds_kll_rank(CAST(date_string_col AS BINARY), 10.0) from functional_parquet.alltypestiny;
 ---- CATCH
 UDF ERROR: Unable to deserialize sketch
 ====
@@ -248,23 +264,29 @@ FLOAT,FLOAT
 ====
 ---- QUERY
 # Checks that ds_kll_union() produces NULL for an empty dataset.
-select ds_kll_union(field) from functional_parquet.emptytable;
+select ds_kll_union(CAST(field AS BINARY)) from functional_parquet.emptytable;
 ---- TYPES
-STRING
+BINARY
 ---- RESULTS
 'NULL'
 ====
 ---- QUERY
 # Checks that ds_kll_union() produces NULL for NULL inputs.
-select ds_kll_union(null_str) from functional_parquet.nullrows;
+select ds_kll_union(CAST(null_str AS BINARY)) from functional_parquet.nullrows;
 ---- TYPES
-STRING
+BINARY
 ---- RESULTS
 'NULL'
 ====
 ---- QUERY
-# ds_kll_union() returns an error if it receives an invalid serialized sketch.
+# Check that ds_kll_union rejects STRING sketch inputs.
 select ds_kll_union(date_string_col) from functional_parquet.alltypestiny where id=1;
+---- CATCH
+AnalysisException: No matching function with signature: ds_kll_union(STRING)
+====
+---- QUERY
+# ds_kll_union() returns an error if it receives an invalid serialized sketch.
+select ds_kll_union(CAST(date_string_col AS BINARY)) from functional_parquet.alltypestiny where id=1;
 ---- CATCH
 UDF ERROR: Error while merging DataSketches KLL sketches. Message: Possible corruption: M must be 8: 48
 ====
@@ -300,17 +322,25 @@ STRING
 ====
 ---- QUERY
 # Check that ds_kll_quantiles_as_string() returns null for a null input.
-select ds_kll_quantiles_as_string(c, 0.5) from functional_parquet.nulltable;
+select ds_kll_quantiles_as_string(CAST(c AS BINARY), 0.5) from functional_parquet.nulltable;
 ---- RESULTS
 'NULL'
 ---- TYPES
 STRING
 ====
 ---- QUERY
-# Check that ds_kll_quantiles_as_string() returns error for strings that are not
-# serialized sketches.
+# Check that ds_kll_quantiles_as_string() rejects STRING sketch inputs.
 select
     ds_kll_quantiles_as_string(date_string_col, 0.5)
+from functional_parquet.alltypestiny;
+---- CATCH
+AnalysisException: No matching function with signature: ds_kll_quantiles_as_string(STRING, DECIMAL(1,1))
+====
+---- QUERY
+# Check that ds_kll_quantiles_as_string() returns error for BINARY that is not a
+# serialized sketch.
+select
+    ds_kll_quantiles_as_string(CAST(date_string_col AS BINARY), 0.5)
 from functional_parquet.alltypestiny;
 ---- CATCH
 UDF ERROR: Error while getting quantiles from DataSketches KLL. Message: Possible corruption: M must be 8: 48
@@ -405,7 +435,7 @@ select
     ds_kll_quantiles_as_string(ds_kll_sketch(float_col))
 from functional_parquet.alltypessmall;
 ---- CATCH
-AnalysisException: No matching function with signature: ds_kll_quantiles_as_string(STRING)
+AnalysisException: No matching function with signature: ds_kll_quantiles_as_string(BINARY)
 ====
 ---- QUERY
 # Checks that ds_kll_pmf_as_string() produces NULL for an empty dataset.
@@ -419,16 +449,22 @@ STRING
 ====
 ---- QUERY
 # Check that ds_kll_pmf_as_string() returns null for a null input.
-select ds_kll_pmf_as_string(c, 0.5) from functional_parquet.nulltable;
+select ds_kll_pmf_as_string(CAST(c AS BINARY), 0.5) from functional_parquet.nulltable;
 ---- RESULTS
 'NULL'
 ---- TYPES
 STRING
 ====
 ---- QUERY
-# Check that ds_kll_pmf_as_string() returns error for strings that are not serialized
-# sketches.
+# Check that ds_kll_pmf_as_string() rejects STRING sketch inputs.
 select ds_kll_pmf_as_string(date_string_col, 0.5) from functional_parquet.alltypestiny;
+---- CATCH
+AnalysisException: No matching function with signature: ds_kll_pmf_as_string(STRING, DECIMAL(1,1))
+====
+---- QUERY
+# Check that ds_kll_pmf_as_string() returns error for BINARY that is not a serialized
+# sketch.
+select ds_kll_pmf_as_string(CAST(date_string_col AS BINARY), 0.5) from functional_parquet.alltypestiny;
 ---- CATCH
 UDF ERROR: Error while running DataSketches KLL function. Message: Possible corruption: M must be 8: 48
 ====
@@ -496,16 +532,22 @@ STRING
 ====
 ---- QUERY
 # Check that ds_kll_cdf_as_string() returns null for a null input.
-select ds_kll_cdf_as_string(c, 0.5) from functional_parquet.nulltable;
+select ds_kll_cdf_as_string(CAST(c AS BINARY), 0.5) from functional_parquet.nulltable;
 ---- RESULTS
 'NULL'
 ---- TYPES
 STRING
 ====
 ---- QUERY
-# Check that ds_kll_cdf_as_string() returns error for strings that are not serialized
-# sketches.
+# Check that ds_kll_cdf_as_string() rejects STRING sketch inputs.
 select ds_kll_cdf_as_string(date_string_col, 0.5) from functional_parquet.alltypestiny;
+---- CATCH
+AnalysisException: No matching function with signature: ds_kll_cdf_as_string(STRING, DECIMAL(1,1))
+====
+---- QUERY
+# Check that ds_kll_cdf_as_string() returns error for BINARY that is not a serialized
+# sketch.
+select ds_kll_cdf_as_string(CAST(date_string_col AS BINARY), 0.5) from functional_parquet.alltypestiny;
 ---- CATCH
 UDF ERROR: Error while running DataSketches KLL function. Message: Possible corruption: M must be 8: 48
 ====
@@ -578,15 +620,21 @@ STRING
 ====
 ---- QUERY
 # Check that ds_kll_stringify() returns null for a null input.
-select ds_kll_stringify(c) from functional_parquet.nulltable;
+select ds_kll_stringify(CAST(c AS BINARY)) from functional_parquet.nulltable;
 ---- RESULTS
 'NULL'
 ---- TYPES
 STRING
 ====
 ---- QUERY
-# Check that ds_kll_stringify() returns error for strings that are not serialized sketches.
+# Check that ds_kll_stringify() rejects STRING sketch inputs.
 select ds_kll_stringify(date_string_col) from functional_parquet.alltypestiny;
+---- CATCH
+AnalysisException: No matching function with signature: ds_kll_stringify(STRING)
+====
+---- QUERY
+# Check that ds_kll_stringify() returns error for BINARY that is not a serialized sketch.
+select ds_kll_stringify(CAST(date_string_col AS BINARY)) from functional_parquet.alltypestiny;
 ---- CATCH
 UDF ERROR: Unable to deserialize sketch
 ====
