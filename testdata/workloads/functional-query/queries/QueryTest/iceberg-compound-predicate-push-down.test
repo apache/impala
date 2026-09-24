@@ -375,6 +375,11 @@ where
 0
 ---- RUNTIME_PROFILE
 aggregation(SUM, NumRowGroups): 12
+---- CALCITE_PLANNER_RUNTIME_PROFILE
+# Calcite pushes NOT into the OR, so 'NOT col_db = 2.71822' becomes a separate
+# conjunct that is pushed down to Iceberg. Iceberg skips the two data files whose
+# col_db lower and upper bounds are both 2.71822.
+aggregation(SUM, NumRowGroups): 10
 ====
 ---- QUERY
 # icebergPredicates_:
