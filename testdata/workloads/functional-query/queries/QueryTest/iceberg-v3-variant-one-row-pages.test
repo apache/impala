@@ -1,0 +1,111 @@
+====
+---- QUERY
+# Every page of iceberg_v3_variant_one_row_pages holds exactly one row and the table has
+# two row groups of 20 rows. 'id' is the file position of the row and the 'pos' field of
+# every non-NULL v is equal to it. grp = 7 only in the first row of each row group
+# (rows 0 and 20), so 'grp != 7' rejects exactly those.
+# Only row 0 is a candidate row (page index of id) and grp != 7 rejects it; the row group
+# stats skip the other row group. So the reader of v skips row 0 alone, which is a whole
+# candidate page, at the end of the row group.
+SELECT id, v FROM iceberg_v3_variant_one_row_pages WHERE id = 0 AND grp != 7;
+---- RESULTS
+---- TYPES
+INT, STRING
+====
+---- QUERY
+# The same at the start of the second row group; the first one is skipped.
+SELECT v, id FROM iceberg_v3_variant_one_row_pages WHERE id = 20 AND grp != 7;
+---- RESULTS
+---- TYPES
+STRING, INT
+====
+---- QUERY
+# The only candidate row is row 1 and it survives, so v skips nothing.
+SELECT id, v FROM iceberg_v3_variant_one_row_pages WHERE id = 1 AND grp != 7;
+---- RESULTS
+1,'{"pad":"xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx","pos":1}'
+---- TYPES
+INT, STRING
+====
+---- QUERY
+# Row 0 starts the only candidate range [0, 5] and is rejected, the other rows of the
+# range survive. With batch_size=1 v skips row 0 alone, then reads the next pages.
+SELECT v, id, variant_get(v, '$.pos', 'int') = id FROM iceberg_v3_variant_one_row_pages
+WHERE id < 6 AND grp != 7;
+---- RESULTS
+'{"pad":"xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx","pos":1}',1,true
+'{"pos":2}',2,true
+'NULL',3,NULL
+'{"pos":4}',4,true
+'{"pos":5}',5,true
+---- TYPES
+STRING, INT, BOOLEAN
+====
+---- QUERY
+# The same at the start of the second row group.
+SELECT v, id, variant_get(v, '$.pos', 'int') = id FROM iceberg_v3_variant_one_row_pages
+WHERE id BETWEEN 20 AND 25 AND grp != 7;
+---- RESULTS
+'{"pad":"xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx","pos":21}',21,true
+'{"pos":22}',22,true
+'{"pos":23}',23,true
+'NULL',24,NULL
+'{"pos":25}',25,true
+---- TYPES
+STRING, INT, BOOLEAN
+====
+---- QUERY
+# grp = 3 makes every candidate range a single row, and every candidate row survives.
+# The non-filter readers are a variant (the first column reader), a collection without
+# a variant and id.
+SELECT v, arr, id FROM iceberg_v3_variant_one_row_pages WHERE grp = 3;
+---- RESULTS
+'NULL','[3,103]',3
+'{"pos":8}','NULL',8
+'{"pos":13}','[]',13
+'{"pos":18}','[18,118]',18
+'{"pos":23}','NULL',23
+'{"pos":28}','[]',28
+'{"pos":33}','[33,133]',33
+'NULL','NULL',38
+---- TYPES
+STRING, STRING, INT
+====
+---- QUERY
+# The same with the collection as the first column reader.
+SELECT arr, v, id FROM iceberg_v3_variant_one_row_pages WHERE grp = 3;
+---- RESULTS
+'[3,103]','NULL',3
+'NULL','{"pos":8}',8
+'[]','{"pos":13}',13
+'[18,118]','{"pos":18}',18
+'NULL','{"pos":23}',23
+'[]','{"pos":28}',28
+'[33,133]','{"pos":33}',33
+'NULL','NULL',38
+---- TYPES
+STRING, STRING, INT
+====
+---- QUERY
+# '!=' is not a min/max predicate, so the page index is not used. Only the first row
+# of each row group is rejected and every non-NULL v must land on its own row.
+SELECT count(*), count(variant_get(v, '$.pos', 'int')),
+  sum(if(variant_get(v, '$.pos', 'int') = id, 1, 0))
+FROM iceberg_v3_variant_one_row_pages WHERE grp != 7;
+---- RESULTS
+38,32,32
+---- TYPES
+BIGINT, BIGINT, BIGINT
+====
+---- QUERY
+# Rows near the start and at the end of both row groups, a variant next to a
+# collection. The page index only filters in the first row group.
+SELECT id, arr, v FROM iceberg_v3_variant_one_row_pages WHERE id IN (2, 19, 22, 39);
+---- RESULTS
+2,'NULL','{"pos":2}'
+19,'[]','{"pos":19}'
+22,'[]','{"pos":22}'
+39,'[39,139]','{"pad":"xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx","pos":39}'
+---- TYPES
+INT, STRING, STRING
+====

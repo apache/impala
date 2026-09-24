@@ -1475,6 +1475,57 @@ where gen.scala is:
     FROM local.iceberg_v3_spark_variant ORDER BY id""").show(100, false)
   System.exit(0)
 
+testdata/data/iceberg_test/iceberg_v3/iceberg_v3_variant_multipage
+Iceberg V3 table for testing late materialization of VARIANT values.
+Schema: id INT, pos BIGINT, rg_pos INT, grp INT, descr STRING, v VARIANT, v2 VARIANT.
+One Parquet file with 420 rows in 3 row groups (160, 140 and 120 rows) and a page index.
+Most pages of the 'value' children of v and v2 are small and not aligned with each other
+or with the pages of the other columns. 'pos' has 25-row pages, v2.metadata 22 or 23-row
+pages in the first two row groups, and the other columns mostly 32-row pages. 'pos' and
+'id' are the file position of the row, 'rg_pos' is its position inside its row group and
+'grp' is a pseudo-random value in [0, 9]. Every non-NULL v and v2 is an object whose 'pos'
+field is the file position of the row.
+Generated with a custom Python script (written by Claude Opus 5.5) that writes the
+Parquet file with pyarrow 24.0.0 and the Iceberg metadata with avro 1.12.1.
+
+testdata/data/iceberg_test/iceberg_v3/iceberg_v3_variant_one_row_pages
+Iceberg V3 table for testing late materialization of VARIANT values together with page
+index filtering, when the page that holds the first row of a row group holds no other row.
+Schema: id INT, grp INT, arr ARRAY<INT>, v VARIANT. One Parquet file with 40 rows in 2 row
+groups of 20 rows and a page index. Every page of every column holds exactly one row.
+'id' is the file position of the row. 'grp' is 7 in the first row of each row group and
+id % 5 in the other rows. 'arr' is [id, id + 100], [] or NULL if id % 3 is 0, 1 or 2. v is
+NULL if id % 7 = 3, otherwise an object whose 'pos' field is the file position of the
+row. In rows 1, 21 and 39 the object also has a 60 characters long 'pad' field.
+Generated with a custom Python script (written by Claude Opus 5.5) that writes the
+Parquet file with pyarrow 24.0.0 and the Iceberg metadata with avro 1.12.1.
+
+testdata/data/iceberg_test/iceberg_v3/iceberg_v3_variant_short_id
+testdata/data/iceberg_test/iceberg_v3/iceberg_v3_variant_short_value
+testdata/data/iceberg_test/iceberg_v3/iceberg_v3_variant_repeated
+testdata/data/iceberg_test/iceberg_v3/iceberg_v3_variant_repeated_child
+Iceberg V3 tables with a deliberately corrupt Parquet file, for testing how the scanner
+handles malformed VARIANT columns. Schema: id INT, v VARIANT. Each table has one Parquet
+file with 10 rows in one row group, no page index, and one uncompressed, PLAIN encoded V1
+data page per column. 'id' is 0..9 and v is the object {"pos": id}, except that v is NULL
+for id 3. In the Parquet schema v is 'optional group v { required binary metadata;
+required binary value; }'. After pyarrow writes a valid file, the script patches single
+bytes that it locates by parsing the Thrift encoded page headers and footer, so the file
+size does not change:
+- iceberg_v3_variant_short_id: DataPageHeader.num_values of the data page of 'id' and
+  ColumnMetaData.num_values of its column chunk go from 10 to 9 (zigzag varint 0x14 ->
+  0x12), so 'id' has one row fewer than the row group and v.
+- iceberg_v3_variant_short_value: the same two fields go from 10 to 9 for both
+  'v.metadata' and 'v.value', so v has one row fewer than the row group and 'id'.
+- iceberg_v3_variant_repeated: the repetition_type of the SchemaElement of v goes from
+  OPTIONAL to REPEATED (zigzag varint 0x02 -> 0x04).
+- iceberg_v3_variant_repeated_child: the repetition_type of the SchemaElement of
+  'v.value' goes from REQUIRED to REPEATED (zigzag varint 0x00 -> 0x04).
+Everything else, e.g. RowGroup.num_rows, the statistics and the Iceberg metadata, still
+describes 10 rows. Generated with a custom Python script (written by Claude Opus 5.5) that
+writes and patches the Parquet file with pyarrow 24.0.0 and writes the Iceberg metadata
+with avro 1.12.1.
+
 arrays_big.parq:
 Generated with RandomNestedDataGenerator.java from the following schema:
 {

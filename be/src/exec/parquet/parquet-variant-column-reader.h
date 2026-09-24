@@ -18,6 +18,7 @@
 #pragma once
 
 #include "exec/parquet/parquet-struct-column-reader.h"
+#include "gutil/strings/substitute.h"
 
 namespace impala {
 
@@ -42,14 +43,40 @@ class VariantColumnReader : public StructColumnReader {
 
   virtual bool IsStructReader() const override { return false; }
 
-  // A variant is physically a struct (StructColumnReader) and inherits its lack of
-  // SkipRows() support (StructColumnReader::SkipRows() is a DCHECK(false) stub because
-  // structs are excluded from late materialization). The scanner's late-materialization
-  // guard skips any reader subtree for which HasStructReader() is true, so we must report
-  // true here to be excluded as well; otherwise SkipRows() would be called on this reader
-  // and crash. IsStructReader() stays false because a variant is not a user-visible
-  // struct. TODO: implement SkipRows() to allow late materialization for variants.
-  virtual bool HasStructReader() const override { return true; }
+  /// Unlike a real struct a variant can be late materialized: HasStructReader() is false
+  /// for it, because IsStructReader() is false and its children are scalar readers, so
+  /// HdfsParquetScanner::HasStructColumnReader() does not exclude it. The children are
+  /// read through the non-batched interface. If they have read the levels of the next
+  /// row ahead, BaseScalarColumnReader::SkipRows() undoes that first. Ending with
+  /// NextLevels() reads the levels of the next row again and refreshes our own levels
+  /// from children_[0], including ParquetLevel::ROW_GROUP_END, which the scanner polls
+  /// on column_readers_[0].
+  virtual bool SkipRows(int64_t num_rows, int64_t skip_row_id) override {
+    DCHECK_EQ(children_.size(), 2);
+    // Only top level variants exist so far, see IMPALA-15132, and CreateColumnReaders()
+    // rejects a VARIANT that is a repeated group. A nested one would have to compose
+    // with its parent through next_levels_consumed_, which is untested.
+    DCHECK_EQ(max_rep_level(), 0);
+    next_levels_consumed_ = false;
+    for (ParquetColumnReader* child : children_) {
+      if (!child->SkipRows(num_rows, skip_row_id)) return false;
+    }
+    return StructColumnReader::NextLevels();
+  }
+
+  /// Our levels already mirror children_[0], so by the time the scanner declares the row
+  /// group finished we must be at its end too. If we are not, this column has more rows
+  /// than the columns it is read with; report that instead of letting the children drop
+  /// the row they read ahead, which would also leave RowGroupAtEnd() false forever.
+  virtual bool SetRowGroupAtEnd() override {
+    if (UNLIKELY(!RowGroupAtEnd())) {
+      parent_->parse_status_.MergeStatus(Status(strings::Substitute(
+          "Corrupt Parquet file '$0': column '$1' has more rows than the other columns "
+          "of the row group", filename(), schema_element().name)));
+      return false;
+    }
+    return ComplexColumnReader::SetRowGroupAtEnd();
+  }
 };
 
 } // namespace impala

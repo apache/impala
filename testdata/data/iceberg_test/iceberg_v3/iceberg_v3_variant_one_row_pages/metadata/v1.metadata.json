@@ -1,0 +1,108 @@
+{
+  "format-version": 3,
+  "table-uuid": "15142000-0000-4000-8000-000000010001",
+  "location": "/test-warehouse/iceberg_v3_variant_one_row_pages",
+  "last-sequence-number": 1,
+  "last-updated-ms": 1789000010000,
+  "last-column-id": 5,
+  "current-schema-id": 0,
+  "schemas": [
+    {
+      "type": "struct",
+      "schema-id": 0,
+      "fields": [
+        {
+          "id": 1,
+          "name": "id",
+          "required": false,
+          "type": "int"
+        },
+        {
+          "id": 2,
+          "name": "grp",
+          "required": false,
+          "type": "int"
+        },
+        {
+          "id": 3,
+          "name": "arr",
+          "required": false,
+          "type": {
+            "type": "list",
+            "element-id": 4,
+            "element": "int",
+            "element-required": false
+          }
+        },
+        {
+          "id": 5,
+          "name": "v",
+          "required": false,
+          "type": "variant"
+        }
+      ]
+    }
+  ],
+  "default-spec-id": 0,
+  "partition-specs": [
+    {
+      "spec-id": 0,
+      "fields": []
+    }
+  ],
+  "last-partition-id": 999,
+  "default-sort-order-id": 0,
+  "sort-orders": [
+    {
+      "order-id": 0,
+      "fields": []
+    }
+  ],
+  "properties": {
+    "write.format.default": "parquet",
+    "write.delete.mode": "merge-on-read",
+    "write.update.mode": "merge-on-read",
+    "write.merge.mode": "merge-on-read"
+  },
+  "current-snapshot-id": 1514200000010001,
+  "next-row-id": 40,
+  "refs": {
+    "main": {
+      "snapshot-id": 1514200000010001,
+      "type": "branch"
+    }
+  },
+  "snapshots": [
+    {
+      "sequence-number": 1,
+      "snapshot-id": 1514200000010001,
+      "timestamp-ms": 1789000010000,
+      "summary": {
+        "operation": "append",
+        "added-data-files": "1",
+        "added-records": "40",
+        "added-files-size": "12107",
+        "changed-partition-count": "1",
+        "total-records": "40",
+        "total-files-size": "12107",
+        "total-data-files": "1",
+        "total-delete-files": "0",
+        "total-position-deletes": "0",
+        "total-equality-deletes": "0"
+      },
+      "manifest-list": "/test-warehouse/iceberg_v3_variant_one_row_pages/metadata/snap-1514200000010001-1-15142000-0000-4000-8000-0000000100aa.avro",
+      "schema-id": 0,
+      "first-row-id": 0,
+      "added-rows": 40
+    }
+  ],
+  "statistics": [],
+  "partition-statistics": [],
+  "snapshot-log": [
+    {
+      "timestamp-ms": 1789000010000,
+      "snapshot-id": 1514200000010001
+    }
+  ],
+  "metadata-log": []
+}

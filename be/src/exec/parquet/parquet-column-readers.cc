@@ -1597,6 +1597,36 @@ bool BaseScalarColumnReader::SkipTopLevelRows(int64_t num_rows, int64_t* remaini
   return SkipEncodedValuesInPage(num_values_to_skip);
 }
 
+bool BaseScalarColumnReader::UndoLevelsReadahead() {
+  DCHECK(levels_readahead_);
+  if (UNLIKELY(def_level_ == ParquetLevel::ROW_GROUP_END)) {
+    // NextLevels() returns before consuming a level when it runs off the row group, so
+    // the flag is stale and there is nothing to undo. Callers only skip rows that other
+    // readers have already read, so this column is shorter than they are.
+    levels_readahead_ = false;
+    parent_->parse_status_.MergeStatus(Status(Substitute("Corrupt Parquet file '$0': "
+        "column '$1' has fewer rows than the other columns of the row group",
+        filename(), schema_element().name)));
+    return false;
+  }
+  DCHECK_GE(def_level_, 0);
+  DCHECK_GE(rep_level_, 0);
+  // Un-read only the levels that NextLevels() actually read: it reads a repetition level
+  // only when max_rep_level() > 0 and a definition level only when max_def_level() > 0.
+  if (max_rep_level() > 0) rep_levels_.CachePrev();
+  if (max_def_level() > 0) def_levels_.CachePrev();
+  // Roll back the row counter under the same condition NextLevels() advances it. It has
+  // to be evaluated before 'rep_level_' is invalidated below.
+  if (max_rep_level() == 0 || rep_level_ == 0) --current_row_;
+  // Outside collections NextLevels() never assigns 'rep_level_' again, so leave it at
+  // the value Reset() gives it instead of invalidating it.
+  rep_level_ = max_rep_level() == 0 ? 0 : ParquetLevel::INVALID_LEVEL;
+  def_level_ = ParquetLevel::INVALID_LEVEL;
+  ++num_buffered_values_;
+  levels_readahead_ = false;
+  return true;
+}
+
 bool BaseScalarColumnReader::SetRowGroupAtEnd() {
   if (RowGroupAtEnd()) {
     return true;
@@ -1773,7 +1803,10 @@ void BaseScalarColumnReader::SetLevelDecodeError(
 /// Wrapper around 'SkipTopLevelRows' to skip across multiple pages.
 /// Function handles 3 scenarios:
 /// 1. Page Filtering: When this is enabled this function can be used
-///    to skip to a particular 'skip_row_id'.
+///    to skip to a particular 'skip_row_id', which is -1 if the caller does not know
+///    it. Row 0 is a valid 'skip_row_id' too: scenario 3 can drop a page by its
+///    header without moving to the next candidate page, so it must not be used
+///    while page filtering.
 /// 2. Collection: When this scalar reader is reading elements of a collection
 /// 3. Rest of the cases.
 /// For page filtering, we keep track of first and last page indexes and keep
@@ -1789,7 +1822,7 @@ void BaseScalarColumnReader::SetLevelDecodeError(
 /// consecutive values can belong to same row.
 template <bool IN_COLLECTION>
 bool BaseScalarColumnReader::SkipRowsInternal(int64_t num_rows, int64_t skip_row_id) {
-  if (DoesPageFiltering() && skip_row_id > 0) {
+  if (DoesPageFiltering() && skip_row_id >= 0) {
     // Checks if its the beginning of row group and advances to next page.
     if (candidate_page_idx_ < 0) {
       if (UNLIKELY(!NextPage())) {

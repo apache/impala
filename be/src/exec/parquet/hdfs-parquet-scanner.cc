@@ -48,6 +48,7 @@
 #include "runtime/runtime-state.h"
 #include "runtime/scoped-buffer.h"
 #include "service/hs2-util.h"
+#include "util/debug-util.h"
 #include "util/dict-encoding.h"
 #include "util/parquet-bloom-filter.h"
 #include "util/pretty-printer.h"
@@ -267,6 +268,10 @@ Status HdfsParquetScanner::Open(ScannerContext* context) {
           != non_filter_readers_.end()) {
     late_materialization_threshold_ = 1;
   }
+  // Evaluated only once, because a FAIL debug action logs a stack trace each time.
+  late_materialization_debug_at_capacity_ = late_materialization_threshold_ >= 0
+      && !DebugAction(state_->query_options(),
+          "PARQUET_LATE_MATERIALIZATION_AT_CAPACITY").ok();
   return Status::OK();
 }
 
@@ -2357,6 +2362,13 @@ Status HdfsParquetScanner::AssembleRows(RowBatch* row_batch, bool* skip_row_grou
       late_materialization_threshold_ < 0 || filter_readers_[0]->max_rep_level() > 0 ||
       HasStructColumnReader(non_filter_readers_)) {
     // Late Materialization is either disabled or not applicable for assembling rows here.
+    // Structs are excluded for two reasons: StructColumnReader::SkipRows() is not
+    // implemented (IMPALA-11364), and a predicate on a struct member references the slot
+    // id of that member, not of the struct, so DivideFilterAndNonFilterColumnReaders()
+    // would put the struct reader among the non-filter readers while a conjunct reads
+    // from it. Variants have neither problem: they implement SkipRows(), and a predicate
+    // can only read a variant's children through the SlotRef of the variant, whose
+    // GetSlotIds() returns the slot id of the variant itself.
     return AssembleRowsWithoutLateMaterialization(column_readers_, row_batch,
         skip_row_group);
   }
@@ -2425,22 +2437,27 @@ Status HdfsParquetScanner::AssembleRows(RowBatch* row_batch, bool* skip_row_grou
       // skip reading for rest of the non-filter column readers now.
       RETURN_IF_ERROR(SkipRowsForColumns(
           non_filter_readers_, &num_rows_to_skip, &last_row_id_processed));
-      for (int c = 0; c < non_filter_readers_.size(); ++c) {
-        ParquetColumnReader* col_reader = non_filter_readers_[c];
-        if (UNLIKELY(!col_reader->SetRowGroupAtEnd())) {
-          return Status(
-              Substitute("Could not move to RowGroup end in file $0.", filename()));
-        }
-      }
+      RETURN_IF_ERROR(SetNonFilterReadersAtRowGroupEnd());
     }
     if (num_row_to_commit != 0) {
       RETURN_IF_ERROR(CheckPageFiltering());
       RETURN_IF_ERROR(CommitRows(row_batch, num_row_to_commit));
     }
-    if (row_batch->AtCapacity()) {
+    if (row_batch->AtCapacity() || UNLIKELY(late_materialization_debug_at_capacity_)) {
       // skip reading for rest of the non-filter column readers now.
       RETURN_IF_ERROR(SkipRowsForColumns(
           non_filter_readers_, &num_rows_to_skip, &last_row_id_processed));
+      // The skip above only skips rows if none survived in this iteration, so the batch
+      // is at capacity by memory (or the debug action is set). Collection and variant
+      // readers read the levels of the next row right after skipping, so if one of them
+      // is column_readers_[0], it can reach the end of the row group here while the
+      // filter readers have not reported it yet. The next GetNext() then treats the row
+      // group as finished, so the other non-filter readers must be moved to its end too:
+      // with page filtering their skip stopped at 'last_row_id_processed', and
+      // ValidateEndOfRowGroup() would find their buffered values.
+      if (column_readers_[0]->RowGroupAtEnd()) {
+        RETURN_IF_ERROR(SetNonFilterReadersAtRowGroupEnd());
+      }
       break;
     }
   }
@@ -2457,6 +2474,18 @@ bool HdfsParquetScanner::HasStructColumnReader(
     if (col_reader->HasStructReader()) return true;
   }
   return false;
+}
+
+Status HdfsParquetScanner::SetNonFilterReadersAtRowGroupEnd() {
+  for (ParquetColumnReader* col_reader : non_filter_readers_) {
+    if (UNLIKELY(!col_reader->SetRowGroupAtEnd())) {
+      // The reader may have reported the reason, e.g. that it has more rows.
+      if (!parse_status_.ok()) return parse_status_;
+      return Status(
+          Substitute("Could not move to RowGroup end in file $0.", filename()));
+    }
+  }
+  return Status::OK();
 }
 
 Status HdfsParquetScanner::SkipRowsForColumns(
@@ -2932,6 +2961,18 @@ Status HdfsParquetScanner::CreateColumnReaders(const TupleDescriptor& tuple_desc
             "supported yet.",
             PrintPath(*scan_node_->hdfs_table(), slot_desc->col_path()), filename(),
             node->children.size(), child_slots.size()));
+      }
+      // A VARIANT has one metadata and one value per row, so neither the group nor its
+      // children may be repeated. The readers rely on this, e.g. the children are read
+      // like top level columns and VariantColumnReader::SkipRows() expects
+      // max_rep_level() == 0.
+      bool repeated = node->is_repeated();
+      for (const SchemaNode& child : node->children) repeated |= child.is_repeated();
+      if (repeated) {
+        return Status(Substitute("VARIANT column '$0' or one of its children is "
+            "repeated in the Parquet schema of file '$1'. This indicates a malformed "
+            "file.",
+            PrintPath(*scan_node_->hdfs_table(), slot_desc->col_path()), filename()));
       }
       for (int i = 0; i < child_slots.size(); ++i) {
         ParquetColumnReader* child_reader = ParquetColumnReader::Create(

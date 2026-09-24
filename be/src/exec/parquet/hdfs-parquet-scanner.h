@@ -405,6 +405,7 @@ class HdfsParquetScanner : public HdfsColumnarScanner {
   friend class ParquetPageIndex;
   friend class ParquetColumnChunkReader;
   friend class ParquetPageReader;
+  friend class VariantColumnReader;
 
   /// Index of the current row group being processed. Initialized to -1 which indicates
   /// that we have not started processing the first row group yet (GetNext() has not yet
@@ -578,6 +579,11 @@ class HdfsParquetScanner : public HdfsColumnarScanner {
   /// then we can skip materializing 6 rows (21-26) as threshold 5 is less than 6. But
   /// if threshold is 10, then rows 21-26 will be materialized instead.
   int32_t late_materialization_threshold_;
+
+  /// Set by the PARQUET_LATE_MATERIALIZATION_AT_CAPACITY debug action. The late
+  /// materialization loop of AssembleRows() then returns the row batch after every
+  /// scratch batch, as if the row batch were full. Only used by tests.
+  bool late_materialization_debug_at_capacity_ = false;
 
   /// In late Materializing, we try to materialize only the portition of a batch that
   /// survive after filtering and call it micro batch. This represents a micro batch
@@ -937,6 +943,9 @@ class HdfsParquetScanner : public HdfsColumnarScanner {
   /// then we skip to row index 'skip_to_row'.
   Status SkipRowsForColumns(const vector<ParquetColumnReader*>& column_readers,
       int64_t* num_rows_to_skip, int64_t* skip_to_row);
+
+  /// Moves every reader in 'non_filter_readers_' to the end of the current row group.
+  Status SetNonFilterReadersAtRowGroupEnd();
 
   /// Returns whether Hive legacy zone conversion should be used for transforming
   /// timestamps based on file metadata and configuration.

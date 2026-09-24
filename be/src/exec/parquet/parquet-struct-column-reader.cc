@@ -131,6 +131,8 @@ bool StructColumnReader::ReadValueBatch(MemPool* pool, int max_values, int tuple
 
 bool StructColumnReader::SkipRows(int64_t num_rows, int64_t skip_row_id) {
   // Structs are excluded from late materialization so no need to implement SkipRows().
+  // VariantColumnReader derives from this class and overrides it, because variants are
+  // not excluded.
   DCHECK(false);
   return true;
 }

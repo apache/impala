@@ -16,6 +16,7 @@
 # under the License.
 
 from collections import defaultdict, namedtuple
+from copy import deepcopy
 import datetime
 import glob
 import json
@@ -3014,6 +3015,15 @@ class TestIcebergV3Table(IcebergTestSuite):
     assert result.data == ["21\t14"], result.data
     assert "UDF WARNING" not in (result.log or ""), result.log
 
+  def test_v3_variant_corrupt_files(self, vector, unique_database):
+    """IMPALA-15142: Parquet files where a VARIANT column or one of its children is
+    repeated, or where it has a different number of rows than the other columns, fail
+    with an error."""
+    for table in ["iceberg_v3_variant_short_id", "iceberg_v3_variant_short_value",
+                  "iceberg_v3_variant_repeated", "iceberg_v3_variant_repeated_child"]:
+      self.load_table(unique_database, table)
+    self.run_test_case('QueryTest/iceberg-v3-variant-corrupt', vector, unique_database)
+
   def test_v3_default_values(self, vector, unique_database):
     """Test Iceberg V3 initial-default and write-default values."""
     self.load_table(unique_database, "iceberg_v3_default_value")
@@ -3218,6 +3228,79 @@ class TestIcebergV3VariantCodegen(IcebergTestSuite):
         "parquet", table_location="${IMPALA_HOME}/testdata/data/iceberg_test/iceberg_v3",
         warehouse_prefix=os.getenv("FILESYSTEM_PREFIX"))
     self.run_test_case('QueryTest/iceberg-v3-variant-codegen', vector, unique_database)
+
+
+class TestIcebergV3VariantLateMaterialization(IcebergTestSuite):
+  """IMPALA-15142: late materialization of Iceberg V3 VARIANT columns in Parquet files.
+  These tests run many queries. Late materialization does not depend on codegen, so core
+  runs them only with codegen enabled."""
+
+  # Makes the Parquet scanner return the row batch after every scratch batch when it
+  # uses late materialization, as if the row batch were full.
+  LATE_MAT_AT_CAPACITY = 'PARQUET_LATE_MATERIALIZATION_AT_CAPACITY:FAIL'
+
+  @classmethod
+  def add_test_dimensions(cls):
+    super(TestIcebergV3VariantLateMaterialization, cls).add_test_dimensions()
+    cls.ImpalaTestMatrix.add_constraint(
+      lambda v: v.get_value('table_format').file_format == 'parquet')
+    disable_codegen_options = [False]
+    if cls.exploration_strategy() == 'exhaustive':
+      disable_codegen_options = [False, True]
+    cls.ImpalaTestMatrix.add_dimension(create_exec_option_dimension(
+        batch_sizes=[19, 1024], disable_codegen_options=disable_codegen_options))
+
+  def load_table(self, database, table_name):
+    create_iceberg_table_from_directory(self.client, database, table_name, "parquet",
+        table_location="${IMPALA_HOME}/testdata/data/iceberg_test/iceberg_v3",
+        warehouse_prefix=os.getenv("FILESYSTEM_PREFIX"))
+
+  def test_v3_variant_late_materialization(self, vector, unique_database):
+    """Late materialization of VARIANT columns whose values span several pages and row
+    groups. The results must not depend on late materialization or on the page index.
+    With the debug action the scanner returns the row batch after every scratch batch,
+    like it does when the row batch is full."""
+    self.load_table(unique_database, "iceberg_v3_variant_multipage")
+    new_vector = deepcopy(vector)
+    late_mat_thresholds = [-1, 1, 20]
+    if self.exploration_strategy() != 'exhaustive':
+      # Core runs each threshold with one of the batch sizes only.
+      batch_size = vector.get_value('exec_option')['batch_size']
+      late_mat_thresholds = [-1, 1 if batch_size == 19 else 20]
+    for late_mat in late_mat_thresholds:
+      new_vector.get_value('exec_option')['parquet_late_materialization_threshold'] = \
+          late_mat
+      for page_index in ['true', 'false']:
+        new_vector.get_value('exec_option')['parquet_read_page_index'] = page_index
+        self.run_test_case('QueryTest/iceberg-v3-variant-late-materialization',
+            new_vector, unique_database)
+        if late_mat == -1:
+          continue
+        self.run_test_case('QueryTest/iceberg-v3-variant-late-materialization-profile',
+            new_vector, unique_database)
+        new_vector.get_value('exec_option')['debug_action'] = self.LATE_MAT_AT_CAPACITY
+        self.run_test_case('QueryTest/iceberg-v3-variant-late-materialization',
+            new_vector, unique_database)
+        del new_vector.get_value('exec_option')['debug_action']
+
+  def test_v3_variant_one_row_pages(self, vector, unique_database):
+    """Late materialization with page filtering skips whole pages of the VARIANT children,
+    also when the skip only covers the first row of a row group. With batch_size=1 that
+    row is also skipped right before the next row is read."""
+    self.load_table(unique_database, "iceberg_v3_variant_one_row_pages")
+    new_vector = deepcopy(vector)
+    batch_sizes = [vector.get_value('exec_option')['batch_size']]
+    # The vectors have batch_size 19 and 1024, add 1 only to one of them.
+    if batch_sizes[0] == 1024:
+      batch_sizes.append(1)
+    for batch_size in batch_sizes:
+      new_vector.get_value('exec_option')['batch_size'] = batch_size
+      self.run_test_case('QueryTest/iceberg-v3-variant-one-row-pages', new_vector,
+          unique_database)
+      new_vector.get_value('exec_option')['debug_action'] = self.LATE_MAT_AT_CAPACITY
+      self.run_test_case('QueryTest/iceberg-v3-variant-one-row-pages', new_vector,
+          unique_database)
+      del new_vector.get_value('exec_option')['debug_action']
 
 
 class TestIcebergUuidAggregates(IcebergTestSuite):

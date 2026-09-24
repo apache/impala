@@ -134,13 +134,189 @@ SELECT id, v FROM functional_parquet.trino_variant ORDER BY id;
 INT, STRING
 ====
 ---- QUERY
-# Filtered scan: a predicate on a non-variant column exercises Parquet late
-# materialization, which must NOT call SkipRows() on the variant column reader
+# Filtered scan: a predicate on a non-variant column makes the variant a non-filter
+# reader, so Parquet late materialization skips rows for it (IMPALA-15142). The file has
+# 55 rows and a single data page per column, so every skipped row is skipped inside the
+# page, twice: once for 'metadata' and once for 'value'.
 SELECT id, v FROM functional_parquet.trino_variant WHERE id = 31;
 ---- RESULTS
 31,'{"age":30,"name":"Alice"}'
 ---- TYPES
 INT, STRING
+---- RUNTIME_PROFILE
+aggregation(SUM, NumTopLevelValuesSkipped): 108
+====
+---- QUERY
+# No row survives, so a single 55-row skip is issued before the variant has read
+# anything, and each child discards its only data page without decompressing it. v is
+# column_readers_[0], so the scan loop polls it for the end of the row group, which only
+# the NextLevels() at the end of VariantColumnReader::SkipRows() provides.
+SELECT v, id FROM functional_parquet.trino_variant WHERE id = 45;
+---- RESULTS
+---- TYPES
+STRING, INT
+---- RUNTIME_PROFILE
+aggregation(SUM, NumPagesSkippedByLateMaterialization): 2
+aggregation(SUM, NumTopLevelValuesSkipped): 0
+====
+---- QUERY
+# v is column_readers_[0] and fills FILE__POSITION, and descr is a second non-filter
+# reader. Row 0, the NULL variant, is skipped on its own, which skips no encoded values.
+# id 62 is the last row.
+SELECT v, file__position, descr FROM functional_parquet.trino_variant
+WHERE id IN (1, 31, 62);
+---- RESULTS
+'null',1,'variant null'
+'{"age":30,"name":"Alice"}',31,'obj age/name'
+'"<unsupported-type>"',54,'uuid'
+---- TYPES
+STRING, BIGINT, STRING
+---- RUNTIME_PROFILE
+aggregation(SUM, NumTopLevelValuesSkipped): 156
+====
+---- QUERY
+# The NULL variant survives. Its read ahead goes through the NULL branch of
+# StructColumnReader::ReadValue() and is then undone by the skip.
+SELECT v, id FROM functional_parquet.trino_variant WHERE id IN (0, 31);
+---- RESULTS
+'NULL',0
+'{"age":30,"name":"Alice"}',31
+---- TYPES
+STRING, INT
+---- RUNTIME_PROFILE
+aggregation(SUM, NumTopLevelValuesSkipped): 106
+====
+---- QUERY
+# A 52-row leading skip. With batch_size=19 it becomes a 38-row skip, longer than the
+# 32-level cache, so SkipTopLevelRows() also takes its RLE repeated-run branch.
+SELECT v, file__position FROM functional_parquet.trino_variant WHERE id >= 60;
+---- RESULTS
+'"1957-11-07 12:33:54.123456789"',52
+'"<unsupported-type>"',53
+'"<unsupported-type>"',54
+---- TYPES
+STRING, BIGINT
+---- RUNTIME_PROFILE
+aggregation(SUM, NumTopLevelValuesSkipped): 104
+====
+---- QUERY
+# Threshold 1 puts every surviving row in its own micro batch, so the variant children
+# alternate between reading, undoing their read ahead and skipping a row. v fills
+# FILE__POSITION, so a row counter that drifted on the undo would show up as wrong
+# positions: the row index is id for id <= 41 and id - 8 for id >= 50.
+set parquet_late_materialization_threshold=1;
+SELECT v, file__position, id FROM functional_parquet.trino_variant WHERE id % 2 = 1;
+---- RESULTS
+'null',1,1
+'false',3,3
+'34',5,5
+'1000',7,7
+'100000',9,9
+'-12345',11,11
+'14.3',13,13
+'"hello"',15,15
+'"context"',17,17
+'"mobile"',19,19
+'"iceberg"',21,21
+'"a\\t\\"\\\\\\u0000b"',23,23
+'[1,2,3,4,10]',25,25
+'["iceberg","string"]',27,27
+'[["string","iceberg",34],[34,null],[],["string","iceberg"],34]',29,29
+'{"age":30,"name":"Alice"}',31,31
+'{"page":"home","retries":3}',33,33
+'{"context":{"page":"home","retries":3},"device":"mobile","int_array":[1,2,3,4,10],"user":"Alice"}',35,35
+'{"a\\bb":10,"c\\fd":30,"e\\u0001f":20}',37,37
+'{}',39,39
+'{"a":123456789,"c":["string","iceberg"]}',41,41
+'123456.789',43,51
+'9876543210.123456789',45,53
+'"2024-11-07"',47,55
+'"CgsMDQ=="',49,57
+'"2024-11-07 12:33:54.123456000"',51,59
+'"<unsupported-type>"',53,61
+---- TYPES
+STRING, BIGINT, INT
+---- RUNTIME_PROFILE
+aggregation(SUM, NumTopLevelValuesSkipped): 56
+====
+---- QUERY
+# With batch_size=19 every row of the first scratch batch survives, so the non-filter
+# readers read the complete batch. With 1024 it is a single micro batch followed by a
+# trailing skip to the end of the row group.
+SELECT id, v FROM functional_parquet.trino_variant WHERE id < 22;
+---- RESULTS
+0,'NULL'
+1,'null'
+2,'true'
+3,'false'
+4,'42'
+5,'34'
+6,'-34'
+7,'1000'
+8,'-1234'
+9,'100000'
+10,'12345'
+11,'-12345'
+12,'10000000000'
+13,'14.3'
+14,'-14.3'
+15,'"hello"'
+16,'"impala"'
+17,'"context"'
+18,'"home"'
+19,'"mobile"'
+20,'"Alice"'
+21,'"iceberg"'
+---- TYPES
+INT, STRING
+---- RUNTIME_PROFILE
+aggregation(SUM, NumTopLevelValuesSkipped): 66
+====
+---- QUERY
+# The variant is the filter reader, because variant_get() reads its slot. The scalar
+# non-filter readers id and descr each skip 53 rows.
+SELECT id, descr FROM functional_parquet.trino_variant
+WHERE variant_get(v, '$.age', 'int') = 30;
+---- RESULTS
+31,'obj age/name'
+32,'obj age/name/active'
+---- TYPES
+INT, STRING
+---- RUNTIME_PROFILE
+aggregation(SUM, NumTopLevelValuesSkipped): 106
+====
+---- QUERY
+# A conjunct on FILE__POSITION makes the reader that fills it, the variant as
+# column_readers_[0], a filter reader (IMPALA-15375), and id is the skipped one.
+SELECT v, id FROM functional_parquet.trino_variant WHERE file__position = 31;
+---- RESULTS
+'{"age":30,"name":"Alice"}',31
+---- TYPES
+STRING, INT
+---- RUNTIME_PROFILE
+aggregation(SUM, NumTopLevelValuesSkipped): 54
+====
+---- QUERY
+# The 'metadata' child of top_v is PLAIN encoded, unlike in trino_variant. A leading
+# one-row skip, then the last row is read.
+SELECT top_v, id FROM trino_nested_variant WHERE id = 2;
+---- RESULTS
+'{"name":"Alice"}',2
+---- TYPES
+STRING, INT
+---- RUNTIME_PROFILE
+aggregation(SUM, NumTopLevelValuesSkipped): 2
+====
+---- QUERY
+# Control: with late materialization disabled nothing is skipped.
+set parquet_late_materialization_threshold=-1;
+SELECT id, v FROM functional_parquet.trino_variant WHERE id = 31;
+---- RESULTS
+31,'{"age":30,"name":"Alice"}'
+---- TYPES
+INT, STRING
+---- RUNTIME_PROFILE
+aggregation(SUM, NumTopLevelValuesSkipped): 0
 ====
 ---- QUERY
 # TOP-N (sort with LIMIT) materializes the variant into the sort/heap tuple via

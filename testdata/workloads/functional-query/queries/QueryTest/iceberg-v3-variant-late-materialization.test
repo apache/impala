@@ -1,0 +1,197 @@
+====
+---- QUERY
+# The rows of iceberg_v3_variant_multipage carry their file position in 'pos' and in the
+# 'pos' field of v and v2, so most queries check that the values landed on the right rows:
+# the number of rows, of non-NULL v values, of v values on the right row, the same two for
+# v2 and the number of rows with the right FILE__POSITION.
+# Here survivors are scattered over all pages and row groups. v is the first slot, so a
+# variant reader also drives the scan.
+SELECT count(*), count(variant_get(v, '$.pos', 'bigint')),
+  sum(if(variant_get(v, '$.pos', 'bigint') = pos, 1, 0)),
+  count(variant_get(v2, '$.pos', 'bigint')),
+  sum(if(variant_get(v2, '$.pos', 'bigint') = pos, 1, 0)),
+  sum(if(file__position = pos, 1, 0))
+FROM iceberg_v3_variant_multipage WHERE grp = 3;
+---- RESULTS
+42,35,35,25,25,42
+---- TYPES
+BIGINT, BIGINT, BIGINT, BIGINT, BIGINT, BIGINT
+====
+---- QUERY
+# Most rows survive, so the skips are short.
+SELECT count(*), count(variant_get(v, '$.pos', 'bigint')),
+  sum(if(variant_get(v, '$.pos', 'bigint') = pos, 1, 0)),
+  count(variant_get(v2, '$.pos', 'bigint')),
+  sum(if(variant_get(v2, '$.pos', 'bigint') = pos, 1, 0)),
+  sum(if(file__position = pos, 1, 0))
+FROM iceberg_v3_variant_multipage WHERE grp != 3;
+---- RESULTS
+378,326,326,236,236,378
+---- TYPES
+BIGINT, BIGINT, BIGINT, BIGINT, BIGINT, BIGINT
+====
+---- QUERY
+# The first and last rows of the file and of each row group.
+SELECT id, file__position, v, v2 FROM iceberg_v3_variant_multipage
+WHERE id IN (0, 1, 2, 158, 159, 160, 161, 299, 300, 301, 418, 419);
+---- RESULTS
+0,0,'NULL','NULL'
+1,1,'NULL','{"pos":1}'
+2,2,'{"grp":0,"name":"row_2","pad":"xxxxxxxxxxxxx","pos":2}','{"pos":2}'
+158,158,'{"grp":7,"name":"row_158","pad":"xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx","pos":158}','{"pos":158}'
+159,159,'NULL','NULL'
+160,160,'NULL','NULL'
+161,161,'{"k":"k2","pos":161}','{"pos":161}'
+299,299,'{"grp":2,"name":"row_299","pad":"xxxxxxxxxxxxxxxxxxxxxx","pos":299}','NULL'
+300,300,'NULL','NULL'
+301,301,'{"k":"k1","pos":301}','{"pos":301}'
+418,418,'{"grp":4,"name":"row_418","pad":"xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx","pos":418}','{"pos":418}'
+419,419,'{"grp":8,"name":"row_419","pad":"xxxxxxxxx","pos":419}','NULL'
+---- TYPES
+INT, BIGINT, STRING, STRING
+====
+---- QUERY
+# The page index filters out the pages of the scalar columns that have no match, so the
+# variant readers also skip the rows of those pages.
+SELECT count(*), count(variant_get(v, '$.pos', 'bigint')),
+  sum(if(variant_get(v, '$.pos', 'bigint') = pos, 1, 0)),
+  count(variant_get(v2, '$.pos', 'bigint')),
+  sum(if(variant_get(v2, '$.pos', 'bigint') = pos, 1, 0)),
+  sum(if(file__position = pos, 1, 0))
+FROM iceberg_v3_variant_multipage WHERE id BETWEEN 100 AND 110;
+---- RESULTS
+11,11,11,9,9,11
+---- TYPES
+BIGINT, BIGINT, BIGINT, BIGINT, BIGINT, BIGINT
+====
+---- QUERY
+# Only the last rows of each row group survive.
+SELECT count(*), count(variant_get(v, '$.pos', 'bigint')),
+  sum(if(variant_get(v, '$.pos', 'bigint') = pos, 1, 0)),
+  count(variant_get(v2, '$.pos', 'bigint')),
+  sum(if(variant_get(v2, '$.pos', 'bigint') = pos, 1, 0)),
+  sum(if(file__position = pos, 1, 0))
+FROM iceberg_v3_variant_multipage WHERE rg_pos > 110;
+---- RESULTS
+87,86,86,69,69,87
+---- TYPES
+BIGINT, BIGINT, BIGINT, BIGINT, BIGINT, BIGINT
+====
+---- QUERY
+# The first rows of each row group and a few rows from the middle.
+SELECT count(*), count(variant_get(v, '$.pos', 'bigint')),
+  sum(if(variant_get(v, '$.pos', 'bigint') = pos, 1, 0)),
+  count(variant_get(v2, '$.pos', 'bigint')),
+  sum(if(variant_get(v2, '$.pos', 'bigint') = pos, 1, 0)),
+  sum(if(file__position = pos, 1, 0))
+FROM iceberg_v3_variant_multipage WHERE rg_pos < 5 OR rg_pos BETWEEN 60 AND 62;
+---- RESULTS
+24,15,15,15,15,24
+---- TYPES
+BIGINT, BIGINT, BIGINT, BIGINT, BIGINT, BIGINT
+====
+---- QUERY
+# Only the last row of the first row group survives, the other row groups have no match.
+SELECT v, v2, id, file__position FROM iceberg_v3_variant_multipage WHERE id = 159;
+---- RESULTS
+'NULL','NULL',159,159
+---- TYPES
+STRING, STRING, INT, BIGINT
+====
+---- QUERY
+# Only the last row of the file survives.
+SELECT v, v2, id, file__position FROM iceberg_v3_variant_multipage WHERE id = 419;
+---- RESULTS
+'{"grp":8,"name":"row_419","pad":"xxxxxxxxx","pos":419}','NULL',419,419
+---- TYPES
+STRING, STRING, INT, BIGINT
+====
+---- QUERY
+# A predicate on FILE__POSITION. The reader of v fills FILE__POSITION, so it becomes a
+# filter reader, v2 and id do not.
+SELECT v, file__position, v2, id FROM iceberg_v3_variant_multipage
+WHERE file__position IN (0, 159, 160, 419);
+---- RESULTS
+'NULL',0,'NULL',0
+'NULL',159,'NULL',159
+'NULL',160,'NULL',160
+'{"grp":8,"name":"row_419","pad":"xxxxxxxxx","pos":419}',419,'NULL',419
+---- TYPES
+STRING, BIGINT, STRING, INT
+====
+---- QUERY
+# v is a filter column here, v2 is not.
+SELECT count(*), count(variant_get(v2, '$.pos', 'bigint')),
+  sum(if(variant_get(v2, '$.pos', 'bigint') = pos, 1, 0)),
+  sum(if(file__position = pos, 1, 0))
+FROM iceberg_v3_variant_multipage WHERE variant_get(v, '$.grp', 'int') = 3;
+---- RESULTS
+26,14,14,26
+---- TYPES
+BIGINT, BIGINT, BIGINT, BIGINT
+====
+---- QUERY
+# Rows 365, 366 and 387 are in a v2 page that only contains NULLs, rows 306, 312 and
+# 319 in a page that is mostly NULL.
+SELECT v2, id FROM iceberg_v3_variant_multipage
+WHERE grp = 5 AND id BETWEEN 300 AND 410;
+---- RESULTS
+'{"k":"v2_zzzzzzzzzzzzzzzzzzzzzzzzzz","pos":306}',306
+'NULL',312
+'NULL',319
+'NULL',365
+'NULL',366
+'NULL',387
+'NULL',409
+---- TYPES
+STRING, INT
+====
+---- QUERY
+# v is NULL in every surviving row.
+SELECT count(*), count(variant_get(v, '$.pos', 'bigint')),
+  count(variant_get(v2, '$.pos', 'bigint')),
+  sum(if(variant_get(v2, '$.pos', 'bigint') = pos, 1, 0)),
+  sum(if(file__position = pos, 1, 0))
+FROM iceberg_v3_variant_multipage WHERE descr = 'null';
+---- RESULTS
+59,0,43,43,59
+---- TYPES
+BIGINT, BIGINT, BIGINT, BIGINT, BIGINT
+====
+---- QUERY
+# These v values are larger than the page size, so each of them is the last value of
+# its page.
+SELECT count(*), count(variant_get(v, '$.pos', 'bigint')),
+  sum(if(variant_get(v, '$.pos', 'bigint') = pos, 1, 0)),
+  count(variant_get(v2, '$.pos', 'bigint')),
+  sum(if(variant_get(v2, '$.pos', 'bigint') = pos, 1, 0)),
+  sum(if(file__position = pos, 1, 0))
+FROM iceberg_v3_variant_multipage WHERE descr = 'big';
+---- RESULTS
+23,23,23,14,14,23
+---- TYPES
+BIGINT, BIGINT, BIGINT, BIGINT, BIGINT, BIGINT
+====
+---- QUERY
+# Only variant columns are materialized after the filter.
+SELECT sum(variant_get(v, '$.pos', 'bigint')), sum(variant_get(v2, '$.pos', 'bigint'))
+FROM iceberg_v3_variant_multipage WHERE grp = 4;
+---- RESULTS
+7240,3528
+---- TYPES
+BIGINT, BIGINT
+====
+---- QUERY
+# Only rows 401 and 402 survive. With the page index, the last candidate rows of the
+# first two row groups are read in a scratch batch without survivors. If the scanner
+# returns the row batch right after it (PARQUET_LATE_MATERIALIZATION_AT_CAPACITY), v,
+# the first column reader, has reached the end of the row group in the skip, while the
+# skip of 'pos' stopped in the middle of a page.
+SELECT v, v2, pos, file__position FROM iceberg_v3_variant_multipage
+WHERE rg_pos BETWEEN 100 AND 102 AND grp = 1;
+---- RESULTS
+'{"k":"k2","pos":401}','{"pos":401}',401,401
+'{"grp":1,"name":"row_402","pad":"xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx","pos":402}','{"k":"v2_zz","pos":402}',402,402
+---- TYPES
+STRING, STRING, BIGINT, BIGINT
+====

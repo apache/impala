@@ -1,0 +1,16 @@
+====
+---- QUERY
+# Only run with late materialization enabled. v and v2 are the only non-filter readers,
+# so the counters show that rows of the VARIANT children were skipped, some of them as
+# whole pages.
+SELECT count(*), sum(if(variant_get(v, '$.pos', 'bigint') = file__position, 1, 0)),
+  sum(if(variant_get(v2, '$.pos', 'bigint') = file__position, 1, 0))
+FROM iceberg_v3_variant_multipage WHERE grp = 3;
+---- RESULTS
+42,35,25
+---- TYPES
+BIGINT, BIGINT, BIGINT
+---- RUNTIME_PROFILE
+aggregation(SUM, NumTopLevelValuesSkipped)> 0
+aggregation(SUM, NumPagesSkippedByLateMaterialization)> 0
+====

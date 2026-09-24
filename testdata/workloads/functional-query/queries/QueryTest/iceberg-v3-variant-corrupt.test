@@ -1,0 +1,60 @@
+====
+---- QUERY
+# 'id' has 9 values in a row group of 10 rows. id, the filter reader, reaches the end of
+# the row group first, while v, the first column reader, has already read the levels of
+# row 9, so it cannot be moved to the end of the row group.
+SELECT v, id FROM iceberg_v3_variant_short_id WHERE id = 5;
+---- CATCH
+column 'v' has more rows than the other columns of the row group
+====
+---- QUERY
+# The same when no row survives and v only skips rows.
+SELECT v, id FROM iceberg_v3_variant_short_id WHERE id = 9;
+---- CATCH
+column 'v' has more rows than the other columns of the row group
+====
+---- QUERY
+# Both children of v have 9 values in a row group of 10 rows. Reading row 8 takes the
+# children to the end of the row group, so the skip of row 9 has no read ahead levels
+# to undo.
+SELECT v, id FROM iceberg_v3_variant_short_value WHERE id = 8;
+---- CATCH
+column 'metadata' has fewer rows than the other columns of the row group
+====
+---- QUERY
+# Here the skip after row 5 runs out of values.
+SELECT v, id FROM iceberg_v3_variant_short_value WHERE id = 5;
+---- CATCH
+Couldn't skip rows in column 'v'
+====
+---- QUERY
+# v is a repeated group. The file is rejected before reading any rows, with and
+# without late materialization.
+SELECT v, id FROM iceberg_v3_variant_repeated WHERE id = 5;
+---- CATCH
+or one of its children is repeated in the Parquet schema of file
+====
+---- QUERY
+SELECT v FROM iceberg_v3_variant_repeated;
+---- CATCH
+or one of its children is repeated in the Parquet schema of file
+====
+---- QUERY
+# The other column can still be read.
+SELECT id FROM iceberg_v3_variant_repeated WHERE id = 5;
+---- RESULTS
+5
+---- TYPES
+INT
+====
+---- QUERY
+# Only the 'value' child of v is repeated.
+SELECT v, id FROM iceberg_v3_variant_repeated_child WHERE id = 5;
+---- CATCH
+or one of its children is repeated in the Parquet schema of file
+====
+---- QUERY
+SELECT v FROM iceberg_v3_variant_repeated_child;
+---- CATCH
+or one of its children is repeated in the Parquet schema of file
+====

@@ -601,26 +601,21 @@ class BaseScalarColumnReader : public ParquetColumnReader {
   /// parquet file where number of values might differ from metadata.
   virtual bool SkipRows(int64_t num_rows, int64_t skip_row_id) override {
     // Undo NextLevels() if it is called before calling this method.
-    if (levels_readahead_) {
-      DCHECK_NE(def_level_, ParquetLevel::INVALID_LEVEL);
-      DCHECK_NE(rep_level_, ParquetLevel::INVALID_LEVEL);
-      rep_levels_.CachePrev();
-      def_levels_.CachePrev();
-      // Roll back 'current_row_' too, under the same condition NextLevels() advances
-      // it. Evaluated before 'rep_level_' is invalidated below. At the end of a row
-      // group 'rep_level_' is ROW_GROUP_END, where nothing was advanced.
-      if (max_rep_level() == 0 || rep_level_ == 0) --current_row_;
-      rep_level_ = ParquetLevel::INVALID_LEVEL;
-      def_level_ = ParquetLevel::INVALID_LEVEL;
-      ++num_buffered_values_;
-      levels_readahead_ = false;
-    }
+    if (levels_readahead_ && !UndoLevelsReadahead()) return false;
     if (max_rep_level() > 0) {
       return SkipRowsInternal<true>(num_rows, skip_row_id);
     } else {
       return SkipRowsInternal<false>(num_rows, skip_row_id);
     }
   }
+
+  /// Reverts the last NextLevels(), so that the reader ends up in a state a batched
+  /// reader could also be in: the level that was read ahead is un-read, no row is
+  /// half-consumed, 'levels_readahead_' is false and 'current_row_' equals
+  /// LastProcessedRow(). Returns false if there is nothing to undo because the reader
+  /// already reached the end of the row group, which only happens for a corrupt file
+  /// where this column has fewer rows than the columns it is read with.
+  bool UndoLevelsReadahead();
 
   /// Sets to row group end. 'rep_level_' and 'def_level_' is set to
   /// ParquetLevel::ROW_GROUP_END. ParquetLevel::INVALID_LEVEL
