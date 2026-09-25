@@ -17,8 +17,6 @@
 
 #include "exec/iceberg-metadata/iceberg-row-reader.h"
 
-#include <type_traits>
-
 #include "exec/exec-node.inline.h"
 #include "exec/iceberg-metadata/iceberg-metadata-scanner.h"
 #include "exec/scan-node.h"
@@ -67,8 +65,6 @@ Status IcebergRowReader::InitJNI() {
       &float_value_));
   RETURN_IF_ERROR(JniUtil::GetMethodID(env, long_cl_, "doubleValue", "()D",
       &double_value_));
-  RETURN_IF_ERROR(JniUtil::GetMethodID(env, char_sequence_cl_, "toString",
-      "()Ljava/lang/String;", &char_sequence_to_string_));
   return Status::OK();
 }
 
@@ -254,32 +250,12 @@ Status IcebergRowReader::WriteTimeStampSlot(JNIEnv* env, const jobject &accessed
   return Status::OK();
 }
 
-/// To obtain bytes from JNI the JniByteArrayGuard or the JniUtfCharGuard class is used.
-/// Then the data has to be copied to the tuple_data_pool, because the JVM releases the
-/// reference and reclaims the memory area.
-template <bool IS_BINARY>
-Status IcebergRowReader::WriteStringOrBinarySlot(JNIEnv* env,
-    const jobject &accessed_value, void* slot, MemPool* tuple_data_pool) {
-  using jbufferType = typename std::conditional<IS_BINARY, jbyteArray, jstring>::type;
-  using GuardType = typename std::conditional<
-      IS_BINARY, JniByteArrayGuard, JniUtfCharGuard>::type;
-  const jclass& jobject_subclass = IS_BINARY ? byte_buffer_cl_ : char_sequence_cl_;
-
-  DCHECK(accessed_value != nullptr);
-  DCHECK(env->IsInstanceOf(accessed_value, jobject_subclass) == JNI_TRUE);
-
-  jbufferType jbuffer;
-  if constexpr (IS_BINARY) {
-    RETURN_IF_ERROR(metadata_scanner_->ConvertJavaByteBufferToByteArray(
-        env, accessed_value, &jbuffer));
-  } else {
-    jbuffer = static_cast<jstring>(env->CallObjectMethod(accessed_value,
-        char_sequence_to_string_));
-    RETURN_ERROR_IF_EXC(env);
-  }
-
-  GuardType jbuffer_guard;
-  RETURN_IF_ERROR(GuardType::create(env, jbuffer, &jbuffer_guard));
+/// Copies the contents of 'jbuffer' to 'tuple_data_pool' and points 'slot' to it. The
+/// data has to be copied because the JVM reclaims the memory area of 'jbuffer'.
+static Status CopyByteArrayToSlot(JNIEnv* env, jbyteArray jbuffer, bool is_binary,
+    void* slot, MemPool* tuple_data_pool) {
+  JniByteArrayGuard jbuffer_guard;
+  RETURN_IF_ERROR(JniByteArrayGuard::create(env, jbuffer, &jbuffer_guard));
   uint32_t jbuffer_size = jbuffer_guard.get_size();
 
   // Allocate memory and copy the bytes from the JVM to the RowBatch.
@@ -287,7 +263,7 @@ Status IcebergRowReader::WriteStringOrBinarySlot(JNIEnv* env,
       tuple_data_pool->TryAllocateUnaligned(jbuffer_size));
   if (UNLIKELY(buffer == nullptr)) {
     string details = strings::Substitute("Failed to allocate $0 bytes for $1.",
-        jbuffer_size, IS_BINARY ? "binary" : "string");
+        jbuffer_size, is_binary ? "binary" : "string");
     return tuple_data_pool->mem_tracker()->MemLimitExceeded(
         nullptr, details, jbuffer_size);
   }
@@ -295,6 +271,29 @@ Status IcebergRowReader::WriteStringOrBinarySlot(JNIEnv* env,
   memcpy(buffer, jbuffer_guard.get(), jbuffer_size);
   reinterpret_cast<StringValue*>(slot)->Assign(buffer, jbuffer_size);
   return Status::OK();
+}
+
+/// Strings are converted to UTF-8 bytes on the Java side, because the JNI string
+/// functions only provide modified UTF-8.
+template <bool IS_BINARY>
+Status IcebergRowReader::WriteStringOrBinarySlot(JNIEnv* env,
+    const jobject &accessed_value, void* slot, MemPool* tuple_data_pool) {
+  const jclass& jobject_subclass = IS_BINARY ? byte_buffer_cl_ : char_sequence_cl_;
+
+  DCHECK(accessed_value != nullptr);
+  DCHECK(env->IsInstanceOf(accessed_value, jobject_subclass) == JNI_TRUE);
+
+  jbyteArray jbuffer;
+  if constexpr (IS_BINARY) {
+    RETURN_IF_ERROR(metadata_scanner_->ConvertJavaByteBufferToByteArray(
+        env, accessed_value, &jbuffer));
+  } else {
+    RETURN_IF_ERROR(metadata_scanner_->ConvertJavaCharSequenceToUtf8ByteArray(
+        env, accessed_value, &jbuffer));
+  }
+  Status status = CopyByteArrayToSlot(env, jbuffer, IS_BINARY, slot, tuple_data_pool);
+  env->DeleteLocalRef(jbuffer);
+  return status;
 }
 
 Status IcebergRowReader::WriteStructSlot(JNIEnv* env, const jobject &struct_like_row,
@@ -415,6 +414,8 @@ Status IcebergRowReader::WriteMapKeyAndValue(JNIEnv* env, const jobject& map_sca
   RETURN_IF_ERROR(WriteSlot(env, value_struct_like_row, value, value_slot_desc,
         tuple, tuple_data_pool_collection, state));
 
+  env->DeleteLocalRef(key);
+  env->DeleteLocalRef(value);
   return Status::OK();
 }
 

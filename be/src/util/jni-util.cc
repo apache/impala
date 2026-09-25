@@ -40,7 +40,7 @@ Status JniBufferGuard<T>::create(JNIEnv* env, T jbuffer, JniBufferGuard<T>* out)
   const char* buffer = nullptr;
   uint32_t size = -1;
   if constexpr (std::is_same_v<T, jstring>) {
-    size = env->GetStringLength(jbuffer);
+    size = env->GetStringUTFLength(jbuffer);
     buffer = env->GetStringUTFChars(jbuffer, &is_copy);
   } else {
     static_assert(std::is_same_v<T, jbyteArray>);

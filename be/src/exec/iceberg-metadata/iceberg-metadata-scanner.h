@@ -79,6 +79,11 @@ class IcebergMetadataScanner {
   Status ConvertJavaByteBufferToByteArray(JNIEnv* env, const jobject& byte_buffer,
       jbyteArray* result) WARN_UNUSED_RESULT;
 
+  /// Helper function that returns the UTF-8 encoding of a java.lang.CharSequence as a
+  /// Java primitive byte array. This is used with STRING fields.
+  Status ConvertJavaCharSequenceToUtf8ByteArray(JNIEnv* env,
+      const jobject& char_sequence, jbyteArray* result) WARN_UNUSED_RESULT;
+
   /// Removes global references.
   void Close(RuntimeState* state);
 
@@ -105,6 +110,8 @@ class IcebergMetadataScanner {
       iceberg_metadata_scanner_collection_scanner_get_next_collection_item_ = nullptr;
   inline static jmethodID
       iceberg_metadata_scanner_byte_buffer_to_byte_array_ = nullptr;
+  inline static jmethodID
+      iceberg_metadata_scanner_char_sequence_to_utf8_bytes_ = nullptr;
 
   inline static jmethodID map_entry_get_key_ = nullptr;
   inline static jmethodID map_entry_get_value_ = nullptr;

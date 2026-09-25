@@ -70,7 +70,6 @@ class IcebergRowReader {
   inline static jmethodID long_value_ = nullptr;
   inline static jmethodID float_value_ = nullptr;
   inline static jmethodID double_value_ = nullptr;
-  inline static jmethodID char_sequence_to_string_ = nullptr;
 
   /// The scan node that started this row reader.
   ScanNode* scan_node_;

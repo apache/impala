@@ -1197,3 +1197,43 @@ row_regex:1,\d+,1,1,'{.*}','{.*}',1,'\[1,2,3,4,5\]','\["one","two","three","four
 ---- TYPES
 INT,BIGINT,BIGINT,BIGINT,STRING,STRING,INT,STRING,STRING
 ====
+---- QUERY
+# IMPALA-15423: Non-ASCII strings must be returned in full and as standard UTF-8.
+create table $DATABASE.ice_utf8 (city string, n int) partitioned by spec (city)
+stored as iceberg;
+insert into $DATABASE.ice_utf8 values
+  ('Zürich', 1), ('東京', 2), ('abc😀', 3), ('plain', 4);
+select f.`partition`.city, hex(f.`partition`.city) from $DATABASE.ice_utf8.`files` f
+order by f.`partition`.city;
+---- RESULTS: RAW_STRING
+'Zürich','5AC3BC72696368'
+'abc😀','616263F09F9880'
+'plain','706C61696E'
+'東京','E69DB1E4BAAC'
+---- TYPES
+STRING,STRING
+====
+---- QUERY
+select p.`partition`, p.record_count from $DATABASE.ice_utf8.`partitions` p
+order by p.`partition`.city;
+---- RESULTS: RAW_STRING
+'{"city":"Zürich"}',1
+'{"city":"abc😀"}',1
+'{"city":"plain"}',1
+'{"city":"東京"}',1
+---- TYPES
+STRING,BIGINT
+====
+---- QUERY
+# NUL is encoded as 0xC080 in modified UTF-8, but as a single zero byte in UTF-8.
+create table $DATABASE.ice_nul (s string) partitioned by spec (s) stored as iceberg;
+insert into $DATABASE.ice_nul values ('a\0b');
+select hex(f.`partition`.s) from $DATABASE.ice_nul.`files` f
+union all
+select hex(p.`partition`.s) from $DATABASE.ice_nul.`partitions` p;
+---- RESULTS
+'610062'
+'610062'
+---- TYPES
+STRING
+====

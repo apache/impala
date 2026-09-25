@@ -109,7 +109,8 @@ struct JniMethodDescriptor {
 
 /// Helper class for the lifetime management of JNI char or byte buffers. Releases the JNI
 /// buffer when destructed. T must be either jstring or jbyteArray. If T is a jstring, the
-/// string in the buffer is in utf-8 format.
+/// string in the buffer is in modified UTF-8 format, which differs from standard UTF-8
+/// for NUL and supplementary characters.
 ///
 /// See also JniScopedArrayCritical, which can also be used for byte buffers but its usage
 /// is more restricted, see https://docs.oracle.com/javase/8/docs/technotes/guides/jni/spec/functions.html#GetPrimitiveArrayCritical_ReleasePrimitiveArrayCritical
@@ -130,10 +131,10 @@ class JniBufferGuard {
   /// array lives as long as this guard. jbuffer should not be null.
   static Status create(JNIEnv* env, T jbuffer, JniBufferGuard* out);
 
-  /// Get the size of the buffer.
+  /// Get the size of the buffer in bytes.
   uint32_t get_size() { return size; }
 
-  /// Get the buffer. Returns nullptr if the guard does hold a buffer.
+  /// Get the buffer. Returns nullptr if the guard does not hold a buffer.
   const char* get() { return buffer; }
  private:
   JNIEnv* env;

@@ -20,6 +20,7 @@ package org.apache.impala.util;
 import com.google.common.base.Preconditions;
 
 import java.nio.ByteBuffer;
+import java.nio.charset.StandardCharsets;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
@@ -136,6 +137,14 @@ public class IcebergMetadataScanner {
     return structLike.get(pos, javaClass);
   }
 
+  /**
+   * Returns the UTF-8 encoding of a CharSequence. The JNI string functions only provide
+   * modified UTF-8, which differs from standard UTF-8 for NUL and supplementary
+   * characters.
+   */
+  public byte[] CharSequenceToUtf8Bytes(CharSequence charSequence) {
+    return charSequence.toString().getBytes(StandardCharsets.UTF_8);
+  }
 
   /**
    * Extracts the contents of a ByteBuffer into a byte array.

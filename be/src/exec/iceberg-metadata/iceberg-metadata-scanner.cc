@@ -77,6 +77,9 @@ Status IcebergMetadataScanner::InitJNI() {
   RETURN_IF_ERROR(JniUtil::GetMethodID(env, iceberg_metadata_scanner_cl_,
       "ByteBufferToByteArray", "(Ljava/nio/ByteBuffer;)[B",
       &iceberg_metadata_scanner_byte_buffer_to_byte_array_));
+  RETURN_IF_ERROR(JniUtil::GetMethodID(env, iceberg_metadata_scanner_cl_,
+      "CharSequenceToUtf8Bytes", "(Ljava/lang/CharSequence;)[B",
+      &iceberg_metadata_scanner_char_sequence_to_utf8_bytes_));
 
   RETURN_IF_ERROR(JniUtil::GetMethodID(env, map_entry_cl_, "getKey",
       "()Ljava/lang/Object;", &map_entry_get_key_));
@@ -248,6 +251,16 @@ Status IcebergMetadataScanner::ConvertJavaByteBufferToByteArray(JNIEnv* env,
     const jobject& byte_buffer, jbyteArray* result) {
   jobject arr = env->CallObjectMethod(jmetadata_scanner_,
       iceberg_metadata_scanner_byte_buffer_to_byte_array_, byte_buffer);
+  RETURN_ERROR_IF_EXC(env);
+  DCHECK(env->IsInstanceOf(arr, byte_array_cl_));
+  *result = static_cast<jbyteArray>(arr);
+  return Status::OK();
+}
+
+Status IcebergMetadataScanner::ConvertJavaCharSequenceToUtf8ByteArray(JNIEnv* env,
+    const jobject& char_sequence, jbyteArray* result) {
+  jobject arr = env->CallObjectMethod(jmetadata_scanner_,
+      iceberg_metadata_scanner_char_sequence_to_utf8_bytes_, char_sequence);
   RETURN_ERROR_IF_EXC(env);
   DCHECK(env->IsInstanceOf(arr, byte_array_cl_));
   *result = static_cast<jbyteArray>(arr);

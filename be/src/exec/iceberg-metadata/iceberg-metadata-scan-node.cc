@@ -87,6 +87,10 @@ Status IcebergMetadataScanNode::GetNext(RuntimeState* state, RowBatch* row_batch
   Tuple* tuple = reinterpret_cast<Tuple*>(tuple_buffer);
   tuple->Init(tuple_buffer_size);
   while (!ReachedLimit() && !row_batch->AtCapacity()) {
+    // This thread is attached to the JVM, so the local references created while reading
+    // the row would only be freed when it detaches. Free them after each row instead.
+    JniLocalFrame jni_frame;
+    RETURN_IF_ERROR(jni_frame.push(env));
     int row_idx = row_batch->AddRow();
     TupleRow* tuple_row = row_batch->GetRow(row_idx);
     tuple_row->SetTuple(0, tuple);
