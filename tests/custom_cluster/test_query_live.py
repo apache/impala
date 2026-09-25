@@ -240,6 +240,30 @@ class TestQueryLive(CustomClusterTestSuite):
                                                  "--cluster_id=test_query_live",
                                     workload_mgmt=True,
                                     disable_log_buffering=True)
+  def test_decimal_columns(self):
+    """IMPALA-15422: Writing a DECIMAL column must not overwrite other slots.
+       BACKENDS_COUNT is the only INT column, so it is laid out right after the 8-byte
+       DECIMAL slots, and it is written before them when it precedes them in the select
+       list."""
+    result = self.client.execute("select * from functional.alltypes")
+    describe = self.client.execute("describe sys.impala_query_live")
+    decimal_cols = [line.split('\t')[0] for line in describe.data
+                    if line.split('\t')[1].startswith('decimal')]
+    assert len(decimal_cols) > 0
+    expected = self.client.execute("select backends_count from sys.impala_query_live "
+        "where query_id='{}'".format(result.query_id))
+    assert expected.data == ["3"]
+    for col in decimal_cols:
+      actual = self.client.execute("select backends_count, {} from "
+          "sys.impala_query_live where query_id='{}'".format(col, result.query_id))
+      assert len(actual.data) == 1
+      assert actual.data[0].split('\t')[0] == "3", \
+          "backends_count overwritten when selected with {}".format(col)
+
+  @CustomClusterTestSuite.with_args(impalad_args="--query_log_write_interval_s=300 "
+                                                 "--cluster_id=test_query_live",
+                                    workload_mgmt=True,
+                                    disable_log_buffering=True)
   def test_alter(self):
     """Asserts alter works on query live table."""
     column_desc = 'test_alter\tstring\t'

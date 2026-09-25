@@ -105,12 +105,17 @@ static void WriteDecimalSlot(
     case 4:
       *reinterpret_cast<Decimal4Value*>(slot) =
           Decimal4Value::FromDouble(type, value, false, &overflow);
+      break;
     case 8:
       *reinterpret_cast<Decimal8Value*>(slot) =
           Decimal8Value::FromDouble(type, value, false, &overflow);
+      break;
     case 16:
       *reinterpret_cast<Decimal16Value*>(slot) =
           Decimal16Value::FromDouble(type, value, false, &overflow);
+      break;
+    default:
+      DCHECK(false) << "Invalid decimal byte size: " << type.GetByteSize();
   }
   DCHECK(!overflow);
 }
