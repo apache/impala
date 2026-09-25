@@ -51,7 +51,6 @@ Checks: "-*,clang*,\
 -clang-diagnostic-unused-parameter,\
 -clang-diagnostic-vla-cxx-extension,\
 -clang-analyzer-security.ArrayBound,\
--clang-analyzer-security.insecureAPI.bzero,\
 -clang-analyzer-security.insecureAPI.DeprecatedOrUnsafeBufferHandling,\
 -clang-analyzer-unix.StdCLibraryFunctions,\
 -clang-analyzer-unix.Stream,\

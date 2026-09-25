@@ -50,7 +50,7 @@ GzipCompressor::GzipCompressor(Format format, MemPool* mem_pool, bool reuse_buff
   // To limit compression levels in range [Z_BEST_SPEED, Z_BEST_COMPRESSION]
   // Default compression level is set to 6
 
-  bzero(&stream_, sizeof(stream_));
+  memset(&stream_, 0, sizeof(stream_));
 }
 
 GzipCompressor::~GzipCompressor() {

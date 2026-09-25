@@ -49,7 +49,7 @@ const string DECOMPRESSOR_MEM_LIMIT_EXCEEDED =
 GzipDecompressor::GzipDecompressor(MemPool* mem_pool, bool reuse_buffer, bool is_deflate)
   : Codec(mem_pool, reuse_buffer, true),
     is_deflate_(is_deflate) {
-  bzero(&stream_, sizeof(stream_));
+  memset(&stream_, 0, sizeof(stream_));
 }
 
 GzipDecompressor::~GzipDecompressor() {
@@ -246,7 +246,7 @@ Status GzipDecompressor::ProcessBlock(bool output_preallocated, int64_t input_le
 
 BzipDecompressor::BzipDecompressor(MemPool* mem_pool, bool reuse_buffer)
   : Codec(mem_pool, reuse_buffer, true) {
-  bzero(&stream_, sizeof(stream_));
+  memset(&stream_, 0, sizeof(stream_));
 }
 
 BzipDecompressor::~BzipDecompressor() {

@@ -418,7 +418,7 @@ class DataStreamTest : public testing::Test {
     RowBatch* batch = new RowBatch(row_desc_, BATCH_CAPACITY, &tracker_);
     int64_t* tuple_mem = reinterpret_cast<int64_t*>(
         batch->tuple_data_pool()->Allocate(BATCH_CAPACITY * PER_ROW_DATA));
-    bzero(tuple_mem, BATCH_CAPACITY * PER_ROW_DATA);
+    memset(tuple_mem, 0, BATCH_CAPACITY * PER_ROW_DATA);
     for (int i = 0; i < BATCH_CAPACITY; ++i) {
       int idx = batch->AddRow();
       TupleRow* row = batch->GetRow(idx);

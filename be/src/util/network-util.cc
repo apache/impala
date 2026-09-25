@@ -310,7 +310,7 @@ int FindUnusedEphemeralPort() {
   int sockfd = socket(AF_INET, SOCK_STREAM, 0);
   if (sockfd < 0) return -1;
   struct sockaddr_in server_address;
-  bzero(reinterpret_cast<char*>(&server_address), sizeof(server_address));
+  memset(&server_address, 0, sizeof(server_address));
   server_address.sin_family = AF_INET;
   server_address.sin_addr.s_addr = INADDR_ANY;
   for (int tries = 0; tries < 100; ++tries) {
