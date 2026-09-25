@@ -505,3 +505,13 @@ DESCRIBE ice_alter_cols;
 ---- TYPES
 STRING,STRING,STRING,STRING
 ====
+---- QUERY
+# IMPALA-15364: Adding a NOT NULL column without a default value should be
+# rejected because existing rows have no value for the new column.
+CREATE TABLE ice_not_null_no_default (i INT)
+STORED AS ICEBERG TBLPROPERTIES('format-version'='2');
+INSERT INTO ice_not_null_no_default VALUES (1);
+ALTER TABLE ice_not_null_no_default ADD COLUMNS (j INT NOT NULL);
+---- CATCH
+A new non-null column must have a default value
+====

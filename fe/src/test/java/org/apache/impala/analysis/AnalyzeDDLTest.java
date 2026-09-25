@@ -585,8 +585,9 @@ public class AnalyzeDDLTest extends FrontendTestBase {
     // ALTER TABLE ADD COLUMN(S): allowed on Iceberg.
     AnalyzesOk("alter table functional_parquet.iceberg_non_partitioned " +
         "add column uuid_col UUID");
-    AnalyzesOk("alter table functional_parquet.iceberg_partitioned " +
-        "add column uuid_col UUID NOT NULL");
+    AnalysisError("alter table functional_parquet.iceberg_partitioned " +
+        "add column uuid_col UUID NOT NULL",
+        "A new non-null column must have a default value");
     AnalyzesOk("alter table functional_parquet.iceberg_non_partitioned " +
         "add columns (uuid_col UUID, uuid_col2 UUID)");
   }
@@ -666,6 +667,11 @@ public class AnalyzeDDLTest extends FrontendTestBase {
     // A non-null column must have a default on Kudu table.
     AnalysisError("alter table functional_kudu.alltypes add columns" +
         "(new_col int not null)",
+        "A new non-null column must have a default value: new_col INT NOT NULL");
+
+    // A non-null column must have a default on Iceberg table.
+    AnalysisError("alter table functional_parquet.iceberg_partitioned " +
+        "add columns (new_col int not null)",
         "A new non-null column must have a default value: new_col INT NOT NULL");
 
     // Cannot ALTER ADD COLUMN complex type on Kudu table.

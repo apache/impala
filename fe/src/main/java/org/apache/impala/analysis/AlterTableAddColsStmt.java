@@ -131,12 +131,15 @@ public class AlterTableAddColsStmt extends AlterTableStmt {
           throw new AnalysisException("A new non-null column must have a default " +
               "value: " + c.toString());
         }
-      } else if (t instanceof FeIcebergTable) {
-        FeIcebergTable iceTbl = (FeIcebergTable) t;
+      } else if (t instanceof FeIcebergTable iceTbl) {
         // For Iceberg tables, only default values are supported as column options
         if (c.hasIncompatibleIcebergOptions()) {
           throw new AnalysisException("The specified column options are not supported " +
               "in Iceberg tables: " + c.toString());
+        }
+        if (c.isExplicitNotNullable() && !c.hasDefaultValue()) {
+          throw new AnalysisException("A new non-null column must have a " +
+              "default value: " + c.toString());
         }
         if (c.hasDefaultValue() && iceTbl.getFormatVersion() < 3) {
           throw new AnalysisException(String.format(
