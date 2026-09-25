@@ -35,7 +35,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
-import java.util.TreeSet;
+import java.util.TreeMap;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
 
@@ -46,7 +46,6 @@ import org.apache.iceberg.FileContent;
 import org.apache.iceberg.FileFormat;
 import org.apache.iceberg.FileScanTask;
 import org.apache.iceberg.expressions.Expression;
-import org.apache.iceberg.expressions.ExpressionUtil;
 import org.apache.iceberg.expressions.ExpressionVisitors;
 import org.apache.iceberg.expressions.True;
 import org.apache.iceberg.io.CloseableIterable;
@@ -121,9 +120,11 @@ public class IcebergScanPlanner {
   // Mapping for translated Impala expressions
   private final Map<Expression, Expr> impalaIcebergPredicateMapping_ =
       new LinkedHashMap<>();
-  // Residual expressions after Iceberg planning
-  private final Set<Expression> residualExpressions_ =
-      new TreeSet<>(Comparator.comparing(ExpressionUtil::toSanitizedString));
+  // Distinct residual expressions after Iceberg planning, keyed by their string form.
+  // The key must identify the expression exactly: e.g. the sanitized string would map
+  // 'id != 12345' and 'id != 54321' to the same key, and one of them would get lost.
+  // The map is sorted to make the order of the retained conjuncts deterministic.
+  private final Map<String, Expression> residualExpressions_ = new TreeMap<>();
   // Expressions filtered by Iceberg's planFiles, subset of
   // 'impalaIcebergPredicateMapping_''s values
   private final List<Expr> skippedExpressions_ = new ArrayList<>();
@@ -726,11 +727,16 @@ public class IcebergScanPlanner {
             timeTravelSpec,
             metricsReporter_)) {
       long dataFilesCacheMisses = 0;
+      // Consecutive files often share the same residual object, e.g. every file of an
+      // unpartitioned table, so we can skip computing its string form for them.
+      Expression prevResidualExpr = null;
       for (FileScanTask fileScanTask : fileScanTasks) {
         DataFile dataFile = fileScanTask.file();
         Expression residualExpr = fileScanTask.residual();
-        if (residualExpr != null && !(residualExpr instanceof True)) {
-          residualExpressions_.add(residualExpr);
+        if (residualExpr != null && !(residualExpr instanceof True)
+            && residualExpr != prevResidualExpr) {
+          residualExpressions_.putIfAbsent(residualExpr.toString(), residualExpr);
+          prevResidualExpr = residualExpr;
         }
         Pair<IcebergFileDescriptor, Boolean> fileDesc =
             getFileDescriptor(dataFile, fileStore);
@@ -820,7 +826,7 @@ public class IcebergScanPlanner {
     List<Expr> expressionsToRetain = new ArrayList<>(untranslatedExpressions_);
     // Add relaxed predicates - they were pushed to Iceberg but must still be evaluated
     expressionsToRetain.addAll(relaxedExpressions_);
-    for (Expression expression : residualExpressions_) {
+    for (Expression expression : residualExpressions_.values()) {
       List<Expression> locatedExpressions = ExpressionVisitors.visit(expression,
           new IcebergExpressionCollector());
       for (Expression located : locatedExpressions) {
@@ -828,7 +834,8 @@ public class IcebergScanPlanner {
         // If we fail to locate any of the Iceberg residual expressions then we skip
         // filtering the predicates to be pushed down to Impala scanner.
         if (expr == null) return false;
-        expressionsToRetain.add(expr);
+        // Different residuals can contain the same predicate.
+        if (!expressionsToRetain.contains(expr)) expressionsToRetain.add(expr);
       }
     }
     skippedExpressions_.addAll(

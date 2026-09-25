@@ -1,0 +1,36 @@
+====
+---- QUERY
+# IMPALA-15421: The residuals of different files can differ only in their literal values,
+# e.g. 'id != 11' and 'id != 21' below. Predicate subsetting must keep both of them.
+create table ice_trunc (id int) partitioned by spec (truncate(10, id))
+stored as iceberg;
+insert into ice_trunc values (11), (12), (21), (22);
+select id from ice_trunc where id != 11 and id != 21;
+---- RESULTS
+12
+22
+---- TYPES
+INT
+====
+---- QUERY
+select id from ice_trunc where id not in (11, 21);
+---- RESULTS
+12
+22
+---- TYPES
+INT
+====
+---- QUERY
+create table ice_day (ts timestamp, s string) partitioned by spec (day(ts))
+stored as iceberg;
+insert into ice_day values
+  ('2024-01-01 00:00:00', 'a'), ('2024-01-01 01:00:00', 'b'),
+  ('2024-02-02 00:00:00', 'c'), ('2024-02-02 01:00:00', 'd');
+select s from ice_day
+where ts != '2024-01-01 00:00:00' and ts != '2024-02-02 00:00:00';
+---- RESULTS
+'b'
+'d'
+---- TYPES
+STRING
+====

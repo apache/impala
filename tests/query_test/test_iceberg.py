@@ -1348,6 +1348,10 @@ class TestIcebergTable(IcebergTestSuite):
       self.run_test_case('QueryTest/iceberg-compound-predicate-push-down', vector,
                          use_db=unique_database)
 
+  def test_predicate_subsetting(self, vector, unique_database):
+    self.run_test_case('QueryTest/iceberg-predicate-subsetting', vector,
+                       use_db=unique_database)
+
   def test_plain_count_star_optimization(self, vector, unique_database):
       self.run_test_case('QueryTest/iceberg-plain-count-star-optimization', vector,
                          use_db=unique_database)
