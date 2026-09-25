@@ -81,13 +81,13 @@ export USE_AVRO_CPP=${USE_AVRO_CPP:=false}
 # moving to a different build of the toolchain, e.g. when a version is bumped or a
 # compile option is changed. The build id can be found in the output of the toolchain
 # build jobs, it is constructed from the build number and toolchain git hash prefix.
-export IMPALA_TOOLCHAIN_BUILD_ID_AARCH64=216-799855d147
-export IMPALA_TOOLCHAIN_BUILD_ID_X86_64=695-799855d147
+export IMPALA_TOOLCHAIN_BUILD_ID_AARCH64=224-b841447297
+export IMPALA_TOOLCHAIN_BUILD_ID_X86_64=701-b841447297
 export IMPALA_TOOLCHAIN_REPO=\
 ${IMPALA_TOOLCHAIN_REPO:-https://github.com/cloudera/native-toolchain.git}
 export IMPALA_TOOLCHAIN_BRANCH=${IMPALA_TOOLCHAIN_BRANCH:-master}
 export IMPALA_TOOLCHAIN_COMMIT_HASH=\
-${IMPALA_TOOLCHAIN_COMMIT_HASH-799855d147fbe682d76af6c31a91071f0002f298}
+${IMPALA_TOOLCHAIN_COMMIT_HASH-b841447297ae848de078720c794b60d4914922b0}
 # Compare the build ref in build IDs by removing everything up-to-and-including the
 # first hyphen.
 if [ "${IMPALA_TOOLCHAIN_BUILD_ID_AARCH64#*-}" \
@@ -119,7 +119,7 @@ export IMPALA_ABSEIL_CPP_VERSION=20250512.2
 unset IMPALA_ABSEIL_CPP_URL
 export IMPALA_BINUTILS_VERSION=2.42-p24
 unset IMPALA_BINUTILS_URL
-export IMPALA_BOOST_VERSION=1.91.0-p1
+export IMPALA_BOOST_VERSION=1.92.0-p1
 unset IMPALA_BOOST_URL
 export IMPALA_BREAKPAD_VERSION=e09741c609dcd5f5274d40182c5e2cc9a002d5ba-p3
 unset IMPALA_BREAKPAD_URL
@@ -222,7 +222,7 @@ if [[ $ARCH_NAME == 'aarch64' ]]; then
   export IMPALA_HADOOP_CLIENT_VERSION=3.3.6-p2
   unset IMPALA_HADOOP_CLIENT_URL
 fi
-export IMPALA_MOLD_VERSION=2.40.4
+export IMPALA_MOLD_VERSION=2.42.1
 unset IMPALA_MOLD_URL
 
 # Impala JDBC driver for testing.
