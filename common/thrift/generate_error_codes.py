@@ -514,7 +514,8 @@ error_codes = (
    "(PARQUET_ANNOTATE_STRINGS_UTF8=true). To write such values, disable the "
    "UTF-8 annotation (PARQUET_ANNOTATE_STRINGS_UTF8=false), or use a BINARY "
    "column instead of STRING. Note that Iceberg tables always annotate STRING "
-   "columns as UTF-8, so a BINARY column is required there.")
+   "columns as UTF-8, so a BINARY column is required there. To find the offending rows, "
+   "run SELECT * FROM <table> WHERE NOT is_valid_utf8($0).")
 )
 
 import sys

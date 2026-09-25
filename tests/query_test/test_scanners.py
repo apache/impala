@@ -1000,6 +1000,7 @@ class TestParquet(ImpalaTestSuite):
     err = self.execute_query_expect_failure(self.client, invalid,
         vector.get_value('exec_option'))
     assert "not valid UTF-8" in str(err)
+    assert "is_valid_utf8" in str(err)
 
     # The failed INSERT OVERWRITE must not have altered the table.
     result = self.execute_query("select s from %s" % qualified_table_name,
@@ -1015,6 +1016,13 @@ class TestParquet(ImpalaTestSuite):
     src_tbl = "%s.utf8_validation_src" % unique_database
     self.execute_query("create table %s (s string) stored as parquet" % src_tbl)
     self.execute_query("insert into %s values (unhex('ff'))" % src_tbl, opts)
+    self.execute_query("insert into %s values ('hello')" % src_tbl, opts)
+
+    # is_valid_utf8() finds the rows that fail the write-path validation.
+    result = self.execute_query(
+        "select count(*) from %s where not is_valid_utf8(s)" % src_tbl,
+        vector.get_value('exec_option'))
+    assert result.data == ['1']
 
     err = self.execute_query_expect_failure(self.client,
         "insert overwrite %s select s from %s" % (qualified_table_name, src_tbl),

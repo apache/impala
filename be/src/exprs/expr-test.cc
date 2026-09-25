@@ -11098,6 +11098,17 @@ TEST_P(ExprTest, Utf8Test) {
   TestValue("utf8_length('你好 hello 你好')", TYPE_INT, 11);
   TestValue("utf8_length('hello')", TYPE_INT, 5);
 
+  // Verifies is_valid_utf8() validates bytes. The invalid sequences use unhex() since
+  // they cannot be written as string literals in this UTF-8 encoded file.
+  TestIsNull("is_valid_utf8(NULL)", TYPE_BOOLEAN);
+  TestValue<bool>("is_valid_utf8('')", TYPE_BOOLEAN, true); // empty is valid
+  TestValue<bool>("is_valid_utf8('hello')", TYPE_BOOLEAN, true); // ascii
+  TestValue<bool>("is_valid_utf8('你好')", TYPE_BOOLEAN, true); // 3-byte chars
+  TestValue<bool>("is_valid_utf8(unhex('ff'))", TYPE_BOOLEAN, false); // never valid
+  TestValue<bool>("is_valid_utf8(unhex('ab'))", TYPE_BOOLEAN, false); // lone cont. byte
+  TestValue<bool>("is_valid_utf8(unhex('c328'))", TYPE_BOOLEAN, false); // bad 2nd byte
+  TestValue<bool>("is_valid_utf8(unhex('eda080'))", TYPE_BOOLEAN, false); // surrogate
+
   // Verifies position and length of utf8_substring() are UTF-8 aware.
   // '你' and '好' are both encoded into 3 bytes.
   TestStringValue("utf8_substring('Hello', 1)", "Hello");

@@ -131,6 +131,10 @@ under the License.
       </li>
 
       <li>
+        <xref href="#string_functions/is_valid_utf8">IS_VALID_UTF8</xref>
+      </li>
+
+      <li>
         <xref href="#string_functions/jaro_distance">JARO_DISTANCE, JARO_DIST</xref>
       </li>
 
@@ -692,6 +696,38 @@ select instr('foo bar bletch', 'b', 1, 2);
                 <codeph>NULL</codeph>, the function also returns
                 <codeph>NULL</codeph>.</li>
           </ul>
+        </dd>
+
+      </dlentry>
+
+      <dlentry id="is_valid_utf8" rev="IMPALA-15411">
+
+        <dt>
+          IS_VALID_UTF8(STRING str)
+        </dt>
+
+        <dd>
+          <b>Purpose:</b> Returns <codeph>true</codeph> if the argument is a valid UTF-8 encoded
+          string, <codeph>false</codeph> otherwise. Returns <codeph>NULL</codeph> if the argument
+          is <codeph>NULL</codeph>. An empty string is valid.
+          <p>
+            <b>Return type:</b> <codeph>BOOLEAN</codeph>
+          </p>
+
+          <p>
+            <b>Added in:</b> <keyword keyref="impala50"/>
+          </p>
+
+          <p conref="../shared/impala_common.xml#common/usage_notes_blurb"/>
+
+          <p>
+            This function validates bytes rather than characters, so its result does not depend on
+            the <codeph>UTF8_MODE</codeph> query option. It applies the same check as the Parquet
+            writer, so it can be used to locate values that would be rejected by the UTF-8
+            validation controlled by <xref keyref="parquet_annotate_strings_utf8"/>:
+          </p>
+
+<codeblock>SELECT * FROM t WHERE NOT is_valid_utf8(s);</codeblock>
         </dd>
 
       </dlentry>

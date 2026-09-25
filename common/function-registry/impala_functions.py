@@ -536,6 +536,7 @@ visible_functions = [
   [['char_length'], 'INT', ['STRING'], 'impala::StringFunctions::Length'],
   [['character_length'], 'INT', ['STRING'], 'impala::StringFunctions::Length'],
   [['utf8_length'], 'INT', ['STRING'], 'impala::StringFunctions::Utf8Length'],
+  [['is_valid_utf8'], 'BOOLEAN', ['STRING'], 'impala::StringFunctions::IsValidUtf8Builtin'],
   [['lower', 'lcase'], 'STRING', ['STRING'], 'impala::StringFunctions::Lower'],
   [['lower_ascii', 'lcase_ascii'], 'STRING', ['STRING'], 'impala::StringFunctions::LowerAscii'],
   [['lower_utf8', 'lcase_utf8'], 'STRING', ['STRING'], 'impala::StringFunctions::LowerUtf8'],

@@ -38,6 +38,7 @@
 #include "util/string-util.h"
 #include "util/ubsan.h"
 #include "util/url-parser.h"
+#include "util/utf8-util.h"
 
 #include "common/names.h"
 
@@ -288,6 +289,13 @@ static int CountUtf8Chars(uint8_t* ptr, int len) {
 IntVal StringFunctions::Utf8Length(FunctionContext* context, const StringVal& str) {
   if (str.is_null) return IntVal::null();
   return IntVal(CountUtf8Chars(str.ptr, str.len));
+}
+
+// Validates bytes, not characters, so it does not depend on UTF8_MODE.
+BooleanVal StringFunctions::IsValidUtf8Builtin(
+    FunctionContext* context, const StringVal& str) {
+  if (str.is_null) return BooleanVal::null();
+  return BooleanVal(IsValidUtf8(reinterpret_cast<const char*>(str.ptr), str.len));
 }
 
 // Marks as IR_ALWAYS_INLINE since this is called in MaskFunctions::MaskHash().

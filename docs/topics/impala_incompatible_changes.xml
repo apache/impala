@@ -79,7 +79,10 @@ under the License.
             column, or set <codeph>PARQUET_ANNOTATE_STRINGS_UTF8=false</codeph> to restore
             the previous behavior. Iceberg tables always annotate <codeph>STRING</codeph>
             columns as UTF-8 and cannot disable it, so a <codeph>BINARY</codeph> column is
-            required there.</p>
+            required there.</p><p>To find the affected rows, use the
+            <xref href="impala_string_functions.xml#string_functions/is_valid_utf8">IS_VALID_UTF8()</xref>
+            function, for example
+            <codeph>SELECT * FROM t WHERE NOT is_valid_utf8(s)</codeph>.</p>
             <note>Existing Iceberg tables that already contain non-UTF-8 bytes in
             <codeph>STRING</codeph> columns may start to fail on operations that rewrite
             data, such as <codeph>OPTIMIZE</codeph>, <codeph>UPDATE</codeph>, and

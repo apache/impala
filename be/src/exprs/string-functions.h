@@ -108,6 +108,8 @@ class StringFunctions {
   static IntVal Length(FunctionContext*, const StringVal& str);
   static IntVal CharLength(FunctionContext*, const StringVal& str);
   static IntVal Utf8Length(FunctionContext*, const StringVal& str);
+  /// Returns true if 'str' is valid UTF-8. Not affected by UTF8_MODE.
+  static BooleanVal IsValidUtf8Builtin(FunctionContext*, const StringVal& str);
   static StringVal Lower(FunctionContext*, const StringVal& str);
   static StringVal LowerAscii(FunctionContext*, const StringVal& str);
   static StringVal LowerUtf8(FunctionContext*, const StringVal& str);
