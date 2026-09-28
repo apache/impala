@@ -73,7 +73,9 @@ if (window.location.search.includes("imported")) {
       const sql_stmt_body = document.createElement("pre");
       sql_stmt_body.className = "code";
       const sql_code = sql_stmt_body.appendChild(document.createElement("code"))
-      sql_code.innerHTML = sql_query;
+      // The statement comes from a user supplied profile, it must not be interpreted as
+      // HTML. highlightBlock() escapes the text when it adds the highlighting markup.
+      sql_code.textContent = sql_query;
       tab_body.innerHTML = "";
       tab_body.appendChild(sql_stmt_body);
       hljs.highlightBlock(sql_stmt_body);

@@ -299,8 +299,10 @@ command line parameter.</p>
       "{{ __common__.host-url }}/www/scripts/queries/profileParseWorker.js");
   let query_processor_start_time, raw_total_size, compressed_total_size, upload_count;
 
+  // Adds a cell to 'row' that shows 'val' as text. The values of the imported queries
+  // come from user supplied profiles, so they must not be interpreted as HTML.
   function insertRowVal(row, val) {
-    row.insertCell().innerHTML = val;
+    row.insertCell().textContent = val;
   }
 
   function setScrollReload() {
@@ -407,15 +409,17 @@ command line parameter.</p>
         const row = imported_queries_table.insertRow();
         const query_link = document.createElement("a");
         query_link.href = `{{ __common__.host-url }}/query_timeline?query_id=${query.id}&imported=true`;
-        query_link.innerHTML = query.id;
-        insertRowVal(row, query_link.outerHTML);
+        query_link.textContent = query.id;
+        row.insertCell().appendChild(query_link);
         insertRowVal(row, query.user);
         insertRowVal(row, query.default_db);
         insertRowVal(row, query.type);
         insertRowVal(row, query.start_time);
         insertRowVal(row, query.end_time);
-        insertRowVal(row, `${query.bytes_read}
-          <hr style="margin-top:0px;margin-bottom:0px;"/>${query.bytes_sent}`);
+        const bytes_separator = document.createElement("hr");
+        bytes_separator.style.marginTop = "0px";
+        bytes_separator.style.marginBottom = "0px";
+        row.insertCell().append(query.bytes_read, bytes_separator, query.bytes_sent);
         insertRowVal(row, query.state);
         insertRowVal(row, query.rows_fetched);
         insertRowVal(row, query.resource_pool);
@@ -427,7 +431,7 @@ command line parameter.</p>
         deleteButton.value = "X";
         deleteButton.className = "btn btn-primary";
         deleteButton.setAttribute("onclick", "deleteProfile(this);");
-        insertRowVal(row, deleteButton.outerHTML);
+        row.insertCell().appendChild(deleteButton);
         cursor.continue();
       }
     };

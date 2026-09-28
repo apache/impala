@@ -139,6 +139,14 @@ const colours = ["#A9A9A9", "#FF8C00", "#8A2BE2", "#A52A2A", "#00008B", "#006400
 const cols_by_time = ["#000000", "#1A0500", "#330A00", "#4C0F00", "#661400", "#801A00",
                     "#991F00", "#B22400", "#CC2900", "#E62E00", "#FF3300", "#FF4719"];
 
+// Escapes text before it is interpolated into the HTML labels of the plan graph.
+// Plan node labels and details embed user supplied identifiers, e.g. table aliases,
+// which must be rendered as text instead of being interpreted as markup.
+function escapeHtml(text) {
+  return String(text).replace(/&/g, "&amp;").replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+}
+
 // Recursively build a list of edges and states that comprise the plan graph
 function build(node, parent, edges, states, colour_idx, max_node_time) {
   states.push({ "name": node["label"],
@@ -209,15 +217,19 @@ function renderGraph(ignored_arg) {
   // Keep a map of names to states for use when processing edges.
   const states_by_name = { }
   states.forEach((state) => {
-    // Build the label for the node from the name and the detail
-    let html = "<span>" + state.name + "</span><br/>";
-    html += "<span>" + state.detail + "</span><br/>";
-    html += "<span>" + state.num_instances + " instance";
+    // Build the label for the node from the name and the detail. Dagre-D3 inserts
+    // this label as HTML, so every interpolated value must be escaped: the label
+    // detail of a scan node contains the table alias, which is arbitrary user
+    // supplied text.
+    let html = "<span>" + escapeHtml(state.name) + "</span><br/>";
+    html += "<span>" + escapeHtml(state.detail) + "</span><br/>";
+    html += "<span>" + escapeHtml(state.num_instances) + " instance";
     if (state.num_instances > 1) {
       html += "s";
     }
     html += "</span><br/>";
-    html += "<span>Max: " + state.max_time + ", avg: " + state.avg_time + "</span>";
+    html += "<span>Max: " + escapeHtml(state.max_time) + ", avg: "
+        + escapeHtml(state.avg_time) + "</span>";
 
     let style = state.style;
 
