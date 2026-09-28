@@ -911,7 +911,8 @@ Status JWTHelper::Verify(const JWTDecodedToken* decoded_token) const {
     return Status(TErrorCode::JWT_VERIFY_FAILED, "Unsecured JWT");
   } else if (jwks_mgr_ == nullptr) {
     // Skip to signature validation if JWKS file or url is not specified.
-    return Status::OK();
+    return Status(TErrorCode::NOT_IMPLEMENTED_ERROR,
+        "Token auth not supported on this daemon.");
   }
 
   JWKSSnapshotPtr jwks = GetJWKS();
