@@ -92,6 +92,23 @@ public class IcebergPartitionField extends StmtNode {
     transform_.analyze(analyzer);
   }
 
+  /**
+   * Checks that this field's transform can be applied to a source column of type
+   * 'sourceType'. UUID source columns support IDENTITY, BUCKET, and VOID transforms.
+   */
+  public void analyzeSourceType(Type sourceType) throws AnalysisException {
+    if (!sourceType.isUuid()) return;
+    TIcebergPartitionTransformType transformType = getTransformType();
+    if (transformType == TIcebergPartitionTransformType.IDENTITY
+        || transformType == TIcebergPartitionTransformType.BUCKET
+        || transformType == TIcebergPartitionTransformType.VOID) {
+      return;
+    }
+    throw new AnalysisException(String.format("Partition transform %s is not " +
+        "supported on UUID column '%s'. Only IDENTITY, BUCKET, and VOID transforms " +
+        "are supported on UUID columns.", transformType, origFieldName_));
+  }
+
   @Override
   public final String toSql() {
     return toSql(ToSqlOptions.DEFAULT);

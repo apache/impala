@@ -272,3 +272,115 @@ SELECT id, uuid_col FROM ti_uuid_mixed_avro ORDER BY id
 ---- CATCH
 Reading UUID columns from AVRO format is not yet supported
 ====
+---- TRINO_QUERY
+# Partition evolution: start with identity partitioning on uuid_col.
+CREATE TABLE ti_uuid_part_evolve (id integer, uuid_col uuid, name varchar)
+WITH (format_version=3, format='PARQUET', partitioning = ARRAY['uuid_col']);
+INSERT INTO ti_uuid_part_evolve VALUES
+  (1, UUID '12345678-1234-5678-1234-567812345678', 'identity_alice'),
+  (2, UUID 'abcdefab-cdef-abcd-efab-cdefabcdefab', 'identity_bob');
+# Evolve to bucket(4, uuid_col).
+ALTER TABLE ti_uuid_part_evolve SET PROPERTIES partitioning = ARRAY['bucket(uuid_col, 4)'];
+INSERT INTO ti_uuid_part_evolve VALUES
+  (3, UUID 'ffffffff-ffff-ffff-ffff-ffffffffffff', 'bucket_max'),
+  (4, NULL, 'bucket_null');
+# Same UUID as row 2, written under the bucket spec.
+INSERT INTO ti_uuid_part_evolve VALUES
+  (5, UUID 'abcdefab-cdef-abcd-efab-cdefabcdefab', 'bucket_bob');
+====
+---- QUERY
+# Impala reads rows written under both the identity and bucket partition specs.
+INVALIDATE METADATA ti_uuid_part_evolve;
+SELECT id, uuid_col, name FROM ti_uuid_part_evolve ORDER BY id;
+---- RESULTS
+1,'12345678-1234-5678-1234-567812345678','identity_alice'
+2,'abcdefab-cdef-abcd-efab-cdefabcdefab','identity_bob'
+3,'ffffffff-ffff-ffff-ffff-ffffffffffff','bucket_max'
+4,'NULL','bucket_null'
+5,'abcdefab-cdef-abcd-efab-cdefabcdefab','bucket_bob'
+---- TYPES
+INT,UUID,STRING
+---- HS2_TYPES
+INT,STRING,STRING
+====
+---- QUERY
+# Both partition specs are visible after evolution. Rows 3 and 5 were written by separate
+# INSERTs into bucket 2.
+SHOW PARTITIONS ti_uuid_part_evolve
+---- RESULTS
+'{"uuid_col":"12345678-1234-5678-1234-567812345678"}',1,1
+'{"uuid_col":"abcdefab-cdef-abcd-efab-cdefabcdefab"}',1,1
+'{"uuid_col_bucket":"2"}',2,2
+'{"uuid_col_bucket":null}',1,1
+---- TYPES
+STRING,BIGINT,BIGINT
+====
+---- QUERY
+# Equality on the UUID source column matches rows from both partition specs.
+SELECT id FROM ti_uuid_part_evolve
+WHERE uuid_col = CAST('abcdefab-cdef-abcd-efab-cdefabcdefab' AS UUID)
+ORDER BY id
+---- RESULTS
+2
+5
+---- TYPES
+INT
+====
+---- QUERY
+# UUID value predicates are evaluated in the scan, not pushed to Iceberg.
+SELECT id FROM ti_uuid_part_evolve
+WHERE uuid_col > CAST('20000000-0000-0000-0000-000000000000' AS UUID)
+ORDER BY id
+---- RESULTS
+2
+3
+5
+---- TYPES
+INT
+====
+---- QUERY
+SELECT id FROM ti_uuid_part_evolve WHERE uuid_col IS NULL
+---- RESULTS
+4
+---- TYPES
+INT
+====
+---- TRINO_QUERY
+# Identity-partitioned table: one INSERT writes a single manifest whose partition summary
+# spans UUIDs on both sides of the signed-long sign bit.
+CREATE TABLE ti_uuid_identity_drop (id integer, uuid_col uuid, name varchar)
+WITH (format_version=3, format='PARQUET', partitioning = ARRAY['uuid_col']);
+INSERT INTO ti_uuid_identity_drop VALUES
+  (1, UUID '12345678-1234-5678-1234-567812345678', 'positive'),
+  (2, UUID '80000000-0000-0000-0000-000000000000', 'sign_bit'),
+  (3, UUID 'ffffffff-ffff-ffff-ffff-ffffffffffff', 'max');
+====
+---- QUERY
+# Impala reads the Trino-written identity partitions.
+INVALIDATE METADATA ti_uuid_identity_drop;
+SHOW PARTITIONS ti_uuid_identity_drop
+---- RESULTS
+'{"uuid_col":"12345678-1234-5678-1234-567812345678"}',1,1
+'{"uuid_col":"80000000-0000-0000-0000-000000000000"}',1,1
+'{"uuid_col":"ffffffff-ffff-ffff-ffff-ffffffffffff"}',1,1
+---- TYPES
+STRING,BIGINT,BIGINT
+====
+---- QUERY
+# Trino builds the manifest summary with Iceberg's signed UUID comparator, so manifest
+# pruning keeps the partition of ffffffff-..., which is negative as a signed long.
+ALTER TABLE ti_uuid_identity_drop
+DROP PARTITION (uuid_col = CAST('ffffffff-ffff-ffff-ffff-ffffffffffff' AS UUID))
+---- RESULTS
+'Dropped 1 partition(s)'
+---- TYPES
+STRING
+====
+---- QUERY
+SHOW PARTITIONS ti_uuid_identity_drop
+---- RESULTS
+'{"uuid_col":"12345678-1234-5678-1234-567812345678"}',1,1
+'{"uuid_col":"80000000-0000-0000-0000-000000000000"}',1,1
+---- TYPES
+STRING,BIGINT,BIGINT
+====

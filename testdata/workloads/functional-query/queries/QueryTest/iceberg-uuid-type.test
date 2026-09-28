@@ -743,3 +743,279 @@ COMPUTE STATS iceberg_uuid_test (id)
 ---- TYPES
 STRING
 ====
+---- QUERY
+# Table partitioned by identity(uuid_identity) and bucket(4, uuid_bucket).
+SELECT id, uuid_identity, uuid_bucket FROM iceberg_uuid_test_part ORDER BY id
+---- RESULTS
+1,'00000000-0000-0000-0000-000000000000','00000000-0000-0000-0000-000000000000'
+2,'ffffffff-ffff-ffff-ffff-ffffffffffff','ffffffff-ffff-ffff-ffff-ffffffffffff'
+3,'12345678-1234-5678-1234-567812345678','12345678-1234-5678-1234-567812345678'
+4,'12345678-1234-5678-1234-567812345678','80000000-0000-0000-0000-000000000000'
+5,'NULL','NULL'
+---- TYPES
+INT,UUID,UUID
+---- HS2_TYPES
+INT,STRING,STRING
+====
+---- QUERY
+# Identity partition values are the canonical UUID strings. Rows 3 and 4 share one data
+# file whose uuid_bucket values (12345678-... and 80000000-...) are on opposite sides of
+# the signed-long sign bit.
+SHOW PARTITIONS iceberg_uuid_test_part
+---- RESULTS
+'{"uuid_identity":"00000000-0000-0000-0000-000000000000","uuid_bucket_bucket":"0"}',1,1
+'{"uuid_identity":"12345678-1234-5678-1234-567812345678","uuid_bucket_bucket":"1"}',2,1
+'{"uuid_identity":"ffffffff-ffff-ffff-ffff-ffffffffffff","uuid_bucket_bucket":"2"}',1,1
+'{"uuid_identity":null,"uuid_bucket_bucket":null}',1,1
+---- TYPES
+STRING,BIGINT,BIGINT
+====
+---- QUERY
+SHOW CREATE TABLE iceberg_uuid_test_part
+---- RESULTS: VERIFY_IS_SUBSET
+row_regex: .*PARTITIONED BY SPEC.*uuid_identity.*BUCKET\(4. uuid_bucket\).*
+---- TYPES
+STRING
+====
+---- QUERY
+SELECT id FROM iceberg_uuid_test_part
+WHERE uuid_identity = CAST('12345678-1234-5678-1234-567812345678' AS UUID)
+ORDER BY id
+---- RESULTS
+3
+4
+---- TYPES
+INT
+====
+---- QUERY
+# Range predicates use unsigned UUID order: ffffffff-... is negative as a signed long.
+SELECT id FROM iceberg_uuid_test_part
+WHERE uuid_identity > CAST('20000000-0000-0000-0000-000000000000' AS UUID)
+ORDER BY id
+---- RESULTS
+2
+---- TYPES
+INT
+====
+---- QUERY
+SELECT id FROM iceberg_uuid_test_part WHERE uuid_identity IS NULL ORDER BY id
+---- RESULTS
+5
+---- TYPES
+INT
+====
+---- QUERY
+# The next three predicates hit the data file shared by rows 3 and 4. Its unsigned
+# min/max bounds are misordered under Iceberg's signed UUID comparison, so Iceberg would
+# skip the file if these predicates were pushed down.
+SELECT id FROM iceberg_uuid_test_part
+WHERE uuid_bucket = CAST('12345678-1234-5678-1234-567812345678' AS UUID)
+---- RESULTS
+3
+---- TYPES
+INT
+====
+---- QUERY
+SELECT id FROM iceberg_uuid_test_part
+WHERE uuid_bucket IN (CAST('12345678-1234-5678-1234-567812345678' AS UUID),
+                      CAST('80000000-0000-0000-0000-000000000000' AS UUID))
+ORDER BY id
+---- RESULTS
+3
+4
+---- TYPES
+INT
+====
+---- QUERY
+# ffffffff-... and 80000000-... are negative as signed longs, so a signed comparison
+# would return no rows.
+SELECT id FROM iceberg_uuid_test_part
+WHERE uuid_bucket > CAST('20000000-0000-0000-0000-000000000000' AS UUID)
+ORDER BY id
+---- RESULTS
+2
+4
+---- TYPES
+INT
+====
+---- QUERY
+# UUID value predicates stay in the scan and Iceberg prunes no data files.
+EXPLAIN SELECT id FROM iceberg_uuid_test_part
+WHERE uuid_bucket = CAST('12345678-1234-5678-1234-567812345678' AS UUID);
+---- RESULTS: VERIFY_IS_SUBSET
+row_regex: .*HDFS partitions=4/4 files=4 .*
+row_regex: .*   predicates: uuid_bucket = ''12345678-1234-5678-1234-567812345678''.*
+---- TYPES
+STRING
+====
+---- QUERY
+# IS NULL does not compare UUID values, so it is pushed to Iceberg and prunes partitions.
+EXPLAIN SELECT id FROM iceberg_uuid_test_part WHERE uuid_identity IS NULL;
+---- RESULTS: VERIFY_IS_SUBSET
+row_regex: .*HDFS partitions=1/4 files=1 .*
+row_regex: .*skipped Iceberg predicates: uuid_identity IS NULL.*
+---- TYPES
+STRING
+====
+---- QUERY
+# SHOW PARTITIONS WHERE with an identity UUID = filter. All partitions are in one
+# manifest whose signed uuid_identity summary is [ffffffff-..., 12345678-...], so
+# Iceberg must not prune it for values on either side of the sign bit.
+SHOW PARTITIONS iceberg_uuid_test_part
+WHERE uuid_identity = CAST('00000000-0000-0000-0000-000000000000' AS UUID)
+---- RESULTS
+'{"uuid_identity":"00000000-0000-0000-0000-000000000000","uuid_bucket_bucket":"0"}',1,1
+---- TYPES
+STRING,BIGINT,BIGINT
+====
+---- QUERY
+SHOW PARTITIONS iceberg_uuid_test_part
+WHERE uuid_identity = CAST('ffffffff-ffff-ffff-ffff-ffffffffffff' AS UUID)
+---- RESULTS
+'{"uuid_identity":"ffffffff-ffff-ffff-ffff-ffffffffffff","uuid_bucket_bucket":"2"}',1,1
+---- TYPES
+STRING,BIGINT,BIGINT
+====
+---- QUERY
+SHOW PARTITIONS iceberg_uuid_test_part
+WHERE uuid_identity IN (CAST('00000000-0000-0000-0000-000000000000' AS UUID),
+                        CAST('12345678-1234-5678-1234-567812345678' AS UUID))
+---- RESULTS
+'{"uuid_identity":"00000000-0000-0000-0000-000000000000","uuid_bucket_bucket":"0"}',1,1
+'{"uuid_identity":"12345678-1234-5678-1234-567812345678","uuid_bucket_bucket":"1"}',2,1
+---- TYPES
+STRING,BIGINT,BIGINT
+====
+---- QUERY
+# Iceberg matches the NULL partition for != and NOT IN.
+SHOW PARTITIONS iceberg_uuid_test_part
+WHERE uuid_identity != CAST('00000000-0000-0000-0000-000000000000' AS UUID)
+---- RESULTS
+'{"uuid_identity":"12345678-1234-5678-1234-567812345678","uuid_bucket_bucket":"1"}',2,1
+'{"uuid_identity":"ffffffff-ffff-ffff-ffff-ffffffffffff","uuid_bucket_bucket":"2"}',1,1
+'{"uuid_identity":null,"uuid_bucket_bucket":null}',1,1
+---- TYPES
+STRING,BIGINT,BIGINT
+====
+---- QUERY
+SHOW PARTITIONS iceberg_uuid_test_part
+WHERE uuid_identity NOT IN (CAST('00000000-0000-0000-0000-000000000000' AS UUID),
+                            CAST('12345678-1234-5678-1234-567812345678' AS UUID))
+---- RESULTS
+'{"uuid_identity":"ffffffff-ffff-ffff-ffff-ffffffffffff","uuid_bucket_bucket":"2"}',1,1
+'{"uuid_identity":null,"uuid_bucket_bucket":null}',1,1
+---- TYPES
+STRING,BIGINT,BIGINT
+====
+---- QUERY
+SHOW PARTITIONS iceberg_uuid_test_part
+WHERE uuid_identity > CAST('20000000-0000-0000-0000-000000000000' AS UUID)
+---- CATCH
+UUID values can only be used with =, !=, IN or NOT IN on columns that are identity partitioned in every partition spec
+====
+---- QUERY
+# SHOW FILES PARTITION with an identity UUID = filter returns one data file.
+SHOW FILES IN iceberg_uuid_test_part
+PARTITION (uuid_identity = CAST('00000000-0000-0000-0000-000000000000' AS UUID))
+---- RESULTS
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/iceberg_uuid_test_part/data/uuid_identity=00000000-0000-0000-0000-000000000000/.*\.parquet','.*','','$ERASURECODE_POLICY'
+---- TYPES
+STRING,STRING,STRING,STRING
+====
+---- QUERY
+SHOW FILES IN iceberg_uuid_test_part
+PARTITION (uuid_identity IN (CAST('00000000-0000-0000-0000-000000000000' AS UUID),
+                             CAST('ffffffff-ffff-ffff-ffff-ffffffffffff' AS UUID)))
+---- RESULTS
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/iceberg_uuid_test_part/data/uuid_identity=00000000-0000-0000-0000-000000000000/.*\.parquet','.*','','$ERASURECODE_POLICY'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/iceberg_uuid_test_part/data/uuid_identity=ffffffff-ffff-ffff-ffff-ffffffffffff/.*\.parquet','.*','','$ERASURECODE_POLICY'
+---- TYPES
+STRING,STRING,STRING,STRING
+====
+---- QUERY
+SHOW FILES IN iceberg_uuid_test_part
+PARTITION (uuid_identity != CAST('00000000-0000-0000-0000-000000000000' AS UUID))
+---- RESULTS
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/iceberg_uuid_test_part/data/uuid_identity=12345678-1234-5678-1234-567812345678/.*\.parquet','.*','','$ERASURECODE_POLICY'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/iceberg_uuid_test_part/data/uuid_identity=ffffffff-ffff-ffff-ffff-ffffffffffff/.*\.parquet','.*','','$ERASURECODE_POLICY'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/iceberg_uuid_test_part/data/uuid_identity=null/.*\.parquet','.*','','$ERASURECODE_POLICY'
+---- TYPES
+STRING,STRING,STRING,STRING
+====
+---- QUERY
+SHOW FILES IN iceberg_uuid_test_part
+PARTITION (uuid_identity NOT IN (CAST('00000000-0000-0000-0000-000000000000' AS UUID),
+                                 CAST('12345678-1234-5678-1234-567812345678' AS UUID)))
+---- RESULTS
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/iceberg_uuid_test_part/data/uuid_identity=ffffffff-ffff-ffff-ffff-ffffffffffff/.*\.parquet','.*','','$ERASURECODE_POLICY'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/iceberg_uuid_test_part/data/uuid_identity=null/.*\.parquet','.*','','$ERASURECODE_POLICY'
+---- TYPES
+STRING,STRING,STRING,STRING
+====
+---- QUERY
+SHOW FILES IN iceberg_uuid_test_part
+PARTITION (uuid_identity > CAST('20000000-0000-0000-0000-000000000000' AS UUID))
+---- CATCH
+UUID values can only be used with =, !=, IN or NOT IN on columns that are identity partitioned in every partition spec
+====
+---- QUERY
+# A bucket partition filter compares INT bucket numbers, so it converts to an Iceberg
+# expression. Bucket 3 has no data files.
+ALTER TABLE iceberg_uuid_test_part DROP PARTITION (bucket(4, uuid_bucket) = 3)
+---- CATCH
+No matching partition(s) found
+====
+---- QUERY
+# An identity UUID partition filter with no matching partition.
+ALTER TABLE iceberg_uuid_test_part
+DROP PARTITION (uuid_identity = CAST('22222222-2222-2222-2222-222222222222' AS UUID))
+---- CATCH
+No matching partition(s) found
+====
+---- QUERY
+# Range predicates on UUID identity partitions are rejected.
+ALTER TABLE iceberg_uuid_test_part
+DROP PARTITION (uuid_identity > CAST('20000000-0000-0000-0000-000000000000' AS UUID))
+---- CATCH
+UUID values can only be used with =, !=, IN or NOT IN on columns that are identity partitioned in every partition spec
+====
+---- QUERY
+# IN with two UUID literals drops both matching identity partitions. This runs first,
+# while the single manifest's signed uuid_identity summary is [ffffffff-..., 12345678-...].
+ALTER TABLE iceberg_uuid_test_part
+DROP PARTITION (uuid_identity IN (CAST('ffffffff-ffff-ffff-ffff-ffffffffffff' AS UUID),
+                                  CAST('00000000-0000-0000-0000-000000000000' AS UUID)))
+====
+---- QUERY
+SHOW PARTITIONS iceberg_uuid_test_part
+---- RESULTS
+'{"uuid_identity":"12345678-1234-5678-1234-567812345678","uuid_bucket_bucket":"1"}',2,1
+'{"uuid_identity":null,"uuid_bucket_bucket":null}',1,1
+---- TYPES
+STRING,BIGINT,BIGINT
+====
+---- QUERY
+# Drop the bucket=1 partition (uuid_identity=12345678-...).
+ALTER TABLE iceberg_uuid_test_part DROP PARTITION (bucket(4, uuid_bucket) = 1)
+====
+---- QUERY
+SHOW PARTITIONS iceberg_uuid_test_part
+---- RESULTS
+'{"uuid_identity":null,"uuid_bucket_bucket":null}',1,1
+---- TYPES
+STRING,BIGINT,BIGINT
+====
+---- QUERY
+CREATE TABLE uuid_spec_evolution (i INT, u UUID)
+PARTITIONED BY SPEC (BUCKET(4, u)) STORED AS ICEBERG
+====
+---- QUERY
+ALTER TABLE uuid_spec_evolution SET PARTITION SPEC (u)
+====
+---- QUERY
+# u was bucket-partitioned in an older spec, so UUID values are rejected.
+ALTER TABLE uuid_spec_evolution
+DROP PARTITION (u = CAST('12345678-1234-5678-1234-567812345678' AS UUID))
+---- CATCH
+UUID values can only be used with =, !=, IN or NOT IN on columns that are identity partitioned in every partition spec
+====

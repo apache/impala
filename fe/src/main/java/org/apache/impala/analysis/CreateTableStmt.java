@@ -863,16 +863,17 @@ public class CreateTableStmt extends StatementBase implements SingleTableStmt {
     Preconditions.checkState(fields != null && !fields.isEmpty());
     for (IcebergPartitionField field : fields) {
       String fieldName = field.getFieldName();
-      boolean containFlag = false;
+      ColumnDef sourceColumnDef = null;
       for (ColumnDef columnDef : tableDef_.getColumnDefs()) {
         if (columnDef.getColName().equalsIgnoreCase(fieldName)) {
-          containFlag = true;
+          sourceColumnDef = columnDef;
           break;
         }
       }
-      if (!containFlag) {
+      if (sourceColumnDef == null) {
         throw new AnalysisException("Cannot find source column: " + fieldName);
       }
+      field.analyzeSourceType(sourceColumnDef.getType());
     }
   }
 

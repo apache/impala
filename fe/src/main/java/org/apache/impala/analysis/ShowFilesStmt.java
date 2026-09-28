@@ -161,7 +161,7 @@ public class ShowFilesStmt extends StatementBase implements SingleTableStmt {
               table.getIcebergApiTable().spec());
       // For Impala expression to Iceberg expression conversion
       IcebergPredicateConverter converter =
-          new IcebergPartitionPredicateConverter(table.getIcebergSchema(), analyzer);
+          new IcebergPartitionPredicateConverter(table, analyzer);
 
       for (Expr expr : partitionSet_.getPartitionExprs()) {
         expr = rewriter.rewrite(expr);

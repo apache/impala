@@ -91,6 +91,7 @@ public class AlterTableSetPartitionSpecStmt extends AlterTableStmt {
             "Source column '%s' in table %s must be a primitive type",
             partField.getFieldName(), table.getTableName()));
       }
+      partField.analyzeSourceType(col.getType());
     }
   }
 }

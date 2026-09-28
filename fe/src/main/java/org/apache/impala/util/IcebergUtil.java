@@ -2135,6 +2135,14 @@ public class IcebergUtil {
     //                           files  files
     // Later PARTITION KEY SCAN could be a UNION NODE that produces the partition keys,
     // see SingleNodePlanner.createOptimizedPartitionUnionNode().
+    return isIdentityPartitionedInAllSpecs(table, column);
+  }
+
+  /**
+   * Returns true if 'column' is identity partitioned in every partition spec of 'table'.
+   */
+  public static boolean isIdentityPartitionedInAllSpecs(FeIcebergTable table,
+      IcebergColumn column) {
     for (IcebergPartitionSpec spec : table.getPartitionSpecs()) {
       if (IcebergUtil.getPartitionTransformType(column, spec) !=
           TIcebergPartitionTransformType.IDENTITY) {

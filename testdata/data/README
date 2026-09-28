@@ -1032,6 +1032,26 @@ Generated using the Iceberg Java API.
 UUID values are stored as Avro fixed(16) with logicalType=uuid.
 Used to verify Avro UUID reads are rejected until a later patch.
 
+iceberg_test/iceberg_uuid/iceberg_uuid_test_part:
+Iceberg V3 Parquet table for UUID partition transform tests.
+Generated using the Iceberg Java API (version 1.11.0).
+Columns: id (int), uuid_identity (uuid), uuid_bucket (uuid).
+Partition spec: identity(uuid_identity), bucket(4, uuid_bucket).
+Rows (uuid_identity, uuid_bucket, bucket):
+  1: 00000000-0000-0000-0000-000000000000 for both (bucket 0): minimum value
+  2: ffffffff-ffff-ffff-ffff-ffffffffffff for both (bucket 2): maximum value, negative
+     as a signed long
+  3: 12345678-1234-5678-1234-567812345678 for both (bucket 1): non-uniform bytes, so
+     byte-order mistakes are visible
+  4: 12345678-1234-5678-1234-567812345678, 80000000-0000-0000-0000-000000000000
+     (bucket 1): smallest negative signed value, in the same data file as row 3
+  5: NULL for both (null partition values)
+Bucket numbers are computed by Iceberg (Murmur3 over the 16 big-endian UUID bytes).
+All four data files are added in a single append, so one manifest holds every
+partition. Its uuid_identity summary, built with Iceberg's signed UUID comparator,
+spans the sign bit: lower ffffffff-ffff-ffff-ffff-ffffffffffff, upper
+12345678-1234-5678-1234-567812345678.
+
 iceberg_v2_positional_delete_all_rows:
 iceberg_v2_positional_delete_all_rows_orc:
 Created similarly to iceberg_v2_no_deletes.

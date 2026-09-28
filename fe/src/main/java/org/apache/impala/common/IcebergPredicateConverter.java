@@ -152,12 +152,11 @@ public class IcebergPredicateConverter {
   protected ConverterResult convert(BinaryPredicate predicate) {
     try {
       Term term = getTerm(predicate.getChild(0));
-      IcebergColumn column = term.referencedColumn_;
 
       LiteralExpr literal = getSecondChildAsLiteralExpr(predicate);
       checkNullLiteral(literal);
       Operation op = getOperation(predicate);
-      Object value = getIcebergValue(column, literal);
+      Object value = getIcebergValue(term, op, literal);
 
       List<Object> literals = Collections.singletonList(value);
       Expression iceExpr = Expressions.predicate(op, term.term_, literals);
@@ -170,9 +169,9 @@ public class IcebergPredicateConverter {
   protected ConverterResult convert(InPredicate predicate) {
     try {
       Term term = getTerm(predicate.getChild(0));
-      IcebergColumn column = term.referencedColumn_;
       // Expressions takes a list of values as Objects
       List<Object> values = new ArrayList<>();
+      Operation op = predicate.isNotIn() ? Operation.NOT_IN : Operation.IN;
       for (int i = 1; i < predicate.getChildren().size(); ++i) {
         if (!Expr.IS_LITERAL.apply(predicate.getChild(i))) {
           return new ConverterResult(ConversionStatus.FAILED,
@@ -181,7 +180,7 @@ public class IcebergPredicateConverter {
         }
         LiteralExpr literal = (LiteralExpr) predicate.getChild(i);
         checkNullLiteral(literal);
-        Object value = getIcebergValue(column, literal);
+        Object value = getIcebergValue(term, op, literal);
         values.add(value);
       }
 
@@ -437,8 +436,9 @@ public class IcebergPredicateConverter {
     }
   }
 
-  protected Object getIcebergValue(IcebergColumn column, LiteralExpr literal)
+  protected Object getIcebergValue(Term term, Operation op, LiteralExpr literal)
       throws ImpalaRuntimeException {
+    IcebergColumn column = term.referencedColumn_;
     PrimitiveType primitiveType = literal.getType().getPrimitiveType();
     switch (primitiveType) {
       case BOOLEAN: return ((BoolLiteral) literal).getValue();
@@ -448,6 +448,7 @@ public class IcebergPredicateConverter {
       case BIGINT: return ((NumericLiteral) literal).getLongValue();
       case FLOAT: return (float) ((NumericLiteral) literal).getDoubleValue();
       case DOUBLE: return ((NumericLiteral) literal).getDoubleValue();
+      case UUID: return getIcebergUuidValue(term, op, (StringLiteral) literal);
       case STRING:
       case DATETIME:
       case CHAR: return ((StringLiteral) literal).getUnescapedValue();
@@ -463,6 +464,21 @@ public class IcebergPredicateConverter {
                 literal.getStringValue(), primitiveType));
       }
     }
+  }
+
+  /**
+   * Returns the Iceberg value for a UUID literal. Subclasses may override this to allow
+   * UUID value conversion in contexts where it is safe, such as metadata-only operations.
+   */
+  protected Object getIcebergUuidValue(Term term, Operation op, StringLiteral literal)
+      throws ImpalaRuntimeException {
+    // The Iceberg Java library compares UUIDs as signed longs, but Parquet min/max bounds
+    // use unsigned byte order, so Iceberg could skip data files that contain matching
+    // rows. This is a bug in the Java library, not in the Iceberg spec.
+    // TODO: IMPALA-15476: push down = and IN on columns that are identity partitioned in
+    // every spec, and derived bucket(N, col) = <hash> predicates, which are safe.
+    throw new ImpalaRuntimeException(
+        "UUID values cannot be converted to Iceberg expressions");
   }
 
   /**

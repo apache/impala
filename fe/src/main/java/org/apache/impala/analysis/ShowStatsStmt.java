@@ -291,7 +291,7 @@ public class ShowStatsStmt extends StatementBase implements SingleTableStmt {
       // Convert the Impala expression to an Iceberg expression
       // BoolLiterals are handled by the converter and optimized in getPartitionStats
       IcebergPartitionPredicateConverter converter =
-          new IcebergPartitionPredicateConverter(table.getIcebergSchema(), analyzer);
+          new IcebergPartitionPredicateConverter(table, analyzer);
       IcebergPredicateConverter.ConverterResult result = converter.convert(foldedExpr);
 
       if (result.isFailed()) {

@@ -84,9 +84,17 @@ class TestIcebergTable(IcebergTestSuite):
   def test_iceberg_binary_type(self, vector, unique_database):
     self.run_test_case('QueryTest/iceberg-binary-type', vector, use_db=unique_database)
 
-  def test_iceberg_uuid_type(self, vector):
-    self.run_test_case('QueryTest/iceberg-uuid-type', vector,
-        use_db="functional_parquet")
+  def test_iceberg_uuid_type(self, vector, unique_database):
+    uuid_fixture_dir = "${IMPALA_HOME}/testdata/data/iceberg_test/iceberg_uuid"
+    create_iceberg_table_from_directory(self.client, unique_database,
+        "iceberg_uuid_test", "parquet", table_location=uuid_fixture_dir)
+    create_iceberg_table_from_directory(self.client, unique_database,
+        "iceberg_uuid_test_orc", "orc", table_location=uuid_fixture_dir)
+    create_iceberg_table_from_directory(self.client, unique_database,
+        "iceberg_uuid_test_avro", "avro", table_location=uuid_fixture_dir)
+    create_iceberg_table_from_directory(self.client, unique_database,
+        "iceberg_uuid_test_part", "parquet", table_location=uuid_fixture_dir)
+    self.run_test_case('QueryTest/iceberg-uuid-type', vector, use_db=unique_database)
 
   def test_utf8_string_validation(self, unique_database):
     """IMPALA-12675: Iceberg always annotates STRING as UTF-8, so writing non-UTF-8 bytes

@@ -5283,6 +5283,48 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
         "PARTITIONED BY SPEC (BUCKET(10, p1), DAY(10, p2)) STORED AS ICEBERG" +
         tblProperties,
         "Only BUCKET and TRUNCATE partition transforms accept a parameter.");
+
+    // UUID source columns support IDENTITY, BUCKET, and VOID transforms.
+    AnalyzesOk("CREATE TABLE tbl1 (i int, u uuid) PARTITIONED BY SPEC (u) " +
+        "STORED AS ICEBERG" + tblProperties);
+    AnalyzesOk("CREATE TABLE tbl1 (i int, u uuid) PARTITIONED BY SPEC (BUCKET(4, u)) " +
+        "STORED AS ICEBERG" + tblProperties);
+    AnalyzesOk("CREATE TABLE tbl1 (i int, u uuid) PARTITIONED BY SPEC (VOID(u)) " +
+        "STORED AS ICEBERG" + tblProperties);
+    AnalyzesOk("CREATE TABLE tbl1 (i int, u uuid) " +
+        "PARTITIONED BY SPEC (u, BUCKET(4, u), TRUNCATE(4, i)) " +
+        "STORED AS ICEBERG" + tblProperties);
+    String[][] rejectedUuidTransforms = new String[][] {
+        {"YEAR(u)", "YEAR"}, {"MONTH(u)", "MONTH"}, {"DAY(u)", "DAY"},
+        {"HOUR(u)", "HOUR"}, {"TRUNCATE(4, u)", "TRUNCATE"}};
+    String uuidTransformError =
+        "Partition transform %s is not supported on UUID column '%s'. Only IDENTITY, "
+        + "BUCKET, and VOID transforms are supported on UUID columns.";
+    for (String[] transform : rejectedUuidTransforms) {
+      AnalysisError("CREATE TABLE tbl1 (i int, u uuid) PARTITIONED BY SPEC (" +
+          transform[0] + ") STORED AS ICEBERG" + tblProperties,
+          String.format(uuidTransformError, transform[1], "u"));
+      AnalysisError("ALTER TABLE functional_parquet.iceberg_uuid_test " +
+          "SET PARTITION SPEC (" + transform[0].replace("u)", "uuid_col)") + ")",
+          String.format(uuidTransformError, transform[1], "uuid_col"));
+    }
+    AnalyzesOk("ALTER TABLE functional_parquet.iceberg_uuid_test " +
+        "SET PARTITION SPEC (uuid_col)");
+    AnalyzesOk("ALTER TABLE functional_parquet.iceberg_uuid_test " +
+        "SET PARTITION SPEC (BUCKET(4, uuid_col))");
+    AnalyzesOk("ALTER TABLE functional_parquet.iceberg_uuid_test " +
+        "SET PARTITION SPEC (VOID(uuid_col))");
+    // Source column references are case-insensitive.
+    AnalyzesOk("CREATE TABLE tbl1 (i int, u uuid) PARTITIONED BY SPEC " +
+        "(U, BUCKET(4, U)) STORED AS ICEBERG" + tblProperties);
+    AnalysisError("CREATE TABLE tbl1 (i int, u uuid) PARTITIONED BY SPEC (YEAR(U)) " +
+        "STORED AS ICEBERG" + tblProperties,
+        String.format(uuidTransformError, "YEAR", "u"));
+    AnalyzesOk("ALTER TABLE functional_parquet.iceberg_uuid_test " +
+        "SET PARTITION SPEC (BUCKET(4, UUID_COL))");
+    AnalysisError("ALTER TABLE functional_parquet.iceberg_uuid_test " +
+        "SET PARTITION SPEC (TRUNCATE(4, UUID_COL))",
+        String.format(uuidTransformError, "TRUNCATE", "uuid_col"));
   }
 
   @Test

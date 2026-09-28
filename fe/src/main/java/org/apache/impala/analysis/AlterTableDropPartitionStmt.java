@@ -149,7 +149,7 @@ public class AlterTableDropPartitionStmt extends AlterTableStmt {
             table.getIcebergApiTable().spec());
     // For Impala expression to Iceberg expression conversion
     IcebergPredicateConverter converter =
-        new IcebergPartitionPredicateConverter(table.getIcebergSchema(), analyzer);
+        new IcebergPartitionPredicateConverter(table, analyzer);
 
     List<Expression> icebergPartitionExprs = new ArrayList<>();
     for (Expr expr : partitionSet_.getPartitionExprs()) {
