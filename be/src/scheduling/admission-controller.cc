@@ -1472,9 +1472,16 @@ bool AdmissionController::CanAdmitRequest(const ScheduleState& state,
 bool AdmissionController::CanAdmitQuota(const ScheduleState& state,
     const TPoolConfig& pool_cfg, const TPoolConfig& root_cfg,
     string* not_admitted_reason) {
-  PoolStats* pool_stats = GetPoolStats(state);
+  return CanAdmitQuota(state.request().query_ctx.session, state.request_pool(),
+      GetPoolStats(state), pool_cfg, root_cfg, not_admitted_reason);
+}
+
+bool AdmissionController::CanAdmitQuota(const TSessionState& session,
+    const string& pool_name, PoolStats* pool_stats, const TPoolConfig& pool_cfg,
+    const TPoolConfig& root_cfg,
+    string* not_admitted_reason) {
+  DCHECK(pool_stats != nullptr);
   string user;
-  const TSessionState& session = state.request().query_ctx.session;
   Status status = GetEffectiveShortUser(session, &user);
   if (!status.ok()) {
     *not_admitted_reason = Substitute(BAD_USER_NAME, GetEffectiveUser(session));
@@ -1484,7 +1491,7 @@ bool AdmissionController::CanAdmitQuota(const ScheduleState& state,
   // Check quotas at pool level.
   int64_t user_load = pool_stats->GetUserLoad(user);
   if (!HasSufficientPoolQuotas(
-          user, pool_cfg, state.request_pool(), user_load, not_admitted_reason)) {
+          user, pool_cfg, pool_name, user_load, not_admitted_reason)) {
     return false;
   }
 
@@ -1782,6 +1789,9 @@ Status AdmissionController::SubmitForAdmission(const AdmissionRequest& request,
         queue_node->admission_request.request.GetQueryExecRequest(&exec_req_queue_node));
     DCHECK(exec_req_queue_node != nullptr);
     RETURN_IF_ERROR(GetEffectiveShortUser(exec_req_queue_node->query_ctx.session, &user));
+    queue_node->effective_user = user;
+    queue_node->track_user_load =
+        HasQuotaConfig(queue_node->pool_cfg) || HasQuotaConfig(queue_node->root_cfg);
 
     if (queue_node->admitted_schedule.get() != nullptr) {
       DCHECK(queue_node->admitted_schedule->query_schedule_pb().get() != nullptr);
@@ -1817,8 +1827,9 @@ Status AdmissionController::SubmitForAdmission(const AdmissionRequest& request,
     queue_node->initial_queue_reason = queue_node->not_admitted_reason;
 
     stats->Queue();
-    if (HasQuotaConfig(queue_node->pool_cfg) || HasQuotaConfig(queue_node->root_cfg)) {
+    if (queue_node->track_user_load) {
       stats->IncrementPerUser(user);
+      queue_node->user_load_counted = true;
     }
     queue->Enqueue(queue_node);
     // Clear the decompressed cache to save the memory after enqueue.
@@ -1909,7 +1920,10 @@ Status AdmissionController::WaitOnQueued(const UniqueIdPB& query_id,
     PoolStats* pool_stats = GetPoolStats(queue_node->pool_name);
     pool_stats->UpdateWaitTime(wait_time_ms);
     if (outcome == AdmissionOutcome::REJECTED) {
-      if (queue->Remove(queue_node)) pool_stats->Dequeue(true);
+      if (queue->Remove(queue_node)) {
+        pool_stats->Dequeue(true);
+        DecrementQueuedUserLoadIfTracked(queue_node, pool_stats);
+      }
       queue_node->profile->AddInfoString(
           PROFILE_INFO_KEY_ADMISSION_RESULT, PROFILE_INFO_VAL_REJECTED);
       const ErrorMsg& rejected_msg = ErrorMsg(TErrorCode::ADMISSION_REJECTED,
@@ -1921,6 +1935,7 @@ Status AdmissionController::WaitOnQueued(const UniqueIdPB& query_id,
       bool removed = queue->Remove(queue_node);
       DCHECK(removed);
       pool_stats->Dequeue(true);
+      DecrementQueuedUserLoadIfTracked(queue_node, pool_stats);
       queue_node->profile->AddInfoString(
           PROFILE_INFO_KEY_ADMISSION_RESULT, PROFILE_INFO_VAL_TIME_OUT);
       const ErrorMsg& rejected_msg = ErrorMsg(TErrorCode::ADMISSION_TIMED_OUT,
@@ -1931,6 +1946,7 @@ Status AdmissionController::WaitOnQueued(const UniqueIdPB& query_id,
     } else if (outcome == AdmissionOutcome::CANCELLED) {
       if (queue->Remove(queue_node)) {
         pool_stats->Dequeue(false);
+        DecrementQueuedUserLoadIfTracked(queue_node, pool_stats);
       }
       queue_node->profile->AddInfoString(
           PROFILE_INFO_KEY_ADMISSION_RESULT, PROFILE_INFO_VAL_CANCELLED_IN_QUEUE);
@@ -2515,6 +2531,23 @@ bool AdmissionController::FindGroupToAdmitOrReject(
   if (queue_node->group_states.empty()) {
     DCHECK(!queue_node->not_admitted_reason.empty());
     if (IsReasonCoordinatorRemoved(queue_node->not_admitted_reason)) return false;
+    if (!admit_from_queue) {
+      const TQueryExecRequest* exec_req = nullptr;
+      Status status =
+          queue_node->admission_request.request.GetQueryExecRequest(&exec_req);
+      if (!status.ok()) {
+        queue_node->not_admitted_reason =
+            Substitute("Failed to get query execution request: $0", status.GetDetail());
+        return false;
+      }
+      DCHECK(exec_req != nullptr);
+      if (!CanAdmitQuota(exec_req->query_ctx.session, pool_name, pool_stats, pool_config,
+              root_cfg, &rejection_reason)) {
+        DCHECK(!rejection_reason.empty());
+        queue_node->not_admitted_reason = rejection_reason;
+        return false;
+      }
+    }
     return true;
   }
 
@@ -2761,6 +2794,7 @@ void AdmissionController::TryDequeue() {
         AdmissionOutcome outcome =
             queue_node->admit_outcome->Set(AdmissionOutcome::REJECTED);
         if (outcome == AdmissionOutcome::REJECTED) {
+          DecrementQueuedUserLoadIfTracked(queue_node, stats);
           stats->metrics()->total_rejected->Increment(1);
           VLOG_QUERY << "Rejected, query id=" << PrintId(query_id)
                      << " reason: " << queue_node->not_admitted_reason;
@@ -2783,6 +2817,7 @@ void AdmissionController::TryDequeue() {
       }
 
       if (is_cancelled) {
+        DecrementQueuedUserLoadIfTracked(queue_node, stats);
         VLOG_QUERY << "Dequeued cancelled query=" << PrintId(query_id);
         if (admission_map_cleanup_cb_) {
           admission_map_cleanup_cb_(query_id, __func__);
@@ -2933,6 +2968,14 @@ void AdmissionController::AdmitQuery(
     allocation.slots_to_use = entry.second.exec_params->slots_to_use();
     allocation.mem_to_admit = GetMemToAdmit(*state, entry.second);
   }
+}
+
+void AdmissionController::DecrementQueuedUserLoadIfTracked(
+    QueueNode* node, PoolStats* pool_stats) {
+  if (!node->track_user_load || !node->user_load_counted) return;
+  DCHECK(!node->effective_user.empty());
+  pool_stats->DecrementPerUser(node->effective_user);
+  node->user_load_counted = false;
 }
 
 string AdmissionController::GetStalenessDetail(

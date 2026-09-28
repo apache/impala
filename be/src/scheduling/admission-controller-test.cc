@@ -941,6 +941,12 @@ TEST_F(AdmissionControllerTest, UserAndGroupQuotas) {
   ScheduleState* schedule_state = MakeScheduleState(QUEUE_E, config_e, host_count,
       30L * MEGABYTE, ImpalaServer::DEFAULT_EXECUTOR_GROUP_NAME, USER_A);
   string not_admitted_reason;
+  auto can_admit_quota_with_session = [&](const ScheduleState& state,
+      string* reason) {
+    return admission_controller->CanAdmitQuota(state.request().query_ctx.session,
+        state.request_pool(), admission_controller->GetPoolStats(state), config_e,
+        config_root, reason);
+  };
 
   // Simulate that there are 2 queries queued.
   pool_stats->local_stats_.num_queued = 2;
@@ -980,12 +986,16 @@ TEST_F(AdmissionControllerTest, UserAndGroupQuotas) {
       *schedule_state, config_e, config_root, &not_admitted_reason));
   EXPECT_STR_CONTAINS(not_admitted_reason,
       "current per-user load 3 for user 'userA' is at or above the user limit 3");
+  string reason_with_session;
+  ASSERT_FALSE(can_admit_quota_with_session(*schedule_state, &reason_with_session));
+  EXPECT_EQ(not_admitted_reason, reason_with_session);
 
   // If UserA's load is 2 it should be admitted because the user rule takes precedence
   // over the wildcard rule.
   pool_stats->agg_user_loads_.insert(USER_A, 2);
   ASSERT_TRUE(admission_controller->CanAdmitQuota(
       *schedule_state, config_e, config_root, &not_admitted_reason));
+  ASSERT_TRUE(can_admit_quota_with_session(*schedule_state, &reason_with_session));
 
   // Test wildcards with User2.
   schedule_state = MakeScheduleState(QUEUE_E, config_e, host_count, 30L * MEGABYTE,
@@ -997,6 +1007,8 @@ TEST_F(AdmissionControllerTest, UserAndGroupQuotas) {
       *schedule_state, config_e, config_root, &not_admitted_reason));
   EXPECT_STR_CONTAINS(not_admitted_reason,
       "current per-user load 3 for user 'user2' is at or above the wildcard limit 1");
+  ASSERT_FALSE(can_admit_quota_with_session(*schedule_state, &reason_with_session));
+  EXPECT_EQ(not_admitted_reason, reason_with_session);
 
   pool_stats->agg_user_loads_.clear_key(USER2);
   ASSERT_TRUE(admission_controller->CanAdmitQuota(
@@ -1027,6 +1039,8 @@ TEST_F(AdmissionControllerTest, UserAndGroupQuotas) {
   ASSERT_FALSE(admission_controller->CanAdmitQuota(
       *bad_user_state, config_e, config_root, &not_admitted_reason));
   EXPECT_STR_CONTAINS(not_admitted_reason, "cannot parse user name a@b.b.com@d.com");
+  ASSERT_FALSE(can_admit_quota_with_session(*bad_user_state, &reason_with_session));
+  EXPECT_EQ(not_admitted_reason, reason_with_session);
 }
 
 /// Test CanAdmitRequest in the context of user and group quotas.
@@ -1519,6 +1533,22 @@ TEST_F(AdmissionControllerTest, PoolStats) {
       "[" + USER1 + "]", pool_stats->metrics()->agg_current_users->ToHumanReadable());
   ASSERT_EQ(
       "[" + USER1 + "]", pool_stats->metrics()->local_current_users->ToHumanReadable());
+
+  // Simulate a queued query leaving the queue without admission.
+  Promise<AdmissionOutcome, PromiseMode::MULTIPLE_PRODUCER> admit_outcome;
+  UniqueIdPB* coord_id = pool_.Add(new UniqueIdPB());
+  AdmissionController::QueueNode* queue_node =
+      makeQueueNode(admission_controller, coord_id, &admit_outcome, config, QUEUE);
+  queue_node->effective_user = USER1;
+  queue_node->track_user_load = true;
+  queue_node->user_load_counted = true;
+  admission_controller->DecrementQueuedUserLoadIfTracked(queue_node, pool_stats);
+  ASSERT_EQ(0, pool_stats->agg_user_loads_.get(USER1));
+  ASSERT_EQ("[]", pool_stats->metrics()->agg_current_users->ToHumanReadable());
+  ASSERT_EQ("[]", pool_stats->metrics()->local_current_users->ToHumanReadable());
+  // Re-establish baseline for the following release-path checks.
+  pool_stats->IncrementPerUser(USER1);
+  ASSERT_EQ(1, pool_stats->agg_user_loads_.get(USER1));
 
   // Show that Admit and Release leave stats at zero.
   AdmissionController::PerUserTracking per_user_tracking{USER1, true, false};

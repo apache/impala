@@ -16,6 +16,7 @@
 # under the License.
 
 from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
+from tests.common.cluster_config import impalad_admission_ctrl_config_args
 from tests.common.environ import IS_CALCITE_PLANNER
 from tests.common.impala_connection import FINISHED, RUNNING
 from tests.common.parametrize import UniqueDatabase
@@ -332,6 +333,216 @@ class TestExecutorGroups(CustomClusterTestSuite):
     self._add_executor_group("group1", 2)
     client.wait_for_finished_timeout(handle, 20)
     assert self._get_num_executor_groups(only_healthy=True) == 1
+
+  @pytest.mark.execute_serially
+  @CustomClusterTestSuite.with_args(
+      impalad_args=impalad_admission_ctrl_config_args(
+          fs_allocation_file="fair-scheduler-test2.xml",
+          llama_site_file="llama-site-test2-long-timeout.xml"),
+      statestored_args="-statestore_heartbeat_frequency_ms=500", force_restart=True)
+  def test_user_quota_applies_without_executors(self):
+    """Verify user quotas are enforced even when no executors are available."""
+    request_pool = "root.queueD"
+    user = "userD"
+    clients = []
+    handles = []
+    try:
+      for _ in range(2):
+        client = self.coordinator.service.create_hs2_client(user=user)
+        client.set_configuration({'request_pool': request_pool})
+        handle = client.execute_async(TEST_QUERY)
+        clients.append(client)
+        handles.append(handle)
+        self._assert_eventually_in_profile(handle, "Waiting for executors to start")
+
+      rejecting_client = self.coordinator.service.create_hs2_client(user=user)
+      rejecting_client.set_configuration({'request_pool': request_pool})
+      clients.append(rejecting_client)
+      result = self.execute_query_expect_failure(rejecting_client, TEST_QUERY)
+      error_str = str(result)
+      assert "Rejected query from pool root.queueD" in error_str
+      assert ("current per-user load 2 for user 'userD' is at or above the user "
+              "limit 2") in error_str
+
+      self._add_executor_group("group1", min_size=1, num_executors=1,
+                               resource_pool=request_pool)
+      for i, handle in enumerate(handles):
+        assert clients[i].wait_for_finished_timeout(handle, 30)
+    finally:
+      for i, handle in enumerate(handles):
+        try:
+          clients[i].close_query(handle)
+        except Exception:
+          pass
+      for client in clients:
+        try:
+          client.close()
+        except Exception:
+          pass
+
+  @pytest.mark.execute_serially
+  @CustomClusterTestSuite.with_args(
+      impalad_args=impalad_admission_ctrl_config_args(
+          fs_allocation_file="fair-scheduler-test2.xml",
+          llama_site_file="llama-site-test2-long-timeout.xml"),
+      statestored_args="-statestore_heartbeat_frequency_ms=500", force_restart=True)
+  def test_wildcard_user_quota_applies_without_executors(self):
+    """Verify wildcard user quotas are enforced without available executors."""
+    request_pool = "root.queueE"
+    user = "userW"
+    clients = []
+    handles = []
+    try:
+      first_client = self.coordinator.service.create_hs2_client(user=user)
+      first_client.set_configuration({'request_pool': request_pool})
+      first_handle = first_client.execute_async(TEST_QUERY)
+      clients.append(first_client)
+      handles.append(first_handle)
+      self._assert_eventually_in_profile(first_handle, "Waiting for executors to start")
+
+      rejecting_client = self.coordinator.service.create_hs2_client(user=user)
+      rejecting_client.set_configuration({'request_pool': request_pool})
+      clients.append(rejecting_client)
+      result = self.execute_query_expect_failure(rejecting_client, TEST_QUERY)
+      error_str = str(result)
+      assert "Rejected query from pool root.queueE" in error_str
+      assert ("current per-user load 1 for user 'userW' is at or above the wildcard "
+              "limit 1") in error_str
+
+      self._add_executor_group("group1", min_size=1, num_executors=1,
+                               resource_pool=request_pool)
+      assert first_client.wait_for_finished_timeout(first_handle, 30)
+    finally:
+      for i, handle in enumerate(handles):
+        try:
+          clients[i].close_query(handle)
+        except Exception:
+          pass
+      for client in clients:
+        try:
+          client.close()
+        except Exception:
+          pass
+
+  @pytest.mark.execute_serially
+  @CustomClusterTestSuite.with_args(
+      impalad_args=impalad_admission_ctrl_config_args(
+          fs_allocation_file="fair-scheduler-test2.xml",
+          llama_site_file="llama-site-test2-long-timeout.xml",
+          additional_args="--injected_group_members_debug_only=group1:userB"),
+      statestored_args="-statestore_heartbeat_frequency_ms=500", force_restart=True)
+  def test_group_quota_applies_without_executors(self):
+    """Verify group quotas are enforced even when no executors are available."""
+    request_pool = "root.queueE"
+    user = "userB"
+    clients = []
+    handles = []
+    try:
+      for _ in range(2):
+        client = self.coordinator.service.create_hs2_client(user=user)
+        client.set_configuration({'request_pool': request_pool})
+        handle = client.execute_async(TEST_QUERY)
+        clients.append(client)
+        handles.append(handle)
+        self._assert_eventually_in_profile(handle, "Waiting for executors to start")
+
+      rejecting_client = self.coordinator.service.create_hs2_client(user=user)
+      rejecting_client.set_configuration({'request_pool': request_pool})
+      clients.append(rejecting_client)
+      result = self.execute_query_expect_failure(rejecting_client, TEST_QUERY)
+      error_str = str(result)
+      assert "Rejected query from pool root.queueE" in error_str
+      assert ("current per-group load 2 for user 'userB' in group 'group1' is at or "
+              "above the group limit 2") in error_str
+
+      self._add_executor_group("group1", min_size=1, num_executors=1,
+                               resource_pool=request_pool)
+      for i, handle in enumerate(handles):
+        assert clients[i].wait_for_finished_timeout(handle, 30)
+    finally:
+      for i, handle in enumerate(handles):
+        try:
+          clients[i].close_query(handle)
+        except Exception:
+          pass
+      for client in clients:
+        try:
+          client.close()
+        except Exception:
+          pass
+
+  @pytest.mark.execute_serially
+  @CustomClusterTestSuite.with_args(
+      impalad_args=impalad_admission_ctrl_config_args(
+          fs_allocation_file="fair-scheduler-test2.xml",
+          llama_site_file="llama-site-test2-short-timeout.xml"),
+      statestored_args="-statestore_heartbeat_frequency_ms=500", force_restart=True)
+  def test_timed_out_queue_releases_user_quota(self):
+    """Verify timed out queued queries do not leak user load."""
+    request_pool = "root.queueD"
+    user = "userD"
+    for _ in range(2):
+      timed_out_client = self.coordinator.service.create_hs2_client(user=user)
+      timed_out_client.set_configuration({'request_pool': request_pool})
+      result = self.execute_query_expect_failure(timed_out_client, TEST_QUERY)
+      assert "Admission for query exceeded timeout" in str(result)
+      timed_out_client.close()
+
+    self._add_executor_group("group1", min_size=1, num_executors=1,
+                             resource_pool=request_pool)
+    success_client = self.coordinator.service.create_hs2_client(user=user)
+    success_client.set_configuration({'request_pool': request_pool})
+    self.execute_query_expect_success(success_client, TEST_QUERY)
+    success_client.close()
+
+  @pytest.mark.execute_serially
+  @CustomClusterTestSuite.with_args(
+      impalad_args=impalad_admission_ctrl_config_args(
+          fs_allocation_file="fair-scheduler-test2.xml",
+          llama_site_file="llama-site-test2-short-timeout.xml",
+          additional_args="--injected_group_members_debug_only=group1:userB"),
+      statestored_args="-statestore_heartbeat_frequency_ms=500", force_restart=True)
+  def test_timed_out_queue_releases_group_quota(self):
+    """Verify timed out queued queries do not leak group quota load."""
+    request_pool = "root.queueE"
+    user = "userB"
+    for _ in range(2):
+      timed_out_client = self.coordinator.service.create_hs2_client(user=user)
+      timed_out_client.set_configuration({'request_pool': request_pool})
+      result = self.execute_query_expect_failure(timed_out_client, TEST_QUERY)
+      assert "Admission for query exceeded timeout" in str(result)
+      timed_out_client.close()
+
+    self._add_executor_group("group1", min_size=1, num_executors=1,
+                             resource_pool=request_pool)
+    success_client = self.coordinator.service.create_hs2_client(user=user)
+    success_client.set_configuration({'request_pool': request_pool})
+    self.execute_query_expect_success(success_client, TEST_QUERY)
+    success_client.close()
+
+  @pytest.mark.execute_serially
+  @CustomClusterTestSuite.with_args(
+      impalad_args=impalad_admission_ctrl_config_args(
+          fs_allocation_file="fair-scheduler-test2.xml",
+          llama_site_file="llama-site-test2-short-timeout.xml"),
+      statestored_args="-statestore_heartbeat_frequency_ms=500", force_restart=True)
+  def test_timed_out_queue_releases_wildcard_user_quota(self):
+    """Verify timed out queued queries do not leak wildcard user load."""
+    request_pool = "root.queueE"
+    user = "userW"
+    for _ in range(2):
+      timed_out_client = self.coordinator.service.create_hs2_client(user=user)
+      timed_out_client.set_configuration({'request_pool': request_pool})
+      result = self.execute_query_expect_failure(timed_out_client, TEST_QUERY)
+      assert "Admission for query exceeded timeout" in str(result)
+      timed_out_client.close()
+
+    self._add_executor_group("group1", min_size=1, num_executors=1,
+                             resource_pool=request_pool)
+    success_client = self.coordinator.service.create_hs2_client(user=user)
+    success_client.set_configuration({'request_pool': request_pool})
+    self.execute_query_expect_success(success_client, TEST_QUERY)
+    success_client.close()
 
   @pytest.mark.execute_serially
   def test_executor_group_health(self):

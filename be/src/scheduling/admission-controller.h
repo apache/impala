@@ -1058,6 +1058,15 @@ class AdmissionController {
     /// Info about why this query was queued.
     string initial_queue_reason;
 
+    /// Effective short user from the request's session.
+    string effective_user;
+
+    /// True when per-user load tracking is enabled for this request.
+    bool track_user_load = false;
+
+    /// True when this request has incremented per-user queue load and still owns it.
+    bool user_load_counted = false;
+
     /// The MonotonicMillis() time when the query was queued.
     int64_t wait_start_ms;
 
@@ -1253,6 +1262,15 @@ class AdmissionController {
   /// Caller owns not_admitted_reason
   bool CanAdmitQuota(const ScheduleState& state, const TPoolConfig& pool_cfg,
       const TPoolConfig& root_cfg, string* not_admitted_reason);
+  /// Returns true if User Quotas allow the session to be admitted to the pool with
+  /// config 'pool_cfg' and root config 'root_cfg'.
+  /// If no quotas are configured then True is returned.
+  /// User and group Quotas are checked on the pool and the root pool.
+  /// Caller must hold admission_ctrl_lock_.
+  /// Caller owns not_admitted_reason.
+  bool CanAdmitQuota(const TSessionState& session, const string& pool_name,
+      PoolStats* pool_stats, const TPoolConfig& pool_cfg, const TPoolConfig& root_cfg,
+      string* not_admitted_reason);
 
   /// Returns true if the query can be admitted as a trivial query, therefore it can
   /// bypass the admission control immediately.
@@ -1365,6 +1383,10 @@ class AdmissionController {
   /// accounting and logging on successful submission.
   /// Caller must hold 'admission_ctrl_lock_'.
   void AdmitQuery(QueueNode* node, string& user, bool was_queued, bool is_trivial);
+  /// Decrement per-user queue load for queued requests that leave the queue without
+  /// being admitted.
+  /// Caller must hold 'admission_ctrl_lock_'.
+  void DecrementQueuedUserLoadIfTracked(QueueNode* node, PoolStats* pool_stats);
 
   /// Same as PoolToJson() but requires 'admission_ctrl_lock_' to be held by the caller.
   /// Is a helper method used by both PoolToJson() and AllPoolsToJson()
