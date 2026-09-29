@@ -60,6 +60,7 @@ class TestUtils(BaseTestSuite):
     runtime_profile = "- ExampleTimeStats: (Avg: 161.554ms ; " \
                       "Min: 101.411us ; " \
                       "Max: 1h2m3s4ms5us6ns ; " \
+                      "Sum: 969.324ms ; " \
                       "Number of samples: 6)"
     summary_stats = get_time_summary_stats_counter("ExampleTimeStats", runtime_profile)
     assert len(summary_stats) == 1

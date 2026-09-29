@@ -2024,6 +2024,7 @@ void ClientRequestState::SetCreateTableAsSelectResultSet() {
 
 void ClientRequestState::MarkInactive() {
   client_wait_sw_.Start();
+  client_wait_started_ = true;
   lock_guard<mutex> l(expiration_data_lock_);
   last_active_time_ms_ = UnixMillis();
   DCHECK(ref_count_ > 0) << "Invalid MarkInactive()";
@@ -2042,10 +2043,11 @@ void ClientRequestState::MarkActive() {
   // time should be counted for finalization as well.
   if (!eos()) {
     client_wait_timer_->Set(elapsed_time);
-    // The first call is before any MarkInactive() call has run and produces
-    // a zero-length sample. Skip this zero-length sample (but not any later
-    // zero-length samples).
-    if (elapsed_time != 0 || last_client_wait_time_ != 0) {
+    // The first call is before any MarkInactive() call, so it is not a client wait.
+    // A zero elapsed time must not be used to detect it, because a real wait shorter
+    // than the resolution of MonotonicStopWatch (see OsInfo::fast_clock()) is also
+    // measured as zero.
+    if (client_wait_started_) {
       int64_t current_wait_time = elapsed_time - last_client_wait_time_;
       client_wait_time_stats_->UpdateCounter(current_wait_time);
     }

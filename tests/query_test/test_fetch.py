@@ -85,74 +85,80 @@ class TestFetch(ImpalaTestSuite):
 
   def test_client_fetch_time_stats(self):
     num_rows = 27
-    client = MinimalHS2Connection(IMPALAD_HS2_HOST_PORT)
-    query = "select sleep(10) from functional.alltypes limit {0}".format(num_rows)
-    handle = client.execute_async(query)
-    try:
-      # Wait until the query is 'FINISHED' and results are available for fetching.
-      client.wait_for_finished_timeout(handle, 30)
+    with MinimalHS2Connection(IMPALAD_HS2_HOST_PORT) as client:
+      query = "select sleep(10) from functional.alltypes limit {0}".format(num_rows)
+      handle = client.execute_async(query)
+      try:
+        # Wait until the query is 'FINISHED' and results are available for fetching.
+        client.wait_for_finished_timeout(handle, 30)
 
-      # This loop will do 6 fetches that contain data and a final fetch with
-      # no data. The last fetch is after eos has been set, so it does not count.
-      rows_fetched = 0
-      while True:
-        result = client.fetch(query, handle, max_rows=5)
-        assert result is not None
-        rows_fetched += len(result)
-        # If no rows are returned, we are done.
-        if len(result) == 0:
-          break
+        # Sleep before the first fetch, so that the first sample is longer than the
+        # resolution of MonotonicStopWatch (see OsInfo::fast_clock()).
         sleep(0.1)
 
-      # After fetching all rows, sleep before closing the query. This should not
-      # count as client wait time, because the query is already done.
-      sleep(2.5)
-    finally:
-      client.close_query(handle)
+        # This loop will do 6 fetches that contain data and a final fetch with
+        # no data. The last fetch is after eos has been set, so it does not count.
+        rows_fetched = 0
+        while True:
+          result = client.fetch(query, handle, max_rows=5)
+          assert result is not None
+          rows_fetched += len(result)
+          # If no rows are returned, we are done.
+          if len(result) == 0:
+            break
+          sleep(0.1)
 
-    runtime_profile = client.get_runtime_profile(handle)
+        # After fetching all rows, sleep before closing the query. This should not
+        # count as client wait time, because the query is already done.
+        sleep(2.5)
+      finally:
+        client.close_query(handle)
 
-    summary_stats = get_time_summary_stats_counter("ClientFetchWaitTimeStats",
-                                                   runtime_profile)
-    assert len(summary_stats) == 1
-    assert summary_stats[0].total_num_values == 6
-    # The 2.5 second sleep should not count, so the max must be less than 2.5 seconds.
-    assert summary_stats[0].max_value < 2500000000
-    assert summary_stats[0].min_value > 0
-    client.close()
+      runtime_profile = client.get_runtime_profile(handle)
+
+      summary_stats = get_time_summary_stats_counter("ClientFetchWaitTimeStats",
+                                                     runtime_profile)
+      assert len(summary_stats) == 1
+      assert summary_stats[0].total_num_values == 6
+      # The 2.5 second sleep should not count, so the max must be less than 2.5 seconds.
+      assert summary_stats[0].max_value < 2500000000
+      assert summary_stats[0].min_value > 0
 
   def test_client_fetch_time_stats_incomplete(self):
     num_rows = 27
-    client = MinimalHS2Connection(IMPALAD_HS2_HOST_PORT)
-    query = "select sleep(10) from functional.alltypes limit {0}".format(num_rows)
-    handle = client.execute_async(query)
-    try:
-      # Wait until the query is 'FINISHED' and results are available for fetching.
-      client.wait_for_finished_timeout(handle, 30)
+    with MinimalHS2Connection(IMPALAD_HS2_HOST_PORT) as client:
+      query = "select sleep(10) from functional.alltypes limit {0}".format(num_rows)
+      handle = client.execute_async(query)
+      try:
+        # Wait until the query is 'FINISHED' and results are available for fetching.
+        client.wait_for_finished_timeout(handle, 30)
 
-      # This loop will do 5 fetches for a total of 25 rows. This is incomplete.
-      for i in range(5):
-        result = client.fetch(query, handle, max_rows=5)
-        assert result is not None
+        # Sleep before the first fetch, so that the first sample is longer than the
+        # resolution of MonotonicStopWatch (see OsInfo::fast_clock()).
         sleep(0.1)
 
-      # Sleep before closing the query. For an incomplete fetch, this still counts
-      # towards the query time, so this does show up in the counters.
-      sleep(2.5)
-    finally:
-      client.close_query(handle)
+        # This loop will do 5 fetches for a total of 25 rows. This is incomplete.
+        for i in range(5):
+          result = client.fetch(query, handle, max_rows=5)
+          assert result is not None
+          sleep(0.1)
 
-    runtime_profile = client.get_runtime_profile(handle)
+        # Sleep before closing the query. For an incomplete fetch, this still counts
+        # towards the query time, so this does show up in the counters.
+        sleep(2.5)
+      finally:
+        client.close_query(handle)
 
-    summary_stats = get_time_summary_stats_counter("ClientFetchWaitTimeStats",
-                                                   runtime_profile)
-    assert len(summary_stats) == 1
-    # There are 5 fetches and the finalization sample for a total of 6.
-    assert summary_stats[0].total_num_values == 6
-    # The 2.5 second sleep does count for an incomplete fetch, verify the max is higher.
-    assert summary_stats[0].max_value >= 2500000000
-    assert summary_stats[0].min_value > 0
-    client.close()
+      runtime_profile = client.get_runtime_profile(handle)
+
+      summary_stats = get_time_summary_stats_counter("ClientFetchWaitTimeStats",
+                                                     runtime_profile)
+      assert len(summary_stats) == 1
+      # There are 5 fetches and the finalization sample for a total of 6.
+      assert summary_stats[0].total_num_values == 6
+      # The 2.5 second sleep does count for an incomplete fetch, verify the max is higher.
+      assert summary_stats[0].max_value >= 2500000000
+      assert summary_stats[0].min_value > 0
 
 
 class TestFetchAndSpooling(ImpalaTestSuite):

@@ -736,6 +736,9 @@ class ClientRequestState {
   /// Timer to track idle time for the above counter.
   MonotonicStopWatch client_wait_sw_;
   int64_t last_client_wait_time_ = 0;
+  /// True once MarkInactive() has started 'client_wait_sw_'. Lets MarkActive() skip
+  /// the initial call from Exec(), which does not follow a client wait.
+  bool client_wait_started_ = false;
 
   // Tracks time spent in dumping the profile before the query is archived.
   RuntimeProfile::SummaryStatsCounter* get_inflight_profile_time_stats_;

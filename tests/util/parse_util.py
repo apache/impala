@@ -248,12 +248,13 @@ def get_time_summary_stats_counter(counter_name, runtime_profile):
        runtime_profile = "- ExampleTimer: (Avg: 100.000ms ; " \
                                           "Min: 100.000ms ; " \
                                           "Max: 100.000ms ; " \
+                                          "Sum: 600.000ms ; " \
                                           "Number of samples: 6)"
        summary_stats = get_bytes_summary_stats_counter("ExampleTimer",
                                                       runtime_profile)
        assert len(summary_stats) == 1
-       assert summary_stats[0].sum == summary_stats[0].min_value == \
-              summary_stats[0].max_value == 100000000 and \
+       assert summary_stats[0].min_value == summary_stats[0].max_value == \
+              100000000 and summary_stats[0].sum == 600000000 and \
               summary_stats[0].total_num_values == 6
   """
   # This requires the Thrift definitions to be generated. We limit the scope of the import
@@ -264,6 +265,7 @@ def get_time_summary_stats_counter(counter_name, runtime_profile):
     Avg:\s(?P<avg>.*)\s;\s # Matches Avg: ? ;
     Min:\s(?P<min>.*)\s;\s # Matches Min: ? ;
     Max:\s(?P<max>.*)\s;\s # Matches Max: ? ;
+    Sum:\s(?P<sum>.*)\s;\s # Matches Sum: ? ;
     Number\sof\ssamples:\s(?P<samples>[0-9]+)\) # Matches Number of samples: ?)""",
                                   re.VERBOSE)
 
@@ -280,7 +282,7 @@ def get_time_summary_stats_counter(counter_name, runtime_profile):
       summary_stat = summary_stat.groupdict()
       num_samples = int(summary_stat['samples'])
       summary_stats.append(TSummaryStatsCounter(total_num_values=num_samples,
-          sum=num_samples * parse_duration_string_ns(summary_stat['avg']),
+          sum=parse_duration_string_ns(summary_stat['sum']),
           min_value=parse_duration_string_ns(summary_stat['min']),
           max_value=parse_duration_string_ns(summary_stat['max'])))
 
