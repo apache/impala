@@ -22,7 +22,7 @@
 # "-INTERNAL" appended. Parts of the code will look for this to distinguish
 # between released and internal versions.
 VERSION=${IMPALA_VERSION}
-GIT_HASH=f6a5cf48a16e3054cf5a680a19fd6d219f060b6b
+GIT_HASH=b3e78704d824efd8f9ecb884d4aa1c09d4e12017
 if [ -z $GIT_HASH ]
 then
   GIT_HASH="Could not obtain git hash"
