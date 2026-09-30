@@ -1478,6 +1478,20 @@ Status impala::SetQueryOption(TImpalaQueryOptions::type option, const string& va
         query_options->__set_avg_collection_size(int32_t_val);
         break;
       }
+      case TImpalaQueryOptions::BOTTLENECK_SUMMARY_MAX_ENTRIES: {
+        int32_t int32_t_val = 0;
+        RETURN_IF_ERROR(QueryOptionParser::ParseAndCheckNonNegative<int32_t>(
+            option, value, &int32_t_val));
+        query_options->__set_bottleneck_summary_max_entries(int32_t_val);
+        break;
+      }
+      case TImpalaQueryOptions::BOTTLENECK_SUMMARY_MIN_QUERY_TIME_FRAC: {
+        double double_val = 0.0;
+        RETURN_IF_ERROR(QueryOptionParser::ParseAndCheckInclusiveRange<double>(
+            option, value, 0.0, 1.0, &double_val));
+        query_options->__set_bottleneck_summary_min_query_time_frac(double_val);
+        break;
+      }
       default:
         string key = to_string(option);
         if (IsRemovedQueryOption(key)) {

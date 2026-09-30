@@ -283,6 +283,7 @@ void Coordinator::BackendState::ExecCompleteCb(
       goto done;
     }
 
+    exec_start_time_ns_ = MonotonicStopWatch::Now();
     for (const auto& entry : instance_stats_map_) entry.second->stopwatch_.Start();
     VLOG_FILE << "rpc succeeded: ExecQueryFInstances query_id=" << PrintId(query_id_);
     exec_done_ = true;
@@ -526,13 +527,16 @@ bool Coordinator::BackendState::ApplyExecStatusReport(
   unique_lock<mutex> lock(lock_);
   last_report_time_ms_ = GenerateReportTimestamp();
 
-  // If this backend completed previously, don't apply the update. This ensures that
-  // the profile doesn't change during or after Coordinator::ComputeQuerySummary(), but
-  // can mean that we lose profile information for failed queries, since the Coordinator
-  // will call Cancel() on all BackendStates and we may stop accepting reports before some
-  // backends send their final report.
-  // TODO: revisit ComputeQuerySummary()
-  if (IsDoneLocked(lock)) return false;
+  // Reject updates only once the query summary is being computed, so that backends
+  // marked done by cancel/error still accept final status reports with up-to-date
+  // latency_ns. This ensures that the profile doesn't change during or after
+  // Coordinator::ComputeQuerySummary().
+  if (status_reports_closed_) return false;
+
+  // A backend that is already done (cancelled, failed, or receiving a retried final
+  // report) still applies the report, but only the report that makes it done returns
+  // true, so that the caller notifies backend_exec_complete_barrier_ once per backend.
+  const bool was_done = IsDoneLocked(lock);
 
   // Use empty profile in case profile serialization/deserialization failed.
   // Depending on the aggregated_profile value, there is one profile tree per
@@ -594,7 +598,9 @@ bool Coordinator::BackendState::ApplyExecStatusReport(
           VLOG_FILE << "host=" << host_
                     << " error log: " << PrintErrorMapToString(error_log_);
 
-          if (stateful_report.has_aux_error_info()) {
+          // Errors reported after this backend is done, e.g. while its instances are
+          // torn down after cancellation, must not blacklist nodes or retry the query.
+          if (!was_done && stateful_report.has_aux_error_info()) {
             aux_error_info->push_back(stateful_report.aux_error_info());
           }
         }
@@ -666,7 +672,14 @@ bool Coordinator::BackendState::ApplyExecStatusReport(
   }
 
   // TODO: keep backend-wide stopwatch?
-  return IsDoneLocked(lock);
+  const bool is_done = IsDoneLocked(lock);
+  if (is_done) FreezeUnsetInstanceCompletionTimesLocked(lock);
+  return !was_done && is_done;
+}
+
+void Coordinator::BackendState::CloseStatusReports() {
+  lock_guard<mutex> l(lock_);
+  status_reports_closed_ = true;
 }
 
 void Coordinator::BackendState::UpdateHostProfile(
@@ -680,6 +693,47 @@ void Coordinator::BackendState::UpdateExecStats(
     const vector<FragmentStats*>& fragment_stats, bool finalize) {
   unique_lock<mutex> l(lock_);
   UpdateExecStatsLocked(l, fragment_stats, finalize);
+}
+
+int64_t Coordinator::BackendState::GetMaxInstanceElapsedTime(int64_t now_ns) const {
+  unique_lock<mutex> l(lock_);
+  if (exec_start_time_ns_ < 0) return 0;
+  const int64_t running_time_ns = max<int64_t>(0, now_ns - exec_start_time_ns_);
+  const bool backend_done = IsDoneLocked(l);
+  int64_t max_elapsed_ns = 0;
+  for (const auto& entry : instance_stats_map_) {
+    const int64_t completion_time_ns = entry.second->completion_time_ns_;
+    const int64_t frozen_elapsed_ns = entry.second->frozen_elapsed_time_ns_;
+    if (completion_time_ns >= 0) {
+      // Instance finished and UpdateExecStats() recorded completion.
+      max_elapsed_ns = max(max_elapsed_ns, completion_time_ns);
+    } else if (frozen_elapsed_ns >= 0) {
+      // Backend done (e.g. cancelled) before profile counters were finalized.
+      max_elapsed_ns = max(max_elapsed_ns, frozen_elapsed_ns);
+    } else if (backend_done) {
+      // Done backend, freeze not run yet; use stopwatch until freeze or finalize.
+      max_elapsed_ns = max(max_elapsed_ns,
+          static_cast<int64_t>(entry.second->stopwatch_.ElapsedTime()));
+    } else {
+      // Instance still running: wall time since this backend accepted exec.
+      max_elapsed_ns = max(max_elapsed_ns, running_time_ns);
+    }
+  }
+  return max_elapsed_ns;
+}
+
+void Coordinator::BackendState::FreezeUnsetInstanceCompletionTimesLocked(
+    const unique_lock<mutex>& lock) {
+  DCHECK(lock.owns_lock() && lock.mutex() == &lock_);
+  for (auto& entry : instance_stats_map_) {
+    InstanceStats& instance_stats = *entry.second;
+    if (instance_stats.completion_time_ns_ >= 0) continue;
+    if (instance_stats.frozen_elapsed_time_ns_ >= 0) continue;
+    // Stop the stopwatch even if the instance is not done, so that the completion time
+    // recorded by UpdateExecStats() later equals the frozen time.
+    instance_stats.stopwatch_.Stop();
+    instance_stats.frozen_elapsed_time_ns_ = instance_stats.stopwatch_.ElapsedTime();
+  }
 }
 
 void Coordinator::BackendState::UpdateExecStatsLocked(const unique_lock<mutex>& lock,
@@ -821,6 +875,10 @@ Coordinator::BackendState::CancelResult Coordinator::BackendState::Cancel(
     }
   }
 done:
+  {
+    unique_lock<mutex> l(lock_);
+    if (IsDoneLocked(l)) FreezeUnsetInstanceCompletionTimesLocked(l);
+  }
   if (notify_exec_done) exec_done_cv_.NotifyAll();
   return result;
 }
@@ -969,9 +1027,10 @@ void Coordinator::BackendState::InstanceStats::UpdateExecStats(
   int fragment_idx = exec_params_.fragment_idx();
   DCHECK_LT(fragment_idx, fragment_stats.size());
   FragmentStats* f = fragment_stats[fragment_idx];
-  if (!completion_time_set_ && (finalize || done_)) {
+  if (completion_time_ns_ < 0 && (finalize || done_)) {
     // Set the completion time if the query or instance finished.
     int64_t completion_time = stopwatch_.ElapsedTime();
+    completion_time_ns_ = completion_time;
     RuntimeProfile::Counter* completion_timer =
         PROFILE_CompletionTime.Instantiate(profile_);
     completion_timer->Set(completion_time);
@@ -983,7 +1042,6 @@ void Coordinator::BackendState::InstanceStats::UpdateExecStats(
       execution_rate_counter->Set(static_cast<int64_t>(rate));
       if (!aggregated_profile_) f->rates_(rate);
     }
-    completion_time_set_ = true;
   }
   if (!agg_profile_up_to_date_) {
     // Merge this instance profile (which may or may not included the full instance

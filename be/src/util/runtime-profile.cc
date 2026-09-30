@@ -1120,6 +1120,14 @@ void RuntimeProfile::UpdateInfoString(const string& key, string value) {
   if (it != info_strings_.end()) it->second = std::move(value);
 }
 
+bool RuntimeProfile::RemoveInfoString(const string& key) {
+  lock_guard<SpinLock> l(info_strings_lock_);
+  if (info_strings_.erase(key) == 0) return false;
+  info_strings_display_order_.erase(std::remove(info_strings_display_order_.begin(),
+      info_strings_display_order_.end(), key), info_strings_display_order_.end());
+  return true;
+}
+
 const string* RuntimeProfile::GetInfoString(const string& key) const {
   lock_guard<SpinLock> l(info_strings_lock_);
   InfoStrings::const_iterator it = info_strings_.find(key);

@@ -1118,6 +1118,14 @@ enum TImpalaQueryOptions {
   // The constant value was chosen arbitrarily to not be "too high" or "too low".
   // TODO: Compute stats for nested types and pick them up.
   AVG_COLLECTION_SIZE = 206
+
+  // Maximum number of plan nodes listed in the Bottleneck Summary of the query profile.
+  // Set to 0 to omit the summary.
+  BOTTLENECK_SUMMARY_MAX_ENTRIES = 207
+
+  // Minimum fraction of the query's execution wall time, between 0 and 1, that a plan
+  // node must account for to be listed in the Bottleneck Summary.
+  BOTTLENECK_SUMMARY_MIN_QUERY_TIME_FRAC = 208
 }
 
 // The summary of a DML statement.

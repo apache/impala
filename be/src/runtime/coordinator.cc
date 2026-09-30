@@ -25,6 +25,7 @@
 
 #include <thrift/protocol/TDebugProtocol.h>
 #include <boost/algorithm/string/join.hpp>
+#include <boost/container/small_vector.hpp>
 #include <boost/filesystem.hpp>
 #include <boost/algorithm/string/split.hpp>
 #include <boost/algorithm/string.hpp>
@@ -930,8 +931,9 @@ void Coordinator::HandleExecStateTransition(
   // after the query finishes. So the end time of non Query statement is not set here.
   // Instead, we set it in ClientRequestState::Wait().
   if (stmt_type_ == TStmtType::QUERY) parent_request_state_->UpdateEndTime();
-  // Can compute summary only after we stop accepting reports from the backends. Both
-  // WaitForBackends() and CancelBackends() ensures that.
+  // ComputeQuerySummary() stops accepting reports from the backends before computing
+  // the summary. Reports for backends that are already done (e.g. cancelled) are
+  // applied until then, so that their final reports are included in the profile.
   // TODO: should move this off of the query execution path?
   ComputeQuerySummary();
   finalized_.Set(true);
@@ -1406,16 +1408,24 @@ int64_t Coordinator::GetMaxBackendStateLagMs(NetworkAddressPB* address) {
 // TODO: add histogram/percentile
 void Coordinator::ComputeQuerySummary() {
   DCHECK(exec_rpcs_complete_.Load()) << "Exec() must be called first";
+  // Stop accepting reports before finalizing any backend, so that no report updates
+  // the fragment stats or profiles while the summary is computed or afterwards.
+  for (BackendState* backend_state : backend_states_) {
+    backend_state->CloseStatusReports();
+  }
+
+  // Make sure fragment_stats_ are up-to-date. This is also done when Wait() was never
+  // called (e.g. cancel before Wait()) so that instance profile counters are finalized.
+  for (BackendState* backend_state: backend_states_) {
+    backend_state->UpdateExecStats(fragment_stats_, /*finalize=*/true);
+  }
+
   // In this case, the query did not even get to start all fragment instances.
   // Some of the state that is used below might be uninitialized.  In this case,
   // the query has made so little progress, reporting a summary is not very useful.
   if (!has_called_wait_.Load()) return;
 
   if (backend_states_.empty()) return;
-  // make sure fragment_stats_ are up-to-date
-  for (BackendState* backend_state: backend_states_) {
-    backend_state->UpdateExecStats(fragment_stats_, /*finalize=*/true);
-  }
 
   for (FragmentStats* fragment_stats: fragment_stats_) {
     fragment_stats->AddSplitStats();
@@ -1895,10 +1905,75 @@ void Coordinator::MarkCancelledNodes(TExecSummary* exec_summary) {
   }
 }
 
+void Coordinator::SetQueryTimeFractions(int64_t exec_wall_time_ns,
+    double min_query_time_frac, int max_entries, TExecSummary* exec_summary,
+    vector<BottleneckEntry>* bottlenecks) {
+  DCHECK(exec_summary != nullptr);
+  DCHECK(bottlenecks != nullptr);
+  bottlenecks->clear();
+  if (exec_wall_time_ns <= 0) return;
+  exec_summary->__set_exec_wall_time_ns(exec_wall_time_ns);
+  // 16 inline slots (256 bytes) keep the common case free of heap allocations. This is
+  // a size chosen for typical plans rather than a limit: more candidates spill to the
+  // heap.
+  boost::container::small_vector<pair<double, int>, 16> candidates;
+  for (int i = 0; i < exec_summary->nodes.size(); ++i) {
+    TPlanNodeExecSummary& node = exec_summary->nodes[i];
+    int64_t max_latency_ns = 0;
+    bool has_reported_latency = false;
+    for (const TExecStats& stat : node.exec_stats) {
+      if (!stat.__isset.latency_ns) continue;
+      has_reported_latency = true;
+      max_latency_ns = max(max_latency_ns, stat.latency_ns);
+    }
+    if (!has_reported_latency || max_latency_ns <= 0) continue;
+    const double query_time_frac =
+        min(1.0, static_cast<double>(max_latency_ns) / exec_wall_time_ns);
+    node.__set_query_time_frac(query_time_frac);
+    if (query_time_frac >= min_query_time_frac) {
+      candidates.emplace_back(query_time_frac, i);
+    }
+  }
+  const int num_entries = min<int>(max_entries, candidates.size());
+  if (num_entries <= 0) return;
+  partial_sort(candidates.begin(), candidates.begin() + num_entries, candidates.end(),
+      [](const pair<double, int>& a, const pair<double, int>& b) {
+        if (a.first != b.first) return a.first > b.first;
+        return a.second < b.second;
+      });
+  bottlenecks->reserve(num_entries);
+  for (int i = 0; i < num_entries; ++i) {
+    const TPlanNodeExecSummary& node = exec_summary->nodes[candidates[i].second];
+    bottlenecks->push_back({node.label, node.query_time_frac});
+  }
+}
+
 void Coordinator::GetTExecSummary(TExecSummary* exec_summary) {
-  lock_guard<SpinLock> l(exec_summary_.lock);
-  *exec_summary = exec_summary_.thrift_exec_summary;
+  vector<BottleneckEntry> bottlenecks;
+  GetTExecSummary(exec_summary, &bottlenecks);
+}
+
+void Coordinator::GetTExecSummary(
+    TExecSummary* exec_summary, vector<BottleneckEntry>* bottlenecks) {
+  {
+    lock_guard<SpinLock> l(exec_summary_.lock);
+    *exec_summary = exec_summary_.thrift_exec_summary;
+  }
+  // The rest only works on the copy, so it is done without holding the lock.
   if (!IsExecuting()) MarkCancelledNodes(exec_summary);
+  // 'backend_states_' is only safe to read once the exec RPCs have completed.
+  int64_t exec_wall_time_ns = 0;
+  if (exec_rpcs_complete_.Load()) {
+    const int64_t now_ns = MonotonicStopWatch::Now();
+    for (BackendState* backend_state : backend_states_) {
+      exec_wall_time_ns =
+          max(exec_wall_time_ns, backend_state->GetMaxInstanceElapsedTime(now_ns));
+    }
+  }
+  const TQueryOptions& query_options = exec_params_.query_options();
+  SetQueryTimeFractions(exec_wall_time_ns,
+      query_options.bottleneck_summary_min_query_time_frac,
+      query_options.bottleneck_summary_max_entries, exec_summary, bottlenecks);
 }
 
 MemTracker* Coordinator::query_mem_tracker() const {

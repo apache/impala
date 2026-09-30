@@ -273,6 +273,7 @@ TEST(QueryOptions, SetIntOptions) {
       {MAKE_OPTIONDEF(max_num_filters_aggregated_per_host),
           {-1, I32_MAX}},
       {MAKE_OPTIONDEF(num_nodes),                      {0, 1}},
+      {MAKE_OPTIONDEF(bottleneck_summary_max_entries), {0, I32_MAX}},
   };
   for (const auto& test_case : case_set) {
     const OptionDef<int32_t>& option_def = test_case.first;
@@ -327,6 +328,9 @@ TEST(QueryOptions, SetFractionalOptions) {
       {MAKE_OPTIONDEF(agg_mem_correlation_factor), true},
       {MAKE_OPTIONDEF(runtime_filter_cardinality_reduction_scale), true},
       {MAKE_OPTIONDEF(mem_estimate_scale_for_spilling_operator), true},
+      // Inclusive of 0 and 1. At 0, every plan node with exec stats qualifies for the
+      // Bottleneck Summary (see CoordinatorBackendStateTest.MinQueryTimeFracZero).
+      {MAKE_OPTIONDEF(bottleneck_summary_min_query_time_frac), true},
   };
   for (const auto& test_case : case_set) {
     const OptionDef<double>& option_def = test_case.first;

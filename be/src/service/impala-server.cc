@@ -19,8 +19,10 @@
 
 #include <unistd.h>
 #include <algorithm>
+#include <cmath>
 #include <exception>
 #include <functional>
+#include <iomanip>
 #include <sstream>
 #include <string_view>
 #ifdef CALLONCEHACK
@@ -1624,16 +1626,44 @@ void ImpalaServer::SetExecTimeLimit(const ClientRequestState* request_state) {
       now + (1000L * exec_time_limit_s), query_id, ExpirationKind::EXEC_TIME_LIMIT});
 }
 
+/// Replaces the Bottleneck Summary info strings in 'profile' with 'bottlenecks': an
+/// empty "Bottleneck Summary" header followed by "Bottleneck N" -> "<percent>% <label>",
+/// with the percentage shown to three significant digits (e.g. 18.4, 9.48, 100).
+/// Removes the summary if 'bottlenecks' is empty. Existing entries are overwritten in
+/// place and only stale ones removed, so the summary never disappears mid-update.
+static void SetBottleneckSummaryInfoStrings(RuntimeProfile* profile,
+    const vector<Coordinator::BottleneckEntry>& bottlenecks) {
+  if (!bottlenecks.empty()) {
+    profile->AddInfoString("Bottleneck Summary", "");
+    stringstream pct_ss;
+    for (int i = 0; i < bottlenecks.size(); ++i) {
+      pct_ss.clear();
+      pct_ss.str("");
+      pct_ss << fixed << setprecision(2) << setw(5)
+             << bottlenecks[i].query_time_frac * 100;
+      profile->AddInfoString(Substitute("Bottleneck $0", i + 1),
+          Substitute("$0% $1", pct_ss.str(), bottlenecks[i].label));
+    }
+  } else {
+    profile->RemoveInfoString("Bottleneck Summary");
+  }
+  // Remove entries left over from a previous summary that had more of them.
+  for (int i = bottlenecks.size() + 1;
+       profile->RemoveInfoString(Substitute("Bottleneck $0", i)); ++i) {}
+}
+
 void ImpalaServer::UpdateExecSummary(const QueryHandle& query_handle) const {
   DCHECK(query_handle->GetCoordinator() != nullptr);
   TExecSummary t_exec_summary;
-  query_handle->GetCoordinator()->GetTExecSummary(&t_exec_summary);
+  vector<Coordinator::BottleneckEntry> bottlenecks;
+  query_handle->GetCoordinator()->GetTExecSummary(&t_exec_summary, &bottlenecks);
   query_handle->summary_profile()->SetTExecSummary(t_exec_summary);
   string exec_summary = PrintExecSummary(t_exec_summary);
   query_handle->summary_profile()->AddInfoStringRedacted("ExecSummary", exec_summary);
   vector<string> errors = query_handle->GetAnalysisWarnings();
   errors.emplace_back(query_handle->GetCoordinator()->GetErrorLog());
   query_handle->summary_profile()->AddInfoStringRedacted("Errors", join(errors, "\n"));
+  SetBottleneckSummaryInfoStrings(query_handle->summary_profile(), bottlenecks);
 }
 
 // In a single pass over every plan node, collects (a) an index from plan node ID to the

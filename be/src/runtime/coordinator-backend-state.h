@@ -29,6 +29,7 @@
 #include <boost/accumulators/statistics/stats.hpp>
 #include <boost/accumulators/statistics/variance.hpp>
 
+#include "common/atomic.h"
 #include "gen-cpp/admission_control_service.pb.h"
 #include "gen-cpp/control_service.proxy.h"
 #include "kudu/rpc/rpc_controller.h"
@@ -138,21 +139,31 @@ class Coordinator::BackendState {
   /// BEGIN: Functions that should only be called after WaitOnExecRpc() has returned.
 
   /// Update overall execution status, including the instances' exec status/profiles
-  /// and the error log, if this backend is not already done. Updates the fragment
-  /// instances' TExecStats in exec_summary (exec_summary->nodes.exec_stats), updates
-  /// scan_range_progress with any newly-completed scan ranges and updates query_progress
-  /// with any newly-completed fragment instances.
+  /// and the error log, unless CloseStatusReports() has been called. Reports are still
+  /// applied after this backend is done (e.g. cancelled), so that the final reports
+  /// update the profile. Updates the fragment instances' TExecStats in exec_summary
+  /// (exec_summary->nodes.exec_stats), updates scan_range_progress with any
+  /// newly-completed scan ranges and updates query_progress with any newly-completed
+  /// fragment instances.
   ///
   /// If any instance reports an error, the overall execution status becomes the first
   /// reported error status. Returns true iff this update changed IsDone() from false
   /// to true, either because it was the last fragment to complete or because it was
-  /// the first error received. Adds the AuxErrorInfoPB from each
-  /// FragmentInstanceExecStatusPB in backend_exec_status to the vector aux_error_info.
+  /// the first error received. A report for a backend that is already done, e.g. a
+  /// retried final report, returns false. Adds the AuxErrorInfoPB from each
+  /// FragmentInstanceExecStatusPB in backend_exec_status to the vector aux_error_info,
+  /// unless this backend was already done before this update.
   bool ApplyExecStatusReport(const ReportExecStatusRequestPB& backend_exec_status,
       const TRuntimeProfileForest& thrift_profiles, ExecSummary* exec_summary,
       ProgressUpdater* scan_range_progress, ProgressUpdater* query_progress,
       DmlExecState* dml_exec_state, std::vector<AuxErrorInfoPB>* aux_error_info,
       const std::vector<FragmentStats*>& fragment_stats);
+
+  /// Makes ApplyExecStatusReport() reject all further reports. Called for every backend
+  /// before the query summary is computed, so that the profile does not change during
+  /// or after Coordinator::ComputeQuerySummary(). Once this returns, no report is being
+  /// applied to this backend.
+  void CloseStatusReports();
 
   /// Merges the incoming 'thrift_profile' into this backend state's host profile.
   void UpdateHostProfile(const TRuntimeProfileTree& thrift_profile);
@@ -164,6 +175,13 @@ class Coordinator::BackendState {
   /// last call to this function for the query and we must update all instances,
   /// regardless of whether they are done or not.
   void UpdateExecStats(const std::vector<FragmentStats*>& fragment_stats, bool finalize);
+
+  /// Returns the longest execution time in nanoseconds across this backend's fragment
+  /// instances as of 'now_ns', a MonotonicStopWatch::Now() value. Uses an instance's
+  /// completion time if it has been set. If the backend is done and an instance has no
+  /// completion time yet, uses the instance stopwatch. Otherwise uses the time since the
+  /// instances were started. Returns 0 if the instances have not been started.
+  int64_t GetMaxInstanceElapsedTime(int64_t now_ns) const;
 
   /// Make a PublishFilter rpc with given params to this backend. The backend
   /// must be one of the filter targets for the filter being published.
@@ -275,6 +293,13 @@ class Coordinator::BackendState {
 
    private:
     friend class BackendState;
+    friend class CoordinatorBackendStateTest;
+    FRIEND_TEST(CoordinatorBackendStateTest, ExecWallTimeFrozenWhenBackendDone);
+    FRIEND_TEST(CoordinatorBackendStateTest, DuplicateFinalReportReturnsTrueOnce);
+    FRIEND_TEST(CoordinatorBackendStateTest, ReportAfterCancelIsAppliedButNotCounted);
+    FRIEND_TEST(CoordinatorBackendStateTest, ReportsRejectedAfterClose);
+    FRIEND_TEST(CoordinatorBackendStateTest, FinalizedCompletionTimeMatchesFrozenTime);
+    FRIEND_TEST(FinalizeCountersAfterFreezeTest, BothProfileFormats);
 
     /// The exec params for this fragment instance. Owned by the QuerySchedulePB in
     /// ClientRequestState.
@@ -315,8 +340,17 @@ class Coordinator::BackendState {
     /// 'agg_profile_'.
     bool agg_profile_up_to_date_ = true;
 
-    /// If true, the completion time for this instance has been set.
-    bool completion_time_set_ = false;
+    /// Completion time of this instance in nanoseconds, or -1 if not yet recorded.
+    /// Set in UpdateExecStats() when the instance or query finishes. Protected by
+    /// BackendState::lock_.
+    int64_t completion_time_ns_ = -1;
+
+    /// Elapsed time frozen when the backend is done but completion_time_ns_ is not set
+    /// yet (e.g. cancel before Wait()). Used only for exec wall time; does not affect
+    /// profile counter finalization in UpdateExecStats(). 'stopwatch_' is stopped when
+    /// this is set, so a completion time recorded later has the same value. Protected by
+    /// BackendState::lock_.
+    int64_t frozen_elapsed_time_ns_ = -1;
 
     /// true if the final report has been received for the fragment instance.
     /// Used to handle duplicate done ReportExecStatus RPC messages. Used only
@@ -353,6 +387,11 @@ class Coordinator::BackendState {
   /// map from instance idx to InstanceStats, the latter live in the obj_pool parameter
   /// of Init()
   std::unordered_map<int, InstanceStats*> instance_stats_map_;
+
+  /// MonotonicStopWatch::Now() value when the instances' stopwatches were started after
+  /// the exec RPC succeeded, or -1 if they have not been started.
+  /// Protected by 'lock_'.
+  int64_t exec_start_time_ns_ = -1;
 
   /// indices of fragments executing on this backend, populated in Init()
   std::unordered_set<int> fragments_;
@@ -395,7 +434,7 @@ class Coordinator::BackendState {
   /// BEGIN: Members that are protected by 'lock_'.
 
   /// Lock ordering: Coordinator::lock_ must only be obtained *prior* to lock_
-  std::mutex lock_;
+  mutable std::mutex lock_;
 
   // Number of in-flight instances
   int num_remaining_instances_ = 0;
@@ -451,6 +490,10 @@ class Coordinator::BackendState {
   /// Resource utilization values. Set in ApplyExecStatusReport().
   ResourceUtilization backend_utilization_;
 
+  /// True once CloseStatusReports() has been called. ApplyExecStatusReport() rejects
+  /// all reports after that.
+  bool status_reports_closed_ = false;
+
   /// END: Members that are protected by 'lock_'.
   /////////////////////////////////////////
 
@@ -488,11 +531,31 @@ class Coordinator::BackendState {
   void UpdateExecStatsLocked(const std::unique_lock<std::mutex>& lock,
       const std::vector<FragmentStats*>& fragment_stats, bool finalize);
 
+  /// Records elapsed time on instances that do not have completion_time_ns_ yet so exec
+  /// wall time does not keep growing after the backend is done (e.g. query cancelled
+  /// before Wait()). Also stops their stopwatches, so the completion time that
+  /// UpdateExecStats() records later equals the frozen time and exec wall time does not
+  /// change when the query summary is finalized. Does not set completion_time_ns_;
+  /// UpdateExecStats() still owns CompletionTime and ExecutionRate profile counters.
+  /// Caller must hold 'lock_'.
+  void FreezeUnsetInstanceCompletionTimesLocked(
+      const std::unique_lock<std::mutex>& lock);
+
   /// Logs 'msg' at the VLOG_QUERY level, along with 'query_id_' and 'krpc_host_'.
   void VLogForBackend(const std::string& msg);
 
   /// Populates the 'by_node_filepath_to_hosts' mapping in 'request' from 'exec_params_'.
   void CopyFilepathToHostsMappingToRequest(ExecQueryFInstancesRequestPB* request) const;
+
+  // Requires access to InstanceStats, instance_stats_map_ and exec_start_time_ns_.
+  friend class CoordinatorBackendStateTest;
+  FRIEND_TEST(CoordinatorBackendStateTest, MaxInstanceElapsedTime);
+  FRIEND_TEST(CoordinatorBackendStateTest, ExecWallTimeFrozenWhenBackendDone);
+  FRIEND_TEST(CoordinatorBackendStateTest, DuplicateFinalReportReturnsTrueOnce);
+  FRIEND_TEST(CoordinatorBackendStateTest, ReportAfterCancelIsAppliedButNotCounted);
+  FRIEND_TEST(CoordinatorBackendStateTest, ReportsRejectedAfterClose);
+  FRIEND_TEST(CoordinatorBackendStateTest, FinalizedCompletionTimeMatchesFrozenTime);
+  FRIEND_TEST(FinalizeCountersAfterFreezeTest, BothProfileFormats);
 };
 
 /// Per fragment execution statistics.

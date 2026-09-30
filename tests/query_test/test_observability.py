@@ -23,11 +23,12 @@ import uuid
 
 import pytest
 
+from impala_shell.impala_client import ImpalaHS2Client
 from impala_thrift_gen.RuntimeProfile.ttypes import TRuntimeProfileFormat
 from tests.common.environ import IS_CALCITE_PLANNER
 from tests.common.impala_cluster import ImpalaCluster
 from tests.common.impala_connection import IMPALA_CONNECTION_EXCEPTION
-from tests.common.impala_test_suite import ImpalaTestSuite
+from tests.common.impala_test_suite import IMPALAD_HS2_HOST_PORT, ImpalaTestSuite
 from tests.common.skip import (SkipIfFS, SkipIfLocal, SkipIfNotHdfsMinicluster,
                                SkipIfCalcite)
 from tests.common.test_vector import HS2
@@ -427,6 +428,130 @@ class TestObservability(ImpalaTestSuite):
         exec_summary.progress.total_scan_ranges
     assert exec_summary.progress.num_completed_fragment_instances == \
         exec_summary.progress.total_fragment_instances
+
+  QUERY_TIME_FRAC_QUERY = """select count(*) from functional.alltypes a
+      join functional.alltypes b on a.id = b.id"""
+
+  @staticmethod
+  def _max_reported_latency_ns(node):
+    """Same latency selection as Coordinator::SetQueryTimeFractions()."""
+    if not node.exec_stats:
+      return None
+    max_latency_ns = 0
+    has_reported = False
+    for stats in node.exec_stats:
+      if stats.latency_ns is None:
+        continue
+      has_reported = True
+      max_latency_ns = max(max_latency_ns, stats.latency_ns)
+    if not has_reported or max_latency_ns <= 0:
+      return None
+    return max_latency_ns
+
+  def __get_final_exec_summary(self, query, query_options):
+    """Runs 'query' to completion and returns its final TExecSummary, its text runtime
+    profile and the elapsed time in nanoseconds measured by the client."""
+    # Impyla decodes GetExecSummary() responses with its own bundled Thrift classes,
+    # which drop newer fields, so use the shell client and its generated classes.
+    client = ImpalaHS2Client(IMPALAD_HS2_HOST_PORT.split(":"), 1024, None)
+    handle = None
+    try:
+      client.connect()
+      start_time = time()
+      handle = client.execute_query(query, query_options)
+      for _ in client.fetch(handle): pass
+      client_elapsed_ns = (time() - start_time) * 1e9
+      exec_summary, _ = client.get_summary(handle)
+      profile, _ = client.get_runtime_profile(handle)
+    finally:
+      if handle is not None: client.close_query(handle)
+      client.close_connection()
+    return exec_summary, profile, client_elapsed_ns
+
+  @pytest.mark.parametrize("mt_dop", [0, 2])
+  def test_exec_summary_query_time_frac(self, mt_dop):
+    """Test that the final exec summary has the execution wall time and a query-relative
+    time fraction for each node derived from its slowest instance."""
+    exec_summary, _, client_elapsed_ns = self.__get_final_exec_summary(
+        self.QUERY_TIME_FRAC_QUERY, {"mt_dop": str(mt_dop)})
+
+    # Execution starts after the query is submitted and all backends have reported by
+    # the time the last fetch returns.
+    wall_time_ns = exec_summary.exec_wall_time_ns
+    assert 0 < wall_time_ns <= client_elapsed_ns
+    for node in exec_summary.nodes:
+      max_latency_ns = self._max_reported_latency_ns(node)
+      if max_latency_ns is None:
+        assert node.query_time_frac is None, node.label
+        continue
+      expected_frac = min(1.0, max_latency_ns / wall_time_ns)
+      assert node.query_time_frac is not None, node.label
+      assert node.query_time_frac == pytest.approx(expected_frac), node.label
+
+  @SkipIfNotHdfsMinicluster.tuned_for_minicluster
+  @pytest.mark.parametrize("mt_dop", [0, 2])
+  def test_exec_summary_query_time_frac_hotspot(self, mt_dop):
+    """Test that a node with an injected GetNext() delay has the highest
+    query_time_frac and is listed first in the Bottleneck Summary."""
+    hotspot_id = 2
+    exec_summary, profile, _ = self.__get_final_exec_summary(self.QUERY_TIME_FRAC_QUERY,
+        {"mt_dop": str(mt_dop), "debug_action": "%d:GETNEXT:DELAY@200" % hotspot_id})
+
+    nodes_with_frac = [n for n in exec_summary.nodes if n.query_time_frac is not None]
+    fracs = [(node.label, node.query_time_frac) for node in nodes_with_frac]
+    hottest = max(nodes_with_frac, key=lambda node: node.query_time_frac)
+    assert hottest.node_id == hotspot_id, fracs
+    assert re.search(r"Bottleneck Summary:\s*\n\s+Bottleneck 1: \d+(?:\.\d+)?%% %s\n"
+        % re.escape(hottest.label), profile), profile
+
+  @pytest.mark.parametrize("max_entries", [0, 1, 4])
+  def test_bottleneck_summary_query_options(self, max_entries):
+    """Test that the Bottleneck Summary lists BOTTLENECK_SUMMARY_MAX_ENTRIES nodes when
+    BOTTLENECK_SUMMARY_MIN_QUERY_TIME_FRAC lets every node qualify, and that 0 omits
+    the summary."""
+    exec_summary, profile, _ = self.__get_final_exec_summary(self.QUERY_TIME_FRAC_QUERY,
+        {"bottleneck_summary_max_entries": str(max_entries),
+         "bottleneck_summary_min_query_time_frac": "0"})
+    num_nodes = sum(1 for node in exec_summary.nodes
+                    if self._max_reported_latency_ns(node) is not None)
+    num_entries = min(max_entries, num_nodes)
+    assert len(re.findall(r"\n\s+Bottleneck \d+: ", profile)) == num_entries, profile
+    assert ("Bottleneck Summary:" in profile) == (num_entries > 0), profile
+
+  @SkipIfNotHdfsMinicluster.tuned_for_minicluster
+  def test_exec_summary_query_time_frac_running(self):
+    """Test that a running query has query time fractions and a Bottleneck Summary
+    before it completes."""
+    # Injected GetNext() delay keeps the scan running long enough to poll the summary and
+    # is reflected in exec-summary local time. A per-row sleep() keeps the query running
+    # but barely adds to any node's local time, so no node would reach the threshold.
+    query = "select count(*) from functional.alltypes"
+    client = ImpalaHS2Client(IMPALAD_HS2_HOST_PORT.split(":"), 1024, None)
+    handle = None
+    try:
+      client.connect()
+      handle = client.execute_query(query, {"debug_action": "0:GETNEXT:DELAY@500"})
+      # Node times are only updated by status reports, so wait for one to arrive.
+      deadline = time() + 60
+      while True:
+        exec_summary, _ = client.get_summary(handle)
+        profile, _ = client.get_runtime_profile(handle)
+        if re.search(r"Bottleneck Summary:\s*\n\s+Bottleneck 1: \d+(?:\.\d+)?% ",
+            profile): break
+        assert time() < deadline, profile
+        sleep(0.5)
+      progress = exec_summary.progress
+      assert progress.num_completed_fragment_instances < progress.total_fragment_instances
+      assert exec_summary.exec_wall_time_ns > 0
+      for node in exec_summary.nodes:
+        if node.query_time_frac is None:
+          continue
+        assert 0 <= node.query_time_frac <= 1, node.label
+    finally:
+      if handle is not None:
+        client.cancel_query(handle)
+        client.close_query(handle)
+      client.close_connection()
 
   def test_exec_summary_in_runtime_profile(self):
     """Test that the exec summary is populated in runtime profile correctly in every

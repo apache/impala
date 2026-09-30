@@ -194,8 +194,20 @@ class Coordinator { // NOLINT: The member variables could be re-ordered to save 
 
   const ProgressUpdater& query_progress() const { return query_progress_; }
 
-  /// Get a copy of the current exec summary. Thread-safe.
+  /// A plan node listed in the Bottleneck Summary.
+  struct BottleneckEntry {
+    std::string label;
+    double query_time_frac = 0;
+  };
+
+  /// Get a copy of the current exec summary, with query_time_frac set on each node
+  /// relative to the execution time so far. Thread-safe.
   void GetTExecSummary(TExecSummary* exec_summary);
+
+  /// Same as above, and also sets 'bottlenecks' to the nodes to list in
+  /// the Bottleneck Summary.
+  void GetTExecSummary(
+      TExecSummary* exec_summary, std::vector<BottleneckEntry>* bottlenecks);
 
   /// Returns a map from filter ID to the set of target node IDs where the filter
   /// rejected data. Calls ComputeEffectiveFilterTargets() if not already computed.
@@ -593,6 +605,16 @@ class Coordinator { // NOLINT: The member variables could be re-ordered to save 
   /// instance didn't complete execution, e.g., due to parent node reaches limit.
   static void MarkCancelledNodes(TExecSummary* exec_summary);
 
+  /// Sets exec_wall_time_ns on exec_summary and query_time_frac on each node with exec
+  /// stats: the max latency_ns across the node's instances divided by
+  /// exec_wall_time_ns, clamped to [0, 1]. Sets bottlenecks to up to max_entries nodes
+  /// with a query_time_frac of at least min_query_time_frac, ordered from highest to
+  /// lowest, with ties broken by plan order. Does nothing to exec_summary and sets no
+  /// bottlenecks if exec_wall_time_ns <= 0.
+  static void SetQueryTimeFractions(int64_t exec_wall_time_ns,
+      double min_query_time_frac, int max_entries, TExecSummary* exec_summary,
+      std::vector<BottleneckEntry>* bottlenecks);
+
   // For DCHECK_EQ, etc of ExecState values.
   friend std::ostream& operator<<(std::ostream& o, const ExecState s) {
     return o << ExecStateToString(s);
@@ -742,6 +764,18 @@ class Coordinator { // NOLINT: The member variables could be re-ordered to save 
   FRIEND_TEST(CoordinatorBackendStateTest, CoordinatorOnly);
   FRIEND_TEST(CoordinatorBackendStateTest, TimedRelease);
   FRIEND_TEST(CoordinatorBackendStateTest, BatchedRelease);
+  FRIEND_TEST(CoordinatorBackendStateTest, MaxInstanceElapsedTime);
+  FRIEND_TEST(CoordinatorBackendStateTest, ExecWallTimeFrozenWhenBackendDone);
+  FRIEND_TEST(CoordinatorBackendStateTest, QueryTimeFractions);
+  FRIEND_TEST(CoordinatorBackendStateTest, QueryTimeFractionsUnsetLatency);
+  FRIEND_TEST(CoordinatorBackendStateTest, QueryTimeFractionsZeroLatency);
+  FRIEND_TEST(CoordinatorBackendStateTest, BottleneckSelection);
+  FRIEND_TEST(CoordinatorBackendStateTest, MinQueryTimeFracZero);
+  FRIEND_TEST(CoordinatorBackendStateTest, DuplicateFinalReportReturnsTrueOnce);
+  FRIEND_TEST(CoordinatorBackendStateTest, ReportAfterCancelIsAppliedButNotCounted);
+  FRIEND_TEST(CoordinatorBackendStateTest, ReportsRejectedAfterClose);
+  FRIEND_TEST(CoordinatorBackendStateTest, FinalizedCompletionTimeMatchesFrozenTime);
+  FRIEND_TEST(FinalizeCountersAfterFreezeTest, BothProfileFormats);
 };
 
 }

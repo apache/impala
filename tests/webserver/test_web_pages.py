@@ -759,6 +759,30 @@ class TestWebPage(ImpalaTestSuite):
     # Verify error message
     assert "Table already exists" in response_json['status']
 
+  def test_query_plan_query_time_frac(self):
+    """Test that the plan JSON of a finished query has query_time_frac for every plan
+    node with exec stats."""
+    query = "select count(*) from functional.alltypes"
+    with self.create_impala_client(protocol=HS2) as client:
+      handle = client.execute_async(query)
+      # Fetching all rows finalizes the exec summary. The query is kept open so that the
+      # page does not race with the query being archived.
+      client.fetch(query, handle)
+      response_json = self.get_debug_page("{0}?query_id={1}&json".format(
+          self.QUERY_PLAN.format(25000), client.handle_id(handle)))
+      client.close_query(handle)
+    assert 'plan_json' in response_json, response_json
+    fracs = []
+    nodes = list(response_json['plan_json']['plan_nodes'])
+    while nodes:
+      node = nodes.pop()
+      nodes.extend(node['children'])
+      if 'max_time_val' in node:
+        assert 'query_time_frac' in node, node
+        fracs.append(node['query_time_frac'])
+    assert fracs, response_json
+    assert all(0 <= frac <= 1 for frac in fracs), fracs
+
   @pytest.mark.xfail(run=False, reason="IMPALA-8059")
   def test_backend_states(self, unique_database):
     """Test that /query_backends returns the list of backend states for DML or

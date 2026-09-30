@@ -771,6 +771,28 @@ TEST(CountersTest, InfoStringTest) {
   EXPECT_EQ(*update_dst_profile->GetInfoString("Foo"), "Bar");
 }
 
+// Test that removing an info string also removes it from the display order, so that
+// adding it again places it last.
+TEST(CountersTest, RemoveInfoString) {
+  ObjectPool pool;
+  RuntimeProfile* profile = RuntimeProfile::Create(&pool, "Profile");
+  profile->AddInfoString("A", "1");
+  profile->AddInfoString("B", "2");
+  profile->AddInfoString("C", "3");
+
+  EXPECT_TRUE(profile->RemoveInfoString("A"));
+  EXPECT_FALSE(profile->RemoveInfoString("A"));
+  EXPECT_FALSE(profile->RemoveInfoString("Missing"));
+  EXPECT_EQ(nullptr, profile->GetInfoString("A"));
+  profile->AddInfoString("A", "4");
+
+  TRuntimeProfileTree tprofile;
+  profile->ToThrift(&tprofile);
+  EXPECT_EQ(vector<string>({"B", "C", "A"}),
+      tprofile.nodes[0].info_strings_display_order);
+  EXPECT_EQ("4", tprofile.nodes[0].info_strings["A"]);
+}
+
 // Helper for the AggregateInfoStrings that verifies the encoded event sequence
 // in the thrift representation when it was merged into the profile at instance offset
 // 'offset'.

@@ -82,6 +82,11 @@ struct TPlanNodeExecSummary {
   // The number of hosts. It cannot be inferred from exec_stats, since the length of the
   // list can be greater when mt_dop > 0.
   9: optional i32 num_hosts
+
+  // Max latency_ns across instances divided by TExecSummary.exec_wall_time_ns, clamped
+  // to [0, 1]. Set by the coordinator whenever it returns the exec summary, including
+  // for running queries, where latency_ns is as of the last status report.
+  10: optional double query_time_frac
 }
 
 // Progress counters for an in-flight query.
@@ -122,4 +127,11 @@ struct TExecSummary {
   // Contains the latest queuing reason if the query is currently queued by admission
   // control.
   8: optional string queued_reason
+
+  // Approximate execution wall time: the longest execution time across all fragment
+  // instances. Each is measured on the coordinator from when its backend accepted the
+  // exec RPC until the instance's final status report was received, or until now if
+  // the instance is still running. Excludes planning, admission and post-execution
+  // work. Set by the coordinator whenever it returns the exec summary.
+  9: optional i64 exec_wall_time_ns
 }

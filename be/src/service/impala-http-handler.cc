@@ -1164,6 +1164,10 @@ void ExecStatsToJsonHelper(
       total_time / ::max(static_cast<int>(summary.exec_stats.size()), 1), TUnit::TIME_NS);
   Value avg_time_str_json(avg_time_str, document->GetAllocator());
   value->AddMember("avg_time", avg_time_str_json, document->GetAllocator());
+  if (summary.__isset.query_time_frac) {
+    value->AddMember(
+        "query_time_frac", summary.query_time_frac, document->GetAllocator());
+  }
 }
 
 // Helper for PlanToJson(), processes a single list of plan nodes which are the

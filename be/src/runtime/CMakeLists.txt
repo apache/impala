@@ -136,7 +136,8 @@ add_dependencies(RuntimeTests gen-deps)
 
 ADD_UNIFIED_BE_LSAN_TEST(backend-machine-info-aggregator-test
     "MachineInfoPbStringTest.*:BackendMachineInfoAggregatorTest.*")
-ADD_UNIFIED_BE_LSAN_TEST(coordinator-backend-state-test CoordinatorBackendStateTest.*)
+ADD_UNIFIED_BE_LSAN_TEST(coordinator-backend-state-test
+    "CoordinatorBackendStateTest.*:BothFormats/FinalizeCountersAfterFreezeTest.*")
 ADD_UNIFIED_BE_LSAN_TEST(mem-pool-test MemPoolTest.*)
 ADD_BE_TEST(client-cache-test)
 ADD_UNIFIED_BE_LSAN_TEST(free-pool-test FreePoolTest.*)
