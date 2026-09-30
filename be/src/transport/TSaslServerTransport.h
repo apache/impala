@@ -84,13 +84,13 @@ class TSaslServerTransport : public TSaslTransport {
                           std::string serverName, std::string realm,
                           unsigned flags, std::map<std::string, std::string> props,
                           std::vector<struct sasl_callback> callbacks)
-        : mechanism_(move(mechanism)),
-          protocol_(move(protocol)),
-          serverName_(move(serverName)),
-          realm_(move(realm)),
+        : mechanism_(std::move(mechanism)),
+          protocol_(std::move(protocol)),
+          serverName_(std::move(serverName)),
+          realm_(std::move(realm)),
           flags_(flags),
-          props_(move(props)),
-          callbacks_(move(callbacks)) {
+          props_(std::move(props)),
+          callbacks_(std::move(callbacks)) {
     }
   };
 
@@ -113,10 +113,11 @@ class TSaslServerTransport : public TSaslTransport {
                            std::vector<struct sasl_callback> callbacks) {
     // Make a copy because expression evaluation order is not guaranteed.
     std::string mechanism_key = mechanism;
-    serverDefinitionMap_.insert(std::pair<std::string,
-                                          TSaslServerDefinition*>(move(mechanism_key),
-        new TSaslServerDefinition(move(mechanism), move(protocol), move(serverName),
-            move(realm), flags, move(props), move(callbacks))));
+    serverDefinitionMap_.insert(std::pair<std::string, TSaslServerDefinition*>(
+        std::move(mechanism_key),
+        new TSaslServerDefinition(
+            std::move(mechanism), std::move(protocol), std::move(serverName),
+            std::move(realm), flags, std::move(props), std::move(callbacks))));
   }
 
   /* Set the server */
@@ -140,7 +141,7 @@ class TSaslServerTransport : public TSaslTransport {
             std::vector<struct sasl_callback> callbacks)
         : TTransportFactory() {
       addServerDefinition(mechanism, protocol, serverName, realm, flags,
-          move(props), move(callbacks));
+          std::move(props), std::move(callbacks));
     }
 
     virtual ~Factory() {}
@@ -162,7 +163,7 @@ class TSaslServerTransport : public TSaslTransport {
       serverDefinitionMap_.insert(
           std::pair<std::string, TSaslServerDefinition*>(mechanism,
           new TSaslServerDefinition(mechanism, protocol,
-              serverName, realm, flags, move(props), move(callbacks))));
+              serverName, realm, flags, std::move(props), std::move(callbacks))));
     }
    private:
     /* Map for holding and returning server definitions. */

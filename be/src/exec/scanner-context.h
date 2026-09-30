@@ -137,7 +137,9 @@ class ScannerContext {
     /// The callback takes the file offset of the asynchronous read (this may be more
     /// than file_offset() due to data being assembled in the boundary buffer).
     typedef std::function<int (int64_t)> ReadPastSizeCallback;
-    void set_read_past_size_cb(ReadPastSizeCallback cb) { read_past_size_cb_ = move(cb); }
+    void set_read_past_size_cb(ReadPastSizeCallback cb) {
+      read_past_size_cb_ = std::move(cb);
+    }
 
     /// Return the number of bytes left in the range for this stream.
     int64_t bytes_left() { return scan_range_->bytes_to_read() - total_bytes_returned_; }

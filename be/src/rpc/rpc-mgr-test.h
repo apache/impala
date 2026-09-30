@@ -168,7 +168,7 @@ class RpcMgrTest : public testing::TestWithParam<bool> {
   // Takes over ownership of the newly created 'service' which needs to have a lifetime
   // as long as 'rpc_mgr_' as RpcMgr::Shutdown() will call Shutdown() of 'service'.
   GeneratedServiceIf* TakeOverService(std::unique_ptr<GeneratedServiceIf> service) {
-    services_.emplace_back(move(service));
+    services_.emplace_back(std::move(service));
     return services_.back().get();
   }
 

@@ -113,8 +113,8 @@ Status SetFaststringSidecar(const T& obj, RPC* rpc, int* sidecar_idx, int64_t* l
   sidecar_str.assign_copy(serialized_buf, serialized_len);
   std::unique_ptr<kudu::rpc::RpcSidecar> rpc_sidecar =
       kudu::rpc::RpcSidecar::FromFaststring(std::move(sidecar_str));
-  RETURN_IF_ERROR(FromKuduStatus(
-      rpc->AddOutboundSidecar(move(rpc_sidecar), sidecar_idx), "Failed to add sidecar"));
+  RETURN_IF_ERROR(FromKuduStatus(rpc->AddOutboundSidecar(
+      std::move(rpc_sidecar), sidecar_idx), "Failed to add sidecar"));
   *length = serialized_len;
   return Status::OK();
 }

@@ -39,7 +39,7 @@ struct QueryHandle {
   /// Sets the QueryDriver and ClientRequestState for this handle.
   void SetHandle(
       std::shared_ptr<QueryDriver> query_driver, ClientRequestState* request_state) {
-    SetQueryDriver(move(query_driver));
+    SetQueryDriver(std::move(query_driver));
     SetClientRequestState(request_state);
   }
 

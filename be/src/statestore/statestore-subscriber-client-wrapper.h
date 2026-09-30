@@ -26,12 +26,12 @@ class StatestoreSubscriberClientWrapper : public StatestoreSubscriberClient {
   public:
    StatestoreSubscriberClientWrapper(
        std::shared_ptr<::apache::thrift::protocol::TProtocol> prot)
-     : StatestoreSubscriberClient(move(prot)) {}
+     : StatestoreSubscriberClient(std::move(prot)) {}
 
    StatestoreSubscriberClientWrapper(
        std::shared_ptr<::apache::thrift::protocol::TProtocol> iprot,
        std::shared_ptr<::apache::thrift::protocol::TProtocol> oprot)
-     : StatestoreSubscriberClient(move(iprot), move(oprot)) {}
+     : StatestoreSubscriberClient(std::move(iprot), std::move(oprot)) {}
 
 /// We intentionally disable this clang warning as we intend to hide the
 /// the same-named functions defined in the base class.

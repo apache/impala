@@ -82,10 +82,10 @@ inline void ColumnStats<T>::EncodeToThrift(parquet::Statistics* out) const {
   if (has_min_max_values_) {
     std::string min_str;
     EncodePlainValue(min_value_, BytesNeeded(min_value_), &min_str);
-    out->__set_min_value(move(min_str));
+    out->__set_min_value(std::move(min_str));
     std::string max_str;
     EncodePlainValue(max_value_, BytesNeeded(max_value_), &max_str);
-    out->__set_max_value(move(max_str));
+    out->__set_max_value(std::move(max_str));
   }
   out->__set_null_count(null_count_);
 }

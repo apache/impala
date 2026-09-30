@@ -416,14 +416,14 @@ class KrpcDataStreamMgr : public CacheLineAligned {
 
     /// Defining the move constructor as vectors of unique_ptr are not copyable.
     EarlySendersList(EarlySendersList&& other)
-      : waiting_sender_ctxs(move(other.waiting_sender_ctxs)),
-        closed_sender_ctxs(move(other.closed_sender_ctxs)),
+      : waiting_sender_ctxs(std::move(other.waiting_sender_ctxs)),
+        closed_sender_ctxs(std::move(other.closed_sender_ctxs)),
         arrival_time(other.arrival_time) { }
 
     /// Defining the move operator= as vectors of unique_ptr are not copyable.
     EarlySendersList& operator=(EarlySendersList&& other) {
-      waiting_sender_ctxs = move(other.waiting_sender_ctxs);
-      closed_sender_ctxs = move(other.closed_sender_ctxs);
+      waiting_sender_ctxs = std::move(other.waiting_sender_ctxs);
+      closed_sender_ctxs = std::move(other.closed_sender_ctxs);
       arrival_time = other.arrival_time;
       return *this;
     }
