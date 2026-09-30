@@ -762,7 +762,7 @@ Status HdfsScanner::UpdateDecompressor(const THdfsCompression::type& compression
 }
 
 Status HdfsScanner::UpdateDecompressor(const string& codec) {
-  map<const string, const THdfsCompression::type>::const_iterator
+  map<string, THdfsCompression::type>::const_iterator
     type = Codec::CODEC_MAP.find(codec);
 
   if (type == Codec::CODEC_MAP.end()) {
