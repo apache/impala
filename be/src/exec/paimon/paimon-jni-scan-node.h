@@ -74,7 +74,8 @@ class PaimonJniScanNode : public ScanNode {
   /// Fills the next rowbatch with the results returned by the Paimon scan.
   Status GetNext(RuntimeState* state, RowBatch* row_batch, bool* eos) override;
 
-  /// Finalize and close this operator.
+  /// Finalize and close this operator. Safe to call if Prepare() or Open() failed or
+  /// were not called.
   void Close(RuntimeState* state) override;
 
  protected:

@@ -60,6 +60,18 @@ QUERIES = [
            WHERE t2.int_col < 1000"""
 ]
 
+# Queries that read fixed tables instead of '{db}'. See add_test_dimensions().
+FIXED_TABLE_QUERIES = [
+  # IMPALA-14778: Iceberg metadata scans run in the coordinator fragment. If the query
+  # fails or is cancelled, the UNION closes children that it has not opened.
+  """select snapshot_id from functional_parquet.iceberg_query_metadata.snapshots
+     union all
+     select snapshot_id from functional_parquet.iceberg_query_metadata.snapshots""",
+]
+# Locations that do not apply to the nodes of FIXED_TABLE_QUERIES: the *_SCANNER ones
+# are HDFS-scanner only, and no exec node calls ExecDebugAction(CLOSE).
+FIXED_TABLE_SKIPPED_LOCATIONS = ['PREPARE_SCANNER', 'GETNEXT_SCANNER', 'CLOSE']
+
 
 @SkipIf.skip_hbase  # -skip_hbase argument specified
 @SkipIfFS.hbase  # missing coverage: failures
@@ -68,7 +80,7 @@ class TestFailpoints(ImpalaTestSuite):
   def add_test_dimensions(cls):
     super(TestFailpoints, cls).add_test_dimensions()
     cls.ImpalaTestMatrix.add_dimension(
-        ImpalaTestDimension('query', *QUERIES))
+        ImpalaTestDimension('query', *(QUERIES + FIXED_TABLE_QUERIES)))
     cls.ImpalaTestMatrix.add_dimension(
         ImpalaTestDimension('action', *FAILPOINT_ACTIONS))
     cls.ImpalaTestMatrix.add_dimension(
@@ -88,6 +100,13 @@ class TestFailpoints(ImpalaTestSuite):
     cls.ImpalaTestMatrix.add_constraint(
         lambda v: not (v.get_value('action') == 'CANCEL'
                      and v.get_value('location') == 'CLOSE'))
+    # The tables of FIXED_TABLE_QUERIES do not depend on the table format, so run them
+    # with a single table format and mt_dop.
+    cls.ImpalaTestMatrix.add_constraint(
+        lambda v: v.get_value('query') not in FIXED_TABLE_QUERIES or (
+            v.get_value('table_format').file_format == 'parquet'
+            and v.get_value('mt_dop') == 0
+            and v.get_value('location') not in FIXED_TABLE_SKIPPED_LOCATIONS))
 
   # Run serially because this can create enough memory pressure to invoke the Linux OOM
   # killer on machines with 30GB RAM. This makes the test run in 4 minutes instead of 1-2.

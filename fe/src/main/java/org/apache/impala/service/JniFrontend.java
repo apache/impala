@@ -33,6 +33,7 @@ import org.apache.hadoop.security.JniBasedUnixGroupsMappingWithFallback;
 import org.apache.hadoop.security.JniBasedUnixGroupsNetgroupMappingWithFallback;
 import org.apache.hadoop.security.ShellBasedUnixGroupsMapping;
 import org.apache.hadoop.security.ShellBasedUnixGroupsNetgroupMapping;
+import org.apache.impala.analysis.Analyzer;
 import org.apache.impala.analysis.DescriptorTable;
 import org.apache.impala.analysis.ToSqlUtils;
 import org.apache.impala.analysis.SqlScanner;
@@ -47,6 +48,7 @@ import org.apache.impala.hive.geospatial.esri.GeometryUtils;
 import org.apache.impala.thrift.TGeospatialLibrary;
 import org.apache.impala.catalog.FeTable;
 import org.apache.impala.catalog.Function;
+import org.apache.impala.catalog.TableNotFoundException;
 import org.apache.impala.common.UserCancelledException;
 import org.apache.impala.common.FileSystemUtil;
 import org.apache.impala.common.ImpalaException;
@@ -776,11 +778,23 @@ public class JniFrontend {
     frontend_.refreshAuthorization();
   }
 
+  /**
+   * Returns the table with the given name (a serialized TTableName) from the impalad's
+   * catalog. Used by the backend's IcebergMetadataScanNode, which gets the base table
+   * again at execution time; the table may have been dropped since the query was
+   * analyzed. Never returns null, because the backend cannot handle a null result.
+   */
   FeTable getCatalogTable(byte[] tableNameParam) throws ImpalaException {
     Preconditions.checkNotNull(frontend_);
     TTableName tableName = new TTableName();
     JniUtil.deserializeThrift(protocolFactory_, tableName, tableNameParam);
-    return frontend_.getCatalog().getTable(tableName.db_name, tableName.table_name);
+    FeTable table =
+        frontend_.getCatalog().getTable(tableName.db_name, tableName.table_name);
+    if (table == null) {
+      throw new TableNotFoundException(Analyzer.TBL_DOES_NOT_EXIST_ERROR_MSG
+          + tableName.db_name + "." + tableName.table_name);
+    }
+    return table;
   }
 
   // Caching this saves ~50ms per call to getHadoopConfig

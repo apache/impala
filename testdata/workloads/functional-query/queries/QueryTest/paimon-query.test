@@ -18,6 +18,21 @@ select count(*) from functional_parquet.paimon_primitive_alltypes
 BIGINT
 ====
 ---- QUERY
+# IMPALA-14778: Close() of a Paimon scan whose Prepare() failed.
+set debug_action="0:PREPARE:FAIL";
+select int_value from functional_parquet.paimon_primitive_alltypes;
+---- CATCH
+Debug Action: FAIL
+====
+---- QUERY
+# IMPALA-14778: Close() of a Paimon scan whose Open() failed before the JNI scanner was
+# created.
+set debug_action="0:OPEN:FAIL";
+select int_value from functional_parquet.paimon_primitive_alltypes;
+---- CATCH
+Debug Action: FAIL
+====
+---- QUERY
 # Gets all types including a row with a NULL value. The predicate pushed to
 # the DataSource.
 select bool_value,tiny_value,small_value,int_value,big_value,float_value,double_value,decimal_value,char_value,varchar_value,binary_value,date_value,ts_value

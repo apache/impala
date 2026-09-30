@@ -30,6 +30,8 @@ class RuntimeState;
 /// Adapter class of the FE IcebergMetadataScanner, wraps the JNI calls as C++ methods.
 class IcebergMetadataScanner {
  public:
+  /// 'jtable' is a JNI global reference to the base table, returned by
+  /// Frontend::GetCatalogTable(). This object takes ownership of it.
   IcebergMetadataScanner(jobject jtable, const char* metadata_table_name,
       const TupleDescriptor* tuple_desc);
 
@@ -84,7 +86,8 @@ class IcebergMetadataScanner {
   Status ConvertJavaCharSequenceToUtf8ByteArray(JNIEnv* env,
       const jobject& char_sequence, jbyteArray* result) WARN_UNUSED_RESULT;
 
-  /// Removes global references.
+  /// Closes the Java scanner and removes the global references. Safe to call if Init()
+  /// failed or was not called.
   void Close(RuntimeState* state);
 
  private:
@@ -112,11 +115,13 @@ class IcebergMetadataScanner {
       iceberg_metadata_scanner_byte_buffer_to_byte_array_ = nullptr;
   inline static jmethodID
       iceberg_metadata_scanner_char_sequence_to_utf8_bytes_ = nullptr;
+  inline static jmethodID iceberg_metadata_scanner_close_ = nullptr;
 
   inline static jmethodID map_entry_get_key_ = nullptr;
   inline static jmethodID map_entry_get_value_ = nullptr;
 
-  /// The Impala FeTable object in Java, used to scan the metadata table.
+  /// The Impala FeTable object in Java, used to scan the metadata table. Global
+  /// reference owned by this object; nullptr after Close().
   jobject jtable_;
 
   /// The name of the metadata table, used to identify which metadata table is needed.
@@ -127,8 +132,9 @@ class IcebergMetadataScanner {
 
   /// Iceberg metadata scanner Java object, it helps preparing the metadata table and
   /// executes an Iceberg table scan. Allows the ScanNode to fetch the metadata from
-  /// the Java Heap.
-  jobject jmetadata_scanner_;
+  /// the Java Heap. Set by Init(); nullptr before that, if Init() failed, and after
+  /// Close().
+  jobject jmetadata_scanner_ = nullptr;
 
   /// Maps the SlotId to a FieldId, used when obtaining an Accessor for a field.
   std::unordered_map<SlotId, int> slot_id_to_field_id_map_;

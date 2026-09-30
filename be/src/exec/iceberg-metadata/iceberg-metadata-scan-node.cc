@@ -16,8 +16,12 @@
 // under the License.
 
 #include "exec/iceberg-metadata/iceberg-metadata-scan-node.h"
+
+#include <boost/algorithm/string/case_conv.hpp>
+
 #include "exec/exec-node.inline.h"
 #include "exec/exec-node-util.h"
+#include "gutil/strings/substitute.h"
 #include "runtime/exec-env.h"
 #include "runtime/runtime-state.h"
 #include "runtime/tuple-row.h"
@@ -59,8 +63,9 @@ Status IcebergMetadataScanNode::Open(RuntimeState* state) {
   RETURN_IF_ERROR(ScanNode::Open(state));
   JNIEnv* env = JniUtil::GetJNIEnv();
   if (env == nullptr) return Status("Failed to get/create JVM");
-  // Get the FeTable object from the Frontend
-  jobject jtable;
+  // Get the FeTable object from the Frontend. 'metadata_scanner_' takes ownership of
+  // the global reference.
+  jobject jtable = nullptr;
   RETURN_IF_ERROR(GetCatalogTable(&jtable));
   metadata_scanner_.reset(new IcebergMetadataScanner(jtable, metadata_table_name_.c_str(),
       tuple_desc_));
@@ -75,6 +80,7 @@ Status IcebergMetadataScanNode::GetNext(RuntimeState* state, RowBatch* row_batch
     bool* eos) {
   SCOPED_TIMER(runtime_profile_->total_time_counter());
   ScopedGetNextEventAdder ea(this, eos);
+  RETURN_IF_ERROR(ExecDebugAction(TExecNodePhase::GETNEXT, state));
   RETURN_IF_CANCELLED(state);
   JNIEnv* env = JniUtil::GetJNIEnv();
   if (env == nullptr) return Status("Failed to get/create JVM");
@@ -129,12 +135,22 @@ Status IcebergMetadataScanNode::GetNext(RuntimeState* state, RowBatch* row_batch
 
 void IcebergMetadataScanNode::Close(RuntimeState* state) {
   if (is_closed()) return;
-  metadata_scanner_->Close(state);
+  // 'metadata_scanner_' is only created in Open(). Close() is also called if Prepare()
+  // or Open() failed before that, and for nodes that were never opened, e.g. the
+  // remaining children of a UNION that was cancelled or reached its limit.
+  if (metadata_scanner_ != nullptr) metadata_scanner_->Close(state);
   ScanNode::Close(state);
 }
 
 Status IcebergMetadataScanNode::GetCatalogTable(jobject* jtable) {
   Frontend* fe = ExecEnv::GetInstance()->frontend();
-  RETURN_IF_ERROR(fe->GetCatalogTable(table_name_, jtable));
+  Status status = fe->GetCatalogTable(table_name_, jtable);
+  if (!status.ok()) {
+    // E.g. the table or its database was dropped after the query was analyzed. Use the
+    // same prefix as IcebergMetadataScanner.checkIcebergTable() in the frontend.
+    return Status(strings::Substitute("Cannot scan metadata table '$0.$1.$2': $3",
+        table_name_.db_name, table_name_.table_name,
+        boost::algorithm::to_lower_copy(metadata_table_name_), status.msg().msg()));
+  }
   return Status::OK();
 }

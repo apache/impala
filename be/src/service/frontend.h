@@ -146,7 +146,8 @@ class Frontend {
   Status GetCatalogObject(const TCatalogObject& request, TCatalogObject* response);
 
   /// Gets the Java object of a Catalog table object. It can be used to call Java methods
-  /// of the Catalog Table object.
+  /// of the Catalog Table object. 'result' is a JNI global reference that the caller
+  /// must delete.
   Status GetCatalogTable(const TTableName& table_name, jobject *result);
 
   /// Call FE to get the roles.

@@ -17,8 +17,10 @@
 
 package org.apache.impala.util;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 
+import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.util.Iterator;
@@ -32,6 +34,11 @@ import org.apache.iceberg.MetadataTableType;
 import org.apache.iceberg.MetadataTableUtils;
 import org.apache.iceberg.StructLike;
 import org.apache.impala.catalog.FeIcebergTable;
+import org.apache.impala.catalog.FeIncompleteTable;
+import org.apache.impala.catalog.FeTable;
+import org.apache.impala.catalog.TableLoadingException;
+import org.apache.impala.common.ImpalaException;
+import org.apache.impala.common.ImpalaRuntimeException;
 import org.apache.impala.common.JniUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -47,7 +54,7 @@ import org.apache.iceberg.io.CloseableIterator;
  * Iceberg generally throws RuntimeExceptions, these have to be taken care of by the
  * caller of {@code IcebergMetadataScanner}.
  */
-public class IcebergMetadataScanner {
+public class IcebergMetadataScanner implements AutoCloseable {
   private final static Logger LOG = LoggerFactory.getLogger(IcebergMetadataScanner.class);
 
   // Metadata table instance.
@@ -65,12 +72,40 @@ public class IcebergMetadataScanner {
   // Persist the data rows iterator, so we can continue after a batch is filled
   private CloseableIterator<StructLike> dataRowsIterator_;
 
-  public IcebergMetadataScanner(FeIcebergTable iceTbl, String metadataTableName) {
-    Preconditions.checkNotNull(iceTbl);
-    this.iceTbl_ = (FeIcebergTable) iceTbl;
+  public IcebergMetadataScanner(FeTable table, String metadataTableName)
+      throws ImpalaException {
     this.metadataTableName_ = metadataTableName;
+    this.iceTbl_ = checkIcebergTable(table, metadataTableName);
     this.metadataTable_ = MetadataTableUtils.createMetadataTableInstance(
       iceTbl_.getIcebergApiTable(), MetadataTableType.valueOf(metadataTableName_));
+  }
+
+  /**
+   * Returns 'table' as an FeIcebergTable. The backend gets the base table again at
+   * execution time (JniFrontend.getCatalogTable()), so it may differ from the table the
+   * query was analyzed with: it may have failed to load, or it may have been dropped and
+   * recreated as a non-Iceberg table. Throws an exception in these cases; a load failure
+   * is kept as the cause.
+   */
+  @VisibleForTesting
+  static FeIcebergTable checkIcebergTable(FeTable table, String metadataTableName)
+      throws ImpalaException {
+    Preconditions.checkNotNull(table);
+    String tblName = table.getFullName();
+    String errorPrefix = String.format("Cannot scan metadata table '%s.%s': ", tblName,
+        metadataTableName.toLowerCase());
+    if (table instanceof FeIncompleteTable) {
+      ImpalaException cause = ((FeIncompleteTable) table).getCause();
+      String reason = cause != null ?
+          "failed to load table '" + tblName + "'" :
+          "the metadata of table '" + tblName + "' is not loaded";
+      throw new TableLoadingException(errorPrefix + reason, cause);
+    }
+    if (!(table instanceof FeIcebergTable)) {
+      throw new ImpalaRuntimeException(
+          errorPrefix + "table '" + tblName + "' is not an Iceberg table");
+    }
+    return (FeIcebergTable) table;
   }
 
   /**
@@ -94,14 +129,49 @@ public class IcebergMetadataScanner {
 
   /**
    * Iterates over the {{fileScanTaskIterator_}} to find a {FileScanTask} that has rows.
+   * Closes the rows iterator of the previous task, as it may hold an open manifest
+   * reader.
    */
   private boolean FindFileScanTaskWithRows() {
+    closeDataRowsIterator();
+    if (fileScanTaskIterator_ == null) return false;
     while (fileScanTaskIterator_.hasNext()) {
       DataTask dataTask = (DataTask)fileScanTaskIterator_.next();
       dataRowsIterator_ = dataTask.rows().iterator();
       if (dataRowsIterator_.hasNext()) return true;
+      closeDataRowsIterator();
     }
     return false;
+  }
+
+  /**
+   * Closes the iterators, releasing the Iceberg readers that are still open. Safe to call
+   * before ScanMetadataTable() and more than once. GetNext() returns null afterwards.
+   */
+  @Override
+  public void close() {
+    closeDataRowsIterator();
+    if (fileScanTaskIterator_ != null) {
+      closeQuietly(fileScanTaskIterator_);
+      fileScanTaskIterator_ = null;
+    }
+  }
+
+  private void closeDataRowsIterator() {
+    if (dataRowsIterator_ == null) return;
+    // Reset the field first, so a failed close is not retried.
+    CloseableIterator<StructLike> iterator = dataRowsIterator_;
+    dataRowsIterator_ = null;
+    closeQuietly(iterator);
+  }
+
+  private void closeQuietly(CloseableIterator<?> iterator) {
+    try {
+      iterator.close();
+    } catch (IOException | RuntimeException e) {
+      LOG.warn(String.format("Failed to close iterator of metadata table %s.%s",
+          iceTbl_.getFullName(), metadataTableName_.toLowerCase()), e);
+    }
   }
 
   /**

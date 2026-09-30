@@ -48,7 +48,7 @@ class PaimonJniScanner {
   Status GetNextBatchDirect(JNIEnv* env, struct ArrowArray** array,
       struct ArrowSchema** schema, long* rows, long* offheap_used) WARN_UNUSED_RESULT;
 
-  /// Removes global references.
+  /// Removes global references. Safe to call if Init() failed or was not called.
   void Close(RuntimeState* state);
 
  private:
@@ -69,8 +69,9 @@ class PaimonJniScanner {
   const std::string& table_name_;
   /// Paimon scanner Java object, it helps preparing the  table and
   /// executes an Paimon table scan. Allows the ScanNode to fetch the row batch from
-  /// the Java Off Heap.
-  jobject j_jni_scanner_;
+  /// the Java Off Heap. Set by Init(); nullptr before that, if Init() failed, and after
+  /// Close().
+  jobject j_jni_scanner_ = nullptr;
 
   std::string DebugString();
 };

@@ -46,7 +46,7 @@ Status IcebergMetadataScanner::InitJNI() {
 
   // Method ids:
   RETURN_IF_ERROR(JniUtil::GetMethodID(env, iceberg_metadata_scanner_cl_,
-      "<init>", "(Lorg/apache/impala/catalog/FeIcebergTable;Ljava/lang/String;)V",
+      "<init>", "(Lorg/apache/impala/catalog/FeTable;Ljava/lang/String;)V",
       &iceberg_metadata_scanner_ctor_));
   RETURN_IF_ERROR(JniUtil::GetMethodID(env, iceberg_metadata_scanner_cl_,
       "ScanMetadataTable", "()V", &iceberg_metadata_scanner_scan_metadata_table_));
@@ -80,6 +80,8 @@ Status IcebergMetadataScanner::InitJNI() {
   RETURN_IF_ERROR(JniUtil::GetMethodID(env, iceberg_metadata_scanner_cl_,
       "CharSequenceToUtf8Bytes", "(Ljava/lang/CharSequence;)[B",
       &iceberg_metadata_scanner_char_sequence_to_utf8_bytes_));
+  RETURN_IF_ERROR(JniUtil::GetMethodID(env, iceberg_metadata_scanner_cl_,
+      "close", "()V", &iceberg_metadata_scanner_close_));
 
   RETURN_IF_ERROR(JniUtil::GetMethodID(env, map_entry_cl_, "getKey",
       "()Ljava/lang/Object;", &map_entry_get_key_));
@@ -270,7 +272,21 @@ Status IcebergMetadataScanner::ConvertJavaCharSequenceToUtf8ByteArray(JNIEnv* en
 void IcebergMetadataScanner::Close(RuntimeState* state) {
   JNIEnv* env = JniUtil::GetJNIEnv();
   if (env != nullptr) {
-    if (jmetadata_scanner_ != nullptr) env->DeleteGlobalRef(jmetadata_scanner_);
+    if (jmetadata_scanner_ != nullptr) {
+      // Releases the Iceberg manifest readers that are still open.
+      Status status = JniCall::instance_method(jmetadata_scanner_,
+          iceberg_metadata_scanner_close_).Call();
+      if (!status.ok()) {
+        LOG(WARNING) << "Failed to close IcebergMetadataScanner: "
+                     << status.GetDetail();
+      }
+      env->DeleteGlobalRef(jmetadata_scanner_);
+      jmetadata_scanner_ = nullptr;
+    }
+    if (jtable_ != nullptr) {
+      env->DeleteGlobalRef(jtable_);
+      jtable_ = nullptr;
+    }
   }
 }
 

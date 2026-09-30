@@ -301,6 +301,53 @@ row_regex:\d+
 ---- TYPES
 BIGINT
 ====
+---- QUERY
+# IMPALA-14778: The limit is on the UNION, so its second child is closed without being
+# opened.
+select * from (
+  select snapshot_id from functional_parquet.iceberg_query_metadata.snapshots
+  union all
+  select snapshot_id from functional_parquet.iceberg_query_metadata.snapshots) v
+limit 1;
+---- RESULTS
+row_regex:\d+
+---- TYPES
+BIGINT
+====
+---- QUERY
+# IMPALA-14778: The planner adds 'limit 1' to the UNION of an uncorrelated EXISTS.
+select count(*) from functional_parquet.iceberg_query_metadata
+where exists (
+  select 1 from (
+    select snapshot_id from functional_parquet.iceberg_query_metadata.snapshots
+    union all
+    select snapshot_id from functional_parquet.iceberg_query_metadata.history) v);
+---- RESULTS
+2
+---- TYPES
+BIGINT
+====
+---- QUERY
+# IMPALA-14778: Open() of the metadata scan fails before the scanner is created.
+set debug_action="0:OPEN:FAIL";
+select snapshot_id from functional_parquet.iceberg_query_metadata.snapshots;
+---- CATCH
+Debug Action: FAIL
+====
+---- QUERY
+# IMPALA-14778: Prepare() of the metadata scan fails.
+set debug_action="0:PREPARE:FAIL";
+select snapshot_id from functional_parquet.iceberg_query_metadata.snapshots;
+---- CATCH
+Debug Action: FAIL
+====
+---- QUERY
+# IMPALA-14778: GetNext() of the metadata scan fails.
+set debug_action="0:GETNEXT:FAIL";
+select snapshot_id from functional_parquet.iceberg_query_metadata.snapshots;
+---- CATCH
+Debug Action: FAIL
+====
 
 ####
 # Test joins

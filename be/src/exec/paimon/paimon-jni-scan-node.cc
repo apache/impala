@@ -255,10 +255,9 @@ void PaimonJniScanNode::Close(RuntimeState* state) {
     arrow_record_batch_row_index_ = 0;
     arrow_record_batch_row_count_ = 0;
   }
-  /// Close jni scanner if splits is not empty.
-  if (!splits_empty_) {
-    jni_scanner_->Close(state);
-  }
+  /// 'jni_scanner_' is only created in Open(), and only if there are splits. Close()
+  /// is also called if Prepare() or Open() failed before that, or Open() was not called.
+  if (jni_scanner_ != nullptr) jni_scanner_->Close(state);
   OffheapTrackFree();
   if (arrow_batch_mem_tracker_ != nullptr) {
     arrow_batch_mem_tracker_->Close();

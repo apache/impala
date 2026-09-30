@@ -92,8 +92,13 @@ void PaimonJniScanner::Close(RuntimeState* state) {
   if (env != nullptr) {
     if (j_jni_scanner_ != nullptr) {
       /// Call close method to free resources of java PaimonJniScanner.
-      env->CallObjectMethod(j_jni_scanner_, paimon_jni_scanner_close_);
+      Status status = JniCall::instance_method(j_jni_scanner_,
+          paimon_jni_scanner_close_).Call();
+      if (!status.ok()) {
+        LOG(WARNING) << "Failed to close PaimonJniScanner: " << status.GetDetail();
+      }
       env->DeleteGlobalRef(j_jni_scanner_);
+      j_jni_scanner_ = nullptr;
     }
   }
 }

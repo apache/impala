@@ -37,12 +37,13 @@ import pytz
 
 # noinspection PyUnresolvedReferences
 from impala_thrift_gen.parquet.ttypes import ConvertedType
+from tests.common.environ import build_flavor_timeout
 from tests.common.file_utils import (
     create_iceberg_table_from_directory,
     create_table_from_parquet,
 )
 from tests.common.iceberg_test_suite import IcebergTestSuite
-from tests.common.impala_connection import IMPALA_CONNECTION_EXCEPTION
+from tests.common.impala_connection import IMPALA_CONNECTION_EXCEPTION, RUNNING
 from tests.common.skip import (SkipIf, SkipIfDockerizedCluster, SkipIfFS,
     SkipIfNotHdfsMinicluster)
 from tests.common.test_dimensions import (add_exec_option_dimension,
@@ -1359,6 +1360,52 @@ class TestIcebergTable(IcebergTestSuite):
   def test_predicate_subsetting(self, vector, unique_database):
     self.run_test_case('QueryTest/iceberg-predicate-subsetting', vector,
                        use_db=unique_database)
+
+  def test_metadata_table_base_table_changed(self, unique_database):
+    """IMPALA-14778: IcebergMetadataScanNode gets the base table again in Open(). If
+    the table was dropped or replaced by a non-Iceberg table after analysis, the query
+    must fail cleanly instead of crashing impalad. Open() of the metadata scan (node 0)
+    is delayed so that the table can be changed meanwhile."""
+    tbl = unique_database + ".ice_tbl"
+    query = "select count(*) from {}.snapshots".format(tbl)
+    error_prefix = "Cannot scan metadata table '{}.snapshots': ".format(tbl)
+    # The DDL must finish while Open() is delayed. Allow more time on slow builds and on
+    # object stores, where creating and dropping Iceberg tables is slower.
+    delay_s = build_flavor_timeout(10, slow_build_timeout=20)
+    if not IS_HDFS:
+      delay_s *= 2
+
+    def run_with_concurrent_ddl(ddl_stmts, expected_error):
+      self.execute_query("create table {} (i int) stored by iceberg".format(tbl))
+      with self.create_impala_client() as client:
+        client.set_configuration_option(
+            "debug_action", "0:OPEN:DELAY@{}".format(delay_s * 1000))
+        start = time.time()
+        handle = client.execute_async(query)
+        client.wait_for_impala_state(handle, RUNNING, 60)
+        for stmt in ddl_stmts:
+          self.execute_query(stmt)
+        # Open() continues at least 'delay_s' after the submit. If the DDL took longer,
+        # the query may have seen the table before or during the DDL.
+        timing = "DDL finished {:.1f}s after submit, Open() delay: {}s".format(
+            time.time() - start, delay_s)
+        try:
+          client.wait_for_finished_timeout(handle, delay_s + 60)
+          assert False, "Query should have failed: {} ({})".format(query, timing)
+        except IMPALA_CONNECTION_EXCEPTION as e:
+          assert expected_error.lower() in str(e).lower(), "{} ({})".format(e, timing)
+      # Check that the coordinator is still alive: before IMPALA-14778 it crashed in
+      # Close() right after returning the error.
+      assert self.execute_scalar("select 1") == "1"
+
+    run_with_concurrent_ddl(["drop table {}".format(tbl)],
+        error_prefix + "TableNotFoundException: Table does not exist: {}".format(tbl))
+    # 'describe' makes the coordinator load the new table, also in legacy catalog mode,
+    # where a newly created table is otherwise an unloaded IncompleteTable.
+    run_with_concurrent_ddl(["drop table {}".format(tbl),
+        "create table {} (i int) stored as parquet".format(tbl),
+        "describe {}".format(tbl)],
+        error_prefix + "table '{}' is not an Iceberg table".format(tbl))
 
   def test_plain_count_star_optimization(self, vector, unique_database):
       self.run_test_case('QueryTest/iceberg-plain-count-star-optimization', vector,

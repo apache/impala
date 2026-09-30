@@ -42,8 +42,9 @@ class Status;
 /// into Impala rowbatches.
 ///
 /// The flow of scanning is:
-/// 1. Backend:  gets the FeIcebergTable object from the frontend
-/// 2. Backend:  creates an IcebergMetadataScanner object on the Java heap
+/// 1. Backend:  gets the base table (an FeTable) from the frontend
+/// 2. Backend:  creates an IcebergMetadataScanner object on the Java heap, which
+///              checks that the base table is a loaded Iceberg table
 /// 3. Backend:  triggers a metadata table creation and scan on the Frontend
 /// 4. Frontend: creates the metadata table and executes the scan
 /// 5. Backend:  calls GetNext that calls the IcebergMetadataScanner's GetNext
@@ -74,7 +75,8 @@ class IcebergMetadataScanNode : public ScanNode {
   /// Fills the next rowbatch with the results returned by the Iceberg scan.
   Status GetNext(RuntimeState* state, RowBatch* row_batch, bool* eos) override;
 
-  /// Finalize and close this operator.
+  /// Finalize and close this operator. Safe to call if Prepare() or Open() failed or
+  /// were not called.
   void Close(RuntimeState* state) override;
 
  private:
@@ -97,7 +99,9 @@ class IcebergMetadataScanNode : public ScanNode {
   RuntimeProfile::Counter* scan_prepare_timer_;
   RuntimeProfile::Counter* iceberg_api_scan_timer_;
 
-  /// Gets the FeIceberg table from the Frontend.
+  /// Gets the base table (an FeTable) from the Frontend as a JNI global reference. It
+  /// may have been dropped since the query was analyzed; the error then names the
+  /// metadata table.
   Status GetCatalogTable(jobject* jtable);
 };
 
