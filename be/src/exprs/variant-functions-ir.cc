@@ -57,7 +57,10 @@ namespace {
 enum class NavStatus {
   OK,        // 'sub' holds the resolved, non-null sub-value.
   SQL_NULL,  // NULL input, path not found, or a variant null at the path -> SQL NULL.
-  CORRUPT,   // metadata blob failed to parse, or the value at the path is empty.
+  // Metadata blob failed to parse, or a value on the path (the root included) cannot be
+  // read, e.g. an empty or truncated value, or an unreadable object field or array
+  // element.
+  CORRUPT,
 };
 
 // Navigates 'v' to the sub-value at 'path'. 'meta'/'root' are caller-owned storage kept
@@ -74,9 +77,18 @@ NavStatus Navigate(const VariantVal& v, const StringVal& path,
   VariantValue root(v.value.ptr, v.value.len, meta);
   const std::string_view path_view(
       reinterpret_cast<const char*>(path.ptr), path.len);
-  if (!root.NavigatePath(path_view, sub)) return NavStatus::SQL_NULL; // segment missing
-  // Every encoded value has at least a header byte. An empty value blob or a zero-length
-  // field/element is corrupt, and reading its header would go out of bounds.
+  switch (root.NavigatePath(path_view, sub)) {
+    case VariantLookupResult::FOUND:
+      break;
+    case VariantLookupResult::NOT_FOUND:
+      return NavStatus::SQL_NULL;  // missing field/element, or a step into a scalar
+    case VariantLookupResult::CORRUPT:
+      return NavStatus::CORRUPT;
+  }
+  // NavigatePath() sizes every value on the path from its header, so the value at the
+  // path has at least its header byte. Checked in release builds too, because reading
+  // the header of an empty value would go out of bounds.
+  DCHECK(sub->IsValid() && sub->Len() >= 1);
   if (UNLIKELY(!sub->IsValid() || sub->Len() < 1)) return NavStatus::CORRUPT;
   if (sub->IsNull()) return NavStatus::SQL_NULL; // VNULL at the path
   return NavStatus::OK;

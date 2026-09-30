@@ -1343,6 +1343,75 @@ v is 42, "hello", {"age":30,"name":"Alice"}, a variant null and a SQL NULL.
 Generated with a custom Java program (written by Claude Opus 5.5) using the Iceberg
 1.11 Java library.
 
+testdata/data/iceberg_test/iceberg_v3/iceberg_v3_spark_variant
+Iceberg V3 table with an (unshredded) VARIANT column, written by Spark 4.1.3 and Iceberg
+1.11.0 (IMPALA-15460). Spark stores object values in document order (parse_json) or in
+struct field / map entry order (to_variant_object), so the field offsets are not
+monotonic, and it orders field ids by UTF-16 code units. Rows 20-22 are crafted with
+Spark's VariantVal: duplicate dictionary strings, array offsets [2,0,4] and 4-byte field
+offsets. Schema: id INT, descr STRING (the test case name), v VARIANT.
+Generated with spark-shell (Spark 4.1.3, Java 17) and a Hadoop catalog whose warehouse
+is a local /test-warehouse directory; the .crc files were deleted afterwards:
+  spark-shell --master 'local[1]' --driver-java-options -Dfile.encoding=UTF-8 \
+    --packages org.apache.iceberg:iceberg-spark-runtime-4.1_2.13:1.11.0 \
+    --conf spark.sql.catalog.local=org.apache.iceberg.spark.SparkCatalog \
+    --conf spark.sql.catalog.local.type=hadoop \
+    --conf spark.sql.catalog.local.warehouse=file:///test-warehouse \
+    -i gen.scala
+where gen.scala is:
+  import org.apache.spark.sql.Row
+  import org.apache.spark.unsafe.types.VariantVal
+  def hx(s: String): Array[Byte] =
+    s.trim.split("\\s+").map(x => Integer.parseInt(x, 16).toByte)
+  spark.sql("""CREATE TABLE local.iceberg_v3_spark_variant
+    (id INT, descr STRING, v VARIANT) USING iceberg
+    TBLPROPERTIES ('format-version'='3')""")
+  val docs = spark.sql("""
+    SELECT id, descr, parse_json(j) AS v FROM VALUES
+      (1,  'sorted keys',                        '{"a":1,"b":2}'),
+      (2,  'reversed 2 keys',                    '{"b":2,"a":1}'),
+      (3,  'one key out of place',               '{"a":1,"c":3,"b":2}'),
+      (4,  'nested object, inner keys reversed', '{"a":{"y":1,"x":2},"b":0}'),
+      (5,  'reversed 3 keys (spec example)',     '{"c":3,"b":2,"a":1}'),
+      (6,  'byte order: B sorts before a',       '{"a":1,"B":2}'),
+      (7,  'reversed objects in an array',       '[{"b":2,"a":1},{"d":4,"c":3}]'),
+      (8,  'mixed value sizes',
+           '{"s":"hello","n":null,"i":123456789012,"b":true}'),
+      (14, 'empty object',                       '{}'),
+      (15, 'deep nesting, all reversed',
+           '{"z":{"y":{"x":[{"w":1,"v":2}]}},"a":0}'),
+      (16, 'single field',                       '{"a":1}'),
+      (17, 'UTF-16 key order',                   '{"！":2,"😀":1}')
+      AS t(id, descr, j)
+    UNION ALL SELECT 9, '2-byte field offsets',
+      parse_json(concat('{"b":"', repeat('x', 300), '","a":1}'))
+    UNION ALL SELECT 10, '3-byte field offsets',
+      parse_json(concat('{"b":"', repeat('x', 70000), '","a":1}'))
+    UNION ALL SELECT 11, 'is_large: 300 reversed fields',
+      parse_json(concat('{', concat_ws(',', transform(sequence(299, 0, -1),
+          i -> format_string('"f%03d":%d', i, i))), '}'))
+    UNION ALL SELECT 12, 'to_variant_object(struct)',
+      to_variant_object(named_struct('b', 2, 'a', 1))
+    UNION ALL SELECT 13, 'to_variant_object(map)',
+      to_variant_object(map('b', 2, 'a', 1))
+    UNION ALL SELECT 18, 'to_variant_object(struct) with TIMESTAMP and DATE',
+      to_variant_object(named_struct('ts', TIMESTAMP'2024-01-02 03:04:05',
+          'd', DATE'2024-01-02', 'a', 1))
+  """)
+  val crafted = spark.createDataFrame(spark.sparkContext.parallelize(Seq(
+    Row(20, "crafted: duplicate dictionary strings",
+        new VariantVal(hx("02 01 02 00 02 0c 07"), hx("01 03 00 01 02 03 78 61 61"))),
+    Row(21, "crafted: array offsets [2,0,4]",
+        new VariantVal(hx("03 02 02 00 04 0c 06 0c 05"), hx("01 00 00"))),
+    Row(22, "crafted: 4-byte field offsets, reversed",
+        new VariantVal(hx("0e 02 01 00 02 00 00 00 00 00 00 00 04 00 00 00 0c 02 0c 01"),
+            hx("01 02 00 01 02 62 61"))))), docs.schema)
+  docs.unionByName(crafted).coalesce(1).writeTo("local.iceberg_v3_spark_variant")
+    .append()
+  spark.sql("""SELECT id, substr(to_json(v), 1, 120) AS j
+    FROM local.iceberg_v3_spark_variant ORDER BY id""").show(100, false)
+  System.exit(0)
+
 arrays_big.parq:
 Generated with RandomNestedDataGenerator.java from the following schema:
 {

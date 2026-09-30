@@ -2771,6 +2771,18 @@ class TestIcebergV3Table(IcebergTestSuite):
     self.load_table(unique_database, "trino_variant")
     self.run_test_case('QueryTest/iceberg-v3-variant-get', vector, unique_database)
 
+  def test_v3_variant_spark(self, vector, unique_database):
+    """IMPALA-15460: VARIANT values written by Spark 4.1.3 + Iceberg 1.11.0. Spark stores
+    object values in document order, so their field offsets are not monotonic."""
+    self.load_table(unique_database, "iceberg_v3_spark_variant")
+    self.run_test_case('QueryTest/iceberg-v3-variant-spark', vector, unique_database)
+    # Valid data must not be reported as corrupt, not even as a try_ warning.
+    result = self.execute_query_expect_success(self.client,
+        "select count(variant_to_json(v)), count(try_variant_get(v, '$.a', 'int')) "
+        "from {0}.iceberg_v3_spark_variant".format(unique_database))
+    assert result.data == ["21\t14"], result.data
+    assert "UDF WARNING" not in (result.log or ""), result.log
+
 
   def test_v3_default_values(self, vector, unique_database):
     """Test Iceberg V3 initial-default and write-default values."""

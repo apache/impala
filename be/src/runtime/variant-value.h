@@ -102,6 +102,28 @@ inline std::ostream& operator<<(std::ostream& os, VariantBasicType bt) {
   return os << "UNKNOWN(" << static_cast<int>(bt) << ")";
 }
 
+// Result of looking up an object field, an array element or a path in a variant value.
+enum class VariantLookupResult : uint8_t {
+  // '*result' holds the value.
+  FOUND,
+  // No such field, the array index is out of range, a path step does not match the type
+  // of the value (e.g. a field name on an array or on a scalar), or the path is
+  // malformed. Callers map this to SQL NULL.
+  NOT_FOUND,
+  // The value, or the entry that was looked up, is malformed (e.g. a truncated header, a
+  // field id outside the dictionary, or a field whose encoding does not fit).
+  CORRUPT
+};
+
+inline std::ostream& operator<<(std::ostream& os, VariantLookupResult r) {
+  switch (r) {
+    case VariantLookupResult::FOUND: return os << "FOUND";
+    case VariantLookupResult::NOT_FOUND: return os << "NOT_FOUND";
+    case VariantLookupResult::CORRUPT: return os << "CORRUPT";
+  }
+  return os << "UNKNOWN(" << static_cast<int>(r) << ")";
+}
+
 // Parses and provides access to the variant metadata blob (field name dictionary).
 // The metadata format:
 //   - Header byte: version (bits 0-3), sorted flag (bit 4),
@@ -123,9 +145,9 @@ class VariantMetadata {
   // index must be in [0, DictionarySize()).
   std::string_view GetFieldName(uint32_t index) const;
 
-  // Looks up a field name in the dictionary. Returns the index if found, -1 otherwise.
-  // If the dictionary is sorted, uses binary search.
-  int FindFieldId(std::string_view name) const;
+  // True if the dictionary claims to be sorted and unique (the sorted_strings bit).
+  // Lookups do not rely on it.
+  bool IsSorted() const { return is_sorted_; }
 
   bool IsValid() const { return offsets_ != nullptr; }
 
@@ -179,24 +201,46 @@ class VariantValue {
   [[nodiscard]] bool GetString(StringValue* out) const;
   [[nodiscard]] bool GetBinary(StringValue* out) const;
 
-  // Object access. Each returns false if this value is not a well-formed object (a
-  // corrupt or truncated header/offset table), if 'index' is out of range, or if the
-  // field's encoding is out of bounds.
+  // Object access by position. Each returns false if this value is not a well-formed
+  // object (a corrupt or truncated header/offset table), if 'index' is out of range, or
+  // if the field's encoding is out of bounds.
   [[nodiscard]] bool GetObjectSize(uint32_t* out) const;
-  // Gets the field value by field name. Returns false if the field is not found.
-  [[nodiscard]] bool GetFieldByName(std::string_view name, VariantValue* result) const;
   // Gets the field value by position index.
   [[nodiscard]] bool GetFieldByIndex(uint32_t index, VariantValue* result) const;
   // Gets the field name at position index in this object.
   [[nodiscard]] bool GetFieldNameByIndex(uint32_t index, std::string_view* out) const;
+  // Gets the value of the field named 'name'. Searches this object's field ids by their
+  // names, so it works with any dictionary (sorted or not, with or without duplicate
+  // strings) and with field ids in UTF-16 order. NOT_FOUND if this is not an object or
+  // has no such field; CORRUPT if this is an empty value, there is no metadata, the
+  // object is malformed, or the field (or a field id compared before it) cannot be
+  // read.
+  [[nodiscard]] VariantLookupResult GetFieldByName(
+      std::string_view name, VariantValue* result) const;
 
-  // Array access. Returns false on a corrupt/truncated array or an out-of-range index.
+  // Array access. GetArraySize() returns false on a corrupt/truncated array.
   [[nodiscard]] bool GetArraySize(uint32_t* out) const;
-  [[nodiscard]] bool GetArrayElement(uint32_t index, VariantValue* result) const;
+  // NOT_FOUND if this is not an array or 'index' is out of range; CORRUPT if this is an
+  // empty value, a malformed array, or the element cannot be read.
+  [[nodiscard]] VariantLookupResult GetArrayElement(
+      uint32_t index, VariantValue* result) const;
 
-  // Navigate a dotted path like "field.nested[0].value".
-  // Returns false if the path cannot be resolved.
-  [[nodiscard]] bool NavigatePath(std::string_view path, VariantValue* result) const;
+  // Navigates a path like "$.field.nested[0].value". '*result' is unspecified unless
+  // FOUND. CORRUPT if this value (sized by ValueSize()) or a value looked up on the path
+  // cannot be read. A malformed path gives NOT_FOUND (the FE rejects malformed constant
+  // paths).
+  [[nodiscard]] VariantLookupResult NavigatePath(
+      std::string_view path, VariantValue* result) const;
+
+  // Computes the encoded size of the value starting at 'data' from its header, like
+  // parquet-java's VariantUtil.valueSize(): a fixed size for most primitives,
+  // 1 + length for a short string, 5 + length for a long string or binary, and
+  // header + tables + last offset for an object or array (nested values are not
+  // validated). Returns false if 'data' is null or 'avail' is 0, the primitive type id
+  // is unknown (21-63), an object or array header or offset table is malformed, or the
+  // value would extend past 'avail' bytes.
+  [[nodiscard]] static bool ValueSize(const uint8_t* data, uint32_t avail,
+      uint32_t* size);
 
   // Serialize this variant value to JSON string.
   Status ToJson(std::string* json_out) const;
@@ -249,12 +293,16 @@ class VariantValue {
     const uint8_t* field_ids;
     const uint8_t* offsets;
     const uint8_t* data;
+    // Size of the value data, i.e. the last offset, which is validated to fit in the
+    // buffer. Bytes after it (e.g. padding) are not part of any value.
     uint32_t data_len;
   };
   struct ArrayLayout {
     uint32_t num_elems;
     const uint8_t* offsets;
     const uint8_t* data;
+    // Size of the value data, i.e. the last offset, which is validated to fit in the
+    // buffer. Bytes after it (e.g. padding) are not part of any value.
     uint32_t data_len;
   };
   // Parse and bounds-check the object/array header + offset table. Returns false (without
@@ -262,15 +310,26 @@ class VariantValue {
   [[nodiscard]] bool ParseObjectLayout(ObjectLayout* out) const;
   [[nodiscard]] bool ParseArrayLayout(ArrayLayout* out) const;
 
-  // Extract a single field/element from an already-parsed, validated layout, bounds-
-  // checking the individual entry's offsets (and, for a field name, that its dictionary
-  // id is in range). Shared by the public single-access accessors and by JSON
-  // serialization, which parses the layout once and reuses it across the whole loop.
+  // Extract a single field/element from an already-parsed, validated layout. A value is
+  // located by its entry's start offset, which is bounds-checked against data_len, and
+  // sized from its own header; the next offset is not used, because values may be stored
+  // in any order. For a field name, checks that its dictionary id is in range. Shared by
+  // the public single-access accessors and by JSON serialization, which parses the
+  // layout once and reuses it across the whole loop.
   [[nodiscard]] bool FieldFromLayout(const ObjectLayout& layout, uint32_t index,
       VariantValue* result) const;
   [[nodiscard]] bool FieldNameFromLayout(const ObjectLayout& layout, uint32_t index,
       std::string_view* out) const;
+  // Sets '*index' to the position of the field named 'name' in 'layout'. NOT_FOUND if
+  // there is no such field; CORRUPT if a field id it compares is outside the dictionary.
+  [[nodiscard]] VariantLookupResult FindField(const ObjectLayout& layout,
+      std::string_view name, uint32_t* index) const;
   [[nodiscard]] bool ElementFromLayout(const ArrayLayout& layout, uint32_t index,
+      VariantValue* result) const;
+  // Sets '*result' to the value that starts at offset 'start' of the value data
+  // ['data', 'data' + 'data_len'), sized by ValueSize(). Returns false if it does not
+  // fit.
+  [[nodiscard]] bool SliceValue(const uint8_t* data, uint32_t data_len, uint32_t start,
       VariantValue* result) const;
 
   // JSON serialization lives in the .cc (so rapidjson stays out of this header) but needs

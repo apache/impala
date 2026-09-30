@@ -124,7 +124,7 @@ uint32_t VariantMetadata::ReadOffset(uint32_t index) const {
 }
 
 string_view VariantMetadata::GetFieldName(uint32_t index) const {
-  // Callers (FindFieldId and FieldNameFromLayout) must bound-check the index.
+  // The caller (FieldNameFromLayout) must bound-check the index.
   DCHECK_LT(index, dict_size_);
   uint32_t start = ReadOffset(index);
   uint32_t end = ReadOffset(index + 1);
@@ -133,24 +133,6 @@ string_view VariantMetadata::GetFieldName(uint32_t index) const {
   DCHECK_LE(end, string_data_len_);
   return string_view(reinterpret_cast<const char*>(string_data_ + start),
       end - start);
-}
-
-int VariantMetadata::FindFieldId(string_view name) const {
-  if (is_sorted_) {
-    int lo = 0, hi = dict_size_ - 1;
-    while (lo <= hi) {
-      int mid = (lo + hi) / 2;
-      int cmp = name.compare(GetFieldName(mid));
-      if (cmp == 0) return mid;
-      if (cmp < 0) hi = mid - 1;
-      else lo = mid + 1;
-    }
-  } else {
-    for (uint32_t i = 0; i < dict_size_; ++i) {
-      if (name == GetFieldName(i)) return i;
-    }
-  }
-  return -1;
 }
 
 // --- VariantValue ---
@@ -281,7 +263,13 @@ bool VariantValue::ParseObjectLayout(ObjectLayout* out) const {
   out->field_ids = data_ + 1 + num_size;
   out->offsets = out->field_ids + static_cast<uint64_t>(num_fields) * field_id_size;
   out->data = data_ + data_start_off;
-  out->data_len = static_cast<uint32_t>(len_ - data_start_off);
+  // The last offset is the total size of the value data (spec: "the byte after the end
+  // of the last value"). Values are bounded by it rather than by the end of the buffer;
+  // bytes after it (e.g. padding written by Hive) are ignored.
+  uint32_t values_len = ReadUint(
+      out->offsets + static_cast<uint64_t>(num_fields) * offset_size, offset_size);
+  if (values_len > len_ - data_start_off) return false;
+  out->data_len = values_len;
   return true;
 }
 
@@ -292,21 +280,83 @@ bool VariantValue::GetObjectSize(uint32_t* out) const {
   return true;
 }
 
-bool VariantValue::GetFieldByName(string_view name, VariantValue* result) const {
-  if (metadata_ == nullptr) return false;
-  ObjectLayout layout;
-  if (!ParseObjectLayout(&layout)) return false;
-
-  int field_id = metadata_->FindFieldId(name);
-  if (field_id < 0) return false;
-
-  // Search for this field_id in the object's field_id array.
-  uint32_t field_id_size = ObjectFieldIdSize();
-  for (uint32_t i = 0; i < layout.num_fields; ++i) {
-    uint32_t fid = ReadUint(layout.field_ids + i * field_id_size, field_id_size);
-    if (fid == static_cast<uint32_t>(field_id)) return FieldFromLayout(layout, i, result);
+VariantLookupResult VariantValue::GetFieldByName(string_view name,
+    VariantValue* result) const {
+  if (data_ == nullptr || len_ < 1 || metadata_ == nullptr) {
+    return VariantLookupResult::CORRUPT;
   }
-  return false;
+  if (GetBasicType() != VariantBasicType::OBJECT) return VariantLookupResult::NOT_FOUND;
+  ObjectLayout layout;
+  if (!ParseObjectLayout(&layout)) return VariantLookupResult::CORRUPT;
+  uint32_t index;
+  VariantLookupResult r = FindField(layout, name, &index);
+  if (r != VariantLookupResult::FOUND) return r;
+  return FieldFromLayout(layout, index, result) ? VariantLookupResult::FOUND
+                                                : VariantLookupResult::CORRUPT;
+}
+
+VariantLookupResult VariantValue::FindField(const ObjectLayout& layout,
+    string_view name, uint32_t* index) const {
+  // Search this object's field ids by their names instead of looking up 'name' in the
+  // dictionary first: with sorted_strings=0 the dictionary may hold a string more than
+  // once and the object may use any of those ids. Like parquet-java, scan small objects
+  // and binary search large ones.
+  constexpr uint32_t BINARY_SEARCH_THRESHOLD = 32;
+  string_view field_name;
+  if (layout.num_fields >= BINARY_SEARCH_THRESHOLD) {
+    // The field ids are sorted by name in unsigned byte order, which is also how
+    // string_view::compare() orders chars.
+    uint32_t lo = 0;
+    uint32_t hi = layout.num_fields;
+    while (lo < hi) {
+      uint32_t mid = lo + (hi - lo) / 2;
+      if (!FieldNameFromLayout(layout, mid, &field_name)) {
+        return VariantLookupResult::CORRUPT;
+      }
+      int cmp = field_name.compare(name);
+      if (cmp == 0) {
+        *index = mid;
+        return VariantLookupResult::FOUND;
+      }
+      if (cmp < 0) {
+        lo = mid + 1;
+      } else {
+        hi = mid;
+      }
+    }
+    // Spark before 4.3 (SPARK-58949) and parquet-java (GH-3735) sorted the field ids by
+    // UTF-16 code units instead. The two orders differ only between code points in
+    // U+E000..U+FFFF and above U+FFFF, which UTF-8 encodes with a leading byte >= 0xEE.
+    // A name without such a byte compares the same in both orders, so the search above
+    // finds it. Scan for the others.
+    bool may_differ_in_utf16 = false;
+    for (char c : name) {
+      if (static_cast<uint8_t>(c) >= 0xEE) {
+        may_differ_in_utf16 = true;
+        break;
+      }
+    }
+    if (!may_differ_in_utf16) return VariantLookupResult::NOT_FOUND;
+  }
+  for (uint32_t i = 0; i < layout.num_fields; ++i) {
+    if (!FieldNameFromLayout(layout, i, &field_name)) {
+      return VariantLookupResult::CORRUPT;
+    }
+    if (field_name == name) {
+      *index = i;
+      return VariantLookupResult::FOUND;
+    }
+  }
+  return VariantLookupResult::NOT_FOUND;
+}
+
+bool VariantValue::SliceValue(const uint8_t* data, uint32_t data_len, uint32_t start,
+    VariantValue* result) const {
+  if (start >= data_len) return false;
+  uint32_t size;
+  if (!ValueSize(data + start, data_len - start, &size)) return false;
+  *result = VariantValue(data + start, size, metadata_);
+  return true;
 }
 
 bool VariantValue::FieldFromLayout(const ObjectLayout& layout, uint32_t index,
@@ -314,10 +364,10 @@ bool VariantValue::FieldFromLayout(const ObjectLayout& layout, uint32_t index,
   if (index >= layout.num_fields) return false;
   uint32_t offset_size = ObjectOffsetSize();
   uint32_t start = ReadUint(layout.offsets + index * offset_size, offset_size);
-  uint32_t end = ReadUint(layout.offsets + (index + 1) * offset_size, offset_size);
-  if (end < start || end > layout.data_len) return false;
-  *result = VariantValue(layout.data + start, end - start, metadata_);
-  return true;
+  // Offsets are listed in field name order, but the values may be stored in any order
+  // (Spark stores them in document order), so offset[index + 1] is not where this value
+  // ends. Size the value from its own header, like parquet-java does.
+  return SliceValue(layout.data, layout.data_len, start, result);
 }
 
 bool VariantValue::GetFieldByIndex(uint32_t index, VariantValue* result) const {
@@ -365,7 +415,11 @@ bool VariantValue::ParseArrayLayout(ArrayLayout* out) const {
   out->num_elems = num_elems;
   out->offsets = data_ + 1 + num_size;
   out->data = data_ + data_start_off;
-  out->data_len = static_cast<uint32_t>(len_ - data_start_off);
+  // The last offset is the total size of the element data, see ParseObjectLayout().
+  uint32_t values_len = ReadUint(
+      out->offsets + static_cast<uint64_t>(num_elems) * offset_size, offset_size);
+  if (values_len > len_ - data_start_off) return false;
+  out->data_len = values_len;
   return true;
 }
 
@@ -381,39 +435,129 @@ bool VariantValue::ElementFromLayout(const ArrayLayout& layout, uint32_t index,
   if (index >= layout.num_elems) return false;
   uint32_t offset_size = ArrayOffsetSize();
   uint32_t start = ReadUint(layout.offsets + index * offset_size, offset_size);
-  uint32_t end = ReadUint(layout.offsets + (index + 1) * offset_size, offset_size);
-  if (end < start || end > layout.data_len) return false;
-  *result = VariantValue(layout.data + start, end - start, metadata_);
-  return true;
+  // The spec defines an element's offset only as where it starts, so size it from its
+  // own header like an object field.
+  return SliceValue(layout.data, layout.data_len, start, result);
 }
 
-bool VariantValue::GetArrayElement(uint32_t index, VariantValue* result) const {
+VariantLookupResult VariantValue::GetArrayElement(uint32_t index,
+    VariantValue* result) const {
+  if (data_ == nullptr || len_ < 1) return VariantLookupResult::CORRUPT;
+  if (GetBasicType() != VariantBasicType::ARRAY) return VariantLookupResult::NOT_FOUND;
   ArrayLayout layout;
-  if (!ParseArrayLayout(&layout)) return false;
-  return ElementFromLayout(layout, index, result);
+  if (!ParseArrayLayout(&layout)) return VariantLookupResult::CORRUPT;
+  if (index >= layout.num_elems) return VariantLookupResult::NOT_FOUND;
+  return ElementFromLayout(layout, index, result) ? VariantLookupResult::FOUND
+                                                  : VariantLookupResult::CORRUPT;
+}
+
+// --- Value sizing ---
+
+bool VariantValue::ValueSize(const uint8_t* data, uint32_t avail, uint32_t* size) {
+  if (data == nullptr || avail < 1) return false;
+  // 64-bit, so that 5 + a long string's 4-byte length cannot wrap around. Initialized
+  // because the basic type switch below has no default case.
+  uint64_t sz = 0;
+  switch (static_cast<VariantBasicType>(data[0] & 0x03)) {
+    case VariantBasicType::SHORT_STRING:
+      sz = 1 + (data[0] >> 2);
+      break;
+    case VariantBasicType::OBJECT: {
+      VariantValue v(data, avail, nullptr);
+      ObjectLayout layout;
+      if (!v.ParseObjectLayout(&layout)) return false;
+      sz = static_cast<uint64_t>(layout.data - data) + layout.data_len;
+      break;
+    }
+    case VariantBasicType::ARRAY: {
+      VariantValue v(data, avail, nullptr);
+      ArrayLayout layout;
+      if (!v.ParseArrayLayout(&layout)) return false;
+      sz = static_cast<uint64_t>(layout.data - data) + layout.data_len;
+      break;
+    }
+    case VariantBasicType::PRIMITIVE:
+      switch (static_cast<VariantPhysicalType>(data[0] >> 2)) {
+        case VariantPhysicalType::VNULL:
+        case VariantPhysicalType::BOOLEAN_TRUE:
+        case VariantPhysicalType::BOOLEAN_FALSE:
+          sz = 1;
+          break;
+        case VariantPhysicalType::INT8:
+          sz = 2;
+          break;
+        case VariantPhysicalType::INT16:
+          sz = 3;
+          break;
+        case VariantPhysicalType::INT32:
+        case VariantPhysicalType::DATE:
+        case VariantPhysicalType::FLOAT:
+          sz = 5;
+          break;
+        case VariantPhysicalType::INT64:
+        case VariantPhysicalType::DOUBLE:
+        case VariantPhysicalType::TIMESTAMPTZ:
+        case VariantPhysicalType::TIMESTAMPNTZ:
+        case VariantPhysicalType::TIME:
+        case VariantPhysicalType::TIMESTAMPTZ_NANOS:
+        case VariantPhysicalType::TIMESTAMPNTZ_NANOS:
+          sz = 9;
+          break;
+        case VariantPhysicalType::DECIMAL4:
+          sz = 6;
+          break;
+        case VariantPhysicalType::DECIMAL8:
+          sz = 10;
+          break;
+        case VariantPhysicalType::DECIMAL16:
+          sz = 18;
+          break;
+        case VariantPhysicalType::UUID:
+          sz = 17;
+          break;
+        case VariantPhysicalType::BINARY:
+        case VariantPhysicalType::STRING:
+          if (avail < 5) return false;
+          sz = 5 + static_cast<uint64_t>(ReadUint(data + 1, 4));
+          break;
+        default:
+          return false;  // Unknown primitive type id (21-63).
+      }
+      break;
+  }
+  if (sz > avail) return false;
+  *size = static_cast<uint32_t>(sz);
+  return true;
 }
 
 // --- Path navigation ---
 
-bool VariantValue::NavigatePath(std::string_view path,
+VariantLookupResult VariantValue::NavigatePath(std::string_view path,
     VariantValue* result) const {
+  constexpr VariantLookupResult NOT_FOUND = VariantLookupResult::NOT_FOUND;
+  // Fields and elements are sized from their headers when they are looked up. Size the
+  // root the same way, so that a root that cannot be read (e.g. an empty or truncated
+  // value, or an unknown type id) is corrupt too. Bytes after it (e.g. padding) are
+  // ignored.
+  uint32_t root_size;
+  if (!ValueSize(data_, len_, &root_size)) return VariantLookupResult::CORRUPT;
   *result = *this;
-  if (path == "$") return true;
+  if (path == "$") return VariantLookupResult::FOUND;
 
   const char* p = path.data();
   const char* end = p + path.size();
 
   // Path must start with '$'.
-  if (p >= end || *p != '$') return false;
+  if (p >= end || *p != '$') return NOT_FOUND;
   ++p;
 
   // '$' alone is handled above; after '$' we need '.' or '['.
-  if (p >= end) return false;
-  if (*p != '.' && *p != '[') return false;
+  if (p >= end) return NOT_FOUND;
+  if (*p != '.' && *p != '[') return NOT_FOUND;
   if (*p == '.') ++p;
 
   // Must have at least one segment after the prefix.
-  if (p >= end) return false;
+  if (p >= end) return NOT_FOUND;
 
   while (p < end) {
     if (*p == '[') {
@@ -424,26 +568,28 @@ bool VariantValue::NavigatePath(std::string_view path,
       while (p < end && *p >= '0' && *p <= '9') {
         index = index * 10 + (*p - '0');
         // An array holds at most UINT32_MAX elements.
-        if (index > std::numeric_limits<uint32_t>::max()) return false;
+        if (index > std::numeric_limits<uint32_t>::max()) return NOT_FOUND;
         ++p;
       }
-      if (p == digits_start) return false;
-      if (p >= end || *p != ']') return false;
+      if (p == digits_start) return NOT_FOUND;
+      if (p >= end || *p != ']') return NOT_FOUND;
       ++p;  // skip ']'
-      if (!result->GetArrayElement(static_cast<uint32_t>(index), result)) return false;
+      VariantLookupResult r =
+          result->GetArrayElement(static_cast<uint32_t>(index), result);
+      if (r != VariantLookupResult::FOUND) return r;
       if (p < end && *p == '.') ++p;
     } else {
       const char* seg_start = p;
       while (p < end && *p != '.' && *p != '[') ++p;
       int seg_len = p - seg_start;
-      if (seg_len == 0) return false;
-      if (!result->GetFieldByName(string_view(seg_start, seg_len), result)) {
-        return false;
-      }
+      if (seg_len == 0) return NOT_FOUND;
+      VariantLookupResult r =
+          result->GetFieldByName(string_view(seg_start, seg_len), result);
+      if (r != VariantLookupResult::FOUND) return r;
       if (p < end && *p == '.') ++p;
     }
   }
-  return true;
+  return VariantLookupResult::FOUND;
 }
 
 // --- JSON serialization ---
@@ -637,6 +783,10 @@ Status VariantJsonSerializer::Write(const VariantValue& val,
           // TODO: implement proper formatting for these types.
           writer->String("<unsupported-type>");
           break;
+        default:
+          return Status(Substitute(
+              "Malformed variant value: unknown primitive type id $0",
+              static_cast<int>(val.GetPhysicalType())));
       }
       return Status::OK();
     }
@@ -656,7 +806,7 @@ Status VariantJsonSerializer::Write(const VariantValue& val,
         writer->Key(field_name.data(), field_name.size());
         VariantValue child;
         if (UNLIKELY(!val.FieldFromLayout(layout, i, &child))) {
-          return Status("Failed to read object field");
+          return MalformedVariant("object field value (out of bounds or unknown type)");
         }
         RETURN_IF_ERROR(Write(child, metadata, writer, depth - 1));
       }
@@ -672,7 +822,7 @@ Status VariantJsonSerializer::Write(const VariantValue& val,
       for (uint32_t i = 0; i < layout.num_elems; ++i) {
         VariantValue elem;
         if (UNLIKELY(!val.ElementFromLayout(layout, i, &elem))) {
-          return Status("Failed to read array element");
+          return MalformedVariant("array element (out of bounds or unknown type)");
         }
         RETURN_IF_ERROR(Write(elem, metadata, writer, depth - 1));
       }

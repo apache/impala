@@ -1,0 +1,188 @@
+====
+---- QUERY
+# IMPALA-15460: Spark stores object values in document order, so the field offsets of
+# rows 2 and 3 (and of row 4's nested object) are not monotonic. These rows used to
+# return NULL or fail.
+SELECT id, variant_to_json(v), variant_to_json(variant_get(v, '$.a')),
+       variant_get(v, '$.b', 'int'), variant_get(v, '$.a.x', 'int')
+FROM iceberg_v3_spark_variant WHERE id <= 4 ORDER BY id;
+---- RESULTS
+1,'{"a":1,"b":2}','1',2,NULL
+2,'{"a":1,"b":2}','1',2,NULL
+3,'{"a":1,"b":2,"c":3}','1',2,NULL
+4,'{"a":{"x":2,"y":1},"b":0}','{"x":2,"y":1}',0,2
+---- TYPES
+INT, STRING, STRING, INT, INT
+====
+---- QUERY
+# SELECT of the column goes through the client result serializer. JSON lists the fields
+# in field id order, which is name order, except for row 17 (see below). Rows 9-11 are
+# checked below. Row 18 is left out because its TIMESTAMPTZ value is not rendered yet.
+SELECT id, v FROM iceberg_v3_spark_variant WHERE id NOT IN (9, 10, 11, 18) ORDER BY id;
+---- RESULTS: RAW_STRING
+1,'{"a":1,"b":2}'
+2,'{"a":1,"b":2}'
+3,'{"a":1,"b":2,"c":3}'
+4,'{"a":{"x":2,"y":1},"b":0}'
+5,'{"a":1,"b":2,"c":3}'
+6,'{"B":2,"a":1}'
+7,'[{"a":1,"b":2},{"c":3,"d":4}]'
+8,'{"b":true,"i":123456789012,"n":null,"s":"hello"}'
+12,'{"a":1,"b":2}'
+13,'{"a":1,"b":2}'
+14,'{}'
+15,'{"a":0,"z":{"y":{"x":[{"v":2,"w":1}]}}}'
+16,'{"a":1}'
+17,'{"😀":1,"！":2}'
+20,'{"a":7}'
+21,'[5,6]'
+22,'{"a":1,"b":2}'
+---- TYPES
+INT, STRING
+====
+---- QUERY
+# 2-byte field offsets and an is_large object. Row 10 (70000 chars) is checked by
+# length below, so that a failure does not print a 70 KB diff.
+SELECT id, v FROM iceberg_v3_spark_variant WHERE id IN (9, 11) ORDER BY id;
+---- RESULTS
+row_regex: 9,'\{"a":1,"b":"x{300}"\}'
+row_regex: 11,'\{"f000":0,"f001":1,.*,"f298":298,"f299":299\}'
+---- TYPES
+INT, STRING
+====
+---- QUERY
+SELECT id, variant_get(v, '$.a', 'int'), length(variant_get(v, '$.b', 'string')),
+       length(variant_to_json(v)), length(variant_to_json(variant_get(v, '$')))
+FROM iceberg_v3_spark_variant WHERE id IN (9, 10) ORDER BY id;
+---- RESULTS
+9,1,300,314,314
+10,1,70000,70014,70014
+---- TYPES
+INT, INT, INT, INT, INT
+====
+---- QUERY
+SELECT variant_get(v, '$.f000', 'int'), variant_get(v, '$.f150', 'int'),
+       variant_get(v, '$.f299', 'int'), length(variant_to_json(v))
+FROM iceberg_v3_spark_variant WHERE id = 11;
+---- RESULTS
+0,150,299,3191
+---- TYPES
+INT, INT, INT, INT
+====
+---- QUERY
+SELECT id, variant_get(v, '$.a', 'int'), variant_get(v, '$.b', 'int'),
+       variant_get(v, '$.c', 'int'), variant_get(v, '$.B', 'int')
+FROM iceberg_v3_spark_variant WHERE id IN (1, 2, 3, 5, 6, 12, 13, 16, 22)
+ORDER BY id;
+---- RESULTS
+1,1,2,NULL,NULL
+2,1,2,NULL,NULL
+3,1,2,3,NULL
+5,1,2,3,NULL
+6,1,NULL,NULL,2
+12,1,2,NULL,NULL
+13,1,2,NULL,NULL
+16,1,NULL,NULL,NULL
+22,1,2,NULL,NULL
+---- TYPES
+INT, INT, INT, INT, INT
+====
+---- QUERY
+# Typed values from a Spark struct. 'ts' is a TIMESTAMPTZ, which Impala does not render
+# yet, but it is sized from its header, so its siblings stay readable.
+SELECT variant_get(v, '$.a', 'int'), variant_get(v, '$.d', 'date'),
+       variant_get(v, '$.d', 'string')
+FROM iceberg_v3_spark_variant WHERE id = 18;
+---- RESULTS
+1,2024-01-02,'2024-01-02'
+---- TYPES
+INT, DATE, STRING
+====
+---- QUERY
+# Objects inside an array, and deep nesting with every level reversed.
+SELECT variant_get(v, '$[0].a', 'int'), variant_get(v, '$[0].b', 'int'),
+       variant_get(v, '$[1].c', 'int'), variant_get(v, '$[1].d', 'int'),
+       variant_to_json(variant_get(v, '$[1]'))
+FROM iceberg_v3_spark_variant WHERE id = 7;
+---- RESULTS
+1,2,3,4,'{"c":3,"d":4}'
+---- TYPES
+INT, INT, INT, INT, STRING
+====
+---- QUERY
+SELECT variant_get(v, '$.z.y.x[0].v', 'int'), variant_get(v, '$.z.y.x[0].w', 'int'),
+       variant_get(v, '$.a', 'int'), variant_to_json(variant_get(v, '$.z.y'))
+FROM iceberg_v3_spark_variant WHERE id = 15;
+---- RESULTS
+2,1,0,'{"x":[{"v":2,"w":1}]}'
+---- TYPES
+INT, INT, INT, STRING
+====
+---- QUERY
+SELECT variant_get(v, '$.s', 'string'), variant_get(v, '$.i', 'bigint'),
+       variant_get(v, '$.b', 'boolean'), variant_to_json(variant_get(v, '$.n'))
+FROM iceberg_v3_spark_variant WHERE id = 8;
+---- RESULTS
+'hello',123456789012,true,'NULL'
+---- TYPES
+STRING, BIGINT, BOOLEAN, STRING
+====
+---- QUERY
+# The whole object as STRING used to fail with "corrupt or unreadable variant".
+SELECT id, variant_get(v, '$', 'string') FROM iceberg_v3_spark_variant
+WHERE id IN (2, 3, 4) ORDER BY id;
+---- RESULTS
+2,'{"a":1,"b":2}'
+3,'{"a":1,"b":2,"c":3}'
+4,'{"a":{"x":2,"y":1},"b":0}'
+---- TYPES
+INT, STRING
+====
+---- QUERY
+# Filters used to drop the rows silently.
+SELECT count(*) FROM iceberg_v3_spark_variant WHERE variant_get(v, '$.a.x', 'int') = 2;
+---- RESULTS
+1
+---- TYPES
+BIGINT
+====
+---- QUERY
+SELECT count(*) FROM iceberg_v3_spark_variant
+WHERE try_variant_get(v, '$.a', 'int') = 1;
+---- RESULTS
+12
+---- TYPES
+BIGINT
+====
+---- QUERY
+SELECT count(*), count(variant_to_json(v)) FROM iceberg_v3_spark_variant;
+---- RESULTS
+21,21
+---- TYPES
+BIGINT, BIGINT
+====
+---- QUERY
+# Crafted rows: duplicate dictionary strings, decreasing array offsets.
+SELECT variant_get(v, '$.a', 'int') FROM iceberg_v3_spark_variant WHERE id = 20;
+---- RESULTS
+7
+---- TYPES
+INT
+====
+---- QUERY
+SELECT variant_get(v, '$[0]', 'int'), variant_get(v, '$[1]', 'int')
+FROM iceberg_v3_spark_variant WHERE id = 21;
+---- RESULTS
+5,6
+---- TYPES
+INT, INT
+====
+---- QUERY
+# Spark lists field ids in UTF-16 order, not byte order, for keys above U+FFFF.
+SELECT variant_get(v, '$.！', 'int'), variant_get(v, '$.😀', 'int')
+FROM iceberg_v3_spark_variant WHERE id = 17;
+---- RESULTS
+2,1
+---- TYPES
+INT, INT
+====

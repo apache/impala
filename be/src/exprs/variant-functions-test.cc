@@ -17,9 +17,12 @@
 
 #include "exprs/variant-functions.h"
 
+#include <algorithm>
 #include <cstring>
+#include <sstream>
 #include <vector>
 
+#include "gutil/strings/substitute.h"
 #include "runtime/mem-pool.h"
 #include "runtime/mem-tracker.h"
 #include "runtime/variant-value.h"
@@ -33,7 +36,8 @@ using impala_udf::FunctionContext;
 namespace impala {
 
 // ------------------------- variant-blob builders ---------------------------
-// (Mirrors the encoding used in be/src/util/variant-util-test.cc.)
+// (Mirrors the encoding used in be/src/util/variant-util-test.cc, with 1-byte field ids
+// and offsets only.)
 
 static vector<uint8_t> BuildMetadata(const vector<string>& field_names) {
   vector<uint8_t> buf;
@@ -103,33 +107,69 @@ static vector<uint8_t> BuildShortString(const string& s) {
   return buf;
 }
 
+// Lays out 'values' in the order given by 'storage_order', a permutation of
+// [0, values.size()) (empty means the identity). Sets '*offsets' to where each value
+// starts, followed by the total size, and appends the value data to '*data'.
+static void LayoutValues(const vector<vector<uint8_t>>& values,
+    const vector<int>& storage_order, vector<uint32_t>* offsets, vector<uint8_t>* data) {
+  vector<int> order = storage_order;
+  if (order.empty()) {
+    for (int i = 0; i < values.size(); ++i) order.push_back(i);
+  }
+  CHECK_EQ(order.size(), values.size());
+  vector<int> sorted_order = order;
+  std::sort(sorted_order.begin(), sorted_order.end());
+  for (int i = 0; i < sorted_order.size(); ++i) CHECK_EQ(i, sorted_order[i]);
+  offsets->assign(values.size() + 1, 0);
+  for (int k : order) {
+    (*offsets)[k] = data->size();
+    data->insert(data->end(), values[k].begin(), values[k].end());
+  }
+  (*offsets)[values.size()] = data->size();
+  CHECK_LE(data->size(), 255);
+}
+
+// 'values[i]' is the value of 'field_ids[i]'. The field ids must be listed in field name
+// order, but the values may be stored in any order: 'storage_order' lists the indices of
+// 'values' in the order they are stored in (empty means the same order as 'field_ids').
 static vector<uint8_t> BuildObject(const vector<int>& field_ids,
-    const vector<vector<uint8_t>>& values) {
-  int num_fields = field_ids.size();
+    const vector<vector<uint8_t>>& values, const vector<int>& storage_order = {}) {
   vector<uint32_t> offsets;
-  uint32_t offset = 0;
-  for (const auto& v : values) { offsets.push_back(offset); offset += v.size(); }
-  offsets.push_back(offset);
+  vector<uint8_t> data;
+  LayoutValues(values, storage_order, &offsets, &data);
   vector<uint8_t> buf = {0x02};  // OBJECT, 1-byte fields/offsets
-  buf.push_back(static_cast<uint8_t>(num_fields));
+  buf.push_back(static_cast<uint8_t>(field_ids.size()));
   for (int fid : field_ids) buf.push_back(static_cast<uint8_t>(fid));
   for (uint32_t o : offsets) buf.push_back(static_cast<uint8_t>(o));
-  for (const auto& v : values) buf.insert(buf.end(), v.begin(), v.end());
+  buf.insert(buf.end(), data.begin(), data.end());
   return buf;
 }
 
-static vector<uint8_t> BuildArray(const vector<vector<uint8_t>>& elements) {
-  int num_elements = elements.size();
+// The elements are stored in 'storage_order' (see BuildObject()).
+static vector<uint8_t> BuildArray(const vector<vector<uint8_t>>& elements,
+    const vector<int>& storage_order = {}) {
   vector<uint32_t> offsets;
-  uint32_t offset = 0;
-  for (const auto& e : elements) { offsets.push_back(offset); offset += e.size(); }
-  offsets.push_back(offset);
+  vector<uint8_t> data;
+  LayoutValues(elements, storage_order, &offsets, &data);
   vector<uint8_t> buf = {0x03};  // ARRAY, 1-byte offsets
-  buf.push_back(static_cast<uint8_t>(num_elements));
+  buf.push_back(static_cast<uint8_t>(elements.size()));
   for (uint32_t o : offsets) buf.push_back(static_cast<uint8_t>(o));
-  for (const auto& e : elements) buf.insert(buf.end(), e.begin(), e.end());
+  buf.insert(buf.end(), data.begin(), data.end());
   return buf;
 }
+
+// Parses space-separated hex bytes, e.g. "02 01 00".
+static vector<uint8_t> FromHex(const string& hex) {
+  vector<uint8_t> buf;
+  std::istringstream in(hex);
+  string byte;
+  while (in >> byte) buf.push_back(static_cast<uint8_t>(std::stoul(byte, nullptr, 16)));
+  return buf;
+}
+
+// What try_variant_get() writes to stderr for a corrupt variant (see CaptureStderr()).
+static const char* CORRUPT_WARNING =
+    "UDF WARNING: variant_get: corrupt or unreadable variant";
 
 // --------------------------------- fixture ---------------------------------
 
@@ -193,6 +233,20 @@ class VariantFunctionsTest : public ::testing::Test {
   string AsString(const StringVal& s) {
     EXPECT_FALSE(s.is_null);
     return string(reinterpret_cast<char*>(s.ptr), s.len);
+  }
+
+  // Renders a VARIANT as JSON with variant_to_json() (asserts non-null).
+  string Json(const VariantVal& v) {
+    return AsString(VariantFunctions::VariantToJson(ctx_, v));
+  }
+
+  // Runs 'fn' and returns what it wrote to stderr. A test FunctionContext has no
+  // RuntimeState, so FunctionContext::AddWarning() writes "UDF WARNING: ..." to stderr.
+  template <typename Fn>
+  string CaptureStderr(const Fn& fn) {
+    testing::internal::CaptureStderr();
+    fn();
+    return testing::internal::GetCapturedStderr();
   }
 
   // Creates an owned FunctionContext with 'num_args' (all non-constant by default).
@@ -457,7 +511,7 @@ TEST_F(VariantFunctionsTest, ThreeArgInvalidDate) {
 TEST_F(VariantFunctionsTest, ThreeArgStringFormats) {
   BUILD_PERSON();
   VariantVal person = MakeVariant(meta, obj);
-  // Whole object -> JSON text (stored field order: age then name).
+  // Whole object -> JSON text (field id order, i.e. name order).
   EXPECT_EQ("{\"age\":30,\"name\":\"Alice\"}",
       AsString(VariantFunctions::VariantGetString(
           ctx_, person, StringVal("$"), StringVal("string"))));
@@ -550,19 +604,28 @@ TEST_F(VariantFunctionsTest, CorruptMetadata) {
   EXPECT_TRUE(c->has_error());
 }
 
-// A zero-length value at the path is corrupt (every encoded value has a header byte):
-// strict raises an error, try_ yields NULL without erroring. Covers an empty value blob
-// and an object field whose start and end offsets are equal.
+// Every encoded value has at least a header byte, so an empty value blob and an object
+// field that starts at the end of the value data are corrupt: strict raises an error,
+// try_ yields NULL with a warning. Covers an empty value blob (at '$' and when looking up
+// a field in it) and such a field.
 TEST_F(VariantFunctionsTest, EmptyValueAtPath) {
   vector<uint8_t> meta = BuildMetadata({"a"});
   vector<uint8_t> empty_val;
-  vector<uint8_t> empty_field = {0x02, 0x01, 0x00, 0x00, 0x00};  // {"a": <0 bytes>}
+  // {"a": <starts at the end of the (empty) value data>}
+  vector<uint8_t> empty_field = {0x02, 0x01, 0x00, 0x00, 0x00};
   struct Case { const vector<uint8_t>* value; const char* path; };
-  for (const Case& tc : {Case{&empty_val, "$"}, Case{&empty_field, "$.a"}}) {
+  for (const Case& tc : {Case{&empty_val, "$"}, Case{&empty_val, "$.a"},
+           Case{&empty_field, "$.a"}}) {
     VariantVal v = MakeVariant(meta, *tc.value);
-    EXPECT_TRUE(VariantFunctions::TryVariantGet(ctx_, v, StringVal(tc.path)).is_null);
-    EXPECT_TRUE(VariantFunctions::TryVariantGetBoolean(
-        ctx_, v, StringVal(tc.path), StringVal("boolean")).is_null);
+    string warnings = CaptureStderr([&]() {
+      EXPECT_TRUE(VariantFunctions::TryVariantGet(ctx_, v, StringVal(tc.path)).is_null);
+    });
+    EXPECT_NE(string::npos, warnings.find(CORRUPT_WARNING)) << tc.path << warnings;
+    warnings = CaptureStderr([&]() {
+      EXPECT_TRUE(VariantFunctions::TryVariantGetBoolean(
+          ctx_, v, StringVal(tc.path), StringVal("boolean")).is_null);
+    });
+    EXPECT_NE(string::npos, warnings.find(CORRUPT_WARNING)) << tc.path << warnings;
     EXPECT_FALSE(ctx_->has_error()) << tc.path;
     FunctionContext* c = MakeCtx(2);
     EXPECT_TRUE(VariantFunctions::VariantGet(c, v, StringVal(tc.path)).is_null);
@@ -571,6 +634,208 @@ TEST_F(VariantFunctionsTest, EmptyValueAtPath) {
     EXPECT_TRUE(VariantFunctions::VariantGetInt(
         c3, v, StringVal(tc.path), StringVal("int")).is_null);
     EXPECT_TRUE(c3->has_error()) << tc.path;
+  }
+}
+
+// ------------------ values stored out of name order (IMPALA-15460) ------------------
+
+// Spark 4.1.3 bytes of {"b":2,"a":1} and {"a":1,"c":3,"b":2}: the field ids and offsets
+// are listed in name order, but the values are stored in document order.
+TEST_F(VariantFunctionsTest, OutOfOrderSparkBytes) {
+  struct Case {
+    const char* meta;
+    const char* value;
+    const char* json;
+  };
+  const vector<Case> cases = {
+      {"01 02 00 01 02 62 61", "02 02 01 00 02 00 04 0c 02 0c 01", R"V({"a":1,"b":2})V"},
+      {"01 03 00 01 02 03 61 63 62", "02 03 00 02 01 00 04 02 06 0c 01 0c 03 0c 02",
+          R"V({"a":1,"b":2,"c":3})V"}};
+  for (const Case& c : cases) {
+    SCOPED_TRACE(c.value);
+    vector<uint8_t> meta = FromHex(c.meta);
+    vector<uint8_t> value = FromHex(c.value);
+    VariantVal v = MakeVariant(meta, value);
+    EXPECT_EQ(1, VariantFunctions::VariantGetInt(
+        ctx_, v, StringVal("$.a"), StringVal("int")).val);
+    EXPECT_EQ(2, VariantFunctions::VariantGetInt(
+        ctx_, v, StringVal("$.b"), StringVal("int")).val);
+    EXPECT_EQ(1, VariantFunctions::TryVariantGetInt(
+        ctx_, v, StringVal("$.a"), StringVal("int")).val);
+    EXPECT_EQ(2, VariantFunctions::TryVariantGetInt(
+        ctx_, v, StringVal("$.b"), StringVal("int")).val);
+    EXPECT_EQ(c.json, AsString(VariantFunctions::VariantGetString(
+        ctx_, v, StringVal("$"), StringVal("string"))));
+    EXPECT_EQ(c.json, Json(v));
+    // The 2-arg variant_get returns the exact bytes of the field.
+    VariantVal a = VariantFunctions::VariantGet(ctx_, v, StringVal("$.a"));
+    ASSERT_FALSE(a.is_null);
+    EXPECT_EQ(2, a.value.len);
+    EXPECT_EQ("1", Json(a));
+  }
+  EXPECT_FALSE(ctx_->has_error());
+}
+
+// Spark 4.1.3 bytes of {"a":{"y":1,"x":2},"b":0}.
+TEST_F(VariantFunctionsTest, OutOfOrderNested) {
+  vector<uint8_t> meta = FromHex("01 04 00 01 02 03 04 61 79 78 62");
+  vector<uint8_t> value =
+      FromHex("02 02 00 03 00 0b 0d 02 02 02 01 02 00 04 0c 01 0c 02 0c 00");
+  VariantVal v = MakeVariant(meta, value);
+  EXPECT_EQ(2, VariantFunctions::VariantGetInt(
+      ctx_, v, StringVal("$.a.x"), StringVal("int")).val);
+  EXPECT_EQ(1, VariantFunctions::VariantGetInt(
+      ctx_, v, StringVal("$.a.y"), StringVal("int")).val);
+  EXPECT_EQ(0, VariantFunctions::VariantGetInt(
+      ctx_, v, StringVal("$.b"), StringVal("int")).val);
+  VariantVal a = VariantFunctions::VariantGet(ctx_, v, StringVal("$.a"));
+  EXPECT_EQ(R"V({"x":2,"y":1})V", Json(a));
+  EXPECT_EQ(R"V({"x":2,"y":1})V", AsString(VariantFunctions::VariantGetString(
+      ctx_, v, StringVal("$.a"), StringVal("string"))));
+  // Chaining: the outer get consumes the VARIANT returned by the inner one.
+  EXPECT_EQ(2, VariantFunctions::VariantGetInt(
+      ctx_, a, StringVal("$.x"), StringVal("int")).val);
+  EXPECT_FALSE(ctx_->has_error());
+}
+
+// {"c":"s","b":true,"a":2.5}, stored in reverse name order, through the typed getters.
+TEST_F(VariantFunctionsTest, OutOfOrderAllGetters) {
+  vector<uint8_t> meta = BuildMetadata({"a", "b", "c"});
+  vector<uint8_t> obj = BuildObject({0, 1, 2},
+      {BuildDouble(2.5), BuildBoolean(true), BuildShortString("s")},
+      /*storage_order=*/{2, 1, 0});
+  VariantVal v = MakeVariant(meta, obj);
+  EXPECT_EQ("s", AsString(VariantFunctions::VariantGetString(
+      ctx_, v, StringVal("$.c"), StringVal("string"))));
+  EXPECT_EQ("s", AsString(VariantFunctions::TryVariantGetString(
+      ctx_, v, StringVal("$.c"), StringVal("string"))));
+  BooleanVal b = VariantFunctions::VariantGetBoolean(
+      ctx_, v, StringVal("$.b"), StringVal("boolean"));
+  ASSERT_FALSE(b.is_null);
+  EXPECT_TRUE(b.val);
+  b = VariantFunctions::TryVariantGetBoolean(
+      ctx_, v, StringVal("$.b"), StringVal("boolean"));
+  ASSERT_FALSE(b.is_null);
+  EXPECT_TRUE(b.val);
+  EXPECT_DOUBLE_EQ(2.5, VariantFunctions::VariantGetDouble(
+      ctx_, v, StringVal("$.a"), StringVal("double")).val);
+  EXPECT_DOUBLE_EQ(2.5, VariantFunctions::TryVariantGetDouble(
+      ctx_, v, StringVal("$.a"), StringVal("double")).val);
+  EXPECT_EQ(R"V({"a":2.5,"b":true,"c":"s"})V", Json(v));
+  EXPECT_FALSE(ctx_->has_error());
+}
+
+TEST_F(VariantFunctionsTest, OutOfOrderArrays) {
+  // [{"b":2,"a":1}]
+  vector<uint8_t> meta = BuildMetadata({"a", "b"});
+  vector<uint8_t> arr = BuildArray(
+      {BuildObject({0, 1}, {BuildInt8(1), BuildInt8(2)}, /*storage_order=*/{1, 0})});
+  VariantVal v = MakeVariant(meta, arr);
+  EXPECT_EQ(1, VariantFunctions::VariantGetInt(
+      ctx_, v, StringVal("$[0].a"), StringVal("int")).val);
+  EXPECT_EQ(2, VariantFunctions::VariantGetInt(
+      ctx_, v, StringVal("$[0].b"), StringVal("int")).val);
+  // [5,6] with the elements stored as 6, 5: the offsets are [2, 0, 4].
+  vector<uint8_t> empty_meta = FromHex("01 00 00");
+  vector<uint8_t> arr2 = FromHex("03 02 02 00 04 0c 06 0c 05");
+  VariantVal v2 = MakeVariant(empty_meta, arr2);
+  EXPECT_EQ(5, VariantFunctions::VariantGetInt(
+      ctx_, v2, StringVal("$[0]"), StringVal("int")).val);
+  EXPECT_EQ(6, VariantFunctions::VariantGetInt(
+      ctx_, v2, StringVal("$[1]"), StringVal("int")).val);
+  EXPECT_EQ("[5,6]", Json(v2));
+  EXPECT_FALSE(ctx_->has_error());
+}
+
+// An unsorted dictionary ["x", "a", "a"] holds "a" twice, and {"a":7} uses the second id.
+TEST_F(VariantFunctionsTest, DuplicateDictionaryStrings) {
+  vector<uint8_t> meta = FromHex("01 03 00 01 02 03 78 61 61");
+  vector<uint8_t> obj = FromHex("02 01 02 00 02 0c 07");
+  VariantVal v = MakeVariant(meta, obj);
+  IntVal a = VariantFunctions::VariantGetInt(ctx_, v, StringVal("$.a"), StringVal("int"));
+  ASSERT_FALSE(a.is_null);
+  EXPECT_EQ(7, a.val);
+  EXPECT_EQ(R"V({"a":7})V", Json(v));
+  EXPECT_FALSE(ctx_->has_error());
+}
+
+// A value on the path that cannot be read, the root included, is corrupt: strict
+// variant_get raises an error, try_variant_get returns NULL with a warning.
+TEST_F(VariantFunctionsTest, UnreadableValueIsCorrupt) {
+  vector<uint8_t> meta = BuildMetadata({"a"});
+  struct Case {
+    const char* value;
+    const char* path;
+  };
+  const vector<Case> cases = {
+      // An INT32 field that runs past the last offset (2).
+      {"02 01 00 00 02 14 01", "$.a"},
+      // A field of an unknown primitive type (id 21).
+      {"02 01 00 00 01 54", "$.a"},
+      // Field id 5 is outside the 1-entry dictionary.
+      {"02 01 05 00 02 0c 01", "$.a"},
+      // A nested object with 100 fields in 3 bytes.
+      {"02 01 00 00 03 02 64 00", "$.a.b"},
+      // {"a":{"a":<INT32 without a payload>}}: '$.a' can be read, '$.a.a' cannot.
+      {"02 01 00 00 07 02 01 00 00 02 14 01", "$.a.a"},
+      // [<INT32 without a payload>]
+      {"03 01 00 01 14", "$[0]"},
+      // An object with 100 fields in 3 bytes.
+      {"02 64 00", "$.a"},
+      // A root INT32 without a full payload, and a root of an unknown type (id 21).
+      {"14 01", "$"},
+      {"54", "$"},
+      {"54", "$.a"}};
+  for (const Case& c : cases) {
+    SCOPED_TRACE(Substitute("value: '$0' path: '$1'", c.value, c.path));
+    vector<uint8_t> value = FromHex(c.value);
+    VariantVal v = MakeVariant(meta, value);
+    FunctionContext* c2 = MakeCtx(2);
+    EXPECT_TRUE(VariantFunctions::VariantGet(c2, v, StringVal(c.path)).is_null);
+    EXPECT_TRUE(c2->has_error());
+    EXPECT_STREQ("variant_get: corrupt or unreadable variant", c2->error_msg());
+    FunctionContext* c3 = MakeCtx(3);
+    EXPECT_TRUE(VariantFunctions::VariantGetInt(
+        c3, v, StringVal(c.path), StringVal("int")).is_null);
+    EXPECT_TRUE(c3->has_error());
+    EXPECT_STREQ("variant_get: corrupt or unreadable variant", c3->error_msg());
+    string warnings = CaptureStderr([&]() {
+      EXPECT_TRUE(VariantFunctions::TryVariantGet(ctx_, v, StringVal(c.path)).is_null);
+    });
+    EXPECT_NE(string::npos, warnings.find(CORRUPT_WARNING)) << warnings;
+    warnings = CaptureStderr([&]() {
+      EXPECT_TRUE(VariantFunctions::TryVariantGetInt(
+          ctx_, v, StringVal(c.path), StringVal("int")).is_null);
+    });
+    EXPECT_NE(string::npos, warnings.find(CORRUPT_WARNING)) << warnings;
+    EXPECT_FALSE(ctx_->has_error());
+  }
+}
+
+// A path that does not match the value is SQL NULL, without an error or a warning.
+TEST_F(VariantFunctionsTest, MissingPathsStayNull) {
+  // {"a":1,"b":[1]}
+  vector<uint8_t> meta = BuildMetadata({"a", "b"});
+  vector<uint8_t> obj = BuildObject({0, 1}, {BuildInt8(1), BuildArray({BuildInt8(1)})});
+  VariantVal v = MakeVariant(meta, obj);
+  for (const char* path : {"$.zzz", "$.a.b", "$[0]", "$.b[5]", "$.b.c"}) {
+    SCOPED_TRACE(path);
+    FunctionContext* c2 = MakeCtx(2);
+    EXPECT_TRUE(VariantFunctions::VariantGet(c2, v, StringVal(path)).is_null);
+    EXPECT_FALSE(c2->has_error());
+    FunctionContext* c3 = MakeCtx(3);
+    EXPECT_TRUE(VariantFunctions::VariantGetInt(
+        c3, v, StringVal(path), StringVal("int")).is_null);
+    EXPECT_FALSE(c3->has_error());
+    string warnings = CaptureStderr([&]() {
+      EXPECT_TRUE(VariantFunctions::TryVariantGet(ctx_, v, StringVal(path)).is_null);
+    });
+    EXPECT_EQ(string::npos, warnings.find("UDF WARNING")) << warnings;
+    warnings = CaptureStderr([&]() {
+      EXPECT_TRUE(VariantFunctions::TryVariantGetInt(
+          ctx_, v, StringVal(path), StringVal("int")).is_null);
+    });
+    EXPECT_EQ(string::npos, warnings.find("UDF WARNING")) << warnings;
   }
 }
 
