@@ -108,7 +108,6 @@ HdfsParquetScanner::HdfsParquetScanner(HdfsScanNodeBase* scan_node, RuntimeState
     min_max_tuple_(nullptr),
     row_batches_produced_(0),
     dictionary_pool_(new MemPool(scan_node->mem_tracker())),
-    stats_batch_read_pool_(new MemPool(scan_node->mem_tracker())),
     assemble_rows_timer_(scan_node_->materialize_tuple_timer()),
     num_stats_filtered_row_groups_counter_(nullptr),
     num_minmax_filtered_row_groups_counter_(nullptr),
@@ -1168,41 +1167,6 @@ CompareFunc GetCompareLessFunc(const ColumnType& col_type) {
   return nullptr;
 }
 
-Status HdfsParquetScanner::ConvertStatsIntoInternalValuesBatch(
-    const ColumnStatsReader& stats_reader, const parquet::ColumnIndex& column_index,
-    int start_page_idx, int end_page_idx, const ColumnType& col_type,
-    uint8_t** min_values, uint8_t** max_values) {
-  DCHECK_GE(end_page_idx, start_page_idx);
-  int slot_size = col_type.GetSlotSize();
-  int64_t total_size = (end_page_idx - start_page_idx + 1) * slot_size;
-
-  uint8_t* min_slots = stats_batch_read_pool_->TryAllocate(total_size);
-  if (!min_slots) {
-    return stats_batch_read_pool_->mem_tracker()->MemLimitExceeded(state_,
-        "Fail to allocate memory to hold a batch of min column stats", total_size);
-  }
-  if (!stats_reader.ReadFromStringsBatch(ColumnStatsReader::StatsField::MIN,
-          column_index.min_values, start_page_idx, end_page_idx, col_type.len,
-          min_slots)) {
-    return Status("Fail to read from min stats in column index in batch");
-  }
-
-  uint8_t* max_slots = stats_batch_read_pool_->TryAllocate(total_size);
-  if (!max_slots) {
-    return stats_batch_read_pool_->mem_tracker()->MemLimitExceeded(state_,
-        "Fail to allocate memory to hold a batch of max column stats", total_size);
-  }
-  if (!stats_reader.ReadFromStringsBatch(ColumnStatsReader::StatsField::MAX,
-          column_index.max_values, start_page_idx, end_page_idx, col_type.len,
-          max_slots)) {
-    return Status("Fail to read from max stats in column index in batch");
-  }
-
-  *min_values = min_slots;
-  *max_values = max_slots;
-  return Status::OK();
-}
-
 Status HdfsParquetScanner::SkipPagesBatch(parquet::RowGroup& row_group,
     const ColumnStatsReader& stats_reader, const parquet::ColumnIndex& column_index,
     int start_page_idx, int end_page_idx, const ColumnType& col_type, int col_idx,
@@ -1216,72 +1180,62 @@ Status HdfsParquetScanner::SkipPagesBatch(parquet::RowGroup& row_group,
 
   int slot_size = col_type.GetSlotSize();
 
-  VLOG(3) << "SkiPagesBatch() called: "
+  VLOG(3) << "SkipPagesBatch() called: "
           << " start_page_idx=" << start_page_idx
           << ", end_page_idx=" << end_page_idx
           << ", #pages=" << (end_page_idx - start_page_idx + 1)
           << ", slot_size=" << slot_size;
 
+  // Decode the min/max values of the pages into slots of 'col_type', the same way as
+  // EvaluatePageIndex() does. The slots are stored in strings, as
+  // CollectSkippedPageRangesForSortedColumn() expects them, at the index of the page in
+  // the span. Pages whose min/max values cannot be decoded are not skipped.
+  const int num_pages = end_page_idx - start_page_idx + 1;
+  vector<string> min_vals(num_pages);
+  vector<string> max_vals(num_pages);
+  vector<bool> decoded(num_pages, false);
+  bool all_decoded = true;
+  for (int i = 0; i < num_pages; i++) {
+    min_vals[i].resize(slot_size);
+    max_vals[i].resize(slot_size);
+    bool is_null_page;
+    decoded[i] = ReadStatFromIndex(stats_reader, column_index, start_page_idx + i,
+        &is_null_page, min_vals[i].data(), max_vals[i].data());
+    DCHECK(!is_null_page);
+    if (!decoded[i]) all_decoded = false;
+  }
+
   bool validate_fast_code_path = false;
 
+  // TODO(IMPALA-15707): remove the fast code path and MINMAX_FILTER_FAST_CODE_PATH. The
+  // pages are decoded one by one above, so the binary search saves little over the
+  // regular code path below, which skips the same pages.
   // Go through a fast code path to collect the skipped pages via binary search, provided
-  // that the fast code path mode is on, min/max values are sorted, and a compare less
-  // function is defined for 'col_type'.
+  // that the fast code path mode is on, min/max values are sorted, a compare less
+  // function is defined for 'col_type' and the min/max values of all pages are decoded.
   TMinmaxFilterFastCodePathMode::type fast_code_path_mode =
       state_->query_options().minmax_filter_fast_code_path;
   // A vector of booleans used only for verification.
   std::vector<bool> pageIndicesFromFastSearch(end_page_idx + 1, false);
   if (fast_code_path_mode != TMinmaxFilterFastCodePathMode::OFF
       && column_index.boundary_order == parquet::BoundaryOrder::ASCENDING
-      && col_type.type == minmax_filter->type() && GetCompareLessFunc(col_type)) {
+      && col_type.type == minmax_filter->type() && GetCompareLessFunc(col_type)
+      && all_decoded) {
     validate_fast_code_path =
         fast_code_path_mode == TMinmaxFilterFastCodePathMode::VERIFICATION;
 
     vector<PageRange> skipped_page_ranges;
-    if (ParquetPlainEncoder::IsIdenticalToParquetStorageType(col_type)) {
-      // For those Impala types that are identical to the Parquet storage type, do
-      // the binary search directly on the min/max values.
-      const vector<string>& min_vals = column_index.min_values;
-      const vector<string>& max_vals = column_index.max_values;
-      HdfsParquetScanner::CollectSkippedPageRangesForSortedColumn(minmax_filter, col_type,
-          min_vals, max_vals, start_page_idx, end_page_idx, &skipped_page_ranges);
-    } else {
-      // Otherwise, convert the min/max values into internal format first which validate
-      // the stats and then do the binary search.
-      uint8_t* min_slots = nullptr;
-      uint8_t* max_slots = nullptr;
-      RETURN_IF_ERROR(ConvertStatsIntoInternalValuesBatch(stats_reader, column_index,
-          start_page_idx, end_page_idx, col_type, &min_slots, &max_slots));
-
-      // Prepare two string vectors that hold the converted min and max values.
-      // First allocate a total of 'start_page_idx' strings in each vectors which do not
-      // participate in the binary search. Then reserve a total of 'end_page_idx' + 1
-      // strings. Lastly, copy a total of 'sz' converted stats objects into the two
-      // vectors as strings.
-      vector<string> min_vals(start_page_idx);
-      vector<string> max_vals(start_page_idx);
-      min_vals.reserve(end_page_idx+1);
-      max_vals.reserve(end_page_idx+1);
-
-      uint8_t* min_slot = min_slots;
-      uint8_t* max_slot = max_slots;
-      int64_t sz = end_page_idx - start_page_idx + 1;
-      for (int i = 0; i < sz; i++) {
-        min_vals.emplace_back(string(reinterpret_cast<char*>(min_slot), slot_size));
-        max_vals.emplace_back(string(reinterpret_cast<char*>(max_slot), slot_size));
-        min_slot += slot_size;
-        max_slot += slot_size;
-      }
-      // The two string vectors are ready. Perform the binary search.
-      HdfsParquetScanner::CollectSkippedPageRangesForSortedColumn(minmax_filter, col_type,
-          min_vals, max_vals, start_page_idx, end_page_idx, &skipped_page_ranges);
-      stats_batch_read_pool_->FreeAll();
+    HdfsParquetScanner::CollectSkippedPageRangesForSortedColumn(minmax_filter, col_type,
+        min_vals, max_vals, 0, num_pages - 1, &skipped_page_ranges);
+    for (PageRange& page_range : skipped_page_ranges) {
+      // Convert the indexes in the span to page indexes.
+      page_range.first += start_page_idx;
+      page_range.last += start_page_idx;
     }
     if (UNLIKELY(validate_fast_code_path)) {
       for (const auto& page_range : skipped_page_ranges) {
         page_range.convertToIndices(&pageIndicesFromFastSearch);
       }
-      skip_ranges->clear();
     } else {
       for (const auto& page_range : skipped_page_ranges) {
         RowRange row_range;
@@ -1299,37 +1253,30 @@ Status HdfsParquetScanner::SkipPagesBatch(parquet::RowGroup& row_group,
   }
 
   // Go through the regular code path to collect the skipped pages. Linearly go over
-  // each page in the entire page range ([start_page_idx, end_page_idx]) which are
-  // collected with batch read.
-  uint8_t* min_slots = nullptr;
-  uint8_t* max_slots = nullptr;
-  RETURN_IF_ERROR(ConvertStatsIntoInternalValuesBatch(stats_reader,
-      column_index, start_page_idx, end_page_idx, col_type, &min_slots, &max_slots));
-
-  uint8_t* min_slot = min_slots;
-  uint8_t* max_slot = max_slots;
-  for (int i = start_page_idx; i <= end_page_idx; i++) {
-    VLOG(3) << "stats for page[" << i << "]: "
+  // each page in the entire page range ([start_page_idx, end_page_idx]).
+  for (int i = 0; i < num_pages; i++) {
+    if (!decoded[i]) continue;
+    const int page_idx = start_page_idx + i;
+    void* min_slot = min_vals[i].data();
+    void* max_slot = max_vals[i].data();
+    VLOG(3) << "stats for page[" << page_idx << "]: "
             << "min=" << RawValue::PrintValue(min_slot, col_type, col_type.scale)
             << ", max=" << RawValue::PrintValue(max_slot, col_type, col_type.scale);
     if (!minmax_filter->EvalOverlap(col_type, min_slot, max_slot)) {
-      RETURN_IF_ERROR(AddToSkipRanges(min_slot, max_slot, row_group, i, col_type,
+      RETURN_IF_ERROR(AddToSkipRanges(min_slot, max_slot, row_group, page_idx, col_type,
           col_idx, col_chunk, skip_ranges, filtered_pages));
 
       if (UNLIKELY(validate_fast_code_path)) {
-        if (!pageIndicesFromFastSearch[i]) {
+        if (!pageIndicesFromFastSearch[page_idx]) {
           return Status(
               Substitute("Fast code path does not find the skipped page $0 found in the "
                          "normal code path. The workaround is to turn it off via set "
-                         "minmax_filter_fast_code_path=false", i));
+                         "minmax_filter_fast_code_path=false", page_idx));
         } else {
-          pageIndicesFromFastSearch[i] = false;
+          pageIndicesFromFastSearch[page_idx] = false;
         }
       }
     }
-
-    min_slot += slot_size;
-    max_slot += slot_size;
   }
 
   if (UNLIKELY(validate_fast_code_path)) {
@@ -1343,7 +1290,6 @@ Status HdfsParquetScanner::SkipPagesBatch(parquet::RowGroup& row_group,
     }
   }
 
-  stats_batch_read_pool_->FreeAll();
   return Status::OK();
 }
 
@@ -1543,8 +1489,8 @@ Status HdfsParquetScanner::FindSkipRangesForPagesWithMinMaxFilters(
             << ", #pages=" << num_of_pages;
     int first_not_null_page_idx = -1;
 
-    // Try to detect the longest span of non-null pages and batch read min/max stats for
-    // it. If a null-page is found, skip it right away and continue.
+    // Filter each span of non-null pages with SkipPagesBatch(). If a null-page is found,
+    // skip it right away and continue.
     for (int page_idx = 0; page_idx < num_of_pages; ++page_idx) {
       bool is_null_page = column_index.null_pages[page_idx];
       if (UNLIKELY(is_null_page)) {
@@ -1568,7 +1514,7 @@ Status HdfsParquetScanner::FindSkipRangesForPagesWithMinMaxFilters(
       }
     }
 
-    // Prorcess the last span of non-null pages, if exist. The range of the span
+    // Process the last span of non-null pages, if exist. The range of the span
     // is [first_not_null_page_idx, num_of_pages-1]
     if (LIKELY(first_not_null_page_idx != -1)) {
       RETURN_IF_ERROR(SkipPagesBatch(row_group, stats_reader, column_index,

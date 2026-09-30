@@ -102,3 +102,192 @@ select * from binary_decimal_precision_and_scale_widening where small_dec > 0 an
 ---- TYPES
 DECIMAL,DECIMAL,DECIMAL
 ====
+---- QUERY
+# IMPALA-15443: row group statistics and page index of DECIMAL columns stored as INT32
+# and INT64, read into slots of the same and of wider types. The file has two row
+# groups: [-5,-1] with pages [-5,-4], [-3,-2], [-1] and [0,4] with pages [0,1], [2,3],
+# [4]. Only the predicate column is materialized, so the page counters count its pages.
+select count(*) from int_decimal_stats_orig where d32 < 0
+---- RESULTS
+5
+---- TYPES
+BIGINT
+---- RUNTIME_PROFILE
+aggregation(SUM, NumStatsFilteredRowGroups): 1
+aggregation(SUM, NumStatsFilteredPages): 0
+====
+---- QUERY
+select count(*) from int_decimal_stats_orig where d64 < 0
+---- RESULTS
+5
+---- TYPES
+BIGINT
+---- RUNTIME_PROFILE
+aggregation(SUM, NumStatsFilteredRowGroups): 1
+aggregation(SUM, NumStatsFilteredPages): 0
+====
+---- QUERY
+select count(*) from int_decimal_stats_orig where d32 = -3
+---- RESULTS
+1
+---- TYPES
+BIGINT
+---- RUNTIME_PROFILE
+aggregation(SUM, NumStatsFilteredRowGroups): 1
+aggregation(SUM, NumStatsFilteredPages): 2
+====
+---- QUERY
+select count(*) from int_decimal_stats_orig where d64 = -3
+---- RESULTS
+1
+---- TYPES
+BIGINT
+---- RUNTIME_PROFILE
+aggregation(SUM, NumStatsFilteredRowGroups): 1
+aggregation(SUM, NumStatsFilteredPages): 2
+====
+---- QUERY
+select count(*) from int_decimal_stats_orig where d64 > -2
+---- RESULTS
+6
+---- TYPES
+BIGINT
+---- RUNTIME_PROFILE
+aggregation(SUM, NumStatsFilteredRowGroups): 0
+aggregation(SUM, NumStatsFilteredPages): 2
+====
+---- QUERY
+select id, d32, d64 from int_decimal_stats_orig where d64 between -4 and -3
+---- RESULTS
+2,-4.00,-4.00
+3,-3.00,-3.00
+---- TYPES
+INT,DECIMAL,DECIMAL
+====
+---- QUERY
+select count(*) from int_decimal_stats_wide where d32 < 0
+---- RESULTS
+5
+---- TYPES
+BIGINT
+---- RUNTIME_PROFILE
+aggregation(SUM, NumStatsFilteredRowGroups): 1
+aggregation(SUM, NumStatsFilteredPages): 0
+====
+---- QUERY
+select count(*) from int_decimal_stats_wide where d64 < 0
+---- RESULTS
+5
+---- TYPES
+BIGINT
+---- RUNTIME_PROFILE
+aggregation(SUM, NumStatsFilteredRowGroups): 1
+aggregation(SUM, NumStatsFilteredPages): 0
+====
+---- QUERY
+select count(*) from int_decimal_stats_wide where d32 = -3
+---- RESULTS
+1
+---- TYPES
+BIGINT
+---- RUNTIME_PROFILE
+aggregation(SUM, NumStatsFilteredRowGroups): 1
+aggregation(SUM, NumStatsFilteredPages): 2
+====
+---- QUERY
+select count(*) from int_decimal_stats_wide where d64 = -3
+---- RESULTS
+1
+---- TYPES
+BIGINT
+---- RUNTIME_PROFILE
+aggregation(SUM, NumStatsFilteredRowGroups): 1
+aggregation(SUM, NumStatsFilteredPages): 2
+====
+---- QUERY
+select count(*) from int_decimal_stats_wide where d64 > -2
+---- RESULTS
+6
+---- TYPES
+BIGINT
+---- RUNTIME_PROFILE
+aggregation(SUM, NumStatsFilteredRowGroups): 0
+aggregation(SUM, NumStatsFilteredPages): 2
+====
+---- QUERY
+select id, d32, d64 from int_decimal_stats_wide where d64 between -4 and -3
+---- RESULTS
+2,-4.00,-4.00
+3,-3.00,-3.00
+---- TYPES
+INT,DECIMAL,DECIMAL
+====
+---- QUERY
+select count(*) from int_decimal_stats_wider where d32 < 0
+---- RESULTS
+5
+---- TYPES
+BIGINT
+---- RUNTIME_PROFILE
+aggregation(SUM, NumStatsFilteredRowGroups): 1
+aggregation(SUM, NumStatsFilteredPages): 0
+====
+---- QUERY
+select count(*) from int_decimal_stats_wider where d64 < 0
+---- RESULTS
+5
+---- TYPES
+BIGINT
+---- RUNTIME_PROFILE
+aggregation(SUM, NumStatsFilteredRowGroups): 1
+aggregation(SUM, NumStatsFilteredPages): 0
+====
+---- QUERY
+select count(*) from int_decimal_stats_wider where d32 = -3
+---- RESULTS
+1
+---- TYPES
+BIGINT
+---- RUNTIME_PROFILE
+aggregation(SUM, NumStatsFilteredRowGroups): 1
+aggregation(SUM, NumStatsFilteredPages): 2
+====
+---- QUERY
+select count(*) from int_decimal_stats_wider where d64 = -3
+---- RESULTS
+1
+---- TYPES
+BIGINT
+---- RUNTIME_PROFILE
+aggregation(SUM, NumStatsFilteredRowGroups): 1
+aggregation(SUM, NumStatsFilteredPages): 2
+====
+---- QUERY
+# IMPALA-15443: the same with a scale change from 2 to 4.
+select count(*) from int_decimal_stats_scale where d32 < -2.5
+---- RESULTS
+3
+---- TYPES
+BIGINT
+---- RUNTIME_PROFILE
+aggregation(SUM, NumStatsFilteredRowGroups): 1
+aggregation(SUM, NumStatsFilteredPages): 1
+====
+---- QUERY
+select count(*) from int_decimal_stats_scale where d64 >= 3.5
+---- RESULTS
+1
+---- TYPES
+BIGINT
+---- RUNTIME_PROFILE
+aggregation(SUM, NumStatsFilteredRowGroups): 1
+aggregation(SUM, NumStatsFilteredPages): 2
+====
+---- QUERY
+select id, d32, d64 from int_decimal_stats_scale where d32 < -3.5
+---- RESULTS
+1,-5.0000,-5.0000
+2,-4.0000,-4.0000
+---- TYPES
+INT,DECIMAL,DECIMAL
+====

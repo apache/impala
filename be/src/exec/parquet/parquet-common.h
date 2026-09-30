@@ -349,18 +349,6 @@ class ParquetPlainEncoder {
   static int64_t DecodeBatch(const uint8_t* buffer, const uint8_t* buffer_end,
       int fixed_len_size, int64_t num_values, int64_t stride, InternalType* v);
 
-  /// Decode 'source' by memcpy() sizeof(InternalType) bytes from 'source' to 'v'.
-  template <typename InternalType>
-  static ALWAYS_INLINE inline void DecodeNoBoundsCheck(
-      const std::string& source, InternalType* v);
-
-  /// Answer the question whether an Impala internal type 'type' has the same
-  /// storage type as Parquet.
-  static bool IsIdenticalToParquetStorageType(const ColumnType& type) {
-    return (type.type == TYPE_INT || type.type == TYPE_BIGINT || type.type == TYPE_FLOAT
-        || type.type == TYPE_DOUBLE);
-  }
-
  private:
   /// Decode values without bounds checking. `buffer_end` is only used for DCHECKs in
   /// DEBUG mode, it is unused in RELEASE mode.
@@ -465,12 +453,18 @@ inline int DecodeWithConversion(const uint8_t* buffer, const uint8_t* buffer_end
 /// float          | FLOAT
 /// double         | DOUBLE
 /// Decimal4Value  | INT32
+/// Decimal4Value  | INT64 (statistics of INT64 decimals with precision <= 9)
 /// Decimal8Value  | INT64
+/// DateValue      | INT32
+/// It copies the lower sizeof(InternalType) bytes, so it must not be used for widening
+/// conversions. Those have specializations below.
 template <typename InternalType, parquet::Type::type PARQUET_TYPE>
 void ParquetPlainEncoder::DecodeNoBoundsCheck(const uint8_t* buffer,
     const uint8_t* buffer_end, int fixed_len_size, InternalType* v) {
   int byte_size = EncodedByteSize(PARQUET_TYPE, -1);
   DCHECK_GE(buffer_end - buffer, byte_size);
+  // IMPALA-15443: a widening conversion would read past the encoded value.
+  DCHECK_LE(sizeof(InternalType), static_cast<size_t>(byte_size));
 
   /// This generic template is only used when either no conversion is needed or with
   /// narrowing integer conversions (e.g. int32_t to int16_t or int8_t) where copying the
@@ -509,20 +503,33 @@ inline void ParquetPlainEncoder::DecodeNoBoundsCheck<double, parquet::Type::FLOA
   DecodeWithConversion<float, double>(buffer, buffer_end, v);
 }
 
-/// The string source version of DecodeNoBoundsCheck() which works with the following
-/// combination of internal and Parquet types requiring no conversions and validation.
-/// =============================
-/// InternalType   | PARQUET_TYPE
-/// =============================
-/// int32_t        | INT32
-/// int64_t        | INT64
-/// float          | FLOAT
-/// double         | DOUBLE
-template <typename InternalType>
-inline void ParquetPlainEncoder::DecodeNoBoundsCheck(
-    const string& source, InternalType* v) {
-  DCHECK_GE(source.size(), sizeof(InternalType));
-  memcpy(v, source.data(), sizeof(InternalType));
+/// IMPALA-15443: DECIMAL values stored as INT32/INT64 are decoded into a wider decimal
+/// if the table's precision needs more bytes than the physical type, e.g. after widening
+/// DECIMAL(9,2) to DECIMAL(18,2) (IMPALA-7087) or when reading INT/BIGINT columns as
+/// DECIMAL (IMPALA-13625). Statistics are decoded at the slot's width, so the unscaled
+/// value must be sign-extended.
+template <>
+inline void ParquetPlainEncoder::
+DecodeNoBoundsCheck<Decimal8Value, parquet::Type::INT32>(
+    const uint8_t* buffer, const uint8_t* buffer_end, int fixed_len_size,
+    Decimal8Value* v) {
+  DecodeWithConversion<int32_t, Decimal8Value>(buffer, buffer_end, v);
+}
+
+template <>
+inline void ParquetPlainEncoder::
+DecodeNoBoundsCheck<Decimal16Value, parquet::Type::INT32>(
+    const uint8_t* buffer, const uint8_t* buffer_end, int fixed_len_size,
+    Decimal16Value* v) {
+  DecodeWithConversion<int32_t, Decimal16Value>(buffer, buffer_end, v);
+}
+
+template <>
+inline void ParquetPlainEncoder::
+DecodeNoBoundsCheck<Decimal16Value, parquet::Type::INT64>(
+    const uint8_t* buffer, const uint8_t* buffer_end, int fixed_len_size,
+    Decimal16Value* v) {
+  DecodeWithConversion<int64_t, Decimal16Value>(buffer, buffer_end, v);
 }
 
 template <>

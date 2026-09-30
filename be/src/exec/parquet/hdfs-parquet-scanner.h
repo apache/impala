@@ -380,6 +380,8 @@ class HdfsParquetScanner : public HdfsColumnarScanner {
   ///    return [L, 'end_page_idx'], i.e. a page range at the end is skipped;
   ///    return ['start_page_idx', K], [L, 'end_page_idx'], i.e. some pages at the middle
   ///    are retained.
+  ///
+  ///  TODO(IMPALA-15707): remove it together with MINMAX_FILTER_FAST_CODE_PATH.
   static void CollectSkippedPageRangesForSortedColumn(const MinMaxFilter* minmax_filter,
       const ColumnType& col_type, const vector<string>& min_vals,
       const vector<string>& max_vals, int start_page_idx, int end_page_idx,
@@ -453,10 +455,6 @@ class HdfsParquetScanner : public HdfsColumnarScanner {
   /// Pool to copy dictionary page buffer into. This pool is shared across all the
   /// pages in a column chunk.
   boost::scoped_ptr<MemPool> dictionary_pool_;
-
-  /// Pool to hold batch read min/max stats. This pool is shared across all the
-  /// pages in a column chunk.
-  boost::scoped_ptr<MemPool> stats_batch_read_pool_;
 
   /// True, if we filter pages based on the Parquet page index.
   bool filter_pages_ = false;
@@ -681,7 +679,7 @@ class HdfsParquetScanner : public HdfsColumnarScanner {
       const parquet::ColumnChunk& col_chunk, vector<RowRange>* skip_ranges,
       int* filtered_pages);
 
-  /// Batch read a range ['start_page_idx', 'end_page_idx'] of min/max stats of non-null
+  /// Read the min/max stats of the range ['start_page_idx', 'end_page_idx'] of non-null
   /// pages for column 'col_idx' from 'column_index' and filter out those that are outside
   /// the min/max range specified in 'minmax_filter'.
   ///
@@ -693,19 +691,6 @@ class HdfsParquetScanner : public HdfsColumnarScanner {
       int start_page_idx, int end_page_idx, const ColumnType& col_type, int col_idx,
       const parquet::ColumnChunk& col_chunk, const MinMaxFilter* minmax_filter,
       vector<RowRange>* skip_ranges, int* filtered_pages);
-
-  /// Convert page column stats of column 'column_index' and type 'col_type' into internal
-  /// format. The range of the pages to convert is ['start_page_idx', 'end_page_idx'].
-  ///
-  /// On return:
-  ///   1. Status::OK() object with *min_values and *max_values pointed to memory
-  //       allocated from 'stats_batch_read_pool_' and populated with the min/max values
-  //       in runtime value format (e.g. RawValue for int32, or StringValue for string)
-  //       respectively, or
-  ///   2. An error condition.
-  Status ConvertStatsIntoInternalValuesBatch(const ColumnStatsReader& stats_reader,
-      const parquet::ColumnIndex& column_index, int start_page_idx, int end_page_idx,
-      const ColumnType& col_type, uint8_t** min_values, uint8_t** max_values);
 
   /// Resets page index filtering state, i.e. clears 'candidate_ranges_' and resets
   /// scalar readers' page filtering as well.

@@ -23,6 +23,7 @@ import re
 import time
 
 from tests.common.environ import build_flavor_timeout, ImpalaTestClusterProperties
+from tests.common.file_utils import create_table_and_copy_files
 from tests.common.impala_cluster import ImpalaCluster
 from tests.common.impala_test_suite import ImpalaTestSuite
 from tests.common.skip import SkipIfEC, SkipIfLocal, SkipIfFS
@@ -340,6 +341,26 @@ class TestOverlapMinMaxFilters(ImpalaTestSuite):
   def test_overlap_min_max_filters_on_partition_columns(self, vector, unique_database):
     self.run_test_case('QueryTest/overlap_min_max_filters_on_partition_columns', vector,
                        unique_database, test_file_vars=DEFAULT_VARS)
+
+  def test_overlap_min_max_filters_on_widened_columns(self, vector, unique_database):
+    """IMPALA-15443: min/max filters on columns whose table type is wider than the type
+    in the Parquet files, e.g. after ALTER TABLE CHANGE COLUMN or an Iceberg type
+    promotion."""
+    create_table_and_copy_files(self.client,
+        "create table {db}.{tbl} (id int, d32 decimal(18,2), d64 decimal(20,2)) "
+        "stored as parquet", unique_database, "int_decimal_wide",
+        ["testdata/data/decimal_int32_int64_page_index.parquet"])
+    # Page-level min/max filtering for all columns, not only for the leading sort column
+    # that gets it by default. Wait for the filters, so that the number of filtered pages
+    # does not depend on when they arrive. The verification mode runs both the fast code
+    # path (binary search on ASCENDING page indexes) and the regular code path, and fails
+    # the query if they skip different pages.
+    vector.set_exec_option('minmax_filter_threshold', 0.5)
+    vector.set_exec_option('minmax_filtering_level', 'page')
+    vector.set_exec_option('minmax_filter_fast_code_path', 'verification')
+    vector.set_exec_option('runtime_filter_wait_time_ms', WAIT_TIME_MS)
+    self.run_test_case('QueryTest/overlap_min_max_filters_on_widened_columns', vector,
+                       unique_database)
 
   @SkipIfLocal.hdfs_client
   def test_partition_column_in_parquet_data_file(self, unique_database):

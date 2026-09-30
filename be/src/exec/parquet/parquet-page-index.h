@@ -44,7 +44,8 @@ public:
   /// It needs to be called before the serialization methods.
   Status ReadAll(int row_group_idx);
 
-  /// Deserializes a ColumnIndex object for the given column chunk.
+  /// Deserializes a ColumnIndex object for the given column chunk. Returns an error if
+  /// it does not have a min and a max value for each page.
   Status DeserializeColumnIndex(const parquet::ColumnChunk& col_chunk,
       parquet::ColumnIndex* column_index);
 

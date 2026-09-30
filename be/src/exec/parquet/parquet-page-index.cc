@@ -127,8 +127,16 @@ Status ParquetPageIndex::DeserializeColumnIndex(const ColumnChunk& col_chunk,
   uint32_t length = col_chunk.column_index_length;
   DCHECK_GE(buffer_offset, 0);
   DCHECK_LE(buffer_offset + length, column_index_size_);
-  return DeserializeThriftMsg(page_index_buffer_.buffer() + buffer_offset,
-      &length, true, column_index);
+  RETURN_IF_ERROR(DeserializeThriftMsg(page_index_buffer_.buffer() + buffer_offset,
+      &length, true, column_index));
+  // The scanner looks up the min/max values of a page by its index in 'null_pages'.
+  if (UNLIKELY(column_index->min_values.size() != column_index->null_pages.size()
+      || column_index->max_values.size() != column_index->null_pages.size())) {
+    return Status(Substitute("Invalid column index in file $0: it has $1 pages, but $2 "
+        "min and $3 max values.", scanner_->filename(), column_index->null_pages.size(),
+        column_index->min_values.size(), column_index->max_values.size()));
+  }
+  return Status::OK();
 }
 
 Status ParquetPageIndex::DeserializeOffsetIndex(const ColumnChunk& col_chunk,

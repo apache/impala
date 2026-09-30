@@ -1,0 +1,312 @@
+====
+---- QUERY
+# IMPALA-15443: min/max filters on columns whose table type is wider than the type
+# in the Parquet files, e.g. after ALTER TABLE CHANGE COLUMN or an Iceberg type
+# promotion. Each of these tables is sorted by its only column and has one file with
+# one row group and 5 pages: [-5,-4], [-3,-2], [-1,0], [1,2], [3,4].
+set parquet_page_row_count_limit=2;
+create table int_to_bigint (c int) sort by (c) stored as parquet;
+insert into int_to_bigint
+values (-5), (-4), (-3), (-2), (-1), (0), (1), (2), (3), (4);
+alter table int_to_bigint change c c bigint;
+select count(*) from int_to_bigint
+---- RESULTS
+10
+---- TYPES
+BIGINT
+====
+---- QUERY
+set parquet_page_row_count_limit=2;
+create table float_to_double (c float) sort by (c) stored as parquet;
+insert into float_to_double
+values (-5), (-4), (-3), (-2), (-1), (0), (1), (2), (3), (4);
+alter table float_to_double change c c double;
+select count(*) from float_to_double
+---- RESULTS
+10
+---- TYPES
+BIGINT
+====
+---- QUERY
+set parquet_page_row_count_limit=2;
+create table int_to_double (c int) sort by (c) stored as parquet;
+insert into int_to_double
+values (-5), (-4), (-3), (-2), (-1), (0), (1), (2), (3), (4);
+alter table int_to_double change c c double;
+select count(*) from int_to_double
+---- RESULTS
+10
+---- TYPES
+BIGINT
+====
+---- QUERY
+set parquet_page_row_count_limit=2;
+create table int_to_decimal (c int) sort by (c) stored as parquet;
+insert into int_to_decimal
+values (-5), (-4), (-3), (-2), (-1), (0), (1), (2), (3), (4);
+alter table int_to_decimal change c c decimal(10,0);
+select count(*) from int_to_decimal
+---- RESULTS
+10
+---- TYPES
+BIGINT
+====
+---- QUERY
+set parquet_page_row_count_limit=2;
+create table bigint_to_decimal (c bigint) sort by (c) stored as parquet;
+insert into bigint_to_decimal
+values (-5), (-4), (-3), (-2), (-1), (0), (1), (2), (3), (4);
+alter table bigint_to_decimal change c c decimal(19,0);
+select count(*) from bigint_to_decimal
+---- RESULTS
+10
+---- TYPES
+BIGINT
+====
+---- QUERY
+set parquet_page_row_count_limit=2;
+create table ice_int_to_bigint (c int) sort by (c) stored by iceberg;
+insert into ice_int_to_bigint
+values (-5), (-4), (-3), (-2), (-1), (0), (1), (2), (3), (4);
+alter table ice_int_to_bigint change column c c bigint;
+select count(*) from ice_int_to_bigint
+---- RESULTS
+10
+---- TYPES
+BIGINT
+====
+---- QUERY
+set parquet_page_row_count_limit=2;
+create table ice_float_to_double (c float) sort by (c) stored by iceberg;
+insert into ice_float_to_double
+values (-5), (-4), (-3), (-2), (-1), (0), (1), (2), (3), (4);
+alter table ice_float_to_double change column c c double;
+select count(*) from ice_float_to_double
+---- RESULTS
+10
+---- TYPES
+BIGINT
+====
+---- QUERY
+# Tables with a NULL page before the other pages, like in files sorted with NULLS FIRST,
+# e.g. by Spark or Iceberg. The rows are inserted in this order, so the file has one row
+# group and 6 pages: [NULL,NULL], [-5,-4], [-3,-2], [-1,0], [1,2], [3,4]. The page index
+# is still ASCENDING, because NULL pages are ignored when it is computed. So the non-NULL
+# pages are processed as a span that starts at the second page.
+set parquet_page_row_count_limit=2;
+create table int_nulls_first (c int) stored as parquet;
+insert into int_nulls_first values (cast(NULL as int)), (NULL), (-5), (-4), (-3), (-2),
+    (-1), (0), (1), (2), (3), (4);
+select count(*), count(c) from int_nulls_first
+---- RESULTS
+12,10
+---- TYPES
+BIGINT,BIGINT
+====
+---- QUERY
+set parquet_page_row_count_limit=2;
+create table int_to_bigint_nulls_first (c int) stored as parquet;
+insert into int_to_bigint_nulls_first values (cast(NULL as int)), (NULL), (-5), (-4),
+    (-3), (-2), (-1), (0), (1), (2), (3), (4);
+alter table int_to_bigint_nulls_first change c c bigint;
+select count(*), count(c) from int_to_bigint_nulls_first
+---- RESULTS
+12,10
+---- TYPES
+BIGINT,BIGINT
+====
+---- QUERY
+set parquet_page_row_count_limit=2;
+create table int_to_decimal_nulls_first (c int) stored as parquet;
+insert into int_to_decimal_nulls_first values (cast(NULL as int)), (NULL), (-5), (-4),
+    (-3), (-2), (-1), (0), (1), (2), (3), (4);
+alter table int_to_decimal_nulls_first change c c decimal(10,0);
+select count(*), count(c) from int_to_decimal_nulls_first
+---- RESULTS
+12,10
+---- TYPES
+BIGINT,BIGINT
+====
+---- QUERY
+set parquet_page_row_count_limit=2;
+create table string_nulls_first (c string) stored as parquet;
+insert into string_nulls_first values (cast(NULL as string)), (NULL), ('a'), ('b'), ('c'),
+    ('d'), ('e'), ('f'), ('g'), ('h'), ('i'), ('j');
+select count(*), count(c) from string_nulls_first
+---- RESULTS
+12,10
+---- TYPES
+BIGINT,BIGINT
+====
+---- QUERY
+# TIMESTAMP stored as INT64.
+set parquet_page_row_count_limit=2;
+set parquet_timestamp_type=INT64_MICROS;
+create table int64_timestamp (c timestamp) sort by (c) stored as parquet;
+insert into int64_timestamp values (cast('2026-01-01' as timestamp)),
+    (cast('2026-01-02' as timestamp)), (cast('2026-01-03' as timestamp)),
+    (cast('2026-01-04' as timestamp)), (cast('2026-01-05' as timestamp)),
+    (cast('2026-01-06' as timestamp)), (cast('2026-01-07' as timestamp)),
+    (cast('2026-01-08' as timestamp)), (cast('2026-01-09' as timestamp)),
+    (cast('2026-01-10' as timestamp));
+select count(*) from int64_timestamp
+---- RESULTS
+10
+---- TYPES
+BIGINT
+====
+---- QUERY
+# The queries below join with two literals and check how many pages the min/max
+# filter skipped. The Python test sets the filtering options. The filter [-3,-2]
+# keeps only the page [-3,-2].
+select straight_join count(*) from int_to_bigint a
+join (values (cast(-3 as bigint) v), (cast(-2 as bigint))) b on a.c = b.v
+---- RESULTS
+2
+---- TYPES
+BIGINT
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRuntimeFilteredPages): 4
+====
+---- QUERY
+select straight_join count(*) from float_to_double a
+join (values (cast(-3 as double) v), (cast(-2 as double))) b on a.c = b.v
+---- RESULTS
+2
+---- TYPES
+BIGINT
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRuntimeFilteredPages): 4
+====
+---- QUERY
+select straight_join count(*) from int_to_double a
+join (values (cast(-3 as double) v), (cast(-2 as double))) b on a.c = b.v
+---- RESULTS
+2
+---- TYPES
+BIGINT
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRuntimeFilteredPages): 4
+====
+---- QUERY
+select straight_join count(*) from int_to_decimal a
+join (values (cast(-3 as decimal(10,0)) v), (cast(-2 as decimal(10,0)))) b on a.c = b.v
+---- RESULTS
+2
+---- TYPES
+BIGINT
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRuntimeFilteredPages): 4
+====
+---- QUERY
+select straight_join count(*) from bigint_to_decimal a
+join (values (cast(-3 as decimal(19,0)) v), (cast(-2 as decimal(19,0)))) b on a.c = b.v
+---- RESULTS
+2
+---- TYPES
+BIGINT
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRuntimeFilteredPages): 4
+====
+---- QUERY
+select straight_join count(*) from ice_int_to_bigint a
+join (values (cast(-3 as bigint) v), (cast(-2 as bigint))) b on a.c = b.v
+---- RESULTS
+2
+---- TYPES
+BIGINT
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRuntimeFilteredPages): 4
+====
+---- QUERY
+select straight_join count(*) from ice_float_to_double a
+join (values (cast(-3 as double) v), (cast(-2 as double))) b on a.c = b.v
+---- RESULTS
+2
+---- TYPES
+BIGINT
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRuntimeFilteredPages): 4
+====
+---- QUERY
+# DECIMAL(9,2) stored as INT32 read as DECIMAL(18,2), and DECIMAL(10,2) stored as INT64
+# read as DECIMAL(20,2). The file has two row groups: [-5,-1] with pages [-5,-4],
+# [-3,-2], [-1] and [0,4] with pages [0,1], [2,3], [4]. The filter [-1,0] overlaps both
+# row groups and keeps the pages [-1] and [0,1].
+select straight_join count(*) from int_decimal_wide a
+join (values (cast(-1 as decimal(18,2)) v), (cast(0 as decimal(18,2)))) b on a.d32 = b.v
+---- RESULTS
+2
+---- TYPES
+BIGINT
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRuntimeFilteredPages): 4
+====
+---- QUERY
+select straight_join count(*) from int_decimal_wide a
+join (values (cast(-1 as decimal(20,2)) v), (cast(0 as decimal(20,2)))) b on a.d64 = b.v
+---- RESULTS
+2
+---- TYPES
+BIGINT
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRuntimeFilteredPages): 4
+====
+---- QUERY
+# The filter [3,4] keeps only the last page. The NULL page is skipped too, and
+# NumStatsFilteredPages counts all pages that are skipped.
+select straight_join count(*) from int_nulls_first a
+join (values (cast(3 as int) v), (cast(4 as int))) b on a.c = b.v
+---- RESULTS
+2
+---- TYPES
+BIGINT
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRuntimeFilteredPages): 5
+aggregation(SUM, NumStatsFilteredPages): 5
+====
+---- QUERY
+select straight_join count(*) from int_to_bigint_nulls_first a
+join (values (cast(3 as bigint) v), (cast(4 as bigint))) b on a.c = b.v
+---- RESULTS
+2
+---- TYPES
+BIGINT
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRuntimeFilteredPages): 5
+aggregation(SUM, NumStatsFilteredPages): 5
+====
+---- QUERY
+select straight_join count(*) from int_to_decimal_nulls_first a
+join (values (cast(3 as decimal(10,0)) v), (cast(4 as decimal(10,0)))) b on a.c = b.v
+---- RESULTS
+2
+---- TYPES
+BIGINT
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRuntimeFilteredPages): 5
+aggregation(SUM, NumStatsFilteredPages): 5
+====
+---- QUERY
+select straight_join count(*) from string_nulls_first a
+join (values (cast('i' as string) v), (cast('j' as string))) b on a.c = b.v
+---- RESULTS
+2
+---- TYPES
+BIGINT
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRuntimeFilteredPages): 5
+aggregation(SUM, NumStatsFilteredPages): 5
+====
+---- QUERY
+# The filter [2026-01-03, 2026-01-04] keeps only the second page.
+select straight_join count(*) from int64_timestamp a
+join (values (cast('2026-01-03' as timestamp) v), (cast('2026-01-04' as timestamp))) b
+on a.c = b.v
+---- RESULTS
+2
+---- TYPES
+BIGINT
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRuntimeFilteredPages): 4
+====

@@ -87,3 +87,91 @@ select c2 from read_int_as_decimal order by c2;
 NULL
 NULL
 ====
+---- QUERY
+# IMPALA-15443: statistics and page index of INT32/INT64 columns read as DECIMAL. The
+# file has one row group with 5 pages: [-5,-4], [-3,-2], [-1,0], [1,2], [3,4].
+set parquet_page_row_count_limit=2;
+create table int_as_decimal_stats (c1 int, c2 bigint) sort by (c1) stored as parquet;
+insert into int_as_decimal_stats values (-5, -5), (-4, -4), (-3, -3), (-2, -2),
+    (-1, -1), (0, 0), (1, 1), (2, 2), (3, 3), (4, 4);
+alter table int_as_decimal_stats change c1 c1 decimal(10,0);
+alter table int_as_decimal_stats change c2 c2 decimal(19,0);
+select count(*) from int_as_decimal_stats
+---- RESULTS
+10
+---- TYPES
+BIGINT
+====
+---- QUERY
+select count(*) from int_as_decimal_stats where c1 < 0
+---- RESULTS
+5
+---- TYPES
+BIGINT
+---- RUNTIME_PROFILE
+aggregation(SUM, NumStatsFilteredPages): 2
+====
+---- QUERY
+select count(*) from int_as_decimal_stats where c1 < 3
+---- RESULTS
+8
+---- TYPES
+BIGINT
+---- RUNTIME_PROFILE
+aggregation(SUM, NumStatsFilteredPages): 1
+====
+---- QUERY
+select count(*) from int_as_decimal_stats where c1 > -2
+---- RESULTS
+6
+---- TYPES
+BIGINT
+---- RUNTIME_PROFILE
+aggregation(SUM, NumStatsFilteredPages): 2
+====
+---- QUERY
+select count(*) from int_as_decimal_stats where c2 < 0
+---- RESULTS
+5
+---- TYPES
+BIGINT
+---- RUNTIME_PROFILE
+aggregation(SUM, NumStatsFilteredPages): 2
+====
+---- QUERY
+select count(*) from int_as_decimal_stats where c2 = -3
+---- RESULTS
+1
+---- TYPES
+BIGINT
+---- RUNTIME_PROFILE
+aggregation(SUM, NumStatsFilteredPages): 4
+====
+---- QUERY
+select c1, c2 from int_as_decimal_stats where c2 between -4 and -3
+---- RESULTS
+-4,-4
+-3,-3
+---- TYPES
+DECIMAL,DECIMAL
+====
+---- QUERY
+alter table int_as_decimal_stats change c1 c1 decimal(20,4);
+select count(*) from int_as_decimal_stats where c1 < -2.5
+---- RESULTS
+3
+---- TYPES
+BIGINT
+---- RUNTIME_PROFILE
+aggregation(SUM, NumStatsFilteredPages): 3
+====
+---- QUERY
+alter table int_as_decimal_stats change c2 c2 decimal(25,5);
+select count(*) from int_as_decimal_stats where c2 >= 3.5
+---- RESULTS
+1
+---- TYPES
+BIGINT
+---- RUNTIME_PROFILE
+aggregation(SUM, NumStatsFilteredPages): 4
+====

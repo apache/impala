@@ -473,6 +473,48 @@ TEST(PlainEncoding, DecimalBigEndian) {
   ASSERT_EQ(memcmp(result_buffer, buffer_swapped + 16 - sizeof(d16), sizeof(d16)), 0);
 }
 
+/// IMPALA-15443: Decodes the INT32/INT64 value 'unscaled' into the wider decimal type
+/// 'WideDecimal' and checks that it is sign-extended and that decoding does not read past
+/// the encoded value.
+template <typename StoredType, typename WideDecimal, parquet::Type::type PARQUET_TYPE>
+void TestDecimalWidening(StoredType unscaled) {
+  constexpr int byte_size = sizeof(StoredType);
+  // The bytes after the encoded value are garbage that must not be read.
+  constexpr int buffer_size = byte_size + sizeof(WideDecimal);
+  uint8_t buffer[buffer_size];
+  memset(buffer, 0xAB, buffer_size);
+  memcpy(buffer, &unscaled, byte_size);
+  const uint8_t* buffer_end = buffer + byte_size;
+  const WideDecimal expected(unscaled);
+
+  WideDecimal result;
+  memset(&result, 0xAB, sizeof(result));
+  EXPECT_EQ(byte_size, (ParquetPlainEncoder::Decode<WideDecimal, PARQUET_TYPE>(
+      buffer, buffer_end, byte_size, &result)));
+  EXPECT_EQ(expected, result);
+
+  WideDecimal batch_result;
+  memset(&batch_result, 0xAB, sizeof(batch_result));
+  EXPECT_EQ(byte_size, (ParquetPlainEncoder::DecodeBatch<WideDecimal, PARQUET_TYPE>(
+      buffer, buffer_end, byte_size, 1, sizeof(WideDecimal), &batch_result)));
+  EXPECT_EQ(expected, batch_result);
+
+  EXPECT_EQ(-1, (ParquetPlainEncoder::Decode<WideDecimal, PARQUET_TYPE>(
+      buffer, buffer_end - 1, byte_size, &result)));
+}
+
+TEST(PlainEncoding, DecimalWidening) {
+  for (int32_t v : {0, 1, -1, 12345, -12345, std::numeric_limits<int32_t>::max(),
+      std::numeric_limits<int32_t>::min()}) {
+    TestDecimalWidening<int32_t, Decimal8Value, parquet::Type::INT32>(v);
+    TestDecimalWidening<int32_t, Decimal16Value, parquet::Type::INT32>(v);
+  }
+  for (int64_t v : {0L, 1L, -1L, -500L, 999999999999999999L, -999999999999999999L,
+      std::numeric_limits<int64_t>::max(), std::numeric_limits<int64_t>::min()}) {
+    TestDecimalWidening<int64_t, Decimal16Value, parquet::Type::INT64>(v);
+  }
+}
+
 /// Test that corrupt strings are handled correctly.
 TEST(PlainEncoding, CorruptString) {
   // Test string with negative length.

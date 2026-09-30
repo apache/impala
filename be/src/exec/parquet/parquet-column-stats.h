@@ -20,7 +20,6 @@
 
 #include <string>
 #include <type_traits>
-#include <vector>
 
 #include "exec/hdfs-table-writer.h"
 #include "exec/parquet/parquet-common.h"
@@ -294,46 +293,13 @@ public:
   /// both stats are read successfully, false otherwise.
   bool ReadMinMaxFromThrift(void* min_slot, void* max_slot) const;
 
-  /// Read plain encoded value from a string 'encoded_value' into 'slot'.
+  /// Read plain encoded value from a string 'encoded_value' into 'slot'. Used for row
+  /// group statistics and page index (parquet::ColumnIndex) values.
   /// Set paired_stats_value as nullptr if there is no corresponding paired stats,
   /// or paired stats value is not set.
   bool ReadFromString(StatsField stats_field, const std::string& encoded_value,
       const std::string* paired_stats_value,
       void* slot) const;
-
-  /// Batch read encoded values from a range ['start_idx', 'end_idx'] in
-  /// vector<string> 'encoded_value' into 'slots'.
-  ///
-  /// Return 'true' when all values in the range are decoded successfully, 'false'
-  /// otherwise.
-  bool ReadFromStringsBatch(StatsField stats_field,
-      const vector<std::string>& encoded_values, int64_t start_index,
-      int64_t end_idx, int fixed_len_size, void* slots) const;
-
-  /// Batch decode routine that reads from a vector of std::string 'source' and decodes
-  /// each value in the vector into a value of Impala type 'InternalType'.
-  ///
-  /// Return the number of decoded values from 'source' or -1 if there was an error
-  /// decoding (e.g. invalid data) or invalid specification of the range.
-  ///
-  /// This routine breaks 'source' into batches of 8 elements and unrolls each batch.
-  ///
-  /// For each string value, this routine calls
-  /// ColumnStats<InternalType>::DecodePlainValue() which in turn calls
-  /// ParquetPlainEncoder::DecodeByParquetType() that switches on Parquet type.
-  template <typename InternalType>
-  int64_t DecodeBatchOneBoundsCheck(const vector<std::string>& source, int64_t start_idx,
-      int64_t end_idx, int fixed_len_size, InternalType* v,
-      parquet::Type::type PARQUET_TYPE) const;
-
-  /// A fast track version of the above batch decode routine DecodeBatchOneBoundsCheck().
-  ///
-  /// For each string value, this routine calls ParquetPlainEncoder::DecodeNoBoundsCheck()
-  /// that simply memcpy out the value. This version is used when the Impala internal type
-  /// and the Parquet type are identical.
-  template <typename InternalType>
-  int64_t DecodeBatchOneBoundsCheckFastTrack(const vector<std::string>& source,
-      int64_t start_idx, int64_t end_idx, int fixed_len_size, InternalType* v) const;
 
   // Gets the null_count statistics from the column chunk's metadata and returns
   // it via an output parameter.
@@ -379,10 +345,6 @@ private:
 
   /// Decodes Iceberg UUID statistics (16 raw bytes) directly into the inline slot.
   bool DecodeUuid(const std::string& encoded_value, void* slot) const;
-
-  /// Batch version of DecodeUuid(). Returns the number of decoded values, or -1 on error.
-  int64_t DecodeUuidBatch(const vector<std::string>& encoded_values, int64_t start_idx,
-      int64_t end_idx, void* slot) const;
 
   bool IsUuidColumn() const {
     return element_.__isset.logicalType && element_.logicalType.__isset.UUID;

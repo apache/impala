@@ -686,6 +686,7 @@ enum TImpalaQueryOptions {
   //     ON  - Take the fast code path,
   //     VERIFICATION - Take both code paths and verify that the results from both are
   //                    the same.
+  // TODO(IMPALA-15707): remove this option and the fast code path.
   MINMAX_FILTER_FAST_CODE_PATH = 131
 
   // If true, Kudu's multi-row transaction is enabled.

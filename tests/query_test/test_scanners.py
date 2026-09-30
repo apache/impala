@@ -1329,6 +1329,18 @@ class TestParquet(ImpalaTestSuite):
         STORED AS PARQUET""", unique_database, "scale_overflow",
         ["testdata/data/binary_decimal_no_dictionary.parquet"])
 
+    # IMPALA-15443: DECIMAL columns stored as INT32 and INT64 with column orders, so their
+    # statistics and page index are used, read into slots of the same and wider types.
+    for tbl, d32_type, d64_type in [
+        ("int_decimal_stats_orig", "decimal(9,2)", "decimal(10,2)"),
+        ("int_decimal_stats_wide", "decimal(18,2)", "decimal(20,2)"),
+        ("int_decimal_stats_wider", "decimal(20,2)", "decimal(38,2)"),
+        ("int_decimal_stats_scale", "decimal(12,4)", "decimal(22,4)")]:
+      create_table_and_copy_files(self.client,
+          "create table {db}.{tbl} (id int, d32 %s, d64 %s) stored as parquet"
+          % (d32_type, d64_type), unique_database, tbl,
+          ["testdata/data/decimal_int32_int64_page_index.parquet"])
+
     self.run_test_case("QueryTest/parquet-decimal-precision-and-scale-widening", vector,
                        unique_database)
 
