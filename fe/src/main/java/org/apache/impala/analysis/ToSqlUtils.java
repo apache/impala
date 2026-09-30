@@ -563,7 +563,7 @@ public class ToSqlUtils {
           IcebergPartitionSpec latestPartitionSpec =
               feIcebergTable.getDefaultPartitionSpec();
           if (latestPartitionSpec.hasPartitionFields()) {
-            icebergPartitions = feIcebergTable.getDefaultPartitionSpec().toSql();
+            icebergPartitions = latestPartitionSpec.toSql();
           }
         }
       }

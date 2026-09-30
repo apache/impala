@@ -1100,6 +1100,75 @@ class TestIcebergTable(IcebergTestSuite):
     assert truncate_s['field-id'] == 1004
 
   @SkipIf.not_dfs
+  def test_non_dense_partition_spec_ids(self, vector, unique_database):
+    """IMPALA-15461: Iceberg partition spec ids are not positions in the list of specs.
+    Iceberg's ExpireSnapshots.cleanExpiredMetadata(true) removes unused specs, e.g.
+    spec 0 of a table that was re-partitioned before its first write. Impala cannot do
+    that, so this test edits the current metadata JSON of HiveCatalog tables."""
+    part_tbl = "ice_nondense"
+    self.execute_query("""create table {}.{} (id bigint, region string)
+        stored by iceberg tblproperties ('format-version'='2')""".format(
+        unique_database, part_tbl))
+    self.execute_query("alter table {}.{} set partition spec (region)".format(
+        unique_database, part_tbl))
+    self.execute_query("insert into {}.{} values (1, 'EU'), (2, 'NA'), (3, 'AS')"
+        .format(unique_database, part_tbl))
+
+    def remove_spec_0(metadata):
+      # Same as Iceberg's RemovePartitionSpecs update: no manifest uses spec 0.
+      assert metadata['default-spec-id'] == 1
+      assert [s['spec-id'] for s in metadata['partition-specs']] == [0, 1]
+      metadata['partition-specs'] = [
+          s for s in metadata['partition-specs'] if s['spec-id'] != 0]
+    self._rewrite_current_metadata_json(unique_database, part_tbl, remove_spec_0)
+
+    unpart_tbl = "ice_nondense_unpart"
+    self.execute_query("""create table {}.{} (id bigint, region string)
+        stored by iceberg tblproperties ('format-version'='2')""".format(
+        unique_database, unpart_tbl))
+
+    def renumber_spec_0_to_1(metadata):
+      # No snapshot yet, so nothing refers to spec 0.
+      assert not metadata.get('snapshots')
+      assert metadata['default-spec-id'] == 0
+      assert metadata['partition-specs'] == [{'spec-id': 0, 'fields': []}]
+      metadata['partition-specs'][0]['spec-id'] = 1
+      metadata['default-spec-id'] = 1
+    self._rewrite_current_metadata_json(unique_database, unpart_tbl,
+        renumber_spec_0_to_1)
+
+    self.run_test_case('QueryTest/iceberg-non-dense-spec-ids', vector,
+        use_db=unique_database)
+
+    # The .test file evolved 'ice_nondense' to specs [1, 2] with default spec 1.
+    metadata = self._read_current_metadata_json(unique_database, part_tbl)
+    assert [s['spec-id'] for s in metadata['partition-specs']] == [1, 2]
+    assert metadata['default-spec-id'] == 1
+    metadata = self._read_current_metadata_json(unique_database, unpart_tbl)
+    assert [s['spec-id'] for s in metadata['partition-specs']] == [1]
+    assert metadata['default-spec-id'] == 1
+
+  def _read_current_metadata_json(self, db, tbl):
+    return json.loads(check_output(
+        ['hadoop', 'fs', '-cat', self.get_latest_metadata_path(db, tbl)]))
+
+  def _rewrite_current_metadata_json(self, db, tbl, update_fn):
+    """Applies 'update_fn' to the current metadata JSON of the HiveCatalog table
+    'db.tbl' and overwrites the file in place. The metadata location does not change,
+    so a REFRESH could skip the reload; INVALIDATE METADATA always reloads."""
+    metadata_path = self.get_latest_metadata_path(db, tbl)
+    metadata = self._read_current_metadata_json(db, tbl)
+    update_fn(metadata)
+    with tempfile.NamedTemporaryFile(mode='w', suffix='.metadata.json',
+                                     delete=False) as f:
+      json.dump(metadata, f, indent=2)
+    try:
+      self.filesystem_client.copy_from_local(f.name, metadata_path)
+    finally:
+      os.remove(f.name)
+    self.execute_query("invalidate metadata {}.{}".format(db, tbl))
+
+  @SkipIf.not_dfs
   def test_writing_metrics_to_metadata_v1(self, unique_database):
     self._test_writing_metrics_to_metadata_impl(unique_database, 'ice_stats_v1', '1')
 

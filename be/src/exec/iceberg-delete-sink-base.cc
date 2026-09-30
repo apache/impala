@@ -149,9 +149,15 @@ Status IcebergDeleteSinkBase::ConstructPartitionInfo(int32_t spec_id,
     non_void_partition_fields = table_desc_->IcebergNonVoidPartitionFields();
   } else {
     // Otherwise collect the non-void partition names belonging to 'spec_id'.
-    const TIcebergPartitionSpec& partition_spec =
-        table_desc_->IcebergPartitionSpecs()[spec_id];
-    for (const TIcebergPartitionField& spec_field : partition_spec.partition_fields) {
+    const TIcebergPartitionSpec* partition_spec =
+        table_desc_->GetIcebergPartitionSpec(spec_id);
+    if (UNLIKELY(partition_spec == nullptr)) {
+      // Only possible if the data files and the partition specs come from different
+      // versions of the table metadata.
+      return Status(Substitute("Iceberg table $0 has no partition spec with id $1",
+          table_desc_->fully_qualified_name(), spec_id));
+    }
+    for (const TIcebergPartitionField& spec_field : partition_spec->partition_fields) {
       auto transform_type = spec_field.transform.transform_type;
       if (transform_type != TIcebergPartitionTransformType::VOID) {
         non_void_partition_fields.push_back(spec_field);

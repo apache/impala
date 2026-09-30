@@ -605,9 +605,10 @@ public class IcebergScanPlanner {
       throws ImpalaException {
     Preconditions.checkState(!equalityIdsToDeleteFiles_.isEmpty());
 
+    // The anti-joins below ignore partition specs, so all files must share one spec.
     if (getIceTable().getPartitionSpecs().size() > 1) {
       throw new ImpalaRuntimeException("Equality delete files are not supported for " +
-          "tables with partition evolution");
+          "tables with multiple partition specs");
     }
 
     PlanNode leftSideOfJoin = null;

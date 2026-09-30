@@ -114,6 +114,7 @@ add_library(RuntimeTests STATIC
   coordinator-backend-state-test.cc
   date-test.cc
   decimal-test.cc
+  descriptors-test.cc
   free-pool-test.cc
   hdfs-fs-cache-test.cc
   mem-pool-test.cc
@@ -153,6 +154,7 @@ ADD_UNIFIED_BE_LSAN_TEST(mem-tracker-test MemTestTest.*)
 ADD_UNIFIED_BE_LSAN_TEST(multi-precision-test
     "MultiPrecisionIntTest.*:MultiPrecisionFloatTest.*")
 ADD_UNIFIED_BE_LSAN_TEST(decimal-test DecimalTest.*)
+ADD_UNIFIED_BE_LSAN_TEST(descriptors-test "DescriptorsTest.*")
 # Exception to unified be tests: Custom main function (initializes LLVM)
 ADD_BE_LSAN_TEST(buffered-tuple-stream-test)
 ADD_UNIFIED_BE_LSAN_TEST(hdfs-fs-cache-test "HdfsFsCacheTest.*")

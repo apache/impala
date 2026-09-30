@@ -831,7 +831,7 @@ AnalysisException: Impala can only write delete files in PARQUET, but the given 
 ---- QUERY
 select * from functional_parquet.iceberg_v2_delete_equality_partition_evolution;
 ---- CATCH
-ImpalaRuntimeException: Equality delete files are not supported for tables with partition evolution
+ImpalaRuntimeException: Equality delete files are not supported for tables with multiple partition specs
 ====
 ---- QUERY
 # Cannot drop Flink primary key column.

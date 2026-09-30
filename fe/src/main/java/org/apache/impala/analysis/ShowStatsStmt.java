@@ -134,12 +134,9 @@ public class ShowStatsStmt extends StatementBase implements SingleTableStmt {
       if (op_ == TShowStatsOp.PARTITIONS) {
         if (table_ instanceof FeIcebergTable) {
           FeIcebergTable feIcebergTable = (FeIcebergTable) table_;
-          // We only get latest partition spec from Iceberg now, so this list only
-          // contains one partition spec member.
-          // Iceberg snapshots chosen maybe supported in the future.
-          Preconditions.checkNotNull(feIcebergTable.getPartitionSpecs());
+          IcebergPartitionSpec defaultSpec = feIcebergTable.getDefaultPartitionSpec();
           // Partition spec without partition fields is non-partitioned.
-          if (!(feIcebergTable.getDefaultPartitionSpec().hasPartitionFields())) {
+          if (defaultSpec == null || !defaultSpec.hasPartitionFields()) {
             partitioned = false;
           }
         } else {

@@ -1,0 +1,395 @@
+====
+---- QUERY
+# IMPALA-15461: Partition spec ids are not positions in the list of partition specs.
+# 'ice_nondense' has a single partition spec with id 1: identity(region), and it is the
+# default spec. It has 3 data files written with spec 1.
+SELECT id, region, partition__spec__id FROM ice_nondense ORDER BY id;
+---- RESULTS
+1,'EU',1
+2,'NA',1
+3,'AS',1
+---- TYPES
+BIGINT, STRING, INT
+====
+---- QUERY
+SELECT id FROM ice_nondense WHERE region = 'EU';
+---- RESULTS
+1
+---- TYPES
+BIGINT
+---- RUNTIME_PROFILE
+row_regex:.*partitions=1/3 files=1 size=.*
+====
+---- QUERY
+SELECT region FROM ice_nondense WHERE id = 2;
+---- RESULTS
+'NA'
+---- TYPES
+STRING
+====
+---- QUERY
+# Runtime filter on a partition column.
+SELECT a.id FROM ice_nondense a JOIN ice_nondense b ON a.region = b.region
+WHERE b.id = 3;
+---- RESULTS
+3
+---- TYPES
+BIGINT
+====
+---- QUERY
+SELECT count(*), count(id) FROM ice_nondense;
+---- RESULTS
+3,3
+---- TYPES
+BIGINT, BIGINT
+====
+---- QUERY
+SELECT count(*) FROM $DATABASE.ice_nondense.snapshots;
+---- RESULTS
+1
+---- TYPES
+BIGINT
+====
+---- QUERY
+SELECT spec_id, count(*) FROM $DATABASE.ice_nondense.`files` GROUP BY spec_id;
+---- RESULTS
+1,3
+---- TYPES
+INT, BIGINT
+====
+---- QUERY
+SELECT id FROM ice_nondense FOR SYSTEM_TIME AS OF now() WHERE id < 3 ORDER BY id;
+---- RESULTS
+1
+2
+---- TYPES
+BIGINT
+====
+---- QUERY
+SHOW CREATE TABLE ice_nondense;
+---- RESULTS
+row_regex:.*PARTITIONED BY SPEC\\n\(\\n  region\\n\).*
+---- TYPES
+STRING
+====
+---- QUERY
+SHOW PARTITIONS ice_nondense;
+---- RESULTS
+'{"region":"AS"}',1,1
+'{"region":"EU"}',1,1
+'{"region":"NA"}',1,1
+---- TYPES
+STRING, BIGINT, BIGINT
+====
+---- QUERY
+COMPUTE STATS ice_nondense;
+SHOW COLUMN STATS ice_nondense;
+---- RESULTS
+'id','BIGINT',3,0,8,8,-1,-1
+'region','STRING',3,0,2,2,-1,-1
+---- TYPES
+STRING, STRING, BIGINT, BIGINT, BIGINT, DOUBLE, BIGINT, BIGINT
+====
+---- QUERY
+INSERT INTO ice_nondense VALUES (4, 'EU');
+SELECT id, region, partition__spec__id,
+    input__file__name LIKE '%/data/region=EU/%'
+FROM ice_nondense WHERE id = 4;
+---- RESULTS
+4,'EU',1,true
+---- TYPES
+BIGINT, STRING, INT, BOOLEAN
+====
+---- QUERY
+# INSERT OVERWRITE is only allowed while the table has a single partition spec.
+INSERT OVERWRITE ice_nondense SELECT id + 10, region FROM ice_nondense
+WHERE region = 'AS';
+SELECT id, region FROM ice_nondense ORDER BY id;
+---- RESULTS
+1,'EU'
+2,'NA'
+4,'EU'
+13,'AS'
+---- TYPES
+BIGINT, STRING
+====
+---- QUERY
+DELETE FROM ice_nondense WHERE id = 2;
+SELECT id, region FROM ice_nondense ORDER BY id;
+---- RESULTS
+1,'EU'
+4,'EU'
+13,'AS'
+---- TYPES
+BIGINT, STRING
+====
+---- QUERY
+SHOW FILES IN ice_nondense;
+---- RESULTS: VERIFY_IS_SUBSET
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_nondense/data/region=NA/delete-.*parq','.*B','','.*'
+---- TYPES
+STRING, STRING, STRING, STRING
+====
+---- QUERY
+UPDATE ice_nondense SET region = 'AS' WHERE id = 1;
+SELECT id, region, partition__spec__id FROM ice_nondense ORDER BY id;
+---- RESULTS
+1,'AS',1
+4,'EU',1
+13,'AS',1
+---- TYPES
+BIGINT, STRING, INT
+====
+---- QUERY
+MERGE INTO ice_nondense t USING
+  (SELECT CAST(4 AS BIGINT) id, 'NA' region
+   UNION ALL SELECT CAST(20 AS BIGINT), 'SA') s
+ON t.id = s.id
+WHEN MATCHED THEN UPDATE SET region = s.region
+WHEN NOT MATCHED THEN INSERT VALUES (s.id, s.region);
+SELECT id, region FROM ice_nondense ORDER BY id;
+---- RESULTS
+1,'AS'
+4,'NA'
+13,'AS'
+20,'SA'
+---- TYPES
+BIGINT, STRING
+====
+---- QUERY
+CREATE TABLE ice_nondense_like LIKE ice_nondense;
+SHOW CREATE TABLE ice_nondense_like;
+---- RESULTS
+row_regex:.*PARTITIONED BY SPEC\\n\(\\n  region\\n\).*
+---- TYPES
+STRING
+====
+---- QUERY
+CREATE TABLE ice_nondense_ctas STORED BY ICEBERG AS
+SELECT id, region FROM ice_nondense;
+SELECT id, region FROM ice_nondense_ctas ORDER BY id;
+---- RESULTS
+1,'AS'
+4,'NA'
+13,'AS'
+20,'SA'
+---- TYPES
+BIGINT, STRING
+====
+---- QUERY
+# New partition spec. It gets id 2, so the specs are [1, 2] and the default spec is 2.
+ALTER TABLE ice_nondense SET PARTITION SPEC (id);
+SHOW CREATE TABLE ice_nondense;
+---- RESULTS
+row_regex:.*PARTITIONED BY SPEC\\n\(\\n  id\\n\).*
+---- TYPES
+STRING
+====
+---- QUERY
+INSERT INTO ice_nondense VALUES (30, 'EU'), (31, 'NA');
+SELECT id, region, partition__spec__id FROM ice_nondense ORDER BY id;
+---- RESULTS
+1,'AS',1
+4,'NA',1
+13,'AS',1
+20,'SA',1
+30,'EU',2
+31,'NA',2
+---- TYPES
+BIGINT, STRING, INT
+====
+---- QUERY
+SELECT region FROM ice_nondense WHERE id = 31;
+---- RESULTS
+'NA'
+---- TYPES
+STRING
+====
+---- QUERY
+# Delete a row from a data file written with spec 1, which is not the default spec.
+DELETE FROM ice_nondense WHERE id = 20;
+SELECT id FROM ice_nondense ORDER BY id;
+---- RESULTS
+1
+4
+13
+30
+31
+---- TYPES
+BIGINT
+====
+---- QUERY
+# The position delete file must be written with spec 1, i.e. into the partition of
+# the deleted row.
+SHOW FILES IN ice_nondense;
+---- RESULTS: VERIFY_IS_SUBSET
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_nondense/data/region=SA/delete-.*parq','.*B','','.*'
+---- TYPES
+STRING, STRING, STRING, STRING
+====
+---- QUERY
+# Going back to identity(region) reuses spec id 1, so the specs are [1, 2] and the
+# default spec is 1.
+ALTER TABLE ice_nondense SET PARTITION SPEC (region);
+SHOW CREATE TABLE ice_nondense;
+---- RESULTS
+row_regex:.*PARTITIONED BY SPEC\\n\(\\n  region\\n\).*
+---- TYPES
+STRING
+====
+---- QUERY
+INSERT INTO ice_nondense VALUES (40, 'EU');
+SELECT id, region, partition__spec__id FROM ice_nondense ORDER BY id;
+---- RESULTS
+1,'AS',1
+4,'NA',1
+13,'AS',1
+30,'EU',2
+31,'NA',2
+40,'EU',1
+---- TYPES
+BIGINT, STRING, INT
+====
+---- QUERY
+SELECT input__file__name LIKE '%/data/region=EU/%' FROM ice_nondense WHERE id = 40;
+---- RESULTS
+true
+---- TYPES
+BOOLEAN
+====
+---- QUERY
+SELECT id FROM ice_nondense WHERE region = 'EU';
+---- RESULTS
+30
+40
+---- TYPES
+BIGINT
+====
+---- QUERY
+SELECT a.id FROM ice_nondense a JOIN ice_nondense b ON a.region = b.region
+WHERE b.id = 40;
+---- RESULTS
+30
+40
+---- TYPES
+BIGINT
+====
+---- QUERY
+SHOW PARTITIONS ice_nondense;
+---- RESULTS: VERIFY_IS_SUBSET
+'{"id":"30"}',1,1
+'{"id":"31"}',1,1
+---- TYPES
+STRING, BIGINT, BIGINT
+====
+---- QUERY
+# Delete a row from a data file written with spec 2, which is not the default spec.
+DELETE FROM ice_nondense WHERE id = 31;
+SELECT id FROM ice_nondense ORDER BY id;
+---- RESULTS
+1
+4
+13
+30
+40
+---- TYPES
+BIGINT
+====
+---- QUERY
+SHOW FILES IN ice_nondense;
+---- RESULTS: VERIFY_IS_SUBSET
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_nondense/data/id=31/delete-.*parq','.*B','','.*'
+---- TYPES
+STRING, STRING, STRING, STRING
+====
+---- QUERY
+UPDATE ice_nondense SET region = 'AF' WHERE id = 30;
+SELECT id, region, partition__spec__id FROM ice_nondense WHERE id >= 30 ORDER BY id;
+---- RESULTS
+30,'AF',1
+40,'EU',1
+---- TYPES
+BIGINT, STRING, INT
+====
+---- QUERY
+OPTIMIZE TABLE ice_nondense;
+SELECT id, region, partition__spec__id FROM ice_nondense ORDER BY id;
+---- RESULTS
+1,'AS',1
+4,'NA',1
+13,'AS',1
+30,'AF',1
+40,'EU',1
+---- TYPES
+BIGINT, STRING, INT
+====
+---- QUERY
+SELECT DISTINCT spec_id, content FROM $DATABASE.ice_nondense.`files`;
+---- RESULTS
+1,0
+---- TYPES
+INT, INT
+====
+---- QUERY
+# 'ice_nondense_unpart' is unpartitioned, and its only partition spec has id 1.
+SHOW CREATE TABLE ice_nondense_unpart;
+---- RESULTS: VERIFY_IS_NOT_IN
+row_regex:.*PARTITIONED BY SPEC.*
+---- TYPES
+STRING
+====
+---- QUERY
+SHOW PARTITIONS ice_nondense_unpart;
+---- CATCH
+AnalysisException: Table is not partitioned: $DATABASE.ice_nondense_unpart
+====
+---- QUERY
+INSERT INTO ice_nondense_unpart VALUES (1, 'EU'), (2, 'NA'), (3, 'AS');
+SELECT id, region, partition__spec__id FROM ice_nondense_unpart ORDER BY id;
+---- RESULTS
+1,'EU',1
+2,'NA',1
+3,'AS',1
+---- TYPES
+BIGINT, STRING, INT
+====
+---- QUERY
+INSERT INTO ice_nondense_unpart PARTITION (region) SELECT 5, 'EU';
+---- CATCH
+PARTITION clause is only valid for INSERT into partitioned table.
+====
+---- QUERY
+DELETE FROM ice_nondense_unpart WHERE id = 2;
+SELECT id FROM ice_nondense_unpart ORDER BY id;
+---- RESULTS
+1
+3
+---- TYPES
+BIGINT
+====
+---- QUERY
+SELECT DISTINCT content, spec_id FROM $DATABASE.ice_nondense_unpart.`files`;
+---- RESULTS
+0,1
+1,1
+---- TYPES
+INT, INT
+====
+---- QUERY
+UPDATE ice_nondense_unpart SET region = 'SA' WHERE id = 3;
+OPTIMIZE TABLE ice_nondense_unpart;
+SELECT id, region, partition__spec__id FROM ice_nondense_unpart ORDER BY id;
+---- RESULTS
+1,'EU',1
+3,'SA',1
+---- TYPES
+BIGINT, STRING, INT
+====
+---- QUERY
+SELECT a.id FROM ice_nondense a JOIN ice_nondense_unpart b ON a.region = b.region
+WHERE b.id = 1;
+---- RESULTS
+40
+---- TYPES
+BIGINT
+====

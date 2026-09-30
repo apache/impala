@@ -216,20 +216,27 @@ public interface FeIcebergTable extends FeFsTable {
   String getIcebergTableLocation();
 
   /**
-   * Return the Iceberg partition spec info
+   * Return the Iceberg partition spec info. The position of a spec in this list is not
+   * its spec id: spec ids can be non-dense, e.g. after Iceberg's
+   * ExpireSnapshots.cleanExpiredMetadata() removed unused specs. Use
+   * getPartitionSpec(int) to find a spec by id.
    */
   List<IcebergPartitionSpec> getPartitionSpecs();
 
   /**
-   *  Return the latest partition spec.
+   * Return the default partition spec, i.e. the spec with id
+   * getDefaultPartitionSpecId().
    */
   IcebergPartitionSpec getDefaultPartitionSpec();
 
   /**
-   *  Return the ID used for getting the default partititon spec.
+   * Return the id (not the list position) of the default partition spec.
    */
   int getDefaultPartitionSpecId();
 
+  /**
+   * Return the partition spec with id 'specId', or null if there is no such spec.
+   */
   default IcebergPartitionSpec getPartitionSpec(int specId) {
     for (IcebergPartitionSpec spec : getPartitionSpecs()) {
       if (spec.getSpecId() == specId) return spec;
@@ -1240,14 +1247,22 @@ public interface FeIcebergTable extends FeFsTable {
       return new IcebergPartitionSpec(spec.specId(), fields);
     }
 
+    /**
+     * Returns the default partition spec of 'feIcebergTable', i.e. the spec with id
+     * getDefaultPartitionSpecId(), or null if the table has no partition specs.
+     */
     public static IcebergPartitionSpec getDefaultPartitionSpec(
         FeIcebergTable feIcebergTable) {
+      int defaultSpecId = feIcebergTable.getDefaultPartitionSpecId();
+      IcebergPartitionSpec defaultSpec = feIcebergTable.getPartitionSpec(defaultSpecId);
+      if (defaultSpec != null) return defaultSpec;
       List<IcebergPartitionSpec> specs = feIcebergTable.getPartitionSpecs();
-      Preconditions.checkState(specs != null);
       if (specs.isEmpty()) return null;
-      int defaultSpecId = feIcebergTable.getIcebergApiTable().spec().specId();
-      Preconditions.checkState(specs.size() > defaultSpecId);
-      return specs.get(defaultSpecId);
+      throw new IllegalStateException(String.format(
+          "Default partition spec %d of table %s not found. Partition spec ids: %s",
+          defaultSpecId, feIcebergTable.getFullName(),
+          specs.stream().map(IcebergPartitionSpec::getSpecId)
+              .collect(Collectors.toList())));
     }
 
     /**

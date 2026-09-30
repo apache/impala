@@ -265,8 +265,8 @@ public class IcebergTable extends Table implements FeIcebergTable {
   // Partitioning schemes of this Iceberg table.
   private List<IcebergPartitionSpec> partitionSpecs_;
 
-  // Index for partitionSpecs_ to show the current item in the list. Not always the
-  // last item of the list is the latest.
+  // Id of the default partition spec. It is not a position in partitionSpecs_: spec ids
+  // can be non-dense, see FeIcebergTable.getPartitionSpecs().
   private int defaultPartitionSpecId_;
 
   // File descriptor store of all data and delete files.

@@ -285,19 +285,43 @@ HdfsTableDescriptor::HdfsTableDescriptor(const TTableDescriptor& tdesc, ObjectPo
     iceberg_format_version_ = tdesc.icebergTable.format_version;
     iceberg_table_location_ = tdesc.icebergTable.table_location;
     iceberg_spec_id_ = tdesc.icebergTable.default_partition_spec_id;
-    iceberg_partition_specs_ = tdesc.icebergTable.partition_spec;
-    const TIcebergPartitionSpec& spec = iceberg_partition_specs_[iceberg_spec_id_];
-    DCHECK_EQ(spec.spec_id, iceberg_spec_id_);
-    for (const TIcebergPartitionField& spec_field : spec.partition_fields) {
-      auto transform_type = spec_field.transform.transform_type;
-      if (transform_type == TIcebergPartitionTransformType::VOID) continue;
-      iceberg_non_void_partition_fields_.push_back(spec_field);
+    // Init() looks up the default spec.
+    for (const TIcebergPartitionSpec& spec : tdesc.icebergTable.partition_spec) {
+      bool inserted = iceberg_partition_specs_.emplace(spec.spec_id, spec).second;
+      DCHECK(inserted) << "Duplicate Iceberg partition spec id " << spec.spec_id;
     }
     iceberg_parquet_compression_codec_ = tdesc.icebergTable.parquet_compression_codec;
     iceberg_parquet_row_group_size_ = tdesc.icebergTable.parquet_row_group_size;
     iceberg_parquet_plain_page_size_ = tdesc.icebergTable.parquet_plain_page_size;
     iceberg_parquet_dict_page_size_ = tdesc.icebergTable.parquet_dict_page_size;
   }
+}
+
+Status HdfsTableDescriptor::Init() {
+  if (!is_iceberg_) return Status::OK();
+  const TIcebergPartitionSpec* spec = GetIcebergPartitionSpec(iceberg_spec_id_);
+  if (spec == nullptr) {
+    vector<string> spec_ids;
+    for (const auto& entry : iceberg_partition_specs_) {
+      spec_ids.push_back(std::to_string(entry.first));
+    }
+    return Status(Substitute("Iceberg table $0 has no partition spec with the default "
+        "partition spec id $1. Partition spec ids: [$2]", fully_qualified_name(),
+        iceberg_spec_id_, join(spec_ids, ", ")));
+  }
+  DCHECK(iceberg_non_void_partition_fields_.empty());
+  for (const TIcebergPartitionField& spec_field : spec->partition_fields) {
+    auto transform_type = spec_field.transform.transform_type;
+    if (transform_type == TIcebergPartitionTransformType::VOID) continue;
+    iceberg_non_void_partition_fields_.push_back(spec_field);
+  }
+  return Status::OK();
+}
+
+const TIcebergPartitionSpec* HdfsTableDescriptor::GetIcebergPartitionSpec(
+    int32_t spec_id) const {
+  auto it = iceberg_partition_specs_.find(spec_id);
+  return it == iceberg_partition_specs_.end() ? nullptr : &it->second;
 }
 
 void HdfsTableDescriptor::ReleaseResources() {
@@ -635,6 +659,7 @@ Status DescriptorTbl::CreateTblDescriptorInternal(const TTableDescriptor& tdesc,
     case TTableType::ICEBERG_TABLE:
     case TTableType::HDFS_TABLE: {
       HdfsTableDescriptor* hdfs_tbl = pool->Add(new HdfsTableDescriptor(tdesc, pool));
+      RETURN_IF_ERROR(hdfs_tbl->Init());
       *desc = hdfs_tbl;
       RETURN_IF_ERROR(CreatePartKeyExprs(*hdfs_tbl, pool));
       break;

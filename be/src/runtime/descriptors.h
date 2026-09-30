@@ -474,6 +474,12 @@ class HdfsPartitionDescriptor {
 class HdfsTableDescriptor : public TableDescriptor {
  public:
   HdfsTableDescriptor(const TTableDescriptor& tdesc, ObjectPool* pool);
+
+  /// Finishes the initialization steps that can fail. Must be called once, right after
+  /// the constructor. For Iceberg tables it looks up the default partition spec by its
+  /// id and returns an error if the table has no partition spec with that id.
+  Status Init() WARN_UNUSED_RESULT;
+
   const std::string& hdfs_base_dir() const { return hdfs_base_dir_; }
   const std::string& null_partition_key_value() const {
     return null_partition_key_value_;
@@ -506,9 +512,13 @@ class HdfsTableDescriptor : public TableDescriptor {
 
   bool IsIcebergTable() const { return is_iceberg_; }
   const std::string& IcebergTableLocation() const { return iceberg_table_location_; }
-  const std::vector<TIcebergPartitionSpec>& IcebergPartitionSpecs() const {
-    return iceberg_partition_specs_;
-  }
+  /// Returns the partition spec of this Iceberg table with id 'spec_id', or nullptr if
+  /// there is no such spec. Spec ids are not positions in TIcebergTable.partition_spec:
+  /// they can be non-dense, e.g. after Iceberg's cleanExpiredMetadata() removed specs.
+  const TIcebergPartitionSpec* GetIcebergPartitionSpec(int32_t spec_id) const;
+
+  /// Returns the non-void partition fields of the default partition spec (populated by
+  /// Init()).
   const std::vector<TIcebergPartitionField>& IcebergNonVoidPartitionFields() const {
     return iceberg_non_void_partition_fields_;
   }
@@ -526,6 +536,7 @@ class HdfsTableDescriptor : public TableDescriptor {
     return iceberg_parquet_dict_page_size_;
   }
 
+  /// Returns the id (not the list position) of the default partition spec.
   int32_t IcebergSpecId() const {
     return iceberg_spec_id_;
   }
@@ -549,13 +560,14 @@ class HdfsTableDescriptor : public TableDescriptor {
   TValidWriteIdList valid_write_id_list_;
   bool is_iceberg_ = false;
   std::string iceberg_table_location_;
-  std::vector<TIcebergPartitionSpec> iceberg_partition_specs_;
+  /// Partition specs of an Iceberg table, keyed by spec id.
+  std::map<int32_t, TIcebergPartitionSpec> iceberg_partition_specs_;
   std::vector<TIcebergPartitionField> iceberg_non_void_partition_fields_;
   TCompressionCodec iceberg_parquet_compression_codec_;
   int64_t iceberg_parquet_row_group_size_;
   int64_t iceberg_parquet_plain_page_size_;
   int64_t iceberg_parquet_dict_page_size_;
-  int32_t iceberg_spec_id_;
+  int32_t iceberg_spec_id_ = -1;
   int32_t iceberg_format_version_;
 };
 
