@@ -222,13 +222,61 @@ Status SlotRef::GetCodegendComputeFnImpl(LlvmCodeGen* codegen, llvm::Function** 
   llvm::Value* row_ptr = args[1];
 
   LlvmBuilder builder(codegen->context());
-  CodegenAnyVal result_value = CodegenValue(codegen, &builder, *fn, eval_ptr, row_ptr);
+  CodegenAnyVal result_value = CanCodegenBranchFree() ?
+      CodegenValueBranchFree(codegen, &builder, *fn, row_ptr) :
+      CodegenValue(codegen, &builder, *fn, eval_ptr, row_ptr);
   builder.CreateRet(result_value.GetLoweredValue());
 
   *fn = codegen->FinalizeFunction(*fn);
   if (UNLIKELY(*fn == NULL)) return Status(TErrorCode::IR_VERIFY_FAILED, "SlotRef");
   codegen->RegisterExprFn(unique_slot_id, *fn);
   return Status::OK();
+}
+
+bool SlotRef::CanCodegenBranchFree() const {
+  // A null tuple pointer cannot be dereferenced, so nullable tuples need the branch.
+  if (tuple_is_nullable_ || null_indicator_offset_.bit_mask == 0) return false;
+  // Only types whose value is a single scalar load are supported; others have multiple
+  // components (ptr/len, date/time) or child slots.
+  return CodegenAnyVal::IsSimpleType(type_);
+}
+
+// Resulting IR for a nullable int slot in a non-nullable tuple:
+//
+// define i64 @GetSlotRef(ptr %eval, ptr %row) {
+// entry:
+//   %tuple_ptr_addr = getelementptr inbounds ptr, ptr %row, i32 0
+//   %tuple_ptr = load ptr, ptr %tuple_ptr_addr, align 8
+//   %null_byte_ptr = getelementptr inbounds i8, ptr %tuple_ptr, i32 20
+//   %null_byte = load i8, ptr %null_byte_ptr, align 1
+//   %null_mask = and i8 %null_byte, 2
+//   %is_null = icmp ne i8 %null_mask, 0
+//   %slot_addr = getelementptr inbounds i8, ptr %tuple_ptr, i32 4
+//   %val = load i32, ptr %slot_addr, align 4
+//   %val_or_zero = select i1 %is_null, i32 0, i32 %val
+//   ...
+//   ret i64 %result
+// }
+CodegenAnyVal SlotRef::CodegenValueBranchFree(LlvmCodeGen* codegen,
+    LlvmBuilder* builder, llvm::Function* fn, llvm::Value* row_ptr) {
+  DCHECK(CanCodegenBranchFree());
+  builder->SetInsertPoint(llvm::BasicBlock::Create(codegen->context(), "entry", fn));
+  llvm::Value* tuple_ptr_addr = builder->CreateInBoundsGEP(codegen->ptr_type(), row_ptr,
+      codegen->GetI32Constant(tuple_idx_), "tuple_ptr_addr");
+  llvm::Value* tuple_ptr =
+      builder->CreateLoad(codegen->ptr_type(), tuple_ptr_addr, "tuple_ptr");
+  llvm::Value* is_null = SlotDescriptor::CodegenIsNull(
+      codegen, builder, null_indicator_offset_, tuple_ptr);
+  // The slot is always part of the tuple's memory, so reading it is safe even if null.
+  llvm::Value* slot_ptr = builder->CreateInBoundsGEP(codegen->i8_type(), tuple_ptr,
+      codegen->GetI32Constant(slot_offset_), "slot_addr");
+  llvm::Value* val =
+      builder->CreateAnyValLoad(codegen->GetSlotType(type_), slot_ptr, type_, "val");
+  llvm::Value* val_or_zero = builder->CreateSelect(
+      is_null, llvm::Constant::getNullValue(val->getType()), val, "val_or_zero");
+
+  return CodegenAnyVal::GetNullableVal(
+      codegen, builder, type_, val_or_zero, is_null, "result");
 }
 
 // Generates null checking code: null checking may be generated for the tuple and for the

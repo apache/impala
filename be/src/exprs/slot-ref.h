@@ -90,6 +90,12 @@ class SlotRef : public ScalarExpr {
   CodegenAnyVal CodegenValue(LlvmCodeGen* codegen, LlvmBuilder* builder,
       llvm::Function* fn, llvm::Value* eval_ptr, llvm::Value* row_ptr,
       llvm::BasicBlock* entry_block = nullptr);
+  /// Returns true if CodegenValueBranchFree() can be used for this slot.
+  bool CanCodegenBranchFree() const;
+  /// Reads the slot unconditionally and selects on the null bit, avoiding the
+  /// null-check diamond that LLVM fails to merge once several reads are inlined.
+  CodegenAnyVal CodegenValueBranchFree(LlvmCodeGen* codegen, LlvmBuilder* builder,
+      llvm::Function* fn, llvm::Value* row_ptr);
   void CodegenNullChecking(LlvmCodeGen* codegen, LlvmBuilder* builder, llvm::Function* fn,
       llvm::BasicBlock* next_block_if_null, llvm::BasicBlock* next_block_if_not_null,
       llvm::Value* tuple_ptr);

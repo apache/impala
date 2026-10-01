@@ -96,6 +96,10 @@ class CodegenAnyVal {
       const ColumnType& type, llvm::Function* fn, llvm::ArrayRef<llvm::Value*> args,
       const char* name = "");
 
+  /// Returns true if values of 'type' consist of a single scalar that can be read from a
+  /// slot with one load and set with SetVal(). Types default to false when not listed.
+  static bool IsSimpleType(const ColumnType& type);
+
   /// Returns the lowered AnyVal type associated with 'type'.
   /// E.g.: TYPE_BOOLEAN (which corresponds to a BooleanVal) => i16
   static llvm::Type* GetLoweredType(LlvmCodeGen* cg, const ColumnType& type);
@@ -119,6 +123,12 @@ class CodegenAnyVal {
   /// value still needs to be set.
   static CodegenAnyVal GetNonNullVal(LlvmCodeGen* codegen, LlvmBuilder* builder,
       const ColumnType& type, const char* name = "");
+
+  /// Return a *Val with value 'val' and null flag 'is_null'. 'type' must be a type that
+  /// supports SetVal().
+  static CodegenAnyVal GetNullableVal(LlvmCodeGen* codegen, LlvmBuilder* builder,
+      const ColumnType& type, llvm::Value* val, llvm::Value* is_null,
+      const char* name = "");
 
   /// Creates a wrapper around a lowered *Val value.
   //

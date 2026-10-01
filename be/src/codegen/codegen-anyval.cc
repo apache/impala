@@ -41,6 +41,23 @@ const char* CodegenAnyVal::LLVM_DECIMALVAL_NAME   = "struct.impala_udf::DecimalV
 const char* CodegenAnyVal::LLVM_DATEVAL_NAME      = "struct.impala_udf::DateVal";
 const char* CodegenAnyVal::LLVM_COLLECTIONVAL_NAME = "struct.impala_udf::CollectionVal";
 
+bool CodegenAnyVal::IsSimpleType(const ColumnType& type) {
+  switch (type.type) {
+    case TYPE_BOOLEAN:
+    case TYPE_TINYINT:
+    case TYPE_SMALLINT:
+    case TYPE_INT:
+    case TYPE_BIGINT:
+    case TYPE_FLOAT:
+    case TYPE_DOUBLE:
+    case TYPE_DECIMAL:
+    case TYPE_DATE:
+      return true;
+    default:
+      return false;
+  }
+}
+
 llvm::Type* CodegenAnyVal::GetLoweredType(LlvmCodeGen* cg, const ColumnType& type) {
   switch (type.type) {
     case TYPE_BOOLEAN: // i16
@@ -801,6 +818,14 @@ CodegenAnyVal CodegenAnyVal::GetNonNullVal(LlvmCodeGen* codegen, LlvmBuilder* bu
   // All zeros => 'is_null' = false
   llvm::Value* value = llvm::Constant::getNullValue(val_type);
   return CodegenAnyVal(codegen, builder, type, value, name);
+}
+
+CodegenAnyVal CodegenAnyVal::GetNullableVal(LlvmCodeGen* codegen, LlvmBuilder* builder,
+    const ColumnType& type, llvm::Value* val, llvm::Value* is_null, const char* name) {
+  CodegenAnyVal result = GetNonNullVal(codegen, builder, type, name);
+  result.SetVal(val);
+  result.SetIsNull(is_null);
+  return result;
 }
 
 // Returns the last block generated so we can set it as a predecessor in PHI nodes.
