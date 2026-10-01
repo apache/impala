@@ -79,6 +79,28 @@ class TestIcebergTable(IcebergTestSuite):
   def test_alter_iceberg_tables_v2(self, vector, unique_database):
     self.run_test_case('QueryTest/iceberg-alter-v2', vector, use_db=unique_database)
 
+  def test_iceberg_drop_old_partition_col(self, vector, unique_database):
+    """IMPALA-13591: Test time-travel and column re-add after dropping a column
+    that was previously used in a partition spec."""
+    tbl = unique_database + ".ice_drop_old_part_col2"
+    self.execute_query("""create table {0} (i int, p int)
+        partitioned by spec (bucket(7, p))
+        stored as iceberg""".format(tbl))
+    self.execute_query("insert into {0} values (1, 1)".format(tbl))
+    snapshots = get_snapshots(self.client, tbl, expected_result_size=1)
+    first_snapshot = snapshots[0].get_snapshot_id()
+    self.execute_query(
+        "alter table {0} set partition spec (bucket(7, i))".format(tbl))
+    self.execute_query("alter table {0} drop column p".format(tbl))
+    self.execute_query("insert into {0} values (2)".format(tbl))
+    # Time-travel to the first snapshot, which was created under the old
+    # partition spec bucket(7, p). This forces Impala to interpret partition
+    # metadata from the old spec whose source column has been dropped.
+    result = self.execute_query(
+        "select * from {0} for system_version as of {1}".format(
+            tbl, first_snapshot))
+    assert result.data == ['1\t1']
+
   def test_alter_iceberg_tables_default(self, vector, unique_database):
     self.run_test_case('QueryTest/iceberg-alter-default', vector, use_db=unique_database)
 

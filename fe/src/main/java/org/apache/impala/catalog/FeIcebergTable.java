@@ -67,6 +67,7 @@ import org.apache.iceberg.util.PropertyUtil;
 import org.apache.iceberg.util.SnapshotUtil;
 import org.apache.impala.analysis.IcebergPartitionField;
 import org.apache.impala.analysis.IcebergPartitionSpec;
+import org.apache.impala.analysis.IcebergPartitionTransform;
 import org.apache.impala.analysis.LiteralExpr;
 import org.apache.impala.analysis.TimeTravelSpec;
 import org.apache.impala.analysis.TimeTravelSpec.Kind;
@@ -1238,11 +1239,24 @@ public interface FeIcebergTable extends FeFsTable {
       Map<String, Integer> transformParams =
           IcebergUtil.getPartitionTransformParams(spec);
       for (PartitionField field : spec.fields()) {
-        fields.add(new IcebergPartitionField(field.sourceId(), field.fieldId(),
-            spec.schema().findColumnName(field.sourceId()), field.name(),
-            IcebergUtil.getPartitionTransform(field, transformParams),
-            IcebergSchemaConverter.toImpalaType(
-                field.transform().getResultType(schema.findType(field.sourceId())))));
+        String colName = spec.schema().findColumnName(field.sourceId());
+        IcebergPartitionField partitionField;
+        if (colName == null) {
+          // Source column was dropped. Per the Iceberg spec, replaced partition
+          // fields use the void transform to preserve field IDs in manifests.
+          partitionField = new IcebergPartitionField(field.sourceId(), field.fieldId(),
+              field.name(), field.name(),
+              new IcebergPartitionTransform(
+                  TIcebergPartitionTransformType.VOID, null),
+              Type.INT);
+        } else {
+          partitionField = new IcebergPartitionField(field.sourceId(), field.fieldId(),
+              colName, field.name(),
+              IcebergUtil.getPartitionTransform(field, transformParams),
+              IcebergSchemaConverter.toImpalaType(
+                field.transform().getResultType(schema.findType(field.sourceId()))));
+        }
+        fields.add(partitionField);
       }
       return new IcebergPartitionSpec(spec.specId(), fields);
     }

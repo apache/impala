@@ -515,3 +515,78 @@ ALTER TABLE ice_not_null_no_default ADD COLUMNS (j INT NOT NULL);
 ---- CATCH
 A new non-null column must have a default value
 ====
+---- QUERY
+# IMPALA-13591: Dropping a column that was previously used in a partition spec
+# (but is no longer in the active spec) should not corrupt the table.
+create table ice_drop_old_part_col (i int, p int)
+partitioned by spec (bucket(7, p))
+stored as iceberg;
+insert into ice_drop_old_part_col values (1, 1);
+alter table ice_drop_old_part_col set partition spec (bucket(7, i));
+alter table ice_drop_old_part_col drop column p;
+---- RESULTS
+'Column has been dropped.'
+---- TYPES
+STRING
+====
+---- QUERY
+select * from ice_drop_old_part_col;
+---- RESULTS
+1
+---- TYPES
+INT
+====
+---- QUERY
+# IMPALA-13591: Verify metadata queries work after dropping old partition column.
+describe ice_drop_old_part_col;
+---- RESULTS
+'i','int','','true'
+---- TYPES
+STRING,STRING,STRING,STRING
+====
+---- QUERY
+# IMPALA-13591: SHOW PARTITIONS exercises the VOID placeholder in old specs.
+show partitions ice_drop_old_part_col;
+---- RESULTS
+'{"p_bucket":"5"}',1,1
+---- TYPES
+STRING, BIGINT, BIGINT
+====
+---- QUERY
+# IMPALA-13591: SHOW FILES verifies file metadata is still accessible.
+show files in ice_drop_old_part_col;
+---- RESULTS: VERIFY_IS_SUBSET
+row_regex:'.*ice_drop_old_part_col/data/.*','.*','','$ERASURECODE_POLICY'
+---- TYPES
+STRING, STRING, STRING, STRING
+====
+---- QUERY
+# IMPALA-13591: Insert after dropping old partition column should work.
+insert into ice_drop_old_part_col values (2);
+select * from ice_drop_old_part_col order by i;
+---- RESULTS
+1
+2
+---- TYPES
+INT
+====
+---- QUERY
+# IMPALA-13591: Drop a partition column, re-add it with the same name, and partition
+# by it again. The re-added column gets a new Iceberg field ID, so the old partition
+# spec references a nonexistent source ID (VOID placeholder) while the new spec works.
+create table ice_readd_part_col (i int, p int)
+partitioned by spec (bucket(7, p))
+stored as iceberg;
+insert into ice_readd_part_col values (1, 10);
+alter table ice_readd_part_col set partition spec (bucket(7, i));
+alter table ice_readd_part_col drop column p;
+alter table ice_readd_part_col add columns (p int);
+alter table ice_readd_part_col set partition spec (bucket(7, p));
+insert into ice_readd_part_col values (2, 20);
+select i, p from ice_readd_part_col order by i;
+---- RESULTS
+1,NULL
+2,20
+---- TYPES
+INT,INT
+====
