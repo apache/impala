@@ -490,12 +490,14 @@ class TestAdmissionController(TestAdmissionControllerBase):
 
   def _execute_and_collect_profiles(self, queries, timeout_s, config_options={},
       allow_query_failure=False):
-    """Submit the query statements in 'queries' in parallel to the first impalad in
-    the cluster. After submission, the results are fetched from the queries in
-    sequence and their profiles are collected. Wait for up to timeout_s for
-    each query to finish. If 'allow_query_failure' is True, succeeds if the query
-    completes successfully or ends up in the EXCEPTION state. Otherwise expects the
-    queries to complete successfully.
+    """Submit the query statements in 'queries' to the first impalad in the cluster.
+    Each query is submitted only after the previous one has reached an admission
+    decision, so that the queries enter the admission queue in submission order. The
+    results are then fetched from the queries in sequence and their profiles are
+    collected. Wait for up to timeout_s for each query to finish. If
+    'allow_query_failure' is True, succeeds if the query completes successfully or
+    ends up in the EXCEPTION state. Otherwise expects the queries to complete
+    successfully.
     Returns the profile strings."""
     client = self.cluster.impalads[0].service.create_hs2_client()
     expected_states = [FINISHED]
@@ -506,7 +508,13 @@ class TestAdmissionController(TestAdmissionControllerBase):
       profiles = []
       client.set_configuration(config_options)
       for query in queries:
-        handles.append(client.execute_async(query))
+        new_handle = client.execute_async(query)
+        handles.append(new_handle)
+        # IMPALA-15137: admission order is not guaranteed to match submission order.
+        # Each query gets its own thread to call SubmitForAdmission(), so a later
+        # query can reach the admission controller first. Wait for query to hit
+        # admission controller (admitted/queued/rejected).
+        self._wait_for_change_to_profile(new_handle, "Admission result", client=client)
       for query, handle in zip(queries, handles):
         state, _ = client.wait_for_any_impala_state(handle, expected_states, timeout_s)
         if state == FINISHED:
