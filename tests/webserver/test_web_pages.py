@@ -348,6 +348,7 @@ class TestWebPage(ImpalaTestSuite):
         url = self.METRICS_URL.format(port) + page
         assert content_type == requests.get(url).headers['Content-Type']
 
+  @pytest.mark.execute_serially
   def test_log_level(self):
     """Test that the /log_level page outputs are as expected and work well on basic and
     malformed inputs. This however does not test that the log level changes are actually
