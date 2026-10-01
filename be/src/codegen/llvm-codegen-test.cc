@@ -587,11 +587,17 @@ TEST_F(LlvmCodeGenTest, CpuAttrWhitelist) {
       LlvmCodeGen::ApplyCpuAttrWhitelist(
                 {"+dummy1", "+dummy2", "-dummy3", "+dummy4", "+sse2", "-lzcnt"}));
   // IMPALA-6291: Test that all AVX512 attributes are disabled.
-  vector<string> avx512_attrs;
-  EXPECT_EQ(std::unordered_set<string>({"-avx512ifma", "-avx512dqavx512er", "-avx512f",
-                "-avx512bw", "-avx512vl", "-avx512cd", "-avx512vbmi", "-avx512pf"}),
-      LlvmCodeGen::ApplyCpuAttrWhitelist({"+avx512ifma", "+avx512dqavx512er", "+avx512f",
-          "+avx512bw", "+avx512vl", "+avx512cd", "+avx512vbmi", "+avx512pf"}));
+  EXPECT_EQ(std::unordered_set<string>({
+                "-avx512ifma", "-avx512dq", "-avx512er", "-avx512f", "-avx512bw",
+                "-avx512vl", "-avx512cd", "-avx512vbmi", "-avx512pf"}),
+      LlvmCodeGen::ApplyCpuAttrWhitelist({
+                "+avx512ifma", "+avx512dq", "+avx512er", "+avx512f", "+avx512bw",
+                "+avx512vl", "+avx512cd", "+avx512vbmi", "+avx512pf"}));
+  // cx8 must stay enabled: disabling it also disables cx16 and 64-bit atomics.
+  const std::unordered_set<string> baseline = IS_AARCH64 ?
+      std::unordered_set<string>({"+crc", "+lse", "+neon"}) :
+      std::unordered_set<string>({"+cx8", "+cx16", "+fxsr", "+sahf", "+crc32"});
+  EXPECT_EQ(baseline, LlvmCodeGen::ApplyCpuAttrWhitelist(baseline));
 }
 
 // Test that exercises the code path that deletes non-finalized methods before it

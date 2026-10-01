@@ -111,20 +111,20 @@ DEFINE_string(asm_module_dir, "",
     "if set, saves disassembly for generated IR modules to the specified directory.");
 DECLARE_string(local_library_dir);
 // IMPALA-6291: AVX-512 and other CPU attrs the community doesn't routinely test are
-// disabled. AVX-512 is affected by known bugs in LLVM 3.9.1. The following attrs that
-// exist in LLVM 3.9.1 are disabled: avx512bw,avx512cd,avx512dq,avx512er,avx512f,
-// avx512ifma,avx512pf,avx512vbmi,avx512vl,clflushopt,clwb,fma4,mwaitx.1.2,pcommit,pku,
-// prefetchwt1,sgx,sha,sse4a,tbm,xop,xsavec,xsaves. If new attrs are added to LLVM,
-// they will be disabled until added to this whitelist.
+// disabled. Any detected attr not listed here is explicitly disabled, overriding the
+// defaults implied by the CPU name, so baseline attrs that LLVM detects (e.g. cx8,
+// which cx16 implies and 64-bit atomics need) must be listed. Attrs deliberately left
+// out: AVX-512, gfni, avxvnni*, amx-*, avx10.*, APX, sse4a, sgx, sha3 and SVE.
 #ifdef __aarch64__
-DEFINE_string_hidden(llvm_cpu_attr_whitelist, "crc,neon,fp-armv8,crypto",
+DEFINE_string_hidden(llvm_cpu_attr_whitelist, "aes,crc,fp-armv8,lse,neon,rand,sha2,sm4",
     "(Experimental) a comma-separated list of LLVM CPU attribute flags that are enabled "
     "for runtime code generation. This flag is provided to enable additional LLVM CPU "
     "attribute flags for testing.");
 #else
-DEFINE_string_hidden(llvm_cpu_attr_whitelist, "64bit,adx,aes,avx,avx2,bmi,bmi2,cmov,cx16,"
-    "f16c,fma,fsgsbase,hle,invpcid,lzcnt,mmx,movbe,pclmul,popcnt,prfchw,rdrnd,rdseed,rtm,"
-    "smap,sse,sse2,sse3,sse4.1,sse4.2,ssse3,xsave,xsaveopt,crc32",
+DEFINE_string_hidden(llvm_cpu_attr_whitelist, "64bit,adx,aes,avx,avx2,bmi,bmi2,"
+    "clflushopt,clwb,cmov,crc32,cx16,cx8,f16c,fma,fsgsbase,fxsr,invpcid,lzcnt,mmx,"
+    "movbe,pclmul,pku,popcnt,prfchw,rdrnd,rdseed,rtm,sahf,sha,sse,sse2,sse3,sse4.1,"
+    "sse4.2,ssse3,vaes,vpclmulqdq,xsave,xsavec,xsaveopt,xsaves",
     "(Experimental) a comma-separated list of LLVM CPU attribute flags that are enabled "
     "for runtime code generation. The default flags are a known-good set that are "
     "routinely tested. This flag is provided to enable additional LLVM CPU attribute "
