@@ -1,0 +1,134 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+Licensed to the Apache Software Foundation (ASF) under one
+or more contributor license agreements.  See the NOTICE file
+distributed with this work for additional information
+regarding copyright ownership.  The ASF licenses this file
+to you under the Apache License, Version 2.0 (the
+"License"); you may not use this file except in compliance
+with the License.  You may obtain a copy of the License at
+
+  http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing,
+software distributed under the License is distributed on an
+"AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+KIND, either express or implied.  See the License for the
+specific language governing permissions and limitations
+under the License.
+-->
+<!DOCTYPE concept PUBLIC "-//OASIS//DTD DITA Concept//EN" "concept.dtd">
+<concept id="impala_history_based_optimization" rev="5.0.0">
+  <title>History Based Optimization</title>
+  <prolog>
+    <metadata>
+      <data name="Category" value="Impala"/>
+      <data name="Category" value="Performance"/>
+      <data name="Category" value="Optimization"/>
+      <data name="Category" value="Concepts"/>
+      <data name="Category" value="Data Analysts"/>
+    </metadata>
+  </prolog>
+  <conbody>
+    <p> History Based Optimization provides automatic query plan adjustments by using historical
+      runtime statistics to optimize query processing in Impala.<note type="note">History Based
+        Optimization (HBO) is an experimental feature and a work in progress in <keyword
+          keyref="impala50_full"/>.</note></p>
+    <p>History Based Optimization (HBO) accelerates query processing by reusing historical runtime
+      statistics collected from previous query runs. Impala collects runtime statistics during
+      query processing and stores them in the HBO cache. By default, the in-memory cache is
+      maintained per coordinator and is lost when the coordinator restarts. During subsequent query planning, the
+      planner reads the stored cardinality statistics from the HBO cache and applies them to
+      generate an optimized query plan.</p>
+    <p><b>Observability updates</b></p>
+    <p>You can verify whether a query uses HBO statistics by reviewing the query profile or EXPLAIN
+      output. If cardinality statistics are read from the HBO cache, the EXPLAIN output or the query
+      plan in the profile displays the "from HBO" annotation. Extended profile updates provide
+      additional details regarding the applied HBO statistics.</p>
+    <p><b>EXPLAIN output examples</b></p>
+    <p>When HBO is enabled and statistics are found in the cache, the EXPLAIN output shows
+      "from HBO" annotations in the cardinality estimates. The following example shows a join query
+      where HBO provides cardinality for both scan nodes and the join operation:</p>
+    <codeblock>PLAN-ROOT SINK
+|
+02:HASH JOIN [INNER JOIN, BROADCAST]
+|  hash predicates: b.id = a.id
+|  row-size=29B cardinality=31 (from HBO)
+|
+|--04:EXCHANGE [BROADCAST]
+|  |
+|  00:SCAN HDFS [functional.alltypes a]
+|     partition predicates: a.`year` = 2010, a.`month` = 1
+|     row-size=8B cardinality=31 (from HBO)
+|
+01:SCAN HDFS [functional.alltypes b]
+   partition predicates: b.`year` = 2010
+   row-size=21B cardinality=365 (from HBO)</codeblock>
+    <p>In this example, HBO provides cardinality estimates of 31 rows for the first scan and 365
+      rows for the second scan.</p>
+    <p outputclass="toc inpage all"/>
+  </conbody>
+  <concept id="hbo_enabling">
+    <title>Enabling history based optimization</title>
+    <conbody>
+      <p>Configure History Based Optimization query options in Impala to store runtime statistics
+        and apply historical cardinality data during query planning.</p>
+      <p>You can configure HBO behavior at the session or query level by setting specific query
+        options.</p>
+      <p><b>Prerequisites:</b> You must have access to the Impala shell or a supported query
+        editor.</p>
+      <p>
+        <ul>
+          <li>Enable the <codeph>STORE_HBO_STATS</codeph> query option to populate the HBO cache
+            with runtime query statistics. The statistics are stored asynchronously after the query
+            finishes, so enabling this option does not add significant query latency: <codeph>SET
+              STORE_HBO_STATS</codeph>=<codeph>true</codeph>;</li>
+          <li dir="ltr">Enable the <codeph>USE_HBO_STATS</codeph> query option to instruct the
+            planner to read and apply stored statistics from the HBO cache: <codeph>SET
+              USE_HBO_STATS</codeph>=<codeph>true</codeph>;</li>
+        </ul>
+      </p>
+    </conbody>
+    <concept id="hbo_flags">
+      <title>History based optimization flags</title>
+      <conbody>
+        <p>History Based Optimization startup flags specify the similarity threshold, maximum stored
+          runs, and memory cache size for the Impala daemon.</p>
+        <p>The following table describes the History Based Optimization startup flags for the Impala
+          daemon (impalad):
+          <table>
+            <tgroup cols="3">
+              <colspec colname="c1" colwidth="1*"/>
+              <colspec colname="c2" colwidth="1*"/>
+              <colspec colname="c3" colwidth="2*"/>
+              <thead>
+                <row>
+                  <entry>Flag</entry>
+                  <entry>Default Value</entry>
+                  <entry>Description</entry>
+                </row>
+              </thead>
+              <tbody>
+                <row>
+                  <entry><parmname>hbo_similarity_threshold</parmname></entry>
+                  <entry>0.1 (10%)</entry>
+                  <entry>Specifies the similarity threshold value used to match queries against historical entries in the HBO cache. The threshold compares scan input statistics, and hash keys identify plan-node subtrees rather than whole queries.</entry>
+                </row>
+                <row>
+                  <entry><parmname>hbo_max_runs_per_key</parmname></entry>
+                  <entry>100</entry>
+                  <entry>Specifies the maximum number of historical runs stored per hash key in the HBO cache. When this limit is exceeded, the oldest run is evicted.</entry>
+                </row>
+                <row>
+                  <entry><parmname>hbo_in_memory_backend_cache_size_bytes</parmname></entry>
+                  <entry>1 GB</entry>
+                  <entry>Specifies the maximum memory size, in bytes, allocated for the in-memory backend HBO cache.</entry>
+                </row>
+              </tbody>
+            </tgroup>
+          </table>
+        </p>
+      </conbody>
+    </concept>
+  </concept>
+</concept>

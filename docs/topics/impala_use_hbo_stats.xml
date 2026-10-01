@@ -1,0 +1,64 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+Licensed to the Apache Software Foundation (ASF) under one
+or more contributor license agreements.  See the NOTICE file
+distributed with this work for additional information
+regarding copyright ownership.  The ASF licenses this file
+to you under the Apache License, Version 2.0 (the
+"License"); you may not use this file except in compliance
+with the License.  You may obtain a copy of the License at
+
+  http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing,
+software distributed under the License is distributed on an
+"AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+KIND, either express or implied.  See the License for the
+specific language governing permissions and limitations
+under the License.
+-->
+<!DOCTYPE concept PUBLIC "-//OASIS//DTD DITA Concept//EN" "concept.dtd">
+<concept id="impala_use_hbo_stats" rev="5.0.0">
+  <title>USE_HBO_STATS Query Option</title>
+  <titlealts audience="PDF">
+    <navtitle>USE HBO STATS</navtitle>
+  </titlealts>
+  <prolog>
+    <metadata>
+      <data name="Category" value="Impala"/>
+      <data name="Category" value="Impala Query Options"/>
+      <data name="Category" value="Troubleshooting"/>
+      <data name="Category" value="Querying"/>
+      <data name="Category" value="Developers"/>
+      <data name="Category" value="Data Analysts"/>
+    </metadata>
+  </prolog>
+  <conbody>
+    <p>The <parmname>USE_HBO_STATS</parmname> query option determines whether Impala uses stored
+      historical cardinality data during query planning.</p>
+    <p>When enabled, the planner checks the History Based Optimization (HBO) cache for matching
+      historical runs. If matching statistics exist for supported plan nodes (e.g., ScanNode,
+      AggregationNode, UnionNode, or JoinNode), the planner applies those cardinality stats to
+      refine the query plan.</p>
+    <p conref="../shared/impala_common.xml#common/type_boolean"/>
+    <p conref="../shared/impala_common.xml#common/default_false_0"/>
+    <p><b>Added in:</b>
+      <keyword keyref="impala50_full"/></p>
+    <p><b>Usage notes:</b></p>
+    <ul>
+      <li>You can enable <parmname>USE_HBO_STATS</parmname> and <parmname>STORE_HBO_STATS</parmname>
+        independently. Enable <parmname>STORE_HBO_STATS</parmname> to collect and store statistics,
+        and enable <parmname>USE_HBO_STATS</parmname> to read and apply stored statistics during
+        query planning. Enable both options to fully participate in history-based plan
+        optimization.</li>
+      <li>Verify whether cardinality statistics were read from HBO by inspecting the query profile
+        or EXPLAIN output. Plan nodes using cached statistics display a "from HBO" annotation.</li>
+    </ul>
+    <p><b>Examples:</b></p>
+    <p>Run the following command to enable reading HBO statistics for the current
+      session:<codeblock>SET USE_HBO_STATS=true;</codeblock></p>
+    <p conref="../shared/impala_common.xml#common/related_info"/>
+    <p><xref href="impala_history_based_optimization.xml"/></p>
+    <p><xref href="impala_store_hbo_stats.xml"/></p>
+  </conbody>
+</concept>

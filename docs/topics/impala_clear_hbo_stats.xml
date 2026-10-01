@@ -110,6 +110,7 @@ under the License.
     <p>
       <xref href="impala_perf_stats.xml#perf_stats"/>
     </p>
+    <p><xref href="impala_history_based_optimization.xml"/></p>
 
   </conbody>
 

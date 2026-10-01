@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+Licensed to the Apache Software Foundation (ASF) under one
+or more contributor license agreements.  See the NOTICE file
+distributed with this work for additional information
+regarding copyright ownership.  The ASF licenses this file
+to you under the Apache License, Version 2.0 (the
+"License"); you may not use this file except in compliance
+with the License.  You may obtain a copy of the License at
+
+  http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing,
+software distributed under the License is distributed on an
+"AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+KIND, either express or implied.  See the License for the
+specific language governing permissions and limitations
+under the License.
+-->
+<!DOCTYPE concept PUBLIC "-//OASIS//DTD DITA Concept//EN" "concept.dtd">
+<concept id="impala_store_hbo_stats" rev="5.0.0">
+  <title>STORE_HBO_STATS Query Option</title>
+  <titlealts audience="PDF">
+    <navtitle>STORE HBO STATS</navtitle>
+  </titlealts>
+  <prolog>
+    <metadata>
+      <data name="Category" value="Impala"/>
+      <data name="Category" value="Impala Query Options"/>
+      <data name="Category" value="Troubleshooting"/>
+      <data name="Category" value="Querying"/>
+      <data name="Category" value="Developers"/>
+      <data name="Category" value="Data Analysts"/>
+    </metadata>
+  </prolog>
+  <conbody>
+    <p>The <parmname>STORE_HBO_STATS</parmname> query option determines whether Impala populates the
+      History-Based Optimization (HBO) cache with runtime statistics from completed queries.</p>
+    <p>When enabled, Impala collects actual cardinality statistics during query processing and stores
+      them asynchronously in the HBO cache after the query completes. This asynchronous storage does
+      not add significant latency to query execution. These saved entries provide the historical
+      baseline used during future query planning when <parmname>USE_HBO_STATS</parmname> is
+      enabled.</p>
+    <p conref="../shared/impala_common.xml#common/type_boolean"/>
+    <p conref="../shared/impala_common.xml#common/default_false_0"/>
+    <p><b>Added in:</b>
+      <keyword keyref="impala50_full"/></p>
+    <p><b>Usage notes:</b></p>
+    <ul>
+      <li>Enable this option on queries to build historical stats for supported plan nodes (e.g.,
+        HdfsScanNode, AggregationNode, JoinNode).</li>
+      <li>Daemon startup flags such as <parmname>hbo_max_runs_per_key</parmname> and
+          <parmname>hbo_in_memory_backend_cache_size_bytes</parmname> control the maximum historical
+        runs and cache allocation for stored statistics.</li>
+    </ul>
+    <p><b>Examples:</b></p>
+    <p>Run the following command to instruct Impala to collect and cache statistics for subsequent
+      queries in the session:<codeblock>SET STORE_HBO_STATS=true;</codeblock></p>
+    <p conref="../shared/impala_common.xml#common/related_info"/>
+    <p><xref href="impala_history_based_optimization.xml"/></p>
+    <p><xref href="impala_use_hbo_stats.xml"/></p>
+  </conbody>
+</concept>

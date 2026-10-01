@@ -271,6 +271,7 @@ under the License.
         <!-- <topicref href="topics/impala_seq_compression_mode.xml"/> -->
         <topicref href="topics/impala_shuffle_distinct_exprs.xml"/>
         <topicref href="topics/impala_spool_query_results.xml"/>
+        <topicref rev="4.5.0" href="topics/impala_store_hbo_stats.xml"/>
         <topicref href="topics/impala_support_start_over.xml"/>
         <topicref href="topics/impala_sync_ddl.xml"/>
         <topicref href="topics/impala_sync_hms_events_strict_mode.xml"/>
@@ -279,6 +280,7 @@ under the License.
         <topicref href="topics/impala_thread_reservation_limit.xml"/>
         <topicref href="topics/impala_timezone.xml"/>
         <topicref href="topics/impala_topn_bytes_limit.xml"/>
+        <topicref rev="4.5.0" href="topics/impala_use_hbo_stats.xml"/>
         <topicref rev="4.5.0" href="topics/impala_use_null_slots_cache.xml"/>
         <topicref href="topics/impala_utf8_mode.xml"/>
       </topicref>
@@ -324,6 +326,7 @@ under the License.
     <topicref href="topics/impala_perf_cookbook.xml"/>
     <topicref href="topics/impala_perf_joins.xml"/>
     <topicref href="topics/impala_perf_stats.xml"/>
+    <topicref href="topics/impala_history_based_optimization.xml"/>
     <topicref href="topics/impala_perf_benchmarking.xml"/>
     <topicref href="topics/impala_perf_resources.xml"/>
     <topicref rev="2.5.0" href="topics/impala_runtime_filtering.xml"/>
