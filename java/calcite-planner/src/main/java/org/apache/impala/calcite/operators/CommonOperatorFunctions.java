@@ -59,8 +59,12 @@ public class CommonOperatorFunctions {
           + name + "; operand types: " + operandTypes);
     }
 
+    // IF's first operand is the condition, not a possible return value. Keep it
+    // in function resolution above, but exclude it from DECIMAL type inference.
+    List<RelDataType> returnOperandTypes = name.equalsIgnoreCase("if")
+        ? operandTypes.subList(1, 3) : operandTypes;
     RelDataType returnType = fn.getReturnType().equals(Type.DECIMAL)
-        ? ImpalaTypeConverter.getCompatibleType(operandTypes, factory)
+        ? ImpalaTypeConverter.getCompatibleType(returnOperandTypes, factory)
         : ImpalaTypeConverter.createRelDataType(fn.getReturnType());
 
     return isNullable(operandTypes)

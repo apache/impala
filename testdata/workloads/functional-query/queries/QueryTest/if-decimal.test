@@ -1,0 +1,63 @@
+====
+---- QUERY
+select if(true, cast(1.234 as decimal(15,3)), cast(2.345 as decimal(15,3))),
+       if(false, cast(1.234 as decimal(15,3)), cast(2.345 as decimal(15,3)))
+---- RESULTS
+1.234,2.345
+---- TYPES
+DECIMAL,DECIMAL
+====
+---- QUERY
+# Both return branches determine precision and scale, regardless of the condition.
+select if(true, cast(1.23 as decimal(15,3)), cast(4.5678 as decimal(20,4))),
+       if(false, cast(1.23 as decimal(15,3)), cast(4.5678 as decimal(20,4)))
+---- RESULTS
+1.2300,4.5678
+---- TYPES
+DECIMAL,DECIMAL
+====
+---- QUERY
+select if(null, cast(1.234 as decimal(15,3)), cast(9.87 as decimal(15,3))),
+       if(cast(null as boolean), cast(1.234 as decimal(15,3)),
+          cast(9.87 as decimal(15,3))),
+       if(true, cast(null as decimal(15,3)), cast(9.87 as decimal(15,3))),
+       if(false, cast(1.234 as decimal(15,3)), cast(null as decimal(15,3)))
+---- RESULTS
+9.870,9.870,NULL,NULL
+---- TYPES
+DECIMAL,DECIMAL,DECIMAL,DECIMAL
+====
+---- QUERY
+select if(true, cast(7 as int), cast(1.25 as decimal(15,3))),
+       if(false, cast(7 as int), cast(1.25 as decimal(15,3))),
+       if(true, cast(1.5 as double), cast(2.5 as double))
+---- RESULTS
+7.000,1.250,1.5
+---- TYPES
+DECIMAL,DECIMAL,DOUBLE
+====
+---- QUERY
+# A scanned condition selects both DECIMAL branches at execution time.
+select id, if(id % 2 = 0, cast(id as decimal(15,3)),
+              cast(id + 10 as decimal(20,4)))
+from functional.alltypestiny where id < 4 order by id
+---- RESULTS
+0,0.0000
+1,11.0000
+2,2.0000
+3,13.0000
+---- TYPES
+INT,DECIMAL
+====
+---- QUERY
+select id, if(if(id = 0, cast(null as boolean), id % 2 = 0),
+              cast(1.25 as decimal(15,3)), cast(null as decimal(20,4)))
+from functional.alltypestiny where id < 4 order by id
+---- RESULTS
+0,NULL
+1,NULL
+2,1.2500
+3,NULL
+---- TYPES
+INT,DECIMAL
+====

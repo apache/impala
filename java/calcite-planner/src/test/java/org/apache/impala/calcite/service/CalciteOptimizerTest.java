@@ -274,6 +274,44 @@ public class CalciteOptimizerTest extends FrontendTestBase {
   }
 
   @Test
+  public void testIfDecimalReturnTypeExcludesCondition() throws ImpalaException {
+    for (String expression : ImmutableList.of(
+        "if(true, cast(1 as decimal(15,3)), cast(2 as decimal(15,3)))",
+        "if(false, cast(1 as decimal(15,3)), cast(2 as decimal(15,3)))",
+        "if(cast(null as boolean), cast(1 as decimal(15,3)), "
+            + "cast(2 as decimal(15,3)))",
+        "if(true, cast(1 as decimal(15,3)), null)",
+        "if(false, null, cast(2 as decimal(15,3)))")) {
+      RelDataType type = createPreImpalaConvertPlan("select " + expression)
+          .outputTypes().get(0);
+      assertEquals(expression, SqlTypeName.DECIMAL, type.getSqlTypeName());
+      assertEquals(expression, 15, type.getPrecision());
+      assertEquals(expression, 3, type.getScale());
+    }
+    RelDataType mixed = createPreImpalaConvertPlan(
+        "select if(int_col > 0, decimal_col, cast(2 as decimal(15,3))) "
+            + "from " + TEST_TABLE).outputTypes().get(0);
+    assertEquals(SqlTypeName.DECIMAL, mixed.getSqlTypeName());
+    assertEquals(15, mixed.getPrecision());
+    assertEquals(3, mixed.getScale());
+  }
+
+  @Test
+  public void testIfDoubleAndDecimalCaseControls() throws ImpalaException {
+    RelDataType doubleType = createPreImpalaConvertPlan(
+        "select if(int_col > 0, cast(1 as double), cast(2 as double)) "
+            + "from " + TEST_TABLE).outputTypes().get(0);
+    assertEquals(SqlTypeName.DOUBLE, doubleType.getSqlTypeName());
+    RelDataType decimalType = createPreImpalaConvertPlan(
+        "select case when int_col > 0 then cast(1 as decimal(15,3)) "
+            + "else cast(2 as decimal(15,3)) end from " + TEST_TABLE)
+        .outputTypes().get(0);
+    assertEquals(SqlTypeName.DECIMAL, decimalType.getSqlTypeName());
+    assertEquals(15, decimalType.getPrecision());
+    assertEquals(3, decimalType.getScale());
+  }
+
+  @Test
   public void testFloorAndCeilCarryImpalaDecimalTypeToLogicalSeam()
       throws ImpalaException {
     for (String function : ImmutableList.of("floor", "ceil")) {
