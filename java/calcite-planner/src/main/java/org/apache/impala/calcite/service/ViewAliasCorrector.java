@@ -21,6 +21,7 @@ import com.google.common.base.Preconditions;
 
 import org.apache.calcite.sql.SqlBasicCall;
 import org.apache.calcite.sql.SqlIdentifier;
+import org.apache.calcite.sql.SqlKind;
 import org.apache.calcite.sql.SqlNode;
 import org.apache.calcite.sql.SqlNodeList;
 import org.apache.calcite.sql.SqlSelect;
@@ -148,8 +149,17 @@ public class ViewAliasCorrector {
     }
 
     private boolean itemHasAliasIssue(SqlNode topLevelItem, SqlNode secondLevelItem) {
+      // Hive's wrapper projects a qualified column with an explicit alias. Other
+      // select items cannot have this issue, even if view validation failed.
+      if (!(topLevelItem instanceof SqlBasicCall)
+          || topLevelItem.getKind() != SqlKind.AS) {
+        return false;
+      }
       SqlBasicCall call = (SqlBasicCall) topLevelItem;
-      SqlIdentifier topLevelIdentifier = (SqlIdentifier) call.getOperandList().get(0);
+      if (!(call.operand(0) instanceof SqlIdentifier)) {
+        return false;
+      }
+      SqlIdentifier topLevelIdentifier = (SqlIdentifier) call.operand(0);
       return topLevelIdentifier.names.size() > 1 &&
           !topLevelIdentifier.names.get(1).equals(
               SqlValidatorUtil.alias(secondLevelItem));
@@ -178,12 +188,13 @@ public class ViewAliasCorrector {
 
       List<SqlNode> fixedSelectList = new ArrayList<>();
       for (int i = 0; i < select.getSelectList().size(); ++i) {
-        SqlBasicCall call = (SqlBasicCall) select.getSelectList().get(i);
+        SqlNode item = select.getSelectList().get(i);
         // Just add the select item if there is no issue.
         if (!itemsWithAliasIssue_.contains(i)) {
-          fixedSelectList.add(call);
+          fixedSelectList.add(item);
           continue;
         }
+        SqlBasicCall call = (SqlBasicCall) item;
         SqlIdentifier identifier = (SqlIdentifier) call.getOperandList().get(0);
         // Calcite uses "EXPR$" as its generic alias.  This is all internal, so
         // the naming does not matter. The "i" portion in "EXPR$<i>" matches the
