@@ -21,16 +21,62 @@
 #include <vector>
 
 #include "gutil/strings/substitute.h"
+#include "gutil/utf/utf.h"
 #include "util/bit-util.h"
 #include "util/string-util.h"
+#include "util/utf8-util.h"
 
 #include "common/names.h"
 
 namespace impala {
 
+namespace {
+
+/// Length of 'str' cut to 'max_length' bytes with a trailing partial character dropped,
+/// or -1 if that is not valid UTF-8 and the caller should truncate byte-wise. Only the
+/// first 'max_length' bytes are inspected.
+int Utf8TruncationLength(const string& str, int32_t max_length) {
+  DCHECK_LT(max_length, static_cast<int64_t>(str.length()));
+  size_t len = TrimPartialUtf8(str.data(), max_length);
+  if (!IsValidUtf8(str.data(), len)) return -1;
+  return static_cast<int>(len);
+}
+
+/// Replaces the last character of valid UTF-8 'str' whose successor fits in 'max_length'
+/// bytes with that successor and drops everything after it, so 'str' sorts higher and
+/// stays valid UTF-8. False if there is none, e.g. every character is U+10FFFF.
+bool IncrementUtf8(string* str, int32_t max_length) {
+  for (int end = static_cast<int>(str->length()); end > 0;) {
+    int start = end - 1;
+    while (start > 0 && !BitUtil::IsUtf8StartByte((*str)[start])) --start;
+    Rune r;
+    charntorune(&r, str->data() + start, end - start);
+    if (r < Runemax) {
+      ++r;
+      if (r == 0xD800) r = 0xE000; // Skip the surrogates.
+      char buf[UTFmax];
+      const int len = runetochar(buf, &r);
+      if (start + len <= max_length) {
+        str->resize(start);
+        str->append(buf, len);
+        return true;
+      }
+    }
+    end = start;
+  }
+  return false;
+}
+
+} // anonymous namespace
+
 Status TruncateDown(const string& str, int32_t max_length, string* result) {
   DCHECK(result != nullptr);
-  *result = str.substr(0, std::min(static_cast<int32_t>(str.length()), max_length));
+  if (str.length() <= max_length) {
+    *result = str;
+    return Status::OK();
+  }
+  const int utf8_length = Utf8TruncationLength(str, max_length);
+  *result = str.substr(0, utf8_length >= 0 ? utf8_length : max_length);
   return Status::OK();
 }
 
@@ -41,6 +87,15 @@ Status TruncateUp(const string& str, int32_t max_length, string* result) {
     return Status::OK();
   }
 
+  const int utf8_length = Utf8TruncationLength(str, max_length);
+  if (utf8_length >= 0) {
+    *result = str.substr(0, utf8_length);
+    if (IncrementUtf8(result, max_length)) return Status::OK();
+    // No greater valid UTF-8 value fits, e.g. every character is U+10FFFF.
+    // Falling back to byte-wise increment.
+  }
+
+  // Raise the last non-0xFF byte and drop everything after it.
   *result = str.substr(0, max_length);
   int i = max_length - 1;
   while (i > 0 && static_cast<int32_t>((*result)[i]) == -1) {

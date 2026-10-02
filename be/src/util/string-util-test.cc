@@ -55,6 +55,28 @@ TEST(TruncateDownTest, Basic) {
   EvalTruncation(a, b, 2, DOWN);
 }
 
+// Don't cut in the middle of a character.
+TEST(TruncateDownTest, Utf8) {
+  // Cut inside a 2, 3 and 4-byte character.
+  EvalTruncation("a\xC3\xA9", "a", 2, DOWN);         // aé
+  EvalTruncation("a\xE4\xB8\xAD", "a", 2, DOWN);     // a中
+  EvalTruncation("a\xE4\xB8\xAD", "a", 3, DOWN);     // a中
+  EvalTruncation("a\xF0\x9F\x98\x80", "a", 2, DOWN); // a😀
+  EvalTruncation("a\xF0\x9F\x98\x80", "a", 4, DOWN); // a😀
+
+  // Cut on a character boundary.
+  EvalTruncation("a\xC3\xA9", "a\xC3\xA9", 3, DOWN);                 // aé
+  EvalTruncation("a\xE4\xB8\xAD", "a\xE4\xB8\xAD", 4, DOWN);         // a中
+  EvalTruncation("a\xF0\x9F\x98\x80", "a\xF0\x9F\x98\x80", 5, DOWN); // a😀
+
+  // The only character is dropped.
+  EvalTruncation("\xE4\xB8\xAD", "", 2, DOWN);       // 中
+
+  // Still invalid after trimming the lead byte, so cut bytes.
+  EvalTruncation(string("a\xC3\xC3\xC3", 4),
+      string("a\xC3\xC3", 3), 3, DOWN); // aÃÃÃ => aÃÃ
+}
+
 TEST(TruncateUpTest, Basic) {
   EvalTruncation("0123456789", "0123456789", 100, UP);
   EvalTruncation("abcdefghij", "abcdefghij", 10, UP);
@@ -78,6 +100,35 @@ TEST(TruncateUpTest, Basic) {
   char a[] = {0, (char)0x7F, (char)0xFF, 0};
   char b[] = {0, (char)0x80, 0};
   EvalTruncation(a, b, 2, UP);
+}
+
+TEST(TruncateUpTest, Utf8) {
+  // The last whole character is replaced by the next code point.
+  EvalTruncation("\xC3\xA9\xC3\xA9", "\xC3\xAA", 3, UP);             // éé => ê
+  EvalTruncation("\xE4\xB8\xAD\xE4\xB8\xAD", "\xE4\xB8\xAE", 4, UP); // 中中 => 丮
+  EvalTruncation("\xC3\xBF\xC3\xBF", "\xC4\x80", 3, UP);             // ÿÿ => Ā
+
+  // Partial character dropped first.
+  EvalTruncation("a\xE4\xB8\xAD\xE4\xB8\xAD", "b", 3, UP); // a中中 => b
+
+  // The next code point can be a byte longer.
+  // U+007F (7F) => U+0080 (C2 80)
+  EvalTruncation("\x7F\x7F\x7F", "\xC2\x80", 2, UP);
+  // U+07FF (DF BF) => U+0800 (E0 A0 80)
+  EvalTruncation("\xDF\xBF\xDF\xBF", "\xE0\xA0\x80", 3, UP);
+  // U+FFFF (EF BF BF) => U+10000 (F0 90 80 80)
+  EvalTruncation("\xEF\xBF\xBF\xEF\xBF\xBF", "\xF0\x90\x80\x80", 4, UP);
+
+  // If it doesn't fit, the character before it goes up instead.
+  EvalTruncation("aa\x7Fz", "ab", 3, UP);
+  // Surrogates are skipped: U+D7FF => U+E000.
+  EvalTruncation("\xED\x9F\xBF\xED\x9F\xBF", "\xEE\x80\x80", 3, UP);
+  // Nothing above U+10FFFF, so bytes are increased instead.
+  EvalTruncation("\xF4\x8F\xBF\xBF\xF4\x8F\xBF\xBF", "\xF4\x8F\xBF\xC0", 4, UP);
+  // The 0xFF tail trims away, leaving a valid "aaa" => "aab".
+  EvalTruncation(string("aaa\xFF\xFF", 5), "aab", 4, UP);
+  // Nothing valid left after trimming: byte-wise path, trailing 0xFFs dropped.
+  EvalTruncation(string("a\xFF\xFF\xFF\xFF", 5), "b", 4, UP);
 }
 
 TEST(CommaSeparatedContainsTest, Basic) {

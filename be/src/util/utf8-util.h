@@ -32,4 +32,9 @@ bool IsValidUtf8(const char* ptr, size_t len);
 /// null). Backed by the SIMD-accelerated simdutf library.
 int64_t FindFirstInvalidUtf8(const char* ptr, size_t len);
 
+/// Given valid UTF-8 whose last character may be cut short, returns a length 1 to 3 bytes
+/// shorter so that only whole characters remain, or 'len' if none was cut. Examines only
+/// the trailing bytes: check the result with IsValidUtf8() if the input may be invalid.
+size_t TrimPartialUtf8(const char* ptr, size_t len);
+
 } // namespace impala

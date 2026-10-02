@@ -94,4 +94,19 @@ TEST(Utf8UtilTest, FindFirstInvalidPosition) {
   EXPECT_EQ(2, FindFirstInvalidUtf8("ab\xc3", 3));     // truncated 2-byte sequence
 }
 
+TEST(Utf8UtilTest, TrimPartialUtf8) {
+  EXPECT_EQ(0, TrimPartialUtf8(nullptr, 0));
+  EXPECT_EQ(3, TrimPartialUtf8("abc", 3));
+  // A complete last character is kept.
+  EXPECT_EQ(3, TrimPartialUtf8("a\xc3\xa9", 3));         // aé
+  EXPECT_EQ(4, TrimPartialUtf8("a\xe4\xb8\xad", 4));     // a中
+  EXPECT_EQ(5, TrimPartialUtf8("a\xf0\x9f\x98\x80", 5)); // a😀
+  // A last character cut after 1, 2 or 3 of its bytes is dropped.
+  EXPECT_EQ(1, TrimPartialUtf8("a\xc3", 2));
+  EXPECT_EQ(1, TrimPartialUtf8("a\xe4\xb8", 3));
+  EXPECT_EQ(1, TrimPartialUtf8("a\xf0\x9f\x98", 4));
+  // Only the trailing bytes are examined.
+  EXPECT_EQ(4, TrimPartialUtf8("\x80" "abc", 4));
+}
+
 } // namespace impala

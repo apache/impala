@@ -37,4 +37,9 @@ int64_t FindFirstInvalidUtf8(const char* ptr, size_t len) {
   return static_cast<int64_t>(result.count);
 }
 
+size_t TrimPartialUtf8(const char* ptr, size_t len) {
+  if (len == 0) return 0;
+  return simdutf::trim_partial_utf8(ptr, len);
+}
+
 } // namespace impala

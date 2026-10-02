@@ -394,6 +394,28 @@ class TestHdfsParquetTableIndexWriter(ImpalaTestSuite):
     max_value = column.column_index.max_values[0]
     assert max_value == b'aab'
 
+  def test_utf8_string_values(self, vector, unique_database, tmpdir):
+    """Page index min/max values of a UTF8-annotated column must stay valid UTF-8, i.e.
+    they must not be truncated in the middle of a multi-byte character."""
+
+    # 30 three-byte characters exceed PAGE_INDEX_MAX_STRING_LENGTH and don't line up
+    # with it, so both cuts land inside a character. unhex() keeps this file ASCII.
+    values_sql = ("(cast(repeat(unhex('E4B8AD'), 30) as {0})), "  # U+4E2D, the min
+                  "(cast(repeat(unhex('E697A5'), 30) as {0}))")   # U+65E5, the max
+    for col_type in ["STRING", "VARCHAR(200)", "CHAR(200)"]:
+      table_name = "utf8_" + col_type.split("(")[0].lower()
+      hdfs_path = self._create_table_with_values_of_type(col_type, vector,
+          unique_database, table_name, values_sql.format(col_type))
+      row_group_indexes = self._get_row_groups_from_hdfs_folder(hdfs_path,
+          tmpdir.join(table_name))
+
+      column_index = row_group_indexes[0][0].column_index
+      assert len(column_index.min_values) == 1, col_type
+      assert len(column_index.max_values) == 1, col_type
+      # The partial 22nd character is dropped, then the max's last one goes up to U+65E6.
+      assert column_index.min_values == [b"\xe4\xb8\xad" * 21], col_type
+      assert column_index.max_values == [b"\xe6\x97\xa5" * 20 + b"\xe6\x97\xa6"], col_type
+
   def test_row_count_limit(self, vector, unique_database, tmpdir):
     """Tests that we can set the page row count limit via a query option.
     """

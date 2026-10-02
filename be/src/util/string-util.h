@@ -28,6 +28,9 @@ namespace impala {
 
 /// 'str' holds the minimum value of some string set. We need to truncate it
 /// if it is longer than 'max_length'.
+/// If the first 'max_length' bytes are valid UTF-8, a character cut in half is dropped as
+/// well, so the result stays valid UTF-8 and may be up to 3 bytes shorter than
+/// 'max_length'. Non-UTF-8 values are truncated byte-wise.
 WARN_UNUSED_RESULT
 Status TruncateDown(const std::string& str, int32_t max_length, std::string* result);
 
@@ -35,6 +38,10 @@ Status TruncateDown(const std::string& str, int32_t max_length, std::string* res
 /// to only occupy 'max_length' bytes. We also want to guarantee that the truncated
 /// value remains greater than all the strings in the original set, so we need
 /// to increase it after truncation. E.g.: when 'max_length' == 3: AAAAAAA => AAB
+/// UTF-8 values are truncated as in TruncateDown(), then their last character that still
+/// fits is replaced by the next code point, so the result stays valid UTF-8. Other
+/// values, and UTF-8 values where nothing fits (e.g. all U+10FFFF), are increased
+/// byte-wise.
 /// Returns error if it cannot increase the string value, ie. all bytes are 0xFF.
 WARN_UNUSED_RESULT
 Status TruncateUp(const std::string& str, int32_t max_length, std::string* result);
