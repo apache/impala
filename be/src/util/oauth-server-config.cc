@@ -49,7 +49,8 @@ DECLARE_string(oauth_jwt_custom_claim_username);
 DEFINE_string(oauth_servers, "",
     "JSON array of OAuth server configurations for JWT/OAuth token verification. Each "
     "element may specify caCertFilePath, verifyServerCert, jwksFilePath, jwksUrl, "
-    "jwksPullTimeoutSecs, jwksUpdateFrequencySecs, and usernameClaim.");
+    "jwksPullTimeoutSecs, jwksUpdateFrequencySecs, usernameClaim, "
+    "audienceClaims, and issuerClaims.");
 
 namespace impala {
 
@@ -130,6 +131,26 @@ Status ReadOptionalIntField(const rapidjson::Value& obj, const char* field_name,
   return Status::OK();
 }
 
+Status ReadOptionalStringArrayField(const rapidjson::Value& obj, const char* field_name,
+    vector<string>* values_out) {
+  DCHECK(values_out != nullptr);
+  if (!obj.HasMember(field_name)) return Status::OK();
+  const rapidjson::Value& field = obj[field_name];
+  if (!field.IsArray()) {
+    return Status(Substitute("oauth_servers entry field '$0' must be an array",
+        field_name));
+  }
+  for (rapidjson::SizeType i = 0; i < field.Size(); ++i) {
+    if (!field[i].IsString()) {
+      return Status(Substitute("oauth_servers entry field '$0' must be an array of "
+          "strings", field_name));
+    }
+    // Preserve backward compatibility: empty entries are treated as unset values.
+    if (field[i].GetStringLength() > 0) values_out->push_back(field[i].GetString());
+  }
+  return Status::OK();
+}
+
 Status ParseOAuthServerObject(
     const rapidjson::Value& obj, OAuthServerConfig* config_out) {
   if (!obj.IsObject()) {
@@ -150,6 +171,10 @@ Status ParseOAuthServerObject(
   RETURN_IF_ERROR(ReadOptionalIntField(
       obj, "jwksUpdateFrequencySecs", &config.jwks_update_frequency_secs));
   RETURN_IF_ERROR(ReadOptionalStringField(obj, "usernameClaim", &config.username_claim));
+  RETURN_IF_ERROR(ReadOptionalStringArrayField(
+      obj, "audienceClaims", &config.audience_claims));
+  RETURN_IF_ERROR(ReadOptionalStringArrayField(
+      obj, "issuerClaims", &config.issuer_claims));
   RETURN_IF_ERROR(ValidateJwksSettings(config));
   if (config.username_claim.empty()) {
     return Status("oauth_servers entry field 'usernameClaim' must not be empty");

@@ -38,6 +38,8 @@ struct OAuthServerConfig {
   int32_t jwks_pull_timeout_secs = DEFAULT_JWKS_PULL_TIMEOUT_SECS;
   int32_t jwks_update_frequency_secs = DEFAULT_JWKS_UPDATE_FREQUENCY_SECS;
   std::string username_claim = "username";
+  std::vector<std::string> audience_claims;
+  std::vector<std::string> issuer_claims;
 };
 
 /// Builds the full list of OAuth server configs from --oauth_servers plus any legacy

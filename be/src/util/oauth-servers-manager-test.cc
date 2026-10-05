@@ -124,6 +124,53 @@ TEST(OAuthServersManagerTest, VerifyTokenFromSecondServerWhenFirstDoesNotMatch) 
   EXPECT_EQ("test-user", username);
 }
 
+TEST(OAuthServersManagerTest, VerifyTokenFromSecondServerWhenFirstAudienceDoesNotMatch) {
+  google::FlagSaver flag_saver;
+  const string impala_home = GetImpalaHome();
+  const string jwks_path =
+      Substitute("$0/testdata/jwt/jwks_signing.json", impala_home);
+  const string jwt_path = Substitute("$0/testdata/jwt/jwt_signed", impala_home);
+  const string token = ReadTrimmedFile(jwt_path);
+  ASSERT_FALSE(token.empty());
+
+  FLAGS_oauth_servers = Substitute(
+      R"([{"jwksFilePath":"$0","usernameClaim":"sub",)"
+      R"("audienceClaims":["wrong-audience"]},)"
+      R"({"jwksFilePath":"$0","usernameClaim":"sub",)"
+      R"("audienceClaims":["impala-tests"]}])",
+      jwks_path);
+  OAuthServersManager manager;
+  ASSERT_OK(manager.Init());
+  ASSERT_EQ(2, manager.size());
+
+  string username;
+  ASSERT_OK(manager.AuthenticateBearerToken(token, &username));
+  EXPECT_EQ("test-user", username);
+}
+
+TEST(OAuthServersManagerTest, VerifyFailsWhenAudienceClaimsDoNotMatch) {
+  google::FlagSaver flag_saver;
+  const string impala_home = GetImpalaHome();
+  const string jwks_path =
+      Substitute("$0/testdata/jwt/jwks_signing.json", impala_home);
+  const string jwt_path = Substitute("$0/testdata/jwt/jwt_signed", impala_home);
+  const string token = ReadTrimmedFile(jwt_path);
+  ASSERT_FALSE(token.empty());
+
+  FLAGS_oauth_servers = Substitute(
+      R"([{"jwksFilePath":"$0","usernameClaim":"sub",)"
+      R"("audienceClaims":["wrong-audience"]}])",
+      jwks_path);
+  OAuthServersManager manager;
+  ASSERT_OK(manager.Init());
+  ASSERT_EQ(1, manager.size());
+
+  string username;
+  Status status = manager.AuthenticateBearerToken(token, &username);
+  EXPECT_FALSE(status.ok());
+  EXPECT_NE(string::npos, status.GetDetail().find("Claim 'aud' value"));
+}
+
 TEST(OAuthServersManagerTest, VerifyFailsWhenOnlyWrongJwksConfigured) {
   google::FlagSaver flag_saver;
   const string impala_home = GetImpalaHome();

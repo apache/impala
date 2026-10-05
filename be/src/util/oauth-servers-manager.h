@@ -65,6 +65,8 @@ class OAuthServersManager {
   struct OAuthServerVerifier {
     JWTHelper jwt_helper;
     std::string username_claim;
+    std::vector<std::string> audience_claims;
+    std::vector<std::string> issuer_claims;
   };
 
   /// Extracts the username using the username claim from the server at 'server_idx'.

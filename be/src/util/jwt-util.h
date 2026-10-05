@@ -74,10 +74,19 @@ class JWTHelper {
   static Status Decode(
       const std::string& token, UniqueJWTDecodedToken& decoded_token_out);
 
+  /// Verify the token is in compact JWT form before decoding it.
+  static Status ValidateTokenFormat(const std::string& token);
+
   /// Verify the token's signature with the JWKS. The token should be already decoded by
   /// calling Decode().
   /// Return Status::OK if the verification is successful.
   Status Verify(const JWTDecodedToken* decoded_token) const;
+
+  /// Verify the aud and iss claims against configured allowed values. Empty vectors
+  /// disable validation for that claim.
+  static Status VerifyJwtClaims(const JWTDecodedToken* decoded_token,
+      const std::vector<std::string>& audience_claims,
+      const std::vector<std::string>& issuer_claims);
 
   /// Returns true if this helper has a matching key candidate for the token's key id /
   /// algorithm family, and false otherwise.
@@ -87,6 +96,14 @@ class JWTHelper {
   /// Return Status::OK if the extraction is successful.
   static Status GetCustomClaimUsername(const JWTDecodedToken* decoded_token,
       const std::string& custom_claim_username, std::string& username);
+
+  /// Returns the JSON value of a payload claim, or an empty string if the claim is
+  /// absent.
+  static std::string GetPayloadClaim(
+      const JWTDecodedToken* decoded_token, const std::string& claim_name);
+
+  /// Returns the key ID from the decoded JWT header, or an empty string if absent.
+  static std::string GetKeyId(const JWTDecodedToken* decoded_token);
 
   /// Return snapshot of JWKS.
   std::shared_ptr<const JWKSSnapshot> GetJWKS() const;

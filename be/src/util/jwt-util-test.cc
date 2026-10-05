@@ -1303,4 +1303,110 @@ TEST(JwtUtilTest, VerifyJwtTokenWithx5cCertificateWithoutAlg) {
   EXPECT_OK(status);
 }
 
+TEST(JwtUtilTest, ValidateJwtTokenFormat) {
+  EXPECT_OK(JWTHelper::ValidateTokenFormat("abc.def.ghi"));
+
+  Status status = JWTHelper::ValidateTokenFormat("abc.def");
+  ASSERT_FALSE(status.ok());
+  ASSERT_TRUE(status.GetDetail().find("expected exactly two periods") != string::npos)
+      << " Actual error: " << status.GetDetail();
+
+  status = JWTHelper::ValidateTokenFormat("abc.def.ghi!");
+  ASSERT_FALSE(status.ok());
+  ASSERT_TRUE(status.GetDetail().find("outside the JWT compact serialization alphabet")
+      != string::npos)
+      << " Actual error: " << status.GetDetail();
+
+  status = JWTHelper::ValidateTokenFormat("abc=.def.ghi");
+  ASSERT_FALSE(status.ok());
+  ASSERT_TRUE(status.GetDetail().find("outside the JWT compact serialization alphabet")
+      != string::npos)
+      << " Actual error: " << status.GetDetail();
+}
+
+TEST(JwtUtilTest, VerifyJwtAudienceAndIssuerClaims) {
+  picojson::array audience_values;
+  audience_values.push_back(picojson::value("impala-service"));
+  audience_values.push_back(picojson::value("other-service"));
+
+  auto token =
+      jwt::create()
+          .set_issuer("auth0")
+          .set_type("JWS")
+          .set_algorithm("RS256")
+          .set_key_id(kid_1)
+          .set_payload_claim("aud", picojson::value(audience_values))
+          .set_payload_claim("username", picojson::value("impala"))
+          .sign(jwt::algorithm::rs256(rsa_pub_key_pem, rsa_priv_key_pem, "", ""));
+
+  JWTHelper::UniqueJWTDecodedToken decoded_token;
+  Status status = JWTHelper::Decode(token, decoded_token);
+  EXPECT_OK(status);
+
+  EXPECT_OK(JWTHelper::VerifyJwtClaims(
+      decoded_token.get(), {"impala-service"}, {"auth0"}));
+  EXPECT_OK(JWTHelper::VerifyJwtClaims(
+      decoded_token.get(), {"missing-service", "other-service"}, {"auth0"}));
+
+  status = JWTHelper::VerifyJwtClaims(
+      decoded_token.get(), {"missing-service"}, {"auth0"});
+  ASSERT_FALSE(status.ok());
+  ASSERT_TRUE(status.GetDetail().find("Claim 'aud' value") != string::npos)
+      << " Actual error: " << status.GetDetail();
+
+  status = JWTHelper::VerifyJwtClaims(
+      decoded_token.get(), {"impala-service"}, {"issuer2"});
+  ASSERT_FALSE(status.ok());
+  ASSERT_TRUE(status.GetDetail().find("Claim 'iss' value") != string::npos)
+      << " Actual error: " << status.GetDetail();
+}
+
+TEST(JwtUtilTest, VerifyJwtClaimsRequireConfiguredClaims) {
+  auto token =
+      jwt::create()
+          .set_type("JWS")
+          .set_algorithm("RS256")
+          .set_key_id(kid_1)
+          .set_payload_claim("username", picojson::value("impala"))
+          .sign(jwt::algorithm::rs256(rsa_pub_key_pem, rsa_priv_key_pem, "", ""));
+
+  JWTHelper::UniqueJWTDecodedToken decoded_token;
+  Status status = JWTHelper::Decode(token, decoded_token);
+  EXPECT_OK(status);
+
+  status = JWTHelper::VerifyJwtClaims(decoded_token.get(), {"impala-service"}, {});
+  ASSERT_FALSE(status.ok());
+  ASSERT_TRUE(status.GetDetail().find("Claim 'aud' was not present") != string::npos)
+      << " Actual error: " << status.GetDetail();
+
+  status = JWTHelper::VerifyJwtClaims(decoded_token.get(), {}, {"auth0"});
+  ASSERT_FALSE(status.ok());
+  ASSERT_TRUE(status.GetDetail().find("Claim 'iss' was not present") != string::npos)
+      << " Actual error: " << status.GetDetail();
+}
+
+TEST(JwtUtilTest, VerifyJwtClaimsRejectsArrayIssuerClaim) {
+  picojson::array issuer_values;
+  issuer_values.push_back(picojson::value("auth0"));
+  issuer_values.push_back(picojson::value("issuer2"));
+
+  auto token =
+      jwt::create()
+          .set_type("JWS")
+          .set_algorithm("RS256")
+          .set_key_id(kid_1)
+          .set_payload_claim("iss", picojson::value(issuer_values))
+          .set_payload_claim("username", picojson::value("impala"))
+          .sign(jwt::algorithm::rs256(rsa_pub_key_pem, rsa_priv_key_pem, "", ""));
+
+  JWTHelper::UniqueJWTDecodedToken decoded_token;
+  Status status = JWTHelper::Decode(token, decoded_token);
+  EXPECT_OK(status);
+
+  status = JWTHelper::VerifyJwtClaims(decoded_token.get(), {}, {"auth0"});
+  ASSERT_FALSE(status.ok());
+  ASSERT_TRUE(status.GetDetail().find("Claim 'iss' value") != string::npos)
+      << " Actual error: " << status.GetDetail();
+}
+
 } // namespace impala

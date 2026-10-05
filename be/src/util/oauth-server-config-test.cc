@@ -46,7 +46,9 @@ TEST(OAuthServerConfigTest, ParseOAuthServersJson) {
           "jwksUrl": "https://example.com/jwks.json",
           "jwksPullTimeoutSecs": 15,
           "jwksUpdateFrequencySecs": 14400,
-          "usernameClaim": "preferred_username"
+          "usernameClaim": "preferred_username",
+          "audienceClaims": ["impala-service"],
+          "issuerClaims": ["auth0"]
         },
         {
           "jwksFilePath": "/opt/auth-servers/jwks.json"
@@ -62,9 +64,15 @@ TEST(OAuthServerConfigTest, ParseOAuthServersJson) {
   EXPECT_EQ(15, configs[0].jwks_pull_timeout_secs);
   EXPECT_EQ(14400, configs[0].jwks_update_frequency_secs);
   EXPECT_EQ("preferred_username", configs[0].username_claim);
+  ASSERT_EQ(1, configs[0].audience_claims.size());
+  EXPECT_EQ("impala-service", configs[0].audience_claims[0]);
+  ASSERT_EQ(1, configs[0].issuer_claims.size());
+  EXPECT_EQ("auth0", configs[0].issuer_claims[0]);
   EXPECT_EQ("/opt/auth-servers/jwks.json", configs[1].jwks_uri);
   EXPECT_TRUE(configs[1].is_local_jwks);
   EXPECT_EQ("username", configs[1].username_claim);
+  EXPECT_TRUE(configs[1].audience_claims.empty());
+  EXPECT_TRUE(configs[1].issuer_claims.empty());
 }
 
 TEST(OAuthServerConfigTest, GetJwksUriPrefersFilePath) {
@@ -107,6 +115,51 @@ TEST(OAuthServerConfigTest, ParseOAuthServersJsonRejectsBothJwksFilePathAndUrl) 
   EXPECT_FALSE(status.ok());
   EXPECT_NE(string::npos,
       status.GetDetail().find("cannot specify both jwksFilePath and jwksUrl"));
+}
+
+TEST(OAuthServerConfigTest, ParseOAuthServersJsonRejectsNonArrayAudienceClaims) {
+  google::FlagSaver flag_saver;
+  vector<OAuthServerConfig> configs;
+  FLAGS_oauth_servers = R"([{
+    "jwksFilePath":"/tmp/jwks.json",
+    "audienceClaims":"impala-service"
+  }])";
+  Status status = BuildOAuthServerConfigs(&configs);
+  EXPECT_FALSE(status.ok());
+  EXPECT_NE(string::npos,
+      status.GetDetail().find(
+          "oauth_servers entry field 'audienceClaims' "
+          "must be an array"));
+}
+
+TEST(OAuthServerConfigTest, ParseOAuthServersJsonRejectsNonArrayIssuerClaims) {
+  google::FlagSaver flag_saver;
+  vector<OAuthServerConfig> configs;
+  FLAGS_oauth_servers = R"([{
+    "jwksFilePath":"/tmp/jwks.json",
+    "issuerClaims":"auth0"
+  }])";
+  Status status = BuildOAuthServerConfigs(&configs);
+  EXPECT_FALSE(status.ok());
+  EXPECT_NE(string::npos,
+      status.GetDetail().find(
+          "oauth_servers entry field 'issuerClaims' "
+          "must be an array"));
+}
+
+TEST(OAuthServerConfigTest, ParseOAuthServersJsonAcceptsEmptyClaimValuesAsUnset) {
+  google::FlagSaver flag_saver;
+  vector<OAuthServerConfig> configs;
+  FLAGS_oauth_servers = R"([{
+    "jwksFilePath":"/tmp/jwks.json",
+    "usernameClaim":"sub",
+    "audienceClaims":[],
+    "issuerClaims":[""]
+  }])";
+  ASSERT_OK(BuildOAuthServerConfigs(&configs));
+  ASSERT_EQ(1, configs.size());
+  EXPECT_TRUE(configs[0].audience_claims.empty());
+  EXPECT_TRUE(configs[0].issuer_claims.empty());
 }
 
 TEST(OAuthServerConfigTest, BuildOAuthServerConfigsUsesOauthServersJson) {

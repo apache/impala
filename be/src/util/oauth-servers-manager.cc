@@ -55,6 +55,8 @@ Status OAuthServersManager::Init() {
         config.jwks_update_frequency_secs);
     if (!status.ok()) return status;
     verifier.username_claim = std::move(config.username_claim);
+    verifier.audience_claims = std::move(config.audience_claims);
+    verifier.issuer_claims = std::move(config.issuer_claims);
     jwt_helpers_->emplace_back(std::move(verifier));
   }
   return Status::OK();
@@ -65,6 +67,7 @@ Status OAuthServersManager::AuthenticateBearerToken(
   DCHECK(jwt_helpers_);
   DCHECK(username_out != nullptr);
   username_out->clear();
+  RETURN_IF_ERROR(JWTHelper::ValidateTokenFormat(token));
   JWTHelper::UniqueJWTDecodedToken decoded_token;
   RETURN_IF_ERROR(JWTHelper::Decode(token, decoded_token));
   return Verify(decoded_token.get(), username_out);
@@ -83,7 +86,12 @@ Status OAuthServersManager::Verify(const JWTHelper::JWTDecodedToken* decoded_tok
     RETURN_IF_ERROR(FindMatchingServer(decoded_token, next_idx, &matched_server_idx));
     if (matched_server_idx == size()) break;
     attempted_signature_verification = true;
-    Status status = jwt_helpers_->at(matched_server_idx).jwt_helper.Verify(decoded_token);
+    const OAuthServerVerifier& verifier = jwt_helpers_->at(matched_server_idx);
+    Status status = verifier.jwt_helper.Verify(decoded_token);
+    if (status.ok()) {
+      status = JWTHelper::VerifyJwtClaims(
+          decoded_token, verifier.audience_claims, verifier.issuer_claims);
+    }
     if (status.ok()) {
       if (username_out != nullptr) {
         RETURN_IF_ERROR(GetUsername(decoded_token, matched_server_idx, username_out));

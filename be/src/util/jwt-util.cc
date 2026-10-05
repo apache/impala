@@ -16,6 +16,7 @@
 // under the License.
 
 #include <string.h>
+#include <algorithm>
 #include <cerrno>
 #include <ostream>
 #include <unordered_map>
@@ -48,9 +49,6 @@
 #include "util/kudu-status-util.h"
 #include "util/test-info.h"
 
-DECLARE_int32(jwks_update_frequency_s);
-DECLARE_int32(jwks_pulling_timeout_s);
-
 // Support only a single x5c certificate.
 // Update MAX_X5C_CERTIFICATES when we can
 // support more than one.
@@ -65,6 +63,55 @@ namespace impala {
 
 using rapidjson::Document;
 using rapidjson::Value;
+
+namespace {
+
+bool IsAllowedJwtChar(char c) {
+  return std::isalnum(static_cast<unsigned char>(c)) || c == '-' || c == '_' || c == '.';
+}
+
+const char* const AUD_CLAIM_NAME = "aud";
+const char* const ISS_CLAIM_NAME = "iss";
+
+bool ClaimValueMatches(const picojson::value& claim_value,
+    const vector<string>& allowed_values, bool allow_array_values) {
+  if (claim_value.is<string>()) {
+    const string& value = claim_value.get<string>();
+    return std::find(allowed_values.begin(), allowed_values.end(), value)
+        != allowed_values.end();
+  }
+  if (allow_array_values && claim_value.is<picojson::array>()) {
+    const picojson::array& values = claim_value.get<picojson::array>();
+    for (const picojson::value& value : values) {
+      if (value.is<string>()) {
+        const string& str_value = value.get<string>();
+        if (std::find(allowed_values.begin(), allowed_values.end(), str_value)
+            != allowed_values.end()) {
+          return true;
+        }
+      }
+    }
+  }
+  return false;
+}
+
+Status VerifyClaim(const DecodedJWT& decoded_jwt, const string& claim_name,
+    const vector<string>& allowed_values, bool allow_array_values) {
+  if (allowed_values.empty()) return Status::OK();
+  if (!decoded_jwt.has_payload_claim(claim_name)) {
+    return Status(TErrorCode::JWT_VERIFY_FAILED,
+        Substitute("Claim '$0' was not present", claim_name));
+  }
+  picojson::value claim_value = decoded_jwt.get_payload_claim(claim_name).to_json();
+  if (!ClaimValueMatches(claim_value, allowed_values, allow_array_values)) {
+    return Status(TErrorCode::JWT_VERIFY_FAILED,
+        Substitute("Claim '$0' value '$1' is not allowed", claim_name,
+            claim_value.serialize()));
+  }
+  return Status::OK();
+}
+
+} // anonymous namespace
 
 // JWK Set (JSON Web Key Set) is JSON data structure that represents a set of JWKs.
 // This class parses JWKS file.
@@ -879,6 +926,18 @@ JWKSSnapshotPtr JWTHelper::GetJWKS() const {
   return jwks_mgr_->GetJWKSSnapshot();
 }
 
+Status JWTHelper::ValidateTokenFormat(const string& token) {
+  if (std::count(token.begin(), token.end(), '.') != 2) {
+    return Status(TErrorCode::JWT_VERIFY_FAILED,
+        "Token is not in compact JWT format: expected exactly two periods");
+  }
+  if (!std::all_of(token.begin(), token.end(), IsAllowedJwtChar)) {
+    return Status(TErrorCode::JWT_VERIFY_FAILED,
+        "Token contains characters outside the JWT compact serialization alphabet");
+  }
+  return Status::OK();
+}
+
 // Decode the given JWT token.
 Status JWTHelper::Decode(const string& token, UniqueJWTDecodedToken& decoded_token_out) {
   Status status;
@@ -991,6 +1050,16 @@ Status JWTHelper::Verify(const JWTDecodedToken* decoded_token) const {
   return status;
 }
 
+Status JWTHelper::VerifyJwtClaims(const JWTDecodedToken* decoded_token,
+    const vector<string>& audience_claims, const vector<string>& issuer_claims) {
+  DCHECK(decoded_token != nullptr);
+  RETURN_IF_ERROR(
+      VerifyClaim(decoded_token->decoded_jwt_, AUD_CLAIM_NAME, audience_claims, true));
+  RETURN_IF_ERROR(
+      VerifyClaim(decoded_token->decoded_jwt_, ISS_CLAIM_NAME, issuer_claims, false));
+  return Status::OK();
+}
+
 Status JWTHelper::CanVerify(
     const JWTDecodedToken* decoded_token, bool* can_verify_out) const {
   DCHECK(initialized_);
@@ -1043,6 +1112,34 @@ Status JWTHelper::CanVerify(
   }
   *can_verify_out = pub_key != nullptr;
   return Status::OK();
+}
+
+string JWTHelper::GetPayloadClaim(
+    const JWTDecodedToken* decoded_token, const string& claim_name) {
+  DCHECK(decoded_token != nullptr);
+  try {
+    if (decoded_token->decoded_jwt_.has_payload_claim(claim_name)) {
+      return decoded_token->decoded_jwt_.get_payload_claim(claim_name)
+          .to_json()
+          .serialize();
+    }
+  } catch (const std::exception& e) {
+    VLOG(2) << "Error retrieving JWT claim '" << claim_name << "' for logging: "
+            << e.what();
+  }
+  return "";
+}
+
+string JWTHelper::GetKeyId(const JWTDecodedToken* decoded_token) {
+  DCHECK(decoded_token != nullptr);
+  try {
+    if (decoded_token->decoded_jwt_.has_key_id()) {
+      return decoded_token->decoded_jwt_.get_key_id();
+    }
+  } catch (const std::exception& e) {
+    VLOG(2) << "Error retrieving JWT key ID for logging: " << e.what();
+  }
+  return "";
 }
 
 Status JWTHelper::GetCustomClaimUsername(const JWTDecodedToken* decoded_token,

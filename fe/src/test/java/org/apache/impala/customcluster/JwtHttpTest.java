@@ -168,6 +168,35 @@ public class JwtHttpTest {
     }
   }
 
+  private String readTrimmedFile(Path path) {
+    try {
+      return Files.readString(path).trim();
+    } catch (IOException e) {
+      fail("Failed to read file: " + e.getMessage());
+      return "";
+    }
+  }
+
+  private String getResponseHeaderIgnoreCase(
+      Map<String, List<String>> responseHeaders, String headerName) {
+    if (responseHeaders == null) return "";
+    for (Map.Entry<String, List<String>> entry : responseHeaders.entrySet()) {
+      if (entry.getKey() == null || entry.getValue() == null) continue;
+      if (entry.getKey().equalsIgnoreCase(headerName) && !entry.getValue().isEmpty()) {
+        return entry.getValue().get(0);
+      }
+    }
+    return "";
+  }
+
+  private void verifyBearerErrorContainsClaim(
+      THttpClientWithHeaders transport, String claimName) {
+    String authHeader = getResponseHeaderIgnoreCase(
+        transport.getResponseHeaders(), "WWW-Authenticate");
+    assertThat(authHeader, containsString("invalid_token"));
+    assertThat(authHeader, containsString(String.format("Claim '%s'", claimName)));
+  }
+
   static void verifySuccess(TStatus status) throws Exception {
     if (status.getStatusCode() == TStatusCode.SUCCESS_STATUS
         || status.getStatusCode() == TStatusCode.SUCCESS_WITH_INFO_STATUS) {
@@ -224,7 +253,8 @@ public class JwtHttpTest {
     setUp(String.format(
         "--jwt_token_auth=true --jwks_file_path=%s --jwt_allow_without_tls=true",
         jwksFilename));
-    THttpClient transport = new THttpClient("http://localhost:28000");
+    THttpClientWithHeaders transport =
+        new THttpClientWithHeaders("http://localhost:28000");
     Map<String, String> headers = new HashMap<String, String>();
 
     // Case 1: Authenticate with valid JWT Token in HTTP header.
@@ -285,6 +315,152 @@ public class JwtHttpTest {
       // JWT authentication is not invoked.
       verifyJwtAuthMetrics(3, 1);
       assertEquals(e.getMessage(), "HTTP Response code: 401");
+    }
+  }
+
+  /**
+   * Tests JWT authentication when issuer claim validation is configured.
+   */
+  @Test
+  public void testJwtAuthWithIssuerClaimValidation() throws Exception {
+    createJWKSForWebServer_ = false;
+    String jwksFilename =
+        new File(System.getenv("IMPALA_HOME"),
+        String.format("testdata/jwt/%s", JWKS_FILE_NAME)).getPath();
+    String oauthServers = String.format(
+        "[{\"jwksFilePath\":\"%s\",\"issuerClaims\":[\"auth0\"]}]",
+        jwksFilename);
+    setUp(String.format(
+        "--jwt_token_auth=true --oauth_servers='%s' --jwt_allow_without_tls=true",
+        oauthServers));
+    THttpClientWithHeaders transport =
+        new THttpClientWithHeaders("http://localhost:28000");
+    Map<String, String> headers = new HashMap<String, String>();
+
+    headers.put("Authorization", "Bearer " + jwtToken_);
+    headers.put("X-Forwarded-For", "127.0.0.1");
+    transport.setCustomHeaders(headers);
+    transport.open();
+    TCLIService.Iface client = new TCLIService.Client(new TBinaryProtocol(transport));
+
+    TOpenSessionReq openReq = new TOpenSessionReq();
+    TOpenSessionResp openResp = client.OpenSession(openReq);
+    verifyJwtAuthMetrics(1, 0);
+    execAndFetch(
+        client, openResp.getSessionHandle(), "select logged_in_user()", "impala");
+  }
+
+  /**
+   * Tests JWT authentication fails when issuer validation is configured with a
+   * non-matching value.
+   */
+  @Test
+  public void testJwtAuthWithWrongIssuerClaim() throws Exception {
+    createJWKSForWebServer_ = false;
+    String jwksFilename =
+        new File(System.getenv("IMPALA_HOME"),
+            String.format("testdata/jwt/%s", JWKS_FILE_NAME)).getPath();
+    String oauthServers = String.format(
+        "[{\"jwksFilePath\":\"%s\",\"issuerClaims\":[\"issuer2\"]}]",
+        jwksFilename);
+    setUp(String.format(
+        "--jwt_token_auth=true --oauth_servers='%s' --jwt_allow_without_tls=true",
+        oauthServers));
+    THttpClientWithHeaders transport =
+        new THttpClientWithHeaders("http://localhost:28000");
+    Map<String, String> headers = new HashMap<String, String>();
+
+    headers.put("Authorization", "Bearer " + jwtToken_);
+    headers.put("X-Forwarded-For", "127.0.0.1");
+    transport.setCustomHeaders(headers);
+    transport.open();
+    TCLIService.Iface client = new TCLIService.Client(new TBinaryProtocol(transport));
+
+    TOpenSessionReq openReq = new TOpenSessionReq();
+    try {
+      client.OpenSession(openReq);
+      fail("Exception expected.");
+    } catch (Exception e) {
+      verifyJwtAuthMetrics(0, 1);
+      assertEquals(e.getMessage(), "HTTP Response code: 401");
+      verifyBearerErrorContainsClaim(transport, "iss");
+    }
+  }
+
+  /**
+   * Tests JWT authentication fails when audience validation is configured and the token
+   * has no audience claim.
+   */
+  @Test
+  public void testJwtAuthWithMissingAudienceClaim() throws Exception {
+    createJWKSForWebServer_ = false;
+    String jwksFilename =
+        new File(System.getenv("IMPALA_HOME"),
+        String.format("testdata/jwt/%s", JWKS_FILE_NAME)).getPath();
+    String oauthServers = String.format(
+        "[{\"jwksFilePath\":\"%s\",\"audienceClaims\":[\"impala\"]}]",
+        jwksFilename);
+    setUp(String.format(
+        "--jwt_token_auth=true --oauth_servers='%s' --jwt_allow_without_tls=true",
+        oauthServers));
+    THttpClientWithHeaders transport =
+        new THttpClientWithHeaders("http://localhost:28000");
+    Map<String, String> headers = new HashMap<String, String>();
+
+    headers.put("Authorization", "Bearer " + jwtToken_);
+    headers.put("X-Forwarded-For", "127.0.0.1");
+    transport.setCustomHeaders(headers);
+    transport.open();
+    TCLIService.Iface client = new TCLIService.Client(new TBinaryProtocol(transport));
+
+    TOpenSessionReq openReq = new TOpenSessionReq();
+    try {
+      client.OpenSession(openReq);
+      fail("Exception expected.");
+    } catch (Exception e) {
+      verifyJwtAuthMetrics(0, 1);
+      assertEquals(e.getMessage(), "HTTP Response code: 401");
+      verifyBearerErrorContainsClaim(transport, "aud");
+    }
+  }
+
+  /**
+   * Tests JWT authentication fails when audience validation is configured and
+   * the token audience does not match.
+   */
+  @Test
+  public void testJwtAuthWithWrongAudienceClaim() throws Exception {
+    createJWKSForWebServer_ = false;
+    String jwksFilename =
+        new File(System.getenv("IMPALA_HOME"),
+            "testdata/jwt/jwks_signing.json").getPath();
+    String tokenWithAudience = readTrimmedFile(Paths.get(
+        System.getenv("IMPALA_HOME"), "testdata", "jwt", "jwt_signed"));
+    String oauthServers = String.format(
+        "[{\"jwksFilePath\":\"%s\",\"usernameClaim\":\"sub\","
+            + "\"audienceClaims\":[\"wrong-audience\"]}]",
+        jwksFilename);
+    setUp(String.format(
+        "--jwt_token_auth=true --oauth_servers='%s' --jwt_allow_without_tls=true",
+        oauthServers));
+    THttpClientWithHeaders transport =
+        new THttpClientWithHeaders("http://localhost:28000");
+    Map<String, String> headers = new HashMap<String, String>();
+
+    headers.put("Authorization", "Bearer " + tokenWithAudience);
+    headers.put("X-Forwarded-For", "127.0.0.1");
+    transport.setCustomHeaders(headers);
+    transport.open();
+    TCLIService.Iface client = new TCLIService.Client(new TBinaryProtocol(transport));
+
+    TOpenSessionReq openReq = new TOpenSessionReq();
+    try {
+      client.OpenSession(openReq);
+      fail("Exception expected.");
+    } catch (Exception e) {
+      verifyJwtAuthMetrics(0, 1);
+      assertEquals(e.getMessage(), "HTTP Response code: 401");
+      verifyBearerErrorContainsClaim(transport, "aud");
     }
   }
 

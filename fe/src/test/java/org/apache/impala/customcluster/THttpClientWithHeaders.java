@@ -32,10 +32,12 @@ import java.io.IOException;
 
 import java.net.URL;
 import java.net.HttpURLConnection;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import org.apache.http.Header;
 import org.apache.http.HttpEntity;
 import org.apache.http.HttpHost;
 import org.apache.http.HttpResponse;
@@ -264,6 +266,15 @@ public class THttpClientWithHeaders extends TEndpointTransport {
       }
   }
 
+  private static Map<String, List<String>> captureResponseHeaders(HttpResponse response) {
+    Map<String, List<String>> headers = new HashMap<>();
+    for (Header header : response.getAllHeaders()) {
+      headers.computeIfAbsent(header.getName(), key -> new ArrayList<>())
+          .add(header.getValue());
+    }
+    return headers;
+  }
+
   private void flushUsingHttpClient() throws TTransportException {
 
     if (null == this.client) {
@@ -301,6 +312,7 @@ public class THttpClientWithHeaders extends TEndpointTransport {
 
       HttpResponse response = this.client.execute(this.host, post);
       int responseCode = response.getStatusLine().getStatusCode();
+      responseHeaders_ = captureResponseHeaders(response);
 
       //
       // Retrieve the inputstream BEFORE checking the status code so
@@ -400,15 +412,13 @@ public class THttpClientWithHeaders extends TEndpointTransport {
       connection.getOutputStream().write(data);
 
       int responseCode = connection.getResponseCode();
+      responseHeaders_ = connection.getHeaderFields();
       if (responseCode != HttpURLConnection.HTTP_OK) {
         throw new TTransportException("HTTP Response code: " + responseCode);
       }
 
       // Read the responses
       inputStream_ = connection.getInputStream();
-      // Capture the response headers.
-      // This is not in the THttpClient.java class in the apache/thrift repository.
-      responseHeaders_ = connection.getHeaderFields();
 
     } catch (IOException iox) {
       throw new TTransportException(iox);
