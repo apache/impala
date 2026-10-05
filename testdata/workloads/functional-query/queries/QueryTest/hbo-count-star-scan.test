@@ -9,8 +9,7 @@ PLAN-ROOT SINK
 |  row-size=8B cardinality=1 (from HBO)
 |
 00:SCAN HDFS [tpch_parquet.orders]
-   HDFS partitions=1/1 files=2 size=54.21MB
-   row-size=8B cardinality=2 (from HBO)
+   row-size=8B cardinality=$NUM_FILES (from HBO)
 ====
 ---- QUERY
 # The regular scan must not get the cardinality of the count(*) scan (IMPALA-15394).
@@ -21,6 +20,5 @@ PLAN-ROOT SINK
 01:EXCHANGE [UNPARTITIONED]
 |
 00:SCAN HDFS [tpch_parquet.orders]
-   HDFS partitions=1/1 files=2 size=54.21MB
    row-size=8B cardinality=1.50M
 ====

@@ -36,7 +36,7 @@ class HboTestMixin(object):
   self.execute_query, self.load_query_test_file). Kept backend-agnostic so the same
   golden-file comparison drives both the in-memory and distributed cache suites."""
 
-  def _run_hbo_explains(self, test_file):
+  def _run_hbo_explains(self, test_file, test_file_vars=None):
     """Run EXPLAIN queries from a golden .test file and verify their output against
     the plan sections. A test case may define any of PLAN, DISTRIBUTEDPLAN,
     CALCITE_PLANNER_PLAN and CALCITE_PLANNER_DISTRIBUTED_PLAN. Each present section is
@@ -71,7 +71,10 @@ class HboTestMixin(object):
         self.client.set_configuration(config)
         result = self.execute_query(query)
         actual_plan_lines = result.data[result.data.index('PLAN-ROOT SINK'):]
-        expected_plan_lines = section[plan_section_name].splitlines()
+        expected_plan = section[plan_section_name]
+        for key, value in (test_file_vars or {}).items():
+          expected_plan = expected_plan.replace(key, value)
+        expected_plan_lines = expected_plan.splitlines()
         # To avoid the test being fragile, we only compare the cardinality lines.
         actual_cardinality_lines = [line for line in actual_plan_lines
                                     if 'cardinality' in line]
@@ -80,6 +83,6 @@ class HboTestMixin(object):
         assert actual_cardinality_lines == expected_cardinality_lines, (
             "EXPLAIN output mismatch for {0} ({1}).\nExpected:\n{2}\n\n"
             "Actual:\n{3}".format(test_file, plan_section_name,
-                section[plan_section_name], '\n'.join(actual_plan_lines)))
+                expected_plan, '\n'.join(actual_plan_lines)))
       assert verified_any, \
           "No plan section found for query in {0}:\n{1}".format(test_file, query)

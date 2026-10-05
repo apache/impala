@@ -216,8 +216,11 @@ class TestHBO(HboTestMixin, ImpalaTestSuite):
     self.client.set_configuration(QUERY_OPTIONS)
     # An optimized count(*) scan returns one row per file, so a regular scan of the same
     # table and conjuncts must not get its cardinality. Use a parquet table with stats.
+    # Erasure coding can change the number of files in the test data.
+    num_files = len(self.execute_query("SHOW FILES IN tpch_parquet.orders").data)
     self.execute_query("SELECT count(*) FROM tpch_parquet.orders")
-    self._run_hbo_explains('QueryTest/hbo-count-star-scan')
+    self._run_hbo_explains('QueryTest/hbo-count-star-scan',
+        test_file_vars={'$NUM_FILES': str(num_files)})
 
   def test_partition_key_scan_cardinality(self):
     self.client.set_configuration(QUERY_OPTIONS)
