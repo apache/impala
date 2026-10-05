@@ -19,11 +19,13 @@ package org.apache.impala.calcite.operators;
 
 import org.apache.calcite.rel.type.RelDataType;
 import org.apache.calcite.sql.SqlFunction;
+import org.apache.calcite.sql.SqlCallBinding;
 import org.apache.calcite.sql.SqlKind;
 import org.apache.calcite.sql.SqlOperatorBinding;
 import org.apache.calcite.sql.type.OperandTypes;
 import org.apache.calcite.sql.SqlFunctionCategory;
 import org.apache.calcite.sql.type.SqlTypeName;
+import org.apache.calcite.sql.type.SqlTypeFamily;
 import org.apache.impala.catalog.ScalarType;
 import org.apache.impala.catalog.Type;
 import org.apache.impala.calcite.type.ImpalaTypeConverter;
@@ -36,12 +38,41 @@ public class ImpalaAdjustScaleFunction extends SqlFunction {
 
   public ImpalaAdjustScaleFunction(String name) {
     super(name, null, SqlKind.OTHER_FUNCTION,
-        null, null, OperandTypes.NUMERIC_OPTIONAL_INTEGER,
+        null, null, name.equals("TRUNC")
+            ? OperandTypes.or(OperandTypes.NUMERIC_OPTIONAL_INTEGER,
+                OperandTypes.family(SqlTypeFamily.DATETIME, SqlTypeFamily.CHARACTER),
+                OperandTypes.family(SqlTypeFamily.CHARACTER, SqlTypeFamily.CHARACTER))
+            : OperandTypes.NUMERIC_OPTIONAL_INTEGER,
         SqlFunctionCategory.NUMERIC);
   }
 
   @Override
+  public boolean checkOperandTypes(SqlCallBinding binding, boolean throwOnFailure) {
+    if (getName().equals("TRUNC") && binding.getOperandCount() == 2
+        && SqlTypeFamily.DATETIME.contains(binding.getOperandType(0))
+        && !SqlTypeFamily.CHARACTER.contains(binding.getOperandType(1))
+        && binding.getOperandType(1).getSqlTypeName() != SqlTypeName.NULL) {
+      if (throwOnFailure) throw binding.newValidationSignatureError();
+      return false;
+    }
+    return super.checkOperandTypes(binding, throwOnFailure);
+  }
+
+  @Override
   public RelDataType inferReturnType(SqlOperatorBinding opBinding) {
+    // Only TRUNC has temporal overloads. Preserve the numeric scale rules for
+    // TRUNC and its numeric aliases, and use native resolution for temporal calls.
+    SqlTypeName inputType = opBinding.getOperandType(0).getSqlTypeName();
+    if (getName().equals("TRUNC") && opBinding.getOperandCount() == 2
+        && (SqlTypeFamily.DATETIME.contains(opBinding.getOperandType(0))
+            || SqlTypeFamily.CHARACTER.contains(opBinding.getOperandType(0))
+            || (inputType == SqlTypeName.NULL
+                && (SqlTypeFamily.CHARACTER.contains(opBinding.getOperandType(1))
+                    || opBinding.getOperandType(1).getSqlTypeName()
+                        == SqlTypeName.NULL)))) {
+      return CommonOperatorFunctions.inferReturnType(opBinding, getName());
+    }
+
     if (opBinding.getOperandType(0).getSqlTypeName().equals(SqlTypeName.DOUBLE) ||
         opBinding.getOperandType(0).getSqlTypeName().equals(SqlTypeName.FLOAT)) {
       return ImpalaTypeConverter.getRelDataType(Type.DOUBLE);
