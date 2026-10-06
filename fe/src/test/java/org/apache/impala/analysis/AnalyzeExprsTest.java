@@ -23,6 +23,7 @@ import static org.junit.Assert.assertNotEquals;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 
+import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -3003,6 +3004,54 @@ public class AnalyzeExprsTest extends AnalyzerTest {
         "Decimal precision must be <= 38: 39");
     AnalysisError("select cast(1 as decimal(1, 2))",
         "Decimal scale (2) must be <= precision (1)");
+  }
+
+  private void testDecimalTruncation(String expr, Type expectedType,
+      String expectedValue) throws AnalysisException {
+    for (boolean isV2 : new boolean[] {false, true}) {
+      TQueryOptions options = new TQueryOptions();
+      options.setDecimal_v2(isV2);
+      // Check the inferred type before evaluating the decimal.
+      options.setEnable_expr_rewrites(false);
+      AnalysisContext ctx = createAnalysisCtx(options);
+      SelectStmt stmt = (SelectStmt) AnalyzesOk("select " + expr, ctx);
+      Assert.assertEquals(expr + " Decimal Version: " + (isV2 ? "2" : "1"),
+          expectedType, stmt.resultExprs_.get(0).getType());
+      LiteralExpr value = LiteralExpr.create(stmt.resultExprs_.get(0), ctx.getQueryCtx());
+      if (expectedValue == null) {
+        assertTrue(expr, value instanceof NullLiteral);
+      } else {
+        assertTrue(expr, value instanceof NumericLiteral);
+        assertEquals(expr, 0, new BigDecimal(expectedValue).compareTo(
+            ((NumericLiteral) value).getValue()));
+      }
+    }
+  }
+
+  @Test
+  public void TestDecimalTruncationMinimumPrecision() throws AnalysisException {
+    for (String alias : new String[] {"trunc", "truncate", "dtrunc"}) {
+      for (int precision : new int[] {1, 9, 10, 18, 19, 38}) {
+        String input = "cast(0.1 as decimal(" + precision + "," + precision + "))";
+        for (String scale : new String[] {"", ",0", ",-1"}) {
+          testDecimalTruncation(alias + "(" + input + scale + ")",
+              ScalarType.createDecimalType(1, 0), "0");
+        }
+        testDecimalTruncation(alias + "(" + input + ",1)",
+            ScalarType.createDecimalType(1, 1), "0.1");
+        testDecimalTruncation(alias + "(" + input + ",39)",
+            ScalarType.createDecimalType(precision, precision), "0.1");
+      }
+      testDecimalTruncation(alias + "(0.1)", ScalarType.createDecimalType(1, 0), "0");
+      testDecimalTruncation(alias + "(cast(null as decimal(38,38)),0)",
+          ScalarType.createDecimalType(1, 0), null);
+      testDecimalTruncation(alias + "(cast(-0.1 as decimal(38,38)),-1)",
+          ScalarType.createDecimalType(1, 0), "0");
+    }
+    testDecimalTruncation("round(cast(0.1 as decimal(38,38)),0)",
+        ScalarType.createDecimalType(1, 0), "0");
+    testDecimalTruncation("dround(cast(0.1 as decimal(38,38)),0)",
+        ScalarType.createDecimalType(1, 0), "0");
   }
 
   @Test

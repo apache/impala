@@ -624,6 +624,8 @@ public class FunctionCallExpr extends Expr {
         // digit before the decimal if the value gets rounded up.
         ++digitsBefore;
       }
+      // Even truncating every fractional digit needs one digit to represent zero.
+      if (digitsAfter == 0) digitsBefore = Math.max(digitsBefore, 1);
     }
     Preconditions.checkState(returnType.isDecimal() && !returnType.isWildcardDecimal());
     if (analyzer.isDecimalV2()) {
