@@ -29,7 +29,7 @@ import org.junit.Test;
 public class LocalImplTest {
   @Test
   public void testDmlCatalogNamesRequireUniqueNonEmptyNames() {
-    List<String> ids = LocalImpl.getIcebergDmlCatalogNames(Arrays.asList(
+    List<String> ids = LocalImpl.getCatalogNames(Arrays.asList(
         restCatalog("duplicate"), restCatalog(""), restCatalog("duplicate"),
         restCatalog("unique")));
 

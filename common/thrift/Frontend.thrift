@@ -44,6 +44,18 @@ struct TIcebergDmlFinalizeRequest {
   5: optional string debug_action
 }
 
+// Request to execute a DDL statement through a REST catalog owned by the coordinator.
+// This request never goes to CatalogD. The response is a CatalogService.TDdlExecResponse
+// whose TCatalogUpdateResult carries no catalog version to wait for.
+struct TIcebergDdlExecRequest {
+  // Name of the REST catalog that owns the target of the DDL.
+  1: required string rest_catalog_name
+
+  // The DDL to execute. Only the DDL types that IcebergDdlExecutor implements are
+  // accepted.
+  2: required CatalogService.TDdlExecRequest ddl_params
+}
+
 // Struct for HiveUdf expr to create the proper execution object in the FE
 // java side. See exprs/hive-udf-call.h for how hive Udfs are executed in general.
 // TODO: this could be the UdfID, collapsing the first 3 arguments but synchronizing
@@ -581,6 +593,11 @@ struct TCatalogOpRequest {
 
   // Parameters for SHOW CURRENT GROUPS
   22: optional TShowCurrentGroupsParams show_current_groups_params
+
+  // Set when 'ddl_params' targets a table owned by a coordinator-local Iceberg REST
+  // catalog. The coordinator frontend executes the DDL through the named catalog and
+  // the request never goes to CatalogD. See TIcebergDdlExecRequest.
+  23: optional string rest_catalog_name
 }
 
 // Query options type

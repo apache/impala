@@ -117,6 +117,7 @@ import org.apache.impala.service.FeSupport;
 import org.apache.impala.thrift.QueryConstants;
 import org.apache.impala.thrift.TAccessEvent;
 import org.apache.impala.thrift.TCatalogObjectType;
+import org.apache.impala.thrift.TDdlType;
 import org.apache.impala.thrift.TExecutorGroupSet;
 import org.apache.impala.thrift.TGeospatialLibrary;
 import org.apache.impala.thrift.TImpalaQueryOptions;
@@ -414,6 +415,31 @@ public class Analyzer {
   static boolean hasProviderDerivedCapabilities(FeTable table) {
     return table instanceof FeIcebergTable
         && ((FeIcebergTable)table).hasProviderDerivedCapabilities();
+  }
+
+  /**
+   * Checks that the coordinator can execute this DDL against a table whose capabilities
+   * come from its provider. The DDL runs on the coordinator through the REST catalog the
+   * table was loaded from, so that catalog needs a unique name to route by. Callers
+   * decide which DDL to let through; today that is DROP TABLE only.
+   */
+  static void ensureRestCatalogDdlSupported(FeTable table, TDdlType ddlType)
+      throws AnalysisException {
+    Preconditions.checkArgument(hasProviderDerivedCapabilities(table));
+    if (!((FeIcebergTable)table).hasRoutableRestCatalog()) {
+      throw restCatalogNotUnique(ddlType, table.getFullName());
+    }
+  }
+
+  /**
+   * Returns the error for DDL 'ddlType' on table 'fullTableName' of a REST catalog that
+   * does not have a unique name, so the coordinator cannot route the DDL to it.
+   */
+  public static AnalysisException restCatalogNotUnique(TDdlType ddlType,
+      String fullTableName) {
+    return new AnalysisException(String.format(
+        "%s is disabled because the REST catalog does not have a unique name: %s",
+        ddlType.name().replace('_', ' '), fullTableName));
   }
 
   /**

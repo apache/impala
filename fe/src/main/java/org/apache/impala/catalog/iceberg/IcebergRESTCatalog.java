@@ -100,14 +100,17 @@ public class IcebergRESTCatalog implements IcebergCatalog {
 
   @Override
   public boolean dropTable(FeIcebergTable feTable, boolean purge) {
-    throw new UnsupportedOperationException(
-        "DROP TABLE is not implemented for REST catalog");
+    return dropTable(feTable.getDb().getName(), feTable.getName(), purge);
   }
 
+  /**
+   * Drops the table through the REST catalog. With 'purge' the server is asked to
+   * remove the table data as well. Returns false if the table did not exist.
+   */
   @Override
   public boolean dropTable(String dbName, String tblName, boolean purge) {
-    throw new UnsupportedOperationException(
-        "DROP TABLE is not implemented for REST catalog");
+    return restCatalog_.dropTable(TableIdentifier.of(Namespace.of(dbName), tblName),
+        purge);
   }
 
   @Override

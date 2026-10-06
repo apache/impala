@@ -44,8 +44,16 @@ class CatalogOpExecutor {
   CatalogOpExecutor(ExecEnv* env, Frontend* fe, RuntimeProfile* profile)
       : env_(env), fe_(fe), profile_(profile) {}
 
-  /// Executes the given catalog operation against the catalog server.
+  /// Executes the given catalog operation against the catalog server, or in the
+  /// coordinator frontend for DDL that targets a coordinator-local Iceberg REST catalog
+  /// (see ExecIcebergRestDdl()).
   Status Exec(const TCatalogOpRequest& catalog_op);
+
+  /// Whether the DDL in 'request' runs in the coordinator frontend through an Iceberg
+  /// REST catalog instead of CatalogD. Such a DDL produces no catalog update.
+  static bool IsIcebergRestDdl(const TCatalogOpRequest& request) {
+    return request.__isset.rest_catalog_name;
+  }
 
   /// Fetches the metadata for the specific TCatalogObject descriptor from the catalog
   /// server. If the catalog server does not have the object cached, its metadata will
@@ -129,6 +137,12 @@ class CatalogOpExecutor {
       const apache::hive::service::cli::thrift::TTableSchema& col_stats_schema,
       const apache::hive::service::cli::thrift::TRowSet& col_stats_data,
       TAlterTableUpdateStatsParams* params);
+
+  /// Executes the DDL in 'request' in the coordinator frontend through the Iceberg REST
+  /// catalog named by request.rest_catalog_name. Nothing goes to CatalogD. Sets
+  /// exec_response_ and catalog_update_result_; the latter carries no catalog version
+  /// since the coordinator caches nothing for REST catalog tables.
+  Status ExecIcebergRestDdl(const TCatalogOpRequest& request);
 
   /// Response from executing the DDL request, see ddl_exec_response().
   boost::scoped_ptr<TDdlExecResponse> exec_response_;

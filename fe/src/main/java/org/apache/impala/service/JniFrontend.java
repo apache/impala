@@ -83,6 +83,7 @@ import org.apache.impala.thrift.TGetMetadataTablesParams;
 import org.apache.impala.thrift.TGetTableHistoryResult;
 import org.apache.impala.thrift.TGetTablesParams;
 import org.apache.impala.thrift.TGetTablesResult;
+import org.apache.impala.thrift.TIcebergDdlExecRequest;
 import org.apache.impala.thrift.TIcebergDmlFinalizeRequest;
 import org.apache.impala.thrift.TLoadDataReq;
 import org.apache.impala.thrift.TLoadDataResp;
@@ -233,6 +234,18 @@ public class JniFrontend {
     TIcebergDmlFinalizeRequest request = new TIcebergDmlFinalizeRequest();
     JniUtil.deserializeThrift(protocolFactory_, request, req);
     frontend_.finalizeIcebergDml(request);
+  }
+
+  /**
+   * Jni wrapper for Frontend.execIcebergRestDdl(). Accepts a serialized
+   * TIcebergDdlExecRequest and returns a serialized TDdlExecResponse.
+   */
+  public byte[] execIcebergRestDdl(byte[] req) throws ImpalaException, TException {
+    Preconditions.checkNotNull(frontend_);
+    TIcebergDdlExecRequest request = new TIcebergDdlExecRequest();
+    JniUtil.deserializeThrift(protocolFactory_, request, req);
+    TSerializer serializer = new TSerializer(protocolFactory_);
+    return serializer.serialize(frontend_.execIcebergRestDdl(request));
   }
 
   /**

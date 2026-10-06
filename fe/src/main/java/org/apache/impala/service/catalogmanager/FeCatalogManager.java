@@ -21,6 +21,7 @@ import java.util.concurrent.atomic.AtomicReference;
 import org.apache.impala.authorization.AuthorizationChecker;
 import org.apache.impala.catalog.CatalogException;
 import org.apache.impala.catalog.FeCatalog;
+import org.apache.impala.catalog.iceberg.IcebergRESTCatalog;
 import org.apache.impala.common.ImpalaRuntimeException;
 import org.apache.impala.service.BackendConfig;
 import org.apache.impala.thrift.TBackendGflags;
@@ -74,13 +75,27 @@ public abstract class FeCatalogManager {
   public abstract FeCatalog getOrCreateCatalog();
 
   /**
-   * Returns a catalog backed by the metadata provider that owns coordinator-side
-   * Iceberg DML finalization.
+   * Returns a catalog over the Iceberg REST catalog named 'catalogName', for
+   * loading its tables on the coordinator. The coordinator finalizes DML and executes
+   * DDL for the tables of that catalog through it instead of CatalogD. Implementations
+   * that configure no REST catalogs keep the default, which rejects every name.
    */
-  public FeCatalog getCatalogForIcebergDml(String catalogName)
+  public FeCatalog getCatalog(String catalogName) throws ImpalaRuntimeException {
+    throw unknownCatalog(catalogName);
+  }
+
+  /**
+   * Returns the Iceberg REST catalog named 'catalogName' itself, for metadata
+   * operations that go beyond a loaded table, such as DROP TABLE.
+   */
+  public IcebergRESTCatalog getIcebergCatalog(String catalogName)
       throws ImpalaRuntimeException {
-    throw new ImpalaRuntimeException(
-        "Coordinator-side Iceberg DML finalization is not configured");
+    throw unknownCatalog(catalogName);
+  }
+
+  protected static ImpalaRuntimeException unknownCatalog(String catalogName) {
+    return new ImpalaRuntimeException(
+        String.format("Unknown Iceberg REST catalog: %s", catalogName));
   }
 
   /**

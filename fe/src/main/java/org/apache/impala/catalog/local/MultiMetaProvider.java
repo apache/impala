@@ -33,14 +33,19 @@ import java.util.stream.Collectors;
 import org.apache.hadoop.hive.metastore.api.ColumnStatisticsObj;
 import org.apache.hadoop.hive.metastore.api.Database;
 import org.apache.hadoop.hive.metastore.api.Table;
+import org.apache.hadoop.hive.metastore.api.UnknownDBException;
+import org.apache.iceberg.exceptions.NoSuchNamespaceException;
 import org.apache.impala.authorization.AuthorizationPolicy;
 import org.apache.impala.catalog.CatalogException;
+import org.apache.impala.catalog.CatalogRef;
 import org.apache.impala.catalog.DataSource;
+import org.apache.impala.catalog.DatabaseNotFoundException;
 import org.apache.impala.catalog.Function;
 import org.apache.impala.catalog.HdfsCachePool;
 import org.apache.impala.catalog.SqlConstraints;
 import org.apache.impala.catalog.local.LocalIcebergTable.TableParams;
 import org.apache.impala.common.Pair;
+import org.apache.impala.thrift.CatalogLookupStatus;
 import org.apache.impala.thrift.TBriefTableMeta;
 import org.apache.impala.thrift.TNetworkAddress;
 import org.apache.impala.thrift.TPartialTableInfo;
@@ -106,6 +111,63 @@ public class MultiMetaProvider implements MetaProvider {
   public Database loadDb(String dbName) throws TException {
     return tryAllProviders(
         unchecked(provider -> provider.loadDb(dbName)));
+  }
+
+  /**
+   * Returns the catalog that executes DDL on table 'tableName' of database 'dbName'.
+   * Every provider lists the database afresh, so nothing is remembered from earlier
+   * statements. The table is served by the provider that lists it. A table that no
+   * provider lists, such as the target of DROP TABLE IF EXISTS on a missing table, is
+   * served by the first provider that has the database, or by the primary provider if
+   * none has it: CatalogD when it is deployed, otherwise the first REST catalog.
+   * The table is rejected when several providers list it, as ambiguous like
+   * loadTableList() rejects it, and when a provider fails to list the database for
+   * another reason than not having it, as that provider may hold it.
+   */
+  @Override
+  public CatalogRef getCatalogRef(String dbName, String tableName) throws TException {
+    MetaProvider tableProvider = null;
+    MetaProvider firstDbProvider = null;
+    for (MetaProvider provider : getAllProviders()) {
+      ImmutableCollection<TBriefTableMeta> tables;
+      try {
+        tables = provider.loadTableList(dbName);
+      } catch (Exception e) {
+        if (isDbNotFound(e)) continue;
+        throw new TException(String.format(
+            "Cannot decide which catalog serves %s.%s: %s failed to list the tables " +
+            "of %s: %s. Retry once it is reachable.",
+            dbName, tableName, provider.getURI(), dbName, e.getMessage()), e);
+      }
+      if (firstDbProvider == null) firstDbProvider = provider;
+      if (tables.stream().noneMatch(t -> t.getName().equalsIgnoreCase(tableName))) {
+        continue;
+      }
+      if (tableProvider != null) {
+        throw new TException("Ambiguous table name: " + tableName);
+      }
+      tableProvider = provider;
+    }
+    if (tableProvider == null) {
+      tableProvider = firstDbProvider != null ? firstDbProvider : primaryProvider_;
+    }
+    return tableProvider.getCatalogRef(dbName, tableName);
+  }
+
+  /** Whether 'e' tells that a provider does not have the database it was asked for. */
+  private static boolean isDbNotFound(Throwable e) {
+    for (Throwable t = e; t != null; t = t.getCause()) {
+      if (t instanceof NoSuchNamespaceException || t instanceof UnknownDBException
+          || t instanceof DatabaseNotFoundException) {
+        return true;
+      }
+      if (t instanceof InconsistentMetadataFetchException
+          && ((InconsistentMetadataFetchException) t).getReason()
+              == CatalogLookupStatus.DB_NOT_FOUND) {
+        return true;
+      }
+    }
+    return false;
   }
 
   @Override

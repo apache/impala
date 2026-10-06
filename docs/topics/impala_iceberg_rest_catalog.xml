@@ -130,10 +130,10 @@ iceberg.rest-catalog.prefix=my_catalog</codeblock>
             <b>Catalog Name:</b>
           </p>
           <p>
-            Required for DML statements (INSERT INTO, INSERT OVERWRITE, UPDATE, DELETE
-            and MERGE), and unused otherwise. The name identifies the catalog that
-            finalizes the write, so it has to be unique among the configured REST
-            catalogs; DML is disabled for a catalog that leaves it unset, and for every
+            Required for INSERT INTO, INSERT OVERWRITE, UPDATE, DELETE, MERGE and DROP
+            TABLE, and unused otherwise. The name identifies the catalog that commits the
+            change, so it has to be unique among the configured REST catalogs; these
+            statements are disabled for a catalog that leaves it unset, and for every
             catalog sharing a name with another.
           </p>
           <codeblock>iceberg.rest-catalog.name=my_catalog</codeblock>
@@ -244,6 +244,13 @@ iceberg.rest-catalog.uri=http://rest-catalog-server:9084</codeblock>
             If a table with the same name exists in multiple catalogs, queries will fail with an
             ambiguity error. The error message will indicate which catalogs contain the table.
           </p>
+          <p>
+            Before it is executed, <codeph>DROP TABLE</codeph> and <codeph>DROP VIEW</codeph>
+            look up which catalog holds the table in every catalog that is configured. If
+            more than one catalog lists the table, or a catalog cannot list the database,
+            for example because its server is unreachable, the statement fails, also for
+            tables in the Hive Metastore. Retry it once the catalog is reachable.
+          </p>
         </section>
       </conbody>
     </concept>
@@ -282,7 +289,16 @@ iceberg.rest-catalog.uri=http://rest-catalog-server:9084</codeblock>
               unpartitioned. TRUNCATE is not supported.
             </li>
             <li>
-              <b>DDL Operations:</b> DDL operations (CREATE, ALTER, DROP,...) are not supported.
+              <b>DDL Operations:</b> Only DROP TABLE is supported, and only for a catalog
+              configured with a unique <codeph>iceberg.rest-catalog.name</codeph>. The
+              coordinator drops the table through the REST catalog; the Impala Catalog
+              Server is not involved. <codeph>DROP TABLE ... PURGE</codeph> asks the
+              REST catalog to delete the data files of the table as well; without
+              PURGE, whether they are deleted is up to the REST catalog server. This
+              differs from Iceberg tables in the Hive Metastore, where tables created by
+              Impala have <codeph>external.table.purge=true</codeph>, so a plain DROP
+              TABLE deletes their data files too. Other DDL operations (CREATE,
+              ALTER,...) are not supported.
             </li>
             <li>
               <b>Views:</b> Iceberg views are not supported through the REST Catalog.

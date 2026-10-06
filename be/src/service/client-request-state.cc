@@ -893,13 +893,17 @@ void ClientRequestState::ExecDdlRequestImpl(bool exec_in_worker_thread) {
     return;
   }
 
-  // Add newly created table to catalog cache.
-  status = parent_server_->ProcessCatalogUpdateResult(
-      *catalog_op_executor_->update_catalog_result(),
-      exec_req.query_options.sync_ddl, query_options(), query_events_);
-  {
-    lock_guard<mutex> l(lock_);
-    RETURN_VOID_IF_ERROR(UpdateQueryStatus(status, exec_in_worker_thread));
+  // Add newly created table to catalog cache. DDL executed in the coordinator frontend
+  // through an Iceberg REST catalog never reaches CatalogD, and the coordinator caches
+  // nothing for REST catalog tables, so there is no catalog update to wait for.
+  if (!CatalogOpExecutor::IsIcebergRestDdl(exec_req.catalog_op_request)) {
+    status = parent_server_->ProcessCatalogUpdateResult(
+        *catalog_op_executor_->update_catalog_result(),
+        exec_req.query_options.sync_ddl, query_options(), query_events_);
+    {
+      lock_guard<mutex> l(lock_);
+      RETURN_VOID_IF_ERROR(UpdateQueryStatus(status, exec_in_worker_thread));
+    }
   }
 
   if (is_CTAS) {
@@ -942,6 +946,10 @@ Status ClientRequestState::ExecDdlRequest() {
 
   summary_profile_->AddInfoString("DDL Type", op_type);
   summary_profile_->AddInfoString("DDL execution mode", exec_mode);
+  if (CatalogOpExecutor::IsIcebergRestDdl(exec_request().catalog_op_request)) {
+    summary_profile_->AddInfoString("Iceberg REST catalog",
+        exec_request().catalog_op_request.rest_catalog_name);
+  }
   VLOG_QUERY << "DDL exec mode=" << exec_mode;
 
   if (!async_ddl) return ExecDdlRequestImplSync();

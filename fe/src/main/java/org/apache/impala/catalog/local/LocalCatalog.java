@@ -28,6 +28,7 @@ import org.apache.impala.authorization.AuthorizationPolicy;
 import org.apache.impala.catalog.BuiltinsDb;
 import org.apache.impala.catalog.Catalog;
 import org.apache.impala.catalog.CatalogException;
+import org.apache.impala.catalog.CatalogRef;
 import org.apache.impala.catalog.DataSource;
 import org.apache.impala.catalog.DatabaseNotFoundException;
 import org.apache.impala.catalog.Db;
@@ -213,6 +214,17 @@ public class LocalCatalog implements FeCatalog {
   public FeDb getDb(String db) {
     loadDbs();
     return dbs_.get(db.toLowerCase());
+  }
+
+  @Override
+  public CatalogRef getCatalogRef(String dbName, String tableName) {
+    try {
+      return metaProvider_.getCatalogRef(dbName.toLowerCase(), tableName.toLowerCase());
+    } catch (TException e) {
+      throw new LocalCatalogException(String.format(
+          "Could not resolve the catalog of table %s.%s: %s", dbName, tableName,
+          e.getMessage()), e);
+    }
   }
 
   private FeDb getDbOrThrow(String dbName) throws DatabaseNotFoundException {

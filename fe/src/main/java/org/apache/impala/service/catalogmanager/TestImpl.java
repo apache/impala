@@ -38,11 +38,6 @@ class TestImpl extends FeCatalogManager {
   }
 
   @Override
-  public FeCatalog getCatalogForIcebergDml(String catalogName) {
-    return catalog_;
-  }
-
-  @Override
   public TUpdateCatalogCacheResponse updateCatalogCache(TUpdateCatalogCacheRequest req) {
     throw new IllegalStateException(
         "Unexpected call to updateCatalogCache() with a test catalog instance");

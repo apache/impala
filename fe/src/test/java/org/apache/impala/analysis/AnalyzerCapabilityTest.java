@@ -30,6 +30,7 @@ import org.apache.impala.catalog.FeIcebergTable;
 import org.apache.impala.catalog.FeTable;
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.compat.MetastoreShim;
+import org.apache.impala.thrift.TDdlType;
 import org.junit.Test;
 
 public class AnalyzerCapabilityTest {
@@ -88,6 +89,25 @@ public class AnalyzerCapabilityTest {
     assertInsertRejected(table,
         "Iceberg table UUID is unavailable");
     assertRejectedNonInsertDml(table, WRITE_NOT_SUPPORTED);
+  }
+
+  @Test
+  public void testRestTableDdlNeedsUniqueCatalogName() throws Exception {
+    FeIcebergTable table = mock(FeIcebergTable.class);
+    when(table.getFullName()).thenReturn("rest_db.rest_table");
+    when(table.hasProviderDerivedCapabilities()).thenReturn(true);
+
+    when(table.hasRoutableRestCatalog()).thenReturn(true);
+    Analyzer.ensureRestCatalogDdlSupported(table, TDdlType.DROP_TABLE);
+
+    when(table.hasRoutableRestCatalog()).thenReturn(false);
+    try {
+      Analyzer.ensureRestCatalogDdlSupported(table, TDdlType.DROP_TABLE);
+      fail("Expected DDL on a REST table without a unique catalog name to be rejected");
+    } catch (AnalysisException e) {
+      assertTrue(e.getMessage(), e.getMessage().contains(
+          "DROP TABLE is disabled because the REST catalog does not have a unique name"));
+    }
   }
 
   private static void assertRejectedNonInsertDml(

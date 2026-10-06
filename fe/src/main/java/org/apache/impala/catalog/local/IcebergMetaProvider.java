@@ -47,10 +47,15 @@ import org.apache.iceberg.Snapshot;
 import org.apache.iceberg.TableScan;
 import org.apache.iceberg.catalog.Namespace;
 import org.apache.iceberg.catalog.TableIdentifier;
+import org.apache.iceberg.exceptions.NoSuchNamespaceException;
+import org.apache.iceberg.exceptions.NoSuchTableException;
+import org.apache.iceberg.exceptions.NotFoundException;
+import org.apache.iceberg.exceptions.RESTException;
 import org.apache.iceberg.types.Types;
 import org.apache.impala.authorization.AuthorizationChecker;
 import org.apache.impala.authorization.AuthorizationPolicy;
 import org.apache.impala.catalog.CatalogException;
+import org.apache.impala.catalog.CatalogRef;
 import org.apache.impala.catalog.DataSource;
 import org.apache.impala.catalog.FeIcebergTable;
 import org.apache.impala.catalog.FileDescriptor;
@@ -84,6 +89,7 @@ import org.apache.impala.util.IcebergSchemaConverter;
 import org.apache.impala.util.ListMap;
 import org.apache.thrift.TException;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableCollection;
 import com.google.common.collect.ImmutableList;
@@ -103,21 +109,33 @@ public class IcebergMetaProvider implements MetaProvider {
   private final AuthorizationPolicy authPolicy_ = new AuthorizationPolicy();
 
   private IcebergRESTCatalog iceCatalog_;
-  private final String dmlCatalogName_;
+  private final String catalogName_;
+  // The catalog all databases of this provider belong to.
+  private final CatalogRef catalogRef_;
 
   Properties properties_;
 
-  public IcebergMetaProvider(Properties properties, String dmlCatalogName) {
+  public IcebergMetaProvider(Properties properties, String catalogName) {
+    this(properties, new IcebergRESTCatalog(properties), catalogName);
+  }
+
+  @VisibleForTesting
+  IcebergMetaProvider(Properties properties, IcebergRESTCatalog iceCatalog,
+      String catalogName) {
     properties_ = properties;
-    iceCatalog_ = new IcebergRESTCatalog(properties);
-    Preconditions.checkArgument(dmlCatalogName == null
-        || dmlCatalogName.equals(iceCatalog_.getName()));
-    dmlCatalogName_ = dmlCatalogName;
+    iceCatalog_ = iceCatalog;
+    Preconditions.checkArgument(catalogName == null
+        || catalogName.equals(iceCatalog_.getName()));
+    catalogName_ = catalogName;
+    catalogRef_ = CatalogRef.rest(catalogName, getURI());
   }
 
   public String getURI() {
     return "Iceberg REST (" + iceCatalog_.getUri() + ")";
   }
+
+  /** The REST catalog this provider loads its metadata from. */
+  public IcebergRESTCatalog getIcebergCatalog() { return iceCatalog_; }
 
   public void setAuthzChecker(
       AtomicReference<? extends AuthorizationChecker> authzChecker) {
@@ -159,6 +177,16 @@ public class IcebergMetaProvider implements MetaProvider {
     return db;
   }
 
+  /**
+   * Every table of this provider is served by its REST catalog. Like loadDb(), this does
+   * not check that the namespace or the table exists: the REST catalog answers for a
+   * missing one when a statement reaches it.
+   */
+  @Override
+  public CatalogRef getCatalogRef(String dbName, String tableName) {
+    return catalogRef_;
+  }
+
   @Override
   public ImmutableCollection<TBriefTableMeta> loadTableList(String dbName)
       throws TException {
@@ -186,6 +214,13 @@ public class IcebergMetaProvider implements MetaProvider {
     }
   }
 
+  /**
+   * Loads the table from the REST catalog. Failures to load it, including the
+   * unchecked exceptions of the REST client, such as a table or a namespace that
+   * disappeared after it was listed, are reported as TException, so that LocalDb turns
+   * a table that is listed but cannot be loaded into a failed table that DROP TABLE can
+   * still analyze, as MultiMetaProvider does for its providers.
+   */
   @Override
   public Pair<Table, TableMetaRef> loadTable(String dbName, String tableName)
       throws TException {
@@ -202,15 +237,17 @@ public class IcebergMetaProvider implements MetaProvider {
       msTable.setPartitionKeys(Collections.emptyList());
       msTable.setParameters(createTableProps(tbl));
       msTable.setTableType(TableType.EXTERNAL_TABLE.toString());
-      // General metadata writes remain unsupported. INSERT INTO is enabled through the
-      // provider-derived DML capability on TableMetaRef instead of this HMS capability.
+      // General metadata writes remain unsupported. INSERT INTO and the coordinator-local
+      // DDL are enabled through the provider-derived capability on TableMetaRef instead
+      // of this HMS capability.
       MetastoreShim.setTableAccessType(msTable, ACCESSTYPE_READ);
       long loadingTime = System.currentTimeMillis();
       TableMetaRef ref = new TableMetaRefImpl(dbName, tableName, msTable, tbl,
           loadingTime, credentials);
       return Pair.create(msTable, ref);
-    } catch (ImpalaRuntimeException|IcebergTableLoadingException e) {
-      throw new IllegalStateException(
+    } catch (ImpalaRuntimeException | IcebergTableLoadingException | RESTException
+        | NoSuchNamespaceException | NoSuchTableException | NotFoundException e) {
+      throw new TException(
           String.format("Error loading Iceberg table %s.%s", dbName, tableName), e);
     }
   }
@@ -551,8 +588,8 @@ public class IcebergMetaProvider implements MetaProvider {
     }
 
     @Override
-    public String getIcebergDmlCatalogName() {
-      return dmlCatalogName_;
+    public String getCatalogName() {
+      return catalogName_;
     }
   }
 

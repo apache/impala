@@ -29,6 +29,7 @@ import org.apache.hadoop.hive.metastore.api.Table;
 import org.apache.hadoop.hive.metastore.api.UnknownDBException;
 import org.apache.impala.authorization.AuthorizationPolicy;
 import org.apache.impala.catalog.CatalogException;
+import org.apache.impala.catalog.CatalogRef;
 import org.apache.impala.catalog.DataSource;
 import org.apache.impala.catalog.FileDescriptor;
 import org.apache.impala.catalog.Function;
@@ -88,6 +89,17 @@ public interface MetaProvider {
   ImmutableList<String> loadDbList() throws TException;
 
   Database loadDb(String dbName) throws TException;
+
+  /**
+   * Returns the catalog that serves table 'dbName'.'tableName'. The table need not exist
+   * or be loadable, and its metadata is not loaded to answer: for a missing table or
+   * database, this is the catalog that answers for it. Providers that are not backed by
+   * an Iceberg REST catalog are served by CatalogD. Throws when the catalog cannot be
+   * decided.
+   */
+  default CatalogRef getCatalogRef(String dbName, String tableName) throws TException {
+    return CatalogRef.CATALOGD;
+  }
 
   ImmutableCollection<TBriefTableMeta> loadTableList(String dbName)
       throws MetaException, UnknownDBException, TException;
@@ -212,8 +224,11 @@ public interface MetaProvider {
      */
     default boolean hasProviderDerivedCapabilities() { return false; }
 
-    /** REST catalog name used for coordinator-side DML finalization. */
-    default String getIcebergDmlCatalogName() { return null; }
+    /**
+     * Name of the REST catalog the table was loaded from, when that catalog has a
+     * unique name. The coordinator routes DML finalization and DDL execution by it.
+     */
+    default String getCatalogName() { return null; }
   }
 
   /**

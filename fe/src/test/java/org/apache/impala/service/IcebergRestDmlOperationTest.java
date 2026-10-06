@@ -96,7 +96,7 @@ public class IcebergRestDmlOperationTest {
     FeIcebergTable table = mock(FeIcebergTable.class);
     org.apache.iceberg.Table apiTable = mock(org.apache.iceberg.Table.class);
     UUID uuid = UUID.randomUUID();
-    when(table.getIcebergDmlCatalogName()).thenReturn("rest-1");
+    when(table.getCatalogName()).thenReturn("rest-1");
     when(table.getIcebergApiTable()).thenReturn(apiTable);
     when(apiTable.uuid()).thenReturn(uuid);
 

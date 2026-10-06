@@ -804,7 +804,7 @@ public class CatalogOpExecutor {
   /**
    * Create result set from string 'summary', and attach it to 'response'.
    */
-  private static void addSummary(TDdlExecResponse response, String summary) {
+  static void addSummary(TDdlExecResponse response, String summary) {
     TColumnValue resultColVal = new TColumnValue();
     resultColVal.setString_val(summary);
     TResultSet resultSet = new TResultSet();

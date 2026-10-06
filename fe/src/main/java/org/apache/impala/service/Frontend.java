@@ -198,6 +198,7 @@ import org.apache.impala.thrift.TCounter;
 import org.apache.impala.thrift.TCreateDropRoleParams;
 import org.apache.impala.thrift.TDatabase;
 import org.apache.impala.thrift.TDdlExecRequest;
+import org.apache.impala.thrift.TDdlExecResponse;
 import org.apache.impala.thrift.TDdlQueryOptions;
 import org.apache.impala.thrift.TDdlType;
 import org.apache.impala.thrift.TDescribeHistoryParams;
@@ -216,6 +217,7 @@ import org.apache.impala.thrift.TGetTableHistoryResult;
 import org.apache.impala.thrift.TGetTableHistoryResultItem;
 import org.apache.impala.thrift.TGrantRevokePrivParams;
 import org.apache.impala.thrift.TGrantRevokeRoleParams;
+import org.apache.impala.thrift.TIcebergDdlExecRequest;
 import org.apache.impala.thrift.TIcebergDmlFinalizeParams;
 import org.apache.impala.thrift.TIcebergDmlFinalizeRequest;
 import org.apache.impala.thrift.TIcebergOperation;
@@ -674,6 +676,20 @@ public class Frontend {
   public void finalizeIcebergDml(TIcebergDmlFinalizeRequest request)
       throws ImpalaException {
     IcebergDmlFinalizer.finalizeDml(catalogManager_, request);
+  }
+
+  /** Executes DDL through the coordinator-local Iceberg REST catalog that owns it. */
+  public TDdlExecResponse execIcebergRestDdl(TIcebergDdlExecRequest request)
+      throws ImpalaException {
+    return IcebergDdlExecutor.execDdl(catalogManager_, request);
+  }
+
+  /** Makes 'result' a statement that does nothing but return 'summary'. */
+  private static void setNoOpResult(TExecRequest result, List<String> summary) {
+    result.setResult_set_metadata(new TResultSetMetadata(
+        Collections.singletonList(new TColumn("summary", Type.STRING.toThrift()))));
+    result.setStmt_type(TStmtType.NO_OP);
+    result.setNoop_result(summary);
   }
 
   /**
@@ -3175,8 +3191,16 @@ public class Frontend {
     try {
       TQueryOptions queryOptions = queryCtx.client_request.query_options;
       if (analysisResult.isCatalogOp()) {
+        IcebergRestDdlRouter.Route route = IcebergRestDdlRouter.route(analysisResult);
+        if (route.isNoOp()) {
+          setNoOpResult(result, route.getNoopSummary());
+          return result;
+        }
         result.stmt_type = TStmtType.DDL;
         createCatalogOpRequest(analysisResult, result);
+        if (route.getRestCatalogName() != null) {
+          result.catalog_op_request.setRest_catalog_name(route.getRestCatalogName());
+        }
         TLineageGraph thriftLineageGraph = analysisResult.getThriftLineageGraph();
         if (thriftLineageGraph != null && thriftLineageGraph.isSetQuery_text()) {
           result.catalog_op_request.setLineage_graph(thriftLineageGraph);
@@ -3215,11 +3239,7 @@ public class Frontend {
           }
         }
       } else if (analysisResult.isNoOpStmt()) {
-        result.setResult_set_metadata(new TResultSetMetadata(
-            Collections.singletonList(
-                new TColumn("summary", Type.STRING.toThrift()))));
-        result.setStmt_type(TStmtType.NO_OP);
-        result.setNoop_result(analysisResult.getStmt().getNoopSummary());
+        setNoOpResult(result, analysisResult.getStmt().getNoopSummary());
         return result;
       } else if (analysisResult.isLoadDataStmt()) {
         result.stmt_type = TStmtType.LOAD;
@@ -3559,7 +3579,7 @@ public class Frontend {
     iceFinalizeParams.operation = iceOperation;
     iceFinalizeParams.setSpec_id(iceTable.getDefaultPartitionSpecId());
     iceFinalizeParams.setInitial_snapshot_id(iceTable.snapshotId());
-    String catalogName = iceTable.getIcebergDmlCatalogName();
+    String catalogName = iceTable.getCatalogName();
     if (catalogName != null) iceFinalizeParams.setRest_catalog_name(catalogName);
     Table apiTable = iceTable.getIcebergApiTable();
     if (apiTable == null) return iceFinalizeParams;

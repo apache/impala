@@ -131,6 +131,7 @@ Frontend::Frontend() {
     {"checkConfiguration", "()Ljava/lang/String;", &check_config_id_},
     {"updateCatalogCache", "([B)[B", &update_catalog_cache_id_},
     {"finalizeIcebergDml", "([B)V", &finalize_iceberg_dml_id_},
+    {"execIcebergRestDdl", "([B)[B", &exec_iceberg_rest_ddl_id_},
     {"updateExecutorMembership", "([B)V", &update_membership_id_},
     {"getCatalogInfo", "()[B", &get_catalog_info_},
     {"getCatalogMetrics", "()[B", &get_catalog_metrics_id_},
@@ -216,6 +217,11 @@ Status Frontend::UpdateCatalogCache(const TUpdateCatalogCacheRequest& req,
 
 Status Frontend::FinalizeIcebergDml(const TIcebergDmlFinalizeRequest& req) {
   return JniUtil::CallJniMethod(fe_, finalize_iceberg_dml_id_, req);
+}
+
+Status Frontend::ExecIcebergRestDdl(
+    const TIcebergDdlExecRequest& req, TDdlExecResponse* resp) {
+  return JniUtil::CallJniMethod(fe_, exec_iceberg_rest_ddl_id_, req, resp);
 }
 
 Status Frontend::UpdateExecutorMembership(const TUpdateExecutorMembershipRequest& req) {

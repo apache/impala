@@ -51,6 +51,10 @@ class Frontend {
   /// Finalizes Iceberg DML through the coordinator Java frontend.
   Status FinalizeIcebergDml(const TIcebergDmlFinalizeRequest& req);
 
+  /// Executes DDL through a coordinator-local Iceberg REST catalog in the Java
+  /// frontend. The DDL never goes to CatalogD.
+  Status ExecIcebergRestDdl(const TIcebergDdlExecRequest& req, TDdlExecResponse* resp);
+
   /// Request to update the Impalad frontend cluster membership snapshot of executors.
   /// The TUpdateExecutorMembershipRequest contains the latest set of executor nodes.
   Status UpdateExecutorMembership(const TUpdateExecutorMembershipRequest& req);
@@ -295,6 +299,7 @@ class Frontend {
   jmethodID check_config_id_; // JniFrontend.checkConfiguration()
   jmethodID update_catalog_cache_id_; // JniFrontend.updateCatalogCache(byte[][])
   jmethodID finalize_iceberg_dml_id_; // JniFrontend.finalizeIcebergDml(byte[])
+  jmethodID exec_iceberg_rest_ddl_id_; // JniFrontend.execIcebergRestDdl(byte[])
   jmethodID update_membership_id_; // JniFrontend.updateExecutorMembership()
   jmethodID get_catalog_info_; // JniFrontend.getCatalogInfo()
   jmethodID get_catalog_metrics_id_; // JniFrontend.getCatalogMetrics()

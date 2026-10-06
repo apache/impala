@@ -26,6 +26,7 @@ import org.apache.impala.catalog.TableLoadingException;
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.thrift.TAccessEvent;
 import org.apache.impala.thrift.TCatalogObjectType;
+import org.apache.impala.thrift.TDdlType;
 import org.apache.impala.thrift.TDropTableOrViewParams;
 import org.apache.impala.thrift.TTableName;
 import org.apache.impala.util.MetaStoreUtil;
@@ -139,8 +140,14 @@ public class DropTableOrViewStmt extends StatementBase implements SingleTableStm
       // It currently supports create bucketed tables,
       // but it should also support drop bucketed tables.
       if (dropTable_ && !MetaStoreUtil.isBucketedTable(table.getMetaStoreTable())) {
-        // To drop a view needs not write capabilities, only checks for tables.
-        analyzer.checkTableCapability(table, Analyzer.OperationType.WRITE);
+        if (Analyzer.hasProviderDerivedCapabilities(table)) {
+          // The coordinator drops the table through its REST catalog, see
+          // IcebergDdlExecutor.
+          Analyzer.ensureRestCatalogDdlSupported(table, TDdlType.DROP_TABLE);
+        } else {
+          // To drop a view needs not write capabilities, only checks for tables.
+          analyzer.checkTableCapability(table, Analyzer.OperationType.WRITE);
+        }
       }
     } catch (TableLoadingException e) {
       // We should still try to DROP tables that failed to load, so that tables that are
@@ -168,4 +175,5 @@ public class DropTableOrViewStmt extends StatementBase implements SingleTableStm
   public TableName getTableName() { return tableName_; }
   public String getTbl() { return tableName_.getTbl(); }
   public boolean isDropTable() { return dropTable_; }
+  public boolean isIfExists() { return ifExists_; }
 }

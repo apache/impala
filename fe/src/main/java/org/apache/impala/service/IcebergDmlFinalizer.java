@@ -65,7 +65,7 @@ final class IcebergDmlFinalizer {
     try {
       validateRestDmlOperation(request.getIceberg_operation());
       String catalogName = request.getRest_catalog_name();
-      FeTable table = catalogManager.getCatalogForIcebergDml(catalogName)
+      FeTable table = catalogManager.getCatalog(catalogName)
           .getTable(request.getDb_name(), request.getTarget_table());
       iceTbl = validateRestTargetTable(request, table);
       iceTxn = IcebergUtil.getIcebergTransaction(iceTbl);
@@ -91,7 +91,7 @@ final class IcebergDmlFinalizer {
           request.getDb_name(), request.getTarget_table()));
     }
 
-    if (!request.getRest_catalog_name().equals(iceTbl.getIcebergDmlCatalogName())) {
+    if (!request.getRest_catalog_name().equals(iceTbl.getCatalogName())) {
       throw new ImpalaRuntimeException(String.format(
           "REST catalog changed for table %s.%s",
           request.getDb_name(), request.getTarget_table()));

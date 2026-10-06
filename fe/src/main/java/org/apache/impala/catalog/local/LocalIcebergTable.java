@@ -245,8 +245,8 @@ public class LocalIcebergTable extends LocalTable implements FeIcebergTable {
   }
 
   @Override
-  public String getIcebergDmlCatalogName() {
-    return ref_ == null ? null : ref_.getIcebergDmlCatalogName();
+  public String getCatalogName() {
+    return ref_ == null ? null : ref_.getCatalogName();
   }
 
   @Override

@@ -112,8 +112,12 @@ import org.slf4j.LoggerFactory;
 public interface FeIcebergTable extends FeFsTable {
   final static Logger LOG = LoggerFactory.getLogger(FeIcebergTable.class);
 
-  /** REST catalog name used for coordinator-side DML finalization. */
-  default String getIcebergDmlCatalogName() { return null; }
+  /**
+   * Name of the REST catalog this table was loaded from, when that catalog has a unique
+   * name; null otherwise. The coordinator routes DML finalization and DDL execution to
+   * the catalog by this name.
+   */
+  default String getCatalogName() { return null; }
 
   /**
    * Whether the metadata provider decides what this table supports, rather than the
@@ -125,12 +129,19 @@ public interface FeIcebergTable extends FeFsTable {
   default boolean hasProviderDerivedCapabilities() { return false; }
 
   /**
+   * Whether the coordinator can commit changes to this table through its REST catalog:
+   * the capabilities come from the provider and the catalog has a unique name to route
+   * the commit by.
+   */
+  default boolean hasRoutableRestCatalog() {
+    return hasProviderDerivedCapabilities() && getCatalogName() != null;
+  }
+
+  /**
    * Whether INSERT INTO, INSERT OVERWRITE, UPDATE, DELETE, MERGE and OPTIMIZE can be
    * finalized by the metadata provider. Metadata writes are intentionally excluded.
    */
-  default boolean supportsDml() {
-    return hasProviderDerivedCapabilities() && getIcebergDmlCatalogName() != null;
-  }
+  default boolean supportsDml() { return hasRoutableRestCatalog(); }
 
   /**
    * Return content file store.

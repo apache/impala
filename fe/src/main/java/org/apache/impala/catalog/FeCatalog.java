@@ -66,6 +66,17 @@ public interface FeCatalog {
   /** @see Catalog#getDb(String) */
   FeDb getDb(String db);
 
+  /**
+   * Returns the catalog that table 'dbName'.'tableName' belongs to. The table need not
+   * exist or be loadable: for a missing table or database, this is the catalog that
+   * answers for it, so that statements with IF EXISTS on it can still be executed. The
+   * catalogd-backed catalog has CatalogD serve every table. Throws a RuntimeException
+   * when the catalog cannot be decided, e.g. because several catalogs list the table.
+   */
+  default CatalogRef getCatalogRef(String dbName, String tableName) {
+    return CatalogRef.CATALOGD;
+  }
+
   /** @see Catalog#getHdfsPartition(String, String, List) */
   FeFsPartition getHdfsPartition(String db, String tbl,
       List<TPartitionKeyValue> partitionSpec) throws CatalogException;

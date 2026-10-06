@@ -108,6 +108,8 @@ Status CatalogOpExecutor::Exec(const TCatalogOpRequest& request) {
       // Compute stats stmts must be executed via ExecComputeStats().
       DCHECK(request.ddl_params.ddl_type != TDdlType::COMPUTE_STATS);
 
+      if (IsIcebergRestDdl(request)) return ExecIcebergRestDdl(request);
+
       if (!FLAGS_catalogd_deployed) {
         return Status("Operation is not supported without CatalogD.");
       }
@@ -368,6 +370,21 @@ void CatalogOpExecutor::SetColumnStats(const TTableSchema& col_stats_schema,
     params->column_stats[col_stats_schema.columns[i].columnName] = col_stats;
   }
   params->__isset.column_stats = true;
+}
+
+Status CatalogOpExecutor::ExecIcebergRestDdl(const TCatalogOpRequest& request) {
+  DCHECK(request.op_type == TCatalogOpType::DDL);
+  DCHECK(IsIcebergRestDdl(request));
+  VLOG_QUERY << "Executing " << PrintValue(request.ddl_params.ddl_type)
+             << " using the coordinator frontend through Iceberg REST catalog "
+             << request.rest_catalog_name;
+  TIcebergDdlExecRequest fe_request;
+  fe_request.__set_rest_catalog_name(request.rest_catalog_name);
+  fe_request.__set_ddl_params(request.ddl_params);
+  exec_response_.reset(new TDdlExecResponse());
+  RETURN_IF_ERROR(fe_->ExecIcebergRestDdl(fe_request, exec_response_.get()));
+  catalog_update_result_.reset(new TCatalogUpdateResult(exec_response_->result));
+  return StatusFromThrift(exec_response_->result.status);
 }
 
 Status CatalogOpExecutor::GetCatalogObject(const TCatalogObject& object_desc,

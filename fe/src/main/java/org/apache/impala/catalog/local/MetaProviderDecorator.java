@@ -28,6 +28,7 @@ import org.apache.hadoop.hive.metastore.api.Table;
 import org.apache.hadoop.hive.metastore.api.UnknownDBException;
 import org.apache.impala.authorization.AuthorizationPolicy;
 import org.apache.impala.catalog.CatalogException;
+import org.apache.impala.catalog.CatalogRef;
 import org.apache.impala.catalog.DataSource;
 import org.apache.impala.catalog.Function;
 import org.apache.impala.catalog.HdfsCachePool;
@@ -84,6 +85,10 @@ public abstract class MetaProviderDecorator implements MetaProvider {
 
   public Database loadDb(String dbName) throws TException {
     return this.decoratedObj_.loadDb(dbName);
+  }
+
+  public CatalogRef getCatalogRef(String dbName, String tableName) throws TException {
+    return this.decoratedObj_.getCatalogRef(dbName, tableName);
   }
 
   public ImmutableCollection<TBriefTableMeta> loadTableList(String dbName)

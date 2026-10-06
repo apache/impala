@@ -41,6 +41,7 @@ import org.apache.hadoop.hive.metastore.api.Database;
 import org.apache.hadoop.hive.metastore.api.Table;
 import org.apache.impala.authorization.AuthorizationPolicy;
 import org.apache.impala.catalog.CatalogException;
+import org.apache.impala.catalog.CatalogRef;
 import org.apache.impala.catalog.DataSource;
 import org.apache.impala.catalog.Function;
 import org.apache.impala.catalog.HdfsCachePool;
@@ -65,7 +66,7 @@ public class MetaProviderDecoratorTest {
 
   // Expected number of public methods in MetaProvider interface
   // Update this constant when adding new methods to MetaProvider
-  private static final int EXPECTED_METHOD_COUNT = 24;
+  private static final int EXPECTED_METHOD_COUNT = 25;
 
   @Test
   public void testMetaProviderMethodCount() {
@@ -185,6 +186,14 @@ public class MetaProviderDecoratorTest {
     Database actualDatabase = fixture.loadDb("testDb");
     assertThat(actualDatabase, sameInstance(expectedDatabase));
     verify(mockDecorated).loadDb(eq("testDb"));
+
+    // Test getCatalogRef(String, String)
+    CatalogRef expectedCatalogRef = CatalogRef.rest("rest-1", "test-uri");
+    when(mockDecorated.getCatalogRef(anyString(), anyString()))
+        .thenReturn(expectedCatalogRef);
+    assertThat(fixture.getCatalogRef("testDb", "testTable"),
+        sameInstance(expectedCatalogRef));
+    verify(mockDecorated).getCatalogRef(eq("testDb"), eq("testTable"));
 
     // Test loadTableList(String)
     ImmutableCollection<TBriefTableMeta> actualTableList =

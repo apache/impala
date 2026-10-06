@@ -25,6 +25,7 @@ import java.util.Properties;
 
 import org.apache.iceberg.exceptions.RESTException;
 import org.apache.impala.catalog.FeCatalog;
+import org.apache.impala.catalog.iceberg.IcebergRESTCatalog;
 import org.apache.impala.catalog.iceberg.RESTCatalogProperties;
 import org.apache.impala.catalog.local.BlacklistingMetaProvider;
 import org.apache.impala.catalog.local.CatalogdMetaProvider;
@@ -47,7 +48,9 @@ import org.slf4j.LoggerFactory;
 class LocalImpl extends FeCatalogManager {
 
   private static final Logger LOG = LoggerFactory.getLogger(LocalImpl.class);
-  private final Map<String, MetaProvider> icebergDmlProviders_ = new HashMap<>();
+  // Providers of the uniquely named REST catalogs keyed by catalog name, for the
+  // coordinator-local DML and DDL on their tables.
+  private final Map<String, IcebergMetaProvider> catalogProviders_ = new HashMap<>();
   private final MetaProvider provider_;
 
   public LocalImpl() throws ImpalaRuntimeException {
@@ -96,14 +99,22 @@ class LocalImpl extends FeCatalogManager {
   }
 
   @Override
-  public FeCatalog getCatalogForIcebergDml(String catalogName)
+  public FeCatalog getCatalog(String catalogName) throws ImpalaRuntimeException {
+    return new LocalCatalog(
+        new BlacklistingMetaProvider(getCatalogProvider(catalogName)));
+  }
+
+  @Override
+  public IcebergRESTCatalog getIcebergCatalog(String catalogName)
       throws ImpalaRuntimeException {
-    MetaProvider provider = icebergDmlProviders_.get(catalogName);
-    if (provider == null) {
-      throw new ImpalaRuntimeException(String.format(
-          "Unknown Iceberg REST catalog: %s", catalogName));
-    }
-    return new LocalCatalog(provider);
+    return getCatalogProvider(catalogName).getIcebergCatalog();
+  }
+
+  private IcebergMetaProvider getCatalogProvider(String catalogName)
+      throws ImpalaRuntimeException {
+    IcebergMetaProvider provider = catalogProviders_.get(catalogName);
+    if (provider == null) throw unknownCatalog(catalogName);
+    return provider;
   }
 
   @Override
@@ -124,17 +135,17 @@ class LocalImpl extends FeCatalogManager {
       throws ImpalaRuntimeException {
     ConfigLoader loader = new ConfigLoader(catalogConfigDir);
     List<Properties> configs = loader.loadConfigs();
-    List<String> catalogNames = getIcebergDmlCatalogNames(configs);
+    List<String> catalogNames = getCatalogNames(configs);
 
     List<MetaProvider> list = new ArrayList<>();
     for (int i = 0; i < configs.size(); ++i) {
       Properties properties = configs.get(i);
       String catalogName = catalogNames.get(i);
       try {
-        MetaProvider provider = new BlacklistingMetaProvider(
-            new IcebergMetaProvider(properties, catalogName));
-        list.add(provider);
-        if (catalogName != null) icebergDmlProviders_.put(catalogName, provider);
+        IcebergMetaProvider icebergProvider =
+            new IcebergMetaProvider(properties, catalogName);
+        list.add(new BlacklistingMetaProvider(icebergProvider));
+        if (catalogName != null) catalogProviders_.put(catalogName, icebergProvider);
       } catch (RESTException e) {
         LOG.error(String.format(
             "Unable to instantiate IcebergMetaProvider from the following "
@@ -144,7 +155,7 @@ class LocalImpl extends FeCatalogManager {
     return list;
   }
 
-  static List<String> getIcebergDmlCatalogNames(List<Properties> configs) {
+  static List<String> getCatalogNames(List<Properties> configs) {
     List<String> names = new ArrayList<>();
     Map<String, Integer> nameCounts = new HashMap<>();
     for (Properties properties : configs) {
@@ -159,7 +170,8 @@ class LocalImpl extends FeCatalogManager {
     }
     nameCounts.forEach((name, count) -> {
       if (count > 1) {
-        LOG.warn("Disabling Iceberg DML for duplicate REST catalog name: {}", name);
+        LOG.warn("Disabling Iceberg DML and DDL for duplicate REST catalog name: {}",
+            name);
       }
     });
     return catalogNames;
