@@ -17,6 +17,8 @@
 
 package org.apache.impala.analysis;
 
+import org.apache.impala.catalog.Table;
+import org.apache.impala.compat.MetastoreShim;
 import org.junit.Test;
 
 /**
@@ -26,6 +28,79 @@ import org.junit.Test;
  * DeleteStmt uses only a subset of the functionality of the UpdateStmt for now.
  */
 public class AnalyzeModifyStmtsTest extends AnalyzerTest {
+
+  @Test
+  public void TestIcebergWriteCapabilities() throws Exception {
+    Table table = catalog_.getOrLoadTable("functional_parquet",
+        "iceberg_v2_partitioned_position_deletes");
+    org.apache.hadoop.hive.metastore.api.Table originalMsTable =
+        table.getMetaStoreTable();
+    org.apache.hadoop.hive.metastore.api.Table msTable = originalMsTable.deepCopy();
+    String tableName = table.getFullName();
+    String[] statements = {
+        "update " + tableName + " set id = 1 where id = 2",
+        "delete from " + tableName + " where id = 2",
+        String.format("merge into %s target using (select 1 id) source "
+            + "on target.id = source.id when matched then delete", tableName),
+        "optimize table " + tableName,
+    };
+    try {
+      table.setMetaStoreTable(msTable);
+      msTable.getSd().setNumBuckets(0);
+      if (MetastoreShim.getMajorVersion() > 2) {
+        MetastoreShim.setTableAccessType(msTable, Analyzer.ACCESSTYPE_READWRITE);
+      }
+      for (String statement : statements) AnalyzesOk(statement);
+
+      if (MetastoreShim.getMajorVersion() > 2) {
+        MetastoreShim.setTableAccessType(msTable, Analyzer.ACCESSTYPE_READ);
+        for (String statement : statements) {
+          AnalysisError(statement, "Write not supported. Table " + tableName);
+        }
+        MetastoreShim.setTableAccessType(msTable, Analyzer.ACCESSTYPE_READWRITE);
+      }
+
+      msTable.getSd().setNumBuckets(1);
+      for (String statement : statements) {
+        AnalysisError(statement,
+            tableName + " is a bucketed table. Only read operations are supported "
+                + "on such tables.");
+      }
+    } finally {
+      table.setMetaStoreTable(originalMsTable);
+    }
+  }
+
+  @Test
+  public void TestKuduWriteCapabilities() throws Exception {
+    Table table = catalog_.getOrLoadTable("functional_kudu", "dimtbl");
+    org.apache.hadoop.hive.metastore.api.Table originalMsTable =
+        table.getMetaStoreTable();
+    org.apache.hadoop.hive.metastore.api.Table msTable = originalMsTable.deepCopy();
+    String tableName = table.getFullName();
+    String[] statements = {
+        "update " + tableName + " set name = 'test' where id = 1",
+        "delete from " + tableName + " where id = 1",
+    };
+    try {
+      table.setMetaStoreTable(msTable);
+      msTable.getSd().setNumBuckets(0);
+      // Kudu writes do not require HMS write capabilities.
+      if (MetastoreShim.getMajorVersion() > 2) {
+        MetastoreShim.setTableAccessType(msTable, Analyzer.ACCESSTYPE_READ);
+      }
+      for (String statement : statements) AnalyzesOk(statement);
+
+      msTable.getSd().setNumBuckets(1);
+      for (String statement : statements) {
+        AnalysisError(statement,
+            tableName + " is a bucketed table. Only read operations are supported "
+                + "on such tables.");
+      }
+    } finally {
+      table.setMetaStoreTable(originalMsTable);
+    }
+  }
 
   @Test
   public void TestFromListAliases() {

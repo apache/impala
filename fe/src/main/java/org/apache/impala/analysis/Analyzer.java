@@ -411,26 +411,6 @@ public class Analyzer {
         && ((FeIcebergTable)table).hasProviderDerivedCapabilities();
   }
 
-  /**
-   * Refuses every DML other than INSERT INTO on a table whose capabilities come from
-   * its provider.
-   *
-   * <p>Called by hand from MergeStmt, ModifyStmt and OptimizeStmt, because those three
-   * do not go through checkTableCapability() at all - only InsertStmt, AlterTableStmt,
-   * DropTableOrViewStmt, LoadDataStmt, TruncateStmt and BaseTableRef do. A new DML
-   * statement, or a new path into an existing one, needs this call adding. Bringing
-   * the three under checkTableCapability() instead is IMPALA-15320: it would start
-   * running ensureTableWriteSupported() on statements that have never run it, which
-   * is a behaviour change of its own and not one to make here.
-   */
-  static void ensureNonInsertDmlSupported(FeTable table) throws AnalysisException {
-    if (hasProviderDerivedCapabilities(table)) {
-      throw new AnalysisException(String.format(
-          "Only INSERT INTO is supported for REST-backed Iceberg table: %s",
-          table.getFullName()));
-    }
-  }
-
   /** Check whether a table supports this write operation. */
   static void ensureTableWriteSupported(FeTable table, boolean isInsertInto)
       throws AnalysisException {

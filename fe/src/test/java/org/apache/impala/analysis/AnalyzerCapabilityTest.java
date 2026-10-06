@@ -53,7 +53,7 @@ public class AnalyzerCapabilityTest {
     Analyzer.ensureTableWriteSupported(table, true);
 
     try {
-      Analyzer.ensureNonInsertDmlSupported(table);
+      Analyzer.checkTableCapability(table, Analyzer.OperationType.WRITE);
       fail("Expected non-INSERT DML to be rejected");
     } catch (AnalysisException e) {
       assertTrue(e.getMessage(),
@@ -92,7 +92,7 @@ public class AnalyzerCapabilityTest {
   private static void assertRejectedNonInsertDml(
       FeTable table, String expectedMessage) throws Exception {
     try {
-      Analyzer.ensureNonInsertDmlSupported(table);
+      Analyzer.checkTableCapability(table, Analyzer.OperationType.WRITE);
       fail("Expected non-INSERT DML to be rejected");
     } catch (AnalysisException e) {
       assertTrue(e.getMessage(), e.getMessage().contains(expectedMessage));
