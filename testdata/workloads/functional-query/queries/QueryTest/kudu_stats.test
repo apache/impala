@@ -22,9 +22,8 @@ insert into simple values (1, 'one', 1.0, 1), (2, 'two', 2.0, 2);
 ====
 ---- QUERY
 # Kudu takes time to commit the rows and update its live row count.
-select sleep(5000);
 show table stats simple;
----- RESULTS:
+---- RESULTS: RETRY=10@1000
 2,3,regex:.*,'KUDU',regex:.*
 ---- TYPES
 BIGINT,BIGINT,STRING,STRING,STRING
