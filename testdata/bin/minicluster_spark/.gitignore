@@ -1,0 +1,4 @@
+# Assembled by run-spark.sh and bind mounted into the Spark container.
+# Machine-specific or downloaded; must not be committed.
+conf/
+jars/
