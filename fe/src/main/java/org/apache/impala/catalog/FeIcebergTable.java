@@ -177,7 +177,7 @@ public interface FeIcebergTable extends FeFsTable {
   /**
    * Validates that UUID columns can be read from the file formats present in the
    * scan. When empty, falls back to the table's default write format.
-   * TODO: Remove when ORC/Avro UUID read support is added.
+   * TODO: Remove when Avro UUID read support is added.
    */
   default void validateUuidReadSupported(Set<HdfsFileFormat> fileFormats)
       throws AnalysisException {
@@ -185,7 +185,7 @@ public interface FeIcebergTable extends FeFsTable {
         ? Collections.singleton(IcebergUtil.toHdfsFileFormat(getIcebergFileFormat()))
         : fileFormats;
     for (HdfsFileFormat format : formatsToCheck) {
-      if (format != HdfsFileFormat.PARQUET) {
+      if (format != HdfsFileFormat.PARQUET && format != HdfsFileFormat.ORC) {
         throw new AnalysisException(String.format(
             "Reading UUID columns from %s format is not yet supported.", format));
       }

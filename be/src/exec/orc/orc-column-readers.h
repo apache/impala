@@ -385,6 +385,27 @@ class OrcStringColumnReader : public OrcPrimitiveColumnReader<OrcStringColumnRea
   Status InitBlob(orc::DataBuffer<char>* blob, MemPool* pool);
 };
 
+/// Reads Iceberg UUIDs, which ORC stores as BINARY, into 16-byte inline slots.
+/// The values are copied straight from the ORC batch, and the batch's blob is
+/// not copied into Impala memory.
+class OrcUuidColumnReader : public OrcPrimitiveColumnReader<OrcUuidColumnReader> {
+ public:
+  OrcUuidColumnReader(const orc::Type* node, const SlotDescriptor* slot_desc,
+      HdfsOrcScanner* scanner)
+      : OrcPrimitiveColumnReader<OrcUuidColumnReader>(node, slot_desc, scanner) { }
+
+  virtual ~OrcUuidColumnReader() { }
+
+  Status UpdateInputBatch(orc::ColumnVectorBatch* orc_batch) override WARN_UNUSED_RESULT;
+
+  Status ReadValue(int row_idx, Tuple* tuple, MemPool* pool) final WARN_UNUSED_RESULT;
+
+ private:
+  friend class OrcPrimitiveColumnReader<OrcUuidColumnReader>;
+
+  orc::StringVectorBatch* batch_ = nullptr;
+};
+
 class OrcTimestampReader : public OrcPrimitiveColumnReader<OrcTimestampReader> {
  public:
   OrcTimestampReader(const orc::Type* node, const SlotDescriptor* slot_desc,

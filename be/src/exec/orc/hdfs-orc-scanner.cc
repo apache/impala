@@ -32,6 +32,7 @@
 #include "runtime/runtime-filter.inline.h"
 #include "runtime/timestamp-value.inline.h"
 #include "runtime/tuple-row.h"
+#include "runtime/uuid-value.h"
 #include "util/decompress.h"
 
 #include "common/names.h"
@@ -1142,6 +1143,10 @@ orc::PredicateDataType HdfsOrcScanner::GetOrcPredicateDataType(const ColumnType&
     case TYPE_VARCHAR:
     case TYPE_CHAR:
     case TYPE_FIXED_UDA_INTERMEDIATE:
+    // Iceberg writes UUIDs to ORC as BINARY. ORC search arguments have no BINARY type,
+    // so UUIDs are pushed down as STRING. ORC keeps no min/max statistics for BINARY,
+    // so only null counts and bloom filters can skip data.
+    case TYPE_UUID:
       return orc::PredicateDataType::STRING;
     case TYPE_DECIMAL:
       return orc::PredicateDataType::DECIMAL;
@@ -1196,6 +1201,10 @@ orc::Literal HdfsOrcScanner::GetSearchArgumentLiteral(ScalarExprEvaluator* eval,
       if (UNLIKELY(!val)) return orc::Literal(*predicate_type);
       const StringValue* sv = reinterpret_cast<StringValue*>(val);
       return orc::Literal(sv->Ptr(), sv->Len());
+    }
+    case TYPE_UUID: {
+      if (UNLIKELY(!val)) return orc::Literal(*predicate_type);
+      return orc::Literal(reinterpret_cast<const char*>(val), UuidValue::BYTE_SIZE);
     }
     // Predicates on CHAR/VARCHAR are currently skipped in FE. We will focus on them in
     // IMPALA-10882.
@@ -1386,6 +1395,10 @@ Status HdfsOrcScanner::PrepareSearchArguments() {
         GetOrcPredicateDataType(const_expr->type())) {
       continue;
     }
+    // Impala UUID and STRING both map to orc::PredicateDataType::STRING above. The FE
+    // does not plan mixed UUID vs string literals (UuidCompatibility).
+    DCHECK((slot_desc->type().type == TYPE_UUID)
+        == (const_expr->type().type == TYPE_UUID));
     // Skip if the file schema contains unsupported types.
     // TODO: push down stats predicates on CHAR/VARCHAR(IMPALA-10882) and
     //  TIMESTAMP(IMPALA-10915) to ORC reader

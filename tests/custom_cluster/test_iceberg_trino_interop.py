@@ -68,6 +68,6 @@ class TestIcebergTrinoInterop(CustomClusterTestSuite):
 
   @pytest.mark.execute_serially
   def test_uuid_read(self, vector, unique_database):
-    """Trino writes Iceberg Parquet UUID columns. Impala reads them back."""
+    """Trino writes Iceberg Parquet and ORC UUID columns. Impala reads them back."""
     self.run_test_case('QueryTest/iceberg-trino-interop-uuid', vector,
                        use_db=unique_database)

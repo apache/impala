@@ -677,7 +677,7 @@ public class HdfsScanNode extends ScanNode {
 
   /**
    * Validates that Iceberg tables with UUID columns can be read from the file formats
-   * present in this scan. TODO: Remove when ORC/Avro UUID read support is added.
+   * present in this scan. TODO: Remove when Avro UUID read support is added.
    */
   private void checkUuidReadSupported() throws ImpalaException {
     FeTable table = desc_.getTable();
@@ -2603,8 +2603,9 @@ public class HdfsScanNode extends ScanNode {
             // estReservation need to be spread for each stream. Estimate how many stream
             // that will be available for this column based on column type.
             int estNumStream = 2; // DATA and PRESENT stream.
-            if (type.isTimestamp() || type.isStringType() || type.isDecimal()) {
-              estNumStream++; // SECONDARY/LENGTH stream.
+            if (type.isTimestamp() || type.isStringType() || type.isDecimal()
+                || type.isUuid()) {
+              estNumStream++; // SECONDARY/LENGTH stream. Iceberg UUIDs are ORC BINARY.
               if (type.isStringType()) {
                 estNumStream++; // DICTIONARY_DATA stream
               }

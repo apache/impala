@@ -501,6 +501,10 @@ Status OrcSchemaResolver::ValidatePrimitiveType(const ColumnType& type,
           || type.type == TYPE_CHAR) {
         return Status::OK();
       }
+      // Iceberg stores UUIDs as BINARY in ORC.
+      if (type.type == TYPE_UUID && orc_type.getKind() == orc::TypeKind::BINARY) {
+        return Status::OK();
+      }
       break;
     case orc::TypeKind::TIMESTAMP:
     case orc::TypeKind::TIMESTAMP_INSTANT:

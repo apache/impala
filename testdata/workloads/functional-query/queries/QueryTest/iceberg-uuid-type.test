@@ -1,6 +1,6 @@
 ====
 ---- QUERY
-# Iceberg UUID Parquet read-path tests.
+# Iceberg UUID Parquet and ORC read-path tests.
 DESCRIBE iceberg_uuid_test
 ---- RESULTS: VERIFY_IS_SUBSET
 'id','int','','true'
@@ -55,10 +55,194 @@ AS SELECT * FROM iceberg_uuid_test
 Impala does not support writing UUID columns
 ====
 ---- QUERY
-# ORC format is not yet supported for UUID column reads.
-SELECT id, uuid_col FROM iceberg_uuid_test_orc
----- CATCH
-Reading UUID columns from ORC format is not yet supported
+# Iceberg UUID ORC read-path tests. ORC stores UUIDs as BINARY with the
+# iceberg.binary-type=UUID attribute.
+DESCRIBE FORMATTED iceberg_uuid_test_orc
+---- RESULTS: VERIFY_IS_SUBSET
+'','write.format.default','orc                 '
+---- TYPES
+STRING,STRING,STRING
+====
+---- QUERY
+SELECT id, uuid_col, name FROM iceberg_uuid_test_orc ORDER BY id
+---- RESULTS
+1,'12345678-1234-5678-1234-567812345678','alice'
+2,'abcdefab-cdef-abcd-efab-cdefabcdefab','bob'
+3,'00000000-0000-0000-0000-000000000000','zeros'
+4,'NULL','null_uuid'
+5,'ffffffff-ffff-ffff-ffff-ffffffffffff','max'
+---- TYPES
+INT,UUID,STRING
+---- HS2_TYPES
+INT,STRING,STRING
+====
+---- QUERY
+SELECT id FROM iceberg_uuid_test_orc
+WHERE uuid_col = CAST('12345678-1234-5678-1234-567812345678' AS UUID)
+---- RESULTS
+1
+---- TYPES
+INT
+====
+---- QUERY
+SELECT id FROM iceberg_uuid_test_orc
+WHERE uuid_col IN (CAST('abcdefab-cdef-abcd-efab-cdefabcdefab' AS UUID),
+                   CAST('ffffffff-ffff-ffff-ffff-ffffffffffff' AS UUID))
+ORDER BY id
+---- RESULTS
+2
+5
+---- TYPES
+INT
+====
+---- QUERY
+# Rows with NULL uuid_col are excluded by != and NOT IN.
+SELECT id FROM iceberg_uuid_test_orc
+WHERE uuid_col != CAST('00000000-0000-0000-0000-000000000000' AS UUID)
+  AND uuid_col NOT IN (CAST('ffffffff-ffff-ffff-ffff-ffffffffffff' AS UUID))
+ORDER BY id
+---- RESULTS
+1
+2
+---- TYPES
+INT
+====
+---- QUERY
+# Range predicates use unsigned byte order: abcdefab-... and ffffffff-... are negative
+# as signed longs.
+SELECT id FROM iceberg_uuid_test_orc
+WHERE uuid_col > CAST('20000000-0000-0000-0000-000000000000' AS UUID)
+ORDER BY id
+---- RESULTS
+2
+5
+---- TYPES
+INT
+====
+---- QUERY
+SELECT id FROM iceberg_uuid_test_orc WHERE uuid_col IS NULL
+---- RESULTS
+4
+---- TYPES
+INT
+====
+---- QUERY
+SELECT uuid_col FROM iceberg_uuid_test_orc ORDER BY uuid_col
+---- RESULTS
+'00000000-0000-0000-0000-000000000000'
+'12345678-1234-5678-1234-567812345678'
+'abcdefab-cdef-abcd-efab-cdefabcdefab'
+'ffffffff-ffff-ffff-ffff-ffffffffffff'
+'NULL'
+---- TYPES
+UUID
+---- HS2_TYPES
+STRING
+====
+---- QUERY
+SELECT COUNT(uuid_col), COUNT(DISTINCT uuid_col), MIN(uuid_col), MAX(uuid_col)
+FROM iceberg_uuid_test_orc
+---- RESULTS
+4,4,'00000000-0000-0000-0000-000000000000','ffffffff-ffff-ffff-ffff-ffffffffffff'
+---- TYPES
+BIGINT,BIGINT,UUID,UUID
+---- HS2_TYPES
+BIGINT,BIGINT,STRING,STRING
+====
+---- QUERY
+SELECT CAST(uuid_col AS STRING) FROM iceberg_uuid_test_orc WHERE id = 1
+---- RESULTS
+'12345678-1234-5678-1234-567812345678'
+---- TYPES
+STRING
+====
+---- QUERY
+# JOIN of the Parquet and ORC tables on the UUID column.
+SELECT p.id, o.name FROM iceberg_uuid_test p
+JOIN iceberg_uuid_test_orc o ON p.uuid_col = o.uuid_col
+ORDER BY p.id
+---- RESULTS
+1,'alice'
+2,'bob'
+3,'zeros'
+5,'max'
+---- TYPES
+INT,STRING
+====
+---- QUERY
+# UUID predicates are pushed to the ORC reader as STRING search arguments on the raw
+# bytes. ORC BINARY columns have no min/max statistics, so only null counts and bloom
+# filters can skip data.
+set explain_level=2;
+EXPLAIN SELECT id FROM iceberg_uuid_test_orc
+WHERE id < 3 AND uuid_col = CAST('12345678-1234-5678-1234-567812345678' AS UUID)
+---- RESULTS: VERIFY_IS_SUBSET
+row_regex: .*orc statistics predicates:.*id < .*
+row_regex: .*orc statistics predicates:.*uuid_col = .*
+---- TYPES
+STRING
+====
+---- QUERY
+# IS NOT NULL is tested without an equality predicate on uuid_col, which would make it
+# redundant and remove it from the scan.
+set explain_level=2;
+EXPLAIN SELECT id FROM iceberg_uuid_test_orc WHERE id < 3 AND uuid_col IS NOT NULL
+---- RESULTS: VERIFY_IS_SUBSET
+row_regex: .*orc statistics predicates:.*uuid_col IS NOT NULL.*
+---- TYPES
+STRING
+====
+---- QUERY
+set explain_level=2;
+EXPLAIN SELECT id FROM iceberg_uuid_test_orc WHERE uuid_col IS NULL
+---- RESULTS: VERIFY_IS_SUBSET
+row_regex: .*orc statistics predicates: uuid_col IS NULL
+---- TYPES
+STRING
+====
+---- QUERY
+SELECT id FROM iceberg_uuid_test_orc WHERE uuid_col IS NOT NULL ORDER BY id
+---- RESULTS
+1
+2
+3
+5
+---- TYPES
+INT
+====
+---- QUERY
+SELECT id FROM iceberg_uuid_test_orc
+WHERE id < 3 AND uuid_col = CAST('12345678-1234-5678-1234-567812345678' AS UUID)
+  AND uuid_col IS NOT NULL
+---- RESULTS
+1
+---- TYPES
+INT
+====
+---- QUERY
+# ORC BINARY has no min/max stats; equality on a value not in the file
+# must skip the stripe via the uuid_col bloom filter.
+SELECT count(*) FROM iceberg_uuid_test_orc
+WHERE uuid_col = CAST('99999999-9999-9999-9999-999999999999' AS UUID)
+---- RESULTS
+0
+---- TYPES
+BIGINT
+---- RUNTIME_PROFILE
+aggregation(SUM, RowsRead): 0
+====
+---- QUERY
+# Same bloom skip as above, but IN uses a separate ORC search-argument path (sarg->in).
+SELECT count(*) FROM iceberg_uuid_test_orc
+WHERE uuid_col IN (
+  CAST('99999999-9999-9999-9999-999999999999' AS UUID),
+  CAST('88888888-8888-8888-8888-888888888888' AS UUID))
+---- RESULTS
+0
+---- TYPES
+BIGINT
+---- RUNTIME_PROFILE
+aggregation(SUM, RowsRead): 0
 ====
 ---- QUERY
 # Avro format is not yet supported for UUID column reads.

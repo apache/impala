@@ -1043,10 +1043,11 @@ Generated using the Iceberg Java API (version 1.10.2).
 UUID values are stored as FIXED_LEN_BYTE_ARRAY(16) with the annotation logicalType.UUID.
 
 iceberg_test/iceberg_uuid/iceberg_uuid_test_orc:
-Same logical row data as iceberg_uuid_test, ORC format (format v2, unpartitioned).
-Generated using the Iceberg Java API.
-UUID values are stored as ORC BINARY with the iceberg.binary-type=UUID property.
-Used to verify ORC UUID reads are rejected until a later patch.
+Same logical row data as iceberg_uuid_test, ORC format (format v2, unpartitioned),
+in a single data file. Generated using the Iceberg Java API (version 1.10.1) with
+write.orc.bloom.filter.columns=uuid_col. UUID values are stored as ORC BINARY with
+the iceberg.binary-type=UUID attribute. ORC BINARY has no min/max statistics, so
+only null counts and the bloom filter can skip data.
 
 iceberg_test/iceberg_uuid/iceberg_uuid_test_avro:
 Same logical row data as iceberg_uuid_test, Avro format (format v2, unpartitioned).

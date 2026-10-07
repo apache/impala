@@ -24,6 +24,7 @@
 #include "runtime/decimal-value.h"
 #include "runtime/string-value.inline.h"
 #include "runtime/timestamp-value.inline.h"
+#include "runtime/uuid-value.h"
 #include "util/mem-util.h"
 #include "common/names.h"
 
@@ -98,6 +99,9 @@ OrcColumnReader* OrcColumnReader::Create(const orc::Type* node,
       case TYPE_VARCHAR:
       case TYPE_CHAR:
         reader = new OrcStringColumnReader(node, slot_desc, scanner);
+        break;
+      case TYPE_UUID:
+        reader = new OrcUuidColumnReader(node, slot_desc, scanner);
         break;
       case TYPE_DECIMAL:
         if (node->getPrecision() == 0 || node->getPrecision() > 18) {
@@ -299,6 +303,31 @@ Status OrcStringColumnReader::ReadValueInternal(int row_idx, Tuple* tuple) {
   if (SLOT_TYPE == TYPE_VARCHAR && dst_len < src_len) {
     dst->SetLen(dst_len);
   }
+  return Status::OK();
+}
+
+Status OrcUuidColumnReader::UpdateInputBatch(orc::ColumnVectorBatch* orc_batch) {
+  batch_ = static_cast<orc::StringVectorBatch*>(orc_batch);
+  DCHECK(batch_ == dynamic_cast<orc::StringVectorBatch*>(orc_batch));
+  // ORC never dictionary-encodes BINARY columns.
+  if (UNLIKELY(orc_batch != nullptr && orc_batch->isEncoded)) {
+    return Status(Substitute("Corrupt ORC file: $0. UUID column $1 is dictionary "
+        "encoded.", scanner_->filename(), orc_column_id_));
+  }
+  return Status::OK();
+}
+
+Status OrcUuidColumnReader::ReadValue(int row_idx, Tuple* tuple, MemPool* pool) {
+  if (IsNull(DCHECK_NOTNULL(batch_), row_idx)) {
+    SetNullSlot(tuple);
+    return Status::OK();
+  }
+  int64_t src_len = batch_->length[row_idx];
+  if (UNLIKELY(src_len != UuidValue::BYTE_SIZE)) {
+    return Status(Substitute("Corrupt ORC file: $0. UUID value has length $1, "
+        "expected $2.", scanner_->filename(), src_len, UuidValue::BYTE_SIZE));
+  }
+  memcpy(GetSlot(tuple), batch_->data[row_idx], UuidValue::BYTE_SIZE);
   return Status::OK();
 }
 

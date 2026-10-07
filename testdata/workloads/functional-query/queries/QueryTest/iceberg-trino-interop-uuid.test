@@ -1,7 +1,7 @@
 # Impala <-> Trino interop over Apache Iceberg V3 tables: UUID column reads.
 #
 # See iceberg-trino-interop-insert.test for the shared setup notes. Trino writes
-# Parquet UUID columns; Impala reads them after INVALIDATE METADATA. Impala
+# Parquet and ORC UUID columns; Impala reads them after INVALIDATE METADATA. Impala
 # cannot INSERT UUID columns yet, so this file only covers the Trino -> Impala
 # direction.
 ====
@@ -217,7 +217,8 @@ DESCRIBE ti_uuid_struct_array;
 STRING,STRING,STRING,STRING
 ====
 ---- TRINO_QUERY
-# Mixed Parquet + ORC: start with Parquet so Impala can read before the format change.
+# Mixed Parquet + ORC: start with Parquet, then switch to ORC so the table
+# has data files in both formats.
 CREATE TABLE ti_uuid_mixed_orc (id integer, uuid_col uuid, name varchar)
 WITH (format_version=3, format='PARQUET');
 INSERT INTO ti_uuid_mixed_orc VALUES (1, UUID '12345678-1234-5678-1234-567812345678', 'parquet');
@@ -235,14 +236,117 @@ INT,STRING,STRING
 ---- TRINO_QUERY
 # Add an ORC data file after changing the write format.
 ALTER TABLE ti_uuid_mixed_orc SET PROPERTIES format='ORC';
-INSERT INTO ti_uuid_mixed_orc VALUES (2, NULL, 'orc');
+INSERT INTO ti_uuid_mixed_orc VALUES
+  (2, NULL, 'orc'),
+  (3, UUID 'abcdefab-cdef-abcd-efab-cdefabcdefab', 'orc');
 ====
 ---- QUERY
-# Impala must reject the scan once an ORC data file is present.
+# Impala reads UUIDs from both the Parquet and the ORC data files.
 INVALIDATE METADATA ti_uuid_mixed_orc;
-SELECT id, uuid_col FROM ti_uuid_mixed_orc ORDER BY id
----- CATCH
-Reading UUID columns from ORC format is not yet supported
+SELECT id, uuid_col, name FROM ti_uuid_mixed_orc ORDER BY id
+---- RESULTS
+1,'12345678-1234-5678-1234-567812345678','parquet'
+2,'NULL','orc'
+3,'abcdefab-cdef-abcd-efab-cdefabcdefab','orc'
+---- TYPES
+INT,UUID,STRING
+---- HS2_TYPES
+INT,STRING,STRING
+====
+---- QUERY
+SELECT id FROM ti_uuid_mixed_orc
+WHERE uuid_col = CAST('abcdefab-cdef-abcd-efab-cdefabcdefab' AS UUID)
+---- RESULTS
+3
+---- TYPES
+INT
+====
+---- TRINO_QUERY
+# ORC table with UUIDs at the top level and inside STRUCT, ARRAY and MAP. The UUIDs of
+# rows 1 and 2 are on opposite sides of the signed-long sign bit.
+CREATE TABLE ti_uuid_orc (
+  id integer,
+  uuid_col uuid,
+  s row(uuid_col uuid, name varchar),
+  uuid_arr array(uuid),
+  uuid_map map(uuid, varchar)
+)
+WITH (format_version=3, format='ORC');
+INSERT INTO ti_uuid_orc VALUES
+  (1, UUID '12345678-1234-5678-1234-567812345678',
+   ROW(UUID '12345678-1234-5678-1234-567812345678', 'alice'),
+   ARRAY[UUID '12345678-1234-5678-1234-567812345678',
+         UUID 'abcdefab-cdef-abcd-efab-cdefabcdefab'],
+   MAP(ARRAY[UUID '12345678-1234-5678-1234-567812345678'], ARRAY['alice'])),
+  (2, UUID 'abcdefab-cdef-abcd-efab-cdefabcdefab',
+   ROW(UUID 'abcdefab-cdef-abcd-efab-cdefabcdefab', 'bob'),
+   ARRAY[UUID 'abcdefab-cdef-abcd-efab-cdefabcdefab'],
+   MAP(ARRAY[UUID 'abcdefab-cdef-abcd-efab-cdefabcdefab'], ARRAY['bob'])),
+  (3, NULL, NULL, NULL, NULL);
+====
+---- QUERY
+INVALIDATE METADATA ti_uuid_orc;
+SELECT id, uuid_col, s.uuid_col, s.name FROM ti_uuid_orc ORDER BY id
+---- RESULTS
+1,'12345678-1234-5678-1234-567812345678','12345678-1234-5678-1234-567812345678','alice'
+2,'abcdefab-cdef-abcd-efab-cdefabcdefab','abcdefab-cdef-abcd-efab-cdefabcdefab','bob'
+3,'NULL','NULL','NULL'
+---- TYPES
+INT,UUID,UUID,STRING
+---- HS2_TYPES
+INT,STRING,STRING,STRING
+====
+---- QUERY
+# Unnesting reads UUIDs through the ORC collection readers.
+SELECT t.id, a.item FROM ti_uuid_orc t, t.uuid_arr a ORDER BY t.id, a.item
+---- RESULTS
+1,'12345678-1234-5678-1234-567812345678'
+1,'abcdefab-cdef-abcd-efab-cdefabcdefab'
+2,'abcdefab-cdef-abcd-efab-cdefabcdefab'
+---- TYPES
+INT,UUID
+---- HS2_TYPES
+INT,STRING
+====
+---- QUERY
+SELECT t.id, m.key, m.value FROM ti_uuid_orc t, t.uuid_map m ORDER BY t.id
+---- RESULTS
+1,'12345678-1234-5678-1234-567812345678','alice'
+2,'abcdefab-cdef-abcd-efab-cdefabcdefab','bob'
+---- TYPES
+INT,UUID,STRING
+---- HS2_TYPES
+INT,STRING,STRING
+====
+---- QUERY
+# abcdefab-... is negative as a signed long; the scan compares UUIDs unsigned.
+SELECT id FROM ti_uuid_orc
+WHERE uuid_col > CAST('20000000-0000-0000-0000-000000000000' AS UUID)
+---- RESULTS
+2
+---- TYPES
+INT
+====
+---- QUERY
+SELECT id FROM ti_uuid_orc
+WHERE uuid_col IN (CAST('12345678-1234-5678-1234-567812345678' AS UUID),
+                   CAST('abcdefab-cdef-abcd-efab-cdefabcdefab' AS UUID))
+ORDER BY id
+---- RESULTS
+1
+2
+---- TYPES
+INT
+====
+---- QUERY
+# JOIN of the Trino-written ORC table and the Trino-written Parquet table.
+SELECT o.id, p.name FROM ti_uuid_orc o JOIN ti_uuid p ON o.uuid_col = p.uuid_col
+ORDER BY o.id
+---- RESULTS
+1,'alice'
+2,'bob'
+---- TYPES
+INT,STRING
 ====
 ---- TRINO_QUERY
 # Mixed Parquet + Avro: start with Parquet so Impala can read before the format change.
