@@ -36,6 +36,7 @@ import org.apache.kudu.ColumnSchema;
 import org.apache.kudu.Schema;
 import org.apache.kudu.client.KuduClient;
 import org.apache.kudu.client.KuduPartitioner;
+import org.apache.kudu.client.KuduTableStatistics;
 import org.apache.kudu.client.LocatedTablet;
 import org.apache.kudu.client.PartitionSchema;
 import org.apache.kudu.client.PartitionSchema.HashBucketSchema;
@@ -225,10 +226,13 @@ public interface FeKuduTable extends FeTable {
             client.openTable(table.getKuduTableName());
         List<LocatedTablet> tablets = kuduTable.getTabletsLocations(
             BackendConfig.INSTANCE.getKuduClientTimeoutMs());
+        long numRows = table.getNumRows();
+        KuduTableStatistics tableStatistics = kuduTable.getTableStatistics();
+        if (numRows == -1) numRows = tableStatistics.getLiveRowCount();
         TResultRowBuilder tResultRowBuilder = new TResultRowBuilder();
-        tResultRowBuilder.add(table.getNumRows());
+        tResultRowBuilder.add(numRows);
         tResultRowBuilder.add((long) tablets.size());
-        tResultRowBuilder.addBytes(kuduTable.getTableStatistics().getOnDiskSize());
+        tResultRowBuilder.addBytes(tableStatistics.getOnDiskSize());
         tResultRowBuilder.add("KUDU");
         tResultRowBuilder.add(table.getKuduMasterHosts());
         result.addToRows(tResultRowBuilder.get());

@@ -538,7 +538,7 @@ PLAN-ROOT SINK
    limit: 1000
    row-size=43B cardinality=3
 ====
-# kudu_planner_test.no_stats has no stats computed and query has no limit.
+# kudu_planner_test.no_stats has a row count from Kudu (7.30K) and query has no limit.
 # Query should run without 'small query' optimization.
 select * from kudu_planner_test.no_stats;
 ---- DISTRIBUTEDPLAN
@@ -547,9 +547,9 @@ PLAN-ROOT SINK
 01:EXCHANGE [UNPARTITIONED]
 |
 00:SCAN KUDU [kudu_planner_test.no_stats]
-   row-size=88B cardinality=unavailable
+   row-size=88B cardinality=7.30K
 ====
-# kudu_planner_test.no_stats has no stats computed and
+# kudu_planner_test.no_stats has a row count from Kudu (7.30K) and
 # query has limit less than 8. 'small query' optimization is enabled.
 select * from kudu_planner_test.no_stats limit 7;
 ---- DISTRIBUTEDPLAN
@@ -559,8 +559,8 @@ PLAN-ROOT SINK
    limit: 7
    row-size=88B cardinality=7
 ====
-# kudu_planner_test.no_stats has no stats computed and query has limit more than 8.
-# 'small query' optimization is disabled.
+# kudu_planner_test.no_stats has a row count from Kudu (7.30K) and query has limit more
+# than 8. 'small query' optimization is disabled.
 select * from kudu_planner_test.no_stats limit 1000;
 ---- DISTRIBUTEDPLAN
 PLAN-ROOT SINK
@@ -586,9 +586,8 @@ PLAN-ROOT SINK
    limit: 7
    row-size=103B cardinality=7
 ====
-# IMPALA-5602: If a query contains predicates that are all pushed to kudu, there is a
-# limit, and no table stats, then the query should not incorrectly run with 'small query'
-# optimization.
+# IMPALA-5602: If a query contains predicates that are all pushed to kudu and there is a
+# limit, then the query should not incorrectly run with 'small query' optimization.
 select * from kudu_planner_test.no_stats where tinyint_col = 9 limit 7;
 ---- DISTRIBUTEDPLAN
 PLAN-ROOT SINK
@@ -599,7 +598,7 @@ PLAN-ROOT SINK
 00:SCAN KUDU [kudu_planner_test.no_stats]
    kudu predicates: tinyint_col = 9
    limit: 7
-   row-size=88B cardinality=0
+   row-size=88B cardinality=7
 ====
 # alltypes_datasource has estimated input cardinality of 5000.
 # Query should run without 'small query' optimization.

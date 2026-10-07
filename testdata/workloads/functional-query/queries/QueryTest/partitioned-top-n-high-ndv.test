@@ -11,6 +11,9 @@ alter table $DATABASE.high_ndv_cols set column stats part2 ('numDVs'='12502840',
 alter table $DATABASE.high_ndv_cols set column stats part3 ('numDVs'='4245286','numNulls'='0');
 alter table $DATABASE.high_ndv_cols set column stats col4 ('numDVs'='963','numNulls'='0');
 alter table $DATABASE.high_ndv_cols set column stats col5 ('numDVs'='2','numNulls'='0');
+# Kudu's live row count is not yet visible after the insert, so set numRows explicitly.
+# Long.MAX_VALUE keeps the NDV product, which overflows a long, from being capped by it.
+alter table $DATABASE.high_ndv_cols set tblproperties('numRows'='9223372036854775807');
 ====
 ---- QUERY
 # IMPALA-14070: Run EXPLAIN.
@@ -57,7 +60,7 @@ row_regex:'|  order by: col6 ASC.*'
 '|  row-size=72B cardinality=9223372.04T'
 '|'
 '00:SCAN KUDU [$DATABASE.high_ndv_cols]'
-'   row-size=96B cardinality=unavailable'
+'   row-size=96B cardinality=9223372.04T'
 ---- TYPES
 STRING
 ====

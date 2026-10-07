@@ -65,6 +65,7 @@ import org.apache.impala.util.ExecutorMembershipSnapshot;
 import org.apache.kudu.ColumnSchema;
 import org.apache.kudu.Schema;
 import org.apache.kudu.client.KuduClient;
+import org.apache.kudu.client.KuduException;
 import org.apache.kudu.client.KuduPredicate;
 import org.apache.kudu.client.KuduPredicate.ComparisonOp;
 import org.apache.kudu.client.KuduScanToken;
@@ -118,6 +119,9 @@ public class KuduScanNode extends ScanNode {
   // Exprs in kuduConjuncts_ converted to KuduPredicates.
   private final List<KuduPredicate> kuduPredicates_ = new ArrayList<>();
 
+  // Live row count fetched from Kudu when HMS does not have table statistics.
+  private long liveNumRows_ = -1;
+
   // Slot that is used to record the Kudu metadata for the count(*) aggregation if
   // this scan node has the count(*) optimization enabled.
   private SlotDescriptor countStarSlot_ = null;
@@ -160,6 +164,14 @@ public class KuduScanNode extends ScanNode {
       org.apache.kudu.client.KuduTable rpcTable =
           analyzer.getKuduTable(kuduTable_);
       validateSchema(rpcTable);
+      if (kuduTable_.getNumRows() == -1 && tableNumRowsHint_ == -1) {
+        try {
+          liveNumRows_ = rpcTable.getTableStatistics().getLiveRowCount();
+        } catch (KuduException e) {
+          LOG.warn("Unable to get live row count for Kudu table '{}'; " +
+              "planning will use unknown cardinality", rpcTable.getName(), e);
+        }
+      }
 
       countStarSlot_ =
           helper_.getCountStarOptimizationDescriptor(this, analyzer, conjuncts_);
@@ -384,9 +396,12 @@ public class KuduScanNode extends ScanNode {
     super.computeStats(analyzer);
     computeNumNodes(analyzer);
 
-    // Update the cardinality, hint value will be used when table has no stats.
-    inputCardinality_ = cardinality_ =
-        kuduTable_.getNumRows() == -1 ? tableNumRowsHint_ : kuduTable_.getNumRows();
+    // Use Kudu's live row count when HMS has no table stats. An explicit hint wins.
+    long numRows = kuduTable_.getNumRows();
+    if (numRows == -1) {
+      numRows = tableNumRowsHint_ != -1 ? tableNumRowsHint_ : liveNumRows_;
+    }
+    inputCardinality_ = cardinality_ = numRows;
     if (isPointLookupQuery_) {
       // Adjust input and output cardinality for point lookup.
       // Planner don't create KuduScanNode for query with closure "limit 0" so
