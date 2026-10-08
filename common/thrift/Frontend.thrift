@@ -952,7 +952,8 @@ struct TExecutorGroupSet {
   // The optional num_cores_per_executor is used to determine which executor group set to
   // run for a query. The num_cores_per_executor value is set to
   // max_query_cpu_core_per_node_limit attribute of the group set with name prefix
-  // 'exec_group_name_prefix' from the pool service.
+  // 'exec_group_name_prefix' from the pool service. For the default executor group it
+  // is the smallest core count reported by its executors.
   // The total number of CPU cores among all executors in this executor group equals
   // num_cores_per_executor * curr_num_executors if curr_num_executors is greater than 0,
   // otherwise it equals num_cores_per_executor * expected_num_executors.

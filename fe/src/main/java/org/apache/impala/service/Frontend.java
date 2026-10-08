@@ -2289,9 +2289,12 @@ public class Frontend {
         result.add(l);
       } else {
         // Copy and augment the group with the maximally allowed max_mem_limit value.
+        // Keep the core count that the executors reported, so that
+        // COMPUTE_PROCESSING_COST does not plan more instances per node than there are
+        // cores.
         result.add(new TExecutorGroupSet(e));
         result.get(0).setMax_mem_limit(Long.MAX_VALUE);
-        result.get(0).setNum_cores_per_executor(Integer.MAX_VALUE);
+        result.get(0).setNum_cores_per_executor(reportedCoresOrMax(e));
       }
       return result;
     }
@@ -2318,7 +2321,8 @@ public class Frontend {
         // The prefix may be unset; the sort below compares prefixes.
         default_entry.setExec_group_name_prefix("");
         default_entry.setMax_mem_limit(Long.MAX_VALUE);
-        default_entry.setNum_cores_per_executor(Integer.MAX_VALUE);
+        // As for a default-only cluster, keep the reported core count.
+        default_entry.setNum_cores_per_executor(reportedCoresOrMax(e));
         result.add(default_entry);
         continue;
       }
@@ -2387,6 +2391,15 @@ public class Frontend {
     return execGroupSet.getCurr_num_executors() > 0 ?
         execGroupSet.getCurr_num_executors() :
         execGroupSet.getExpected_num_executors();
+  }
+
+  // Returns the core count that the executors of a default group reported, or
+  // Integer.MAX_VALUE if they reported none.
+  private static int reportedCoresOrMax(TExecutorGroupSet execGroupSet) {
+    return execGroupSet.isSetNum_cores_per_executor()
+            && execGroupSet.getNum_cores_per_executor() > 0 ?
+        execGroupSet.getNum_cores_per_executor() :
+        Integer.MAX_VALUE;
   }
 
   private static int expectedTotalCores(TExecutorGroupSet execGroupSet) {
@@ -2822,6 +2835,11 @@ public class Frontend {
         // Check if cpu requirement match.
         Preconditions.checkState(scaledCpuAskBounded <= scaledCpuAskUnbounded);
         cpuReqSatisfied = scaledCpuAskUnbounded <= availableCores;
+        if (default_executor_group && numExecutorGroupSets == 1) {
+          // The core count of the default group only caps per-node parallelism. There
+          // is no larger group set to step up to, so it must not reject the query.
+          cpuReqSatisfied = true;
+        }
 
         // Mark parallelism after scaling.
         addCounter(

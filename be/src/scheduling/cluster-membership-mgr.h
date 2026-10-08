@@ -315,7 +315,8 @@ class ClusterMembershipMgr {
 /// 'expected_exec_group_sets' sorted in increasing order by their expected group size.
 /// The frontend uses cluster membership information to determine whether it expects the
 /// scheduler to assign local or remote reads. It also uses the number of executors to
-/// determine the join type (partitioned vs broadcast).
+/// determine the join type (partitioned vs broadcast). For the default executor group,
+/// it also gets the number of CPU cores of the smallest executor.
 void PopulateExecutorMembershipRequest(const ClusterMembershipMgr::SnapshotPtr& snapshot,
     const std::vector<TExecutorGroupSet>& expected_exec_group_sets,
     TUpdateExecutorMembershipRequest& update_req);

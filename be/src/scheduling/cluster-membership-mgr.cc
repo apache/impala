@@ -768,12 +768,22 @@ void PopulateExecutorMembershipRequest(const ClusterMembershipMgr::SnapshotPtr& 
     exec_group_sets.emplace_back();
     exec_group_sets.back().__set_expected_num_executors(FLAGS_num_expected_executors);
     const ExecutorGroup* group = &(default_it->second);
+    // The smallest core count reported by the executors of the default group, or 0 if
+    // none of them reported one.
+    int min_num_cores = 0;
     for (const auto& backend : group->GetAllExecutorDescriptors()) {
       if (backend.is_executor()) {
         update_req.hostnames.insert(backend.address().hostname());
         update_req.ip_addresses.insert(backend.ip_address());
         exec_group_sets.back().curr_num_executors++;
+        int num_cores = backend.machine_info().cpu_num_cores();
+        if (num_cores > 0) {
+          min_num_cores = min_num_cores == 0 ? num_cores : min(min_num_cores, num_cores);
+        }
       }
+    }
+    if (min_num_cores > 0) {
+      exec_group_sets.back().__set_num_cores_per_executor(min_num_cores);
     }
   }
 

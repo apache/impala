@@ -93,6 +93,23 @@ public class ExecutorGroupSetSelectionTest {
   }
 
   /**
+   * As on a default-only cluster, the default group set keeps the core count that its
+   * executors reported, or gets Integer.MAX_VALUE if they reported none.
+   */
+  @Test
+  public void testDefaultGroupSetKeepsReportedCores() throws Exception {
+    List<TExecutorGroupSet> sets = defaultAndCustomGroupSets();
+    TExecutorGroupSet result = select(sets, NO_REQUEST_POOL).get(0);
+    assertEquals(DEFAULT_PREFIX, result.getExec_group_name_prefix());
+    assertEquals(Integer.MAX_VALUE, result.getNum_cores_per_executor());
+
+    sets.get(0).setNum_cores_per_executor(16);
+    result = select(sets, NO_REQUEST_POOL).get(0);
+    assertEquals(DEFAULT_PREFIX, result.getExec_group_name_prefix());
+    assertEquals(16, result.getNum_cores_per_executor());
+  }
+
+  /**
    * A custom pool must not pick up the default group set as an extra candidate, or the
    * query could be planned for the default executors.
    */

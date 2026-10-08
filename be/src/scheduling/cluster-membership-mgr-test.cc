@@ -872,6 +872,8 @@ TEST(ClusterMembershipMgrUnitTest, PopulateExecutorMembershipRequest) {
     EXPECT_EQ(update_req.exec_group_sets[0].curr_num_executors, 1);
     EXPECT_EQ(update_req.exec_group_sets[0].expected_num_executors, 20);
     EXPECT_EQ(update_req.exec_group_sets[0].exec_group_name_prefix, "");
+    // The executor did not report its number of cores.
+    EXPECT_FALSE(update_req.exec_group_sets[0].__isset.num_cores_per_executor);
     snapshot_ptr->executor_groups.clear();
   }
 
@@ -886,6 +888,26 @@ TEST(ClusterMembershipMgrUnitTest, PopulateExecutorMembershipRequest) {
     EXPECT_EQ(update_req.exec_group_sets[0].curr_num_executors, 1);
     EXPECT_EQ(update_req.exec_group_sets[0].expected_num_executors, 20);
     EXPECT_EQ(update_req.exec_group_sets[0].exec_group_name_prefix, "");
+    snapshot_ptr->executor_groups.clear();
+  }
+
+  // Case 1c: Not using executor groups, executors with different numbers of cores
+  {
+    ExecutorGroup exec_group(ImpalaServer::DEFAULT_EXECUTOR_GROUP_NAME, 1);
+    BackendDescriptorPB be_desc1 = MakeBackendDescriptor(1, 0);
+    be_desc1.mutable_machine_info()->set_cpu_num_cores(16);
+    exec_group.AddExecutor(be_desc1);
+    BackendDescriptorPB be_desc2 = MakeBackendDescriptor(2, 1);
+    be_desc2.mutable_machine_info()->set_cpu_num_cores(8);
+    exec_group.AddExecutor(be_desc2);
+    snapshot_ptr->executor_groups.insert({exec_group.name(), exec_group});
+    ClusterMembershipMgr::SnapshotPtr ptr = snapshot_ptr;
+    PopulateExecutorMembershipRequest(ptr, empty_exec_group_sets, update_req);
+    EXPECT_EQ(update_req.exec_group_sets.size(), 1);
+    EXPECT_EQ(update_req.exec_group_sets[0].curr_num_executors, 2);
+    EXPECT_EQ(update_req.exec_group_sets[0].exec_group_name_prefix, "");
+    // The cores of the smallest executor.
+    EXPECT_EQ(update_req.exec_group_sets[0].num_cores_per_executor, 8);
     snapshot_ptr->executor_groups.clear();
   }
 
