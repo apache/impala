@@ -145,7 +145,7 @@ public class JoinRelationInfo {
 
   /*
    * 1. Join condition must be an Equality Predicate.
-   * 2. both sides must reference 1 column.
+   * 2. Both operands must reference one column from different join inputs.
    * 3. If needed flip the columns.
    */
   private static Pair<Integer, Integer> getJoinInputRefs(Join joinRel,
@@ -164,9 +164,11 @@ public class JoinRelationInfo {
     ImmutableBitSet rightCols =
         RelOptUtil.InputFinder.bits(((RexCall) joinCond).getOperands().get(1));
 
-    // Any operator that doesn't have a column from each side of the join would
-    // have been pushed down.
-    Preconditions.checkState(leftCols.cardinality() == 1 && rightCols.cardinality() == 1);
+    // The specialized estimate needs one referenced column in each operand.
+    // Compound expressions and constants must use the default estimate instead.
+    if (leftCols.cardinality() != 1 || rightCols.cardinality() != 1) {
+      return null;
+    }
 
     int nFieldsLeft = joinRel.getLeft().getRowType().getFieldList().size();
     int nFieldsRight = joinRel.getRight().getRowType().getFieldList().size();
@@ -180,6 +182,12 @@ public class JoinRelationInfo {
       ImmutableBitSet t = leftCols;
       leftCols = rightCols;
       rightCols = t;
+    }
+
+    // Each column must belong to a different join input before looking up statistics.
+    if (leftCols.nextSetBit(0) >= nFieldsLeft ||
+        !rightFieldsBitSet.contains(rightCols)) {
+      return null;
     }
 
     int leftColIdx = leftCols.nextSetBit(0);
