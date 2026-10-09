@@ -908,6 +908,11 @@ IR_ALWAYS_INLINE IntVal StringFunctions::Instr(FunctionContext* context,
   }
   if (start_position.val == 0) return IntVal(0);
 
+  if (start_position.val > static_cast<int64_t>(str.len)
+      || start_position.val < -static_cast<int64_t>(str.len)) {
+    return IntVal(0);
+  }
+
   bool utf8_mode = context->impl()->GetConstFnAttr(FunctionContextImpl::UTF8_MODE);
   StringValue haystack = StringValue::FromStringVal(str);
   StringValue::SimpleString haystack_s = haystack.ToSimpleString();

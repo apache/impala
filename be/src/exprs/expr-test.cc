@@ -4924,6 +4924,11 @@ TEST_P(ExprTest, StringFunctions) {
   TestValue("instr('corporate floor', 'or', -14)", TYPE_INT, 2);
   TestValue("instr('corporate floor', 'or', -15)", TYPE_INT, 0);
 
+  TestValue("instr('corporate floor', 'or', 4294967297)", TYPE_INT, 0);
+  TestValue("instr('corporate floor', 'or', -4294967294)", TYPE_INT, 0);
+  TestValue("instr('corporate floor', 'or', -9223372036854775807 - 1)", TYPE_INT, 0);
+  TestValue("instr('corporate floor', 'or', -4294967294, 2)", TYPE_INT, 0);
+
   TestValue("instr('corporate floor', 'or', 0, 1)", TYPE_INT, 0);
   TestValue("instr('corporate floor', 'or', 14, 1)", TYPE_INT, 14);
   TestValue("instr('corporate floor', 'or', 15, 1)", TYPE_INT, 0);
@@ -11202,6 +11207,8 @@ TEST_P(ExprTest, Utf8Test) {
   TestValue("instr('最快的SQL引擎', 'SQL', -5)", TYPE_INT, 4);
   TestValue("instr('最快的SQL引擎', 'SQL', -6)", TYPE_INT, 0);
   TestValue("instr('最快的SQL引擎', 'SQL', -600)", TYPE_INT, 0);
+  TestValue("instr('最快的SQL引擎', 'SQL', 4294967300)", TYPE_INT, 0);
+  TestValue("instr('最快的SQL引擎', 'SQL', -4294967300)", TYPE_INT, 0);
   TestValue("instr('最快的SQL引擎跑SQL', '引擎', 1)", TYPE_INT, 7);
   TestValue("instr('最快的SQL引擎跑SQL', '引擎', 7)", TYPE_INT, 7);
   TestValue("instr('最快的SQL引擎跑SQL', '引擎', 8)", TYPE_INT, 0);
