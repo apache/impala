@@ -22,6 +22,7 @@ import com.google.common.base.Preconditions;
 import org.apache.calcite.prepare.RelOptTableImpl;
 import org.apache.calcite.rel.type.RelDataType;
 import org.apache.calcite.rel.type.RelDataTypeFactory;
+import org.apache.calcite.schema.Table;
 import org.apache.calcite.runtime.CalciteContextException;
 import org.apache.calcite.sql.validate.SelectScope;
 import org.apache.calcite.sql.validate.SqlNameMatcher;
@@ -34,6 +35,7 @@ import org.apache.calcite.sql.validate.SqlValidatorScope;
 import org.apache.calcite.sql.validate.SqlValidatorScope.Resolve;
 import org.apache.calcite.sql.validate.SqlValidatorScope.ResolvedImpl;
 import org.apache.calcite.sql.validate.SqlValidatorTable;
+import org.apache.calcite.sql.JoinConditionType;
 import org.apache.calcite.sql.SqlOperatorTable;
 import org.apache.calcite.sql.SqlBasicCall;
 import org.apache.calcite.sql.SqlCall;
@@ -49,6 +51,7 @@ import org.apache.calcite.sql.SqlNumericLiteral;
 import org.apache.calcite.sql.SqlOperator;
 import org.apache.calcite.sql.SqlSelect;
 import org.apache.calcite.sql.SqlWithItem;
+import org.apache.calcite.util.Util;
 import org.apache.impala.analysis.Analyzer;
 import org.apache.impala.authorization.Privilege;
 import org.apache.impala.calcite.schema.CalciteTable;
@@ -64,7 +67,10 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.math.BigDecimal;
+import java.util.List;
 import java.util.Map;
+
+import static org.apache.calcite.sql.validate.SqlNonNullableAccessors.getCondition;
 
 /**
  * The ImpalaSqlValidatorImpl is responsible for registering column-level and
@@ -233,6 +239,58 @@ public class ImpalaSqlValidatorImpl extends SqlValidatorImpl {
     } finally {
       viewAliasCorrector_.exitSelect();
     }
+  }
+
+  protected void validateJoin(SqlJoin join, SqlValidatorScope scope) {
+    super.validateJoin(join, scope);
+    final SqlNode left = join.getLeft();
+    final SqlNode right = join.getRight();
+    final JoinConditionType conditionType = join.getConditionType();
+    if (conditionType == JoinConditionType.USING) {
+      // This mimics what super.validateJoin() does when the JoinConditionType is USING.
+      List<SqlIdentifier> list = (List) getCondition(join);
+      for (SqlIdentifier id : list) {
+        registerColumnPrivilegeInUsing(id, left);
+        registerColumnPrivilegeInUsing(id, right);
+      }
+    }
+  }
+
+  private void registerColumnPrivilegeInUsing(SqlIdentifier identifier,
+      SqlNode leftOrRight) {
+    if (leftOrRight instanceof SqlJoin) {
+      registerColumnPrivilegeInUsing(identifier, ((SqlJoin) leftOrRight).getLeft());
+      registerColumnPrivilegeInUsing(identifier, ((SqlJoin) leftOrRight).getRight());
+    }
+
+    SqlValidatorNamespace namespace = getNamespace(leftOrRight);
+    if (namespace != null) {
+      // The following mimics what SqlValidatorImpl#checkRollUpInUsing() does to resolve
+      // the column name of an actual table/view in the USING clause.
+      SqlValidatorTable sqlValidatorTable = namespace.getTable();
+      if (sqlValidatorTable != null) {
+        Table table = sqlValidatorTable.table();
+        String columnName = Util.last(identifier.names);
+        FeTable feTable = getFeTable(table);
+        // We only need to register column privilege if the column exists in the table.
+        if (feTable.getColumn(columnName) != null) {
+          this.analyzer_.registerPrivReq(
+              builder -> builder.allOf(Privilege.SELECT)
+              .onColumn(feTable.getDb().getName(),
+                  feTable.getTableName().getTbl(), columnName,
+                  feTable.getOwnerUser()).build()
+          );
+        }
+      }
+    }
+  }
+
+  private FeTable getFeTable(Table table) {
+    if (table instanceof CalciteTable) {
+      return ((CalciteTable) table).getFeTable();
+    }
+    Preconditions.checkState(table instanceof ImpalaViewTable);
+    return ((ImpalaViewTable) table).getFeView();
   }
 
   @Override

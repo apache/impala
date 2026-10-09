@@ -1731,24 +1731,57 @@ class TestRanger(CustomClusterTestSuite):
       self.create_impala_client(user=grantee_user) as non_owner_client:
       # Set the query option planner to CALCITE and ensure there is no fallback to
       # the original planner
-      non_owner_client.set_configuration({"planner": "CALCITE"})
-      non_owner_client.set_configuration({"fallback_planner": "CALCITE"})
+      non_owner_client.set_configuration({"planner": "CALCITE",
+          "fallback_planner": "CALCITE"})
+      # This prevents execute() of 'non_owner_client' from fetching the query profile
+      # from the server. Recall that if 'grantee_user' does not have the SELECT privilege
+      # on the underlying table of a view, even though 'grantee_user' has the SELECT
+      # privileges on all the columns of the underlying table, the attempt to retrieve
+      # the query profile from the server would still result in an error.
+      non_owner_client._collect_profile_and_log = False
       unique_database = unique_name + "_db"
-      unique_table = unique_name + "_tbl"
-      test_select_query = "select * from {0}.{1}".format(unique_database, unique_table)
+      unique_table_1 = unique_name + "_tbl_1"
+      unique_table_2 = unique_name + "_tbl_2"
+      unique_view_1 = unique_name + "_view_1"
+      unique_view_2 = unique_name + "_view_2"
+      tables = [unique_table_1, unique_table_2]
+      views = [unique_view_1, unique_view_2]
+      views_with_tables = [(unique_view_1, unique_table_1),
+          (unique_view_2, unique_table_2)]
+      test_select_query = "select * from {0}.{1}".format(unique_database, unique_table_1)
+
+      join_query_1_template = "with iv as (select 1 as id) \
+          select iv.id from iv join {0}.{1} using (id)"
+      test_join_query_1 = join_query_1_template.format(unique_database, unique_table_1)
+      test_join_query_1_with_view = join_query_1_template.format(unique_database,
+          unique_view_1)
+
+      join_query_2_template = "with iv as (select 1 as id) \
+          select iv.id from {0}.{1} a join {0}.{2} b on a.bigint_col = b.bigint_col \
+          join iv using (id)"
+      test_join_query_2 = join_query_2_template.format(unique_database, unique_table_1,
+          unique_table_2)
+      test_join_query_2_with_view = join_query_2_template.format(unique_database,
+          unique_view_1, unique_view_2)
+
       error_msg_prefix = "User '{0}' does not have privileges to execute 'SELECT' on:" \
           .format(grantee_user)
       try:
-        # Set up a temporary database and a table.
+        # Set up a temporary database, the tables and views needed in the test.
         admin_client.execute("drop database if exists {0} cascade"
             .format(unique_database))
         admin_client.execute("create database {0}".format(unique_database))
-        admin_client.execute("create table {0}.{1} (id int, bigint_col bigint)"
-            .format(unique_database, unique_table))
-        admin_client.execute("refresh authorization")
+        for table in tables:
+          admin_client.execute("create table {0}.{1} (id int, bigint_col bigint)"
+              .format(unique_database, table))
+        for view, table in views_with_tables:
+          admin_client.execute("create view {0}.{1} as select * from {0}.{2}"
+              .format(unique_database, view, table))
 
-        admin_client.execute("grant select (id) on table {0}.{1} to user {2}"
-            .format(unique_database, unique_table, grantee_user))
+        # Grant the SELECT privilege on the column 'id' of the tables and views.
+        for table in tables + views:
+            admin_client.execute("grant select (id) on table {0}.{1} to user {2}"
+                .format(unique_database, table, grantee_user))
         admin_client.execute("refresh authorization")
 
         # Even though 'grantee_user' was already granted the SELECT privilege on the
@@ -1757,23 +1790,108 @@ class TestRanger(CustomClusterTestSuite):
         # column 'bigint_col'.
         result = self.execute_query_expect_failure(non_owner_client, test_select_query)
         assert "{0} {1}.{2}" \
-            .format(error_msg_prefix, unique_database, unique_table) in str(result)
+            .format(error_msg_prefix, unique_database, unique_table_1) in str(result)
 
-        admin_client.execute("grant select (bigint_col) on table {0}.{1} to user {2}"
-            .format(unique_database, unique_table, grantee_user))
+        # Verify that the query succeeds without an AuthorizationException which shows
+        # that it suffices to only have the SELECT privilege on the column 'id' of the
+        # table 'unique_table_1' (v.s. the SELECT privilege on the whole table).
+        non_owner_client.execute(test_join_query_1)
+
+        # Verify that the query succeeds without an AuthorizationException which shows
+        # that it suffices to only have the SELECT privilege on the column 'id' of the
+        # view 'unique_view_1' (v.s. the SELECT privilege on the whole view).
+        non_owner_client.execute(test_join_query_1_with_view)
+
+        # Verify that the query fails. This is because the SELECT privileges on the
+        # column 'bigint_col' in both tables are required to execute 'test_join_query_2'.
+        result = self.execute_query_expect_failure(non_owner_client, test_join_query_2)
+        assert "{0} {1}.{2}" \
+            .format(error_msg_prefix, unique_database, unique_table_2) in str(result)
+
+        # Verify that the query fails. This is because the SELECT privileges on the
+        # column 'bigint_col' in both views are required to execute
+        # 'test_join_query_2_with_view'.
+        result = self.execute_query_expect_failure(non_owner_client,
+            test_join_query_2_with_view)
+        assert "{0} {1}.{2}" \
+            .format(error_msg_prefix, unique_database, unique_view_1) in str(result)
+
+        # Grant the SELECT privilege on the column 'bigint_col' of the tables and views.
+        for table in tables + views:
+            admin_client.execute("grant select (bigint_col) on table {0}.{1} to user {2}"
+                .format(unique_database, table, grantee_user))
         admin_client.execute("refresh authorization")
 
         # After 'grantee_user' is granted the SELECT privilege on the column
-        # 'bigint_col', the query could be executed.
+        # 'bigint_col' in the table 'unique_table_1', the query could be executed.
         non_owner_client.execute(test_select_query)
+
+        # After 'grantee_user' is granted the SELECT privilege on the column
+        # 'bigint_col' in both tables, the query could be executed.
+        non_owner_client.execute(test_join_query_2)
+
+        # After 'grantee_user' is granted the SELECT privilege on the column
+        # 'bigint_col' in both views, the query could be executed.
+        non_owner_client.execute(test_join_query_2_with_view)
       finally:
-        admin_client.execute("revoke select (id) on table {0}.{1} from user {2}"
-            .format(unique_database, unique_table, grantee_user))
-        admin_client.execute("revoke select (bigint_col) on table {0}.{1} from user {2}"
-            .format(unique_database, unique_table, grantee_user))
+        for table in tables + views:
+          admin_client.execute("revoke select (id) on table {0}.{1} from user {2}"
+              .format(unique_database, table, grantee_user))
+          admin_client.execute("revoke select (bigint_col) on table {0}.{1} "
+              "from user {2}".format(unique_database, table, grantee_user))
         admin_client.execute("refresh authorization")
         admin_client.execute("drop database if exists {0} cascade"
             .format(unique_database))
+
+  def _test_join_with_using_calcite_frontend(self, unique_name):
+    """
+    This verifies the privileges required to execute a JOIN via the USING clause.
+    """
+    grantee_user = "non_owner"
+    with self.create_impala_client(user=ADMIN) as admin_client, \
+        self.create_impala_client(user=grantee_user) as non_owner_client:
+      # Set the query option planner to CALCITE and ensure there is no fallback to
+      # the original planner
+      non_owner_client.set_configuration({"planner": "CALCITE",
+          "fallback_planner": "CALCITE"})
+      unique_database = unique_name + "_db"
+      unique_table_1 = unique_name + "_tbl_1"
+      unique_table_2 = unique_name + "_tbl_2"
+      join_query = "with c as (select 1 as id) \
+          select c.id from {0}.{1} a join {0}.{2} b on a.k = b.k \
+          join c using (id)".format(unique_database, unique_table_1, unique_table_2)
+      error_msg_prefix = "User '{0}' does not have privileges to execute 'SELECT' on:" \
+          .format(grantee_user)
+      try:
+        # Set up a temporary database, the tables needed in the test.
+        admin_client.execute("drop database if exists {0} cascade"
+            .format(unique_database))
+        admin_client.execute("create database {0}".format(unique_database))
+        admin_client.execute("create table {0}.{1} (id int, k int)"
+            .format(unique_database, unique_table_1))
+        admin_client.execute("create table {0}.{1} (k int)"
+            .format(unique_database, unique_table_2))
+
+        result = self.execute_query_expect_failure(non_owner_client, join_query)
+        assert "{0} {1}.{2}" \
+            .format(error_msg_prefix, unique_database, unique_table_1) in str(result)
+
+        # Verifies we need to grant 'grantee_user' the SELECT privileges on all the
+        # columns involved in 'join_query' to execute the query.
+        admin_client.execute("grant select (k, id) on table {0}.{1} to user {2}"
+             .format(unique_database, unique_table_1, grantee_user))
+        admin_client.execute("grant select (k) on table {0}.{1} to user {2}"
+             .format(unique_database, unique_table_2, grantee_user))
+
+        non_owner_client.execute(join_query)
+      finally:
+        admin_client.execute("revoke select (k, id) on table {0}.{1} from user {2}"
+            .format(unique_database, unique_table_1, grantee_user))
+        admin_client.execute("revoke select (k) on table {0}.{1} from user {2}"
+            .format(unique_database, unique_table_2, grantee_user))
+        admin_client.execute("refresh authorization")
+        admin_client.execute("drop database if exists {0} cascade"
+                             .format(unique_database))
 
   def _test_view_on_view(self, use_calcite_planner,
       v2_created_by_non_superuser, v1_created_by_non_superuser,
@@ -1793,8 +1911,8 @@ class TestRanger(CustomClusterTestSuite):
       if use_calcite_planner is True:
         # Set the query option planner to CALCITE and ensure there is no fallback to
         # the original planner
-        non_owner_client.set_configuration({"planner": "CALCITE"})
-        non_owner_client.set_configuration({"fallback_planner": "CALCITE"})
+        non_owner_client.set_configuration({"planner": "CALCITE",
+            "fallback_planner": "CALCITE"})
       test_select_query = "select * from {0}".format(v2_name)
       select_error_prefix = "User '{0}' does not have privileges to execute " \
           "'SELECT' on:".format(grantee_user)
@@ -4203,6 +4321,9 @@ class TestRangerWithCalcite(TestRanger):
 
   def test_select_calcite_frontend(self, unique_name):
     self._test_select_calcite_frontend(unique_name)
+
+  def test_join_with_using_calcite_frontend(self, unique_name):
+    self._test_join_with_using_calcite_frontend(unique_name)
 
   def test_view_on_view_all_configs(self, unique_name):
     self._test_view_on_view_all_configs(unique_name)
