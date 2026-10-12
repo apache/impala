@@ -55,7 +55,6 @@ import org.apache.impala.catalog.HdfsFileFormat;
 import org.apache.impala.common.ImpalaException;
 import org.apache.impala.common.Pair;
 import org.apache.impala.common.UnsupportedFeatureException;
-import org.apache.impala.planner.HdfsEstimatedMissingTableStats;
 import org.apache.impala.planner.HdfsPartitionPruner;
 import org.apache.impala.util.AcidUtils;
 
@@ -78,7 +77,8 @@ public class CalciteTable extends RelOptAbstractTable
 
   private final SimplifiedAnalyzer analyzer_;
 
-  private final HdfsEstimatedMissingTableStats estimatedMissingStats_;
+  // Row count estimate when table_.getNumRows() is unknown (-1). -1 if not computed.
+  private final double estimatedMissingNumRows_;
 
   public CalciteTable(FeTable table, CalciteCatalogReader reader,
       Analyzer analyzer) throws ImpalaException {
@@ -88,14 +88,7 @@ public class CalciteTable extends RelOptAbstractTable
     this.columns_ = Lists.newArrayList(table.getStarColumns());
     this.impalaPositionMap_ = buildPositionMap();
     this.analyzer_ = (SimplifiedAnalyzer) analyzer;
-    // TODO: If table_.getNumRows() is unknown (-1), this logic will load all partitions
-    // to compute estimation using HdfsEstimatedMissingTableStats. This is potentially
-    // expensive and should be avoided in local catalog mode.
-    estimatedMissingStats_ = (table_ instanceof FeFsTable) && table_.getNumRows() < 0 ?
-        new HdfsEstimatedMissingTableStats(
-            analyzer.getQueryOptions(), (FeFsTable) table_,
-            ((FeFsTable) table_).loadAllPartitions(), -1) :
-        null;
+    estimatedMissingNumRows_ = table_.getStatsNumRows(analyzer);
 
     checkIfTableIsSupported(table);
   }
@@ -221,12 +214,13 @@ public class CalciteTable extends RelOptAbstractTable
 
   @Override
   public double getRowCount() {
-    if (table_.getNumRows() >= 0.0) {
+    if (table_.getNumRows() >= 0) {
       return (double) table_.getNumRows();
     }
 
-    Preconditions.checkNotNull(estimatedMissingStats_);
-    return estimatedMissingStats_.statsNumRows_;
+    Preconditions.checkState(estimatedMissingNumRows_ >= 0,
+        "Missing row count estimate for table %s", table_.getFullName());
+    return estimatedMissingNumRows_;
   }
 
   public List<Column> getColumns() {

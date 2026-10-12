@@ -23,8 +23,10 @@ import java.util.List;
 
 import javax.xml.bind.DatatypeConverter;
 
+import org.apache.impala.analysis.Analyzer;
 import org.apache.impala.analysis.KuduPartitionParam;
 import org.apache.impala.analysis.RangePartition;
+import org.apache.impala.common.AnalysisException;
 import org.apache.impala.common.ImpalaRuntimeException;
 import org.apache.impala.service.BackendConfig;
 import org.apache.impala.thrift.TColumn;
@@ -35,12 +37,15 @@ import org.apache.impala.util.TResultRowBuilder;
 import org.apache.kudu.ColumnSchema;
 import org.apache.kudu.Schema;
 import org.apache.kudu.client.KuduClient;
+import org.apache.kudu.client.KuduException;
 import org.apache.kudu.client.KuduPartitioner;
 import org.apache.kudu.client.KuduTableStatistics;
 import org.apache.kudu.client.LocatedTablet;
 import org.apache.kudu.client.PartitionSchema;
 import org.apache.kudu.client.PartitionSchema.HashBucketSchema;
 import org.apache.kudu.client.PartitionSchema.RangeSchema;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
@@ -49,6 +54,8 @@ import com.google.common.base.Preconditions;
  * Frontend interface for interacting with a Kudu-backed table.
  */
 public interface FeKuduTable extends FeTable {
+  Logger LOG = LoggerFactory.getLogger(FeKuduTable.class);
+
   /**
    * Return the comma-separated list of masters for the Kudu cluster
    * backing this table.
@@ -93,6 +100,25 @@ public interface FeKuduTable extends FeTable {
         .filter(c -> !c.isHidden() && !c.isAutoIncrementing())
         .map(c -> (Column)c)
         ::iterator;
+  }
+
+  /**
+   * Fetches Kudu's live row count when getNumRows() is unknown.
+   */
+  @Override
+  default long getStatsNumRows(Analyzer analyzer) {
+    if (getNumRows() >= 0) {
+      return -1;
+    }
+    try {
+      // This is similar to what we do in KuduScanNode#init() in the classic planner.
+      org.apache.kudu.client.KuduTable rpcTable = analyzer.getKuduTable(this);
+      return rpcTable.getTableStatistics().getLiveRowCount();
+    } catch (AnalysisException | KuduException e) {
+      LOG.warn("Unable to get live row count for Kudu table '{}'",
+          this.getFullName(), e);
+      return -1;
+    }
   }
 
   /**

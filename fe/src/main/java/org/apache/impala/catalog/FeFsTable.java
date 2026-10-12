@@ -43,10 +43,12 @@ import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hive.metastore.api.FieldSchema;
 import org.apache.hadoop.hive.metastore.api.SQLForeignKey;
 import org.apache.hadoop.hive.metastore.api.SQLPrimaryKey;
+import org.apache.impala.analysis.Analyzer;
 import org.apache.impala.analysis.Expr;
 import org.apache.impala.analysis.LiteralExpr;
 import org.apache.impala.analysis.PartitionKeyValue;
 import org.apache.impala.common.AnalysisException;
+import org.apache.impala.planner.HdfsEstimatedMissingTableStats;
 import org.apache.impala.common.FileSystemUtil;
 import org.apache.impala.common.Pair;
 import org.apache.impala.common.PrintUtils;
@@ -123,6 +125,22 @@ public interface FeFsTable extends FeTable {
   // in be/src/util/parquet-bloom-filter.h.
   public static final long PARQUET_BLOOM_FILTER_MAX_BYTES = 128 * 1024 * 1024;
   public static final long PARQUET_BLOOM_FILTER_MIN_BYTES = 64;
+
+  /**
+   * Uses HdfsEstimatedMissingTableStats when getNumRows() is unknown.
+   */
+  @Override
+  default long getStatsNumRows(Analyzer analyzer) {
+    if (getNumRows() >= 0) {
+      return -1;
+    }
+    // TODO: If table.getNumRows() is unknown (-1), this logic will load all
+    // partitions to compute estimation using HdfsEstimatedMissingTableStats. This is
+    // potentially expensive and should be avoided in local catalog mode.
+    return new HdfsEstimatedMissingTableStats(
+        analyzer.getQueryOptions(), this, loadAllPartitions(),
+        /* tableNumRowsHint */ -1).statsNumRows_;
+  }
 
   // Represents a set of storage-related statistics aggregated at the table or partition
   // level.

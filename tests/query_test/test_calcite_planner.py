@@ -18,7 +18,11 @@
 import logging
 
 from tests.common.impala_test_suite import ImpalaTestSuite
-from tests.common.test_dimensions import (add_mandatory_exec_option)
+from tests.common.kudu_test_suite import KuduTestSuite
+from tests.common.skip import SkipIfKudu
+from tests.common.test_dimensions import (
+    add_mandatory_exec_option,
+    create_single_exec_option_dimension)
 
 LOG = logging.getLogger(__name__)
 
@@ -68,6 +72,26 @@ class TestCalcitePlanner(ImpalaTestSuite):
     vector.get_value('exec_option')['cte_threshold'] = 1
     vector.get_value('exec_option')['enable_explain_calcite'] = True
     self.run_test_case('QueryTest/cte_decompose', vector, use_db='tpch')
+
+
+class TestCalciteKuduStats(KuduTestSuite):
+  """Tests Calcite row count estimation for Kudu tables without HMS stats."""
+
+  @classmethod
+  def add_test_dimensions(cls):
+    super(TestCalciteKuduStats, cls).add_test_dimensions()
+    cls.ImpalaTestMatrix.add_dimension(create_single_exec_option_dimension())
+    add_mandatory_exec_option(cls, 'planner', 'CALCITE')
+    add_mandatory_exec_option(cls, 'fallback_planner', 'CALCITE')
+    # The default read mode of READ_LATEST does not provide high enough consistency for
+    # these tests.
+    add_mandatory_exec_option(cls, 'kudu_read_mode', 'READ_AT_SNAPSHOT')
+
+  @SkipIfKudu.no_hybrid_clock()
+  def test_calcite_kudu_stats(self, vector, unique_database):
+    self.run_test_case('QueryTest/calcite_kudu_stats', vector,
+        use_db=unique_database)
+
 
 class TestFallbackPlanner(ImpalaTestSuite):
 

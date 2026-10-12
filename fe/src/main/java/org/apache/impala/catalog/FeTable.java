@@ -25,6 +25,7 @@ import java.util.stream.Collectors;
 
 import org.apache.hadoop.hive.common.ValidWriteIdList;
 import org.apache.hadoop.hive.metastore.api.Table;
+import org.apache.impala.analysis.Analyzer;
 import org.apache.impala.analysis.Expr;
 import org.apache.impala.analysis.SlotDescriptor;
 import org.apache.impala.analysis.SlotRef;
@@ -252,6 +253,16 @@ public interface FeTable {
    * @return the timestamp when the table is last loaded or reloaded in catalogd.
    */
   long getLastLoadedTimeMs();
+
+  /**
+   * Computes a fallback row count when HMS stats are unavailable.
+   * Subtypes such as FeFsTable and FeKuduTable override this when they can estimate
+   * missing stats. Returns -1 when getNumRows() is known or estimation is not
+   * supported or fails.
+   */
+  default long getStatsNumRows(Analyzer analyzer) {
+    return -1;
+  }
 
   /**
    * Returns a list of thrift column descriptors ordered by position.

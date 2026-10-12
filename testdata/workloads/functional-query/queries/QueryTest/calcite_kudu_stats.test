@@ -1,0 +1,67 @@
+====
+---- QUERY
+create table kudu_tbl_01 (id int primary key, name string, valf float, vali bigint)
+  partition by range (partition values < 10, partition 10 <= values < 30,
+  partition 30 <= values) stored as kudu tblproperties('kudu.num_tablet_replicas' = '1')
+---- RESULTS
+'Table has been created.'
+====
+---- QUERY
+# SHOW TABLE STATS should use Kudu's live row count when HMS stats are missing.
+show table stats kudu_tbl_01;
+---- RESULTS
+0,3,regex:.*,'KUDU',regex:.*
+---- TYPES
+BIGINT,BIGINT,STRING,STRING,STRING
+---- LABELS
+#Rows,#Partitions,Size,Format,Location
+====
+---- QUERY
+insert into kudu_tbl_01 values (1, 'one', 1.0, 1), (2, 'two', 2.0, 2);
+====
+---- QUERY
+# Kudu takes time to commit the rows and update its live row count.
+show table stats kudu_tbl_01;
+---- RESULTS: RETRY=10@1000
+2,3,regex:.*,'KUDU',regex:.*
+---- TYPES
+BIGINT,BIGINT,STRING,STRING,STRING
+---- LABELS
+#Rows,#Partitions,Size,Format,Location
+====
+---- QUERY
+# The Calcite planner should use Kudu's live row count when HMS stats are missing.
+explain select * from kudu_tbl_01;
+---- RESULTS: VERIFY_IS_SUBSET
+row_regex:.*SCAN KUDU.*
+row_regex:.*row-size=.* cardinality=2.*
+---- TYPES
+STRING
+---- RUNTIME_PROFILE
+row_regex: PlannerType: CalcitePlanner
+====
+---- QUERY
+# IMPALA-15545: Joining a Kudu table without HMS stats with an HDFS table used to
+# fail in CalciteTable.getRowCount() with a NullPointerException.
+create table kudu_tbl_02 (id int primary key, string_col string) stored as kudu;
+select k2.id, a.id
+from kudu_tbl_02 k2 JOIN functional.alltypestiny a
+ON (k2.id=a.id);
+---- RESULTS
+---- TYPES
+INT,INT
+---- RUNTIME_PROFILE
+row_regex: PlannerType: CalcitePlanner
+====
+---- QUERY
+# IMPALA-15545: Joining 2 Kudu tables without HMS stats should not result in a
+# NullPointerException.
+select k1.id, k2.id
+from kudu_tbl_02 k2 JOIN kudu_tbl_01 k1
+ON (k2.id=k1.id);
+---- RESULTS
+---- TYPES
+INT,INT
+---- RUNTIME_PROFILE
+row_regex: PlannerType: CalcitePlanner
+====
