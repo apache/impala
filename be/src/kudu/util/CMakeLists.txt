@@ -455,6 +455,9 @@ add_executable(protoc-gen-insertions protoc-gen-insertions.cc)
 # Impala needs some extra dependency libs compared to Kudu.
 # Note that the order is important.
 target_link_libraries(protoc-gen-insertions gutil glog gflags protoc protobuf  ${KUDU_BASE_LIBS})
+# Impala - run at build time, so needs rpath to the toolchain's libstdc++.
+set_target_properties(protoc-gen-insertions PROPERTIES LINK_FLAGS
+  "${TOOLCHAIN_LINK_FLAGS}")
 
 #######################################
 # kudu_test_util

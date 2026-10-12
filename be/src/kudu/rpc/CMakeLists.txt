@@ -109,6 +109,8 @@ add_executable(protoc-gen-krpc protoc-gen-krpc.cc
 # IMPALA-8642: kudu_version.cc depends on gen-cpp/Status_types.h in target thrift-deps
 add_dependencies(protoc-gen-krpc thrift-deps)
 target_link_libraries(protoc-gen-krpc gutil glog gflags protoc protobuf rpc_header_proto ${KUDU_BASE_LIBS})
+# Impala - run at build time, so needs rpath to the toolchain's libstdc++.
+set_target_properties(protoc-gen-krpc PROPERTIES LINK_FLAGS "${TOOLCHAIN_LINK_FLAGS}")
 
 ### RPC test
 if(NOT NO_TESTS)
