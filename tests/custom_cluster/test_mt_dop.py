@@ -73,6 +73,49 @@ class TestMtDopFlags(CustomClusterTestSuite):
                         " functional.emptytable union all select id from"
                         " functional.alltypestiny) t")
 
+  @CustomClusterTestSuite.with_args(cluster_size=1)
+  def test_mt_dop_union_limit_scan_range_submission(self, unique_database):
+    """Regression test for a hang with mt_dop > 1 on a single backend: UNION nodes
+    open their children lazily, so if a LIMIT makes one fragment instance stop
+    pulling rows before it opens one of the union's scan node children, that
+    instance never submits its scan ranges for that child. Another co-located
+    instance that does open the child then waits forever for the missing
+    submission in ScanRangeSharedState::GetNextScanRange()."""
+    # Use mt_dop=0 for the inserts so each INSERT statement creates one file.
+    self.client.execute("set mt_dop=0")
+    # 'repro0' must consist of a single scan range (one text file) with at least 10
+    # distinct keys. The instance that reads it reaches the aggregation limit and
+    # then stops without opening the second union child.
+    self.client.execute("create table {0}.repro0 (k int) stored as textfile".format(
+        unique_database))
+    self.client.execute("insert into {0}.repro0 values (0),(1),(2),(3),(4),(5),(6),"
+                        "(7),(8),(9),(10),(11),(12),(13),(14),(15),(16),(17),(18),(19),"
+                        "(20),(21),(22),(23),(24)".format(unique_database))
+    # 'repro1' must consist of two scan ranges (two text files) so that the fragment
+    # gets two co-located instances, but must have fewer than 10 distinct keys so
+    # that the instance which opens it cannot satisfy the limit itself.
+    self.client.execute("create table {0}.repro1 (k int) stored as textfile".format(
+        unique_database))
+    self.client.execute("insert into {0}.repro1 values (1),(2),(3)".format(
+        unique_database))
+    self.client.execute("insert into {0}.repro1 values (4),(5),(6)".format(
+        unique_database))
+    # Verify the file counts that this test relies on.
+    assert len(self.execute_query(
+        "show files in {0}.repro0".format(unique_database)).data) == 1
+    assert len(self.execute_query(
+        "show files in {0}.repro1".format(unique_database)).data) == 2
+    self.client.execute("set mt_dop=2")
+    self.client.execute("set exec_time_limit_s=10")
+    # One instance reads repro0's single scan range, produces enough groups to hit the
+    # LIMIT, and stops without opening the repro1 scan. The other instance gets no
+    # repro0 ranges, so it opens repro1 and then waits for the first instance's scan
+    # range submission, which shouldn't hang.
+    result = self.execute_query("select k from (select k from {0}.repro0 union all"
+                                " select k from {0}.repro1) t group by 1 limit 10"
+                                .format(unique_database))
+    assert len(result.data) == 10
+
 
 class TestMaxMtDop(CustomClusterTestSuite):
   @classmethod

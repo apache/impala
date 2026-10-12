@@ -144,6 +144,17 @@ void HdfsScanNodeMt::Close(RuntimeState* state) {
   if (scanner_.get() != nullptr) scanner_->Close(nullptr);
   scanner_.reset();
   scanner_ctx_.reset();
+  if (!initial_ranges_issued_.Load()) {
+    // This instance never called IssueInitialScanRanges(). This happens because UNION
+    // nodes open their children lazily: if a LIMIT above stops pulling rows in one
+    // instance, that instance may never open one of the union's scan node children,
+    // while other co-located instances do open it. Those instances then wait for this
+    // instance's scan range submission in ScanRangeSharedState::GetNextScanRange() and
+    // would block forever. Decrement the shared 'remaining_scan_range_submissions_'
+    // counter here, mirroring the decrement that IssueInitialScanRanges() performs for
+    // instances that do issue their ranges.
+    shared_state_->UpdateRemainingScanRangeSubmissions(-1);
+  }
   HdfsScanNodeBase::Close(state);
 }
 
