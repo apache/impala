@@ -1156,13 +1156,6 @@ THE SOFTWARE.
 
 --------------------------------------------------------------------------------
 
-be/src/thirdparty/roaring: Apache 2.0, MIT
-
-The CRoaring project is under a dual license (Apache/MIT).
-Users of the library may choose one or the other license.
-
---------------------------------------------------------------------------------
-
 www/datatables/extensions/dataTables.rowGroup*: MIT license
 
 MIT license

@@ -703,6 +703,7 @@ set (IMPALA_DEPENDENCIES
   zstd
   re2
   simdutf
+  croaring
   ${Boost_LIBRARIES}
   ${LLVM_MODULE_LIBS}
   thrift

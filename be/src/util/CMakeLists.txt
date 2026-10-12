@@ -20,7 +20,6 @@ add_subdirectory(cache)
 set(SQUEASEL_SRC_DIR "${CMAKE_SOURCE_DIR}/be/src/thirdparty/squeasel")
 set(MUSTACHE_SRC_DIR "${CMAKE_SOURCE_DIR}/be/src/thirdparty/mustache")
 set(MPFIT_SRC_DIR "${CMAKE_SOURCE_DIR}/be/src/thirdparty/mpfit")
-set(ROARING_SRC_DIR "${CMAKE_SOURCE_DIR}/be/src/thirdparty/roaring")
 
 # where to put generated libraries
 set(LIBRARY_OUTPUT_PATH "${BUILD_OUTPUT_ROOT_DIRECTORY}/util")
@@ -139,8 +138,7 @@ set(UTIL_SRCS
   webserver.cc
   zip-util.cc
   ${MUSTACHE_SRC_DIR}/mustache.cc
-  ${MPFIT_SRC_DIR}/mpfit.c
-  ${ROARING_SRC_DIR}/roaring.c)
+  ${MPFIT_SRC_DIR}/mpfit.c)
 
 # parquet-bloom-filter-avx2.cc uses AVX2 operations.
 # NOTE: AVX2 detection has been centralized in be/CMakeLists.txt.
@@ -159,15 +157,6 @@ if (AVX2_SUPPORT)
   message("Compiler supports AVX2 (be/src/util)")
 else()
   message("Compiler does not support AVX2 (be/src/util)")
-endif()
-
-# roaring.c uses AVX operations
-# disable AVX512 unconditionally
-set_source_files_properties(${ROARING_SRC_DIR}/roaring.c
-    PROPERTIES COMPILE_DEFINITIONS "CROARING_COMPILER_SUPPORTS_AVX512=0")
-if (NOT AVX2_SUPPORT)
-  set_source_files_properties(${ROARING_SRC_DIR}/roaring.c
-      PROPERTIES COMPILE_DEFINITIONS "ROARING_DISABLE_AVX=1")
 endif()
 
 add_library(Util ${UTIL_SRCS})

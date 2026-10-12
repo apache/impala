@@ -159,6 +159,7 @@ set_dep_root(CLOUDFLAREZLIB)
 set_dep_root(OPENTELEMETRY_CPP)
 set_dep_root(TCMALLOC)
 set_dep_root(SIMDUTF)
+set_dep_root(CROARING)
 
 set(ABSL_ROOT
     $ENV{IMPALA_TOOLCHAIN_PACKAGES_HOME}/abseil-cpp-$ENV{IMPALA_ABSEIL_CPP_VERSION})
@@ -351,6 +352,10 @@ IMPALA_ADD_THIRDPARTY_LIB(re2 ${RE2_INCLUDE_DIR} ${RE2_STATIC_LIB} "")
 # find simdutf headers and libs
 find_package(Simdutf REQUIRED)
 IMPALA_ADD_THIRDPARTY_LIB(simdutf ${SIMDUTF_INCLUDE_DIR} ${SIMDUTF_STATIC_LIB} "")
+
+# find CRoaring headers and libs
+find_package(Croaring REQUIRED)
+IMPALA_ADD_THIRDPARTY_LIB(croaring ${CROARING_INCLUDE_DIR} ${CROARING_STATIC_LIB} "")
 
 # find jwt-cpp headers
 find_package(JwtCpp REQUIRED)

@@ -20,7 +20,7 @@
 #include <limits>
 #include "common/status.h"
 
-#include "thirdparty/roaring/roaring.h"
+#include <roaring/roaring64.h>
 
 namespace impala {
 
@@ -231,9 +231,7 @@ private:
   }
 
   void Cleanup() {
-    // Our CRoaring's roaring64_bitmap_free crashes on nullptrs. This is fixed in
-    // newer versions.
-    if (rbitmap_) roaring64_bitmap_free(rbitmap_);
+    roaring64_bitmap_free(rbitmap_);
   }
 
   roaring64_bitmap_t* rbitmap_ = roaring64_bitmap_create();
