@@ -128,8 +128,10 @@ public class FileMetadataLoaderTest {
     assertTrue(stats.maxModificationTime >= stats.minModificationTime);
 
     // Host and host:disk pair stats (for HDFS tables these should be populated)
-    assertTrue(stats.getNumUniqueHosts() >= 0);
-    assertTrue(stats.getNumUniqueHostDiskPairs() >= 0);
+    FileMetadataHostStats hostStats = fml.getFileMetadataHostStats();
+    assertNotNull(hostStats);
+    assertTrue(hostStats.getNumUniqueHosts() >= 0);
+    assertTrue(hostStats.getNumUniqueHostDiskPairs() >= 0);
   }
 
   @Test

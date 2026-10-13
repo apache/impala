@@ -82,6 +82,9 @@ public class FileMetadataLoader {
   // gets called.
   protected FileMetadataStats fileMetadataStats_ = null;
 
+  // Host statistics for logging.
+  protected FileMetadataHostStats fileMetadataHostStats_;
+
   /**
    * @param partDir the dir for which to fetch file metadata
    * @param recursive whether to recursively list files
@@ -184,6 +187,7 @@ public class FileMetadataLoader {
     Path partPath = FileSystemUtil.createFullyQualifiedPath(new Path(partDir_));
     loadStats_ = new LoadStats(partDir_);
     fileMetadataStats_ = new FileMetadataStats();
+    fileMetadataHostStats_ = new FileMetadataHostStats();
     FileSystem fs = partPath.getFileSystem(CONF);
 
     // If we don't have any prior FDs from which we could re-use old block location info,
@@ -233,6 +237,7 @@ public class FileMetadataLoader {
             fileStatus, partPath);
         loadedFds_.add(Preconditions.checkNotNull(fd));
         fileMetadataStats_.accumulate(fd);
+        fileMetadataHostStats_.accumulate(fd);
 
         // Track access time stats
         long accessTime = fileStatus.getAccessTime();
@@ -268,6 +273,10 @@ public class FileMetadataLoader {
 
   public FileMetadataStats getFileMetadataStats() {
     return fileMetadataStats_;
+  }
+
+  public FileMetadataHostStats getFileMetadataHostStats() {
+    return fileMetadataHostStats_;
   }
 
   /**

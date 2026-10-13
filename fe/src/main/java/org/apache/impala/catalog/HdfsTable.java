@@ -756,6 +756,7 @@ public class HdfsTable extends Table implements FeFsTable {
         getFullName());
 
 
+    FileMetadataHostStats loadHostStats = null;
     if (!skipIcebergFileMetadataLoading_) {
       // Actually load the partitions.
       // TODO(IMPALA-8406): if this fails to load files from one or more partitions, then
@@ -763,9 +764,12 @@ public class HdfsTable extends Table implements FeFsTable {
       // operation we're in the middle of. This could cause a partial metadata update
       // -- eg we may have refreshed the top-level table properties without refreshing the
       // files.
-      new ParallelFileMetadataLoader(getFileSystem(), partBuilders, validWriteIds_,
-          validTxnList, Utils.shouldRecursivelyListPartitions(this),
-          getHostIndex(), debugActions, logPrefix).load();
+      ParallelFileMetadataLoader metadataLoader = new ParallelFileMetadataLoader(
+          getFileSystem(), partBuilders, validWriteIds_, validTxnList,
+          Utils.shouldRecursivelyListPartitions(this), getHostIndex(), debugActions,
+          logPrefix);
+      metadataLoader.load();
+      loadHostStats = metadataLoader.getAggregatedHostStats();
     }
 
     // Aggregate file metadata stats from all partitions
@@ -796,7 +800,8 @@ public class HdfsTable extends Table implements FeFsTable {
 
     // Log detailed file metadata statistics
     if (LOG.isInfoEnabled()) {
-      LOG.info(aggregatedStats.toLogString(getFullName(), partNames, duration));
+      LOG.info(aggregatedStats.toLogString(
+          getFullName(), partNames, duration, loadHostStats));
     }
     return duration;
   }

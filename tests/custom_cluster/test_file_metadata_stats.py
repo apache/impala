@@ -15,10 +15,11 @@
 # specific language governing permissions and limitations
 # under the License.
 
+import pytest
+
 from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
 from tests.common.environ import ImpalaTestClusterProperties
 from tests.common.skip import SkipIf, IS_OZONE
-import pytest
 
 
 @pytest.mark.execute_serially
@@ -90,8 +91,8 @@ class TestFileMetadataStats(CustomClusterTestSuite):
     self.execute_query("refresh {}".format(tbl_name))
 
     # Verify comprehensive statistics are logged
-    log_regex = r"Loaded file and block metadata for.*{}.*Files: \d+.*Blocks: \d+".\
-        format(tbl_name.replace(".", r"\."))
+    log_regex = (r"Loaded file and block metadata for.*{}.*Files: \d+.*Blocks: \d+"
+                 r".*Hosts: \d+").format(tbl_name.replace(".", r"\."))
     self.assert_catalogd_log_contains("INFO", log_regex, expected_count=-1, timeout_s=10)
 
     # Verify total size is logged

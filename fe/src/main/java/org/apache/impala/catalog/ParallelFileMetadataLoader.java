@@ -81,6 +81,9 @@ public class ParallelFileMetadataLoader {
   // Object returned by the corresponding loader.
   private final List<Consumer<Object>> updaters_;
 
+  // Host statistics aggregated across paths loaded in the most recent {@link #load()}.
+  private FileMetadataHostStats aggregatedHostStats_;
+
   /**
    * Constructs a loader for file descriptors and metadata stats.
    */
@@ -175,6 +178,7 @@ public class ParallelFileMetadataLoader {
    */
   public void load() throws TableLoadingException {
     if (loaders_.isEmpty()) return;
+    aggregatedHostStats_ = new FileMetadataHostStats();
 
     int failedLoadTasks = 0;
     int poolSize = getPoolSize(loaders_.size(), fs_);
@@ -194,6 +198,13 @@ public class ParallelFileMetadataLoader {
         try {
           Object result = future.second.get();
           updaters_.get(i).accept(result);
+          if (result instanceof FileMetadataLoader) {
+            FileMetadataHostStats pathHostStats =
+                ((FileMetadataLoader) result).getFileMetadataHostStats();
+            if (pathHostStats != null) {
+              aggregatedHostStats_.merge(pathHostStats);
+            }
+          }
         } catch (ExecutionException | InterruptedException e) {
           if (++failedLoadTasks <= MAX_PATH_METADATA_LOADING_ERRORS_TO_LOG) {
             LOG.error("{} encountered an error loading data for path {}",
@@ -215,6 +226,10 @@ public class ParallelFileMetadataLoader {
       throw new TableLoadingException(logPrefix_ + ": failed to load " + failedLoadTasks
           + " paths. Check the catalog server log for more details.");
     }
+  }
+
+  public FileMetadataHostStats getAggregatedHostStats() {
+    return aggregatedHostStats_;
   }
 
   /**
