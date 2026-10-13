@@ -26,6 +26,8 @@ namespace impala {
 class LikePredicateTests {
 public:
   static void TestMatchOptimization();
+  static bool MatchConstant(const string& pattern, const string& value,
+      bool case_sensitive);
 
 private:
   static LikePredicate::LikePredicateFunction GetMatchFunction(const string& pattern,
@@ -80,8 +82,51 @@ LikePredicate::LikePredicateFunction LikePredicateTests::GetMatchFunction(
   return test_state.function_;
 }
 
+// Runs a constant pattern through OptimizeConstantPatternMatch() and matches it
+// against the given value the same way RegexMatch() does for constant patterns.
+bool LikePredicateTests::MatchConstant(const string& pattern, const string& value,
+    bool case_sensitive) {
+  LikePredicate::LikePredicateState test_state;
+  test_state.case_sensitive_ = case_sensitive;
+  test_state.function_ = &LikePredicate::LikeFn;
+  LikePredicate::OptimizeConstantPatternMatch(pattern, &test_state);
+  re2::StringPiece operand(value.data(), value.size());
+  if (test_state.function_ == &LikePredicate::LikeFn) {
+    return RE2::FullMatch(operand, *test_state.regex_.get());
+  }
+  return RE2::PartialMatch(operand, *test_state.regex_.get());
+}
+
 TEST(TestLikePredicate, RegexMatchOptimization) {
     LikePredicateTests::TestMatchOptimization();
+}
+
+// IMPALA-15547 regression: constant LIKE patterns with embedded NUL bytes must not
+// be truncated at the first NUL when converting the LIKE pattern to a regex. The
+// truncation was introduced by the IMPALA-12374 constant pattern optimization.
+TEST(TestLikePredicate, RegexMatchWithEmbeddedNul) {
+  // Untrimmed pattern: the trailing % must not make the suffix after the NUL
+  // disappear. Before the fix the pattern was truncated to "a%" and "ax" matched.
+  EXPECT_FALSE(LikePredicateTests::MatchConstant(
+      std::string("a%\0b", 4), "ax", true));
+  EXPECT_TRUE(LikePredicateTests::MatchConstant(
+      std::string("a%\0b", 4), std::string("a\0b", 3), true));
+
+  // Pattern with leading and trailing %: the trimmed pattern must keep the bytes
+  // after the NUL. Before the fix it was truncated to "a", so any value containing
+  // "a" (e.g. "xa\0") matched.
+  EXPECT_TRUE(LikePredicateTests::MatchConstant(
+      std::string("%a\0_%", 5), std::string("xa\0c", 4), true));
+  EXPECT_TRUE(LikePredicateTests::MatchConstant(
+      std::string("%a\0_%", 5), std::string("xa\0cc", 5), true));
+  EXPECT_FALSE(LikePredicateTests::MatchConstant(
+      std::string("%a\0_%", 5), std::string("xa\0", 3), true));
+
+  // Case-insensitive (ILIKE) takes the same regex conversion path.
+  EXPECT_TRUE(LikePredicateTests::MatchConstant(
+      std::string("%a\0_%", 5), std::string("xA\0C", 4), false));
+  EXPECT_FALSE(LikePredicateTests::MatchConstant(
+      std::string("%a\0_%", 5), std::string("xa\0", 3), false));
 }
 
 } // namespace impala

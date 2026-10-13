@@ -382,7 +382,9 @@ void LikePredicate::OptimizeConstantPatternMatch(const string &pattern,
     bool re_full_match = true;
     bool re_anchor_start = false;
     bool re_anchor_end = false;
-    StringVal re_pattern_val = StringVal(pattern.c_str());
+    StringVal re_pattern_val =
+        StringVal(reinterpret_cast<uint8_t*>(const_cast<char*>(pattern.data())),
+            pattern.size());
     // IMPALA-12374:
     // Avoid leading/trailing .* in regex, use (anchored) partial match instead
     re2::RE2 leading_trailing_re("(?:%+)(.*)(?:%+)");
@@ -392,17 +394,23 @@ void LikePredicate::OptimizeConstantPatternMatch(const string &pattern,
     if (RE2::FullMatch(pattern, leading_trailing_re, &trimmed_pattern) &&
         !RE2::FullMatch(pattern, ends_with_escaped_wildcard)) {
       // e.g. '%a%b%'
-      re_pattern_val = StringVal(trimmed_pattern.c_str());
+      re_pattern_val =
+          StringVal(reinterpret_cast<uint8_t*>(const_cast<char*>(
+              trimmed_pattern.data())), trimmed_pattern.size());
       re_full_match = false;
     } else if(RE2::FullMatch(pattern, leading_re, &trimmed_pattern)) {
       // e.g. '%a%b'
-      re_pattern_val = StringVal(trimmed_pattern.c_str());
+      re_pattern_val =
+          StringVal(reinterpret_cast<uint8_t*>(const_cast<char*>(
+              trimmed_pattern.data())), trimmed_pattern.size());
       re_full_match = false;
       re_anchor_end = true;
     } else if(RE2::FullMatch(pattern, trailing_re, &trimmed_pattern) &&
         !RE2::FullMatch(pattern, ends_with_escaped_wildcard)) {
       // e.g. 'a%b%'
-      re_pattern_val = StringVal(trimmed_pattern.c_str());
+      re_pattern_val =
+          StringVal(reinterpret_cast<uint8_t*>(const_cast<char*>(
+              trimmed_pattern.data())), trimmed_pattern.size());
       re_full_match = false;
       re_anchor_start = true;
     }
