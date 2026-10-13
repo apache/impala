@@ -16,6 +16,7 @@
 # under the License.
 
 import os
+import time
 from urllib.parse import quote
 
 import pytest
@@ -23,6 +24,7 @@ import requests
 
 from tests.common.custom_cluster_test_suite import CustomClusterTestSuite, HIVE_CONF_DIR
 from tests.common.iceberg_rest_server import IcebergRestServer
+from tests.common.impala_connection import IMPALA_CONNECTION_EXCEPTION
 from tests.util.filesystem_utils import get_fs_path
 from tests.util.hdfs_util import HadoopFsCommandLineClient
 
@@ -44,6 +46,7 @@ MULTIPLE_REST_WITHOUT_CATALOGD_IMPALAD_ARGS = """--use_local_catalog=true
         .format(IMPALA_HOME)
 MULTICATALOG_CATALOGD_ARGS = "--catalog_topic_mode=minimal"
 WRITE_TEST_TABLE = "impala_rest_dml_test.insert_test"
+PARTITIONED_WRITE_TEST_TABLE = "impala_rest_dml_test.partitioned_insert_test"
 SECONDARY_WRITE_TEST_TABLE = "impala_rest_dml_test_secondary.insert_test"
 WRITE_TEST_CATALOG_LOCATION = IcebergRestServer.DEFAULT_CATALOG_LOCATION
 SECONDARY_WRITE_TEST_CATALOG_LOCATION = \
@@ -53,8 +56,9 @@ SECONDARY_WRITE_TEST_CATALOG_LOCATION = \
 def RestServerProperties(*server_configs):
   """
   Annotation to specify configurations for multiple REST servers to be started.
-  Each argument is a dictionary with optional 'port', 'catalog_location', and
-  'test_table' keys.
+  Each argument is a dictionary with optional 'port', 'catalog_location',
+  'test_table' and 'partitioned_test_table' keys. The test tables are created through
+  the REST API, see _create_rest_test_table().
   Example:
   @RestServerProperties({'port': 9085},
       {'port': 9086, 'catalog_location': '/tmp/cat2', 'test_table': 'db.tbl'})
@@ -74,6 +78,7 @@ class IcebergRestCatalogTests(CustomClusterTestSuite):
           "running without Hive.")
     self.servers = []
     self.rest_test_tables = []
+    self.partitioned_rest_test_tables = set()
 
     server_configs = getattr(method, 'rest_server_configs', None)
 
@@ -83,18 +88,23 @@ class IcebergRestCatalogTests(CustomClusterTestSuite):
         catalog_location = config.get('catalog_location',
             IcebergRestServer.DEFAULT_CATALOG_LOCATION)
         test_table = config.get('test_table')
+        partitioned_test_table = config.get('partitioned_test_table')
         print("Starting REST server with annotation properties: "
               "Port=%s, Catalog Location=%s" % (port, catalog_location))
         server = IcebergRestServer(port, catalog_location)
         self.servers.append(server)
         if test_table:
           self.rest_test_tables.append((server, test_table))
+        if partitioned_test_table:
+          self.rest_test_tables.append((server, partitioned_test_table))
+          self.partitioned_rest_test_tables.add(partitioned_test_table)
 
     try:
       for server in self.servers:
         server.start_rest_server(300)
       for server, table_name in self.rest_test_tables:
-        self._create_rest_test_table(server, table_name)
+        self._create_rest_test_table(server, table_name,
+            partitioned=table_name in self.partitioned_rest_test_tables)
       super(IcebergRestCatalogTests, self).setup_method(method)
       # At this point we can create the Impala clients that we will need.
       self.create_impala_clients()
@@ -143,7 +153,9 @@ class IcebergRestCatalogTests(CustomClusterTestSuite):
       response.raise_for_status()
 
   @classmethod
-  def _create_rest_test_table(cls, server, table_name):
+  def _create_rest_test_table(cls, server, table_name, partitioned=False):
+    """Creates 'table_name' with an INT column 'i'. A partitioned table also gets an INT
+    column 'p' and an identity partition spec on it."""
     namespace, table = table_name.split('.', 1)
     cls._drop_rest_test_table(server, table_name)
     namespace_response = requests.post(
@@ -152,19 +164,27 @@ class IcebergRestCatalogTests(CustomClusterTestSuite):
     if namespace_response.status_code != 409:
       namespace_response.raise_for_status()
 
+    fields = [{'id': 1, 'name': 'i', 'required': False, 'type': 'int'}]
+    create_request = {
+        'name': table,
+        'schema': {
+            'type': 'struct',
+            'schema-id': 0,
+            'fields': fields,
+        },
+        'properties': {'format-version': '2'},
+    }
+    if partitioned:
+      fields.append({'id': 2, 'name': 'p', 'required': False, 'type': 'int'})
+      create_request['partition-spec'] = {
+          'spec-id': 0,
+          'fields': [{'source-id': 2, 'field-id': 1000, 'name': 'p',
+                      'transform': 'identity'}],
+      }
     create_response = requests.post(
         "http://localhost:{}/v1/namespaces/{}/tables".format(
             server.port, quote(namespace, safe='')),
-        json={
-            'name': table,
-            'schema': {
-                'type': 'struct',
-                'schema-id': 0,
-                'fields': [
-                    {'id': 1, 'name': 'i', 'required': False, 'type': 'int'}],
-            },
-            'properties': {'format-version': '2'},
-        }, timeout=30)
+        json=create_request, timeout=30)
     create_response.raise_for_status()
 
 
@@ -284,7 +304,6 @@ class TestIcebergRestCatalogDmlStandalone(IcebergRestCatalogTests):
     assert len(filesystem_client.ls(data_path)) == 1
 
     unsupported_statements = [
-        "insert overwrite {} values (2)".format(table_name),
         "truncate table {}".format(table_name),
         "delete from {} where i = 1".format(table_name),
         "update {} set i = 2 where i = 1".format(table_name),
@@ -295,7 +314,8 @@ class TestIcebergRestCatalogDmlStandalone(IcebergRestCatalogTests):
     ]
     for statement in unsupported_statements:
       error = self.execute_query_expect_failure(self.client, statement)
-      assert "AnalysisException: Only INSERT INTO is supported" in str(error)
+      assert ("AnalysisException: Only INSERT INTO and INSERT OVERWRITE are supported"
+          in str(error))
 
   @RestServerProperties(
       {'port': 9084, 'catalog_location': WRITE_TEST_CATALOG_LOCATION,
@@ -322,6 +342,62 @@ class TestIcebergRestCatalogDmlStandalone(IcebergRestCatalogTests):
     assert result.data == ['2']
     assert self._snapshot_count(WRITE_TEST_TABLE) == 1
     assert self._snapshot_count(SECONDARY_WRITE_TEST_TABLE) == 1
+
+  @RestServerProperties(
+      {'port': 9084, 'catalog_location': WRITE_TEST_CATALOG_LOCATION,
+       'test_table': WRITE_TEST_TABLE,
+       'partitioned_test_table': PARTITIONED_WRITE_TEST_TABLE})
+  @CustomClusterTestSuite.with_args(
+     impalad_args=REST_STANDALONE_IMPALAD_ARGS,
+     start_args=NO_CATALOGD_STARTARGS,
+     cluster_size=1)
+  @pytest.mark.execute_serially
+  def test_rest_catalog_insert_overwrite(self, vector):
+    self.run_test_case('QueryTest/iceberg-rest-insert-overwrite', vector,
+        use_db="impala_rest_dml_test")
+
+    # Without catalogd, nothing orders the commits of a REST table but Iceberg's own
+    # validation. An overwrite planned before a concurrent write commits must fail
+    # instead of erasing that write.
+    table_name = WRITE_TEST_TABLE
+    self.execute_query_expect_success(
+        self.client, "insert overwrite {} values (1)".format(table_name))
+    self._check_overwrite_conflict(
+        table_name, "insert into {} values (2)".format(table_name))
+    result = self.execute_query_expect_success(
+        self.client, "select i from {}".format(table_name))
+    assert sorted(result.data) == ['1', '2']
+
+    self._check_overwrite_conflict(
+        table_name, "insert overwrite {} values (3)".format(table_name))
+    result = self.execute_query_expect_success(
+        self.client, "select i from {}".format(table_name))
+    assert result.data == ['3']
+
+  def _check_overwrite_conflict(self, table_name, concurrent_stmt):
+    """Runs 'concurrent_stmt' while a slow INSERT OVERWRITE on 'table_name' is
+    executing, and checks that the overwrite fails to commit and leaves no files."""
+    namespace, table = table_name.split('.', 1)
+    data_path = get_fs_path("{}/{}/{}/data".format(
+        WRITE_TEST_CATALOG_LOCATION, namespace, table))
+    filesystem_client = HadoopFsCommandLineClient()
+    files_before = set(filesystem_client.ls(data_path))
+
+    handle = self.client.execute_async(
+        "insert overwrite {} select sleep(5000)".format(table_name))
+    time.sleep(1)
+    self.execute_query_expect_success(self.client, concurrent_stmt)
+    with pytest.raises(IMPALA_CONNECTION_EXCEPTION) as error:
+      self.client.wait_for_finished_timeout(handle, 30)
+    assert "Found conflicting files" in str(error.value)
+
+    # Every file written since the overwrite started belongs to 'concurrent_stmt'.
+    result = self.execute_query_expect_success(
+        self.client, "select file_path from {}.`files`".format(table_name))
+    table_files = set(path.rsplit('/', 1)[-1] for path in result.data)
+    new_files = set(filesystem_client.ls(data_path)) - files_before
+    assert new_files
+    assert new_files <= table_files
 
   def _snapshot_count(self, table_name):
     result = self.execute_query_expect_success(

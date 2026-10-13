@@ -62,6 +62,35 @@ class TestIcebergRestCatalogCleanup(BaseTestSuite):
     existing_namespace.raise_for_status.assert_not_called()
     created_table.raise_for_status.assert_called_once_with()
 
+  def test_partitioned_table_fixture_adds_identity_spec(self):
+    server = Mock(port=9084)
+
+    with patch('tests.custom_cluster.test_iceberg_rest_catalog.requests.delete',
+               return_value=Mock(status_code=404)), \
+        patch('tests.custom_cluster.test_iceberg_rest_catalog.requests.post',
+              side_effect=[Mock(status_code=409), Mock(status_code=200)]) as post:
+      IcebergRestCatalogTests._create_rest_test_table(
+          server, 'impala_rest_dml_test.partitioned_insert_test', partitioned=True)
+
+    assert post.call_args_list[1] == call(
+        'http://localhost:9084/v1/namespaces/impala_rest_dml_test/tables',
+        json={
+            'name': 'partitioned_insert_test',
+            'schema': {
+                'type': 'struct',
+                'schema-id': 0,
+                'fields': [
+                    {'id': 1, 'name': 'i', 'required': False, 'type': 'int'},
+                    {'id': 2, 'name': 'p', 'required': False, 'type': 'int'}],
+            },
+            'partition-spec': {
+                'spec-id': 0,
+                'fields': [{'source-id': 2, 'field-id': 1000, 'name': 'p',
+                            'transform': 'identity'}],
+            },
+            'properties': {'format-version': '2'},
+        }, timeout=30)
+
   @pytest.mark.parametrize('failed_servers', [[], [0], [1], [0, 1]])
   def test_teardown_stops_all_servers_and_runs_parent(self, failed_servers):
     suite = IcebergRestCatalogTests()

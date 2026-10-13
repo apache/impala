@@ -96,10 +96,9 @@ final class IcebergDmlFinalizer {
 
   static void validateRestDmlOperation(TIcebergOperationParam operation)
       throws ImpalaRuntimeException {
-    if (operation.getOperation() != TIcebergOperation.INSERT
-        || operation.isIs_overwrite()) {
+    if (operation.getOperation() != TIcebergOperation.INSERT) {
       throw new ImpalaRuntimeException(
-          "The Iceberg REST finalizer only supports INSERT INTO");
+          "The Iceberg REST finalizer only supports INSERT INTO and INSERT OVERWRITE");
     }
     if (!operation.isSetTable_uuid()) {
       throw new ImpalaRuntimeException(

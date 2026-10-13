@@ -207,6 +207,11 @@ public class Analyzer {
       "%s is a bucketed table. Only read operations are supported on such tables.";
   private static final String TABLE_NOT_SUPPORTED =
       "%s not supported. Table %s  access type is: %s";
+  private static final String REST_TABLE_WRITE_NOT_SUPPORTED =
+      "Only INSERT INTO and INSERT OVERWRITE are supported for REST-backed Iceberg " +
+      "table: %s";
+  private static final String REST_TABLE_UUID_UNAVAILABLE =
+      "INSERT is disabled because the Iceberg table UUID is unavailable: %s";
 
   private final static Logger LOG = LoggerFactory.getLogger(Analyzer.class);
 
@@ -401,9 +406,9 @@ public class Analyzer {
     }
   }
 
-  static boolean supportsInsertInto(FeTable table) {
+  static boolean supportsInsert(FeTable table) {
     return table instanceof FeIcebergTable
-        && ((FeIcebergTable)table).supportsInsertInto();
+        && ((FeIcebergTable)table).supportsInsert();
   }
 
   static boolean hasProviderDerivedCapabilities(FeTable table) {
@@ -411,17 +416,19 @@ public class Analyzer {
         && ((FeIcebergTable)table).hasProviderDerivedCapabilities();
   }
 
-  /** Check whether a table supports this write operation. */
-  static void ensureTableWriteSupported(FeTable table, boolean isInsertInto)
+  /**
+   * Check whether a table supports this write operation. 'isInsert' is true for
+   * INSERT INTO and INSERT OVERWRITE, and false for every other write, UPSERT included.
+   */
+  static void ensureTableWriteSupported(FeTable table, boolean isInsert)
       throws AnalysisException {
     if (!hasProviderDerivedCapabilities(table)) {
       ensureTableWriteSupported(table);
       return;
     }
-    if (!isInsertInto) {
-      throw new AnalysisException(String.format(
-          "Only INSERT INTO is supported for REST-backed Iceberg table: %s",
-          table.getFullName()));
+    if (!isInsert) {
+      throw new AnalysisException(
+          String.format(REST_TABLE_WRITE_NOT_SUPPORTED, table.getFullName()));
     }
     ensureRestCatalogInsertEnabled(table);
     // The provider-derived capability replaces only the HMS access-type check. Keep
@@ -434,9 +441,9 @@ public class Analyzer {
 
   private static void ensureRestCatalogInsertEnabled(FeTable table)
       throws AnalysisException {
-    if (!supportsInsertInto(table)) {
+    if (!supportsInsert(table)) {
       throw new AnalysisException(String.format(
-          "INSERT INTO is disabled because the REST catalog does not have a "
+          "INSERT is disabled because the REST catalog does not have a "
               + "unique name: %s",
           table.getFullName()));
     }
@@ -445,14 +452,12 @@ public class Analyzer {
         ((FeIcebergTable)table).getIcebergApiTable();
     try {
       if (apiTable == null || apiTable.uuid() == null) {
-        throw new AnalysisException(String.format(
-            "INSERT INTO is disabled because the Iceberg table UUID is unavailable: %s",
-            table.getFullName()));
+        throw new AnalysisException(
+            String.format(REST_TABLE_UUID_UNAVAILABLE, table.getFullName()));
       }
     } catch (UnsupportedOperationException e) {
-      throw new AnalysisException(String.format(
-          "INSERT INTO is disabled because the Iceberg table UUID is unavailable: %s",
-          table.getFullName()));
+      throw new AnalysisException(
+          String.format(REST_TABLE_UUID_UNAVAILABLE, table.getFullName()));
     }
   }
 

@@ -33,6 +33,9 @@ import org.apache.impala.compat.MetastoreShim;
 import org.junit.Test;
 
 public class AnalyzerCapabilityTest {
+  private static final String WRITE_NOT_SUPPORTED =
+      "Only INSERT INTO and INSERT OVERWRITE are supported";
+
   @Test
   public void testInsertCapabilityOnlyBypassesHmsAccessType() throws Exception {
     FeIcebergTable table = mock(FeIcebergTable.class);
@@ -45,20 +48,17 @@ public class AnalyzerCapabilityTest {
     when(table.getMetaStoreTable()).thenReturn(msTable);
     when(table.getFullName()).thenReturn("rest_db.rest_table");
     when(table.hasProviderDerivedCapabilities()).thenReturn(true);
-    when(table.supportsInsertInto()).thenReturn(true);
+    when(table.supportsInsert()).thenReturn(true);
     org.apache.iceberg.Table apiTable = mock(org.apache.iceberg.Table.class);
     when(apiTable.uuid()).thenReturn(UUID.randomUUID());
     when(table.getIcebergApiTable()).thenReturn(apiTable);
 
+    // INSERT INTO and INSERT OVERWRITE both take the 'isInsert' path.
     Analyzer.ensureTableWriteSupported(table, true);
 
-    try {
-      Analyzer.checkTableCapability(table, Analyzer.OperationType.WRITE);
-      fail("Expected non-INSERT DML to be rejected");
-    } catch (AnalysisException e) {
-      assertTrue(e.getMessage(),
-          e.getMessage().contains("Only INSERT INTO is supported"));
-    }
+    // Every other write reaches ensureTableWriteSupported() through
+    // checkTableCapability(WRITE).
+    assertRejectedNonInsertDml(table, WRITE_NOT_SUPPORTED);
 
     storageDescriptor.setNumBuckets(1);
     assertInsertRejected(table,
@@ -70,11 +70,11 @@ public class AnalyzerCapabilityTest {
     FeIcebergTable table = mock(FeIcebergTable.class);
     when(table.getFullName()).thenReturn("rest_db.rest_table");
     when(table.hasProviderDerivedCapabilities()).thenReturn(true);
-    when(table.supportsInsertInto()).thenReturn(false);
+    when(table.supportsInsert()).thenReturn(false);
 
     assertInsertRejected(table,
         "REST catalog does not have a unique name");
-    assertRejectedNonInsertDml(table, "Only INSERT INTO is supported");
+    assertRejectedNonInsertDml(table, WRITE_NOT_SUPPORTED);
   }
 
   @Test
@@ -82,11 +82,11 @@ public class AnalyzerCapabilityTest {
     FeIcebergTable table = mock(FeIcebergTable.class);
     when(table.getFullName()).thenReturn("rest_db.rest_table");
     when(table.hasProviderDerivedCapabilities()).thenReturn(true);
-    when(table.supportsInsertInto()).thenReturn(true);
+    when(table.supportsInsert()).thenReturn(true);
 
     assertInsertRejected(table,
         "Iceberg table UUID is unavailable");
-    assertRejectedNonInsertDml(table, "Only INSERT INTO is supported");
+    assertRejectedNonInsertDml(table, WRITE_NOT_SUPPORTED);
   }
 
   private static void assertRejectedNonInsertDml(

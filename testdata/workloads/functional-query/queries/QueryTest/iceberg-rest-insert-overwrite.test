@@ -1,0 +1,74 @@
+====
+---- QUERY
+# The table is created through the REST API and has no snapshot yet.
+insert overwrite insert_test values (1);
+select * from insert_test;
+---- RESULTS
+1
+---- TYPES
+INT
+====
+---- QUERY
+insert into insert_test values (2);
+insert overwrite insert_test values (3);
+select * from insert_test;
+---- RESULTS
+3
+---- TYPES
+INT
+====
+---- QUERY
+# Overwrite the table with a query that reads it.
+insert overwrite insert_test select cast(i + 1 as int) from insert_test;
+select * from insert_test;
+---- RESULTS
+4
+---- TYPES
+INT
+====
+---- QUERY
+# Every statement above committed exactly one snapshot.
+select count(*) from impala_rest_dml_test.insert_test.snapshots;
+---- RESULTS
+4
+---- TYPES
+BIGINT
+====
+---- QUERY
+# An empty result clears an unpartitioned table.
+insert overwrite insert_test select * from insert_test where false;
+select * from insert_test;
+---- RESULTS
+---- TYPES
+INT
+====
+---- QUERY
+# Only partition p=2 receives rows, so partition p=1 is kept.
+insert into partitioned_insert_test values (1, 1), (2, 2);
+insert overwrite partitioned_insert_test values (20, 2);
+select * from partitioned_insert_test;
+---- RESULTS
+1,1
+20,2
+---- TYPES
+INT,INT
+====
+---- QUERY
+# An empty result replaces no partition of a partitioned table, so nothing is
+# committed.
+insert overwrite partitioned_insert_test
+select * from partitioned_insert_test where false;
+select count(*) from impala_rest_dml_test.partitioned_insert_test.snapshots;
+---- RESULTS
+2
+---- TYPES
+BIGINT
+====
+---- QUERY
+select * from partitioned_insert_test;
+---- RESULTS
+1,1
+20,2
+---- TYPES
+INT,INT
+====
