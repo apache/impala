@@ -51,6 +51,10 @@ public class HistoricalStats {
   public static final String HBO_STATS_READ_COUNT = HBO_STATS_PREFIX + ".ReadCount";
   // Number of those reads that found the key in the cache (subset of ReadCount).
   public static final String HBO_STATS_HIT_COUNT = HBO_STATS_PREFIX + ".HitCount";
+  // Number of plan nodes that skipped the HBO lookup because HBOStats.TotalTime reached
+  // hbo_max_read_time_ms.
+  public static final String HBO_STATS_SKIPPED_COUNT =
+      HBO_STATS_PREFIX + ".SkippedCount";
 
   /** A matched HBO cardinality and the lookup provenance used to select it. */
   public record PlanNodeStatsMatch(

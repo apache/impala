@@ -1231,6 +1231,23 @@ abstract public class PlanNode extends TreeNode<PlanNode> {
    */
   protected void tryUpdateCardinalityFromHbo(Analyzer analyzer) {
     if (!analyzer.getQueryOptions().use_hbo_stats) return;
+    FrontendProfile profile = FrontendProfile.getCurrentOrNull();
+    // Stop reading HBO stats once the per-query time budget is exhausted. The node that
+    // crosses the threshold still finishes. Later nodes skip.
+    int limitMs = analyzer.getQueryOptions().getHbo_max_read_time_ms();
+    if (limitMs > 0 && profile != null) {
+      long totalNs = profile.getCounterValue(HistoricalStats.HBO_STATS_TOTAL_TIME);
+      if (totalNs >= limitMs * 1_000_000L) {
+        // Warn only on the first skip of the query.
+        if (profile.getCounterValue(HistoricalStats.HBO_STATS_SKIPPED_COUNT) == 0) {
+          LOG.warn("HBO is turned off for the rest of this query since the time limit "
+              + "is reached: HBOStats.TotalTime={}, hbo_max_read_time_ms={}",
+              PrintUtils.printTimeNs(totalNs), PrintUtils.printTimeMs(limitMs));
+        }
+        profile.addToCounter(HistoricalStats.HBO_STATS_SKIPPED_COUNT, TUnit.NONE, 1);
+        return;
+      }
+    }
     // Time the whole lookup, including hash-key generation.
     long startNs = System.nanoTime();
     try {
@@ -1249,7 +1266,6 @@ abstract public class PlanNode extends TreeNode<PlanNode> {
         LOG.debug("No HBO stats for {}. Keys: {}", getDisplayLabel(), hashKeys);
       }
     } finally {
-      FrontendProfile profile = FrontendProfile.getCurrentOrNull();
       if (profile != null) {
         profile.addToCounter(HistoricalStats.HBO_STATS_TOTAL_TIME, TUnit.TIME_NS,
             System.nanoTime() - startNs);

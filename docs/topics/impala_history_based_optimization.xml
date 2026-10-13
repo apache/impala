@@ -45,6 +45,24 @@ under the License.
       output. If cardinality statistics are read from the HBO cache, the EXPLAIN output or the query
       plan in the profile displays the "from HBO" annotation. Extended profile updates provide
       additional details regarding the applied HBO statistics.</p>
+    <p>The Frontend section of the query profile contains the following counters for the
+      HBO lookups that the planner performs. Each counter sums over all plan nodes of the
+      query:</p>
+    <ul>
+      <li><codeph>HBOStats.TotalTime</codeph>: The total time spent on HBO lookups,
+        including hash-key generation and reading from the cache backend.</li>
+      <li><codeph>HBOStats.ReadTime</codeph>: The time spent reading from the cache
+        backend. This is a subset of <codeph>HBOStats.TotalTime</codeph>.</li>
+      <li><codeph>HBOStats.ReadCount</codeph>: The number of lookups sent to the cache
+        backend.</li>
+      <li><codeph>HBOStats.HitCount</codeph>: The number of those lookups that found
+        statistics in the cache. This is a subset of
+        <codeph>HBOStats.ReadCount</codeph>.</li>
+      <li><codeph>HBOStats.SkippedCount</codeph>: The number of plan node lookups that
+        the planner skipped because <codeph>HBOStats.TotalTime</codeph> reached the limit
+        set by the <codeph>HBO_MAX_READ_TIME_MS</codeph> query option. This counter
+        appears only when at least one lookup was skipped.</li>
+    </ul>
     <p><b>EXPLAIN output examples</b></p>
     <p>When HBO is enabled and statistics are found in the cache, the EXPLAIN output shows
       "from HBO" annotations in the cardinality estimates. The following example shows a join query
@@ -86,6 +104,13 @@ under the License.
           <li dir="ltr">Enable the <codeph>USE_HBO_STATS</codeph> query option to instruct the
             planner to read and apply stored statistics from the HBO cache: <codeph>SET
               USE_HBO_STATS</codeph>=<codeph>true</codeph>;</li>
+          <li>Optionally, set the <codeph>HBO_MAX_READ_TIME_MS</codeph> query option to
+            limit the total time that the planner spends reading HBO statistics for a
+            query, for example when the HBO cache backend is slow. After the limit is
+            reached, the planner skips HBO for the remaining plan nodes of the query and
+            uses its normal cardinality estimates. The default value 0 means no limit.
+            For example, to allow at most 100 milliseconds: <codeph>SET
+              HBO_MAX_READ_TIME_MS</codeph>=<codeph>100</codeph>;</li>
         </ul>
       </p>
     </conbody>

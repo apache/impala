@@ -846,6 +846,9 @@ struct TQueryOptions {
 
   // See comment in ImpalaService.thrift
   210: optional bool chain_grouping_sets_preagg = true;
+
+  // See comment in ImpalaService.thrift
+  211: optional i32 hbo_max_read_time_ms = 0
 }
 
 // Impala currently has three types of sessions: Beeswax, HiveServer2 and external

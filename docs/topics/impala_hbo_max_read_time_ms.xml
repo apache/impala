@@ -1,0 +1,102 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+Licensed to the Apache Software Foundation (ASF) under one
+or more contributor license agreements.  See the NOTICE file
+distributed with this work for additional information
+regarding copyright ownership.  The ASF licenses this file
+to you under the Apache License, Version 2.0 (the
+"License"); you may not use this file except in compliance
+with the License.  You may obtain a copy of the License at
+
+  http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing,
+software distributed under the License is distributed on an
+"AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+KIND, either express or implied.  See the License for the
+specific language governing permissions and limitations
+under the License.
+-->
+<!DOCTYPE concept PUBLIC "-//OASIS//DTD DITA Concept//EN" "concept.dtd">
+<concept id="hbo_max_read_time_ms" rev="5.0.0">
+  <title>HBO_MAX_READ_TIME_MS Query Option</title>
+  <titlealts audience="PDF">
+    <navtitle>HBO MAX READ TIME MS</navtitle>
+  </titlealts>
+  <prolog>
+    <metadata>
+      <data name="Category" value="Impala"/>
+      <data name="Category" value="Impala Query Options"/>
+      <data name="Category" value="Troubleshooting"/>
+      <data name="Category" value="Querying"/>
+      <data name="Category" value="Developers"/>
+      <data name="Category" value="Data Analysts"/>
+    </metadata>
+  </prolog>
+  <conbody>
+    <p>
+      <indexterm audience="hidden">HBO_MAX_READ_TIME_MS query option</indexterm>
+      The <parmname>HBO_MAX_READ_TIME_MS</parmname> query option limits the total time
+      that the planner spends reading History Based Optimization (HBO) statistics for
+      one query.</p>
+    <p>When <parmname>USE_HBO_STATS</parmname> is enabled, the planner looks up
+      historical cardinality statistics for each supported plan node. If the HBO cache
+      backend is slow, these lookups can add noticeable time to query planning. An example
+      is a remote Redis or Valkey server that is configured with the
+      <codeph>--hbo_cache_backend=redis</codeph> startup flag. Set
+      <parmname>HBO_MAX_READ_TIME_MS</parmname> to bound that time. Once the limit is
+      reached, the planner stops reading HBO statistics for the rest of the query and
+      uses its normal cardinality estimates instead.</p>
+    <p conref="../shared/impala_common.xml#common/type_integer"/>
+    <p><b>Default:</b> 0 (no limit)</p>
+    <p><b>Units:</b> milliseconds</p>
+    <p>Negative values are rejected with an error.</p>
+    <p><b>Added in:</b>
+      <keyword keyref="impala51_full"/></p>
+    <p><b>Usage notes:</b></p>
+    <ul>
+      <li>This option takes effect only when <parmname>USE_HBO_STATS</parmname> is set
+        to <codeph>true</codeph>. Otherwise, the planner does not read HBO statistics and
+        there is nothing to limit.</li>
+      <li>The limit applies to the total time of all HBO lookups for the query, summed
+        over all plan nodes. This is the value of the <codeph>HBOStats.TotalTime</codeph>
+        counter in the Frontend section of the query profile. The time includes both
+        generating the hash keys and reading from the cache backend.</li>
+      <li>The planner checks the limit before it looks up the statistics for each plan
+        node. The plan node whose lookup crosses the limit still completes its lookup, so
+        the total time can exceed the limit by about the cost of one plan node lookup.
+        Every later plan node skips the HBO lookup and keeps its normal, non-HBO
+        cardinality estimate.</li>
+      <li>If Impala plans the query more than once, for example when it tries several
+        executor group sets, all of the planning attempts share one time budget.</li>
+      <li>The option affects only reading HBO statistics. It does not affect
+        <parmname>STORE_HBO_STATS</parmname>, and the time spent storing statistics does
+        not count against the limit.</li>
+      <li>Because the planner skips some HBO lookups, the plan can differ from the plan
+        that it would produce with no limit. Plan nodes that skip the lookup do not show
+        the "from HBO" annotation in the EXPLAIN output or in the query plan in the
+        profile.</li>
+    </ul>
+    <p><b>Observability when the limit is reached:</b></p>
+    <ul>
+      <li>The <codeph>HBOStats.SkippedCount</codeph> counter in the Frontend section of
+        the query profile shows how many plan node lookups the planner skipped. The
+        counter appears only when at least one lookup was skipped.</li>
+      <li>The coordinator log contains one warning for the query. The warning has the
+        following format, which is wrapped here for readability:
+        <codeblock>HBO is turned off for the rest of this query since the time limit
+is reached: HBOStats.TotalTime=..., hbo_max_read_time_ms=...</codeblock></li>
+    </ul>
+    <p><b>Examples:</b></p>
+    <p>Run the following commands to allow the planner to spend at most 100 milliseconds
+      reading HBO statistics for each query in the current
+      session:<codeblock>SET USE_HBO_STATS=true;
+SET HBO_MAX_READ_TIME_MS=100;</codeblock></p>
+    <p>Run the following command to remove the
+      limit:<codeblock>SET HBO_MAX_READ_TIME_MS=0;</codeblock></p>
+    <p conref="../shared/impala_common.xml#common/related_info"/>
+    <p><xref href="impala_history_based_optimization.xml"/></p>
+    <p><xref href="impala_use_hbo_stats.xml"/></p>
+    <p><xref href="impala_store_hbo_stats.xml"/></p>
+  </conbody>
+</concept>

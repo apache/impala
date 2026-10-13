@@ -1496,6 +1496,13 @@ Status impala::SetQueryOption(TImpalaQueryOptions::type option, const string& va
         query_options->__set_chain_grouping_sets_preagg(IsTrue(value));
         break;
       }
+      case TImpalaQueryOptions::HBO_MAX_READ_TIME_MS: {
+        int32_t int32_t_val = 0;
+        RETURN_IF_ERROR(QueryOptionParser::ParseAndCheckNonNegative<int32_t>(
+            option, value, &int32_t_val));
+        query_options->__set_hbo_max_read_time_ms(int32_t_val);
+        break;
+      }
       default:
         string key = to_string(option);
         if (IsRemovedQueryOption(key)) {

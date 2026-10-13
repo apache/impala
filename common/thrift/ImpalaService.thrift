@@ -1131,6 +1131,11 @@ enum TImpalaQueryOptions {
   // output of each grouping set into the next one instead of passing every input row to
   // every grouping set.
   CHAIN_GROUPING_SETS_PREAGG = 209
+
+  // Caps the total time (in ms) the planner may spend reading HBO stats, measured by
+  // the HBOStats.TotalTime profile counter. Once reached, the query stops reading from
+  // the HBO cache. 0 means no limit. Only has effect when use_hbo_stats is true.
+  HBO_MAX_READ_TIME_MS = 210
 }
 
 // The summary of a DML statement.

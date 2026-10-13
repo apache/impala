@@ -260,6 +260,16 @@ public class FrontendProfile {
     counter.value = value;
   }
 
+  /**
+   * Returns the current value of the counter with the given name, or 0 if no such
+   * counter exists yet.
+   */
+  public synchronized long getCounterValue(String name) {
+    Preconditions.checkState(profile_ != null, "already emitted profile");
+    TCounter counter = countersByName_.get(Preconditions.checkNotNull(name));
+    return counter == null ? 0 : counter.value;
+  }
+
   public static class Scope implements AutoCloseable {
     private final FrontendProfile oldThreadLocalValue_;
 

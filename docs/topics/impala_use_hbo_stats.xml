@@ -53,6 +53,9 @@ under the License.
         optimization.</li>
       <li>Verify whether cardinality statistics were read from HBO by inspecting the query profile
         or EXPLAIN output. Plan nodes using cached statistics display a "from HBO" annotation.</li>
+      <li>To bound the time that the planner spends reading HBO statistics for a query,
+        for example when the HBO cache backend is slow, set the
+        <parmname>HBO_MAX_READ_TIME_MS</parmname> query option.</li>
     </ul>
     <p><b>Examples:</b></p>
     <p>Run the following command to enable reading HBO statistics for the current
@@ -60,5 +63,6 @@ under the License.
     <p conref="../shared/impala_common.xml#common/related_info"/>
     <p><xref href="impala_history_based_optimization.xml"/></p>
     <p><xref href="impala_store_hbo_stats.xml"/></p>
+    <p><xref href="impala_hbo_max_read_time_ms.xml"/></p>
   </conbody>
 </concept>
