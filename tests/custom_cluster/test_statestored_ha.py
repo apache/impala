@@ -67,6 +67,15 @@ class TestStatestoredHA(CustomClusterTestSuite):
     _, catalog_service_port = active_catalogd_address.split(":")
     return int(catalog_service_port)
 
+  # Wait until the active catalogd of statestore has the given catalog service port.
+  def __wait_for_active_catalogd_port(self, statestore_service, port, timeout_s=60):
+    start_time = time.time()
+    while statestore_service.get_metric_value(
+        "statestore.active-catalogd-address").split(":")[-1] != str(port):
+      assert time.time() - start_time < timeout_s, \
+          "Active catalogd of statestore is not at port {0}".format(port)
+      sleep(1)
+
   # Verify port of the active catalogd of impalad is matching with the catalog
   # service port of the given catalogd service.
   def __verify_impalad_active_catalogd_port(self, impalad_index, catalogd_service):
@@ -808,6 +817,111 @@ class TestStatestoredHA(CustomClusterTestSuite):
            % (elapsed_s))
     finally:
       client.close()
+
+  # Delay of each statestore registration of the restarted catalogd on startup.
+  REGISTRATION_DELAY_MS = 10000
+
+  @pytest.mark.execute_serially
+  @CustomClusterTestSuite.with_args(
+    statestored_args="--use_network_address_as_statestore_priority=true "
+                     "--statestore_ha_heartbeat_monitoring_frequency_ms=50 "
+                     "--heartbeat_monitoring_frequency_ms=6000 "
+                     "--statestore_peer_timeout_seconds=2 "
+                     "--use_subscriber_id_as_catalogd_priority=true",
+    impalad_args="--statestore_subscriber_timeout_seconds=2",
+    catalogd_args="--statestore_subscriber_timeout_seconds=2",
+    start_args="--enable_statestored_ha --enable_catalogd_ha",
+    disable_log_buffering=True)
+  def test_catalogd_failover_after_statestored_failover_on_startup(self):
+    """A catalogd registers with the standby statestored, which then takes over before
+    the catalogd finishes registering with the other statestored on startup. The
+    catalogd gets UpdateStatestoredRole from the new active statestored in between, so
+    it must keep that statestored as active after the second registration. Then the
+    active catalogd is killed, and the restarted catalogd must become active."""
+    statestoreds = self.cluster.statestoreds()
+    assert len(statestoreds) == 2
+    statestore_service_0 = statestoreds[0].service
+    statestore_service_1 = statestoreds[1].service
+    assert statestore_service_0.get_metric_value("statestore.active-status")
+    assert not statestore_service_1.get_metric_value("statestore.active-status")
+
+    # Subscribers register with statestoreds[0] (--state_store_port) first. Make it the
+    # standby one: fail over to statestoreds[1], then restart statestoreds[0].
+    statestoreds[0].kill()
+    self.__wait_statestore_to_be_active(statestore_service_1, 1)
+    statestoreds[0].start(wait_until_ready=True)
+    statestore_service_0 = statestoreds[0].service
+    statestore_service_0.wait_for_live_subscribers(5, timeout=60)
+    assert not statestore_service_0.get_metric_value("statestore.active-status")
+    assert statestore_service_1.get_metric_value("statestore.active-status")
+
+    # use_subscriber_id_as_catalogd_priority makes both statestoreds elect catalogds[0].
+    catalogds = self.cluster.catalogds()
+    assert len(catalogds) == 2
+    active_catalogd = catalogds[0]
+    standby_catalogd = catalogds[1]
+    active_port = active_catalogd.service.get_catalog_service_port()
+    # Only the active statestored sets statestore.active-catalogd-address.
+    self.__wait_for_active_catalogd_port(statestore_service_1, active_port)
+    assert active_catalogd.service.get_metric_value("catalog-server.active-status")
+    assert not standby_catalogd.service.get_metric_value("catalog-server.active-status")
+
+    # Restart the standby catalogd and delay each of its two registrations, so that
+    # the statestore service can fail over between them.
+    standby_log = "catalogd_node1"
+    old_log_path = self.build_log_path(standby_log, "INFO")
+    standby_catalogd.kill()
+    statestore_service_0.wait_for_live_subscribers(4, timeout=60)
+    statestore_service_1.wait_for_live_subscribers(4, timeout=60)
+    standby_catalogd.start(wait_until_ready=False,
+        additional_args="--debug_actions=REGISTER_STATESTORE_ON_STARTUP:SLEEP@{0}"
+        .format(self.REGISTRATION_DELAY_MS))
+    start_time = time.time()
+    while self.build_log_path(standby_log, "INFO") == old_log_path:
+      assert time.time() - start_time < 60, "No new log file for " + standby_log
+      sleep(0.5)
+
+    # The first registration is with the standby statestoreds[0].
+    registered_regex = "statestore registration successful on startup"
+    self.assert_log_contains(standby_log, "INFO", registered_regex, expected_count=1,
+        timeout_s=120, sleep_s=0.2)
+    # Kill the active statestoreds[1] before the second registration starts.
+    # statestoreds[0] takes over and sends UpdateStatestoredRole to the catalogd.
+    statestoreds[1].kill()
+    self.__wait_statestore_to_be_active(statestore_service_0, 0)
+    self.assert_log_contains(standby_log, "INFO",
+        "Updated active statestored as .*:{0}".format(
+            statestore_service_0.get_statestore_service_port()),
+        expected_count=1, timeout_s=30)
+    # The second registration is still in progress, since statestoreds[1] is down.
+    self.assert_log_contains(standby_log, "INFO", registered_regex, expected_count=1,
+        timeout_s=0)
+
+    # Bring statestoreds[1] back as standby. The second registration then succeeds.
+    statestoreds[1].start(wait_until_ready=True)
+    statestore_service_1 = statestoreds[1].service
+    self.assert_log_contains(standby_log, "INFO", registered_regex, expected_count=2,
+        timeout_s=120)
+    standby_catalogd.service.wait_for_page_ready("healthz")
+    assert statestore_service_0.get_metric_value("statestore.active-status")
+    assert not statestore_service_1.get_metric_value("statestore.active-status")
+    statestore_service_0.wait_for_live_subscribers(5, timeout=60)
+
+    # Kill the active catalogd. statestoreds[0] fails over to the restarted catalogd,
+    # which must accept the UpdateCatalogd RPC and become active.
+    active_catalogd.kill()
+    standby_port = standby_catalogd.service.get_catalog_service_port()
+    self.__wait_for_active_catalogd_port(statestore_service_0, standby_port)
+    try:
+      standby_catalogd.service.wait_for_metric_value(
+          "catalog-server.active-status", expected_value=True, timeout=30)
+    finally:
+      # Log the number of UpdateCatalogd RPCs the catalogd skipped, for diagnosis.
+      skipped = 0
+      with open(self.build_log_path(standby_log, "INFO")) as f:
+        for line in f:
+          if "Skipped updating catalogd message" in line: skipped += 1
+      LOG.info("{0} skipped {1} UpdateCatalogd RPCs".format(standby_log, skipped))
 
 
 class TestStatestoredHAStartupDelay(CustomClusterTestSuite):

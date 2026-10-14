@@ -345,7 +345,28 @@ Status StatestoreSubscriber::Start() {
     RETURN_IF_ERROR(statestore2_->Start(&statestore2_is_active));
     lock_guard<mutex> r(statestore_ha_lock_);
     DCHECK(!statestore_is_active || !statestore2_is_active);
-    if (statestore_is_active) {
+    if (active_statestore_ != nullptr) {
+      // The active and standby statestoreds are nullptr until they are set below,
+      // unless UpdateStatestoredRole() has set them while registering with the two
+      // statestoreds, e.g. when the statestore service fails over between the two
+      // registrations. The roles in the registration responses could then be out of
+      // date, so keep the ones set by UpdateStatestoredRole(), unless the standby
+      // statestored reported itself as active with a newer active version in a later
+      // registration response.
+      DCHECK(standby_statestore_ != nullptr);
+      bool is_active = false;
+      int64_t active_version = active_statestore_->GetActiveVersion(&is_active);
+      bool standby_is_active = false;
+      int64_t standby_version = standby_statestore_->GetActiveVersion(&standby_is_active);
+      if (standby_is_active && standby_version > active_version) {
+        StatestoreStub* tmp = active_statestore_;
+        active_statestore_ = standby_statestore_;
+        standby_statestore_ = tmp;
+        standby_statestore_->SetStatestoreActive(false, standby_version);
+      }
+      LOG(INFO) << "Active statestored was updated during registration, set active "
+                << "statestored as " << active_statestore_->GetAddress();
+    } else if (statestore_is_active) {
       active_statestore_ = statestore_;
       standby_statestore_ = statestore2_;
       LOG(INFO) << "Set active statestored as " << statestore_->GetAddress();
