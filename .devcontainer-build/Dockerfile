@@ -156,6 +156,11 @@ RUN echo "y" | sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohm
     && echo "[STATUS] - finished deleting debug benchmark binaries" \
     && echo "[STATUS] - deleting log files" \
     && find "${IMPALA_LOGS_DIR}" -type f -delete \
+    && find testdata/cluster -type f -name "*.log" -delete \
+    && find testdata/cluster -type f -name "*.out" -delete \
+    && find toolchain -type f -name "*.log" -delete \
+    && find toolchain -type f -name "*.out" -delete \
+    && find toolchain -type d -regextype posix-minimal-basic -iregex ".*src\/test$" | xargs rm -rf \
     && echo "[STATUS] - finished deleting log files" \
     && echo "[STATUS] - cleaning/configuring local git repo" \
     && git reflog expire --expire=30.days.ago --all \
