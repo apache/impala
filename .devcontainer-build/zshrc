@@ -38,7 +38,6 @@ source $ZSH/oh-my-zsh.sh
 # Start Impala devcontainer customizations.
 export IMPALA_HOME="${HOME}/impala"
 export IMPALA_LINKER="mold"
-export LD_LIBRARY_PATH="/usr/lib/$(uname -m)-linux-gnu"
 export PATH="${PATH}:${IMPALA_HOME}/be/build/debug/service"
 
 setup-asf-gerrit-remote() {
