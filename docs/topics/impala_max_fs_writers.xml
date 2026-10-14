@@ -1,0 +1,82 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+Licensed to the Apache Software Foundation (ASF) under one
+or more contributor license agreements.  See the NOTICE file
+distributed with this work for additional information
+regarding copyright ownership.  The ASF licenses this file
+to you under the Apache License, Version 2.0 (the
+"License"); you may not use this file except in compliance
+with the License.  You may obtain a copy of the License at
+
+  http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing,
+software distributed under the License is distributed on an
+"AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+KIND, either express or implied.  See the License for the
+specific language governing permissions and limitations
+under the License.
+-->
+<!DOCTYPE concept PUBLIC "-//OASIS//DTD DITA Concept//EN" "concept.dtd">
+<concept id="impala_max_fs_writers" rev="4.0.0">
+
+  <title>MAX_FS_WRITERS Query Option</title>
+  <titlealts audience="PDF"><navtitle>MAX FS WRITERS</navtitle></titlealts>
+  <prolog>
+    <metadata>
+      <data name="Category" value="Impala"/>
+      <data name="Category" value="Impala Query Options"/>
+      <data name="Category" value="Performance"/>
+      <data name="Category" value="Querying"/>
+      <data name="Category" value="Developers"/>
+      <data name="Category" value="Data Analysts"/>
+    </metadata>
+  </prolog>
+
+  <conbody>
+
+    <p rev="4.0.0">
+      <indexterm audience="hidden">MAX_FS_WRITERS query option</indexterm>
+      The <parmname>MAX_FS_WRITERS</parmname> query option sets an upper limit on the number of writer instances to be scheduled during an <cmdname>INSERT</cmdname> operation.
+    </p>
+
+    <p conref="../shared/impala_common.xml#common/type_integer"/>
+
+    <p>
+      <b>Default:</b> 0 (no limit)
+    </p>
+
+    <p>
+      <b>Added in:</b> <keyword keyref="impala40"/> (HDFS inserts), <keyword keyref="impala50_full"/> (Kudu partitions)
+    </p>
+
+    <p conref="../shared/impala_common.xml#common/usage_notes_blurb"/>
+
+    <p>
+      When set to a positive integer, this option constrains the number of parallel write instances
+      during <cmdname>INSERT</cmdname> operations on HDFS and Kudu targets.
+    </p>
+
+    <p>
+      When this option is enabled, the planner may add an exchange node in the root fragment to control the write parallelism. The scheduler distributes the limited writer
+      instances evenly across available backends using round-robin assignment.
+    </p>
+
+    <p>
+      Set this option to 0 (the default) to disable any writer limit. When set to a positive value,
+      this option takes precedence over the "no-shuffle" hint.
+    </p>
+
+    <p>
+      A mismatch of cluster state during query planning and scheduling can result in more or less fragment instances to be scheduled than expected.
+      For example, if <codeph>max_fs_writers</codeph> is 2 and the planner sees only 2 executors then it might not add an exchange between a scan node and the table sink, but during scheduling if there are 3 nodes then that scan+tablesink instance will be scheduled on 3 backends. When this occurs, Impala logs a warning: <msgph>Extra table sink instances scheduled, probably due to mismatch of cluster state during planning vs scheduling. Expected: 2 Found: 3</msgph>
+    </p>
+
+    <p conref="../shared/impala_common.xml#common/related_info"/>
+    <p>
+      <xref href="impala_insert.xml"/>,
+      <xref href="impala_hints.xml"/>
+    </p>
+
+  </conbody>
+</concept>

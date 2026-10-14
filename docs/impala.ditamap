@@ -225,6 +225,7 @@ under the License.
         <topicref href="topics/impala_live_summary.xml"/>
         <topicref href="topics/impala_max_errors.xml"/>
         <topicref href="topics/impala_max_fragment_instances_per_node.xml"/>
+        <topicref href="topics/impala_max_fs_writers.xml"/>
         <topicref rev="3.1 IMPALA-6847" href="topics/impala_max_mem_estimate_for_admission.xml"/>
         <topicref rev="2.5.0" href="topics/impala_max_num_runtime_filters.xml"/>
         <topicref href="topics/impala_max_result_spooling_mem.xml"/>
