@@ -843,7 +843,7 @@ INT
 EXPLAIN SELECT id FROM iceberg_uuid_test_part
 WHERE uuid_bucket = CAST('12345678-1234-5678-1234-567812345678' AS UUID);
 ---- RESULTS: VERIFY_IS_SUBSET
-row_regex: .*HDFS partitions=4/4 files=4 .*
+row_regex: .*$FILESYSTEM_NAME partitions=4/4 files=4 .*
 row_regex: .*   predicates: uuid_bucket = ''12345678-1234-5678-1234-567812345678''.*
 ---- TYPES
 STRING
@@ -852,7 +852,7 @@ STRING
 # IS NULL does not compare UUID values, so it is pushed to Iceberg and prunes partitions.
 EXPLAIN SELECT id FROM iceberg_uuid_test_part WHERE uuid_identity IS NULL;
 ---- RESULTS: VERIFY_IS_SUBSET
-row_regex: .*HDFS partitions=1/4 files=1 .*
+row_regex: .*$FILESYSTEM_NAME partitions=1/4 files=1 .*
 row_regex: .*skipped Iceberg predicates: uuid_identity IS NULL.*
 ---- TYPES
 STRING
