@@ -34,7 +34,7 @@ import org.junit.Test;
 
 public class AnalyzerCapabilityTest {
   private static final String WRITE_NOT_SUPPORTED =
-      "Only INSERT INTO and INSERT OVERWRITE are supported";
+      "Only INSERT INTO, INSERT OVERWRITE and UPDATE are supported";
 
   @Test
   public void testInsertCapabilityOnlyBypassesHmsAccessType() throws Exception {
@@ -48,7 +48,7 @@ public class AnalyzerCapabilityTest {
     when(table.getMetaStoreTable()).thenReturn(msTable);
     when(table.getFullName()).thenReturn("rest_db.rest_table");
     when(table.hasProviderDerivedCapabilities()).thenReturn(true);
-    when(table.supportsInsert()).thenReturn(true);
+    when(table.supportsDml()).thenReturn(true);
     org.apache.iceberg.Table apiTable = mock(org.apache.iceberg.Table.class);
     when(apiTable.uuid()).thenReturn(UUID.randomUUID());
     when(table.getIcebergApiTable()).thenReturn(apiTable);
@@ -70,7 +70,7 @@ public class AnalyzerCapabilityTest {
     FeIcebergTable table = mock(FeIcebergTable.class);
     when(table.getFullName()).thenReturn("rest_db.rest_table");
     when(table.hasProviderDerivedCapabilities()).thenReturn(true);
-    when(table.supportsInsert()).thenReturn(false);
+    when(table.supportsDml()).thenReturn(false);
 
     assertInsertRejected(table,
         "REST catalog does not have a unique name");
@@ -82,7 +82,7 @@ public class AnalyzerCapabilityTest {
     FeIcebergTable table = mock(FeIcebergTable.class);
     when(table.getFullName()).thenReturn("rest_db.rest_table");
     when(table.hasProviderDerivedCapabilities()).thenReturn(true);
-    when(table.supportsInsert()).thenReturn(true);
+    when(table.supportsDml()).thenReturn(true);
 
     assertInsertRejected(table,
         "Iceberg table UUID is unavailable");

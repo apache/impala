@@ -125,10 +125,10 @@ public interface FeIcebergTable extends FeFsTable {
   default boolean hasProviderDerivedCapabilities() { return false; }
 
   /**
-   * Whether INSERT INTO and INSERT OVERWRITE can be finalized by the metadata provider.
-   * Metadata writes are intentionally excluded.
+   * Whether INSERT INTO, INSERT OVERWRITE and UPDATE can be finalized by the metadata
+   * provider. Metadata writes are intentionally excluded.
    */
-  default boolean supportsInsert() {
+  default boolean supportsDml() {
     return hasProviderDerivedCapabilities() && getIcebergDmlCatalogName() != null;
   }
 

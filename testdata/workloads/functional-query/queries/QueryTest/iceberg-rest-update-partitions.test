@@ -1,0 +1,243 @@
+====
+---- QUERY
+# Adapted from iceberg-v3-update-partitions.test for REST catalog.
+# Tables are pre-created via the REST API; DDL tests (CREATE TABLE,
+# ALTER TABLE, partition evolution) are omitted.
+# TODO: Remove this file and run iceberg-v3-update-partitions.test against the REST
+# catalog once CREATE TABLE, CTAS and ALTER TABLE are supported for REST catalog tables.
+# Identity partition: UPDATE on empty table is no-op.
+UPDATE id_part SET i = 1;
+---- DML_RESULTS: id_part
+---- TYPES
+INT,STRING
+====
+---- QUERY
+INSERT INTO id_part VALUES(1, 'one'), (2, 'two'), (3, 'three');
+UPDATE id_part SET i = cast(i * 10 as int);
+---- DML_RESULTS: id_part
+10,'one'
+20,'two'
+30,'three'
+---- TYPES
+INT,STRING
+====
+---- QUERY
+INSERT INTO id_part VALUES(4, 'four'), (5, 'five'), (6, 'six');
+UPDATE id_part SET i =  cast(i / 2 as int), s = upper(s);
+---- DML_RESULTS: id_part
+5,'ONE'
+10,'TWO'
+15,'THREE'
+2,'FOUR'
+2,'FIVE'
+3,'SIX'
+---- TYPES
+INT,STRING
+====
+---- QUERY
+# Truncate partition: UPDATE on empty table is no-op.
+UPDATE trunc_part SET i = 1;
+---- DML_RESULTS: trunc_part
+---- TYPES
+INT,STRING
+====
+---- QUERY
+INSERT INTO trunc_part VALUES(1, 'one'), (2, 'two'), (3, 'three');
+UPDATE trunc_part SET i = cast(i + 100 as int) WHERE s like 't%';
+---- DML_RESULTS: trunc_part
+1,'one'
+102,'two'
+103,'three'
+---- TYPES
+INT,STRING
+====
+---- QUERY
+INSERT INTO trunc_part VALUES(4, 'four'), (5, 'five'), (6, 'six');
+UPDATE trunc_part SET s = concat(upper(s), s), i = cast(i + 1000 as int) WHERE i % 2 = 0;
+---- DML_RESULTS: trunc_part
+1,'one'
+1102,'TWOtwo'
+103,'three'
+1004,'FOURfour'
+5,'five'
+1006,'SIXsix'
+---- TYPES
+INT,STRING
+====
+---- QUERY
+# Multi-partition: bucket + truncate.
+# UPDATE on empty table is no-op.
+UPDATE multi_part SET i = 1;
+---- DML_RESULTS: multi_part
+---- TYPES
+INT,STRING,DOUBLE
+====
+---- QUERY
+INSERT INTO multi_part VALUES(1, 'one', 1.1), (2, 'two', 2.2), (3, 'three', 3.33);
+UPDATE multi_part
+SET s = concat(s, s), f = 9.9, i = cast(i + 10 as int)
+WHERE i != (select min(i) from multi_part) and
+      i != (select max(i) from multi_part);
+---- DML_RESULTS: multi_part
+1,'one',1.1
+12,'twotwo',9.9
+3,'three', 3.33
+---- TYPES
+INT,STRING,DOUBLE
+====
+---- QUERY
+INSERT INTO multi_part VALUES(4, 'four', 4.4), (5, 'five', 5.5), (6, 'six', 6.6);
+UPDATE multi_part SET i = 0, s = 'void', f = 3.14 WHERE i % 2 = 0;
+---- DML_RESULTS: multi_part
+1,'one',1.1
+0,'void',3.14
+3,'three', 3.33
+0,'void',3.14
+5,'five',5.5
+0,'void',3.14
+---- TYPES
+INT,STRING,DOUBLE
+====
+---- QUERY
+# No matching rows to WHERE condition
+UPDATE multi_part SET i = 0, s = 'void', f = 3.14
+WHERE f > 1000;
+---- DML_RESULTS: multi_part
+1,'one',1.1
+0,'void',3.14
+3,'three',3.33
+0,'void',3.14
+5,'five',5.5
+0,'void',3.14
+---- TYPES
+INT,STRING,DOUBLE
+====
+---- QUERY
+INSERT INTO multi_part VALUES (null, 'null',0.0);
+---- DML_RESULTS: multi_part
+1,'one',1.1
+0,'void',3.14
+3,'three',3.33
+0,'void',3.14
+5,'five',5.5
+0,'void',3.14
+NULL,'null',0.0
+---- TYPES
+INT,STRING,DOUBLE
+====
+---- QUERY
+UPDATE multi_part SET i = 111, s = 'fox', f = 1.1 where i is null;
+---- DML_RESULTS: multi_part
+1,'one',1.1
+0,'void',3.14
+3,'three',3.33
+0,'void',3.14
+5,'five',5.5
+0,'void',3.14
+111,'fox',1.1
+---- TYPES
+INT,STRING,DOUBLE
+====
+---- QUERY
+# Date partition: year transform.
+insert into date_year_part values
+  (1, '1968-01-01'), (2, '1969-12-31'), (3, '1970-01-01'), (4, '2023-11-15');
+UPDATE date_year_part SET d = years_add(d, 10), i = cast(i + 10 as int);
+---- DML_RESULTS: date_year_part
+11,1978-01-01
+12,1979-12-31
+13,1980-01-01
+14,2033-11-15
+---- TYPES
+INT, DATE
+====
+---- QUERY
+# Date partition: month transform.
+insert into date_month_part values
+  (1, '1968-01-01'), (2, '1969-12-31'), (3, '1970-01-01'), (4, '2023-11-15');
+UPDATE date_month_part SET d = years_add(d, 10), i = cast(i + 10 as int);
+---- DML_RESULTS: date_month_part
+11,1978-01-01
+12,1979-12-31
+13,1980-01-01
+14,2033-11-15
+---- TYPES
+INT, DATE
+====
+---- QUERY
+# Date partition: day transform.
+insert into date_day_part values
+  (1, '1968-01-01'), (2, '1969-12-31'), (3, '1970-01-01'), (4, '2023-11-15');
+UPDATE date_day_part SET d = years_add(d, 10), i = cast(i + 10 as int);
+---- DML_RESULTS: date_day_part
+11,1978-01-01
+12,1979-12-31
+13,1980-01-01
+14,2033-11-15
+---- TYPES
+INT, DATE
+====
+---- QUERY
+# Timestamp partition: year transform.
+insert into ts_year_part values (1, '1968-01-01'),
+  (2, '1969-12-31'), (3, '1970-01-01'), (4, '2023-11-15');
+UPDATE ts_year_part SET ts = years_add(ts, -10), i = cast(i + 100 as int);
+---- DML_RESULTS: ts_year_part
+101,1958-01-01 00:00:00
+102,1959-12-31 00:00:00
+103,1960-01-01 00:00:00
+104,2013-11-15 00:00:00
+---- TYPES
+INT, TIMESTAMP
+====
+---- QUERY
+# Timestamp partition: month transform.
+insert into ts_month_part values (1, '1968-01-01 01:02:03'),
+  (2, '1969-12-31 23:59:00'), (3, '1970-01-01 00:00:00'),
+  (4, '2023-11-15 15:31:00');
+UPDATE ts_month_part SET ts = years_add(ts, -10), i = cast(i + 100 as int);
+---- DML_RESULTS: ts_month_part
+101,1958-01-01 01:02:03
+102,1959-12-31 23:59:00
+103,1960-01-01 00:00:00
+104,2013-11-15 15:31:00
+---- TYPES
+INT, TIMESTAMP
+====
+---- QUERY
+# Timestamp partition: day transform.
+insert into ts_day_part values (1, '1968-01-01 01:02:03'),
+  (2, '1969-12-31 23:59:00'), (3, '1970-01-01 00:00:00'),
+  (4, '2023-11-15 15:31:00');
+UPDATE ts_day_part SET ts = years_add(ts, -10), i = cast(i + 100 as int);
+---- DML_RESULTS: ts_day_part
+101,1958-01-01 01:02:03
+102,1959-12-31 23:59:00
+103,1960-01-01 00:00:00
+104,2013-11-15 15:31:00
+---- TYPES
+INT, TIMESTAMP
+====
+---- QUERY
+# Timestamp partition: hour transform.
+insert into ts_hour_part values (1, '1968-01-01 01:02:03'),
+  (2, '1969-12-31 23:59:00'), (3, '1970-01-01 00:00:00'),
+  (4, '2023-11-15 15:31:00');
+UPDATE ts_hour_part SET ts = years_add(ts, -10), i = cast(i + 100 as int);
+---- DML_RESULTS: ts_hour_part
+101,1958-01-01 01:02:03
+102,1959-12-31 23:59:00
+103,1960-01-01 00:00:00
+104,2013-11-15 15:31:00
+---- TYPES
+INT, TIMESTAMP
+====
+---- QUERY
+# Numeric truncate with multiple partition transforms.
+insert into numeric_truncate values (1, 12, 1222, 135, 20.75);
+UPDATE numeric_truncate SET dec_10_2 = 75.20, dec_8_0 = 531, bigint_col = 2111, int_col = 21, id = 11;
+---- DML_RESULTS: numeric_truncate
+11,21,2111,531,75.20
+---- TYPES
+INT,INT,BIGINT,DECIMAL,DECIMAL
+====

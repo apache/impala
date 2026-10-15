@@ -17,6 +17,8 @@
 
 package org.apache.impala.service;
 
+import java.util.EnumSet;
+
 import org.apache.iceberg.Transaction;
 import org.apache.iceberg.exceptions.CommitStateUnknownException;
 import org.apache.impala.catalog.FeIcebergTable;
@@ -35,6 +37,9 @@ import org.slf4j.LoggerFactory;
 /** Shared transaction and cleanup handling for Iceberg DML finalization. */
 final class IcebergDmlFinalizer {
   private static final Logger LOG = LoggerFactory.getLogger(IcebergDmlFinalizer.class);
+
+  private static final EnumSet<TIcebergOperation> SUPPORTED_REST_OPS =
+      EnumSet.of(TIcebergOperation.INSERT, TIcebergOperation.UPDATE);
 
   @FunctionalInterface
   interface PostOperationHook {
@@ -96,9 +101,9 @@ final class IcebergDmlFinalizer {
 
   static void validateRestDmlOperation(TIcebergOperationParam operation)
       throws ImpalaRuntimeException {
-    if (operation.getOperation() != TIcebergOperation.INSERT) {
+    if (!SUPPORTED_REST_OPS.contains(operation.getOperation())) {
       throw new ImpalaRuntimeException(
-          "The Iceberg REST finalizer only supports INSERT INTO and INSERT OVERWRITE");
+          "Unsupported operation for the Iceberg REST finalizer");
     }
     if (!operation.isSetTable_uuid()) {
       throw new ImpalaRuntimeException(

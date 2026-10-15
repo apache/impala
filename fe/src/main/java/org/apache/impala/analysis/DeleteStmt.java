@@ -50,6 +50,9 @@ public class DeleteStmt extends ModifyStmt {
   }
 
   @Override
+  protected boolean isRestDmlSupported() { return false; }
+
+  @Override
   protected void createModifyImpl() {
     if (table_ instanceof FeKuduTable) {
       modifyImpl_ = new KuduDeleteImpl(this);

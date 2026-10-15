@@ -1,0 +1,427 @@
+====
+---- QUERY
+# Adapted from iceberg-v3-update.test for REST catalog.
+# Tables are pre-created via the REST API; DDL tests (CREATE TABLE,
+# ALTER TABLE, DELETE, CREATE VIEW, UDF) are omitted.
+# TODO: Remove this file and run iceberg-v3-update.test against the REST catalog
+# once CREATE TABLE, CTAS and ALTER TABLE are supported for REST catalog tables.
+# Basic UPDATE on unpartitioned V3 table via REST catalog.
+INSERT INTO update_basic VALUES (1, 'one'), (2, 'two'), (3, 'three');
+UPDATE update_basic SET s = 'updated' WHERE i = 2;
+---- RUNTIME_PROFILE
+NumModifiedRows: 1
+NumDeletedRows: 1
+====
+---- QUERY
+SELECT * FROM update_basic ORDER BY i;
+---- RESULTS
+1,'one'
+2,'updated'
+3,'three'
+---- TYPES
+INT,STRING
+====
+---- QUERY
+# _row_id is preserved, _last_updated_sequence_number is updated.
+SELECT _row_id, _last_updated_sequence_number, '|', * FROM update_basic ORDER BY i;
+---- RESULTS
+0,1,'|',1,'one'
+1,2,'|',2,'updated'
+2,1,'|',3,'three'
+---- TYPES
+BIGINT,BIGINT,STRING,INT,STRING
+====
+---- QUERY
+# The delete side of UPDATE creates a DV (Puffin) file.
+SELECT content, file_format, record_count, referenced_data_file IS NOT NULL, content_offset IS NOT NULL
+FROM $DATABASE.update_basic.`files`
+ORDER BY content, file_format;
+---- RESULTS
+0,'PARQUET',1,false,false
+0,'PARQUET',3,false,false
+1,'PUFFIN',1,true,true
+---- TYPES
+INT,STRING,BIGINT,BOOLEAN,BOOLEAN
+====
+---- QUERY
+# UPDATE multiple rows at once.
+INSERT INTO update_multi VALUES (1, 'a'), (2, 'b'), (3, 'c'), (4, 'd'), (5, 'e');
+UPDATE update_multi SET s = upper(s) WHERE i >= 3;
+---- RUNTIME_PROFILE
+NumModifiedRows: 3
+NumDeletedRows: 3
+====
+---- QUERY
+SELECT * FROM update_multi ORDER BY i;
+---- RESULTS
+1,'a'
+2,'b'
+3,'C'
+4,'D'
+5,'E'
+---- TYPES
+INT,STRING
+====
+---- QUERY
+# _row_id is preserved, _last_updated_sequence_number is updated.
+SELECT _row_id, _last_updated_sequence_number, '|', * FROM update_multi ORDER BY i;
+---- RESULTS
+0,1,'|',1,'a'
+1,1,'|',2,'b'
+2,2,'|',3,'C'
+3,2,'|',4,'D'
+4,2,'|',5,'E'
+---- TYPES
+BIGINT,BIGINT,STRING,INT,STRING
+====
+---- QUERY
+# No WHERE clause, but only update a subset of rows.
+UPDATE update_multi SET s = lower(s);
+---- RUNTIME_PROFILE
+NumModifiedRows: 3
+NumDeletedRows: 3
+====
+---- QUERY
+SELECT * FROM update_multi ORDER BY i;
+---- RESULTS
+1,'a'
+2,'b'
+3,'c'
+4,'d'
+5,'e'
+---- TYPES
+INT,STRING
+====
+---- QUERY
+SELECT content, file_format, record_count, referenced_data_file IS NOT NULL, content_offset IS NOT NULL
+FROM $DATABASE.update_multi.`files`
+ORDER BY content, file_format, record_count;
+---- RESULTS
+0,'PARQUET',3,false,false
+0,'PARQUET',3,false,false
+0,'PARQUET',5,false,false
+1,'PUFFIN',3,true,true
+1,'PUFFIN',3,true,true
+---- TYPES
+INT,STRING,BIGINT,BOOLEAN,BOOLEAN
+====
+---- QUERY
+UPDATE update_multi SET s = 'x';
+---- RUNTIME_PROFILE
+NumModifiedRows: 5
+NumDeletedRows: 5
+====
+---- QUERY
+SELECT * FROM update_multi ORDER BY i;
+---- RESULTS
+1,'x'
+2,'x'
+3,'x'
+4,'x'
+5,'x'
+---- TYPES
+INT,STRING
+====
+---- QUERY
+update single_col set i = 4;
+---- DML_RESULTS: single_col
+---- TYPES
+INT
+---- RUNTIME_PROFILE
+NumModifiedRows: 0
+NumDeletedRows: 0
+====
+---- QUERY
+insert into single_col values (1), (2), (3);
+update single_col set i = cast(i + 1 as int);
+---- DML_RESULTS: single_col
+2
+3
+4
+---- TYPES
+INT
+---- RUNTIME_PROFILE
+NumModifiedRows: 3
+NumDeletedRows: 3
+====
+---- QUERY
+update single_col set i = 1 where i = 2
+---- DML_RESULTS: single_col
+1
+3
+4
+---- TYPES
+INT
+---- RUNTIME_PROFILE
+NumModifiedRows: 1
+NumDeletedRows: 1
+====
+---- QUERY
+insert into ice_alltypes values (false, 0, 0, 0, 0, 0, 0, '2000-01-01', '2000-01-01 00:00:00',
+ 'zero', cast('zerob' as binary));
+---- DML_RESULTS: ice_alltypes
+false,0,0,0,0,0,0.00,2000-01-01,2000-01-01 00:00:00,'zero','zerob'
+---- TYPES
+BOOLEAN,INT,BIGINT,FLOAT,DOUBLE,DECIMAL,DECIMAL,DATE,TIMESTAMP,STRING,BINARY
+---- RUNTIME_PROFILE
+NumModifiedRows: 1
+NumDeletedRows: 0
+====
+---- QUERY
+update ice_alltypes set bool_col = true;
+---- DML_RESULTS: ice_alltypes
+true,0,0,0,0,0,0.00,2000-01-01,2000-01-01 00:00:00,'zero','zerob'
+---- TYPES
+BOOLEAN,INT,BIGINT,FLOAT,DOUBLE,DECIMAL,DECIMAL,DATE,TIMESTAMP,STRING,BINARY
+---- RUNTIME_PROFILE
+NumModifiedRows: 1
+NumDeletedRows: 1
+====
+---- QUERY
+update ice_alltypes set int_col = 1;
+---- DML_RESULTS: ice_alltypes
+true,1,0,0,0,0,0.00,2000-01-01,2000-01-01 00:00:00,'zero','zerob'
+---- TYPES
+BOOLEAN,INT,BIGINT,FLOAT,DOUBLE,DECIMAL,DECIMAL,DATE,TIMESTAMP,STRING,BINARY
+---- RUNTIME_PROFILE
+NumModifiedRows: 1
+NumDeletedRows: 1
+====
+---- QUERY
+update ice_alltypes set bigint_col = 1;
+---- DML_RESULTS: ice_alltypes
+true,1,1,0,0,0,0.00,2000-01-01,2000-01-01 00:00:00,'zero','zerob'
+---- TYPES
+BOOLEAN,INT,BIGINT,FLOAT,DOUBLE,DECIMAL,DECIMAL,DATE,TIMESTAMP,STRING,BINARY
+---- RUNTIME_PROFILE
+NumModifiedRows: 1
+NumDeletedRows: 1
+====
+---- QUERY
+update ice_alltypes set float_col = 1;
+---- DML_RESULTS: ice_alltypes
+true,1,1,1,0,0,0.00,2000-01-01,2000-01-01 00:00:00,'zero','zerob'
+---- TYPES
+BOOLEAN,INT,BIGINT,FLOAT,DOUBLE,DECIMAL,DECIMAL,DATE,TIMESTAMP,STRING,BINARY
+---- RUNTIME_PROFILE
+NumModifiedRows: 1
+NumDeletedRows: 1
+====
+---- QUERY
+update ice_alltypes set double_col = 1;
+---- DML_RESULTS: ice_alltypes
+true,1,1,1,1,0,0.00,2000-01-01,2000-01-01 00:00:00,'zero','zerob'
+---- TYPES
+BOOLEAN,INT,BIGINT,FLOAT,DOUBLE,DECIMAL,DECIMAL,DATE,TIMESTAMP,STRING,BINARY
+---- RUNTIME_PROFILE
+NumModifiedRows: 1
+NumDeletedRows: 1
+====
+---- QUERY
+update ice_alltypes set dec_10_0_col = 1;
+---- DML_RESULTS: ice_alltypes
+true,1,1,1,1,1,0.00,2000-01-01,2000-01-01 00:00:00,'zero','zerob'
+---- TYPES
+BOOLEAN,INT,BIGINT,FLOAT,DOUBLE,DECIMAL,DECIMAL,DATE,TIMESTAMP,STRING,BINARY
+---- RUNTIME_PROFILE
+NumModifiedRows: 1
+NumDeletedRows: 1
+====
+---- QUERY
+update ice_alltypes set dec_8_2_col = 1;
+---- DML_RESULTS: ice_alltypes
+true,1,1,1,1,1,1.00,2000-01-01,2000-01-01 00:00:00,'zero','zerob'
+---- TYPES
+BOOLEAN,INT,BIGINT,FLOAT,DOUBLE,DECIMAL,DECIMAL,DATE,TIMESTAMP,STRING,BINARY
+---- RUNTIME_PROFILE
+NumModifiedRows: 1
+NumDeletedRows: 1
+====
+---- QUERY
+update ice_alltypes set date_col = '2001-01-01';
+---- DML_RESULTS: ice_alltypes
+true,1,1,1,1,1,1.00,2001-01-01,2000-01-01 00:00:00,'zero','zerob'
+---- TYPES
+BOOLEAN,INT,BIGINT,FLOAT,DOUBLE,DECIMAL,DECIMAL,DATE,TIMESTAMP,STRING,BINARY
+---- RUNTIME_PROFILE
+NumModifiedRows: 1
+NumDeletedRows: 1
+====
+---- QUERY
+update ice_alltypes set timestamp_col = '2001-01-01 01:01:01';
+---- DML_RESULTS: ice_alltypes
+true,1,1,1,1,1,1.00,2001-01-01,2001-01-01 01:01:01,'zero','zerob'
+---- TYPES
+BOOLEAN,INT,BIGINT,FLOAT,DOUBLE,DECIMAL,DECIMAL,DATE,TIMESTAMP,STRING,BINARY
+---- RUNTIME_PROFILE
+NumModifiedRows: 1
+NumDeletedRows: 1
+====
+---- QUERY
+update ice_alltypes set string_col = 'one';
+---- DML_RESULTS: ice_alltypes
+true,1,1,1,1,1,1.00,2001-01-01,2001-01-01 01:01:01,'one','zerob'
+---- TYPES
+BOOLEAN,INT,BIGINT,FLOAT,DOUBLE,DECIMAL,DECIMAL,DATE,TIMESTAMP,STRING,BINARY
+---- RUNTIME_PROFILE
+NumModifiedRows: 1
+NumDeletedRows: 1
+====
+---- QUERY
+update ice_alltypes set binary_col = cast('oneb' as binary);
+---- DML_RESULTS: ice_alltypes
+true,1,1,1,1,1,1.00,2001-01-01,2001-01-01 01:01:01,'one','oneb'
+---- TYPES
+BOOLEAN,INT,BIGINT,FLOAT,DOUBLE,DECIMAL,DECIMAL,DATE,TIMESTAMP,STRING,BINARY
+---- RUNTIME_PROFILE
+NumModifiedRows: 1
+NumDeletedRows: 1
+====
+---- QUERY
+update ice_alltypes set bigint_col = 33, int_col = 30, string_col = 'three';
+---- DML_RESULTS: ice_alltypes
+true,30,33,1,1,1,1.00,2001-01-01,2001-01-01 01:01:01,'three','oneb'
+---- TYPES
+BOOLEAN,INT,BIGINT,FLOAT,DOUBLE,DECIMAL,DECIMAL,DATE,TIMESTAMP,STRING,BINARY
+---- RUNTIME_PROFILE
+NumModifiedRows: 1
+NumDeletedRows: 1
+====
+---- QUERY
+# The row already has the desired values, no need to update. (IMPALA-12588)
+update ice_alltypes set bigint_col = 33, int_col = 30, string_col = 'three';
+---- DML_RESULTS: ice_alltypes
+true,30,33,1,1,1,1.00,2001-01-01,2001-01-01 01:01:01,'three','oneb'
+---- TYPES
+BOOLEAN,INT,BIGINT,FLOAT,DOUBLE,DECIMAL,DECIMAL,DATE,TIMESTAMP,STRING,BINARY
+---- RUNTIME_PROFILE
+NumModifiedRows: 0
+NumDeletedRows: 0
+====
+---- QUERY
+# Only one field changes.
+update ice_alltypes set bigint_col = 33, int_col = 3, string_col = 'three';
+---- DML_RESULTS: ice_alltypes
+true,3,33,1,1,1,1.00,2001-01-01,2001-01-01 01:01:01,'three','oneb'
+---- TYPES
+BOOLEAN,INT,BIGINT,FLOAT,DOUBLE,DECIMAL,DECIMAL,DATE,TIMESTAMP,STRING,BINARY
+---- RUNTIME_PROFILE
+NumModifiedRows: 1
+NumDeletedRows: 1
+====
+---- QUERY
+update ice_alltypes set dec_10_0_col = 23, dec_8_2_col = cast(123.123 as decimal(8, 2));
+---- DML_RESULTS: ice_alltypes
+true,3,33,1,1,23,123.12,2001-01-01,2001-01-01 01:01:01,'three','oneb'
+---- TYPES
+BOOLEAN,INT,BIGINT,FLOAT,DOUBLE,DECIMAL,DECIMAL,DATE,TIMESTAMP,STRING,BINARY
+---- RUNTIME_PROFILE
+NumModifiedRows: 1
+NumDeletedRows: 1
+====
+---- QUERY
+# UPDATE table based on a reference table.
+insert into ice_alltypes values (false, 0, 0, 0, 0, 0, 0, '2000-01-01', '2000-01-01 00:00:00',
+ 'zero', cast('zerob' as binary));
+insert into ref_table values (0, 111, 'IMPALA', '2023-11-07'), (3, 222, 'ICEBERG', '2023-11-08');
+update ice_alltypes set bigint_col=bi, string_col=s, date_col=d from ice_alltypes, ref_table where int_col = i;
+---- DML_RESULTS: ice_alltypes
+false,0,111,0,0,0,0.00,2023-11-07,2000-01-01 00:00:00,'IMPALA','zerob'
+true,3,222,1,1,23,123.12,2023-11-08,2001-01-01 01:01:01,'ICEBERG','oneb'
+---- TYPES
+BOOLEAN,INT,BIGINT,FLOAT,DOUBLE,DECIMAL,DECIMAL,DATE,TIMESTAMP,STRING,BINARY
+---- RUNTIME_PROFILE
+NumModifiedRows: 2
+NumDeletedRows: 2
+====
+---- QUERY
+# If the JOIN in UPDATE has multiple matches Impala should raise an error.
+# Changing bigint_col to actually have rows to update.
+insert into ref_table values (0, 1111, 'IIMMPPAALLAA', '2023-12-01');
+update ice_alltypes set bigint_col=bi+1, string_col=s, date_col=d from ice_alltypes, ref_table where int_col = i;
+---- CATCH
+Duplicated row in DELETE sink.
+====
+---- QUERY
+# Check that NULL values and expressions evaluating to NULL in assignments are handled correctly.
+update ice_alltypes set dec_10_0_col = NULL, dec_8_2_col = cast(123.123 + NULL as decimal(8, 2));
+---- DML_RESULTS: ice_alltypes
+false,0,111,0,0,NULL,NULL,2023-11-07,2000-01-01 00:00:00,'IMPALA','zerob'
+true,3,222,1,1,NULL,NULL,2023-11-08,2001-01-01 01:01:01,'ICEBERG','oneb'
+---- TYPES
+BOOLEAN,INT,BIGINT,FLOAT,DOUBLE,DECIMAL,DECIMAL,DATE,TIMESTAMP,STRING,BINARY
+---- RUNTIME_PROFILE
+NumModifiedRows: 2
+NumDeletedRows: 2
+====
+---- QUERY
+# Check that NULL assignments and WHERE condition filter rows correctly.
+update ice_alltypes set dec_10_0_col = cast(123.123 as decimal(10, 0)), dec_8_2_col = NULL where int_col < 2;
+---- DML_RESULTS: ice_alltypes
+false,0,111,0,0,123,NULL,2023-11-07,2000-01-01 00:00:00,'IMPALA','zerob'
+true,3,222,1,1,NULL,NULL,2023-11-08,2001-01-01 01:01:01,'ICEBERG','oneb'
+---- TYPES
+BOOLEAN,INT,BIGINT,FLOAT,DOUBLE,DECIMAL,DECIMAL,DATE,TIMESTAMP,STRING,BINARY
+---- RUNTIME_PROFILE
+NumModifiedRows: 1
+NumDeletedRows: 1
+====
+---- QUERY
+# Swap two columns
+update ice_alltypes set dec_10_0_col = cast(dec_8_2_col as decimal(10, 0)), dec_8_2_col = cast(dec_10_0_col as decimal(8, 2));
+---- DML_RESULTS: ice_alltypes
+false,0,111,0,0,NULL,123.00,2023-11-07,2000-01-01 00:00:00,'IMPALA','zerob'
+true,3,222,1,1,NULL,NULL,2023-11-08,2001-01-01 01:01:01,'ICEBERG','oneb'
+---- TYPES
+BOOLEAN,INT,BIGINT,FLOAT,DOUBLE,DECIMAL,DECIMAL,DATE,TIMESTAMP,STRING,BINARY
+---- RUNTIME_PROFILE
+NumModifiedRows: 1
+NumDeletedRows: 1
+====
+---- QUERY
+# Check col_a = col_b + col_c
+update ice_alltypes set dec_10_0_col = cast(bigint_col + dec_8_2_col as decimal(10, 0));
+---- DML_RESULTS: ice_alltypes
+false,0,111,0,0,234,123.00,2023-11-07,2000-01-01 00:00:00,'IMPALA','zerob'
+true,3,222,1,1,NULL,NULL,2023-11-08,2001-01-01 01:01:01,'ICEBERG','oneb'
+---- TYPES
+BOOLEAN,INT,BIGINT,FLOAT,DOUBLE,DECIMAL,DECIMAL,DATE,TIMESTAMP,STRING,BINARY
+---- RUNTIME_PROFILE
+NumModifiedRows: 1
+NumDeletedRows: 1
+====
+---- QUERY
+# Test if changing SKIP_UNNEEDED_UPDATES_COL_LIMIT query option takes effect: the row
+# is updated even though the table content remained the same.
+UPDATE update_basic SET i = cast(i * 10 as int), s = 'same';
+---- RUNTIME_PROFILE
+NumModifiedRows: 3
+NumDeletedRows: 3
+====
+---- QUERY
+SET SKIP_UNNEEDED_UPDATES_COL_LIMIT = 1;
+UPDATE update_basic SET i = 10, s = 'same' WHERE i = 10;
+---- DML_RESULTS: update_basic
+10,'same'
+20,'same'
+30,'same'
+---- TYPES
+INT,STRING
+---- RUNTIME_PROFILE
+NumModifiedRows: 1
+NumDeletedRows: 1
+====
+---- QUERY
+# Setting SKIP_UNNEEDED_UPDATES_COL_LIMIT back to default. No rows should be updated.
+SET SKIP_UNNEEDED_UPDATES_COL_LIMIT = 10;
+UPDATE update_basic SET i = 10, s = 'same' WHERE i = 10;
+---- DML_RESULTS: update_basic
+10,'same'
+20,'same'
+30,'same'
+---- TYPES
+INT,STRING
+---- RUNTIME_PROFILE
+NumModifiedRows: 0
+NumDeletedRows: 0
+====

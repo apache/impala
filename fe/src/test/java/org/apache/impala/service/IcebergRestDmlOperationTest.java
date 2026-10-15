@@ -35,7 +35,8 @@ import org.junit.Test;
 
 public class IcebergRestDmlOperationTest {
   @Test
-  public void testStandaloneFinalizerAcceptsOnlyInsert() throws Exception {
+  public void testStandaloneFinalizerAcceptsInsertAndUpdate()
+      throws Exception {
     TIcebergOperationParam operation = new TIcebergOperationParam();
     operation.setOperation(TIcebergOperation.INSERT);
     operation.setIs_overwrite(false);
@@ -50,8 +51,12 @@ public class IcebergRestDmlOperationTest {
 
     operation.setTable_uuid(UUID.randomUUID().toString());
     operation.setIs_overwrite(false);
+    operation.setOperation(TIcebergOperation.UPDATE);
+    IcebergDmlFinalizer.validateRestDmlOperation(operation);
+
     operation.setOperation(TIcebergOperation.DELETE);
-    assertUnsupported(operation);
+    assertUnsupported(operation,
+        "Unsupported operation for the Iceberg REST finalizer");
   }
 
   @Test
@@ -83,14 +88,15 @@ public class IcebergRestDmlOperationTest {
     assertFalse(params.isSetRest_catalog_name());
   }
 
-  private static void assertUnsupported(TIcebergOperationParam operation)
+  private static void assertUnsupported(
+      TIcebergOperationParam operation, String expectedMessage)
       throws Exception {
     try {
       IcebergDmlFinalizer.validateRestDmlOperation(operation);
       fail("Expected unsupported REST DML operation to be rejected");
     } catch (ImpalaRuntimeException e) {
-      assertTrue(e.getMessage().contains(
-          "only supports INSERT INTO and INSERT OVERWRITE"));
+      assertTrue(e.getMessage(), e.getMessage().contains(
+          expectedMessage));
     }
   }
 

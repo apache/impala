@@ -208,10 +208,10 @@ public class Analyzer {
   private static final String TABLE_NOT_SUPPORTED =
       "%s not supported. Table %s  access type is: %s";
   private static final String REST_TABLE_WRITE_NOT_SUPPORTED =
-      "Only INSERT INTO and INSERT OVERWRITE are supported for REST-backed Iceberg " +
-      "table: %s";
+      "Only INSERT INTO, INSERT OVERWRITE and UPDATE are supported for REST-backed " +
+      "Iceberg table: %s";
   private static final String REST_TABLE_UUID_UNAVAILABLE =
-      "INSERT is disabled because the Iceberg table UUID is unavailable: %s";
+      "DML is disabled because the Iceberg table UUID is unavailable: %s";
 
   private final static Logger LOG = LoggerFactory.getLogger(Analyzer.class);
 
@@ -406,9 +406,9 @@ public class Analyzer {
     }
   }
 
-  static boolean supportsInsert(FeTable table) {
+  static boolean supportsDml(FeTable table) {
     return table instanceof FeIcebergTable
-        && ((FeIcebergTable)table).supportsInsert();
+        && ((FeIcebergTable)table).supportsDml();
   }
 
   static boolean hasProviderDerivedCapabilities(FeTable table) {
@@ -417,20 +417,21 @@ public class Analyzer {
   }
 
   /**
-   * Check whether a table supports this write operation. 'isInsert' is true for
-   * INSERT INTO and INSERT OVERWRITE, and false for every other write, UPSERT included.
+   * Check whether a table supports this write operation. 'isRestDmlSupported' is true
+   * for INSERT INTO, INSERT OVERWRITE and UPDATE, and false for every other write,
+   * UPSERT included.
    */
-  static void ensureTableWriteSupported(FeTable table, boolean isInsert)
-      throws AnalysisException {
+  static void ensureTableWriteSupported(FeTable table,
+      boolean isRestDmlSupported) throws AnalysisException {
     if (!hasProviderDerivedCapabilities(table)) {
       ensureTableWriteSupported(table);
       return;
     }
-    if (!isInsert) {
+    if (!isRestDmlSupported) {
       throw new AnalysisException(
           String.format(REST_TABLE_WRITE_NOT_SUPPORTED, table.getFullName()));
     }
-    ensureRestCatalogInsertEnabled(table);
+    ensureRestCatalogDmlEnabled(table);
     // The provider-derived capability replaces only the HMS access-type check. Keep
     // the structural checks that apply to every INSERT target.
     ensureTableNotBucketed(table);
@@ -439,11 +440,11 @@ public class Analyzer {
     }
   }
 
-  private static void ensureRestCatalogInsertEnabled(FeTable table)
+  private static void ensureRestCatalogDmlEnabled(FeTable table)
       throws AnalysisException {
-    if (!supportsInsert(table)) {
+    if (!supportsDml(table)) {
       throw new AnalysisException(String.format(
-          "INSERT is disabled because the REST catalog does not have a "
+          "DML is disabled because the REST catalog does not have a "
               + "unique name: %s",
           table.getFullName()));
     }

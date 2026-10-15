@@ -42,6 +42,7 @@ import org.apache.hadoop.hive.metastore.api.MetaException;
 import org.apache.hadoop.hive.metastore.api.SerDeInfo;
 import org.apache.hadoop.hive.metastore.api.StorageDescriptor;
 import org.apache.hadoop.hive.metastore.api.Table;
+import org.apache.iceberg.BaseTable;
 import org.apache.iceberg.Snapshot;
 import org.apache.iceberg.TableScan;
 import org.apache.iceberg.catalog.Namespace;
@@ -520,14 +521,8 @@ public class IcebergMetaProvider implements MetaProvider {
 
     @Override
     public List<VirtualColumn> getVirtualColumns() {
-      List<VirtualColumn> ret = new ArrayList<>();
-      ret.add(VirtualColumn.INPUT_FILE_NAME);
-      ret.add(VirtualColumn.FILE_POSITION);
-      ret.add(VirtualColumn.PARTITION_SPEC_ID);
-      ret.add(VirtualColumn.ICEBERG_PARTITION_SERIALIZED);
-      ret.add(VirtualColumn.ICEBERG_DATA_SEQUENCE_NUMBER);
-      ret.add(VirtualColumn.ICEBERG_FIRST_ROW_ID);
-      return ret;
+      return VirtualColumn.getIcebergVirtualColumns(
+          ((BaseTable) iceApiTbl_).operations().current().formatVersion());
     }
 
     @Override

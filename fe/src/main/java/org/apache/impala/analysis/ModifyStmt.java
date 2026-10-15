@@ -95,6 +95,8 @@ public abstract class ModifyStmt extends DmlStatementBase {
     wherePredicate_ = wherePredicate;
   }
 
+  protected abstract boolean isRestDmlSupported();
+
   @Override
   public void collectTableRefs(List<TableRef> tblRefs) {
     tblRefs.add(new TableRef(targetTablePath_, null));
@@ -157,7 +159,7 @@ public abstract class ModifyStmt extends DmlStatementBase {
               "but the following table is neither: %s",
               dstTbl.getFullName()));
     }
-    Analyzer.checkTableCapability(dstTbl, Analyzer.OperationType.WRITE);
+    Analyzer.ensureTableWriteSupported(dstTbl, isRestDmlSupported());
     if (dstTbl instanceof FeIcebergTable) {
       setMaxTableSinks(analyzer_.getQueryOptions().getMax_fs_writers());
     }

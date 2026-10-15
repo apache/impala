@@ -24,6 +24,9 @@ import requests
 
 from tests.common.custom_cluster_test_suite import CustomClusterTestSuite, HIVE_CONF_DIR
 from tests.common.iceberg_rest_server import IcebergRestServer
+from tests.common.iceberg_rest_test_tables import (
+    INSERT_TEST_TABLE, PARTITIONED_INSERT_TEST_TABLE, UPDATE_PARTITIONS_TEST_TABLES,
+    UPDATE_TEST_TABLES, create_table_request)
 from tests.common.impala_connection import IMPALA_CONNECTION_EXCEPTION
 from tests.util.filesystem_utils import get_fs_path
 from tests.util.hdfs_util import HadoopFsCommandLineClient
@@ -51,14 +54,17 @@ SECONDARY_WRITE_TEST_TABLE = "impala_rest_dml_test_secondary.insert_test"
 WRITE_TEST_CATALOG_LOCATION = IcebergRestServer.DEFAULT_CATALOG_LOCATION
 SECONDARY_WRITE_TEST_CATALOG_LOCATION = \
     '/test-warehouse/iceberg_test/secondary_hadoop_catalog'
+UPDATE_TEST_NS = "impala_rest_update_test"
 
 
 def RestServerProperties(*server_configs):
   """
   Annotation to specify configurations for multiple REST servers to be started.
   Each argument is a dictionary with optional 'port', 'catalog_location',
-  'test_table' and 'partitioned_test_table' keys. The test tables are created through
-  the REST API, see _create_rest_test_table().
+  'test_table', 'partitioned_test_table' and 'test_tables' keys. 'test_tables' is a
+  (namespace, {table name: definition}) pair, see iceberg_rest_test_tables. The test
+  tables are created through the REST API before the test and dropped after it, see
+  _create_rest_test_table().
   Example:
   @RestServerProperties({'port': 9085},
       {'port': 9086, 'catalog_location': '/tmp/cat2', 'test_table': 'db.tbl'})
@@ -77,8 +83,8 @@ class IcebergRestCatalogTests(CustomClusterTestSuite):
       raise Exception("Cannot specify HIVE_CONF_DIR because the tests of this class are "
           "running without Hive.")
     self.servers = []
+    # (server, table name, table definition) of the tables to create.
     self.rest_test_tables = []
-    self.partitioned_rest_test_tables = set()
 
     server_configs = getattr(method, 'rest_server_configs', None)
 
@@ -94,17 +100,21 @@ class IcebergRestCatalogTests(CustomClusterTestSuite):
         server = IcebergRestServer(port, catalog_location)
         self.servers.append(server)
         if test_table:
-          self.rest_test_tables.append((server, test_table))
+          self.rest_test_tables.append((server, test_table, INSERT_TEST_TABLE))
         if partitioned_test_table:
-          self.rest_test_tables.append((server, partitioned_test_table))
-          self.partitioned_rest_test_tables.add(partitioned_test_table)
+          self.rest_test_tables.append(
+              (server, partitioned_test_table, PARTITIONED_INSERT_TEST_TABLE))
+        if 'test_tables' in config:
+          namespace, tables = config['test_tables']
+          for table, definition in tables.items():
+            self.rest_test_tables.append(
+                (server, "{}.{}".format(namespace, table), definition))
 
     try:
       for server in self.servers:
         server.start_rest_server(300)
-      for server, table_name in self.rest_test_tables:
-        self._create_rest_test_table(server, table_name,
-            partitioned=table_name in self.partitioned_rest_test_tables)
+      for server, table_name, definition in self.rest_test_tables:
+        self._create_rest_test_table(server, table_name, definition=definition)
       super(IcebergRestCatalogTests, self).setup_method(method)
       # At this point we can create the Impala clients that we will need.
       self.create_impala_clients()
@@ -124,7 +134,7 @@ class IcebergRestCatalogTests(CustomClusterTestSuite):
 
   def _stop_rest_servers(self, timeout_s=60):
     first_error = None
-    for server, table_name in getattr(self, 'rest_test_tables', []):
+    for server, table_name, _ in getattr(self, 'rest_test_tables', []):
       try:
         self._drop_rest_test_table(server, table_name)
       except Exception as e:
@@ -153,9 +163,13 @@ class IcebergRestCatalogTests(CustomClusterTestSuite):
       response.raise_for_status()
 
   @classmethod
-  def _create_rest_test_table(cls, server, table_name, partitioned=False):
-    """Creates 'table_name' with an INT column 'i'. A partitioned table also gets an INT
-    column 'p' and an identity partition spec on it."""
+  def _create_rest_test_table(cls, server, table_name, partitioned=False,
+      definition=None):
+    """Creates 'table_name' from 'definition', see iceberg_rest_test_tables. Without a
+    definition, the table gets an INT column 'i', and a partitioned table also gets an
+    INT column 'p' and an identity partition spec on it."""
+    if definition is None:
+      definition = PARTITIONED_INSERT_TEST_TABLE if partitioned else INSERT_TEST_TABLE
     namespace, table = table_name.split('.', 1)
     cls._drop_rest_test_table(server, table_name)
     namespace_response = requests.post(
@@ -164,27 +178,10 @@ class IcebergRestCatalogTests(CustomClusterTestSuite):
     if namespace_response.status_code != 409:
       namespace_response.raise_for_status()
 
-    fields = [{'id': 1, 'name': 'i', 'required': False, 'type': 'int'}]
-    create_request = {
-        'name': table,
-        'schema': {
-            'type': 'struct',
-            'schema-id': 0,
-            'fields': fields,
-        },
-        'properties': {'format-version': '2'},
-    }
-    if partitioned:
-      fields.append({'id': 2, 'name': 'p', 'required': False, 'type': 'int'})
-      create_request['partition-spec'] = {
-          'spec-id': 0,
-          'fields': [{'source-id': 2, 'field-id': 1000, 'name': 'p',
-                      'transform': 'identity'}],
-      }
     create_response = requests.post(
         "http://localhost:{}/v1/namespaces/{}/tables".format(
             server.port, quote(namespace, safe='')),
-        json=create_request, timeout=30)
+        json=create_table_request(table, definition), timeout=30)
     create_response.raise_for_status()
 
 
@@ -306,7 +303,6 @@ class TestIcebergRestCatalogDmlStandalone(IcebergRestCatalogTests):
     unsupported_statements = [
         "truncate table {}".format(table_name),
         "delete from {} where i = 1".format(table_name),
-        "update {} set i = 2 where i = 1".format(table_name),
         "merge into {0} target using (select 1 i) source "
         "on target.i = source.i when matched then update set i = 2".format(
             table_name),
@@ -314,8 +310,76 @@ class TestIcebergRestCatalogDmlStandalone(IcebergRestCatalogTests):
     ]
     for statement in unsupported_statements:
       error = self.execute_query_expect_failure(self.client, statement)
-      assert ("AnalysisException: Only INSERT INTO and INSERT OVERWRITE are supported"
-          in str(error))
+      assert ("AnalysisException: Only INSERT INTO, INSERT OVERWRITE and UPDATE "
+              "are supported") in str(error)
+
+  @RestServerProperties(
+      {'port': 9084, 'catalog_location': WRITE_TEST_CATALOG_LOCATION,
+       'test_tables': (UPDATE_TEST_NS, UPDATE_TEST_TABLES)})
+  @CustomClusterTestSuite.with_args(
+     impalad_args=REST_STANDALONE_IMPALAD_ARGS,
+     start_args=NO_CATALOGD_STARTARGS,
+     cluster_size=1)
+  @pytest.mark.execute_serially
+  def test_rest_catalog_update(self, vector):
+    """Test UPDATE on Iceberg REST catalog tables (format-version 3)."""
+    ns = UPDATE_TEST_NS
+    self.run_test_case('QueryTest/iceberg-rest-update', vector, use_db=ns)
+
+    table_name = "{}.update_basic".format(ns)
+    data_path = get_fs_path(
+        "/test-warehouse/iceberg_test/hadoop_catalog/"
+        "{}/update_basic/data".format(ns))
+    filesystem_client = HadoopFsCommandLineClient()
+
+    # State left behind by the last section of iceberg-rest-update.test.
+    expected_rows = ['10\tsame', '20\tsame', '30\tsame']
+    committed_files = set(filesystem_client.ls(data_path))
+    unknown_state = {'debug_action':
+        'ICEBERG_COMMIT:EXCEPTION@CommitStateUnknownException@'
+        'simulated REST commit state unknown'}
+    error = self.execute_query_expect_failure(
+        self.client,
+        "update {} set s = 'fail' where i = 10".format(table_name),
+        query_options=unknown_state)
+    assert "simulated REST commit state unknown" in str(error)
+
+    result = self.execute_query_expect_success(
+        self.client, "select * from {} order by i".format(table_name))
+    assert result.data == expected_rows
+    # Files are kept when the commit state is unknown.
+    orphan_files = set(filesystem_client.ls(data_path)) - committed_files
+    assert len(orphan_files) > 0
+    for orphan_file in orphan_files:
+      assert filesystem_client.delete_file_dir(data_path + "/" + orphan_file)
+
+    commit_failure = {'debug_action':
+        'ICEBERG_COMMIT:EXCEPTION@CommitFailedException@'
+        'simulated REST commit failure'}
+    error = self.execute_query_expect_failure(
+        self.client,
+        "update {} set s = 'fail' where i = 10".format(table_name),
+        query_options=commit_failure)
+    assert "simulated REST commit failure" in str(error)
+
+    result = self.execute_query_expect_success(
+        self.client, "select * from {} order by i".format(table_name))
+    assert result.data == expected_rows
+    # Files written by a failed commit are cleaned up.
+    assert set(filesystem_client.ls(data_path)) == committed_files
+
+  @RestServerProperties(
+      {'port': 9084, 'catalog_location': WRITE_TEST_CATALOG_LOCATION,
+       'test_tables': (UPDATE_TEST_NS, UPDATE_PARTITIONS_TEST_TABLES)})
+  @CustomClusterTestSuite.with_args(
+     impalad_args=REST_STANDALONE_IMPALAD_ARGS,
+     start_args=NO_CATALOGD_STARTARGS,
+     cluster_size=1)
+  @pytest.mark.execute_serially
+  def test_rest_catalog_update_partitions(self, vector):
+    """Test UPDATE on partitioned Iceberg REST catalog tables (format-version 3)."""
+    self.run_test_case(
+        'QueryTest/iceberg-rest-update-partitions', vector, use_db=UPDATE_TEST_NS)
 
   @RestServerProperties(
       {'port': 9084, 'catalog_location': WRITE_TEST_CATALOG_LOCATION,

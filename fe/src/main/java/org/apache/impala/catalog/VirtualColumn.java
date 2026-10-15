@@ -17,10 +17,13 @@
 
 package org.apache.impala.catalog;
 
+import java.util.List;
+
 import org.apache.impala.thrift.TColumn;
 import org.apache.impala.thrift.TVirtualColumnType;
 
 import com.google.common.base.Preconditions;
+import com.google.common.collect.ImmutableList;
 
 /**
  * Virtual columns are columns that are not stored by the table, but they can reveal some
@@ -71,6 +74,21 @@ public class VirtualColumn extends Column {
   public static VirtualColumn BUCKET_ID = new VirtualColumn("BUCKET_ID",
       Type.INT, TVirtualColumnType.BUCKET_ID);
 
+  // Virtual columns of Iceberg V1 and V2 tables.
+  private static final List<VirtualColumn> ICEBERG_BASE_VIRTUAL_COLUMNS =
+      ImmutableList.of(INPUT_FILE_NAME, FILE_POSITION, PARTITION_SPEC_ID,
+          ICEBERG_PARTITION_SERIALIZED, ICEBERG_DATA_SEQUENCE_NUMBER,
+          ICEBERG_FIRST_ROW_ID);
+  // V3 tables add the row lineage columns on top of the base ones.
+  private static final List<VirtualColumn> ICEBERG_V3_VIRTUAL_COLUMNS =
+      ImmutableList.<VirtualColumn>builder()
+          .addAll(ICEBERG_BASE_VIRTUAL_COLUMNS)
+          .add(ICEBERG_ROW_ID, ICEBERG_LAST_UPDATED_SEQUENCE_NUMBER)
+          .build();
+
+  public static List<VirtualColumn> getIcebergVirtualColumns(int formatVersion) {
+    return formatVersion >= 3 ? ICEBERG_V3_VIRTUAL_COLUMNS : ICEBERG_BASE_VIRTUAL_COLUMNS;
+  }
 
   public static VirtualColumn getVirtualColumn(TVirtualColumnType virtColType) {
     switch (virtColType) {

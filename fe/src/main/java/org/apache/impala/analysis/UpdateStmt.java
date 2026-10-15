@@ -57,6 +57,9 @@ public class UpdateStmt extends ModifyStmt {
   }
 
   @Override
+  protected boolean isRestDmlSupported() { return true; }
+
+  @Override
   protected void createModifyImpl() {
     // Currently Kudu and Iceberg tables are supported.
     if (table_ instanceof FeKuduTable) {
