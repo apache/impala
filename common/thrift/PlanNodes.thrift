@@ -601,6 +601,11 @@ struct TAggregationNode {
 
   // Set to true if this aggregation can complete early
   4: required bool fast_limit_check
+
+  // If true, each Aggregator after the first consumes the output rows of the previous
+  // one. Only for streaming preaggregations of nested grouping sets. Mutually exclusive
+  // with 'replicate_input'.
+  5: optional bool chain_aggregators = false
 }
 
 struct TSortInfo {

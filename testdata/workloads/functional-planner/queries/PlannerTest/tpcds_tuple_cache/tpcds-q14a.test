@@ -2071,16 +2071,20 @@ max-parallelism=109 segment-costs=[31467972, 31467972, 31443606, 8492690, 202730
 |    output: sum(sales), sum(number_sales)
 |    group by: channel, i_brand_id, i_class_id, i_category_id
 |  Class 1
-|    output: sum(sales), sum(number_sales)
+|    input: Class 0
+|    output: sum:merge(sales), sum:merge(number_sales)
 |    group by: channel, i_brand_id, i_class_id, NULL
 |  Class 2
-|    output: sum(sales), sum(number_sales)
+|    input: Class 1
+|    output: sum:merge(sales), sum:merge(number_sales)
 |    group by: channel, i_brand_id, NULL, NULL
 |  Class 3
-|    output: sum(sales), sum(number_sales)
+|    input: Class 2
+|    output: sum:merge(sales), sum:merge(number_sales)
 |    group by: channel, NULL, NULL, NULL
 |  Class 4
-|    output: sum(sales), sum(number_sales)
+|    input: Class 3
+|    output: sum:merge(sales), sum:merge(number_sales)
 |    group by: NULL, NULL, NULL, NULL
 |  mem-estimate=50.00MB mem-reservation=10.00MB thread-reservation=0
 |  tuple-ids=104N,105N,106N,107N,108N row-size=240B cardinality=1.12M cost=8321461
@@ -4767,16 +4771,20 @@ max-parallelism=109 segment-costs=[31467972, 31467972, 31443606, 8492690, 202730
 |    output: sum(sales), sum(number_sales)
 |    group by: channel, i_brand_id, i_class_id, i_category_id
 |  Class 1
-|    output: sum(sales), sum(number_sales)
+|    input: Class 0
+|    output: sum:merge(sales), sum:merge(number_sales)
 |    group by: channel, i_brand_id, i_class_id, NULL
 |  Class 2
-|    output: sum(sales), sum(number_sales)
+|    input: Class 1
+|    output: sum:merge(sales), sum:merge(number_sales)
 |    group by: channel, i_brand_id, NULL, NULL
 |  Class 3
-|    output: sum(sales), sum(number_sales)
+|    input: Class 2
+|    output: sum:merge(sales), sum:merge(number_sales)
 |    group by: channel, NULL, NULL, NULL
 |  Class 4
-|    output: sum(sales), sum(number_sales)
+|    input: Class 3
+|    output: sum:merge(sales), sum:merge(number_sales)
 |    group by: NULL, NULL, NULL, NULL
 |  mem-estimate=50.00MB mem-reservation=10.00MB thread-reservation=0
 |  tuple-ids=104N,105N,106N,107N,108N row-size=240B cardinality=1.12M cost=8321461

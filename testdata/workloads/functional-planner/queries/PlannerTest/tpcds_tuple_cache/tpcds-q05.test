@@ -607,10 +607,12 @@ max-parallelism=120 segment-costs=[86121, 4448543, 4190, 344492, 574824] cpu-com
 |    output: sum(sales), sum(returns), sum(profit)
 |    group by: channel, id
 |  Class 1
-|    output: sum(sales), sum(returns), sum(profit)
+|    input: Class 0
+|    output: sum:merge(sales), sum:merge(returns), sum:merge(profit)
 |    group by: channel, NULL
 |  Class 2
-|    output: sum(sales), sum(returns), sum(profit)
+|    input: Class 1
+|    output: sum:merge(sales), sum:merge(returns), sum:merge(profit)
 |    group by: NULL, NULL
 |  mem-estimate=30.00MB mem-reservation=6.00MB thread-reservation=0
 |  tuple-ids=27N,28N,29N row-size=216B cardinality=37.19K cost=335170
@@ -1176,10 +1178,12 @@ max-parallelism=120 segment-costs=[86121, 4448543, 4190, 344492, 574824] cpu-com
 |    output: sum(sales), sum(returns), sum(profit)
 |    group by: channel, id
 |  Class 1
-|    output: sum(sales), sum(returns), sum(profit)
+|    input: Class 0
+|    output: sum:merge(sales), sum:merge(returns), sum:merge(profit)
 |    group by: channel, NULL
 |  Class 2
-|    output: sum(sales), sum(returns), sum(profit)
+|    input: Class 1
+|    output: sum:merge(sales), sum:merge(returns), sum:merge(profit)
 |    group by: NULL, NULL
 |  mem-estimate=30.00MB mem-reservation=6.00MB thread-reservation=0
 |  tuple-ids=27N,28N,29N row-size=216B cardinality=37.19K cost=335170

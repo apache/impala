@@ -239,16 +239,20 @@ max-parallelism=261 segment-costs=[9532758249, 5356784990] cpu-comparison-result
 |    output: avg(CAST(tpcds_partitioned_parquet_snap.inventory.inv_quantity_on_hand AS BIGINT))
 |    group by: tpcds_partitioned_parquet_snap.item.i_product_name, tpcds_partitioned_parquet_snap.item.i_brand, tpcds_partitioned_parquet_snap.item.i_class, tpcds_partitioned_parquet_snap.item.i_category
 |  Class 1
-|    output: avg(CAST(tpcds_partitioned_parquet_snap.inventory.inv_quantity_on_hand AS BIGINT))
+|    input: Class 0
+|    output: avg:merge(tpcds_partitioned_parquet_snap.inventory.inv_quantity_on_hand)
 |    group by: tpcds_partitioned_parquet_snap.item.i_product_name, tpcds_partitioned_parquet_snap.item.i_brand, tpcds_partitioned_parquet_snap.item.i_class, NULL
 |  Class 2
-|    output: avg(CAST(tpcds_partitioned_parquet_snap.inventory.inv_quantity_on_hand AS BIGINT))
+|    input: Class 1
+|    output: avg:merge(tpcds_partitioned_parquet_snap.inventory.inv_quantity_on_hand)
 |    group by: tpcds_partitioned_parquet_snap.item.i_product_name, tpcds_partitioned_parquet_snap.item.i_brand, NULL, NULL
 |  Class 3
-|    output: avg(CAST(tpcds_partitioned_parquet_snap.inventory.inv_quantity_on_hand AS BIGINT))
+|    input: Class 2
+|    output: avg:merge(tpcds_partitioned_parquet_snap.inventory.inv_quantity_on_hand)
 |    group by: tpcds_partitioned_parquet_snap.item.i_product_name, NULL, NULL, NULL
 |  Class 4
-|    output: avg(CAST(tpcds_partitioned_parquet_snap.inventory.inv_quantity_on_hand AS BIGINT))
+|    input: Class 3
+|    output: avg:merge(tpcds_partitioned_parquet_snap.inventory.inv_quantity_on_hand)
 |    group by: NULL, NULL, NULL, NULL
 |  mem-estimate=3.61GB mem-reservation=138.00MB thread-reservation=0
 |  tuple-ids=8N,10N,12N,14N,16N row-size=441B cardinality=172.80M cost=7880050563
@@ -465,16 +469,20 @@ max-parallelism=261 segment-costs=[9532758249, 5356784990] cpu-comparison-result
 |    output: avg(CAST(tpcds_partitioned_parquet_snap.inventory.inv_quantity_on_hand AS BIGINT))
 |    group by: tpcds_partitioned_parquet_snap.item.i_product_name, tpcds_partitioned_parquet_snap.item.i_brand, tpcds_partitioned_parquet_snap.item.i_class, tpcds_partitioned_parquet_snap.item.i_category
 |  Class 1
-|    output: avg(CAST(tpcds_partitioned_parquet_snap.inventory.inv_quantity_on_hand AS BIGINT))
+|    input: Class 0
+|    output: avg:merge(tpcds_partitioned_parquet_snap.inventory.inv_quantity_on_hand)
 |    group by: tpcds_partitioned_parquet_snap.item.i_product_name, tpcds_partitioned_parquet_snap.item.i_brand, tpcds_partitioned_parquet_snap.item.i_class, NULL
 |  Class 2
-|    output: avg(CAST(tpcds_partitioned_parquet_snap.inventory.inv_quantity_on_hand AS BIGINT))
+|    input: Class 1
+|    output: avg:merge(tpcds_partitioned_parquet_snap.inventory.inv_quantity_on_hand)
 |    group by: tpcds_partitioned_parquet_snap.item.i_product_name, tpcds_partitioned_parquet_snap.item.i_brand, NULL, NULL
 |  Class 3
-|    output: avg(CAST(tpcds_partitioned_parquet_snap.inventory.inv_quantity_on_hand AS BIGINT))
+|    input: Class 2
+|    output: avg:merge(tpcds_partitioned_parquet_snap.inventory.inv_quantity_on_hand)
 |    group by: tpcds_partitioned_parquet_snap.item.i_product_name, NULL, NULL, NULL
 |  Class 4
-|    output: avg(CAST(tpcds_partitioned_parquet_snap.inventory.inv_quantity_on_hand AS BIGINT))
+|    input: Class 3
+|    output: avg:merge(tpcds_partitioned_parquet_snap.inventory.inv_quantity_on_hand)
 |    group by: NULL, NULL, NULL, NULL
 |  mem-estimate=3.61GB mem-reservation=138.00MB thread-reservation=0
 |  tuple-ids=8N,10N,12N,14N,16N row-size=441B cardinality=172.80M cost=7880050563

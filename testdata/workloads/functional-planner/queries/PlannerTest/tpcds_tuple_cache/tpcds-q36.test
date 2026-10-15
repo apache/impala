@@ -304,10 +304,12 @@ max-parallelism=374 segment-costs=[6602771919, 1636865] cpu-comparison-result=12
 |    output: sum(ss_net_profit), sum(ss_ext_sales_price)
 |    group by: i_category, i_class
 |  Class 1
-|    output: sum(ss_net_profit), sum(ss_ext_sales_price)
+|    input: Class 0
+|    output: sum:merge(ss_net_profit), sum:merge(ss_ext_sales_price)
 |    group by: i_category, NULL
 |  Class 2
-|    output: sum(ss_net_profit), sum(ss_ext_sales_price)
+|    input: Class 1
+|    output: sum:merge(ss_net_profit), sum:merge(ss_ext_sales_price)
 |    group by: NULL, NULL
 |  mem-estimate=30.00MB mem-reservation=6.00MB thread-reservation=0
 |  tuple-ids=4N,5N,6N row-size=188B cardinality=120.12K cost=4258848317
@@ -561,10 +563,12 @@ max-parallelism=374 segment-costs=[6602771919, 1636865] cpu-comparison-result=12
 |    output: sum(ss_net_profit), sum(ss_ext_sales_price)
 |    group by: i_category, i_class
 |  Class 1
-|    output: sum(ss_net_profit), sum(ss_ext_sales_price)
+|    input: Class 0
+|    output: sum:merge(ss_net_profit), sum:merge(ss_ext_sales_price)
 |    group by: i_category, NULL
 |  Class 2
-|    output: sum(ss_net_profit), sum(ss_ext_sales_price)
+|    input: Class 1
+|    output: sum:merge(ss_net_profit), sum:merge(ss_ext_sales_price)
 |    group by: NULL, NULL
 |  mem-estimate=30.00MB mem-reservation=6.00MB thread-reservation=0
 |  tuple-ids=4N,5N,6N row-size=188B cardinality=120.12K cost=4258848317

@@ -85,7 +85,8 @@ class AggregatorConfig {
 
   /// The RowDescriptor for the exec node this aggregator corresponds to.
   const RowDescriptor& row_desc_;
-  /// The RowDescriptor for the child of the exec node this aggregator corresponds to.
+  /// The RowDescriptor of the input rows: the child's, or the exec node's for a chained
+  /// aggregator after the first.
   const RowDescriptor& input_row_desc_;
 
   /// Certain aggregates require a finalize step, which is the final step of the

@@ -107,6 +107,11 @@ public class AggregationNode extends PlanNode implements SpillableOperator {
   // If true, this node uses streaming preaggregation. Invalid if this is a merge agg.
   private boolean useStreamingPreagg_ = false;
 
+  // If the aggregation classes are chained, the grouping and aggregate exprs of each
+  // class over the intermediate tuple of the previous class. Null for the first class.
+  private List<List<Expr>> chainedGroupingExprs_;
+  private List<List<FunctionCallExpr>> chainedAggExprs_;
+
   // Resource profiles for each aggregation class.
   // Set in computeNodeResourceProfile().
   private List<ResourceProfile> resourceProfiles_;
@@ -171,6 +176,8 @@ public class AggregationNode extends PlanNode implements SpillableOperator {
     needsFinalize_ = src.needsFinalize_;
     useIntermediateTuple_ = src.useIntermediateTuple_;
     isNonCorrelatedScalarSubquery_ = src.isNonCorrelatedScalarSubquery_;
+    chainedGroupingExprs_ = src.chainedGroupingExprs_;
+    chainedAggExprs_ = src.chainedAggExprs_;
   }
 
   @Override
@@ -205,9 +212,74 @@ public class AggregationNode extends PlanNode implements SpillableOperator {
     for (AggregateInfo aggInfo : aggInfos_) {
       if (aggInfo.getGroupingExprs().size() > 0) {
         useStreamingPreagg_ = true;
-        return;
+        break;
       }
     }
+    if (useStreamingPreagg_ && aggPhase_ == AggPhase.FIRST && aggInfos_.size() > 1
+        && multiAggInfo_.getIsGroupingSet()
+        && ctx.getQueryOptions().isChain_grouping_sets_preagg()) {
+      computeChainedAggregators(ctx.getRootAnalyzer());
+    }
+  }
+
+  /**
+   * Sets 'chainedGroupingExprs_' and 'chainedAggExprs_' if each grouping expr of class
+   * 'i' is a NULL literal or the grouping expr of class 'i - 1' at the same position,
+   * e.g. ROLLUP(a, b) gives (a, b), (a, NULL) and (NULL, NULL).
+   */
+  private void computeChainedAggregators(Analyzer analyzer) {
+    List<List<Expr>> chainedGroupingExprs = new ArrayList<>();
+    List<List<FunctionCallExpr>> chainedAggExprs = new ArrayList<>();
+    chainedGroupingExprs.add(null);
+    chainedAggExprs.add(null);
+    for (int i = 1; i < aggInfos_.size(); ++i) {
+      AggregateInfo prevAggInfo = aggInfos_.get(i - 1);
+      AggregateInfo aggInfo = aggInfos_.get(i);
+      List<Expr> prevGroupingExprs = prevAggInfo.getGroupingExprs();
+      List<Expr> groupingExprs = aggInfo.getGroupingExprs();
+      int numGroupingExprs = groupingExprs.size();
+      if (prevGroupingExprs.size() != numGroupingExprs
+          || !prevAggInfo.getAggregateExprs().equals(aggInfo.getAggregateExprs())
+          || !prevAggInfo.getMaterializedSlots().equals(aggInfo.getMaterializedSlots())) {
+        return;
+      }
+      List<SlotDescriptor> prevSlots = prevAggInfo.getIntermediateTupleDesc().getSlots();
+      List<Expr> chainedGroupingExprsOfClass = new ArrayList<>();
+      for (int j = 0; j < numGroupingExprs; ++j) {
+        Expr groupingExpr = groupingExprs.get(j);
+        if (Expr.IS_NULL_LITERAL.apply(groupingExpr)) {
+          chainedGroupingExprsOfClass.add(groupingExpr);
+          continue;
+        }
+        Expr prevGroupingExpr = prevGroupingExprs.get(j);
+        SlotDescriptor prevSlot = prevSlots.get(j);
+        if (Expr.IS_NULL_LITERAL.apply(prevGroupingExpr)
+            || !groupingExpr.equals(prevGroupingExpr) || !prevSlot.isMaterialized()) {
+          return;
+        }
+        chainedGroupingExprsOfClass.add(new SlotRef(prevSlot));
+      }
+      List<FunctionCallExpr> chainedAggExprsOfClass = new ArrayList<>();
+      for (int j : aggInfo.getMaterializedSlots()) {
+        SlotDescriptor prevSlot = prevSlots.get(numGroupingExprs + j);
+        Preconditions.checkState(prevSlot.isMaterialized());
+        List<Expr> mergeParams = Lists.newArrayList(new SlotRef(prevSlot));
+        FunctionCallExpr mergeExpr = FunctionCallExpr.createMergeAggCall(
+            aggInfo.getAggregateExprs().get(j), mergeParams);
+        mergeExpr.analyzeNoThrow(analyzer);
+        chainedAggExprsOfClass.add(mergeExpr);
+      }
+      chainedGroupingExprs.add(chainedGroupingExprsOfClass);
+      chainedAggExprs.add(chainedAggExprsOfClass);
+    }
+    chainedGroupingExprs_ = chainedGroupingExprs;
+    chainedAggExprs_ = chainedAggExprs;
+  }
+
+  /** Returns true if the backend chains the aggregation classes. */
+  private boolean chainAggregators() {
+    return chainedGroupingExprs_ != null && isPreagg_ && useStreamingPreagg_
+        && !needsFinalize_ && !hasLimit();
   }
 
   /**
@@ -902,8 +974,11 @@ public class AggregationNode extends PlanNode implements SpillableOperator {
 
     populateHboThriftFields(msg, serialCtx);
 
-    boolean replicateInput = aggPhase_ == AggPhase.FIRST && aggInfos_.size() > 1;
+    boolean chainAggregators = chainAggregators();
+    boolean replicateInput =
+        aggPhase_ == AggPhase.FIRST && aggInfos_.size() > 1 && !chainAggregators;
     msg.agg_node.setReplicate_input(replicateInput);
+    msg.agg_node.setChain_aggregators(chainAggregators);
     // Normalize input cardinality estimate for caching in case stats change.
     // Cache key of scan ensures we detect changes to actual input data.
     msg.agg_node.setEstimated_input_cardinality(serialCtx.isTupleCache() ?
@@ -911,8 +986,14 @@ public class AggregationNode extends PlanNode implements SpillableOperator {
     msg.agg_node.setFast_limit_check(canCompleteEarly());
     for (int i = 0; i < aggInfos_.size(); ++i) {
       AggregateInfo aggInfo = aggInfos_.get(i);
+      boolean chained = chainAggregators && i > 0;
+      List<FunctionCallExpr> aggExprs = chained ?
+          chainedAggExprs_.get(i) : aggInfo.getMaterializedAggregateExprs();
+      // The chained exprs were computed in setIsPreagg().
+      Preconditions.checkState(
+          aggExprs.size() == aggInfo.getMaterializedAggregateExprs().size());
       List<TExpr> aggregateFunctions = new ArrayList<>();
-      for (FunctionCallExpr e : aggInfo.getMaterializedAggregateExprs()) {
+      for (FunctionCallExpr e : aggExprs) {
         aggregateFunctions.add(e.treeToThrift(serialCtx));
       }
       // At the point when TupleCachePlanner runs, the resource profile has not been
@@ -927,7 +1008,8 @@ public class AggregationNode extends PlanNode implements SpillableOperator {
           serialCtx.translateTupleId(aggInfo.getIntermediateTupleId()).asInt(),
           serialCtx.translateTupleId(aggInfo.getOutputTupleId()).asInt(),
           needsFinalize_, useStreamingPreagg_, resourceProfile);
-      List<Expr> groupingExprs = aggInfo.getGroupingExprs();
+      List<Expr> groupingExprs =
+          chained ? chainedGroupingExprs_.get(i) : aggInfo.getGroupingExprs();
       if (!groupingExprs.isEmpty()) {
         taggregator.setGrouping_exprs(Expr.treesToThrift(groupingExprs, serialCtx));
       }
@@ -963,14 +1045,25 @@ public class AggregationNode extends PlanNode implements SpillableOperator {
 
     if (detailLevel.ordinal() >= TExplainLevel.STANDARD.ordinal()) {
       if (aggInfos_.size() == 1) {
-        output.append(
-            getAggInfoExplainString(detailPrefix, aggInfos_.get(0), detailLevel));
+        AggregateInfo aggInfo = aggInfos_.get(0);
+        output.append(getAggInfoExplainString(detailPrefix,
+            aggInfo.getMaterializedAggregateExprs(), aggInfo.getGroupingExprs(),
+            detailLevel));
       } else {
+        boolean showChaining = chainAggregators()
+            && detailLevel.ordinal() >= TExplainLevel.EXTENDED.ordinal();
         for (int i = 0; i < aggInfos_.size(); ++i) {
           AggregateInfo aggInfo = aggInfos_.get(i);
+          String classPrefix = detailPrefix + "  ";
           output.append(String.format("%sClass %d\n", detailPrefix, i));
-          output.append(
-              getAggInfoExplainString(detailPrefix + "  ", aggInfo, detailLevel));
+          List<FunctionCallExpr> aggExprs = aggInfo.getMaterializedAggregateExprs();
+          if (showChaining && i > 0) {
+            // The class merges the output of the previous class.
+            output.append(String.format("%sinput: Class %d\n", classPrefix, i - 1));
+            aggExprs = chainedAggExprs_.get(i);
+          }
+          output.append(getAggInfoExplainString(
+              classPrefix, aggExprs, aggInfo.getGroupingExprs(), detailLevel));
         }
       }
       if (!conjuncts_.isEmpty()) {
@@ -983,11 +1076,10 @@ public class AggregationNode extends PlanNode implements SpillableOperator {
     return output.toString();
   }
 
-  private StringBuilder getAggInfoExplainString(
-      String prefix, AggregateInfo aggInfo, TExplainLevel detailLevel) {
+  private StringBuilder getAggInfoExplainString(String prefix,
+      List<FunctionCallExpr> aggExprs, List<Expr> groupingExprs,
+      TExplainLevel detailLevel) {
     StringBuilder output = new StringBuilder();
-    List<FunctionCallExpr> aggExprs = aggInfo.getMaterializedAggregateExprs();
-    List<Expr> groupingExprs = aggInfo.getGroupingExprs();
     if (!aggExprs.isEmpty()) {
       output.append(prefix)
           .append("output: ")

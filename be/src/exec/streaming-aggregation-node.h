@@ -18,7 +18,9 @@
 #ifndef IMPALA_EXEC_STREAMING_AGGREGATION_NODE_H
 #define IMPALA_EXEC_STREAMING_AGGREGATION_NODE_H
 
+#include <deque>
 #include <memory>
+#include <vector>
 
 #include "exec/aggregation-node-base.h"
 
@@ -43,6 +45,16 @@ class RuntimeState;
 /// the final aggregation.
 ///
 /// This node only supports grouping aggregations.
+///
+/// If 'chain_aggregators_' is true, the Aggregators compute nested grouping sets, e.g.
+/// ROLLUP. Only the first one consumes child(0). Every row that Aggregator 'i' outputs is
+/// returned by this node and also merged into Aggregator 'i + 1'. For example, for
+/// ROLLUP(a, b, c):
+///
+///   child(0) --> Agg 0 ---> Agg 1 ---> Agg 2 ---> Agg 3
+///                (a, b, c)  (a, b)     (a)        ()
+///                  |          |          |          |
+///                  +----------+----------+----------+--> output of this node
 class StreamingAggregationNode : public AggregationNodeBase {
  public:
   StreamingAggregationNode(
@@ -75,13 +87,32 @@ class StreamingAggregationNode : public AggregationNodeBase {
   /// 'child_batch_' into.
   int32_t replicate_agg_idx_ = 0;
 
+  /// Chained output batches to return, in order: a batch may reference memory attached
+  /// to a later batch of the same Aggregator.
+  std::deque<std::unique_ptr<RowBatch>> chained_output_batches_;
+
   /// END: Members that must be Reset()
   /////////////////////////////////////////
+
+  /// Empty batches to reuse for 'chained_output_batches_'.
+  std::vector<std::unique_ptr<RowBatch>> free_batches_;
 
   /// Get output rows from child for streaming pre-aggregation. Aggregates some rows with
   /// hash table and passes through other rows converted into the intermediate
   /// tuple format. Sets 'child_eos_' once all rows from child have been returned.
   Status GetRowsStreaming(RuntimeState* state, RowBatch* row_batch) WARN_UNUSED_RESULT;
+
+  /// Implementation of GetNext() if 'chain_aggregators_' is true.
+  Status GetNextChained(
+      RuntimeState* state, RowBatch* row_batch, bool* eos) WARN_UNUSED_RESULT;
+
+  /// Feeds 'batch' into the Aggregator at 'agg_idx' and its output recursively into the
+  /// following ones, adding the output to 'chained_output_batches_'.
+  Status AddBatchToChain(RuntimeState* state, int agg_idx, RowBatch* batch,
+      int capacity) WARN_UNUSED_RESULT;
+
+  /// Returns an empty batch of 'capacity' rows with null tuple pointers.
+  std::unique_ptr<RowBatch> GetFreeBatch(int capacity);
 };
 } // namespace impala
 

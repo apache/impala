@@ -22,6 +22,7 @@ import pytest
 from testdata.common import widetable
 from tests.common.impala_test_suite import ImpalaTestSuite
 from tests.common.test_dimensions import (
+    add_exec_option_dimension,
     ALL_CLUSTER_SIZES,
     create_exec_option_dimension,
     create_exec_option_dimension_from_dict,
@@ -518,3 +519,297 @@ class TestTPCHAggregationQueries(ImpalaTestSuite):
 
   def test_min_multiple_distinct(self, vector):
     self.run_test_case('min-multiple-distinct-aggs', vector)
+
+
+class TestGroupingSetsChainedPreagg(ImpalaTestSuite):
+  """Tests CHAIN_GROUPING_SETS_PREAGG. TPC-H is large enough to pass through rows."""
+
+  @classmethod
+  def get_workload(cls):
+    return 'tpch'
+
+  @classmethod
+  def add_test_dimensions(cls):
+    super(TestGroupingSetsChainedPreagg, cls).add_test_dimensions()
+    cls.ImpalaTestMatrix.add_constraint(lambda v:
+        v.get_value('table_format').file_format == 'parquet'
+        and v.get_value('table_format').compression_codec == 'none')
+    add_exec_option_dimension(cls, 'chain_grouping_sets_preagg', ['true', 'false'])
+
+  def test_grouping_sets_results(self, vector):
+    """The results must be the same with and without chaining."""
+    # The .test file sets these options in some queries.
+    vector.unset_exec_option('batch_size')
+    vector.unset_exec_option('num_nodes')
+    self.run_test_case('grouping-sets-chained-preagg', vector)
+
+  def test_grouping_sets_profile(self, vector):
+    """The queries set the option themselves, so only run with the default."""
+    if vector.get_exec_option('chain_grouping_sets_preagg') != 'true':
+      pytest.skip("Only runs with the default value of the query option")
+    vector.unset_exec_option('chain_grouping_sets_preagg')
+    vector.unset_exec_option('num_nodes')
+    self.run_test_case('grouping-sets-chained-preagg-profile', vector)
+
+
+LINEITEM = "tpch_parquet.lineitem"
+
+
+class GroupingSetsQuery(object):
+  """A grouping sets query and a reference query with one plain GROUP BY per grouping
+  set. 'keys' are (expr, alias) pairs. 'sets' are the key aliases of each grouping set,
+  or None for a ROLLUP. 'aggs' are aggregate exprs, ('grouping', alias) or
+  ('grouping_id', aliases or None). 'having' is the HAVING clause and the same condition
+  over the reference columns, which include 'gid_' = grouping_id(). Like Impala, the
+  reference returns a repeated grouping set once and no row for the empty grouping set
+  over an empty input."""
+
+  def __init__(self, keys, aggs, from_clause, sets=None, having=None):
+    self.keys = keys
+    self.aggs = aggs
+    self.from_clause = from_clause
+    self.sets = sets
+    self.having = having
+    self.exprs = dict((alias, expr) for expr, alias in keys)
+
+  def columns(self):
+    return [alias for _, alias in self.keys] + \
+        ["a{0}".format(i) for i in range(len(self.aggs))]
+
+  def grouping_sets(self):
+    if self.sets is not None: return self.sets
+    aliases = [alias for _, alias in self.keys]
+    return [aliases[:n] for n in range(len(aliases), -1, -1)]
+
+  def _grouping_args(self, agg):
+    fn, args = agg
+    if args is None: return [alias for _, alias in self.keys]
+    return [args] if fn == 'grouping' else args
+
+  def sql(self):
+    items = ["{0} {1}".format(expr, alias) for expr, alias in self.keys]
+    for i, agg in enumerate(self.aggs):
+      if isinstance(agg, tuple):
+        args = [] if agg[1] is None else self._grouping_args(agg)
+        agg = "{0}({1})".format(agg[0], ", ".join(self.exprs[a] for a in args))
+      items.append("{0} a{1}".format(agg, i))
+    if self.sets is None:
+      group_by = "rollup({0})".format(", ".join(expr for expr, _ in self.keys))
+    else:
+      group_by = "grouping sets({0})".format(", ".join(
+          "({0})".format(", ".join(self.exprs[a] for a in s)) for s in self.sets))
+    sql = "select {0} from {1} group by {2}".format(
+        ", ".join(items), self.from_clause, group_by)
+    if self.having: sql += " having " + self.having[0]
+    return sql
+
+  def reference_sql(self):
+    branches = []
+    grouping_sets = []
+    for grouping_set in self.grouping_sets():
+      if grouping_set not in grouping_sets: grouping_sets.append(grouping_set)
+    for grouping_set in grouping_sets:
+      def grouping_id(args):
+        # The first arg is the most significant bit, 1 if the key isn't in the set.
+        return sum(1 << (len(args) - 1 - i)
+            for i, a in enumerate(args) if a not in grouping_set)
+      items = ["{0} {1}".format(expr if alias in grouping_set else "null", alias)
+          for expr, alias in self.keys]
+      for i, agg in enumerate(self.aggs):
+        if isinstance(agg, tuple):
+          agg = str(grouping_id(self._grouping_args(agg)))
+        else:
+          for expr, alias in self.keys:
+            agg = agg.replace("grouping({0})".format(expr), str(grouping_id([alias])))
+        items.append("{0} a{1}".format(agg, i))
+      items.append("{0} gid_".format(grouping_id([a for _, a in self.keys])))
+      branch = "select {0} from {1}".format(", ".join(items), self.from_clause)
+      if grouping_set:
+        branch += " group by " + ", ".join(self.exprs[a] for a in grouping_set)
+      else:
+        branch += " having count(*) > 0"
+      branches.append(branch)
+    sql = "select {0} from ({1}) r".format(
+        ", ".join(self.columns()), " union all ".join(branches))
+    if self.having: sql += " where " + self.having[1]
+    return sql
+
+
+def lineitem(max_orderkey):
+  return "{0} where l_orderkey < {1}".format(LINEITEM, max_orderkey)
+
+
+# (name, queries, chained, checksum). 'chained' is whether the plan chains. 'checksum'
+# compares a checksum instead of all rows.
+CHAINED_PREAGG_QUERIES = [
+  # Aggregate functions with fixed-size, variable-length and serialized intermediates,
+  # and functions over only NULLs.
+  ("agg_fns", [GroupingSetsQuery(
+      [("l_returnflag", "k1"), ("l_linestatus", "k2"), ("l_shipmode", "k3")],
+      ["count(*)", "count(nullif(l_shipmode, 'AIR'))", "sum(l_quantity)",
+       "sum(l_extendedprice * (1 - l_discount))", "avg(l_discount)", "min(l_comment)",
+       "max(l_comment)", "min(cast(l_shipdate as timestamp))",
+       "max(cast(l_receiptdate as date))", "min(l_returnflag = 'R')",
+       "max(cast(l_shipinstruct as char(6)))", "min(cast(l_comment as varchar(8)))",
+       "ndv(l_partkey)",
+       "length(group_concat(if(l_orderkey % 100 = 0, l_shipinstruct, null)))",
+       "round(variance(l_quantity), 4)", "round(stddev_pop(l_discount), 6)",
+       "sum(cast(null as int))", "min(cast(null as string))", ("grouping_id", None)],
+      lineitem(1000000))], True, False),
+  # Unique keys in the first two classes, so that they pass through most rows.
+  ("unique_keys", [GroupingSetsQuery(
+      [("l_orderkey", "k1"), ("l_linenumber", "k2"), ("l_suppkey", "k3")],
+      ["count(*)", "sum(l_quantity)", "min(l_extendedprice)", "max(l_discount)",
+       ("grouping_id", None)],
+      lineitem(600000))], True, True),
+  # The first class reduces the input less than the second one.
+  ("mid_card", [GroupingSetsQuery(
+      [("l_partkey", "k1"), ("l_suppkey", "k2")],
+      ["count(*)", "sum(l_quantity)", "avg(l_extendedprice)", "max(l_tax)",
+       ("grouping", "k2")],
+      lineitem(3000000))], True, True),
+  # Unique string keys.
+  ("string_keys", [GroupingSetsQuery(
+      [("l_comment", "k1"), ("l_shipmode", "k2")],
+      ["count(*)", "sum(l_quantity)"], lineitem(600000))], True, True),
+  # Keys with NULLs and empty strings, with grouping() and grouping_id().
+  ("nulls", [GroupingSetsQuery(
+      [("a", "k1"), ("b", "k2"), ("c", "k3")],
+      ["count(*)", "sum(q)", ("grouping", "k1"), ("grouping", "k3"),
+       ("grouping_id", ["k1", "k2"]), ("grouping_id", ["k3", "k1"]),
+       ("grouping_id", None)],
+      "(select nullif(l_shipmode, 'AIR') a, "
+      "if(l_shipinstruct = 'NONE', '', l_shipinstruct) b, nullif(l_returnflag, 'N') c, "
+      "l_quantity q from {0}) t".format(lineitem(1000000)))], True, False),
+  # Seven classes.
+  ("many_classes", [GroupingSetsQuery(
+      [("l_returnflag", "k1"), ("l_linestatus", "k2"), ("l_shipmode", "k3"),
+       ("l_shipinstruct", "k4"), ("l_linenumber", "k5"), ("year(l_shipdate)", "k6")],
+      ["count(*)", "sum(l_quantity)", "max(l_comment)", ("grouping_id", None)],
+      lineitem(1000000))], True, False),
+  # Grouping keys of many types.
+  ("key_types", [GroupingSetsQuery(
+      [("cast(l_shipdate as timestamp)", "k1"), ("cast(l_commitdate as date)", "k2"),
+       ("l_discount", "k3"), ("cast(l_tax as double)", "k4"),
+       ("cast(l_linenumber as tinyint)", "k5"), ("l_returnflag = 'R'", "k6"),
+       ("cast(l_shipmode as char(4))", "k7"),
+       ("cast(l_shipinstruct as varchar(3))", "k8")],
+      ["count(*)", "sum(l_quantity)", ("grouping_id", None)],
+      lineitem(300000))], True, True),
+  # Aggregate exprs and exprs over the grouping keys and grouping().
+  ("exprs", [GroupingSetsQuery(
+      [("l_suppkey % 100", "k1"), ("concat(l_shipmode, '-', l_returnflag)", "k2")],
+      ["sum(l_quantity) / count(*)", "max(l_tax) - min(l_tax)",
+       "count(*) * 2 + grouping(l_suppkey % 100)",
+       "if(grouping(concat(l_shipmode, '-', l_returnflag)) = 1, 'all', 'one')"],
+      lineitem(3000000))], True, True),
+  # Nested grouping sets that aren't a rollup.
+  ("nested_sets", [GroupingSetsQuery(
+      [("l_partkey", "k1"), ("l_suppkey", "k2"), ("l_shipmode", "k3")],
+      ["count(*)", "sum(l_quantity)", ("grouping_id", ["k1", "k2", "k3"])],
+      lineitem(1000000), sets=[["k1", "k2", "k3"], ["k1", "k3"], ["k3"], []])],
+   True, True),
+  # The same grouping set twice, which returns its rows once. The repeated set is
+  # dropped, so the rest are chained.
+  ("duplicate_sets", [GroupingSetsQuery(
+      [("l_partkey", "k1"), ("l_shipmode", "k2")],
+      ["count(*)", "sum(l_quantity)", ("grouping_id", ["k1", "k2"])],
+      lineitem(1000000), sets=[["k1", "k2"], ["k1", "k2"], ["k1"], []])],
+   True, True),
+  # Nested grouping sets from the smallest to the largest one, which aren't chained.
+  ("ascending_sets", [GroupingSetsQuery(
+      [("l_partkey", "k1"), ("l_shipmode", "k2")],
+      ["count(*)", "sum(l_quantity)", ("grouping_id", ["k1", "k2"])],
+      lineitem(1000000), sets=[[], ["k1"], ["k1", "k2"]])], False, True),
+  # Grouping sets that aren't nested, which aren't chained.
+  ("not_nested", [GroupingSetsQuery(
+      [("l_returnflag", "k1"), ("l_shipmode", "k2"), ("l_linestatus", "k3")],
+      ["count(*)", "sum(l_quantity)", ("grouping_id", ["k1", "k2", "k3"])],
+      lineitem(1000000), sets=[["k1", "k2"], ["k3"], ["k1", "k3"]])], False, False),
+  # Rollup over a join.
+  ("join", [GroupingSetsQuery(
+      [("o_custkey", "k1"), ("o_orderpriority", "k2"), ("l_shipmode", "k3")],
+      ["count(*)", "sum(l_extendedprice)", ("grouping_id", None)],
+      "{0} join tpch_parquet.orders on l_orderkey = o_orderkey "
+      "where l_orderkey < 600000".format(LINEITEM))], True, True),
+  # A union of two rollups with HAVING.
+  ("union_having", [
+    GroupingSetsQuery([("l_returnflag", "k1"), ("l_shipmode", "k2")], ["count(*)"],
+        lineitem(1000000), having=("count(*) > 30000", "a0 > 30000")),
+    GroupingSetsQuery([("o_orderstatus", "k1"), ("o_orderpriority", "k2")],
+        ["count(*)"], "tpch_parquet.orders",
+        having=("grouping_id() != 1", "gid_ != 1"))], True, False),
+  # Empty input.
+  ("empty", [GroupingSetsQuery(
+      [("l_returnflag", "k1"), ("l_linestatus", "k2")],
+      ["count(*)", "sum(l_quantity)", "min(l_comment)", ("grouping_id", None)],
+      lineitem(0))], True, False),
+]
+
+# 'name=value' pairs separated by ';'. Denied reservations make the preaggregations pass
+# rows through and the merge aggregations spill.
+DENY_RESERVATION = "debug_action=-1:OPEN:SET_DENY_RESERVATION_PROBABILITY@{0}"
+CHAINED_PREAGG_OPTIONS_CORE = ["", DENY_RESERVATION.format("0.5")]
+CHAINED_PREAGG_OPTIONS_EXHAUSTIVE = CHAINED_PREAGG_OPTIONS_CORE + [
+  DENY_RESERVATION.format("1.0"), "batch_size=16", "mt_dop=2",
+  "preagg_bytes_limit=1m"]
+
+
+class TestGroupingSetsChainedPreaggResults(ImpalaTestSuite):
+  """Compares grouping sets results with and without CHAIN_GROUPING_SETS_PREAGG to
+  equivalent queries without grouping sets."""
+
+  # The results of the reference queries by test case name.
+  reference_results = {}
+
+  @classmethod
+  def get_workload(cls):
+    return 'tpch'
+
+  @classmethod
+  def add_test_dimensions(cls):
+    super(TestGroupingSetsChainedPreaggResults, cls).add_test_dimensions()
+    cls.ImpalaTestMatrix.add_constraint(lambda v:
+        v.get_value('table_format').file_format == 'parquet'
+        and v.get_value('table_format').compression_codec == 'none')
+    options = CHAINED_PREAGG_OPTIONS_CORE if cls.exploration_strategy() == 'core' \
+        else CHAINED_PREAGG_OPTIONS_EXHAUSTIVE
+    cls.ImpalaTestMatrix.add_dimension(
+        ImpalaTestDimension('chained_preagg_options', *options))
+
+  def _run(self, query, query_options):
+    result = self.execute_query(query, query_options)
+    assert result.success
+    return sorted(result.data), result.runtime_profile
+
+  @staticmethod
+  def _checksum(query, columns):
+    """Returns the row count and an order-independent hash sum of 'query'."""
+    row = ", ".join("coalesce(cast({0} as string), 'NULL')".format(c) for c in columns)
+    return ("select count(*), sum(abs(fnv_hash(concat_ws('|', {0}))) % 1000000007) "
+            "from ({1}) v".format(row, query))
+
+  @pytest.mark.parametrize("name,queries,chained,checksum", CHAINED_PREAGG_QUERIES,
+      ids=[q[0] for q in CHAINED_PREAGG_QUERIES])
+  def test_results(self, vector, name, queries, chained, checksum):
+    query = " union all ".join(q.sql() for q in queries)
+    reference = " union all ".join(q.reference_sql() for q in queries)
+    if checksum:
+      query = self._checksum(query, queries[0].columns())
+      reference = self._checksum(reference, queries[0].columns())
+    if name not in self.reference_results:
+      # The reference result doesn't depend on the options.
+      self.reference_results[name] = self._run(reference, {})[0]
+    expected = self.reference_results[name]
+
+    query_options = dict(vector.get_exec_option_dict())
+    for option in vector.get_value('chained_preagg_options').split(';'):
+      if option:
+        option_name, value = option.split('=', 1)
+        query_options[option_name] = value
+    for chain in ['true', 'false']:
+      query_options['chain_grouping_sets_preagg'] = chain
+      rows, profile = self._run(query, query_options)
+      assert ("Chained Aggregators" in profile) == (chain == 'true' and chained), \
+          "chain_grouping_sets_preagg={0}".format(chain)
+      assert rows == expected, "chain_grouping_sets_preagg={0}".format(chain)

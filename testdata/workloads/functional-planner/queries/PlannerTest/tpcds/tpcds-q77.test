@@ -526,10 +526,12 @@ Per-Host Resources: mem-estimate=54.34MB mem-reservation=11.81MB thread-reservat
 |    output: sum(sales), sum(returns), sum(profit)
 |    group by: channel, id
 |  Class 1
-|    output: sum(sales), sum(returns), sum(profit)
+|    input: Class 0
+|    output: sum:merge(sales), sum:merge(returns), sum:merge(profit)
 |    group by: channel, NULL
 |  Class 2
-|    output: sum(sales), sum(returns), sum(profit)
+|    input: Class 1
+|    output: sum:merge(sales), sum:merge(returns), sum:merge(profit)
 |    group by: NULL, NULL
 |  mem-estimate=30.00MB mem-reservation=6.00MB thread-reservation=0
 |  tuple-ids=30N,31N,32N row-size=192B cardinality=90
@@ -1081,10 +1083,12 @@ Per-Instance Resources: mem-estimate=44.80MB mem-reservation=7.94MB thread-reser
 |    output: sum(sales), sum(returns), sum(profit)
 |    group by: channel, id
 |  Class 1
-|    output: sum(sales), sum(returns), sum(profit)
+|    input: Class 0
+|    output: sum:merge(sales), sum:merge(returns), sum:merge(profit)
 |    group by: channel, NULL
 |  Class 2
-|    output: sum(sales), sum(returns), sum(profit)
+|    input: Class 1
+|    output: sum:merge(sales), sum:merge(returns), sum:merge(profit)
 |    group by: NULL, NULL
 |  mem-estimate=30.00MB mem-reservation=6.00MB thread-reservation=0
 |  tuple-ids=30N,31N,32N row-size=192B cardinality=102

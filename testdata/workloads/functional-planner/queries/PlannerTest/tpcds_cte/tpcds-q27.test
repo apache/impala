@@ -262,10 +262,12 @@ max-parallelism=120 segment-costs=[1117187119, 140153632] cpu-comparison-result=
 |    output: avg(CAST(tpcds_partitioned_parquet_snap.store_sales.ss_quantity AS BIGINT)), avg(tpcds_partitioned_parquet_snap.store_sales.ss_list_price), avg(tpcds_partitioned_parquet_snap.store_sales.ss_coupon_amt), avg(tpcds_partitioned_parquet_snap.store_sales.ss_sales_price)
 |    group by: tpcds_partitioned_parquet_snap.item.i_item_id, tpcds_partitioned_parquet_snap.store.s_state
 |  Class 1
-|    output: avg(CAST(tpcds_partitioned_parquet_snap.store_sales.ss_quantity AS BIGINT)), avg(tpcds_partitioned_parquet_snap.store_sales.ss_list_price), avg(tpcds_partitioned_parquet_snap.store_sales.ss_coupon_amt), avg(tpcds_partitioned_parquet_snap.store_sales.ss_sales_price)
+|    input: Class 0
+|    output: avg:merge(tpcds_partitioned_parquet_snap.store_sales.ss_quantity), avg:merge(tpcds_partitioned_parquet_snap.store_sales.ss_list_price), avg:merge(tpcds_partitioned_parquet_snap.store_sales.ss_coupon_amt), avg:merge(tpcds_partitioned_parquet_snap.store_sales.ss_sales_price)
 |    group by: tpcds_partitioned_parquet_snap.item.i_item_id, NULL
 |  Class 2
-|    output: avg(CAST(tpcds_partitioned_parquet_snap.store_sales.ss_quantity AS BIGINT)), avg(tpcds_partitioned_parquet_snap.store_sales.ss_list_price), avg(tpcds_partitioned_parquet_snap.store_sales.ss_coupon_amt), avg(tpcds_partitioned_parquet_snap.store_sales.ss_sales_price)
+|    input: Class 1
+|    output: avg:merge(tpcds_partitioned_parquet_snap.store_sales.ss_quantity), avg:merge(tpcds_partitioned_parquet_snap.store_sales.ss_list_price), avg:merge(tpcds_partitioned_parquet_snap.store_sales.ss_coupon_amt), avg:merge(tpcds_partitioned_parquet_snap.store_sales.ss_sales_price)
 |    group by: NULL, NULL
 |  mem-estimate=30.00MB mem-reservation=20.00MB thread-reservation=0
 |  tuple-ids=10N,12N,14N row-size=202B cardinality=9.63M cost=69388410
@@ -521,10 +523,12 @@ max-parallelism=120 segment-costs=[1117187119, 140153632] cpu-comparison-result=
 |    output: avg(CAST(tpcds_partitioned_parquet_snap.store_sales.ss_quantity AS BIGINT)), avg(tpcds_partitioned_parquet_snap.store_sales.ss_list_price), avg(tpcds_partitioned_parquet_snap.store_sales.ss_coupon_amt), avg(tpcds_partitioned_parquet_snap.store_sales.ss_sales_price)
 |    group by: tpcds_partitioned_parquet_snap.item.i_item_id, tpcds_partitioned_parquet_snap.store.s_state
 |  Class 1
-|    output: avg(CAST(tpcds_partitioned_parquet_snap.store_sales.ss_quantity AS BIGINT)), avg(tpcds_partitioned_parquet_snap.store_sales.ss_list_price), avg(tpcds_partitioned_parquet_snap.store_sales.ss_coupon_amt), avg(tpcds_partitioned_parquet_snap.store_sales.ss_sales_price)
+|    input: Class 0
+|    output: avg:merge(tpcds_partitioned_parquet_snap.store_sales.ss_quantity), avg:merge(tpcds_partitioned_parquet_snap.store_sales.ss_list_price), avg:merge(tpcds_partitioned_parquet_snap.store_sales.ss_coupon_amt), avg:merge(tpcds_partitioned_parquet_snap.store_sales.ss_sales_price)
 |    group by: tpcds_partitioned_parquet_snap.item.i_item_id, NULL
 |  Class 2
-|    output: avg(CAST(tpcds_partitioned_parquet_snap.store_sales.ss_quantity AS BIGINT)), avg(tpcds_partitioned_parquet_snap.store_sales.ss_list_price), avg(tpcds_partitioned_parquet_snap.store_sales.ss_coupon_amt), avg(tpcds_partitioned_parquet_snap.store_sales.ss_sales_price)
+|    input: Class 1
+|    output: avg:merge(tpcds_partitioned_parquet_snap.store_sales.ss_quantity), avg:merge(tpcds_partitioned_parquet_snap.store_sales.ss_list_price), avg:merge(tpcds_partitioned_parquet_snap.store_sales.ss_coupon_amt), avg:merge(tpcds_partitioned_parquet_snap.store_sales.ss_sales_price)
 |    group by: NULL, NULL
 |  mem-estimate=30.00MB mem-reservation=20.00MB thread-reservation=0
 |  tuple-ids=10N,12N,14N row-size=202B cardinality=9.63M cost=69388410

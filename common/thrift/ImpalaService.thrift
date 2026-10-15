@@ -1126,6 +1126,11 @@ enum TImpalaQueryOptions {
   // Minimum fraction of the query's execution wall time, between 0 and 1, that a plan
   // node must account for to be listed in the Bottleneck Summary.
   BOTTLENECK_SUMMARY_MIN_QUERY_TIME_FRAC = 208
+
+  // If true, the streaming preaggregation of nested grouping sets, e.g. ROLLUP, feeds the
+  // output of each grouping set into the next one instead of passing every input row to
+  // every grouping set.
+  CHAIN_GROUPING_SETS_PREAGG = 209
 }
 
 // The summary of a DML statement.

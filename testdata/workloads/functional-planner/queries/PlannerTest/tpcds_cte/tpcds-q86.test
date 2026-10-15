@@ -249,10 +249,12 @@ max-parallelism=1130 segment-costs=[11221010030, 1265550] cpu-comparison-result=
 |    output: sum(tpcds_partitioned_parquet_snap.web_sales.ws_net_paid)
 |    group by: tpcds_partitioned_parquet_snap.item.i_category, tpcds_partitioned_parquet_snap.item.i_class
 |  Class 1
-|    output: sum(tpcds_partitioned_parquet_snap.web_sales.ws_net_paid)
+|    input: Class 0
+|    output: sum:merge(tpcds_partitioned_parquet_snap.web_sales.ws_net_paid)
 |    group by: tpcds_partitioned_parquet_snap.item.i_category, NULL
 |  Class 2
-|    output: sum(tpcds_partitioned_parquet_snap.web_sales.ws_net_paid)
+|    input: Class 1
+|    output: sum:merge(tpcds_partitioned_parquet_snap.web_sales.ws_net_paid)
 |    group by: NULL, NULL
 |  mem-estimate=30.00MB mem-reservation=6.00MB thread-reservation=0
 |  tuple-ids=6N,7N,8N row-size=140B cardinality=120.12K cost=8897791980
@@ -448,10 +450,12 @@ max-parallelism=1130 segment-costs=[11221010030, 1265550] cpu-comparison-result=
 |    output: sum(tpcds_partitioned_parquet_snap.web_sales.ws_net_paid)
 |    group by: tpcds_partitioned_parquet_snap.item.i_category, tpcds_partitioned_parquet_snap.item.i_class
 |  Class 1
-|    output: sum(tpcds_partitioned_parquet_snap.web_sales.ws_net_paid)
+|    input: Class 0
+|    output: sum:merge(tpcds_partitioned_parquet_snap.web_sales.ws_net_paid)
 |    group by: tpcds_partitioned_parquet_snap.item.i_category, NULL
 |  Class 2
-|    output: sum(tpcds_partitioned_parquet_snap.web_sales.ws_net_paid)
+|    input: Class 1
+|    output: sum:merge(tpcds_partitioned_parquet_snap.web_sales.ws_net_paid)
 |    group by: NULL, NULL
 |  mem-estimate=30.00MB mem-reservation=6.00MB thread-reservation=0
 |  tuple-ids=6N,7N,8N row-size=140B cardinality=120.12K cost=8897791980

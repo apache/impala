@@ -1,0 +1,334 @@
+====
+---- QUERY
+# Each query compares grouping sets query 'r' with the equivalent GROUP BY queries 'u'
+# and returns the number of distinct rows and of rows that aren't in both.
+#
+# Rollup with fixed-size and variable-length intermediates.
+with r as (
+  select l_returnflag f, l_linestatus s, l_shipmode m, grouping_id() gid,
+    count(*) c, sum(l_extendedprice) sp, avg(l_discount) ad, min(l_comment) mn,
+    max(l_shipinstruct) mx, ndv(l_partkey) nd, length(group_concat(l_linestatus, '')) gc
+  from lineitem
+  group by rollup(l_returnflag, l_linestatus, l_shipmode)),
+u as (
+  select l_returnflag f, l_linestatus s, l_shipmode m, 0 gid,
+    count(*) c, sum(l_extendedprice) sp, avg(l_discount) ad, min(l_comment) mn,
+    max(l_shipinstruct) mx, ndv(l_partkey) nd, length(group_concat(l_linestatus, '')) gc
+  from lineitem group by 1, 2, 3
+  union all
+  select l_returnflag, l_linestatus, null, 1,
+    count(*), sum(l_extendedprice), avg(l_discount), min(l_comment),
+    max(l_shipinstruct), ndv(l_partkey), length(group_concat(l_linestatus, ''))
+  from lineitem group by 1, 2
+  union all
+  select l_returnflag, null, null, 3,
+    count(*), sum(l_extendedprice), avg(l_discount), min(l_comment),
+    max(l_shipinstruct), ndv(l_partkey), length(group_concat(l_linestatus, ''))
+  from lineitem group by 1
+  union all
+  select null, null, null, 7,
+    count(*), sum(l_extendedprice), avg(l_discount), min(l_comment),
+    max(l_shipinstruct), ndv(l_partkey), length(group_concat(l_linestatus, ''))
+  from lineitem)
+select count(*), sum(if(n = 2, 0, 1)) from (
+  select count(*) n from (select * from r union all select * from u) t
+  group by f, s, m, gid, c, sp, ad, mn, mx, nd, gc) v
+---- RESULTS
+36,0
+---- TYPES
+BIGINT,BIGINT
+====
+---- QUERY
+# Almost unique keys, so the first class passes through most rows, with string
+# intermediates.
+with r as (
+  select l_orderkey o, l_linenumber l, grouping_id() gid, count(*) c,
+    sum(l_quantity) sq, avg(l_tax) atx, min(l_comment) mn, max(l_shipmode) mx
+  from lineitem
+  group by rollup(l_orderkey, l_linenumber)),
+u as (
+  select l_orderkey o, l_linenumber l, 0 gid, count(*) c,
+    sum(l_quantity) sq, avg(l_tax) atx, min(l_comment) mn, max(l_shipmode) mx
+  from lineitem group by 1, 2
+  union all
+  select l_orderkey, null, 1, count(*),
+    sum(l_quantity), avg(l_tax), min(l_comment), max(l_shipmode)
+  from lineitem group by 1
+  union all
+  select null, null, 3, count(*),
+    sum(l_quantity), avg(l_tax), min(l_comment), max(l_shipmode)
+  from lineitem)
+select count(*), sum(if(n = 2, 0, 1)) from (
+  select count(*) n from (select * from r union all select * from u) t
+  group by o, l, gid, c, sq, atx, mn, mx) v
+---- RESULTS
+7501216,0
+---- TYPES
+BIGINT,BIGINT
+====
+---- QUERY
+# Same with small batches, so output batches fill up mid input batch.
+set batch_size=16;
+with r as (
+  select l_orderkey o, l_linenumber l, grouping_id() gid, count(*) c,
+    sum(l_quantity) sq, avg(l_tax) atx, min(l_comment) mn, max(l_shipmode) mx
+  from lineitem
+  where l_orderkey < 100000
+  group by rollup(l_orderkey, l_linenumber)),
+u as (
+  select l_orderkey o, l_linenumber l, 0 gid, count(*) c,
+    sum(l_quantity) sq, avg(l_tax) atx, min(l_comment) mn, max(l_shipmode) mx
+  from lineitem where l_orderkey < 100000 group by 1, 2
+  union all
+  select l_orderkey, null, 1, count(*),
+    sum(l_quantity), avg(l_tax), min(l_comment), max(l_shipmode)
+  from lineitem where l_orderkey < 100000 group by 1
+  union all
+  select null, null, 3, count(*),
+    sum(l_quantity), avg(l_tax), min(l_comment), max(l_shipmode)
+  from lineitem where l_orderkey < 100000)
+select count(*) > 0, sum(if(n = 2, 0, 1)) from (
+  select count(*) n from (select * from r union all select * from u) t
+  group by o, l, gid, c, sq, atx, mn, mx) v
+---- RESULTS
+true,0
+---- TYPES
+BOOLEAN,BIGINT
+====
+---- QUERY
+# Rollup over string keys that have NULL values, with grouping().
+with r as (
+  select n_name nn, if(c_mktsegment = 'BUILDING', null, c_mktsegment) seg,
+    grouping_id() gid, grouping(n_name) gn, count(*) c, sum(c_acctbal) sb,
+    min(c_phone) mn, max(c_name) mx
+  from customer join nation on c_nationkey = n_nationkey
+  group by rollup(n_name, if(c_mktsegment = 'BUILDING', null, c_mktsegment))),
+u as (
+  select n_name nn, if(c_mktsegment = 'BUILDING', null, c_mktsegment) seg, 0 gid,
+    0 gn, count(*) c, sum(c_acctbal) sb, min(c_phone) mn, max(c_name) mx
+  from customer join nation on c_nationkey = n_nationkey
+  group by 1, 2
+  union all
+  select n_name, null, 1, 0, count(*), sum(c_acctbal), min(c_phone), max(c_name)
+  from customer join nation on c_nationkey = n_nationkey
+  group by 1
+  union all
+  select null, null, 3, 1, count(*), sum(c_acctbal), min(c_phone), max(c_name)
+  from customer join nation on c_nationkey = n_nationkey)
+select count(*), sum(if(n = 2, 0, 1)) from (
+  select count(*) n from (select * from r union all select * from u) t
+  group by nn, seg, gid, gn, c, sb, mn, mx) v
+---- RESULTS
+151,0
+---- TYPES
+BIGINT,BIGINT
+====
+---- QUERY
+# Nested grouping sets that aren't a rollup.
+with r as (
+  select l_returnflag f, l_shipmode m, l_linestatus s, grouping_id() gid,
+    count(*) c, sum(l_extendedprice) sp, max(l_comment) mx
+  from lineitem
+  group by grouping sets((l_returnflag, l_shipmode, l_linestatus),
+    (l_returnflag, l_linestatus), (l_linestatus))),
+u as (
+  select l_returnflag f, l_shipmode m, l_linestatus s, 0 gid,
+    count(*) c, sum(l_extendedprice) sp, max(l_comment) mx
+  from lineitem group by 1, 2, 3
+  union all
+  select l_returnflag, null, l_linestatus, 2,
+    count(*), sum(l_extendedprice), max(l_comment)
+  from lineitem group by 1, 3
+  union all
+  select null, null, l_linestatus, 6,
+    count(*), sum(l_extendedprice), max(l_comment)
+  from lineitem group by 3)
+select count(*), sum(if(n = 2, 0, 1)) from (
+  select count(*) n from (select * from r union all select * from u) t
+  group by f, m, s, gid, c, sp, mx) v
+---- RESULTS
+34,0
+---- TYPES
+BIGINT,BIGINT
+====
+---- QUERY
+# CUBE and grouping sets that aren't nested can't be chained.
+with r as (
+  select l_returnflag f, l_linestatus s, grouping_id() gid, count(*) c,
+    sum(l_extendedprice) sp, min(l_comment) mn
+  from lineitem
+  group by cube(l_returnflag, l_linestatus)),
+u as (
+  select l_returnflag f, l_linestatus s, 0 gid, count(*) c,
+    sum(l_extendedprice) sp, min(l_comment) mn
+  from lineitem group by 1, 2
+  union all
+  select l_returnflag, null, 1, count(*), sum(l_extendedprice), min(l_comment)
+  from lineitem group by 1
+  union all
+  select null, l_linestatus, 2, count(*), sum(l_extendedprice), min(l_comment)
+  from lineitem group by 2
+  union all
+  select null, null, 3, count(*), sum(l_extendedprice), min(l_comment)
+  from lineitem)
+select count(*), sum(if(n = 2, 0, 1)) from (
+  select count(*) n from (select * from r union all select * from u) t
+  group by f, s, gid, c, sp, mn) v
+---- RESULTS
+10,0
+---- TYPES
+BIGINT,BIGINT
+====
+---- QUERY
+with r as (
+  select l_returnflag f, l_linestatus s, grouping_id() gid, count(*) c,
+    sum(l_extendedprice) sp, min(l_comment) mn
+  from lineitem
+  group by grouping sets((l_returnflag), (l_linestatus))),
+u as (
+  select l_returnflag f, null s, 1 gid, count(*) c,
+    sum(l_extendedprice) sp, min(l_comment) mn
+  from lineitem group by 1
+  union all
+  select null, l_linestatus, 2, count(*), sum(l_extendedprice), min(l_comment)
+  from lineitem group by 2)
+select count(*), sum(if(n = 2, 0, 1)) from (
+  select count(*) n from (select * from r union all select * from u) t
+  group by f, s, gid, c, sp, mn) v
+---- RESULTS
+5,0
+---- TYPES
+BIGINT,BIGINT
+====
+---- QUERY
+# Rollup over a single column.
+with r as (
+  select l_shipmode m, grouping_id() gid, count(*) c, avg(l_quantity) aq,
+    ndv(l_suppkey) nd
+  from lineitem
+  group by rollup(l_shipmode)),
+u as (
+  select l_shipmode m, 0 gid, count(*) c, avg(l_quantity) aq, ndv(l_suppkey) nd
+  from lineitem group by 1
+  union all
+  select null, 1, count(*), avg(l_quantity), ndv(l_suppkey)
+  from lineitem)
+select count(*), sum(if(n = 2, 0, 1)) from (
+  select count(*) n from (select * from r union all select * from u) t
+  group by m, gid, c, aq, nd) v
+---- RESULTS
+8,0
+---- TYPES
+BIGINT,BIGINT
+====
+---- QUERY
+# Rollup over expressions.
+with r as (
+  select year(o_orderdate) y, month(o_orderdate) mo, o_orderpriority p,
+    grouping_id() gid, count(*) c, sum(o_totalprice) sp, avg(o_totalprice) ap,
+    max(o_comment) mx
+  from orders
+  group by rollup(year(o_orderdate), month(o_orderdate), o_orderpriority)),
+u as (
+  select year(o_orderdate) y, month(o_orderdate) mo, o_orderpriority p, 0 gid,
+    count(*) c, sum(o_totalprice) sp, avg(o_totalprice) ap, max(o_comment) mx
+  from orders group by 1, 2, 3
+  union all
+  select year(o_orderdate), month(o_orderdate), null, 1,
+    count(*), sum(o_totalprice), avg(o_totalprice), max(o_comment)
+  from orders group by 1, 2
+  union all
+  select year(o_orderdate), null, null, 3,
+    count(*), sum(o_totalprice), avg(o_totalprice), max(o_comment)
+  from orders group by 1
+  union all
+  select null, null, null, 7,
+    count(*), sum(o_totalprice), avg(o_totalprice), max(o_comment)
+  from orders)
+select count(*), sum(if(n = 2, 0, 1)) from (
+  select count(*) n from (select * from r union all select * from u) t
+  group by y, mo, p, gid, c, sp, ap, mx) v
+---- RESULTS
+488,0
+---- TYPES
+BIGINT,BIGINT
+====
+---- QUERY
+# Rollup with HAVING, ORDER BY and LIMIT.
+select l_returnflag, l_linestatus, count(*)
+from lineitem
+group by rollup(l_returnflag, l_linestatus)
+having count(*) > 1000000
+order by 3 desc
+limit 1
+---- RESULTS
+'NULL','NULL',6001215
+---- TYPES
+STRING,STRING,BIGINT
+====
+---- QUERY
+# Rollup in a single node plan, which has no preaggregation.
+set num_nodes=1;
+with r as (
+  select l_returnflag f, l_linestatus s, l_shipmode m, grouping_id() gid,
+    count(*) c, sum(l_extendedprice) sp, min(l_comment) mn
+  from lineitem
+  where l_orderkey < 100000
+  group by rollup(l_returnflag, l_linestatus, l_shipmode)),
+u as (
+  select l_returnflag f, l_linestatus s, l_shipmode m, 0 gid,
+    count(*) c, sum(l_extendedprice) sp, min(l_comment) mn
+  from lineitem where l_orderkey < 100000 group by 1, 2, 3
+  union all
+  select l_returnflag, l_linestatus, null, 1,
+    count(*), sum(l_extendedprice), min(l_comment)
+  from lineitem where l_orderkey < 100000 group by 1, 2
+  union all
+  select l_returnflag, null, null, 3,
+    count(*), sum(l_extendedprice), min(l_comment)
+  from lineitem where l_orderkey < 100000 group by 1
+  union all
+  select null, null, null, 7,
+    count(*), sum(l_extendedprice), min(l_comment)
+  from lineitem where l_orderkey < 100000)
+select count(*) > 0, sum(if(n = 2, 0, 1)) from (
+  select count(*) n from (select * from r union all select * from u) t
+  group by f, s, m, gid, c, sp, mn) v
+---- RESULTS
+true,0
+---- TYPES
+BOOLEAN,BIGINT
+====
+---- QUERY
+# Rollup without streaming preaggregation.
+set disable_streaming_preaggregations=true;
+with r as (
+  select l_returnflag f, l_linestatus s, l_shipmode m, grouping_id() gid,
+    count(*) c, sum(l_extendedprice) sp, min(l_comment) mn
+  from lineitem
+  where l_orderkey < 100000
+  group by rollup(l_returnflag, l_linestatus, l_shipmode)),
+u as (
+  select l_returnflag f, l_linestatus s, l_shipmode m, 0 gid,
+    count(*) c, sum(l_extendedprice) sp, min(l_comment) mn
+  from lineitem where l_orderkey < 100000 group by 1, 2, 3
+  union all
+  select l_returnflag, l_linestatus, null, 1,
+    count(*), sum(l_extendedprice), min(l_comment)
+  from lineitem where l_orderkey < 100000 group by 1, 2
+  union all
+  select l_returnflag, null, null, 3,
+    count(*), sum(l_extendedprice), min(l_comment)
+  from lineitem where l_orderkey < 100000 group by 1
+  union all
+  select null, null, null, 7,
+    count(*), sum(l_extendedprice), min(l_comment)
+  from lineitem where l_orderkey < 100000)
+select count(*) > 0, sum(if(n = 2, 0, 1)) from (
+  select count(*) n from (select * from r union all select * from u) t
+  group by f, s, m, gid, c, sp, mn) v
+---- RESULTS
+true,0
+---- TYPES
+BOOLEAN,BIGINT
+====

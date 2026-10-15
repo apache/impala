@@ -36,6 +36,7 @@ namespace impala {
 AggregationNode::AggregationNode(
     ObjectPool* pool, const AggregationPlanNode& pnode, const DescriptorTbl& descs)
   : AggregationNodeBase(pool, pnode, descs) {
+  DCHECK(!chain_aggregators_) << "Only streaming preaggs chain aggregators";
   for (auto& t_agg : pnode.tnode_->agg_node.aggregators) {
     DCHECK(!t_agg.use_streaming_preaggregation);
   }

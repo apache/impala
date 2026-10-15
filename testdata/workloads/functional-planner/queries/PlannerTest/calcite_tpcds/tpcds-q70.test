@@ -394,10 +394,12 @@ max-parallelism=1160 segment-costs=[11503494823, 1707075] cpu-comparison-result=
 |    output: sum(tpcds_partitioned_parquet_snap.store_sales.ss_net_profit)
 |    group by: tpcds_partitioned_parquet_snap.store.s_state, tpcds_partitioned_parquet_snap.store.s_county
 |  Class 1
-|    output: sum(tpcds_partitioned_parquet_snap.store_sales.ss_net_profit)
+|    input: Class 0
+|    output: sum:merge(tpcds_partitioned_parquet_snap.store_sales.ss_net_profit)
 |    group by: tpcds_partitioned_parquet_snap.store.s_state, NULL
 |  Class 2
-|    output: sum(tpcds_partitioned_parquet_snap.store_sales.ss_net_profit)
+|    input: Class 1
+|    output: sum:merge(tpcds_partitioned_parquet_snap.store_sales.ss_net_profit)
 |    group by: NULL, NULL
 |  mem-estimate=30.00MB mem-reservation=6.00MB thread-reservation=0
 |  tuple-ids=19N,20N,21N row-size=138B cardinality=163.68K cost=6803896484
@@ -775,10 +777,12 @@ max-parallelism=1160 segment-costs=[11503494823, 1707075] cpu-comparison-result=
 |    output: sum(tpcds_partitioned_parquet_snap.store_sales.ss_net_profit)
 |    group by: tpcds_partitioned_parquet_snap.store.s_state, tpcds_partitioned_parquet_snap.store.s_county
 |  Class 1
-|    output: sum(tpcds_partitioned_parquet_snap.store_sales.ss_net_profit)
+|    input: Class 0
+|    output: sum:merge(tpcds_partitioned_parquet_snap.store_sales.ss_net_profit)
 |    group by: tpcds_partitioned_parquet_snap.store.s_state, NULL
 |  Class 2
-|    output: sum(tpcds_partitioned_parquet_snap.store_sales.ss_net_profit)
+|    input: Class 1
+|    output: sum:merge(tpcds_partitioned_parquet_snap.store_sales.ss_net_profit)
 |    group by: NULL, NULL
 |  mem-estimate=30.00MB mem-reservation=6.00MB thread-reservation=0
 |  tuple-ids=19N,20N,21N row-size=138B cardinality=163.68K cost=6803896484

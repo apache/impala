@@ -177,16 +177,20 @@ max-parallelism=261 segment-costs=[8962975991, 5356784990] cpu-comparison-result
 |    output: avg(CAST(inv_quantity_on_hand AS BIGINT))
 |    group by: i_product_name, i_brand, i_class, i_category
 |  Class 1
-|    output: avg(CAST(inv_quantity_on_hand AS BIGINT))
+|    input: Class 0
+|    output: avg:merge(inv_quantity_on_hand)
 |    group by: i_product_name, i_brand, i_class, NULL
 |  Class 2
-|    output: avg(CAST(inv_quantity_on_hand AS BIGINT))
+|    input: Class 1
+|    output: avg:merge(inv_quantity_on_hand)
 |    group by: i_product_name, i_brand, NULL, NULL
 |  Class 3
-|    output: avg(CAST(inv_quantity_on_hand AS BIGINT))
+|    input: Class 2
+|    output: avg:merge(inv_quantity_on_hand)
 |    group by: i_product_name, NULL, NULL, NULL
 |  Class 4
-|    output: avg(CAST(inv_quantity_on_hand AS BIGINT))
+|    input: Class 3
+|    output: avg:merge(inv_quantity_on_hand)
 |    group by: NULL, NULL, NULL, NULL
 |  mem-estimate=3.61GB mem-reservation=138.00MB thread-reservation=0
 |  tuple-ids=3N,5N,7N,9N,11N row-size=441B cardinality=172.80M cost=7880050563
@@ -343,16 +347,20 @@ max-parallelism=261 segment-costs=[8962975991, 5356784990] cpu-comparison-result
 |    output: avg(CAST(inv_quantity_on_hand AS BIGINT))
 |    group by: i_product_name, i_brand, i_class, i_category
 |  Class 1
-|    output: avg(CAST(inv_quantity_on_hand AS BIGINT))
+|    input: Class 0
+|    output: avg:merge(inv_quantity_on_hand)
 |    group by: i_product_name, i_brand, i_class, NULL
 |  Class 2
-|    output: avg(CAST(inv_quantity_on_hand AS BIGINT))
+|    input: Class 1
+|    output: avg:merge(inv_quantity_on_hand)
 |    group by: i_product_name, i_brand, NULL, NULL
 |  Class 3
-|    output: avg(CAST(inv_quantity_on_hand AS BIGINT))
+|    input: Class 2
+|    output: avg:merge(inv_quantity_on_hand)
 |    group by: i_product_name, NULL, NULL, NULL
 |  Class 4
-|    output: avg(CAST(inv_quantity_on_hand AS BIGINT))
+|    input: Class 3
+|    output: avg:merge(inv_quantity_on_hand)
 |    group by: NULL, NULL, NULL, NULL
 |  mem-estimate=3.61GB mem-reservation=138.00MB thread-reservation=0
 |  tuple-ids=3N,5N,7N,9N,11N row-size=441B cardinality=172.80M cost=7880050563

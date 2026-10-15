@@ -313,10 +313,12 @@ max-parallelism=1824 segment-costs=[48455225769, 1707075] cpu-comparison-result=
 |    output: sum(ss_net_profit)
 |    group by: s_state, s_county
 |  Class 1
-|    output: sum(ss_net_profit)
+|    input: Class 0
+|    output: sum:merge(ss_net_profit)
 |    group by: s_state, NULL
 |  Class 2
-|    output: sum(ss_net_profit)
+|    input: Class 1
+|    output: sum:merge(ss_net_profit)
 |    group by: NULL, NULL
 |  mem-estimate=30.00MB mem-reservation=6.00MB thread-reservation=0
 |  tuple-ids=11N,12N,13N row-size=138B cardinality=163.68K cost=35617146069
@@ -648,10 +650,12 @@ max-parallelism=1824 segment-costs=[48455225769, 1707075] cpu-comparison-result=
 |    output: sum(ss_net_profit)
 |    group by: s_state, s_county
 |  Class 1
-|    output: sum(ss_net_profit)
+|    input: Class 0
+|    output: sum:merge(ss_net_profit)
 |    group by: s_state, NULL
 |  Class 2
-|    output: sum(ss_net_profit)
+|    input: Class 1
+|    output: sum:merge(ss_net_profit)
 |    group by: NULL, NULL
 |  mem-estimate=30.00MB mem-reservation=6.00MB thread-reservation=0
 |  tuple-ids=11N,12N,13N row-size=138B cardinality=163.68K cost=35617146069

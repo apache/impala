@@ -508,6 +508,13 @@ Status GroupingAggregator::AddBatchStreaming(
 
   TPrefetchMode::type prefetch_mode = state->query_options().prefetch_mode;
   int64_t num_row_out_batch_old = out_batch->num_rows();
+  // Allocate Serialize() results of passed-through rows from 'out_batch', as
+  // QueryMaintenance() clears 'expr_results_pool_' while the rows are still in use.
+  vector<ScopedResultsPool> allocate_from_batch_pool;
+  if (needs_serialize_) {
+    allocate_from_batch_pool =
+        ScopedResultsPool::Create(agg_fn_evals_, out_batch->tuple_data_pool());
+  }
   GroupingAggregatorConfig::AddBatchStreamingImplFn fn
       = add_batch_streaming_impl_fn_.load();
   if (fn != nullptr) {

@@ -190,16 +190,20 @@ Per-Host Resources: mem-estimate=1.80GB mem-reservation=140.62MB thread-reservat
 |    output: avg(CAST(inv_quantity_on_hand AS BIGINT))
 |    group by: i_product_name, i_brand, i_class, i_category
 |  Class 1
-|    output: avg(CAST(inv_quantity_on_hand AS BIGINT))
+|    input: Class 0
+|    output: avg:merge(inv_quantity_on_hand)
 |    group by: i_product_name, i_brand, i_class, NULL
 |  Class 2
-|    output: avg(CAST(inv_quantity_on_hand AS BIGINT))
+|    input: Class 1
+|    output: avg:merge(inv_quantity_on_hand)
 |    group by: i_product_name, i_brand, NULL, NULL
 |  Class 3
-|    output: avg(CAST(inv_quantity_on_hand AS BIGINT))
+|    input: Class 2
+|    output: avg:merge(inv_quantity_on_hand)
 |    group by: i_product_name, NULL, NULL, NULL
 |  Class 4
-|    output: avg(CAST(inv_quantity_on_hand AS BIGINT))
+|    input: Class 3
+|    output: avg:merge(inv_quantity_on_hand)
 |    group by: NULL, NULL, NULL, NULL
 |  mem-estimate=1.66GB mem-reservation=113.00MB thread-reservation=0
 |  tuple-ids=4N,6N,8N,10N,12N row-size=422B cardinality=144.00K
@@ -357,16 +361,20 @@ Per-Instance Resources: mem-estimate=1.70GB mem-reservation=129.00MB thread-rese
 |    output: avg(CAST(inv_quantity_on_hand AS BIGINT))
 |    group by: i_product_name, i_brand, i_class, i_category
 |  Class 1
-|    output: avg(CAST(inv_quantity_on_hand AS BIGINT))
+|    input: Class 0
+|    output: avg:merge(inv_quantity_on_hand)
 |    group by: i_product_name, i_brand, i_class, NULL
 |  Class 2
-|    output: avg(CAST(inv_quantity_on_hand AS BIGINT))
+|    input: Class 1
+|    output: avg:merge(inv_quantity_on_hand)
 |    group by: i_product_name, i_brand, NULL, NULL
 |  Class 3
-|    output: avg(CAST(inv_quantity_on_hand AS BIGINT))
+|    input: Class 2
+|    output: avg:merge(inv_quantity_on_hand)
 |    group by: i_product_name, NULL, NULL, NULL
 |  Class 4
-|    output: avg(CAST(inv_quantity_on_hand AS BIGINT))
+|    input: Class 3
+|    output: avg:merge(inv_quantity_on_hand)
 |    group by: NULL, NULL, NULL, NULL
 |  mem-estimate=1.66GB mem-reservation=113.00MB thread-reservation=0
 |  tuple-ids=4N,6N,8N,10N,12N row-size=422B cardinality=144.00K
@@ -784,28 +792,36 @@ Per-Host Resources: mem-estimate=3.12GB mem-reservation=223.62MB thread-reservat
 |    output: sum(coalesce(ss_sales_price * CAST(ss_quantity AS DECIMAL(10,0)), CAST(0 AS DECIMAL(18,2))))
 |    group by: i_category, i_class, i_brand, i_product_name, d_year, d_qoy, d_moy, s_store_id
 |  Class 1
-|    output: sum(coalesce(ss_sales_price * CAST(ss_quantity AS DECIMAL(10,0)), CAST(0 AS DECIMAL(18,2))))
+|    input: Class 0
+|    output: sum:merge(coalesce(ss_sales_price * ss_quantity, 0))
 |    group by: i_category, i_class, i_brand, i_product_name, d_year, d_qoy, d_moy, NULL
 |  Class 2
-|    output: sum(coalesce(ss_sales_price * CAST(ss_quantity AS DECIMAL(10,0)), CAST(0 AS DECIMAL(18,2))))
+|    input: Class 1
+|    output: sum:merge(coalesce(ss_sales_price * ss_quantity, 0))
 |    group by: i_category, i_class, i_brand, i_product_name, d_year, d_qoy, NULL, NULL
 |  Class 3
-|    output: sum(coalesce(ss_sales_price * CAST(ss_quantity AS DECIMAL(10,0)), CAST(0 AS DECIMAL(18,2))))
+|    input: Class 2
+|    output: sum:merge(coalesce(ss_sales_price * ss_quantity, 0))
 |    group by: i_category, i_class, i_brand, i_product_name, d_year, NULL, NULL, NULL
 |  Class 4
-|    output: sum(coalesce(ss_sales_price * CAST(ss_quantity AS DECIMAL(10,0)), CAST(0 AS DECIMAL(18,2))))
+|    input: Class 3
+|    output: sum:merge(coalesce(ss_sales_price * ss_quantity, 0))
 |    group by: i_category, i_class, i_brand, i_product_name, NULL, NULL, NULL, NULL
 |  Class 5
-|    output: sum(coalesce(ss_sales_price * CAST(ss_quantity AS DECIMAL(10,0)), CAST(0 AS DECIMAL(18,2))))
+|    input: Class 4
+|    output: sum:merge(coalesce(ss_sales_price * ss_quantity, 0))
 |    group by: i_category, i_class, i_brand, NULL, NULL, NULL, NULL, NULL
 |  Class 6
-|    output: sum(coalesce(ss_sales_price * CAST(ss_quantity AS DECIMAL(10,0)), CAST(0 AS DECIMAL(18,2))))
+|    input: Class 5
+|    output: sum:merge(coalesce(ss_sales_price * ss_quantity, 0))
 |    group by: i_category, i_class, NULL, NULL, NULL, NULL, NULL, NULL
 |  Class 7
-|    output: sum(coalesce(ss_sales_price * CAST(ss_quantity AS DECIMAL(10,0)), CAST(0 AS DECIMAL(18,2))))
+|    input: Class 6
+|    output: sum:merge(coalesce(ss_sales_price * ss_quantity, 0))
 |    group by: i_category, NULL, NULL, NULL, NULL, NULL, NULL, NULL
 |  Class 8
-|    output: sum(coalesce(ss_sales_price * CAST(ss_quantity AS DECIMAL(10,0)), CAST(0 AS DECIMAL(18,2))))
+|    input: Class 7
+|    output: sum:merge(coalesce(ss_sales_price * ss_quantity, 0))
 |    group by: NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL
 |  mem-estimate=3.03GB mem-reservation=211.00MB thread-reservation=0
 |  tuple-ids=4N,5N,6N,7N,8N,9N,10N,11N,12N row-size=1.07KB cardinality=11.63M
@@ -1013,28 +1029,36 @@ Per-Instance Resources: mem-estimate=2.30GB mem-reservation=212.00MB thread-rese
 |    output: sum(coalesce(ss_sales_price * CAST(ss_quantity AS DECIMAL(10,0)), CAST(0 AS DECIMAL(18,2))))
 |    group by: i_category, i_class, i_brand, i_product_name, d_year, d_qoy, d_moy, s_store_id
 |  Class 1
-|    output: sum(coalesce(ss_sales_price * CAST(ss_quantity AS DECIMAL(10,0)), CAST(0 AS DECIMAL(18,2))))
+|    input: Class 0
+|    output: sum:merge(coalesce(ss_sales_price * ss_quantity, 0))
 |    group by: i_category, i_class, i_brand, i_product_name, d_year, d_qoy, d_moy, NULL
 |  Class 2
-|    output: sum(coalesce(ss_sales_price * CAST(ss_quantity AS DECIMAL(10,0)), CAST(0 AS DECIMAL(18,2))))
+|    input: Class 1
+|    output: sum:merge(coalesce(ss_sales_price * ss_quantity, 0))
 |    group by: i_category, i_class, i_brand, i_product_name, d_year, d_qoy, NULL, NULL
 |  Class 3
-|    output: sum(coalesce(ss_sales_price * CAST(ss_quantity AS DECIMAL(10,0)), CAST(0 AS DECIMAL(18,2))))
+|    input: Class 2
+|    output: sum:merge(coalesce(ss_sales_price * ss_quantity, 0))
 |    group by: i_category, i_class, i_brand, i_product_name, d_year, NULL, NULL, NULL
 |  Class 4
-|    output: sum(coalesce(ss_sales_price * CAST(ss_quantity AS DECIMAL(10,0)), CAST(0 AS DECIMAL(18,2))))
+|    input: Class 3
+|    output: sum:merge(coalesce(ss_sales_price * ss_quantity, 0))
 |    group by: i_category, i_class, i_brand, i_product_name, NULL, NULL, NULL, NULL
 |  Class 5
-|    output: sum(coalesce(ss_sales_price * CAST(ss_quantity AS DECIMAL(10,0)), CAST(0 AS DECIMAL(18,2))))
+|    input: Class 4
+|    output: sum:merge(coalesce(ss_sales_price * ss_quantity, 0))
 |    group by: i_category, i_class, i_brand, NULL, NULL, NULL, NULL, NULL
 |  Class 6
-|    output: sum(coalesce(ss_sales_price * CAST(ss_quantity AS DECIMAL(10,0)), CAST(0 AS DECIMAL(18,2))))
+|    input: Class 5
+|    output: sum:merge(coalesce(ss_sales_price * ss_quantity, 0))
 |    group by: i_category, i_class, NULL, NULL, NULL, NULL, NULL, NULL
 |  Class 7
-|    output: sum(coalesce(ss_sales_price * CAST(ss_quantity AS DECIMAL(10,0)), CAST(0 AS DECIMAL(18,2))))
+|    input: Class 6
+|    output: sum:merge(coalesce(ss_sales_price * ss_quantity, 0))
 |    group by: i_category, NULL, NULL, NULL, NULL, NULL, NULL, NULL
 |  Class 8
-|    output: sum(coalesce(ss_sales_price * CAST(ss_quantity AS DECIMAL(10,0)), CAST(0 AS DECIMAL(18,2))))
+|    input: Class 7
+|    output: sum:merge(coalesce(ss_sales_price * ss_quantity, 0))
 |    group by: NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL
 |  mem-estimate=2.26GB mem-reservation=211.00MB thread-reservation=0
 |  tuple-ids=4N,5N,6N,7N,8N,9N,10N,11N,12N row-size=1.07KB cardinality=11.74M

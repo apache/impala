@@ -1492,6 +1492,10 @@ Status impala::SetQueryOption(TImpalaQueryOptions::type option, const string& va
         query_options->__set_bottleneck_summary_min_query_time_frac(double_val);
         break;
       }
+      case TImpalaQueryOptions::CHAIN_GROUPING_SETS_PREAGG: {
+        query_options->__set_chain_grouping_sets_preagg(IsTrue(value));
+        break;
+      }
       default:
         string key = to_string(option);
         if (IsRemovedQueryOption(key)) {

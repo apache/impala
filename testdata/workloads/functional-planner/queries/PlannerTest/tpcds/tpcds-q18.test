@@ -268,16 +268,20 @@ Per-Host Resources: mem-estimate=99.17MB mem-reservation=76.94MB thread-reservat
 |    output: avg(CAST(cs_quantity AS DECIMAL(12,2))), avg(CAST(cs_list_price AS DECIMAL(12,2))), avg(CAST(cs_coupon_amt AS DECIMAL(12,2))), avg(CAST(cs_sales_price AS DECIMAL(12,2))), avg(CAST(cs_net_profit AS DECIMAL(12,2))), avg(CAST(c_birth_year AS DECIMAL(12,2))), avg(CAST(cd1.cd_dep_count AS DECIMAL(12,2)))
 |    group by: i_item_id, ca_country, ca_state, ca_county
 |  Class 1
-|    output: avg(CAST(cs_quantity AS DECIMAL(12,2))), avg(CAST(cs_list_price AS DECIMAL(12,2))), avg(CAST(cs_coupon_amt AS DECIMAL(12,2))), avg(CAST(cs_sales_price AS DECIMAL(12,2))), avg(CAST(cs_net_profit AS DECIMAL(12,2))), avg(CAST(c_birth_year AS DECIMAL(12,2))), avg(CAST(cd1.cd_dep_count AS DECIMAL(12,2)))
+|    input: Class 0
+|    output: avg:merge(CAST(cs_quantity AS DECIMAL(12,2))), avg:merge(CAST(cs_list_price AS DECIMAL(12,2))), avg:merge(CAST(cs_coupon_amt AS DECIMAL(12,2))), avg:merge(CAST(cs_sales_price AS DECIMAL(12,2))), avg:merge(CAST(cs_net_profit AS DECIMAL(12,2))), avg:merge(CAST(c_birth_year AS DECIMAL(12,2))), avg:merge(CAST(cd1.cd_dep_count AS DECIMAL(12,2)))
 |    group by: i_item_id, ca_country, ca_state, NULL
 |  Class 2
-|    output: avg(CAST(cs_quantity AS DECIMAL(12,2))), avg(CAST(cs_list_price AS DECIMAL(12,2))), avg(CAST(cs_coupon_amt AS DECIMAL(12,2))), avg(CAST(cs_sales_price AS DECIMAL(12,2))), avg(CAST(cs_net_profit AS DECIMAL(12,2))), avg(CAST(c_birth_year AS DECIMAL(12,2))), avg(CAST(cd1.cd_dep_count AS DECIMAL(12,2)))
+|    input: Class 1
+|    output: avg:merge(CAST(cs_quantity AS DECIMAL(12,2))), avg:merge(CAST(cs_list_price AS DECIMAL(12,2))), avg:merge(CAST(cs_coupon_amt AS DECIMAL(12,2))), avg:merge(CAST(cs_sales_price AS DECIMAL(12,2))), avg:merge(CAST(cs_net_profit AS DECIMAL(12,2))), avg:merge(CAST(c_birth_year AS DECIMAL(12,2))), avg:merge(CAST(cd1.cd_dep_count AS DECIMAL(12,2)))
 |    group by: i_item_id, ca_country, NULL, NULL
 |  Class 3
-|    output: avg(CAST(cs_quantity AS DECIMAL(12,2))), avg(CAST(cs_list_price AS DECIMAL(12,2))), avg(CAST(cs_coupon_amt AS DECIMAL(12,2))), avg(CAST(cs_sales_price AS DECIMAL(12,2))), avg(CAST(cs_net_profit AS DECIMAL(12,2))), avg(CAST(c_birth_year AS DECIMAL(12,2))), avg(CAST(cd1.cd_dep_count AS DECIMAL(12,2)))
+|    input: Class 2
+|    output: avg:merge(CAST(cs_quantity AS DECIMAL(12,2))), avg:merge(CAST(cs_list_price AS DECIMAL(12,2))), avg:merge(CAST(cs_coupon_amt AS DECIMAL(12,2))), avg:merge(CAST(cs_sales_price AS DECIMAL(12,2))), avg:merge(CAST(cs_net_profit AS DECIMAL(12,2))), avg:merge(CAST(c_birth_year AS DECIMAL(12,2))), avg:merge(CAST(cd1.cd_dep_count AS DECIMAL(12,2)))
 |    group by: i_item_id, NULL, NULL, NULL
 |  Class 4
-|    output: avg(CAST(cs_quantity AS DECIMAL(12,2))), avg(CAST(cs_list_price AS DECIMAL(12,2))), avg(CAST(cs_coupon_amt AS DECIMAL(12,2))), avg(CAST(cs_sales_price AS DECIMAL(12,2))), avg(CAST(cs_net_profit AS DECIMAL(12,2))), avg(CAST(c_birth_year AS DECIMAL(12,2))), avg(CAST(cd1.cd_dep_count AS DECIMAL(12,2)))
+|    input: Class 3
+|    output: avg:merge(CAST(cs_quantity AS DECIMAL(12,2))), avg:merge(CAST(cs_list_price AS DECIMAL(12,2))), avg:merge(CAST(cs_coupon_amt AS DECIMAL(12,2))), avg:merge(CAST(cs_sales_price AS DECIMAL(12,2))), avg:merge(CAST(cs_net_profit AS DECIMAL(12,2))), avg:merge(CAST(c_birth_year AS DECIMAL(12,2))), avg:merge(CAST(cd1.cd_dep_count AS DECIMAL(12,2)))
 |    group by: NULL, NULL, NULL, NULL
 |  mem-estimate=50.00MB mem-reservation=38.00MB thread-reservation=0
 |  tuple-ids=7N,9N,11N,13N,15N row-size=641B cardinality=93.17K
@@ -533,16 +537,20 @@ Per-Instance Resources: mem-estimate=59.98MB mem-reservation=38.00MB thread-rese
 |    output: avg(CAST(cs_quantity AS DECIMAL(12,2))), avg(CAST(cs_list_price AS DECIMAL(12,2))), avg(CAST(cs_coupon_amt AS DECIMAL(12,2))), avg(CAST(cs_sales_price AS DECIMAL(12,2))), avg(CAST(cs_net_profit AS DECIMAL(12,2))), avg(CAST(c_birth_year AS DECIMAL(12,2))), avg(CAST(cd1.cd_dep_count AS DECIMAL(12,2)))
 |    group by: i_item_id, ca_country, ca_state, ca_county
 |  Class 1
-|    output: avg(CAST(cs_quantity AS DECIMAL(12,2))), avg(CAST(cs_list_price AS DECIMAL(12,2))), avg(CAST(cs_coupon_amt AS DECIMAL(12,2))), avg(CAST(cs_sales_price AS DECIMAL(12,2))), avg(CAST(cs_net_profit AS DECIMAL(12,2))), avg(CAST(c_birth_year AS DECIMAL(12,2))), avg(CAST(cd1.cd_dep_count AS DECIMAL(12,2)))
+|    input: Class 0
+|    output: avg:merge(CAST(cs_quantity AS DECIMAL(12,2))), avg:merge(CAST(cs_list_price AS DECIMAL(12,2))), avg:merge(CAST(cs_coupon_amt AS DECIMAL(12,2))), avg:merge(CAST(cs_sales_price AS DECIMAL(12,2))), avg:merge(CAST(cs_net_profit AS DECIMAL(12,2))), avg:merge(CAST(c_birth_year AS DECIMAL(12,2))), avg:merge(CAST(cd1.cd_dep_count AS DECIMAL(12,2)))
 |    group by: i_item_id, ca_country, ca_state, NULL
 |  Class 2
-|    output: avg(CAST(cs_quantity AS DECIMAL(12,2))), avg(CAST(cs_list_price AS DECIMAL(12,2))), avg(CAST(cs_coupon_amt AS DECIMAL(12,2))), avg(CAST(cs_sales_price AS DECIMAL(12,2))), avg(CAST(cs_net_profit AS DECIMAL(12,2))), avg(CAST(c_birth_year AS DECIMAL(12,2))), avg(CAST(cd1.cd_dep_count AS DECIMAL(12,2)))
+|    input: Class 1
+|    output: avg:merge(CAST(cs_quantity AS DECIMAL(12,2))), avg:merge(CAST(cs_list_price AS DECIMAL(12,2))), avg:merge(CAST(cs_coupon_amt AS DECIMAL(12,2))), avg:merge(CAST(cs_sales_price AS DECIMAL(12,2))), avg:merge(CAST(cs_net_profit AS DECIMAL(12,2))), avg:merge(CAST(c_birth_year AS DECIMAL(12,2))), avg:merge(CAST(cd1.cd_dep_count AS DECIMAL(12,2)))
 |    group by: i_item_id, ca_country, NULL, NULL
 |  Class 3
-|    output: avg(CAST(cs_quantity AS DECIMAL(12,2))), avg(CAST(cs_list_price AS DECIMAL(12,2))), avg(CAST(cs_coupon_amt AS DECIMAL(12,2))), avg(CAST(cs_sales_price AS DECIMAL(12,2))), avg(CAST(cs_net_profit AS DECIMAL(12,2))), avg(CAST(c_birth_year AS DECIMAL(12,2))), avg(CAST(cd1.cd_dep_count AS DECIMAL(12,2)))
+|    input: Class 2
+|    output: avg:merge(CAST(cs_quantity AS DECIMAL(12,2))), avg:merge(CAST(cs_list_price AS DECIMAL(12,2))), avg:merge(CAST(cs_coupon_amt AS DECIMAL(12,2))), avg:merge(CAST(cs_sales_price AS DECIMAL(12,2))), avg:merge(CAST(cs_net_profit AS DECIMAL(12,2))), avg:merge(CAST(c_birth_year AS DECIMAL(12,2))), avg:merge(CAST(cd1.cd_dep_count AS DECIMAL(12,2)))
 |    group by: i_item_id, NULL, NULL, NULL
 |  Class 4
-|    output: avg(CAST(cs_quantity AS DECIMAL(12,2))), avg(CAST(cs_list_price AS DECIMAL(12,2))), avg(CAST(cs_coupon_amt AS DECIMAL(12,2))), avg(CAST(cs_sales_price AS DECIMAL(12,2))), avg(CAST(cs_net_profit AS DECIMAL(12,2))), avg(CAST(c_birth_year AS DECIMAL(12,2))), avg(CAST(cd1.cd_dep_count AS DECIMAL(12,2)))
+|    input: Class 3
+|    output: avg:merge(CAST(cs_quantity AS DECIMAL(12,2))), avg:merge(CAST(cs_list_price AS DECIMAL(12,2))), avg:merge(CAST(cs_coupon_amt AS DECIMAL(12,2))), avg:merge(CAST(cs_sales_price AS DECIMAL(12,2))), avg:merge(CAST(cs_net_profit AS DECIMAL(12,2))), avg:merge(CAST(c_birth_year AS DECIMAL(12,2))), avg:merge(CAST(cd1.cd_dep_count AS DECIMAL(12,2)))
 |    group by: NULL, NULL, NULL, NULL
 |  mem-estimate=50.00MB mem-reservation=38.00MB thread-reservation=0
 |  tuple-ids=7N,9N,11N,13N,15N row-size=641B cardinality=93.17K

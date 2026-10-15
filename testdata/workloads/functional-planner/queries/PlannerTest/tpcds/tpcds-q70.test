@@ -306,10 +306,12 @@ Per-Host Resources: mem-estimate=72.61MB mem-reservation=15.81MB thread-reservat
 |    output: sum(ss_net_profit)
 |    group by: s_state, s_county
 |  Class 1
-|    output: sum(ss_net_profit)
+|    input: Class 0
+|    output: sum:merge(ss_net_profit)
 |    group by: s_state, NULL
 |  Class 2
-|    output: sum(ss_net_profit)
+|    input: Class 1
+|    output: sum:merge(ss_net_profit)
 |    group by: NULL, NULL
 |  mem-estimate=30.00MB mem-reservation=6.00MB thread-reservation=0
 |  tuple-ids=11N,12N,13N row-size=141B cardinality=9
@@ -584,10 +586,12 @@ Per-Instance Resources: mem-estimate=49.59MB mem-reservation=7.00MB thread-reser
 |    output: sum(ss_net_profit)
 |    group by: s_state, s_county
 |  Class 1
-|    output: sum(ss_net_profit)
+|    input: Class 0
+|    output: sum:merge(ss_net_profit)
 |    group by: s_state, NULL
 |  Class 2
-|    output: sum(ss_net_profit)
+|    input: Class 1
+|    output: sum:merge(ss_net_profit)
 |    group by: NULL, NULL
 |  mem-estimate=30.00MB mem-reservation=6.00MB thread-reservation=0
 |  tuple-ids=11N,12N,13N row-size=141B cardinality=18

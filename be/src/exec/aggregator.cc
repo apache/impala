@@ -52,7 +52,9 @@ AggregatorConfig::AggregatorConfig(
     output_tuple_id_(taggregator.output_tuple_id),
     output_tuple_desc_(state->desc_tbl().GetTupleDescriptor(output_tuple_id_)),
     row_desc_(*pnode->row_descriptor_),
-    input_row_desc_(*pnode->children_[0]->row_descriptor_),
+    input_row_desc_(pnode->tnode_->agg_node.chain_aggregators && agg_idx > 0 ?
+            *pnode->row_descriptor_ :
+            *pnode->children_[0]->row_descriptor_),
     needs_finalize_(taggregator.need_finalize) {}
 
 Status AggregatorConfig::Init(

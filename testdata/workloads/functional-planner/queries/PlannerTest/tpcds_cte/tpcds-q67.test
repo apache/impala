@@ -352,28 +352,36 @@ max-parallelism=1823 segment-costs=[236966836668, 2144442934166] cpu-comparison-
 |    output: sum(coalesce(multiply(tpcds_partitioned_parquet_snap.store_sales.ss_sales_price, CAST(tpcds_partitioned_parquet_snap.store_sales.ss_quantity AS DECIMAL(10,0))), CAST(0 AS DECIMAL(18,2))))
 |    group by: tpcds_partitioned_parquet_snap.item.i_category, tpcds_partitioned_parquet_snap.item.i_class, tpcds_partitioned_parquet_snap.item.i_brand, tpcds_partitioned_parquet_snap.item.i_product_name, tpcds_partitioned_parquet_snap.date_dim.d_year, tpcds_partitioned_parquet_snap.date_dim.d_qoy, tpcds_partitioned_parquet_snap.date_dim.d_moy, tpcds_partitioned_parquet_snap.store.s_store_id
 |  Class 1
-|    output: sum(coalesce(multiply(tpcds_partitioned_parquet_snap.store_sales.ss_sales_price, CAST(tpcds_partitioned_parquet_snap.store_sales.ss_quantity AS DECIMAL(10,0))), CAST(0 AS DECIMAL(18,2))))
+|    input: Class 0
+|    output: sum:merge(coalesce(multiply(tpcds_partitioned_parquet_snap.store_sales.ss_sales_price, tpcds_partitioned_parquet_snap.store_sales.ss_quantity), 0))
 |    group by: tpcds_partitioned_parquet_snap.item.i_category, tpcds_partitioned_parquet_snap.item.i_class, tpcds_partitioned_parquet_snap.item.i_brand, tpcds_partitioned_parquet_snap.item.i_product_name, tpcds_partitioned_parquet_snap.date_dim.d_year, tpcds_partitioned_parquet_snap.date_dim.d_qoy, tpcds_partitioned_parquet_snap.date_dim.d_moy, NULL
 |  Class 2
-|    output: sum(coalesce(multiply(tpcds_partitioned_parquet_snap.store_sales.ss_sales_price, CAST(tpcds_partitioned_parquet_snap.store_sales.ss_quantity AS DECIMAL(10,0))), CAST(0 AS DECIMAL(18,2))))
+|    input: Class 1
+|    output: sum:merge(coalesce(multiply(tpcds_partitioned_parquet_snap.store_sales.ss_sales_price, tpcds_partitioned_parquet_snap.store_sales.ss_quantity), 0))
 |    group by: tpcds_partitioned_parquet_snap.item.i_category, tpcds_partitioned_parquet_snap.item.i_class, tpcds_partitioned_parquet_snap.item.i_brand, tpcds_partitioned_parquet_snap.item.i_product_name, tpcds_partitioned_parquet_snap.date_dim.d_year, tpcds_partitioned_parquet_snap.date_dim.d_qoy, NULL, NULL
 |  Class 3
-|    output: sum(coalesce(multiply(tpcds_partitioned_parquet_snap.store_sales.ss_sales_price, CAST(tpcds_partitioned_parquet_snap.store_sales.ss_quantity AS DECIMAL(10,0))), CAST(0 AS DECIMAL(18,2))))
+|    input: Class 2
+|    output: sum:merge(coalesce(multiply(tpcds_partitioned_parquet_snap.store_sales.ss_sales_price, tpcds_partitioned_parquet_snap.store_sales.ss_quantity), 0))
 |    group by: tpcds_partitioned_parquet_snap.item.i_category, tpcds_partitioned_parquet_snap.item.i_class, tpcds_partitioned_parquet_snap.item.i_brand, tpcds_partitioned_parquet_snap.item.i_product_name, tpcds_partitioned_parquet_snap.date_dim.d_year, NULL, NULL, NULL
 |  Class 4
-|    output: sum(coalesce(multiply(tpcds_partitioned_parquet_snap.store_sales.ss_sales_price, CAST(tpcds_partitioned_parquet_snap.store_sales.ss_quantity AS DECIMAL(10,0))), CAST(0 AS DECIMAL(18,2))))
+|    input: Class 3
+|    output: sum:merge(coalesce(multiply(tpcds_partitioned_parquet_snap.store_sales.ss_sales_price, tpcds_partitioned_parquet_snap.store_sales.ss_quantity), 0))
 |    group by: tpcds_partitioned_parquet_snap.item.i_category, tpcds_partitioned_parquet_snap.item.i_class, tpcds_partitioned_parquet_snap.item.i_brand, tpcds_partitioned_parquet_snap.item.i_product_name, NULL, NULL, NULL, NULL
 |  Class 5
-|    output: sum(coalesce(multiply(tpcds_partitioned_parquet_snap.store_sales.ss_sales_price, CAST(tpcds_partitioned_parquet_snap.store_sales.ss_quantity AS DECIMAL(10,0))), CAST(0 AS DECIMAL(18,2))))
+|    input: Class 4
+|    output: sum:merge(coalesce(multiply(tpcds_partitioned_parquet_snap.store_sales.ss_sales_price, tpcds_partitioned_parquet_snap.store_sales.ss_quantity), 0))
 |    group by: tpcds_partitioned_parquet_snap.item.i_category, tpcds_partitioned_parquet_snap.item.i_class, tpcds_partitioned_parquet_snap.item.i_brand, NULL, NULL, NULL, NULL, NULL
 |  Class 6
-|    output: sum(coalesce(multiply(tpcds_partitioned_parquet_snap.store_sales.ss_sales_price, CAST(tpcds_partitioned_parquet_snap.store_sales.ss_quantity AS DECIMAL(10,0))), CAST(0 AS DECIMAL(18,2))))
+|    input: Class 5
+|    output: sum:merge(coalesce(multiply(tpcds_partitioned_parquet_snap.store_sales.ss_sales_price, tpcds_partitioned_parquet_snap.store_sales.ss_quantity), 0))
 |    group by: tpcds_partitioned_parquet_snap.item.i_category, tpcds_partitioned_parquet_snap.item.i_class, NULL, NULL, NULL, NULL, NULL, NULL
 |  Class 7
-|    output: sum(coalesce(multiply(tpcds_partitioned_parquet_snap.store_sales.ss_sales_price, CAST(tpcds_partitioned_parquet_snap.store_sales.ss_quantity AS DECIMAL(10,0))), CAST(0 AS DECIMAL(18,2))))
+|    input: Class 6
+|    output: sum:merge(coalesce(multiply(tpcds_partitioned_parquet_snap.store_sales.ss_sales_price, tpcds_partitioned_parquet_snap.store_sales.ss_quantity), 0))
 |    group by: tpcds_partitioned_parquet_snap.item.i_category, NULL, NULL, NULL, NULL, NULL, NULL, NULL
 |  Class 8
-|    output: sum(coalesce(multiply(tpcds_partitioned_parquet_snap.store_sales.ss_sales_price, CAST(tpcds_partitioned_parquet_snap.store_sales.ss_quantity AS DECIMAL(10,0))), CAST(0 AS DECIMAL(18,2))))
+|    input: Class 7
+|    output: sum:merge(coalesce(multiply(tpcds_partitioned_parquet_snap.store_sales.ss_sales_price, tpcds_partitioned_parquet_snap.store_sales.ss_quantity), 0))
 |    group by: NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL
 |  mem-estimate=4.17GB mem-reservation=211.00MB thread-reservation=0
 |  tuple-ids=8N,9N,10N,11N,12N,13N,14N,15N,16N row-size=1.09KB cardinality=27.91G cost=223786154400
@@ -643,28 +651,36 @@ max-parallelism=1823 segment-costs=[236966836668, 2144442934166] cpu-comparison-
 |    output: sum(coalesce(multiply(tpcds_partitioned_parquet_snap.store_sales.ss_sales_price, CAST(tpcds_partitioned_parquet_snap.store_sales.ss_quantity AS DECIMAL(10,0))), CAST(0 AS DECIMAL(18,2))))
 |    group by: tpcds_partitioned_parquet_snap.item.i_category, tpcds_partitioned_parquet_snap.item.i_class, tpcds_partitioned_parquet_snap.item.i_brand, tpcds_partitioned_parquet_snap.item.i_product_name, tpcds_partitioned_parquet_snap.date_dim.d_year, tpcds_partitioned_parquet_snap.date_dim.d_qoy, tpcds_partitioned_parquet_snap.date_dim.d_moy, tpcds_partitioned_parquet_snap.store.s_store_id
 |  Class 1
-|    output: sum(coalesce(multiply(tpcds_partitioned_parquet_snap.store_sales.ss_sales_price, CAST(tpcds_partitioned_parquet_snap.store_sales.ss_quantity AS DECIMAL(10,0))), CAST(0 AS DECIMAL(18,2))))
+|    input: Class 0
+|    output: sum:merge(coalesce(multiply(tpcds_partitioned_parquet_snap.store_sales.ss_sales_price, tpcds_partitioned_parquet_snap.store_sales.ss_quantity), 0))
 |    group by: tpcds_partitioned_parquet_snap.item.i_category, tpcds_partitioned_parquet_snap.item.i_class, tpcds_partitioned_parquet_snap.item.i_brand, tpcds_partitioned_parquet_snap.item.i_product_name, tpcds_partitioned_parquet_snap.date_dim.d_year, tpcds_partitioned_parquet_snap.date_dim.d_qoy, tpcds_partitioned_parquet_snap.date_dim.d_moy, NULL
 |  Class 2
-|    output: sum(coalesce(multiply(tpcds_partitioned_parquet_snap.store_sales.ss_sales_price, CAST(tpcds_partitioned_parquet_snap.store_sales.ss_quantity AS DECIMAL(10,0))), CAST(0 AS DECIMAL(18,2))))
+|    input: Class 1
+|    output: sum:merge(coalesce(multiply(tpcds_partitioned_parquet_snap.store_sales.ss_sales_price, tpcds_partitioned_parquet_snap.store_sales.ss_quantity), 0))
 |    group by: tpcds_partitioned_parquet_snap.item.i_category, tpcds_partitioned_parquet_snap.item.i_class, tpcds_partitioned_parquet_snap.item.i_brand, tpcds_partitioned_parquet_snap.item.i_product_name, tpcds_partitioned_parquet_snap.date_dim.d_year, tpcds_partitioned_parquet_snap.date_dim.d_qoy, NULL, NULL
 |  Class 3
-|    output: sum(coalesce(multiply(tpcds_partitioned_parquet_snap.store_sales.ss_sales_price, CAST(tpcds_partitioned_parquet_snap.store_sales.ss_quantity AS DECIMAL(10,0))), CAST(0 AS DECIMAL(18,2))))
+|    input: Class 2
+|    output: sum:merge(coalesce(multiply(tpcds_partitioned_parquet_snap.store_sales.ss_sales_price, tpcds_partitioned_parquet_snap.store_sales.ss_quantity), 0))
 |    group by: tpcds_partitioned_parquet_snap.item.i_category, tpcds_partitioned_parquet_snap.item.i_class, tpcds_partitioned_parquet_snap.item.i_brand, tpcds_partitioned_parquet_snap.item.i_product_name, tpcds_partitioned_parquet_snap.date_dim.d_year, NULL, NULL, NULL
 |  Class 4
-|    output: sum(coalesce(multiply(tpcds_partitioned_parquet_snap.store_sales.ss_sales_price, CAST(tpcds_partitioned_parquet_snap.store_sales.ss_quantity AS DECIMAL(10,0))), CAST(0 AS DECIMAL(18,2))))
+|    input: Class 3
+|    output: sum:merge(coalesce(multiply(tpcds_partitioned_parquet_snap.store_sales.ss_sales_price, tpcds_partitioned_parquet_snap.store_sales.ss_quantity), 0))
 |    group by: tpcds_partitioned_parquet_snap.item.i_category, tpcds_partitioned_parquet_snap.item.i_class, tpcds_partitioned_parquet_snap.item.i_brand, tpcds_partitioned_parquet_snap.item.i_product_name, NULL, NULL, NULL, NULL
 |  Class 5
-|    output: sum(coalesce(multiply(tpcds_partitioned_parquet_snap.store_sales.ss_sales_price, CAST(tpcds_partitioned_parquet_snap.store_sales.ss_quantity AS DECIMAL(10,0))), CAST(0 AS DECIMAL(18,2))))
+|    input: Class 4
+|    output: sum:merge(coalesce(multiply(tpcds_partitioned_parquet_snap.store_sales.ss_sales_price, tpcds_partitioned_parquet_snap.store_sales.ss_quantity), 0))
 |    group by: tpcds_partitioned_parquet_snap.item.i_category, tpcds_partitioned_parquet_snap.item.i_class, tpcds_partitioned_parquet_snap.item.i_brand, NULL, NULL, NULL, NULL, NULL
 |  Class 6
-|    output: sum(coalesce(multiply(tpcds_partitioned_parquet_snap.store_sales.ss_sales_price, CAST(tpcds_partitioned_parquet_snap.store_sales.ss_quantity AS DECIMAL(10,0))), CAST(0 AS DECIMAL(18,2))))
+|    input: Class 5
+|    output: sum:merge(coalesce(multiply(tpcds_partitioned_parquet_snap.store_sales.ss_sales_price, tpcds_partitioned_parquet_snap.store_sales.ss_quantity), 0))
 |    group by: tpcds_partitioned_parquet_snap.item.i_category, tpcds_partitioned_parquet_snap.item.i_class, NULL, NULL, NULL, NULL, NULL, NULL
 |  Class 7
-|    output: sum(coalesce(multiply(tpcds_partitioned_parquet_snap.store_sales.ss_sales_price, CAST(tpcds_partitioned_parquet_snap.store_sales.ss_quantity AS DECIMAL(10,0))), CAST(0 AS DECIMAL(18,2))))
+|    input: Class 6
+|    output: sum:merge(coalesce(multiply(tpcds_partitioned_parquet_snap.store_sales.ss_sales_price, tpcds_partitioned_parquet_snap.store_sales.ss_quantity), 0))
 |    group by: tpcds_partitioned_parquet_snap.item.i_category, NULL, NULL, NULL, NULL, NULL, NULL, NULL
 |  Class 8
-|    output: sum(coalesce(multiply(tpcds_partitioned_parquet_snap.store_sales.ss_sales_price, CAST(tpcds_partitioned_parquet_snap.store_sales.ss_quantity AS DECIMAL(10,0))), CAST(0 AS DECIMAL(18,2))))
+|    input: Class 7
+|    output: sum:merge(coalesce(multiply(tpcds_partitioned_parquet_snap.store_sales.ss_sales_price, tpcds_partitioned_parquet_snap.store_sales.ss_quantity), 0))
 |    group by: NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL
 |  mem-estimate=4.17GB mem-reservation=211.00MB thread-reservation=0
 |  tuple-ids=8N,9N,10N,11N,12N,13N,14N,15N,16N row-size=1.09KB cardinality=27.91G cost=223786154400

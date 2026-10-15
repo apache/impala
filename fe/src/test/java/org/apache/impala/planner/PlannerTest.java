@@ -224,6 +224,16 @@ public class PlannerTest extends PlannerTestBase {
     runPlannerTestFile("grouping-sets");
   }
 
+  /**
+   * Tests which streaming preaggregations chain their grouping sets. EXTENDED shows
+   * the chaining and the merge functions of the chained classes.
+   */
+  @Test
+  public void testGroupingSetsChainedPreagg() {
+    runPlannerTestFile("grouping-sets-chained-preagg",
+        ImmutableSet.of(PlannerTestOption.EXTENDED_EXPLAIN));
+  }
+
   @Test
   public void testPivotClause() {
     TQueryOptions options = defaultQueryOptions();

@@ -843,6 +843,9 @@ struct TQueryOptions {
 
   // See comment in ImpalaService.thrift
   209: optional double bottleneck_summary_min_query_time_frac = 0.05;
+
+  // See comment in ImpalaService.thrift
+  210: optional bool chain_grouping_sets_preagg = true;
 }
 
 // Impala currently has three types of sessions: Beeswax, HiveServer2 and external

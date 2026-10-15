@@ -228,10 +228,12 @@ Per-Host Resources: mem-estimate=106.09MB mem-reservation=17.75MB thread-reserva
 |    output: sum(ss_net_profit), sum(ss_ext_sales_price)
 |    group by: i_category, i_class
 |  Class 1
-|    output: sum(ss_net_profit), sum(ss_ext_sales_price)
+|    input: Class 0
+|    output: sum:merge(ss_net_profit), sum:merge(ss_ext_sales_price)
 |    group by: i_category, NULL
 |  Class 2
-|    output: sum(ss_net_profit), sum(ss_ext_sales_price)
+|    input: Class 1
+|    output: sum:merge(ss_net_profit), sum:merge(ss_ext_sales_price)
 |    group by: NULL, NULL
 |  mem-estimate=30.00MB mem-reservation=6.00MB thread-reservation=0
 |  tuple-ids=4N,5N,6N row-size=188B cardinality=3.00K
@@ -409,10 +411,12 @@ Per-Instance Resources: mem-estimate=50.68MB mem-reservation=8.00MB thread-reser
 |    output: sum(ss_net_profit), sum(ss_ext_sales_price)
 |    group by: i_category, i_class
 |  Class 1
-|    output: sum(ss_net_profit), sum(ss_ext_sales_price)
+|    input: Class 0
+|    output: sum:merge(ss_net_profit), sum:merge(ss_ext_sales_price)
 |    group by: i_category, NULL
 |  Class 2
-|    output: sum(ss_net_profit), sum(ss_ext_sales_price)
+|    input: Class 1
+|    output: sum:merge(ss_net_profit), sum:merge(ss_ext_sales_price)
 |    group by: NULL, NULL
 |  mem-estimate=30.00MB mem-reservation=6.00MB thread-reservation=0
 |  tuple-ids=4N,5N,6N row-size=188B cardinality=6.01K

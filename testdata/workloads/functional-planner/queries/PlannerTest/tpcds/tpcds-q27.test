@@ -204,10 +204,12 @@ Per-Host Resources: mem-estimate=165.85MB mem-reservation=30.31MB thread-reserva
 |    output: avg(CAST(ss_quantity AS BIGINT)), avg(ss_list_price), avg(ss_coupon_amt), avg(ss_sales_price)
 |    group by: i_item_id, s_state
 |  Class 1
-|    output: avg(CAST(ss_quantity AS BIGINT)), avg(ss_list_price), avg(ss_coupon_amt), avg(ss_sales_price)
+|    input: Class 0
+|    output: avg:merge(ss_quantity), avg:merge(ss_list_price), avg:merge(ss_coupon_amt), avg:merge(ss_sales_price)
 |    group by: i_item_id, NULL
 |  Class 2
-|    output: avg(CAST(ss_quantity AS BIGINT)), avg(ss_list_price), avg(ss_coupon_amt), avg(ss_sales_price)
+|    input: Class 1
+|    output: avg:merge(ss_quantity), avg:merge(ss_list_price), avg:merge(ss_coupon_amt), avg:merge(ss_sales_price)
 |    group by: NULL, NULL
 |  mem-estimate=30.00MB mem-reservation=8.00MB thread-reservation=0
 |  tuple-ids=5N,7N,9N row-size=202B cardinality=53.13K
@@ -391,10 +393,12 @@ Per-Instance Resources: mem-estimate=51.02MB mem-reservation=12.00MB thread-rese
 |    output: avg(CAST(ss_quantity AS BIGINT)), avg(ss_list_price), avg(ss_coupon_amt), avg(ss_sales_price)
 |    group by: i_item_id, s_state
 |  Class 1
-|    output: avg(CAST(ss_quantity AS BIGINT)), avg(ss_list_price), avg(ss_coupon_amt), avg(ss_sales_price)
+|    input: Class 0
+|    output: avg:merge(ss_quantity), avg:merge(ss_list_price), avg:merge(ss_coupon_amt), avg:merge(ss_sales_price)
 |    group by: i_item_id, NULL
 |  Class 2
-|    output: avg(CAST(ss_quantity AS BIGINT)), avg(ss_list_price), avg(ss_coupon_amt), avg(ss_sales_price)
+|    input: Class 1
+|    output: avg:merge(ss_quantity), avg:merge(ss_list_price), avg:merge(ss_coupon_amt), avg:merge(ss_sales_price)
 |    group by: NULL, NULL
 |  mem-estimate=30.00MB mem-reservation=8.00MB thread-reservation=0
 |  tuple-ids=5N,7N,9N row-size=202B cardinality=105.51K

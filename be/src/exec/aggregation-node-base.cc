@@ -70,7 +70,9 @@ AggregationNodeBase::AggregationNodeBase(
     ObjectPool* pool, const AggregationPlanNode& pnode, const DescriptorTbl& descs)
   : ExecNode(pool, pnode, descs),
     replicate_input_(pnode.tnode_->agg_node.replicate_input),
+    chain_aggregators_(pnode.tnode_->agg_node.chain_aggregators),
     total_finstances_(pnode.total_finstances_) {
+  DCHECK(!(replicate_input_ && chain_aggregators_));
   // Create the Aggregator nodes from their configs.
   int num_aggs = pnode.aggs_.size();
   for (int i = 0; i < num_aggs; ++i) {

@@ -1,0 +1,698 @@
+# ROLLUP chains the classes of the streaming preaggregation. Each class after the
+# first merges the output of the previous class.
+select l_returnflag, l_linestatus, l_shipmode, count(*), min(l_comment),
+  avg(l_discount), ndv(l_partkey)
+from tpch.lineitem
+group by rollup(l_returnflag, l_linestatus, l_shipmode)
+---- PLAN
+F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
+|  Per-Host Resources: mem-estimate=304.00MB mem-reservation=16.00MB thread-reservation=2
+PLAN-ROOT SINK
+|  output exprs: CASE valid_tid(2,4,6,8) WHEN 2 THEN l_returnflag WHEN 4 THEN l_returnflag WHEN 6 THEN l_returnflag WHEN 8 THEN NULL END, CASE valid_tid(2,4,6,8) WHEN 2 THEN l_linestatus WHEN 4 THEN l_linestatus WHEN 6 THEN NULL WHEN 8 THEN NULL END, CASE valid_tid(2,4,6,8) WHEN 2 THEN l_shipmode WHEN 4 THEN NULL WHEN 6 THEN NULL WHEN 8 THEN NULL END, aggif(valid_tid(2,4,6,8) IN (2, 4, 6, 8), CASE valid_tid(2,4,6,8) WHEN 2 THEN count(*) WHEN 4 THEN count(*) WHEN 6 THEN count(*) WHEN 8 THEN count(*) END), aggif(valid_tid(2,4,6,8) IN (2, 4, 6, 8), CASE valid_tid(2,4,6,8) WHEN 2 THEN min(l_comment) WHEN 4 THEN min(l_comment) WHEN 6 THEN min(l_comment) WHEN 8 THEN min(l_comment) END), aggif(valid_tid(2,4,6,8) IN (2, 4, 6, 8), CASE valid_tid(2,4,6,8) WHEN 2 THEN avg(l_discount) WHEN 4 THEN avg(l_discount) WHEN 6 THEN avg(l_discount) WHEN 8 THEN avg(l_discount) END), aggif(valid_tid(2,4,6,8) IN (2, 4, 6, 8), CASE valid_tid(2,4,6,8) WHEN 2 THEN ndv(l_partkey) WHEN 4 THEN ndv(l_partkey) WHEN 6 THEN ndv(l_partkey) WHEN 8 THEN ndv(l_partkey) END)
+|  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
+|
+02:AGGREGATE [FINALIZE]
+|  output: aggif(valid_tid(2,4,6,8) IN (CAST(2 AS INT), CAST(4 AS INT), CAST(6 AS INT), CAST(8 AS INT)), CASE valid_tid(2,4,6,8) WHEN CAST(2 AS INT) THEN count(*) WHEN CAST(4 AS INT) THEN count(*) WHEN CAST(6 AS INT) THEN count(*) WHEN CAST(8 AS INT) THEN count(*) END), aggif(valid_tid(2,4,6,8) IN (CAST(2 AS INT), CAST(4 AS INT), CAST(6 AS INT), CAST(8 AS INT)), CASE valid_tid(2,4,6,8) WHEN CAST(2 AS INT) THEN min(l_comment) WHEN CAST(4 AS INT) THEN min(l_comment) WHEN CAST(6 AS INT) THEN min(l_comment) WHEN CAST(8 AS INT) THEN min(l_comment) END), aggif(valid_tid(2,4,6,8) IN (CAST(2 AS INT), CAST(4 AS INT), CAST(6 AS INT), CAST(8 AS INT)), CASE valid_tid(2,4,6,8) WHEN CAST(2 AS INT) THEN avg(l_discount) WHEN CAST(4 AS INT) THEN avg(l_discount) WHEN CAST(6 AS INT) THEN avg(l_discount) WHEN CAST(8 AS INT) THEN avg(l_discount) END), aggif(valid_tid(2,4,6,8) IN (CAST(2 AS INT), CAST(4 AS INT), CAST(6 AS INT), CAST(8 AS INT)), CASE valid_tid(2,4,6,8) WHEN CAST(2 AS INT) THEN ndv(l_partkey) WHEN CAST(4 AS INT) THEN ndv(l_partkey) WHEN CAST(6 AS INT) THEN ndv(l_partkey) WHEN CAST(8 AS INT) THEN ndv(l_partkey) END)
+|  group by: CASE valid_tid(2,4,6,8) WHEN CAST(2 AS INT) THEN l_returnflag WHEN CAST(4 AS INT) THEN l_returnflag WHEN CAST(6 AS INT) THEN l_returnflag WHEN CAST(8 AS INT) THEN NULL END, CASE valid_tid(2,4,6,8) WHEN CAST(2 AS INT) THEN l_linestatus WHEN CAST(4 AS INT) THEN l_linestatus WHEN CAST(6 AS INT) THEN NULL WHEN CAST(8 AS INT) THEN NULL END, CASE valid_tid(2,4,6,8) WHEN CAST(2 AS INT) THEN l_shipmode WHEN CAST(4 AS INT) THEN NULL WHEN CAST(6 AS INT) THEN NULL WHEN CAST(8 AS INT) THEN NULL END, CASE valid_tid(2,4,6,8) WHEN CAST(2 AS INT) THEN CAST(2 AS INT) WHEN CAST(4 AS INT) THEN CAST(4 AS INT) WHEN CAST(6 AS INT) THEN CAST(6 AS INT) WHEN CAST(8 AS INT) THEN CAST(8 AS INT) END
+|  mem-estimate=10.00MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
+|  tuple-ids=9 row-size=76B cardinality=52
+|  in pipelines: 02(GETNEXT), 01(OPEN)
+|
+01:AGGREGATE [FINALIZE]
+|  Class 0
+|    output: count(*), min(l_comment), avg(l_discount), ndv(l_partkey)
+|    group by: l_returnflag, l_linestatus, l_shipmode
+|  Class 1
+|    output: count(*), min(l_comment), avg(l_discount), ndv(l_partkey)
+|    group by: l_returnflag, l_linestatus, NULL
+|  Class 2
+|    output: count(*), min(l_comment), avg(l_discount), ndv(l_partkey)
+|    group by: l_returnflag, NULL, NULL
+|  Class 3
+|    output: count(*), min(l_comment), avg(l_discount), ndv(l_partkey)
+|    group by: NULL, NULL, NULL
+|  mem-estimate=40.00MB mem-reservation=8.00MB thread-reservation=0
+|  tuple-ids=1N,3N,5N,7N row-size=297B cardinality=52
+|  in pipelines: 01(GETNEXT), 00(OPEN)
+|
+00:SCAN HDFS [tpch.lineitem]
+   HDFS partitions=1/1 files=1 size=718.94MB
+   stored statistics:
+     table: rows=6.00M size=718.94MB
+     columns: all
+   extrapolated-rows=disabled max-scan-range-rows=1.07M
+   mem-estimate=264.00MB mem-reservation=8.00MB thread-reservation=1
+   tuple-ids=0 row-size=97B cardinality=6.00M
+   in pipelines: 00(GETNEXT)
+---- DISTRIBUTEDPLAN
+F02:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
+|  Per-Host Resources: mem-estimate=4.02MB mem-reservation=4.00MB thread-reservation=1
+PLAN-ROOT SINK
+|  output exprs: CASE valid_tid(2,4,6,8) WHEN 2 THEN l_returnflag WHEN 4 THEN l_returnflag WHEN 6 THEN l_returnflag WHEN 8 THEN NULL END, CASE valid_tid(2,4,6,8) WHEN 2 THEN l_linestatus WHEN 4 THEN l_linestatus WHEN 6 THEN NULL WHEN 8 THEN NULL END, CASE valid_tid(2,4,6,8) WHEN 2 THEN l_shipmode WHEN 4 THEN NULL WHEN 6 THEN NULL WHEN 8 THEN NULL END, aggif(valid_tid(2,4,6,8) IN (2, 4, 6, 8), CASE valid_tid(2,4,6,8) WHEN 2 THEN count(*) WHEN 4 THEN count(*) WHEN 6 THEN count(*) WHEN 8 THEN count(*) END), aggif(valid_tid(2,4,6,8) IN (2, 4, 6, 8), CASE valid_tid(2,4,6,8) WHEN 2 THEN min(l_comment) WHEN 4 THEN min(l_comment) WHEN 6 THEN min(l_comment) WHEN 8 THEN min(l_comment) END), aggif(valid_tid(2,4,6,8) IN (2, 4, 6, 8), CASE valid_tid(2,4,6,8) WHEN 2 THEN avg(l_discount) WHEN 4 THEN avg(l_discount) WHEN 6 THEN avg(l_discount) WHEN 8 THEN avg(l_discount) END), aggif(valid_tid(2,4,6,8) IN (2, 4, 6, 8), CASE valid_tid(2,4,6,8) WHEN 2 THEN ndv(l_partkey) WHEN 4 THEN ndv(l_partkey) WHEN 6 THEN ndv(l_partkey) WHEN 8 THEN ndv(l_partkey) END)
+|  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
+|
+05:EXCHANGE [UNPARTITIONED]
+|  mem-estimate=16.00KB mem-reservation=0B thread-reservation=0
+|  tuple-ids=9 row-size=76B cardinality=52
+|  in pipelines: 02(GETNEXT)
+|
+F01:PLAN FRAGMENT [HASH(CASE valid_tid(1,3,5,7) WHEN 1 THEN murmur_hash(l_returnflag) WHEN 3 THEN murmur_hash(l_returnflag) WHEN 5 THEN murmur_hash(l_returnflag) WHEN 7 THEN murmur_hash(NULL) END,CASE valid_tid(1,3,5,7) WHEN 1 THEN murmur_hash(l_linestatus) WHEN 3 THEN murmur_hash(l_linestatus) WHEN 5 THEN murmur_hash(NULL) WHEN 7 THEN murmur_hash(NULL) END,CASE valid_tid(1,3,5,7) WHEN 1 THEN murmur_hash(l_shipmode) WHEN 3 THEN murmur_hash(NULL) WHEN 5 THEN murmur_hash(NULL) WHEN 7 THEN murmur_hash(NULL) END)] hosts=3 instances=3
+Per-Host Resources: mem-estimate=50.00MB mem-reservation=9.94MB thread-reservation=1
+02:AGGREGATE [FINALIZE]
+|  output: aggif(valid_tid(2,4,6,8) IN (CAST(2 AS INT), CAST(4 AS INT), CAST(6 AS INT), CAST(8 AS INT)), CASE valid_tid(2,4,6,8) WHEN CAST(2 AS INT) THEN count(*) WHEN CAST(4 AS INT) THEN count(*) WHEN CAST(6 AS INT) THEN count(*) WHEN CAST(8 AS INT) THEN count(*) END), aggif(valid_tid(2,4,6,8) IN (CAST(2 AS INT), CAST(4 AS INT), CAST(6 AS INT), CAST(8 AS INT)), CASE valid_tid(2,4,6,8) WHEN CAST(2 AS INT) THEN min(l_comment) WHEN CAST(4 AS INT) THEN min(l_comment) WHEN CAST(6 AS INT) THEN min(l_comment) WHEN CAST(8 AS INT) THEN min(l_comment) END), aggif(valid_tid(2,4,6,8) IN (CAST(2 AS INT), CAST(4 AS INT), CAST(6 AS INT), CAST(8 AS INT)), CASE valid_tid(2,4,6,8) WHEN CAST(2 AS INT) THEN avg(l_discount) WHEN CAST(4 AS INT) THEN avg(l_discount) WHEN CAST(6 AS INT) THEN avg(l_discount) WHEN CAST(8 AS INT) THEN avg(l_discount) END), aggif(valid_tid(2,4,6,8) IN (CAST(2 AS INT), CAST(4 AS INT), CAST(6 AS INT), CAST(8 AS INT)), CASE valid_tid(2,4,6,8) WHEN CAST(2 AS INT) THEN ndv(l_partkey) WHEN CAST(4 AS INT) THEN ndv(l_partkey) WHEN CAST(6 AS INT) THEN ndv(l_partkey) WHEN CAST(8 AS INT) THEN ndv(l_partkey) END)
+|  group by: CASE valid_tid(2,4,6,8) WHEN CAST(2 AS INT) THEN l_returnflag WHEN CAST(4 AS INT) THEN l_returnflag WHEN CAST(6 AS INT) THEN l_returnflag WHEN CAST(8 AS INT) THEN NULL END, CASE valid_tid(2,4,6,8) WHEN CAST(2 AS INT) THEN l_linestatus WHEN CAST(4 AS INT) THEN l_linestatus WHEN CAST(6 AS INT) THEN NULL WHEN CAST(8 AS INT) THEN NULL END, CASE valid_tid(2,4,6,8) WHEN CAST(2 AS INT) THEN l_shipmode WHEN CAST(4 AS INT) THEN NULL WHEN CAST(6 AS INT) THEN NULL WHEN CAST(8 AS INT) THEN NULL END, CASE valid_tid(2,4,6,8) WHEN CAST(2 AS INT) THEN CAST(2 AS INT) WHEN CAST(4 AS INT) THEN CAST(4 AS INT) WHEN CAST(6 AS INT) THEN CAST(6 AS INT) WHEN CAST(8 AS INT) THEN CAST(8 AS INT) END
+|  mem-estimate=10.00MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
+|  tuple-ids=9 row-size=76B cardinality=52
+|  in pipelines: 02(GETNEXT), 04(OPEN)
+|
+04:AGGREGATE [FINALIZE]
+|  Class 0
+|    output: count:merge(*), min:merge(l_comment), avg:merge(l_discount), ndv:merge(l_partkey)
+|    group by: l_returnflag, l_linestatus, l_shipmode
+|  Class 1
+|    output: count:merge(*), min:merge(l_comment), avg:merge(l_discount), ndv:merge(l_partkey)
+|    group by: l_returnflag, l_linestatus, NULL
+|  Class 2
+|    output: count:merge(*), min:merge(l_comment), avg:merge(l_discount), ndv:merge(l_partkey)
+|    group by: l_returnflag, NULL, NULL
+|  Class 3
+|    output: count:merge(*), min:merge(l_comment), avg:merge(l_discount), ndv:merge(l_partkey)
+|    group by: NULL, NULL, NULL
+|  mem-estimate=40.00MB mem-reservation=8.00MB thread-reservation=0
+|  tuple-ids=2N,4N,6N,8N row-size=297B cardinality=52
+|  in pipelines: 04(GETNEXT), 00(OPEN)
+|
+03:EXCHANGE [HASH(CASE valid_tid(1,3,5,7) WHEN 1 THEN murmur_hash(l_returnflag) WHEN 3 THEN murmur_hash(l_returnflag) WHEN 5 THEN murmur_hash(l_returnflag) WHEN 7 THEN murmur_hash(NULL) END,CASE valid_tid(1,3,5,7) WHEN 1 THEN murmur_hash(l_linestatus) WHEN 3 THEN murmur_hash(l_linestatus) WHEN 5 THEN murmur_hash(NULL) WHEN 7 THEN murmur_hash(NULL) END,CASE valid_tid(1,3,5,7) WHEN 1 THEN murmur_hash(l_shipmode) WHEN 3 THEN murmur_hash(NULL) WHEN 5 THEN murmur_hash(NULL) WHEN 7 THEN murmur_hash(NULL) END)]
+|  mem-estimate=158.28KB mem-reservation=0B thread-reservation=0
+|  tuple-ids=1N,3N,5N,7N row-size=297B cardinality=156
+|  in pipelines: 00(GETNEXT)
+|
+F00:PLAN FRAGMENT [RANDOM] hosts=3 instances=3
+Per-Host Resources: mem-estimate=307.67MB mem-reservation=16.00MB thread-reservation=2
+01:AGGREGATE [STREAMING]
+|  Class 0
+|    output: count(*), min(l_comment), avg(l_discount), ndv(l_partkey)
+|    group by: l_returnflag, l_linestatus, l_shipmode
+|  Class 1
+|    input: Class 0
+|    output: count:merge(*), min:merge(l_comment), avg:merge(l_discount), ndv:merge(l_partkey)
+|    group by: l_returnflag, l_linestatus, NULL
+|  Class 2
+|    input: Class 1
+|    output: count:merge(*), min:merge(l_comment), avg:merge(l_discount), ndv:merge(l_partkey)
+|    group by: l_returnflag, NULL, NULL
+|  Class 3
+|    input: Class 2
+|    output: count:merge(*), min:merge(l_comment), avg:merge(l_discount), ndv:merge(l_partkey)
+|    group by: NULL, NULL, NULL
+|  mem-estimate=40.00MB mem-reservation=8.00MB thread-reservation=0
+|  tuple-ids=1N,3N,5N,7N row-size=297B cardinality=156
+|  in pipelines: 00(GETNEXT)
+|
+00:SCAN HDFS [tpch.lineitem, RANDOM]
+   HDFS partitions=1/1 files=1 size=718.94MB
+   stored statistics:
+     table: rows=6.00M size=718.94MB
+     columns: all
+   extrapolated-rows=disabled max-scan-range-rows=1.07M
+   mem-estimate=264.00MB mem-reservation=8.00MB thread-reservation=1
+   tuple-ids=0 row-size=97B cardinality=6.00M
+   in pipelines: 00(GETNEXT)
+====
+# ROLLUP over one expr.
+select l_shipmode, count(*) from tpch.lineitem group by rollup(l_shipmode)
+---- DISTRIBUTEDPLAN
+F02:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
+|  Per-Host Resources: mem-estimate=4.02MB mem-reservation=4.00MB thread-reservation=1
+PLAN-ROOT SINK
+|  output exprs: CASE valid_tid(1,2) WHEN 1 THEN l_shipmode WHEN 2 THEN NULL END, aggif(valid_tid(1,2) IN (1, 2), CASE valid_tid(1,2) WHEN 1 THEN count(*) WHEN 2 THEN count(*) END)
+|  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
+|
+05:EXCHANGE [UNPARTITIONED]
+|  mem-estimate=16.00KB mem-reservation=0B thread-reservation=0
+|  tuple-ids=3 row-size=24B cardinality=8
+|  in pipelines: 02(GETNEXT)
+|
+F01:PLAN FRAGMENT [HASH(CASE valid_tid(1,2) WHEN 1 THEN murmur_hash(l_shipmode) WHEN 2 THEN murmur_hash(NULL) END)] hosts=3 instances=3
+Per-Host Resources: mem-estimate=30.00MB mem-reservation=5.81MB thread-reservation=1
+02:AGGREGATE [FINALIZE]
+|  output: aggif(valid_tid(1,2) IN (CAST(1 AS INT), CAST(2 AS INT)), CASE valid_tid(1,2) WHEN CAST(1 AS INT) THEN count(*) WHEN CAST(2 AS INT) THEN count(*) END)
+|  group by: CASE valid_tid(1,2) WHEN CAST(1 AS INT) THEN l_shipmode WHEN CAST(2 AS INT) THEN NULL END, CASE valid_tid(1,2) WHEN CAST(1 AS INT) THEN CAST(1 AS INT) WHEN CAST(2 AS INT) THEN CAST(2 AS INT) END
+|  mem-estimate=10.00MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
+|  tuple-ids=3 row-size=24B cardinality=8
+|  in pipelines: 02(GETNEXT), 04(OPEN)
+|
+04:AGGREGATE [FINALIZE]
+|  Class 0
+|    output: count:merge(*)
+|    group by: l_shipmode
+|  Class 1
+|    output: count:merge(*)
+|    group by: NULL
+|  mem-estimate=20.00MB mem-reservation=3.88MB thread-reservation=0
+|  tuple-ids=1N,2N row-size=44B cardinality=8
+|  in pipelines: 04(GETNEXT), 00(OPEN)
+|
+03:EXCHANGE [HASH(CASE valid_tid(1,2) WHEN 1 THEN murmur_hash(l_shipmode) WHEN 2 THEN murmur_hash(NULL) END)]
+|  mem-estimate=16.00KB mem-reservation=0B thread-reservation=0
+|  tuple-ids=1N,2N row-size=44B cardinality=24
+|  in pipelines: 00(GETNEXT)
+|
+F00:PLAN FRAGMENT [RANDOM] hosts=3 instances=3
+Per-Host Resources: mem-estimate=284.61MB mem-reservation=12.00MB thread-reservation=2
+01:AGGREGATE [STREAMING]
+|  Class 0
+|    output: count(*)
+|    group by: l_shipmode
+|  Class 1
+|    input: Class 0
+|    output: count:merge(*)
+|    group by: NULL
+|  mem-estimate=20.00MB mem-reservation=4.00MB thread-reservation=0
+|  tuple-ids=1N,2N row-size=44B cardinality=24
+|  in pipelines: 00(GETNEXT)
+|
+00:SCAN HDFS [tpch.lineitem, RANDOM]
+   HDFS partitions=1/1 files=1 size=718.94MB
+   stored statistics:
+     table: rows=6.00M size=718.94MB
+     columns: all
+   extrapolated-rows=disabled max-scan-range-rows=1.07M
+   mem-estimate=264.00MB mem-reservation=8.00MB thread-reservation=1
+   tuple-ids=0 row-size=16B cardinality=6.00M
+   in pipelines: 00(GETNEXT)
+====
+# Nested grouping sets that aren't a ROLLUP.
+select l_returnflag, l_shipmode, l_linestatus, count(*), max(l_comment)
+from tpch.lineitem
+group by grouping sets((l_returnflag, l_shipmode, l_linestatus),
+  (l_returnflag, l_linestatus), (l_linestatus))
+---- DISTRIBUTEDPLAN
+F02:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
+|  Per-Host Resources: mem-estimate=4.02MB mem-reservation=4.00MB thread-reservation=1
+PLAN-ROOT SINK
+|  output exprs: CASE valid_tid(1,2,3) WHEN 1 THEN l_returnflag WHEN 2 THEN l_returnflag WHEN 3 THEN NULL END, CASE valid_tid(1,2,3) WHEN 1 THEN l_shipmode WHEN 2 THEN NULL WHEN 3 THEN NULL END, CASE valid_tid(1,2,3) WHEN 1 THEN l_linestatus WHEN 2 THEN l_linestatus WHEN 3 THEN l_linestatus END, aggif(valid_tid(1,2,3) IN (1, 2, 3), CASE valid_tid(1,2,3) WHEN 1 THEN count(*) WHEN 2 THEN count(*) WHEN 3 THEN count(*) END), aggif(valid_tid(1,2,3) IN (1, 2, 3), CASE valid_tid(1,2,3) WHEN 1 THEN max(l_comment) WHEN 2 THEN max(l_comment) WHEN 3 THEN max(l_comment) END)
+|  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
+|
+05:EXCHANGE [UNPARTITIONED]
+|  mem-estimate=16.00KB mem-reservation=0B thread-reservation=0
+|  tuple-ids=4 row-size=60B cardinality=50
+|  in pipelines: 02(GETNEXT)
+|
+F01:PLAN FRAGMENT [HASH(CASE valid_tid(1,2,3) WHEN 1 THEN murmur_hash(l_returnflag) WHEN 2 THEN murmur_hash(l_returnflag) WHEN 3 THEN murmur_hash(NULL) END,CASE valid_tid(1,2,3) WHEN 1 THEN murmur_hash(l_shipmode) WHEN 2 THEN murmur_hash(NULL) WHEN 3 THEN murmur_hash(NULL) END,CASE valid_tid(1,2,3) WHEN 1 THEN murmur_hash(l_linestatus) WHEN 2 THEN murmur_hash(l_linestatus) WHEN 3 THEN murmur_hash(l_linestatus) END)] hosts=3 instances=3
+Per-Host Resources: mem-estimate=40.00MB mem-reservation=7.94MB thread-reservation=1
+02:AGGREGATE [FINALIZE]
+|  output: aggif(valid_tid(1,2,3) IN (CAST(1 AS INT), CAST(2 AS INT), CAST(3 AS INT)), CASE valid_tid(1,2,3) WHEN CAST(1 AS INT) THEN count(*) WHEN CAST(2 AS INT) THEN count(*) WHEN CAST(3 AS INT) THEN count(*) END), aggif(valid_tid(1,2,3) IN (CAST(1 AS INT), CAST(2 AS INT), CAST(3 AS INT)), CASE valid_tid(1,2,3) WHEN CAST(1 AS INT) THEN max(l_comment) WHEN CAST(2 AS INT) THEN max(l_comment) WHEN CAST(3 AS INT) THEN max(l_comment) END)
+|  group by: CASE valid_tid(1,2,3) WHEN CAST(1 AS INT) THEN l_returnflag WHEN CAST(2 AS INT) THEN l_returnflag WHEN CAST(3 AS INT) THEN NULL END, CASE valid_tid(1,2,3) WHEN CAST(1 AS INT) THEN l_shipmode WHEN CAST(2 AS INT) THEN NULL WHEN CAST(3 AS INT) THEN NULL END, CASE valid_tid(1,2,3) WHEN CAST(1 AS INT) THEN l_linestatus WHEN CAST(2 AS INT) THEN l_linestatus WHEN CAST(3 AS INT) THEN l_linestatus END, CASE valid_tid(1,2,3) WHEN CAST(1 AS INT) THEN CAST(1 AS INT) WHEN CAST(2 AS INT) THEN CAST(2 AS INT) WHEN CAST(3 AS INT) THEN CAST(3 AS INT) END
+|  mem-estimate=10.00MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
+|  tuple-ids=4 row-size=60B cardinality=50
+|  in pipelines: 02(GETNEXT), 04(OPEN)
+|
+04:AGGREGATE [FINALIZE]
+|  Class 0
+|    output: count:merge(*), max:merge(l_comment)
+|    group by: l_returnflag, l_shipmode, l_linestatus
+|  Class 1
+|    output: count:merge(*), max:merge(l_comment)
+|    group by: l_returnflag, NULL, l_linestatus
+|  Class 2
+|    output: count:merge(*), max:merge(l_comment)
+|    group by: NULL, NULL, l_linestatus
+|  mem-estimate=30.00MB mem-reservation=6.00MB thread-reservation=0
+|  tuple-ids=1N,2N,3N row-size=177B cardinality=50
+|  in pipelines: 04(GETNEXT), 00(OPEN)
+|
+03:EXCHANGE [HASH(CASE valid_tid(1,2,3) WHEN 1 THEN murmur_hash(l_returnflag) WHEN 2 THEN murmur_hash(l_returnflag) WHEN 3 THEN murmur_hash(NULL) END,CASE valid_tid(1,2,3) WHEN 1 THEN murmur_hash(l_shipmode) WHEN 2 THEN murmur_hash(NULL) WHEN 3 THEN murmur_hash(NULL) END,CASE valid_tid(1,2,3) WHEN 1 THEN murmur_hash(l_linestatus) WHEN 2 THEN murmur_hash(l_linestatus) WHEN 3 THEN murmur_hash(l_linestatus) END)]
+|  mem-estimate=91.84KB mem-reservation=0B thread-reservation=0
+|  tuple-ids=1N,2N,3N row-size=177B cardinality=150
+|  in pipelines: 00(GETNEXT)
+|
+F00:PLAN FRAGMENT [RANDOM] hosts=3 instances=3
+Per-Host Resources: mem-estimate=296.22MB mem-reservation=14.00MB thread-reservation=2
+01:AGGREGATE [STREAMING]
+|  Class 0
+|    output: count(*), max(l_comment)
+|    group by: l_returnflag, l_shipmode, l_linestatus
+|  Class 1
+|    input: Class 0
+|    output: count:merge(*), max:merge(l_comment)
+|    group by: l_returnflag, NULL, l_linestatus
+|  Class 2
+|    input: Class 1
+|    output: count:merge(*), max:merge(l_comment)
+|    group by: NULL, NULL, l_linestatus
+|  mem-estimate=30.00MB mem-reservation=6.00MB thread-reservation=0
+|  tuple-ids=1N,2N,3N row-size=177B cardinality=150
+|  in pipelines: 00(GETNEXT)
+|
+00:SCAN HDFS [tpch.lineitem, RANDOM]
+   HDFS partitions=1/1 files=1 size=718.94MB
+   stored statistics:
+     table: rows=6.00M size=718.94MB
+     columns: all
+   extrapolated-rows=disabled max-scan-range-rows=1.07M
+   mem-estimate=264.00MB mem-reservation=8.00MB thread-reservation=1
+   tuple-ids=0 row-size=81B cardinality=6.00M
+   in pipelines: 00(GETNEXT)
+====
+# ROLLUP over exprs.
+select substr(l_shipdate, 1, 4), substr(l_shipdate, 6, 2), sum(l_quantity)
+from tpch.lineitem
+group by rollup(substr(l_shipdate, 1, 4), substr(l_shipdate, 6, 2))
+---- DISTRIBUTEDPLAN
+F02:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
+|  Per-Host Resources: mem-estimate=110.14MB mem-reservation=4.00MB thread-reservation=1
+PLAN-ROOT SINK
+|  output exprs: CASE valid_tid(1,2,3) WHEN 1 THEN substr(l_shipdate, 1, 4) WHEN 2 THEN substr(l_shipdate, 1, 4) WHEN 3 THEN NULL END, CASE valid_tid(1,2,3) WHEN 1 THEN substr(l_shipdate, 6, 2) WHEN 2 THEN NULL WHEN 3 THEN NULL END, aggif(valid_tid(1,2,3) IN (1, 2, 3), CASE valid_tid(1,2,3) WHEN 1 THEN sum(l_quantity) WHEN 2 THEN sum(l_quantity) WHEN 3 THEN sum(l_quantity) END)
+|  mem-estimate=100.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
+|
+05:EXCHANGE [UNPARTITIONED]
+|  mem-estimate=10.14MB mem-reservation=0B thread-reservation=0
+|  tuple-ids=4 row-size=44B cardinality=9.66M
+|  in pipelines: 02(GETNEXT)
+|
+F01:PLAN FRAGMENT [HASH(CASE valid_tid(1,2,3) WHEN 1 THEN murmur_hash(substr(l_shipdate, 1, 4)) WHEN 2 THEN murmur_hash(substr(l_shipdate, 1, 4)) WHEN 3 THEN murmur_hash(NULL) END,CASE valid_tid(1,2,3) WHEN 1 THEN murmur_hash(substr(l_shipdate, 6, 2)) WHEN 2 THEN murmur_hash(NULL) WHEN 3 THEN murmur_hash(NULL) END)] hosts=3 instances=3
+Per-Host Resources: mem-estimate=394.00MB mem-reservation=103.94MB thread-reservation=1
+02:AGGREGATE [FINALIZE]
+|  output: aggif(valid_tid(1,2,3) IN (CAST(1 AS INT), CAST(2 AS INT), CAST(3 AS INT)), CASE valid_tid(1,2,3) WHEN CAST(1 AS INT) THEN sum(l_quantity) WHEN CAST(2 AS INT) THEN sum(l_quantity) WHEN CAST(3 AS INT) THEN sum(l_quantity) END)
+|  group by: CASE valid_tid(1,2,3) WHEN CAST(1 AS INT) THEN substr(l_shipdate, 1, 4) WHEN CAST(2 AS INT) THEN substr(l_shipdate, 1, 4) WHEN CAST(3 AS INT) THEN NULL END, CASE valid_tid(1,2,3) WHEN CAST(1 AS INT) THEN substr(l_shipdate, 6, 2) WHEN CAST(2 AS INT) THEN NULL WHEN CAST(3 AS INT) THEN NULL END, CASE valid_tid(1,2,3) WHEN CAST(1 AS INT) THEN CAST(1 AS INT) WHEN CAST(2 AS INT) THEN CAST(2 AS INT) WHEN CAST(3 AS INT) THEN CAST(3 AS INT) END
+|  mem-estimate=128.00MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
+|  tuple-ids=4 row-size=44B cardinality=9.66M
+|  in pipelines: 02(GETNEXT), 04(OPEN)
+|
+04:AGGREGATE [FINALIZE]
+|  Class 0
+|    output: sum:merge(l_quantity)
+|    group by: substr(l_shipdate, 1, 4), substr(l_shipdate, 6, 2)
+|  Class 1
+|    output: sum:merge(l_quantity)
+|    group by: substr(l_shipdate, 1, 4), NULL
+|  Class 2
+|    output: sum:merge(l_quantity)
+|    group by: NULL, NULL
+|  mem-estimate=266.00MB mem-reservation=69.94MB thread-reservation=0
+|  tuple-ids=1N,2N,3N row-size=120B cardinality=9.66M
+|  in pipelines: 04(GETNEXT), 00(OPEN)
+|
+03:EXCHANGE [HASH(CASE valid_tid(1,2,3) WHEN 1 THEN murmur_hash(substr(l_shipdate, 1, 4)) WHEN 2 THEN murmur_hash(substr(l_shipdate, 1, 4)) WHEN 3 THEN murmur_hash(NULL) END,CASE valid_tid(1,2,3) WHEN 1 THEN murmur_hash(substr(l_shipdate, 6, 2)) WHEN 2 THEN murmur_hash(NULL) WHEN 3 THEN murmur_hash(NULL) END)]
+|  mem-estimate=10.39MB mem-reservation=0B thread-reservation=0
+|  tuple-ids=1N,2N,3N row-size=120B cardinality=9.66M
+|  in pipelines: 00(GETNEXT)
+|
+F00:PLAN FRAGMENT [RANDOM] hosts=3 instances=3
+Per-Host Resources: mem-estimate=531.55MB mem-reservation=78.00MB thread-reservation=2
+01:AGGREGATE [STREAMING]
+|  Class 0
+|    output: sum(l_quantity)
+|    group by: substr(l_shipdate, CAST(1 AS BIGINT), CAST(4 AS BIGINT)), substr(l_shipdate, CAST(6 AS BIGINT), CAST(2 AS BIGINT))
+|  Class 1
+|    input: Class 0
+|    output: sum:merge(l_quantity)
+|    group by: substr(l_shipdate, CAST(1 AS BIGINT), CAST(4 AS BIGINT)), NULL
+|  Class 2
+|    input: Class 1
+|    output: sum:merge(l_quantity)
+|    group by: NULL, NULL
+|  mem-estimate=266.00MB mem-reservation=70.00MB thread-reservation=0
+|  tuple-ids=1N,2N,3N row-size=120B cardinality=9.66M
+|  in pipelines: 00(GETNEXT)
+|
+00:SCAN HDFS [tpch.lineitem, RANDOM]
+   HDFS partitions=1/1 files=1 size=718.94MB
+   stored statistics:
+     table: rows=6.00M size=718.94MB
+     columns: all
+   extrapolated-rows=disabled max-scan-range-rows=1.07M
+   mem-estimate=264.00MB mem-reservation=8.00MB thread-reservation=1
+   tuple-ids=0 row-size=20B cardinality=4.83M
+   in pipelines: 00(GETNEXT)
+====
+# CUBE isn't chained, as its grouping sets aren't nested.
+select l_returnflag, l_linestatus, count(*) from tpch.lineitem
+group by cube(l_returnflag, l_linestatus)
+---- DISTRIBUTEDPLAN
+F02:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
+|  Per-Host Resources: mem-estimate=4.02MB mem-reservation=4.00MB thread-reservation=1
+PLAN-ROOT SINK
+|  output exprs: CASE valid_tid(1,2,3,4) WHEN 1 THEN l_returnflag WHEN 2 THEN NULL WHEN 3 THEN l_returnflag WHEN 4 THEN NULL END, CASE valid_tid(1,2,3,4) WHEN 1 THEN l_linestatus WHEN 2 THEN l_linestatus WHEN 3 THEN NULL WHEN 4 THEN NULL END, aggif(valid_tid(1,2,3,4) IN (1, 2, 3, 4), CASE valid_tid(1,2,3,4) WHEN 1 THEN count(*) WHEN 2 THEN count(*) WHEN 3 THEN count(*) WHEN 4 THEN count(*) END)
+|  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
+|
+05:EXCHANGE [UNPARTITIONED]
+|  mem-estimate=16.00KB mem-reservation=0B thread-reservation=0
+|  tuple-ids=5 row-size=36B cardinality=12
+|  in pipelines: 02(GETNEXT)
+|
+F01:PLAN FRAGMENT [HASH(CASE valid_tid(1,2,3,4) WHEN 1 THEN murmur_hash(l_returnflag) WHEN 2 THEN murmur_hash(NULL) WHEN 3 THEN murmur_hash(l_returnflag) WHEN 4 THEN murmur_hash(NULL) END,CASE valid_tid(1,2,3,4) WHEN 1 THEN murmur_hash(l_linestatus) WHEN 2 THEN murmur_hash(l_linestatus) WHEN 3 THEN murmur_hash(NULL) WHEN 4 THEN murmur_hash(NULL) END)] hosts=3 instances=3
+Per-Host Resources: mem-estimate=50.00MB mem-reservation=9.69MB thread-reservation=1
+02:AGGREGATE [FINALIZE]
+|  output: aggif(valid_tid(1,2,3,4) IN (CAST(1 AS INT), CAST(2 AS INT), CAST(3 AS INT), CAST(4 AS INT)), CASE valid_tid(1,2,3,4) WHEN CAST(1 AS INT) THEN count(*) WHEN CAST(2 AS INT) THEN count(*) WHEN CAST(3 AS INT) THEN count(*) WHEN CAST(4 AS INT) THEN count(*) END)
+|  group by: CASE valid_tid(1,2,3,4) WHEN CAST(1 AS INT) THEN l_returnflag WHEN CAST(2 AS INT) THEN NULL WHEN CAST(3 AS INT) THEN l_returnflag WHEN CAST(4 AS INT) THEN NULL END, CASE valid_tid(1,2,3,4) WHEN CAST(1 AS INT) THEN l_linestatus WHEN CAST(2 AS INT) THEN l_linestatus WHEN CAST(3 AS INT) THEN NULL WHEN CAST(4 AS INT) THEN NULL END, CASE valid_tid(1,2,3,4) WHEN CAST(1 AS INT) THEN CAST(1 AS INT) WHEN CAST(2 AS INT) THEN CAST(2 AS INT) WHEN CAST(3 AS INT) THEN CAST(3 AS INT) WHEN CAST(4 AS INT) THEN CAST(4 AS INT) END
+|  mem-estimate=10.00MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
+|  tuple-ids=5 row-size=36B cardinality=12
+|  in pipelines: 02(GETNEXT), 04(OPEN)
+|
+04:AGGREGATE [FINALIZE]
+|  Class 0
+|    output: count:merge(*)
+|    group by: l_returnflag, l_linestatus
+|  Class 1
+|    output: count:merge(*)
+|    group by: NULL, l_linestatus
+|  Class 2
+|    output: count:merge(*)
+|    group by: l_returnflag, NULL
+|  Class 3
+|    output: count:merge(*)
+|    group by: NULL, NULL
+|  mem-estimate=40.00MB mem-reservation=7.75MB thread-reservation=0
+|  tuple-ids=1N,2N,3N,4N row-size=132B cardinality=12
+|  in pipelines: 04(GETNEXT), 00(OPEN)
+|
+03:EXCHANGE [HASH(CASE valid_tid(1,2,3,4) WHEN 1 THEN murmur_hash(l_returnflag) WHEN 2 THEN murmur_hash(NULL) WHEN 3 THEN murmur_hash(l_returnflag) WHEN 4 THEN murmur_hash(NULL) END,CASE valid_tid(1,2,3,4) WHEN 1 THEN murmur_hash(l_linestatus) WHEN 2 THEN murmur_hash(l_linestatus) WHEN 3 THEN murmur_hash(NULL) WHEN 4 THEN murmur_hash(NULL) END)]
+|  mem-estimate=17.16KB mem-reservation=0B thread-reservation=0
+|  tuple-ids=1N,2N,3N,4N row-size=132B cardinality=36
+|  in pipelines: 00(GETNEXT)
+|
+F00:PLAN FRAGMENT [RANDOM] hosts=3 instances=3
+Per-Host Resources: mem-estimate=305.73MB mem-reservation=16.00MB thread-reservation=2
+01:AGGREGATE [STREAMING]
+|  Class 0
+|    output: count(*)
+|    group by: l_returnflag, l_linestatus
+|  Class 1
+|    output: count(*)
+|    group by: NULL, l_linestatus
+|  Class 2
+|    output: count(*)
+|    group by: l_returnflag, NULL
+|  Class 3
+|    output: count(*)
+|    group by: NULL, NULL
+|  mem-estimate=40.00MB mem-reservation=8.00MB thread-reservation=0
+|  tuple-ids=1N,2N,3N,4N row-size=132B cardinality=36
+|  in pipelines: 00(GETNEXT)
+|
+00:SCAN HDFS [tpch.lineitem, RANDOM]
+   HDFS partitions=1/1 files=1 size=718.94MB
+   stored statistics:
+     table: rows=6.00M size=718.94MB
+     columns: all
+   extrapolated-rows=disabled max-scan-range-rows=1.07M
+   mem-estimate=264.00MB mem-reservation=8.00MB thread-reservation=1
+   tuple-ids=0 row-size=26B cardinality=6.00M
+   in pipelines: 00(GETNEXT)
+====
+# Grouping sets that aren't nested aren't chained.
+select l_returnflag, l_linestatus, count(*) from tpch.lineitem
+group by grouping sets((l_returnflag), (l_linestatus))
+---- DISTRIBUTEDPLAN
+F02:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
+|  Per-Host Resources: mem-estimate=4.02MB mem-reservation=4.00MB thread-reservation=1
+PLAN-ROOT SINK
+|  output exprs: CASE valid_tid(1,2) WHEN 1 THEN l_returnflag WHEN 2 THEN NULL END, CASE valid_tid(1,2) WHEN 1 THEN NULL WHEN 2 THEN l_linestatus END, aggif(valid_tid(1,2) IN (1, 2), CASE valid_tid(1,2) WHEN 1 THEN count(*) WHEN 2 THEN count(*) END)
+|  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
+|
+05:EXCHANGE [UNPARTITIONED]
+|  mem-estimate=16.00KB mem-reservation=0B thread-reservation=0
+|  tuple-ids=3 row-size=36B cardinality=5
+|  in pipelines: 02(GETNEXT)
+|
+F01:PLAN FRAGMENT [HASH(CASE valid_tid(1,2) WHEN 1 THEN murmur_hash(l_returnflag) WHEN 2 THEN murmur_hash(NULL) END,CASE valid_tid(1,2) WHEN 1 THEN murmur_hash(NULL) WHEN 2 THEN murmur_hash(l_linestatus) END)] hosts=3 instances=3
+Per-Host Resources: mem-estimate=30.00MB mem-reservation=5.81MB thread-reservation=1
+02:AGGREGATE [FINALIZE]
+|  output: aggif(valid_tid(1,2) IN (CAST(1 AS INT), CAST(2 AS INT)), CASE valid_tid(1,2) WHEN CAST(1 AS INT) THEN count(*) WHEN CAST(2 AS INT) THEN count(*) END)
+|  group by: CASE valid_tid(1,2) WHEN CAST(1 AS INT) THEN l_returnflag WHEN CAST(2 AS INT) THEN NULL END, CASE valid_tid(1,2) WHEN CAST(1 AS INT) THEN NULL WHEN CAST(2 AS INT) THEN l_linestatus END, CASE valid_tid(1,2) WHEN CAST(1 AS INT) THEN CAST(1 AS INT) WHEN CAST(2 AS INT) THEN CAST(2 AS INT) END
+|  mem-estimate=10.00MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
+|  tuple-ids=3 row-size=36B cardinality=5
+|  in pipelines: 02(GETNEXT), 04(OPEN)
+|
+04:AGGREGATE [FINALIZE]
+|  Class 0
+|    output: count:merge(*)
+|    group by: l_returnflag, NULL
+|  Class 1
+|    output: count:merge(*)
+|    group by: NULL, l_linestatus
+|  mem-estimate=20.00MB mem-reservation=3.88MB thread-reservation=0
+|  tuple-ids=1N,2N row-size=66B cardinality=5
+|  in pipelines: 04(GETNEXT), 00(OPEN)
+|
+03:EXCHANGE [HASH(CASE valid_tid(1,2) WHEN 1 THEN murmur_hash(l_returnflag) WHEN 2 THEN murmur_hash(NULL) END,CASE valid_tid(1,2) WHEN 1 THEN murmur_hash(NULL) WHEN 2 THEN murmur_hash(l_linestatus) END)]
+|  mem-estimate=16.00KB mem-reservation=0B thread-reservation=0
+|  tuple-ids=1N,2N row-size=66B cardinality=15
+|  in pipelines: 00(GETNEXT)
+|
+F00:PLAN FRAGMENT [RANDOM] hosts=3 instances=3
+Per-Host Resources: mem-estimate=284.87MB mem-reservation=12.00MB thread-reservation=2
+01:AGGREGATE [STREAMING]
+|  Class 0
+|    output: count(*)
+|    group by: l_returnflag, NULL
+|  Class 1
+|    output: count(*)
+|    group by: NULL, l_linestatus
+|  mem-estimate=20.00MB mem-reservation=4.00MB thread-reservation=0
+|  tuple-ids=1N,2N row-size=66B cardinality=15
+|  in pipelines: 00(GETNEXT)
+|
+00:SCAN HDFS [tpch.lineitem, RANDOM]
+   HDFS partitions=1/1 files=1 size=718.94MB
+   stored statistics:
+     table: rows=6.00M size=718.94MB
+     columns: all
+   extrapolated-rows=disabled max-scan-range-rows=1.07M
+   mem-estimate=264.00MB mem-reservation=8.00MB thread-reservation=1
+   tuple-ids=0 row-size=26B cardinality=6.00M
+   in pipelines: 00(GETNEXT)
+====
+# Multiple count(distinct) also have multiple aggregation classes, which aren't
+# chained.
+select count(distinct l_returnflag), count(distinct l_linestatus)
+from tpch.lineitem group by l_shipmode
+---- DISTRIBUTEDPLAN
+F03:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
+|  Per-Host Resources: mem-estimate=4.02MB mem-reservation=4.00MB thread-reservation=1
+PLAN-ROOT SINK
+|  output exprs: aggif(valid_tid(2,4) = 2, count(l_returnflag)), aggif(valid_tid(2,4) = 4, count(l_linestatus))
+|  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
+|
+08:EXCHANGE [UNPARTITIONED]
+|  mem-estimate=16.00KB mem-reservation=0B thread-reservation=0
+|  tuple-ids=5 row-size=28B cardinality=8
+|  in pipelines: 03(GETNEXT)
+|
+F02:PLAN FRAGMENT [HASH(CASE valid_tid(2,4) WHEN 2 THEN murmur_hash(l_shipmode) WHEN 4 THEN murmur_hash(l_shipmode) END)] hosts=3 instances=3
+Per-Host Resources: mem-estimate=30.00MB mem-reservation=5.81MB thread-reservation=1
+03:AGGREGATE [FINALIZE]
+|  output: aggif(valid_tid(2,4) = CAST(2 AS INT), count(l_returnflag)), aggif(valid_tid(2,4) = CAST(4 AS INT), count(l_linestatus))
+|  group by: CASE valid_tid(2,4) WHEN CAST(2 AS INT) THEN l_shipmode WHEN CAST(4 AS INT) THEN l_shipmode END
+|  mem-estimate=10.00MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
+|  tuple-ids=5 row-size=28B cardinality=8
+|  in pipelines: 03(GETNEXT), 07(OPEN)
+|
+07:AGGREGATE [FINALIZE]
+|  Class 0
+|    output: count:merge(l_returnflag)
+|    group by: l_shipmode
+|  Class 1
+|    output: count:merge(l_linestatus)
+|    group by: l_shipmode
+|  mem-estimate=20.00MB mem-reservation=3.88MB thread-reservation=0
+|  tuple-ids=2N,4N row-size=49B cardinality=14
+|  in pipelines: 07(GETNEXT), 05(OPEN)
+|
+06:EXCHANGE [HASH(CASE valid_tid(2,4) WHEN 2 THEN murmur_hash(l_shipmode) WHEN 4 THEN murmur_hash(l_shipmode) END)]
+|  mem-estimate=16.00KB mem-reservation=0B thread-reservation=0
+|  tuple-ids=2N,4N row-size=49B cardinality=36
+|  in pipelines: 05(GETNEXT)
+|
+F01:PLAN FRAGMENT [HASH(CASE valid_tid(1,3) WHEN 1 THEN murmur_hash(l_shipmode) WHEN 3 THEN murmur_hash(l_shipmode) END,CASE valid_tid(1,3) WHEN 1 THEN murmur_hash(l_returnflag) WHEN 3 THEN murmur_hash(l_linestatus) END)] hosts=3 instances=3
+Per-Host Resources: mem-estimate=40.66MB mem-reservation=7.88MB thread-reservation=1
+02:AGGREGATE [STREAMING]
+|  Class 0
+|    output: count(l_returnflag)
+|    group by: l_shipmode
+|  Class 1
+|    output: count(l_linestatus)
+|    group by: l_shipmode
+|  mem-estimate=20.00MB mem-reservation=4.00MB thread-reservation=0
+|  tuple-ids=2N,4N row-size=49B cardinality=36
+|  in pipelines: 05(GETNEXT)
+|
+05:AGGREGATE
+|  Class 0
+|    group by: l_shipmode, l_returnflag
+|  Class 1
+|    group by: l_shipmode, l_linestatus
+|  mem-estimate=20.00MB mem-reservation=3.88MB thread-reservation=0
+|  tuple-ids=1N,3N row-size=59B cardinality=35
+|  in pipelines: 05(GETNEXT), 00(OPEN)
+|
+04:EXCHANGE [HASH(CASE valid_tid(1,3) WHEN 1 THEN murmur_hash(l_shipmode) WHEN 3 THEN murmur_hash(l_shipmode) END,CASE valid_tid(1,3) WHEN 1 THEN murmur_hash(l_returnflag) WHEN 3 THEN murmur_hash(l_linestatus) END)]
+|  mem-estimate=22.48KB mem-reservation=0B thread-reservation=0
+|  tuple-ids=1N,3N row-size=59B cardinality=105
+|  in pipelines: 00(GETNEXT)
+|
+F00:PLAN FRAGMENT [RANDOM] hosts=3 instances=3
+Per-Host Resources: mem-estimate=284.78MB mem-reservation=12.00MB thread-reservation=2
+01:AGGREGATE [STREAMING]
+|  Class 0
+|    group by: l_shipmode, l_returnflag
+|  Class 1
+|    group by: l_shipmode, l_linestatus
+|  mem-estimate=20.00MB mem-reservation=4.00MB thread-reservation=0
+|  tuple-ids=1N,3N row-size=59B cardinality=105
+|  in pipelines: 00(GETNEXT)
+|
+00:SCAN HDFS [tpch.lineitem, RANDOM]
+   HDFS partitions=1/1 files=1 size=718.94MB
+   stored statistics:
+     table: rows=6.00M size=718.94MB
+     columns: all
+   extrapolated-rows=disabled max-scan-range-rows=1.07M
+   mem-estimate=264.00MB mem-reservation=8.00MB thread-reservation=1
+   tuple-ids=0 row-size=42B cardinality=6.00M
+   in pipelines: 00(GETNEXT)
+====
+# Disabled by the query option.
+select l_returnflag, l_linestatus, count(*) from tpch.lineitem
+group by rollup(l_returnflag, l_linestatus)
+---- QUERYOPTIONS
+chain_grouping_sets_preagg=false
+---- DISTRIBUTEDPLAN
+F02:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
+|  Per-Host Resources: mem-estimate=4.02MB mem-reservation=4.00MB thread-reservation=1
+PLAN-ROOT SINK
+|  output exprs: CASE valid_tid(1,2,3) WHEN 1 THEN l_returnflag WHEN 2 THEN l_returnflag WHEN 3 THEN NULL END, CASE valid_tid(1,2,3) WHEN 1 THEN l_linestatus WHEN 2 THEN NULL WHEN 3 THEN NULL END, aggif(valid_tid(1,2,3) IN (1, 2, 3), CASE valid_tid(1,2,3) WHEN 1 THEN count(*) WHEN 2 THEN count(*) WHEN 3 THEN count(*) END)
+|  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
+|
+05:EXCHANGE [UNPARTITIONED]
+|  mem-estimate=16.00KB mem-reservation=0B thread-reservation=0
+|  tuple-ids=4 row-size=36B cardinality=10
+|  in pipelines: 02(GETNEXT)
+|
+F01:PLAN FRAGMENT [HASH(CASE valid_tid(1,2,3) WHEN 1 THEN murmur_hash(l_returnflag) WHEN 2 THEN murmur_hash(l_returnflag) WHEN 3 THEN murmur_hash(NULL) END,CASE valid_tid(1,2,3) WHEN 1 THEN murmur_hash(l_linestatus) WHEN 2 THEN murmur_hash(NULL) WHEN 3 THEN murmur_hash(NULL) END)] hosts=3 instances=3
+Per-Host Resources: mem-estimate=40.00MB mem-reservation=7.75MB thread-reservation=1
+02:AGGREGATE [FINALIZE]
+|  output: aggif(valid_tid(1,2,3) IN (CAST(1 AS INT), CAST(2 AS INT), CAST(3 AS INT)), CASE valid_tid(1,2,3) WHEN CAST(1 AS INT) THEN count(*) WHEN CAST(2 AS INT) THEN count(*) WHEN CAST(3 AS INT) THEN count(*) END)
+|  group by: CASE valid_tid(1,2,3) WHEN CAST(1 AS INT) THEN l_returnflag WHEN CAST(2 AS INT) THEN l_returnflag WHEN CAST(3 AS INT) THEN NULL END, CASE valid_tid(1,2,3) WHEN CAST(1 AS INT) THEN l_linestatus WHEN CAST(2 AS INT) THEN NULL WHEN CAST(3 AS INT) THEN NULL END, CASE valid_tid(1,2,3) WHEN CAST(1 AS INT) THEN CAST(1 AS INT) WHEN CAST(2 AS INT) THEN CAST(2 AS INT) WHEN CAST(3 AS INT) THEN CAST(3 AS INT) END
+|  mem-estimate=10.00MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
+|  tuple-ids=4 row-size=36B cardinality=10
+|  in pipelines: 02(GETNEXT), 04(OPEN)
+|
+04:AGGREGATE [FINALIZE]
+|  Class 0
+|    output: count:merge(*)
+|    group by: l_returnflag, l_linestatus
+|  Class 1
+|    output: count:merge(*)
+|    group by: l_returnflag, NULL
+|  Class 2
+|    output: count:merge(*)
+|    group by: NULL, NULL
+|  mem-estimate=30.00MB mem-reservation=5.81MB thread-reservation=0
+|  tuple-ids=1N,2N,3N row-size=99B cardinality=10
+|  in pipelines: 04(GETNEXT), 00(OPEN)
+|
+03:EXCHANGE [HASH(CASE valid_tid(1,2,3) WHEN 1 THEN murmur_hash(l_returnflag) WHEN 2 THEN murmur_hash(l_returnflag) WHEN 3 THEN murmur_hash(NULL) END,CASE valid_tid(1,2,3) WHEN 1 THEN murmur_hash(l_linestatus) WHEN 2 THEN murmur_hash(NULL) WHEN 3 THEN murmur_hash(NULL) END)]
+|  mem-estimate=16.00KB mem-reservation=0B thread-reservation=0
+|  tuple-ids=1N,2N,3N row-size=99B cardinality=30
+|  in pipelines: 00(GETNEXT)
+|
+F00:PLAN FRAGMENT [RANDOM] hosts=3 instances=3
+Per-Host Resources: mem-estimate=295.30MB mem-reservation=14.00MB thread-reservation=2
+01:AGGREGATE [STREAMING]
+|  Class 0
+|    output: count(*)
+|    group by: l_returnflag, l_linestatus
+|  Class 1
+|    output: count(*)
+|    group by: l_returnflag, NULL
+|  Class 2
+|    output: count(*)
+|    group by: NULL, NULL
+|  mem-estimate=30.00MB mem-reservation=6.00MB thread-reservation=0
+|  tuple-ids=1N,2N,3N row-size=99B cardinality=30
+|  in pipelines: 00(GETNEXT)
+|
+00:SCAN HDFS [tpch.lineitem, RANDOM]
+   HDFS partitions=1/1 files=1 size=718.94MB
+   stored statistics:
+     table: rows=6.00M size=718.94MB
+     columns: all
+   extrapolated-rows=disabled max-scan-range-rows=1.07M
+   mem-estimate=264.00MB mem-reservation=8.00MB thread-reservation=1
+   tuple-ids=0 row-size=26B cardinality=6.00M
+   in pipelines: 00(GETNEXT)
+====
+# No chaining without a streaming preaggregation.
+select l_returnflag, l_linestatus, count(*) from tpch.lineitem
+group by rollup(l_returnflag, l_linestatus)
+---- QUERYOPTIONS
+disable_streaming_preaggregations=true
+---- DISTRIBUTEDPLAN
+F02:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
+|  Per-Host Resources: mem-estimate=4.02MB mem-reservation=4.00MB thread-reservation=1
+PLAN-ROOT SINK
+|  output exprs: CASE valid_tid(1,2,3) WHEN 1 THEN l_returnflag WHEN 2 THEN l_returnflag WHEN 3 THEN NULL END, CASE valid_tid(1,2,3) WHEN 1 THEN l_linestatus WHEN 2 THEN NULL WHEN 3 THEN NULL END, aggif(valid_tid(1,2,3) IN (1, 2, 3), CASE valid_tid(1,2,3) WHEN 1 THEN count(*) WHEN 2 THEN count(*) WHEN 3 THEN count(*) END)
+|  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
+|
+05:EXCHANGE [UNPARTITIONED]
+|  mem-estimate=16.00KB mem-reservation=0B thread-reservation=0
+|  tuple-ids=4 row-size=36B cardinality=10
+|  in pipelines: 02(GETNEXT)
+|
+F01:PLAN FRAGMENT [HASH(CASE valid_tid(1,2,3) WHEN 1 THEN murmur_hash(l_returnflag) WHEN 2 THEN murmur_hash(l_returnflag) WHEN 3 THEN murmur_hash(NULL) END,CASE valid_tid(1,2,3) WHEN 1 THEN murmur_hash(l_linestatus) WHEN 2 THEN murmur_hash(NULL) WHEN 3 THEN murmur_hash(NULL) END)] hosts=3 instances=3
+Per-Host Resources: mem-estimate=40.00MB mem-reservation=7.75MB thread-reservation=1
+02:AGGREGATE [FINALIZE]
+|  output: aggif(valid_tid(1,2,3) IN (CAST(1 AS INT), CAST(2 AS INT), CAST(3 AS INT)), CASE valid_tid(1,2,3) WHEN CAST(1 AS INT) THEN count(*) WHEN CAST(2 AS INT) THEN count(*) WHEN CAST(3 AS INT) THEN count(*) END)
+|  group by: CASE valid_tid(1,2,3) WHEN CAST(1 AS INT) THEN l_returnflag WHEN CAST(2 AS INT) THEN l_returnflag WHEN CAST(3 AS INT) THEN NULL END, CASE valid_tid(1,2,3) WHEN CAST(1 AS INT) THEN l_linestatus WHEN CAST(2 AS INT) THEN NULL WHEN CAST(3 AS INT) THEN NULL END, CASE valid_tid(1,2,3) WHEN CAST(1 AS INT) THEN CAST(1 AS INT) WHEN CAST(2 AS INT) THEN CAST(2 AS INT) WHEN CAST(3 AS INT) THEN CAST(3 AS INT) END
+|  mem-estimate=10.00MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
+|  tuple-ids=4 row-size=36B cardinality=10
+|  in pipelines: 02(GETNEXT), 04(OPEN)
+|
+04:AGGREGATE [FINALIZE]
+|  Class 0
+|    output: count:merge(*)
+|    group by: l_returnflag, l_linestatus
+|  Class 1
+|    output: count:merge(*)
+|    group by: l_returnflag, NULL
+|  Class 2
+|    output: count:merge(*)
+|    group by: NULL, NULL
+|  mem-estimate=30.00MB mem-reservation=5.81MB thread-reservation=0
+|  tuple-ids=1N,2N,3N row-size=99B cardinality=10
+|  in pipelines: 04(GETNEXT), 01(OPEN)
+|
+03:EXCHANGE [HASH(CASE valid_tid(1,2,3) WHEN 1 THEN murmur_hash(l_returnflag) WHEN 2 THEN murmur_hash(l_returnflag) WHEN 3 THEN murmur_hash(NULL) END,CASE valid_tid(1,2,3) WHEN 1 THEN murmur_hash(l_linestatus) WHEN 2 THEN murmur_hash(NULL) WHEN 3 THEN murmur_hash(NULL) END)]
+|  mem-estimate=16.00KB mem-reservation=0B thread-reservation=0
+|  tuple-ids=1N,2N,3N row-size=99B cardinality=30
+|  in pipelines: 01(GETNEXT)
+|
+F00:PLAN FRAGMENT [RANDOM] hosts=3 instances=3
+Per-Host Resources: mem-estimate=294.00MB mem-reservation=13.81MB thread-reservation=2
+01:AGGREGATE
+|  Class 0
+|    output: count(*)
+|    group by: l_returnflag, l_linestatus
+|  Class 1
+|    output: count(*)
+|    group by: l_returnflag, NULL
+|  Class 2
+|    output: count(*)
+|    group by: NULL, NULL
+|  mem-estimate=30.00MB mem-reservation=5.81MB thread-reservation=0
+|  tuple-ids=1N,2N,3N row-size=99B cardinality=30
+|  in pipelines: 01(GETNEXT), 00(OPEN)
+|
+00:SCAN HDFS [tpch.lineitem, RANDOM]
+   HDFS partitions=1/1 files=1 size=718.94MB
+   stored statistics:
+     table: rows=6.00M size=718.94MB
+     columns: all
+   extrapolated-rows=disabled max-scan-range-rows=1.07M
+   mem-estimate=264.00MB mem-reservation=8.00MB thread-reservation=1
+   tuple-ids=0 row-size=26B cardinality=6.00M
+   in pipelines: 00(GETNEXT)
+====

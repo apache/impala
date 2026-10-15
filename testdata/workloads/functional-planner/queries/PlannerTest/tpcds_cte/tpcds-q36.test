@@ -283,10 +283,12 @@ max-parallelism=130 segment-costs=[1289219915, 1636865] cpu-comparison-result=12
 |    output: sum(tpcds_partitioned_parquet_snap.store_sales.ss_net_profit), sum(tpcds_partitioned_parquet_snap.store_sales.ss_ext_sales_price)
 |    group by: tpcds_partitioned_parquet_snap.item.i_category, tpcds_partitioned_parquet_snap.item.i_class
 |  Class 1
-|    output: sum(tpcds_partitioned_parquet_snap.store_sales.ss_net_profit), sum(tpcds_partitioned_parquet_snap.store_sales.ss_ext_sales_price)
+|    input: Class 0
+|    output: sum:merge(tpcds_partitioned_parquet_snap.store_sales.ss_net_profit), sum:merge(tpcds_partitioned_parquet_snap.store_sales.ss_ext_sales_price)
 |    group by: tpcds_partitioned_parquet_snap.item.i_category, NULL
 |  Class 2
-|    output: sum(tpcds_partitioned_parquet_snap.store_sales.ss_net_profit), sum(tpcds_partitioned_parquet_snap.store_sales.ss_ext_sales_price)
+|    input: Class 1
+|    output: sum:merge(tpcds_partitioned_parquet_snap.store_sales.ss_net_profit), sum:merge(tpcds_partitioned_parquet_snap.store_sales.ss_ext_sales_price)
 |    group by: NULL, NULL
 |  mem-estimate=30.00MB mem-reservation=6.00MB thread-reservation=0
 |  tuple-ids=8N,9N,10N row-size=188B cardinality=120.12K cost=480704004
@@ -525,10 +527,12 @@ max-parallelism=130 segment-costs=[1289219915, 1636865] cpu-comparison-result=12
 |    output: sum(tpcds_partitioned_parquet_snap.store_sales.ss_net_profit), sum(tpcds_partitioned_parquet_snap.store_sales.ss_ext_sales_price)
 |    group by: tpcds_partitioned_parquet_snap.item.i_category, tpcds_partitioned_parquet_snap.item.i_class
 |  Class 1
-|    output: sum(tpcds_partitioned_parquet_snap.store_sales.ss_net_profit), sum(tpcds_partitioned_parquet_snap.store_sales.ss_ext_sales_price)
+|    input: Class 0
+|    output: sum:merge(tpcds_partitioned_parquet_snap.store_sales.ss_net_profit), sum:merge(tpcds_partitioned_parquet_snap.store_sales.ss_ext_sales_price)
 |    group by: tpcds_partitioned_parquet_snap.item.i_category, NULL
 |  Class 2
-|    output: sum(tpcds_partitioned_parquet_snap.store_sales.ss_net_profit), sum(tpcds_partitioned_parquet_snap.store_sales.ss_ext_sales_price)
+|    input: Class 1
+|    output: sum:merge(tpcds_partitioned_parquet_snap.store_sales.ss_net_profit), sum:merge(tpcds_partitioned_parquet_snap.store_sales.ss_ext_sales_price)
 |    group by: NULL, NULL
 |  mem-estimate=30.00MB mem-reservation=6.00MB thread-reservation=0
 |  tuple-ids=8N,9N,10N row-size=188B cardinality=120.12K cost=480704004

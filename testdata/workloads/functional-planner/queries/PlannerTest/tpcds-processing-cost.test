@@ -114,19 +114,24 @@ max-parallelism=21 segment-costs=[89349287, 198453333]
 |    output: sum(CAST(ss_store_sk AS BIGINT))
 |    group by: ss_net_paid_inc_tax, ss_ext_list_price, ss_net_profit, ss_net_paid, ss_ext_sales_price
 |  Class 1
-|    output: sum(CAST(ss_store_sk AS BIGINT))
+|    input: Class 0
+|    output: sum:merge(ss_store_sk)
 |    group by: ss_net_paid_inc_tax, ss_ext_list_price, ss_net_profit, ss_net_paid, NULL
 |  Class 2
-|    output: sum(CAST(ss_store_sk AS BIGINT))
+|    input: Class 1
+|    output: sum:merge(ss_store_sk)
 |    group by: ss_net_paid_inc_tax, ss_ext_list_price, ss_net_profit, NULL, NULL
 |  Class 3
-|    output: sum(CAST(ss_store_sk AS BIGINT))
+|    input: Class 2
+|    output: sum:merge(ss_store_sk)
 |    group by: ss_net_paid_inc_tax, ss_ext_list_price, NULL, NULL, NULL
 |  Class 4
-|    output: sum(CAST(ss_store_sk AS BIGINT))
+|    input: Class 3
+|    output: sum:merge(ss_store_sk)
 |    group by: ss_net_paid_inc_tax, NULL, NULL, NULL, NULL
 |  Class 5
-|    output: sum(CAST(ss_store_sk AS BIGINT))
+|    input: Class 4
+|    output: sum:merge(ss_store_sk)
 |    group by: NULL, NULL, NULL, NULL, NULL
 |  mem-estimate=180.00MB mem-reservation=172.00MB thread-reservation=0
 |  tuple-ids=1N,2N,3N,4N,5N,6N row-size=168B cardinality=14.27M cost=88353820

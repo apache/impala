@@ -56,6 +56,10 @@ class AggregationNodeBase : public ExecNode {
   /// AggregationNodeBase::SplitMiniBatches().
   const bool replicate_input_;
 
+  /// If true, each Aggregator after the first consumes the output of the previous one.
+  /// Mutually exclusive with 'replicate_input_'.
+  const bool chain_aggregators_;
+
   /////////////////////////////////////////
   /// BEGIN: Members that must be Reset()
 

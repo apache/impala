@@ -1,0 +1,95 @@
+====
+---- QUERY
+# The streaming preaggregation chains the aggregation classes of a rollup.
+select count(*) from (
+  select l_returnflag, l_linestatus, count(*), min(l_comment)
+  from lineitem
+  group by rollup(l_returnflag, l_linestatus)) v
+---- RESULTS
+8
+---- TYPES
+BIGINT
+---- RUNTIME_PROFILE
+row_regex: .*ExecOption: .*Chained Aggregators.*
+====
+---- QUERY
+# Nested grouping sets are chained too.
+select count(*) from (
+  select l_returnflag, l_linestatus, count(*)
+  from lineitem
+  group by grouping sets((l_returnflag, l_linestatus), (l_linestatus))) v
+---- RESULTS
+6
+---- TYPES
+BIGINT
+---- RUNTIME_PROFILE
+row_regex: .*ExecOption: .*Chained Aggregators.*
+====
+---- QUERY
+# Almost unique keys make the first class pass through rows.
+select count(*) from (
+  select l_orderkey, l_linenumber, count(*), max(l_comment)
+  from lineitem
+  group by rollup(l_orderkey, l_linenumber)) v
+---- RESULTS
+7501216
+---- TYPES
+BIGINT
+---- RUNTIME_PROFILE
+row_regex: .*ExecOption: .*Chained Aggregators.*
+aggregation(SUM, RowsPassedThrough)> 0
+====
+---- QUERY
+# Disabled by the query option.
+set chain_grouping_sets_preagg=false;
+select count(*) from (
+  select l_returnflag, l_linestatus, count(*)
+  from lineitem
+  group by rollup(l_returnflag, l_linestatus)) v
+---- RESULTS
+8
+---- TYPES
+BIGINT
+---- RUNTIME_PROFILE
+!row_regex: .*Chained Aggregators.*
+====
+---- QUERY
+# CUBE isn't chained, as its grouping sets aren't nested.
+select count(*) from (
+  select l_returnflag, l_linestatus, count(*)
+  from lineitem
+  group by cube(l_returnflag, l_linestatus)) v
+---- RESULTS
+10
+---- TYPES
+BIGINT
+---- RUNTIME_PROFILE
+!row_regex: .*Chained Aggregators.*
+====
+---- QUERY
+# Grouping sets that aren't nested aren't chained.
+select count(*) from (
+  select l_returnflag, l_linestatus, count(*)
+  from lineitem
+  group by grouping sets((l_returnflag), (l_linestatus))) v
+---- RESULTS
+5
+---- TYPES
+BIGINT
+---- RUNTIME_PROFILE
+!row_regex: .*Chained Aggregators.*
+====
+---- QUERY
+# A single node plan has no preaggregation to chain.
+set num_nodes=1;
+select count(*) from (
+  select l_returnflag, l_linestatus, count(*)
+  from lineitem
+  group by rollup(l_returnflag, l_linestatus)) v
+---- RESULTS
+8
+---- TYPES
+BIGINT
+---- RUNTIME_PROFILE
+!row_regex: .*Chained Aggregators.*
+====
