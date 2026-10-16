@@ -26,7 +26,8 @@ from tests.common.custom_cluster_test_suite import CustomClusterTestSuite, HIVE_
 from tests.common.iceberg_rest_server import IcebergRestServer
 from tests.common.iceberg_rest_test_tables import (
     DELETE_PARTITIONED_TEST_TABLES, DELETE_TEST_TABLES, INSERT_TEST_TABLE,
-    PARTITIONED_INSERT_TEST_TABLE, UPDATE_PARTITIONS_TEST_TABLES, UPDATE_TEST_TABLES,
+    MERGE_PARTITION_SORT_TEST_TABLES, MERGE_TEST_TABLES, PARTITIONED_INSERT_TEST_TABLE,
+    UPDATE_PARTITIONS_TEST_TABLES, UPDATE_TEST_TABLES,
     create_table_request)
 from tests.common.impala_connection import IMPALA_CONNECTION_EXCEPTION
 from tests.util.filesystem_utils import get_fs_path
@@ -56,6 +57,7 @@ WRITE_TEST_CATALOG_LOCATION = IcebergRestServer.DEFAULT_CATALOG_LOCATION
 SECONDARY_WRITE_TEST_CATALOG_LOCATION = \
     '/test-warehouse/iceberg_test/secondary_hadoop_catalog'
 UPDATE_TEST_NS = "impala_rest_update_test"
+MERGE_TEST_NS = "impala_rest_merge_test"
 
 
 def RestServerProperties(*server_configs):
@@ -203,6 +205,14 @@ class TestIcebergRestCatalogWithHms(IcebergRestCatalogTests):
     result = self.execute_query_expect_success(
         self.client, "select i from {}".format(WRITE_TEST_TABLE))
     assert result.data == ['1']
+    # MERGE into the REST table using an HMS table as the source.
+    self.execute_query_expect_success(self.client,
+        "merge into {} t using (select id from functional.alltypestiny where id < 3) s "
+        "on t.i = s.id when matched then delete "
+        "when not matched then insert values (s.id)".format(WRITE_TEST_TABLE))
+    result = self.execute_query_expect_success(
+        self.client, "select i from {} order by i".format(WRITE_TEST_TABLE))
+    assert result.data == ['0', '2']
 
   @RestServerProperties(
     {'port': 9084},
@@ -303,15 +313,12 @@ class TestIcebergRestCatalogDmlStandalone(IcebergRestCatalogTests):
 
     unsupported_statements = [
         "truncate table {}".format(table_name),
-        "merge into {0} target using (select 1 i) source "
-        "on target.i = source.i when matched then update set i = 2".format(
-            table_name),
         "optimize table {}".format(table_name),
     ]
     for statement in unsupported_statements:
       error = self.execute_query_expect_failure(self.client, statement)
-      assert ("AnalysisException: Only INSERT INTO, INSERT OVERWRITE, UPDATE and "
-              "DELETE are supported") in str(error)
+      assert ("AnalysisException: Only INSERT INTO, INSERT OVERWRITE, UPDATE, DELETE "
+              "and MERGE are supported") in str(error)
 
   @RestServerProperties(
       {'port': 9084, 'catalog_location': WRITE_TEST_CATALOG_LOCATION,
@@ -449,6 +456,74 @@ class TestIcebergRestCatalogDmlStandalone(IcebergRestCatalogTests):
 
   @RestServerProperties(
       {'port': 9084, 'catalog_location': WRITE_TEST_CATALOG_LOCATION,
+       'test_tables': (MERGE_TEST_NS, MERGE_TEST_TABLES)})
+  @CustomClusterTestSuite.with_args(
+     impalad_args=REST_STANDALONE_IMPALAD_ARGS,
+     start_args=NO_CATALOGD_STARTARGS,
+     cluster_size=1)
+  @pytest.mark.execute_serially
+  def test_rest_catalog_merge(self, vector):
+    """Test MERGE on Iceberg REST catalog tables."""
+    ns = MERGE_TEST_NS
+    self.run_test_case('QueryTest/iceberg-rest-merge', vector, use_db=ns)
+
+    table_name = "{}.s14_target".format(ns)
+    data_path = get_fs_path(
+        "/test-warehouse/iceberg_test/hadoop_catalog/"
+        "{}/s14_target/data".format(ns))
+    filesystem_client = HadoopFsCommandLineClient()
+    # Writes both a data file and a deletion vector.
+    merge = ("merge into {} t using (values (2 id, 'fail' val), (4, 'new')) s "
+             "on t.id = s.id when matched then update set val = s.val "
+             "when not matched then insert values (s.id, s.val)").format(table_name)
+    select = "select * from {} order by id".format(table_name)
+
+    # State left behind by the last s14_target section of iceberg-rest-merge.test.
+    expected_rows = ['1\tone', '2\tagain', '3\tagain']
+    committed_files = set(filesystem_client.ls(data_path))
+    unknown_state = {'debug_action':
+        'ICEBERG_COMMIT:EXCEPTION@CommitStateUnknownException@'
+        'simulated REST commit state unknown'}
+    error = self.execute_query_expect_failure(
+        self.client, merge, query_options=unknown_state)
+    assert "simulated REST commit state unknown" in str(error)
+
+    result = self.execute_query_expect_success(self.client, select)
+    assert result.data == expected_rows
+    # Files are kept when the commit state is unknown.
+    orphan_files = set(filesystem_client.ls(data_path)) - committed_files
+    assert len(orphan_files) > 0
+    for orphan_file in orphan_files:
+      assert filesystem_client.delete_file_dir(data_path + "/" + orphan_file)
+
+    commit_failure = {'debug_action':
+        'ICEBERG_COMMIT:EXCEPTION@CommitFailedException@'
+        'simulated REST commit failure'}
+    error = self.execute_query_expect_failure(
+        self.client, merge, query_options=commit_failure)
+    assert "simulated REST commit failure" in str(error)
+
+    result = self.execute_query_expect_success(self.client, select)
+    assert result.data == expected_rows
+    # Files written by a failed commit are cleaned up.
+    assert set(filesystem_client.ls(data_path)) == committed_files
+
+  @RestServerProperties(
+      {'port': 9084, 'catalog_location': WRITE_TEST_CATALOG_LOCATION,
+       'test_tables': (MERGE_TEST_NS, MERGE_PARTITION_SORT_TEST_TABLES)})
+  @CustomClusterTestSuite.with_args(
+     impalad_args=REST_STANDALONE_IMPALAD_ARGS,
+     start_args=NO_CATALOGD_STARTARGS,
+     cluster_size=1)
+  @pytest.mark.execute_serially
+  def test_rest_catalog_merge_partition_sort(self, vector):
+    """Test MERGE on partitioned and sorted Iceberg REST catalog tables
+    (format-version 2)."""
+    self.run_test_case(
+        'QueryTest/iceberg-rest-merge-partition-sort', vector, use_db=MERGE_TEST_NS)
+
+  @RestServerProperties(
+      {'port': 9084, 'catalog_location': WRITE_TEST_CATALOG_LOCATION,
        'test_table': WRITE_TEST_TABLE},
       {'port': 9085,
        'catalog_location': SECONDARY_WRITE_TEST_CATALOG_LOCATION,
@@ -458,7 +533,7 @@ class TestIcebergRestCatalogDmlStandalone(IcebergRestCatalogTests):
      start_args=NO_CATALOGD_STARTARGS,
      cluster_size=1)
   @pytest.mark.execute_serially
-  def test_multiple_rest_catalogs_route_insert(self):
+  def test_multiple_rest_catalogs_route_dml(self):
     self.execute_query_expect_success(
         self.client, "insert into {} values (1)".format(WRITE_TEST_TABLE))
     result = self.execute_query_expect_success(
@@ -472,6 +547,20 @@ class TestIcebergRestCatalogDmlStandalone(IcebergRestCatalogTests):
     assert result.data == ['2']
     assert self._snapshot_count(WRITE_TEST_TABLE) == 1
     assert self._snapshot_count(SECONDARY_WRITE_TEST_TABLE) == 1
+
+    # A MERGE whose source is in another REST catalog commits only to the target's.
+    # It deletes the matched row 1 and inserts the unmatched row 2.
+    self.execute_query_expect_success(
+        self.client, "insert into {} values (1)".format(SECONDARY_WRITE_TEST_TABLE))
+    self.execute_query_expect_success(self.client,
+        "merge into {} t using {} s on t.i = s.i when matched then delete "
+        "when not matched then insert values (s.i)".format(
+            WRITE_TEST_TABLE, SECONDARY_WRITE_TEST_TABLE))
+    result = self.execute_query_expect_success(
+        self.client, "select i from {}".format(WRITE_TEST_TABLE))
+    assert result.data == ['2']
+    assert self._snapshot_count(WRITE_TEST_TABLE) == 2
+    assert self._snapshot_count(SECONDARY_WRITE_TEST_TABLE) == 2
 
   @RestServerProperties(
       {'port': 9084, 'catalog_location': WRITE_TEST_CATALOG_LOCATION,

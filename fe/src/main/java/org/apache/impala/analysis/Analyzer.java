@@ -208,7 +208,7 @@ public class Analyzer {
   private static final String TABLE_NOT_SUPPORTED =
       "%s not supported. Table %s  access type is: %s";
   private static final String REST_TABLE_WRITE_NOT_SUPPORTED =
-      "Only INSERT INTO, INSERT OVERWRITE, UPDATE and DELETE are supported for " +
+      "Only INSERT INTO, INSERT OVERWRITE, UPDATE, DELETE and MERGE are supported for " +
       "REST-backed Iceberg table: %s";
   private static final String REST_TABLE_UUID_UNAVAILABLE =
       "DML is disabled because the Iceberg table UUID is unavailable: %s";
@@ -418,8 +418,8 @@ public class Analyzer {
 
   /**
    * Check whether a table supports this write operation. 'isRestDmlSupported' is true
-   * for INSERT INTO, INSERT OVERWRITE, UPDATE and DELETE, and false for every other
-   * write, UPSERT included.
+   * for every DML operation supported on REST-backed tables, and false for every
+   * other write.
    */
   static void ensureTableWriteSupported(FeTable table,
       boolean isRestDmlSupported) throws AnalysisException {

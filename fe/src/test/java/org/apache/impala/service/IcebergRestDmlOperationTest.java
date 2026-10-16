@@ -76,8 +76,17 @@ public class IcebergRestDmlOperationTest {
   }
 
   @Test
-  public void testRestFinalizerRejectsMerge() {
-    assertRejected(restOperation(TIcebergOperation.MERGE), UNSUPPORTED_OPERATION);
+  public void testRestFinalizerAcceptsMerge() throws Exception {
+    TIcebergOperationParam operation = restOperation(TIcebergOperation.MERGE);
+    IcebergDmlFinalizer.validateRestDmlOperation(operation);
+
+    operation.unsetTable_uuid();
+    assertRejected(operation, MISSING_UUID);
+  }
+
+  @Test
+  public void testRestFinalizerRejectsOptimize() {
+    assertRejected(restOperation(TIcebergOperation.OPTIMIZE), UNSUPPORTED_OPERATION);
   }
 
   @Test

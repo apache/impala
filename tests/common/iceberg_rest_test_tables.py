@@ -174,3 +174,59 @@ DELETE_PARTITIONED_TEST_TABLES.update(_v3({
         'fields': _cols(('bi', 'long'), ('year', 'int')),
         'partition': [_rest_part(2, 1000, 'year', 'identity')]},
 }))
+
+
+_MERGE_ALLTYPES = _cols(
+    ('id', 'int'), ('bool_col', 'boolean'), ('int_col', 'int'), ('float_col', 'float'),
+    ('decimal_col', 'decimal(20, 0)'), ('date_col', 'date'), ('string_col', 'string'))
+
+# Mirrors the CREATE TABLE statements of iceberg-v3-merge.test.
+MERGE_TEST_TABLES = _v3(dict(
+    (name, {'fields': _cols(('id', 'int'), ('val', 'string'))}) for name in (
+        's1_target', 's1_source', 's2_target', 's2_source', 's4_target', 's4_source',
+        's5_target', 's5_source', 's8_target', 's8_source', 's9_target', 's9_source',
+        's10_target', 's10_source', 's11_target', 's11_source', 's13_target',
+        's14_target', 's14_source', 's15_target', 's15_source', 's20_target',
+        's20_source')))
+MERGE_TEST_TABLES.update(_v3(dict(
+    (name, {'fields': _cols(('id', 'int'), ('cat', 'string'), ('val', 'int')),
+            'partition': [_rest_part(2, 1000, 'cat', 'identity')]})
+    for name in ('s3_target', 's6_target', 's21_target'))))
+MERGE_TEST_TABLES.update(_v3(dict(
+    (name, {'fields': _cols(('id', 'int'), ('cat', 'string'), ('val', 'int'))})
+    for name in ('s3_source', 's6_source', 's12_source', 's21_source'))))
+MERGE_TEST_TABLES.update(_v3({
+    's7_target': {'fields': _cols(('id', 'int'), ('val', 'string'), ('score', 'int'))},
+    's7_source': {'fields': _cols(('id', 'int'), ('val', 'string'), ('score', 'int'))},
+    's12_target': {
+        'fields': _cols(('id', 'int'), ('cat', 'string'), ('val', 'int')),
+        'partition': [_rest_part(2, 1000, 'cat', 'identity'),
+                      _rest_part(1, 1001, 'id_bucket', 'bucket[4]')]},
+    's17_target': {
+        'fields': _cols(('i', 'int'), ('s', 'string')),
+        'partition': [_rest_part(1, 1000, 'i', 'identity')]},
+    's17_source': {'fields': _cols(('i', 'int'), ('s', 'string'))},
+    's18_target': {
+        'fields': _cols(('i', 'int'), ('s', 'string')),
+        'partition': [_rest_part(2, 1000, 's_trunc', 'truncate[1]')]},
+    's18_source': {'fields': _cols(('i', 'int'), ('s', 'string'))},
+    's23': {'fields': _cols(('s', 'string'))},
+    'source': {'fields': _MERGE_ALLTYPES},
+    'target_part': {
+        'fields': _MERGE_ALLTYPES,
+        'partition': [_rest_part(2, 1000, 'bool_col', 'identity')]},
+}))
+
+
+# Mirrors the CREATE TABLE statements of iceberg-merge-partition-sort.test.
+MERGE_PARTITION_SORT_TEST_TABLES = {
+    'source': {'fields': _MERGE_ALLTYPES, 'properties': {'format-version': '2'}},
+    'target_part_sort': {
+        'fields': _MERGE_ALLTYPES,
+        'partition': [_rest_part(3, 1000, 'int_col_bucket', 'bucket[5]'),
+                      _rest_part(5, 1001, 'decimal_col_trunc', 'truncate[3]'),
+                      _rest_part(6, 1002, 'date_col_year', 'year'),
+                      _rest_part(7, 1003, 'string_col_trunc', 'truncate[3]')],
+        'properties': {'format-version': '2', 'sort.columns': 'int_col',
+                       'sort.order': 'LEXICAL'}},
+}

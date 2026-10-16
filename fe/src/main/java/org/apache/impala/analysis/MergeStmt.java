@@ -76,7 +76,7 @@ public class MergeStmt extends DmlStatementBase {
     targetTableRef_ = analyzer.resolveTableRef(targetTableRef_);
 
     table_ = targetTableRef_.getTable();
-    Analyzer.checkTableCapability(table_, Analyzer.OperationType.WRITE);
+    Analyzer.ensureTableWriteSupported(table_, true);
 
     if (impl_ == null) {
       if (table_ instanceof FeIcebergTable) {
