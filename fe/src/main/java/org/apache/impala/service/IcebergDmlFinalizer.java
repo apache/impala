@@ -39,7 +39,8 @@ final class IcebergDmlFinalizer {
   private static final Logger LOG = LoggerFactory.getLogger(IcebergDmlFinalizer.class);
 
   private static final EnumSet<TIcebergOperation> SUPPORTED_REST_OPS =
-      EnumSet.of(TIcebergOperation.INSERT, TIcebergOperation.UPDATE);
+      EnumSet.of(TIcebergOperation.INSERT, TIcebergOperation.UPDATE,
+          TIcebergOperation.DELETE);
 
   @FunctionalInterface
   interface PostOperationHook {
@@ -84,13 +85,12 @@ final class IcebergDmlFinalizer {
   private static FeIcebergTable validateRestTargetTable(
       TIcebergDmlFinalizeRequest request, FeTable table)
       throws ImpalaRuntimeException {
-    if (!(table instanceof FeIcebergTable)) {
+    if (!(table instanceof FeIcebergTable iceTbl)) {
       throw new ImpalaRuntimeException(String.format(
           "DML finalization target is not an Iceberg table: %s.%s",
           request.getDb_name(), request.getTarget_table()));
     }
 
-    FeIcebergTable iceTbl = (FeIcebergTable)table;
     if (!request.getRest_catalog_name().equals(iceTbl.getIcebergDmlCatalogName())) {
       throw new ImpalaRuntimeException(String.format(
           "REST catalog changed for table %s.%s",

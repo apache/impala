@@ -32,6 +32,10 @@ def _rest_part(source_id, field_id, name, transform):
           'transform': transform}
 
 
+def _cols(*cols):
+  return [_rest_col(i + 1, name, col_type) for i, (name, col_type) in enumerate(cols)]
+
+
 def _v3(tables):
   return dict((name, dict(table, properties=dict(
       table.get('properties', {}), **{'format-version': '3'})))
@@ -129,3 +133,44 @@ UPDATE_PARTITIONS_TEST_TABLES = _v3({
                       _rest_part(4, 1003, 'dec_8_0_trunc', 'truncate[20]'),
                       _rest_part(5, 1004, 'dec_10_2_trunc', 'truncate[50]')]},
 })
+
+
+# Mirrors the CREATE TABLE statements of iceberg-v3-delete.test.
+DELETE_TEST_TABLES = _v3({
+    'ice_v3_dv': {'fields': _cols(('i', 'int'), ('s', 'string'))},
+    'ice_v3_dv_where': {'fields': _cols(('id', 'int'), ('cat', 'string'),
+                                        ('val', 'int'))},
+    'ice_v3_dv_sub': {'fields': _cols(('id', 'int'), ('value', 'int'))},
+    'ice_v3_dv_join1': {'fields': _cols(('id', 'int'), ('name', 'string'))},
+    'ice_v3_dv_join2': {'fields': _cols(('id', 'int'), ('detail', 'string'))},
+    'ice_v3_dv_agg': {'fields': _cols(('cat', 'string'), ('val', 'int'))},
+    'ice_v3_dv_pos': {'fields': _cols(('id', 'int'), ('string_data', 'string'))},
+    'ice_v3_dv_merge': {'fields': _cols(('id', 'int'))},
+    'ice_v3_dv_null': {'fields': _cols(('id', 'int'), ('nullable', 'string'))},
+    'ice_v3_dv_like': {'fields': _cols(('id', 'int'), ('text', 'string'))},
+    'ice_v3_dv_noop': {'fields': _cols(('id', 'int'))},
+    'ice_v3_dv_empty': {'fields': _cols(('id', 'int'))},
+    'ice_v3_dv_order': {'fields': _cols(('id', 'int'), ('score', 'int'))},
+    'ice_v3_dv_distinct': {'fields': _cols(('cat', 'string'), ('val', 'int'))},
+    'ice_v3_dv_seq': {'fields': _cols(('id', 'int'), ('batch', 'int'))},
+    'ice_v3_dv_large': {'fields': _cols(('id', 'long'))},
+    'ice_delete': {'fields': _cols(('i', 'int'), ('s', 'string'))},
+    'delete_all': {'fields': _cols(('s', 'string'))},
+})
+
+
+# Mirrors the CREATE TABLE statements of iceberg-v3-delete-partitioned.test.
+DELETE_PARTITIONED_TEST_TABLES = dict(
+    (name, UPDATE_PARTITIONS_TEST_TABLES[name]) for name in (
+        'id_part', 'trunc_part', 'date_year_part', 'date_month_part', 'date_day_part',
+        'ts_year_part', 'ts_month_part', 'ts_day_part', 'ts_hour_part',
+        'numeric_truncate'))
+DELETE_PARTITIONED_TEST_TABLES.update(_v3({
+    'multi_part': {
+        'fields': _cols(('i', 'int'), ('s', 'string'), ('f', 'double')),
+        'partition': [_rest_part(1, 1000, 'i_bucket', 'bucket[3]'),
+                      _rest_part(2, 1001, 's_trunc', 'truncate[1]')]},
+    'ice_invalid_deletes': {
+        'fields': _cols(('bi', 'long'), ('year', 'int')),
+        'partition': [_rest_part(2, 1000, 'year', 'identity')]},
+}))

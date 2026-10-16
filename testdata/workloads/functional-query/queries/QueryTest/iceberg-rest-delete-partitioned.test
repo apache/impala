@@ -1,0 +1,286 @@
+====
+---- QUERY
+# Adapted from iceberg-v3-delete-partitioned.test for REST catalog.
+# Tables are pre-created via the REST API; DDL tests (CREATE TABLE, CTAS,
+# ALTER TABLE, partition evolution) and tests loading HMS tables are omitted.
+# ice_invalid_deletes generates the rows iceberg-v3-delete-partitioned.test reads
+# from functional.alltypes, since a REST-only cluster cannot read HMS tables.
+# TODO: Remove this file and run iceberg-v3-delete-partitioned.test against the REST
+# catalog once CREATE TABLE, CTAS and ALTER TABLE are supported for REST catalog tables.
+# Delete from empty table is no-op.
+DELETE FROM id_part where i = 1;
+SELECT * FROM id_part;
+---- RESULTS
+---- TYPES
+INT,STRING
+====
+---- QUERY
+SHOW FILES IN id_part;
+---- RESULTS
+---- TYPES
+STRING, STRING, STRING, STRING
+====
+---- QUERY
+INSERT INTO id_part VALUES(1, 'one'), (2, 'two'), (3, 'three');
+DELETE FROM id_part WHERE i = 2;
+SELECT * FROM id_part;
+---- RESULTS
+1,'one'
+3,'three'
+---- TYPES
+INT,STRING
+====
+---- QUERY
+INSERT INTO id_part VALUES(4, 'four'), (5, 'five'), (6, 'six');
+DELETE FROM id_part WHERE i % 2 = 0;
+SELECT * FROM id_part;
+---- RESULTS
+1,'one'
+3,'three'
+5,'five'
+---- TYPES
+INT,STRING
+====
+---- QUERY
+DELETE FROM id_part WHERE strleft(s, 1) = 'o';
+SELECT * FROM id_part;
+---- RESULTS
+5,'five'
+3,'three'
+---- TYPES
+INT,STRING
+====
+---- QUERY
+DELETE FROM id_part WHERE i > 0;
+SELECT * FROM id_part;
+---- RESULTS
+---- TYPES
+INT,STRING
+====
+---- QUERY
+INSERT INTO id_part VALUES (null, 'null');
+SELECT * FROM id_part;
+---- RESULTS
+NULL,'null'
+---- TYPES
+INT,STRING
+====
+---- QUERY
+DELETE FROM id_part where s = 'null';
+SELECT * FROM id_part;
+---- RESULTS
+---- TYPES
+INT,STRING
+====
+---- QUERY
+# Delete from empty table is no-op.
+DELETE FROM trunc_part where i = 1;
+SELECT * FROM trunc_part;
+---- RESULTS
+---- TYPES
+INT,STRING
+====
+---- QUERY
+INSERT INTO trunc_part VALUES(1, 'one'), (2, 'two'), (3, 'three');
+DELETE FROM trunc_part WHERE s like 't%';
+SELECT * FROM trunc_part;
+---- RESULTS
+1,'one'
+---- TYPES
+INT,STRING
+====
+---- QUERY
+INSERT INTO trunc_part VALUES(4, 'four'), (5, 'five'), (6, 'six');
+DELETE FROM trunc_part WHERE i % 2 = 0;
+SELECT * FROM trunc_part;
+---- RESULTS
+1,'one'
+5,'five'
+---- TYPES
+INT,STRING
+====
+---- QUERY
+DELETE FROM trunc_part WHERE i > 0;
+SELECT * FROM trunc_part;
+---- RESULTS
+---- TYPES
+INT,STRING
+====
+---- QUERY
+INSERT INTO trunc_part VALUES (0, null);
+SELECT * FROM trunc_part;
+---- RESULTS
+0,'NULL'
+---- TYPES
+INT,STRING
+====
+---- QUERY
+DELETE FROM trunc_part where s is null;
+SELECT * FROM trunc_part;
+---- RESULTS
+---- TYPES
+INT,STRING
+====
+---- QUERY
+# Delete from empty table is no-op.
+DELETE FROM multi_part where i = 1;
+SELECT * FROM multi_part;
+---- RESULTS
+---- TYPES
+INT,STRING,DOUBLE
+====
+---- QUERY
+INSERT INTO multi_part VALUES(1, 'one', 1.1), (2, 'two', 2.2), (3, 'three', 3.33);
+DELETE FROM multi_part
+WHERE i != (select min(i) from multi_part) and
+      i != (select max(i) from multi_part);
+SELECT * FROM multi_part;
+---- RESULTS
+1,'one',1.1
+3,'three',3.33
+---- TYPES
+INT,STRING,DOUBLE
+====
+---- QUERY
+INSERT INTO multi_part VALUES(4, 'four', 4.4), (5, 'five', 5.5), (6, 'six', 6.6);
+DELETE FROM multi_part WHERE i % 2 = 0;
+SELECT * FROM multi_part;
+---- RESULTS
+1,'one',1.1
+3,'three',3.33
+5,'five',5.5
+---- TYPES
+INT,STRING,DOUBLE
+====
+---- QUERY
+DELETE FROM multi_part WHERE i > 0;
+SELECT * FROM multi_part;
+---- RESULTS
+---- TYPES
+INT,STRING,DOUBLE
+====
+---- QUERY
+INSERT INTO multi_part VALUES (null, 'null',0.0);
+SELECT * FROM multi_part;
+---- RESULTS
+NULL,'null',0.0
+---- TYPES
+INT,STRING,DOUBLE
+====
+---- QUERY
+DELETE FROM multi_part where s = 'null';
+SELECT * FROM multi_part;
+---- RESULTS
+---- TYPES
+INT,STRING,DOUBLE
+====
+---- QUERY
+insert into date_year_part values (1, '1968-01-01 01:02:03'),
+  (2, '1969-12-31 23:59:00'), (3, '1970-01-01 00:00:00'),
+  (4, '2023-11-15 15:31:00');
+====
+---- QUERY
+delete from date_year_part where i > 0;
+select * from date_year_part;
+---- RESULTS
+---- TYPES
+INT, DATE
+====
+---- QUERY
+insert into date_month_part values (1, '1968-01-01'),
+  (2, '1969-12-31'), (3, '1970-01-01'), (4, '2023-11-15');
+delete from date_month_part where i > 0;
+select * from date_month_part;
+---- RESULTS
+---- TYPES
+INT, DATE
+====
+---- QUERY
+insert into date_day_part values (1, '1968-01-01'),
+  (2, '1969-12-31'), (3, '1970-01-01'), (4, '2023-11-15');
+delete from date_day_part where i > 0;
+select * from date_day_part;
+---- RESULTS
+---- TYPES
+INT, DATE
+====
+---- QUERY
+insert into ts_year_part values (1, '1968-01-01'),
+  (2, '1969-12-31'), (3, '1970-01-01'), (4, '2023-11-15');
+delete from ts_year_part where i > 0;
+select * from ts_year_part;
+---- RESULTS
+---- TYPES
+INT, TIMESTAMP
+====
+---- QUERY
+insert into ts_month_part values (1, '1968-01-01 01:02:03'),
+  (2, '1969-12-31 23:59:00'), (3, '1970-01-01 00:00:00'),
+  (4, '2023-11-15 15:31:00');
+delete from ts_month_part where i > 0;
+select * from ts_month_part;
+---- RESULTS
+---- TYPES
+INT, TIMESTAMP
+====
+---- QUERY
+insert into ts_day_part values (1, '1968-01-01 01:02:03'),
+  (2, '1969-12-31 23:59:00'), (3, '1970-01-01 00:00:00'),
+  (4, '2023-11-15 15:31:00');
+delete from ts_day_part where i > 0;
+select * from ts_day_part;
+---- RESULTS
+---- TYPES
+INT, TIMESTAMP
+====
+---- QUERY
+insert into ts_hour_part values (1, '1968-01-01 01:02:03'),
+  (2, '1969-12-31 23:59:00'), (3, '1970-01-01 00:00:00'),
+  (4, '2023-11-15 15:31:00');
+delete from ts_hour_part where i > 0;
+select * from ts_hour_part;
+---- RESULTS
+---- TYPES
+INT, TIMESTAMP
+====
+---- QUERY
+insert into numeric_truncate values (1, 12, 1222, 135, 20.75);
+delete from numeric_truncate where id = 1;
+---- DML_RESULTS: numeric_truncate
+---- TYPES
+INT,INT,BIGINT,DECIMAL,DECIMAL
+====
+---- QUERY
+# Create table to test IMPALA-13768. It will have multiple partitions, with
+# multiple data files in each partition, where min/max ranges of column 'bi'
+# is disjunct for data files (in same partition).
+# Generates the rows of 'select bigint_col, year from functional.alltypes
+# where month = 10': for each year, 31 rows of each bigint_col value 0, 10, ..., 90.
+insert into ice_invalid_deletes
+    select cast(b.d * 10 as bigint), y.year
+    from (values (2009 year), (2010)) y,
+         (values (0 d), (1), (2), (3), (4), (5), (6), (7), (8), (9)) b,
+         (values (0 n), (1), (2), (3), (4), (5), (6), (7), (8), (9), (10), (11), (12),
+             (13), (14), (15), (16), (17), (18), (19), (20), (21), (22), (23), (24),
+             (25), (26), (27), (28), (29), (30)) r;
+with v as (select max(bi) as max_bi from ice_invalid_deletes)
+insert into ice_invalid_deletes select bi + v.max_bi, year from v, ice_invalid_deletes;
+delete from ice_invalid_deletes where bi % 11 = 0;
+====
+---- QUERY
+# Scan single data file (single channel in EXCHANGE sender) with delete file
+# that have references to other data files.
+select count(*) from ice_invalid_deletes where year=2010 and bi = 180;
+---- RESULTS
+31
+---- TYPES
+BIGINT
+====
+---- QUERY
+# Scan single data file per partition with delete files that reference other data files.
+select count(*) from ice_invalid_deletes where year>2000 and bi = 180;
+---- RESULTS
+62
+---- TYPES
+BIGINT
+====

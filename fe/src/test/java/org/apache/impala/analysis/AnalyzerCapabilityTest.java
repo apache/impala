@@ -34,7 +34,7 @@ import org.junit.Test;
 
 public class AnalyzerCapabilityTest {
   private static final String WRITE_NOT_SUPPORTED =
-      "Only INSERT INTO, INSERT OVERWRITE and UPDATE are supported";
+      "Only INSERT INTO, INSERT OVERWRITE, UPDATE and DELETE are supported";
 
   @Test
   public void testInsertCapabilityOnlyBypassesHmsAccessType() throws Exception {

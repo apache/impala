@@ -19,8 +19,8 @@ package org.apache.impala.service;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
-import static org.junit.Assert.fail;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -34,29 +34,50 @@ import org.apache.impala.thrift.TIcebergOperationParam;
 import org.junit.Test;
 
 public class IcebergRestDmlOperationTest {
+  private static final String MISSING_UUID = "Missing Iceberg table UUID";
+  private static final String UNSUPPORTED_OPERATION =
+      "Unsupported operation for the Iceberg REST finalizer";
+
   @Test
-  public void testStandaloneFinalizerAcceptsInsertAndUpdate()
-      throws Exception {
-    TIcebergOperationParam operation = new TIcebergOperationParam();
-    operation.setOperation(TIcebergOperation.INSERT);
-    operation.setIs_overwrite(false);
-    assertMissingUuid(operation);
-    operation.setTable_uuid(UUID.randomUUID().toString());
+  public void testRestFinalizerAcceptsInsert() throws Exception {
+    TIcebergOperationParam operation = restOperation(TIcebergOperation.INSERT);
     IcebergDmlFinalizer.validateRestDmlOperation(operation);
 
+    operation.unsetTable_uuid();
+    assertRejected(operation, MISSING_UUID);
+  }
+
+  @Test
+  public void testRestFinalizerAcceptsInsertOverwrite() throws Exception {
+    TIcebergOperationParam operation = restOperation(TIcebergOperation.INSERT);
     operation.setIs_overwrite(true);
     IcebergDmlFinalizer.validateRestDmlOperation(operation);
-    operation.unsetTable_uuid();
-    assertMissingUuid(operation);
 
-    operation.setTable_uuid(UUID.randomUUID().toString());
-    operation.setIs_overwrite(false);
-    operation.setOperation(TIcebergOperation.UPDATE);
+    operation.unsetTable_uuid();
+    assertRejected(operation, MISSING_UUID);
+  }
+
+  @Test
+  public void testRestFinalizerAcceptsUpdate() throws Exception {
+    TIcebergOperationParam operation = restOperation(TIcebergOperation.UPDATE);
     IcebergDmlFinalizer.validateRestDmlOperation(operation);
 
-    operation.setOperation(TIcebergOperation.DELETE);
-    assertUnsupported(operation,
-        "Unsupported operation for the Iceberg REST finalizer");
+    operation.unsetTable_uuid();
+    assertRejected(operation, MISSING_UUID);
+  }
+
+  @Test
+  public void testRestFinalizerAcceptsDelete() throws Exception {
+    TIcebergOperationParam operation = restOperation(TIcebergOperation.DELETE);
+    IcebergDmlFinalizer.validateRestDmlOperation(operation);
+
+    operation.unsetTable_uuid();
+    assertRejected(operation, MISSING_UUID);
+  }
+
+  @Test
+  public void testRestFinalizerRejectsMerge() {
+    assertRejected(restOperation(TIcebergOperation.MERGE), UNSUPPORTED_OPERATION);
   }
 
   @Test
@@ -88,25 +109,19 @@ public class IcebergRestDmlOperationTest {
     assertFalse(params.isSetRest_catalog_name());
   }
 
-  private static void assertUnsupported(
-      TIcebergOperationParam operation, String expectedMessage)
-      throws Exception {
-    try {
-      IcebergDmlFinalizer.validateRestDmlOperation(operation);
-      fail("Expected unsupported REST DML operation to be rejected");
-    } catch (ImpalaRuntimeException e) {
-      assertTrue(e.getMessage(), e.getMessage().contains(
-          expectedMessage));
-    }
+  /** Returns a valid REST DML operation, with a table UUID and no overwrite. */
+  private static TIcebergOperationParam restOperation(TIcebergOperation op) {
+    TIcebergOperationParam operation = new TIcebergOperationParam();
+    operation.setOperation(op);
+    operation.setIs_overwrite(false);
+    operation.setTable_uuid(UUID.randomUUID().toString());
+    return operation;
   }
 
-  private static void assertMissingUuid(TIcebergOperationParam operation)
-      throws Exception {
-    try {
-      IcebergDmlFinalizer.validateRestDmlOperation(operation);
-      fail("Expected a missing UUID to be rejected");
-    } catch (ImpalaRuntimeException e) {
-      assertTrue(e.getMessage().contains("Missing Iceberg table UUID"));
-    }
+  private static void assertRejected(
+      TIcebergOperationParam operation, String expectedMessage) {
+    ImpalaRuntimeException e = assertThrows(ImpalaRuntimeException.class,
+        () -> IcebergDmlFinalizer.validateRestDmlOperation(operation));
+    assertTrue(e.getMessage(), e.getMessage().contains(expectedMessage));
   }
 }

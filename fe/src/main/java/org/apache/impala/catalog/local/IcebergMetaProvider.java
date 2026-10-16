@@ -579,9 +579,9 @@ public class IcebergMetaProvider implements MetaProvider {
 
     TPartialTableInfo ret = new TPartialTableInfo();
     TIcebergTable iceTable = new TIcebergTable();
-    if (apiTable.currentSnapshot() != null) {
-      iceTable.setCatalog_snapshot_id(apiTable.currentSnapshot().snapshotId());
-    }
+    // -1 marks a table without snapshots, as for catalogd-loaded tables.
+    iceTable.setCatalog_snapshot_id(apiTable.currentSnapshot() != null
+        ? apiTable.currentSnapshot().snapshotId() : -1);
     iceTable.setDefault_partition_spec_id(apiTable.spec().specId());
     ret.setIceberg_table(iceTable);
     return ret;

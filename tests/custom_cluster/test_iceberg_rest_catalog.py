@@ -25,8 +25,9 @@ import requests
 from tests.common.custom_cluster_test_suite import CustomClusterTestSuite, HIVE_CONF_DIR
 from tests.common.iceberg_rest_server import IcebergRestServer
 from tests.common.iceberg_rest_test_tables import (
-    INSERT_TEST_TABLE, PARTITIONED_INSERT_TEST_TABLE, UPDATE_PARTITIONS_TEST_TABLES,
-    UPDATE_TEST_TABLES, create_table_request)
+    DELETE_PARTITIONED_TEST_TABLES, DELETE_TEST_TABLES, INSERT_TEST_TABLE,
+    PARTITIONED_INSERT_TEST_TABLE, UPDATE_PARTITIONS_TEST_TABLES, UPDATE_TEST_TABLES,
+    create_table_request)
 from tests.common.impala_connection import IMPALA_CONNECTION_EXCEPTION
 from tests.util.filesystem_utils import get_fs_path
 from tests.util.hdfs_util import HadoopFsCommandLineClient
@@ -302,7 +303,6 @@ class TestIcebergRestCatalogDmlStandalone(IcebergRestCatalogTests):
 
     unsupported_statements = [
         "truncate table {}".format(table_name),
-        "delete from {} where i = 1".format(table_name),
         "merge into {0} target using (select 1 i) source "
         "on target.i = source.i when matched then update set i = 2".format(
             table_name),
@@ -310,8 +310,8 @@ class TestIcebergRestCatalogDmlStandalone(IcebergRestCatalogTests):
     ]
     for statement in unsupported_statements:
       error = self.execute_query_expect_failure(self.client, statement)
-      assert ("AnalysisException: Only INSERT INTO, INSERT OVERWRITE and UPDATE "
-              "are supported") in str(error)
+      assert ("AnalysisException: Only INSERT INTO, INSERT OVERWRITE, UPDATE and "
+              "DELETE are supported") in str(error)
 
   @RestServerProperties(
       {'port': 9084, 'catalog_location': WRITE_TEST_CATALOG_LOCATION,
@@ -380,6 +380,72 @@ class TestIcebergRestCatalogDmlStandalone(IcebergRestCatalogTests):
     """Test UPDATE on partitioned Iceberg REST catalog tables (format-version 3)."""
     self.run_test_case(
         'QueryTest/iceberg-rest-update-partitions', vector, use_db=UPDATE_TEST_NS)
+
+  @RestServerProperties(
+      {'port': 9084, 'catalog_location': WRITE_TEST_CATALOG_LOCATION,
+       'test_tables': (UPDATE_TEST_NS, DELETE_TEST_TABLES)})
+  @CustomClusterTestSuite.with_args(
+     impalad_args=REST_STANDALONE_IMPALAD_ARGS,
+     start_args=NO_CATALOGD_STARTARGS,
+     cluster_size=1)
+  @pytest.mark.execute_serially
+  def test_rest_catalog_delete(self, vector):
+    """Test DELETE on Iceberg REST catalog tables (format-version 3)."""
+    ns = UPDATE_TEST_NS
+    self.run_test_case('QueryTest/iceberg-rest-delete', vector, use_db=ns)
+
+    table_name = "{}.ice_delete".format(ns)
+    data_path = get_fs_path(
+        "/test-warehouse/iceberg_test/hadoop_catalog/"
+        "{}/ice_delete/data".format(ns))
+    filesystem_client = HadoopFsCommandLineClient()
+
+    # State left behind by the last ice_delete section of iceberg-rest-delete.test.
+    expected_rows = ['10\tten']
+    committed_files = set(filesystem_client.ls(data_path))
+    unknown_state = {'debug_action':
+        'ICEBERG_COMMIT:EXCEPTION@CommitStateUnknownException@'
+        'simulated REST commit state unknown'}
+    error = self.execute_query_expect_failure(
+        self.client, "delete from {} where i = 10".format(table_name),
+        query_options=unknown_state)
+    assert "simulated REST commit state unknown" in str(error)
+
+    result = self.execute_query_expect_success(
+        self.client, "select * from {}".format(table_name))
+    assert result.data == expected_rows
+    # Files are kept when the commit state is unknown.
+    orphan_files = set(filesystem_client.ls(data_path)) - committed_files
+    assert len(orphan_files) > 0
+    for orphan_file in orphan_files:
+      assert filesystem_client.delete_file_dir(data_path + "/" + orphan_file)
+
+    commit_failure = {'debug_action':
+        'ICEBERG_COMMIT:EXCEPTION@CommitFailedException@'
+        'simulated REST commit failure'}
+    error = self.execute_query_expect_failure(
+        self.client, "delete from {} where i = 10".format(table_name),
+        query_options=commit_failure)
+    assert "simulated REST commit failure" in str(error)
+
+    result = self.execute_query_expect_success(
+        self.client, "select * from {}".format(table_name))
+    assert result.data == expected_rows
+    # Files written by a failed commit are cleaned up.
+    assert set(filesystem_client.ls(data_path)) == committed_files
+
+  @RestServerProperties(
+      {'port': 9084, 'catalog_location': WRITE_TEST_CATALOG_LOCATION,
+       'test_tables': (UPDATE_TEST_NS, DELETE_PARTITIONED_TEST_TABLES)})
+  @CustomClusterTestSuite.with_args(
+     impalad_args=REST_STANDALONE_IMPALAD_ARGS,
+     start_args=NO_CATALOGD_STARTARGS,
+     cluster_size=1)
+  @pytest.mark.execute_serially
+  def test_rest_catalog_delete_partitioned(self, vector):
+    """Test DELETE on partitioned Iceberg REST catalog tables (format-version 3)."""
+    self.run_test_case(
+        'QueryTest/iceberg-rest-delete-partitioned', vector, use_db=UPDATE_TEST_NS)
 
   @RestServerProperties(
       {'port': 9084, 'catalog_location': WRITE_TEST_CATALOG_LOCATION,
