@@ -21,6 +21,7 @@
 #include <string.h>
 #include <fstream>
 #include <sstream>
+#include <string_view>
 
 #include <unistd.h>
 #include <sys/stat.h>
@@ -87,17 +88,23 @@ void OsInfo::Init() {
   if (os_version.good()) getline(os_version, os_version_);
   if (os_version.is_open()) os_version.close();
 
-  // Read the current clocksource to see if CLOCK_MONOTONIC is known to be fast. "tsc" is
-  // fast, while "xen" is slow (40 times slower than "tsc" on EC2). If CLOCK_MONOTONIC is
+  // Read the current clocksource to see if CLOCK_MONOTONIC is known to be fast.
+  // On X86_64, "tsc" is fast, while "xen" is slow (40 times slower than "tsc"
+  // on EC2). On ARM, "arch_sys_counter" is the fast clocksource. If CLOCK_MONOTONIC is
   // known to be slow, we use CLOCK_MONOTONIC_COARSE, which uses jiffies, with a
   // resolution measured in milliseconds, rather than nanoseconds.
+#ifdef __aarch64__
+  constexpr std::string_view FAST_CLOCK_SOURCE = "arch_sys_counter";
+#else
+  constexpr std::string_view FAST_CLOCK_SOURCE = "tsc";
+#endif
   std::ifstream clocksource_file(
       "/sys/devices/system/clocksource/clocksource0/current_clocksource");
   if (clocksource_file.good()) {
     std::string clocksource;
     clocksource_file >> clocksource;
     clock_name_ = "clocksource: '" + clocksource + "', clockid_t: ";
-    if (HAVE_CLOCK_MONOTONIC_COARSE && clocksource != "tsc") {
+    if (HAVE_CLOCK_MONOTONIC_COARSE && clocksource != FAST_CLOCK_SOURCE) {
       clock_name_ += "CLOCK_MONOTONIC_COARSE";
       fast_clock_ = CLOCK_MONOTONIC_COARSE;
     } else {
