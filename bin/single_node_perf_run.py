@@ -206,35 +206,12 @@ def compare(base_dir, hash_a, hash_b, options):
   report_benchmark_results(file_a, file_b, description)
 
   # From the two json files extract the profiles and diff them
-  if options.split_profiles:
-    generate_profile_files(file_a, hash_a, base_dir)
-    generate_profile_files(file_b, hash_b, base_dir)
-    with open(os.path.join(IMPALA_HOME, "performance_result_profile_diff.txt"), "w") as f:
-      # This does not check that the diff command succeeds
-      subprocess.run(["diff", "-u", os.path.join(base_dir, hash_a + "_profiles"),
-        os.path.join(base_dir, hash_b + "_profiles")], stdout=f, text=True, env={})
-  else:
-    generate_profile_file(file_a, hash_a, base_dir)
-    generate_profile_file(file_b, hash_b, base_dir)
-    with open(os.path.join(IMPALA_HOME, "performance_result_profile_diff.txt"), "w") as f:
-      # This does not check that the diff command succeeds
-      subprocess.run(["diff", "-u", os.path.join(base_dir, hash_a + "_profile.txt"),
-        os.path.join(base_dir, hash_b + "_profile.txt")], stdout=f, text=True, env={})
-
-
-def generate_profile_file(name, hash, base_dir):
-  """Extracts runtime profiles from the JSON file 'name'.
-
-  Writes the runtime profiles back in a simple text file in the same directory.
-  """
-  with open(name, 'rb') as fid:
-    data = json.loads(fid.read().decode("utf-8", "ignore"))
-    with open(os.path.join(base_dir, hash + "_profile.txt"), "w+") as out:
-      # For each query
-      for key in data:
-        for iteration in data[key]:
-          out.write(iteration["runtime_profile"])
-          out.write("\n\n")
+  generate_profile_files(file_a, hash_a, base_dir)
+  generate_profile_files(file_b, hash_b, base_dir)
+  with open(os.path.join(IMPALA_HOME, "performance_result_profile_diff.txt"), "w") as f:
+    # This does not check that the diff command succeeds
+    subprocess.run(["diff", "-u", os.path.join(base_dir, hash_a + "_profiles"),
+      os.path.join(base_dir, hash_b + "_profiles")], stdout=f, text=True, env={})
 
 
 def generate_profile_files(name, hash, base_dir):
@@ -393,12 +370,6 @@ def parse_options():
                       help="use ninja, rather than Make, as the build tool")
   parser.add_argument("--impalad_args", action="append", default=[],
                       help="Additional arguments to pass to each Impalad during startup")
-  parser.add_argument("--split_profiles", action="store_true", dest="split_profiles",
-                      default=True, help=("If specified, query profiles will be "
-                        "generated as separate files (the default)"))
-  parser.add_argument("--no_split_profiles", action="store_false", dest="split_profiles",
-                      help=("If specified, query profiles will be generated as a "
-                        "single-combined file"))
   parser.add_argument("--exec_options",
                       help=("Query exec option string to run workload (formatted as "
                         "'opt1:val1;opt2:val2')"))
