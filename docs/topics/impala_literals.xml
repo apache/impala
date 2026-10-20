@@ -406,13 +406,14 @@ insert into t1 partition(x=NULL, y) select c1, c3  from some_other_table;</codeb
         </li>
 
         <li>
-          There is no <codeph>DEFAULT</codeph> clause to specify a non-<codeph>NULL</codeph>
-          default value.
+          Except for Kudu tables and Iceberg V3 tables, there is no <codeph>DEFAULT</codeph>
+          clause to specify a non-<codeph>NULL</codeph> default value.
         </li>
 
         <li>
           If an <codeph>INSERT</codeph> operation mentions some columns but not others, the
-          unmentioned columns contain <codeph>NULL</codeph> for all inserted rows.
+          unmentioned columns contain <codeph>NULL</codeph> for all inserted rows, unless
+          the columns have default values in Kudu tables or Iceberg V3 tables.
         </li>
 
         <li rev="1.2.1">

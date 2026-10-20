@@ -85,9 +85,12 @@ under the License.
 
     <p>
       In <keyword keyref="impala28_full"/> and higher, Impala supports the <codeph>UPDATE</codeph>, <codeph>DELETE</codeph>, 
-      and <codeph>UPSERT</codeph> statements for Kudu tables. For Iceberg V2 tables, Impala supports the <codeph>DELETE</codeph> 
+      and <codeph>UPSERT</codeph> statements for Kudu tables. For Iceberg tables, Impala supports the <codeph>DELETE</codeph> 
       statement starting in <keyword keyref="impala43"/>, the <codeph>UPDATE</codeph> statement starting in <keyword keyref="impala44"/>, 
       and the <codeph>MERGE</codeph> statement starting in <keyword keyref="impala45"/>.
+      Except for <codeph>MERGE</codeph> statements that only insert rows, these statements
+      require Iceberg V2 or V3 tables. Impala supports V3 tables starting in
+      <keyword keyref="impala50"/>.
       For HDFS or S3 tables, to simulate the effects of an <codeph>UPDATE</codeph> or <codeph>DELETE</codeph> statement
       in other database systems, typically you use <codeph>INSERT</codeph> or <codeph>CREATE TABLE AS SELECT</codeph> to copy data
       from one table to another, filtering out or changing the appropriate rows during the copy operation.

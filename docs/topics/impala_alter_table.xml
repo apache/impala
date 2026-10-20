@@ -79,6 +79,10 @@ ALTER TABLE <varname>name</varname> ALTER [COLUMN] <varname>column_name</varname
 
 kudu_storage_attr ::= { DEFAULT | BLOCK_SIZE | ENCODING | COMPRESSION }</ph>
 
+<ph rev="5.0.0 IMPALA-15433">-- Iceberg V3 tables only.
+ALTER TABLE <varname>name</varname> ALTER [COLUMN] <varname>column_name</varname>
+  { SET DEFAULT <varname>default_value</varname> | DROP DEFAULT }</ph>
+
 <ph rev="2.10.0 IMPALA-4622">-- Non-Kudu tables only.
 ALTER TABLE <varname>name</varname> ALTER [COLUMN] <varname>column_name</varname>
   SET COMMENT '<varname>comment_text</varname>'</ph>
@@ -136,6 +140,14 @@ statsKey ::= numDVs | numNulls | avgSize | maxSize</ph>
 <varname>row_format</varname> ::= DELIMITED
   [FIELDS TERMINATED BY '<varname>char</varname>' [ESCAPED BY '<varname>char</varname>']]
   [LINES TERMINATED BY '<varname>char</varname>']</codeblock>
+
+    <p rev="5.0.0 IMPALA-15433">
+      For Iceberg V3 tables, a <varname>col_spec</varname> in <codeph>ADD COLUMN</codeph>
+      or <codeph>ADD COLUMNS</codeph> can have a <codeph>DEFAULT
+      <varname>constant</varname></codeph> clause, and <codeph>ALTER COLUMN ... SET
+      DEFAULT</codeph> or <codeph>DROP DEFAULT</codeph> changes the write default of a
+      column. See <xref href="impala_iceberg.xml#iceberg_v3_column_defaults"/>.
+    </p>
 
     <p conref="../shared/impala_common.xml#common/ddl_blurb"/>
 

@@ -718,6 +718,12 @@ CREATE TABLE ctas_t1
       <xref href="impala_kudu.xml#kudu_default_attribute"/>.
     </p>
 
+    <p rev="5.0.0 IMPALA-15433">
+      Starting in <keyword keyref="impala50"/>, columns of Iceberg V3 tables can also have a
+      <codeph>DEFAULT <varname>constant</varname></codeph> clause. See
+      <xref href="impala_iceberg.xml#iceberg_v3_column_defaults"/>.
+    </p>
+
     <p rev="IMPALA-3719">
       For more on the <codeph>BLOCK_SIZE</codeph> attribute, see
       <xref href="impala_kudu.xml#kudu_block_size_attribute"/>.

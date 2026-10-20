@@ -194,8 +194,14 @@ CREATE TABLE ice_t (i INT) STORED AS ICEBERG;
         </codeblock>
       </p>
       <p>
-        By default Impala assumes that the Iceberg table uses Parquet data files. ORC and AVRO are also supported,
-        but we need to tell Impala via setting the table property 'write.format.default' to e.g. 'ORC'.
+        By default, Impala creates Iceberg tables with Parquet data files, i.e. it sets the
+        'write.format.default' table property to 'parquet'. Impala can also read ORC and
+        AVRO data files in Iceberg tables, even mixed in the same table, but it can write
+        only Parquet data files. To write a table whose 'write.format.default' is 'orc' or
+        'avro', for example a table that <codeph>CONVERT TO ICEBERG</codeph> created from an
+        ORC table, set the property to 'parquet' first. The existing data files remain
+        readable. The <codeph>DELETE</codeph>, <codeph>UPDATE</codeph> and
+        <codeph>MERGE</codeph> statements fail if they read Avro data files.
       </p>
       <p>
         You can also use <codeph>CREATE TABLE AS SELECT</codeph> to create new Iceberg tables, e.g.:
@@ -244,19 +250,24 @@ CREATE TABLE ice_ctas_part_spec PARTITIONED BY SPEC (truncate(3, s)) STORED AS I
     <title>Iceberg V2 tables</title>
     <conbody>
       <p>
-        Iceberg V2 tables support row-level modifications (DELETE, UPDATE) via "merge-on-read", which means instead
+        Iceberg V2 tables support row-level modifications (DELETE, UPDATE, MERGE) via "merge-on-read", which means instead
         of rewriting existing data files, separate so-called delete files are being written that store information
         about the deleted records. There are two kinds of delete files in Iceberg:
         <ul>
           <li>position deletes</li>
           <li>equality deletes</li>
         </ul>
-        Impala only supports position delete files. These files contain the file path and file position of the deleted
-        rows.
+        Impala can read both kinds of delete files, but it writes only position delete
+        files. These files contain the file path and file position of the deleted rows.
+        Starting in <keyword keyref="impala50"/>, Impala supports Iceberg V3 tables, which
+        use a different mechanism for row-level modifications. See <xref
+        href="impala_iceberg.xml#iceberg_v3"/>.
       </p>
       <p>
-        One can create Iceberg V2 tables via the <codeph>CREATE TABLE</codeph> statement, they just need to specify
-        the 'format-version' table property:
+        Starting in <keyword keyref="impala50"/>, Impala creates Iceberg V2 tables by
+        default. Earlier releases created V1 tables unless the 'format-version' table
+        property was set. To specify the format version explicitly, set the
+        'format-version' table property in the <codeph>CREATE TABLE</codeph> statement:
         <codeblock>
 CREATE TABLE ice_v2 (i int) STORED BY ICEBERG TBLPROPERTIES('format-version'='2');
         </codeblock>
@@ -267,6 +278,366 @@ CREATE TABLE ice_v2 (i int) STORED BY ICEBERG TBLPROPERTIES('format-version'='2'
         <codeblock>
 ALTER TABLE ice_v1_to_v2 SET TBLPROPERTIES('format-version'='2');
         </codeblock>
+      </p>
+      <p>
+        Limitations:
+        <ul>
+          <li>
+            Impala cannot read equality delete files in tables that have more than one
+            partition spec, for example after partition evolution.
+          </li>
+          <li>
+            Impala cannot read equality delete files whose equality columns are
+            floating-point or nested columns.
+          </li>
+        </ul>
+      </p>
+    </conbody>
+  </concept>
+
+  <concept id="iceberg_v3" rev="5.0.0 IMPALA-15433">
+    <title>Iceberg V3 tables</title>
+    <conbody>
+      <p>
+        Starting in <keyword keyref="impala50"/>, Impala supports Iceberg V3 tables.
+        Compared to V2 tables, V3 tables use deletion vectors instead of position delete
+        files for row-level modifications, track the lineage of the rows, and support
+        column default values. Impala can read V3 tables, and it can run the
+        <codeph>INSERT</codeph>, <codeph>INSERT OVERWRITE</codeph>,
+        <codeph>DELETE</codeph>, <codeph>UPDATE</codeph>, <codeph>MERGE</codeph> and
+        <codeph>OPTIMIZE TABLE</codeph> statements against them, with the limitations
+        listed below.
+      </p>
+      <section id="iceberg_v3_create">
+        <title>Creating and upgrading V3 tables</title>
+        <p>
+          Create a V3 table with the 'format-version' table property:
+        </p>
+        <codeblock>
+CREATE TABLE ice_v3 (i INT) STORED BY ICEBERG TBLPROPERTIES('format-version'='3');
+</codeblock>
+        <p>
+          Upgrade an existing V1 or V2 table to V3 with the following statement:
+        </p>
+        <codeblock>
+ALTER TABLE ice_t SET TBLPROPERTIES('format-version'='3');
+</codeblock>
+        <p>
+          The upgrade cannot be undone: setting 'format-version' to a lower value fails.
+          After the upgrade, engines that do not support Iceberg V3, for example older
+          Impala releases, cannot read the table.
+        </p>
+        <p>
+          The 'format-version' property is also accepted by the <codeph>CONVERT TO
+          ICEBERG</codeph> statement. The accepted values are 1, 2 and 3:
+        </p>
+        <codeblock>
+ALTER TABLE hive_tbl CONVERT TO ICEBERG TBLPROPERTIES('format-version'='3');
+</codeblock>
+        <p>
+          <codeph>CREATE TABLE ... LIKE</codeph> keeps the format version of the source
+          Iceberg table.
+        </p>
+        <p>
+          Impala supports the Iceberg format versions 1, 2 and 3. Do not set
+          'format-version' to a higher value. Impala does not run the
+          <codeph>DELETE</codeph>, <codeph>UPDATE</codeph>, <codeph>MERGE</codeph> and
+          <codeph>OPTIMIZE TABLE</codeph> statements on such tables.
+        </p>
+      </section>
+      <section id="iceberg_v3_deletion_vectors">
+        <title>Deletion vectors</title>
+        <p>
+          On V3 tables, the <codeph>DELETE</codeph>, <codeph>UPDATE</codeph> and
+          <codeph>MERGE</codeph> statements write deletion vectors instead of position
+          delete files. A deletion vector is a bitmap that marks the deleted rows of one
+          data file. Deletion vectors are stored in Puffin files, and a data file has at
+          most one deletion vector. Impala can also read the deletion vectors that other
+          engines, for example Spark, wrote.
+        </p>
+        <p>
+          Deletion vectors show up in the <codeph>files</codeph> metadata table with
+          <codeph>content=1</codeph> and <codeph>file_format='PUFFIN'</codeph>. See <xref
+          href="impala_iceberg.xml#iceberg_metadata_tables"/>.
+        </p>
+        <p>
+          On V3 tables Impala always writes deletion vectors in Puffin files, but, as on V2
+          tables, the <codeph>DELETE</codeph> and <codeph>UPDATE</codeph> statements fail if
+          the effective delete file format is not Parquet. The effective delete file format
+          is the value of the <codeph>write.delete.format.default</codeph> table property, or
+          the value of <codeph>write.format.default</codeph> if the first property is not
+          set.
+        </p>
+      </section>
+      <section id="iceberg_v3_limitations">
+        <title>Limitations of V3 tables</title>
+        <ul>
+          <li>
+            A V3 table that was upgraded from V2 can still have V2 position delete files.
+            On such a table, the <codeph>DELETE</codeph> and <codeph>UPDATE</codeph>
+            statements, and the <codeph>MERGE</codeph> statements that update or delete
+            rows, fail with an error like the following:
+            <codeblock>
+DELETE is not allowed on Iceberg format version 3 table 'db.t' as it has
+existing version 2 position delete file(s): 2 position delete file(s). Run
+'OPTIMIZE TABLE db.t' to rewrite the files and remove deletion files before
+attempting DELETE.
+</codeblock>
+            Run <codeph>OPTIMIZE TABLE</codeph> on the table first. It removes all V2
+            position delete files, also when you specify
+            <codeph>FILE_SIZE_THRESHOLD_MB</codeph>. Equality delete files do not cause
+            this error, and the <codeph>INSERT</codeph> statements and the
+            <codeph>MERGE</codeph> statements that only insert rows work on such tables.
+          </li>
+          <li>
+            Impala does not support all the data types that Iceberg V3 added. It can read
+            unshredded <codeph>VARIANT</codeph> values from Parquet data files, but it cannot
+            write tables with <codeph>VARIANT</codeph> columns. It cannot load tables with
+            <codeph>timestamp_ns</codeph>, <codeph>timestamptz_ns</codeph>,
+            <codeph>unknown</codeph>, <codeph>geometry</codeph> or
+            <codeph>geography</codeph> columns. See <xref
+            href="impala_iceberg.xml#iceberg_types"/>.
+          </li>
+          <li>
+            The row lineage columns are not supported for Avro data files. Queries that use
+            <codeph>_row_id</codeph> fail on such files, and <codeph>OPTIMIZE
+            TABLE</codeph> fails on V3 tables if it has to rewrite Avro data files. See <xref
+            href="impala_iceberg.xml#iceberg_row_lineage"/>.
+          </li>
+        </ul>
+      </section>
+    </conbody>
+  </concept>
+
+  <concept id="iceberg_v3_column_defaults" rev="5.0.0 IMPALA-15433">
+    <title>Column default values in Iceberg V3 tables</title>
+    <conbody>
+      <p>
+        Starting in <keyword keyref="impala50"/>, you can define default values for the
+        columns of Iceberg V3 tables. An Iceberg column has two kinds of default values:
+      </p>
+      <ul>
+        <li>
+          The initial default is the value that Impala returns, instead of
+          <codeph>NULL</codeph>, for a column in the data files that were written before
+          the column was added. Impala materializes it when it reads the files, so it does
+          not rewrite the files.
+        </li>
+        <li>
+          The write default is the value that Impala writes when an
+          <codeph>INSERT</codeph> statement omits the column.
+        </li>
+      </ul>
+      <p>
+        Use the following statements to define the default values:
+      </p>
+<codeblock>
+CREATE TABLE t (id INT, status STRING DEFAULT 'new')
+  STORED BY ICEBERG TBLPROPERTIES('format-version'='3');
+ALTER TABLE t ADD COLUMN priority INT DEFAULT 5;
+ALTER TABLE t ALTER COLUMN status SET DEFAULT 'open';
+ALTER TABLE t ALTER COLUMN status DROP DEFAULT;
+</codeblock>
+      <ul>
+        <li>
+          <codeph>CREATE TABLE</codeph> and <codeph>ALTER TABLE ... ADD COLUMN</codeph> or
+          <codeph>ADD COLUMNS</codeph> with a <codeph>DEFAULT</codeph> clause set both the
+          initial default and the write default.
+        </li>
+        <li>
+          In <codeph>ALTER TABLE ... ADD COLUMN</codeph> and <codeph>ADD COLUMNS</codeph>,
+          a column with the <codeph>NOT NULL</codeph> attribute must also have a
+          <codeph>DEFAULT</codeph> clause. Because only V3 tables can have default values,
+          you cannot add <codeph>NOT NULL</codeph> columns to V1 and V2 tables.
+          <codeph>CREATE TABLE</codeph> does not have this requirement.
+        </li>
+        <li>
+          <codeph>ALTER TABLE ... ALTER COLUMN ... SET DEFAULT</codeph> sets only the
+          write default. The existing rows keep their values, and the rows that were
+          written before the column was added still return the initial default, or
+          <codeph>NULL</codeph> if the column has no initial default.
+        </li>
+        <li>
+          <codeph>ALTER TABLE ... ALTER COLUMN ... DROP DEFAULT</codeph> removes only the
+          write default. The initial default remains.
+        </li>
+        <li>
+          To change the default of an existing column, use <codeph>ALTER COLUMN</codeph>.
+          The <codeph>CHANGE COLUMN</codeph> statement does not accept a
+          <codeph>DEFAULT</codeph> clause.
+        </li>
+        <li>
+          <codeph>DESCRIBE</codeph> and <codeph>SHOW CREATE TABLE</codeph> do not show the
+          default values, so a table created from the output of <codeph>SHOW CREATE
+          TABLE</codeph> has no default values. For tables in the Hive catalog,
+          <codeph>DESCRIBE FORMATTED</codeph> shows them in the
+          <codeph>initial-default</codeph> and <codeph>write-default</codeph> fields of the
+          <codeph>current-schema</codeph> table property.
+        </li>
+      </ul>
+      <p>
+        Each default value must be a constant expression. Impala evaluates the expression
+        once, when it runs the statement, and stores the result in the table metadata. For
+        example, <codeph>DEFAULT current_date()</codeph> stores the date on which the
+        statement ran. If the value has no implicit conversion to the type of the column,
+        for example a decimal literal for a <codeph>DOUBLE</codeph> column or a string for a
+        <codeph>DATE</codeph> column, use a cast or a typed literal, for example
+        <codeph>CAST(1.5 AS DOUBLE)</codeph>, <codeph>DATE '2024-01-15'</codeph> or
+        <codeph>CAST(2.5 AS DECIMAL(10,2))</codeph>.
+      </p>
+      <p>
+        The statements fail on Iceberg V1 and V2 tables. In Impala, you can define
+        defaults for columns of the types <codeph>BOOLEAN</codeph>,
+        <codeph>INT</codeph>, <codeph>BIGINT</codeph>, <codeph>FLOAT</codeph>,
+        <codeph>DOUBLE</codeph>, <codeph>DECIMAL</codeph>, <codeph>STRING</codeph> and
+        <codeph>DATE</codeph>. You cannot define a default value for columns of other
+        types, for example <codeph>TIMESTAMP</codeph>, <codeph>BINARY</codeph>,
+        <codeph>UUID</codeph> and complex type columns.
+      </p>
+      <p>
+        When an <codeph>INSERT</codeph> statement or the <codeph>WHEN NOT MATCHED THEN
+        INSERT</codeph> clause of a <codeph>MERGE</codeph> statement omits a column from
+        its column list, Impala writes the write default of the column, or
+        <codeph>NULL</codeph> if the column has no write default. This includes the
+        partition columns. An explicit <codeph>NULL</codeph> value is written as
+        <codeph>NULL</codeph>.
+      </p>
+      <p>
+        Impala does not support the <codeph>DEFAULT</codeph> keyword as a value in
+        <codeph>INSERT</codeph>, <codeph>UPDATE</codeph> or <codeph>MERGE</codeph>
+        statements. To set a column to its write default in an <codeph>UPDATE</codeph>
+        statement or in the <codeph>UPDATE</codeph> clauses of a <codeph>MERGE</codeph>
+        statement, specify the value explicitly.
+      </p>
+      <p>
+        Impala also honors the initial default of the columns that other engines defined,
+        in Parquet, ORC and Avro data files. This includes the initial defaults of Iceberg
+        <codeph>timestamp</codeph> (without time zone) and <codeph>uuid</codeph> columns.
+        A query that reads a <codeph>uuid</codeph> column fails if it reads a data file
+        that is not a Parquet file, even if the file does not contain the column. The
+        following restrictions apply to such tables:
+      </p>
+      <ul>
+        <li>
+          A statement fails if it reads a column that has a default value (an initial or a
+          write default) and whose Iceberg type is <codeph>binary</codeph>,
+          <codeph>timestamptz</codeph> or a complex type, or if it reads a nested field
+          that has a default value or the complex type column that contains such a field.
+          The other fields of that column can be read. For example, <codeph>SELECT
+          *</codeph> fails on such tables, and so do <codeph>UPDATE</codeph>,
+          <codeph>MERGE</codeph> and <codeph>OPTIMIZE TABLE</codeph>, because they read
+          all columns. Queries and <codeph>DELETE</codeph> statements that do not read
+          these columns work.
+        </li>
+        <li>
+          An <codeph>INSERT</codeph> statement, or the <codeph>WHEN NOT MATCHED THEN
+          INSERT</codeph> clause of a <codeph>MERGE</codeph> statement, fails if it omits a
+          column whose write default is a <codeph>TIMESTAMP</codeph> or
+          <codeph>BINARY</codeph> value. Specify the value of the column explicitly.
+        </li>
+      </ul>
+    </conbody>
+  </concept>
+
+  <concept id="iceberg_row_lineage" rev="5.0.0 IMPALA-15433">
+    <title>Row lineage in Iceberg V3 tables</title>
+    <conbody>
+      <p>
+        Iceberg V3 tables track the lineage of their rows. Starting in <keyword
+        keyref="impala50"/>, Impala exposes the lineage through two virtual columns of
+        type <codeph>BIGINT</codeph>:
+      </p>
+      <ul>
+        <li>
+          <codeph>_row_id</codeph> is the identifier of the row.
+        </li>
+        <li>
+          <codeph>_last_updated_sequence_number</codeph> is the sequence number of the
+          snapshot that added the row or last updated it.
+        </li>
+      </ul>
+<codeblock>
+SELECT i, _row_id, _last_updated_sequence_number FROM ice_v3;
+</codeblock>
+      <p>
+        The columns have the following properties:
+      </p>
+      <ul>
+        <li>
+          They exist only in V3 tables. A query that uses them on a V1 or V2 table fails
+          with an error that the column cannot be resolved.
+        </li>
+        <li>
+          The <codeph>SELECT *</codeph> statement does not return them. Specify them
+          explicitly. You can use them in the select list, in the <codeph>WHERE</codeph>
+          clause and in joins, including <codeph>JOIN ... USING (_row_id)</codeph>.
+        </li>
+        <li>
+          If more than one table reference in the query has a column with this name, for
+          example two V3 tables, a self-join, or a V3 table and a table with a regular
+          <codeph>_row_id</codeph> column, qualify the column with the table name or alias,
+          for example <codeph>t1._row_id</codeph>. Otherwise, the query fails because the
+          column reference is ambiguous.
+        </li>
+        <li>
+          A column of the table with the same name takes precedence over the virtual
+          column.
+        </li>
+        <li>
+          Time travel queries return the values for the snapshot that you query.
+        </li>
+        <li>
+          The columns are not available in tables of Iceberg REST catalogs.
+        </li>
+      </ul>
+      <p>
+        The statements change the values of the columns as follows:
+      </p>
+      <ul>
+        <li>
+          <codeph>INSERT</codeph>, <codeph>INSERT OVERWRITE</codeph> and the <codeph>WHEN
+          NOT MATCHED THEN INSERT</codeph> clause of <codeph>MERGE</codeph> assign new row
+          ids and a new <codeph>_last_updated_sequence_number</codeph> to the rows that they
+          write, also to the rows that <codeph>INSERT OVERWRITE</codeph> copies from the
+          same table.
+        </li>
+        <li>
+          <codeph>UPDATE</codeph> and <codeph>MERGE</codeph> keep the
+          <codeph>_row_id</codeph> of the modified rows and assign a new
+          <codeph>_last_updated_sequence_number</codeph> to them.
+        </li>
+        <li>
+          <codeph>OPTIMIZE TABLE</codeph> preserves both values. To rewrite rows and keep
+          their lineage, use <codeph>OPTIMIZE TABLE</codeph> instead of <codeph>INSERT
+          OVERWRITE</codeph>.
+        </li>
+      </ul>
+      <p>
+        Iceberg assigns row ids when a statement commits a new snapshot. The data files
+        that a table had before you upgraded it to V3 have no row ids, so
+        <codeph>_row_id</codeph> is <codeph>NULL</codeph> for their rows until the next
+        statement that commits a snapshot, for example an <codeph>INSERT</codeph> of a
+        single row. That commit assigns row ids to all such files. Statements that change
+        only the table metadata, such as <codeph>ALTER TABLE ... SET TBLPROPERTIES</codeph>,
+        do not assign row ids.
+      </p>
+      <p>
+        Impala computes <codeph>_row_id</codeph> as <codeph>COALESCE(_file_row_id,
+        ICEBERG__FIRST__ROW__ID + FILE__POSITION)</codeph> and
+        <codeph>_last_updated_sequence_number</codeph> as
+        <codeph>COALESCE(_file_last_updated_sequence_number,
+        ICEBERG__DATA__SEQUENCE__NUMBER)</codeph>, where
+        <codeph>ICEBERG__FIRST__ROW__ID</codeph> and
+        <codeph>ICEBERG__DATA__SEQUENCE__NUMBER</codeph> are the first row id and the data
+        sequence number of the data file, and <codeph>FILE__POSITION</codeph> is the
+        position of the row in the data file. <codeph>_file_row_id</codeph> and
+        <codeph>_file_last_updated_sequence_number</codeph> are hidden columns with the
+        values that some data files store explicitly, for example the data files that
+        <codeph>OPTIMIZE TABLE</codeph> writes. For other rows they are
+        <codeph>NULL</codeph>. <codeph>SELECT *</codeph> and <codeph>DESCRIBE</codeph> do
+        not show the hidden columns. <codeph>FILE__POSITION</codeph> and the hidden columns
+        are available only for Parquet and ORC data files, so the row lineage columns are
+        not supported for Avro data files.
       </p>
     </conbody>
   </concept>
@@ -320,7 +691,7 @@ ALTER TABLE non_iceberg_table CONVERT TO ICEBERG TBLPROPERTIES('format-version'=
       <p>
         One can use <codeph>DROP TABLE</codeph> statement to remove an Iceberg table:
         <codeblock>
-          DROP TABLE ice_t;
+DROP TABLE ice_t;
         </codeblock>
       </p>
       <p>
@@ -404,7 +775,7 @@ ALTER TABLE non_iceberg_table CONVERT TO ICEBERG TBLPROPERTIES('format-version'=
               </row>
               <row>
                 <entry>uuid</entry>
-                <entry>Not supported</entry>
+                <entry>UUID (read only, Parquet data files only)</entry>
               </row>
               <row>
                 <entry>fixed(L)</entry>
@@ -412,7 +783,7 @@ ALTER TABLE non_iceberg_table CONVERT TO ICEBERG TBLPROPERTIES('format-version'=
               </row>
               <row>
                 <entry>binary</entry>
-                <entry>Not supported</entry>
+                <entry>BINARY</entry>
               </row>
               <row>
                 <entry>struct</entry>
@@ -426,9 +797,20 @@ ALTER TABLE non_iceberg_table CONVERT TO ICEBERG TBLPROPERTIES('format-version'=
                 <entry>map</entry>
                 <entry>MAP (read only)</entry>
               </row>
+              <row>
+                <entry>variant</entry>
+                <entry>VARIANT (read only, unshredded values in Parquet data files)</entry>
+              </row>
+              <row>
+                <entry>timestamp_ns, timestamptz_ns, unknown, geometry, geography</entry>
+                <entry>Not supported</entry>
+              </row>
             </tbody>
           </tgroup>
         </table>
+      </p>
+      <p>
+        Impala cannot load a table that has a column of a type that is not supported.
       </p>
     </conbody>
   </concept>
@@ -446,7 +828,12 @@ ALTER TABLE non_iceberg_table CONVERT TO ICEBERG TBLPROPERTIES('format-version'=
           <li><codeph>ALTER TABLE ... CHANGE COLUMN ...</codeph> (change name and type of a column iff the new type is compatible with the old type)</li>
           <li><codeph>ALTER TABLE ... ADD COLUMNS ...</codeph> (adds columns to the end of the table)</li>
           <li><codeph>ALTER TABLE ... DROP COLUMN ...</codeph></li>
+          <li><codeph>ALTER TABLE ... ALTER COLUMN ... SET DEFAULT | DROP DEFAULT</codeph> (Iceberg V3 tables only)</li>
         </ul>
+      </p>
+      <p>
+        For Iceberg V3 tables, you can define default values for the columns that you add.
+        See <xref href="impala_iceberg.xml#iceberg_v3_column_defaults"/>.
       </p>
       <p>
         Valid type promotions are:
@@ -598,10 +985,19 @@ INSERT INTO ice_p VALUES (1, 2);
     <conbody>
       <p>
         Since <keyword keyref="impala43"/> Impala is able to run <codeph>DELETE</codeph> statements against
-        Iceberg V2 tables. E.g.:
+        Iceberg tables. E.g.:
         <codeblock>
 DELETE FROM ice_t where i = 3;
         </codeblock>
+      </p>
+      <p>
+        Limitations:
+        <ul>
+          <li>
+            Requires Iceberg V2 or V3 tables. The statement fails on Iceberg V1 tables.
+            Upgrade them to V2 first, see <xref href="impala_iceberg.xml#iceberg_v2"/>.
+          </li>
+        </ul>
       </p>
       <p>
         More information about the <codeph>DELETE</codeph> statement can be found at <xref href="impala_delete.xml#delete"/>.
@@ -697,7 +1093,7 @@ SHOW FILES IN ice_t PARTITION (identity_double > 0.0);
     <conbody>
       <p>
         Since <keyword keyref="impala44"/> Impala is able to run <codeph>UPDATE</codeph> statements against
-        Iceberg V2 tables. E.g.:
+        Iceberg tables. E.g.:
         <codeblock>
 UPDATE ice_t SET val = val + 1;
 UPDATE ice_t SET k = 4 WHERE i = 5;
@@ -711,6 +1107,10 @@ UPDATE ice_t SET ice_t.k = o.k, ice_t.j = o.j, FROM ice_t, other_table o where i
       <p>
         Limitations:
         <ul>
+          <li>
+            Requires Iceberg V2 or V3 tables. The statement fails on Iceberg V1 tables.
+            Upgrade them to V2 first, see <xref href="impala_iceberg.xml#iceberg_v2"/>.
+          </li>
           <li>Only the merge-on-read update mode is supported.</li>
           <li>Only writes position delete files, i.e. no support for writing equality deletes.</li>
           <li>Cannot update tables with complex types.</li>
@@ -747,6 +1147,8 @@ MERGE INTO ice_t USING source ON ice_t.a = source.id
       </p>
       <p>
         The limitations of the <codeph>UPDATE</codeph> statement also apply to the <codeph>MERGE</codeph> statement.
+        The only exception is that <codeph>MERGE</codeph> statements that only have
+        <codeph>WHEN NOT MATCHED THEN INSERT</codeph> clauses also work on Iceberg V1 tables.
       </p>
       <p>
         More information about the <codeph>MERGE</codeph> statement can be found at <xref href="impala_merge.xml"/>.
@@ -781,7 +1183,7 @@ MERGE INTO ice_t USING source ON ice_t.a = source.id
         This causes read performance to degrade over time.
         The following statement can be used to compact the table and optimize it for reading.
         <codeblock>
-OPTIMIZE TABLE [<varname>db_name</varname>.]<varname>table_name</varname> [FILE_SIZE_THRESHOLD_MB=<varname>value</varname>];
+OPTIMIZE TABLE [<varname>db_name</varname>.]<varname>table_name</varname> [(FILE_SIZE_THRESHOLD_MB=<varname>value</varname>)];
         </codeblock>
       </p>
 
@@ -823,6 +1225,13 @@ OPTIMIZE TABLE [<varname>db_name</varname>.]<varname>table_name</varname> [FILE_
         depending on the size of the table.
         It is recommended to specify a file size threshold for recurring table maintenance
         jobs to save resources.
+      </p>
+      <p>
+        Starting in <keyword keyref="impala50"/>, the statement does not rewrite any file
+        and returns the message <codeph>The table is already optimized.</codeph> if the
+        table has no data files, or if you specify <codeph>FILE_SIZE_THRESHOLD_MB</codeph>,
+        no data file has delete files, and no partition has more than one data file that is
+        smaller than the threshold.
       </p>
     </conbody>
   </concept>
@@ -1207,7 +1616,22 @@ ORDER BY made_current_at;
           </li>
           <li><codeph>iceberg.catalog_location</codeph>: Iceberg table catalog location when <codeph>iceberg.catalog</codeph> is <codeph>'hadoop.catalog'</codeph></li>
           <li><codeph>iceberg.table_identifier</codeph>: Iceberg table identifier. We use &lt;database&gt;.&lt;table&gt; instead if this property is not set</li>
+          <li>
+            <codeph>format-version</codeph>: the Iceberg format version of the table, 1, 2
+            or 3. If the property is not set, Impala creates V2 tables. You can raise the
+            format version with <codeph>ALTER TABLE ... SET TBLPROPERTIES</codeph>, but you
+            cannot lower it. See <xref href="impala_iceberg.xml#iceberg_v2"/> and <xref
+            href="impala_iceberg.xml#iceberg_v3"/>.
+          </li>
           <li><codeph>write.format.default</codeph>: data file format of the table. Impala can read AVRO, ORC and PARQUET data files in Iceberg tables, and can write PARQUET data files only.</li>
+          <li>
+            <codeph>write.delete.format.default</codeph>: file format of the position delete
+            files. Impala writes position delete files only in PARQUET format (on V3 tables
+            it writes deletion vectors in Puffin files instead). The
+            <codeph>DELETE</codeph> and <codeph>UPDATE</codeph> statements fail if the
+            effective delete file format is not PARQUET, on V3 tables too. If the property is
+            not set, Impala uses the value of <codeph>write.format.default</codeph>.
+          </li>
           <li><codeph>write.parquet.compression-codec</codeph>:
             Parquet compression codec. Supported values are: NONE, GZIP, SNAPPY
             (default value), LZ4, ZSTD. The table property will be ignored if

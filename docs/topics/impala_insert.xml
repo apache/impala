@@ -176,7 +176,9 @@ hint_with_brackets ::= [SHUFFLE] | [NOSHUFFLE]
           the number of columns in the <codeph>SELECT</codeph> list or the <codeph>VALUES</codeph> tuples. The
           order of columns in the column permutation can be different than in the underlying table, and the columns
           of each input row are reordered to match. If the number of columns in the column permutation is less than
-          in the destination table, all unmentioned columns are set to <codeph>NULL</codeph>.
+          in the destination table, all unmentioned columns are set to <codeph>NULL</codeph>, or
+          to their default values in Kudu tables and Iceberg V3 tables (see
+          <xref href="impala_iceberg.xml#iceberg_v3_column_defaults"/>).
         </p>
       </li>
 
@@ -501,7 +503,7 @@ Inserted 2 rows in 0.16s
 
       <p>
         Any columns in the table that are not listed in the <codeph>INSERT</codeph> statement are set to
-        <codeph>NULL</codeph>.
+        <codeph>NULL</codeph>, or to their default values in Kudu tables and Iceberg V3 tables.
       </p>
 
       <p conref="../shared/impala_common.xml#common/hdfs_blurb"/>
