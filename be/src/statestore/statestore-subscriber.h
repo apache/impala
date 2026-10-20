@@ -328,8 +328,13 @@ class StatestoreSubscriber {
     Status CheckRegistrationId(const RegistrationId& registration_id);
 
     /// Check if the given statestore ID is matching with the statestore ID of this
-    /// statestore.
+    /// statestore. Any ID matches while a registration RPC is in flight, when an RPC
+    /// from the statestore can arrive before the registration response.
     bool IsMatchingStatestoreId(const TUniqueId& statestore_id);
+
+    /// True if the statestore ID received in the registration response equals the given
+    /// non-zero ID.
+    bool HasStatestoreId(const TUniqueId& statestore_id);
 
     int64_t MilliSecondsSinceLastRegistration() const {
       return MonotonicMillis() - last_registration_ms_.Load();
@@ -488,6 +493,9 @@ class StatestoreSubscriber {
     /// from the statestore.
     TUniqueId statestore_id_;
 
+    /// True while a RegisterSubscriber RPC is in flight. Protected by 'id_lock_'.
+    bool registration_in_flight_ = false;
+
     /// Monotonic timestamp of the last successful registration.
     AtomicInt64 last_registration_ms_{0};
   };
@@ -534,6 +542,13 @@ class StatestoreSubscriber {
   /// Return the pointer of the active/standby StatestoreStub.
   StatestoreStub* GetActiveStatestore();
   StatestoreStub* GetStandbyStatestore();
+
+  /// True if the checks of --statestore_subscriber_ha_role_checks apply (HA only).
+  bool HaRoleChecks() const;
+
+  /// True if an RPC from 'statestore_id' belongs to 'stub'; with the HA role checks an
+  /// exact match on the other stub wins over this stub's registration wildcard.
+  bool IsStubFor(StatestoreStub* stub, const TUniqueId& statestore_id);
 
   /// Subscriber thrift implementation, needs to access UpdateState
   friend class StatestoreSubscriberThriftIf;

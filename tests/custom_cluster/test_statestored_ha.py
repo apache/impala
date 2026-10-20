@@ -926,6 +926,79 @@ class TestStatestoredHA(CustomClusterTestSuite):
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args(
     statestored_args="--use_network_address_as_statestore_priority=true "
+                     "--statestore_ha_heartbeat_monitoring_frequency_ms=50 "
+                     "--statestore_peer_timeout_seconds=2",
+    impalad_args="--statestore_subscriber_timeout_seconds=2 "
+                 "--statestore_subscriber_cnxn_attempts=1",
+    start_args="--enable_statestored_ha",
+    disable_log_buffering=True)
+  def test_subscriber_started_while_first_statestored_down(self):
+    """An impalad starts while statestoreds[0], its first configured statestored, is
+    down, so it registers only with statestoreds[1]. The unregistered stub must not take
+    the heartbeats and role updates of statestoreds[1]: the impalad keeps following
+    statestoreds[1] and registers with statestoreds[0] as standby once it is back."""
+    statestoreds = self.cluster.statestoreds()
+    assert len(statestoreds) == 2
+    statestore_service_1 = statestoreds[1].service
+    statestoreds[0].kill()
+    self.__wait_statestore_to_be_active(statestore_service_1, 1)
+
+    impalad = self.cluster.impalads[1]
+    impalad_log = "impalad_node1"
+    impalad.kill()
+    statestore_service_1.wait_for_live_subscribers(3, timeout=60)
+    impalad.start(wait_until_ready=True, timeout=60)
+    self.assert_log_contains(impalad_log, "INFO",
+        "statestore registration unsuccessful on startup", expected_count=1)
+    # Before the fix the registered stub missed its heartbeats and recovered once per
+    # subscriber timeout (2 s), and each recovery swapped the impalad's roles, so 10 s
+    # (5 subscriber timeouts) is enough to see swaps.
+    sleep(10)
+    self.assert_log_contains(impalad_log, "INFO",
+        "Receive UpdateStatestoredRole message from standby statestored",
+        expected_count=0)
+    self.__verify_impalad_active_statestored(1, 1)
+
+    # The stub of statestoreds[0] keeps retrying and registers once it is back.
+    statestoreds[0].start(wait_until_ready=True)
+    statestore_service_0 = statestoreds[0].service
+    statestore_service_0.wait_for_live_subscribers(4, timeout=60)
+    assert not statestore_service_0.get_metric_value("statestore.active-status")
+    self.assert_log_contains(impalad_log, "INFO",
+        "Reconnected to statestore. Exiting recovery mode", expected_count=1,
+        timeout_s=30)
+    self.__verify_impalad_active_statestored(1, 1)
+    self.__run_simple_queries(sync_ddl=True)
+
+  @pytest.mark.execute_serially
+  @CustomClusterTestSuite.with_args(
+      statestored_args="--use_network_address_as_statestore_priority=true",
+      impalad_args="--minidump_path={minidumps}",
+      start_args="--enable_statestored_ha --per_impalad_args=-state_store_2_port=24000",
+      tmp_dir_placeholders=['minidumps'],
+      expect_startup_fail=True)
+  def test_same_statestored_address_twice(self):
+    """Both statestored addresses of an impalad are localhost:24000, the address of
+    statestoreds[0]. The impalad aborts at startup."""
+    self.assert_impalad_log_contains("FATAL",
+        "Both configured statestored addresses are localhost:24000")
+
+  @pytest.mark.execute_serially
+  @CustomClusterTestSuite.with_args(
+      statestored_args="--use_network_address_as_statestore_priority=true",
+      impalad_args="--state_store_2_host=127.0.0.1 "
+                   "--minidump_path={minidumps}",
+      start_args="--enable_statestored_ha --per_impalad_args=-state_store_2_port=24000",
+      tmp_dir_placeholders=['minidumps'],
+      expect_startup_fail=True)
+  def test_same_statestored_through_alias(self):
+    """The statestored addresses of an impalad are localhost:24000 and 127.0.0.1:24000,
+    two addresses of statestoreds[0]. The impalad aborts when it registers."""
+    self.assert_impalad_log_contains("FATAL", "Registered with the same statestored")
+
+  @pytest.mark.execute_serially
+  @CustomClusterTestSuite.with_args(
+    statestored_args="--use_network_address_as_statestore_priority=true "
                      "--statestore_peer_timeout_seconds=120",
     impalad_args="--statestore_subscriber_timeout_seconds=10",
     catalogd_args="--statestore_subscriber_timeout_seconds=10",

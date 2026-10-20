@@ -41,6 +41,7 @@
 #include "util/metrics.h"
 #include "util/openssl-util.h"
 #include "util/collection-metrics.h"
+#include "util/scope-exit-trigger.h"
 #include "util/time.h"
 
 #include "common/names.h"
@@ -67,6 +68,9 @@ DEFINE_int64_hidden(statestore_subscriber_recovery_grace_period_ms, 30000L, "Per
     "after the last successful subscription attempt until the subscriber will be "
     "considered fully recovered. After a successful reconnect attempt, updates to the "
     "cluster membership will only become effective after this period has elapsed.");
+DEFINE_bool_hidden(statestore_subscriber_ha_role_checks, true, "With statestored HA, "
+    "match RPCs to the stub registered with the sending statestored before the "
+    "registration wildcard. Off restores the previous behaviour.");
 DEFINE_int32(statestore_client_rpc_timeout_ms, 300000, "(Advanced) The underlying "
     "TSocket send/recv timeout in milliseconds for a catalog client RPC.");
 
@@ -251,6 +255,11 @@ StatestoreSubscriber::StatestoreSubscriber(const string& subscriber_id,
     active_statestore_ = statestore_;
   } else {
     DCHECK(!statestore2_address.hostname.empty() && statestore2_address.port != 0);
+    if (statestore_address == statestore2_address) {
+      LOG(FATAL) << Substitute(
+          "Both configured statestored addresses are $0, but statestored HA requires "
+          "two different statestoreds.", TNetworkAddressToString(statestore_address));
+    }
     statestore2_ = new StatestoreStub(
         this, /* first_statestore */false, statestore2_address, metrics);
   }
@@ -408,7 +417,7 @@ void StatestoreSubscriber::Heartbeat(const RegistrationId& registration_id,
     TStatestoreConnState::type* active_statestore_conn_state) {
   // It's possible the heartbeat is received for previous registration.
   DCHECK(statestore_ != nullptr);
-  if (statestore_->IsMatchingStatestoreId(statestore_id) || statestore2_ == nullptr) {
+  if (statestore2_ == nullptr || IsStubFor(statestore_, statestore_id)) {
     // Due to race, subscriber could receive heartbeat before receiving registration
     // response. "statestore2_ == nullptr" means HA is not enabled. In that case,
     // we still handle the heartbeat request from statestore even registration response
@@ -465,7 +474,7 @@ void StatestoreSubscriber::UpdateStatestoredRole(bool is_active,
   StatestoreStub* active_statestore = GetActiveStatestore();
   StatestoreStub* standby_statestore = GetStandbyStatestore();
   if (standby_statestore != nullptr
-      && standby_statestore->IsMatchingStatestoreId(statestore_id)) {
+      && IsStubFor(standby_statestore, statestore_id)) {
     LOG(INFO) << "Receive UpdateStatestoredRole message from standby statestored";
     // Receive notification of statestore service fail over, switch active and standby
     // statestoreds.
@@ -498,13 +507,20 @@ void StatestoreSubscriber::UpdateStatestoredRole(bool is_active,
         DCHECK(standby_statestore_ == nullptr);
         // Active/standby statestored are not set. This could happen if statestoreds were
         // started after subscribers' registration attemption.
-        if (statestore_->IsMatchingStatestoreId(statestore_id)) {
+        if (IsStubFor(statestore_, statestore_id)) {
           active_statestore_ = statestore_;
           standby_statestore_ = statestore2_;
-        } else {
-          DCHECK(statestore2_->IsMatchingStatestoreId(statestore_id));
+        } else if (!HaRoleChecks() || IsStubFor(statestore2_, statestore_id)) {
+          DCHECK(HaRoleChecks() || statestore2_->IsMatchingStatestoreId(statestore_id));
           active_statestore_ = statestore2_;
           standby_statestore_ = statestore_;
+        } else {
+          // Not registered with the sender yet: skip it; the next registration or role
+          // change sets the roles.
+          *update_skipped = true;
+          LOG(INFO) << "Skipped updating statestored message from unknown statestored: "
+                    << PrintId(statestore_id);
+          return;
         }
         active_statestore_->SetStatestoreActive(is_active, active_statestored_version);
         standby_statestore_->SetStatestoreActive(!is_active, active_statestored_version);
@@ -690,7 +706,12 @@ Status StatestoreSubscriber::StatestoreStub::Register(bool* has_active_catalogd,
     lock_guard<mutex> l(id_lock_);
     registration_id_ = TUniqueId();
     statestore_id_ = TUniqueId();
+    registration_in_flight_ = true;
   }
+  const auto clear_in_flight = MakeScopeExitTrigger([this]() {
+    lock_guard<mutex> l(id_lock_);
+    registration_in_flight_ = false;
+  });
   RETURN_IF_ERROR(subscriber_->SetRegisterRequest(&request));
   TRegisterSubscriberResponse response;
   attempt = 0; // Used for debug action only.
@@ -737,6 +758,18 @@ Status StatestoreSubscriber::StatestoreStub::Register(bool* has_active_catalogd,
       VLOG(1) << "Statestore ID: " << statestore_id_string;
     } else {
       VLOG(1) << "No statestore ID received from statestore";
+    }
+  }
+  if (status.ok() && response.__isset.statestore_id && subscriber_->HaRoleChecks()) {
+    // The same statestore id on both stubs means both configured addresses lead to
+    // the same statestored, which cannot provide HA.
+    StatestoreStub* other = subscriber_->statestore_ == this ? subscriber_->statestore2_
+                                                             : subscriber_->statestore_;
+    if (other != nullptr && other->HasStatestoreId(response.statestore_id)) {
+      LOG(FATAL) << Substitute(
+          "Registered with the same statestored (id $0) via both configured "
+          "statestored addresses, but statestored HA requires two different "
+          "statestoreds.", PrintId(response.statestore_id));
     }
   }
   {
@@ -932,14 +965,38 @@ Status StatestoreSubscriber::StatestoreStub::CheckRegistrationId(
   return Status::OK();
 }
 
+bool StatestoreSubscriber::HaRoleChecks() const {
+  return statestore2_ != nullptr && FLAGS_statestore_subscriber_ha_role_checks;
+}
+
+bool StatestoreSubscriber::IsStubFor(
+    StatestoreStub* stub, const TUniqueId& statestore_id) {
+  if (!stub->IsMatchingStatestoreId(statestore_id)) return false;
+  if (!HaRoleChecks()) return true;
+  // The two stubs never hold the same non-zero statestore id, enforced by the
+  // checks in the constructor and in Register().
+  StatestoreStub* other = stub == statestore_ ? statestore2_ : statestore_;
+  return !other->HasStatestoreId(statestore_id);
+}
+
 bool StatestoreSubscriber::StatestoreStub::IsMatchingStatestoreId(
     const TUniqueId& statestore_id) {
   lock_guard<mutex> r(id_lock_);
   // It's possible the topic update messages are received before receiving the
   // registration response. In the case, statestore_id_ and is_registered_ are not set.
-  // TODO: need to revisit this when supporting statestored HA.
-  return statestore_id == statestore_id_ ||
-      (!is_registered_ && statestore_id_.hi == 0 && statestore_id_.lo == 0);
+  // With HA the wildcard applies only while the registration RPC is in flight, so that
+  // a stub which failed to register cannot take the RPCs of the other statestored.
+  bool narrow = subscriber_->HaRoleChecks();
+  return statestore_id == statestore_id_
+      || (!is_registered_ && (!narrow || registration_in_flight_)
+          && statestore_id_.hi == 0 && statestore_id_.lo == 0);
+}
+
+bool StatestoreSubscriber::StatestoreStub::HasStatestoreId(
+    const TUniqueId& statestore_id) {
+  lock_guard<mutex> r(id_lock_);
+  return (statestore_id_.hi != 0 || statestore_id_.lo != 0)
+      && statestore_id == statestore_id_;
 }
 
 void StatestoreSubscriber::StatestoreStub::Heartbeat(
