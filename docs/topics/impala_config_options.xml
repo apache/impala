@@ -308,6 +308,93 @@ Starting Impala Catalog Server:                            [  OK  ]</codeblock>
 
       <p conref="../shared/impala_common.xml#common/load_catalog_in_background"/>
 
+      <section id="warmup_tables" rev="5.0.0 IMPALA-14074">
+        <title>Warming Up the Metadata of Critical Tables</title>
+
+        <p>
+          By default, <cmdname>catalogd</cmdname> loads the metadata of a table when the
+          table is referenced for the first time. Starting in <keyword
+          keyref="impala50"/>, you can list tables whose metadata
+          <cmdname>catalogd</cmdname> loads in the background after it starts, and after a
+          global <codeph>INVALIDATE METADATA</codeph> statement. The flags have no effect
+          if <codeph>--load_catalog_in_background</codeph> is <codeph>true</codeph>,
+          because <cmdname>catalogd</cmdname> then loads the metadata of all the tables in
+          the background.
+        </p>
+
+        <ul>
+          <li>
+            <codeph>--warmup_tables_config_file</codeph>: The path of the file that lists
+            the tables. The default is empty, which means that no table is warmed up. Use
+            a fully-qualified URI, for example
+            <codeph>file:///etc/impala/warmup_tables.txt</codeph> or
+            <codeph>hdfs://namenode:8020/impala/warmup_tables.txt</codeph>.
+            <cmdname>catalogd</cmdname> reads the file once, when it starts, so you must
+            restart <cmdname>catalogd</cmdname> to apply changes to the file. If
+            <cmdname>catalogd</cmdname> cannot read the file, it logs a warning and does
+            not warm up any table.
+          </li>
+
+          <li>
+            <codeph>--keeps_warmup_tables_loaded</codeph>: The default is
+            <codeph>false</codeph>. If you set it to <codeph>true</codeph>,
+            <cmdname>catalogd</cmdname> loads the metadata of a listed table in the
+            background again after the metadata of the table is invalidated, for
+            example by an <codeph>INVALIDATE METADATA
+            <varname>table_name</varname></codeph> statement, by an HMS
+            <codeph>RELOAD</codeph> event, or by the automatic invalidation of unused
+            tables. Do not set it to <codeph>true</codeph> together with
+            <codeph>--invalidate_tables_on_memory_pressure</codeph> if the heap of
+            <cmdname>catalogd</cmdname> cannot hold the metadata of all the listed tables.
+            Otherwise, <cmdname>catalogd</cmdname> repeatedly loads and invalidates the
+            tables.
+          </li>
+        </ul>
+
+        <p>
+          The file contains one entry per line:
+        </p>
+
+        <ul>
+          <li>
+            <codeph><varname>db</varname>.<varname>table</varname></codeph> names a table,
+            and <codeph><varname>db</varname>.*</codeph> names all the tables of a
+            database. The names are not case-sensitive.
+          </li>
+
+          <li>
+            <cmdname>catalogd</cmdname> schedules the tables in the order in which they
+            appear in the file, so put the most important tables first.
+          </li>
+
+          <li>
+            Blank lines and lines that start with <codeph>#</codeph> or
+            <codeph>//</codeph> are ignored. A comment must be on a line of its own.
+          </li>
+
+          <li>
+            <cmdname>catalogd</cmdname> skips an entry that does not contain exactly one
+            dot, and logs a warning.
+          </li>
+        </ul>
+
+        <p>
+          For example, the following file warms up the <codeph>sales</codeph> table of the
+          <codeph>retail</codeph> database, and all the tables of the <codeph>dim</codeph>
+          database:
+        </p>
+<codeblock># Critical tables, most important first
+retail.sales
+dim.*</codeblock>
+
+        <p>
+          Start <cmdname>catalogd</cmdname> with the following flags to warm up the tables
+          and keep them loaded:
+        </p>
+<codeblock>--warmup_tables_config_file=hdfs://namenode:8020/impala/warmup_tables.txt
+--keeps_warmup_tables_loaded=true</codeblock>
+      </section>
+
     </conbody>
 
   </concept>

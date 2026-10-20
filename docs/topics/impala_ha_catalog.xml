@@ -97,4 +97,112 @@ under the License.
         the new active CatalogD is operational.</p>
     </conbody>
   </concept>
+  <concept id="catalog_ha_readiness">
+    <title>Checking the Status and Readiness of CatalogD</title>
+    <conbody>
+      <p>
+        The <codeph>/healthz</codeph> page of <codeph>catalogd</codeph> returns
+        <codeph>OK</codeph> on both the active and the standby <codeph>catalogd</codeph>
+        as soon as the service has started. The page does not show which instance is
+        active, and it does not show whether the metadata is loaded. To find the active
+        <codeph>catalogd</codeph>, check the <codeph>catalog-server.active-status</codeph>
+        metric on the <b>/metrics</b> page of <codeph>catalogd</codeph>, which is
+        <codeph>true</codeph> only on the active instance, or the
+        <codeph>/catalog_ha_info</codeph> page of the StateStore.
+      </p>
+      <p>
+        Starting in <keyword keyref="impala50"/>, <codeph>catalogd</codeph> can report
+        <codeph>OK</codeph> and an active status before it finishes loading the metadata.
+        To check that the catalog is populated, see <xref
+        href="impala_metadata.xml#on_demand_metadata/on_demand_startup">Catalogd Startup
+        and Readiness in Metadata On-demand Mode</xref>.
+      </p>
+    </conbody>
+  </concept>
+  <concept id="configuring_failover_behavior" rev="5.0.0 IMPALA-14227">
+    <title>Configuring Failover Behavior</title>
+    <conbody>
+      <p>
+        By default, when the standby <codeph>catalogd</codeph> becomes the active
+        instance, it resets all its metadata, as if you ran <codeph>INVALIDATE
+        METADATA</codeph>, and loads the metadata again. You can configure the standby
+        <codeph>catalogd</codeph> to keep its metadata cache instead. In this case, the
+        new active instance applies the pending Hive Metastore (HMS) events before it
+        becomes active, so that it does not use stale metadata. Set the following flags on
+        both <codeph>catalogd</codeph> instances, because either of them can become the
+        active instance:
+      </p>
+      <ul>
+        <li>
+          <codeph>--catalogd_ha_reset_metadata_on_failover</codeph>: The default is
+          <codeph>true</codeph>, which resets all the metadata at failover. If you set it
+          to <codeph>false</codeph>, the new active <codeph>catalogd</codeph> keeps its
+          current metadata and applies all the HMS events that were generated before the
+          failover. This flag is visible in the <codeph>/varz</codeph> page starting in
+          <keyword keyref="impala50"/>.
+        </li>
+        <li>
+          <codeph>--catalogd_ha_failover_catchup_timeout_s</codeph>: The time in seconds
+          that the new active <codeph>catalogd</codeph> waits for the pending HMS events
+          to be applied. The default is <codeph>300</codeph>. The flag is added in
+          <keyword keyref="impala50"/>, and it is used only if
+          <codeph>--catalogd_ha_reset_metadata_on_failover</codeph> is
+          <codeph>false</codeph>.
+        </li>
+        <li>
+          <codeph>--catalogd_ha_reset_metadata_on_failover_catchup_timeout</codeph>: What
+          the new active <codeph>catalogd</codeph> does if the pending HMS events are not
+          applied within the timeout. The default is <codeph>true</codeph>, which resets
+          all the metadata. If you set it to <codeph>false</codeph>, the
+          <codeph>catalogd</codeph> becomes active with its current metadata, which might
+          be stale. The flag is added in <keyword keyref="impala50"/>, and it is used only
+          if <codeph>--catalogd_ha_reset_metadata_on_failover</codeph> is
+          <codeph>false</codeph>.
+        </li>
+      </ul>
+      <p>
+        The wait for the HMS events happens only at a failover. Regardless of the flags
+        above, the new active <codeph>catalogd</codeph> resets all the metadata if the
+        event processor is in an error state, or if it cannot get the latest event id from
+        HMS in time.
+      </p>
+      <p>
+        The standby <codeph>catalogd</codeph> keeps its metadata up to date from the HMS
+        events. Therefore, setting
+        <codeph>--catalogd_ha_reset_metadata_on_failover=false</codeph>
+        requires that all of the following are true:
+      </p>
+      <ul>
+        <li>
+          <codeph>--hms_event_polling_interval_s</codeph> is greater than 0. The default
+          is <codeph>0.5</codeph>.
+        </li>
+        <li>
+          <codeph>--enable_insert_events</codeph> is <codeph>true</codeph>. This is the
+          default.
+        </li>
+        <li>
+          <codeph>--enable_reload_events</codeph> is <codeph>true</codeph>. The default is
+          <codeph>false</codeph>, so you must set it explicitly. With this flag,
+          <codeph>catalogd</codeph> fires an HMS event for the <codeph>REFRESH</codeph>
+          and <codeph>INVALIDATE METADATA</codeph> statements, so that the other
+          <codeph>catalogd</codeph> can process them.
+        </li>
+      </ul>
+      <p>
+        To fail over with a warm metadata cache, also configure the tables to warm up, as
+        described in <xref
+        href="impala_config_options.xml#config_options_catalogd/warmup_tables">Warming Up
+        the Metadata of Critical Tables</xref>. The
+        standby <codeph>catalogd</codeph> then loads the metadata of the listed tables,
+        and the new active instance does not need to reload them.
+      </p>
+      <p>For example, start both <codeph>catalogd</codeph> instances with the following
+        flags:</p>
+<codeblock>--enable_catalogd_ha=true
+--catalogd_ha_reset_metadata_on_failover=false
+--enable_reload_events=true
+--warmup_tables_config_file=hdfs://namenode:8020/impala/warmup_tables.txt</codeblock>
+    </conbody>
+  </concept>
 </concept>

@@ -69,7 +69,8 @@ under the License.
       </p>
 
       <p>
-        This feature is enabled by default.
+        Starting in <keyword keyref="impala50"/>, this feature is enabled by default. In
+        earlier releases, it was disabled by default.
       </p>
 
       <p>
@@ -167,6 +168,45 @@ under the License.
         <codeph>catalogd</codeph> with <codeph>--catalog_topic_mode=full</codeph>. Note
         that this mode can cause higher memory pressure on the coordinator(s).
       </p>
+
+      <section id="on_demand_startup">
+        <title>Catalogd Startup and Readiness in Metadata On-demand Mode</title>
+
+        <p>
+          Starting in <keyword keyref="impala50"/>, <codeph>catalogd</codeph> starts its
+          service first and then runs the initial metadata load in the background. The
+          initial metadata load reads the list of databases and, for each database, the
+          list of tables and the list of functions. It does not load the metadata of the
+          tables themselves.
+        </p>
+
+        <p>
+          When <codeph>catalogd</codeph> runs with
+          <codeph>--catalog_topic_mode=minimal</codeph>, it does not wait for the initial
+          metadata load to finish before it publishes the first catalog topic update, so
+          the coordinators can accept queries during the load. The coordinators request
+          the metadata that they need on demand. During the initial metadata load,
+          <codeph>catalogd</codeph> answers a request for a database only after it has
+          loaded the list of tables and functions of that database, so the first queries
+          can take longer.
+        </p>
+
+        <p>
+          The <codeph>/healthz</codeph> page of <codeph>catalogd</codeph> returns
+          <codeph>OK</codeph> as soon as the <codeph>catalogd</codeph> service has
+          started, and the <codeph>catalog-server.active-status</codeph> metric can be
+          <codeph>true</codeph> while the initial metadata load is still running.
+          Therefore, a script that waits for <codeph>/healthz</codeph> can continue
+          before the catalog is fully populated.
+        </p>
+
+        <p>
+          To check whether the catalog is populated, use the
+          <codeph>catalog.num-databases</codeph> and <codeph>catalog.num-tables</codeph>
+          metrics on the <b>/metrics</b> page of the <codeph>catalogd</codeph> web UI, or
+          check the content of the <b>/catalog</b> page.
+        </p>
+      </section>
 
     </conbody>
 
