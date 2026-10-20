@@ -70,7 +70,7 @@ class FailureDetector {
 /// considered suspected.
 /// A timeout failure detector is most appropriate for a client which is
 /// receiving periodic heartbeats.
-/// Not thread safe.
+/// Thread safe.
 class TimeoutFailureDetector : public FailureDetector {
  public:
   TimeoutFailureDetector(boost::posix_time::time_duration failure_timeout,
@@ -106,7 +106,7 @@ class TimeoutFailureDetector : public FailureDetector {
 /// The MissedHeartbeatFailureDetector is most appropriate when heartbeats are
 /// being sent, not being received, because it is easy in that situation to tell
 /// when a heartbeat has not been successful.
-/// Not thread safe.
+/// Thread safe.
 class MissedHeartbeatFailureDetector : public FailureDetector {
  public:
   /// max_missed_heartbeats -> the number of heartbeats that can be missed before a

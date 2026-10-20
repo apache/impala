@@ -1162,13 +1162,11 @@ void StatestoreSubscriber::StatestoreStub::GetRegistrationIdAndStatestoreId(
 }
 
 void StatestoreSubscriber::StatestoreStub::IncCountForUpdateStatestoredRoleRPC() {
-  lock_guard<shared_mutex> exclusive_lock(lock_);
   update_statestored_role_rpc_metric_->Increment(1);
 }
 
 TStatestoreConnState::type
 StatestoreSubscriber::StatestoreStub::GetStatestoreConnState() {
-  lock_guard<shared_mutex> exclusive_lock(lock_);
   FailureDetector::PeerState state = failure_detector_->GetPeerState(STATESTORE_ID);
   switch (state) {
     case FailureDetector::FAILED:

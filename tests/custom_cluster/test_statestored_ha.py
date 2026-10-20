@@ -923,6 +923,44 @@ class TestStatestoredHA(CustomClusterTestSuite):
           if "Skipped updating catalogd message" in line: skipped += 1
       LOG.info("{0} skipped {1} UpdateCatalogd RPCs".format(standby_log, skipped))
 
+  @pytest.mark.execute_serially
+  @CustomClusterTestSuite.with_args(
+    statestored_args="--use_network_address_as_statestore_priority=true "
+                     "--statestore_peer_timeout_seconds=120",
+    impalad_args="--statestore_subscriber_timeout_seconds=10",
+    catalogd_args="--statestore_subscriber_timeout_seconds=10",
+    start_args="--enable_statestored_ha --enable_catalogd_ha",
+    disable_log_buffering=True)
+  def test_standby_heartbeats_during_subscriber_recovery(self):
+    """The active statestoreds[0] dies and the standby statestoreds[1] does not take over
+    yet. The subscribers try to re-register with statestoreds[0] in recovery mode. Their
+    replies to the heartbeats of statestoreds[1] must not wait for that, or
+    statestoreds[1] unregisters all subscribers, including the catalogds."""
+    statestoreds = self.cluster.statestoreds()
+    assert len(statestoreds) == 2
+    statestore_service_1 = statestoreds[1].service
+    statestore_service_1.wait_for_live_subscribers(5, timeout=60)
+    statestoreds[0].kill()
+    # The subscribers lose statestoreds[0] and keep re-registering with it.
+    for daemon in ("impalad", "impalad_node1", "impalad_node2", "catalogd",
+                   "catalogd_node1"):
+      self.assert_log_contains(daemon, "INFO",
+          "Connection with statestore lost, entering recovery mode", expected_count=-1,
+          timeout_s=60)
+    # Meanwhile statestoreds[1] must keep heartbeating them; before the fix the heartbeats
+    # timed out. Wait for 10 rounds (statestore_max_missed_heartbeats) to 5 subscribers.
+    num_heartbeats = statestore_service_1.get_metric_value(
+        "statestore.heartbeat-durations")["count"]
+    start_time = time.time()
+    while statestore_service_1.get_metric_value(
+        "statestore.heartbeat-durations")["count"] < num_heartbeats + 50:
+      assert time.time() - start_time < 60, "Heartbeats of statestoreds[1] stalled"
+      sleep(1)
+    assert not statestore_service_1.get_metric_value("statestore.active-status")
+    self.assert_log_contains("statestored_node1", "INFO",
+        "has failed, disconnected or re-registered", expected_count=0)
+    assert statestore_service_1.get_metric_value("statestore.live-backends") == 5
+
 
 class TestStatestoredHAStartupDelay(CustomClusterTestSuite):
   """This test injects a real delay in statestored startup. The impalads and catalogd are
