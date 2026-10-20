@@ -616,7 +616,12 @@ under the License.
                   </ul></p><p>You cannot connect to the 3.2 or earlier versions
                   of Impala using the <codeph>'hs2'</codeph> or
                     <codeph>'hs2-http'</codeph> option.</p><p>Beeswax support is
-                  deprecated and will be removed in the future.</p></entry>
+                  deprecated and will be removed in a future version. Starting in
+                  <keyword keyref="impala50"/>, <codeph>impalad</codeph> does not open the
+                  Beeswax port by default (<codeph>--beeswax_port</codeph> defaults
+                  to 0). To use <codeph>--protocol=beeswax</codeph>, start
+                  <codeph>impalad</codeph> with
+                  <codeph>--beeswax_port=21000</codeph>.</p></entry>
             </row>
             <row rev="4.2.0 IMPALA-10660">
               <entry>--hs2_fp_format=<varname>HS2_FP_FORMAT</varname></entry>
@@ -624,7 +629,8 @@ under the License.
               <entry>
                 Sets the printing format specification for floating point values when using HS2
                 protocol. The default behaviour makes the values handled by Python's str() built-in
-                method. Use '16G' to match Beeswax protocol's floating-point output format
+                method. The value is a Python format specification. Use '16G' to match the
+                floating-point output format of the deprecated Beeswax protocol.
 
                 This feature is available in <keyword keyref="impala42_full"/> and higher.
               </entry>

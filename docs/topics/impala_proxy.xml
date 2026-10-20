@@ -132,9 +132,12 @@ under the License.
         </li>
 
         <li>
-          If you are using Hue or JDBC-based applications, you typically set up load balancing
-          for both ports 21000 and 21050 because these client applications connect through port
-          21050 while the <cmdname>impala-shell</cmdname> command connects through port 21000.
+          Set up load balancing for port 21050, the HiveServer2 port used by
+          <cmdname>impala-shell</cmdname>, Hue, and JDBC and ODBC applications. The
+          Beeswax port 21000 is disabled by default starting in
+          <keyword keyref="impala50"/>. Load balance it only if you start
+          <cmdname>impalad</cmdname> with <codeph>--beeswax_port=21000</codeph> to serve
+          legacy Beeswax clients.
           See <xref href="impala_ports.xml#ports"/> for when to use port 21000, 21050, or
           another value depending on what type of connections you are load balancing.
         </li>
@@ -289,7 +292,7 @@ impala-shell -i impalad-1.mydomain.com -k -b loadbalancer-1.mydomain.com
 
       <p>
         Alternatively, with the fully qualified configurations:
-<codeblock>impala-shell --impalad=impalad-1.mydomain.com:21000 --kerberos --kerberos_host_fqdn=loadbalancer-1.mydomain.com</codeblock>
+<codeblock>impala-shell --impalad=impalad-1.mydomain.com:21050 --kerberos --kerberos_host_fqdn=loadbalancer-1.mydomain.com</codeblock>
       </p>
 
       <p>
@@ -555,7 +558,7 @@ jdbc:hive2://<varname>proxy_host</varname>:<varname>load_balancer_port</varname>
         <li>
           <p>
             In <cmdname>impala-shell</cmdname>, JDBC applications, or ODBC applications, connect
-            to the listener port of the proxy host, rather than port 21000 or 21050 on a host
+            to the listener port of the proxy host, rather than port 21050 on a host
             actually running <cmdname>impalad</cmdname>. The sample configuration file sets
             haproxy to listen on port 25003, therefore you would send all requests to
             <codeph><varname>haproxy_host</varname>:25003</codeph>.
@@ -628,17 +631,18 @@ listen stats :25002
 # Setup for Impala.
 # Impala client connect to load_balancer_host:25003.
 # HAProxy will balance connections among the list of servers listed below.
-# The list of Impalad is listening at port 21000 for beeswax (impala-shell) or original ODBC driver.
-# For JDBC or ODBC version 2.x driver, use port 21050 instead of 21000.
+# The list of Impalad is listening at port 21050 for HiveServer2 (impala-shell,
+# JDBC, and ODBC). The Beeswax port 21000 is disabled by default. Use port 21000
+# here only if impalad is started with --beeswax_port=21000.
 listen impala :25003
     mode tcp
     option tcplog
     balance leastconn
 
-    server <varname>symbolic_name_1</varname> impala-host-1.example.com:21000 check
-    server <varname>symbolic_name_2</varname> impala-host-2.example.com:21000 check
-    server <varname>symbolic_name_3</varname> impala-host-3.example.com:21000 check
-    server <varname>symbolic_name_4</varname> impala-host-4.example.com:21000 check
+    server <varname>symbolic_name_1</varname> impala-host-1.example.com:21050 check
+    server <varname>symbolic_name_2</varname> impala-host-2.example.com:21050 check
+    server <varname>symbolic_name_3</varname> impala-host-3.example.com:21050 check
+    server <varname>symbolic_name_4</varname> impala-host-4.example.com:21050 check
 
 # Setup for Hue or other JDBC-enabled applications.
 # In particular, Hue requires sticky sessions.

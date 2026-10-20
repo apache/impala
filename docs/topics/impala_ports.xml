@@ -57,9 +57,12 @@ under the License.
           <row>
             <entry>Impala Daemon </entry>
             <entry>--beeswax_port</entry>
-            <entry>21000 </entry>
+            <entry>0 (disabled) </entry>
             <entry>Port on which Beeswax client requests are served by Impala
-              Daemons.</entry>
+              Daemons. The Beeswax server is not started by default. Starting in
+              <keyword keyref="impala50"/>, set <codeph>--beeswax_port=21000</codeph>
+              to enable it. This interface is deprecated and will be removed in a
+              future version.</entry>
           </row>
           <row>
             <entry>Impala Daemon </entry>
