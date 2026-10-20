@@ -18,6 +18,7 @@
 #pragma once
 
 #include <cstdint>
+#include <limits>
 
 #include "common/status.h"
 #include "exec/parquet/parquet-delta-decoder.h"
@@ -52,6 +53,13 @@ class ParquetDeltaLengthByteArrayDecoder {
   /// Returns an error if the header is corrupt or the buffer is too small.
   Status NewPage(const uint8_t* data, int data_len,
       int page_num_values) WARN_UNUSED_RESULT;
+
+  /// Values longer than 'max_value_len' bytes are truncated to 'max_value_len', e.g.
+  /// to the length of a VARCHAR column. By default values are not truncated.
+  void SetMaxValueLen(int max_value_len) {
+    DCHECK_GE(max_value_len, 0);
+    max_value_len_ = max_value_len;
+  }
 
   /// Number of string values encoded in this page.
   /// Only valid after a successful call to NewPage().
@@ -110,6 +118,9 @@ class ParquetDeltaLengthByteArrayDecoder {
 
   /// Bytes remaining in the string data section.
   int bytes_remaining_ = 0;
+
+  /// Values are truncated to this length, see SetMaxValueLen().
+  int32_t max_value_len_ = std::numeric_limits<int32_t>::max();
 };
 
 } // namespace impala

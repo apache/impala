@@ -283,6 +283,32 @@ TEST(ParquetDeltaLengthByteArrayDecoderTest, ShortStringsInlined) {
   }
 }
 
+TEST(ParquetDeltaLengthByteArrayDecoderTest, MaxValueLen) {
+  // Values longer than the max length (e.g. of a VARCHAR column) are truncated. Long
+  // values truncated to fit the small-string representation are inlined.
+  const string long_str = "this_is_longer_than_small_limit";
+  const vector<string> input = {"abc", "abcdefghij", "", long_str, "xy"};
+  vector<uint8_t> page;
+  BuildPage(input, &page);
+
+  for (int max_len : {3, 20}) {
+    SCOPED_TRACE(max_len);
+    ParquetDeltaLengthByteArrayDecoder dec;
+    dec.SetMaxValueLen(max_len);
+    ASSERT_OK(dec.NewPage(page.data(), static_cast<int>(page.size()),
+        static_cast<int>(page.size())));
+    const int n = static_cast<int>(input.size());
+    vector<StringValue> out(n);
+    ASSERT_EQ(n, dec.NextValues(n, out.data(), sizeof(StringValue)));
+    for (int i = 0; i < n; ++i) {
+      EXPECT_EQ(input[i].substr(0, max_len), string(out[i].Ptr(), out[i].Len()))
+          << "Mismatch at index " << i;
+    }
+    // Only the long string truncated to 20 bytes is too long to inline.
+    EXPECT_EQ(max_len <= SmallableString::SMALL_LIMIT, dec.HasOnlySmallStrings());
+  }
+}
+
 TEST(ParquetDeltaLengthByteArrayDecoderTest, NewPageResets) {
   const vector<string> first = {"aaa", "bbb"};
   const vector<string> second = {"x", "yy", "zzz"};

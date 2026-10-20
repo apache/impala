@@ -130,7 +130,9 @@ int ParquetDeltaLengthByteArrayDecoder::NextValues(
     }
     const int32_t len = lengths_buf_[buf_pos_++];
     StringValue* sv = reinterpret_cast<StringValue*>(out_bytes);
-    *sv = StringValue(reinterpret_cast<char*>(const_cast<uint8_t*>(data_)), len);
+    // Truncate before Smallify(), so that truncated values can be smallified.
+    *sv = StringValue(reinterpret_cast<char*>(const_cast<uint8_t*>(data_)),
+        std::min(len, max_value_len_));
     // Smallify() is safe here because the StringValue is in the output buffer
     // and exclusively owned by the decoder at this point. For strings that are
     // too long to inline, the StringValue keeps pointing into the page buffer,

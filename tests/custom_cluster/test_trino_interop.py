@@ -123,29 +123,9 @@ class TestTrinoInterop(CustomClusterTestSuite):
           catalog=self.HIVE_CATALOG)
 
   @pytest.mark.execute_serially
-  def test_impala_reads_trino_parquet(self, unique_name):
-    """Trino writes a Parquet table with string columns; Impala reads it back.
-    Trino 482 encodes VARCHAR columns with DELTA_LENGTH_BYTE_ARRAY in Parquet V2,
+  def test_impala_reads_trino_parquet(self, vector, unique_database):
+    """Trino writes a Parquet table with a column of each scalar type; Impala reads it
+    back. Trino 482 encodes VARCHAR columns with DELTA_LENGTH_BYTE_ARRAY in Parquet V2,
     so this specifically exercises Impala's DELTA_LENGTH_BYTE_ARRAY decoder."""
-    trino_db = unique_name
-    try:
-      self.run_stmt_in_trino(
-          "CREATE SCHEMA {0}.{1}".format(self.HIVE_CATALOG, trino_db),
-          catalog=self.HIVE_CATALOG)
-      # Trino's Parquet writer uses DELTA_LENGTH_BYTE_ARRAY for VARCHAR columns.
-      self.run_stmt_in_trino(
-          "CREATE TABLE {0}.t (id INTEGER, s VARCHAR) WITH (format = 'PARQUET')".format(
-              trino_db),
-          catalog=self.HIVE_CATALOG)
-      self.run_stmt_in_trino(
-          "INSERT INTO {0}.t VALUES (1, 'hello'), (2, 'world'), (3, '')".format(trino_db),
-          catalog=self.HIVE_CATALOG)
-
-      EventProcessorUtils.wait_for_event_processing(self)
-      result = self.execute_query(
-          "SELECT id, s FROM {0}.t ORDER BY id".format(trino_db))
-      assert result.data == ["1\thello", "2\tworld", "3\t"], result.data
-    finally:
-      self.run_stmt_in_trino(
-          "DROP SCHEMA IF EXISTS {0}.{1} CASCADE".format(self.HIVE_CATALOG, trino_db),
-          catalog=self.HIVE_CATALOG)
+    self.run_test_case('QueryTest/trino-interop-parquet', vector,
+                       use_db=unique_database)

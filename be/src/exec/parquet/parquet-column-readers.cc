@@ -309,6 +309,7 @@ ScalarColumnReader<InternalType, PARQUET_TYPE, MATERIALIZED>::ScalarColumnReader
     fixed_len_size_ = node.element->type_length;
   } else if (slot_desc_->type().type == TYPE_VARCHAR) {
     fixed_len_size_ = slot_desc_->type().len;
+    delta_length_byte_array_decoder_.SetMaxValueLen(fixed_len_size_);
   } else {
     fixed_len_size_ = -1;
   }

@@ -1,0 +1,58 @@
+# Impala <-> Trino interop over legacy Hive tables: Impala reads a Parquet table that
+# Trino writes, with a column of each scalar type.
+#
+# TRINO_QUERY runs in Trino's 'iceberg' catalog, so the legacy Hive table is created
+# with its fully qualified name in the 'hive' catalog. Both catalogs use the same HMS,
+# so the table is in the test database. Trino 482 encodes VARCHAR columns with
+# DELTA_LENGTH_BYTE_ARRAY in Parquet V2, so this exercises Impala's
+# DELTA_LENGTH_BYTE_ARRAY decoder.
+====
+---- TRINO_QUERY
+# Rows 1 and 2 hold boundary values, row 3 multi-byte strings and row 4 NULLs.
+# U&'\00E1rv\00EDz' is 'árvíz'.
+CREATE TABLE hive.$DATABASE.trino_types (id INTEGER, b BOOLEAN, ti TINYINT,
+  si SMALLINT, i INTEGER, bi BIGINT, f REAL, d DOUBLE, dec4 DECIMAL(9,2),
+  dec8 DECIMAL(18,4), dec16 DECIMAL(38,10), s VARCHAR, vc VARCHAR(10), c CHAR(5),
+  bin VARBINARY, dt DATE, ts TIMESTAMP)
+WITH (format = 'PARQUET');
+INSERT INTO hive.$DATABASE.trino_types VALUES
+  (1, true, 127, 32767, 2147483647, 9223372036854775807, 3.5, -2.25, 1234567.89,
+   12345678901234.5678, 1234567890123456789012345678.0123456789, 'hello',
+   'abcdefghij', 'ab', X'0102FF', DATE '2024-02-29',
+   TIMESTAMP '2024-02-29 12:34:56.789'),
+  (2, false, -128, -32768, -2147483648, -9223372036854775808, -0.125, 1e10,
+   -9999999.99, -0.0001, -0.0000000001, '', 'xy', '', X'', DATE '0001-01-01',
+   TIMESTAMP '1969-12-31 23:59:59.999'),
+  (3, true, 0, 0, 0, 0, 0, 0, 0, 0, 0, U&'\00E1rv\00EDz', 'abcde', 'abcde', X'00',
+   DATE '9999-12-31', TIMESTAMP '9999-12-31 23:59:59.999'),
+  (4, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
+   NULL, NULL, NULL)
+====
+---- QUERY
+# 'bin' is returned as hex() to show its exact bytes.
+INVALIDATE METADATA trino_types;
+SELECT id, b, ti, si, i, bi, f, d, dec4, dec8, dec16, s, vc, c,
+  hex(cast(bin AS STRING)), dt, ts
+FROM trino_types ORDER BY id;
+---- RESULTS: RAW_STRING
+1,true,127,32767,2147483647,9223372036854775807,3.5,-2.25,1234567.89,12345678901234.5678,1234567890123456789012345678.0123456789,'hello','abcdefghij','ab   ','0102FF',2024-02-29,2024-02-29 12:34:56.789000000
+2,false,-128,-32768,-2147483648,-9223372036854775808,-0.125,10000000000,-9999999.99,-0.0001,-0.0000000001,'','xy','     ','',0001-01-01,1969-12-31 23:59:59.999000000
+3,true,0,0,0,0,0,0,0.00,0.0000,0.0000000000,'árvíz','abcde','abcde','00',9999-12-31,9999-12-31 23:59:59.999000000
+4,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,'NULL','NULL','NULL','NULL',NULL,NULL
+---- TYPES
+INT,BOOLEAN,TINYINT,SMALLINT,INT,BIGINT,FLOAT,DOUBLE,DECIMAL,DECIMAL,DECIMAL,STRING,VARCHAR,CHAR,STRING,DATE,TIMESTAMP
+====
+---- QUERY
+# Values longer than the VARCHAR length are truncated. No ORDER BY: sorting would copy
+# 'vc' into the sort tuple, where a value that was not truncated hits a DCHECK instead
+# of failing the result check.
+ALTER TABLE trino_types CHANGE vc vc VARCHAR(3);
+SELECT id, vc FROM trino_types;
+---- RESULTS
+1,'abc'
+2,'xy'
+3,'abc'
+4,'NULL'
+---- TYPES
+INT,VARCHAR
+====
