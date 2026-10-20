@@ -408,7 +408,7 @@ Status StatestoreSubscriber::Start() {
 
 /// Set Register Request
 Status StatestoreSubscriber::SetRegisterRequest(
-    TRegisterSubscriberRequest* request) {
+    TRegisterSubscriberRequest* request, bool /* may_claim_active */) {
   // Resolve the heartbeat address if necessary. Don't re-register with statestore
   // if the heartbeat address cannot be resolved.
   TNetworkAddress heartbeat_address = heartbeat_address_;
@@ -811,11 +811,25 @@ Status StatestoreSubscriber::StatestoreStub::Register(bool* has_active_catalogd,
     statestore_id_ = TUniqueId();
     registration_in_flight_ = true;
   }
+  // A statestore that restarted has a new instance ID; an old statestore does not send
+  // one, which counts as the same instance.
+  bool new_statestore_instance = false;
+  if (get_protocol_response.__isset.statestore_id) {
+    lock_guard<mutex> l(id_lock_);
+    new_statestore_instance =
+        get_protocol_response.statestore_id != last_registered_statestore_id_;
+  }
   const auto clear_in_flight = MakeScopeExitTrigger([this]() {
     lock_guard<mutex> l(id_lock_);
     registration_in_flight_ = false;
   });
-  RETURN_IF_ERROR(subscriber_->SetRegisterRequest(&request));
+  // The view of the active statestore is fresh if this stub is followed as active, or the
+  // followed one is connected (a change would have reached this subscriber).
+  StatestoreStub* active_statestore = subscriber_->GetActiveStatestore();
+  bool view_fresh = active_statestore != nullptr && (active_statestore == this
+      || active_statestore->connected_to_statestore_metric_->GetValue());
+  RETURN_IF_ERROR(subscriber_->SetRegisterRequest(
+      &request, new_statestore_instance && view_fresh));
   TRegisterSubscriberResponse response;
   attempt = 0; // Used for debug action only.
   rpc_status =
@@ -856,6 +870,7 @@ Status StatestoreSubscriber::StatestoreStub::Register(bool* has_active_catalogd,
     }
     if (response.__isset.statestore_id) {
       statestore_id_ = response.statestore_id;
+      if (status.ok()) last_registered_statestore_id_ = statestore_id_;
       const string& statestore_id_string = PrintId(statestore_id_);
       statestore_id_metric_->SetValue(statestore_id_string);
       VLOG(1) << "Statestore ID: " << statestore_id_string;

@@ -149,7 +149,10 @@ class StatestoreSubscriber {
   virtual Status Start();
 
   /// Set Register Request
-  virtual Status SetRegisterRequest(TRegisterSubscriberRequest* request);
+  /// Fills the registration request. 'may_claim_active' is true if a catalogd may claim
+  /// the active role with this registration (see StatestoreStub::Register()).
+  virtual Status SetRegisterRequest(
+      TRegisterSubscriberRequest* request, bool may_claim_active);
 
   /// Return the port that the subscriber is listening on.
   int heartbeat_port() const { return heartbeat_address_.port; }
@@ -499,6 +502,10 @@ class StatestoreSubscriber {
 
     /// True while a RegisterSubscriber RPC is in flight. Protected by 'id_lock_'.
     bool registration_in_flight_ = false;
+
+    /// Instance ID of the statestore of the last successful registration, kept across
+    /// re-registration attempts. Protected by 'id_lock_'.
+    TUniqueId last_registered_statestore_id_;
 
     /// Monotonic timestamp of the last successful registration.
     AtomicInt64 last_registration_ms_{0};

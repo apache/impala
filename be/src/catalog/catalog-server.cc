@@ -743,6 +743,10 @@ Status CatalogServer::Start() {
      Substitute("catalog-server@$0", TNetworkAddressToString(server_address)),
      subscriber_address, statestore_address, statestore2_address, metrics_,
      protocol_version_, server_address));
+  // Lock-free: the callback runs while a statestore stub lock is held, and
+  // 'catalog_lock_' can be held for minutes (topic gathering, metadata reset).
+  statestore_subscriber_->SetActiveRoleCallback(
+      [this]() { return active_status_metric_->GetValue(); });
 
   StatestoreSubscriber::UpdateCallback cb =
       bind<void>(mem_fn(&CatalogServer::UpdateCatalogTopicCallback), this, _1, _2);

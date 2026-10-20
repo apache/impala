@@ -1170,6 +1170,57 @@ class TestStatestoredHA(CustomClusterTestSuite):
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args(
     statestored_args="--use_network_address_as_statestore_priority=true "
+                     "--statestore_ha_heartbeat_monitoring_frequency_ms=50 "
+                     "--statestore_peer_timeout_seconds=2 "
+                     "--use_subscriber_id_as_catalogd_priority=true",
+    impalad_args="--statestore_subscriber_timeout_seconds=2",
+    catalogd_args="--statestore_subscriber_timeout_seconds=2",
+    start_args="--enable_statestored_ha --enable_catalogd_ha",
+    disable_log_buffering=True)
+  def test_active_catalogd_kept_after_statestored_restart(self):
+    """catalogds[1] is active while catalogds[0] has the higher priority. A restarted
+    statestored must keep catalogds[1] as active, also after it takes over."""
+    statestoreds = self.cluster.statestoreds()
+    assert len(statestoreds) == 2
+    statestore_service_0 = statestoreds[0].service
+    catalogds = self.cluster.catalogds()
+    assert len(catalogds) == 2
+
+    # Make catalogds[1] active: fail over from catalogds[0], then restart it as standby.
+    catalogds[0].kill()
+    active_port = catalogds[1].service.get_catalog_service_port()
+    self.__wait_for_active_catalogd_port(statestore_service_0, active_port)
+    catalogds[1].service.wait_for_metric_value(
+        "catalog-server.active-status", expected_value=True, timeout=30)
+    catalogds[0].start(wait_until_ready=True)
+    statestore_service_0.wait_for_live_subscribers(5, timeout=60)
+    assert not catalogds[0].service.get_metric_value("catalog-server.active-status")
+
+    # Restart the standby statestoreds[1]; both catalogds register with it again.
+    statestoreds[1].kill()
+    statestoreds[1].start(wait_until_ready=True)
+    statestore_service_1 = statestoreds[1].service
+    statestore_service_1.wait_for_live_subscribers(5, timeout=60)
+    assert not statestore_service_1.get_metric_value("statestore.active-status")
+    self.assert_log_contains("catalogd_node1", "INFO", "Register as the active catalogd",
+        expected_count=1)
+
+    # statestoreds[1] takes over with its own choice of the active catalogd.
+    statestoreds[0].kill()
+    self.__wait_statestore_to_be_active(statestore_service_1, 1)
+    self.__wait_for_active_catalogd_port(statestore_service_1, active_port, timeout_s=10)
+    # Give a wrong UpdateCatalogd time to reach the catalogds.
+    sleep(2)
+    assert self.__get_active_catalogd_port(statestore_service_1) == active_port
+    assert catalogds[1].service.get_metric_value("catalog-server.active-status")
+    assert not catalogds[0].service.get_metric_value("catalog-server.active-status")
+    for i in range(len(self.cluster.impalads)):
+      self.__verify_impalad_active_catalogd_port(i, catalogds[1].service)
+    self.__run_simple_queries(sync_ddl=True)
+
+  @pytest.mark.execute_serially
+  @CustomClusterTestSuite.with_args(
+    statestored_args="--use_network_address_as_statestore_priority=true "
                      "--statestore_peer_timeout_seconds=120",
     impalad_args="--statestore_subscriber_timeout_seconds=10",
     catalogd_args="--statestore_subscriber_timeout_seconds=10",

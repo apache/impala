@@ -23,6 +23,11 @@ using namespace impala;
 DECLARE_bool(enable_catalogd_ha);
 DECLARE_bool(force_catalogd_active);
 
+DEFINE_bool_hidden(catalogd_ha_keep_active_on_reregistration, true, "With catalogd HA, "
+    "the active catalogd registers as the active one with a new statestore instance "
+    "unless it follows no active statestore or is cut off from it, so that a restarted "
+    "statestore keeps it as the active catalogd.");
+
 StatestoreSubscriberCatalog::StatestoreSubscriberCatalog(
     const std::string& subscriber_id,
     const TNetworkAddress& heartbeat_address,
@@ -37,6 +42,21 @@ StatestoreSubscriberCatalog::StatestoreSubscriberCatalog(
   catalogd_registration_.__set_address(catalogd_address);
   catalogd_registration_.__set_enable_catalogd_ha(FLAGS_enable_catalogd_ha);
   catalogd_registration_.__set_force_catalogd_active(FLAGS_force_catalogd_active);
+}
+
+Status StatestoreSubscriberCatalog::SetRegisterRequest(
+    TRegisterSubscriberRequest* request, bool may_claim_active) {
+  TCatalogRegistration registration = catalogd_registration_;
+  // A new statestore instance does not know the active catalogd: the active one claims
+  // the role, unless it is cut off from the statestore that may have demoted it.
+  if (FLAGS_enable_catalogd_ha && !FLAGS_force_catalogd_active
+      && FLAGS_catalogd_ha_keep_active_on_reregistration && may_claim_active
+      && active_role_callback_ && active_role_callback_()) {
+    registration.__set_force_catalogd_active(true);
+    LOG(INFO) << "Register as the active catalogd";
+  }
+  request->__set_catalogd_registration(registration);
+  return StatestoreSubscriber::SetRegisterRequest(request, may_claim_active);
 }
 
 bool ActiveCatalogdVersionChecker::CheckActiveCatalogdVersion(

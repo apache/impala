@@ -17,6 +17,8 @@
 
 #pragma once
 
+#include <functional>
+
 #include "statestore/statestore-subscriber.h"
 
 namespace impala {
@@ -45,14 +47,19 @@ class StatestoreSubscriberCatalog : public StatestoreSubscriber {
   virtual ~StatestoreSubscriberCatalog() {}
 
   /// Set Register Request
-  virtual Status SetRegisterRequest(TRegisterSubscriberRequest* request) {
-    request->__set_catalogd_registration(catalogd_registration_);
-    return StatestoreSubscriber::SetRegisterRequest(request);
+  virtual Status SetRegisterRequest(
+      TRegisterSubscriberRequest* request, bool may_claim_active) override;
+
+  /// Callback returning true while this catalogd is the active one; must not block.
+  void SetActiveRoleCallback(std::function<bool()> callback) {
+    active_role_callback_ = std::move(callback);
   }
 
  private:
   /// Additional registration info for catalog daemon.
   TCatalogRegistration catalogd_registration_;
+
+  std::function<bool()> active_role_callback_;
 };
 
 /// ActiveCatalogdVersionChecker:
