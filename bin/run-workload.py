@@ -27,6 +27,7 @@
 #   - Stores the execution details in JSON format.
 #
 
+import argparse
 import getpass
 import json
 import logging
@@ -38,7 +39,6 @@ from copy import deepcopy
 from datetime import datetime
 from decimal import Decimal
 from itertools import groupby
-from optparse import OptionParser
 from random import shuffle
 from sys import exit
 
@@ -49,71 +49,72 @@ from tests.performance.workload_runner import WorkloadRunner
 from tests.performance.workload import Workload
 from tests.util.plugin_runner import PluginRunner
 
-parser = OptionParser()
-parser.add_option("-v", "--verbose", dest="verbose", action="store_true",
-                  default=False, help="If set, outputs all benchmark diagnostics.")
-parser.add_option("--exploration_strategy", dest="exploration_strategy", default="core",
-                  help=("The exploration strategy to use for running benchmark: 'core', "
-                        "'pairwise', or 'exhaustive'"))
-parser.add_option("-w", "--workloads", dest="workloads", default="tpcds",
-                  help=("The workload(s) and scale factors to run in a comma-separated "
-                  " list format. Optional scale factors for each workload are specified"
-                  " using colons. For example: -w tpcds,tpch:400gb,tpch:1gb. "
-                  "Some valid workloads:'tpch', 'tpcds', ..."))
-parser.add_option("--impalads", dest="impalads", default="localhost",
-                  help=("A comma-separated list of impalad instances to run the "
-                  "workload against."))
-parser.add_option("--exec_options", dest="exec_options", default=str(),
-                  help=("Run query exec option string "
-                    "(formatted as 'opt1:val1;opt2:val2')."))
-parser.add_option("--results_json_file", dest="results_json_file",
-                  default=os.environ['IMPALA_HOME'] + "/benchmark_results.json",
-                  help="The output file where benchmark results are saved")
-parser.add_option("-i", "--query_iterations", type="int", dest="query_iterations",
-                  default=1, help="Number of times to run each query within a workload")
-parser.add_option("-x", "--workload_iterations", type="int", dest="workload_iterations",
-                  default=1, help="Number of times to run each workload.")
-parser.add_option("--num_clients", type="int", dest="num_clients", default=1,
-                  help="Number of clients (threads) to use when executing each query.")
-parser.add_option("--query_names", dest="query_names", default=str(),
-                  help="A comma-separated list of regular expressions. A query is"
+parser = argparse.ArgumentParser(
+    description="Driver to run performance benchmarks against Impala or Hive.")
+parser.add_argument("-v", "--verbose", action="store_true", default=False,
+                    help="If set, outputs all benchmark diagnostics.")
+parser.add_argument("--exploration_strategy", default="core",
+                    help=("The exploration strategy to use for running benchmark: "
+                          "'core', 'pairwise', or 'exhaustive'"))
+parser.add_argument("-w", "--workloads", default="tpcds",
+                    help=("The workload(s) and scale factors to run in a "
+                          "comma-separated list format. Optional scale factors for each "
+                          "workload are specified using colons. For example: "
+                          "-w tpcds,tpch:400gb,tpch:1gb. "
+                          "Some valid workloads:'tpch', 'tpcds', ..."))
+parser.add_argument("--impalads", default="localhost",
+                    help=("A comma-separated list of impalad instances to run the "
+                          "workload against."))
+parser.add_argument("--exec_options", default=str(),
+                    help=("Run query exec option string "
+                          "(formatted as 'opt1:val1;opt2:val2')."))
+parser.add_argument("--results_json_file",
+                    default=os.environ['IMPALA_HOME'] + "/benchmark_results.json",
+                    help="The output file where benchmark results are saved")
+parser.add_argument("-i", "--query_iterations", type=int, default=1,
+                    help="Number of times to run each query within a workload")
+parser.add_argument("-x", "--workload_iterations", type=int, default=1,
+                    help="Number of times to run each workload.")
+parser.add_argument("--num_clients", type=int, default=1,
+                    help="Number of clients (threads) to use when executing each query.")
+parser.add_argument("--query_names", default=str(),
+                    help="A comma-separated list of regular expressions. A query is"
                     " executed if it matches any of the expressions.")
-parser.add_option("--table_formats", dest="table_formats", default=str(),
-                  help=("Override the default test vectors and run using only the"
-                        " specified table formats. Ex. --table_formats=seq/snap/block"
-                        ",text/none"))
-parser.add_option("--shuffle_query_exec_order", dest="shuffle_queries",
-                  action="store_true", default=False, help=("Randomizes the order "
-                    "of query execution. Useful when the execution scope is a workload"))
-parser.add_option("--plan_first", dest="plan_first", action="store_true", default=False,
-                  help=("Runs EXPLAIN before running the query so that metadata loading"
-                        " is excluded from the timing"))
+parser.add_argument("--table_formats", default=str(),
+                    help=("Override the default test vectors and run using only the"
+                          " specified table formats. Ex. --table_formats=seq/snap/block"
+                          ",text/none"))
+parser.add_argument("--shuffle_query_exec_order", dest="shuffle_queries",
+                    action="store_true", default=False,
+                    help=("Randomizes the order of query execution. Useful when the "
+                          "execution scope is a workload"))
+parser.add_argument("--plan_first", action="store_true", default=False,
+                    help=("Runs EXPLAIN before running the query so that metadata "
+                          "loading is excluded from the timing"))
 
-parser.add_option("--use_kerberos", dest="use_kerberos", action="store_true",
-                  default=False, help="If set, enables talking to a kerberized impalad")
-parser.add_option("--continue_on_query_error", dest="continue_on_query_error",
-                  action="store_true", default=False,
-                  help="If set, continue execution on each query error.")
-parser.add_option("-c", "--client_type", dest="client_type", default='hs2',
-                  choices=['jdbc', 'hs2'],
-                  help="Client type. Valid options are 'beeswax' or 'jdbc' or 'hs2'")
-parser.add_option("--plugin_names", dest="plugin_names", default=None,
-                  help=("Set of comma-separated plugin names with scope; Plugins are"
-                    " specified as <plugin_name>[:<scope>]. If no scope if specified,"
-                    " it defaults to Query. Plugin names are case sensitive"))
-parser.add_option("--exec_engine", dest="exec_engine", default="impala",
-                  choices=['impala', 'hive'],
-                  help=("Which SQL engine to use - impala, hive are valid options"))
-parser.add_option("--hiveserver", dest="hiveserver", default="localhost",
-                  help=("Host that has HiveServers2 service running"))
-parser.add_option("--user", dest="user", default=getpass.getuser(),
-                  help=("User account under which workload/query will run"))
-parser.add_option("--get_password", dest="get_password", default=False,
-                  action="store_true", help=("Prompt for password for user account"))
-parser.add_option("--use_ssl", dest="use_ssl", action="store_true", default=False,
-                  help=("Whether to use SSL or not"))
+parser.add_argument("--use_kerberos", action="store_true", default=False,
+                    help="If set, enables talking to a kerberized impalad")
+parser.add_argument("--continue_on_query_error", action="store_true", default=False,
+                    help="If set, continue execution on each query error.")
+parser.add_argument("-c", "--client_type", default='hs2', choices=['jdbc', 'hs2'],
+                    help="Client type. Valid options are 'jdbc' or 'hs2'")
+parser.add_argument("--plugin_names", default=None,
+                    help=("Set of comma-separated plugin names with scope; Plugins are"
+                          " specified as <plugin_name>[:<scope>]. If no scope if "
+                          "specified, it defaults to Query. Plugin names are case "
+                          "sensitive"))
+parser.add_argument("--exec_engine", default="impala", choices=['impala', 'hive'],
+                    help="Which SQL engine to use - impala, hive are valid options")
+parser.add_argument("--hiveserver", default="localhost",
+                    help="Host that has HiveServers2 service running")
+parser.add_argument("--user", default=getpass.getuser(),
+                    help="User account under which workload/query will run")
+parser.add_argument("--get_password", default=False, action="store_true",
+                    help="Prompt for password for user account")
+parser.add_argument("--use_ssl", action="store_true", default=False,
+                    help="Whether to use SSL or not")
 
-options, args = parser.parse_args()
+options = parser.parse_args()
 
 options.password = None
 if options.get_password:

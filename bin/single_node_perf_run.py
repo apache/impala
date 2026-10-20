@@ -74,15 +74,14 @@
 #   --exec_options        query exec option string to run workload
 #                         (formatted as 'opt1:val1;opt2:val2')
 
-from optparse import OptionParser
 from tempfile import mkdtemp
 
+import argparse
 import json
 import os
 import pipes
 import shutil
 import subprocess
-import sys
 import textwrap
 
 from tests.common.test_dimensions import TableFormatInfo
@@ -343,72 +342,72 @@ def perf_ab_test(options, args):
 
 def parse_options():
   """Parse and return the options and positional arguments."""
-  parser = OptionParser()
-  parser.add_option("--workloads", default="targeted-perf",
-                    help="comma-separated list of workloads. Choices: tpch, "
-                    "targeted-perf, tpcds. Default: targeted-perf")
-  parser.add_option("--scale", help="scale factor for the workloads [required]")
-  parser.add_option("--iterations", default=30, help="number of times to run each query")
-  parser.add_option("--table_formats", default="parquet/none", help="comma-separated "
-                    "list of table formats. Default: parquet/none")
-  parser.add_option("--num_impalads", default=1, help="number of impalads. Default: 1")
+  parser = argparse.ArgumentParser(
+      usage="%(prog)s [options] git_hash_A [git_hash_B]",
+      formatter_class=argparse.RawDescriptionHelpFormatter,
+      description=textwrap.dedent("""\
+        When one hash is given, measures the performance on the specified workloads.
+        When two hashes are given, compares their performance. Output is in
+        $IMPALA_HOME/perf_results/latest. In the performance_result.txt file,
+        git_hash_A is referred to as the "Base" result. For example, if you run with
+        git_hash_A = aBad1dea... and git_hash_B = 8675309... the
+        performance_result.txt will say at the top:
+
+          Run Description: "aBad1dea... vs 8675309..."
+
+        The different queries will have their run time statistics in columns
+        "Avg(s)", "StdDev(%)", "BaseAvg(s)", "Base StdDev(%)". The first two refer
+        to git_hash_B, the second two refer to git_hash_A. The column "Delta(Avg)"
+        is negative if git_hash_B is faster and is positive if git_hash_A is faster.
+
+        WARNING: This script will run git checkout. You should not touch the tree
+        while the script is running. You should start the script from a clean git
+        tree.
+
+        WARNING: When --load is used, this script calls load_data.py which can
+        overwrite your TPC-H and TPC-DS data."""))
+  parser.add_argument("git_hash_A", metavar="git_hash_A",
+                      help="git hash (or ref) to measure; the \"Base\" in comparisons")
+  parser.add_argument("git_hash_B", metavar="git_hash_B", nargs="?",
+                      help="optional second git hash (or ref) to compare against")
+  parser.add_argument("--workloads", default="targeted-perf",
+                      help="comma-separated list of workloads. Choices: tpch, "
+                      "targeted-perf, tpcds. Default: targeted-perf")
+  parser.add_argument("--scale", required=True,
+                      help="scale factor for the workloads [required]")
+  parser.add_argument("--iterations", type=int, default=30,
+                      help="number of times to run each query. Default: 30")
+  parser.add_argument("--table_formats", default="parquet/none", help="comma-separated "
+                      "list of table formats. Default: parquet/none")
+  parser.add_argument("--num_impalads", type=int, default=1,
+                      help="number of impalads. Default: 1")
   # Less commonly-used options:
-  parser.add_option("--query_names",
-                    help="comma-separated list of regular expressions. A query is "
-                    "executed if it matches any regular expression in this list")
-  parser.add_option("--load", action="store_true",
-                    help="load databases for the chosen workloads")
-  parser.add_option("--start_minicluster", action="store_true",
-                    help="start a new Hadoop minicluster")
-  parser.add_option("--ninja", action="store_true",
-                    help="use ninja, rather than Make, as the build tool")
-  parser.add_option("--impalad_args", dest="impalad_args", action="append", type="string",
-                    default=[],
-                    help="Additional arguments to pass to each Impalad during startup")
-  parser.add_option("--split_profiles", action="store_true", dest="split_profiles",
-                    default=True, help=("If specified, query profiles will be generated "
-                      "as separate files"))
-  parser.add_option("--no_split_profiles", action="store_false", dest="split_profiles",
-                    help=("If specified, query profiles will be generated as a "
-                      "single-combined file"))
-  parser.add_option("--exec_options", dest="exec_options",
-                    help=("Query exec option string to run workload (formatted as "
-                      "'opt1:val1;opt2:val2')"))
+  parser.add_argument("--query_names",
+                      help="comma-separated list of regular expressions. A query is "
+                      "executed if it matches any regular expression in this list")
+  parser.add_argument("--load", action="store_true",
+                      help="load databases for the chosen workloads")
+  parser.add_argument("--start_minicluster", action="store_true",
+                      help="start a new Hadoop minicluster")
+  parser.add_argument("--ninja", action="store_true",
+                      help="use ninja, rather than Make, as the build tool")
+  parser.add_argument("--impalad_args", action="append", default=[],
+                      help="Additional arguments to pass to each Impalad during startup")
+  parser.add_argument("--split_profiles", action="store_true", dest="split_profiles",
+                      default=True, help=("If specified, query profiles will be "
+                        "generated as separate files (the default)"))
+  parser.add_argument("--no_split_profiles", action="store_false", dest="split_profiles",
+                      help=("If specified, query profiles will be generated as a "
+                        "single-combined file"))
+  parser.add_argument("--exec_options",
+                      help=("Query exec option string to run workload (formatted as "
+                        "'opt1:val1;opt2:val2')"))
 
-  parser.set_usage(textwrap.dedent("""
-    single_node_perf_run.py [options] git_hash_A [git_hash_B]
+  options = parser.parse_args()
 
-    When one hash is given, measures the performance on the specified workloads.
-    When two hashes are given, compares their performance. Output is in
-    $IMPALA_HOME/perf_results/latest. In the performance_result.txt file,
-    git_hash_A is referred to as the "Base" result. For example, if you run with
-    git_hash_A = aBad1dea... and git_hash_B = 8675309... the
-    performance_result.txt will say at the top:
-
-      Run Description: "aBad1dea... vs 8675309..."
-
-    The different queries will have their run time statistics in columns
-    "Avg(s)", "StdDev(%)", "BaseAvg(s)", "Base StdDev(%)". The first two refer
-    to git_hash_B, the second two refer to git_hash_A. The column "Delta(Avg)"
-    is negative if git_hash_B is faster and is positive if git_hash_A is faster.
-
-    WARNING: This script will run git checkout. You should not touch the tree
-    while the script is running. You should start the script from a clean git
-    tree.
-
-    WARNING: When --load is used, this script calls load_data.py which can
-    overwrite your TPC-H and TPC-DS data."""))
-
-  options, args = parser.parse_args()
-
-  if not 1 <= len(args) <= 2:
-    parser.print_usage(sys.stderr)
-    raise Exception("Invalid arguments: either 1 or 2 Git hashes allowed")
-
-  if not options.scale:
-    parser.print_help(sys.stderr)
-    raise Exception("--scale is required")
-
+  args = [options.git_hash_A]
+  if options.git_hash_B:
+    args.append(options.git_hash_B)
   return options, args
 
 

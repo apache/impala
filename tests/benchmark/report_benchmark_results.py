@@ -28,6 +28,7 @@
 # be an int (2). The following line changes this behavior so that float will be returned
 # if necessary (2.5).
 
+import argparse
 import difflib
 import json
 import logging
@@ -37,7 +38,6 @@ import prettytable
 import re
 from collections import defaultdict
 from datetime import date
-from optparse import OptionParser
 from urllib.request import Request, urlopen
 from tests.util.calculation_util import (
     calculate_tval, calculate_avg, calculate_stddev, calculate_geomean, calculate_mwu)
@@ -87,60 +87,60 @@ TEST_VECTOR = 'test_vector'
 TIME_TAKEN = 'time_taken'
 WORKLOAD_NAME = 'workload_name'
 
-parser = OptionParser()
-parser.add_option("--input_result_file", dest="result_file",
-                 default=os.environ['IMPALA_HOME'] + '/benchmark_results.json',
-                 help="The input JSON file with benchmark results")
-parser.add_option("--hive_results", dest="hive_results", action="store_true",
-                 help="Process results generated from queries ran against Hive")
-parser.add_option("--reference_result_file", dest="reference_result_file",
-                 default=os.environ['IMPALA_HOME'] + '/reference_benchmark_results.json',
-                 help="The input JSON file with reference benchmark results")
-parser.add_option("--junit_output_file", dest="junit_output_file", default='',
-                 help='If set, outputs results in Junit format to the specified file')
-parser.add_option("--no_output_table", dest="no_output_table", action="store_true",
-                 default=False, help='Outputs results in table format to the console')
-parser.add_option("--report_description", dest="report_description", default=None,
-                 help='Optional description for the report.')
-parser.add_option("--cluster_name", dest="cluster_name", default='UNKNOWN',
-                 help="Name of the cluster the results are from (ex. Bolt)")
-parser.add_option("--verbose", "-v", dest="verbose", action="store_true",
-                 default=False, help='Outputs to console with with increased verbosity')
-parser.add_option("--output_all_summary_nodes", dest="output_all_summary_nodes",
-                 action="store_true", default=False,
-                 help='Print all execution summary nodes')
-parser.add_option("--build_version", dest="build_version", default='UNKNOWN',
-                 help="Build/version info about the Impalad instance results are from.")
-parser.add_option("--lab_run_info", dest="lab_run_info", default='UNKNOWN',
-                 help="Information about the lab run (name/id) that published "
-                 "the results.")
-parser.add_option("--run_user_name", dest="run_user_name", default='anonymous',
-                 help="User name that this run is associated with in the perf database")
-parser.add_option("--tval_threshold", dest="tval_threshold", default=3.0,
-                 type="float", help="The ttest t-value at which a performance change "
-                 "will be flagged as sigificant.")
-parser.add_option("--zval_threshold", dest="zval_threshold", default=3.0, type="float",
-                  help="The Mann-Whitney Z-value at which a performance change will be "
-                  "flagged as sigificant.")
-parser.add_option("--min_percent_change_threshold",
-                 dest="min_percent_change_threshold", default=5.0,
-                 type="float", help="Any performance changes below this threshold"
-                 " will not be classified as significant. If the user specifies an"
-                 " empty value, the threshold will be set to 0")
-parser.add_option("--max_percent_change_threshold",
-                 dest="max_percent_change_threshold", default=float("inf"),
-                 type="float", help="Any performance changes above this threshold"
-                 " will be classified as significant. If the user specifies an"
-                 " empty value, the threshold will be set to positive infinity")
-parser.add_option("--allowed_latency_diff_secs",
-                 dest="allowed_latency_diff_secs", default=0.0, type="float",
-                 help="If specified, only a timing change that differs by more than"
-                 " this value will be considered significant.")
-parser.add_option("--generate_html_profile_diff", action="store_true",
-                 help="If specified, generates HTML output with profile differences. "
-                 "This is very expensive and unwieldy for large profiles, so it is off "
-                 "by default.")
-options, args = parser.parse_args()
+parser = argparse.ArgumentParser(
+    description="Compares benchmark result JSON files and prints a report.")
+parser.add_argument("--input_result_file", dest="result_file",
+                    default=os.environ['IMPALA_HOME'] + '/benchmark_results.json',
+                    help="The input JSON file with benchmark results")
+parser.add_argument("--hive_results", action="store_true",
+                    help="Process results generated from queries ran against Hive")
+parser.add_argument("--reference_result_file",
+                    default=os.environ['IMPALA_HOME']
+                        + '/reference_benchmark_results.json',
+                    help="The input JSON file with reference benchmark results")
+parser.add_argument("--junit_output_file", default='',
+                    help='If set, outputs results in Junit format to the specified file')
+parser.add_argument("--no_output_table", action="store_true", default=False,
+                    help='Outputs results in table format to the console')
+parser.add_argument("--report_description", default=None,
+                    help='Optional description for the report.')
+parser.add_argument("--cluster_name", default='UNKNOWN',
+                    help="Name of the cluster the results are from (ex. Bolt)")
+parser.add_argument("--verbose", "-v", action="store_true", default=False,
+                    help='Outputs to console with with increased verbosity')
+parser.add_argument("--output_all_summary_nodes", action="store_true", default=False,
+                    help='Print all execution summary nodes')
+parser.add_argument("--build_version", default='UNKNOWN',
+                    help="Build/version info about the Impalad instance results are "
+                    "from.")
+parser.add_argument("--lab_run_info", default='UNKNOWN',
+                    help="Information about the lab run (name/id) that published "
+                    "the results.")
+parser.add_argument("--run_user_name", default='anonymous',
+                    help="User name that this run is associated with in the perf "
+                    "database")
+parser.add_argument("--tval_threshold", default=3.0, type=float,
+                    help="The ttest t-value at which a performance change "
+                    "will be flagged as sigificant.")
+parser.add_argument("--zval_threshold", default=3.0, type=float,
+                    help="The Mann-Whitney Z-value at which a performance change will "
+                    "be flagged as sigificant.")
+parser.add_argument("--min_percent_change_threshold", default=5.0, type=float,
+                    help="Any performance changes below this threshold"
+                    " will not be classified as significant. If the user specifies an"
+                    " empty value, the threshold will be set to 0")
+parser.add_argument("--max_percent_change_threshold", default=float("inf"), type=float,
+                    help="Any performance changes above this threshold"
+                    " will be classified as significant. If the user specifies an"
+                    " empty value, the threshold will be set to positive infinity")
+parser.add_argument("--allowed_latency_diff_secs", default=0.0, type=float,
+                    help="If specified, only a timing change that differs by more than"
+                    " this value will be considered significant.")
+parser.add_argument("--generate_html_profile_diff", action="store_true",
+                    help="If specified, generates HTML output with profile differences. "
+                    "This is very expensive and unwieldy for large profiles, so it is "
+                    "off by default.")
+options = parser.parse_args()
 
 
 def get_dict_from_json(filename):
