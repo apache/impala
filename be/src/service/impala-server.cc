@@ -258,8 +258,7 @@ DEFINE_string(tls_ciphersuites,
     kudu::security::SecurityDefaults::kDefaultTlsCipherSuites,
     "The TLSv1.3 cipher suites to use for TLS-secured Thrift RPC and KRPC connections. "
     "TLSv1.3 uses a new way to specify ciper suites that is independent of the older "
-    "TLSv1.2 and below cipher lists. See 'man (1) ciphers' for more information. "
-    "This flag is only effective if Impala is built with OpenSSL v1.1.1 or newer.");
+    "TLSv1.2 and below cipher lists. See 'man (1) ciphers' for more information.");
 
 const string SSL_MIN_VERSION_HELP = "The minimum SSL/TLS version that Thrift "
     "services should use for both client and server connections. Supported versions are "

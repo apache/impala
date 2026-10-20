@@ -104,7 +104,7 @@ under the License.
     <section id="section_bjg_z15_whc">
       <title>Compatibility and error handling</title>
       <p>For compatibility, AES-CTR and AES-CFB are provided as fallbacks for environments for which
-        AES-GCM might not be supported, for example, OpenSSL versions lower than 1.0.1.</p>
+        AES-GCM might not be supported.</p>
       <p>If a user-provided mode is a valid member of the AES_CIPHER_MODE modes but is not supported
         by the internal OpenSSL library, the library default mode is chosen.</p>
       <p>If a user provides an unsupported or invalid mode, the system returns an error.</p>

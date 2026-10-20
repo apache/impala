@@ -110,5 +110,53 @@ under the License.
     </p>
 
     <p outputclass="toc"/>
+
+    <section id="shell_python" rev="5.0.0">
+      <title>Python Requirements and Interpreter Selection</title>
+
+      <p>
+        Starting in <keyword keyref="impala50"/>, <cmdname>impala-shell</cmdname> requires
+        Python 3.8 or higher. Python 2 is no longer supported.
+        <cmdname>impala-shell</cmdname> can be installed on Python 3.11, 3.12, and 3.13.
+      </p>
+
+      <p>
+        The <cmdname>impala-shell</cmdname> tarball contains one installation for each
+        supported Python version. The <cmdname>impala-shell</cmdname> launcher script
+        selects the Python interpreter in this order:
+      </p>
+
+      <ol>
+        <li>
+          The executable named by the <codeph>IMPALA_PYTHON_EXECUTABLE</codeph>
+          environment variable, if it is set and the executable is found.
+        </li>
+
+        <li>
+          <codeph>python3</codeph>, if it is on the <codeph>PATH</codeph>.
+        </li>
+
+        <li>
+          <codeph>python</codeph>, if it is on the <codeph>PATH</codeph>.
+        </li>
+      </ol>
+
+      <p>
+        If none of these is found, the launcher exits with an error. If the selected
+        interpreter has a Python version that the tarball does not include, the launcher
+        exits with an error that lists the supported Python versions. Before
+        <keyword keyref="impala50"/>, the launcher preferred <codeph>python</codeph> over
+        <codeph>python3</codeph>.
+      </p>
+
+      <p>
+        The <codeph>IMPALA_SHELL_PYTHON_FALLBACK</codeph> environment variable controls
+        what happens when <codeph>IMPALA_PYTHON_EXECUTABLE</codeph> is set but its
+        executable is not found. The default value is <codeph>true</codeph>, which makes
+        the launcher continue with <codeph>python3</codeph> or <codeph>python</codeph>. If
+        you set it to <codeph>false</codeph>, the launcher exits with an error instead.
+        This variable is available in <keyword keyref="impala50"/> and higher.
+      </p>
+    </section>
   </conbody>
 </concept>

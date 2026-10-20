@@ -117,13 +117,11 @@ under the License.
           useful for connecting to a known-good Impala that is only running over
           TLS/SSL, when a copy of the certificate is not available (such as when
           debugging customer installations).</p>
-        <p>For <cmdname>impala-shell</cmdname> to successfully connect to an
-          Impala cluster that has the minimum allowed TLS/SSL version set to 1.2
-            (<codeph>--ssl_minimum_version=tlsv1.2</codeph>), the Python version
-          on the cluster that <cmdname>impala-shell</cmdname> runs on must be
-          2.7.9 or higher (or a vendor-provided Python version with the required
-          support. Some vendors patched Python 2.7.5 versions on Red Hat
-          Enterprise Linux 7 and derivatives).</p>
+        <p>
+          Starting in <keyword keyref="impala50"/>, <cmdname>impala-shell</cmdname>
+          requires Python 3.8 or higher and no longer supports Python 2. See
+          <xref href="impala_impala_shell.xml#impala_shell/shell_python"/>.
+        </p>
       </section>
 
     </conbody>
@@ -212,6 +210,23 @@ under the License.
         from https://wiki.mozilla.org/Security/Server_Side_TLS.
         Prior to <keyword keyref="impala42"/> the default was unset, and Impala used the default
         cipher list for the underlying platform.
+      </p>
+
+      <p>
+        The <codeph>--ssl_cipher_list</codeph> setting applies to TLS 1.2 and earlier. To
+        specify the cipher suites for TLS 1.3, which uses a separate format, use the
+        <codeph>--tls_ciphersuites</codeph> configuration setting. The argument is a
+        string of cipher suite names separated by colons. The default value is:
+      </p>
+
+<codeblock>
+TLS_AES_128_GCM_SHA256:TLS_AES_256_GCM_SHA384:TLS_CHACHA20_POLY1305_SHA256
+</codeblock>
+
+      <p>
+        See the output of <cmdname>man ciphers</cmdname> for the cipher suite names.
+        Starting in <keyword keyref="impala50"/>, this setting is applied to all
+        TLS-secured Thrift servers.
       </p>
 
     </conbody>
