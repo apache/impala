@@ -1999,6 +1999,11 @@ Status Statestore::ReceiveHaHandshakeRequest(const TUniqueId& peer_statestore_id
       LOG(INFO) << "Set the statestored as " << (is_active_ ? "active" : "standby");
     }
   } else {
+    // The negotiation confirmed this statestored as active: refresh the active
+    // version and notify the subscribers.
+    active_version_ = UnixMicros();
+    num_received_heartbeat_in_active_ = 0;
+    update_statestored_cv_.NotifyAll();
     LOG(INFO) << "Active state of statestored is not changed";
   }
   *statestore_active = is_active_;

@@ -547,6 +547,10 @@ class StatestoreSubscriber {
   StatestoreStub* GetActiveStatestore();
   StatestoreStub* GetStandbyStatestore();
 
+  /// Follows the registered stub reporting active with the highest version and clears
+  /// the active flag of the other stub. Takes 'statestore_ha_lock_'.
+  void ReconcileRoles(const char* reason);
+
   /// True if the checks of --statestore_subscriber_ha_role_checks apply (HA only).
   bool HaRoleChecks() const;
 

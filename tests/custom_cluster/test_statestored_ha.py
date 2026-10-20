@@ -17,6 +17,7 @@
 
 import logging
 import time
+from signal import SIGCONT, SIGSTOP
 from time import sleep
 
 import pytest
@@ -820,6 +821,8 @@ class TestStatestoredHA(CustomClusterTestSuite):
 
   # Delay of each statestore registration of the restarted catalogd on startup.
   REGISTRATION_DELAY_MS = 10000
+  # Log line of each successful statestore registration on startup.
+  REGISTERED_REGEX = "statestore registration successful on startup"
 
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args(
@@ -995,6 +998,174 @@ class TestStatestoredHA(CustomClusterTestSuite):
     """The statestored addresses of an impalad are localhost:24000 and 127.0.0.1:24000,
     two addresses of statestoreds[0]. The impalad aborts when it registers."""
     self.assert_impalad_log_contains("FATAL", "Registered with the same statestored")
+
+  @pytest.mark.execute_serially
+  @CustomClusterTestSuite.with_args(
+    statestored_args="--use_network_address_as_statestore_priority=true "
+                     "--statestore_ha_heartbeat_monitoring_frequency_ms=50 "
+                     "--statestore_peer_timeout_seconds=2 "
+                     "--use_subscriber_id_as_catalogd_priority=true",
+    impalad_args="--statestore_subscriber_timeout_seconds=2",
+    catalogd_args="--statestore_subscriber_timeout_seconds=2",
+    start_args="--enable_statestored_ha --enable_catalogd_ha",
+    disable_log_buffering=True)
+  def test_statestored_failover_between_startup_registrations(self):
+    """A catalogd registers with the active statestoreds[0] on startup, which then dies
+    before the catalogd registers with statestoreds[1]. No role update reaches the
+    catalogd in between, so both registration answers say active. The catalogd must
+    follow statestoreds[1], whose answer is newer."""
+    statestoreds = self.cluster.statestoreds()
+    assert len(statestoreds) == 2
+    statestore_service_1 = statestoreds[1].service
+    catalogds = self.cluster.catalogds()
+    standby_catalogd = catalogds[1]
+    assert not standby_catalogd.service.get_metric_value("catalog-server.active-status")
+
+    standby_log = "catalogd_node1"
+    old_log_path = self.build_log_path(standby_log, "INFO")
+    standby_catalogd.kill()
+    statestore_service_1.wait_for_live_subscribers(4, timeout=60)
+    standby_catalogd.start(wait_until_ready=False,
+        additional_args="--debug_actions=REGISTER_STATESTORE_ON_STARTUP:SLEEP@{0}"
+        .format(self.REGISTRATION_DELAY_MS))
+    start_time = time.time()
+    while self.build_log_path(standby_log, "INFO") == old_log_path:
+      assert time.time() - start_time < 60, "No new log file for " + standby_log
+      sleep(0.5)
+
+    # Kill the active statestoreds[0] once the first registration is done.
+    registered_regex = "statestore registration successful on startup"
+    self.assert_log_contains(standby_log, "INFO", registered_regex, expected_count=1,
+        timeout_s=120, sleep_s=0.2)
+    statestoreds[0].kill()
+    self.__wait_statestore_to_be_active(statestore_service_1, 1)
+    # statestoreds[1] became active before the second registration, so it answers active.
+    self.assert_log_contains(standby_log, "INFO", registered_regex, expected_count=1,
+        timeout_s=0)
+    self.assert_log_contains(standby_log, "INFO", registered_regex, expected_count=2,
+        timeout_s=120)
+    self.assert_log_contains(standby_log, "INFO",
+        r"Set active statestored as .*:{0} \(startup, was".format(
+            statestore_service_1.get_statestore_service_port()),
+        expected_count=1)
+    self.__verify_catalogd_active_statestored(1, 1)
+
+    # statestoreds[0] comes back as standby; the catalogd keeps following statestoreds[1].
+    statestoreds[0].start(wait_until_ready=True)
+    statestore_service_0 = statestoreds[0].service
+    statestore_service_0.wait_for_live_subscribers(5, timeout=60)
+    assert not statestore_service_0.get_metric_value("statestore.active-status")
+    sleep(5)
+    self.__verify_catalogd_active_statestored(1, 1)
+    self.__run_simple_queries(sync_ddl=True)
+
+  def __restart_standby_catalogd_with_registration_delay(self):
+    """Make statestoreds[1] the active one, then restart the standby catalogd so that
+    its first registration is with the standby statestoreds[0] and its second one with
+    the active statestoreds[1]. Each registration is delayed by REGISTRATION_DELAY_MS.
+    Returns (statestore_service_0, statestore_service_1, standby_catalogd,
+    standby_log) once the first registration succeeded."""
+    statestoreds = self.cluster.statestoreds()
+    assert len(statestoreds) == 2
+    statestore_service_0 = statestoreds[0].service
+    statestore_service_1 = statestoreds[1].service
+    assert statestore_service_0.get_metric_value("statestore.active-status")
+    assert not statestore_service_1.get_metric_value("statestore.active-status")
+    # Subscribers register with statestoreds[0] (--state_store_port) first. Make it the
+    # standby one: fail over to statestoreds[1], then restart statestoreds[0].
+    statestoreds[0].kill()
+    self.__wait_statestore_to_be_active(statestore_service_1, 1)
+    statestoreds[0].start(wait_until_ready=True)
+    statestore_service_0 = statestoreds[0].service
+    statestore_service_0.wait_for_live_subscribers(5, timeout=60)
+    assert not statestore_service_0.get_metric_value("statestore.active-status")
+
+    standby_catalogd = self.cluster.catalogds()[1]
+    assert not standby_catalogd.service.get_metric_value("catalog-server.active-status")
+    standby_log = "catalogd_node1"
+    old_log_path = self.build_log_path(standby_log, "INFO")
+    standby_catalogd.kill()
+    statestore_service_0.wait_for_live_subscribers(4, timeout=60)
+    statestore_service_1.wait_for_live_subscribers(4, timeout=60)
+    standby_catalogd.start(wait_until_ready=False,
+        additional_args="--debug_actions=REGISTER_STATESTORE_ON_STARTUP:SLEEP@{0}"
+        .format(self.REGISTRATION_DELAY_MS))
+    start_time = time.time()
+    while self.build_log_path(standby_log, "INFO") == old_log_path:
+      assert time.time() - start_time < 60, "No new log file for " + standby_log
+      sleep(0.5)
+    # The first registration is with the standby statestoreds[0].
+    self.assert_log_contains(standby_log, "INFO", self.REGISTERED_REGEX,
+        expected_count=1, timeout_s=120, sleep_s=0.2)
+    return statestore_service_0, statestore_service_1, standby_catalogd, standby_log
+
+  @pytest.mark.execute_serially
+  @CustomClusterTestSuite.with_args(
+    statestored_args="--use_network_address_as_statestore_priority=true "
+                     "--statestore_ha_heartbeat_monitoring_frequency_ms=1000 "
+                     "--heartbeat_monitoring_frequency_ms=6000 "
+                     "--statestore_peer_timeout_seconds=2 "
+                     "--use_subscriber_id_as_catalogd_priority=true",
+    impalad_args="--statestore_subscriber_timeout_seconds=2",
+    catalogd_args="--statestore_subscriber_timeout_seconds=2",
+    start_args="--enable_statestored_ha --enable_catalogd_ha",
+    disable_log_buffering=True)
+  def test_stale_active_statestored_on_startup(self):
+    """A catalogd registers with the standby statestored. Then the active statestored
+    is paused, the standby one takes over, and the paused statestored still reports
+    itself as active with its old active version when it resumes during the catalogd's
+    second registration and when other subscribers re-register with it. The
+    subscribers must ignore that, and after the statestoreds negotiate again, all
+    subscribers must follow the active one."""
+    statestoreds = self.cluster.statestoreds()
+    statestore_service_0, statestore_service_1, standby_catalogd, standby_log = \
+        self.__restart_standby_catalogd_with_registration_delay()
+    first_registration_time = time.time()
+    # Pause the active statestoreds[1] before the second registration starts.
+    # statestoreds[0] takes over and sends UpdateStatestoredRole to the catalogd.
+    statestoreds[1].kill(SIGSTOP)
+    try:
+      self.__wait_statestore_to_be_active(statestore_service_0, 0)
+      self.assert_log_contains(standby_log, "INFO",
+          "Updated active statestored as .*:{0}".format(
+              statestore_service_0.get_statestore_service_port()),
+          expected_count=1, timeout_s=30)
+      # Also pause statestoreds[0]: the HA heartbeats that statestoreds[1] resumes
+      # sending must not overflow its dual-active counter and start a renegotiation
+      # that refreshes the stale version before the second registration is answered.
+      statestoreds[0].kill(SIGSTOP)
+      try:
+        # Resume statestoreds[1] once the second registration waits for its response.
+        resume_time = first_registration_time + self.REGISTRATION_DELAY_MS / 1000.0 + 2
+        sleep(max(0, resume_time - time.time()))
+        self.assert_log_contains(standby_log, "INFO", self.REGISTERED_REGEX,
+            expected_count=1, timeout_s=0)
+        statestoreds[1].kill(SIGCONT)
+        self.assert_log_contains(standby_log, "INFO", self.REGISTERED_REGEX,
+            expected_count=2, timeout_s=120)
+        self.assert_log_contains(standby_log, "INFO",
+            "Ignored out-of-date active status of statestored .*:{0}".format(
+                statestore_service_1.get_statestore_service_port()),
+            expected_count=-1, timeout_s=0)
+      finally:
+        statestoreds[0].kill(SIGCONT)
+    finally:
+      statestoreds[1].kill(SIGCONT)
+    standby_catalogd.service.wait_for_page_ready("healthz")
+    # The two statestoreds negotiate the active role again. All subscribers must follow
+    # the one that ends up active and get topic updates from it.
+    start_time = time.time()
+    while (statestore_service_0.get_metric_value("statestore.active-status")
+            == statestore_service_1.get_metric_value("statestore.active-status")):
+      assert time.time() - start_time < 60, "No single active statestored"
+      sleep(0.5)
+    active_index = \
+        0 if statestore_service_0.get_metric_value("statestore.active-status") else 1
+    for i in range(len(self.cluster.catalogds())):
+      self.__verify_catalogd_active_statestored(i, active_index)
+    for i in range(len(self.cluster.impalads)):
+      self.__verify_impalad_active_statestored(i, active_index)
+    self.__run_simple_queries(sync_ddl=True)
 
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args(
