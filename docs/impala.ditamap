@@ -89,6 +89,7 @@ under the License.
     <topicref href="topics/impala_authentication.xml">
       <topicref href="topics/impala_kerberos.xml"/>
       <topicref href="topics/impala_ldap.xml"/>
+      <topicref href="topics/impala_saml.xml"/>
       <topicref href="topics/impala_mixed_security.xml"/>
       <topicref href="topics/impala_delegation.xml"/>
     </topicref>

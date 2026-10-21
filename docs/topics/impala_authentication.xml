@@ -44,6 +44,10 @@ under the License.
       Impala supports authentication using either Kerberos or LDAP.
     </p>
     <p>
+      Impala also supports single sign-on with SAML2, see
+      <xref href="impala_saml.xml#saml_auth"/>.
+    </p>
+    <p>
       You can also make proxy connections to Impala through Apache Knox.
     </p>
 

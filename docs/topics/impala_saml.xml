@@ -1,0 +1,259 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+Licensed to the Apache Software Foundation (ASF) under one
+or more contributor license agreements.  See the NOTICE file
+distributed with this work for additional information
+regarding copyright ownership.  The ASF licenses this file
+to you under the Apache License, Version 2.0 (the
+"License"); you may not use this file except in compliance
+with the License.  You may obtain a copy of the License at
+
+  http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing,
+software distributed under the License is distributed on an
+"AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+KIND, either express or implied.  See the License for the
+specific language governing permissions and limitations
+under the License.
+-->
+<!DOCTYPE concept PUBLIC "-//OASIS//DTD DITA Concept//EN" "concept.dtd">
+<concept id="saml_auth">
+
+  <title>Using SAML2 Authentication with Impala</title>
+  <titlealts audience="PDF"><navtitle>SAML2 Authentication</navtitle></titlealts>
+  <prolog>
+    <metadata>
+      <data name="Category" value="Impala"/>
+      <data name="Category" value="Security"/>
+      <data name="Category" value="Authentication"/>
+      <data name="Category" value="SAML"/>
+      <data name="Category" value="Administrators"/>
+    </metadata>
+  </prolog>
+
+  <conbody>
+
+    <p>
+      <indexterm audience="hidden">SAML2 authentication</indexterm>Impala can authenticate
+      users with single sign-on (SSO) through the SAML2 browser profile. Impala acts as
+      the service provider, and the users sign in at an external identity provider (IdP),
+      for example Keycloak or Okta. You can enable SAML2 for the following endpoints of an
+      <cmdname>impalad</cmdname> coordinator. Each endpoint has its own flags, and the
+      endpoints share the other flags:
+    </p>
+      <ul>
+        <li>
+          The HiveServer2 HTTP endpoint (<codeph>--hs2_http_port</codeph>), for clients
+          that connect with the <codeph>hs2-http</codeph> protocol. This is available
+          since <keyword keyref="impala40"/>.
+        </li>
+        <li>
+          The coordinator Web UI. This is available starting in
+          <keyword keyref="impala50"/>. See
+          <xref href="impala_security_webui.xml#webui_saml2"/>.
+        </li>
+      </ul>
+    <p>
+      SAML2 authentication is available only on coordinators, and it requires TLS.
+    </p>
+
+    <section id="saml_idp">
+      <title>Registering Impala at the identity provider</title>
+      <p>
+        Before you configure Impala, register it as a service provider at the IdP, and
+        export the metadata file of the IdP. Impala uses the metadata file to validate the
+        SAML responses. At the IdP, specify:
+      </p>
+      <ul>
+        <li>
+          The service provider entity ID. It must be the same as the value of
+          <codeph>--saml2_sp_entity_id</codeph>. If you do not set the flag, each endpoint
+          uses its callback URL as the entity ID.
+        </li>
+        <li>
+          The callback URL (the assertion consumer service URL) of the endpoint, the value
+          of <codeph>--saml2_sp_callback_url</codeph> or
+          <codeph>--webserver_saml2_sp_callback_url</codeph>.
+        </li>
+      </ul>
+      <p>
+        Each endpoint has its own IdP metadata flag (<codeph>--saml2_idp_metadata</codeph>
+        for the HiveServer2 HTTP endpoint and <codeph>--webserver_saml2_idp_metadata</codeph>
+        for the Web UI) and its own callback URL, so the endpoints can use the same IdP or
+        different IdPs.
+      </p>
+      <p>
+        If the endpoints use the same IdP, the entity ID determines the registration:
+      </p>
+      <ul>
+        <li>
+          If you do not set <codeph>--saml2_sp_entity_id</codeph>, the endpoints have
+          different entity IDs, so register Impala as two service providers at the IdP, one
+          for each endpoint, each with its own callback URL.
+        </li>
+        <li>
+          If you set <codeph>--saml2_sp_entity_id</codeph>, both endpoints use the same
+          entity ID, so register Impala as one service provider with two assertion consumer
+          service URLs, the callback URLs of the two endpoints.
+        </li>
+      </ul>
+    </section>
+
+    <section id="saml_shared_flags">
+      <title>Flags that are shared by the endpoints</title>
+      <p>
+        Set the following <cmdname>impalad</cmdname> startup flags once for all the
+        endpoints that use SAML2:
+      </p>
+      <ul>
+        <li>
+          <codeph>--saml2_keystore_path</codeph>: The path of the keystore that holds the
+          key pair that Impala uses to sign the requests. If the file does not exist,
+          Impala creates a keystore. You must set this flag.
+        </li>
+        <li>
+          <codeph>--saml2_keystore_password_cmd</codeph>: A command that prints the
+          password of the keystore. You must set this flag.
+        </li>
+        <li>
+          <codeph>--saml2_private_key_password_cmd</codeph>: A command that prints the
+          password of the private key in the keystore.
+        </li>
+        <li>
+          <codeph>--saml2_sp_entity_id</codeph>: The entity ID of the service provider.
+          The default is the callback URL.
+        </li>
+        <li>
+          <codeph>--saml2_want_assertations_signed</codeph>: Whether Impala requires the
+          assertions of the responses to be signed. The default is <codeph>true</codeph>.
+          Set it to <codeph>false</codeph> only for testing, because it makes the
+          authentication insecure.
+        </li>
+        <li>
+          <codeph>--saml2_sign_requests</codeph>: Whether Impala signs the SAML requests,
+          so that the IdP can validate them. The default is <codeph>false</codeph>.
+        </li>
+        <li>
+          <codeph>--saml2_group_attribute_name</codeph> and
+          <codeph>--saml2_group_filter</codeph>: See the following section.
+        </li>
+      </ul>
+    </section>
+
+    <section id="saml_groups">
+      <title>Restricting the access to groups</title>
+      <p>
+        By default, Impala accepts every user that the IdP authenticates. To allow only
+        the members of some groups, set <codeph>--saml2_group_attribute_name</codeph> to
+        the name of the attribute in the SAML assertion that holds the groups, and set
+        <codeph>--saml2_group_filter</codeph> to a comma-separated list of the allowed
+        groups. If you set the attribute name, you must also set the filter. Only the
+        users whose assertion has the attribute with a group from the list can sign in.
+        The filter applies to every endpoint that uses SAML2.
+      </p>
+    </section>
+
+    <section id="saml_hs2">
+      <title>SAML2 authentication on the HiveServer2 HTTP endpoint</title>
+      <p>
+        To enable SAML2 on the HiveServer2 HTTP endpoint, start the coordinators with the
+        following flags in addition to the shared flags and the flags that enable TLS for
+        the client connections:
+      </p>
+        <ul>
+          <li>
+            <codeph>--saml2_idp_metadata</codeph>: The path of the metadata file of the
+            IdP.
+          </li>
+          <li>
+            <codeph>--saml2_sp_callback_url</codeph>: The URL where the IdP posts the SAML
+            responses, in the form
+            <codeph>https://host:port/path</codeph>.
+            Use the port of the HiveServer2 HTTP endpoint as the clients and the browser
+            reach it, which is <codeph>--hs2_http_port</codeph> unless a proxy maps a
+            different port. Impala handles the requests to the path of the URL as SAML
+            responses.
+          </li>
+        </ul>
+<codeblock>--ssl_server_certificate=/etc/impala/ssl/server.pem
+--ssl_private_key=/etc/impala/ssl/server.key
+--saml2_idp_metadata=/etc/impala/saml/idp-metadata.xml
+--saml2_sp_callback_url=https://coordinator1.example.com:28000/SAML2/SSO/POST
+--saml2_sp_entity_id=impala-coordinator1
+--saml2_keystore_path=/etc/impala/saml/saml2.jks
+--saml2_keystore_password_cmd="cat /etc/impala/saml/keystore.pw"
+--saml2_private_key_password_cmd="cat /etc/impala/saml/key.pw"</codeblock>
+      <p>
+        The client starts the authentication, and Impala and the client use the following
+        steps:
+      </p>
+        <ol>
+          <li>
+            The client opens a local port, and it sends a request to the HiveServer2 HTTP
+            endpoint with the <codeph>X-Hive-Token-Response-Port</codeph> header set to
+            that port. Impala answers with a redirect to the IdP, and with a client
+            identifier in the <codeph>X-Hive-Client-Identifier</codeph> header.
+          </li>
+          <li>
+            The client opens the redirect URL in a browser. The user signs in at the IdP,
+            and the IdP posts the SAML response to the callback URL.
+          </li>
+          <li>
+            Impala validates the response and returns a page that sends a bearer token to
+            the local port of the client. If the validation fails, the page contains an
+            error message instead of the token.
+          </li>
+          <li>
+            The client sends the requests again with the
+            <codeph>X-Hive-Client-Identifier</codeph> header and the
+            <codeph>Authorization: Bearer</codeph> header with the token. Impala validates
+            the token and returns an authentication cookie.
+          </li>
+          <li>
+            The client uses the cookie in the next requests.
+          </li>
+        </ol>
+      <p>
+        The token is valid for the time that <codeph>--saml2_callback_token_ttl</codeph>
+        sets, 30000 milliseconds by default, and it can be used only once. The user must
+        finish the sign-in within 5 minutes, because Impala keeps the state of the sign-in
+        in the memory of the coordinator for that time. Therefore the IdP must post the
+        response to the coordinator that started the sign-in. The lifetime of the cookie
+        is controlled by <codeph>--max_cookie_lifetime_s</codeph>, and the cookies are
+        valid on more than one coordinator only if you configure the same
+        <codeph>--cookie_secret_file</codeph> for them. See
+        <xref href="impala_client.xml"/>.
+      </p>
+      <p>
+        The client must implement the protocol above, which is the SAML2 browser flow of
+        HiveServer2. <cmdname>impala-shell</cmdname> does not support SAML2
+        authentication. You can use SAML2 together with Kerberos or LDAP on the
+        HiveServer2 HTTP endpoint: a request that does not start the SAML2 flow is
+        authenticated with the other methods that you configured. This combination is
+        experimental. If a client starts the SAML2 flow and fails, Impala returns the
+        HTTP status 401 and does not try the other methods.
+      </p>
+      <p>
+        The following metrics of the coordinator count the successful and the failed
+        authentications:
+      </p>
+<codeblock>impala.thrift-server.hiveserver2-http-frontend.total-saml-auth-success
+impala.thrift-server.hiveserver2-http-frontend.total-saml-auth-failure</codeblock>
+    </section>
+
+    <section id="saml_tls">
+      <title>Related topics</title>
+      <ul>
+        <li>
+          <xref href="impala_security_webui.xml#webui_saml2"/>
+        </li>
+        <li>
+          <xref href="impala_ssl.xml#ssl"/>
+        </li>
+      </ul>
+    </section>
+
+  </conbody>
+
+</concept>

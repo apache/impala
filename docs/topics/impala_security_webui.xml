@@ -81,4 +81,91 @@ the last step which was missing was to append one file to the other to make the 
       </p>
     </note>
   </conbody>
+
+  <concept id="webui_saml2" rev="5.0.0 IMPALA-15606">
+
+    <title>SAML2 Single Sign-On for the Web UI</title>
+
+    <conbody>
+
+    <p>
+      Starting in <keyword keyref="impala50"/>, the coordinator Web UI supports SAML2
+      single sign-on. When a user opens a page of the Web UI without being authenticated,
+      Impala redirects the browser to the IdP. After the user signs in, Impala sets an
+      authentication cookie and redirects the browser to the page that the user requested.
+      Impala preserves the original URI in the SAML RelayState.
+    </p>
+    <p>
+      Register Impala at the IdP and configure the shared flags as described in
+      <xref href="impala_saml.xml#saml_auth"/>. In addition, set the following flags on
+      the coordinators:
+    </p>
+      <ul>
+        <li>
+          <codeph>--webserver_saml2_idp_metadata</codeph>: The path of the metadata file
+          of the IdP.
+        </li>
+        <li>
+          <codeph>--webserver_saml2_sp_callback_url</codeph>: The URL where the IdP posts
+          the SAML responses, in the form
+          <codeph>https://host:port/path</codeph>.
+          Use the port of the Web UI as the browser reaches it, which is
+          <codeph>--webserver_port</codeph> unless a proxy maps a different port. Setting
+          this flag turns on SAML2 for the Web UI.
+        </li>
+      </ul>
+<codeblock>--webserver_certificate_file=/etc/impala/ssl/server.pem
+--webserver_private_key_file=/etc/impala/ssl/server.key
+--webserver_saml2_idp_metadata=/etc/impala/saml/idp-metadata.xml
+--webserver_saml2_sp_callback_url=https://coordinator1.example.com:25000/SAML2/SSO/POST
+--saml2_sp_entity_id=impala-coordinator1
+--saml2_keystore_path=/etc/impala/saml/saml2.jks
+--saml2_keystore_password_cmd="cat /etc/impala/saml/keystore.pw"
+--saml2_private_key_password_cmd="cat /etc/impala/saml/key.pw"</codeblock>
+    <p>
+      The following restrictions apply:
+    </p>
+      <ul>
+        <li>
+          SAML2 applies to the Web UI of the <cmdname>impalad</cmdname> daemons that run
+          as coordinators (<codeph>--is_coordinator=true</codeph>).
+        </li>
+        <li>
+          The Web UI must use TLS (<codeph>--webserver_certificate_file</codeph>).
+        </li>
+        <li>
+          You cannot use <codeph>--webserver_password_file</codeph> together with SAML2.
+        </li>
+        <li>
+          The Web UI must use authentication cookies, so <codeph>--max_cookie_lifetime_s</codeph>
+          must be greater than 0. The default value is 86400 seconds (1 day).
+        </li>
+        <li>
+          Impala keeps the state of a sign-in in the memory of the coordinator for 5
+          minutes, so the user must finish the sign-in in that time, and the IdP must post
+          the response to the coordinator that started the sign-in.
+        </li>
+      </ul>
+    <p>
+      You can combine SAML2 with the Kerberos (SPNEGO) and LDAP authentication of the Web
+      UI. A request that has no <codeph>Authorization</codeph> header goes to SAML2. If
+      the client sends Kerberos or LDAP credentials and they are not valid, Impala returns
+      the HTTP status 401 and does not use SAML2.
+    </p>
+    <p>
+      The authentication cookie is controlled by the same flags as the cookies of the
+      HiveServer2 HTTP endpoint: <codeph>--max_cookie_lifetime_s</codeph> sets its
+      lifetime, and <codeph>--cookie_secret_file</codeph> makes the cookies of several
+      coordinators valid on each other. See <xref href="impala_client.xml"/>.
+    </p>
+    <p>
+      The metrics <codeph>impala.webserver.total-saml-auth-success</codeph> and
+      <codeph>impala.webserver.total-saml-auth-failure</codeph> count the successful and
+      failed authentications.
+    </p>
+
+    </conbody>
+
+  </concept>
+
 </concept>
