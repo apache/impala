@@ -20,6 +20,7 @@ FROM ubuntu:22.04
 ARG GIT_REPO
 ARG GIT_BRANCH
 ARG GIT_HASH
+ARG GIT_REPO_PREFIX="https://"
 LABEL git.repo="${GIT_REPO}"
 LABEL git.branch="${GIT_BRANCH}"
 LABEL git.hash="${GIT_HASH}"
@@ -166,7 +167,7 @@ RUN echo "y" | sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohm
     && git reflog expire --expire=30.days.ago --all \
     && git gc --aggressive --prune=now \
     && for remote in $(git remote); do git remote rm "${remote}"; done \
-    && git remote add upstream https://github.com/apache/impala.git \
+    && git remote add upstream "${GIT_REPO_PREFIX}{GIT_REPO}" \
     && rm -f "${USER_HOME}/.gitconfig" \
     && echo "[STATUS] - prepopulating Impala shell virtual environment" \
     && ./bin/impala-shell.sh --version \
