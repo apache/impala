@@ -17,10 +17,13 @@
 
 package org.apache.impala.service;
 
+import java.io.IOException;
 import java.util.EnumSet;
+import java.util.List;
 
 import org.apache.iceberg.Transaction;
 import org.apache.iceberg.exceptions.CommitStateUnknownException;
+import org.apache.iceberg.exceptions.RESTException;
 import org.apache.impala.catalog.FeIcebergTable;
 import org.apache.impala.catalog.FeTable;
 import org.apache.impala.common.ImpalaException;
@@ -33,6 +36,9 @@ import org.apache.impala.util.DebugUtils;
 import org.apache.impala.util.IcebergUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Throwables;
 
 /** Shared transaction and cleanup handling for Iceberg DML finalization. */
 final class IcebergDmlFinalizer {
@@ -125,12 +131,16 @@ final class IcebergDmlFinalizer {
   static void finalizeDml(FeIcebergTable table, Transaction transaction,
       TIcebergOperationParam operation, String debugAction,
       PostOperationHook postOperationHook) throws ImpalaRuntimeException {
+    // Only an I/O error after the commit request was sent can mean that the REST
+    // catalog applied the commit.
+    boolean commitAttempted = false;
     try {
       IcebergCatalogOpExecutor.validateTableUuid(table, operation);
       DebugUtils.executeDebugAction(debugAction, DebugUtils.ICEBERG_CONFLICT);
       IcebergCatalogOpExecutor.execute(table, transaction, operation);
       postOperationHook.run();
       DebugUtils.executeDebugAction(debugAction, DebugUtils.ICEBERG_COMMIT);
+      commitAttempted = true;
       transaction.commitTransaction();
     // If we have no information about the success of the commit, we should not delete
     // anything.
@@ -140,10 +150,27 @@ final class IcebergDmlFinalizer {
     // orphan files in the table. Only data/delete files need cleanup from Impala, Iceberg
     // deletes the metadata files created for this update.
     } catch (Exception e) {
+      if (commitAttempted && isLostRestResponse(e)) {
+        LOG.warn("Kept the data files written for table {}: the commit may have been "
+            + "applied by the REST catalog", table.getFullName(), e);
+        throw new ImpalaRuntimeException(e.getMessage(), e);
+      }
       IcebergCatalogOpExecutor.cleanupUncommittedFiles(operation);
       LOG.info("Cleaned up uncommitted data files after failing to commit them to "
           + "table {}", table.getFullName());
       throw new ImpalaRuntimeException(e.getMessage(), e);
     }
+  }
+
+  /**
+   * Whether 'e' is a REST catalog request that failed on I/O, e.g. the connection broke
+   * after the request was sent. The REST catalog may have applied such a commit, but
+   * Iceberg reports it as a RESTException instead of a CommitStateUnknownException.
+   */
+  @VisibleForTesting
+  static boolean isLostRestResponse(Throwable e) {
+    List<Throwable> chain = Throwables.getCausalChain(e);
+    return chain.stream().anyMatch(t -> t instanceof RESTException)
+        && chain.stream().anyMatch(t -> t instanceof IOException);
   }
 }

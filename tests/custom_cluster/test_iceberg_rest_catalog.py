@@ -15,8 +15,12 @@
 # specific language governing permissions and limitations
 # under the License.
 
+import http.client
 import os
+import re
+import threading
 import time
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import quote
 
 import pytest
@@ -1008,3 +1012,145 @@ class TestIcebergRestCatalogNoHms(IcebergRestCatalogTests):
   def test_rest_catalog_basic_blacklisted_tables(self, vector):
     self.run_test_case('QueryTest/iceberg-rest-catalog-blacklist-tables',
         vector, use_db="ice")
+
+
+class LostCommitResponseProxy(object):
+  """HTTP proxy in front of the REST server. When armed for a table, it forwards the
+  next commit request of that table to the REST server, then closes the connection
+  without returning the server's response, as if the network failed after the commit
+  was applied. Every other request is forwarded unchanged."""
+
+  def __init__(self, target_port):
+    proxy = self
+    self.target_port = target_port
+    self.armed_table = None
+    self.dropped_responses = []
+    self.commit_requests = 0
+
+    class Handler(BaseHTTPRequestHandler):
+      def log_message(self, _format, *_args):
+        pass
+
+      def _forward(self):
+        length = int(self.headers.get('Content-Length', 0))
+        body = self.rfile.read(length) if length else None
+        headers = dict((k, v) for k, v in self.headers.items()
+                       if k.lower() not in ('host', 'connection', 'content-length'))
+        conn = http.client.HTTPConnection('localhost', proxy.target_port, timeout=60)
+        conn.request(self.command, self.path, body=body, headers=headers)
+        response = conn.getresponse()
+        data = response.read()
+        conn.close()
+
+        match = re.match(r'^/v1/namespaces/[^/]+/tables/([^/?]+)$', self.path)
+        if self.command == 'POST' and match:
+          proxy.commit_requests += 1
+          if match.group(1) == proxy.armed_table:
+            proxy.armed_table = None
+            proxy.dropped_responses.append(response.status)
+            self.close_connection = True
+            return
+
+        self.send_response(response.status)
+        for k, v in response.getheaders():
+          if k.lower() not in ('transfer-encoding', 'connection', 'content-length'):
+            self.send_header(k, v)
+        self.send_header('Content-Length', str(len(data)))
+        self.end_headers()
+        self.wfile.write(data)
+
+      do_GET = do_POST = do_DELETE = do_HEAD = _forward
+
+    self.server = ThreadingHTTPServer(('localhost', 0), Handler)
+    self.port = self.server.server_address[1]
+    self.thread = threading.Thread(target=self.server.serve_forever, daemon=True)
+    self.thread.start()
+
+  def stop(self):
+    self.server.shutdown()
+    self.server.server_close()
+
+
+LOST_RESPONSE_NS = "impala_rest_lost_response_test"
+LOST_RESPONSE_CATALOG_CONFIG_DIR = os.path.join(
+    IMPALA_HOME, 'logs', 'iceberg_rest_lost_response_config')
+
+
+class TestIcebergRestCatalogLostCommitResponse(IcebergRestCatalogTests):
+  """Commits whose response is lost on the way back from the REST catalog."""
+
+  @classmethod
+  def need_default_clients(cls):
+    return False
+
+  def setup_method(self, method):
+    # impalad connects to the REST catalog at startup, so the proxy and its catalog
+    # config must exist before the cluster starts.
+    self.proxy = LostCommitResponseProxy(IcebergRestServer.DEFAULT_REST_SERVER_PORT)
+    if not os.path.isdir(LOST_RESPONSE_CATALOG_CONFIG_DIR):
+      os.makedirs(LOST_RESPONSE_CATALOG_CONFIG_DIR)
+    with open(os.path.join(LOST_RESPONSE_CATALOG_CONFIG_DIR, 'rest.properties'),
+              'w') as f:
+      f.write("connector.name=iceberg\n"
+              "iceberg.catalog.type=rest\n"
+              "iceberg.rest-catalog.name=rest-1\n"
+              "iceberg.rest-catalog.uri=http://localhost:{}\n".format(self.proxy.port))
+    try:
+      super(TestIcebergRestCatalogLostCommitResponse, self).setup_method(method)
+    except Exception:
+      self.proxy.stop()
+      raise
+
+  def teardown_method(self, method):
+    try:
+      super(TestIcebergRestCatalogLostCommitResponse, self).teardown_method(method)
+    finally:
+      self.proxy.stop()
+
+  @RestServerProperties(
+      {'port': IcebergRestServer.DEFAULT_REST_SERVER_PORT,
+       'catalog_location': WRITE_TEST_CATALOG_LOCATION,
+       'test_tables': (LOST_RESPONSE_NS, {'lost_response': {
+           'fields': [{'id': 1, 'name': 'i', 'required': False, 'type': 'int'},
+                      {'id': 2, 'name': 's', 'required': False, 'type': 'string'}],
+           'properties': {'format-version': '3'}}})})
+  @CustomClusterTestSuite.with_args(
+     impalad_args="--use_local_catalog=true --catalogd_deployed=false "
+                  "--catalog_config_dir={}".format(LOST_RESPONSE_CATALOG_CONFIG_DIR),
+     start_args=NO_CATALOGD_STARTARGS,
+     cluster_size=1)
+  @pytest.mark.execute_serially
+  def test_update_with_lost_commit_response(self):
+    """The REST catalog applies the commit of an UPDATE, but its response is lost. The
+    commit state is unknown to Impala, so the files the committed snapshot references
+    must not be deleted."""
+    table_name = "{}.lost_response".format(LOST_RESPONSE_NS)
+    data_path = get_fs_path("{}/{}/lost_response/data".format(
+        WRITE_TEST_CATALOG_LOCATION, LOST_RESPONSE_NS))
+    filesystem_client = HadoopFsCommandLineClient()
+
+    self.execute_query_expect_success(
+        self.client, "insert into {} values (1, 'one'), (2, 'two')".format(table_name))
+    assert self._snapshot_count(table_name) == 1
+    files_before = set(filesystem_client.ls(data_path))
+
+    self.proxy.armed_table = 'lost_response'
+    self.execute_query_expect_failure(
+        self.client, "update {} set s = 'updated' where i = 1".format(table_name))
+    self.proxy.armed_table = None
+
+    # The REST catalog did apply the commit, only its response was lost.
+    assert self.proxy.dropped_responses == [200]
+    # The files written by the UPDATE are kept.
+    assert set(filesystem_client.ls(data_path)) - files_before
+    assert self._snapshot_count(table_name) == 2
+
+    # So the committed snapshot must still be readable.
+    result = self.execute_query_expect_success(
+        self.client, "select * from {} order by i".format(table_name))
+    assert result.data == ['1\tupdated', '2\ttwo']
+
+  def _snapshot_count(self, table_name):
+    result = self.execute_query_expect_success(
+        self.client, "select count(*) from {}.snapshots".format(table_name))
+    return int(result.data[0])

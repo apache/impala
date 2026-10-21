@@ -755,8 +755,8 @@ public class IcebergPredicateConverter {
   }
 
   /**
-   * Returns Iceberg operator by BinaryPredicate operator, or null if the operation is not
-   * supported by Iceberg.
+   * Returns Iceberg operator by BinaryPredicate operator.
+   * Throws ImpalaRuntimeException if the operation is not supported by Iceberg.
    */
   protected Operation getIcebergOperator(BinaryPredicate.Operator op)
       throws ImpalaRuntimeException {
@@ -774,8 +774,8 @@ public class IcebergPredicateConverter {
   }
 
   /**
-   * Returns Iceberg operator by CompoundPredicate operator, or null if the operation is
-   * not supported by Iceberg.
+   * Returns Iceberg operator by CompoundPredicate operator. Throws
+   * ImpalaRuntimeException if the operation is not supported by Iceberg.
    */
   protected Operation getIcebergOperator(CompoundPredicate.Operator op)
       throws ImpalaRuntimeException {

@@ -24,8 +24,11 @@ import static org.junit.Assert.assertTrue;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+import java.io.IOException;
 import java.util.UUID;
 
+import org.apache.iceberg.exceptions.CommitFailedException;
+import org.apache.iceberg.exceptions.RESTException;
 import org.apache.impala.catalog.FeIcebergTable;
 import org.apache.impala.common.ImpalaRuntimeException;
 import org.apache.impala.thrift.TIcebergDmlFinalizeParams;
@@ -89,6 +92,21 @@ public class IcebergRestDmlOperationTest {
 
     operation.unsetTable_uuid();
     assertRejected(operation, MISSING_UUID);
+  }
+
+  @Test
+  public void testLostRestResponseKeepsFiles() {
+    RESTException lostResponse = new RESTException(
+        new IOException("failed to respond"), "Error occurred while processing POST");
+    assertTrue(IcebergDmlFinalizer.isLostRestResponse(lostResponse));
+    assertTrue(IcebergDmlFinalizer.isLostRestResponse(
+        new RuntimeException(lostResponse)));
+
+    assertFalse(IcebergDmlFinalizer.isLostRestResponse(
+        new RESTException("Failed to parse an error response")));
+    assertFalse(IcebergDmlFinalizer.isLostRestResponse(
+        new CommitFailedException("conflict")));
+    assertFalse(IcebergDmlFinalizer.isLostRestResponse(new IOException("not REST")));
   }
 
   @Test

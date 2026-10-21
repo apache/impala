@@ -1644,7 +1644,7 @@ public class CatalogOpExecutor {
           TAlterTableExecuteParams setExecuteParams = params.getSet_execute_params();
           if (setExecuteParams.isSetExecute_rollback_params()) {
             String rollbackSummary = IcebergCatalogOpExecutor.alterTableExecuteRollback(
-                iceTxn, tbl, setExecuteParams.getExecute_rollback_params());
+                iceTxn, setExecuteParams.getExecute_rollback_params());
             addSummary(response, rollbackSummary);
           } else if (setExecuteParams.isSetExpire_snapshots_params()) {
             String expireSummary =

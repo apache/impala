@@ -159,7 +159,7 @@ public class IcebergCatalogOpExecutor {
    * Adds a column to an existing Iceberg table.
    */
   public static void addColumns(Transaction txn, List<TColumn> columns)
-      throws TableLoadingException, ImpalaRuntimeException {
+      throws ImpalaRuntimeException {
     UpdateSchema schema = txn.updateSchema();
     for (TColumn column : columns) {
       org.apache.iceberg.types.Type type =
@@ -209,7 +209,7 @@ public class IcebergCatalogOpExecutor {
    *   DECIMAL(p1,s1) -> DECIMAL(p1,s2), same scale, p1<=p2
    */
   public static void alterColumn(Transaction txn, String colName, TColumn newCol)
-      throws TableLoadingException, ImpalaRuntimeException {
+      throws ImpalaRuntimeException {
     UpdateSchema schema = txn.updateSchema();
     org.apache.iceberg.types.Type type =
         IcebergSchemaConverter.fromImpalaColumnType(newCol.getColumnType());
@@ -284,7 +284,7 @@ public class IcebergCatalogOpExecutor {
    * Executes an ALTER TABLE EXECUTE ROLLBACK.
    */
   public static String alterTableExecuteRollback(
-      Transaction iceTxn, FeIcebergTable tbl, TAlterTableExecuteRollbackParams params) {
+      Transaction iceTxn, TAlterTableExecuteRollbackParams params) {
     TRollbackType kind = params.getKind();
     ManageSnapshots manageSnapshots = iceTxn.manageSnapshots();
     switch (kind) {
@@ -312,8 +312,7 @@ public class IcebergCatalogOpExecutor {
    * Executes an ALTER TABLE EXECUTE REMOVE_ORPHAN_FILES.
    */
   public static String alterTableExecuteRemoveOrphanFiles(FeIcebergTable tbl,
-      TAlterTableExecuteRemoveOrphanFilesParams params, ExecutorService executors)
-      throws CatalogException {
+      TAlterTableExecuteRemoveOrphanFilesParams params, ExecutorService executors) {
     ImpalaIcebergDeleteOrphanFiles deleteOrphan =
         new ImpalaIcebergDeleteOrphanFiles(FeFsTable.CONF, tbl.getIcebergApiTable())
             .olderThan(params.older_than_millis)
