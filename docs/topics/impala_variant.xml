@@ -1,0 +1,328 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+Licensed to the Apache Software Foundation (ASF) under one
+or more contributor license agreements.  See the NOTICE file
+distributed with this work for additional information
+regarding copyright ownership.  The ASF licenses this file
+to you under the Apache License, Version 2.0 (the
+"License"); you may not use this file except in compliance
+with the License.  You may obtain a copy of the License at
+
+  http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing,
+software distributed under the License is distributed on an
+"AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+KIND, either express or implied.  See the License for the
+specific language governing permissions and limitations
+under the License.
+-->
+<!DOCTYPE concept PUBLIC "-//OASIS//DTD DITA Concept//EN" "concept.dtd">
+<concept id="variant" rev="5.0.0 IMPALA-15434">
+
+  <title>VARIANT Data Type (<keyword keyref="impala50"/> or higher only)</title>
+  <titlealts audience="PDF"><navtitle>VARIANT</navtitle></titlealts>
+  <prolog>
+    <metadata>
+      <data name="Category" value="Impala"/>
+      <data name="Category" value="Impala Data Types"/>
+      <data name="Category" value="SQL"/>
+      <data name="Category" value="Data Analysts"/>
+      <data name="Category" value="Developers"/>
+      <data name="Category" value="Schemas"/>
+      <data name="Category" value="Iceberg"/>
+    </metadata>
+  </prolog>
+
+  <conbody>
+
+    <p>
+      <indexterm audience="hidden">VARIANT data type</indexterm>A semi-structured type
+      that holds values such as JSON documents. The values are stored in the
+      <xref href="https://github.com/apache/parquet-format/blob/master/VariantEncoding.md"
+        scope="external" format="html">Parquet Variant binary encoding</xref>, which
+      Iceberg uses for the <codeph>VARIANT</codeph> type of format version 3 tables.
+      Starting in <keyword keyref="impala50"/>, Impala can read the VARIANT columns of
+      Iceberg tables that other engines, such as Spark or Trino, wrote.
+    </p>
+
+    <p>
+      The column type appears as <codeph>VARIANT</codeph> in the output of
+      <codeph>DESCRIBE</codeph> and <codeph>SHOW CREATE TABLE</codeph>.
+      <codeph>VARIANT</codeph> is not a reserved word.
+    </p>
+
+    <section id="variant_reading">
+      <title>Reading VARIANT columns</title>
+      <p>
+        Impala reads only top-level, unshredded VARIANT columns, in Iceberg tables whose
+        data files are in Parquet format.
+      </p>
+    </section>
+
+    <section id="variant_values">
+      <title>How VARIANT values are returned</title>
+      <p>
+        Impala returns a VARIANT value as its JSON text. Clients receive the column as
+        <codeph>STRING</codeph>. Over JDBC, the <codeph>DATA_TYPE</codeph> of the column
+        is <codeph>VARCHAR</codeph> and the <codeph>TYPE_NAME</codeph> is
+        <codeph>VARIANT</codeph>. The JSON text follows these rules:
+      </p>
+      <ul>
+        <li>
+          A SQL <codeph>NULL</codeph> value is returned as <codeph>NULL</codeph>. A
+          variant null is a regular value, and it is returned as the text
+          <codeph>null</codeph>.
+        </li>
+        <li>
+          Booleans and numbers, including decimals and floating-point numbers, are
+          returned without quotes, for example <codeph>true</codeph>, <codeph>42</codeph>
+          and <codeph>14.3</codeph>.
+        </li>
+        <li>
+          Strings are returned in double quotes, with the JSON escape sequences.
+        </li>
+        <li>
+          Objects and arrays are returned as JSON objects and arrays.
+        </li>
+        <li>
+          Binary values are returned as base64 strings in double quotes, for example
+          <codeph>"CgsMDQ=="</codeph>.
+        </li>
+        <li>
+          Dates, and timestamps without time zone, are returned as strings in double
+          quotes, for example <codeph>"2024-11-07"</codeph> and
+          <codeph>"2024-11-07 12:33:54.123456000"</codeph>.
+        </li>
+        <li>
+          Times, timestamps with time zone and UUIDs are returned as the string
+          <codeph>"&lt;unsupported-type&gt;"</codeph>.
+        </li>
+      </ul>
+      <p>
+        To tell a SQL <codeph>NULL</codeph> from a variant null, use the
+        <codeph>IS NULL</codeph> operator. <codeph>v IS NULL</codeph> is true only for a
+        SQL <codeph>NULL</codeph>, and it is false for a variant null. In contrast,
+        <codeph>variant_get(v, '$') IS NULL</codeph> is true for a variant null, because
+        <codeph>variant_get()</codeph> returns a SQL <codeph>NULL</codeph> for it.
+      </p>
+    </section>
+
+    <section id="variant_functions">
+      <title>Functions for VARIANT values</title>
+      <p>
+        Starting in <keyword keyref="impala50"/>, Impala has the following built-in
+        functions for VARIANT values:
+      </p>
+      <ul>
+        <li>
+          <codeph>variant_get(VARIANT <varname>v</varname>,
+          STRING <varname>path</varname>)</codeph>
+          returns the VARIANT value at the path. You can chain the calls, for example
+          <codeph>variant_get(variant_get(v, '$.a'), '$.b')</codeph>.
+        </li>
+        <li>
+          <codeph>variant_get(VARIANT <varname>v</varname>,
+          STRING <varname>path</varname>, STRING <varname>type</varname>)</codeph>
+          returns the value at the path as a SQL value of the given type.
+        </li>
+        <li>
+          <codeph>try_variant_get()</codeph> has the same two forms as
+          <codeph>variant_get()</codeph>. It returns <codeph>NULL</codeph> instead of
+          failing the query when a value cannot be converted.
+        </li>
+        <li>
+          <codeph>variant_to_json(VARIANT <varname>v</varname>)</codeph> returns the JSON
+          text of the value as a <codeph>STRING</codeph>.
+        </li>
+      </ul>
+      <p>
+        The path starts with <codeph>$</codeph>, followed by any number of
+        <codeph>.<varname>field</varname></codeph> and
+        <codeph>[<varname>index</varname>]</codeph> steps. For example, <codeph>$</codeph>
+        is the whole value, <codeph>$.user.name</codeph> is a field of an object, and
+        <codeph>$.items[0].id</codeph> is a field of the first element of an array. Field
+        names are case-sensitive. A field name cannot be empty or contain
+        <codeph>.</codeph> or <codeph>[</codeph>, and there is no syntax to quote such a
+        name. An index is a non-negative integer. Impala checks the syntax of a constant
+        path during analysis. The first argument must be a VARIANT.
+      </p>
+      <p>
+        <codeph>variant_get()</codeph> and <codeph>try_variant_get()</codeph> return
+        <codeph>NULL</codeph> if the input is <codeph>NULL</codeph>, if the path does not
+        exist, or if the value at the path is a variant null.
+        <codeph>variant_to_json()</codeph> returns <codeph>NULL</codeph> if the input is
+        <codeph>NULL</codeph>.
+      </p>
+      <p>
+        The third argument of the typed form must be a string literal, one of
+        <codeph>boolean</codeph>, <codeph>tinyint</codeph>, <codeph>smallint</codeph>,
+        <codeph>int</codeph>, <codeph>bigint</codeph>, <codeph>float</codeph>,
+        <codeph>double</codeph>, <codeph>string</codeph> and <codeph>date</codeph>. The
+        names are not case-sensitive. Other types, such as <codeph>decimal</codeph> and
+        <codeph>timestamp</codeph>, are not supported. The function converts the value at
+        the path as follows:
+      </p>
+      <ul>
+        <li>
+          <codeph>boolean</codeph>: a variant boolean, or a string that Impala can parse
+          as a boolean.
+        </li>
+        <li>
+          <codeph>tinyint</codeph>, <codeph>smallint</codeph>, <codeph>int</codeph>,
+          <codeph>bigint</codeph>: an integer of any width, or a string that Impala can
+          parse as an integer. The value must fit in the requested type. Impala does not
+          convert floating-point values to integers.
+        </li>
+        <li>
+          <codeph>float</codeph>, <codeph>double</codeph>: a floating-point value, an
+          integer, or a string that Impala can parse as a number. The value must be in the
+          range of <codeph>float</codeph> for the <codeph>float</codeph> type.
+        </li>
+        <li>
+          <codeph>date</codeph>: a variant date, or a string in the
+          <codeph>YYYY-MM-DD</codeph> format. Impala does not convert integers to dates.
+        </li>
+        <li>
+          <codeph>string</codeph>: a string is returned without the quotes. Other values
+          are returned as their JSON text, and dates, timestamps and binary values are
+          returned without the quotes of the JSON string. Times, timestamps with time
+          zone and UUIDs cannot be converted.
+        </li>
+      </ul>
+      <p>
+        If a value cannot be converted, or it does not fit in the requested type,
+        <codeph>variant_get()</codeph> raises an error and
+        <codeph>try_variant_get()</codeph> returns <codeph>NULL</codeph>. If the function
+        finds that the VARIANT value is corrupt, <codeph>variant_get()</codeph> raises an
+        error and <codeph>try_variant_get()</codeph> returns <codeph>NULL</codeph> with a
+        warning.
+        <codeph>variant_to_json()</codeph> returns <codeph>NULL</codeph> with a warning if
+        it cannot render the value.
+      </p>
+      <p>
+        For example:
+      </p>
+<codeblock>SELECT id, variant_get(v, '$.name', 'string') AS name
+FROM events
+WHERE variant_get(v, '$.age', 'int') > 18;
+
+SELECT variant_get(variant_get(v, '$.context'), '$.page') FROM events;
+
+SELECT try_variant_get(v, '$.items[0].quantity', 'int') FROM events;
+
+SELECT variant_to_json(variant_get(v, '$.items')) FROM events;</codeblock>
+    </section>
+
+    <section id="variant_limitations">
+      <title>Limitations</title>
+      <p>
+        Shredded VARIANT values in Parquet files, and VARIANT columns in Avro or ORC data
+        files, are not supported.
+      </p>
+      <p>
+        A VARIANT that is nested in an <codeph>ARRAY</codeph>, <codeph>MAP</codeph> or
+        <codeph>STRUCT</codeph> column cannot be queried. <codeph>DESCRIBE</codeph> still
+        works, and you can query the other columns of the table.
+      </p>
+      <p>
+        The type is read-only. You cannot declare VARIANT columns with Impala, so you
+        cannot use the type in the column definitions of the <codeph>CREATE TABLE</codeph>
+        and <codeph>ALTER TABLE</codeph> statements, or as the target type of
+        <codeph>CAST</codeph>. You cannot cast a VARIANT to another type either. To get
+        the JSON text of a value as a <codeph>STRING</codeph>, use
+        <codeph>variant_to_json()</codeph>.
+      </p>
+      <p>
+        You cannot insert data into a table that has a VARIANT column. The
+        <codeph>INSERT</codeph>, <codeph>UPDATE</codeph>, <codeph>MERGE</codeph> and
+        <codeph>OPTIMIZE TABLE</codeph> statements fail on such a table, and the
+        <codeph>CREATE TABLE AS SELECT</codeph> and <codeph>INSERT ... SELECT</codeph>
+        statements cannot return a VARIANT.
+      </p>
+      <p>
+        VARIANT values cannot be compared, sorted or hashed. You cannot use a VARIANT
+        expression in the following clauses:
+      </p>
+      <ul>
+        <li>
+          <codeph>ORDER BY</codeph>, <codeph>GROUP BY</codeph> and
+          <codeph>SELECT DISTINCT</codeph>.
+        </li>
+        <li>
+          <codeph>UNION</codeph> (without <codeph>ALL</codeph>),
+          <codeph>INTERSECT</codeph> and <codeph>EXCEPT</codeph>.
+        </li>
+        <li>
+          <codeph>CASE</codeph> and <codeph>DECODE</codeph> expressions that return a
+          VARIANT.
+        </li>
+        <li>
+          <codeph>PARTITION BY</codeph> and <codeph>ORDER BY</codeph> in analytic
+          functions.
+        </li>
+      </ul>
+      <p>
+        With the type argument, <codeph>variant_get()</codeph> and
+        <codeph>try_variant_get()</codeph> return a primitive type, so you can use them in
+        these clauses, for example
+        <codeph>GROUP BY variant_get(v, '$.country', 'string')</codeph>.
+      </p>
+      <p>
+        Apart from <codeph>IS [NOT] NULL</codeph> and the functions above, the built-in
+        operators and functions, including the aggregate functions, do not accept VARIANT
+        arguments. For example, <codeph>v = v</codeph>, <codeph>count(v)</codeph> and
+        <codeph>coalesce(v, v)</codeph> are not supported.
+      </p>
+      <p>
+        You can return VARIANT values through <codeph>UNION ALL</codeph>, joins, inline
+        views, views and <codeph>WITH</codeph> clauses.
+      </p>
+    </section>
+
+    <section id="variant_limits">
+      <title>Limits and errors in the values</title>
+      <p>
+        Impala converts a VARIANT value to its JSON text for the query result, for
+        <codeph>variant_to_json()</codeph>, and for the <codeph>string</codeph> type of
+        <codeph>variant_get()</codeph>. The conversion fails if:
+      </p>
+      <ul>
+        <li>
+          A value is nested more than 100 levels deep.
+        </li>
+        <li>
+          A <codeph>DATE</codeph> in the value is outside the range 0001-01-01 to
+          9999-12-31, or a <codeph>TIMESTAMP</codeph> is outside the range 1400-01-01 to
+          9999-12-31. Other engines can write such values.
+        </li>
+        <li>
+          The value has a corrupt encoding.
+        </li>
+      </ul>
+    </section>
+
+    <section id="variant_metadata">
+      <title>Statistics and metadata</title>
+      <ul>
+        <li>
+          <codeph>COMPUTE STATS</codeph> does not compute statistics for VARIANT columns.
+        </li>
+        <li>
+          <codeph>SHOW CREATE TABLE</codeph> prints the column as
+          <codeph>v VARIANT</codeph>. You cannot run the output of the statement, because
+          you cannot declare VARIANT columns with Impala.
+        </li>
+        <li>
+          The Hive metastore has no VARIANT type. When Impala writes the schema of the
+          table to the metastore, it stores a VARIANT column as
+          <codeph>struct&lt;metadata:binary,value:binary&gt;</codeph>. Take this into
+          account when other engines or tools read the schema of the table from the
+          metastore.
+        </li>
+      </ul>
+    </section>
+
+  </conbody>
+
+</concept>

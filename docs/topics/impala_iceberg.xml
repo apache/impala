@@ -819,7 +819,8 @@ DROP TABLE ice_t;
               </row>
               <row>
                 <entry>variant</entry>
-                <entry>VARIANT (read only, unshredded values in Parquet data files)</entry>
+                <entry><xref keyref="variant">VARIANT</xref> (read only, unshredded values
+                  in Parquet data files)</entry>
               </row>
               <row>
                 <entry>timestamp_ns, timestamptz_ns, unknown, geometry, geography</entry>

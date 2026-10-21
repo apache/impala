@@ -10732,6 +10732,7 @@ under the License.
   <keydef href="topics/impala_timestamp.xml" keys="timestamp"/>
   <keydef href="topics/impala_tinyint.xml" keys="tinyint"/>
   <keydef href="topics/impala_varchar.xml" keys="varchar"/>
+  <keydef href="topics/impala_variant.xml" keys="variant"/>
   <keydef href="topics/impala_complex_types.xml" keys="complex_types"/>
   <keydef href="topics/impala_literals.xml" keys="literals"/>
 
