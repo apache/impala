@@ -39,10 +39,10 @@ class HboTestMixin(object):
   def _run_hbo_explains(self, test_file, test_file_vars=None):
     """Run EXPLAIN queries from a golden .test file and verify their output against
     the plan sections. A test case may define any of PLAN, DISTRIBUTEDPLAN,
-    CALCITE_PLANNER_PLAN and CALCITE_PLANNER_DISTRIBUTED_PLAN. Each present section is
+    CALCITE_PLANNER_PLAN and CALCITE_PLANNER_DISTRIBUTEDPLAN. Each present section is
     verified independently (only the cardinality lines are compared):
       - PLAN / CALCITE_PLANNER_PLAN: verified at the default explain level.
-      - DISTRIBUTEDPLAN / CALCITE_PLANNER_DISTRIBUTED_PLAN: verified at EXTENDED
+      - DISTRIBUTEDPLAN / CALCITE_PLANNER_DISTRIBUTEDPLAN: verified at EXTENDED
         (explain_level=2) so exchange cardinalities (e.g. MERGING-EXCHANGE) are shown.
     When IS_CALCITE_PLANNER is set, the CALCITE_PLANNER_* section overrides its
     counterpart when present; otherwise the non-Calcite section is used."""
@@ -51,10 +51,10 @@ class HboTestMixin(object):
     test_cases = self.load_query_test_file(
         'functional-query', test_file,
         valid_section_names=['QUERY', 'PLAN', 'DISTRIBUTEDPLAN',
-            'CALCITE_PLANNER_PLAN', 'CALCITE_PLANNER_DISTRIBUTED_PLAN'])
+            'CALCITE_PLANNER_PLAN', 'CALCITE_PLANNER_DISTRIBUTEDPLAN'])
     plan_variants = [
         ('PLAN', 'CALCITE_PLANNER_PLAN', {'use_hbo_stats': True}),
-        ('DISTRIBUTEDPLAN', 'CALCITE_PLANNER_DISTRIBUTED_PLAN',
+        ('DISTRIBUTEDPLAN', 'CALCITE_PLANNER_DISTRIBUTEDPLAN',
          {'use_hbo_stats': True, 'explain_level': 2}),
     ]
     for section in test_cases:
@@ -76,10 +76,10 @@ class HboTestMixin(object):
           expected_plan = expected_plan.replace(key, value)
         expected_plan_lines = expected_plan.splitlines()
         # To avoid the test being fragile, we only compare the cardinality lines.
-        actual_cardinality_lines = [line for line in actual_plan_lines
-                                    if 'cardinality' in line]
-        expected_cardinality_lines = [line for line in expected_plan_lines
-                                      if 'cardinality' in line]
+        actual_cardinality_lines = [line.split('row-size', 1)[1]
+            for line in actual_plan_lines if 'cardinality' in line]
+        expected_cardinality_lines = [line.split('row-size', 1)[1]
+            for line in expected_plan_lines if 'cardinality' in line]
         assert actual_cardinality_lines == expected_cardinality_lines, (
             "EXPLAIN output mismatch for {0} ({1}).\nExpected:\n{2}\n\n"
             "Actual:\n{3}".format(test_file, plan_section_name,
