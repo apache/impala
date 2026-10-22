@@ -35,6 +35,7 @@
 #include "runtime/timestamp-value.inline.h"
 #include "udf/udf.h"
 #include "util/coding-util.h"
+#include "util/decimal-constants.h"
 
 using impala::datetime_parse_util::SimpleDateFormatTokenizer;
 using std::string_view;
@@ -703,6 +704,11 @@ Status VariantJsonSerializer::Write(const VariantValue& val,
           if (UNLIKELY(scale > ColumnType::MAX_DECIMAL4_PRECISION)) {
             return MalformedVariant("DECIMAL4: scale out of range");
           }
+          // ToString() assumes that the unscaled value fits the precision.
+          if (UNLIKELY(unscaled > MAX_UNSCALED_DECIMAL4
+              || unscaled < -MAX_UNSCALED_DECIMAL4)) {
+            return MalformedVariant("DECIMAL4: unscaled value out of range");
+          }
           string s = Decimal4Value(unscaled).ToString(
               ColumnType::MAX_DECIMAL4_PRECISION, scale);
           writer->RawValue(s.data(), s.size(), rapidjson::kNumberType);
@@ -717,6 +723,10 @@ Status VariantJsonSerializer::Write(const VariantValue& val,
           if (UNLIKELY(scale > ColumnType::MAX_DECIMAL8_PRECISION)) {
             return MalformedVariant("DECIMAL8: scale out of range");
           }
+          if (UNLIKELY(unscaled > MAX_UNSCALED_DECIMAL8
+              || unscaled < -MAX_UNSCALED_DECIMAL8)) {
+            return MalformedVariant("DECIMAL8: unscaled value out of range");
+          }
           string s = Decimal8Value(unscaled).ToString(
               ColumnType::MAX_DECIMAL8_PRECISION, scale);
           writer->RawValue(s.data(), s.size(), rapidjson::kNumberType);
@@ -730,6 +740,10 @@ Status VariantJsonSerializer::Write(const VariantValue& val,
           int scale = val.Data()[1];
           if (UNLIKELY(scale > ColumnType::MAX_PRECISION)) {
             return MalformedVariant("DECIMAL16: scale out of range");
+          }
+          if (UNLIKELY(unscaled > MAX_UNSCALED_DECIMAL16
+              || unscaled < -MAX_UNSCALED_DECIMAL16)) {
+            return MalformedVariant("DECIMAL16: unscaled value out of range");
           }
           string s = Decimal16Value(unscaled).ToString(
               ColumnType::MAX_PRECISION, scale);

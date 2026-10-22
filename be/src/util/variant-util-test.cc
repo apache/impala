@@ -1028,6 +1028,25 @@ TEST(VariantUtilTest, ValueCorruptionRejected) {
   ExpectVariantError(empty_meta,
       {0x28, 0xFF, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00});
+  // Unscaled values outside the precision of the physical type (9, 18 and 38 digits).
+  // ToString() would drop the leading digits, and negating INT32_MIN or INT128_MIN
+  // overflows.
+  const string unscaled_msg = "unscaled value out of range";
+  // DECIMAL4 with unscaled=10^9.
+  ExpectVariantError(empty_meta, {0x20, 0x00, 0x00, 0xCA, 0x9A, 0x3B}, unscaled_msg);
+  // DECIMAL4 with unscaled=INT32_MIN.
+  ExpectVariantError(empty_meta, {0x20, 0x00, 0x00, 0x00, 0x00, 0x80}, unscaled_msg);
+  // DECIMAL8 with unscaled=-10^18.
+  ExpectVariantError(empty_meta,
+      {0x24, 0x00, 0x00, 0x00, 0x9C, 0x58, 0x4C, 0x49, 0x1F, 0xF2}, unscaled_msg);
+  // DECIMAL16 with unscaled=10^38.
+  ExpectVariantError(empty_meta,
+      {0x28, 0x00, 0x00, 0x00, 0x00, 0x00, 0x40, 0x22, 0x8A, 0x09,
+       0x7A, 0xC4, 0x86, 0x5A, 0xA8, 0x4C, 0x3B, 0x4B}, unscaled_msg);
+  // DECIMAL16 with unscaled=INT128_MIN.
+  ExpectVariantError(empty_meta,
+      {0x28, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+       0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x80}, unscaled_msg);
   // Truncated fixed-width payloads: the scale byte is present but the unscaled value is
   // cut short (DECIMAL4/8/16 need 4/8/16 bytes past the scale byte).
   ExpectVariantError(empty_meta, {0x20, 0x02, 0x01});
@@ -1055,6 +1074,23 @@ TEST(VariantUtilTest, DecimalScaleBoundaryAccepted) {
   vector<uint8_t> dec4 = {0x20, 0x09, 0x00, 0x00, 0x00, 0x00};
   EXPECT_OK(VariantToJson(empty_meta.data(), empty_meta.size(),
       dec4.data(), dec4.size(), &json));
+}
+
+// An unscaled value with as many digits as the max precision is valid.
+TEST(VariantUtilTest, DecimalUnscaledBoundaryAccepted) {
+  const vector<uint8_t> empty_meta = {0x01, 0x00, 0x00};
+  string json;
+  // DECIMAL4 with scale=9, unscaled=-999999999.
+  vector<uint8_t> dec4 = {0x20, 0x09, 0x01, 0x36, 0x65, 0xC4};
+  ASSERT_OK(VariantToJson(empty_meta.data(), empty_meta.size(),
+      dec4.data(), dec4.size(), &json));
+  EXPECT_EQ("-0.999999999", json);
+  // DECIMAL16 with scale=0, unscaled=10^38-1.
+  vector<uint8_t> dec16 = {0x28, 0x00, 0xFF, 0xFF, 0xFF, 0xFF, 0x3F, 0x22, 0x8A, 0x09,
+      0x7A, 0xC4, 0x86, 0x5A, 0xA8, 0x4C, 0x3B, 0x4B};
+  ASSERT_OK(VariantToJson(empty_meta.data(), empty_meta.size(),
+      dec16.data(), dec16.size(), &json));
+  EXPECT_EQ(string(38, '9'), json);
 }
 
 // Builds a value that wraps 'inner' in 'depth' nested single-element arrays. Uses 2-byte

@@ -23,6 +23,7 @@
 #include <string_view>
 
 #include "runtime/date-value.h"
+#include "runtime/decimal-value.inline.h"
 #include "runtime/string-value.h"
 #include "runtime/variant-value.h"
 #include "util/string-parser.h"
@@ -141,8 +142,52 @@ bool IsUnrenderablePrimitive(const VariantValue& sub) {
 // Coercion result for scalar extraction.
 enum class Coerce { OK, MISMATCH, OVERFLOW };
 
-// Extracts 'sub' as an int64. Integers widen; DATE yields its days-since-epoch; strings
-// are parsed. Everything else is a type mismatch. Range narrowing is checked by callers.
+// Reads a DECIMAL4/8/16 'sub' (a 1-byte scale followed by the unscaled value) widened to
+// a Decimal16Value. 'sub' must be a PRIMITIVE. Returns false if 'sub' is not a decimal,
+// its payload is truncated, or its scale or unscaled value does not fit the precision of
+// its physical type (as in the JSON serializer and Spark).
+bool GetDecimal(const VariantValue& sub, Decimal16Value* dv, int* scale) {
+  DCHECK(sub.GetBasicType() == VariantBasicType::PRIMITIVE);
+  __int128_t unscaled;
+  __int128_t max_unscaled;
+  int max_precision;
+  switch (sub.GetPhysicalType()) {
+    case VariantPhysicalType::DECIMAL4: {
+      int32_t t;
+      if (!sub.ReadValue(&t, 2)) return false;
+      unscaled = t;
+      max_unscaled = MAX_UNSCALED_DECIMAL4;
+      max_precision = ColumnType::MAX_DECIMAL4_PRECISION;
+      break;
+    }
+    case VariantPhysicalType::DECIMAL8: {
+      int64_t t;
+      if (!sub.ReadValue(&t, 2)) return false;
+      unscaled = t;
+      max_unscaled = MAX_UNSCALED_DECIMAL8;
+      max_precision = ColumnType::MAX_DECIMAL8_PRECISION;
+      break;
+    }
+    case VariantPhysicalType::DECIMAL16:
+      if (!sub.ReadValue(&unscaled, 2)) return false;
+      max_unscaled = MAX_UNSCALED_DECIMAL16;
+      max_precision = ColumnType::MAX_PRECISION;
+      break;
+    default:
+      return false;
+  }
+  // The payload read above succeeded, so the scale byte is in bounds.
+  *scale = sub.Data()[1];
+  if (*scale > max_precision || unscaled > max_unscaled || unscaled < -max_unscaled) {
+    return false;
+  }
+  *dv = Decimal16Value(unscaled);
+  return true;
+}
+
+// Extracts 'sub' as an int64. Integers widen; decimals round half away from zero, like
+// CAST(decimal AS BIGINT); DATE yields its days-since-epoch; strings are parsed.
+// Everything else is a type mismatch. Range narrowing is checked by callers.
 Coerce ToInt64(const VariantValue& sub, int64_t* out) {
   const VariantBasicType bt = sub.GetBasicType();
   if (bt == VariantBasicType::PRIMITIVE) {
@@ -173,6 +218,18 @@ Coerce ToInt64(const VariantValue& sub, int64_t* out) {
         *out = t;
         return Coerce::OK;
       }
+      case VariantPhysicalType::DECIMAL4:
+      case VariantPhysicalType::DECIMAL8:
+      case VariantPhysicalType::DECIMAL16: {
+        Decimal16Value dv;
+        int scale;
+        if (!GetDecimal(sub, &dv, &scale)) return Coerce::MISMATCH;
+        bool overflow = false;
+        int64_t t = dv.ToInt<BigIntVal>(scale, &overflow);
+        if (overflow) return Coerce::OVERFLOW;
+        *out = t;
+        return Coerce::OK;
+      }
       default: break;
     }
   }
@@ -193,7 +250,8 @@ Coerce ToInt64(const VariantValue& sub, int64_t* out) {
   return Coerce::MISMATCH;
 }
 
-// Extracts 'sub' as a double. Floats/ints widen; strings are parsed.
+// Extracts 'sub' as a double. Floats/ints widen; decimals convert like
+// CAST(decimal AS DOUBLE); strings are parsed.
 Coerce ToDouble(const VariantValue& sub, double* out) {
   const VariantBasicType bt = sub.GetBasicType();
   if (bt == VariantBasicType::PRIMITIVE) {
@@ -228,6 +286,15 @@ Coerce ToDouble(const VariantValue& sub, double* out) {
         int64_t t;
         if (!sub.GetInt64(&t)) return Coerce::MISMATCH;
         *out = t;
+        return Coerce::OK;
+      }
+      case VariantPhysicalType::DECIMAL4:
+      case VariantPhysicalType::DECIMAL8:
+      case VariantPhysicalType::DECIMAL16: {
+        Decimal16Value dv;
+        int scale;
+        if (!GetDecimal(sub, &dv, &scale)) return Coerce::MISMATCH;
+        *out = dv.ToDouble(scale);
         return Coerce::OK;
       }
       default: break;
@@ -306,8 +373,8 @@ bool DoGetInt(FunctionContext* ctx, const VariantVal& v, const StringVal& path,
     return false;
   }
   if (c == Coerce::OVERFLOW || x < min_val || x > max_val) {
-    FailCoercion(ctx, is_try, "variant_get: integer value at path is out of range for "
-        "the requested type");
+    FailCoercion(ctx, is_try, "variant_get: value at path is out of range for the "
+        "requested type");
     return false;
   }
   *result = x;

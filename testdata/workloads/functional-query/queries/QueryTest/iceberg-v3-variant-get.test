@@ -210,7 +210,8 @@ ORDER BY id;
 ---- QUERY
 # WHERE: try_variant_get over heterogeneous whole-table scalars. Non-integer rows
 # (booleans, doubles, strings, arrays, objects, dates below the threshold) coerce to
-# NULL rather than erroring, so the predicate simply keeps the two large integers.
+# NULL rather than erroring, so the predicate keeps the two large integers and the two
+# large decimals (ids 51 and 53, rounded to BIGINT).
 SELECT id, try_variant_get(v, '$', 'bigint') AS n
 FROM trino_variant
 WHERE try_variant_get(v, '$', 'bigint') > 50000
@@ -218,6 +219,8 @@ ORDER BY id;
 ---- RESULTS
 9,100000
 12,10000000000
+51,123457
+53,9876543210
 ---- TYPES
 INT, BIGINT
 ====
@@ -521,6 +524,38 @@ SELECT variant_get(v, '$', 'float') FROM trino_variant WHERE id = 5;
 34
 ---- TYPES
 FLOAT
+====
+---- QUERY
+# IMPALA-15611: decimals (ids 50-53 are DECIMAL4, DECIMAL4, DECIMAL8 and DECIMAL16)
+# convert to DOUBLE and FLOAT like CAST(decimal AS DOUBLE/FLOAT).
+SELECT id, variant_get(v, '$', 'double'), variant_get(v, '$', 'float')
+FROM trino_variant WHERE id BETWEEN 50 AND 53;
+---- RESULTS
+50,3.14,3.140000104904175
+51,123456.789,123456.7890625
+52,-123456789.98765433,-123456792
+53,9876543210.123457,9876543488
+---- TYPES
+INT, DOUBLE, FLOAT
+====
+---- QUERY
+# Decimals convert to the integer types like CAST(decimal AS BIGINT): the fraction rounds
+# half away from zero.
+SELECT id, variant_get(v, '$', 'bigint'), try_variant_get(v, '$', 'smallint')
+FROM trino_variant WHERE id BETWEEN 50 AND 53;
+---- RESULTS
+50,3,3
+51,123457,NULL
+52,-123456790,NULL
+53,9876543210,NULL
+---- TYPES
+INT, BIGINT, SMALLINT
+====
+---- QUERY
+# A rounded decimal outside the range of the requested type is an error.
+SELECT variant_get(v, '$', 'int') FROM trino_variant WHERE id = 53;
+---- CATCH
+out of range
 ====
 ---- QUERY
 # Strict narrowing overflow: 100000 does not fit TINYINT.

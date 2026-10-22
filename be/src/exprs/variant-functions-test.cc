@@ -28,6 +28,7 @@
 #include "runtime/variant-value.h"
 #include "testutil/gtest-util.h"
 #include "udf/udf-internal.h"
+#include "util/decimal-constants.h"
 
 #include "common/names.h"
 
@@ -81,6 +82,23 @@ static vector<uint8_t> BuildFloat(float val) { return BuildPrimitive<float>(14, 
 // DATE (physical type 11) stores a signed int32 day count since the epoch.
 static vector<uint8_t> BuildDate(int32_t days) {
   return BuildPrimitive<int32_t>(11, days);
+}
+
+// DECIMAL4/8/16 (physical types 8/9/10) store a 1-byte scale, then the unscaled value.
+template <typename T>
+static vector<uint8_t> BuildDecimal(uint8_t phys_type_id, uint8_t scale, T unscaled) {
+  vector<uint8_t> buf = BuildPrimitive<T>(phys_type_id, unscaled);
+  buf.insert(buf.begin() + 1, scale);
+  return buf;
+}
+static vector<uint8_t> BuildDecimal4(uint8_t scale, int32_t unscaled) {
+  return BuildDecimal<int32_t>(8, scale, unscaled);
+}
+static vector<uint8_t> BuildDecimal8(uint8_t scale, int64_t unscaled) {
+  return BuildDecimal<int64_t>(9, scale, unscaled);
+}
+static vector<uint8_t> BuildDecimal16(uint8_t scale, __int128_t unscaled) {
+  return BuildDecimal<__int128_t>(10, scale, unscaled);
 }
 
 // Types the serializer cannot render. TIME (17), TIMESTAMPTZ (12) and TIMESTAMPTZ_NANOS
@@ -459,6 +477,136 @@ TEST_F(VariantFunctionsTest, ThreeArgDoubleWidening) {
       ctx_, v, StringVal("$.i64"), StringVal("double")).val);
   EXPECT_DOUBLE_EQ(34.0, VariantFunctions::VariantGetDouble(
       ctx_, v, StringVal("$.i8"), StringVal("double")).val);
+}
+
+// 10^n as an int128, for DECIMAL16 values beyond the int64 range.
+static __int128_t Pow10(int n) {
+  __int128_t r = 1;
+  for (int i = 0; i < n; ++i) r *= 10;
+  return r;
+}
+
+// DECIMAL4/8/16 convert to DOUBLE and FLOAT like CAST(decimal AS DOUBLE/FLOAT).
+TEST_F(VariantFunctionsTest, ThreeArgDecimalToDouble) {
+  vector<uint8_t> meta = BuildMetadata({"d16", "d4", "d8", "huge"});  // sorted dict
+  vector<uint8_t> obj = BuildObject({0, 1, 2, 3},
+      {BuildDecimal16(9, Pow10(9) * 9876543210LL + 123456789), BuildDecimal4(2, 1234),
+          BuildDecimal8(9, -123456789987654321LL), BuildDecimal16(0, Pow10(37))});
+  VariantVal v = MakeVariant(meta, obj);
+  EXPECT_EQ(12.34, VariantFunctions::VariantGetDouble(
+      ctx_, v, StringVal("$.d4"), StringVal("double")).val);
+  EXPECT_EQ(-123456789.987654321, VariantFunctions::VariantGetDouble(
+      ctx_, v, StringVal("$.d8"), StringVal("double")).val);
+  EXPECT_EQ(9876543210.123456789, VariantFunctions::TryVariantGetDouble(
+      ctx_, v, StringVal("$.d16"), StringVal("double")).val);
+  EXPECT_DOUBLE_EQ(1e37, VariantFunctions::VariantGetDouble(
+      ctx_, v, StringVal("$.huge"), StringVal("double")).val);
+  EXPECT_FLOAT_EQ(12.34f, VariantFunctions::VariantGetFloat(
+      ctx_, v, StringVal("$.d4"), StringVal("float")).val);
+  EXPECT_FLOAT_EQ(1e37f, VariantFunctions::TryVariantGetFloat(
+      ctx_, v, StringVal("$.huge"), StringVal("float")).val);
+  EXPECT_FALSE(ctx_->has_error());
+}
+
+// STRING is the lossless target type for decimals: like the JSON form, it has every digit
+// of the value, including the ones that do not fit a DOUBLE.
+TEST_F(VariantFunctionsTest, ThreeArgDecimalToString) {
+  vector<uint8_t> meta = BuildMetadata({"d16", "d4", "d8"});  // sorted dictionary
+  vector<uint8_t> obj = BuildObject({0, 1, 2},
+      {BuildDecimal16(9, Pow10(9) * 9876543210LL + 123456789), BuildDecimal4(2, 1234),
+          BuildDecimal8(9, -123456789987654321LL)});
+  VariantVal v = MakeVariant(meta, obj);
+  EXPECT_EQ("12.34", AsString(VariantFunctions::VariantGetString(
+      ctx_, v, StringVal("$.d4"), StringVal("string"))));
+  EXPECT_EQ("-123456789.987654321", AsString(VariantFunctions::VariantGetString(
+      ctx_, v, StringVal("$.d8"), StringVal("string"))));
+  EXPECT_EQ("9876543210.123456789", AsString(VariantFunctions::VariantGetString(
+      ctx_, v, StringVal("$.d16"), StringVal("string"))));
+  EXPECT_EQ(
+      "{\"d16\":9876543210.123456789,\"d4\":12.34,\"d8\":-123456789.987654321}",
+      AsString(VariantFunctions::VariantGetString(
+          ctx_, v, StringVal("$"), StringVal("string"))));
+  EXPECT_FALSE(ctx_->has_error());
+}
+
+// Decimals convert to the integer types like CAST(decimal AS <int type>): the fraction
+// rounds half away from zero, and a rounded value outside the target range overflows.
+TEST_F(VariantFunctionsTest, ThreeArgDecimalToInt) {
+  vector<uint8_t> meta = BuildMetadata({"big", "d16", "frac", "half", "neg_half",
+      "tiny_edge", "tiny_neg_edge", "tiny_neg_over", "tiny_over"});
+  vector<uint8_t> obj = BuildObject({0, 1, 2, 3, 4, 5, 6, 7, 8},
+      {BuildDecimal8(0, 3000000000LL), BuildDecimal16(9, Pow10(9) * 9876543210LL),
+          BuildDecimal4(2, 1234), BuildDecimal4(1, 125), BuildDecimal4(1, -125),
+          BuildDecimal4(1, 1274), BuildDecimal4(1, -1284), BuildDecimal4(1, -1285),
+          BuildDecimal4(1, 1275)});
+  VariantVal v = MakeVariant(meta, obj);
+  EXPECT_EQ(12, VariantFunctions::VariantGetBigInt(
+      ctx_, v, StringVal("$.frac"), StringVal("bigint")).val);
+  EXPECT_EQ(13, VariantFunctions::VariantGetInt(
+      ctx_, v, StringVal("$.half"), StringVal("int")).val);
+  EXPECT_EQ(-13, VariantFunctions::VariantGetSmallInt(
+      ctx_, v, StringVal("$.neg_half"), StringVal("smallint")).val);
+  EXPECT_EQ(127, VariantFunctions::VariantGetTinyInt(
+      ctx_, v, StringVal("$.tiny_edge"), StringVal("tinyint")).val);
+  EXPECT_EQ(-128, VariantFunctions::VariantGetTinyInt(
+      ctx_, v, StringVal("$.tiny_neg_edge"), StringVal("tinyint")).val);
+  EXPECT_EQ(3000000000LL, VariantFunctions::VariantGetBigInt(
+      ctx_, v, StringVal("$.big"), StringVal("bigint")).val);
+  EXPECT_EQ(9876543210LL, VariantFunctions::VariantGetBigInt(
+      ctx_, v, StringVal("$.d16"), StringVal("bigint")).val);
+  // 127.5 and -128.5 round to 128 and -129, which overflow TINYINT; 3000000000
+  // overflows INT.
+  EXPECT_TRUE(VariantFunctions::TryVariantGetTinyInt(
+      ctx_, v, StringVal("$.tiny_over"), StringVal("tinyint")).is_null);
+  EXPECT_TRUE(VariantFunctions::TryVariantGetTinyInt(
+      ctx_, v, StringVal("$.tiny_neg_over"), StringVal("tinyint")).is_null);
+  EXPECT_TRUE(VariantFunctions::TryVariantGetInt(
+      ctx_, v, StringVal("$.big"), StringVal("int")).is_null);
+  EXPECT_FALSE(ctx_->has_error());
+  FunctionContext* c = MakeCtx(3);
+  EXPECT_TRUE(VariantFunctions::VariantGetTinyInt(
+      c, v, StringVal("$.tiny_over"), StringVal("tinyint")).is_null);
+  EXPECT_TRUE(c->has_error());
+}
+
+// A DECIMAL16 value outside the int64 range overflows even BIGINT.
+TEST_F(VariantFunctionsTest, ThreeArgDecimalBigIntOverflow) {
+  vector<uint8_t> meta = BuildMetadata({"d"});
+  vector<uint8_t> obj = BuildObject({0}, {BuildDecimal16(2, Pow10(22))});
+  VariantVal v = MakeVariant(meta, obj);
+  EXPECT_TRUE(VariantFunctions::TryVariantGetBigInt(
+      ctx_, v, StringVal("$.d"), StringVal("bigint")).is_null);
+  EXPECT_FALSE(ctx_->has_error());
+  FunctionContext* c = MakeCtx(3);
+  EXPECT_TRUE(VariantFunctions::VariantGetBigInt(
+      c, v, StringVal("$.d"), StringVal("bigint")).is_null);
+  EXPECT_TRUE(c->has_error());
+}
+
+// A decimal whose scale or unscaled value exceeds the precision of its physical type, or
+// whose payload is truncated, is not convertible.
+TEST_F(VariantFunctionsTest, ThreeArgMalformedDecimal) {
+  vector<uint8_t> truncated = BuildDecimal8(2, 1234);
+  truncated.pop_back();
+  // std::numeric_limits<__int128_t>::min() returns 0, so build INT128_MIN by hand.
+  const __int128_t int128_min =
+      static_cast<__int128_t>(static_cast<__uint128_t>(1) << 127);
+  vector<uint8_t> meta = BuildMetadata({"s", "t", "u", "v", "w"});  // sorted dictionary
+  vector<uint8_t> obj = BuildObject({0, 1, 2, 3, 4},
+      {BuildDecimal4(10, 5), truncated, BuildDecimal4(0, MAX_UNSCALED_DECIMAL4 + 1),
+          BuildDecimal16(0, -MAX_UNSCALED_DECIMAL16 - 1), BuildDecimal16(0, int128_min)});
+  VariantVal v = MakeVariant(meta, obj);
+  for (const char* path : {"$.s", "$.t", "$.u", "$.v", "$.w"}) {
+    EXPECT_TRUE(VariantFunctions::TryVariantGetDouble(
+        ctx_, v, StringVal(path), StringVal("double")).is_null) << path;
+    EXPECT_TRUE(VariantFunctions::TryVariantGetBigInt(
+        ctx_, v, StringVal(path), StringVal("bigint")).is_null) << path;
+    FunctionContext* c = MakeCtx(3);
+    EXPECT_TRUE(VariantFunctions::VariantGetDouble(
+        c, v, StringVal(path), StringVal("double")).is_null) << path;
+    EXPECT_TRUE(c->has_error()) << path;
+  }
+  EXPECT_FALSE(ctx_->has_error());
 }
 
 // DATE extraction from the DATE physical type and from a date string; a bare INT32 is
