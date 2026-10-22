@@ -181,6 +181,7 @@ under the License.
         <topicref href="topics/impala_subqueries.xml"/>
         <topicref rev="IMPALA-5309" href="topics/impala_tablesample.xml"/>
         <topicref href="topics/impala_with.xml"/>
+        <topicref href="topics/impala_pivot.xml"/>
         <topicref href="topics/impala_distinct.xml"/>
       </topicref>
       <topicref href="topics/impala_set.xml">

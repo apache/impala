@@ -3487,6 +3487,9 @@ flight_num:           INT32 SNAPPY DO:83456393 FPO:83488603 SZ:10216514/11474301
       <p rev="2.0.0" id="added_in_20">
         <b>Added in:</b> <keyword keyref="impala200"/>
       </p>
+      <p id="added_in_50" rev="5.0">
+        <b>Added in:</b>
+        <keyword keyref="impala50"/></p>
 
       <p rev="2.0.0" id="enhanced_in_20">
         <b>Added in:</b> Available in earlier Impala releases, but new capabilities were added

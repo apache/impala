@@ -1,0 +1,156 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+Licensed to the Apache Software Foundation (ASF) under one
+or more contributor license agreements.  See the NOTICE file
+distributed with this work for additional information
+regarding copyright ownership.  The ASF licenses this file
+to you under the Apache License, Version 2.0 (the
+"License"); you may not use this file except in compliance
+with the License.  You may obtain a copy of the License at
+
+  http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing,
+software distributed under the License is distributed on an
+"AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+KIND, either express or implied.  See the License for the
+specific language governing permissions and limitations
+under the License.
+-->
+<!DOCTYPE concept PUBLIC "-//OASIS//DTD DITA Concept//EN" "concept.dtd">
+<concept rev="5.0" id="impala_pivot">
+  <title>PIVOT Clause</title>
+  <prolog>
+    <metadata>
+      <data name="Category" value="Impala"/>
+      <data name="Category" value="SQL"/>
+      <data name="Category" value="Querying"/>
+      <data name="Category" value="Developers"/>
+      <data name="Category" value="Data Analysts"/>
+    </metadata>
+  </prolog>
+  <conbody>
+    <p>Impala SQL queries can use the <codeph>PIVOT</codeph> clause to transform unique column
+      values into multiple new columns for horizontal data aggregation.</p>
+    <p>The <codeph>PIVOT</codeph> clause is a query operator that allows you to reorganize data by
+      turning unique values from one column into multiple new columns. This process involves
+      applying an aggregate function to the data and redistributing the results across these new
+      column headers.</p>
+    <p>You can use the <codeph>PIVOT</codeph> clause to summarize data into a grid format such as a
+      calendar or a spreadsheet with totals calculated at the intersection of rows and columns.
+      While a standard <codeph>GROUP BY</codeph> statement aggregates data vertically into a single
+      column of rows, the <codeph>PIVOT</codeph> clause splits aggregation results horizontally
+      across multiple columns. This operation transforms a flat, repeating table into a
+      multi-dimensional summary or cross-tab report.</p>
+    <p>When tracking team sales, calculating total revenue requires evaluating two dimensions, such
+      as the team member who completed the sale (Employees) and the corresponding time period
+      (Months). You can represent this scenario using either of the following approaches:<ul>
+        <li>Standard <codeph>GROUP BY</codeph> approach (vertical) - This operation returns a long,
+          single column of results. You must scroll down through repeating names to compare
+          different months.</li>
+        <li><codeph>PIVOT</codeph> approach (grid) - This operation places the employees down the
+          left side and the months across the top header, which allows for immediate side-by-side
+          comparison.</li>
+      </ul></p>
+    <p>When you apply the <codeph>PIVOT</codeph> clause to a table reference, the following changes occur:<ul>
+        <li>The operation identifies unique values in a designated header column.</li>
+        <li>Each identified value becomes a separate column in the final output.</li>
+        <li>The result table includes the newly generated columns and all original columns from the
+          source table, excluding the header column.</li>
+        <li>The aggregation process calculates values for each intersection of the remaining rows
+          and the new columns.</li>
+      </ul></p>
+    <p conref="../shared/impala_common.xml#common/syntax_blurb"/>
+    <p>The following syntax block shows the structure of a <codeph>PIVOT</codeph>
+      operation:<codeblock>SELECT <varname>columns</varname> FROM <varname>table_name</varname>
+        PIVOT (
+        <varname>aggregate_function_1</varname>(<varname>target_column</varname>) [as <varname>alias_1</varname>], <varname>aggregate_function_2</varname>(<varname>target_column</varname>) [as <varname>alias_2</varname>], ...
+        FOR <varname>header_column</varname> IN (<varname>value_1</varname> [AS <varname>alias_1</varname>], <varname>value_2</varname> [AS <varname>alias_2</varname>], ...)
+        ) [AS <varname>result_alias</varname>];</codeblock></p>
+    <p conref="../shared/impala_common.xml#common/usage_notes_blurb"/>
+    <p>When you use the <codeph>PIVOT</codeph> clause, keep the following details in mind:</p>
+    <ul>
+      <li>You must provide aliases when you specify multiple aggregate expressions in a single
+          <codeph>PIVOT</codeph> clause.</li>
+      <li>The query uses all columns that are not part of the <codeph>PIVOT</codeph> definition to
+        group the rows.</li>
+      <li>The header column is removed from the final display because its data is represented in the
+        new column headers.</li>
+      <li>If the FOR column contains <codeph>NULL</codeph> values, the resulting pivot columns for
+        those specific rows display <codeph>NULL</codeph> unless the aggregation handles them
+        otherwise.</li>
+    </ul>
+    <p conref="../shared/impala_common.xml#common/example_blurb"/>
+    <p>The following example shows a <codeph>PIVOT</codeph> operation that uses a
+        <codeph>count</codeph>
+      aggregation:<codeblock>SELECT year, v1, v2 FROM functional_parquet.alltypestiny PIVOT (
+count(distinct month) FOR month IN (1 AS v1, 2 AS v2)
+) AS t;</codeblock></p>
+    <p>The following example shows how to use <codeph>PIVOT</codeph> within a Common Table
+      Expression (CTE) to handle values from a <codeph>UNION</codeph> node:</p>
+    <codeblock>WITH t1 (a, b) AS (
+VALUES (1, 2), (3, 4)
+)
+SELECT a, v2, v4 FROM t1 PIVOT (
+min(b) FOR b IN (2 AS v2, 4 AS v4)
+) AS t;</codeblock>
+    <p conref="../shared/impala_common.xml#common/added_in_50"/>
+    <p><b>Limitations:</b></p>
+    <p>The <codeph>PIVOT</codeph> clause contains specific technical restrictions and functional
+      constraints when running query operations.</p>
+    <p><b>Multiple header columns</b></p>
+    <p>The <codeph>PIVOT</codeph> clause does not support the use of multiple header columns.</p>
+    <p><b>Workaround:</b> Combine the multiple columns into a new column in a CTE, then use the
+      combined column as the header column.</p>
+    <p conref="../shared/impala_common.xml#common/example_blurb"/>
+    <codeblock>with combine_year_month as (
+   select concat(concat(cast(year as string), '_'), cast(month as string)) as year_month
+   from functional_parquet.alltypestiny
+)
+select * from combine_year_month pivot (
+   count(*) for year_month in ('2009_1', '2009_2', '2009_3', '2009_4')
+) as t;
+
++--------+--------+--------+--------+
+| 2009_1 | 2009_2 | 2009_3 | 2009_4 |
++--------+--------+--------+--------+
+| 2      | 2      | 2      | 2      |
++--------+--------+--------+--------+
+Fetched 1 row(s) in 0.23s</codeblock>
+    <p><b>Complex source table columns</b></p>
+    <p>Referencing complex columns in the source table within a <codeph>PIVOT</codeph> clause is not
+      supported.</p>
+    <p><b>Workaround:</b> None.</p>
+    <p><b>Root cause:</b> A <codeph>GROUP BY</codeph> expression cannot be used on complex types
+      without specifying a field.</p>
+    <p><b>Nested fields as header columns</b></p>
+    <p>Specifying a nested field as the header column is not supported.</p>
+    <p><b>Workaround:</b> Select the field into a new column in a CTE, then use the new column as
+      the header column.</p>
+    <p conref="../shared/impala_common.xml#common/example_blurb"/>
+    <codeblock>with select_ti as (
+   select alltypes.ti as ti
+   from functional_parquet.complextypes_structs
+)
+select * from select_ti pivot (
+   count(*) for ti in (90, 100, 123, 127)
+) as t;
+
++----+-----+-----+-----+
+| 90 | 100 | 123 | 127 |
++----+-----+-----+-----+
+| 1  | 1   | 1   | 1   |
++----+-----+-----+-----+
+Fetched 1 row(s) in 0.11s</codeblock>
+    <p><b>Constant expressions in header values</b></p>
+    <p>Specifying constant expressions other than literals in the header value list is not
+      supported.</p>
+    <p><b>Workaround:</b> Evaluate the constant expressions before writing the SQL statement in the
+      host language, such as Python, and then use the result directly in SQL.</p>
+    <p><b>Non-SELECT statements</b></p>
+    <p>Using the <codeph>PIVOT</codeph> clause in statements other than <codeph>SELECT</codeph> is
+      not supported.</p>
+    <p><b>Workaround:</b> Fetch the result of <codeph>PIVOT</codeph> using the client and then
+      insert it into a table with another SQL statement.</p>
+  </conbody>
+</concept>
