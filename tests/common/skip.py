@@ -315,3 +315,5 @@ class SkipIfCalcite:
       reason="IMPALA-15123: spilling plan is different, needs investigation.")
   processing_plan_different = pytest.mark.skipif(IS_CALCITE_PLANNER,
       reason="IMPALA-15260: processing plan is different, needs investigation.")
+  missing_join_hint_warning = pytest.mark.skipif(IS_CALCITE_PLANNER,
+      reason="IMPALA-15614: no warning for unsupported join hint.")

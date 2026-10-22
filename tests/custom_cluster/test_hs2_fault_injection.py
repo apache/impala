@@ -25,6 +25,7 @@ from impala_shell.ImpalaHttpClient import ImpalaHttpClient
 from impala_shell.shell_exceptions import HttpError
 from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
 from tests.common.impala_test_suite import IMPALAD_HS2_HTTP_HOST_PORT
+from tests.common.skip import SkipIfCalcite
 
 """IMPALA-12216 implemented timestamp to be printed in case of any error/warning
   during query execution, below is an example :
@@ -402,6 +403,7 @@ class TestHS2FaultInjection(CustomClusterTestSuite):
     assert output[2][TS_LEN:] == self.__expect_msg_retry("GetExecSummary")
 
   @pytest.mark.execute_serially
+  @SkipIfCalcite.missing_join_hint_warning
   def test_get_warning_log(self, capsys):
     """Tests fault injection in ImpalaHS2Client's get_warning_log().
     GetLog rpc fails due to fault, but succeeds after a retry"""
