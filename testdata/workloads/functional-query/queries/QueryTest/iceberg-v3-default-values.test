@@ -511,6 +511,45 @@ SELECT * FROM iceberg_ddl_add_defaults WHERE id = 40;
 INT,INT,BIGINT,BOOLEAN,FLOAT,DOUBLE,DECIMAL,STRING,DATE
 ====
 ---- QUERY
+# ADD COLUMN / ADD COLUMNS with NOT NULL DEFAULT must create required Iceberg fields.
+CREATE TABLE iceberg_ddl_add_not_null (id INT)
+STORED AS ICEBERG
+TBLPROPERTIES ('format-version'='3');
+INSERT INTO iceberg_ddl_add_not_null VALUES (1);
+ALTER TABLE iceberg_ddl_add_not_null ADD COLUMN c INT NOT NULL DEFAULT 7;
+ALTER TABLE iceberg_ddl_add_not_null ADD COLUMNS (d INT NOT NULL DEFAULT 8);
+DESCRIBE iceberg_ddl_add_not_null;
+---- RESULTS
+'id','int','','true'
+'c','int','','false'
+'d','int','','false'
+---- TYPES
+STRING,STRING,STRING,STRING
+====
+---- QUERY
+# Existing rows read initial-default; omitted columns use write-default on INSERT.
+SELECT id, c, d FROM iceberg_ddl_add_not_null ORDER BY id;
+---- RESULTS
+1,7,8
+---- TYPES
+INT,INT,INT
+====
+---- QUERY
+INSERT INTO iceberg_ddl_add_not_null (id) VALUES (2);
+SELECT id, c, d FROM iceberg_ddl_add_not_null ORDER BY id;
+---- RESULTS
+1,7,8
+2,7,8
+---- TYPES
+INT,INT,INT
+====
+---- QUERY
+# Explicit NULL is rejected for required columns added with DEFAULT.
+INSERT INTO iceberg_ddl_add_not_null (id, c, d) VALUES (3, NULL, NULL);
+---- CATCH
+Column 'c' is not nullable but during writing a Parquet page we found 1 null values.
+====
+---- QUERY
 # ALTER COLUMN SET DEFAULT on all scalar types (no defaults at CREATE).
 CREATE TABLE iceberg_ddl_alter_defaults (
   id INT,

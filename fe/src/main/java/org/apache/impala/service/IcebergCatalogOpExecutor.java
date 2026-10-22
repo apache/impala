@@ -161,6 +161,10 @@ public class IcebergCatalogOpExecutor {
     for (TColumn column : columns) {
       org.apache.iceberg.types.Type type =
           IcebergSchemaConverter.fromImpalaColumnType(column.getColumnType());
+      boolean isRequired =
+          column.isSetIs_nullable() && !column.isIs_nullable();
+      String name = column.getColumnName();
+      String doc = column.getComment();
 
       String defaultStr = null;
       if (column.isSetIceberg_initial_default()) {
@@ -168,22 +172,30 @@ public class IcebergCatalogOpExecutor {
       } else if (column.isSetIceberg_write_default()) {
         defaultStr = column.getIceberg_write_default();
       }
+      org.apache.iceberg.expressions.Literal<?> defaultValue = null;
       if (defaultStr != null) {
         try {
-          org.apache.iceberg.expressions.Literal<?> defaultValue =
+          defaultValue =
               IcebergSchemaConverter.parseStringToIcebergLiteral(defaultStr, type);
-          schema.addColumn(column.getColumnName(), type,
-              column.getComment(), defaultValue);
         } catch (Exception e) {
           throw new ImpalaRuntimeException(String.format(
               "Failed to parse default value '%s' for column '%s': %s",
-              defaultStr, column.getColumnName(), e.getMessage()));
+              defaultStr, name, e.getMessage()));
         }
-      } else {
-        schema.addColumn(column.getColumnName(), type, column.getComment());
       }
+      addColumnHelper(schema, isRequired, name, type, doc, defaultValue);
     }
     schema.commit();
+  }
+
+  private static void addColumnHelper(UpdateSchema schema, boolean isRequired,
+      String name, org.apache.iceberg.types.Type type, String doc,
+      org.apache.iceberg.expressions.Literal<?> defaultValue) {
+    if (isRequired) {
+      schema.addRequiredColumn(name, type, doc, defaultValue);
+    } else {
+      schema.addColumn(name, type, doc, defaultValue);
+    }
   }
 
   /**
