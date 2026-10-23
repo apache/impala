@@ -3480,7 +3480,7 @@ public class CatalogServiceCatalog extends Catalog {
     TTableName tDbName = new TTableName(dbName.toLowerCase(), "*");
     if (loadInBackground_
         || (keepsWarmupTablesLoaded_
-            && (warmupTables_.contains(tTblName)) || warmupTables_.contains(tDbName))) {
+            && (warmupTables_.contains(tTblName) || warmupTables_.contains(tDbName)))) {
       tableLoadingMgr_.backgroundLoad(tTblName);
     }
   }

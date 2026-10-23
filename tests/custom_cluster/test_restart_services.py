@@ -1153,8 +1153,12 @@ class TestWarmupCatalog(CustomClusterTestSuite):
     self._verify_warmup_scheduling_order(tpch_tables)
     self.execute_query("invalidate metadata")
     self._verify_tables_warmed_up(catalogd, tpch_tables)
-    self.execute_query("invalidate metadata tpcds.item")
-    catalogd.verify_table_metadata_loaded("tpcds", "item", keeps_warmup_tables_loaded)
+    for db, tbl in ("tpch", "nation"), ("tpcds", "item"):
+      self.execute_query("invalidate metadata %s.%s" % (db, tbl))
+      if not keeps_warmup_tables_loaded:
+        # Sleep a while in case the table loading is in progress
+        time.sleep(1)
+      catalogd.verify_table_metadata_loaded(db, tbl, keeps_warmup_tables_loaded)
 
   def _verify_tables_warmed_up(self, catalogd, tpch_tables):
     tables = {
