@@ -2753,6 +2753,10 @@ class TestIcebergV2Table(IcebergTestSuite):
     self.run_test_case('QueryTest/iceberg-predicate-push-down-hint', vector,
                        use_db=unique_database)
 
+  def test_predicate_push_down_float(self, vector, unique_database):
+    self.run_test_case('QueryTest/iceberg-predicate-push-down-float', vector,
+                       use_db=unique_database)
+
   def test_like_pushdown(self, vector, unique_database):
     self.run_test_case('QueryTest/iceberg-like-pushdown', vector, use_db=unique_database)
 

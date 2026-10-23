@@ -26,6 +26,7 @@ import org.apache.iceberg.transforms.Transforms;
 import org.apache.impala.analysis.Analyzer;
 import org.apache.impala.analysis.Expr;
 import org.apache.impala.analysis.IcebergPartitionExpr;
+import org.apache.impala.analysis.NumericLiteral;
 import org.apache.impala.analysis.StringLiteral;
 import org.apache.impala.catalog.Column;
 import org.apache.impala.catalog.FeIcebergTable;
@@ -60,6 +61,12 @@ public class IcebergPartitionPredicateConverter extends IcebergPredicateConverte
     }
     return new Term((UnboundTerm<Object>) Expressions.transform(column.getName(),
         Transforms.fromString(partitionExpr.getTransform().toSql())), icebergColumn);
+  }
+
+  @Override
+  protected double getIcebergDoubleValue(Operation op, NumericLiteral literal) {
+    // Partition values are evaluated exactly, without the NaN value counts of files.
+    return literal.getDoubleValue();
   }
 
   @Override

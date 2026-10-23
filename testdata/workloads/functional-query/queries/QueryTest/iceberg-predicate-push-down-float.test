@@ -1,0 +1,180 @@
+====
+---- QUERY
+# Impala doesn't write NaN value counts, and leaves NaNs out of the bounds, so Iceberg
+# can't skip files for !=, NOT IN and NOT on floating-point columns.
+create table nan_tbl (d double, f float) stored as iceberg
+tblproperties ('impala.iceberg.push_down_hint'='d,f');
+insert into nan_tbl values (1, 1), (cast('nan' as double), cast('nan' as float));
+select count(*) from nan_tbl where d != 1;
+---- TYPES
+BIGINT
+---- RESULTS
+1
+====
+---- QUERY
+select count(*) from nan_tbl where f not in (1, 2);
+---- TYPES
+BIGINT
+---- RESULTS
+1
+====
+---- QUERY
+select count(*) from nan_tbl where not (d = 1);
+---- TYPES
+BIGINT
+---- RESULTS
+1
+====
+---- QUERY
+# Iceberg rewrites NOT(d < 5) to d >= 5, which is not equivalent for NaN.
+select count(*) from nan_tbl where not (d < 5);
+---- TYPES
+BIGINT
+---- RESULTS
+1
+====
+---- QUERY
+# Other comparisons are still pushed down.
+select count(*) from nan_tbl where d > 5;
+---- TYPES
+BIGINT
+---- RESULTS
+0
+---- RUNTIME_PROFILE
+skipped-data-files: 1
+====
+---- QUERY
+# Iceberg orders -0.0 before 0.0, so the upper bound -0.0 is less than 0.
+create table zero_src (x double) stored as iceberg;
+insert into zero_src values (0), (1);
+create table zero_tbl (d double) stored as iceberg
+tblproperties ('impala.iceberg.push_down_hint'='d');
+insert into zero_tbl select -x from zero_src;
+select count(*) from zero_tbl where d = 0;
+---- TYPES
+BIGINT
+---- RESULTS
+1
+====
+---- QUERY
+select count(*) from zero_tbl where d >= 0;
+---- TYPES
+BIGINT
+---- RESULTS
+1
+====
+---- QUERY
+select count(*) from zero_tbl where d in (0, 5);
+---- TYPES
+BIGINT
+---- RESULTS
+1
+====
+---- QUERY
+# The same for identity partitions, where Iceberg evaluates the predicates on the
+# partition values -0.0 and -1.0. The partitions can still be pruned.
+create table zero_part_tbl (i int, d double) partitioned by spec (d) stored as iceberg;
+insert into zero_part_tbl select cast(x as int), -x from zero_src;
+select i from zero_part_tbl where d = 0;
+---- TYPES
+INT
+---- RESULTS
+0
+---- RUNTIME_PROFILE
+row_regex: .*partitions=1/2 files=1 .*
+====
+---- QUERY
+select i from zero_part_tbl where d < 0;
+---- TYPES
+INT
+---- RESULTS
+1
+---- RUNTIME_PROFILE
+row_regex: .*partitions=1/2 files=1 .*
+====
+---- QUERY
+select i from zero_part_tbl where d >= 0;
+---- TYPES
+INT
+---- RESULTS
+0
+---- RUNTIME_PROFILE
+row_regex: .*partitions=1/2 files=1 .*
+====
+---- QUERY
+# Partition filters convert != and NOT IN, they must not match the -0.0 partition.
+show files in zero_part_tbl partition (d != 0);
+---- RESULTS
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/zero_part_tbl/data/d=-1/.*.0.parq','.*','','$ERASURECODE_POLICY'
+---- TYPES
+STRING, STRING, STRING, STRING
+====
+---- QUERY
+show files in zero_part_tbl partition (d not in (0, 5));
+---- RESULTS
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/zero_part_tbl/data/d=-1/.*.0.parq','.*','','$ERASURECODE_POLICY'
+---- TYPES
+STRING, STRING, STRING, STRING
+====
+---- QUERY
+alter table zero_part_tbl drop partition (d < 0);
+select i from zero_part_tbl;
+---- TYPES
+INT
+---- RESULTS
+0
+====
+---- QUERY
+# Narrowing the literal to FLOAT gives -0.0.
+create table float_zero_part_tbl (i int, f float) partitioned by spec (f)
+stored as iceberg;
+insert into float_zero_part_tbl values (1, 0), (2, 1);
+select i from float_zero_part_tbl where f = cast(-1e-46 as float);
+---- TYPES
+INT
+---- RESULTS
+1
+====
+---- QUERY
+# NaN is greater than any other value in Iceberg, but comparisons with NaN are false in
+# Impala.
+create table nan_part_tbl (i int, d double) partitioned by spec (d) stored as iceberg;
+insert into nan_part_tbl values (1, cast('nan' as double)), (2, 7), (3, -3);
+select i from nan_part_tbl where d > 5;
+---- TYPES
+INT
+---- RESULTS
+2
+====
+---- QUERY
+select i from nan_part_tbl where d >= 7;
+---- TYPES
+INT
+---- RESULTS
+2
+====
+---- QUERY
+select i from nan_part_tbl where d != 7;
+---- TYPES
+INT
+---- RESULTS
+1
+3
+====
+---- QUERY
+alter table nan_part_tbl drop partition (d > 5);
+select i from nan_part_tbl;
+---- TYPES
+INT
+---- RESULTS
+1
+3
+====
+---- QUERY
+alter table nan_part_tbl drop partition (d != -3);
+select i from nan_part_tbl;
+---- TYPES
+INT
+---- RESULTS
+3
+====

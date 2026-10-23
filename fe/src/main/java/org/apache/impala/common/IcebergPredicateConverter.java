@@ -18,6 +18,7 @@
 package org.apache.impala.common;
 
 import com.google.common.base.Preconditions;
+import com.google.common.base.Predicate;
 import java.math.BigDecimal;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
@@ -337,6 +338,27 @@ public class IcebergPredicateConverter {
 
       List<Object> literals = Collections.singletonList(value);
       Expression iceExpr = Expressions.predicate(op, term.term_, literals);
+      // Iceberg orders -0.0 before 0.0, but they are equal in Impala, e.g. a file whose
+      // upper bound is -0.0 must not be skipped for 'd = 0', and a -0.0 partition value
+      // must not match 'd < 0'.
+      Object negativeZero = getNegativeZero(value);
+      if (negativeZero != null) {
+        if (op == Operation.EQ) {
+          iceExpr = Expressions.in(term.term_, value, negativeZero);
+        } else if (op == Operation.GT_EQ) {
+          iceExpr = Expressions.greaterThanOrEqual(term.term_, negativeZero);
+        } else if (op == Operation.LT) {
+          iceExpr = Expressions.lessThan(term.term_, negativeZero);
+        } else if (op == Operation.NOT_EQ) {
+          iceExpr = Expressions.notIn(term.term_, value, negativeZero);
+        }
+      }
+      // NaN is greater than any other value in Iceberg, so e.g. a NaN partition value
+      // would match 'd > 5'.
+      if ((value instanceof Double || value instanceof Float) &&
+          (op == Operation.GT || op == Operation.GT_EQ)) {
+        iceExpr = Expressions.and(iceExpr, Expressions.notNaN(term.term_));
+      }
       return new ConverterResult(iceExpr, ConversionStatus.FULLY_CONVERTED);
     } catch (ImpalaRuntimeException e) {
       return new ConverterResult(ConversionStatus.FAILED, e.getMessage());
@@ -359,6 +381,8 @@ public class IcebergPredicateConverter {
         checkNullLiteral(literal);
         Object value = getIcebergValue(term, op, literal);
         values.add(value);
+        Object negativeZero = getNegativeZero(value);
+        if (negativeZero != null) values.add(negativeZero);
       }
 
       // According to the method:
@@ -421,6 +445,12 @@ public class IcebergPredicateConverter {
               "NOT of a partially converted predicate cannot be pushed down to " +
               "Iceberg: %s", predicate.toSql()));
         }
+        // Iceberg rewrites e.g. NOT(d < 5) to d >= 5, which is not equivalent for NaN.
+        if (hasFloatingPointComparison(leftExpr)) {
+          return new ConverterResult(ConversionStatus.FAILED,
+              "Cannot negate a predicate on a floating-point column: " +
+              leftExpr.toSql());
+        }
         Expression iceExpr = Expressions.not(leftResult.getIcebergExpression());
         return new ConverterResult(iceExpr, ConversionStatus.FULLY_CONVERTED);
       }
@@ -449,6 +479,12 @@ public class IcebergPredicateConverter {
     } catch (ImpalaRuntimeException e) {
       return new ConverterResult(ConversionStatus.FAILED, e.getMessage());
     }
+  }
+
+  private static boolean hasFloatingPointComparison(Expr expr) {
+    return expr.contains((Predicate<Expr>) e ->
+        (e instanceof BinaryPredicate || e instanceof InPredicate) &&
+        e.getChild(0).getType().isFloatingPointType());
   }
 
   /**
@@ -651,8 +687,12 @@ public class IcebergPredicateConverter {
       case SMALLINT:
       case INT: return ((NumericLiteral) literal).getIntValue();
       case BIGINT: return ((NumericLiteral) literal).getLongValue();
-      case FLOAT: return (float) ((NumericLiteral) literal).getDoubleValue();
-      case DOUBLE: return ((NumericLiteral) literal).getDoubleValue();
+      case FLOAT: {
+        // Narrowing to FLOAT can give -0.0, e.g. for CAST(-1e-46 AS FLOAT).
+        float value = (float) getIcebergDoubleValue(op, (NumericLiteral) literal);
+        return value == 0 ? 0.0f : value;
+      }
+      case DOUBLE: return getIcebergDoubleValue(op, (NumericLiteral) literal);
       case UUID: return getIcebergUuidValue(term, op, (StringLiteral) literal);
       case STRING:
       case DATETIME:
@@ -669,6 +709,34 @@ public class IcebergPredicateConverter {
                 literal.getStringValue(), primitiveType));
       }
     }
+  }
+
+  /**
+   * Returns the value of a FLOAT or DOUBLE literal if Iceberg can't skip files with
+   * matching rows for 'op'. Iceberg compares floating-point values by their total order,
+   * while Impala follows IEEE 754, where NaN is not equal to anything.
+   */
+  protected double getIcebergDoubleValue(Operation op, NumericLiteral literal)
+      throws ImpalaRuntimeException {
+    // Iceberg assumes that a file without NaN value counts has no NaNs, so it skips files
+    // where the lower and upper bounds equal the literal. Impala doesn't write NaN value
+    // counts and leaves NaNs out of the bounds.
+    if (op == Operation.NOT_EQ || op == Operation.NOT_IN) {
+      throw new ImpalaRuntimeException(
+          "!= and NOT IN can't be converted to Iceberg expressions for floating-point " +
+          "values");
+    }
+    return literal.getDoubleValue();
+  }
+
+  /**
+   * Returns -0.0 of the same type if 'value' is a floating-point zero, null otherwise.
+   * Literals can't be -0.0 in Impala.
+   */
+  private static Object getNegativeZero(Object value) {
+    if (value instanceof Double && (Double) value == 0) return -0.0d;
+    if (value instanceof Float && (Float) value == 0) return -0.0f;
+    return null;
   }
 
   /**
