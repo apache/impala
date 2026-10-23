@@ -121,6 +121,13 @@ public class IcebergScanPlanner {
   // Mapping for translated Impala expressions
   private final Map<Expression, Expr> impalaIcebergPredicateMapping_ =
       new LinkedHashMap<>();
+  // Maps the string form of the predicates in the keys of
+  // 'impalaIcebergPredicateMapping_', e.g. the children of an AND, to the Impala
+  // expressions they were translated from. Like 'residualExpressions_', it is keyed by
+  // the string form, because the same predicate can occur in several expressions, and
+  // only one residual is kept for them.
+  private final Map<String, List<Expr>> icebergPredicateToImpalaExprs_ =
+      new HashMap<>();
   // Distinct residual expressions after Iceberg planning, keyed by their string form.
   // The key must identify the expression exactly: e.g. the sanitized string would map
   // 'id != 12345' and 'id != 54321' to the same key, and one of them would get lost.
@@ -842,12 +849,14 @@ public class IcebergScanPlanner {
       List<Expression> locatedExpressions = ExpressionVisitors.visit(expression,
           new IcebergExpressionCollector());
       for (Expression located : locatedExpressions) {
-        Expr expr = impalaIcebergPredicateMapping_.get(located);
+        List<Expr> exprs = icebergPredicateToImpalaExprs_.get(located.toString());
         // If we fail to locate any of the Iceberg residual expressions then we skip
         // filtering the predicates to be pushed down to Impala scanner.
-        if (expr == null) return false;
+        if (exprs == null) return false;
         // Different residuals can contain the same predicate.
-        if (!expressionsToRetain.contains(expr)) expressionsToRetain.add(expr);
+        for (Expr expr : exprs) {
+          if (!expressionsToRetain.contains(expr)) expressionsToRetain.add(expr);
+        }
       }
     }
     skippedExpressions_.addAll(
@@ -1265,7 +1274,8 @@ public class IcebergScanPlanner {
    */
   private boolean tryConvertIcebergPredicate(Expr expr) {
     IcebergPredicateConverter converter =
-        new IcebergPredicateConverter(getIceTable().getIcebergSchema(), analyzer_);
+        new IcebergPredicateConverter(getIceTable().getIcebergSchema(), analyzer_,
+            IcebergUtil.getPartitionSourceIds(getIceTable()));
     IcebergPredicateConverter.ConverterResult result = converter.convert(expr);
 
     if (result.isFailed()) {
@@ -1275,6 +1285,11 @@ public class IcebergScanPlanner {
 
     Expression icebergExpr = result.getIcebergExpression();
     impalaIcebergPredicateMapping_.put(icebergExpr, expr);
+    for (Expression predicate : ExpressionVisitors.visit(icebergExpr,
+        new IcebergExpressionCollector())) {
+      icebergPredicateToImpalaExprs_.computeIfAbsent(predicate.toString(),
+          k -> new ArrayList<>()).add(expr);
+    }
     LOG.debug("Push down the predicate: {} to iceberg (status={})",
         icebergExpr, result.getStatus());
 

@@ -51,6 +51,7 @@ import org.apache.impala.planner.PlanNodeId;
 import org.apache.impala.planner.ScanNode;
 import org.apache.impala.planner.ScanNodeHelper;
 import org.apache.impala.planner.SingleNodePlanner;
+import org.apache.impala.util.IcebergUtil;
 
 import com.google.common.collect.ImmutableList;
 
@@ -370,7 +371,8 @@ public class ImpalaHdfsScanRel extends TableScan
   private static boolean canConvertIcebergPredicate(FeIcebergTable table, Expr expr,
       Analyzer analyzer) {
     IcebergPredicateConverter converter =
-        new IcebergPredicateConverter(table.getIcebergSchema(), analyzer);
+        new IcebergPredicateConverter(table.getIcebergSchema(), analyzer,
+            IcebergUtil.getPartitionSourceIds(table));
     IcebergPredicateConverter.ConverterResult result = converter.convert(expr);
 
     return !(result.isFailed() || result.isPartiallyConverted());

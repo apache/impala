@@ -37,7 +37,7 @@ public class IcebergPartitionPredicateConverter extends IcebergPredicateConverte
   private final FeIcebergTable table_;
 
   public IcebergPartitionPredicateConverter(FeIcebergTable table, Analyzer analyzer) {
-    super(table.getIcebergSchema(), analyzer);
+    super(table.getIcebergSchema(), analyzer, IcebergUtil.getPartitionSourceIds(table));
     table_ = table;
   }
 

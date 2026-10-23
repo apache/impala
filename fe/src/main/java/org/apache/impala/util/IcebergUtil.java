@@ -1760,6 +1760,23 @@ public class IcebergUtil {
     return TIcebergPartitionTransformType.VOID;
   }
 
+  /**
+   * Returns the ids of the fields that are the sources of partition fields in any
+   * partition spec of 'table'.
+   */
+  public static Set<Integer> getPartitionSourceIds(FeIcebergTable table) {
+    Set<Integer> ret = new HashSet<>();
+    for (IcebergPartitionSpec spec : table.getPartitionSpecs()) {
+      if (!spec.hasPartitionFields()) continue;
+      for (IcebergPartitionField field : spec.getIcebergPartitionFields()) {
+        if (field.getTransformType() != TIcebergPartitionTransformType.VOID) {
+          ret.add(field.getSourceId());
+        }
+      }
+    }
+    return ret;
+  }
+
   public static boolean isPartitionColumn(IcebergColumn column,
       IcebergPartitionSpec spec) {
     return getPartitionTransformType(column, spec) != TIcebergPartitionTransformType.VOID;

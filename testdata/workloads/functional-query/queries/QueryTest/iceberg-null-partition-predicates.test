@@ -1,0 +1,276 @@
+====
+---- QUERY
+# Predicates don't match NULL partition values. Iceberg orders NULL values first, so it
+# evaluates e.g. 'p < 5' and 'p != 5' as true for them, so 'IS NOT NULL' is added to such
+# predicates.
+create table null_part_tbl (p int, x int) partitioned by spec (p) stored as iceberg;
+insert into null_part_tbl values (NULL, 10), (1, 10), (5, 10);
+select p from null_part_tbl where p != 5;
+---- TYPES
+INT
+---- RESULTS
+1
+---- RUNTIME_PROFILE
+row_regex: .*partitions=1/3 files=1 .*
+====
+---- QUERY
+select p from null_part_tbl where p not in (5, 7);
+---- TYPES
+INT
+---- RESULTS
+1
+====
+---- QUERY
+select p from null_part_tbl where not (p = 5);
+---- TYPES
+INT
+---- RESULTS
+1
+====
+---- QUERY
+select p from null_part_tbl where not (p = 5 or p = 7);
+---- TYPES
+INT
+---- RESULTS
+1
+====
+---- QUERY
+select p from null_part_tbl where not (p = 5 and x = 10);
+---- TYPES
+INT
+---- RESULTS
+1
+====
+---- QUERY
+# NULL AND FALSE is FALSE, so the NULL partition matches.
+select p from null_part_tbl where not (p = 5 and x = 11);
+---- TYPES
+INT
+---- RESULTS
+1
+5
+NULL
+====
+---- QUERY
+select p from null_part_tbl where p != 5 or p is null;
+---- TYPES
+INT
+---- RESULTS
+1
+NULL
+====
+---- QUERY
+# NOT (p < 5) is p >= 5, which doesn't match NULL values in Iceberg either.
+select p from null_part_tbl where not (p < 5);
+---- TYPES
+INT
+---- RESULTS
+5
+====
+---- QUERY
+select count(*) from null_part_tbl where not (p is null);
+---- TYPES
+BIGINT
+---- RESULTS
+2
+====
+---- QUERY
+show partitions null_part_tbl where p != 5;
+---- RESULTS
+'{"p":"1"}',1,1
+---- TYPES
+STRING,BIGINT,BIGINT
+====
+---- QUERY
+show files in null_part_tbl partition (p != 5);
+---- RESULTS
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/null_part_tbl/data/p=1/.*.0.parq','.*','','$ERASURECODE_POLICY'
+---- TYPES
+STRING, STRING, STRING, STRING
+====
+---- QUERY
+show files in null_part_tbl partition (p not in (5, 7));
+---- RESULTS
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/null_part_tbl/data/p=1/.*.0.parq','.*','','$ERASURECODE_POLICY'
+---- TYPES
+STRING, STRING, STRING, STRING
+====
+---- QUERY
+show files in null_part_tbl partition (p < 5);
+---- RESULTS
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/null_part_tbl/data/p=1/.*.0.parq','.*','','$ERASURECODE_POLICY'
+---- TYPES
+STRING, STRING, STRING, STRING
+====
+---- QUERY
+alter table null_part_tbl drop partition (p != 5);
+select p from null_part_tbl;
+---- TYPES
+INT
+---- RESULTS
+NULL
+5
+====
+---- QUERY
+# The data file of the NULL partition has both 1 and 10 in 'x', so Iceberg can't skip it
+# for 'x = 1'.
+create table null_mixed_tbl (p int, x int) partitioned by spec (p) stored as iceberg;
+insert into null_mixed_tbl values (NULL, 1), (NULL, 10), (1, 10), (5, 10);
+select p, x from null_mixed_tbl where p < 5 or x = 1;
+---- TYPES
+INT,INT
+---- RESULTS
+1,10
+NULL,1
+====
+---- QUERY
+select p, x from null_mixed_tbl where p <= 4 or x = 1;
+---- TYPES
+INT,INT
+---- RESULTS
+1,10
+NULL,1
+====
+---- QUERY
+select p, x from null_mixed_tbl where not (p >= 5 and x != 1);
+---- TYPES
+INT,INT
+---- RESULTS
+1,10
+NULL,1
+====
+---- QUERY
+select p, x from null_mixed_tbl where p != 5 or x = 1;
+---- TYPES
+INT,INT
+---- RESULTS
+1,10
+NULL,1
+====
+---- QUERY
+# The same for partition transforms.
+create table null_trunc_tbl (p int, x int) partitioned by spec (truncate(10, p))
+stored as iceberg;
+insert into null_trunc_tbl values (NULL, 10), (1, 10), (25, 10);
+select p from null_trunc_tbl where p != 25;
+---- TYPES
+INT
+---- RESULTS
+1
+====
+---- QUERY
+create table null_day_tbl (ts timestamp, x int) partitioned by spec (day(ts))
+stored as iceberg;
+insert into null_day_tbl values (NULL, 10), ('2024-01-01 10:00:00', 10),
+    ('2024-01-02 10:00:00', 10);
+select ts from null_day_tbl where ts not in ('2024-01-02 10:00:00');
+---- TYPES
+TIMESTAMP
+---- RESULTS
+2024-01-01 10:00:00
+====
+---- QUERY
+# Iceberg fails to evaluate LIKE and NOT LIKE on NULL partition values, which is avoided
+# by pruning the NULL partitions.
+create table null_str_tbl (p string, x int) partitioned by spec (p) stored as iceberg;
+insert into null_str_tbl values (NULL, 1), (NULL, 10), ('a', 10), ('b', 10);
+select p from null_str_tbl where p not like 'a%';
+---- TYPES
+STRING
+---- RESULTS
+'b'
+====
+---- QUERY
+# They are pushed down if the NULL partition is pruned.
+select p from null_str_tbl where p like 'a%' or p like 'b%';
+---- TYPES
+STRING
+---- RESULTS
+'a'
+'b'
+---- RUNTIME_PROFILE
+row_regex: .*partitions=2/3 files=2 .*
+====
+---- QUERY
+show files in null_str_tbl partition (p like 'a%' or p like 'b%');
+---- RESULTS
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/null_str_tbl/data/p=a/.*.0.parq','.*','','$ERASURECODE_POLICY'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/null_str_tbl/data/p=b/.*.0.parq','.*','','$ERASURECODE_POLICY'
+---- TYPES
+STRING, STRING, STRING, STRING
+====
+---- QUERY
+# They are not pushed down if the NULL partition may not be pruned.
+select p, x from null_str_tbl where p like 'a%' or p is null;
+---- TYPES
+STRING,INT
+---- RESULTS
+'a',10
+'NULL',1
+'NULL',10
+====
+---- QUERY
+select p, x from null_str_tbl where p like 'a%' or x = 1;
+---- TYPES
+STRING,INT
+---- RESULTS
+'a',10
+'NULL',1
+====
+---- QUERY
+select p, x from null_str_tbl where p not like 'a%' or x = 1;
+---- TYPES
+STRING,INT
+---- RESULTS
+'b',10
+'NULL',1
+====
+---- QUERY
+select p from null_str_tbl where p != 'b';
+---- TYPES
+STRING
+---- RESULTS
+'a'
+====
+---- QUERY
+# Iceberg fails to evaluate IN and NOT IN with several string values for NULL partition
+# values, so they are converted to = and !=. The NULL partition is in the same manifest as
+# the others.
+select p from null_str_tbl where p in ('a', 'b');
+---- TYPES
+STRING
+---- RESULTS
+'a'
+'b'
+====
+---- QUERY
+select p from null_str_tbl where p not in ('a', 'c');
+---- TYPES
+STRING
+---- RESULTS
+'b'
+====
+---- QUERY
+select p from null_str_tbl where p < 'b' or p in ('b', 'c');
+---- TYPES
+STRING
+---- RESULTS
+'a'
+'b'
+====
+---- QUERY
+select p, x from null_str_tbl where p not in ('a', 'c') or x = 1;
+---- TYPES
+STRING,INT
+---- RESULTS
+'b',10
+'NULL',1
+====
+---- QUERY
+show partitions null_str_tbl where p in ('a', 'b');
+---- RESULTS
+'{"p":"a"}',1,1
+'{"p":"b"}',1,1
+---- TYPES
+STRING,BIGINT,BIGINT
+====

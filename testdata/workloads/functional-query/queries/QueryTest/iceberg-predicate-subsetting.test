@@ -34,3 +34,15 @@ where ts != '2024-01-01 00:00:00' and ts != '2024-02-02 00:00:00';
 ---- TYPES
 STRING
 ====
+---- QUERY
+# The residuals of the files of both partitions are 'i > 5', but they come from different
+# conjuncts, so both conjuncts must be kept.
+create table ice_same_residual (p int, i int) partitioned by spec (p) stored as iceberg;
+insert into ice_same_residual values (1, 1), (1, 10), (2, 1), (2, 10);
+select p, i from ice_same_residual where (p = 1 or i > 5) and (p = 2 or i > 5);
+---- RESULTS
+1,10
+2,10
+---- TYPES
+INT,INT
+====

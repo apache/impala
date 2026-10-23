@@ -1444,6 +1444,10 @@ class TestIcebergTable(IcebergTestSuite):
     self.run_test_case('QueryTest/iceberg-is-null-predicate-push-down', vector,
                        use_db=unique_database)
 
+  def test_null_partition_predicates(self, vector, unique_database):
+    self.run_test_case('QueryTest/iceberg-null-partition-predicates', vector,
+                       use_db=unique_database)
+
   def test_compound_predicate_push_down(self, vector, unique_database):
       self.run_test_case('QueryTest/iceberg-compound-predicate-push-down', vector,
                          use_db=unique_database)

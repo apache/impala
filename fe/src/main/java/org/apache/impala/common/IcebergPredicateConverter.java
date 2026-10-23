@@ -22,11 +22,16 @@ import java.math.BigDecimal;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import org.apache.iceberg.Schema;
+import org.apache.iceberg.expressions.And;
 import org.apache.iceberg.expressions.Expression;
 import org.apache.iceberg.expressions.Expression.Operation;
 import org.apache.iceberg.expressions.Expressions;
+import org.apache.iceberg.expressions.Literal;
+import org.apache.iceberg.expressions.Or;
 import org.apache.iceberg.expressions.UnboundPredicate;
 import org.apache.iceberg.expressions.UnboundTerm;
 import org.apache.iceberg.types.Types;
@@ -58,6 +63,8 @@ public class IcebergPredicateConverter {
       LoggerFactory.getLogger(IcebergPredicateConverter.class);
   private final Schema schema_;
   private final Analyzer analyzer_;
+  // Ids of the fields that are the sources of partition fields.
+  private final Set<Integer> partitionSourceIds_;
 
   /**
    * Status of the conversion result.
@@ -124,11 +131,176 @@ public class IcebergPredicateConverter {
   }
 
   public IcebergPredicateConverter(Schema schema, Analyzer analyzer) {
+    this(schema, analyzer, Collections.emptySet());
+  }
+
+  /**
+   * 'partitionSourceIds' are the ids of the fields that are the sources of partition
+   * fields, see makeNullSafe().
+   */
+  public IcebergPredicateConverter(Schema schema, Analyzer analyzer,
+      Set<Integer> partitionSourceIds) {
     this.schema_ = schema;
     this.analyzer_ = analyzer;
+    this.partitionSourceIds_ = partitionSourceIds;
   }
 
   public ConverterResult convert(Expr expr) {
+    ConverterResult result = convertExpr(expr);
+    if (result.isFailed()) return result;
+    try {
+      return new ConverterResult(makeNullSafe(result.getIcebergExpression()),
+          result.getStatus());
+    } catch (ImpalaRuntimeException e) {
+      return new ConverterResult(ConversionStatus.FAILED, e.getMessage());
+    }
+  }
+
+  /**
+   * Returns true if 'columnName' refers to a nullable column whose values are also
+   * evaluated as partition values.
+   */
+  private boolean isNullablePartitionSource(String columnName) {
+    Types.NestedField field = schema_.caseInsensitiveFindField(columnName);
+    return field != null && field.isOptional() &&
+        partitionSourceIds_.contains(field.fieldId());
+  }
+
+  /**
+   * Iceberg orders NULL values before any other value, so it evaluates e.g. 'p < 5',
+   * 'p != 5' and NOT (p = 5) as true for NULL values, while they are NULL in Impala, so
+   * the row doesn't match. This matters for partition values: the scanner doesn't
+   * evaluate the predicates that Iceberg fully evaluated on them, and partition DDL
+   * statements use them to select partitions. Returns 'expr' with its negations pushed
+   * down to the predicates, and 'IS NOT NULL' added to the predicates on nullable
+   * partition source columns that would match NULL values. This is equivalent in
+   * Impala's three valued logic, because NOT(a OR b) = NOT a AND NOT b,
+   * NOT(a < 5) = a >= 5, etc.
+   */
+  private Expression makeNullSafe(Expression expr) throws ImpalaRuntimeException {
+    if (partitionSourceIds_.isEmpty()) return expr;
+    NullSafeRewriter rewriter = new NullSafeRewriter();
+    Expression ret = rewriter.rewrite(Expressions.rewriteNot(expr));
+    // Iceberg fails to evaluate LIKE and NOT LIKE for NULL partition values, which is
+    // only avoided if the NULL partitions are pruned, i.e. 'ret' is false for them.
+    for (String columnName : rewriter.likeColumns_) {
+      if (mayBeTrueForNull(ret, columnName)) {
+        throw new ImpalaRuntimeException(String.format("LIKE on the nullable " +
+            "partition column %s can't be converted to an Iceberg expression that " +
+            "can be true for NULL values of the column", columnName));
+      }
+    }
+    // Keep the original expression if there was nothing to change.
+    return rewriter.changed_ ? ret : expr;
+  }
+
+  /**
+   * Returns false if 'expr', which was rewritten by NullSafeRewriter, is false for every
+   * NULL value of 'columnName'.
+   */
+  private static boolean mayBeTrueForNull(Expression expr, String columnName) {
+    switch (expr.op()) {
+      case TRUE:
+        return true;
+      case FALSE:
+        return false;
+      case AND:
+        And and = (And) expr;
+        return mayBeTrueForNull(and.left(), columnName) &&
+            mayBeTrueForNull(and.right(), columnName);
+      case OR:
+        Or or = (Or) expr;
+        return mayBeTrueForNull(or.left(), columnName) ||
+            mayBeTrueForNull(or.right(), columnName);
+      default:
+        break;
+    }
+    UnboundPredicate<?> pred = (UnboundPredicate<?>) expr;
+    // Predicates on other columns may be true.
+    if (!pred.ref().name().equalsIgnoreCase(columnName)) return true;
+    return pred.op() == Operation.IS_NULL;
+  }
+
+  private class NullSafeRewriter {
+    boolean changed_ = false;
+    // The columns of the LIKE and NOT LIKE predicates.
+    final Set<String> likeColumns_ = new HashSet<>();
+
+    Expression rewrite(Expression expr) {
+      switch (expr.op()) {
+        case TRUE:
+        case FALSE:
+          return expr;
+        case AND:
+          And and = (And) expr;
+          return Expressions.and(rewrite(and.left()), rewrite(and.right()));
+        case OR:
+          Or or = (Or) expr;
+          return Expressions.or(rewrite(or.left()), rewrite(or.right()));
+        default:
+          break;
+      }
+      // Expressions.rewriteNot() removes every NOT.
+      Preconditions.checkState(expr instanceof UnboundPredicate, expr);
+      return rewrite((UnboundPredicate<?>) expr);
+    }
+
+    <T> Expression rewrite(UnboundPredicate<T> pred) {
+      String columnName = pred.ref().name();
+      if (!isNullablePartitionSource(columnName)) return pred;
+      Expression ret = pred;
+      switch (pred.op()) {
+        case STARTS_WITH:
+          likeColumns_.add(columnName);
+          return pred;
+        case NOT_STARTS_WITH:
+          likeColumns_.add(columnName);
+          break;
+        case IN:
+        case NOT_IN:
+          // Iceberg fails to evaluate IN and NOT IN with several string values for NULL
+          // values, but it can evaluate = and !=.
+          if (pred.literals().size() > 1 &&
+              pred.literals().get(0).value() instanceof CharSequence) {
+            changed_ = true;
+            List<Expression> preds = new ArrayList<>();
+            for (Literal<T> literal : pred.literals()) {
+              preds.add(pred.op() == Operation.IN ?
+                  Expressions.equal(pred.term(), literal.value()) :
+                  Expressions.notEqual(pred.term(), literal.value()));
+            }
+            ret = combine(preds, pred.op() == Operation.IN, 0, preds.size());
+          }
+          if (pred.op() == Operation.IN) return ret;
+          break;
+        case LT:
+        case LT_EQ:
+        case NOT_EQ:
+        case NOT_NAN:
+          break;
+        default:
+          // The other predicates don't match NULL values in Iceberg either.
+          return pred;
+      }
+      changed_ = true;
+      return Expressions.and(Expressions.notNull(columnName), ret);
+    }
+  }
+
+  /**
+   * Combines exprs[begin, end) with OR if 'isOr' is true, with AND otherwise, into a
+   * balanced tree.
+   */
+  private static Expression combine(List<Expression> exprs, boolean isOr, int begin,
+      int end) {
+    if (end - begin == 1) return exprs.get(begin);
+    int mid = (begin + end) / 2;
+    Expression left = combine(exprs, isOr, begin, mid);
+    Expression right = combine(exprs, isOr, mid, end);
+    return isOr ? Expressions.or(left, right) : Expressions.and(left, right);
+  }
+
+  private ConverterResult convertExpr(Expr expr) {
     if (expr instanceof BoolLiteral) {
       BoolLiteral boolLiteral = (BoolLiteral) expr;
       Expression iceExpr = boolLiteral.getValue() ? Expressions.alwaysTrue() :
@@ -221,7 +393,7 @@ public class IcebergPredicateConverter {
       Operation op = getOperation(predicate);
 
       Expr leftExpr = predicate.getChild(0);
-      ConverterResult leftResult = convert(leftExpr);
+      ConverterResult leftResult = convertExpr(leftExpr);
 
       // If left child failed, propagate failure
       if (leftResult.isFailed()) {
@@ -234,7 +406,7 @@ public class IcebergPredicateConverter {
       }
 
       Expr rightExpr = predicate.getChild(1);
-      ConverterResult rightResult = convert(rightExpr);
+      ConverterResult rightResult = convertExpr(rightExpr);
 
       // If right child failed, propagate failure
       if (rightResult.isFailed()) {

@@ -887,13 +887,12 @@ WHERE uuid_identity IN (CAST('00000000-0000-0000-0000-000000000000' AS UUID),
 STRING,BIGINT,BIGINT
 ====
 ---- QUERY
-# Iceberg matches the NULL partition for != and NOT IN.
+# != and NOT IN don't match the NULL partition (IMPALA-15643).
 SHOW PARTITIONS iceberg_uuid_test_part
 WHERE uuid_identity != CAST('00000000-0000-0000-0000-000000000000' AS UUID)
 ---- RESULTS
 '{"uuid_identity":"12345678-1234-5678-1234-567812345678","uuid_bucket_bucket":"1"}',2,1
 '{"uuid_identity":"ffffffff-ffff-ffff-ffff-ffffffffffff","uuid_bucket_bucket":"2"}',1,1
-'{"uuid_identity":null,"uuid_bucket_bucket":null}',1,1
 ---- TYPES
 STRING,BIGINT,BIGINT
 ====
@@ -903,7 +902,6 @@ WHERE uuid_identity NOT IN (CAST('00000000-0000-0000-0000-000000000000' AS UUID)
                             CAST('12345678-1234-5678-1234-567812345678' AS UUID))
 ---- RESULTS
 '{"uuid_identity":"ffffffff-ffff-ffff-ffff-ffffffffffff","uuid_bucket_bucket":"2"}',1,1
-'{"uuid_identity":null,"uuid_bucket_bucket":null}',1,1
 ---- TYPES
 STRING,BIGINT,BIGINT
 ====
@@ -938,7 +936,6 @@ PARTITION (uuid_identity != CAST('00000000-0000-0000-0000-000000000000' AS UUID)
 ---- RESULTS
 row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/iceberg_uuid_test_part/data/uuid_identity=12345678-1234-5678-1234-567812345678/.*\.parquet','.*','','$ERASURECODE_POLICY'
 row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/iceberg_uuid_test_part/data/uuid_identity=ffffffff-ffff-ffff-ffff-ffffffffffff/.*\.parquet','.*','','$ERASURECODE_POLICY'
-row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/iceberg_uuid_test_part/data/uuid_identity=null/.*\.parquet','.*','','$ERASURECODE_POLICY'
 ---- TYPES
 STRING,STRING,STRING,STRING
 ====
@@ -948,7 +945,6 @@ PARTITION (uuid_identity NOT IN (CAST('00000000-0000-0000-0000-000000000000' AS 
                                  CAST('12345678-1234-5678-1234-567812345678' AS UUID)))
 ---- RESULTS
 row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/iceberg_uuid_test_part/data/uuid_identity=ffffffff-ffff-ffff-ffff-ffffffffffff/.*\.parquet','.*','','$ERASURECODE_POLICY'
-row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/iceberg_uuid_test_part/data/uuid_identity=null/.*\.parquet','.*','','$ERASURECODE_POLICY'
 ---- TYPES
 STRING,STRING,STRING,STRING
 ====
