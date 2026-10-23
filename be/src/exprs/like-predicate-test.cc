@@ -18,6 +18,8 @@
 #include "exprs/like-predicate.h"
 
 #include <string.h>
+#include <string>
+#include <vector>
 
 #include "testutil/gtest-util.h"
 
@@ -28,6 +30,8 @@ public:
   static void TestMatchOptimization();
   static bool MatchConstant(const string& pattern, const string& value,
       bool case_sensitive);
+  static bool MatchOptimized(const string& pattern, const string& value);
+  static bool MatchNonConstant(const string& pattern, const string& value);
 
 private:
   static LikePredicate::LikePredicateFunction GetMatchFunction(const string& pattern,
@@ -47,11 +51,19 @@ void LikePredicateTests::TestMatchOptimization() {
   EXPECT_EQ(GetMatchFunction("test%%", true), &LikePredicate::ConstantStartsWithFn);
   EXPECT_EQ(GetMatchFunction("%%test%%", true), &LikePredicate::ConstantSubstringFn);
 
-  // Optimizations are not enabled for escaped % wildcards.
-  // See IMPALA-10849 for more info.
-  EXPECT_EQ(GetMatchFunction("\\%test", true), &LikePredicate::LikeFn);
-  EXPECT_EQ(GetMatchFunction("test\\%", true), &LikePredicate::LikeFn);
-  EXPECT_EQ(GetMatchFunction("\\%test\\%", true), &LikePredicate::LikeFn);
+  // Escaped wildcards are part of the constant string (IMPALA-10849, IMPALA-15641).
+  EXPECT_EQ(GetMatchFunction("\\%test", true), &LikePredicate::ConstantEqualsFn);
+  EXPECT_EQ(GetMatchFunction("test\\%", true), &LikePredicate::ConstantEqualsFn);
+  EXPECT_EQ(GetMatchFunction("\\%test\\%", true), &LikePredicate::ConstantEqualsFn);
+  EXPECT_EQ(GetMatchFunction("test\\%%", true), &LikePredicate::ConstantStartsWithFn);
+  EXPECT_EQ(GetMatchFunction("%\\%test", true), &LikePredicate::ConstantEndsWithFn);
+  EXPECT_EQ(GetMatchFunction("%te\\_st%", true), &LikePredicate::ConstantSubstringFn);
+  // An unescaped wildcard in the middle still needs a regex.
+  EXPECT_EQ(GetMatchFunction("test\\%_%", true), &LikePredicate::LikeFnPartial);
+  // A trailing escape character is a literal.
+  EXPECT_EQ(GetMatchFunction("test\\", true), &LikePredicate::ConstantEqualsFn);
+  EXPECT_EQ(GetMatchFunction("%test\\", true), &LikePredicate::ConstantEndsWithFn);
+  EXPECT_EQ(GetMatchFunction("test%\\", true), &LikePredicate::LikeFn);
 
   // IMPALA-12374: Check that more complex patterns with trailing/leading % wildcard
   // use partial regex match, instead of full regex match.
@@ -97,6 +109,44 @@ bool LikePredicateTests::MatchConstant(const string& pattern, const string& valu
   return RE2::PartialMatch(operand, *test_state.regex_.get());
 }
 
+// Matches 'value' case-sensitively the same way as the function that
+// OptimizeConstantPatternMatch() chooses for the constant 'pattern'.
+bool LikePredicateTests::MatchOptimized(const string& pattern, const string& value) {
+  LikePredicate::LikePredicateState test_state;
+  test_state.case_sensitive_ = true;
+  test_state.function_ = &LikePredicate::LikeFn;
+  LikePredicate::OptimizeConstantPatternMatch(pattern, &test_state);
+  const string& search = test_state.search_string_;
+  LikePredicate::LikePredicateFunction fn = test_state.function_;
+  if (fn == &LikePredicate::ConstantEqualsFn) return value == search;
+  if (fn == &LikePredicate::ConstantStartsWithFn) {
+    return value.compare(0, search.size(), search) == 0;
+  }
+  if (fn == &LikePredicate::ConstantEndsWithFn) {
+    return value.size() >= search.size() &&
+        value.compare(value.size() - search.size(), search.size(), search) == 0;
+  }
+  if (fn == &LikePredicate::ConstantSubstringFn) {
+    return value.find(search) != string::npos;
+  }
+  return MatchConstant(pattern, value, true);
+}
+
+// Matches 'value' case-sensitively the same way as RegexMatch() does for a pattern that
+// is not constant.
+bool LikePredicateTests::MatchNonConstant(const string& pattern, const string& value) {
+  LikePredicate::LikePredicateState test_state;
+  StringVal pattern_val(
+      reinterpret_cast<uint8_t*>(const_cast<char*>(pattern.data())), pattern.size());
+  string re_pattern;
+  LikePredicate::ConvertLikePattern(&test_state, pattern_val, &re_pattern);
+  RE2::Options opts;
+  opts.set_never_nl(false);
+  opts.set_dot_nl(true);
+  RE2 re(re_pattern, opts);
+  return RE2::FullMatch(re2::StringPiece(value.data(), value.size()), re);
+}
+
 TEST(TestLikePredicate, RegexMatchOptimization) {
     LikePredicateTests::TestMatchOptimization();
 }
@@ -127,6 +177,42 @@ TEST(TestLikePredicate, RegexMatchWithEmbeddedNul) {
       std::string("%a\0_%", 5), std::string("xA\0C", 4), false));
   EXPECT_FALSE(LikePredicateTests::MatchConstant(
       std::string("%a\0_%", 5), std::string("xa\0", 3), false));
+}
+
+// IMPALA-15641: The fast paths for constant patterns must match the same values as the
+// regex that is used for patterns that are not constant.
+TEST(TestLikePredicate, ConstantMatchesNonConstant) {
+  const std::vector<string> tokens = {"%", "_", "\\%", "\\_", "\\\\", "\\", "\\x", "x"};
+  std::vector<string> patterns;
+  for (const string& t : tokens) {
+    for (const string& p : {t + "ab", "a" + t + "b", "ab" + t, t + "ab%", "%ab" + t,
+             "%" + t + "%", "a" + t + "b%", "%a" + t + "b", "%a" + t + "b%"}) {
+      patterns.push_back(p);
+    }
+  }
+  const std::vector<string> values = {"", "ab", "xab", "axb", "abx", "%ab", "a%b",
+      "ab%", "_ab", "a_b", "ab_", "\\ab", "a\\b", "ab\\", "\\xab", "a\\xb", "ab\\x",
+      "a\\\\b", "x", "%", "_", "\\", "\\x", "ya\\bz", "ya%bz", "yaxbz"};
+  for (const string& p : patterns) {
+    for (const string& v : values) {
+      EXPECT_EQ(LikePredicateTests::MatchOptimized(p, v),
+          LikePredicateTests::MatchNonConstant(p, v))
+          << "pattern: " << p << ", value: " << v;
+    }
+  }
+
+  // The escape character only escapes the wildcards and itself.
+  for (auto match : {&LikePredicateTests::MatchOptimized,
+           &LikePredicateTests::MatchNonConstant}) {
+    EXPECT_TRUE(match("C:\\dir%", "C:\\dir1"));
+    EXPECT_FALSE(match("C:\\dir%", "C:dir1"));
+    EXPECT_TRUE(match("a\\\\b%", "a\\bc"));
+    EXPECT_FALSE(match("a\\\\b%", "a\\\\bc"));
+    EXPECT_TRUE(match("a\\%%", "a%b"));
+    EXPECT_FALSE(match("a\\%%", "a\\b"));
+    EXPECT_TRUE(match("a%\\", "ab\\"));
+    EXPECT_FALSE(match("a%\\", "ab"));
+  }
 }
 
 } // namespace impala

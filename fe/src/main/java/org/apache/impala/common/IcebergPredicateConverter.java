@@ -26,8 +26,6 @@ import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 import org.apache.iceberg.Schema;
 import org.apache.iceberg.expressions.And;
 import org.apache.iceberg.expressions.Expression;
@@ -64,8 +62,6 @@ import org.slf4j.LoggerFactory;
 public class IcebergPredicateConverter {
   private static final Logger LOG =
       LoggerFactory.getLogger(IcebergPredicateConverter.class);
-  private static final Pattern VERBATIM_STARTS_WITH_PATTERN =
-      Pattern.compile("([^%_]*)%+");
   private final Schema schema_;
   private final Analyzer analyzer_;
   // Ids of the fields that are the sources of partition fields.
@@ -523,45 +519,23 @@ public class IcebergPredicateConverter {
   }
 
   /**
-   * Returns the prefix if the backend matches 'pattern' verbatim with a starts-with
-   * check (starts_with_re in LikePredicate::OptimizeConstantPatternMatch()): a run of
-   * characters other than '%' and '_' followed by one or more '%', not ending in '\%'.
-   * Backslashes in the prefix are literal. Returns null for other patterns.
-   */
-  static String getVerbatimStartsWithPrefix(String pattern) {
-    Matcher matcher = VERBATIM_STARTS_WITH_PATTERN.matcher(pattern);
-    if (!matcher.matches() || endsWithEscapedWildcard(pattern)) return null;
-    return matcher.group(1);
-  }
-
-  /**
-   * Mirrors the backend's ends_with_escaped_wildcard RE2 check ".*\\%$". RE2's '.' does
-   * not match '\n', so the check is false for patterns that contain a newline.
-   */
-  private static boolean endsWithEscapedWildcard(String pattern) {
-    return pattern.endsWith("\\%") && pattern.indexOf('\n') == -1;
-  }
-
-  /**
-   * Returns the literal string that pattern[0, endPos) matches when the backend converts
-   * the pattern to a regex (LikePredicate::ConvertLikePattern()): a backslash escapes
-   * the next character, and a trailing lone backslash is dropped. The range must not
+   * Returns the literal string that pattern[0, endPos) matches in the backend
+   * (LikePredicate::ConvertLikePattern()): a backslash only escapes '%', '_' and '\',
+   * before any other character or at the end it is a literal. The range must not
    * contain unescaped wildcards.
    *
    * @param pattern The pattern string from getBackendString()
    * @param endPos Position to stop processing, or -1 to process entire string
    */
-  static String getRegexLiteral(String pattern, int endPos) {
+  static String unescapeLikePattern(String pattern, int endPos) {
     int len = (endPos == -1) ? pattern.length() : endPos;
     StringBuilder sb = new StringBuilder(len);
 
     for (int i = 0; i < len; i++) {
       char c = pattern.charAt(i);
-      if (c == '\\') {
-        if (i + 1 < len) {
-          sb.append(pattern.charAt(i + 1));
-          i++;
-        }
+      if (c == '\\' && i + 1 < len && isEscapable(pattern.charAt(i + 1))) {
+        sb.append(pattern.charAt(i + 1));
+        i++;
         continue;
       }
       sb.append(c);
@@ -570,17 +544,17 @@ public class IcebergPredicateConverter {
     return sb.toString();
   }
 
+  private static boolean isEscapable(char c) {
+    return c == '%' || c == '_' || c == '\\';
+  }
+
   /**
-   * Returns true if, in the backend's regex conversion, the unescaped wildcard at
-   * wildcardPos and everything after it only match "any suffix": all characters are
-   * '%', except for an optional trailing lone backslash, which the backend drops.
+   * Returns true if the unescaped wildcard at wildcardPos and everything after it only
+   * match "any suffix", i.e. all characters are '%'.
    */
   static boolean matchesAnySuffixFrom(String pattern, int wildcardPos) {
     for (int i = wildcardPos; i < pattern.length(); i++) {
-      char c = pattern.charAt(i);
-      if (c == '%') continue;
-      if (c == '\\' && i == pattern.length() - 1) continue;
-      return false;
+      if (pattern.charAt(i) != '%') return false;
     }
     return true;
   }
@@ -620,29 +594,16 @@ public class IcebergPredicateConverter {
             "LIKE pattern cannot be null or empty");
       }
 
-      // The conversion follows LikePredicate::OptimizeConstantPatternMatch() in the
-      // backend, which matches patterns without '%' and '_', and 'prefix%' patterns
-      // verbatim. Only the other patterns treat backslash as an escape character.
-      if (pattern.indexOf('%') == -1 && pattern.indexOf('_') == -1) {
-        return new ConverterResult(Expressions.equal(ref, pattern),
-            ConversionStatus.FULLY_CONVERTED);
-      }
-      String verbatimPrefix = getVerbatimStartsWithPrefix(pattern);
-      if (verbatimPrefix != null && !verbatimPrefix.isEmpty()) {
-        return new ConverterResult(Expressions.startsWith(ref, verbatimPrefix),
-            ConversionStatus.FULLY_CONVERTED);
-      }
-
       int firstWildcard = findFirstUnescapedWildcard(pattern);
       if (firstWildcard == 0) {
         return new ConverterResult(ConversionStatus.FAILED,
             String.format("LIKE pattern '%s' cannot be pushed down to Iceberg. " +
                 "Patterns must start with at least one literal character.", pattern));
       }
-      // No unescaped wildcard, push down the regex literal.
+      // No unescaped wildcard, push down the unescaped pattern.
       if (firstWildcard == -1) {
         return new ConverterResult(
-            Expressions.equal(ref, getRegexLiteral(pattern, -1)),
+            Expressions.equal(ref, unescapeLikePattern(pattern, -1)),
             ConversionStatus.FULLY_CONVERTED);
       }
       // E.g. LIKE 'd%d' pushes down startsWith('d') and the scan still evaluates
@@ -650,7 +611,7 @@ public class IcebergPredicateConverter {
       ConversionStatus status = matchesAnySuffixFrom(pattern, firstWildcard) ?
           ConversionStatus.FULLY_CONVERTED : ConversionStatus.PARTIALLY_CONVERTED;
       Expression iceExpr = Expressions.startsWith(ref,
-          getRegexLiteral(pattern, firstWildcard));
+          unescapeLikePattern(pattern, firstWildcard));
       return new ConverterResult(iceExpr, status);
     } catch (ImpalaRuntimeException e) {
       return new ConverterResult(ConversionStatus.FAILED, e.getMessage());

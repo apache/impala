@@ -435,26 +435,6 @@ explain SELECT 1 FROM alltypestiny a1
 
     </concept>
 
-    <concept id="IMPALA-2422" rev="IMPALA-2422">
-
-      <title>% escaping does not work correctly when occurs at the end in a LIKE clause</title>
-
-      <conbody>
-
-        <p>
-          If the final character in the RHS argument of a <codeph>LIKE</codeph> operator is an
-          escaped <codeph>\%</codeph> character, it does not match a <codeph>%</codeph> final
-          character of the LHS argument.
-        </p>
-
-        <p>
-          <b>Apache Issue:</b> <xref keyref="IMPALA-2422">IMPALA-2422</xref>
-        </p>
-
-      </conbody>
-
-    </concept>
-
     <concept id="IMPALA-2603" rev="IMPALA-2603">
 
       <title>Crash: impala::Coordinator::ValidateCollectionSlots</title>

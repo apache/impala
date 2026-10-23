@@ -18,7 +18,6 @@
 package org.apache.impala.common;
 
 import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 
 import java.util.Collections;
@@ -217,78 +216,60 @@ public class IcebergPredicateConverterTest {
   }
 
   @Test
-  public void testGetVerbatimStartsWithPrefix() {
-    assertEquals("ab", IcebergPredicateConverter.getVerbatimStartsWithPrefix("ab%"));
-    assertEquals("ab", IcebergPredicateConverter.getVerbatimStartsWithPrefix("ab%%%"));
-    assertEquals("", IcebergPredicateConverter.getVerbatimStartsWithPrefix("%"));
-    // Backslashes are literal.
-    assertEquals("a\\b", IcebergPredicateConverter.getVerbatimStartsWithPrefix("a\\b%"));
-    assertEquals("a\\", IcebergPredicateConverter.getVerbatimStartsWithPrefix("a\\%%"));
-    // A newline makes the backend's ends-with-'\%' check fail.
-    assertEquals("a\nb\\",
-        IcebergPredicateConverter.getVerbatimStartsWithPrefix("a\nb\\%"));
-
-    assertNull(IcebergPredicateConverter.getVerbatimStartsWithPrefix("ab"));
-    assertNull(IcebergPredicateConverter.getVerbatimStartsWithPrefix("ab_"));
-    assertNull(IcebergPredicateConverter.getVerbatimStartsWithPrefix("ab%_"));
-    assertNull(IcebergPredicateConverter.getVerbatimStartsWithPrefix("a%b"));
-    assertNull(IcebergPredicateConverter.getVerbatimStartsWithPrefix("ab%\\"));
-    assertNull(IcebergPredicateConverter.getVerbatimStartsWithPrefix("a\\%b%"));
-    // Ends in '\%'.
-    assertNull(IcebergPredicateConverter.getVerbatimStartsWithPrefix("ab\\%"));
-    assertNull(IcebergPredicateConverter.getVerbatimStartsWithPrefix("ab\\\\%"));
-  }
-
-  @Test
   public void testMatchesAnySuffixFrom() {
     assertEquals(true, IcebergPredicateConverter.matchesAnySuffixFrom("ab%", 2));
     assertEquals(true, IcebergPredicateConverter.matchesAnySuffixFrom("ab%%%", 2));
-    assertEquals(true, IcebergPredicateConverter.matchesAnySuffixFrom("ab%\\", 2));
 
     assertEquals(false, IcebergPredicateConverter.matchesAnySuffixFrom("ab_", 2));
     assertEquals(false, IcebergPredicateConverter.matchesAnySuffixFrom("ab%_", 2));
     assertEquals(false, IcebergPredicateConverter.matchesAnySuffixFrom("ab%c", 2));
+    assertEquals(false, IcebergPredicateConverter.matchesAnySuffixFrom("ab%\\", 2));
     assertEquals(false, IcebergPredicateConverter.matchesAnySuffixFrom("ab%\\%", 2));
     assertEquals(false, IcebergPredicateConverter.matchesAnySuffixFrom("ab%\\\\", 2));
   }
 
   @Test
-  public void testGetRegexLiteral() {
+  public void testUnescapeLikePattern() {
     // No escapes
-    assertEquals("exact", IcebergPredicateConverter.getRegexLiteral("exact", -1));
-    assertEquals("prefix", IcebergPredicateConverter.getRegexLiteral("prefix%", 6));
+    assertEquals("exact", IcebergPredicateConverter.unescapeLikePattern("exact", -1));
+    assertEquals("prefix", IcebergPredicateConverter.unescapeLikePattern("prefix%", 6));
 
     // Escaped wildcards
     assertEquals("test%value",
-        IcebergPredicateConverter.getRegexLiteral("test\\%value", -1));
+        IcebergPredicateConverter.unescapeLikePattern("test\\%value", -1));
     assertEquals("test_value",
-        IcebergPredicateConverter.getRegexLiteral("test\\_value", -1));
+        IcebergPredicateConverter.unescapeLikePattern("test\\_value", -1));
     assertEquals("wild%card_mix",
-        IcebergPredicateConverter.getRegexLiteral("wild\\%card\\_mix", -1));
+        IcebergPredicateConverter.unescapeLikePattern("wild\\%card\\_mix", -1));
 
     // Prefix before the unescaped wildcard at endPos
     assertEquals("wild%card",
-        IcebergPredicateConverter.getRegexLiteral("wild\\%card%suffix", 10));
+        IcebergPredicateConverter.unescapeLikePattern("wild\\%card%suffix", 10));
     assertEquals("test%",
-        IcebergPredicateConverter.getRegexLiteral("test\\%%more", 6));
+        IcebergPredicateConverter.unescapeLikePattern("test\\%%more", 6));
 
     // Escaped backslash
     assertEquals("test\\value",
-        IcebergPredicateConverter.getRegexLiteral("test\\\\value", -1));
+        IcebergPredicateConverter.unescapeLikePattern("test\\\\value", -1));
     assertEquals("test\\%",
-        IcebergPredicateConverter.getRegexLiteral("test\\\\\\%", -1));
-    assertEquals("a\\b", IcebergPredicateConverter.getRegexLiteral("a\\\\b%c", 4));
+        IcebergPredicateConverter.unescapeLikePattern("test\\\\\\%", -1));
+    assertEquals("a\\b", IcebergPredicateConverter.unescapeLikePattern("a\\\\b%c", 4));
 
-    // A backslash escapes any character, not only wildcards
-    assertEquals("ab", IcebergPredicateConverter.getRegexLiteral("a\\b", -1));
+    // A backslash before any other character is a literal
+    assertEquals("a\\b", IcebergPredicateConverter.unescapeLikePattern("a\\b", -1));
+    assertEquals("a\\\\b",
+        IcebergPredicateConverter.unescapeLikePattern("a\\\\\\b", -1));
 
-    // The backend drops a trailing lone backslash
-    assertEquals("a%b", IcebergPredicateConverter.getRegexLiteral("a\\%b\\", -1));
+    // A trailing backslash that doesn't escape anything is a literal
+    assertEquals("ab\\", IcebergPredicateConverter.unescapeLikePattern("ab\\", -1));
+    assertEquals("a%b\\", IcebergPredicateConverter.unescapeLikePattern("a\\%b\\", -1));
+    assertEquals("a\\\\",
+        IcebergPredicateConverter.unescapeLikePattern("a\\\\\\", -1));
 
-    assertEquals("", IcebergPredicateConverter.getRegexLiteral("", -1));
-    assertEquals("\\", IcebergPredicateConverter.getRegexLiteral("\\\\", -1));
-    assertEquals("%", IcebergPredicateConverter.getRegexLiteral("\\%", -1));
-    assertEquals("_", IcebergPredicateConverter.getRegexLiteral("\\_", -1));
+    assertEquals("", IcebergPredicateConverter.unescapeLikePattern("", -1));
+    assertEquals("\\", IcebergPredicateConverter.unescapeLikePattern("\\\\", -1));
+    assertEquals("%", IcebergPredicateConverter.unescapeLikePattern("\\%", -1));
+    assertEquals("_", IcebergPredicateConverter.unescapeLikePattern("\\_", -1));
   }
 
   /**
@@ -304,9 +285,9 @@ public class IcebergPredicateConverterTest {
     assertFull("\\%ab", Operation.EQ, "%ab");
     assertFull("\\_ab", Operation.EQ, "_ab");
     assertFull("xab", Operation.EQ, "xab");
-    // Patterns without '%' and '_' are matched verbatim
+    // A backslash before any other character is a literal
     assertFull("\\xab", Operation.EQ, "\\xab");
-    assertFull("\\\\ab", Operation.EQ, "\\\\ab");
+    assertFull("\\\\ab", Operation.EQ, "\\ab");
     assertFull("\\ab", Operation.EQ, "\\ab");
 
     // Middle
@@ -316,7 +297,7 @@ public class IcebergPredicateConverterTest {
     assertFull("a\\_b", Operation.EQ, "a_b");
     assertFull("axb", Operation.EQ, "axb");
     assertFull("a\\xb", Operation.EQ, "a\\xb");
-    assertFull("a\\\\b", Operation.EQ, "a\\\\b");
+    assertFull("a\\\\b", Operation.EQ, "a\\b");
     assertFull("a\\b", Operation.EQ, "a\\b");
 
     // End
@@ -326,20 +307,19 @@ public class IcebergPredicateConverterTest {
     assertFull("ab\\_", Operation.EQ, "ab_");
     assertFull("abx", Operation.EQ, "abx");
     assertFull("ab\\x", Operation.EQ, "ab\\x");
-    assertFull("ab\\\\", Operation.EQ, "ab\\\\");
+    assertFull("ab\\\\", Operation.EQ, "ab\\");
+    // A trailing backslash that doesn't escape anything is a literal
     assertFull("ab\\", Operation.EQ, "ab\\");
   }
 
   /**
-   * Combines prefixes that contain escapes with different wildcard suffixes. 'prefix%'
-   * patterns are matched verbatim by the backend, all other patterns with an unescaped
-   * wildcard go through its regex conversion.
+   * Combines prefixes that contain escapes with different wildcard suffixes.
    */
   @Test
   public void testLikePrefixAndWildcardSuffix() {
     assertFull("ab%", Operation.STARTS_WITH, "ab");
     assertFull("ab%%", Operation.STARTS_WITH, "ab");
-    assertFull("ab%\\", Operation.STARTS_WITH, "ab");
+    assertPartial("ab%\\", "ab");
     assertPartial("ab_", "ab");
     assertPartial("ab_%", "ab");
     assertPartial("ab%_", "ab");
@@ -347,18 +327,18 @@ public class IcebergPredicateConverterTest {
     assertPartial("ab%\\%", "ab");
     assertPartial("ab%\\\\", "ab");
 
-    // Escaped normal character
+    // Backslash before a normal character
     assertFull("a\\b%", Operation.STARTS_WITH, "a\\b");
     assertFull("a\\b%%", Operation.STARTS_WITH, "a\\b");
-    assertFull("a\\b%\\", Operation.STARTS_WITH, "ab");
-    assertPartial("a\\b_", "ab");
-    assertPartial("a\\b_%", "ab");
-    assertPartial("a\\b%c", "ab");
+    assertPartial("a\\b%\\", "a\\b");
+    assertPartial("a\\b_", "a\\b");
+    assertPartial("a\\b_%", "a\\b");
+    assertPartial("a\\b%c", "a\\b");
 
     // Escaped backslash
-    assertFull("a\\\\b%", Operation.STARTS_WITH, "a\\\\b");
-    assertFull("a\\\\b%%", Operation.STARTS_WITH, "a\\\\b");
-    assertFull("a\\\\b%\\", Operation.STARTS_WITH, "a\\b");
+    assertFull("a\\\\b%", Operation.STARTS_WITH, "a\\b");
+    assertFull("a\\\\b%%", Operation.STARTS_WITH, "a\\b");
+    assertPartial("a\\\\b%\\", "a\\b");
     assertPartial("a\\\\b_", "a\\b");
     assertPartial("a\\\\b_%", "a\\b");
     assertPartial("a\\\\b%c", "a\\b");
@@ -366,7 +346,7 @@ public class IcebergPredicateConverterTest {
     // Escaped '%'
     assertFull("a\\%b%", Operation.STARTS_WITH, "a%b");
     assertFull("a\\%b%%", Operation.STARTS_WITH, "a%b");
-    assertFull("a\\%b%\\", Operation.STARTS_WITH, "a%b");
+    assertPartial("a\\%b%\\", "a%b");
     assertPartial("a\\%b_", "a%b");
     assertPartial("a\\%b_%", "a%b");
     assertPartial("a\\%b%c", "a%b");
@@ -374,7 +354,7 @@ public class IcebergPredicateConverterTest {
     // Escaped '_'
     assertFull("a\\_b%", Operation.STARTS_WITH, "a_b");
     assertFull("a\\_b%%", Operation.STARTS_WITH, "a_b");
-    assertFull("a\\_b%\\", Operation.STARTS_WITH, "a_b");
+    assertPartial("a\\_b%\\", "a_b");
     assertPartial("a\\_b_", "a_b");
     assertPartial("a\\_b_%", "a_b");
     assertPartial("a\\_b%c", "a_b");
@@ -388,15 +368,15 @@ public class IcebergPredicateConverterTest {
     assertFailed("%%");
     assertFailed("_");
     assertFailed("%ab%");
-    // Matched verbatim: 'a\' followed by '%%'.
-    assertFull("a\\%%", Operation.STARTS_WITH, "a\\");
-    // Ends in '\%', so it goes through the regex conversion where '\\' is a backslash.
+    // An escaped '%' followed by '%'.
+    assertFull("a\\%%", Operation.STARTS_WITH, "a%");
+    // An escaped backslash before a wildcard.
     assertFull("a\\\\%", Operation.STARTS_WITH, "a\\");
     assertFull("a\\\\\\%", Operation.EQ, "a\\%");
-    // The newline makes the backend's ends-with-'\%' check fail, so it is verbatim.
-    assertFull("a\nb\\%", Operation.STARTS_WITH, "a\nb\\");
-    // The trailing lone backslash is dropped.
-    assertFull("a\\%b\\", Operation.EQ, "a%b");
+    // A newline is an ordinary character.
+    assertFull("a\nb\\%", Operation.EQ, "a\nb%");
+    // A trailing backslash that doesn't escape anything is a literal.
+    assertFull("a\\%b\\", Operation.EQ, "a%b\\");
     assertPartial("a\\%b_\\", "a%b");
     assertFull("a\\%b\\_", Operation.EQ, "a%b_");
     // UTF-8
@@ -453,8 +433,8 @@ public class IcebergPredicateConverterTest {
   }
 
   /**
-   * Constant folded literals are sent to the backend without unescaping, so their
-   * backslashes are not escapes. Non UTF-8 literals can't be converted.
+   * Constant folded literals are sent to the backend without unescaping, so only LIKE
+   * unescapes them. Non UTF-8 literals can't be converted.
    */
   @Test
   public void testFoldedAndNonUtf8Literals() {
@@ -467,7 +447,7 @@ public class IcebergPredicateConverterTest {
     result = converter_.convert(like(foldedLit("a\\b%c")));
     assertEquals(ConversionStatus.PARTIALLY_CONVERTED, result.getStatus());
     pred = (UnboundPredicate<?>) result.getIcebergExpression();
-    assertEquals("ab", pred.literal().value().toString());
+    assertEquals("a\\b", pred.literal().value().toString());
 
     result = converter_.convert(eq(foldedLit("a\\bc")));
     assertEquals(ConversionStatus.FULLY_CONVERTED, result.getStatus());

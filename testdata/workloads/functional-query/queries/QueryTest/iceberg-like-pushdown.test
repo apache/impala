@@ -365,3 +365,70 @@ STRING
 ---- RESULTS
 'impala'
 ====
+---- QUERY
+# IMPALA-15641: A backslash only escapes '%', '_' and itself in LIKE patterns, before
+# other characters it is a literal, also when they are pushed down to Iceberg. Every row
+# is in its own data file.
+create table like_escape_tbl (s string) stored as iceberg
+tblproperties ('impala.iceberg.push_down_hint'='s');
+insert into like_escape_tbl values ('abxc');
+insert into like_escape_tbl values (concat('a', chr(92), 'bz'));
+insert into like_escape_tbl values ('C:dirx');
+insert into like_escape_tbl values (concat('C:', chr(92), 'dir'));
+insert into like_escape_tbl values ('a%b');
+insert into like_escape_tbl values (concat('a%b', chr(92)));
+select replace(s, chr(92), '/') from like_escape_tbl where s like 'a\\b%';
+---- TYPES
+STRING
+---- RESULTS
+'a/bz'
+---- RUNTIME_PROFILE
+skipped-data-files: 5
+====
+---- QUERY
+select replace(s, chr(92), '/') from like_escape_tbl where s like 'C:\\dir%';
+---- TYPES
+STRING
+---- RESULTS
+'C:/dir'
+---- RUNTIME_PROFILE
+skipped-data-files: 5
+====
+---- QUERY
+# The scan evaluates the rest of the pattern with a regex.
+select replace(s, chr(92), '/') from like_escape_tbl where s like 'C:\\di_';
+---- TYPES
+STRING
+---- RESULTS
+'C:/dir'
+---- RUNTIME_PROFILE
+skipped-data-files: 5
+====
+---- QUERY
+# Patterns that are not constant follow the same rule, every value matches itself.
+select count(*) from like_escape_tbl where s like s;
+---- TYPES
+BIGINT
+---- RESULTS
+6
+====
+---- QUERY
+# An escaped backslash.
+select count(*) from like_escape_tbl where s like 'a\\\\b%';
+---- TYPES
+BIGINT
+---- RESULTS
+1
+---- RUNTIME_PROFILE
+skipped-data-files: 5
+====
+---- QUERY
+# A trailing backslash that doesn't escape anything is a literal.
+select replace(s, chr(92), '/') from like_escape_tbl where s like 'a\\%b\\';
+---- TYPES
+STRING
+---- RESULTS
+'a%b/'
+---- RUNTIME_PROFILE
+skipped-data-files: 5
+====

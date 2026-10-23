@@ -25,6 +25,7 @@
 #include "gutil/strings/substitute.h"
 #include "runtime/string-value.inline.h"
 #include "string-functions.h"
+#include "util/utf8-util.h"
 #include "common/names.h"
 
 using namespace impala_udf;
@@ -350,84 +351,106 @@ BooleanVal LikePredicate::RegexMatch(FunctionContext* context,
   }
 }
 
+// The escape character only escapes the wildcards and itself. Before any other
+// character, or at the end of the pattern, it is a literal.
+static bool IsEscape(char escape_char, const char* pattern, int len, int i) {
+  if (pattern[i] != escape_char || i + 1 == len) return false;
+  char next = pattern[i + 1];
+  return next == '%' || next == '_' || next == escape_char;
+}
+
 void LikePredicate::OptimizeConstantPatternMatch(const string &pattern,
     LikePredicateState *state) {
-  re2::RE2 substring_re("(?:%+)([^%_]*)(?:%+)");
-  re2::RE2 ends_with_re("(?:%+)([^%_]*)");
-  re2::RE2 starts_with_re("([^%_]*)(?:%+)");
-  re2::RE2 equals_re("([^%_]*)");
-  re2::RE2 ends_with_escaped_wildcard(".*\\\\%$");
-  string search_string;
-  bool case_sensitive = state->case_sensitive_;
-  if (case_sensitive &&
-      RE2::FullMatch(pattern, substring_re, &search_string) &&
-      !RE2::FullMatch(pattern, ends_with_escaped_wildcard)) {
-    state->SetSearchString(search_string);
-    state->function_ = ConstantSubstringFn;
-  } else if (case_sensitive &&
-      RE2::FullMatch(pattern, starts_with_re, &search_string) &&
-      !RE2::FullMatch(pattern, ends_with_escaped_wildcard)) {
-    state->SetSearchString(search_string);
-    state->function_ = ConstantStartsWithFn;
-  } else if (case_sensitive &&
-      RE2::FullMatch(pattern, ends_with_re, &search_string)) {
-    state->SetSearchString(search_string);
-    state->function_ = ConstantEndsWithFn;
-  } else if (case_sensitive &&
-      RE2::FullMatch(pattern, equals_re, &search_string)) {
-    state->SetSearchString(search_string);
-    state->function_ = ConstantEqualsFn;
-  } else {
-    string re_pattern;
-    bool re_full_match = true;
-    bool re_anchor_start = false;
-    bool re_anchor_end = false;
-    StringVal re_pattern_val =
-        StringVal(reinterpret_cast<uint8_t*>(const_cast<char*>(pattern.data())),
-            pattern.size());
-    // IMPALA-12374:
-    // Avoid leading/trailing .* in regex, use (anchored) partial match instead
-    re2::RE2 leading_trailing_re("(?:%+)(.*)(?:%+)");
-    re2::RE2 leading_re("(?:%+)(.*)");
-    re2::RE2 trailing_re("(.*)(?:%+)");
-    string trimmed_pattern;
-    if (RE2::FullMatch(pattern, leading_trailing_re, &trimmed_pattern) &&
-        !RE2::FullMatch(pattern, ends_with_escaped_wildcard)) {
-      // e.g. '%a%b%'
-      re_pattern_val =
-          StringVal(reinterpret_cast<uint8_t*>(const_cast<char*>(
-              trimmed_pattern.data())), trimmed_pattern.size());
-      re_full_match = false;
-    } else if(RE2::FullMatch(pattern, leading_re, &trimmed_pattern)) {
-      // e.g. '%a%b'
-      re_pattern_val =
-          StringVal(reinterpret_cast<uint8_t*>(const_cast<char*>(
-              trimmed_pattern.data())), trimmed_pattern.size());
-      re_full_match = false;
-      re_anchor_end = true;
-    } else if(RE2::FullMatch(pattern, trailing_re, &trimmed_pattern) &&
-        !RE2::FullMatch(pattern, ends_with_escaped_wildcard)) {
-      // e.g. 'a%b%'
-      re_pattern_val =
-          StringVal(reinterpret_cast<uint8_t*>(const_cast<char*>(
-              trimmed_pattern.data())), trimmed_pattern.size());
-      re_full_match = false;
-      re_anchor_start = true;
-    }
-
-    ConvertLikePattern(state, re_pattern_val, &re_pattern, re_anchor_start,
-        re_anchor_end);
-    RE2::Options opts;
-    opts.set_never_nl(false);
-    opts.set_dot_nl(true);
-    opts.set_case_sensitive(case_sensitive);
-    StringFunctions::SetRE2MemOpt(&opts);
-    state->regex_.reset(new RE2(re_pattern, opts));
-    if (re_full_match) {
-      state->function_ = LikeFn;
+  // Split the pattern into its leading '%' wildcards, the part in the middle and its
+  // trailing '%' wildcards. Escapes are interpreted the same way as in
+  // ConvertLikePattern().
+  struct LikeToken {
+    char c;
+    bool is_wildcard;
+    // The position in 'pattern' after this character.
+    int end_pos;
+  };
+  vector<LikeToken> tokens;
+  bool is_escaped = false;
+  const int pattern_len = pattern.size();
+  for (int i = 0; i < pattern_len; ++i) {
+    char c = pattern[i];
+    if (!is_escaped && (c == '%' || c == '_')) {
+      tokens.push_back({c, true, i + 1});
+    } else if (!is_escaped &&
+        IsEscape(state->escape_char_, pattern.data(), pattern_len, i)) {
+      is_escaped = true;
     } else {
-      state->function_ = LikeFnPartial;
+      tokens.push_back({c, false, i + 1});
+      is_escaped = false;
     }
+  }
+  auto is_percent = [&tokens](int i) {
+    return tokens[i].is_wildcard && tokens[i].c == '%';
+  };
+  const int num_tokens = tokens.size();
+  int middle_begin = 0;
+  while (middle_begin < num_tokens && is_percent(middle_begin)) ++middle_begin;
+  int middle_end = num_tokens;
+  while (middle_end > middle_begin && is_percent(middle_end - 1)) --middle_end;
+  bool has_leading_wildcard = middle_begin > 0;
+  bool has_trailing_wildcard = middle_end < num_tokens;
+
+  // If the middle part has no wildcards, we can search for its unescaped form more
+  // efficiently by using our own string match functions rather than regex matching.
+  string search_string;
+  bool is_constant_middle = true;
+  for (int i = middle_begin; i < middle_end; ++i) {
+    if (tokens[i].is_wildcard) {
+      is_constant_middle = false;
+      break;
+    }
+    search_string.push_back(tokens[i].c);
+  }
+  // The regex path fails for patterns that are not valid UTF-8, also when they are not
+  // constant. The fast paths must not hide that.
+  if (state->case_sensitive_ && is_constant_middle &&
+      IsValidUtf8(pattern.data(), pattern.size())) {
+    state->SetSearchString(search_string);
+    if (has_leading_wildcard && has_trailing_wildcard) {
+      state->function_ = ConstantSubstringFn;
+    } else if (has_trailing_wildcard) {
+      state->function_ = ConstantStartsWithFn;
+    } else if (has_leading_wildcard) {
+      state->function_ = ConstantEndsWithFn;
+    } else {
+      state->function_ = ConstantEqualsFn;
+    }
+    return;
+  }
+
+  // IMPALA-12374:
+  // Avoid leading/trailing .* in regex, use (anchored) partial match instead.
+  // The leading '%' wildcards are the first characters of the pattern, because nothing
+  // escapes them. The middle part ends where the first trailing '%' wildcard is.
+  int raw_begin = middle_begin;
+  int raw_end = has_trailing_wildcard ? tokens[middle_end].end_pos - 1 : pattern_len;
+  StringVal re_pattern_val(
+      reinterpret_cast<uint8_t*>(const_cast<char*>(pattern.data() + raw_begin)),
+      raw_end - raw_begin);
+  bool re_full_match = !has_leading_wildcard && !has_trailing_wildcard;
+  // e.g. 'a%b%'
+  bool re_anchor_start = !has_leading_wildcard && has_trailing_wildcard;
+  // e.g. '%a%b'
+  bool re_anchor_end = has_leading_wildcard && !has_trailing_wildcard;
+  string re_pattern;
+  ConvertLikePattern(state, re_pattern_val, &re_pattern, re_anchor_start,
+      re_anchor_end);
+  RE2::Options opts;
+  opts.set_never_nl(false);
+  opts.set_dot_nl(true);
+  opts.set_case_sensitive(state->case_sensitive_);
+  StringFunctions::SetRE2MemOpt(&opts);
+  state->regex_.reset(new RE2(re_pattern, opts));
+  if (re_full_match) {
+    state->function_ = LikeFn;
+  } else {
+    state->function_ = LikeFnPartial;
   }
 }
 
@@ -446,7 +469,8 @@ void LikePredicate::ConvertLikePattern(LikePredicateState* state,
     } else if (!is_escaped && pattern.ptr[i] == '_') {
       re_pattern->append(".");
     // check for escape char before checking for regex special chars, they might overlap
-    } else if (!is_escaped && pattern.ptr[i] == state->escape_char_) {
+    } else if (!is_escaped && IsEscape(state->escape_char_,
+        reinterpret_cast<const char*>(pattern.ptr), pattern.len, i)) {
       is_escaped = true;
     } else if (
         pattern.ptr[i] == '.'

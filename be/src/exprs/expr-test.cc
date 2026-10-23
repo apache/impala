@@ -4015,6 +4015,52 @@ TEST_P(ExprTest, LikePredicate) {
   // make sure the 3rd \ counts toward the _
   TestValue("'\\\\_' LIKE '\\\\\\\\\\_'", TYPE_BOOLEAN, true);
   TestValue("'\\\\\\\\a' LIKE '\\\\\\\\\\_'", TYPE_BOOLEAN, false);
+  // IMPALA-15641: patterns without wildcards in the middle are matched by the fast
+  // paths, which must interpret escapes the same way as the regex path.
+  TestValue("'abc%x' LIKE 'abc\\%%'", TYPE_BOOLEAN, true);
+  TestValue("'abc\\\\x' LIKE 'abc\\%%'", TYPE_BOOLEAN, false);
+  TestValue("'x%abc' LIKE '%\\%abc'", TYPE_BOOLEAN, true);
+  TestValue("'x\\\\abc' LIKE '%\\%abc'", TYPE_BOOLEAN, false);
+  TestValue("'x%y' LIKE '%\\%%'", TYPE_BOOLEAN, true);
+  TestValue("'x\\\\y' LIKE '%\\%%'", TYPE_BOOLEAN, false);
+  TestValue("'x_y' LIKE '%\\_%'", TYPE_BOOLEAN, true);
+  TestValue("'xyz' LIKE '%\\_%'", TYPE_BOOLEAN, false);
+  // The escape character only escapes the wildcards and itself, before any other
+  // character it is a literal.
+  TestValue("'a\\\\bc' LIKE 'a\\\\b%'", TYPE_BOOLEAN, true);
+  TestValue("'abc' LIKE 'a\\\\b%'", TYPE_BOOLEAN, false);
+  TestValue("'a\\\\bc' LIKE 'a\\\\bc'", TYPE_BOOLEAN, true);
+  TestValue("'abc' LIKE 'a\\\\bc'", TYPE_BOOLEAN, false);
+  TestValue("'xa\\\\bc' LIKE '%a\\\\bc'", TYPE_BOOLEAN, true);
+  TestValue("'xabc' LIKE '%a\\\\bc'", TYPE_BOOLEAN, false);
+  TestValue("'xa\\\\bcx' LIKE '%a\\\\bc%'", TYPE_BOOLEAN, true);
+  TestValue("'xabcx' LIKE '%a\\\\bc%'", TYPE_BOOLEAN, false);
+  TestValue("'a\\\\bcd' LIKE 'a\\\\b_d'", TYPE_BOOLEAN, true);
+  TestValue("'abcd' LIKE 'a\\\\b_d'", TYPE_BOOLEAN, false);
+  TestValue("'a\\\\bc' LIKE 'a\\\\\\\\b%'", TYPE_BOOLEAN, true);
+  TestValue("'a\\\\\\\\bc' LIKE 'a\\\\\\\\b%'", TYPE_BOOLEAN, false);
+  TestValue("'a\\\\bc' LIKE 'a\\\\\\\\bc'", TYPE_BOOLEAN, true);
+  TestValue("'a\\\\bcd' LIKE 'a\\\\\\\\b_d'", TYPE_BOOLEAN, true);
+  // A trailing escape character that doesn't escape anything matches itself.
+  TestValue("'ab\\\\' LIKE 'ab\\\\'", TYPE_BOOLEAN, true);
+  TestValue("'ab' LIKE 'ab\\\\'", TYPE_BOOLEAN, false);
+  TestValue("'xab\\\\' LIKE '%ab\\\\'", TYPE_BOOLEAN, true);
+  TestValue("'xab' LIKE '%ab\\\\'", TYPE_BOOLEAN, false);
+  TestValue("'abc\\\\' LIKE 'ab%\\\\'", TYPE_BOOLEAN, true);
+  TestValue("'abc' LIKE 'ab%\\\\'", TYPE_BOOLEAN, false);
+  TestValue("'ab\\\\\\\\' LIKE 'ab\\\\\\\\\\\\'", TYPE_BOOLEAN, true);
+  TestValue("'ab\\\\' LIKE 'ab\\\\\\\\\\\\'", TYPE_BOOLEAN, false);
+  // Line breaks before escaped wildcards.
+  TestValue("'a\\n%' LIKE 'a\\n\\%'", TYPE_BOOLEAN, true);
+  TestValue("'a\\n\\\\x' LIKE 'a\\n\\%'", TYPE_BOOLEAN, false);
+  TestValue("'a\\n%x' LIKE 'a\\n\\%%'", TYPE_BOOLEAN, true);
+  // The same patterns on the regex path.
+  TestValue("'ABC%X' ILIKE 'abc\\%%'", TYPE_BOOLEAN, true);
+  TestValue("'ABC\\\\X' ILIKE 'abc\\%%'", TYPE_BOOLEAN, false);
+  TestValue("'A\\\\BC' ILIKE 'a\\\\b%'", TYPE_BOOLEAN, true);
+  TestValue("'ABC' ILIKE 'a\\\\b%'", TYPE_BOOLEAN, false);
+  TestValue("'XAB\\\\' ILIKE '%ab\\\\'", TYPE_BOOLEAN, true);
+  TestValue("'XAB' ILIKE '%ab\\\\'", TYPE_BOOLEAN, false);
   // Test invalid patterns, unmatched parenthesis.
   TestNonOkStatus("'a' RLIKE '(./'");
   TestNonOkStatus("'a' REGEXP '(./'");

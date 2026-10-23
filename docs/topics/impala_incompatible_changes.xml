@@ -235,6 +235,19 @@ under the License.
               Memory Limit for the pool. No setting restores the previous behavior;
               removing Max Memory from the pool turns off memory-based admission control
               for the pool. See <xref href="impala_admission.xml#admission_memory"/>.</p></li>
+          <li rev="IMPALA-15641">The <codeph>LIKE</codeph> and <codeph>ILIKE</codeph>
+            operators interpret a backslash the same way in every pattern: it escapes
+            <codeph>%</codeph>, <codeph>_</codeph> and itself, and before any other
+            character, or at the end of the pattern, it matches itself. See
+            <xref href="impala_operators.xml#like"/>.<p>
+              Previously, the result depended on the shape of the pattern. Simple constant
+              <codeph>LIKE</codeph> patterns, such as <codeph>abc%</codeph> or
+              <codeph>%abc%</codeph>, matched backslashes literally, while other patterns
+              treated a backslash as an escape for any character and ignored a trailing
+              backslash. As a result, some queries return different results, for example
+              <codeph>'abc%x' LIKE 'abc\%%'</codeph> is now true, and <codeph>s LIKE
+              'C:\\dir_%'</codeph> matches <codeph>C:\dir1</codeph> instead of
+              <codeph>C:dir1</codeph>.</p></li>
         </ul>
       </p>
     </conbody>

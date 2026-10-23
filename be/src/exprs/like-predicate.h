@@ -124,8 +124,8 @@ class LikePredicate: public Predicate {
 
   /// Try to find an optimized function to match constant pattern,
   /// e.g. if constant contains no wildcards, string equality check will be used.
-  /// IcebergPredicateConverter in the frontend relies on which patterns this matches
-  /// verbatim and how ConvertLikePattern() handles escapes. Keep the two in sync.
+  /// IcebergPredicateConverter in the frontend relies on how this and
+  /// ConvertLikePattern() handle escapes. Keep them in sync.
   static void OptimizeConstantPatternMatch(const string &pattern,
       LikePredicateState *state);
 
