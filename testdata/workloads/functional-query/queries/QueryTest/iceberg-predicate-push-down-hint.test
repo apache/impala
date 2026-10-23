@@ -34,3 +34,50 @@ BIGINT
 aggregation(SUM, NumRowGroups): 1
 aggregation(SUM, NumStatsFilteredRowGroups): 1
 ====
+---- QUERY
+# Timestamp literals with nanoseconds are not pushed down, because they would be rounded
+# to microseconds for Iceberg.
+create table ts_tbl (ts timestamp) stored as iceberg
+tblproperties ('impala.iceberg.push_down_hint'='ts');
+insert into ts_tbl values ('2024-01-01 00:00:00');
+select count(*) from ts_tbl where ts < '2024-01-01 00:00:00.0000004';
+---- TYPES
+BIGINT
+---- RESULTS
+1
+====
+---- QUERY
+select count(*) from ts_tbl where ts > '2023-12-31 23:59:59.9999996';
+---- TYPES
+BIGINT
+---- RESULTS
+1
+====
+---- QUERY
+select count(*) from ts_tbl where ts != '2024-01-01 00:00:00.0000004';
+---- TYPES
+BIGINT
+---- RESULTS
+1
+====
+---- QUERY
+# The same for partition transforms.
+create table ts_part_tbl (ts timestamp) partitioned by spec (day(ts)) stored as iceberg;
+insert into ts_part_tbl values ('2024-01-01 00:00:00');
+select count(*) from ts_part_tbl
+where ts > '2023-01-01' and ts < '2024-01-01 00:00:00.0000004';
+---- TYPES
+BIGINT
+---- RESULTS
+1
+====
+---- QUERY
+# Literals with microsecond precision are still pushed down.
+select count(*) from ts_tbl where ts > '2024-01-01 00:00:00.000001';
+---- TYPES
+BIGINT
+---- RESULTS
+0
+---- RUNTIME_PROFILE
+skipped-data-files: 1
+====

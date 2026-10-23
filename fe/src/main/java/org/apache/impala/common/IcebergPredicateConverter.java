@@ -44,6 +44,7 @@ import org.apache.impala.analysis.NumericLiteral;
 import org.apache.impala.analysis.SlotDescriptor;
 import org.apache.impala.analysis.SlotRef;
 import org.apache.impala.analysis.StringLiteral;
+import org.apache.impala.analysis.TimestampLiteral;
 import org.apache.impala.catalog.Column;
 import org.apache.impala.catalog.IcebergColumn;
 import org.apache.impala.catalog.PrimitiveType;
@@ -536,6 +537,17 @@ public class IcebergPredicateConverter {
 
   protected Long getIcebergTsValue(LiteralExpr literal, IcebergColumn column,
       Schema iceSchema) throws ImpalaRuntimeException {
+    // Iceberg timestamps have microsecond precision. Rounding a literal with nanoseconds
+    // would change the result of comparisons, e.g. ts < '00:00:00.0000004' would become
+    // ts < '00:00:00', which skips files where ts = '00:00:00'.
+    // TODO: IMPALA-15709: round depending on the operator instead, e.g. push down
+    // ts < '00:00:00.0000004' as ts < '00:00:00.000001'.
+    if (literal instanceof TimestampLiteral &&
+        ((TimestampLiteral) literal).getNanosOfDay() % 1000 != 0) {
+      throw new ImpalaRuntimeException(
+          "Timestamps with sub-microsecond precision can't be converted to Iceberg " +
+          "expressions: " + literal.toSql());
+    }
     try {
       org.apache.iceberg.types.Type iceType = iceSchema.findType(column.getFieldId());
       Preconditions.checkState(iceType instanceof Types.TimestampType);

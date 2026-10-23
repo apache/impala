@@ -17,6 +17,8 @@
 
 package org.apache.impala.analysis;
 
+import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
 import java.util.Arrays;
 
 import com.google.common.base.Preconditions;
@@ -76,6 +78,14 @@ public class TimestampLiteral extends LiteralExpr {
   public String getStringValue() { return strValue_; }
 
   public byte[] getValue() { return value_; }
+
+  /**
+   * Returns the time of day in nanoseconds. The first 8 bytes of a BE TimestampValue are
+   * its boost::posix_time::time_duration, which counts nanoseconds.
+   */
+  public long getNanosOfDay() {
+    return ByteBuffer.wrap(value_).order(ByteOrder.LITTLE_ENDIAN).getLong();
+  }
 
   @Override
   protected void toThrift(TExprNode msg) {
