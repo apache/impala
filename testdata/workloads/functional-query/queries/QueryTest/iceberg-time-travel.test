@@ -13,3 +13,41 @@ SELECT * FROM dist_flights JOIN iceberg_airlines a ON dist_flights.carrier = a.c
 ---- TYPES
 STRING,STRING
 ====
+---- QUERY
+# Schema changes don't create snapshots, so time travel to the current snapshot uses its
+# older schema. Iceberg binds the pushed down predicates to the current schema though, so
+# they are not pushed down.
+create table tt_swap_tbl (a int, b int, p int) partitioned by spec (p) stored as iceberg;
+insert into tt_swap_tbl values (1, 10, 1);
+alter table tt_swap_tbl change column a tmp int;
+alter table tt_swap_tbl change column b a int;
+alter table tt_swap_tbl change column tmp b int;
+select count(*) from tt_swap_tbl for system_time as of now() where p = 1 and a = 1;
+---- RESULTS
+1
+---- TYPES
+BIGINT
+====
+---- QUERY
+create table tt_rename_tbl (a int, b int, p int) partitioned by spec (p)
+stored as iceberg;
+insert into tt_rename_tbl values (1, 10, 1);
+alter table tt_rename_tbl change column a c int;
+select count(*) from tt_rename_tbl for system_time as of now() where p = 1 and a = 1;
+---- RESULTS
+1
+---- TYPES
+BIGINT
+====
+---- QUERY
+create table tt_drop_tbl (i int, ts timestamp, p int) partitioned by spec (p)
+stored as iceberg;
+insert into tt_drop_tbl values (1, '2024-01-01 00:00:00', 1);
+alter table tt_drop_tbl drop column ts;
+select count(*) from tt_drop_tbl for system_time as of now()
+where p = 1 and ts = '2024-01-01 00:00:00';
+---- RESULTS
+1
+---- TYPES
+BIGINT
+====

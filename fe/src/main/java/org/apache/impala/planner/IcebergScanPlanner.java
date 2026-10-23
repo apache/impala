@@ -56,8 +56,11 @@ import org.apache.iceberg.metrics.InMemoryMetricsReporter;
 import org.apache.iceberg.metrics.ScanMetricsResult;
 import org.apache.iceberg.metrics.ScanReport;
 import org.apache.iceberg.Schema;
+import org.apache.iceberg.Snapshot;
+import org.apache.iceberg.Table;
 import org.apache.iceberg.types.Types;
 import org.apache.iceberg.types.Types.NestedField;
+import org.apache.iceberg.util.SnapshotUtil;
 import org.apache.impala.analysis.Analyzer;
 import org.apache.impala.analysis.BinaryPredicate;
 import org.apache.impala.analysis.BinaryPredicate.Operator;
@@ -204,8 +207,8 @@ public class IcebergScanPlanner {
     helper_ = helper;
 
     initPushDownHint();
-    extractIcebergConjuncts();
     snapshotId_ = IcebergUtil.getSnapshotId(getIceTable(), helper.getTimeTravelSpec());
+    extractIcebergConjuncts();
   }
 
   private ScanMetricsResult getScanMetrics() {
@@ -1304,6 +1307,22 @@ public class IcebergScanPlanner {
   }
 
   /**
+   * Returns the schema that Iceberg binds the pushed down predicates to: the schema of
+   * the scanned snapshot if it is not the current snapshot of the Iceberg table, e.g. for
+   * time travel, the current schema otherwise. There is nothing to scan if the snapshot
+   * id is -1, so the current schema is fine then too.
+   */
+  private Schema getSchemaForPredicates() {
+    Table iceApiTable = getIceTable().getIcebergApiTable();
+    Snapshot currentSnapshot = iceApiTable.currentSnapshot();
+    if (snapshotId_ == -1 || currentSnapshot == null ||
+        currentSnapshot.snapshotId() == snapshotId_) {
+      return iceApiTable.schema();
+    }
+    return SnapshotUtil.schemaFor(iceApiTable, snapshotId_);
+  }
+
+  /**
    * Transform Impala predicate to Iceberg predicate.
    * Returns true if a predicate was pushed to Iceberg (even if partially converted).
    * If the predicate was partially converted (e.g., LIKE 'd%d' -> startsWith('d')),
@@ -1312,7 +1331,7 @@ public class IcebergScanPlanner {
    */
   private boolean tryConvertIcebergPredicate(Expr expr) {
     IcebergPredicateConverter converter =
-        new IcebergPredicateConverter(getIceTable().getIcebergSchema(), analyzer_,
+        new IcebergPredicateConverter(getSchemaForPredicates(), analyzer_,
             IcebergUtil.getPartitionSourceIds(getIceTable()));
     IcebergPredicateConverter.ConverterResult result = converter.convert(expr);
 

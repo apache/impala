@@ -775,3 +775,23 @@ select _last_updated_sequence_number from ice_v3_a a cross join ice_v3_b b;
 ---- CATCH
 Column/field reference is ambiguous: '_last_updated_sequence_number'
 ====
+---- QUERY
+# The hidden row lineage columns are not in the Iceberg schema, so predicates on them
+# are not pushed down.
+create table ice_v3_part (i int, p int) partitioned by spec (p) stored as iceberg
+tblproperties ('format-version'='3');
+insert into ice_v3_part values (1, 1);
+select count(*) from ice_v3_part where p = 1 and _file_row_id is null;
+---- RESULTS
+1
+---- TYPES
+BIGINT
+====
+---- QUERY
+select count(*) from ice_v3_part
+where p = 1 and _file_last_updated_sequence_number is null;
+---- RESULTS
+1
+---- TYPES
+BIGINT
+====

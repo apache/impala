@@ -890,7 +890,17 @@ public class IcebergPredicateConverter {
               column));
     }
 
-    return new Term(Expressions.ref(column.getName()), (IcebergColumn) column);
+    IcebergColumn iceColumn = (IcebergColumn) column;
+    // Iceberg binds the expression to the schema by column name, so the name must refer
+    // to the same field. It doesn't for hidden columns like _file_row_id, and might not
+    // for time travel to a snapshot with an older schema.
+    Types.NestedField field = schema_.caseInsensitiveFindField(column.getName());
+    if (field == null || field.fieldId() != iceColumn.getFieldId()) {
+      throw new ImpalaRuntimeException(String.format(
+          "Column %s is not field %d of the Iceberg schema", column.getName(),
+          iceColumn.getFieldId()));
+    }
+    return new Term(Expressions.ref(column.getName()), iceColumn);
   }
 
   public static class Term {

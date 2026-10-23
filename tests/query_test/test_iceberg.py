@@ -871,6 +871,23 @@ class TestIcebergTable(IcebergTestSuite):
   def test_time_travel_queries(self, vector, unique_database):
     self.run_test_case('QueryTest/iceberg-time-travel', vector, use_db=unique_database)
 
+  def test_time_travel_predicate_push_down(self, unique_database):
+    """Predicates are pushed down for time travel to a snapshot whose schema had other
+    column names, because Iceberg binds them to the schema of that snapshot."""
+    tbl_name = unique_database + ".tt_rename"
+    self.execute_query("create table {} (i int, p int) partitioned by spec (p) "
+                       "stored as iceberg".format(tbl_name))
+    self.execute_query("insert into {} values (1, 1), (2, 2)".format(tbl_name))
+    snapshot_id = get_snapshots(self.client, tbl_name, expected_result_size=1)[0] \
+        .get_snapshot_id()
+    self.execute_query("alter table {} change column p q int".format(tbl_name))
+    self.execute_query("insert into {} values (3, 3)".format(tbl_name))
+    result = self.execute_query(
+        "select i from {} for system_version as of {} where p = 1".format(
+            tbl_name, snapshot_id))
+    assert result.data == ['1']
+    assert "partitions=1/" in result.runtime_profile
+
   @SkipIf.not_hdfs
   def test_time_travel_after_optimize(self, unique_database):
     """IMPALA-14970: Regression test for time-travel queries after OPTIMIZE on HDFS

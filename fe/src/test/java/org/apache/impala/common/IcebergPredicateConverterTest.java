@@ -22,10 +22,12 @@ import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 
 import java.util.Collections;
+import org.apache.iceberg.Schema;
 import org.apache.iceberg.expressions.Expression.Operation;
 import org.apache.iceberg.expressions.Expressions;
 import org.apache.iceberg.expressions.UnboundPredicate;
 import org.apache.iceberg.expressions.UnboundTransform;
+import org.apache.iceberg.types.Types;
 import org.apache.impala.analysis.BinaryPredicate;
 import org.apache.impala.analysis.CompoundPredicate;
 import org.apache.impala.analysis.Expr;
@@ -52,7 +54,10 @@ public class IcebergPredicateConverterTest {
       new IcebergColumn("s", Type.STRING, null, 0, 1, -1, -1, true);
 
   private static class TestConverter extends IcebergPredicateConverter {
-    TestConverter() { super(null, null); }
+    TestConverter() {
+      super(new Schema(Types.NestedField.optional(STRING_COL.getFieldId(),
+          STRING_COL.getName(), Types.StringType.get())), null);
+    }
 
     @Override
     protected Column getColumnFromSlotRef(SlotRef slotRef) { return STRING_COL; }
