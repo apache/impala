@@ -55,6 +55,8 @@ aggregation(SUM, NumRowGroups): 2
 aggregation(SUM, RowsRead): 3
 ====
 ---- QUERY
+# The data files in the earlier data locations of the table are treated as imported files,
+# so only 'col_int >= 0' is pushed down to Iceberg (IMPALA-15639).
 select
   *
 from
@@ -70,6 +72,6 @@ order by
 ---- TYPES
 INT,BIGINT,FLOAT,DOUBLE,STRING,TIMESTAMP,DATE
 ---- RUNTIME_PROFILE
-aggregation(SUM, NumRowGroups): 3
+aggregation(SUM, NumRowGroups): 6
 aggregation(SUM, RowsRead): 6
 ====

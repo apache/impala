@@ -40,6 +40,8 @@ import org.apache.iceberg.ContentFile;
 import org.apache.iceberg.DataFile;
 import org.apache.iceberg.DeleteFile;
 import org.apache.iceberg.Table;
+import org.apache.iceberg.TableProperties;
+import org.apache.iceberg.util.LocationUtil;
 import org.apache.impala.catalog.iceberg.GroupedContentFiles;
 import org.apache.impala.common.ImpalaRuntimeException;
 import org.apache.impala.common.Pair;
@@ -213,8 +215,8 @@ public class IcebergContentFileStore {
   /////////////////////////////////////////
   // BEGIN: immutable members
   // Note that mergeWithNewFiles() actually mutates these fields by adding new
-  // files, but mergeWithNewFiles() is only used in catalogd while cloneWithoutMutables
-  // is used in coordinators.
+  // files and updating the flags, but mergeWithNewFiles() is only used in catalogd while
+  // cloneWithoutMutables is used in coordinators.
 
   // Separate map-list containers for the different content files.
   private MapListContainer dataFilesWithoutDeletes_ = new MapListContainer();
@@ -234,6 +236,11 @@ public class IcebergContentFileStore {
   private boolean hasAvro_ = false;
   private boolean hasOrc_ = false;
   private boolean hasParquet_ = false;
+
+  // True if some data files are outside of the data location of the table, i.e. they
+  // were imported, e.g. by ALTER TABLE CONVERT TO ICEBERG. The column metrics of such
+  // files come from their file footers and can be wrong, see IMPALA-15639.
+  private boolean hasImportedDataFiles_ = false;
 
   // END: immutable members
   /////////////////////////////////////////
@@ -276,11 +283,14 @@ public class IcebergContentFileStore {
       fileDescMap.put(pathStr, fileDesc);
     }
 
+    List<String> dataLocations = getDataLocations(iceApiTable);
     for (DataFile dataFile : icebergFiles.dataFilesWithoutDeletes) {
       storeFile(dataFile, fileDescMap, dataFilesWithoutDeletes_);
+      updateHasImportedDataFiles(dataFile, dataLocations);
     }
     for (DataFile dataFile : icebergFiles.dataFilesWithDeletes) {
       storeFile(dataFile, fileDescMap, dataFilesWithDeletes_);
+      updateHasImportedDataFiles(dataFile, dataLocations);
     }
     for (DeleteFile deleteFile : icebergFiles.positionDeleteFiles) {
       storeFile(deleteFile, fileDescMap, positionDeleteFiles_);
@@ -310,6 +320,7 @@ public class IcebergContentFileStore {
     ret.hasAvro_ = hasAvro_;
     ret.hasOrc_ = hasOrc_;
     ret.hasParquet_ = hasParquet_;
+    ret.hasImportedDataFiles_ = hasImportedDataFiles_;
     return ret;
   }
 
@@ -404,7 +415,7 @@ public class IcebergContentFileStore {
       GroupedContentFiles newIcebergFiles,
       List<IcebergFileDescriptor> newFds,
       Map<ByteBuffer, Integer> mergedPartitions,
-      String apiTableLocation) {
+      Table iceApiTable) {
     Preconditions.checkState(newIcebergFiles.dataFilesWithDeletes.isEmpty()
         && newIcebergFiles.positionDeleteFiles.isEmpty()
         && newIcebergFiles.equalityDeleteFiles.isEmpty()
@@ -412,14 +423,17 @@ public class IcebergContentFileStore {
         "mergeWithNewFiles only supports append-only changes (dataFilesWithoutDeletes)");
 
     Map<String, IcebergFileDescriptor> newFdMap = new HashMap<>();
+    String apiTableLocation = iceApiTable.location();
     for (IcebergFileDescriptor fd : newFds) {
       String absPathStr = fd.getAbsolutePath(apiTableLocation);
       String pathStr = quickGetPath(absPathStr);
       newFdMap.put(pathStr, fd);
     }
 
+    List<String> dataLocations = getDataLocations(iceApiTable);
     for (DataFile dataFile : newIcebergFiles.dataFilesWithoutDeletes) {
       storeFile(dataFile, newFdMap, dataFilesWithoutDeletes_);
+      updateHasImportedDataFiles(dataFile, dataLocations);
     }
     partitionMap_ = mergedPartitions;
   }
@@ -433,6 +447,45 @@ public class IcebergContentFileStore {
     } else {
       missingFiles_.add(contentFile.location());
     }
+  }
+
+  /**
+   * Returns the paths, without scheme and authority, of the locations where Iceberg
+   * writes the data files of 'iceApiTable', see LocationProviders in Iceberg:
+   * '<table location>/data', where Impala always writes them, and 'write.data.path' or
+   * the deprecated 'write.object-storage.path' and 'write.folder-storage.path' if set.
+   * The object storage layout only adds a hash below these locations. Data files of a
+   * custom location provider can be anywhere, so they may be treated as imported.
+   */
+  @SuppressWarnings("deprecation")
+  private static List<String> getDataLocations(Table iceApiTable) {
+    List<String> ret = new ArrayList<>();
+    ret.add(quickGetPath(LocationUtil.stripTrailingSlash(iceApiTable.location())) +
+        "/data/");
+    Map<String, String> props = iceApiTable.properties();
+    for (String prop : new String[] {TableProperties.WRITE_DATA_LOCATION,
+        TableProperties.OBJECT_STORE_PATH,
+        TableProperties.WRITE_FOLDER_STORAGE_LOCATION}) {
+      String location = props.get(prop);
+      if (location == null) continue;
+      String path = quickGetPath(LocationUtil.stripTrailingSlash(location));
+      // Without its bucket or container, the root of an object store would match any
+      // data file.
+      if (!path.isEmpty()) ret.add(path + "/");
+    }
+    return ret;
+  }
+
+  private void updateHasImportedDataFiles(DataFile dataFile,
+      List<String> dataLocations) {
+    if (hasImportedDataFiles_) return;
+    // Compare the paths without scheme and authority, because the locations are not
+    // always fully qualified.
+    String path = quickGetPath(dataFile.location());
+    for (String dataLocation : dataLocations) {
+      if (path.startsWith(dataLocation)) return;
+    }
+    hasImportedDataFiles_ = true;
   }
 
   // This is only invoked during time travel, when we are querying a snapshot that has
@@ -588,6 +641,7 @@ public class IcebergContentFileStore {
   public boolean hasAvro() { return hasAvro_; }
   public boolean hasOrc() { return hasOrc_; }
   public boolean hasParquet() { return hasParquet_; }
+  public boolean hasImportedDataFiles() { return hasImportedDataFiles_; }
 
   private void updateFileFormats(FbIcebergMetadata icebergMetadata) {
     Preconditions.checkNotNull(icebergMetadata);
@@ -663,6 +717,7 @@ public class IcebergContentFileStore {
     ret.setHas_avro(hasAvro_);
     ret.setHas_orc(hasOrc_);
     ret.setHas_parquet(hasParquet_);
+    ret.setHas_imported_data_files(hasImportedDataFiles_);
     ret.setMissing_files(new ArrayList<>(missingFiles_));
     ret.setPartitions(convertPartitionMapToList(partitionMap_, 0));
     Map<THash128, TIcebergDeletionVector> tdeletion_vectors = new HashMap<>();
@@ -730,6 +785,7 @@ public class IcebergContentFileStore {
       ret.setHas_avro(hasAvro_);
       ret.setHas_orc(hasOrc_);
       ret.setHas_parquet(hasParquet_);
+      ret.setHas_imported_data_files(hasImportedDataFiles_);
       ret.setMissing_files(new ArrayList<>(missingFiles_));
       ret.setPartitions(convertPartitionMapToList(partitionMap_, 0));
       Map<THash128, TIcebergDeletionVector> tdeletion_vectors = new HashMap<>();
@@ -775,6 +831,8 @@ public class IcebergContentFileStore {
     ret.hasAvro_ = tFileStore.isSetHas_avro() ? tFileStore.isHas_avro() : false;
     ret.hasOrc_ = tFileStore.isSetHas_orc() ? tFileStore.isHas_orc() : false;
     ret.hasParquet_ = tFileStore.isSetHas_parquet() ? tFileStore.isHas_parquet() : false;
+    ret.hasImportedDataFiles_ = tFileStore.isSetHas_imported_data_files() ?
+        tFileStore.isHas_imported_data_files() : false;
     ret.missingFiles_ = tFileStore.isSetMissing_files() ?
         new HashSet<>(tFileStore.getMissing_files()) : Collections.emptySet();
     // Call copyBinary to avoid referencing the whole transport buffer in ByteBuffers.

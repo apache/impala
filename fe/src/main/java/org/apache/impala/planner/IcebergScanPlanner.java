@@ -1080,12 +1080,26 @@ public class IcebergScanPlanner {
     // Track identity conjuncts by their index in conjuncts_.
     // The array values are initialized to false.
     boolean[] identityConjunctIndex = new boolean[conjuncts_.size()];
+    // The conjuncts that may be pushed down.
+    boolean[] candidateConjunctIndex = new boolean[conjuncts_.size()];
     for (SlotDescriptor slotDesc : tblRef_.getDesc().getSlots()) {
       idToSlotDesc.put(slotDesc.getId(), slotDesc);
     }
+    // The column metrics of imported data files come from their file footers, and can be
+    // wrong, e.g. if the type of the column in the file doesn't match the Iceberg type.
+    // Only predicates on columns that are identity partitioned in every partition spec
+    // are pushed down for tables with such files, because data files only have metrics
+    // for these columns if they store them.
+    boolean hasImportedDataFiles =
+        getIceTable().getContentFileStore().hasImportedDataFiles();
     for (int i = 0; i < conjuncts_.size(); i++) {
       Expr expr = conjuncts_.get(i);
       List<IcebergColumn> cols = getColumnsInExpr(expr, idToSlotDesc);
+      if (hasImportedDataFiles && (cols.isEmpty() || !cols.stream().allMatch(
+          col -> IcebergUtil.isIdentityPartitionedInAllSpecs(getIceTable(), col)))) {
+        continue;
+      }
+      candidateConjunctIndex[i] = true;
       if (isPartitionColumnIncluded(cols, idToSlotDesc)) {
         pushDownToIceberg = true;
         if (isIdentityPartitionIncluded(cols, idToSlotDesc)) {
@@ -1102,7 +1116,10 @@ public class IcebergScanPlanner {
     }
     for (int i = 0; i < conjuncts_.size(); i++) {
       Expr expr = conjuncts_.get(i);
-      if (tryConvertIcebergPredicate(expr)) {
+      if (!candidateConjunctIndex[i]) {
+        untranslatedExpressions_.add(expr);
+        nonIdentityConjuncts_.add(expr);
+      } else if (tryConvertIcebergPredicate(expr)) {
         if (!identityConjunctIndex[i]) {
           nonIdentityConjuncts_.add(expr);
         }

@@ -384,3 +384,135 @@ select * from special_chars where s='11/22/33';
 ---- TYPES
 INT,STRING
 ====
+---- QUERY
+# IMPALA-15639: The bounds of TIMESTAMP and DECIMAL columns in the file footers are wrong
+# for the Iceberg type, e.g. for INT64 timestamps with MILLIS unit and for decimals whose
+# scale was changed in the Hive table.
+set parquet_timestamp_type=INT64_MILLIS;
+create table migrated_bounds (id int, ts timestamp, d decimal(6,3))
+partitioned by (p int) stored as parquet;
+insert into migrated_bounds partition (p=1) values (1, '2020-01-01 00:00:00', 1.5);
+insert into migrated_bounds partition (p=1) values (2, '2020-06-01 12:00:00', 2.5);
+alter table migrated_bounds change column d d decimal(8,4);
+alter table migrated_bounds convert to iceberg;
+select count(*) from migrated_bounds where p = 1 and ts = '2020-01-01 00:00:00';
+---- TYPES
+BIGINT
+---- RESULTS
+1
+====
+---- QUERY
+select count(*) from migrated_bounds where p = 1 and d = 1.5;
+---- TYPES
+BIGINT
+---- RESULTS
+1
+====
+---- QUERY
+# The bounds of TIMESTAMP and DECIMAL columns are removed, only their value and null
+# counts are kept. So only 'id' has bounds.
+select value_counts, null_value_counts, lower_bounds, upper_bounds
+from $DATABASE.migrated_bounds.`files`;
+---- TYPES
+STRING,STRING,STRING,STRING
+---- RESULTS
+'{1:1,2:1,3:1}','{1:0,2:0,3:0}','{1:"AQAAAA=="}','{1:"AQAAAA=="}'
+'{1:1,2:1,3:1}','{1:0,2:0,3:0}','{1:"AgAAAA=="}','{1:"AgAAAA=="}'
+====
+---- QUERY
+# The bounds of other columns can be wrong too, e.g. in tables migrated by older Impala
+# versions or by other engines. So only predicates on identity partition columns are
+# pushed down to Iceberg for tables that have data files outside of their data location.
+select count(*) from migrated_bounds where p = 1 and id = 100;
+---- TYPES
+BIGINT
+---- RESULTS
+0
+---- RUNTIME_PROFILE
+result-data-files: 2
+skipped-data-files: 0
+====
+---- QUERY
+# Appending data files reloads the table incrementally, which keeps the restriction.
+insert into migrated_bounds values (3, '2021-01-01 00:00:00', 3.5, 1);
+select count(*) from migrated_bounds where p = 1 and id = 100;
+---- TYPES
+BIGINT
+---- RESULTS
+0
+---- RUNTIME_PROFILE
+result-data-files: 3
+skipped-data-files: 0
+====
+---- QUERY
+# Data files of older partition specs don't have partition values for the new partition
+# fields, so their bounds would be used to evaluate predicates on 'id'.
+alter table migrated_bounds set partition spec (p, truncate(10, id));
+select count(*) from migrated_bounds where p = 1 and id = 100;
+---- TYPES
+BIGINT
+---- RESULTS
+0
+---- RUNTIME_PROFILE
+result-data-files: 3
+skipped-data-files: 0
+====
+---- QUERY
+# OPTIMIZE rewrites the imported data files, then every predicate is pushed down again.
+optimize table migrated_bounds;
+select count(*) from migrated_bounds where p = 1 and id = 100;
+---- TYPES
+BIGINT
+---- RESULTS
+0
+---- RUNTIME_PROFILE
+result-data-files: 0
+====
+---- QUERY
+# Data files under 'write.data.path' or the deprecated object storage path are not
+# treated as imported, also if the locations are not fully qualified. The file store is
+# rebuilt on the next full reload.
+create table migrated_locations (id int) partitioned by (p int) stored as parquet;
+insert into migrated_locations partition (p=1) values (1);
+insert into migrated_locations partition (p=1) values (2);
+alter table migrated_locations convert to iceberg;
+alter table migrated_locations set tblproperties (
+    'write.data.path'='/test-warehouse/$DATABASE.db/migrated_locations');
+invalidate metadata migrated_locations;
+select count(*) from migrated_locations where p = 1 and id = 100;
+---- TYPES
+BIGINT
+---- RESULTS
+0
+---- RUNTIME_PROFILE
+result-data-files: 0
+skipped-data-files: 2
+====
+---- QUERY
+alter table migrated_locations unset tblproperties ('write.data.path');
+alter table migrated_locations set tblproperties ('write.object-storage.path'=
+    '$NAMENODE/test-warehouse/$DATABASE.db/migrated_locations');
+invalidate metadata migrated_locations;
+select count(*) from migrated_locations where p = 1 and id = 100;
+---- TYPES
+BIGINT
+---- RESULTS
+0
+---- RUNTIME_PROFILE
+result-data-files: 0
+skipped-data-files: 2
+====
+---- QUERY
+# The root of a file system would match every data file, so it is ignored.
+alter table migrated_locations set tblproperties (
+    'write.object-storage.path'='$NAMENODE');
+invalidate metadata migrated_locations;
+select count(*) from migrated_locations where p = 1 and id = 100;
+---- TYPES
+BIGINT
+---- RESULTS
+0
+---- RUNTIME_PROFILE
+result-data-files: 2
+skipped-data-files: 0
+====

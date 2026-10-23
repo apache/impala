@@ -685,6 +685,9 @@ struct TIcebergContentFileStore {
   // Total number of files in this content file store. Only set in the first partial
   // response (offset 0) so the coordinator knows upfront how many pages to expect.
   11: optional i64 total_file_count
+  // True if some data files are outside of the data location of the table, i.e. they
+  // were imported, e.g. by ALTER TABLE CONVERT TO ICEBERG.
+  12: optional bool has_imported_data_files
 }
 
 // Represents a drop partition request for Iceberg tables

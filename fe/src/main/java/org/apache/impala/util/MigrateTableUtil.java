@@ -22,9 +22,13 @@ import static org.apache.impala.catalog.Table.TBL_PROP_EXTERNAL_TABLE_PURGE;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Maps;
+import java.nio.ByteBuffer;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hive.metastore.IMetaStoreClient;
@@ -33,13 +37,18 @@ import org.apache.hadoop.hive.metastore.api.MetaException;
 import org.apache.hadoop.hive.metastore.api.StorageDescriptor;
 import org.apache.iceberg.AppendFiles;
 import org.apache.iceberg.DataFile;
+import org.apache.iceberg.DataFiles;
 import org.apache.iceberg.FileFormat;
+import org.apache.iceberg.Metrics;
 import org.apache.iceberg.MetricsConfig;
 import org.apache.iceberg.PartitionSpec;
 import org.apache.iceberg.Schema;
 import org.apache.iceberg.Table;
 import org.apache.iceberg.catalog.TableIdentifier;
 import org.apache.iceberg.data.TableMigrationUtil;
+import org.apache.iceberg.types.Type;
+import org.apache.iceberg.types.TypeUtil;
+import org.apache.iceberg.types.Types;
 import org.apache.impala.analysis.TableName;
 import org.apache.impala.catalog.FeFsPartition;
 import org.apache.impala.catalog.FeFsTable;
@@ -232,11 +241,60 @@ public class MigrateTableUtil {
               null, // NameMapping mapping
               params.threadNum_);
 
-      dataFiles.forEach(params.append_::appendFile);
+      for (DataFile dataFile : dataFiles) {
+        params.append_.appendFile(removeUnreliableBounds(dataFile, params));
+      }
     } catch (Exception e) {
       throw new ImpalaRuntimeException(
           "Unable load data files for location: " + location.toString(), e);
     }
+  }
+
+  /**
+   * Returns the ids of the fields whose bounds can't be read from the file footers: the
+   * bounds of TIMESTAMP (with or without time zone) and DECIMAL columns are wrong if
+   * their type in the file doesn't match the Iceberg type, e.g. for INT64 timestamps with
+   * MILLIS unit, or if the type of the column was changed in the Hive table.
+   */
+  private static Set<Integer> getFieldIdsWithUnreliableBounds(Schema schema) {
+    Set<Integer> ret = new HashSet<>();
+    for (Types.NestedField field : TypeUtil.indexById(schema.asStruct()).values()) {
+      Type.TypeID typeId = field.type().typeId();
+      if (typeId == Type.TypeID.TIMESTAMP || typeId == Type.TypeID.DECIMAL) {
+        ret.add(field.fieldId());
+      }
+    }
+    return ret;
+  }
+
+  private static DataFile removeUnreliableBounds(DataFile dataFile, Params params) {
+    Set<Integer> fieldIds = params.fieldIdsWithUnreliableBounds_;
+    if (!hasAnyField(dataFile.lowerBounds(), fieldIds) &&
+        !hasAnyField(dataFile.upperBounds(), fieldIds)) {
+      return dataFile;
+    }
+    Metrics metrics = new Metrics(dataFile.recordCount(), dataFile.columnSizes(),
+        dataFile.valueCounts(), dataFile.nullValueCounts(), dataFile.nanValueCounts(),
+        removeFields(dataFile.lowerBounds(), fieldIds),
+        removeFields(dataFile.upperBounds(), fieldIds));
+    return DataFiles.builder(params.spec_).copy(dataFile).withMetrics(metrics).build();
+  }
+
+  private static boolean hasAnyField(Map<Integer, ByteBuffer> bounds,
+      Set<Integer> fieldIds) {
+    if (bounds == null) return false;
+    for (Integer fieldId : fieldIds) {
+      if (bounds.containsKey(fieldId)) return true;
+    }
+    return false;
+  }
+
+  private static Map<Integer, ByteBuffer> removeFields(Map<Integer, ByteBuffer> bounds,
+      Set<Integer> fieldIds) {
+    if (bounds == null) return null;
+    return bounds.entrySet().stream()
+        .filter(e -> !fieldIds.contains(e.getKey()))
+        .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
   }
 
   private static int getDegreeOfParallelism(TQueryOptions queryOptions) {
@@ -259,6 +317,7 @@ public class MigrateTableUtil {
     final PartitionSpec spec_;
     final Schema schema_;
     final MetricsConfig metricsConfig_;
+    final Set<Integer> fieldIdsWithUnreliableBounds_;
     final int threadNum_;
     final AppendFiles append_;
     final String debugAction_;
@@ -270,6 +329,7 @@ public class MigrateTableUtil {
       spec_ = spec;
       schema_ = schema;
       metricsConfig_ = metricsConfig;
+      fieldIdsWithUnreliableBounds_ = getFieldIdsWithUnreliableBounds(schema);
       threadNum_ = threadNum;
       append_ = append;
       debugAction_ = debugAction;

@@ -458,8 +458,7 @@ public class IcebergFileMetadataLoader extends FileMetadataLoader {
 
     if (incremental) {
       existingFileStore.mergeWithNewFiles(icebergFiles,
-          loader.getLoadedIcebergFds(), loader.getIcebergPartitions(),
-          icebergApiTable.location());
+          loader.getLoadedIcebergFds(), loader.getIcebergPartitions(), icebergApiTable);
       if (outStats != null) outStats.merge(loader.getFileMetadataStats());
       return existingFileStore;
     } else {
