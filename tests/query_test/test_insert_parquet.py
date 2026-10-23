@@ -844,6 +844,37 @@ class TestHdfsParquetTableStatsWriter(ImpalaTestSuite):
     for left, right in zip(orderkey_stats, orderkey_stats[1:]):
       assert left.max <= right.min
 
+  def test_write_statistics_bool_multiple_files(self, vector, unique_database, tmpdir):
+    """IMPALA-15640: Tests that the statistics of BOOLEAN columns only cover the values
+    of their own file when a writer writes several files."""
+    target_table = "test_bool_stats"
+    qualified_target_table = "{0}.{1}".format(unique_database, target_table)
+    hdfs_path = get_fs_path("/test-warehouse/{0}.db/{1}/".format(
+        unique_database, target_table))
+
+    self.execute_query("create table {0} (i int, b boolean, s string) "
+        "stored as parquet".format(qualified_target_table))
+    # The large values of 's' fill a file, so each row is written to a separate file.
+    # The last value is small to avoid an empty file at the end.
+    query = ("insert into {0} select i, b, repeat('x', if(i < 3, 8 * 1024 * 1024, 1)) "
+        "from (values (1 as i, cast(null as boolean) as b), (2, true), (3, false)) v"
+        ).format(qualified_target_table)
+    vector.get_value('exec_option')['num_nodes'] = 1
+    vector.get_value('exec_option')['parquet_file_size'] = 8 * 1024 * 1024
+    self.execute_query(query, vector.get_value('exec_option'))
+
+    row_group_stats = self._get_row_group_stats_from_hdfs_folder(hdfs_path,
+                                                                 tmpdir.strpath)
+    expected_bool_stats = {
+      1: ColumnStats('b', None, None, 1),
+      2: ColumnStats('b', True, True, 0),
+      3: ColumnStats('b', False, False, 0),
+    }
+    assert len(row_group_stats) == 3
+    for i_stats, b_stats, _ in row_group_stats:
+      assert i_stats.min == i_stats.max
+      assert b_stats == expected_bool_stats[i_stats.min]
+
   def test_write_statistics_float_infinity(self, vector, unique_database, tmpdir):
     """Test that statistics for -inf and inf are written correctly."""
     table_name = "test_float_infinity"

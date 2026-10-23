@@ -823,6 +823,12 @@ class HdfsParquetTableWriter::BoolColumnWriter :
     row_group_stats_base_ = &row_group_stats_;
   }
 
+  void Reset() override {
+    BaseColumnWriter::Reset();
+    page_stats_.Reset();
+    row_group_stats_.Reset();
+  }
+
  protected:
   bool ProcessValue(void* value, int64_t* bytes_needed) override {
     bool v = *reinterpret_cast<bool*>(value);
