@@ -20,9 +20,12 @@ package org.apache.impala.planner;
 import com.google.common.base.Joiner;
 
 import com.google.common.base.Preconditions;
+import com.google.common.base.Throwables;
+import com.google.common.collect.Iterables;
 import com.google.common.collect.Lists;
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.nio.charset.CharacterCodingException;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -181,7 +184,7 @@ public class IcebergScanPlanner {
 
   private final long snapshotId_;
 
-  private final InMemoryMetricsReporter metricsReporter_ = new InMemoryMetricsReporter();
+  private InMemoryMetricsReporter metricsReporter_ = new InMemoryMetricsReporter();
 
   // Predicates on columns in this set are always pushed down to Iceberg.
   private final Set<String> columnsWithPushDownHint_ = new HashSet<>();
@@ -238,10 +241,45 @@ public class IcebergScanPlanner {
       return createIcebergScanPlanImpl();
     }
 
-    filterFileDescriptors();
+    try {
+      filterFileDescriptors();
+    } catch (RuntimeException e) {
+      // Iceberg fails to decode string bounds that are not valid UTF-8, e.g. in Parquet
+      // files that were written without the UTF8 annotation and then migrated to Iceberg.
+      // Plan the scan without pushing down predicates in this case. Check the whole cause
+      // chain in case the exception is wrapped.
+      if (impalaIcebergPredicateMapping_.isEmpty() ||
+          !Iterables.any(Throwables.getCausalChain(e),
+              CharacterCodingException.class::isInstance)) {
+        throw e;
+      }
+      LOG.warn("Failed to push down predicates to Iceberg for table {}, planning the " +
+          "scan without them: {}", getIceTable().getFullName(), e.getMessage());
+      discardPushedDownPredicates();
+      return createPlanNodeHelper();
+    }
     filterConjuncts();
     analyzer_.materializeSlots(conjuncts_);
     return createIcebergScanPlanImpl();
+  }
+
+  /**
+   * Resets the state that the conversion of the predicates and the failed
+   * filterFileDescriptors() call set.
+   */
+  private void discardPushedDownPredicates() {
+    impalaIcebergPredicateMapping_.clear();
+    residualExpressions_.clear();
+    untranslatedExpressions_.clear();
+    relaxedExpressions_.clear();
+    nonIdentityConjuncts_ = new ArrayList<>(conjuncts_);
+    dataFilesWithoutDeletes_ = new ArrayList<>();
+    dataFilesWithDeletes_ = new ArrayList<>();
+    positionDeleteFiles_ = new HashSet<>();
+    dataFileToDV_ = new HashMap<>();
+    allEqualityFieldIds_ = new HashSet<>();
+    equalityIdsToDeleteFiles_ = new HashMap<>();
+    metricsReporter_ = new InMemoryMetricsReporter();
   }
 
   /**

@@ -244,3 +244,64 @@ where i = 2 and s = 's'
 ---- TYPES
 INT, STRING
 ====
+---- QUERY
+# Strings written without the UTF8 annotation become binary in the Iceberg metrics of
+# migrated files, and their bounds are truncated to 16 bytes, possibly in the middle of
+# a character. Iceberg fails to decode such bounds as strings, so the scan is planned
+# without pushing down the predicates.
+set parquet_annotate_strings_utf8=false;
+create table migrated_utf8_tbl (s string) partitioned by (p int) stored as parquet;
+insert into migrated_utf8_tbl partition (p=1) values ('中文中文中文');
+alter table migrated_utf8_tbl convert to iceberg;
+select count(*) from migrated_utf8_tbl where p = 1 and s = 'x';
+---- TYPES
+BIGINT
+---- RESULTS
+0
+====
+---- QUERY
+select count(*) from migrated_utf8_tbl where p = 1 and s = '中文中文中文';
+---- TYPES
+BIGINT
+---- RESULTS
+1
+====
+---- QUERY
+# The same with time travel, which always uses Iceberg for planning.
+select count(*) from migrated_utf8_tbl for system_time as of now()
+where p = 1 and s = 'x';
+---- TYPES
+BIGINT
+---- RESULTS
+0
+---- RUNTIME_PROFILE
+result-data-files: 1
+====
+---- QUERY
+# The same with delete files, the state of the failed planning is discarded.
+alter table migrated_utf8_tbl set tblproperties ('format-version'='2');
+insert into migrated_utf8_tbl values ('中文中文中文中文', 1);
+delete from migrated_utf8_tbl where s = '中文中文中文';
+select length(s) from migrated_utf8_tbl where p = 1 and s > 'a';
+---- TYPES
+INT
+---- RESULTS
+24
+====
+---- QUERY
+select length(s) from migrated_utf8_tbl for system_time as of now()
+where p = 1 and s > 'a';
+---- TYPES
+INT
+---- RESULTS
+24
+====
+---- QUERY
+# The same if the predicates are pushed down because of the push down hint.
+alter table migrated_utf8_tbl set tblproperties ('impala.iceberg.push_down_hint'='s');
+select length(s) from migrated_utf8_tbl where s > 'a';
+---- TYPES
+INT
+---- RESULTS
+24
+====

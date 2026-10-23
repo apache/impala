@@ -402,6 +402,11 @@ public class ImpalaHdfsScanRel extends TableScan
     @Override
     public SlotDescriptor getCountStarOptimizationDescriptor(ScanNode scanNode,
         Analyzer analyzer, List<Expr> conjuncts) {
+      // The count star optimization doesn't evaluate the conjuncts. They can remain in
+      // the scan e.g. if Iceberg fails to evaluate the pushed down predicates.
+      Preconditions.checkState(countStarDesc_ == null || conjuncts.isEmpty(),
+          "Count star optimization is not possible with predicates in the scan: %s",
+          conjuncts);
       return countStarDesc_;
     }
 
