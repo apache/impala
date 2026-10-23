@@ -148,8 +148,13 @@ public abstract class FunctionUtils {
     private int typeCompare(Type t1, Type t2) {
       Preconditions.checkState(!t1.isComplexType());
       Preconditions.checkState(!t2.isComplexType());
-      return Integer.compare(t1.getPrimitiveType().ordinal(),
-          t2.getPrimitiveType().ordinal());
+      return Integer.compare(resolutionRank(t1), resolutionRank(t2));
+    }
+
+    // VARIANT is not a scalar type, so getPrimitiveType() returns INVALID_TYPE, which
+    // would sort it before all scalar types. Sort non-scalar types after scalar ones.
+    private static int resolutionRank(Type t) {
+      return t.isScalarType() ? t.getPrimitiveType().ordinal() : Integer.MAX_VALUE;
     }
   }
 }
