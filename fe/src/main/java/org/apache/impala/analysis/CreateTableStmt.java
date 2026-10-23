@@ -209,7 +209,7 @@ public class CreateTableStmt extends StatementBase implements SingleTableStmt {
     List<TColumn> tColumns = new ArrayList<>();
     for (ColumnDef col : getColumnDefs()) {
       TColumn tc = col.toThrift();
-      if (getFileFormat() == THdfsFileFormat.ICEBERG && col.hasDefaultValue()) {
+      if (getFileFormat() == THdfsFileFormat.ICEBERG && col.hasIcebergSchemaDefault()) {
         tc.setIs_iceberg_column(true);
         String defStr = col.getIcebergDefaultValueString();
         tc.setIceberg_initial_default(defStr);
@@ -677,7 +677,7 @@ public class CreateTableStmt extends StatementBase implements SingleTableStmt {
 
     boolean anyColDefaults = false;
     for (ColumnDef col : getColumnDefs()) {
-      if (col.hasDefaultValue()) {
+      if (col.hasIcebergSchemaDefault()) {
         anyColDefaults = true;
         break;
       }
@@ -889,7 +889,7 @@ public class CreateTableStmt extends StatementBase implements SingleTableStmt {
       if (!def.isNullabilitySet()) {
         def.setNullable(true);
       }
-      if (def.hasDefaultValue()) {
+      if (def.hasIcebergSchemaDefault()) {
         IcebergSchemaConverter.validateIcebergDdlDefaultType(def.getType());
       }
     }

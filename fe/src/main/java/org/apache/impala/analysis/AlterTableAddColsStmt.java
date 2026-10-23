@@ -141,12 +141,12 @@ public class AlterTableAddColsStmt extends AlterTableStmt {
           throw new AnalysisException("A new non-null column must have a " +
               "default value: " + c.toString());
         }
-        if (c.hasDefaultValue() && iceTbl.getFormatVersion() < 3) {
+        if (c.hasIcebergSchemaDefault() && iceTbl.getFormatVersion() < 3) {
           throw new AnalysisException(String.format(
               "Adding column with DEFAULT on Iceberg tables requires '%s' >= 3 " +
               "(current: %s).", IcebergTable.FORMAT_VERSION, iceTbl.getFormatVersion()));
         }
-        if (c.hasDefaultValue()) {
+        if (c.hasIcebergSchemaDefault()) {
           IcebergSchemaConverter.validateIcebergDdlDefaultType(c.getType());
         }
       } else if (c.hasKuduOptions()) {
@@ -171,7 +171,7 @@ public class AlterTableAddColsStmt extends AlterTableStmt {
     for (ColumnDef col: columnDefs_) {
       TColumn tCol = col.toThrift();
       // For Iceberg tables, populate default values if applicable.
-      if (isIcebergTable && col.hasDefaultValue()) {
+      if (isIcebergTable && col.hasIcebergSchemaDefault()) {
         String defaultValueStr = col.getIcebergDefaultValueString();
         tCol.setIs_iceberg_column(true);
         tCol.setIceberg_initial_default(defaultValueStr);

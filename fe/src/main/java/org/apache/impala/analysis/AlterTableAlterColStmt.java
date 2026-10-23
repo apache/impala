@@ -105,9 +105,9 @@ public class AlterTableAlterColStmt extends AlterTableStmt {
     TColumn newColThrift = newColDef_.toThrift();
     if (getTargetTable() instanceof FeIcebergTable && isAlterColumnOptionsStmt_) {
       newColThrift.setIs_iceberg_column(true);
-      if (isDropDefault_) {
+      if (isDropDefault_ || newColDef_.isIcebergSqlNullDefault()) {
         newColThrift.setIceberg_drop_write_default(true);
-      } else if (newColDef_.hasDefaultValue()) {
+      } else if (newColDef_.hasIcebergSchemaDefault()) {
         newColThrift.setIceberg_write_default(newColDef_.getIcebergDefaultValueString());
       }
     }
@@ -223,13 +223,18 @@ public class AlterTableAlterColStmt extends AlterTableStmt {
             "is not supported for complex types in Iceberg tables."));
       }
       FeIcebergTable iceTbl = (FeIcebergTable) t;
+      if (!column.isNullable() && !isDropDefault_
+          && newColDef_.isIcebergSqlNullDefault()) {
+        throw new AnalysisException(String.format(
+            "Default value of NULL not allowed on non-nullable column: '%s'", colName_));
+      }
       if (alterColumnSetStmt && iceTbl.getFormatVersion() < 3
           && (isDropDefault_ || newColDef_.hasDefaultValue())) {
         throw new AnalysisException(String.format(
             "ALTER COLUMN SET/DROP DEFAULT on Iceberg tables requires '%s' >= 3 " +
             "(current: %s).", IcebergTable.FORMAT_VERSION, iceTbl.getFormatVersion()));
       }
-      if (alterColumnSetStmt && !isDropDefault_ && newColDef_.hasDefaultValue()) {
+      if (alterColumnSetStmt && newColDef_.hasIcebergSchemaDefault()) {
         IcebergSchemaConverter.validateIcebergDdlDefaultType(newColDef_.getType());
       }
     }

@@ -593,6 +593,33 @@ public class AnalyzeDDLTest extends FrontendTestBase {
   }
 
   @Test
+  public void TestIcebergNullDefault() {
+    String fv3 = "tblproperties ('format-version'='3')";
+    String v1Tbl = "alter table functional_parquet.iceberg_non_partitioned ";
+
+    // DEFAULT NULL on a nullable column is accepted and means no default.
+    AnalyzesOk("create table functional.ice_null_def (i int, s string default null) " +
+        "stored by iceberg " + fv3);
+    AnalyzesOk("create table functional.ice_null_def_int (i int default null) " +
+        "stored by iceberg " + fv3);
+    AnalyzesOk("create table functional.ice_null_def_cast (s string " +
+        "default cast(null as string)) stored by iceberg " + fv3);
+    // No format-version >= 3 requirement since no default is stored.
+    AnalyzesOk("create table functional.ice_null_def_fv2 " +
+        "(i int, s string default null) stored by iceberg");
+    AnalyzesOk(v1Tbl + "add column null_def_col string default null");
+    AnalyzesOk(v1Tbl + "add columns (c string default cast(null as string))");
+    AnalysisError(v1Tbl + "alter column id set default null",
+        "ALTER COLUMN SET/DROP DEFAULT on Iceberg tables requires " +
+        "'format-version' >= 3 (current: 1).");
+
+    // DEFAULT NULL is still rejected on NOT NULL columns.
+    AnalysisError("create table functional.ice_null_def_nn " +
+        "(s string not null default null) stored by iceberg " + fv3,
+        "Default value of NULL not allowed on non-nullable column: 's'");
+  }
+
+  @Test
   public void TestAlterTableAddColumns() {
     AnalyzesOk("alter table functional.alltypes add columns (new_col int)");
     AnalyzesOk("alter table functional.alltypes add columns (NEW_COL int)");

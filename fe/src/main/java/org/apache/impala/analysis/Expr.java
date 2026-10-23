@@ -316,7 +316,7 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
     };
 
   /**
-   * @return true if the expression is a  literal, or a
+   * @return true if the expression is a literal, or a
    * cast of a null (as created by the ConstantFoldingRule.)
    */
   public static final com.google.common.base.Predicate<Expr> IS_LITERAL_VALUE =

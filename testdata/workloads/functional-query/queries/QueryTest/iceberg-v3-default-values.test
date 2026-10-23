@@ -572,6 +572,84 @@ INSERT INTO iceberg_ddl_add_not_null (id, c, d) VALUES (3, NULL, NULL);
 Column 'c' is not nullable but during writing a Parquet page we found 1 null values.
 ====
 ---- QUERY
+# DEFAULT NULL on nullable columns is SQL NULL.
+CREATE TABLE iceberg_null_default_create (i INT, s STRING DEFAULT NULL)
+STORED AS ICEBERG
+TBLPROPERTIES ('format-version'='3');
+INSERT INTO iceberg_null_default_create (i) VALUES (1);
+INSERT INTO iceberg_null_default_create VALUES (2, NULL);
+SELECT i, s, s IS NULL, length(s) FROM iceberg_null_default_create ORDER BY i;
+---- RESULTS
+1,'NULL',true,NULL
+2,'NULL',true,NULL
+---- TYPES
+INT,STRING,BOOLEAN,INT
+====
+---- QUERY
+CREATE TABLE iceberg_null_default_alter (i INT)
+STORED AS ICEBERG
+TBLPROPERTIES ('format-version'='3');
+INSERT INTO iceberg_null_default_alter VALUES (1);
+ALTER TABLE iceberg_null_default_alter ADD COLUMN s STRING DEFAULT NULL;
+ALTER TABLE iceberg_null_default_alter ADD COLUMNS (s2 STRING DEFAULT CAST(NULL AS STRING));
+ALTER TABLE iceberg_null_default_alter ADD COLUMN s3 STRING DEFAULT 'x';
+ALTER TABLE iceberg_null_default_alter ALTER COLUMN s3 SET DEFAULT NULL;
+ALTER TABLE iceberg_null_default_alter ADD COLUMN b BOOLEAN DEFAULT NULL;
+ALTER TABLE iceberg_null_default_alter ALTER COLUMN i SET DEFAULT CAST(NULL AS INT);
+INSERT INTO iceberg_null_default_alter (i) VALUES (2);
+SELECT i, s, s IS NULL, s2, s2 IS NULL, s3, s3 IS NULL, b, b IS NULL
+FROM iceberg_null_default_alter ORDER BY i;
+---- RESULTS
+1,'NULL',true,'NULL',true,'x',false,NULL,true
+2,'NULL',true,'NULL',true,'NULL',true,NULL,true
+---- TYPES
+INT,STRING,BOOLEAN,STRING,BOOLEAN,STRING,BOOLEAN,BOOLEAN,BOOLEAN
+====
+---- QUERY
+# ALTER COLUMN SET DEFAULT NULL is only supported on Iceberg V3 tables.
+ALTER TABLE functional_parquet.iceberg_non_partitioned ALTER COLUMN id SET DEFAULT NULL;
+---- CATCH
+ALTER COLUMN SET/DROP DEFAULT on Iceberg tables requires 'format-version' >= 3 (current: 1).
+====
+---- QUERY
+CREATE TABLE iceberg_null_default_required (i INT NOT NULL)
+STORED AS ICEBERG
+TBLPROPERTIES ('format-version'='3');
+====
+---- QUERY
+# DEFAULT NULL is rejected for a required existing column.
+ALTER TABLE iceberg_null_default_required ALTER COLUMN i SET DEFAULT NULL;
+---- CATCH
+Default value of NULL not allowed on non-nullable column: 'i'
+====
+---- QUERY
+# Non-STRING types: DEFAULT NULL must not be sent as the text 'NULL' to catalogd.
+CREATE TABLE iceberg_null_default_int (i INT DEFAULT NULL, b BOOLEAN DEFAULT CAST(NULL AS BOOLEAN))
+STORED AS ICEBERG
+TBLPROPERTIES ('format-version'='3');
+INSERT INTO iceberg_null_default_int (i) VALUES (1);
+SELECT i, b, b IS NULL FROM iceberg_null_default_int;
+---- RESULTS
+1,NULL,true
+---- TYPES
+INT,BOOLEAN,BOOLEAN
+====
+---- QUERY
+# SET DEFAULT NULL on TIMESTAMP and BINARY columns: no default is stored, so no type
+# validation applies. Only SET DEFAULT with a real value is rejected for these types.
+CREATE TABLE iceberg_null_default_set_ts (i INT, ts TIMESTAMP, b BINARY)
+STORED AS ICEBERG
+TBLPROPERTIES ('format-version'='3');
+ALTER TABLE iceberg_null_default_set_ts ALTER COLUMN ts SET DEFAULT NULL;
+ALTER TABLE iceberg_null_default_set_ts ALTER COLUMN b SET DEFAULT NULL;
+INSERT INTO iceberg_null_default_set_ts (i) VALUES (1);
+SELECT i, ts IS NULL, b IS NULL FROM iceberg_null_default_set_ts;
+---- RESULTS
+1,true,true
+---- TYPES
+INT,BOOLEAN,BOOLEAN
+====
+---- QUERY
 # ALTER COLUMN SET DEFAULT on all scalar types (no defaults at CREATE).
 CREATE TABLE iceberg_ddl_alter_defaults (
   id INT,

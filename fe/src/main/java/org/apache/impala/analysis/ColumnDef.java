@@ -209,6 +209,26 @@ public class ColumnDef {
   public Expr getDefaultValue() { return defaultValue_; }
 
   /**
+   * Returns true if the analyzed DEFAULT is SQL NULL. For Iceberg, this
+   * means no initial-default or write-default in schema metadata.
+   * Must be called after analyze().
+   */
+  public boolean isIcebergSqlNullDefault() {
+    if (!hasDefaultValue()) return false;
+    Preconditions.checkState(outputDefaultValue_ != null,
+        "Column default not analyzed: %s", colName_);
+    return Expr.IS_NULL_VALUE.apply(outputDefaultValue_);
+  }
+
+  /**
+   * Returns true if the column has a non-NULL DEFAULT to store in Iceberg schema
+   * metadata. Must be called after analyze().
+   */
+  public boolean hasIcebergSchemaDefault() {
+    return hasDefaultValue() && !isIcebergSqlNullDefault();
+  }
+
+  /**
    * Returns the analyzed default literal. Must be called after analyze().
    */
   public LiteralExpr getAnalyzedDefaultLiteral() {
