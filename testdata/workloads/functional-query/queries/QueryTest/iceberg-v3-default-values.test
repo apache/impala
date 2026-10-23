@@ -645,6 +645,26 @@ SELECT * FROM iceberg_ddl_drop_add ORDER BY id;
 INT,INT
 ====
 ---- QUERY
+# DROP DEFAULT on TIMESTAMP/BINARY columns whose write-default was set outside Impala.
+# iceberg_v3_all_types metadata has write-defaults on col_timestamp and col_binary.
+# DROP DEFAULT clears write-default only; initial-default remains for TIMESTAMP.
+ALTER TABLE iceberg_v3_all_types ALTER COLUMN col_timestamp DROP DEFAULT;
+ALTER TABLE iceberg_v3_all_types ALTER COLUMN col_binary DROP DEFAULT;
+====
+---- QUERY
+# After DROP DEFAULT, INSERT may omit columns that previously required write-default.
+INSERT INTO iceberg_v3_all_types (
+  id, col_boolean, col_int, col_bigint, col_float, col_double, col_decimal, col_string,
+  col_date)
+VALUES (200, true, 1, 1, 1.0, 1.0, CAST(1.0 AS DECIMAL(10,2)), 'x', CAST('2024-01-01' AS DATE));
+SELECT id, col_timestamp FROM iceberg_v3_all_types WHERE id IN (1, 200) ORDER BY id;
+---- RESULTS
+1,1969-12-31 23:59:59.123456000
+200,NULL
+---- TYPES
+INT,TIMESTAMP
+====
+---- QUERY
 # MERGE INSERT: omitted column with write-default should use write-default, not NULL.
 # iceberg_v3_default_value has columns (i INT, j INT) where j has write-default=-999.
 CREATE TABLE merge_wd_target (i INT, j INT)

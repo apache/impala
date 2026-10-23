@@ -229,7 +229,7 @@ public class AlterTableAlterColStmt extends AlterTableStmt {
             "ALTER COLUMN SET/DROP DEFAULT on Iceberg tables requires '%s' >= 3 " +
             "(current: %s).", IcebergTable.FORMAT_VERSION, iceTbl.getFormatVersion()));
       }
-      if (alterColumnSetStmt && newColDef_.hasDefaultValue()) {
+      if (alterColumnSetStmt && !isDropDefault_ && newColDef_.hasDefaultValue()) {
         IcebergSchemaConverter.validateIcebergDdlDefaultType(newColDef_.getType());
       }
     }

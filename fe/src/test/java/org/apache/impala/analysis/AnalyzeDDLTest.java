@@ -1993,6 +1993,12 @@ public class AnalyzeDDLTest extends FrontendTestBase {
         "default", "Unsupported column option for non-Kudu table: DROP DEFAULT");
     AnalysisError("alter table functional.alltypes_jdbc_datasource alter int_col drop " +
         "default", "Unsupported column option for non-Kudu table: DROP DEFAULT");
+
+    // DROP DEFAULT / SET DEFAULT NULL on TIMESTAMP columns (Kudu).
+    AnalyzesOk("alter table functional_kudu.alltypes alter timestamp_col drop default");
+    AnalyzesOk("alter table functional_kudu.alltypes alter timestamp_col " +
+        "set default null");
+
     // Cannot ALTER TABLE after drop for PAIMON tables.
     AnalysisError("alter table functional_parquet.paimon_partitioned alter int_col" +
             " set comment 'a' ",

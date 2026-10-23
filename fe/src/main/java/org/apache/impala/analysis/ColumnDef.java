@@ -355,7 +355,7 @@ public class ColumnDef {
       }
 
       // TODO: Remove when Impala supports a 64-bit TIMESTAMP type.
-      if (type_.isTimestamp()) {
+      if (type_.isTimestamp() && !Expr.IS_NULL_VALUE.apply(defaultValLiteral)) {
         try {
           long unixTimeMicros = ExprUtil.utcTimestampToUnixTimeMicros(analyzer,
               defaultValLiteral);

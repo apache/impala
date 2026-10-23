@@ -550,6 +550,23 @@ Missing values for column that is not nullable and has no default value new_col2
 alter table kudu_tbl_to_alter alter column new_col1 set default null
 ====
 ---- QUERY
+# DROP DEFAULT and SET DEFAULT NULL on nullable TIMESTAMP columns.
+create table kudu_ts_default (id int primary key, ts timestamp default now()) stored as kudu;
+alter table kudu_ts_default alter column ts drop default;
+insert into kudu_ts_default (id) values (1);
+alter table kudu_ts_default alter column ts set default now();
+insert into kudu_ts_default (id) values (2);
+alter table kudu_ts_default alter column ts set default null;
+insert into kudu_ts_default (id) values (3);
+select id, ts is null from kudu_ts_default;
+---- RESULTS
+1,true
+2,false
+3,true
+---- TYPES
+INT,BOOLEAN
+====
+---- QUERY
 # since new_col1 can't take its default of null, it must have a value specified
 insert into kudu_tbl_to_alter (id, new_col2) values (0, 0)
 ---- RUNTIME_PROFILE
