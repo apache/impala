@@ -44,6 +44,17 @@ under the License.
         The system already tracks specific phases and events for each query and records them in the
         query profile timeline section. By emitting these events to an OTel collector, observability
         systems can track active queries in near real-time.</p>
+      <p>Each query is represented as a single trace containing a root span for the overall query
+        and one or more child spans for the phases of the query lifecycle, such as planning,
+        admission control, and execution. See <xref
+          href="impala_opentelemetry_data_collector.xml">Telemetry data exposed to OTel collector
+          for Impala</xref> for a complete reference of the spans and attributes contained in each
+        trace.</p>
+      <note>Not every client request generates a trace. Queries submitted over the legacy Beeswax
+        protocol and HiveServer2 metadata operations, such as <codeph>GetTables</codeph>
+        or <codeph>GetSchemas</codeph>, are not traced. All other <codeph>SELECT</codeph>
+        queries, DML statements, and DDL statements submitted over HiveServer2 (including
+        HiveServer2 over HTTP) generate traces when OpenTelemetry tracing is enabled.</note>
     </section>
     <section>
       <title>Collected telemetry data</title>
@@ -167,10 +178,75 @@ under the License.
                 to the OTel Collector. (Default: <codeph>true</codeph>)</li>
               <li><codeph>--otel_trace_timeout_s</codeph>- Export timeout threshold in seconds.
                 (Default: <codeph>10</codeph>)</li>
+              <li><codeph>--otel_trace_additional_headers</codeph>- Additional HTTP headers to send
+                with every call to the OTel collector, such as an authentication token. Individual
+                headers are separated by <codeph>:::</codeph>, in the format
+                <codeph>key1=value1:::key2=value2</codeph>. (Default: empty)</li>
               <li><codeph>--otel_debug</codeph>- Set to <codeph>true</codeph> to output additional
-                telemetry debug logs. (Default: <codeph>false</codeph>)</li>
+                telemetry debug logs from the OTel SDK to the Impala log files. (Default:
+                <codeph>false</codeph>)</li>
+            </ul>
+          </li>
+          <li>Configure retry policy flags (Optional) - These flags control how the OTel SDK retries
+            failed export calls to the collector:<ul>
+              <li><codeph>--otel_trace_retry_policy_max_attempts</codeph>- Maximum number of call
+                attempts, including the original attempt. (Default: <codeph>5</codeph>)</li>
+              <li><codeph>--otel_trace_retry_policy_initial_backoff_s</codeph>- Initial backoff
+                delay, in seconds, between retry attempts. (Default: <codeph>1.0</codeph>)</li>
+              <li><codeph>--otel_trace_retry_policy_max_backoff_s</codeph>- Maximum backoff delay,
+                in seconds, between retry attempts. A value of <codeph>0</codeph> or less means no
+                maximum is set. (Default: <codeph>0</codeph>)</li>
+              <li><codeph>--otel_trace_retry_policy_backoff_multiplier</codeph>- Multiplier applied
+                to the backoff delay after each retry attempt. (Default: <codeph>2.0</codeph>)</li>
+            </ul></li>
+          <li>Configure TLS for the collector connection (Optional) - These flags only apply when
+              <codeph>--otel_trace_collector_url</codeph> starts with
+            <codeph>https://</codeph>:<ul>
+              <li><codeph>--otel_trace_ca_cert_path</codeph>- Path to a file containing a bundle of
+                CA certificates used to verify the collector's TLS certificate. Combined with
+                  <codeph>--otel_trace_ca_cert_string</codeph> if both are set.</li>
+              <li><codeph>--otel_trace_ca_cert_string</codeph>- A string containing a bundle of CA
+                certificates, used the same way as <codeph>--otel_trace_ca_cert_path</codeph>.</li>
+              <li><codeph>--otel_trace_tls_minimum_version</codeph>- Minimum TLS version the OTel
+                SDK uses when connecting to the collector, either <codeph>tlsv1.2</codeph> or
+                  <codeph>tlsv1.3</codeph>. If empty, the value of the
+                  <codeph>--ssl_minimum_version</codeph> flag is used.</li>
+              <li><codeph>--otel_trace_ssl_ciphers</codeph>- List of allowed TLS cipher suites when
+                using TLS 1.2. If empty, defaults to the <codeph>--ssl_cipher_list</codeph> startup
+                flag.</li>
+              <li><codeph>--otel_trace_tls_cipher_suites</codeph>- List of allowed TLS cipher suites
+                when using TLS 1.3. If empty, defaults to the <codeph>--tls_ciphersuites</codeph>
+                startup flag.</li>
+              <li><codeph>--otel_trace_tls_insecure_skip_verify</codeph>- Set to
+                  <codeph>true</codeph> to skip verification of the collector's TLS certificate.
+                Only use this for development or testing. (Default: <codeph>false</codeph>)</li>
             </ul></li>
         </ol></p>
+    </section>
+    <section>
+      <title>Propagating trace context from HTTP clients</title>
+      <p>When a query is submitted over HiveServer2 using the HTTP transport (hs2-http), Impala
+        honors the following HTTP request headers to integrate a query's trace into a larger,
+        distributed trace:<ul>
+          <li><codeph>traceparent</codeph>- If a client sends this
+              <xref href="https://www.w3.org/TR/trace-context/" format="html" scope="external">W3C
+              Trace Context</xref> header with a valid <codeph>traceparent</codeph> value, the
+            query's root span is created as a child of the propagated span context instead of as a
+            new root span. This allows a query trace to be linked into an end-to-end trace that
+            originates outside of Impala, such as from a BI tool or application server. If the
+            <codeph>traceparent</codeph> value is invalid, Impala logs a warning and creates
+            a new root trace.</li>
+          <li><codeph>tracestate</codeph>- Optional. This
+              <xref href="https://www.w3.org/TR/trace-context/#tracestate-header" format="html" scope="external">W3C
+              Trace Context</xref> header value is associated with the propagated span context.
+              Only used when a valid <codeph>traceparent</codeph> header is present. Ignored otherwise.
+              </li>
+          <li><codeph>X-Request-Id</codeph>- If present, the header value is recorded as the
+              <codeph>HttpRequestId</codeph> attribute on the root span and on the
+              <codeph>Init</codeph> child span. The Impala Shell appends an iteration count suffix
+            (for example, <codeph>-8</codeph>) to this header when a statement is re-run; Impala
+            strips that suffix before recording the attribute.</li>
+        </ul></p>
     </section>
     <section>
       <title>Limitations</title>
@@ -187,6 +263,12 @@ under the License.
             <dt>Fixed trace data</dt>
             <dd>The traces being sent from Impala are not configurable. This means you cannot
               customize the specific data points included in the traces.</dd>
+          </dlentry>
+          <dlentry>
+            <dt>Beeswax and metadata operations are not traced</dt>
+            <dd>Queries submitted over the legacy Beeswax protocol and HiveServer2 metadata
+              operations (such as <codeph>GetTables</codeph>) never generate a trace, regardless of
+              whether OpenTelemetry tracing is enabled.</dd>
           </dlentry>
         </dl></p>
     </section>

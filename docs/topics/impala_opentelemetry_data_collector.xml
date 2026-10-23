@@ -54,9 +54,16 @@ under the License.
             <row>
               <entry>ClusterId</entry>
               <entry>String</entry>
-              <entry>A string that uniquely identifies a cluster, determined by the value of the
-                  <codeph>--cluster_id</codeph> startup flag.</entry>
+              <entry>A string that uniquely identifies the cluster where the query ran,
+                  determined by the value of the <codeph>--cluster_id</codeph> startup flag.</entry>
               <entry><codeph>impala-1982661901-6j1z</codeph></entry>
+            </row>
+            <row>
+              <entry>Coordinator</entry>
+              <entry>String</entry>
+              <entry>The network address, in <codeph>host:port</codeph> format, of the coordinator
+                that managed the query.</entry>
+              <entry><codeph>coordinator-1.example.com:22000</codeph></entry>
             </row>
             <row>
               <entry>EndTime</entry>
@@ -70,6 +77,14 @@ under the License.
               <entry>A string containing the error message received from the query execution, or an
                 empty string if the query completed successfully.</entry>
               <entry><codeph>Invalid syntax</codeph></entry>
+            </row>
+            <row>
+              <entry>HttpRequestId</entry>
+              <entry>String</entry>
+              <entry>Only present if the query was submitted over HiveServer2 HTTP (hs2-http) with an
+                  <codeph>X-Request-Id</codeph> header. Contains the value of that header, with any
+                Impala Shell iteration count suffix removed.</entry>
+              <entry><codeph>18bb03c8-7de6-11f0-9112-8b736586fd91</codeph></entry>
             </row>
             <row>
               <entry>OriginalQueryId</entry>
@@ -233,6 +248,13 @@ under the License.
                     <entry><codeph>impala-1982661901-6j1z</codeph></entry>
                   </row>
                   <row>
+                    <entry>Coordinator</entry>
+                    <entry>String</entry>
+                    <entry>The network address, in <codeph>host:port</codeph> format, of the
+                      coordinator that managed the query.</entry>
+                    <entry><codeph>coordinator-1.example.com:22000</codeph></entry>
+                  </row>
+                  <row>
                     <entry>DefaultDb</entry>
                     <entry>String</entry>
                     <entry>The name of the default database.</entry>
@@ -257,6 +279,14 @@ under the License.
                     <entry>String</entry>
                     <entry>The Impala query ID.</entry>
                     <entry><codeph>ef403b2690d243be:b960c0ba00000000</codeph></entry>
+                  </row>
+                  <row>
+                    <entry>HttpRequestId</entry>
+                    <entry>String</entry>
+                    <entry>Only present if the query was submitted over HiveServer2 HTTP (hs2-http)
+                      with an <codeph>X-Request-Id</codeph> header. Contains the value of that
+                      header, with any Impala Shell iteration count suffix removed.</entry>
+                    <entry><codeph>18bb03c8-7de6-11f0-9112-8b736586fd91</codeph></entry>
                   </row>
                   <row>
                     <entry>QueryString</entry>
@@ -308,7 +338,7 @@ under the License.
             <row>
               <entry>Name</entry>
               <entry>String</entry>
-              <entry>The name of the span, in the <codeph>{{query_id}} - Init</codeph>
+              <entry>The name of the span, in the <codeph>{{query_id}} - Submitted</codeph>
                 format.</entry>
               <entry><codeph>cdf601fa776431c43:5e59cba4fe284ae22 -
                 Submitted</codeph></entry>
@@ -337,7 +367,7 @@ under the License.
             <row>
               <entry>Name</entry>
               <entry>String</entry>
-              <entry>The name of the span, in the <codeph>{{query_id}} - Init</codeph>
+              <entry>The name of the span, in the <codeph>{{query_id}} - Planning</codeph>
                 format.</entry>
               <entry><codeph>cdf601fa776431c43:5e59cba4fe284ae22 -
                 Planning</codeph></entry>
@@ -426,9 +456,9 @@ under the License.
               <entry>Name</entry>
               <entry>String</entry>
               <entry>The name of the span, in the <codeph>{{query_id}} -
-                  Execution</codeph> format.</entry>
+                  QueryExecution</codeph> format.</entry>
               <entry><codeph>cdf601fa776431c43:5e59cba4fe284ae22 -
-                Execution</codeph></entry>
+                QueryExecution</codeph></entry>
             </row>
             <row>
               <entry>NumDeletedRows</entry>
@@ -478,6 +508,81 @@ under the License.
               <entry>The name of the span, in the <codeph>{{query_id}} - Close</codeph>
                 format.</entry>
               <entry><codeph>cdf601fa776431c43:5e59cba4fe284ae22 - Close</codeph></entry>
+            </row>
+          </tbody>
+        </tgroup>
+      </table>
+    </section>
+    <section>
+      <title>Span events</title>
+      <p>In addition to attributes, Impala adds timestamped events to the currently active child
+        span to mark notable occurrences during that phase of the query lifecycle. Events do not
+        have a duration, only a name and a timestamp.</p>
+      <table frame="all" rowsep="1" colsep="1" id="table_otel_span_events">
+        <tgroup cols="3" colsep="1" rowsep="1">
+          <colspec colnum="1" colname="col1"/>
+          <colspec colnum="2" colname="col2"/>
+          <colspec colnum="3" colname="col3"/>
+          <thead>
+            <row>
+              <entry>Event name</entry>
+              <entry>Span</entry>
+              <entry>Description</entry>
+            </row>
+          </thead>
+          <tbody>
+            <row>
+              <entry>Queued</entry>
+              <entry>AdmissionControl</entry>
+              <entry>The query was placed in an admission control queue because it could not be
+                admitted immediately.</entry>
+            </row>
+            <row>
+              <entry>AllBackendsStarted</entry>
+              <entry>QueryExecution</entry>
+              <entry>All backend fragment instances for the query finished starting up.</entry>
+            </row>
+            <row>
+              <entry>FirstRowFetched</entry>
+              <entry>QueryExecution</entry>
+              <entry>The client fetched the first row of the result set.</entry>
+            </row>
+            <row>
+              <entry>RowsAvailable</entry>
+              <entry>QueryExecution</entry>
+              <entry>The first batch of result rows became available to be fetched.</entry>
+            </row>
+            <row>
+              <entry>LastRowFetched</entry>
+              <entry>QueryExecution</entry>
+              <entry>The client fetched the last row of the result set.</entry>
+            </row>
+            <row>
+              <entry>UpdateCatalogFinished</entry>
+              <entry>QueryExecution</entry>
+              <entry>A DDL statement finished applying its catalog update.</entry>
+            </row>
+            <row>
+              <entry>IcebergRestCatalogCommitFinished</entry>
+              <entry>QueryExecution</entry>
+              <entry>A DML statement against an Iceberg table using a REST catalog finished
+                committing its changes.</entry>
+            </row>
+            <row>
+              <entry>MetastoreUpdateFinished</entry>
+              <entry>QueryExecution</entry>
+              <entry>A DML statement finished updating the Hive Metastore.</entry>
+            </row>
+            <row>
+              <entry>ReleasedAdmissionControlResources</entry>
+              <entry>QueryExecution</entry>
+              <entry>The resources the query held in admission control were released.</entry>
+            </row>
+            <row>
+              <entry>QueryUnregistered</entry>
+              <entry>Close</entry>
+              <entry>The query was unregistered from the coordinator, the final step of the query
+                lifecycle.</entry>
             </row>
           </tbody>
         </tgroup>
