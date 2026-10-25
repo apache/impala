@@ -37,9 +37,9 @@ under the License.
 
     <p>
       <indexterm audience="hidden">Paimon</indexterm>
-      Impala now adds experimental support for Apache Paimon, which is an open table format for realtime lakehouse.
-      With this functionality, you can access any existing Paimon tables using SQL and perform
-      analytics over them. It now supports Hive catalog and Hadoop catalog.
+      Impala adds experimental support for Apache Paimon tables registered in
+      the Hive Metastore. You can create and drop those tables, and query the
+      latest snapshot. Impala supports the Hive catalog and the Hadoop catalog.
     </p>
 
     <p>
@@ -50,40 +50,46 @@ under the License.
   </conbody>
 
   <concept id="paimon_features">
-    <title>Overview of Paimon features</title>
+    <title>Impala support for Paimon tables</title>
   <prolog>
     <metadata>
       <data name="Category" value="Concepts"/>
     </metadata>
   </prolog>
   <conbody>
+    <p>
+      Impala can do the following with a Paimon table:
+    </p>
     <ul>
       <li>
-        <b>Real time updates:</b>
-        <ul>
-          <li>
-            Primary key table supports writing of large-scale updates, has very high update performance,
-            typically through Flink Streaming.
-          </li>
-          <li>
-            Support defining Merge Engines, update records however you like.
-            Deduplicate to keep the last row, or partial-update, or aggregate records, or first-row, you decide.
-          </li>
-        </ul>
+        Create a managed table, or register an existing table with
+        <codeph>CREATE EXTERNAL TABLE</codeph>, using the Hive catalog or the
+        Hadoop catalog.
       </li>
       <li>
-        <b>Data Lake Capabilities:</b>
-        <ul>
-          <li>
-            Scalable metadata: supports storing Petabyte large-scale datasets and storing a large
-            number of partitions.
-          </li>
-          <li>
-            Supports ACID Transactions &amp; Time Travel &amp; Schema Evolution.
-          </li>
-        </ul>
+        Define partitions, a primary key, and fixed buckets when creating a
+        table.
+      </li>
+      <li>
+        Query the latest snapshot with <codeph>SELECT</codeph>, including
+        primary-key tables. The Paimon reader returns the merged rows and
+        applies deletion vectors that are already part of the snapshot.
+      </li>
+      <li>
+        Show the schema, the files in the table, and statistics that are
+        already stored with the table.
+      </li>
+      <li>
+        Drop a managed table, which also deletes its data files, or drop an
+        external table from the Hive Metastore without deleting its files.
       </li>
     </ul>
+    <p>
+      Impala reads tables through the Paimon reader. It does not write rows,
+      change the schema, or select an older snapshot. See
+      <xref href="#impala_paimon/paimon_limitations">Limitations</xref> for the
+      statements Impala rejects.
+    </p>
   </conbody>
   </concept>
 
@@ -98,17 +104,20 @@ under the License.
 
     <conbody>
       <p>
-        When you have an existing Paimon table that is not yet present in the Hive Metastore,
-        you can use the <codeph>CREATE EXTERNAL TABLE</codeph> command in Impala to add the table to the Hive
-        Metastore and make Impala able to interact with this table. Currently Impala supports
-        HadoopCatalog, and HiveCatalog. If you have an existing table in HiveCatalog,
-        and you are using the same Hive Metastore, you need no further actions.
+        When you have an existing Paimon table that is not yet present in the
+        Hive Metastore, you can use the <codeph>CREATE EXTERNAL TABLE</codeph>
+        command in Impala to add the table to the Hive Metastore. Impala
+        supports the Hadoop catalog and the Hive catalog. If the table is
+        already in the Hive catalog and you use the same Hive Metastore, you
+        need no further actions.
       </p>
       <ul>
         <li>
-          <b>HadoopCatalog</b>. A table in HadoopCatalog means that there is a catalog location
-          in the file system under which Paimon tables are stored. Use the following command
-          to add a table in a HadoopCatalog to Impala:
+          <b>HadoopCatalog</b>. A table in the Hadoop catalog is stored under a
+          catalog location in the file system. Set
+          <codeph>paimon.catalog</codeph> to <codeph>hadoop</codeph> and set
+          <codeph>paimon.catalog_location</codeph>. An external table also
+          requires <codeph>paimon.table_identifier</codeph>.
           <codeblock>
 CREATE EXTERNAL TABLE paimon_hadoop_cat
 STORED AS PAIMON
@@ -118,40 +127,103 @@ TBLPROPERTIES('paimon.catalog'='hadoop',
           </codeblock>
         </li>
         <li>
-          <b>HiveCatalog</b>. User can create managed paimon table in HMS like below :
+          <b>HiveCatalog</b>. Omitting <codeph>paimon.catalog</codeph>, or
+          setting it to <codeph>hive</codeph>, uses the Hive catalog. A managed
+          table is created in the Hive Metastore warehouse:
           <codeblock>
-CREATE TABLE paimon_hive_cat(userid INT,movieId INT)
+CREATE TABLE paimon_hive_cat(userid INT, movieId INT)
 STORED AS PAIMON;
           </codeblock>
+          An external Hive-catalog table must set <codeph>LOCATION</codeph>.
+          Do not set <codeph>paimon.catalog_location</codeph> or
+          <codeph>paimon.table_identifier</codeph> on a Hive-catalog table.
+          Any <codeph>paimon.catalog</codeph> value other than
+          <codeph>hadoop</codeph> is treated as the Hive catalog. JDBC and REST
+          catalogs are not supported.
         </li>
       </ul>
       <p>
-        <b>Syntax for creating DDL tables</b>
+        <b>Syntax</b>
         <codeblock>
 CREATE [EXTERNAL] TABLE [IF NOT EXISTS] [db_name.]table_name
 (
 [col_name data_type ,...]
-[PRIMARY KEY (col1,col2)]
+[PRIMARY KEY (col1, col2)]
 )
 [PARTITIONED BY (col_name data_type [COMMENT 'col_comment'], ...)]
 STORED AS PAIMON
 [LOCATION 'hdfs_path']
 [TBLPROPERTIES (
 'primary-key'='col1,col2',
-'file.format' = 'orc/parquet',
-'bucket' = '2',
-'bucket-key' = 'col3',
-]
+'file.format'='parquet',
+'bucket'='2',
+'bucket-key'='col3'
+)]
         </codeblock>
+      </p>
+      <p>
+        Create rules:
       </p>
       <ul>
         <li>
-          <b>Create Partitioned paimon table example:</b>
+          <codeph>PRIMARY KEY (col1, col2)</codeph> and the
+          <codeph>primary-key</codeph> table property are equivalent. Do not
+          specify both. Every name must be a column of the table.
+        </li>
+        <li>
+          Declare partitions with <codeph>PARTITIONED BY</codeph>. The
+          <codeph>partition</codeph> table property is rejected.
+        </li>
+        <li>
+          Fixed buckets use the <codeph>bucket</codeph> and
+          <codeph>bucket-key</codeph> table properties. Every bucket-key name
+          must be a column of the table. <codeph>CLUSTERED BY</codeph> is
+          rejected.
+        </li>
+        <li>
+          <codeph>file.format</codeph> is <codeph>parquet</codeph> or
+          <codeph>orc</codeph>. When the property is omitted, Impala does not
+          set it and Paimon uses its default file format.
+        </li>
+        <li>
+          Unless <codeph>deletion-vectors.enabled</codeph> or
+          <codeph>full-compaction.delta-commits</codeph> is already set, Impala
+          sets <codeph>deletion-vectors.enabled</codeph> to
+          <codeph>true</codeph>.
+        </li>
+        <li>
+          Other table properties are stored as Paimon schema options.
+          <codeph>SHOW CREATE TABLE</codeph> hides
+          <codeph>storage_handler</codeph>, <codeph>primary-key</codeph>, and
+          <codeph>partition</codeph>, and prints the primary key as a
+          <codeph>PRIMARY KEY</codeph> clause.
+        </li>
+        <li>
+          A managed table must list its columns. Impala does not infer the
+          schema of a managed table. Creating a managed table fails when the
+          location already contains a Paimon schema.
+        </li>
+        <li>
+          An external table may omit the column list. Impala then reads the
+          schema from the existing Paimon table. If the statement lists columns
+          and a Paimon schema is found, that schema replaces the columns in the
+          statement. If no schema is found and columns are listed, Impala
+          creates a new Paimon table at the location.
+        </li>
+        <li>
+          Setting <codeph>external.table.purge</codeph> to
+          <codeph>true</codeph> is rejected for both managed and external
+          tables. A Paimon table cannot be cached in HDFS.
+        </li>
+      </ul>
+      <ul>
+        <li>
+          <b>Partitioned table:</b>
           <codeblock>
 CREATE TABLE support_partitioned_by_table2 (
 user_id BIGINT COMMENT 'The user_id field',
 item_id BIGINT COMMENT 'The item_id field',
-behavior STRING COMMENT 'The behavior field',
+behavior STRING COMMENT 'The behavior field'
 )
 PARTITIONED BY (
 dt STRING COMMENT 'The dt field',
@@ -161,7 +233,7 @@ STORED AS PAIMON;
           </codeblock>
         </li>
         <li>
-          <b>Create Partitioned paimon table example with primary key:</b>
+          <b>Partitioned table with a primary key:</b>
           <codeblock>
 CREATE TABLE test_create_managed_part_pk_paimon_table (
 user_id BIGINT COMMENT 'The user_id field',
@@ -179,7 +251,7 @@ TBLPROPERTIES (
           </codeblock>
         </li>
         <li>
-          <b>Create Partitioned paimon table example with bucket:</b>
+          <b>Table with buckets:</b>
           <codeblock>
 CREATE TABLE test_create_managed_bucket_paimon_table (
 user_id BIGINT COMMENT 'The user_id field',
@@ -188,19 +260,25 @@ behavior STRING COMMENT 'The behavior field'
 )
 STORED AS PAIMON
 TBLPROPERTIES (
-'bucket' = '4',
+'bucket'='4',
 'bucket-key'='behavior'
 );
           </codeblock>
         </li>
         <li>
-        <b>Create External paimon table example with no column definitions:</b>
-        <p>For external table creation, user can ignore column definitions, impala will infer schema from underlying paimon
-        table. for example:</p>
+          <b>External table with no column definitions:</b>
+          <p>
+            For an external table, you can omit the column definitions. Impala
+            infers the schema from the underlying Paimon table. For an external
+            Hive-catalog table, <codeph>LOCATION</codeph> is required. A Hadoop
+            catalog table uses <codeph>paimon.catalog_location</codeph> and
+            <codeph>paimon.table_identifier</codeph> instead of
+            <codeph>LOCATION</codeph>.
+          </p>
           <codeblock>
 CREATE EXTERNAL TABLE ext_paimon_table
 STORED AS PAIMON
-[LOCATION 'underlying_paimon_table_location']
+LOCATION 'underlying_paimon_table_location';
           </codeblock>
         </li>
       </ul>
@@ -211,19 +289,84 @@ STORED AS PAIMON
     <title>Dropping Paimon tables</title>
     <conbody>
       <p>
-        One can use <codeph>DROP TABLE</codeph> statement to remove an Paimon table:
+        Use <codeph>DROP TABLE</codeph> to remove a Paimon table:
         <codeblock>
 DROP TABLE test_create_managed_bucket_paimon_table;
         </codeblock>
       </p>
       <p>
-        When <codeph>external.table.purge</codeph> table property is set to true, then the
-        <codeph>DROP TABLE</codeph> statement will also delete the data files. This property
-        is set to true when Impala creates the Paimon table via <codeph>CREATE TABLE</codeph>.
-        When <codeph>CREATE EXTERNAL TABLE</codeph> is used (the table already exists in some
-        catalog) then this <codeph>external.table.purge</codeph> is set to false, i.e.
-        <codeph>DROP TABLE</codeph> doesn't remove any files, only the table definition
-        in HMS.
+        <codeph>DROP TABLE</codeph> on a managed Paimon table removes the Hive
+        Metastore entry and deletes the data files in the table directory.
+        <codeph>DROP TABLE</codeph> on an external Paimon table removes only
+        the Hive Metastore entry. <codeph>DROP TABLE ... PURGE</codeph> also
+        deletes the data files of an external table. If an external table
+        already has <codeph>external.table.purge</codeph> set to
+        <codeph>true</codeph> in the Hive Metastore, <codeph>DROP TABLE</codeph>
+        deletes the data files as well. Impala rejects that property when it
+        creates the table.
+      </p>
+    </conbody>
+  </concept>
+
+  <concept id="paimon_query">
+    <title>Querying Paimon tables</title>
+    <conbody>
+      <p>
+        <codeph>SELECT</codeph> reads the latest snapshot. Impala does not
+        accept <codeph>FOR SYSTEM_TIME AS OF</codeph> or
+        <codeph>FOR SYSTEM_VERSION AS OF</codeph> on a Paimon table.
+      </p>
+      <p>
+        For a primary-key table, the scan returns one merged row per key. It
+        does not return the raw changelog. Deletion vectors that belong to the
+        snapshot are applied by the Paimon reader. Impala projects the scalar
+        columns referenced by the query.
+      </p>
+      <p>
+        <codeph>WHERE</codeph>, joins, <codeph>ORDER BY</codeph>,
+        <codeph>LIMIT</codeph>, and <codeph>COUNT(*)</codeph> are evaluated by
+        Impala. Predicates, including predicates on partition columns, are
+        applied after the scan. Impala does not push predicates into the Paimon
+        reader and does not prune partitions while planning the scan.
+      </p>
+      <p>
+        An existing table that has <codeph>ARRAY</codeph>, <codeph>MAP</codeph>,
+        or <codeph>STRUCT</codeph> columns still loads, and its other columns
+        can be queried. Reading a complex column fails.
+        Since <codeph>EXPAND_COMPLEX_TYPES</codeph> defaults to
+        <codeph>true</codeph>, so <codeph>SELECT *</codeph> expands those
+        columns and fails too. List the scalar columns, or run
+        <codeph>SET EXPAND_COMPLEX_TYPES=false</codeph> as a workaround to
+        query the table without expanding the complex columns.
+        <codeph>CREATE TABLE</codeph> rejects these column types. Virtual
+        columns such as <codeph>INPUT__FILE__NAME</codeph> are not available.
+      </p>
+    </conbody>
+  </concept>
+
+  <concept id="paimon_metadata">
+    <title>Metadata statements</title>
+    <conbody>
+      <p>
+        <codeph>DESCRIBE</codeph> and <codeph>SHOW CREATE TABLE</codeph> show
+        the schema Impala loaded from the Paimon table.
+        <codeph>SHOW CREATE TABLE</codeph> prints a primary key as a
+        <codeph>PRIMARY KEY</codeph> clause.
+      </p>
+      <p>
+        <codeph>SHOW FILES</codeph> lists the data files and deletion files in
+        the latest snapshot, including each file's path, size, partition, and
+        erasure-coding policy. <codeph>SHOW FILES ... PARTITION(...)</codeph>
+        is not accepted.
+      </p>
+      <p>
+        <codeph>SHOW TABLE STATS</codeph>, <codeph>SHOW COLUMN STATS</codeph>,
+        and <codeph>SHOW PARTITIONS</codeph> display statistics already stored
+        with the Paimon table. Impala does not compute new statistics.
+        <codeph>COMPUTE STATS</codeph> and <codeph>DROP STATS</codeph> are
+        rejected. <codeph>SHOW PARTITIONS</codeph> requires a partitioned table.
+        Column statistics for <codeph>DECIMAL</codeph>, <codeph>DATE</codeph>,
+        and <codeph>TIMESTAMP</codeph> columns are not imported.
       </p>
     </conbody>
   </concept>
@@ -233,13 +376,15 @@ DROP TABLE test_create_managed_bucket_paimon_table;
     <conbody>
 
       <p>
-        You can get information about the supported Paimon data types in
-        <xref href="https://paimon.apache.org/docs/1.1/concepts/data-types/" scope="external" format="html">
+        You can get information about the Paimon data types in
+        <xref href="https://paimon.apache.org/docs/1.3/concepts/data-types/" scope="external" format="html">
           the Paimon spec</xref>.
+        Impala can create and query the primitive types in the table below.
+        <codeph>CREATE TABLE</codeph> rejects every other type.
       </p>
 
       <p>
-        The Paimon data types can be mapped to the following SQL types in Impala:
+        The Paimon data types map to the following SQL types in Impala:
         <table rowsep="1" colsep="1" id="paimon_types_sql_types">
           <tgroup cols="2">
             <colspec colname="c1" colnum="1"/>
@@ -265,7 +410,7 @@ DROP TABLE test_create_managed_bucket_paimon_table;
               </row>
               <row>
                 <entry>INT</entry>
-                <entry>INTEGER</entry>
+                <entry>INT</entry>
               </row>
               <row>
                 <entry>BIGINT</entry>
@@ -292,24 +437,24 @@ DROP TABLE test_create_managed_bucket_paimon_table;
                 <entry>TIMESTAMP</entry>
               </row>
               <row>
-                <entry>TIMESTAMP(*WITH*TIMEZONE)</entry>
-                <entry>Not Supported</entry>
+                <entry>TIMESTAMP_LTZ</entry>
+                <entry>TIMESTAMP</entry>
               </row>
               <row>
                 <entry>CHAR(N)</entry>
-                <entry>CHAR(N)</entry>
+                <entry>CHAR(N), or STRING when N is greater than 255</entry>
               </row>
               <row>
                 <entry>VARCHAR(N)</entry>
-                <entry>VARCHAR(N)</entry>
+                <entry>VARCHAR(N), or STRING when N is greater than 65535</entry>
               </row>
               <row>
-                <entry>BINARY(N)</entry>
-                <entry>BINARY(N)</entry>
+                <entry>BINARY</entry>
+                <entry>BINARY</entry>
               </row>
               <row>
-                <entry>VARBINARY(N)</entry>
-                <entry>BINARY(N)</entry>
+                <entry>VARBINARY</entry>
+                <entry>BINARY</entry>
               </row>
               <row>
                 <entry>DATE</entry>
@@ -317,35 +462,67 @@ DROP TABLE test_create_managed_bucket_paimon_table;
               </row>
               <row>
                 <entry>TIME</entry>
-                <entry>Not Supported</entry>
+                <entry>Not supported</entry>
               </row>
               <row>
-                <entry>Not Supported</entry>
-                <entry>DATETIME</entry>
+                <entry>MULTISET</entry>
+                <entry>Not supported</entry>
               </row>
               <row>
-                <entry>MULTISET&lt;t&gt;</entry>
-                <entry>Not Supported</entry>
+                <entry>ARRAY</entry>
+                <entry>Not supported</entry>
               </row>
               <row>
-                <entry>ARRAY&lt;t&gt;</entry>
-                <entry>Not Supported For Now</entry>
+                <entry>MAP</entry>
+                <entry>Not supported</entry>
               </row>
               <row>
-                <entry>MAP&lt;t&gt;</entry>
-                <entry>Not Supported For Now</entry>
-              </row>
-              <row>
-                <entry>ROW&lt;n1 t1,n2 t2&gt;</entry>
-                <entry>Not Supported For Now</entry>
+                <entry>ROW</entry>
+                <entry>Not supported</entry>
               </row>
             </tbody>
           </tgroup>
         </table>
       </p>
       <p>
-      note: the unsupported type for paimon and impala is noted as "Not Supported".
-      The item noted 'Not Supported for Now' will be supported later.
+        <codeph>CREATE TABLE</codeph> writes an Impala
+        <codeph>TIMESTAMP</codeph> column as a Paimon
+        <codeph>TIMESTAMP</codeph> without a time zone. That value is read as
+        stored, in UTC, with no conversion to the query time zone. An existing
+        <codeph>TIMESTAMP_LTZ</codeph> column, which is a timestamp with local
+        time zone, is converted to the query's local time zone. Both are
+        returned as an Impala <codeph>TIMESTAMP</codeph>.
+        <codeph>ARRAY</codeph>, <codeph>MAP</codeph>, and
+        <codeph>ROW</codeph> columns cannot be created. An existing table that
+        already has them can be loaded, as described under
+        <xref href="#impala_paimon/paimon_query">Querying Paimon tables</xref>.
+      </p>
+    </conbody>
+  </concept>
+
+  <concept id="paimon_limitations">
+    <title>Limitations</title>
+    <conbody>
+      <p>
+        Impala rejects the following statements on a Paimon table:
+      </p>
+      <ul>
+        <li><codeph>INSERT</codeph> and <codeph>INSERT OVERWRITE</codeph></li>
+        <li><codeph>UPDATE</codeph>, <codeph>DELETE</codeph>, and
+          <codeph>MERGE</codeph></li>
+        <li><codeph>TRUNCATE TABLE</codeph> and <codeph>LOAD DATA</codeph></li>
+        <li><codeph>CREATE TABLE AS SELECT</codeph> and
+          <codeph>CREATE TABLE LIKE</codeph></li>
+        <li><codeph>ALTER TABLE</codeph>, including
+          <codeph>ALTER TABLE RENAME</codeph></li>
+        <li><codeph>COMPUTE STATS</codeph> and <codeph>DROP STATS</codeph></li>
+        <li><codeph>FOR SYSTEM_TIME AS OF</codeph>,
+          <codeph>FOR SYSTEM_VERSION AS OF</codeph>, and
+          <codeph>DESCRIBE HISTORY</codeph></li>
+      </ul>
+      <p>
+        Impala also does not provide predicate pushdown, partition pruning,
+        HDFS caching, or a JDBC or REST catalog for Paimon tables.
       </p>
     </conbody>
   </concept>
