@@ -120,6 +120,35 @@ target_link_libraries(impalad
   ${IMPALA_LINK_LIBS}
 )
 
+# Deployments of statestored, catalogd, and admissiond using Docker often have
+# constrained memory. If these daemons exceed their memory limit, they can be
+# evicted. Using gperftools with aggressive memory decommit helps here because
+# it returns unused memory immediately. When building against Google TCMalloc,
+# also build an impalad linked against gperftools. It is only used by the
+# statestored, catalogd, and admissiond Docker images, so it is not included
+# in the daemons target.
+if (USING_GOOGLE_TCMALLOC)
+  add_executable(impalad_gperftools
+    daemon-main.cc
+  )
+  set_target_properties(impalad_gperftools PROPERTIES LINK_FLAGS -rdynamic)
+  target_link_libraries(impalad_gperftools
+    ${JAVA_JSIG_LIBRARY}
+    ${IMPALA_LINK_LIBS_NO_MALLOC}
+    MallocUtilGperftools
+  )
+else()
+  # The Docker build is expecting an impalad_gperftools binary to be available.
+  # For builds that don't use Google TCMalloc, add a symlink from impalad_gperftools
+  # to the regular impalad binary so that impalad_gperftools is always available.
+  set(IMPALAD_GPERFTOOLS_SYMLINK ${EXECUTABLE_OUTPUT_PATH}/impalad_gperftools)
+  add_custom_command(
+    OUTPUT ${IMPALAD_GPERFTOOLS_SYMLINK}
+    COMMAND ${CMAKE_COMMAND} -E create_symlink impalad ${IMPALAD_GPERFTOOLS_SYMLINK}
+    DEPENDS impalad)
+  add_custom_target(impalad_gperftools DEPENDS ${IMPALAD_GPERFTOOLS_SYMLINK})
+endif()
+
 install(FILES ${STATESTORED_SYMLINK} DESTINATION ${IMPALA_INSTALLDIR}/sbin)
 install(FILES ${CATALOGD_SYMLINK} DESTINATION ${IMPALA_INSTALLDIR}/sbin)
 install(FILES ${ADMISSIOND_SYMLINK} DESTINATION ${IMPALA_INSTALLDIR}/sbin)

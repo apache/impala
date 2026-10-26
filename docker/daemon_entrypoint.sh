@@ -186,4 +186,12 @@ else
 fi
 echo "LC_ALL: ${LC_ALL}"
 
+# glibc's use of RSEQ conflicts with Google TCMalloc's use, so disable glibc's RSEQ
+# functionality. More details are available at
+# https://github.com/google/tcmalloc/issues/144
+# IMPALA_MALLOC_IMPL is set by the impala_base image.
+if [[ "${IMPALA_MALLOC_IMPL:-}" == "googletcmalloc" ]]; then
+  export GLIBC_TUNABLES="${GLIBC_TUNABLES:+${GLIBC_TUNABLES}:}glibc.pthread.rseq=0"
+fi
+
 exec "$@"

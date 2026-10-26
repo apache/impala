@@ -81,13 +81,13 @@ export USE_AVRO_CPP=${USE_AVRO_CPP:=false}
 # moving to a different build of the toolchain, e.g. when a version is bumped or a
 # compile option is changed. The build id can be found in the output of the toolchain
 # build jobs, it is constructed from the build number and toolchain git hash prefix.
-export IMPALA_TOOLCHAIN_BUILD_ID_AARCH64=249-03f5d471df
-export IMPALA_TOOLCHAIN_BUILD_ID_X86_64=723-03f5d471df
+export IMPALA_TOOLCHAIN_BUILD_ID_AARCH64=255-82ccbd4808
+export IMPALA_TOOLCHAIN_BUILD_ID_X86_64=731-82ccbd4808
 export IMPALA_TOOLCHAIN_REPO=\
 ${IMPALA_TOOLCHAIN_REPO:-https://github.com/cloudera/native-toolchain.git}
 export IMPALA_TOOLCHAIN_BRANCH=${IMPALA_TOOLCHAIN_BRANCH:-master}
 export IMPALA_TOOLCHAIN_COMMIT_HASH=\
-${IMPALA_TOOLCHAIN_COMMIT_HASH-03f5d471df62d9d9d8d7ea9e2c04f8efe27c9e63}
+${IMPALA_TOOLCHAIN_COMMIT_HASH-82ccbd48087b4f6c5b711ddb18af4740cf2e9c92}
 # Compare the build ref in build IDs by removing everything up-to-and-including the
 # first hyphen.
 if [ "${IMPALA_TOOLCHAIN_BUILD_ID_AARCH64#*-}" \
@@ -115,7 +115,7 @@ else
   export IMPALA_AVRO_VERSION=1.7.4-p5
 fi
 unset IMPALA_AVRO_URL
-export IMPALA_ABSEIL_CPP_VERSION=20260526.0
+export IMPALA_ABSEIL_CPP_VERSION=20260817.0-p1
 unset IMPALA_ABSEIL_CPP_URL
 export IMPALA_BINUTILS_VERSION=2.46.1
 unset IMPALA_BINUTILS_URL
@@ -695,9 +695,9 @@ export IMPALA_MINIMAL_DEBUG_INFO=${IMPALA_MINIMAL_DEBUG_INFO-false}
 export IMPALA_COMPRESSED_DEBUG_INFO=${IMPALA_COMPRESSED_DEBUG_INFO-true}
 export IMPALA_SPLIT_DEBUG_INFO=${IMPALA_SPLIT_DEBUG_INFO-false}
 
-# Set preferred malloc implementation, default to gperftools
-# The other option is googletcmalloc.
-export IMPALA_MALLOC_IMPL=${IMPALA_MALLOC_IMPL:-gperftools}
+# Set preferred malloc implementation, default to googletcmalloc
+# The other option is gperftools.
+export IMPALA_MALLOC_IMPL=${IMPALA_MALLOC_IMPL:-googletcmalloc}
 
 # Download and use the CDH components from S3. It can be useful to set this to false if
 # building against a custom local build using HIVE_SRC_DIR_OVERRIDE,

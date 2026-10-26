@@ -774,7 +774,8 @@ endif()
 # FE (for tests) the jvm has already made allocations before tcmalloc can be loaded. In
 # all other binaries, we can use tcmalloc except the address sanitizer build. Address
 # sanitizer is incompatible with tcmalloc (they both intercept malloc/free)
-set (IMPALA_LINK_LIBS_NO_TCMALLOC ${IMPALA_LINK_LIBS} MallocUtilLibc)
+set (IMPALA_LINK_LIBS_NO_MALLOC ${IMPALA_LINK_LIBS})
+set (USING_GOOGLE_TCMALLOC OFF)
 if ("${CMAKE_BUILD_TYPE}" STREQUAL "ADDRESS_SANITIZER" OR
     "${CMAKE_BUILD_TYPE}" STREQUAL "TSAN" OR
     "${CMAKE_BUILD_TYPE}" STREQUAL "TSAN_FULL")
@@ -784,15 +785,9 @@ elseif("$ENV{IMPALA_MALLOC_IMPL}" STREQUAL "gperftools")
   set (IMPALA_LINK_LIBS ${IMPALA_LINK_LIBS} MallocUtilGperftools)
   set (UNIFIED_TEST_LINK_LIBS ${UNIFIED_TEST_LINK_LIBS} MallocUtilGperftools)
 elseif("$ENV{IMPALA_MALLOC_IMPL}" STREQUAL "googletcmalloc")
-  # Our Clang is too old to build with Google TCMalloc, so use gperftools
-  # for this configuration. This only impacts Clang Tidy and UBSAN builds.
-  if ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang")
-    set (IMPALA_LINK_LIBS ${IMPALA_LINK_LIBS} MallocUtilGperftools)
-    set (UNIFIED_TEST_LINK_LIBS ${UNIFIED_TEST_LINK_LIBS} MallocUtilGperftools)
-  else()
-    set (IMPALA_LINK_LIBS ${IMPALA_LINK_LIBS} MallocUtilGoogleTcmalloc)
-    set (UNIFIED_TEST_LINK_LIBS ${UNIFIED_TEST_LINK_LIBS} MallocUtilGoogleTcmalloc)
-  endif()
+  set (IMPALA_LINK_LIBS ${IMPALA_LINK_LIBS} MallocUtilGoogleTcmalloc)
+  set (UNIFIED_TEST_LINK_LIBS ${UNIFIED_TEST_LINK_LIBS} MallocUtilGoogleTcmalloc)
+  set (USING_GOOGLE_TCMALLOC ON)
 else()
   message(FATAL_ERROR "Unknown IMPALA_MALLOC_IMPL: $ENV{IMPALA_MALLOC_IMPL}")
 endif()
@@ -801,7 +796,7 @@ endif()
 # version otherwise the dynamic support libraries will pickup the static libhdfs.a
 # library. The result will not compile as libhdfs.a is not compiled with -fpic. The same
 # is true for other system dependencies that we don't have control over.
-set(IMPALA_LINK_LIBS_DYNAMIC_TARGETS ${IMPALA_LINK_LIBS_NO_TCMALLOC})
+set(IMPALA_LINK_LIBS_DYNAMIC_TARGETS ${IMPALA_LINK_LIBS_NO_MALLOC} MallocUtilLibc)
 list(REMOVE_ITEM IMPALA_LINK_LIBS_DYNAMIC_TARGETS hdfs)
 set(IMPALA_LINK_LIBS_DYNAMIC_TARGETS ${IMPALA_LINK_LIBS_DYNAMIC_TARGETS}
   ${HDFS_SHARED_LIB})

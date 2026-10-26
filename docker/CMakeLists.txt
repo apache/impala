@@ -75,9 +75,10 @@ endif()
 
 
 if (NOT ${DISTRO_BASE_IMAGE} STREQUAL "UNSUPPORTED")
-  # Add a target to build a base docker image for 'build_type'. 'build_context_args' are
-  # passed to the setup_build_context.py script.
-  function(add_base_image build_type build_context_args install_os_packages_args)
+  # Add a target to build a base docker image for 'build_type' with 'malloc_impl'.
+  # 'build_context_args' are passed to the setup_build_context.py script.
+  function(add_base_image build_type malloc_impl build_context_args
+      install_os_packages_args)
     # Build context depends on daemons and frontend jars.
     # Sending the whole impala workspace including test binaries, testdata, etc
     # to the docker daemon can be very expensive, so we create a build context
@@ -85,7 +86,8 @@ if (NOT ${DISTRO_BASE_IMAGE} STREQUAL "UNSUPPORTED")
     add_custom_target(impala_base_build_context_${build_type}
       COMMAND ${CMAKE_SOURCE_DIR}/docker/setup_build_context.py ${build_context_args}
               --output-dir ${IMPALA_BASE_BUILD_CONTEXT_DIR}/${build_type}
-      DEPENDS daemons java ${CMAKE_SOURCE_DIR}/docker/setup_build_context.py
+      DEPENDS daemons impalad_gperftools java
+              ${CMAKE_SOURCE_DIR}/docker/setup_build_context.py
       COMMENT "Creating impala base build context build_type=${build_type}."
       VERBATIM
     )
@@ -97,7 +99,8 @@ if (NOT ${DISTRO_BASE_IMAGE} STREQUAL "UNSUPPORTED")
       COMMAND tar cvh . -C ${CMAKE_SOURCE_DIR}/docker/impala_base/ . |
               ${DOCKER_BUILD} -t impala_base_${build_type}
                 --build-arg BASE_IMAGE=${DISTRO_BASE_IMAGE}
-                --build-arg INSTALL_OS_PACKAGES_ARGS=${install_os_packages_args} -
+                --build-arg INSTALL_OS_PACKAGES_ARGS=${install_os_packages_args}
+                --build-arg MALLOC_IMPL=${malloc_impl} -
       WORKING_DIRECTORY ${IMPALA_BASE_BUILD_CONTEXT_DIR}/${build_type}
       DEPENDS impala_base_build_context_${build_type} ${CMAKE_SOURCE_DIR}/docker/impala_base/Dockerfile
       DEPENDS ${CMAKE_SOURCE_DIR}/docker/daemon_entrypoint.sh
@@ -107,11 +110,32 @@ if (NOT ${DISTRO_BASE_IMAGE} STREQUAL "UNSUPPORTED")
       VERBATIM
     )
   endfunction()
-  add_base_image(release "" "--install-debug-tools basic")
-  add_base_image(release_java21 "" "--install-debug-tools basic --java 21")
-  # Debug images include full debug tools
-  add_base_image(debug "--debug-build" "--install-debug-tools full")
-  add_base_image(debug_java21 "--debug-build" "--install-debug-tools full --java 21")
+
+  # Add the base images for one Java variant. 'java_suffix' is "" for the default Java
+  # version or "_javaN" for a specific version, and 'java_args' selects that version in
+  # install_os_packages.sh.
+  function(add_base_images java_suffix java_args)
+    # The regular base images use the regular impalad binary built with the default malloc
+    # (IMPALA_MALLOC_IMPL, or the sanitizer allocator for sanitizer builds).
+    add_base_image(release${java_suffix} "$ENV{IMPALA_MALLOC_IMPL}" ""
+      "--install-debug-tools basic${java_args}")
+    # Debug images include full debug tools
+    add_base_image(debug${java_suffix} "$ENV{IMPALA_MALLOC_IMPL}" "--debug-build"
+      "--install-debug-tools full${java_args}")
+
+    # Statestored, catalogd, and admissiond benefit from being able to use aggressive
+    # decommit to minimize memory overhead. Since Google TCMalloc doesn't have a direct
+    # equivalent, these stick with an impalad binary built against gperftools for now.
+    add_base_image(release${java_suffix}_gperftools "gperftools"
+      "--malloc-impl=gperftools" "--install-debug-tools basic${java_args}")
+    # Note: to pass multiple arguments to setup_build_context.py, we need to specify
+    # them as a semicolon-separated CMake list.
+    add_base_image(debug${java_suffix}_gperftools "gperftools"
+      "--debug-build;--malloc-impl=gperftools" "--install-debug-tools full${java_args}")
+  endfunction()
+  add_base_images("" "")
+  add_base_images("_java21" " --java 21")
+
   # Target to build all docker images. Dependencies are added for each docker image
   # instantiated below.
   add_custom_target(docker_images)
@@ -145,7 +169,10 @@ if (NOT ${DISTRO_BASE_IMAGE} STREQUAL "UNSUPPORTED")
   # Add debug and release docker image targets for the given daemon e.g. if called
   # with "statestored", targets "statestored_image" and "statestored_debug_image"
   # are added.
-  function(add_daemon_docker_images daemon_name)
+  # 'malloc_variant' is a suffix (either "" or "_gperftools") appended to the build
+  # type. This determines the base image name passed through to
+  # add_daemon_docker_image().
+  function(add_daemon_docker_images daemon_name malloc_variant)
     set(release_image ${daemon_name})
     set(release_target ${daemon_name}_image)
     set(release_java21_image ${daemon_name}_java21)
@@ -154,10 +181,14 @@ if (NOT ${DISTRO_BASE_IMAGE} STREQUAL "UNSUPPORTED")
     set(debug_target ${daemon_name}_debug_image)
     set(debug_java21_image ${daemon_name}_debug_java21)
     set(debug_java21_target ${daemon_name}_debug_java21_image)
-    add_daemon_docker_image(${release_target} ${daemon_name} ${release_image} release)
-    add_daemon_docker_image(${release_java21_target} ${daemon_name} ${release_java21_image} release_java21)
-    add_daemon_docker_image(${debug_target} ${daemon_name} ${debug_image} debug)
-    add_daemon_docker_image(${debug_java21_target} ${daemon_name} ${debug_java21_image} debug_java21)
+    add_daemon_docker_image(${release_target} ${daemon_name} ${release_image}
+      "release${malloc_variant}")
+    add_daemon_docker_image(${release_java21_target} ${daemon_name} ${release_java21_image}
+      "release_java21${malloc_variant}")
+    add_daemon_docker_image(${debug_target} ${daemon_name} ${debug_image}
+      "debug${malloc_variant}")
+    add_daemon_docker_image(${debug_java21_target} ${daemon_name} ${debug_java21_image}
+      "debug_java21${malloc_variant}")
     ADD_DEPENDENCIES(docker_images ${release_target})
     ADD_DEPENDENCIES(docker_java21_images ${release_java21_target})
     ADD_DEPENDENCIES(docker_debug_images ${debug_target})
@@ -166,13 +197,14 @@ if (NOT ${DISTRO_BASE_IMAGE} STREQUAL "UNSUPPORTED")
     set(exported_image_names "${exported_image_names}" PARENT_SCOPE)
   endfunction()
 
-  # Stamp out image targets for all of the Impala daemons.
-  add_daemon_docker_images(impalad_coord_exec)
-  add_daemon_docker_images(impalad_coordinator)
-  add_daemon_docker_images(impalad_executor)
-  add_daemon_docker_images(catalogd)
-  add_daemon_docker_images(statestored)
-  add_daemon_docker_images(admissiond)
+  # Stamp out image targets for all of the Impala daemons. The statestored, catalogd,
+  # and admissiond images use gperftools malloc for its aggressive decommit mode.
+  add_daemon_docker_images(impalad_coord_exec "")
+  add_daemon_docker_images(impalad_coordinator "")
+  add_daemon_docker_images(impalad_executor "")
+  add_daemon_docker_images(catalogd "_gperftools")
+  add_daemon_docker_images(statestored "_gperftools")
+  add_daemon_docker_images(admissiond "_gperftools")
 
   # Quickstart is only supported on Ubuntu, so skip generating the Quickstart targets
   # on other distributions.

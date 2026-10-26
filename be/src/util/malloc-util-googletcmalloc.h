@@ -146,7 +146,11 @@ class GoogleTcmallocMallocUtil : public MallocUtil {
     // Verify that it is using the per-CPU caches. For now, error out if it isn't,
     // as that indicates a misconfiguration.
     if (!tcmalloc::MallocExtension::PerCpuCachesActive()) {
-      return Status("Google TCMalloc is not using the per-CPU cache mode.");
+      return Status("Google TCMalloc is not using the per-CPU cache mode. "
+          "This can happen when there is a conflict with glibc's RSEQ usage. "
+          "Setting GLIBC_TUNABLES=glibc.pthread.rseq=0 may fix this error. If it is "
+          "already set, check that the kernel supports RSEQ (Linux 4.18+) and that "
+          "no seccomp or sandbox policy blocks the rseq syscall.");
     }
 
     // Set the per-CPU cache size
@@ -316,7 +320,7 @@ private:
     DCHECK(tcmalloc::MallocExtension::NeedsProcessBackgroundActions());
     // Never returns:
     tcmalloc::MallocExtension::ProcessBackgroundActions();
-    DCHECK(false) << "TCMalloc ProcessBackgroundActions() should not return.";
+    CHECK(false) << "TCMalloc ProcessBackgroundActions() should not return.";
   }
 };
 

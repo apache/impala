@@ -169,7 +169,12 @@ Impala is divided into several components:
   source files named `*-test.cc`.
   Example (default `debug` build type):
   `be/src/runtime/mem-pool-test.cc` -> `be/build/debug/runtime/mem-pool-test`
-  Run the binary directly.
+  MUST run the binary through `${IMPALA_HOME}/bin/run-jvm-binary.sh`, which sets
+  `LD_LIBRARY_PATH`, `CLASSPATH`, and the other environment variables the binaries
+  need (including disabling glibc's RSEQ so it doesn't conflict with Google TCMalloc).
+  Running the binary directly can fail at startup.
+  Example:
+  `${IMPALA_HOME}/bin/run-jvm-binary.sh be/build/debug/runtime/mem-pool-test`
 - Run Java JUnit tests with Maven from the `fe` directory:
   `mvn test -Dtest="<target_test>"`
   `<target_test>` is either a class name or `ClassName#testMethod`.

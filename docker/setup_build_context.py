@@ -33,6 +33,9 @@ parser.add_argument("--debug-build", help="Setup build context for debug build",
 parser.add_argument("--utility-context",
                     help="Setup utility build context instead of daemon",
                     action="store_true")
+parser.add_argument("--malloc-impl", choices=["googletcmalloc", "gperftools"],
+                    default="googletcmalloc",
+                    help="Use the impalad binary built with this malloc implementation")
 parser.add_argument("--output-dir", help="Directory to use for output")
 args = parser.parse_args()
 
@@ -99,23 +102,34 @@ for lib_dir in TARGET_LIB_DIRS:
   os.mkdir(lib_dir)
 
 
-def symlink_file_into_dir(src_file, dst_dir):
-  """Helper to symlink 'src_file' into 'dst_dir'."""
-  os.symlink(src_file, os.path.join(dst_dir, os.path.basename(src_file)))
+def symlink_file_into_dir(src_file, dst_dir, filename=None):
+  """Helper to symlink 'src_file' into 'dst_dir'. If 'filename' is given, it is used
+  as the destination filename."""
+  if filename:
+    name = filename
+  else:
+    name = os.path.basename(src_file)
+  os.symlink(src_file, os.path.join(dst_dir, name))
 
 
-def symlink_file_into_dirs(src_file, dst_dirs):
-  """Helper to symlink 'src_file' into all dirs in 'dst_dirs'."""
+def symlink_file_into_dirs(src_file, dst_dirs, filename=None):
+  """Helper to symlink 'src_file' into all dirs in 'dst_dirs'. If 'filename' is given,
+  it is used as the destination filename."""
   for dst_dir in dst_dirs:
-    symlink_file_into_dir(src_file, dst_dir)
+    symlink_file_into_dir(src_file, dst_dir, filename=filename)
 
 
-def strip_debug_symbols(src_file, dst_dirs):
+def strip_debug_symbols(src_file, dst_dirs, filename=None):
   """Strips debug symbols from the given 'src_file' and writes the output to the given
-  'dst_dirs', with the same file name as the 'src_file'."""
+  'dst_dirs'. If 'filename' is given, it is used as the destination filename. Otherwise,
+  it uses the same name as the 'src_file'."""
+  if filename:
+    name = filename
+  else:
+    name = os.path.basename(src_file)
   for dst_dir in dst_dirs:
     check_call([STRIP, "--strip-debug", src_file, "-o",
-        os.path.join(dst_dir, os.path.basename(src_file))])
+        os.path.join(dst_dir, name)])
 
 # Impala binaries and native dependencies.
 
@@ -130,11 +144,17 @@ if args.utility_context:
   else:
     strip_debug_symbols(PROFILE_TOOL_BINARY, [BIN_DIR])
 else:
-  IMPALAD_BINARY = os.path.join(IMPALA_HOME, "be/build", BUILD_TYPE, "service/impalad")
-  if args.debug_build:
-    symlink_file_into_dir(IMPALAD_BINARY, BIN_DIR)
+  SERVICE_BUILD_DIR = os.path.join(IMPALA_HOME, "be/build", BUILD_TYPE, "service")
+  if args.malloc_impl == "gperftools":
+    impalad_binary = os.path.join(SERVICE_BUILD_DIR, "impalad_gperftools")
   else:
-    strip_debug_symbols(IMPALAD_BINARY, [BIN_DIR])
+    impalad_binary = os.path.join(SERVICE_BUILD_DIR, "impalad")
+
+  # The binary is always called "impalad" regardless of the malloc implementation.
+  if args.debug_build:
+    symlink_file_into_dir(impalad_binary, BIN_DIR, filename="impalad")
+  else:
+    strip_debug_symbols(impalad_binary, [BIN_DIR], filename="impalad")
 
 # Add libstc++ binaries to LIB_DIR. Strip debug symbols for release builds.
 found_libstdcpp_so = False

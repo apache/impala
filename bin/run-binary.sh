@@ -28,7 +28,7 @@ set -euo pipefail
 # glibc's RSEQ functionality. More details are available at
 # https://github.com/google/tcmalloc/issues/144
 if [[ "${IMPALA_MALLOC_IMPL}" == "googletcmalloc" ]]; then
-  export GLIBC_TUNABLES=glibc.pthread.rseq=0
+  export GLIBC_TUNABLES="${GLIBC_TUNABLES:+${GLIBC_TUNABLES}:}glibc.pthread.rseq=0"
 fi
 
 # LLVM must be on path to symbolise sanitiser stack traces.

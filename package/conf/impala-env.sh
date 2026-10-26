@@ -53,3 +53,8 @@ export JAVA_TOOL_OPTIONS=${JAVA_TOOL_OPTIONS:-}
 : ${CATALOGD_ERRFILE:="/tmp/catalogd.err"}
 : ${ADMISSIOND_ERRFILE:="/tmp/admissiond.err"}
 : ${STATESTORED_ERRFILE:="/tmp/statestored.err"}
+
+# glibc's use of RSEQ conflicts with Google TCMalloc's use, so disable
+# glibc's RSEQ functionality. More details are available at
+# https://github.com/google/tcmalloc/issues/144
+export GLIBC_TUNABLES="${GLIBC_TUNABLES:+${GLIBC_TUNABLES}:}glibc.pthread.rseq=0"

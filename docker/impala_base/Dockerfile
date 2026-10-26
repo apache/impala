@@ -41,6 +41,15 @@ RUN groupadd -r impala -g 1000 && useradd --no-log-init -r -u 1000 -g 1000 impal
     chmod ugo+w /etc/passwd
 USER impala
 
+# The malloc implementation of the binary ("googletcmalloc" or "gperftools").
+# daemon_entrypoint.sh uses this to set up a compatible environment.
+ARG MALLOC_IMPL
+RUN if [ -z "${MALLOC_IMPL}" ]; then \
+      echo "ERROR: MALLOC_IMPL build arg must be set and non-empty" >&2; \
+      exit 1; \
+    fi
+ENV IMPALA_MALLOC_IMPL=${MALLOC_IMPL}
+
 # Copy build artifacts required for the daemon processes. The daemon images are
 # responsible for copying in the required jar files, as each daemon has a different
 # set of jar dependencies.
