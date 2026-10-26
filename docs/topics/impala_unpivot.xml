@@ -1,0 +1,200 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+Licensed to the Apache Software Foundation (ASF) under one
+or more contributor license agreements.  See the NOTICE file
+distributed with this work for additional information
+regarding copyright ownership.  The ASF licenses this file
+to you under the Apache License, Version 2.0 (the
+"License"); you may not use this file except in compliance
+with the License.  You may obtain a copy of the License at
+
+  http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing,
+software distributed under the License is distributed on an
+"AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+KIND, either express or implied.  See the License for the
+specific language governing permissions and limitations
+under the License.
+-->
+<!DOCTYPE concept PUBLIC "-//OASIS//DTD DITA Concept//EN" "concept.dtd">
+<concept rev="5.0" id="impala_unpivot">
+  <title>UNPIVOT Clause</title>
+  <prolog>
+    <metadata>
+      <data name="Category" value="Impala"/>
+      <data name="Category" value="SQL"/>
+      <data name="Category" value="Querying"/>
+      <data name="Category" value="Developers"/>
+      <data name="Category" value="Data Analysts"/>
+    </metadata>
+  </prolog>
+  <conbody>
+    <p>The <codeph>UNPIVOT</codeph> clause transforms structured data sets by
+      merging multiple columns into a single data column while generating a
+      corresponding header column for the original source attributes.</p>
+    <p>The <codeph>UNPIVOT</codeph> clause is a query operator that allows you to
+      reorganize data by merging multiple columns from a table into a single
+      data column. This process creates a more normalized result set by rotating
+      columns into rows, making the data easier to aggregate or analyze.</p>
+    <p>When you apply the <codeph>UNPIVOT</codeph> clause to a table reference,
+      the following changes occur:<ul>
+        <li>The query engine merges specified <codeph>UNPIVOT</codeph> columns
+          from the source table into a single data column.</li>
+        <li>The result table includes a new header column that identifies the
+          original source column for every row.</li>
+        <li>All original columns that are not part of the
+          <codeph>UNPIVOT</codeph> definition are retained in the result
+          set.</li>
+        <li>For each row in the source table, the operation generates one row in
+          the result table for every specified unpivot column.</li>
+      </ul></p>
+    <p conref="../shared/impala_common.xml#common/syntax_blurb"/>
+    <p>The following syntax block shows the structure of a
+      <codeph>UNPIVOT</codeph> operation:<codeblock>SELECT <varname>columns</varname> FROM <varname>table_name</varname>
+UNPIVOT (
+<varname>data_column</varname> FOR <varname>header_column</varname> IN (
+  <varname>column_x</varname> [AS <varname>label_x</varname>],
+  <varname>column_y</varname> [AS <varname>label_y</varname>], ...)
+) [AS] <varname>result_alias</varname>;</codeblock></p>
+    <note type="note">
+      <p>The <varname>result_alias</varname> is mandatory. Only the
+      <codeph>AS</codeph> keyword is optional.</p>
+    </note>
+    <note type="note">
+      <p>The <varname>table_name</varname> in the <codeph>FROM</codeph> clause
+      must reference a table, view, or WITH clause directly. Subqueries and
+      table aliases are not supported on the <codeph>UNPIVOT</codeph> source. The
+      following are syntax errors:</p>
+      <ul>
+        <li><codeph>SELECT * FROM (SELECT ...) s UNPIVOT (...) AS t;</codeph> -
+          subquery as source</li>
+        <li><codeph>SELECT * FROM tbl s UNPIVOT (...) AS t;</codeph> - table with
+          alias</li>
+      </ul>
+    </note>
+    <p conref="../shared/impala_common.xml#common/usage_notes_blurb"/>
+    <p>When you use the <codeph>UNPIVOT</codeph> clause, keep the following details in
+      mind:</p>
+    <ul>
+      <li>The <codeph>AS</codeph> clause in the <codeph>IN</codeph> list is
+        optional. Without <codeph>AS</codeph>, the column name becomes the label
+        as a string. With <codeph>AS</codeph>, the label can be any literal
+        value (string, number, or other literal), but all labels in the same
+        <codeph>UNPIVOT</codeph> clause must be literals of the same data type.
+        If labels have different data types, the query fails with the error
+        <msgph>Expressions for the UNPIVOT header column should have the same
+        type</msgph>. Multiple columns can have the same label, but the same
+        column cannot be listed more than once in the <codeph>IN</codeph>
+        clause.</li>
+      <li>You cannot directly resolve or select the original source columns after
+        performing the <codeph>UNPIVOT</codeph> operation.</li>
+      <li>Rows are generated for <codeph>NULL</codeph> values as well, so the
+        data column contains <codeph>NULL</codeph> for them. Unlike some other
+        databases, Impala has no <codeph>INCLUDE NULLS</codeph> or
+        <codeph>EXCLUDE NULLS</codeph> option. To drop rows with <codeph>NULL</codeph>
+        values in the data column, add
+        <codeph>WHERE <varname>data_column</varname> IS NOT NULL</codeph> to the
+        query.</li>
+    </ul>
+    <p conref="../shared/impala_common.xml#common/example_blurb"/>
+    <p>The following example shows a <codeph>UNPIVOT</codeph> operation that
+      merges two <codeph>INT</codeph> columns into one. The source is a
+      temporary table defined in a <codeph>WITH</codeph> clause:
+      <codeblock>WITH t1 (a, v1, v2) AS (
+  VALUES (1, 2, 3), (4, 5, 6)
+)
+SELECT * FROM t1 UNPIVOT (
+  c FOR b IN (v1 AS 'v1', v2 AS 'v2')
+) AS t;
+
++---+---+----+
+| a | c | b  |
++---+---+----+
+| 1 | 2 | v1 |
+| 1 | 3 | v2 |
+| 4 | 5 | v1 |
+| 4 | 6 | v2 |
++---+---+----+</codeblock></p>
+    <p>In this example:</p>
+    <ul>
+      <li>The <codeph>WITH</codeph> clause defines a temporary table
+        <codeph>t1</codeph> with three columns: <codeph>a</codeph>,
+        <codeph>v1</codeph>, and <codeph>v2</codeph>.</li>
+      <li>The <codeph>UNPIVOT</codeph> clause merges the unpivot columns
+        <codeph>v1</codeph> and <codeph>v2</codeph> into a single data column
+        <codeph>c</codeph>.</li>
+      <li>The header column <codeph>b</codeph> contains the string labels
+        <codeph>'v1'</codeph> or <codeph>'v2'</codeph> to indicate the source of
+        the data for each row.</li>
+      <li>Column <codeph>a</codeph> is retained in the result because it is not
+        part of the <codeph>UNPIVOT</codeph> definition.</li>
+      <li>The result set contains one row for each combination of the original
+        row and each unpivot column.</li>
+    </ul>
+    <p conref="../shared/impala_common.xml#common/added_in_50"/>
+    <p><b>Limitations:</b></p>
+    <p><b>Mismatched data types</b></p>
+    <p>All <codeph>UNPIVOT</codeph> columns must share an identical data
+      type.</p>
+    <p><b>Workaround:</b> Cast the columns to the same data type in a Common
+      Table Expression (CTE), then apply <codeph>UNPIVOT</codeph> to the
+      CTE.</p>
+    <p>Run the following query to align data types:</p>
+    <codeblock>WITH t1 (a, v1, v2) AS (
+   VALUES (1, 2, 3.0)
+), t1_casted AS (
+   SELECT
+       a,
+       CAST(v1 AS DECIMAL(2, 1)) AS v1,
+       CAST(v2 AS DECIMAL(2, 1)) AS v2
+   FROM t1
+)
+SELECT * FROM t1_casted UNPIVOT (
+   c FOR b IN (v1 AS 'v1', v2 AS 'v2')
+) AS t;
+
++---+-----+----+
+| a | c   | b  |
++---+-----+----+
+| 1 | 2.0 | v1 |
+| 1 | 3.0 | v2 |
++---+-----+----+
+Fetched 2 row(s) in 0.11s</codeblock>
+    <p><b>Path expression duplication</b></p>
+    <p>Each <codeph>UNPIVOT</codeph> clause must use a unique path expression
+      because Impala does not support duplicate path expressions across multiple
+      <codeph>UNPIVOT</codeph> clauses in the same query block.</p>
+    <p><b>Workaround:</b> Define a CTE over one of the tables, and use it as the
+      source of one of the <codeph>UNPIVOT</codeph> clauses. The
+      <codeph>UNPIVOT</codeph> source cannot be a subquery, only a table, view,
+      or CTE.</p>
+    <p>Run the following query to isolate the path expressions:</p>
+    <codeblock>WITH table_same_path AS (
+   SELECT month FROM functional_parquet.alltypestiny
+)
+SELECT t1.b, t1.c, t2.b, t2.c
+FROM table_same_path UNPIVOT (
+   c FOR b IN (month AS 'm')
+) AS t1, functional_parquet.alltypestiny UNPIVOT (
+   c FOR b IN (month AS 'm')
+) AS t2
+WHERE t1.c = 1 AND t1.c = t2.c;
+
++---+---+---+---+
+| b | c | b | c |
++---+---+---+---+
+| m | 1 | m | 1 |
+| m | 1 | m | 1 |
+| m | 1 | m | 1 |
+| m | 1 | m | 1 |
++---+---+---+---+
+Fetched 4 row(s) in 0.11s</codeblock>
+    <p><b>Nested fields in the IN list</b></p>
+    <p>Each item in the <codeph>IN</codeph> list must be a top-level column
+      name. Struct fields like <codeph>s.f1</codeph> cannot be listed
+      directly.</p>
+    <p><b>Workaround:</b> Select the field into a new column in a CTE, then list
+      that column in the <codeph>IN</codeph> list.</p>
+  </conbody>
+</concept>
