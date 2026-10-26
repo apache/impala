@@ -260,7 +260,7 @@ public class IcebergSchemaConverter {
         case DOUBLE:
           return Literal.of(((NumericLiteral) expr).getDoubleValue());
         case STRING:
-          return Literal.of(((StringLiteral) expr).getUnescapedValue());
+          return Literal.of(((StringLiteral) expr).unescapeIfNeeded());
         case DECIMAL:
           return Literal.of(((NumericLiteral) expr).getValue());
         case DATE:

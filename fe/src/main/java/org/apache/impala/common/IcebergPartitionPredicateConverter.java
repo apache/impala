@@ -79,7 +79,7 @@ public class IcebergPartitionPredicateConverter extends IcebergPredicateConverte
         || op == Operation.IN || op == Operation.NOT_IN;
     if (isIdentityTerm && isEqualityOp
         && IcebergUtil.isIdentityPartitionedInAllSpecs(table_, term.referencedColumn_)) {
-      return UUID.fromString(literal.getUnescapedValue());
+      return UUID.fromString(getBackendString(literal));
     }
     throw new ImpalaRuntimeException(
         "UUID values can only be used with =, !=, IN or NOT IN on columns that are " +

@@ -25,6 +25,8 @@ import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import org.apache.iceberg.Schema;
 import org.apache.iceberg.expressions.And;
 import org.apache.iceberg.expressions.Expression;
@@ -61,6 +63,8 @@ import org.slf4j.LoggerFactory;
 public class IcebergPredicateConverter {
   private static final Logger LOG =
       LoggerFactory.getLogger(IcebergPredicateConverter.class);
+  private static final Pattern VERBATIM_STARTS_WITH_PATTERN =
+      Pattern.compile("([^%_]*)%+");
   private final Schema schema_;
   private final Analyzer analyzer_;
   // Ids of the fields that are the sources of partition fields.
@@ -392,6 +396,15 @@ public class IcebergPredicateConverter {
     try {
       Operation op = getOperation(predicate);
 
+      // Iceberg's ResidualEvaluator throws on NULL partition values in startsWith() and
+      // notStartsWith(). Iceberg's partition filter drops NULL partitions before that
+      // only if no NOT or OR above the LIKE can make the filter true for them.
+      if (!op.equals(Operation.AND) && predicate.contains(LikePredicate.class)) {
+        return new ConverterResult(ConversionStatus.FAILED, String.format(
+            "LIKE under NOT or OR cannot be pushed down to Iceberg: %s",
+            predicate.toSql()));
+      }
+
       Expr leftExpr = predicate.getChild(0);
       ConverterResult leftResult = convertExpr(leftExpr);
 
@@ -401,8 +414,15 @@ public class IcebergPredicateConverter {
       }
 
       if (op.equals(Operation.NOT)) {
+        // NOT of a relaxed expression is stricter than NOT of the original predicate,
+        // e.g. NOT startsWith(s, 'a') would skip 'axc' for NOT (s LIKE 'a%b').
+        if (leftResult.isPartiallyConverted()) {
+          return new ConverterResult(ConversionStatus.FAILED, String.format(
+              "NOT of a partially converted predicate cannot be pushed down to " +
+              "Iceberg: %s", predicate.toSql()));
+        }
         Expression iceExpr = Expressions.not(leftResult.getIcebergExpression());
-        return new ConverterResult(iceExpr, leftResult.getStatus());
+        return new ConverterResult(iceExpr, ConversionStatus.FULLY_CONVERTED);
       }
 
       Expr rightExpr = predicate.getChild(1);
@@ -446,35 +466,6 @@ public class IcebergPredicateConverter {
   }
 
   /**
-   * Checks if there's any literal (non-wildcard) content after the given position.
-   * This determines if a pattern like 'd%d' has content after the first wildcard.
-   * Only unescaped % and _ are considered non-literal.
-   *
-   * @param pattern The pattern string from StringLiteral.getUnescapedValue()
-   * @param afterPos Position to check after (exclusive)
-   * @return True if there's any literal content after afterPos
-   */
-  static boolean hasLiteralContentAfterWildcard(String pattern, int afterPos) {
-    for (int i = afterPos + 1; i < pattern.length(); i++) {
-      char c = pattern.charAt(i);
-
-      // Check if this is a wildcard
-      if (c == '%' || c == '_') {
-        // If escaped, it's literal content
-        if (isWildcardEscaped(pattern, i)) {
-          return true;
-        }
-        // Unescaped wildcard, continue checking
-        continue;
-      }
-
-      // Any non-wildcard character is literal content
-      return true;
-    }
-    return false;
-  }
-
-  /**
    * Finds the position of the first unescaped wildcard (% or _) in the pattern.
    * Wildcards can be escaped with '\', e.g., 'asd\%' has no unescaped wildcard.
    *
@@ -496,44 +487,66 @@ public class IcebergPredicateConverter {
   }
 
   /**
-   * Removes backslash escapes from LIKE wildcards in the pattern.
-   *
-   * Background: When Impala parses SQL LIKE 'test\%value',
-   * StringLiteral.getUnescapedValue() preserves LIKE-specific escape sequences
-   * and returns the Java string "test\\%value" (backslash followed by %). This
-   * method converts it to "test%value" (literal %) for Iceberg, which doesn't
-   * use backslash escaping.
-   *
-   * Example:
-   *   Input: "test\\%value" (from SQL: LIKE 'test\%value')
-   *   Output: "test%value" (literal % for Iceberg equal())
-   *
-   * @param pattern The pattern string from StringLiteral.getUnescapedValue()
-   * @param endPos Position to stop processing, or -1 to process entire string
-   * @return Pattern with LIKE escape sequences removed
+   * Returns the prefix if the backend matches 'pattern' verbatim with a starts-with
+   * check (starts_with_re in LikePredicate::OptimizeConstantPatternMatch()): a run of
+   * characters other than '%' and '_' followed by one or more '%', not ending in '\%'.
+   * Backslashes in the prefix are literal. Returns null for other patterns.
    */
-  static String unescapeLikePattern(String pattern, int endPos) {
+  static String getVerbatimStartsWithPrefix(String pattern) {
+    Matcher matcher = VERBATIM_STARTS_WITH_PATTERN.matcher(pattern);
+    if (!matcher.matches() || endsWithEscapedWildcard(pattern)) return null;
+    return matcher.group(1);
+  }
+
+  /**
+   * Mirrors the backend's ends_with_escaped_wildcard RE2 check ".*\\%$". RE2's '.' does
+   * not match '\n', so the check is false for patterns that contain a newline.
+   */
+  private static boolean endsWithEscapedWildcard(String pattern) {
+    return pattern.endsWith("\\%") && pattern.indexOf('\n') == -1;
+  }
+
+  /**
+   * Returns the literal string that pattern[0, endPos) matches when the backend converts
+   * the pattern to a regex (LikePredicate::ConvertLikePattern()): a backslash escapes
+   * the next character, and a trailing lone backslash is dropped. The range must not
+   * contain unescaped wildcards.
+   *
+   * @param pattern The pattern string from getBackendString()
+   * @param endPos Position to stop processing, or -1 to process entire string
+   */
+  static String getRegexLiteral(String pattern, int endPos) {
     int len = (endPos == -1) ? pattern.length() : endPos;
     StringBuilder sb = new StringBuilder(len);
 
     for (int i = 0; i < len; i++) {
       char c = pattern.charAt(i);
-
-      if (c == '\\' && i + 1 < pattern.length()) {
-        char next = pattern.charAt(i + 1);
-        // Unescape LIKE wildcards: \% -> %, \_ -> _
-        // Also handle escaped backslash: \\ -> \
-        if (next == '%' || next == '_' || next == '\\') {
-          sb.append(next);
-          i++; // Skip the next character as we've already processed it
-          continue;
+      if (c == '\\') {
+        if (i + 1 < len) {
+          sb.append(pattern.charAt(i + 1));
+          i++;
         }
+        continue;
       }
-
       sb.append(c);
     }
 
     return sb.toString();
+  }
+
+  /**
+   * Returns true if, in the backend's regex conversion, the unescaped wildcard at
+   * wildcardPos and everything after it only match "any suffix": all characters are
+   * '%', except for an optional trailing lone backslash, which the backend drops.
+   */
+  static boolean matchesAnySuffixFrom(String pattern, int wildcardPos) {
+    for (int i = wildcardPos; i < pattern.length(); i++) {
+      char c = pattern.charAt(i);
+      if (c == '%') continue;
+      if (c == '\\' && i == pattern.length() - 1) continue;
+      return false;
+    }
+    return true;
   }
 
   protected ConverterResult convert(LikePredicate predicate) {
@@ -546,14 +559,15 @@ public class IcebergPredicateConverter {
       }
 
       Term term = getTerm(predicate.getChild(0));
-      IcebergColumn column = term.referencedColumn_;
-
-      // Check if the column is a string type
-      if (!column.getType().isStringType()) {
+      // In partition statements the term can be a transform, e.g. truncate(3, s).
+      Type termType = predicate.getChild(0).getType();
+      if (!termType.isStringType()) {
         return new ConverterResult(ConversionStatus.FAILED,
-            String.format("LIKE predicate pushdown only supports string columns, got: %s",
-                column.getType()));
+            String.format("LIKE predicate pushdown only supports strings, got: %s",
+                termType));
       }
+      @SuppressWarnings("unchecked")
+      UnboundTerm<String> ref = (UnboundTerm<String>) (UnboundTerm<?>) term.term_;
 
       LiteralExpr literal = getSecondChildAsLiteralExpr(predicate);
       checkNullLiteral(literal);
@@ -564,43 +578,61 @@ public class IcebergPredicateConverter {
                 literal.toSql()));
       }
 
-      String pattern = ((StringLiteral) literal).getUnescapedValue();
+      String pattern = getBackendString((StringLiteral) literal);
       if (pattern == null || pattern.isEmpty()) {
         return new ConverterResult(ConversionStatus.FAILED,
             "LIKE pattern cannot be null or empty");
       }
 
-      // Find first unescaped wildcard position
-      int firstWildcard = findFirstUnescapedWildcard(pattern);
+      // The conversion follows LikePredicate::OptimizeConstantPatternMatch() in the
+      // backend, which matches patterns without '%' and '_', and 'prefix%' patterns
+      // verbatim. Only the other patterns treat backslash as an escape character.
+      if (pattern.indexOf('%') == -1 && pattern.indexOf('_') == -1) {
+        return new ConverterResult(Expressions.equal(ref, pattern),
+            ConversionStatus.FULLY_CONVERTED);
+      }
+      String verbatimPrefix = getVerbatimStartsWithPrefix(pattern);
+      if (verbatimPrefix != null && !verbatimPrefix.isEmpty()) {
+        return new ConverterResult(Expressions.startsWith(ref, verbatimPrefix),
+            ConversionStatus.FULLY_CONVERTED);
+      }
 
-      // Case 1: Pattern starts with wildcard - cannot push down
+      int firstWildcard = findFirstUnescapedWildcard(pattern);
       if (firstWildcard == 0) {
         return new ConverterResult(ConversionStatus.FAILED,
             String.format("LIKE pattern '%s' cannot be pushed down to Iceberg. " +
                 "Patterns must start with at least one literal character.", pattern));
       }
-
-      // Case 2: No wildcards - exact match
+      // No unescaped wildcard, push down the regex literal.
       if (firstWildcard == -1) {
-        String unescapedPattern = unescapeLikePattern(pattern, -1);
-        Expression iceExpr = Expressions.equal(column.getName(), unescapedPattern);
-        return new ConverterResult(iceExpr, ConversionStatus.FULLY_CONVERTED);
+        return new ConverterResult(
+            Expressions.equal(ref, getRegexLiteral(pattern, -1)),
+            ConversionStatus.FULLY_CONVERTED);
       }
-
-      // Case 3: Wildcard in middle with literal content after - push down relaxed prefix
-      // This allows Iceberg to prune partitions/files, but the original LIKE predicate
-      // will still be evaluated by Impala on the surviving rows.
-      // Example: LIKE 'd%d' pushes down startsWith('d'), keeps LIKE 'd%d' in scan
-      boolean hasContentAfterWildcard = hasLiteralContentAfterWildcard(pattern,
-          firstWildcard);
-      ConversionStatus status = hasContentAfterWildcard ?
-          ConversionStatus.PARTIALLY_CONVERTED : ConversionStatus.FULLY_CONVERTED;
-      String unescapedPattern = unescapeLikePattern(pattern, firstWildcard);
-      Expression iceExpr = Expressions.startsWith(column.getName(), unescapedPattern);
+      // E.g. LIKE 'd%d' pushes down startsWith('d') and the scan still evaluates
+      // LIKE 'd%d'.
+      ConversionStatus status = matchesAnySuffixFrom(pattern, firstWildcard) ?
+          ConversionStatus.FULLY_CONVERTED : ConversionStatus.PARTIALLY_CONVERTED;
+      Expression iceExpr = Expressions.startsWith(ref,
+          getRegexLiteral(pattern, firstWildcard));
       return new ConverterResult(iceExpr, status);
     } catch (ImpalaRuntimeException e) {
       return new ConverterResult(ConversionStatus.FAILED, e.getMessage());
     }
+  }
+
+  /**
+   * Returns the string that the backend receives for 'literal'. Constant folded literals
+   * are not unescaped again, unlike with getUnescapedValue().
+   */
+  protected static String getBackendString(StringLiteral literal)
+      throws ImpalaRuntimeException {
+    if (!literal.isValidUtf8()) {
+      throw new ImpalaRuntimeException(String.format(
+          "Non UTF-8 string can't be converted to Iceberg expression: %s",
+          literal.toSql()));
+    }
+    return literal.unescapeIfNeeded();
   }
 
   protected void checkNullLiteral(LiteralExpr literal) throws ImpalaRuntimeException {
@@ -624,7 +656,7 @@ public class IcebergPredicateConverter {
       case UUID: return getIcebergUuidValue(term, op, (StringLiteral) literal);
       case STRING:
       case DATETIME:
-      case CHAR: return ((StringLiteral) literal).getUnescapedValue();
+      case CHAR: return getBackendString((StringLiteral) literal);
       case TIMESTAMP: return getIcebergTsValue(literal, column, schema_);
       case DATE: return ((DateLiteral) literal).getValue();
       case DECIMAL: return getIcebergDecimalValue(column, (NumericLiteral) literal);

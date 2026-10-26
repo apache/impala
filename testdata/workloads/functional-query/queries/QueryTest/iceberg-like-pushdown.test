@@ -47,14 +47,16 @@ BIGINT
 row_regex: partitions=1/.* files=.*
 ====
 ---- QUERY
-# Test 4: LIKE with OR - prunes to 2 out of 3 partitions
+# Test 4: LIKE under OR is never pushed down, so this scans all partitions. Both sides
+# reject NULL here, but in general an OR can let NULL partitions through Iceberg's
+# partition filter, and Iceberg's residual evaluation of startsWith() throws on them.
 SELECT count(*) FROM functional_parquet.iceberg_partitioned WHERE action LIKE 'c%' OR action LIKE 'd%';
 ---- TYPES
 BIGINT
 ---- RESULTS
 12
 ---- RUNTIME_PROFILE
-row_regex: partitions=2/.* files=.*
+row_regex: partitions=3/.* files=.*
 ====
 ---- QUERY
 # Test 5: LIKE on different partition value 'v%'

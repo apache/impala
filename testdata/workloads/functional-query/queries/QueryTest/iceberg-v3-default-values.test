@@ -492,6 +492,28 @@ SELECT * FROM iceberg_ddl_add_defaults ORDER BY id;
 INT,INT,BIGINT,BOOLEAN,FLOAT,DOUBLE,DECIMAL,STRING,DATE
 ====
 ---- QUERY
+# String defaults with backslashes keep the value of the literal, also when the default
+# is constant folded.
+CREATE TABLE iceberg_ddl_backslash_defaults (
+  id INT,
+  s1 STRING DEFAULT 'a\\bc',
+  s2 STRING DEFAULT concat('a\\b', 'c')
+)
+STORED AS ICEBERG
+TBLPROPERTIES ('format-version'='3');
+INSERT INTO iceberg_ddl_backslash_defaults (id) VALUES (1);
+ALTER TABLE iceberg_ddl_backslash_defaults ADD COLUMN s3 STRING DEFAULT 'x\\ny';
+INSERT INTO iceberg_ddl_backslash_defaults (id) VALUES (2);
+SELECT id, s1 = concat('a', chr(92), 'bc'), s2 = concat('a', chr(92), 'bc'),
+  s3 = concat('x', chr(92), 'ny')
+FROM iceberg_ddl_backslash_defaults ORDER BY id;
+---- RESULTS
+1,true,true,true
+2,true,true,true
+---- TYPES
+INT,BOOLEAN,BOOLEAN,BOOLEAN
+====
+---- QUERY
 # ADD COLUMN initial-default on read; partial INSERT uses write-default.
 INSERT INTO iceberg_ddl_add_defaults (id, str_col) VALUES (30, 'custom');
 SELECT * FROM iceberg_ddl_add_defaults WHERE id = 30;

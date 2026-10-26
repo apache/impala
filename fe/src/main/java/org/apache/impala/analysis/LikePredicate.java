@@ -159,6 +159,7 @@ public class LikePredicate extends Predicate {
   protected float computeEvalCost() {
     if (!hasChildCosts()) return UNKNOWN_COST;
     if (Expr.IS_NON_NULL_LITERAL.apply(getChild(1)) &&
+      ((StringLiteral) getChild(1)).isValidUtf8() &&
       Pattern.matches("[%_]*[^%_]*[%_]*",
           ((StringLiteral) getChild(1)).getValueWithOriginalEscapes())) {
       // This pattern only has wildcards as leading or trailing character,

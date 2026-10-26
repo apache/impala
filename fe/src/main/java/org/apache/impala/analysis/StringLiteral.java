@@ -149,7 +149,13 @@ public class StringLiteral extends LiteralExpr {
     return MetastoreShim.unescapeSQLString("'" + getNormalizedValue() + "'");
   }
 
-  private String unescapeIfNeeded() {
+  /**
+   * Returns the string value for use outside SQL parsing: the same bytes the backend
+   * receives in {@link #toThrift()} for this literal. SQL-quoted literals are unescaped
+   * once; values produced by constant folding are returned as stored.
+   * Throws if the literal is not valid UTF-8.
+   */
+  public String unescapeIfNeeded() {
     checkHasValidString();
     return needsUnescaping_ ? getUnescapedValue() : strValue_;
   }

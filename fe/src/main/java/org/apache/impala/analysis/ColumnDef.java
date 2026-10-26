@@ -223,7 +223,7 @@ public class ColumnDef {
   public String getIcebergDefaultValueString() {
     LiteralExpr lit = getAnalyzedDefaultLiteral();
     if (lit instanceof StringLiteral) {
-      return ((StringLiteral) lit).getUnescapedValue();
+      return ((StringLiteral) lit).unescapeIfNeeded();
     }
     return lit.getStringValue();
   }

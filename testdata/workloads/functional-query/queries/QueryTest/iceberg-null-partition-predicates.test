@@ -189,15 +189,12 @@ STRING
 'a'
 'b'
 ---- RUNTIME_PROFILE
-row_regex: .*partitions=2/3 files=2 .*
+row_regex: .*partitions=3/3 files=3 .*
 ====
 ---- QUERY
 show files in null_str_tbl partition (p like 'a%' or p like 'b%');
----- RESULTS
-row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/null_str_tbl/data/p=a/.*.0.parq','.*','','$ERASURECODE_POLICY'
-row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/null_str_tbl/data/p=b/.*.0.parq','.*','','$ERASURECODE_POLICY'
----- TYPES
-STRING, STRING, STRING, STRING
+---- CATCH
+LIKE under NOT or OR cannot be pushed down to Iceberg
 ====
 ---- QUERY
 # They are not pushed down if the NULL partition may not be pruned.

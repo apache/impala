@@ -1875,6 +1875,166 @@ class TestIcebergTable(IcebergTestSuite):
     self.run_test_case('QueryTest/iceberg-scan-metrics-basic', vector)
 
 
+class TestIcebergStringPushDown(IcebergTestSuite):
+  """Tests that LIKE and string predicates pushed down to Iceberg select the same rows
+  as the backend."""
+
+  # Strings are the values that the backend sees, after SQL string literal unescaping.
+  VALUES = [None, 'a', 'b', 'ab', 'abc', 'abq', 'abx', 'axb', 'axbc', 'abxc', 'xab',
+      '%ab', '_ab', 'a%b', 'a_b', 'ab%', 'ab_', 'a%bc', 'a_bc', 'a%bz', 'a_bz', 'a%xyz',
+      'a\\', 'a\\b', 'a\\\\b', 'a\\bc', 'a\\bz', 'a\\\\bz', 'a\\%', 'a\\%b', 'a\\xb',
+      'a\\xyz', 'ab\\', 'ab\\\\', 'ab\\x', '\\ab', '\\\\ab', '\\xab', 'a\nb\\x', 'a\nb%']
+  NULL_ID = VALUES.index(None)
+  # One token at the beginning, in the middle and at the end.
+  PATTERNS = [p for token in ['%', '_', '\\%', '\\_', 'x', '\\x', '\\\\', '\\']
+      for p in [token + 'ab', 'a' + token + 'b', 'ab' + token]]
+  # Prefixes with escapes and different wildcard suffixes.
+  PATTERNS += [prefix + suffix
+      for prefix in ['ab', 'a\\b', 'a\\\\b', 'a\\%b', 'a\\_b']
+      for suffix in ['%', '%%', '%\\', '_', '_%', '%_', '%c', '%\\%', '%\\\\']]
+  # Special cases of the backend's LIKE implementation.
+  PATTERNS += ['%', '_', 'a\\%%', 'a\\\\%', 'a\\\\\\%', 'a\nb\\%', 'a\\%b\\',
+      'a\\%b_\\', 'a\\%b\\_']
+
+  @classmethod
+  def add_test_dimensions(cls):
+    super(TestIcebergStringPushDown, cls).add_test_dimensions()
+    cls.ImpalaTestMatrix.add_constraint(
+      lambda v: v.get_value('table_format').file_format == 'parquet')
+
+  @staticmethod
+  def _sql_str(s):
+    """Returns a SQL string literal with the value 's'."""
+    return "'{}'".format(
+        s.replace("\\", "\\\\").replace("'", "\\'").replace("\n", "\\n"))
+
+  def _create_tables(self, unique_database):
+    """Creates two tables with VALUES: 'part' is identity partitioned by 's', 'hint' has
+    one file per row and a push down hint on 's', so Iceberg can prune files by the
+    bounds of 's'. Returns the table names, and for each pattern in PATTERNS the ids of
+    the rows that the backend's LIKE matches and does not match. These come from
+    evaluating LIKE in the select list, where it is not pushed down."""
+    part = unique_database + ".part"
+    hint = unique_database + ".hint"
+    self.execute_query("create table {} (id int, s string) partitioned by spec (s) "
+        "stored as iceberg".format(part))
+    self.execute_query("create table {} (id int, s string) partitioned by spec (id) "
+        "stored as iceberg tblproperties ('impala.iceberg.push_down_hint'='s')"
+        .format(hint))
+    rows = ", ".join("({}, {})".format(i, "NULL" if v is None else self._sql_str(v))
+        for i, v in enumerate(self.VALUES))
+    for tbl in [part, hint]:
+      self.execute_query("insert into {} values {}".format(tbl, rows))
+
+    likes = ", ".join("s like {}".format(self._sql_str(p)) for p in self.PATTERNS)
+    result = self.execute_query("select id, {} from {}".format(likes, part))
+    matches = defaultdict(set)
+    non_matches = defaultdict(set)
+    for row in result.data:
+      cols = row.split("\t")
+      for pattern, match in zip(self.PATTERNS, cols[1:]):
+        if match == "true":
+          matches[pattern].add(int(cols[0]))
+        elif match == "false":
+          non_matches[pattern].add(int(cols[0]))
+    return [part, hint], matches, non_matches
+
+  def _check_where(self, tables, pred, expected_ids):
+    for tbl in tables:
+      result = self.execute_query("select id from {} where {}".format(tbl, pred))
+      assert set(int(id) for id in result.data) == expected_ids, \
+          "{}: {}".format(tbl, pred)
+
+  def test_like(self, unique_database):
+    """LIKE predicates pushed down to Iceberg must select the same rows as the backend's
+    LIKE."""
+    tables, matches, _ = self._create_tables(unique_database)
+    for p in self.PATTERNS:
+      self._check_where(tables, "s like {}".format(self._sql_str(p)), matches[p])
+
+  def test_not_like(self, unique_database):
+    """NOT LIKE must select the rows that the backend's LIKE doesn't match, which
+    excludes NULL."""
+    tables, _, non_matches = self._create_tables(unique_database)
+    for p in self.PATTERNS:
+      self._check_where(tables, "not (s like {})".format(self._sql_str(p)),
+          non_matches[p])
+
+  def test_like_under_or(self, unique_database):
+    """The other side of the OR lets the NULL partition through Iceberg's partition
+    filter, so a LIKE under the OR must not reach Iceberg's residual evaluation."""
+    tables, matches, _ = self._create_tables(unique_database)
+    for p in self.PATTERNS:
+      expected = matches[p] | {self.NULL_ID}
+      like = "s like {}".format(self._sql_str(p))
+      self._check_where(tables, "{} or s is null".format(like), expected)
+      self._check_where(tables, "{} or id = {}".format(like, self.NULL_ID), expected)
+
+  def test_folded_strings(self, unique_database):
+    """Constant folded strings are sent to the backend without unescaping, so they must
+    not be unescaped for Iceberg either. Non UTF-8 strings are not pushed down."""
+    tables, matches, _ = self._create_tables(unique_database)
+    for p in self.PATTERNS:
+      self._check_where(tables, "s like concat({}, '')".format(self._sql_str(p)),
+          matches[p])
+    for i, value in enumerate(self.VALUES):
+      if value is not None:
+        self._check_where(tables, "s = concat({}, '')".format(self._sql_str(value)), {i})
+
+    self._check_where(tables, "s = unhex('FF')", set())
+    self._check_where(tables, "s = concat('a', unhex('FF'))", set())
+    # The backend rejects such LIKE patterns for every table format.
+    for tbl in tables:
+      err = self.execute_query_expect_failure(self.client,
+          "select id from {} where s like concat('a', unhex('FF'), '%')".format(tbl))
+      assert "Invalid regex" in str(err)
+
+  def test_like_show_files(self, unique_database):
+    """SHOW FILES rejects LIKE predicates that are not fully converted, and must list
+    the files of exactly the matching partitions otherwise."""
+    tables, matches, _ = self._create_tables(unique_database)
+    part = tables[0]
+    for p in self.PATTERNS:
+      like = "s like {}".format(self._sql_str(p))
+      try:
+        result = self.execute_query("show files in {} partition ({})".format(part, like))
+        assert len(result.data) == len(matches[p]), like
+      except IMPALA_CONNECTION_EXCEPTION as e:
+        if "No matching partition(s) found" in str(e):
+          assert not matches[p], like
+        else:
+          assert "Invalid partition filtering expression" in str(e) \
+              or "can only be partially converted" in str(e), "{}: {}".format(like, e)
+
+  def test_like_on_partition_transform(self, unique_database):
+    """In SHOW FILES and DROP PARTITION, LIKE applies to the partition transform, not to
+    the source column."""
+    tbl = unique_database + ".trunc"
+    self.execute_query("create table {} (id int, s string) "
+        "partitioned by spec (truncate(3, s)) stored as iceberg".format(tbl))
+    self.execute_query("insert into {} values (1, 'abc'), (2, 'abcd'), (3, 'abx'), "
+        "(4, NULL), (5, 'xyz')".format(tbl))
+
+    def show_files(pred):
+      result = self.execute_query(
+          "show files in {} partition ({})".format(tbl, pred))
+      return sorted(re.search(r"/s_trunc=([^/]*)/", row).group(1) for row in result.data)
+
+    assert show_files("truncate(3, s) like 'abc'") == ["abc"]
+    assert show_files("truncate(3, s) like 'ab%'") == ["abc", "abx"]
+    err = self.execute_query_expect_failure(self.client,
+        "show files in {} partition (truncate(3, s) like 'abcd%')".format(tbl))
+    assert "No matching partition(s) found" in str(err)
+    err = self.execute_query_expect_failure(self.client,
+        "show files in {} partition (truncate(3, s) like 'ab_')".format(tbl))
+    assert "can only be partially converted" in str(err)
+
+    self.execute_query(
+        "alter table {} drop partition (truncate(3, s) like 'abc')".format(tbl))
+    result = self.execute_query("select id from {} order by id".format(tbl))
+    assert result.data == ["3", "4", "5"]
+
+
 class TestIcebergV2Table(IcebergTestSuite):
   """Tests related to Iceberg V2 tables."""
 
