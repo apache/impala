@@ -44,6 +44,7 @@ Status SingularRowSrcNode::GetNext(RuntimeState* state, RowBatch* row_batch, boo
   TupleRow* row = row_batch->GetRow(row_idx);
   row_batch->CopyRow(containing_subplan_->current_row(), row);
   row_batch->CommitLastRow();
+  SetNumRowsReturned(1);
   return Status::OK();
 }
 

@@ -347,13 +347,13 @@ Status ExecNode::Prepare(RuntimeState* state) {
 }
 
 Status ExecNode::Open(RuntimeState* state) {
+  num_rows_returned_ = 0;
   RETURN_IF_ERROR(ExecDebugAction(TExecNodePhase::OPEN, state));
   DCHECK_EQ(conjunct_evals_.size(), conjuncts_.size());
   return ScalarExprEvaluator::Open(conjunct_evals_, state);
 }
 
 Status ExecNode::Reset(RuntimeState* state, RowBatch* row_batch) {
-  num_rows_returned_ = 0;
   for (int i = 0; i < children_.size(); ++i) {
     RETURN_IF_ERROR(children_[i]->Reset(state, row_batch));
   }

@@ -1285,6 +1285,56 @@ class TestObservability(ImpalaTestSuite):
       assert k in result.runtime_profile, k + " not found in profile:\n"\
                                           + result.runtime_profile
 
+  def test_subplan_summary(self):
+    """Verify that the actual #Rows column is non-zero under SubplanNodes"""
+    # "id < 6" ensures that all arrays are non-empty so #Rows won't be 0 under
+    # SubplanNode.
+    query = """select id, a.item from functional_parquet.complextypes_arrays t, t.arr1 a
+               where id < 6"""
+    query_to_subplan_rows = {
+      query: 17,
+      query + ' limit 10': 10,
+      "select count(*) from functional_parquet.arrays_big t, t.int_array a": 19487,
+      # A query that has AGGREGATE, SORT, ANALYTIC, SELECT under SubplanNode.
+      # "id < 3" ensures that maps are non-empty.
+      """select id, a from functional_parquet.complextypestbl t,
+           (select count(*) over(partition by key) a
+            from t.int_map group by key) v
+         where a > 0 and id < 3""": 4,
+    }
+    for q, n in query_to_subplan_rows.items():
+      result = self.client.execute(q, fetch_exec_summary=True)
+      unnest_rows = 0
+      join_rows = 0
+      for rows in result.exec_summary:
+        if rows['operator'].endswith(':SUBPLAN'):
+          assert rows['num_rows'] == n
+        elif rows['operator'].endswith(':SINGULAR ROW SRC'):
+          assert rows['num_rows'] == 1
+        elif rows['operator'].endswith(':UNNEST'):
+          unnest_rows = rows['num_rows']
+        elif rows['operator'].endswith(':NESTED LOOP JOIN'):
+          join_rows = rows['num_rows']
+        # Skip fragment rows.
+        elif not rows['operator'].startswith('F'):
+          assert rows['num_rows'] > 0, str(rows)
+      # UnnestNode and JoinNode should keep the #Rows in expanding the last array.
+      # The number depends on which row is the last so we just verify non-zero here.
+      assert unnest_rows > 0
+      assert unnest_rows == join_rows
+
+  def test_nested_subplan_summary(self):
+    """Verify that the actual #Rows column of nested SubplanNodes is non-zero"""
+    query = """select straight_join 1
+        from functional_parquet.complextypestbl t
+        inner join t.int_array_array a
+        inner join a.item i
+        where id <= 2"""
+    result = self.client.execute(query, fetch_exec_summary=True)
+    for rows in result.exec_summary:
+      if rows['operator'].endswith(':SUBPLAN'):
+        assert rows['num_rows'] > 0
+
 
 class TestQueryStates(ImpalaTestSuite):
   """Test that the 'Query State' and 'Impala Query State' are set correctly in the
