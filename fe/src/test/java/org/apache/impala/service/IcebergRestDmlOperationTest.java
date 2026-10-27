@@ -35,8 +35,6 @@ import org.junit.Test;
 
 public class IcebergRestDmlOperationTest {
   private static final String MISSING_UUID = "Missing Iceberg table UUID";
-  private static final String UNSUPPORTED_OPERATION =
-      "Unsupported operation for the Iceberg REST finalizer";
 
   @Test
   public void testRestFinalizerAcceptsInsert() throws Exception {
@@ -85,8 +83,12 @@ public class IcebergRestDmlOperationTest {
   }
 
   @Test
-  public void testRestFinalizerRejectsOptimize() {
-    assertRejected(restOperation(TIcebergOperation.OPTIMIZE), UNSUPPORTED_OPERATION);
+  public void testRestFinalizerAcceptsOptimize() throws Exception {
+    TIcebergOperationParam operation = restOperation(TIcebergOperation.OPTIMIZE);
+    IcebergDmlFinalizer.validateRestDmlOperation(operation);
+
+    operation.unsetTable_uuid();
+    assertRejected(operation, MISSING_UUID);
   }
 
   @Test

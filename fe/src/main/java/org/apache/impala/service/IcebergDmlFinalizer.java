@@ -40,7 +40,7 @@ final class IcebergDmlFinalizer {
 
   private static final EnumSet<TIcebergOperation> SUPPORTED_REST_OPS =
       EnumSet.of(TIcebergOperation.INSERT, TIcebergOperation.UPDATE,
-          TIcebergOperation.DELETE, TIcebergOperation.MERGE);
+          TIcebergOperation.DELETE, TIcebergOperation.MERGE, TIcebergOperation.OPTIMIZE);
 
   @FunctionalInterface
   interface PostOperationHook {

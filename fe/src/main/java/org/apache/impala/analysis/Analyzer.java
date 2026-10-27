@@ -208,8 +208,8 @@ public class Analyzer {
   private static final String TABLE_NOT_SUPPORTED =
       "%s not supported. Table %s  access type is: %s";
   private static final String REST_TABLE_WRITE_NOT_SUPPORTED =
-      "Only INSERT INTO, INSERT OVERWRITE, UPDATE, DELETE and MERGE are supported for " +
-      "REST-backed Iceberg table: %s";
+      "Only INSERT INTO, INSERT OVERWRITE, UPDATE, DELETE, MERGE and OPTIMIZE are " +
+      "supported for REST-backed Iceberg table: %s";
   private static final String REST_TABLE_UUID_UNAVAILABLE =
       "DML is disabled because the Iceberg table UUID is unavailable: %s";
 

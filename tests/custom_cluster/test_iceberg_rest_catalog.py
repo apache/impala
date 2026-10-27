@@ -26,10 +26,10 @@ from tests.common.custom_cluster_test_suite import CustomClusterTestSuite, HIVE_
 from tests.common.iceberg_rest_server import IcebergRestServer
 from tests.common.iceberg_rest_test_tables import (
     DELETE_PARTITIONED_TEST_TABLES, DELETE_TEST_TABLES, INSERT_TEST_TABLE,
-    MERGE_PARTITION_SORT_TEST_TABLES, MERGE_TEST_TABLES, PARTITIONED_INSERT_TEST_TABLE,
-    UPDATE_PARTITIONS_TEST_TABLES, UPDATE_TEST_TABLES,
+    MERGE_PARTITION_SORT_TEST_TABLES, MERGE_TEST_TABLES, OPTIMIZE_TEST_TABLES,
+    PARTITIONED_INSERT_TEST_TABLE, UPDATE_PARTITIONS_TEST_TABLES, UPDATE_TEST_TABLES,
     create_table_request)
-from tests.common.impala_connection import IMPALA_CONNECTION_EXCEPTION
+from tests.common.impala_connection import IMPALA_CONNECTION_EXCEPTION, RUNNING
 from tests.util.filesystem_utils import get_fs_path
 from tests.util.hdfs_util import HadoopFsCommandLineClient
 
@@ -313,12 +313,11 @@ class TestIcebergRestCatalogDmlStandalone(IcebergRestCatalogTests):
 
     unsupported_statements = [
         "truncate table {}".format(table_name),
-        "optimize table {}".format(table_name),
     ]
     for statement in unsupported_statements:
       error = self.execute_query_expect_failure(self.client, statement)
-      assert ("AnalysisException: Only INSERT INTO, INSERT OVERWRITE, UPDATE, DELETE "
-              "and MERGE are supported") in str(error)
+      assert ("AnalysisException: Only INSERT INTO, INSERT OVERWRITE, UPDATE, DELETE, "
+              "MERGE and OPTIMIZE are supported") in str(error)
 
   @RestServerProperties(
       {'port': 9084, 'catalog_location': WRITE_TEST_CATALOG_LOCATION,
@@ -521,6 +520,117 @@ class TestIcebergRestCatalogDmlStandalone(IcebergRestCatalogTests):
     (format-version 2)."""
     self.run_test_case(
         'QueryTest/iceberg-rest-merge-partition-sort', vector, use_db=MERGE_TEST_NS)
+
+  @RestServerProperties(
+      {'port': 9084, 'catalog_location': WRITE_TEST_CATALOG_LOCATION,
+       'test_tables': (UPDATE_TEST_NS, OPTIMIZE_TEST_TABLES)})
+  @CustomClusterTestSuite.with_args(
+     impalad_args=REST_STANDALONE_IMPALAD_ARGS,
+     start_args=NO_CATALOGD_STARTARGS,
+     cluster_size=1)
+  @pytest.mark.execute_serially
+  def test_rest_catalog_optimize(self, vector):
+    """Test OPTIMIZE on Iceberg REST catalog tables."""
+    ns = UPDATE_TEST_NS
+    self.run_test_case('QueryTest/iceberg-rest-optimize', vector, use_db=ns)
+
+    table_name = "{}.ice_optimize".format(ns)
+    data_path = get_fs_path(
+        "/test-warehouse/iceberg_test/hadoop_catalog/"
+        "{}/ice_optimize/data".format(ns))
+    filesystem_client = HadoopFsCommandLineClient()
+
+    # State left behind by the last ice_optimize section of iceberg-rest-optimize.test.
+    # A full table OPTIMIZE rewrites even a table that has a single data file.
+    expected_rows = ['1\tone\ttrue', '3\tthree\ttrue']
+    committed_files = set(filesystem_client.ls(data_path))
+    unknown_state = {'debug_action':
+        'ICEBERG_COMMIT:EXCEPTION@CommitStateUnknownException@'
+        'simulated REST commit state unknown'}
+    error = self.execute_query_expect_failure(
+        self.client, "optimize table {}".format(table_name),
+        query_options=unknown_state)
+    assert "simulated REST commit state unknown" in str(error)
+
+    result = self.execute_query_expect_success(
+        self.client, "select * from {}".format(table_name))
+    assert sorted(result.data) == expected_rows
+    # Files are kept when the commit state is unknown.
+    orphan_files = set(filesystem_client.ls(data_path)) - committed_files
+    assert len(orphan_files) == 1
+    for orphan_file in orphan_files:
+      assert filesystem_client.delete_file_dir(data_path + "/" + orphan_file)
+
+    commit_failure = {'debug_action':
+        'ICEBERG_COMMIT:EXCEPTION@CommitFailedException@'
+        'simulated REST commit failure'}
+    error = self.execute_query_expect_failure(
+        self.client, "optimize table {}".format(table_name),
+        query_options=commit_failure)
+    assert "simulated REST commit failure" in str(error)
+
+    result = self.execute_query_expect_success(
+        self.client, "select * from {}".format(table_name))
+    assert sorted(result.data) == expected_rows
+    # Files written by a failed commit are cleaned up.
+    assert set(filesystem_client.ls(data_path)) == committed_files
+
+    # Without catalogd, nothing orders the commits of a REST table but Iceberg's own
+    # validation. An OPTIMIZE must keep the rows that a concurrent INSERT commits, and
+    # must fail if a concurrent DELETE removes rows from the files that it rewrites.
+    # The debug action of the commit failure is still set in the session.
+    self.client.clear_configuration()
+    table_name = "{}.ice_optimize_conflict".format(ns)
+    self.execute_query_expect_success(
+        self.client, "insert into {} values (1), (2)".format(table_name))
+    self._run_concurrently_with_optimize(
+        table_name, "insert into {} values (3)".format(table_name))
+    result = self.execute_query_expect_success(
+        self.client, "select i from {}".format(table_name))
+    assert sorted(result.data) == ['1', '2', '3']
+
+    error = self._run_concurrently_with_optimize(
+        table_name, "delete from {} where i = 1".format(table_name),
+        expect_failure=True)
+    assert "found new delete for replaced data file" in error
+    result = self.execute_query_expect_success(
+        self.client, "select i from {}".format(table_name))
+    assert sorted(result.data) == ['2', '3']
+
+  def _run_concurrently_with_optimize(self, table_name, concurrent_stmt,
+      expect_failure=False):
+    """Runs 'concurrent_stmt' while an OPTIMIZE of 'table_name' waits before its commit.
+    Checks that the OPTIMIZE fails iff 'expect_failure' is true, and that a failed
+    OPTIMIZE leaves no files behind. Returns the error of a failed OPTIMIZE."""
+    namespace, table = table_name.split('.', 1)
+    data_path = get_fs_path("{}/{}/{}/data".format(
+        WRITE_TEST_CATALOG_LOCATION, namespace, table))
+    filesystem_client = HadoopFsCommandLineClient()
+    files_before = set(filesystem_client.ls(data_path))
+
+    # The delay is after the transaction is created from the table loaded at planning,
+    # so the commit has to refresh the table and validate the rewrite again.
+    self.client.set_configuration(
+        {'debug_action': 'CATALOGD_ICEBERG_CONFLICT:SLEEP@5000'})
+    handle = self.client.execute_async("optimize table {}".format(table_name))
+    self.client.clear_configuration()
+    self.client.wait_for_impala_state(handle, RUNNING, 30)
+    self.execute_query_expect_success(self.client, concurrent_stmt)
+    if not expect_failure:
+      assert self.client.wait_for_finished_timeout(handle, 30)
+      self.client.close_query(handle)
+      return None
+    with pytest.raises(IMPALA_CONNECTION_EXCEPTION) as error:
+      self.client.wait_for_finished_timeout(handle, 30)
+
+    # Every file written since the OPTIMIZE started belongs to 'concurrent_stmt'.
+    result = self.execute_query_expect_success(
+        self.client, "select file_path from {}.`files`".format(table_name))
+    table_files = set(path.rsplit('/', 1)[-1] for path in result.data)
+    new_files = set(filesystem_client.ls(data_path)) - files_before
+    assert new_files
+    assert new_files <= table_files
+    return str(error.value)
 
   @RestServerProperties(
       {'port': 9084, 'catalog_location': WRITE_TEST_CATALOG_LOCATION,

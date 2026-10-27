@@ -36,6 +36,12 @@ def _cols(*cols):
   return [_rest_col(i + 1, name, col_type) for i, (name, col_type) in enumerate(cols)]
 
 
+def _v2(tables):
+  return dict((name, dict(table, properties=dict(
+      table.get('properties', {}), **{'format-version': '2'})))
+      for name, table in tables.items())
+
+
 def _v3(tables):
   return dict((name, dict(table, properties=dict(
       table.get('properties', {}), **{'format-version': '3'})))
@@ -230,3 +236,29 @@ MERGE_PARTITION_SORT_TEST_TABLES = {
         'properties': {'format-version': '2', 'sort.columns': 'int_col',
                        'sort.order': 'LEXICAL'}},
 }
+
+
+# Tables of iceberg-rest-optimize.test, adapted from iceberg-optimize.test and
+# iceberg-v3-optimize.test, and of the commit and conflict checks of
+# test_rest_catalog_optimize.
+OPTIMIZE_TEST_TABLES = _v2({
+    'ice_optimize': {
+        'fields': _cols(('int_col', 'int'), ('string_col', 'string'),
+                        ('bool_col', 'boolean'))},
+    'ice_optimize_part': {
+        'fields': _cols(('int_col', 'int'), ('string_col', 'string'),
+                        ('bool_col', 'boolean')),
+        'partition': [_rest_part(1, 1000, 'int_col', 'identity')]},
+    'ice_optimize_sorted': {
+        'fields': _cols(('i', 'int'), ('s', 'string')),
+        'properties': {'sort.columns': 'i', 'sort.order': 'LEXICAL'}},
+    'ice_optimize_conflict': {'fields': _cols(('i', 'int'))},
+})
+OPTIMIZE_TEST_TABLES.update(_v3({
+    'optimize_nopart': {'fields': _cols(('i', 'int'))},
+    'optimize_nopart_multi_rows': {'fields': _cols(('i', 'int'))},
+    'optimize_part': {
+        'fields': _cols(('i', 'int'), ('s', 'string')),
+        'partition': [_rest_part(2, 1000, 's_trunc', 'truncate[1]')]},
+    'optimize_dv': {'fields': _cols(('i', 'int'), ('s', 'string'))},
+}))

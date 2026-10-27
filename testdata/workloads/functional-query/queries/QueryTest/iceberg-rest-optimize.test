@@ -1,0 +1,352 @@
+====
+---- QUERY
+# Adapted from iceberg-optimize.test and iceberg-v3-optimize.test for REST catalog.
+# Tables are pre-created via the REST API; tests needing DDL (CREATE TABLE, CTAS,
+# ALTER TABLE, so schema and partition evolution too) are omitted. Snapshots and files
+# are checked through the metadata tables.
+# TODO: Remove this file and run iceberg-optimize.test and iceberg-v3-optimize.test
+# against the REST catalog once DDL is supported for REST catalog tables.
+# OPTIMIZE of an empty table is a no-op.
+OPTIMIZE TABLE ice_optimize;
+---- RESULTS
+'The table is already optimized.'
+====
+---- QUERY
+SELECT count(*) FROM $DATABASE.ice_optimize.snapshots;
+---- RESULTS
+0
+---- TYPES
+BIGINT
+====
+---- QUERY
+# Insert a value then delete everything from the table.
+INSERT INTO ice_optimize VALUES(1, 'one', true);
+DELETE FROM ice_optimize WHERE bool_col=true;
+SELECT content, count(*) FROM $DATABASE.ice_optimize.`files` GROUP BY content;
+---- RESULTS
+0,1
+1,1
+---- TYPES
+INT,BIGINT
+====
+---- QUERY
+# OPTIMIZE merges the data and delete files, and the result is an empty snapshot.
+OPTIMIZE TABLE ice_optimize;
+SELECT count(*) FROM $DATABASE.ice_optimize.`files`;
+---- RESULTS
+0
+---- TYPES
+BIGINT
+====
+---- QUERY
+# OPTIMIZE of a table without files is a no-op.
+OPTIMIZE TABLE ice_optimize;
+---- RESULTS
+'The table is already optimized.'
+====
+---- QUERY
+SELECT count(*) FROM $DATABASE.ice_optimize.snapshots;
+---- RESULTS
+3
+---- TYPES
+BIGINT
+====
+---- QUERY
+# Insert rows one by one to write multiple small files.
+INSERT INTO ice_optimize VALUES(1, 'one', true);
+INSERT INTO ice_optimize VALUES(2, 'two', false);
+INSERT INTO ice_optimize VALUES(2, 'two', true);
+INSERT INTO ice_optimize VALUES(3, 'three', true);
+SELECT count(*) FROM $DATABASE.ice_optimize.`files`;
+---- RESULTS
+4
+---- TYPES
+BIGINT
+====
+---- QUERY
+# The only executor writes one file.
+OPTIMIZE TABLE ice_optimize;
+SELECT content, record_count FROM $DATABASE.ice_optimize.`files`;
+---- RESULTS
+0,4
+---- TYPES
+INT,BIGINT
+====
+---- QUERY
+SELECT * FROM ice_optimize;
+---- RESULTS
+1,'one',true
+2,'two',false
+2,'two',true
+3,'three',true
+---- TYPES
+INT,STRING,BOOLEAN
+====
+---- QUERY
+DELETE FROM ice_optimize WHERE int_col = 2;
+SELECT content, count(*) FROM $DATABASE.ice_optimize.`files` GROUP BY content;
+---- RESULTS
+0,1
+1,1
+---- TYPES
+INT,BIGINT
+====
+---- QUERY
+# The delete file is merged, and no delete file is left in the table.
+OPTIMIZE TABLE ice_optimize;
+SELECT content, record_count FROM $DATABASE.ice_optimize.`files`;
+---- RESULTS
+0,2
+---- TYPES
+INT,BIGINT
+====
+---- QUERY
+SELECT * FROM ice_optimize;
+---- RESULTS
+1,'one',true
+3,'three',true
+---- TYPES
+INT,STRING,BOOLEAN
+====
+---- QUERY
+# Write 1 file to the table and check that OPTIMIZE with file size threshold does
+# not modify anything. Note that full table OPTIMIZE always rewrites the entire table.
+INSERT INTO ice_optimize_part VALUES(1, 'one', true);
+OPTIMIZE TABLE ice_optimize_part (FILE_SIZE_THRESHOLD_MB=10);
+---- RESULTS
+'The table is already optimized.'
+====
+---- QUERY
+SELECT count(*) FROM $DATABASE.ice_optimize_part.snapshots;
+---- RESULTS
+1
+---- TYPES
+BIGINT
+====
+---- QUERY
+# Partial compaction rewrites only partition int_col=1, which has two small files. The
+# single file of partition int_col=2 is kept with its data sequence number.
+INSERT INTO ice_optimize_part VALUES(1, 'uno', false);
+INSERT INTO ice_optimize_part VALUES(2, 'two', true);
+OPTIMIZE TABLE ice_optimize_part (FILE_SIZE_THRESHOLD_MB=10);
+SELECT ICEBERG__DATA__SEQUENCE__NUMBER, * FROM ice_optimize_part;
+---- RESULTS
+4,1,'one',true
+4,1,'uno',false
+3,2,'two',true
+---- TYPES
+BIGINT,INT,STRING,BOOLEAN
+====
+---- QUERY
+SELECT count(*) FROM $DATABASE.ice_optimize_part.`files`;
+---- RESULTS
+2
+---- TYPES
+BIGINT
+====
+---- QUERY
+# Data files with deletes are always rewritten, but the single small file of partition
+# int_col=2 is still kept.
+DELETE FROM ice_optimize_part WHERE string_col = 'uno';
+OPTIMIZE TABLE ice_optimize_part (FILE_SIZE_THRESHOLD_MB=10);
+SELECT ICEBERG__DATA__SEQUENCE__NUMBER, * FROM ice_optimize_part;
+---- RESULTS
+6,1,'one',true
+3,2,'two',true
+---- TYPES
+BIGINT,INT,STRING,BOOLEAN
+====
+---- QUERY
+SELECT content, count(*) FROM $DATABASE.ice_optimize_part.`files` GROUP BY content;
+---- RESULTS
+0,2
+---- TYPES
+INT,BIGINT
+====
+---- QUERY
+# Full table compaction rewrites every partition.
+OPTIMIZE TABLE ice_optimize_part;
+SELECT ICEBERG__DATA__SEQUENCE__NUMBER, * FROM ice_optimize_part;
+---- RESULTS
+7,1,'one',true
+7,2,'two',true
+---- TYPES
+BIGINT,INT,STRING,BOOLEAN
+====
+---- QUERY
+SELECT count(*) FROM $DATABASE.ice_optimize_part.`files`;
+---- RESULTS
+2
+---- TYPES
+BIGINT
+====
+---- QUERY
+# OPTIMIZE sorts the rows by the 'sort.columns' table property.
+INSERT INTO ice_optimize_sorted VALUES (3, 'c');
+INSERT INTO ice_optimize_sorted VALUES (1, 'a');
+INSERT INTO ice_optimize_sorted VALUES (2, 'b');
+OPTIMIZE TABLE ice_optimize_sorted;
+SELECT FILE__POSITION, * FROM ice_optimize_sorted;
+---- RESULTS
+0,1,'a'
+1,2,'b'
+2,3,'c'
+---- TYPES
+BIGINT,INT,STRING
+====
+---- QUERY
+INSERT INTO optimize_nopart VALUES (1);
+INSERT INTO optimize_nopart VALUES (2);
+INSERT INTO optimize_nopart VALUES (3);
+
+-- _file_row_id and _file_last_updated_sequence_number are missing from the initial data files.
+SELECT _file_row_id, ICEBERG__FIRST__ROW__ID, _file_last_updated_sequence_number, ICEBERG__DATA__SEQUENCE__NUMBER, *
+FROM optimize_nopart;
+---- RESULTS
+NULL,0,NULL,1,1
+NULL,1,NULL,2,2
+NULL,2,NULL,3,3
+---- TYPES
+BIGINT,BIGINT,BIGINT,BIGINT,INT
+====
+---- QUERY
+# OPTIMIZE should populate _file_row_id and _file_last_updated_sequence_number for all rows.
+OPTIMIZE TABLE optimize_nopart;
+
+SELECT _file_row_id, _file_last_updated_sequence_number, * FROM optimize_nopart;
+---- RESULTS
+0,1,1
+1,2,2
+2,3,3
+---- TYPES
+BIGINT,BIGINT,INT
+====
+---- QUERY
+# Further compaction shouldn't change the row lineage fields.
+OPTIMIZE TABLE optimize_nopart;
+
+SELECT _file_row_id, _file_last_updated_sequence_number, * FROM optimize_nopart;
+---- RESULTS
+0,1,1
+1,2,2
+2,3,3
+---- TYPES
+BIGINT,BIGINT,INT
+====
+---- QUERY
+INSERT INTO optimize_nopart_multi_rows VALUES (1),(2);
+INSERT INTO optimize_nopart_multi_rows VALUES (3),(4);
+INSERT INTO optimize_nopart_multi_rows VALUES (5),(6);
+
+SELECT _file_row_id, ICEBERG__FIRST__ROW__ID, _file_last_updated_sequence_number, ICEBERG__DATA__SEQUENCE__NUMBER, *
+FROM optimize_nopart_multi_rows;
+---- RESULTS
+NULL,0,NULL,1,1
+NULL,0,NULL,1,2
+NULL,2,NULL,2,3
+NULL,2,NULL,2,4
+NULL,4,NULL,3,5
+NULL,4,NULL,3,6
+---- TYPES
+BIGINT,BIGINT,BIGINT,BIGINT,INT
+====
+---- QUERY
+# OPTIMIZE should populate _file_row_id with ICEBERG__FIRST__ROW__ID + FILE__POSITION.
+OPTIMIZE TABLE optimize_nopart_multi_rows;
+
+SELECT _file_row_id, _file_last_updated_sequence_number, *
+FROM optimize_nopart_multi_rows;
+---- RESULTS
+0,1,1
+1,1,2
+2,2,3
+3,2,4
+4,3,5
+5,3,6
+---- TYPES
+BIGINT,BIGINT,INT
+====
+---- QUERY
+INSERT INTO optimize_part VALUES (1,'aa'),(2,'ab');
+INSERT INTO optimize_part VALUES (3,'ac'),(4,'ad');
+INSERT INTO optimize_part VALUES (5,'ba'),(6,'bb');
+
+SELECT _file_row_id, ICEBERG__FIRST__ROW__ID, _row_id, '|',
+       _file_last_updated_sequence_number, ICEBERG__DATA__SEQUENCE__NUMBER, _last_updated_sequence_number, '|',
+       *
+FROM optimize_part;
+---- RESULTS
+NULL,0,0,'|',NULL,1,1,'|',1,'aa'
+NULL,0,1,'|',NULL,1,1,'|',2,'ab'
+NULL,2,2,'|',NULL,2,2,'|',3,'ac'
+NULL,2,3,'|',NULL,2,2,'|',4,'ad'
+NULL,4,4,'|',NULL,3,3,'|',5,'ba'
+NULL,4,5,'|',NULL,3,3,'|',6,'bb'
+---- TYPES
+BIGINT,BIGINT,BIGINT,STRING,BIGINT,BIGINT,BIGINT,STRING,INT,STRING
+====
+---- QUERY
+# With FILE_SIZE_THRESHOLD_MB specified, OPTIMIZE only compact partitions with at least
+# two data files.
+OPTIMIZE TABLE optimize_part (FILE_SIZE_THRESHOLD_MB=10);
+
+SELECT _file_row_id, _row_id, '|',
+       _file_last_updated_sequence_number, _last_updated_sequence_number, '|',
+       *
+FROM optimize_part;
+---- RESULTS
+0,0,'|',1,1,'|',1,'aa'
+1,1,'|',1,1,'|',2,'ab'
+2,2,'|',2,2,'|',3,'ac'
+3,3,'|',2,2,'|',4,'ad'
+NULL,4,'|',NULL,3,'|',5,'ba'
+NULL,5,'|',NULL,3,'|',6,'bb'
+---- TYPES
+BIGINT,BIGINT,STRING,BIGINT,BIGINT,STRING,INT,STRING
+====
+---- QUERY
+# Let's do a full compaction on the partially compacted table.
+OPTIMIZE TABLE optimize_part;
+
+SELECT _file_row_id, _file_last_updated_sequence_number, *
+FROM optimize_part;
+---- RESULTS
+0,1,1,'aa'
+1,1,2,'ab'
+2,2,3,'ac'
+3,2,4,'ad'
+4,3,5,'ba'
+5,3,6,'bb'
+---- TYPES
+BIGINT,BIGINT,INT,STRING
+====
+---- QUERY
+# OPTIMIZE merges deletion vectors and keeps the row ids of the remaining rows.
+INSERT INTO optimize_dv VALUES (1, 'one'), (2, 'two'), (3, 'three'), (4, 'four'),
+    (5, 'five');
+DELETE FROM optimize_dv WHERE i = 3;
+SELECT content, file_format FROM $DATABASE.optimize_dv.`files`;
+---- RESULTS
+0,'PARQUET'
+1,'PUFFIN'
+---- TYPES
+INT,STRING
+====
+---- QUERY
+OPTIMIZE TABLE optimize_dv;
+SELECT _row_id, * FROM optimize_dv;
+---- RESULTS
+0,1,'one'
+1,2,'two'
+3,4,'four'
+4,5,'five'
+---- TYPES
+BIGINT,INT,STRING
+====
+---- QUERY
+SELECT content, file_format FROM $DATABASE.optimize_dv.`files`;
+---- RESULTS
+0,'PARQUET'
+---- TYPES
+INT,STRING
+====

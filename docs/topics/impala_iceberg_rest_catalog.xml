@@ -275,11 +275,11 @@ iceberg.rest-catalog.uri=http://rest-catalog-server:9084</codeblock>
               be set to <codeph>false</codeph>. Only flat namespace hierarchies are supported.
             </li>
             <li>
-              <b>Write Operations:</b> Only INSERT INTO, INSERT OVERWRITE, UPDATE, DELETE
-              and MERGE are supported, and only for a catalog configured with a unique
-              <codeph>iceberg.rest-catalog.name</codeph>. INSERT OVERWRITE replaces only
-              the partitions that receive new rows, or the whole table if it is
-              unpartitioned. OPTIMIZE and TRUNCATE are not supported.
+              <b>Write Operations:</b> Only INSERT INTO, INSERT OVERWRITE, UPDATE, DELETE,
+              MERGE and OPTIMIZE are supported, and only for a catalog configured with a
+              unique <codeph>iceberg.rest-catalog.name</codeph>. INSERT OVERWRITE replaces
+              only the partitions that receive new rows, or the whole table if it is
+              unpartitioned. TRUNCATE is not supported.
             </li>
             <li>
               <b>DDL Operations:</b> DDL operations (CREATE, ALTER, DROP,...) are not supported.
