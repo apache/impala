@@ -250,6 +250,14 @@ public class FunctionResolver {
       return null;
     }
 
+    // Calcite has no equivalent for non-scalar types (e.g. VARIANT), so resolving to
+    // such an overload would only fail later with an obscure type conversion error.
+    for (Type argType : fn.getArgs()) {
+      Preconditions.checkState(argType.isScalarType(), "Function %s resolved to " +
+          "signature %s with non-scalar argument type %s, which is not supported " +
+          "by the Calcite planner", lowercaseName, fn.signatureString(), argType);
+    }
+
     return fn;
   }
 

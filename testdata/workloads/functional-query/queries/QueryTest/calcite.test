@@ -1470,3 +1470,14 @@ true
 ---- RUNTIME_PROFILE
 row_regex: PlannerType: CalcitePlanner
 ====
+---- QUERY
+# IMPALA-15691: IS NULL on a NULL-typed operand used to resolve to
+# is_null_pred(VARIANT) and fail with "Unknown type INVALID_TYPE".
+select null in (select null);
+---- RESULTS
+NULL
+---- TYPES
+BOOLEAN
+---- RUNTIME_PROFILE
+row_regex: PlannerType: CalcitePlanner
+====

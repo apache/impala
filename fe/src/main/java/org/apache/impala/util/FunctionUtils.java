@@ -122,7 +122,8 @@ public abstract class FunctionUtils {
    * in a canonical order so that overload resolution in the case of multiple valid
    * overloads does not depend on the order in which functions are added to the Db. The
    * order is based on the PrimitiveType enum because this was the order used implicitly
-   * for builtin operators and functions in earlier versions of Impala.
+   * for builtin operators and functions in earlier versions of Impala. VARIANT is the
+   * exception; it sorts after all other types.
    */
   public static class FunctionResolutionOrder implements Comparator<Function> {
     @Override
@@ -148,8 +149,16 @@ public abstract class FunctionUtils {
     private int typeCompare(Type t1, Type t2) {
       Preconditions.checkState(!t1.isComplexType());
       Preconditions.checkState(!t2.isComplexType());
-      return Integer.compare(t1.getPrimitiveType().ordinal(),
-          t2.getPrimitiveType().ordinal());
+      return Integer.compare(resolutionRank(t1), resolutionRank(t2));
+    }
+
+    // VARIANT's primitive type is INVALID_TYPE, the first PrimitiveType, which would sort
+    // it before every scalar type. Rank it after all of them instead.
+    private static int resolutionRank(Type t) {
+      if (t.isVariantType()) return Integer.MAX_VALUE;
+      Preconditions.checkState(t.isScalarType(),
+          "Unexpected non-scalar type in function signature: %s", t);
+      return t.getPrimitiveType().ordinal();
     }
   }
 }
