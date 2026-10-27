@@ -181,6 +181,18 @@ public class HdfsScanNode extends ScanNode {
   // overhead per row.
   private static long PARTITION_KEY_SCAN_INPUT_CARDINALITY_ADJUSTMENT_FACTOR = 100;
 
+  // Estimated compressed bytes per row and minimal per-file overhead of the ORC delete
+  // delta files of full ACID tables. Delete events only store the ACID columns, which
+  // compress very well. Measured on delete deltas written by Hive 3: between 0.09
+  // (deleting a contiguous range) and 1.17 (deleting randomly scattered rows) bytes
+  // per row. The chosen value underestimates the row count by at most ~2x in the best
+  // compressing case. The file footer contains the schema of the table, so the
+  // overhead grows with the number of columns: ~750 bytes for 2 columns and ~1.3KB
+  // for 16 columns. A minimal overhead is used, as overestimating the row count of
+  // small files is less harmful than underestimating many small files.
+  private static final double ACID_DELETE_DELTA_BYTES_PER_ROW = 0.2;
+  private static final long ACID_DELETE_DELTA_FILE_OVERHEAD_BYTES = 600;
+
   public static Set<HdfsFileFormat> VALID_COLUMNAR_FORMATS =
       ImmutableSet.<HdfsFileFormat>builder()
           .add(HdfsFileFormat.PARQUET)
@@ -357,6 +369,9 @@ public class HdfsScanNode extends ScanNode {
   private final List<Expr> partitionConjuncts_;
 
   private boolean isFullAcidTable_ = false;
+
+  // True if this node scans the delete delta files of a full ACID table.
+  private boolean isAcidDeleteDeltaScan_ = false;
 
   private HdfsEstimatedMissingTableStats estimatedMissingStats_ =
       new HdfsEstimatedMissingTableStats();
@@ -1500,6 +1515,10 @@ public class HdfsScanNode extends ScanNode {
         updateMaxScanRangeNumRows(
             tableNumRows, sumValues(totalBytesPerFs_), largestScanRangeBytes_);
       }
+      if (isAcidDeleteDeltaScan_ && maxScanRangeNumRows_ >= 0) {
+        maxScanRangeNumRows_ = Math.min(maxScanRangeNumRows_,
+            estimateAcidDeleteDeltaNumRows(largestScanRangeBytes_, 1));
+      }
     }
   }
 
@@ -1537,6 +1556,22 @@ public class HdfsScanNode extends ScanNode {
       long percentBytes, long minSampleBytes, long randomSeed) {
     return FeFsTable.Utils.getFilesSample(tbl_, partitions_, percentBytes, minSampleBytes,
         randomSeed);
+  }
+
+  public void setIsAcidDeleteDeltaScan() {
+    Preconditions.checkState(isFullAcidTable_);
+    isAcidDeleteDeltaScan_ = true;
+  }
+
+  /**
+   * Estimates the number of delete events in 'numFiles' ACID delete delta files with
+   * a total size of 'totalBytes'. Assumes at least one row per file.
+   */
+  private static long estimateAcidDeleteDeltaNumRows(long totalBytes, long numFiles) {
+    long dataBytes = Math.max(0,
+        totalBytes - MathUtil.saturatingMultiply(numFiles,
+            ACID_DELETE_DELTA_FILE_OVERHEAD_BYTES));
+    return Math.max(numFiles, Math.round(dataBytes / ACID_DELETE_DELTA_BYTES_PER_ROW));
   }
 
   /**
@@ -1750,6 +1785,12 @@ public class HdfsScanNode extends ScanNode {
         cardinality_ = Math.round(cardinality_ * fracPercBytes);
         cardinality_ = Math.max(cardinality_, 1);
       }
+    }
+    if (isAcidDeleteDeltaScan_ && cardinality_ >= 0) {
+      // The estimates above treat the delete events like the rows of the table, which
+      // can massively overestimate them, so cap them based on the file sizes.
+      cardinality_ = Math.min(cardinality_, estimateAcidDeleteDeltaNumRows(
+          sumValues(totalBytesPerFs_), sumValues(totalFilesPerFs_)));
     }
 
     // Checked after the block above to first collect information for the explain output.

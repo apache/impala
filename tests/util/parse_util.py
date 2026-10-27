@@ -35,6 +35,10 @@ MEM_ESTIMATE_PATTERN = re.compile(
     r"Per-Host Resource Estimates: Memory=(\d+\.?\d*)(P|T|G|M|K)?B")
 NEW_GLOG_ENTRY_PATTERN = re.compile(r"[IWEF](?P<Time>\d{4} \d{2}:\d{2}:\d{2}\.\d{6}).*")
 CACHE_KEY_PATTERN = re.compile(r"cache key: ([a-f0-9]+)")
+# Regex to extract the estimated cardinality of a plan node. The value is printed by
+# PrintUtils.printEstCardinality().
+CARDINALITY_PATTERN = re.compile(r"cardinality=(unavailable|(\d+\.?\d*)(T|G|M|K)?)")
+METRIC_UNIT_MULTIPLIERS = {None: 1, 'K': 10**3, 'M': 10**6, 'G': 10**9, 'T': 10**12}
 
 
 def parse_glog(text, start_time=None):
@@ -179,6 +183,41 @@ def match_cache_key(explain_lines):
     raise Exception(
       'could not find cache key in explain string:\n' + '\n'.join(explain_lines))
   return cache_key
+
+
+def match_cardinality(explain_lines, node_id):
+  """
+  Given a list of strings from EXPLAIN output, find the estimated cardinality of the plan
+  node with id 'node_id', e.g. 1 for '01:SCAN HDFS'. Requires EXPLAIN_LEVEL >= 1.
+
+  Params:
+    explain_lines: list of str
+    node_id: int
+
+  Returns:
+    int - The cardinality with the precision of the EXPLAIN output, e.g. 1230 for
+    '1.23K', or -1 if it is unavailable.
+
+  Raises:
+    Exception if the plan node or its cardinality is not found
+  """
+  # The node's own details, including its cardinality, precede its children. The
+  # lookbehind excludes fragment ids like 'F01:PLAN FRAGMENT'.
+  node_pattern = re.compile(r"(?<!\w)%02d:[A-Z]" % node_id)
+  node_found = False
+  for line in explain_lines:
+    node_found = node_found or node_pattern.search(line) is not None
+    if not node_found:
+      continue
+    regex_result = CARDINALITY_PATTERN.search(line)
+    if regex_result is None:
+      continue
+    if regex_result.group(1) == 'unavailable':
+      return -1
+    value, units = regex_result.group(2, 3)
+    return int(round(float(value) * METRIC_UNIT_MULTIPLIERS[units]))
+  raise Exception('could not find cardinality of node %d in explain string:\n%s'
+      % (node_id, '\n'.join(explain_lines)))
 
 
 def get_bytes_summary_stats_counter(counter_name, runtime_profile):

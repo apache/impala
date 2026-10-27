@@ -30,9 +30,16 @@ from impala_thrift_gen.hive_metastore.ttypes import (
     OpenTxnRequest,
 )
 from tests.common.impala_test_suite import ImpalaTestSuite
-from tests.common.skip import SkipIf, SkipIfCatalogV2, SkipIfFS, SkipIfHive2
+from tests.common.skip import (
+    SkipIf,
+    SkipIfCatalogV2,
+    SkipIfExploration,
+    SkipIfFS,
+    SkipIfHive2,
+)
 from tests.common.test_dimensions import create_single_exec_option_dimension
 from tests.util.acid_txn import AcidTxn
+from tests.util.parse_util import match_cardinality
 
 
 class TestAcid(ImpalaTestSuite):
@@ -152,6 +159,58 @@ class TestAcid(ImpalaTestSuite):
   @SkipIfFS.hive
   def test_acid_compute_stats(self, vector, unique_database):
     self.run_test_case('QueryTest/acid-compute-stats', vector, use_db=unique_database)
+
+  @SkipIfHive2.acid
+  @SkipIfFS.hive
+  @SkipIfExploration.is_not_exhaustive()
+  def test_full_acid_delete_cardinality(self, unique_database):
+    """IMPALA-15710: The cardinality estimate of the delete delta scan used to be the row
+    count of the table, regardless of the number of deleted rows. Checks that the
+    estimate is capped based on the size of the delete delta files, but never raised."""
+    tbl_name = "{}.delete_cardinality".format(unique_database)
+    self.execute_query("create table {} (id int, s string) stored as orc "
+        "tblproperties('transactional'='true')".format(tbl_name))
+    # Insert 102200 rows, then delete 10 of them.
+    self.run_stmt_in_hive("""insert into {} select id + 7300 * m, string_col
+        from functional.alltypes
+        lateral view explode(array(0,1,2,3,4,5,6,7,8,9,10,11,12,13)) x as m"""
+        .format(tbl_name))
+    self.run_stmt_in_hive("delete from {} where id < 10".format(tbl_name))
+    self.execute_query("refresh {}".format(tbl_name))
+
+    def get_scan_cardinalities():
+      """Returns the estimates of the insert and the delete delta scans."""
+      plan = self.execute_query("explain select * from {}".format(tbl_name)).data
+      return match_cardinality(plan, 0), match_cardinality(plan, 1)
+
+    def check_row_count(num_rows):
+      result = self.execute_query("select count(*) from {}".format(tbl_name))
+      assert result.data == [str(num_rows)]
+
+    # Without row count stats the estimates are based on the file sizes and the row width
+    # of the table. This is lower than the cap for the single small delete delta file.
+    insert_card, delete_card = get_scan_cardinalities()
+    assert 10 <= delete_card < insert_card / 10
+
+    # With row count stats the estimate of the delete delta scan used to be the row
+    # count. Now it is capped close to the 10 deleted rows.
+    self.execute_query("compute stats {}".format(tbl_name))
+    check_row_count(102190)
+    insert_card, delete_card = get_scan_cardinalities()
+    assert insert_card == 102190
+    assert 10 <= delete_card < insert_card / 10
+
+    # Delete 40% of the rows with several statements. The cap is above the row count,
+    # so the estimate is the row count again.
+    for i in range(1, 5):
+      self.run_stmt_in_hive(
+          "delete from {} where id % 10 = {}".format(tbl_name, i))
+    self.execute_query("refresh {}".format(tbl_name))
+    self.execute_query("compute stats {}".format(tbl_name))
+    check_row_count(61314)
+    insert_card, delete_card = get_scan_cardinalities()
+    assert insert_card == 61310
+    assert delete_card == insert_card
 
 #  TODO(todd): further tests to write:
 #  TRUNCATE, once HIVE-20137 is implemented.

@@ -1813,6 +1813,7 @@ public class SingleNodePlanner implements SingleNodePlannerIntf {
     HdfsScanNode deleteDeltaScanNode = new HdfsScanNode(ctx.getNextNodeId(),
         deleteDeltaRef.getDesc(), Collections.emptyList(), deleteDeltaPartitions,
         deleteDeltaRef, /*aggInfo=*/null, partConjuncts, /*isPartitionKeyScan=*/false);
+    deleteDeltaScanNode.setIsAcidDeleteDeltaScan();
     deleteDeltaScanNode.init(analyzer);
     //TODO: ACID join conjuncts currently contain predicates for all partitioning columns
     // and the ACID fields. So all of those columns will be the inputs of the hash
