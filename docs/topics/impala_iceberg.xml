@@ -204,6 +204,20 @@ CREATE TABLE ice_t (i INT) STORED AS ICEBERG;
         <codeph>MERGE</codeph> statements fail if they read Avro data files.
       </p>
       <p>
+        If the 'write.parquet.compression-codec' table property is not specified,
+        <codeph>CREATE TABLE</codeph> sets it to 'snappy'. Without it, the Iceberg library
+        would make ZSTD the default codec of the new table.
+      </p>
+      <p>
+        Columns of Iceberg tables can have the <codeph>NOT NULL</codeph> attribute, e.g.:
+        <codeblock>
+CREATE TABLE ice_not_null (id INT NOT NULL, s STRING) STORED AS ICEBERG;
+        </codeblock>
+        Starting in <keyword keyref="impala50"/>, Impala enforces this constraint when it
+        writes data files. A statement that writes a <codeph>NULL</codeph> value into a
+        <codeph>NOT NULL</codeph> column fails with an error.
+      </p>
+      <p>
         You can also use <codeph>CREATE TABLE AS SELECT</codeph> to create new Iceberg tables, e.g.:
         <codeblock>
 CREATE TABLE ice_ctas STORED AS ICEBERG AS SELECT i, b FROM value_tbl;
@@ -681,6 +695,12 @@ ALTER TABLE non_iceberg_table CONVERT TO ICEBERG TBLPROPERTIES('iceberg.catalog'
 ALTER TABLE non_iceberg_table CONVERT TO ICEBERG TBLPROPERTIES('format-version'='1');
         </codeblock>
         If 'format-version' is omitted, Impala will use the default Iceberg format version.
+      </p>
+      <p>
+        Starting in <keyword keyref="impala50"/>, running <codeph>CONVERT TO
+        ICEBERG</codeph> on a table that is already an Iceberg table does not fail. The
+        statement does nothing and returns the message 'Table has already been
+        migrated.'.
       </p>
     </conbody>
   </concept>
@@ -1497,6 +1517,12 @@ WHERE s.operation = 'append'
 ORDER BY made_current_at;
         </codeblock>
       </p>
+      <p>
+        The <codeph>operation</codeph> column of the <codeph>snapshots</codeph> metadata
+        table shows the type of the operation that created the snapshot. Starting in
+        <keyword keyref="impala50"/>, the snapshots that <codeph>DELETE</codeph>
+        statements create have the operation 'delete'.
+      </p>
     </conbody>
   </concept>
 
@@ -1634,8 +1660,9 @@ ORDER BY made_current_at;
           </li>
           <li><codeph>write.parquet.compression-codec</codeph>:
             Parquet compression codec. Supported values are: NONE, GZIP, SNAPPY
-            (default value), LZ4, ZSTD. The table property will be ignored if
-            <codeph>COMPRESSION_CODEC</codeph> query option is set.
+            (default value), LZ4, ZSTD. If the property is not specified,
+            <codeph>CREATE TABLE</codeph> sets it to SNAPPY. The table property will be
+            ignored if <codeph>COMPRESSION_CODEC</codeph> query option is set.
           </li>
           <li><codeph>write.parquet.compression-level</codeph>:
             Parquet compression level. Used with ZSTD compression only.
