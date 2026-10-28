@@ -338,7 +338,11 @@ public class CoerceOperandShuttle extends RexShuttle {
       RelDataType commonType = isAdjustedFunction(op)
           ? argTypes.get(0)
           : retType;
-      return ImpalaTypeConverter.createImpalaType(commonType);
+      Type commonImpalaType = ImpalaTypeConverter.createImpalaType(commonType);
+      // Scale functions need DECIMAL(p,0) for an implicit integer operand.
+      return op instanceof ImpalaAdjustScaleFunction && commonImpalaType.isIntegerType()
+          ? ((ScalarType) commonImpalaType).getMinResolutionDecimal()
+          : commonImpalaType;
     }
 
     // The return type is something other than a decimal. If there are no decimal

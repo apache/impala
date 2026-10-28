@@ -80,6 +80,10 @@ public class ImpalaAdjustScaleFunction extends SqlFunction {
 
     ScalarType impalaType =
         (ScalarType) ImpalaTypeConverter.createImpalaType(opBinding.getOperandType(0));
+    // One-argument integer calls use the native DOUBLE overload.
+    if (impalaType.isIntegerType() && opBinding.getOperandCount() == 1) {
+      return ImpalaTypeConverter.getRelDataType(Type.DOUBLE);
+    }
     ScalarType decimalType = impalaType.getMinResolutionDecimal();
 
     int precision = getName().equals("ROUND") || getName().equals("DROUND")
@@ -100,7 +104,7 @@ public class ImpalaAdjustScaleFunction extends SqlFunction {
       scale = opBinding.getOperandLiteralValue(1, Integer.class);
     }
 
-    if (impalaType.isDecimal()) {
+    if (impalaType.isDecimal() || impalaType.isIntegerType()) {
       int resultScale = Math.max(0, Math.min(decimalType.decimalScale(), scale));
       int integerDigits = decimalType.decimalPrecision() - decimalType.decimalScale();
       // Keep the requested scale: rounding to tens can carry even for scale 0 input.

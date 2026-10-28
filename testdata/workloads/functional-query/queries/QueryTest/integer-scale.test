@@ -1,0 +1,150 @@
+# Integer scale functions across types, scales, NULLs and boundary values.
+====
+---- QUERY
+set decimal_v2=true;
+drop table if exists integer_scale;
+create table integer_scale (id int, t tinyint, s smallint, i int, b bigint)
+  stored as parquet;
+insert into integer_scale values
+  (1,127,127,127,127),(2,-127,-127,-127,-127),(3,NULL,NULL,NULL,NULL),(4,0,0,0,0);
+====
+---- QUERY
+set decimal_v2=true;
+select id,
+  trunc(t) as t_default_scale,
+  trunc(t,0) as t_zero_scale,
+  trunc(t,2) as t_positive_scale,
+  trunc(t,-1) as t_negative_scale,
+  trunc(s) as s_default_scale,
+  trunc(s,0) as s_zero_scale,
+  trunc(s,2) as s_positive_scale,
+  trunc(s,-1) as s_negative_scale,
+  trunc(i) as i_default_scale,
+  trunc(i,0) as i_zero_scale,
+  trunc(i,2) as i_positive_scale,
+  trunc(i,-1) as i_negative_scale,
+  trunc(b) as b_default_scale,
+  trunc(b,0) as b_zero_scale,
+  trunc(b,2) as b_positive_scale,
+  trunc(b,-1) as b_negative_scale
+from $DATABASE.integer_scale order by id;
+---- RESULTS
+1,127,127,127,120,127,127,127,120,127,127,127,120,127,127,127,120
+2,-127,-127,-127,-120,-127,-127,-127,-120,-127,-127,-127,-120,-127,-127,-127,-120
+3,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL
+4,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+---- TYPES
+int,double,decimal,decimal,decimal,double,decimal,decimal,decimal,double,decimal,decimal,decimal,double,decimal,decimal,decimal
+====
+---- QUERY
+set decimal_v2=true;
+select id,
+  truncate(t) as t_default_scale,
+  truncate(t,0) as t_zero_scale,
+  truncate(t,2) as t_positive_scale,
+  truncate(t,-1) as t_negative_scale,
+  truncate(s) as s_default_scale,
+  truncate(s,0) as s_zero_scale,
+  truncate(s,2) as s_positive_scale,
+  truncate(s,-1) as s_negative_scale,
+  truncate(i) as i_default_scale,
+  truncate(i,0) as i_zero_scale,
+  truncate(i,2) as i_positive_scale,
+  truncate(i,-1) as i_negative_scale,
+  truncate(b) as b_default_scale,
+  truncate(b,0) as b_zero_scale,
+  truncate(b,2) as b_positive_scale,
+  truncate(b,-1) as b_negative_scale
+from $DATABASE.integer_scale order by id;
+---- RESULTS
+1,127,127,127,120,127,127,127,120,127,127,127,120,127,127,127,120
+2,-127,-127,-127,-120,-127,-127,-127,-120,-127,-127,-127,-120,-127,-127,-127,-120
+3,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL
+4,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+---- TYPES
+int,double,decimal,decimal,decimal,double,decimal,decimal,decimal,double,decimal,decimal,decimal,double,decimal,decimal,decimal
+====
+---- QUERY
+set decimal_v2=true;
+select id,
+  dtrunc(t) as t_default_scale,
+  dtrunc(t,0) as t_zero_scale,
+  dtrunc(t,2) as t_positive_scale,
+  dtrunc(t,-1) as t_negative_scale,
+  dtrunc(s) as s_default_scale,
+  dtrunc(s,0) as s_zero_scale,
+  dtrunc(s,2) as s_positive_scale,
+  dtrunc(s,-1) as s_negative_scale,
+  dtrunc(i) as i_default_scale,
+  dtrunc(i,0) as i_zero_scale,
+  dtrunc(i,2) as i_positive_scale,
+  dtrunc(i,-1) as i_negative_scale,
+  dtrunc(b) as b_default_scale,
+  dtrunc(b,0) as b_zero_scale,
+  dtrunc(b,2) as b_positive_scale,
+  dtrunc(b,-1) as b_negative_scale
+from $DATABASE.integer_scale order by id;
+---- RESULTS
+1,127,127,127,120,127,127,127,120,127,127,127,120,127,127,127,120
+2,-127,-127,-127,-120,-127,-127,-127,-120,-127,-127,-127,-120,-127,-127,-127,-120
+3,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL
+4,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+---- TYPES
+int,double,decimal,decimal,decimal,double,decimal,decimal,decimal,double,decimal,decimal,decimal,double,decimal,decimal,decimal
+====
+---- QUERY
+set decimal_v2=true;
+select id,
+  round(t) as t_default_scale,
+  round(t,0) as t_zero_scale,
+  round(t,2) as t_positive_scale,
+  round(t,-1) as t_negative_scale,
+  round(s) as s_default_scale,
+  round(s,0) as s_zero_scale,
+  round(s,2) as s_positive_scale,
+  round(s,-1) as s_negative_scale,
+  round(i) as i_default_scale,
+  round(i,0) as i_zero_scale,
+  round(i,2) as i_positive_scale,
+  round(i,-1) as i_negative_scale,
+  round(b) as b_default_scale,
+  round(b,0) as b_zero_scale,
+  round(b,2) as b_positive_scale,
+  round(b,-1) as b_negative_scale
+from $DATABASE.integer_scale order by id;
+---- RESULTS
+1,127,127,127,130,127,127,127,130,127,127,127,130,127,127,127,130
+2,-127,-127,-127,-130,-127,-127,-127,-130,-127,-127,-127,-130,-127,-127,-127,-130
+3,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL
+4,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+---- TYPES
+int,double,decimal,decimal,decimal,double,decimal,decimal,decimal,double,decimal,decimal,decimal,double,decimal,decimal,decimal
+====
+---- QUERY
+set decimal_v2=true;
+select id,
+  dround(t) as t_default_scale,
+  dround(t,0) as t_zero_scale,
+  dround(t,2) as t_positive_scale,
+  dround(t,-1) as t_negative_scale,
+  dround(s) as s_default_scale,
+  dround(s,0) as s_zero_scale,
+  dround(s,2) as s_positive_scale,
+  dround(s,-1) as s_negative_scale,
+  dround(i) as i_default_scale,
+  dround(i,0) as i_zero_scale,
+  dround(i,2) as i_positive_scale,
+  dround(i,-1) as i_negative_scale,
+  dround(b) as b_default_scale,
+  dround(b,0) as b_zero_scale,
+  dround(b,2) as b_positive_scale,
+  dround(b,-1) as b_negative_scale
+from $DATABASE.integer_scale order by id;
+---- RESULTS
+1,127,127,127,130,127,127,127,130,127,127,127,130,127,127,127,130
+2,-127,-127,-127,-130,-127,-127,-127,-130,-127,-127,-127,-130,-127,-127,-127,-130
+3,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL
+4,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+---- TYPES
+int,double,decimal,decimal,decimal,double,decimal,decimal,decimal,double,decimal,decimal,decimal,double,decimal,decimal,decimal
+====
