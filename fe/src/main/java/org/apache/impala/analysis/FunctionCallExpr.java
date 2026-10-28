@@ -584,6 +584,7 @@ public class FunctionCallExpr extends Expr {
                fnName_.getFunction().equalsIgnoreCase("trunc") ||
                fnName_.getFunction().equalsIgnoreCase("round") ||
                fnName_.getFunction().equalsIgnoreCase("dround")) {
+      int requestedScale = 0;
       if (children_.size() > 1) {
         // The second argument to these functions is the desired scale, otherwise
         // the default is 0.
@@ -606,7 +607,8 @@ public class FunctionCallExpr extends Expr {
             children_.get(1), analyzer.getQueryCtx());
         // If scale is greater than the scale of the decimal, this should be a no-op,
         // so we do not need change the scale of the output decimal.
-        digitsAfter = Math.min(digitsAfter, (int)scaleLiteral.getLongValue());
+        requestedScale = (int) scaleLiteral.getLongValue();
+        digitsAfter = Math.min(digitsAfter, requestedScale);
         Preconditions.checkState(digitsAfter <= ScalarType.MAX_SCALE);
         // Round/Truncate to a negative scale means to round to the digit before
         // the decimal e.g. round(1234.56, -2) would be 1200.
@@ -619,10 +621,10 @@ public class FunctionCallExpr extends Expr {
 
       if ((fnName_.getFunction().equalsIgnoreCase("round") ||
            fnName_.getFunction().equalsIgnoreCase("dround")) &&
-          digitsAfter < childType.decimalScale()) {
-        // If we are rounding to fewer decimal places, it's possible we need another
-        // digit before the decimal if the value gets rounded up.
-        ++digitsBefore;
+          requestedScale < childType.decimalScale()) {
+        // Rounding can carry into another integer digit, including when the
+        // requested scale is negative and the input scale is zero.
+        digitsBefore = Math.min(digitsBefore + 1, ScalarType.MAX_PRECISION);
       }
       // Even truncating every fractional digit needs one digit to represent zero.
       if (digitsAfter == 0) digitsBefore = Math.max(digitsBefore, 1);

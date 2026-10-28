@@ -1,0 +1,116 @@
+# Decimal scale changes, NULLs and precision boundaries.
+====
+---- QUERY
+set decimal_v2=true;
+select round(cast(9995 as decimal(4,0)),-1),
+  dround(cast(-9995 as decimal(4,0)),-1),
+  round(cast(999999995 as decimal(9,0)),-1),
+  round(cast(12345 as decimal(38,0)),-1);
+---- RESULTS
+10000,-10000,1000000000,12350
+---- TYPES
+decimal,decimal,decimal,decimal
+====
+---- QUERY
+set decimal_v2=true;
+drop table if exists decimal_scale;
+create table decimal_scale (id int, d decimal(15,3), f decimal(38,38),
+  w decimal(38,3)) stored as parquet;
+insert into decimal_scale values
+  (1,1.235,0.999,9.995),(2,-1.235,-0.999,-9.995),(3,NULL,NULL,NULL);
+====
+---- QUERY
+set decimal_v2=true;
+select id,
+  trunc(d) as default_scale,
+  trunc(d,2) as reduced_scale,
+  trunc(d,3) as same_scale,
+  trunc(d,5) as higher_scale,
+  trunc(d,-1) as negative_scale,
+  trunc(f,2) as fractional,
+  trunc(f,39) as fractional_high_scale,
+  trunc(w,2) as wide_precision
+from $DATABASE.decimal_scale order by id;
+---- RESULTS
+1,1,1.23,1.235,1.235,0,0.99,0.99900000000000000000000000000000000000,9.99
+2,-1,-1.23,-1.235,-1.235,0,-0.99,-0.99900000000000000000000000000000000000,-9.99
+3,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL
+---- TYPES
+int,decimal,decimal,decimal,decimal,decimal,decimal,decimal,decimal
+====
+---- QUERY
+set decimal_v2=true;
+select id,
+  truncate(d) as default_scale,
+  truncate(d,2) as reduced_scale,
+  truncate(d,3) as same_scale,
+  truncate(d,5) as higher_scale,
+  truncate(d,-1) as negative_scale,
+  truncate(f,2) as fractional,
+  truncate(f,39) as fractional_high_scale,
+  truncate(w,2) as wide_precision
+from $DATABASE.decimal_scale order by id;
+---- RESULTS
+1,1,1.23,1.235,1.235,0,0.99,0.99900000000000000000000000000000000000,9.99
+2,-1,-1.23,-1.235,-1.235,0,-0.99,-0.99900000000000000000000000000000000000,-9.99
+3,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL
+---- TYPES
+int,decimal,decimal,decimal,decimal,decimal,decimal,decimal,decimal
+====
+---- QUERY
+set decimal_v2=true;
+select id,
+  dtrunc(d) as default_scale,
+  dtrunc(d,2) as reduced_scale,
+  dtrunc(d,3) as same_scale,
+  dtrunc(d,5) as higher_scale,
+  dtrunc(d,-1) as negative_scale,
+  dtrunc(f,2) as fractional,
+  dtrunc(f,39) as fractional_high_scale,
+  dtrunc(w,2) as wide_precision
+from $DATABASE.decimal_scale order by id;
+---- RESULTS
+1,1,1.23,1.235,1.235,0,0.99,0.99900000000000000000000000000000000000,9.99
+2,-1,-1.23,-1.235,-1.235,0,-0.99,-0.99900000000000000000000000000000000000,-9.99
+3,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL
+---- TYPES
+int,decimal,decimal,decimal,decimal,decimal,decimal,decimal,decimal
+====
+---- QUERY
+set decimal_v2=true;
+select id,
+  round(d) as default_scale,
+  round(d,2) as reduced_scale,
+  round(d,3) as same_scale,
+  round(d,5) as higher_scale,
+  round(d,-1) as negative_scale,
+  round(f,2) as fractional,
+  round(f,39) as fractional_high_scale,
+  round(w,2) as wide_precision
+from $DATABASE.decimal_scale order by id;
+---- RESULTS
+1,1,1.24,1.235,1.235,0,1.00,0.99900000000000000000000000000000000000,10.00
+2,-1,-1.24,-1.235,-1.235,0,-1.00,-0.99900000000000000000000000000000000000,-10.00
+3,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL
+---- TYPES
+int,decimal,decimal,decimal,decimal,decimal,decimal,decimal,decimal
+====
+---- QUERY
+set decimal_v2=true;
+select id,
+  dround(d) as default_scale,
+  dround(d,2) as reduced_scale,
+  dround(d,3) as same_scale,
+  dround(d,5) as higher_scale,
+  dround(d,-1) as negative_scale,
+  dround(f,2) as fractional,
+  dround(f,39) as fractional_high_scale,
+  dround(w,2) as wide_precision
+from $DATABASE.decimal_scale order by id;
+---- RESULTS
+1,1,1.24,1.235,1.235,0,1.00,0.99900000000000000000000000000000000000,10.00
+2,-1,-1.24,-1.235,-1.235,0,-1.00,-0.99900000000000000000000000000000000000,-10.00
+3,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL
+---- TYPES
+int,decimal,decimal,decimal,decimal,decimal,decimal,decimal,decimal
+====

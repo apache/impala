@@ -100,6 +100,19 @@ public class ImpalaAdjustScaleFunction extends SqlFunction {
       scale = opBinding.getOperandLiteralValue(1, Integer.class);
     }
 
+    if (impalaType.isDecimal()) {
+      int resultScale = Math.max(0, Math.min(decimalType.decimalScale(), scale));
+      int integerDigits = decimalType.decimalPrecision() - decimalType.decimalScale();
+      // Keep the requested scale: rounding to tens can carry even for scale 0 input.
+      if ((getName().equals("ROUND") || getName().equals("DROUND"))
+          && scale < decimalType.decimalScale()) {
+        ++integerDigits;
+      }
+      // Calcite cannot represent DECIMAL(0,0) when every fractional digit is removed.
+      precision = Math.min(ScalarType.MAX_PRECISION,
+          Math.max(1, integerDigits + resultScale));
+      scale = resultScale;
+    }
     Type newDecimalType = ScalarType.createDecimalType(precision, scale);
 
     return ImpalaTypeConverter.createRelDataType(newDecimalType);

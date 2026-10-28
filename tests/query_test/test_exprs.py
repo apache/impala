@@ -67,6 +67,9 @@ class TestExprs(ImpalaTestSuite):
     current_db = self.execute_scalar('select current_database()', vector=vector)
     assert current_db == QueryTestSectionReader.get_db_name(table_format)
 
+  def test_decimal_scale_functions(self, vector, unique_database):
+    self.run_test_case('QueryTest/decimal-scale', vector, use_db=unique_database)
+
   def test_special_strings(self, vector):
     """Test handling of expressions with "special" strings."""
     self.run_test_case('QueryTest/special-strings', vector)
