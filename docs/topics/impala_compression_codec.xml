@@ -59,7 +59,7 @@ under the License.
     <p conref="../shared/impala_common.xml#common/syntax_blurb"/>
 
 <codeblock>SET COMPRESSION_CODEC=<varname>codec_name</varname>; // Supported for all codecs.
-SET COMPRESSION_CODEC=<varname>codec_name</varname>:<varname>compression_level</varname>; // Only supported for ZSTD.
+SET COMPRESSION_CODEC=<varname>codec_name</varname>:<varname>compression_level</varname>; // Only supported for ZSTD, GZIP and LZ4.
 </codeblock>
 
     <p>
@@ -68,11 +68,63 @@ SET COMPRESSION_CODEC=<varname>codec_name</varname>:<varname>compression_level</
     </p>
 
     <p>
-      <codeph>ZSTD</codeph> also supports setting a compression level. The lower the level, the faster the speed at
-      the cost of compression ratio. Compression levels from 1 up to 22 are supported for <codeph>ZSTD</codeph>.
-      The default compression level 3 is used, if one is not passed using the <codeph>compression_codec</codeph>
-      query option.
+      <codeph>ZSTD</codeph>, <codeph>GZIP</codeph> and <codeph>LZ4</codeph> also support setting a compression
+      level by appending <codeph>:<varname>level</varname></codeph> to the codec name. For all of them, a lower
+      level is faster but gives a lower compression ratio. A level outside the supported range, or a level for a
+      codec that does not support levels, is rejected with an error. If no level is specified, the default level
+      of the codec is used.
     </p>
+
+    <table frame="all" id="compression_levels">
+      <title>Compression levels supported by COMPRESSION_CODEC</title>
+      <tgroup cols="3">
+        <colspec colname="c1" colwidth="1*"/>
+        <colspec colname="c2" colwidth="3*"/>
+        <colspec colname="c3" colwidth="1*"/>
+        <thead>
+          <row>
+            <entry>Codec</entry>
+            <entry>Supported levels</entry>
+            <entry>Default level</entry>
+          </row>
+        </thead>
+        <tbody>
+          <row>
+            <entry><codeph>ZSTD</codeph></entry>
+            <entry>
+              From the minimum level of the ZSTD library (a large negative number, where negative levels trade
+              compression ratio for speed) up to 22.
+            </entry>
+            <entry>3</entry>
+          </row>
+          <row>
+            <entry><codeph>GZIP</codeph></entry>
+            <entry>1 (fastest) to 9 (best compression).</entry>
+            <entry>6</entry>
+          </row>
+          <row>
+            <entry><codeph>LZ4</codeph></entry>
+            <entry>
+              1, which uses the fast LZ4 compression, or 3 to 12, which use the LZ4 high compression (HC) mode.
+              Level 2 and levels above 12 are not valid.
+            </entry>
+            <entry>1</entry>
+          </row>
+          <row>
+            <entry><codeph>SNAPPY</codeph>, <codeph>NONE</codeph></entry>
+            <entry>Levels are not supported.</entry>
+            <entry>Not applicable</entry>
+          </row>
+        </tbody>
+      </tgroup>
+    </table>
+
+    <note>
+      <codeph>LZ4</codeph> high compression levels give a better compression ratio than level 1 at the cost of
+      a longer write time, while keeping the fast decompression speed of LZ4. They are useful for data that is
+      written once and read many times. The compression level only affects writing. Data files compressed at
+      any level are read the same way.
+    </note>
 
     <note>
       A Parquet file created with <codeph>COMPRESSION_CODEC=NONE</codeph> is still typically smaller than the
@@ -107,6 +159,9 @@ SET COMPRESSION_CODEC=<varname>codec_name</varname>:<varname>compression_level</
 set compression_codec=lz4;
 insert into parquet_table_lz4_compressed select * from t1;
 
+set compression_codec=lz4:9; // LZ4 high compression, level 9.
+insert into parquet_table_lz4_hc_compressed select * from t1;
+
 set compression_codec=zstd; // Default compression level 3.
 insert into parquet_table_zstd_default_compressed select * from t1;
 
@@ -115,6 +170,9 @@ insert into parquet_table_zstd_highly_compressed select * from t1;
 
 set compression_codec=gzip;
 insert into parquet_table_highly_compressed select * from t1;
+
+set compression_codec=gzip:9; // Best GZIP compression.
+insert into parquet_table_gzip_best_compressed select * from t1;
 
 set compression_codec=snappy;
 insert into parquet_table_compression_plus_fast_queries select * from t1;

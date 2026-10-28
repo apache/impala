@@ -3194,7 +3194,14 @@ flight_num:           INT32 SNAPPY DO:83456393 FPO:83488603 SZ:10216514/11474301
         Impala can query Parquet files that use the <codeph>PLAIN</codeph>,
         <codeph>PLAIN_DICTIONARY</codeph>, <codeph>BIT_PACKED</codeph>, <codeph>RLE</codeph>
         and <codeph>RLE_DICTIONARY</codeph> encodings. <codeph>RLE_DICTIONARY</codeph> is supported
-        only in <keyword keyref="impala40"/> and up.
+        only in <keyword keyref="impala40"/> and up. Impala can also read
+        <codeph>BYTE_ARRAY</codeph> columns (<codeph>STRING</codeph>, <codeph>VARCHAR</codeph>
+        and <codeph>BINARY</codeph>) that use the <codeph>DELTA_LENGTH_BYTE_ARRAY</codeph>
+        encoding, which some writers, such as Trino, use by default for string columns. For
+        such columns, the <codeph>DELTA_BINARY_PACKED</codeph> encoding that those writers
+        list in the column chunk metadata is also accepted. Other delta encodings are not
+        supported, and a file that uses an unsupported encoding fails the query with an
+        error.
         When creating files outside of Impala for use by Impala, make sure to use one of the
         supported encodings. In particular, for MapReduce jobs,
         <codeph>parquet.writer.version</codeph> must not be defined (especially as

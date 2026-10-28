@@ -458,8 +458,21 @@ under the License.
         <codeph>PARQUET_COMPRESSION_CODEC</codeph>.) The allowed values for this query option
         are <codeph>snappy</codeph> (the default), <codeph>gzip</codeph>, <codeph>zstd</codeph>,
         <codeph>lz4</codeph>, and <codeph>none</codeph>. The option value is not case-sensitive.
+        <codeph>zstd</codeph>, <codeph>gzip</codeph> and <codeph>lz4</codeph> also accept a
+        compression level, for example <codeph>zstd:12</codeph>. See
+        <xref href="impala_compression_codec.xml#compression_codec"/> for the supported levels.
         If the option is set to an unrecognized value, all kinds of queries will fail due to
         the invalid option setting, not just queries involving Parquet tables.
+      </p>
+
+      <p id="parquet_lz4_raw">
+        Parquet defines two LZ4 codecs: the deprecated <codeph>LZ4</codeph> codec, which Hadoop
+        implementations write using a framed block format, and the newer
+        <codeph>LZ4_RAW</codeph> codec, which uses plain LZ4 block compression. Impala can
+        read data files that use <codeph>LZ4_RAW</codeph>, in addition to the Hadoop-compatible
+        <codeph>LZ4</codeph> codec. No setting is needed to read them. Impala does not write
+        <codeph>LZ4_RAW</codeph>: when <codeph>COMPRESSION_CODEC=lz4</codeph>, it writes the
+        Hadoop-compatible <codeph>LZ4</codeph> codec.
       </p>
 
     </conbody>
@@ -1121,20 +1134,74 @@ select * from production_table where c1 = 100 and c2 &lt; 50 and ...;
 
             <li>
               <p>
-                You cannot change a <codeph>TINYINT</codeph>, <codeph>SMALLINT</codeph>, or
-                <codeph>INT</codeph> column to <codeph>BIGINT</codeph>, or the other way around.
-                Although the <codeph>ALTER TABLE</codeph> succeeds, any attempt to query those
-                columns results in conversion errors.
+                Widening conversions are supported when every value of the old type can be
+                represented exactly in the new type. You can change a <codeph>TINYINT</codeph>,
+                <codeph>SMALLINT</codeph>, or <codeph>INT</codeph> column to a wider integer type
+                such as <codeph>BIGINT</codeph>, or to <codeph>DOUBLE</codeph>, and a
+                <codeph>FLOAT</codeph> column to <codeph>DOUBLE</codeph>. The reverse
+                (narrowing) conversions are not supported: although the
+                <codeph>ALTER TABLE</codeph> succeeds, any attempt to query those columns
+                results in conversion errors.
               </p>
+            </li>
+
+            <li id="parquet_int_as_decimal">
+              <p>
+                You can change a column that was written as <codeph>INT</codeph> or
+                <codeph>BIGINT</codeph> to a <codeph>DECIMAL</codeph> type. In the data file,
+                such a column is stored as a Parquet <codeph>INT32</codeph> or
+                <codeph>INT64</codeph> without a <codeph>DECIMAL</codeph> annotation, so Impala
+                derives the precision from the physical type instead of from the file metadata:
+              </p>
+              <ul>
+                <li>
+                  An <codeph>INT32</codeph> column is treated as having precision 10 and scale
+                  0. The new <codeph>DECIMAL</codeph> type must have a precision of at least
+                  10.
+                </li>
+                <li>
+                  An <codeph>INT64</codeph> column is treated as having precision 19 and scale
+                  0. The new <codeph>DECIMAL</codeph> type must have a precision of at least
+                  19.
+                </li>
+                <li>
+                  If the new type has a smaller precision, queries on the column fail with an
+                  error that the precision does not match the table metadata.
+                </li>
+                <li>
+                  If the new type has a non-zero scale, the integer values are rescaled. A value
+                  that does not fit the new precision and scale after rescaling is returned as
+                  <codeph>NULL</codeph>. For example, after changing an
+                  <codeph>INT</codeph> column to <codeph>DECIMAL(12,4)</codeph>, the value
+                  <codeph>2147483647</codeph> needs 14 digits and is returned as
+                  <codeph>NULL</codeph>, while the same column as <codeph>DECIMAL(20,4)</codeph>
+                  returns <codeph>2147483647.0000</codeph>.
+                </li>
+              </ul>
+<codeblock>CREATE TABLE int_to_decimal (c1 INT, c2 BIGINT) STORED AS PARQUET;
+INSERT INTO int_to_decimal VALUES (1, 1), (2147483647, 9223372036854775807);
+
+ALTER TABLE int_to_decimal CHANGE c1 c1 DECIMAL(20,4);
+SELECT c1 FROM int_to_decimal;
++-----------------+
+| c1              |
++-----------------+
+| 1.0000          |
+| 2147483647.0000 |
++-----------------+
+
+ALTER TABLE int_to_decimal CHANGE c1 c1 DECIMAL(8,0);
+SELECT c1 FROM int_to_decimal;
+-- Fails because precision 8 is smaller than the 10 derived for INT32.
+</codeblock>
             </li>
 
             <li>
               <p>
                 Any other type conversion for columns produces a conversion error during
                 queries. For example, <codeph>INT</codeph> to <codeph>STRING</codeph>,
-                <codeph>FLOAT</codeph> to <codeph>DOUBLE</codeph>, <codeph>TIMESTAMP</codeph> to
-                <codeph>STRING</codeph>, <codeph>DECIMAL(9,0)</codeph> to
-                <codeph>DECIMAL(5,2)</codeph>, and so on.
+                <codeph>TIMESTAMP</codeph> to <codeph>STRING</codeph>,
+                <codeph>DECIMAL(9,0)</codeph> to <codeph>DECIMAL(5,2)</codeph>, and so on.
               </p>
             </li>
           </ul>
