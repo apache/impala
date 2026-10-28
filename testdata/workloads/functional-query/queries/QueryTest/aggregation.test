@@ -1,5 +1,41 @@
 ====
 ---- QUERY
+# SUM implicitly converts BOOLEAN to BIGINT in both planners.
+select sum(b), sum(distinct b), sum(not b), sum(b is null)
+from (select true as b union all select false union all
+      select cast(null as boolean) union all select true) t
+---- RESULTS
+2,1,1,1
+---- TYPES
+BIGINT,BIGINT,BIGINT,BIGINT
+====
+---- QUERY
+# An all-NULL or empty BOOLEAN input still produces NULL.
+select sum(b) from (select cast(null as boolean) as b) t
+---- RESULTS
+NULL
+---- TYPES
+BIGINT
+====
+---- QUERY
+select sum(b) from (select true as b) t where false
+---- RESULTS
+NULL
+---- TYPES
+BIGINT
+====
+---- QUERY
+select sum(b) over () from (select true as b union all select false union all
+                           select cast(null as boolean) union all select true) t
+---- RESULTS
+2
+2
+2
+2
+---- TYPES
+BIGINT
+====
+---- QUERY
 # test a larger dataset, includes nulls
 # the exact result could vary slightly due to numeric instability
 # 0.001 is a conservative upperbound on the possible difference in results

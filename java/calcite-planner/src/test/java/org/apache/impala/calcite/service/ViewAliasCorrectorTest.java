@@ -102,9 +102,9 @@ public class ViewAliasCorrectorTest extends FrontendTestBase {
   }
 
   @Test
-  public void testSumBooleanViewPreservesValidationError() throws Exception {
-    assertViewValidationError("sum(flag)", "sum(cast(flag as int))",
-        "SUM", Type.BIGINT);
+  public void testAvgBooleanViewPreservesValidationError() throws Exception {
+    assertViewValidationError("avg(flag)", "avg(cast(flag as int))",
+        "AVG", Type.DOUBLE);
   }
 
   private void assertViewValidationError(String expression, String control,

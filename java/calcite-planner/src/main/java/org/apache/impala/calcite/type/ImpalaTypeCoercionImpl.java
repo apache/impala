@@ -22,10 +22,12 @@ import org.apache.calcite.rel.type.RelDataTypeFactory;
 import org.apache.calcite.sql.SqlCall;
 import org.apache.calcite.sql.SqlCallBinding;
 import org.apache.calcite.sql.SqlCharStringLiteral;
+import org.apache.calcite.sql.SqlKind;
 import org.apache.calcite.sql.SqlNode;
 import org.apache.calcite.sql.SqlNodeList;
 import org.apache.calcite.sql.fun.SqlStdOperatorTable;
 import org.apache.calcite.sql.parser.SqlParserPos;
+import org.apache.calcite.sql.type.SqlTypeFamily;
 import org.apache.calcite.sql.type.SqlTypeName;
 import org.apache.calcite.sql.type.SqlTypeUtil;
 import org.apache.calcite.sql.validate.SqlValidator;
@@ -43,6 +45,19 @@ public class ImpalaTypeCoercionImpl extends TypeCoercionImpl {
 
   public ImpalaTypeCoercionImpl(RelDataTypeFactory typeFactory, SqlValidator validator) {
     super(typeFactory, validator);
+  }
+
+  @Override
+  public boolean builtinFunctionCoercion(SqlCallBinding binding,
+      List<RelDataType> operandTypes, List<SqlTypeFamily> expectedFamilies) {
+    // The original planner resolves SUM(BOOLEAN) to SUM(BIGINT).
+    if (binding.getOperator().getKind() == SqlKind.SUM
+        && binding.getOperandCount() == 1
+        && SqlTypeUtil.isBoolean(operandTypes.get(0))) {
+      return coerceOperandType(binding.getScope(), binding.getCall(), 0,
+          factory.createSqlType(SqlTypeName.BIGINT));
+    }
+    return super.builtinFunctionCoercion(binding, operandTypes, expectedFamilies);
   }
 
   @Override
