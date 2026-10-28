@@ -527,8 +527,8 @@ ALTER TABLE t ALTER COLUMN status DROP DEFAULT;
         Impala also honors the initial default of the columns that other engines defined,
         in Parquet, ORC and Avro data files. This includes the initial defaults of Iceberg
         <codeph>timestamp</codeph> (without time zone) and <codeph>uuid</codeph> columns.
-        A query that reads a <codeph>uuid</codeph> column fails if it reads a data file
-        that is not a Parquet file, even if the file does not contain the column. The
+        A query that reads a <codeph>uuid</codeph> column fails if it reads an Avro data
+        file, even if the file does not contain the column. The
         following restrictions apply to such tables:
       </p>
       <ul>
@@ -795,7 +795,8 @@ DROP TABLE ice_t;
               </row>
               <row>
                 <entry>uuid</entry>
-                <entry>UUID (read only, Parquet data files only)</entry>
+                <entry><xref href="impala_uuid.xml#uuid_type">UUID</xref> (read only, Parquet
+                  and ORC data files; Avro not supported)</entry>
               </row>
               <row>
                 <entry>fixed(L)</entry>
@@ -919,10 +920,62 @@ CREATE TABLE ice_p (i INT, b INT) PARTITIONED BY (p1 INT, p2 STRING) STORED AS I
         </codeblock>
       </p>
       <p>
+        Column names in partition specs are case insensitive, like column names everywhere
+        else in Impala. For example, the following statements refer to the columns
+        <codeph>start_time</codeph> and <codeph>end_time</codeph>:
+        <codeblock>
+CREATE TABLE ice_t (start_time TIMESTAMP, end_time TIMESTAMP)
+PARTITIONED BY SPEC (DAY(START_TIME), MONTH(End_Time))
+STORED AS ICEBERG;
+
+ALTER TABLE ice_t DROP PARTITION (DAY(Start_Time) = '2023-11-27');
+        </codeblock>
+      </p>
+      <p>
         One can inspect a table's partition spec by the <codeph>SHOW PARTITIONS</codeph> or
         <codeph>SHOW CREATE TABLE</codeph> commands.
       </p>
+      <note>
+        <codeph>SHOW PARTITIONS</codeph> displays <codeph>BINARY</codeph> partition values in
+        hexadecimal, so the value <codeph>'0'</codeph> appears as <codeph>30</codeph>.
+      </note>
     </conbody>
+
+    <concept id="iceberg_uuid_partitions">
+      <title>Partitioning by UUID columns</title>
+      <conbody>
+        <p>
+          An Iceberg table can be partitioned by a <codeph>UUID</codeph> column with the
+          <codeph>IDENTITY</codeph>, <codeph>BUCKET</codeph> or <codeph>VOID</codeph>
+          partition transform. The Iceberg specification does not allow the other
+          transforms on <codeph>UUID</codeph> columns, so Impala rejects them. Impala cannot
+          write <codeph>UUID</codeph> values,
+          so these tables have to be loaded by another engine, but Impala can query them
+          and manage their partitions. See <xref href="impala_uuid.xml#uuid_type"/>.
+        </p>
+        <p>
+          <codeph>ALTER TABLE DROP PARTITION</codeph>,
+          <codeph>SHOW FILES IN ... PARTITION</codeph> and
+          <codeph>SHOW PARTITIONS ... WHERE</codeph> can select partitions by
+          <codeph>UUID</codeph> value with <codeph>=</codeph>, <codeph>!=</codeph>,
+          <codeph>IN</codeph> and <codeph>NOT IN</codeph>. Cast each value to
+          <codeph>UUID</codeph>. For a table created with
+          <codeph>PARTITIONED BY SPEC (event_id)</codeph>:
+          <codeblock>
+ALTER TABLE events_part DROP PARTITION
+  (event_id = CAST('550e8400-e29b-41d4-a716-446655440000' AS UUID));
+
+SHOW FILES IN events_part PARTITION
+  (event_id IN (CAST('550e8400-e29b-41d4-a716-446655440000' AS UUID),
+                CAST('6ba7b810-9dad-11d1-80b4-00c04fd430c8' AS UUID)));
+          </codeblock>
+          This only works if the column has always been identity partitioned, in the
+          current partition spec and in every earlier one. Range comparisons such as
+          <codeph>&lt;</codeph> and <codeph>BETWEEN</codeph> are not supported in these
+          statements.
+        </p>
+      </conbody>
+    </concept>
   </concept>
 
   <concept id="iceberg_show_partitions">

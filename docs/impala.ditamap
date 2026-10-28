@@ -117,6 +117,7 @@ under the License.
         <topicref href="topics/impala_custom_timezones.xml"/>
       </topicref>
       <topicref href="topics/impala_tinyint.xml"/>
+      <topicref rev="5.0.0" href="topics/impala_uuid.xml"/>
       <topicref href="topics/impala_varchar.xml"/>
       <topicref rev="5.0.0" href="topics/impala_variant.xml"/>
       <topicref href="topics/impala_complex_types.xml">

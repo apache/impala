@@ -1,0 +1,220 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+Licensed to the Apache Software Foundation (ASF) under one
+or more contributor license agreements.  See the NOTICE file
+distributed with this work for additional information
+regarding copyright ownership.  The ASF licenses this file
+to you under the Apache License, Version 2.0 (the
+"License"); you may not use this file except in compliance
+with the License.  You may obtain a copy of the License at
+
+  http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing,
+software distributed under the License is distributed on an
+"AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+KIND, either express or implied.  See the License for the
+specific language governing permissions and limitations
+under the License.
+-->
+<!DOCTYPE concept PUBLIC "-//OASIS//DTD DITA Concept//EN" "concept.dtd">
+<concept id="uuid_type" rev="5.0.0 IMPALA-15101">
+
+  <title>UUID Data Type (<keyword keyref="impala50"/> or higher only)</title>
+
+  <titlealts audience="PDF">
+
+    <navtitle>UUID</navtitle>
+
+  </titlealts>
+
+  <prolog>
+    <metadata>
+      <data name="Category" value="Impala"/>
+      <data name="Category" value="Impala Data Types"/>
+      <data name="Category" value="SQL"/>
+      <data name="Category" value="Data Analysts"/>
+      <data name="Category" value="Developers"/>
+      <data name="Category" value="Iceberg"/>
+    </metadata>
+  </prolog>
+
+  <conbody>
+
+    <p>
+      The <codeph>UUID</codeph> data type holds a 128-bit universally unique identifier,
+      such as <codeph>550e8400-e29b-41d4-a716-446655440000</codeph>. It corresponds to
+      the Iceberg <codeph>uuid</codeph> type and can only be used in Iceberg tables.
+    </p>
+
+    <p>
+      The <codeph>UUID</codeph> data type is not related to the <codeph>UUID()</codeph>
+      function, which generates a random identifier and returns it as a
+      <codeph>STRING</codeph>. See <xref href="impala_misc_functions.xml#misc_functions/uuid"/>.
+    </p>
+
+    <p conref="../shared/impala_common.xml#common/syntax_blurb"/>
+
+<codeblock><varname>column_name</varname> UUID</codeblock>
+
+    <p conref="../shared/impala_common.xml#common/example_blurb"/>
+
+<codeblock>CREATE TABLE events (id INT, event_id UUID) STORED AS ICEBERG;</codeblock>
+
+    <p conref="../shared/impala_common.xml#common/usage_notes_blurb"/>
+
+    <ul>
+      <li>
+        <codeph>UUID</codeph> columns are only allowed in Iceberg tables. In Iceberg tables,
+        <codeph>UUID</codeph> can also be used inside <codeph>STRUCT</codeph>,
+        <codeph>ARRAY</codeph> and <codeph>MAP</codeph> types. Creating or altering any
+        other kind of table with a <codeph>UUID</codeph> column, including a
+        <codeph>UUID</codeph> inside a complex type, fails.
+      </li>
+      <li>
+        Impala shows <codeph>UUID</codeph> values as lowercase strings in the standard
+        <codeph>8-4-4-4-12</codeph> form. <codeph>DESCRIBE</codeph> and
+        <codeph>SHOW CREATE TABLE</codeph> show the column type as <codeph>UUID</codeph>.
+      </li>
+      <li>
+        Clients that connect through HiveServer2, such as JDBC and ODBC applications,
+        receive <codeph>UUID</codeph> values as <codeph>STRING</codeph>. The Hive Metastore
+        also lists the column as <codeph>string</codeph>, because it has no
+        <codeph>UUID</codeph> type, so other tools that read the column type from the Hive
+        Metastore see a <codeph>string</codeph> column. This does not change the column in
+        the Iceberg table, where it remains <codeph>uuid</codeph>.
+      </li>
+    </ul>
+
+    <p>
+      <b>Reading and writing data:</b>
+    </p>
+
+    <ul>
+      <li>
+        Impala can read <codeph>UUID</codeph> columns from Iceberg tables whose data
+        files are in Parquet or ORC format, including tables written by other engines
+        such as Trino or Spark. Queries fail if the table has Avro data files.
+      </li>
+      <li>
+        Impala cannot write <codeph>UUID</codeph> values. <codeph>INSERT</codeph>,
+        <codeph>CREATE TABLE AS SELECT</codeph>, <codeph>UPDATE</codeph>,
+        <codeph>MERGE</codeph> and <codeph>OPTIMIZE</codeph> fail on a table that has a
+        <codeph>UUID</codeph> column. Use another engine to load the data, then query it
+        with Impala. Iceberg write-default values on <codeph>UUID</codeph> columns are not
+        supported.
+      </li>
+    </ul>
+
+    <p>
+      <b>Literals and conversions:</b>
+    </p>
+
+    <p>
+      There is no <codeph>UUID</codeph> literal, and Impala never converts a string to a
+      <codeph>UUID</codeph> automatically. To compare a <codeph>UUID</codeph> column with a
+      constant, cast the string to <codeph>UUID</codeph>:
+    </p>
+
+<codeblock>SELECT id FROM events
+WHERE event_id = CAST('550e8400-e29b-41d4-a716-446655440000' AS UUID);</codeblock>
+
+    <ul>
+      <li>
+        <codeph>CAST(<varname>expr</varname> AS UUID)</codeph> accepts a
+        <codeph>STRING</codeph>, <codeph>VARCHAR</codeph> or <codeph>CHAR</codeph> value
+        in the 36-character <codeph>8-4-4-4-12</codeph> form. Upper case and lower case
+        hexadecimal digits are both accepted. Any other format, for example a value without
+        dashes, in braces, or with surrounding spaces, makes the query fail.
+      </li>
+      <li>
+        <codeph>CAST(<varname>uuid_expr</varname> AS STRING)</codeph> returns the lowercase
+        <codeph>8-4-4-4-12</codeph> form. A <codeph>UUID</codeph> cannot be cast to any
+        other type, including <codeph>CHAR</codeph> and <codeph>VARCHAR</codeph>.
+      </li>
+      <li>
+        String functions such as <codeph>LENGTH()</codeph> and string operators such as
+        <codeph>LIKE</codeph> do not accept <codeph>UUID</codeph> values. Cast the value to
+        <codeph>STRING</codeph> first:
+<codeblock>SELECT id FROM events WHERE CAST(event_id AS STRING) LIKE '550e8400%';</codeblock>
+      </li>
+    </ul>
+
+    <p>
+      <b>Comparisons, sorting and aggregation:</b>
+    </p>
+
+    <ul>
+      <li>
+        <codeph>UUID</codeph> values can be compared with each other using
+        <codeph>=</codeph>, <codeph>!=</codeph>, <codeph>&lt;</codeph>,
+        <codeph>&gt;</codeph>, <codeph>&lt;=</codeph>, <codeph>&gt;=</codeph>,
+        <codeph>IS [NOT] DISTINCT FROM</codeph>, <codeph>IN</codeph>,
+        <codeph>NOT IN</codeph> and <codeph>BETWEEN</codeph>. Both sides must be
+        <codeph>UUID</codeph> values.
+      </li>
+      <li>
+        <codeph>UUID</codeph> values are compared byte by byte as unsigned values, using the
+        RFC 4122 byte sequence (most significant byte first). This gives the same order as
+        sorting their lowercase string form. This order is used by <codeph>ORDER BY</codeph>,
+        range comparisons, <codeph>MIN()</codeph> and <codeph>MAX()</codeph>.
+      </li>
+      <li>
+        <codeph>UUID</codeph> columns can be used in joins, <codeph>GROUP BY</codeph> and
+        <codeph>DISTINCT</codeph>, and with the <codeph>COUNT()</codeph>,
+        <codeph>COUNT(DISTINCT)</codeph>, <codeph>MIN()</codeph>, <codeph>MAX()</codeph>,
+        <codeph>NDV()</codeph> and <codeph>SAMPLED_NDV()</codeph> aggregate functions.
+        Numeric aggregate functions such as <codeph>SUM()</codeph> and
+        <codeph>AVG()</codeph> do not accept <codeph>UUID</codeph> values.
+      </li>
+      <li>
+        <codeph>COMPUTE STATS</codeph> does not collect statistics for
+        <codeph>UUID</codeph> columns. Listing a <codeph>UUID</codeph> column explicitly
+        in <codeph>COMPUTE STATS</codeph> fails.
+      </li>
+    </ul>
+
+    <p conref="../shared/impala_common.xml#common/added_in_50"/>
+
+    <p conref="../shared/impala_common.xml#common/related_info"/>
+
+    <p>
+      <xref href="impala_iceberg.xml#impala_iceberg"/>,
+      <xref href="impala_iceberg.xml#iceberg_uuid_partitions">Partitioning by UUID
+      columns</xref>,
+      <xref href="impala_misc_functions.xml#misc_functions/uuid"/>
+    </p>
+
+    <section id="uuid_partitioning">
+      <title>Partitioning on UUID columns</title>
+      <p>
+        An Iceberg table can be partitioned by a <codeph>UUID</codeph> column with the
+        <codeph>IDENTITY</codeph>, <codeph>BUCKET</codeph> or <codeph>VOID</codeph>
+        partition transform. The Iceberg specification does not allow the
+        <codeph>TRUNCATE</codeph>, <codeph>YEAR</codeph>, <codeph>MONTH</codeph>,
+        <codeph>DAY</codeph> and <codeph>HOUR</codeph> transforms on <codeph>UUID</codeph>
+        columns, so Impala rejects them. Use
+        <codeph>PARTITIONED BY SPEC</codeph>; the legacy
+        <codeph>PARTITIONED BY (<varname>col</varname> UUID)</codeph> syntax is not
+        supported.
+      </p>
+
+<codeblock>CREATE TABLE events_part (id INT, event_id UUID)
+PARTITIONED BY SPEC (event_id)
+STORED AS ICEBERG;
+
+CREATE TABLE events_bucketed (id INT, event_id UUID)
+PARTITIONED BY SPEC (BUCKET(16, event_id))
+STORED AS ICEBERG;</codeblock>
+
+      <p>
+        Because Impala cannot write <codeph>UUID</codeph> values, these tables have to be
+        loaded by another engine. Impala can query them and manage their partitions. See
+        <xref href="impala_iceberg.xml#iceberg_uuid_partitions">Partitioning by UUID
+        columns</xref> for how to filter partitions by <codeph>UUID</codeph> values.
+      </p>
+    </section>
+
+  </conbody>
+
+</concept>
