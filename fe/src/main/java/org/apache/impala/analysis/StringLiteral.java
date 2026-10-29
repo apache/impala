@@ -288,19 +288,7 @@ public class StringLiteral extends LiteralExpr {
     int ret = super.compareTo(o);
     if (ret != 0) return ret; // TODO: this doesn't seem to handle the NULL case well
     StringLiteral other = (StringLiteral) o;
-    // Do byte wise comparisin on UTF8 format to be consistant with BE.
-    // TODO: it would be clearer to use backand's comparision functions in literals.
-    byte[] arr1 = getBinValue();
-    byte[] arr2 = other.getBinValue();
-    // TODO: rewrite once Java 8 support is dropped
-    //return Arrays.compare(binValue_, other.binValue_); // added in java 9
-    for (int i = 0; i < arr1.length && i < arr2.length; i++) {
-      if (arr1[i] < arr2[i]) return -1;
-      if (arr1[i] > arr2[i]) return 1;
-    }
-    if (arr1.length < arr2.length) return -1;
-    if (arr1.length > arr2.length) return 1;
-    return 0;
+    return Arrays.compareUnsigned(getBinValue(), other.getBinValue());
   }
 
   @Override

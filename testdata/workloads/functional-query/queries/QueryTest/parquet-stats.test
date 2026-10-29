@@ -773,3 +773,25 @@ select count(*) from ts where dt = cast("2010-01-01" as timestamp);
 ---- RESULTS
 1
 ====
+---- QUERY
+# The IN predicate contains both ASCII and non-ASCII characters.
+create table non_ascii(a string) stored as parquet;
+insert into non_ascii values ('á');
+select a from non_ascii where a in ('á', 'a');
+---- TYPES
+STRING
+---- RESULTS: RAW_STRING
+'á'
+====
+---- QUERY
+# The Partition Key contains non-ASCII characters.
+create table non_ascii_pk(id int) partitioned by (p string) stored as parquet;
+insert into non_ascii_pk partition(p) values (1, 'á');
+explain select id, p from non_ascii_pk where p < 'a';
+---- TYPES
+STRING
+---- RESULTS: VERIFY_IS_SUBSET
+'00:SCAN $FILESYSTEM_NAME [$DATABASE.non_ascii_pk]'
+'   partition predicates: p < 'a''
+'   partitions=0/1 files=0 size=0B'
+====
