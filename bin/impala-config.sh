@@ -507,7 +507,7 @@ else
   export IMPALA_THRIFT_JAVA_VERSION=${IMPALA_THRIFT_POM_VERSION}-p3
 fi
 unset IMPALA_THRIFT_JAVA_URL
-export IMPALA_THRIFT_PY_VERSION=0.16.0-p8
+export IMPALA_THRIFT_PY_VERSION=0.24.0-p3
 unset IMPALA_THRIFT_PY_URL
 
 # Extract the first component of the hive version.
