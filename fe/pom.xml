@@ -214,6 +214,12 @@ under the License.
           <groupId>org.apache.hadoop</groupId>
           <artifactId>hadoop-client-api</artifactId>
         </exclusion>
+        <!-- Impala does not support Brotli compression, so exclude the Brotli codec-->
+        <!-- com.aayushatharva.brotli4j pulled in by orc-core as well-->
+        <exclusion>
+          <groupId>com.aayushatharva.brotli4j</groupId>
+          <artifactId>*</artifactId>
+        </exclusion>
       </exclusions>
     </dependency>
 
@@ -872,6 +878,9 @@ under the License.
                     <exclude>org.bouncycastle:bcpkix-jdk15to18:*</exclude>
                     <!-- Impala generates its own version from Thrift (IMPALA-15349). -->
                     <exclude>org.apache.hive:hive-service-rpc</exclude>
+                    <!-- Exclude the Brotli codec pulled in by orc-core. -->
+                    <!-- Impala does not support Brotli, and CVE-2026-111497 makes exclusion the safest option -->
+                    <exclude>com.aayushatharva.brotli4j:*</exclude>
                   </excludes>
                   <includes>
                     <!-- ranger-plugins-audit depends on jetty-client, which in turn pulls in jetty-http and jetty-io. -->

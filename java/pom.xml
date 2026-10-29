@@ -524,6 +524,12 @@ under the License.
             <groupId>org.apache.hadoop</groupId>
             <artifactId>hadoop-yarn-registry</artifactId>
           </exclusion>
+          <!-- Impala does not support Brotli compression.
+               Exclude the Brotli codec pulled in by hive-exec via orc-core. -->
+          <exclusion>
+            <groupId>com.aayushatharva.brotli4j</groupId>
+            <artifactId>*</artifactId>
+          </exclusion>
         </exclusions>
       </dependency>
 
@@ -648,8 +654,44 @@ under the License.
           <artifactId>build-helper-maven-plugin</artifactId>
           <version>3.3.0</version>
         </plugin>
+
+        <plugin>
+          <groupId>org.apache.maven.plugins</groupId>
+          <artifactId>maven-enforcer-plugin</artifactId>
+          <version>3.1.0</version>
+        </plugin>
       </plugins>
     </pluginManagement>
+
+    <plugins>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-enforcer-plugin</artifactId>
+        <executions>
+          <!-- Dependencies that must never appear on the classpath, at any
+               version. Version pinning of the components that are shipped is in
+               execution enforce-dependency-versions. -->
+          <execution>
+            <id>enforce-banned-dependencies</id>
+            <goals>
+              <goal>enforce</goal>
+            </goals>
+            <configuration>
+              <rules>
+                <bannedDependencies>
+                  <excludes>
+                    <!-- Exclude the Brotli codec pulled in by orc-core. -->
+                    <!-- Impala does not support Brotli, and CVE-2026-111497 makes exclusion the safest option -->
+                    <exclude>com.aayushatharva.brotli4j:*</exclude>
+                  </excludes>
+                </bannedDependencies>
+              </rules>
+              <fail>true</fail>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
+    </plugins>
   </build>
 
   <modules>
