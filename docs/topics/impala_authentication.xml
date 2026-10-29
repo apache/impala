@@ -41,7 +41,8 @@ under the License.
     </p>
 
     <p>
-      Impala supports authentication using either Kerberos or LDAP.
+      Impala supports authentication using Kerberos, LDAP, or bearer tokens in the form
+      of OAuth access tokens.
     </p>
     <p>
       Impala also supports single sign-on with SAML2, see

@@ -548,6 +548,130 @@ under the License.
                 its arguments in quotation marks.
               </entry>
             </row>
+            <row>
+              <entry>
+                <p>-j or</p>
+                <p>--jwt</p>
+              </entry>
+              <entry>
+                use_jwt=true
+              </entry>
+              <entry>
+                Use a JWT to authenticate to Impala. Impala must be configured to
+                allow OAuth authentication and <codeph>--protocol</codeph> must be
+                <codeph>'hs2-http'</codeph>. See <xref href="impala_oauth.xml"/>.
+              </entry>
+            </row>
+            <row>
+              <entry>
+                --jwt_cmd=<varname>JWT_CMD</varname>
+              </entry>
+              <entry>
+                N/A
+              </entry>
+              <entry>
+                Specifies a command to run to retrieve the JWT when JWT authentication is
+                enabled by the <codeph>-j</codeph> option. If the command includes
+                space-separated arguments, enclose the command and its arguments in
+                quotation marks.
+              </entry>
+            </row>
+            <row>
+              <entry>
+                <p>-a or</p>
+                <p>--oauth</p>
+              </entry>
+              <entry>
+                use_oauth=true
+              </entry>
+              <entry>
+                Use an OAuth access token to authenticate to Impala. Impala must be
+                configured to allow OAuth authentication and <codeph>--protocol</codeph>
+                must be <codeph>'hs2-http'</codeph>. See <xref href="impala_oauth.xml"/>.
+              </entry>
+            </row>
+            <row>
+              <entry>
+                --oauth_cmd=<varname>OAUTH_CMD</varname>
+              </entry>
+              <entry>
+                N/A
+              </entry>
+              <entry>
+                Specifies a command to run to retrieve the OAuth access token when OAuth
+                authentication is enabled by the <codeph>-a</codeph> option. If the
+                command includes space-separated arguments, enclose the command and its
+                arguments in quotation marks. Use this option when you already have a way
+                to obtain a valid access token. To have <cmdname>impala-shell</cmdname>
+                request a token on your behalf instead, use
+                <codeph>--oauth_client_id</codeph>,
+                <codeph>--oauth_client_secret_cmd</codeph>,
+                <codeph>--oauth_server</codeph>, and <codeph>--oauth_endpoint</codeph>.
+              </entry>
+            </row>
+            <row>
+              <entry>
+                --oauth_client_id=<varname>OAUTH_CLIENT_ID</varname>
+              </entry>
+              <entry>
+                oauth_client_id=<varname>OAUTH_CLIENT_ID</varname>
+              </entry>
+              <entry>
+                Client ID to authenticate with the OAuth authorization server, when
+                OAuth authentication is enabled by the <codeph>-a</codeph> option and
+                <cmdname>impala-shell</cmdname> requests an access token on your
+                behalf. Used together with
+                <codeph>--oauth_client_secret_cmd</codeph>,
+                <codeph>--oauth_server</codeph>, and
+                <codeph>--oauth_endpoint</codeph>.
+              </entry>
+            </row>
+            <row>
+              <entry>
+                --oauth_client_secret_cmd=<varname>OAUTH_CLIENT_SECRET_CMD</varname>
+              </entry>
+              <entry>
+                N/A
+              </entry>
+              <entry>
+                Specifies a command to run to retrieve the OAuth client secret
+                associated with <codeph>--oauth_client_id</codeph>. If the command
+                includes space-separated arguments, enclose the command and its
+                arguments in quotation marks. Ignored if <codeph>--oauth_cmd</codeph> is
+                specified. If not set, the shell prompts for the client secret
+                interactively.
+              </entry>
+            </row>
+            <row>
+              <entry>
+                --oauth_server=<varname>OAUTH_SERVER</varname>
+              </entry>
+              <entry>
+                oauth_server=<varname>OAUTH_SERVER</varname>
+              </entry>
+              <entry>
+                Hostname and optional port, in the format <codeph>hostname:port</codeph>,
+                of the OAuth authorization server used to request access and refresh
+                tokens, when <cmdname>impala-shell</cmdname> requests an access token on
+                your behalf using <codeph>--oauth_client_id</codeph> and
+                <codeph>--oauth_client_secret_cmd</codeph>. Also used as part of the
+                audience value of the payload sent when requesting access tokens. Impala
+                must be configured to allow OAuth authentication.
+              </entry>
+            </row>
+            <row>
+              <entry>
+                --oauth_endpoint=<varname>OAUTH_ENDPOINT</varname>
+              </entry>
+              <entry>
+                oauth_endpoint=<varname>OAUTH_ENDPOINT</varname>
+              </entry>
+              <entry>
+                Endpoint on the OAuth authorization server
+                (<codeph>--oauth_server</codeph>) used to request access and refresh
+                tokens.
+              </entry>
+            </row>
             <row rev="2.0.0">
               <entry>
                 --config_file=<varname>path_to_config_file</varname>
@@ -594,7 +718,8 @@ under the License.
               <entry>--auth_creds_ok_in_clear</entry>
               <entry>N/A</entry>
               <entry>
-                Allows LDAP authentication to be used with an insecure connection to the shell.
+                Allows LDAP, JWT, or OAuth authentication to be used with an insecure
+                connection to the shell.
                 WARNING: This will allow authentication credentials to be sent unencrypted,
                 and hence may be vulnerable to an attack.
               </entry>
@@ -736,6 +861,37 @@ query=select count(*) from web_traffic where event_date = trunc(now(),'dd')
 <ph rev="2.11.0 IMPALA-5736">[impala.query_options]
 mem_limit=32g</ph>
 </codeblock>
+    </conbody>
+  </concept>
+  <concept id="shell_oauth_examples">
+    <title>OAuth Client Authentication Examples</title>
+    <conbody>
+      <p>To use either example, configure Impala to accept OAuth access tokens
+        as described in <xref href="impala_oauth.xml"/>. Replace the example hosts,
+        paths, and client ID with your own values. If you store a token or client
+        secret in a file, make sure only you can read it.</p>
+      <example>
+        <title>Connect with an existing JWT access token</title>
+        <p>If you already have a valid OAuth JWT access token, use
+          <codeph>--oauth_cmd</codeph> to read it from a file:</p>
+        <codeblock>impala-shell -i impala.example.com:28000 --protocol=hs2-http --ssl --oauth \
+  --oauth_cmd="cat /path/to/access-token.jwt"</codeblock>
+        <p>To enter the token without saving it to a file, run the following command
+          in a terminal. Paste the token at the <codeph>JWT:</codeph> prompt and press
+          Enter. Bash's <codeph>read -sr</codeph> reads it without displaying it:</p>
+        <codeblock>impala-shell -i impala.example.com:28000 --protocol=hs2-http --ssl --oauth \
+  --oauth_cmd="bash -c 'read -sr -p JWT: jwt 2>/dev/tty &amp;&amp; printf %s \"\$jwt\"'"</codeblock>
+      </example>
+      <example>
+        <title>Request an access token with a client secret</title>
+        <p>To have <cmdname>impala-shell</cmdname> request a token on your behalf,
+          specify your registered client ID and the OAuth server's token endpoint.
+          Use <codeph>--oauth_client_secret_cmd</codeph> to read the client secret:</p>
+        <codeblock>impala-shell -i impala.example.com:28000 --protocol=hs2-http --ssl --oauth \
+  --oauth_client_id=impala-client \
+  --oauth_client_secret_cmd="cat /path/to/client-secret" \
+  --oauth_server=auth.example.com:443 --oauth_endpoint=/oauth2/token</codeblock>
+      </example>
     </conbody>
   </concept>
 </concept>

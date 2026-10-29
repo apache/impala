@@ -1,0 +1,433 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+Licensed to the Apache Software Foundation (ASF) under one
+or more contributor license agreements.  See the NOTICE file
+distributed with this work for additional information
+regarding copyright ownership.  The ASF licenses this file
+to you under the Apache License, Version 2.0 (the
+"License"); you may not use this file except in compliance
+with the License.  You may obtain a copy of the License at
+
+  http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing,
+software distributed under the License is distributed on an
+"AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+KIND, either express or implied.  See the License for the
+specific language governing permissions and limitations
+under the License.
+-->
+<!DOCTYPE concept PUBLIC "-//OASIS//DTD DITA Concept//EN" "concept.dtd">
+<concept id="oauth">
+
+  <title>Enabling OAuth Authentication for Impala</title>
+
+  <prolog>
+    <metadata>
+      <data name="Category" value="Security"/>
+      <data name="Category" value="OAuth"/>
+      <data name="Category" value="Authentication"/>
+      <data name="Category" value="Impala"/>
+      <data name="Category" value="Configuring"/>
+      <data name="Category" value="Starting and Stopping"/>
+      <data name="Category" value="Administrators"/>
+    </metadata>
+  </prolog>
+
+  <conbody>
+
+    <p>
+      Impala can authenticate hs2-http client connections using <term>OAuth 2.0</term>
+      bearer access tokens. With this form of authentication, a client presents a
+      signed token in the <codeph>Authorization</codeph> HTTP header of each request.
+      Impala verifies the token's signature against one or more configured identity
+      provider(s), optionally validates the token's <codeph>aud</codeph> (audience) and
+      <codeph>iss</codeph> (issuer) claims, and then determines identity of the connecting
+      user from a configurable claim in the token.
+    </p>
+
+    <note>
+      Impala's OAuth support only accepts access tokens that are structured and signed
+      as <term>JSON Web Tokens</term> (JWTs). Impala verifies the token locally using a
+      JSON Web Key Set (JWKS); it does not support opaque OAuth access tokens that must
+      be validated by calling an authorization server's token-introspection endpoint.
+      Confirm that your identity provider issues JWT-structured access tokens before
+      configuring OAuth authentication for Impala.
+    </note>
+
+    <note conref="../shared/impala_common.xml#common/authentication_vs_authorization"/>
+
+    <p>
+      Alternative forms of authentication you can use instead of, or alongside, OAuth
+      are Kerberos, described in <xref href="impala_kerberos.xml#kerberos"/>, and LDAP,
+      described in <xref href="impala_ldap.xml#ldap"/>.
+    </p>
+
+    <p outputclass="toc inpage"/>
+
+  </conbody>
+
+  <concept id="oauth_overview">
+
+    <title>How OAuth authentication works</title>
+
+    <conbody>
+
+      <p>
+        Only client-to-Impala connections can be authenticated using OAuth tokens, and
+        only over the HTTP-based transport, that is, connections made over the
+        HiveServer2 HTTP endpoint (<codeph>--hs2_http_port</codeph>) and the Impala
+        coordinator debug web UI (<codeph>--webserver_port</codeph>). OAuth authentication
+        is not supported on the executor debug web UI.
+      </p>
+
+      <p>
+        When a request arrives with an <codeph>Authorization: Bearer
+        <varname>token</varname></codeph> header, Impala:
+      </p>
+
+      <ol>
+        <li>
+          Decodes the token and reads its header to determine which key ID and signing
+          algorithm were used.
+        </li>
+        <li>
+          Looks through its list of configured identity providers for the first one whose
+          keys could have produced the token, and attempts to verify the token's signature
+          using that provider's keys. If verification fails, Impala continues checking
+          any remaining providers that could also have produced the token.
+        </li>
+        <li>
+          If the token's signature is verified, and the provider is configured with
+          <codeph>audienceClaims</codeph> or <codeph>issuerClaims</codeph>, checks that
+          the token's <codeph>aud</codeph> and/or <codeph>iss</codeph> claims match one
+          of the configured values. If the claims do not match, Impala continues by
+          checking any remaining providers that could also have produced the token.
+        </li>
+        <li>
+          Extracts the connecting user's name from the claim named by the provider's
+          <codeph>usernameClaim</codeph> (<codeph>username</codeph>, by default).
+        </li>
+      </ol>
+
+      <p>
+        For hs2-http client connections, after a token has been successfully verified,
+        Impala returns a session cookie to the client so that subsequent requests in the
+        same session do not need to re-verify the token. Connections to the debug Web UIs
+        must provide the token with each request.
+      </p>
+
+    </conbody>
+
+  </concept>
+
+  <concept id="oauth_tls">
+
+    <title>Requirement to Use TLS</title>
+
+    <conbody>
+
+      <p>
+        Because the bearer token is equivalent to a password for the lifetime of the
+        token, OAuth authentication must only be used over an encrypted connection. By
+        default, <cmdname>impalad</cmdname> refuses to start with
+        <codeph>--oauth_token_auth=true</codeph> unless TLS is configured for client
+        connections. For more information about configuring TLS, see
+        <xref href="impala_ssl.xml#ssl"/>.
+      </p>
+
+    </conbody>
+
+  </concept>
+
+  <concept id="oauth_enable">
+
+    <title>Enabling OAuth Token Checking</title>
+
+    <conbody>
+
+      <p>
+        Start <cmdname>impalad</cmdname> with the following flag to turn on
+        bearer-token authentication.
+      </p>
+
+      <dl>
+        <dlentry>
+          <dt>
+            <codeph>--oauth_token_auth</codeph>
+          </dt>
+          <dd>
+            <p>
+              When <codeph>true</codeph>, Impala reads the OAuth token out of the HTTP
+              <codeph>Authorization</codeph> header and extracts the username from the
+              token payload.
+            </p>
+          </dd>
+        </dlentry>
+      </dl>
+
+    </conbody>
+
+  </concept>
+
+  <concept id="oauth_servers_config">
+
+    <title>Configuring Identity Providers with --oauth_servers</title>
+
+    <conbody>
+
+      <note>
+        The <codeph>--jwt_token_auth</codeph>, <codeph>--jwks_file_path</codeph>,
+        <codeph>--jwks_url</codeph>, <codeph>--jwks_verify_server_certificate</codeph>,
+        <codeph>--jwks_ca_certificate</codeph>, <codeph>--jwks_update_frequency_s</codeph>,
+        <codeph>--jwks_pulling_timeout_s</codeph>,
+        <codeph>--jwt_custom_claim_username</codeph>,
+        <codeph>--jwt_allow_without_tls</codeph>, <codeph>--oauth_jwks_file_path</codeph>,
+        <codeph>--oauth_jwks_url</codeph>,
+        <codeph>--oauth_jwks_verify_server_certificate</codeph>,
+        <codeph>--oauth_jwks_ca_certificate</codeph>,
+        <codeph>--oauth_jwks_update_frequency_s</codeph>,
+        <codeph>--oauth_jwks_pulling_timeout_s</codeph>, and
+        <codeph>--oauth_jwt_custom_claim_username</codeph>, flags are deprecated and
+        should not be used. If set, the flags will still be recognized, but migration to
+        the new flags is recommended.
+      </note>
+
+      <p>
+        Use the <codeph>--oauth_servers</codeph> startup flag to configure Impala with
+        identity provider(s) to trust. Its value is a JSON array, with
+        one JSON object per identity provider. Configuring more than one entry allows
+        Impala to accept tokens issued by more than one identity provider.
+      </p>
+
+      <p>
+        Each entry in the array supports the following fields. Only
+        <codeph>jwksFilePath</codeph> or <codeph>jwksUrl</codeph> is required; all other
+        fields are optional.
+      </p>
+
+      <dl>
+        <dlentry>
+          <dt>
+            <codeph>jwksFilePath</codeph>
+          </dt>
+          <dd>
+            <p>
+              File path of a pre-installed JSON Web Key Set (JWKS) file, in the local
+              filesystem of every host running <cmdname>impalad</cmdname>, used to
+              verify tokens issued by this provider. Mutually exclusive with
+              <codeph>jwksUrl</codeph>.
+            </p>
+          </dd>
+        </dlentry>
+        <dlentry>
+          <dt>
+            <codeph>jwksUrl</codeph>
+          </dt>
+          <dd>
+            <p>
+              URL from which Impala downloads the JWKS used to verify tokens issued by
+              this provider. Mutually exclusive with <codeph>jwksFilePath</codeph>.
+            </p>
+          </dd>
+        </dlentry>
+        <dlentry>
+          <dt>
+            <codeph>caCertFilePath</codeph>
+          </dt>
+          <dd>
+            <p>
+              File path of a PEM bundle of root CA certificates to trust when
+              downloading the JWKS from <codeph>jwksUrl</codeph>. Only applicable when
+              <codeph>jwksUrl</codeph> is set.
+            </p>
+          </dd>
+        </dlentry>
+        <dlentry>
+          <dt>
+            <codeph>verifyServerCert</codeph>
+          </dt>
+          <dd>
+            <p>
+              Whether the TLS certificate presented by the <codeph>jwksUrl</codeph>
+              server is verified when downloading the JWKS. The default value is
+              <codeph>true</codeph>. Only applicable when <codeph>jwksUrl</codeph> is
+              set.
+            </p>
+            <note>
+              Do not set to <codeph>false</codeph> outside of dev/test environments.
+            </note>
+          </dd>
+        </dlentry>
+        <dlentry>
+          <dt>
+            <codeph>jwksPullTimeoutSecs</codeph>
+          </dt>
+          <dd>
+            <p>
+              Number of seconds to wait for the connection to <codeph>jwksUrl</codeph>
+              to time out when downloading the JWKS. The default value is
+              <codeph>10</codeph>. Only applicable when <codeph>jwksUrl</codeph> is set.
+            </p>
+          </dd>
+        </dlentry>
+        <dlentry>
+          <dt>
+            <codeph>jwksUpdateFrequencySecs</codeph>
+          </dt>
+          <dd>
+            <p>
+              Number of seconds to wait between re-downloading the JWKS from
+              <codeph>jwksUrl</codeph>, so that key rotation on the identity provider
+              side is picked up without restarting Impala. The default value is
+              <codeph>60</codeph>. Only applicable when <codeph>jwksUrl</codeph> is set.
+            </p>
+          </dd>
+        </dlentry>
+        <dlentry>
+          <dt>
+            <codeph>usernameClaim</codeph>
+          </dt>
+          <dd>
+            <p>
+              Name of the claim in the token payload that holds the Impala username to
+              authenticate as, for example <codeph>username</codeph> or
+              <codeph>sub</codeph>. The default value is <codeph>username</codeph>.
+            </p>
+          </dd>
+        </dlentry>
+        <dlentry>
+          <dt>
+            <codeph>audienceClaims</codeph>
+          </dt>
+          <dd>
+            <p>
+              Array of acceptable values for the token's <codeph>aud</codeph> claim. If
+              specified and non-empty, a token from this provider is only accepted if
+              its <codeph>aud</codeph> claim matches one of the listed values. If
+              omitted or empty, the <codeph>aud</codeph> claim is not checked.
+            </p>
+          </dd>
+        </dlentry>
+        <dlentry>
+          <dt>
+            <codeph>issuerClaims</codeph>
+          </dt>
+          <dd>
+            <p>
+              Array of acceptable values for the token's <codeph>iss</codeph> claim. If
+              specified and non-empty, a token from this provider is only accepted if
+              its <codeph>iss</codeph> claim matches one of the listed values. If
+              omitted or empty, the <codeph>iss</codeph> claim is not checked.
+            </p>
+          </dd>
+        </dlentry>
+      </dl>
+
+      <p>
+        For example, the following value for <codeph>--oauth_servers</codeph> configures
+        two identity providers: one whose JWKS is downloaded from a URL and whose tokens
+        must have been issued for the <codeph>impala-service</codeph> audience by the
+        <codeph>auth_iss</codeph> issuer, and a second, simpler provider whose JWKS is
+        read from a local file.
+      </p>
+
+      <codeblock>--oauth_servers='[
+  {
+    "jwksUrl": "https://idp.example.com/.well-known/jwks.json",
+    "caCertFilePath": "/etc/impala/conf/idp-ca.pem",
+    "usernameClaim": "preferred_username",
+    "audienceClaims": ["impala-service"],
+    "issuerClaims": ["auth_iss"]
+  },
+  {
+    "jwksFilePath": "/etc/impala/conf/second-idp-jwks.json"
+  }
+]'</codeblock>
+
+      <note>
+        Pass the JSON value as a single shell argument, for example by surrounding it
+        with single quotes, so that the double quotes and braces are not interpreted by
+        the shell.
+      </note>
+
+      <p>
+        The <codeph>--oauth_servers</codeph> flag only declares identity providers that
+        Impala can use for token verification. You must still set
+        <codeph>--oauth_token_auth=true</codeph> to actually check for a bearer token on
+        incoming connections.
+      </p>
+
+    </conbody>
+
+  </concept>
+
+  <concept id="oauth_mixed_security">
+
+    <title>Combining OAuth with other authentication methods</title>
+
+    <conbody>
+
+      <p>
+        OAuth authentication can be enabled at the same time as LDAP, Kerberos SPNEGO,
+        or SAML authentication for the same <cmdname>impalad</cmdname>. Impala inspects
+        each incoming HTTP request and determines which mechanism to use for it as
+        follows: an existing session cookie is tried first; otherwise, if the
+        <codeph>Authorization</codeph> header is a <codeph>Bearer</codeph> token that
+        looks like a JWT (it contains at least one <codeph>.</codeph> character),
+        Impala attempts OAuth verification before falling back to any other configured
+        mechanism, such as SAML, LDAP, or SPNEGO.
+      </p>
+
+    </conbody>
+
+  </concept>
+
+  <concept id="oauth_monitoring">
+
+    <title>Monitoring OAuth Authentication</title>
+
+    <conbody>
+
+      <p>
+        Each <cmdname>impalad</cmdname> exposes metrics that count the number of
+        successful and failed bearer-token authentication attempts, both for the
+        HiveServer2 HTTP endpoint and for the debug web UI:
+      </p>
+
+      <ul>
+        <li>
+          <codeph>impala.thrift-server.hiveserver2-http-frontend.total-oauth-token-auth-success</codeph>
+          and
+          <codeph>impala.thrift-server.hiveserver2-http-frontend.total-oauth-token-auth-failure</codeph>
+        </li>
+        <li>
+          <codeph>impala.webserver.total-oauth-token-auth-success</codeph> and
+          <codeph>impala.webserver.total-oauth-token-auth-failure</codeph>
+        </li>
+      </ul>
+
+      <p>
+        These metrics only count the initial token verification for a connection.
+        Subsequent requests on the same connection that are authenticated using the
+        session cookie Impala issues after a successful token verification instead
+        increment the related <codeph>total-cookie-auth-success</codeph> metrics.
+      </p>
+
+      <note>
+        Since session cookies are issued only for hs2-http client connections, the
+        webserver metrics will increment with each request.
+      </note>
+
+      <p>
+        When token verification fails, Impala returns an HTTP <codeph>401</codeph>
+        response with a <codeph>WWW-Authenticate</codeph> header describing the reason
+        for the failure, for example an expired token or a token signed by a key that
+        does not match any configured identity provider.
+      </p>
+
+    </conbody>
+
+  </concept>
+
+</concept>
