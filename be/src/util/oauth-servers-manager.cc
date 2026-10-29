@@ -50,10 +50,19 @@ Status OAuthServersManager::Init() {
 
   for (OAuthServerConfig& config : configs) {
     OAuthServerVerifier verifier;
-    Status status = verifier.jwt_helper.Init(config.jwks_uri, config.verify_server_cert,
-        config.ca_cert_file_path, config.is_local_jwks, config.jwks_pull_timeout_secs,
-        config.jwks_update_frequency_secs);
-    if (!status.ok()) return status;
+    if (config.is_local_jwks) {
+      RETURN_IF_ERROR(verifier.jwt_helper.Init(config.jwks_uri));
+    } else {
+      JwksDownloadOptions options;
+      options.verify_server_certificate = config.verify_server_cert;
+      options.ca_certificate = std::move(config.ca_cert_file_path);
+      options.pull_timeout_secs = config.jwks_pull_timeout_secs;
+      options.update_frequency_secs = config.jwks_update_frequency_secs;
+      options.proxy = std::move(config.jwks_proxy);
+      options.proxy_ca_certificate = std::move(config.jwks_proxy_ca_certificate);
+      options.proxy_pinned_public_key = std::move(config.jwks_proxy_pinned_public_key);
+      RETURN_IF_ERROR(verifier.jwt_helper.InitFromUrl(config.jwks_uri, options));
+    }
     verifier.username_claim = std::move(config.username_claim);
     verifier.audience_claims = std::move(config.audience_claims);
     verifier.issuer_claims = std::move(config.issuer_claims);

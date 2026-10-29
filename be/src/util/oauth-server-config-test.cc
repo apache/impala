@@ -274,4 +274,145 @@ TEST(OAuthServerConfigTest, BuildOAuthServerConfigsCombinesJsonLegacyJwtAndLegac
   EXPECT_TRUE(configs[2].is_local_jwks);
 }
 
+TEST(OAuthServerConfigTest, ParseOAuthServersJsonJwksProxy) {
+  google::FlagSaver flag_saver;
+  for (const char* proxy : {"http://proxy.example.com:3128",
+           "https://proxy.example.com:3129", "HTTPS://proxy.example.com",
+           "socks4://10.0.0.1:1080", "socks4a://proxy.example.com:1080",
+           "socks5://[::1]:1080", "socks5h://proxy.example.com:1080/",
+           "proxy.example.com:3128", "socks6://proxy.example.com:1080"}) {
+    FLAGS_oauth_servers = Substitute(R"([{"jwksUrl":"https://example.com/jwks.json",)"
+        R"("jwksProxy":"$0"}])", proxy);
+    vector<OAuthServerConfig> configs;
+    ASSERT_OK(BuildOAuthServerConfigs(&configs));
+    ASSERT_EQ(1, configs.size());
+    EXPECT_EQ(proxy, configs[0].jwks_proxy);
+    EXPECT_EQ("https://example.com/jwks.json", configs[0].jwks_uri);
+  }
+}
+
+TEST(OAuthServerConfigTest, ParseOAuthServersJsonJwksProxyDefaultsToEmpty) {
+  google::FlagSaver flag_saver;
+  for (const char* proxy_field : {"", R"(,"jwksProxy":"")"}) {
+    FLAGS_oauth_servers = Substitute(
+        R"([{"jwksUrl":"https://example.com/jwks.json"$0}])", proxy_field);
+    vector<OAuthServerConfig> configs;
+    ASSERT_OK(BuildOAuthServerConfigs(&configs));
+    ASSERT_EQ(1, configs.size());
+    EXPECT_TRUE(configs[0].jwks_proxy.empty());
+    EXPECT_TRUE(configs[0].jwks_proxy_pinned_public_key.empty());
+  }
+}
+
+TEST(OAuthServerConfigTest, ParseOAuthServersJsonRejectsNonStringJwksProxy) {
+  google::FlagSaver flag_saver;
+  FLAGS_oauth_servers =
+      R"([{"jwksUrl":"https://example.com/jwks.json","jwksProxy":3128}])";
+  vector<OAuthServerConfig> configs;
+  Status status = BuildOAuthServerConfigs(&configs);
+  EXPECT_FALSE(status.ok());
+  EXPECT_NE(string::npos, status.GetDetail().find("'jwksProxy' must be a string"))
+      << status.GetDetail();
+}
+
+TEST(OAuthServerConfigTest, ParseOAuthServersJsonJwksProxyPinnedPublicKey) {
+  google::FlagSaver flag_saver;
+  for (const char* key : {"/etc/proxy/pubkey.pem",
+           "sha256//YhKJKSzoTt2b5FP18fvpHo7fJYqQCjAa3HWY3tvRMwE=",
+           "sha256//YhKJKSzoTt2b5FP18fvpHo7fJYqQCjAa3HWY3tvRMwE=;"
+           "sha256//t62CeU2tQiqkexU74Gxa2eg7fRbEgoChTociMee9wno="}) {
+    FLAGS_oauth_servers = Substitute(R"([{"jwksUrl":"https://example.com/jwks.json",)"
+        R"("jwksProxy":"https://proxy.example.com:3129",)"
+        R"("jwksProxyPinnedPublicKey":"$0"}])", key);
+    vector<OAuthServerConfig> configs;
+    ASSERT_OK(BuildOAuthServerConfigs(&configs));
+    ASSERT_EQ(1, configs.size());
+    EXPECT_EQ("https://proxy.example.com:3129", configs[0].jwks_proxy);
+    EXPECT_EQ(key, configs[0].jwks_proxy_pinned_public_key);
+  }
+}
+
+TEST(OAuthServerConfigTest, ParseOAuthServersJsonRejectsInvalidJwksProxy) {
+  google::FlagSaver flag_saver;
+  const vector<pair<string, string>> cases = {
+      {"http://", "'jwksProxy' is not a valid URL"},
+      {"http://proxyuser:secret@proxy.example.com:3128",
+          "'jwksProxy' must not contain a user name or password"},
+      {"proxyuser@proxy.example.com:3128",
+          "'jwksProxy' must not contain a user name or password"},
+      {"htps://proxyuser:secret@proxy.example.com:3128",
+          "'jwksProxy' must not contain a user name or password"}};
+  for (const auto& test_case : cases) {
+    FLAGS_oauth_servers = Substitute(R"([{"jwksUrl":"https://example.com/jwks.json",)"
+        R"("jwksProxy":"$0"}])", test_case.first);
+    vector<OAuthServerConfig> configs;
+    Status status = BuildOAuthServerConfigs(&configs);
+    ASSERT_FALSE(status.ok()) << test_case.first;
+    EXPECT_NE(string::npos, status.GetDetail().find(test_case.second))
+        << test_case.first << ": " << status.GetDetail();
+    EXPECT_EQ(string::npos, status.GetDetail().find("proxyuser")) << status.GetDetail();
+    EXPECT_EQ(string::npos, status.GetDetail().find("secret")) << status.GetDetail();
+  }
+}
+
+TEST(OAuthServerConfigTest, ParseOAuthServersJsonJwksProxyCaCertFilePath) {
+  google::FlagSaver flag_saver;
+  const string base = R"({"jwksUrl":"https://example.com/jwks.json",)"
+      R"("jwksProxy":"https://proxy.example.com:3129")";
+  // Each case is the extra JSON fields and the expected jwks_proxy_ca_certificate.
+  const vector<pair<string, string>> cases = {
+      {"", ""},
+      {R"(,"caCertFilePath":"/idp/ca.pem")", "/idp/ca.pem"},
+      {R"(,"jwksProxyCaCertFilePath":"/proxy/ca.pem")", "/proxy/ca.pem"},
+      {R"(,"caCertFilePath":"/idp/ca.pem","jwksProxyCaCertFilePath":"/proxy/ca.pem")",
+          "/proxy/ca.pem"},
+      {R"(,"caCertFilePath":"/idp/ca.pem","jwksProxyCaCertFilePath":"")", ""}};
+  for (const auto& test_case : cases) {
+    FLAGS_oauth_servers = Substitute("[$0$1}]", base, test_case.first);
+    vector<OAuthServerConfig> configs;
+    ASSERT_OK(BuildOAuthServerConfigs(&configs));
+    ASSERT_EQ(1, configs.size());
+    EXPECT_EQ(test_case.second, configs[0].jwks_proxy_ca_certificate)
+        << test_case.first;
+  }
+}
+
+TEST(OAuthServerConfigTest, ParseOAuthServersJsonRejectsPinnedKeyWithoutHttpsProxy) {
+  google::FlagSaver flag_saver;
+  for (const char* proxy : {"http://proxy.example.com:3128",
+           "socks5h://proxy.example.com:1080", "proxy.example.com:3128"}) {
+    FLAGS_oauth_servers = Substitute(R"([{"jwksUrl":"https://example.com/jwks.json",)"
+        R"("jwksProxy":"$0","jwksProxyPinnedPublicKey":"/etc/proxy/pubkey.pem"}])",
+        proxy);
+    vector<OAuthServerConfig> configs;
+    Status status = BuildOAuthServerConfigs(&configs);
+    ASSERT_FALSE(status.ok()) << proxy;
+    EXPECT_NE(string::npos, status.GetDetail().find(
+        "'jwksProxyPinnedPublicKey' requires an https 'jwksProxy'"))
+        << proxy << ": " << status.GetDetail();
+  }
+}
+
+TEST(OAuthServerConfigTest, ParseOAuthServersJsonRejectsPinnedPublicKeyWithoutProxy) {
+  google::FlagSaver flag_saver;
+  FLAGS_oauth_servers = R"([{"jwksUrl":"https://example.com/jwks.json",)"
+      R"("jwksProxyPinnedPublicKey":"/etc/proxy/pubkey.pem"}])";
+  vector<OAuthServerConfig> configs;
+  Status status = BuildOAuthServerConfigs(&configs);
+  EXPECT_FALSE(status.ok());
+  EXPECT_NE(string::npos, status.GetDetail().find(
+      "field 'jwksProxyPinnedPublicKey' requires 'jwksProxy'")) << status.GetDetail();
+}
+
+TEST(OAuthServerConfigTest, ParseOAuthServersJsonRejectsJwksProxyWithJwksFilePath) {
+  google::FlagSaver flag_saver;
+  FLAGS_oauth_servers = R"([{"jwksFilePath":"/tmp/jwks.json",)"
+      R"("jwksProxy":"http://proxy.example.com:3128"}])";
+  vector<OAuthServerConfig> configs;
+  Status status = BuildOAuthServerConfigs(&configs);
+  EXPECT_FALSE(status.ok());
+  EXPECT_NE(string::npos,
+      status.GetDetail().find("field 'jwksProxy' requires 'jwksUrl'"));
+}
+
 } // namespace impala

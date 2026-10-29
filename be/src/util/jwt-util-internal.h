@@ -36,6 +36,7 @@
 
 #include "common/logging.h"
 #include "common/status.h"
+#include "util/jwt-util.h"
 #include "util/thread.h"
 
 namespace impala {
@@ -261,11 +262,9 @@ class JWKSSnapshot {
   Status LoadKeysFromFile(const std::string& jwks_file_path);
   /// Download JWKS JSON file from the given URL, then load the public keys if the
   /// checksum of JWKS object is changed. If no keys were given in the URL, the internal
-  /// maps will be empty.
-  Status LoadKeysFromUrl(
-      const std::string& jwks_url, bool jwks_verify_server_certificate,
-      const std::string& jwks_ca_certificate, uint64_t cur_jwks_hash, bool* is_changed,
-      int32_t jwks_pull_timeout_secs);
+  /// maps will be empty. The JWKS is downloaded according to 'options'.
+  Status LoadKeysFromUrl(const std::string& jwks_url, const JwksDownloadOptions& options,
+      uint64_t cur_jwks_hash, bool* is_changed);
 
   /// Look up the key ID in the internal key maps and returns the key if the lookup was
   /// successful, otherwise return nullptr.
@@ -346,9 +345,10 @@ class JWKSMgr {
   /// the internal maps will be empty.
   /// If the given jwks_uri is a URL, start a working thread which will periodically
   /// checks the JWKS URL for updates. This provides support for key rotation.
-  Status Init(const std::string& jwks_uri, bool jwks_verify_server_certificate,
-      const std::string& jwks_ca_certificate, bool is_local_file,
-      int32_t jwks_pull_timeout_secs = -1, int32_t jwks_update_frequency_secs = -1);
+  /// The JWKS URL is downloaded according to 'options', which is ignored for a local
+  /// file.
+  Status Init(const std::string& jwks_uri, bool is_local_file,
+      const JwksDownloadOptions& options);
 
   /// Returns a read only snapshot of the current JWKS. This function should be called
   /// after calling Init().
@@ -370,16 +370,8 @@ class JWKSMgr {
   /// JWKS URI.
   std::string jwks_uri_;
 
-  /// JWKS insecure TLS
-  bool jwks_verify_server_certificate_;
-
-  /// File path to PEM certificate bundle of certs to trust when retrieving the JWKS
-  /// from the specified URL.
-  std::string jwks_ca_certificate_;
-
-  /// Per-instance JWKS download settings. Negative values mean use the global gflags.
-  int32_t jwks_pull_timeout_secs_ = -1;
-  int32_t jwks_update_frequency_secs_ = -1;
+  /// Settings used to download the JWKS from 'jwks_uri_'.
+  JwksDownloadOptions download_options_;
 
   /// The snapshot of the current JWKS. When the checksum of downloaded JWKS json object
   /// has been changed, the public keys will be reloaded and the content of this pointer

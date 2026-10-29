@@ -15,7 +15,17 @@
 // specific language governing permissions and limitations
 // under the License.
 
+#include <arpa/inet.h>
+#include <netinet/in.h>
+#include <sys/socket.h>
+#include <unistd.h>
+#include <atomic>
+#include <chrono>
 #include <cstdio> // file stuff
+#include <cstdlib>
+#include <mutex>
+#include <thread>
+#include <vector>
 #include <gutil/strings/substitute.h>
 #include <openssl/rand.h>
 
@@ -524,6 +534,80 @@ void TempTestDataFile::Delete() {
   }
 }
 
+/// Minimal HTTP proxy listening on 127.0.0.1 that answers every request with
+/// 'response_body' and records the request line of every request it receives.
+class FakeHttpProxy {
+ public:
+  explicit FakeHttpProxy(std::string response_body)
+    : response_body_(std::move(response_body)) {}
+
+  ~FakeHttpProxy() {
+    if (listen_fd_ < 0) return;
+    stopped_ = true;
+    // Unblocks accept() in the serving thread.
+    shutdown(listen_fd_, SHUT_RDWR);
+    if (serve_thread_.joinable()) serve_thread_.join();
+    close(listen_fd_);
+  }
+
+  Status Start() {
+    listen_fd_ = socket(AF_INET, SOCK_STREAM, 0);
+    if (listen_fd_ < 0) return Status(Substitute("socket(): $0", strerror(errno)));
+    sockaddr_in addr = {};
+    addr.sin_family = AF_INET;
+    addr.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
+    socklen_t addr_len = sizeof(addr);
+    if (bind(listen_fd_, reinterpret_cast<sockaddr*>(&addr), addr_len) != 0
+        || listen(listen_fd_, 8) != 0
+        || getsockname(listen_fd_, reinterpret_cast<sockaddr*>(&addr), &addr_len) != 0) {
+      return Status(Substitute("Failed to start fake proxy: $0", strerror(errno)));
+    }
+    port_ = ntohs(addr.sin_port);
+    serve_thread_ = std::thread(&FakeHttpProxy::Serve, this);
+    return Status::OK();
+  }
+
+  std::string Url() const { return Substitute("http://127.0.0.1:$0", port_); }
+
+  std::vector<std::string> request_lines() const {
+    std::lock_guard<std::mutex> l(lock_);
+    return request_lines_;
+  }
+
+ private:
+  void Serve() {
+    while (!stopped_) {
+      int conn_fd = accept(listen_fd_, nullptr, nullptr);
+      if (conn_fd < 0) continue;
+      std::string request;
+      char buf[1024];
+      while (request.find("\r\n\r\n") == std::string::npos) {
+        ssize_t n = read(conn_fd, buf, sizeof(buf));
+        if (n <= 0) break;
+        request.append(buf, n);
+      }
+      {
+        std::lock_guard<std::mutex> l(lock_);
+        request_lines_.push_back(request.substr(0, request.find("\r\n")));
+      }
+      std::string response = Substitute("HTTP/1.1 200 OK\r\n"
+          "Content-Type: application/json\r\nContent-Length: $0\r\n"
+          "Connection: close\r\n\r\n$1", response_body_.size(), response_body_);
+      ssize_t ignored = write(conn_fd, response.data(), response.size());
+      (void)ignored;
+      close(conn_fd);
+    }
+  }
+
+  const std::string response_body_;
+  int listen_fd_ = -1;
+  int port_ = 0;
+  std::atomic<bool> stopped_{false};
+  std::thread serve_thread_;
+  mutable std::mutex lock_;
+  std::vector<std::string> request_lines_;
+};
+
 TEST(JwtUtilTest, LoadJwksFile) {
   // Load JWKS from file.
   TempTestDataFile jwks_file(Substitute(jwks_rsa_file_format, kid_1, "RS256",
@@ -544,6 +628,129 @@ TEST(JwtUtilTest, LoadJwksFile) {
   std::string non_existing_kid("public:c424b67b-fe28-45d7-b015-f79da5-xxxxx");
   const JWTPublicKey* key3 = jwks->LookupRSAPublicKey(non_existing_kid);
   ASSERT_FALSE(key3 != nullptr);
+}
+
+// The JWKS URL host is not resolvable, so the download only succeeds if it goes
+// through the proxy.
+const std::string kUnresolvableJwksUrl = "http://jwks.proxy-test.invalid/jwks.json";
+
+// Returns options to download the JWKS through 'proxy_url', checking for updates every
+// 'update_frequency_secs' seconds.
+static JwksDownloadOptions ProxyDownloadOptions(
+    const std::string& proxy_url, int32_t update_frequency_secs = 60) {
+  JwksDownloadOptions options;
+  options.verify_server_certificate = false;
+  options.update_frequency_secs = update_frequency_secs;
+  options.proxy = proxy_url;
+  return options;
+}
+
+TEST(JwtUtilTest, LoadJwksUrlThroughProxy) {
+  FakeHttpProxy proxy(Substitute(jwks_rsa_file_format, kid_1, "RS256",
+      rsa_pub_key_jwk_n, rsa_pub_key_jwk_e, kid_2, "RS256", rsa_invalid_pub_key_jwk_n,
+      rsa_pub_key_jwk_e));
+  ASSERT_OK(proxy.Start());
+
+  JWTHelper jwt_helper;
+  ASSERT_OK(jwt_helper.InitFromUrl(kUnresolvableJwksUrl,
+      ProxyDownloadOptions(proxy.Url())));
+  JWKSSnapshotPtr jwks = jwt_helper.GetJWKS();
+  ASSERT_EQ(2, jwks->GetRSAPublicKeyNum());
+  const JWTPublicKey* key1 = jwks->LookupRSAPublicKey(kid_1);
+  ASSERT_TRUE(key1 != nullptr);
+  ASSERT_EQ(rsa_pub_key_pem, key1->get_key());
+
+  std::vector<std::string> request_lines = proxy.request_lines();
+  ASSERT_EQ(1, request_lines.size());
+  EXPECT_EQ(Substitute("GET $0 HTTP/1.1", kUnresolvableJwksUrl), request_lines[0]);
+}
+
+TEST(JwtUtilTest, LoadJwksUrlThroughProxyHonorsNoProxyEnv) {
+  FakeHttpProxy proxy(Substitute(jwks_rsa_file_format, kid_1, "RS256",
+      rsa_pub_key_jwk_n, rsa_pub_key_jwk_e, kid_2, "RS256", rsa_invalid_pub_key_jwk_n,
+      rsa_pub_key_jwk_e));
+  ASSERT_OK(proxy.Start());
+
+  // A 'no_proxy' entry for another host does not bypass the proxy.
+  ASSERT_EQ(0, setenv("no_proxy", "other.proxy-test.invalid", 1));
+  JWTHelper jwt_helper;
+  Status status = jwt_helper.InitFromUrl(kUnresolvableJwksUrl,
+      ProxyDownloadOptions(proxy.Url()));
+  ASSERT_OK(status);
+  ASSERT_EQ(2, jwt_helper.GetJWKS()->GetRSAPublicKeyNum());
+  EXPECT_EQ(1, proxy.request_lines().size());
+
+  // A 'no_proxy' entry for the JWKS host bypasses the proxy, so the download fails.
+  ASSERT_EQ(0, setenv("no_proxy", "jwks.proxy-test.invalid", 1));
+  JWTHelper bypassed_jwt_helper;
+  status = bypassed_jwt_helper.InitFromUrl(kUnresolvableJwksUrl,
+      ProxyDownloadOptions(proxy.Url()));
+  unsetenv("no_proxy");
+  ASSERT_FALSE(status.ok());
+  EXPECT_EQ(1, proxy.request_lines().size());
+}
+
+TEST(JwtUtilTest, RefreshJwksUrlThroughProxy) {
+  FakeHttpProxy proxy(Substitute(jwks_rsa_file_format, kid_1, "RS256",
+      rsa_pub_key_jwk_n, rsa_pub_key_jwk_e, kid_2, "RS256", rsa_invalid_pub_key_jwk_n,
+      rsa_pub_key_jwk_e));
+  ASSERT_OK(proxy.Start());
+
+  JWTHelper jwt_helper;
+  ASSERT_OK(jwt_helper.InitFromUrl(kUnresolvableJwksUrl,
+      ProxyDownloadOptions(proxy.Url(), /*update_frequency_secs=*/1)));
+  // The periodic refresh downloads the JWKS through the proxy again.
+  for (int i = 0; i < 100 && proxy.request_lines().size() < 2; ++i) {
+    std::this_thread::sleep_for(std::chrono::milliseconds(100));
+  }
+  std::vector<std::string> request_lines = proxy.request_lines();
+  ASSERT_GE(request_lines.size(), 2);
+  for (const std::string& request_line : request_lines) {
+    EXPECT_EQ(Substitute("GET $0 HTTP/1.1", kUnresolvableJwksUrl), request_line);
+  }
+  ASSERT_EQ(2, jwt_helper.GetJWKS()->GetRSAPublicKeyNum());
+}
+
+// Returns a local port that nothing listens on.
+static int UnusedLocalPort() {
+  int fd = socket(AF_INET, SOCK_STREAM, 0);
+  CHECK_GE(fd, 0);
+  sockaddr_in addr = {};
+  addr.sin_family = AF_INET;
+  addr.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
+  socklen_t addr_len = sizeof(addr);
+  CHECK_EQ(0, bind(fd, reinterpret_cast<sockaddr*>(&addr), addr_len));
+  CHECK_EQ(0, getsockname(fd, reinterpret_cast<sockaddr*>(&addr), &addr_len));
+  close(fd);
+  return ntohs(addr.sin_port);
+}
+
+TEST(JwtUtilTest, LoadJwksUrlFailsWhenProxyIsUnreachable) {
+  const std::string proxy_url = Substitute("socks5h://127.0.0.1:$0", UnusedLocalPort());
+  JWTHelper jwt_helper;
+  Status status =
+      jwt_helper.InitFromUrl(kUnresolvableJwksUrl, ProxyDownloadOptions(proxy_url));
+  ASSERT_FALSE(status.ok());
+  EXPECT_NE(std::string::npos, status.GetDetail().find(Substitute(
+      "Error downloading JWKS from '$0' via proxy '$1'", kUnresolvableJwksUrl,
+      proxy_url))) << status.GetDetail();
+}
+
+TEST(JwtUtilTest, LoadJwksUrlWithoutProxyIgnoresProxyEnv) {
+  FakeHttpProxy proxy(Substitute(jwks_rsa_file_format, kid_1, "RS256",
+      rsa_pub_key_jwk_n, rsa_pub_key_jwk_e, kid_2, "RS256", rsa_invalid_pub_key_jwk_n,
+      rsa_pub_key_jwk_e));
+  ASSERT_OK(proxy.Start());
+
+  // Without a configured proxy, the proxy environment variables are not used.
+  ASSERT_EQ(0, setenv("http_proxy", proxy.Url().c_str(), 1));
+  JWTHelper jwt_helper;
+  Status status = jwt_helper.InitFromUrl(kUnresolvableJwksUrl, ProxyDownloadOptions(""));
+  unsetenv("http_proxy");
+  ASSERT_FALSE(status.ok());
+  EXPECT_NE(std::string::npos, status.GetDetail().find(Substitute(
+      "Error downloading JWKS from '$0':", kUnresolvableJwksUrl))) << status.GetDetail();
+  EXPECT_TRUE(proxy.request_lines().empty());
 }
 
 TEST(JwtUtilTest, LoadInvalidJwksFiles) {

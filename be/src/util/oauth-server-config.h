@@ -35,6 +35,17 @@ struct OAuthServerConfig {
   bool verify_server_cert = true;
   std::string jwks_uri;
   bool is_local_jwks = false;
+  /// Proxy URL used to download the JWKS from 'jwks_uri', e.g. "https://host:3128" or
+  /// "socks5h://host:1080". Empty means no proxy.
+  std::string jwks_proxy;
+  /// Public key that the TLS certificate of an HTTPS 'jwks_proxy' must match, either a
+  /// path to a PEM or DER file or "sha256//<base64 hash>". Empty means no pinning.
+  std::string jwks_proxy_pinned_public_key;
+  /// Path to a PEM file of CA certificates used to verify the TLS certificate of an
+  /// HTTPS 'jwks_proxy'. Defaults to 'ca_cert_file_path'. Empty means the CA
+  /// certificates in --trusted_certificate_file are used if that flag is set, otherwise
+  /// the default CA bundle.
+  std::string jwks_proxy_ca_certificate;
   int32_t jwks_pull_timeout_secs = DEFAULT_JWKS_PULL_TIMEOUT_SECS;
   int32_t jwks_update_frequency_secs = DEFAULT_JWKS_UPDATE_FREQUENCY_SECS;
   std::string username_claim = "username";

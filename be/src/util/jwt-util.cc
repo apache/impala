@@ -703,21 +703,29 @@ Status JWKSSnapshot::LoadKeysFromFile(const string& jwks_file_path) {
 }
 
 // Download JWKS from the given URL with Kudu's EasyCurl wrapper.
-Status JWKSSnapshot::LoadKeysFromUrl(
-    const std::string& jwks_url, bool jwks_verify_server_certificate,
-    const std::string& jwks_ca_certificate, uint64_t cur_jwks_checksum, bool* is_changed,
-    int32_t jwks_pull_timeout_secs) {
+Status JWKSSnapshot::LoadKeysFromUrl(const std::string& jwks_url,
+    const JwksDownloadOptions& options, uint64_t cur_jwks_checksum, bool* is_changed) {
   kudu::EasyCurl curl;
   kudu::faststring dst;
   Status status;
 
   curl.set_timeout(
-      kudu::MonoDelta::FromMilliseconds(jwks_pull_timeout_secs * 1000));
-  curl.set_verify_peer(jwks_verify_server_certificate);
-  curl.set_ca_certificates(jwks_ca_certificate);
+      kudu::MonoDelta::FromMilliseconds(options.pull_timeout_secs * 1000));
+  curl.set_verify_peer(options.verify_server_certificate);
+  curl.set_ca_certificates(options.ca_certificate);
+  if (!options.proxy.empty()) {
+    curl.set_proxy(options.proxy);
+    curl.set_proxy_ca_certificates(options.proxy_ca_certificate);
+    curl.set_proxy_pinned_public_key(options.proxy_pinned_public_key);
+    // Clear the default noproxy setting of "*" so the proxy is used for all hosts
+    // except the ones listed in the 'no_proxy' environment variable.
+    curl.set_noproxy("");
+  }
   // TODO support CurlAuthType by calling kudu::EasyCurl::set_auth().
-  KUDU_RETURN_IF_ERROR(curl.FetchURL(jwks_url, &dst),
-      Substitute("Error downloading JWKS from '$0'", jwks_url));
+  KUDU_RETURN_IF_ERROR(curl.FetchURL(jwks_url, &dst), options.proxy.empty() ?
+      Substitute("Error downloading JWKS from '$0'", jwks_url) :
+      Substitute("Error downloading JWKS from '$0' via proxy '$1'", jwks_url,
+          options.proxy));
   if (dst.size() > 0) {
     // Verify if the checksum of the downloaded JWKS has been changed.
     jwks_checksum_ = HashUtil::FastHash64(dst.data(), dst.size(), /*seed*/ 0xcafebeef);
@@ -807,17 +815,13 @@ JWKSMgr::~JWKSMgr() {
   if (jwks_update_thread_ != nullptr) jwks_update_thread_->Join();
 }
 
-Status JWKSMgr::Init(const std::string& jwks_uri, bool jwks_verify_server_certificate,
-    const std::string& jwks_ca_certificate, bool is_local_file,
-    int32_t jwks_pull_timeout_secs, int32_t jwks_update_frequency_secs) {
+Status JWKSMgr::Init(const std::string& jwks_uri, bool is_local_file,
+    const JwksDownloadOptions& options) {
   Status status;
   jwks_uri_ = jwks_uri;
-  jwks_verify_server_certificate_ = jwks_verify_server_certificate;
-  jwks_ca_certificate_ = jwks_ca_certificate;
-  jwks_pull_timeout_secs_ = jwks_pull_timeout_secs;
-  jwks_update_frequency_secs_ = jwks_update_frequency_secs;
-  DCHECK_GT(jwks_pull_timeout_secs_, 0);
-  DCHECK(is_local_file || jwks_update_frequency_secs_ > 0);
+  download_options_ = options;
+  DCHECK(is_local_file || download_options_.pull_timeout_secs > 0);
+  DCHECK(is_local_file || download_options_.update_frequency_secs > 0);
   std::shared_ptr<JWKSSnapshot> new_jwks = std::make_shared<JWKSSnapshot>();
   if (is_local_file) {
     status = new_jwks->LoadKeysFromFile(jwks_uri);
@@ -828,9 +832,11 @@ Status JWKSMgr::Init(const std::string& jwks_uri, bool jwks_verify_server_certif
     SetJWKSSnapshot(new_jwks);
   } else {
     bool is_changed = false;
-    status = new_jwks->LoadKeysFromUrl(jwks_uri, jwks_verify_server_certificate,
-        jwks_ca_certificate, current_jwks_checksum_, &is_changed,
-        jwks_pull_timeout_secs_);
+    LOG(INFO) << "Downloading JWKS from '" << jwks_uri << "'"
+              << (options.proxy.empty() ? "" :
+                     Substitute(" via proxy '$0'", options.proxy));
+    status = new_jwks->LoadKeysFromUrl(
+        jwks_uri, download_options_, current_jwks_checksum_, &is_changed);
     if (!status.ok()) {
       LOG(ERROR) << "Failed to load JWKS: " << status;
       return status;
@@ -849,7 +855,7 @@ Status JWKSMgr::Init(const std::string& jwks_uri, bool jwks_verify_server_certif
 
 void JWKSMgr::UpdateJWKSThread() {
   std::shared_ptr<JWKSSnapshot> new_jwks;
-  int64_t timeout_millis = jwks_update_frequency_secs_ * 1000;
+  int64_t timeout_millis = download_options_.update_frequency_secs * 1000;
   while (true) {
     // This Get() will time out until shutdown, when the promise is set.
     bool timed_out;
@@ -858,10 +864,8 @@ void JWKSMgr::UpdateJWKSThread() {
 
     new_jwks = std::make_shared<JWKSSnapshot>();
     bool is_changed = false;
-    Status status =
-        new_jwks->LoadKeysFromUrl(jwks_uri_, jwks_verify_server_certificate_,
-            jwks_ca_certificate_, current_jwks_checksum_, &is_changed,
-            jwks_pull_timeout_secs_);
+    Status status = new_jwks->LoadKeysFromUrl(
+        jwks_uri_, download_options_, current_jwks_checksum_, &is_changed);
     if (!status.ok()) {
       LOG(WARNING) << "Failed to update JWKS: " << status;
     } else if (is_changed) {
@@ -907,16 +911,16 @@ JWTHelper::JWTHelper(JWTHelper&&) noexcept = default;
 JWTHelper& JWTHelper::operator=(JWTHelper&&) noexcept = default;
 
 Status JWTHelper::Init(const std::string& jwks_file_path) {
-  return Init(jwks_file_path, false, "", true);
+  jwks_mgr_ = std::make_unique<JWKSMgr>();
+  RETURN_IF_ERROR(jwks_mgr_->Init(jwks_file_path, true, JwksDownloadOptions()));
+  if (!initialized_) initialized_ = true;
+  return Status::OK();
 }
 
-Status JWTHelper::Init(const std::string& jwks_uri, bool jwks_verify_server_certificate,
-    const std::string& jwks_ca_certificate, bool is_local_file,
-    int32_t jwks_pull_timeout_secs, int32_t jwks_update_frequency_secs) {
+Status JWTHelper::InitFromUrl(
+    const std::string& jwks_url, const JwksDownloadOptions& options) {
   jwks_mgr_ = std::make_unique<JWKSMgr>();
-  RETURN_IF_ERROR(jwks_mgr_->Init(jwks_uri, jwks_verify_server_certificate,
-      jwks_ca_certificate, is_local_file, jwks_pull_timeout_secs,
-      jwks_update_frequency_secs));
+  RETURN_IF_ERROR(jwks_mgr_->Init(jwks_url, false, options));
   if (!initialized_) initialized_ = true;
   return Status::OK();
 }

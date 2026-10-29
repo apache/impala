@@ -18,6 +18,7 @@
 #ifndef IMPALA_JWT_UTIL_H
 #define IMPALA_JWT_UTIL_H
 
+#include <cstdint>
 #include <memory>
 #include <string>
 
@@ -28,6 +29,23 @@ namespace impala {
 
 class JWKSSnapshot;
 class JWKSMgr;
+
+/// Settings used to download the JWKS from a URL.
+struct JwksDownloadOptions {
+  /// Whether to verify the TLS certificates of the JWKS server and of an HTTPS proxy.
+  bool verify_server_certificate = true;
+  /// Path to a PEM file of CA certificates used to verify the JWKS server.
+  std::string ca_certificate;
+  int32_t pull_timeout_secs = 10;
+  int32_t update_frequency_secs = 60;
+  /// Proxy used to download the JWKS. Empty means no proxy.
+  std::string proxy;
+  /// Path to a PEM file of CA certificates used to verify an HTTPS proxy.
+  std::string proxy_ca_certificate;
+  /// Public key that the TLS certificate of an HTTPS proxy must match. Empty means no
+  /// pinning.
+  std::string proxy_pinned_public_key;
+};
 
 /// JSON Web Token (JWT) is an Internet proposed standard for creating data with optional
 /// signature and/or optional encryption whose payload holds JSON that asserts some
@@ -63,11 +81,9 @@ class JWTHelper {
   /// encountered.
   Status Init(const std::string& jwks_file_path);
 
-  /// Load JWKS from a given local JSON file or URL. Returns an error if problems were
-  /// encountered.
-  Status Init(const std::string& jwks_uri, bool jwks_verify_server_certificate,
-      const std::string& jwks_ca_certificate, bool is_local_file,
-      int32_t jwks_pull_timeout_secs = 10, int32_t jwks_update_frequency_secs = 60);
+  /// Download JWKS from a given URL according to 'options' and periodically check the
+  /// URL for updates. Returns an error if problems were encountered.
+  Status InitFromUrl(const std::string& jwks_url, const JwksDownloadOptions& options);
 
   /// Decode the given JWT token. The decoding result is stored in decoded_token_.
   /// Return Status::OK if the decoding is successful.

@@ -202,16 +202,31 @@ Status EasyCurl::DoRequest(const string& url,
     CURL_RETURN_NOT_OK(curl_easy_setopt(curl_, CURLOPT_SSL_VERIFYHOST, 2));
     CURL_RETURN_NOT_OK(curl_easy_setopt(curl_, CURLOPT_SSL_VERIFYPEER, 1));
 
+    CURL_RETURN_NOT_OK(curl_easy_setopt(curl_, CURLOPT_PROXY_SSL_VERIFYHOST, 2));
+    CURL_RETURN_NOT_OK(curl_easy_setopt(curl_, CURLOPT_PROXY_SSL_VERIFYPEER, 1));
+
     if (!FLAGS_trusted_certificate_file.empty()) {
       CURL_RETURN_NOT_OK(curl_easy_setopt(curl_, CURLOPT_CAINFO,
+            FLAGS_trusted_certificate_file.c_str()));
+      CURL_RETURN_NOT_OK(curl_easy_setopt(curl_, CURLOPT_PROXY_CAINFO,
             FLAGS_trusted_certificate_file.c_str()));
     }
   } else {
     CURL_RETURN_NOT_OK(curl_easy_setopt(curl_, CURLOPT_SSL_VERIFYHOST, 0));
     CURL_RETURN_NOT_OK(curl_easy_setopt(curl_, CURLOPT_SSL_VERIFYPEER, 0));
+    CURL_RETURN_NOT_OK(curl_easy_setopt(curl_, CURLOPT_PROXY_SSL_VERIFYHOST, 0));
+    CURL_RETURN_NOT_OK(curl_easy_setopt(curl_, CURLOPT_PROXY_SSL_VERIFYPEER, 0));
   }
   if (!ca_certificates_.empty()) {
     CURL_RETURN_NOT_OK(curl_easy_setopt(curl_, CURLOPT_CAINFO, ca_certificates_.c_str()));
+  }
+  if (!proxy_ca_certificates_.empty()) {
+    CURL_RETURN_NOT_OK(curl_easy_setopt(
+        curl_, CURLOPT_PROXY_CAINFO, proxy_ca_certificates_.c_str()));
+  }
+  if (!proxy_pinned_public_key_.empty()) {
+    CURL_RETURN_NOT_OK(curl_easy_setopt(
+        curl_, CURLOPT_PROXY_PINNEDPUBLICKEY, proxy_pinned_public_key_.c_str()));
   }
 
   switch (auth_type_) {
@@ -277,6 +292,9 @@ Status EasyCurl::DoRequest(const string& url,
         curl_, CURLOPT_CUSTOMREQUEST, custom_method_.c_str()));
   }
 
+  if (!proxy_.empty()) {
+    CURL_RETURN_NOT_OK(curl_easy_setopt(curl_, CURLOPT_PROXY, proxy_.c_str()));
+  }
   if (!noproxy_.empty()) {
     CURL_RETURN_NOT_OK(curl_easy_setopt(curl_, CURLOPT_NOPROXY, noproxy_.c_str()));
   }

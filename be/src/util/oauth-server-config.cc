@@ -17,6 +17,10 @@
 
 #include "util/oauth-server-config.h"
 
+#include <strings.h>
+#include <memory>
+
+#include <curl/curl.h>
 #include <gflags/gflags.h>
 #include <rapidjson/document.h>
 #include <rapidjson/error/en.h>
@@ -49,8 +53,20 @@ DECLARE_string(oauth_jwt_custom_claim_username);
 DEFINE_string(oauth_servers, "",
     "JSON array of OAuth server configurations for JWT/OAuth token verification. Each "
     "element may specify caCertFilePath, verifyServerCert, jwksFilePath, jwksUrl, "
-    "jwksPullTimeoutSecs, jwksUpdateFrequencySecs, usernameClaim, "
-    "audienceClaims, and issuerClaims.");
+    "jwksProxy, jwksProxyCaCertFilePath, jwksProxyPinnedPublicKey, "
+    "jwksPullTimeoutSecs, jwksUpdateFrequencySecs, usernameClaim, audienceClaims, and "
+    "issuerClaims. jwksProxy is the proxy used to download the JWKS from jwksUrl, e.g. "
+    "'https://proxy.example.com:3128' or 'socks5h://proxy.example.com:1080', in any "
+    "format accepted by libcurl's CURLOPT_PROXY except that it must not contain a user "
+    "name or password. Hosts listed in the 'no_proxy' environment variable bypass the "
+    "proxy. The TLS certificate of an https proxy is verified according to "
+    "verifyServerCert against the CA certificates in jwksProxyCaCertFilePath, which "
+    "defaults to caCertFilePath. If jwksProxyCaCertFilePath is empty, the CA "
+    "certificates in --trusted_certificate_file are used if that flag is set, otherwise "
+    "the default CA bundle. It must also match jwksProxyPinnedPublicKey if set, which is "
+    "either a path to a PEM or DER public key file or 'sha256//<base64 hash>' as "
+    "accepted by libcurl's CURLOPT_PROXY_PINNEDPUBLICKEY, and requires an https "
+    "jwksProxy.");
 
 namespace impala {
 
@@ -85,6 +101,52 @@ Status SetJwksSource(const string& jwks_file_path, const string& jwks_url,
   return Status::OK();
 }
 
+bool HasUrlPart(CURLU* url, CURLUPart part) {
+  char* value = nullptr;
+  bool has_part = curl_url_get(url, part, &value, 0) == CURLUE_OK;
+  curl_free(value);
+  return has_part;
+}
+
+// The proxy URL is parsed with libcurl's URL API using the same flags that libcurl uses
+// for CURLOPT_PROXY. The value is never included in error messages.
+Status ValidateJwksProxy(const OAuthServerConfig& config) {
+  if (config.jwks_proxy.empty()) {
+    if (!config.jwks_proxy_pinned_public_key.empty()) {
+      return Status(
+          "oauth_servers entry field 'jwksProxyPinnedPublicKey' requires 'jwksProxy'");
+    }
+    return Status::OK();
+  }
+  if (config.is_local_jwks) {
+    return Status("oauth_servers entry field 'jwksProxy' requires 'jwksUrl'");
+  }
+  std::unique_ptr<CURLU, decltype(&curl_url_cleanup)> url(
+      curl_url(), &curl_url_cleanup);
+  if (url == nullptr) return Status("Failed to allocate a libcurl URL handle");
+  if (curl_url_set(url.get(), CURLUPART_URL, config.jwks_proxy.c_str(),
+          CURLU_NON_SUPPORT_SCHEME | CURLU_GUESS_SCHEME) != CURLUE_OK) {
+    return Status("oauth_servers entry field 'jwksProxy' is not a valid URL");
+  }
+  // The --oauth_servers flag is logged and shown on the debug web UI.
+  if (HasUrlPart(url.get(), CURLUPART_USER)
+      || HasUrlPart(url.get(), CURLUPART_PASSWORD)) {
+    return Status("oauth_servers entry field 'jwksProxy' must not contain a user name "
+        "or password");
+  }
+  if (!config.jwks_proxy_pinned_public_key.empty()) {
+    char* scheme = nullptr;
+    bool is_https = curl_url_get(url.get(), CURLUPART_SCHEME, &scheme, 0) == CURLUE_OK
+        && strcasecmp(scheme, "https") == 0;
+    curl_free(scheme);
+    if (!is_https) {
+      return Status("oauth_servers entry field 'jwksProxyPinnedPublicKey' requires an "
+          "https 'jwksProxy'");
+    }
+  }
+  return Status::OK();
+}
+
 Status ValidateJwksSettings(const OAuthServerConfig& config) {
   if (config.jwks_pull_timeout_secs <= 0) {
     return Status("oauth_servers entry field 'jwksPullTimeoutSecs' must be > 0");
@@ -92,7 +154,7 @@ Status ValidateJwksSettings(const OAuthServerConfig& config) {
   if (config.jwks_update_frequency_secs <= 0) {
     return Status("oauth_servers entry field 'jwksUpdateFrequencySecs' must be > 0");
   }
-  return Status::OK();
+  return ValidateJwksProxy(config);
 }
 
 Status ReadOptionalStringField(const rapidjson::Value& obj, const char* field_name,
@@ -166,6 +228,12 @@ Status ParseOAuthServerObject(
   RETURN_IF_ERROR(ReadOptionalStringField(obj, "jwksFilePath", &jwks_file_path));
   RETURN_IF_ERROR(ReadOptionalStringField(obj, "jwksUrl", &jwks_url));
   RETURN_IF_ERROR(SetJwksSource(jwks_file_path, jwks_url, &config));
+  RETURN_IF_ERROR(ReadOptionalStringField(obj, "jwksProxy", &config.jwks_proxy));
+  config.jwks_proxy_ca_certificate = config.ca_cert_file_path;
+  RETURN_IF_ERROR(ReadOptionalStringField(
+      obj, "jwksProxyCaCertFilePath", &config.jwks_proxy_ca_certificate));
+  RETURN_IF_ERROR(ReadOptionalStringField(
+      obj, "jwksProxyPinnedPublicKey", &config.jwks_proxy_pinned_public_key));
   RETURN_IF_ERROR(ReadOptionalIntField(
       obj, "jwksPullTimeoutSecs", &config.jwks_pull_timeout_secs));
   RETURN_IF_ERROR(ReadOptionalIntField(
