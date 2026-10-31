@@ -179,6 +179,25 @@ under the License.
             </ul><p>These restrictions also apply when Impala loads the metadata of
               existing Avro tables. See
               <xref href="impala_avro.xml#avro_json"/>.</p></li>
+          <li>Queries in a resource pool that has Max Memory set, but neither Minimum
+            Query Memory Limit nor Maximum Query Memory Limit, now run with a per-host
+            memory limit even if they do not set the <codeph>MEM_LIMIT</codeph>,
+              <codeph>MEM_LIMIT_EXECUTORS</codeph>, or
+              <codeph>MEM_LIMIT_COORDINATORS</codeph> query option.<p>The memory limit is
+              the per-host memory estimate of the query, increased if needed to
+              accommodate its minimum memory reservation. Previously, such queries ran
+              without a memory limit. As a result, a query that uses more memory than
+              estimated can now spill to disk or fail with a memory limit exceeded error,
+              and a query whose minimum memory reservation is larger than its estimate
+              needs more of the memory of the pool to be admitted. Query plans can also
+              change, because the planner uses Max Memory divided by the number of
+              executors as the per-host memory limit when it decides whether to broadcast
+              the build side of a join.</p><p>To give such queries more memory, set the
+                <codeph>MEM_LIMIT</codeph> query option, for example in the default query
+              options of the pool, or set Minimum Query Memory Limit and Maximum Query
+              Memory Limit for the pool. No setting restores the previous behavior;
+              removing Max Memory from the pool turns off memory-based admission control
+              for the pool. See <xref href="impala_admission.xml#admission_memory"/>.</p></li>
         </ul>
       </p>
     </conbody>

@@ -216,6 +216,31 @@ under the License.
                   query.</li>
               </ul>
             </p>
+            <p rev="5.0.0 IMPALA-14840">
+              Starting in <keyword keyref="impala50"/>, if Max Memory is set for
+              a pool, but Minimum Query Memory Limit and Maximum Query Memory
+              Limit are not, Impala also sets a memory limit for the queries
+              that do not set the <codeph>MEM_LIMIT</codeph>,
+              <codeph>MEM_LIMIT_EXECUTORS</codeph>, or
+              <codeph>MEM_LIMIT_COORDINATORS</codeph> query option. The
+              per-host memory limit of such a query is its per-host memory
+              estimate, increased if needed to accommodate the minimum memory
+              reservation of the query. In earlier releases, such queries were
+              admitted based on their memory estimates, but ran without a memory
+              limit, so the queries in the pool could use more memory than Max
+              Memory. This also applies when the memory of the default pool is
+              limited by the <codeph>--default_pool_mem_limit</codeph> startup
+              flag. The planner also uses Max Memory divided by the number of
+              executors as the per-host memory limit of such queries when it
+              decides whether to broadcast the build side of a join.
+            </p>
+            <p rev="5.0.0 IMPALA-14840">
+              A query that needs more memory than estimated can spill to disk or
+              fail with a memory limit exceeded error. To give the queries in
+              such a pool more memory, set the <codeph>MEM_LIMIT</codeph> query
+              option, or set Minimum Query Memory Limit and Maximum Query Memory
+              Limit for the pool.
+            </p>
           </dd>
         </dlentry>
         <dlentry>

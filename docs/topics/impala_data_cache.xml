@@ -103,6 +103,35 @@ under the License.
       This is because the cache key consists of the filename, mtime (last modified time of the
       file), and file offset. If the mtime in the file metadata remains unchanged, the scan request
       will consistently access the cache (provided that there is enough capacity).</note>
+
+    <section id="data_cache_scheduling_seed" rev="5.0.0 IMPALA-11979">
+      <title>Consistent Scheduling of Remote Reads</title>
+      <p>
+        To make file-related caches, such as the data cache, more efficient, Impala
+        schedules the reads of each file split from a remote filesystem to a small,
+        consistent set of executors. The <codeph>NUM_REMOTE_EXECUTOR_CANDIDATES</codeph>
+        query option sets the size of the set, 3 by default. If the option is 0, the reads
+        can be scheduled to any executor. Impala picks the executors by hashing the path
+        and offset of the split onto a hash ring of the executors in the executor group.
+        By default, the positions of an executor on the hash ring are derived from its IP
+        address. Therefore, different executor groups schedule the same file split to
+        unrelated executors, and the scheduling changes when the executors restart with
+        different IP addresses.
+      </p>
+      <p>
+        Starting in <keyword keyref="impala50"/>, you can set the
+        <codeph>&#8209;&#8209;scheduling_seed</codeph> startup flag on each executor to
+        derive its positions on the hash ring from the specified string instead of its IP
+        address. The value must be unique among the executors of an executor group, but
+        executors in different executor groups can use the same value. For example, in a
+        cluster with several executor groups of 8 executors, the third executor of each
+        group can use <codeph>&#8209;&#8209;scheduling_seed=executor_3_of_8</codeph>, so
+        that all the executor groups pick the executors with the same scheduling seeds for
+        a given file split. The scheduling also stays the same when an executor restarts
+        with a different IP address, but with the same scheduling seed. The default is an
+        empty string, which means that the IP address of the executor is used.
+      </p>
+    </section>
   </conbody>
 
 </concept>

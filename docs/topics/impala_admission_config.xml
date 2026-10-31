@@ -309,6 +309,11 @@ impala.admission-control.pool-queue-timeout-ms.<varname>queue_name</varname></ph
           If a query fails to pass the User Quota rules then the query will be
           rejected when it is submitted.
         </p>
+        <p rev="5.0.0 IMPALA-13965">
+          Starting in <keyword keyref="impala50"/>, this also applies when no executor
+          group is available, for example while the executors are starting. In earlier
+          releases, such queries were queued without checking the User Quota rules.
+        </p>
 
         <p>
           There are three type of rules:
@@ -785,6 +790,130 @@ impala.admission-control.pool-queue-timeout-ms.<varname>queue_name</varname></ph
 
         </dlentry>
       </dl>
+
+    </conbody>
+
+  </concept>
+
+  <concept id="admission_service">
+
+    <title>Configuring the Admission Control Service</title>
+
+    <prolog>
+      <metadata>
+        <data name="Category" value="Configuring"/>
+      </metadata>
+    </prolog>
+
+    <conbody>
+
+      <p>
+        By default, each coordinator makes its own admission decisions, as described in
+        <xref href="impala_admission.xml#admission_architecture"/>. Alternatively, you can
+        run the admission control service, the <cmdname>admissiond</cmdname> daemon, which
+        makes the admission decisions for all the coordinators. To use the admission
+        control service, start the coordinators with the
+        <codeph>&#8209;&#8209;admission_service_host</codeph> startup flag set to the host
+        name of <cmdname>admissiond</cmdname>. <cmdname>admissiond</cmdname> listens on the
+        port set by the <codeph>&#8209;&#8209;admission_service_port</codeph> startup flag,
+        29500 by default; if you change it, set the same value on the coordinators. Use the
+        same admission control startup flags and configuration files on
+        <cmdname>admissiond</cmdname> and on the coordinators.
+      </p>
+
+      <section id="admission_service_mem_safeguard"
+        rev="5.0.0 IMPALA-14493 IMPALA-14763 IMPALA-14612">
+        <title>Memory Safeguard of the Admission Control Service</title>
+        <p>
+          Starting in <keyword keyref="impala50"/>, <cmdname>admissiond</cmdname> rejects
+          new queries when its memory usage, as reported by the memory allocator, exceeds
+          its process memory limit. This protects <cmdname>admissiond</cmdname> from
+          running out of memory, for example when many large queries are queued. The
+          process memory limit is set by the <codeph>&#8209;&#8209;mem_limit</codeph>
+          startup flag of <cmdname>admissiond</cmdname>, by default 80% of the memory
+          available to the process. The check is skipped for trivial queries that
+          admission control admits immediately, such as <codeph>SELECT 1</codeph>. In
+          addition, before <cmdname>admissiond</cmdname> decompresses a compressed request
+          (see <xref href="#admission_service/admission_service_compression"
+          format="dita">Compressing Admission Requests</xref>), it rejects the query if
+          the memory needed for the decompression would exceed the limit. This can also
+          happen to a queued query when <cmdname>admissiond</cmdname> tries to admit it
+          from the queue.
+        </p>
+        <p>
+          The error message of a query rejected this way contains the following text:
+        </p>
+<codeblock>Admission rejected due to memory pressure in admissiond. Current usage: <varname>N</varname> bytes, limit: <varname>M</varname> bytes</codeblock>
+        <p>
+          To turn off the safeguard, start <cmdname>admissiond</cmdname> with
+          <codeph>&#8209;&#8209;enable_admission_service_mem_safeguard=false</codeph>. The
+          default is <codeph>true</codeph>.
+        </p>
+        <p>
+          To monitor <cmdname>admissiond</cmdname>, use its
+          <codeph>admission-control-service.num-queries</codeph> metric, which shows the
+          number of queries that <cmdname>admissiond</cmdname> currently tracks (queued or
+          running), and the
+          <codeph>admission-control-service.num-queries-high-water-mark</codeph> metric,
+          which shows the highest value of that number.
+        </p>
+      </section>
+
+      <section id="admission_service_compression" rev="5.0.0 IMPALA-14661">
+        <title>Compressing Admission Requests</title>
+        <p>
+          A coordinator sends the execution request of each query to
+          <cmdname>admissiond</cmdname>, which keeps it in memory while the query is
+          queued. The execution requests of complex queries can be large. Starting in
+          <keyword keyref="impala50"/>, you can set the
+          <codeph>&#8209;&#8209;admission_control_rpc_compress_threshold_bytes</codeph>
+          startup flag on the coordinators to compress the execution requests that are
+          larger than the specified number of bytes. While a query is queued,
+          <cmdname>admissiond</cmdname> keeps only the compressed request in memory. The
+          default is 0, which turns off compression.
+        </p>
+        <p>
+          The <codeph>admission-controller.query-exec-request-compressed-bytes</codeph>,
+          <codeph>admission-controller.query-exec-request-uncompressed-bytes</codeph>, and
+          <codeph>admission-controller.query-exec-request-compression-ratio</codeph>
+          histogram metrics of <cmdname>admissiond</cmdname> show the compressed sizes,
+          uncompressed sizes, and compression ratios of the compressed requests.
+        </p>
+      </section>
+
+      <section id="admission_service_fault_tolerance"
+        rev="5.0.0 IMPALA-14466 IMPALA-12057">
+        <title>Fault Tolerance of the Admission Control Service</title>
+        <p>
+          If a coordinator cannot reach <cmdname>admissiond</cmdname> when it submits a
+          query, for example because <cmdname>admissiond</cmdname> is restarting, the
+          coordinator retries the submission for up to the number of seconds set by its
+          <codeph>&#8209;&#8209;admission_max_retry_time_s</codeph> startup flag, 60 by
+          default. Starting in <keyword keyref="impala50"/>, the coordinator resolves the
+          host name in <codeph>&#8209;&#8209;admission_service_host</codeph> again before
+          each retry, so that it can reach an <cmdname>admissiond</cmdname> that restarted
+          with a different IP address under the same host name. If the retries do not
+          succeed in time, the query fails with an error such as <codeph>Failed to admit
+          query after waiting <varname>N</varname>s and retrying <varname>M</varname>
+          times.</codeph> The coordinator retries only the submission. If
+          <cmdname>admissiond</cmdname> becomes unreachable or restarts while a query is
+          queued, the query fails.
+        </p>
+        <p>
+          <cmdname>admissiond</cmdname> learns from the statestore which coordinators are
+          members of the cluster. When a coordinator leaves the cluster,
+          <cmdname>admissiond</cmdname> releases the resources of the queries that it
+          admitted for that coordinator. Starting in <keyword keyref="impala50"/>,
+          <cmdname>admissiond</cmdname> also remembers the coordinators that recently left
+          the cluster, and rejects the queued queries of these coordinators when it tries to
+          admit them, instead of keeping them in the queue until they time out. The rejection
+          reason in the <cmdname>admissiond</cmdname> log is <codeph>The coordinator no
+          longer exists: <varname>host</varname>:<varname>port</varname></codeph>. The
+          <codeph>&#8209;&#8209;cluster_membership_retained_removed_coords</codeph> startup
+          flag of <cmdname>admissiond</cmdname> sets how many removed coordinators it
+          remembers. Valid values are 1 to 1000, and the default is 1000.
+        </p>
+      </section>
 
     </conbody>
 
