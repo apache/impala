@@ -28,6 +28,21 @@ using namespace apache::hive::service::cli::thrift;
 
 namespace impala {
 
+/// Maps the HS2 TStatusCode types to the corresponding TErrorCode.
+static TErrorCode::type HS2TStatusCodeToTErrorCode(const TStatusCode::type& hs2Code) {
+  // There is no one-one mapping between HS2 error codes and TStatusCode types.
+  // So we return a "GENERAL" error type for ERROR_STATUS code. This lets the callers
+  // pick their own error message for substitution.
+  switch (hs2Code) {
+    case TStatusCode::ERROR_STATUS:
+      return TErrorCode::GENERAL;
+    default:
+      DCHECK(false) << "Unexpected hs2Code: " << hs2Code;
+  }
+  LOG(ERROR) << "Unexpected hs2Code encountered: " << hs2Code;
+  return TErrorCode::UNUSED;
+}
+
 Status StatusFromThrift(const TStatus& status) {
   if (status.status_code == TErrorCode::OK) return Status::OK();
 

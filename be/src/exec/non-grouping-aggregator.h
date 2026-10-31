@@ -23,6 +23,7 @@
 
 #include "codegen/codegen-fn-ptr.h"
 #include "exec/aggregator.h"
+#include "gen-cpp/ImpalaInternalService_types.h"
 #include "runtime/mem-pool.h"
 
 namespace impala {

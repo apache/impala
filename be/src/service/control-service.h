@@ -25,6 +25,7 @@
 #include "kudu/rpc/rpc_controller.h"
 
 #include "common/status.h"
+#include "gen-cpp/RuntimeProfile_types.h"
 
 using kudu::MonoDelta;
 using kudu::rpc::RpcContext;

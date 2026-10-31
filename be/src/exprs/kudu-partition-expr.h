@@ -19,6 +19,7 @@
 #define IMPALA_EXPRS_KUDU_PARTITION_EXPR_H_
 
 #include "exprs/scalar-expr.h"
+#include "gen-cpp/Exprs_types.h"
 
 #include <kudu/client/client.h>
 

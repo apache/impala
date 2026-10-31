@@ -18,6 +18,7 @@
 #pragma once
 
 #include "exprs/scalar-fn-call.h"
+#include "gen-cpp/Exprs_types.h"
 #include "runtime/datetime-parser-common.h"
 #include <string>
 

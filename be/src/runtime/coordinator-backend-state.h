@@ -30,6 +30,7 @@
 #include <boost/accumulators/statistics/variance.hpp>
 
 #include "common/atomic.h"
+#include "gen-cpp/ImpalaInternalService_types.h"
 #include "gen-cpp/admission_control_service.pb.h"
 #include "gen-cpp/control_service.proxy.h"
 #include "kudu/rpc/rpc_controller.h"

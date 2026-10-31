@@ -19,6 +19,7 @@
 
 #include <orc/OrcFile.hh>
 
+#include "gen-cpp/Query_types.h"
 #include "runtime/descriptors.h"
 
 namespace impala {

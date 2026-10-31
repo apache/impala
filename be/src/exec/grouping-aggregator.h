@@ -25,6 +25,7 @@
 #include "codegen/codegen-fn-ptr.h"
 #include "exec/aggregator.h"
 #include "exec/hash-table.h"
+#include "gen-cpp/ImpalaInternalService_types.h"
 #include "runtime/buffered-tuple-stream.h"
 #include "runtime/bufferpool/suballocator.h"
 #include "runtime/descriptors.h"

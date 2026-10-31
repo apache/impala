@@ -38,6 +38,7 @@
 
 #include "common/compiler-util.h"
 #include "common/status.h"
+#include "gen-cpp/CatalogObjects_types.h"
 #include "gen-cpp/SystemTables_types.h"
 #include "gen-cpp/Types_types.h"
 #include "kudu/util/version_util.h"

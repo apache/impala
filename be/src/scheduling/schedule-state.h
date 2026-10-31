@@ -24,6 +24,7 @@
 #include <vector>
 
 #include "common/global-types.h"
+#include "gen-cpp/ImpalaInternalService_types.h"
 #include "gen-cpp/Types_types.h"
 #include "gen-cpp/admission_control_service.pb.h"
 #include "gen-cpp/statestore_service.pb.h"

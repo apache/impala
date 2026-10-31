@@ -20,6 +20,7 @@
 
 #include <string>
 
+#include "gen-cpp/Query_types.h"
 #include "runtime/descriptors.h"
 #include "gen-cpp/parquet_types.h"
 

@@ -25,6 +25,7 @@
 #include <rapidjson/fwd.h>
 
 #include "common/status.h"
+#include "gen-cpp/Frontend_types.h"
 #include "kudu/util/web_callback_registry.h"
 #include "runtime/mem-tracker.h"
 #include "thirdparty/squeasel/squeasel.h"

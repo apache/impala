@@ -20,6 +20,7 @@
 #include <ostream>
 
 #include "codegen/llvm-codegen.h"
+#include "gen-cpp/TCLIService_types.h"
 #include "gutil/strings/substitute.h"
 
 #include "common/names.h"

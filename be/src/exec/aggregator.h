@@ -22,6 +22,7 @@
 
 #include "common/global-types.h"
 #include "common/status.h"
+#include "gen-cpp/ImpalaInternalService_types.h"
 #include "gen-cpp/Types_types.h"
 #include "util/runtime-profile.h"
 

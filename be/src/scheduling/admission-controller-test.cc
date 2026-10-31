@@ -19,6 +19,8 @@
 
 #include <regex>
 
+#include "gen-cpp/ImpalaInternalService_types.h"
+
 #include "common/names.h"
 #include "kudu/util/logging.h"
 #include "kudu/util/logging_test_util.h"

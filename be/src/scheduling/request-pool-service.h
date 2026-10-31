@@ -21,6 +21,9 @@
 #include <jni.h>
 
 #include "common/status.h"
+#include "gen-cpp/Frontend_types.h"
+#include "gen-cpp/ImpalaInternalService_types.h"
+#include "gen-cpp/Query_types.h"
 #include "util/metrics-fwd.h"
 
 namespace impala {

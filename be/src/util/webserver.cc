@@ -34,6 +34,7 @@
 
 #include "common/logging.h"
 #include "common/global-flags.h"
+#include "gen-cpp/Frontend_types.h"
 #include "gutil/endian.h"
 #include "gutil/strings/escaping.h"
 #include "gutil/strings/strip.h"

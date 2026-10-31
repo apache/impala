@@ -23,9 +23,9 @@
 #include <sstream>
 
 #include "common/logging.h"
-#include "common/names.h"
+#include "gen-cpp/CatalogObjects_types.h"
 
-using apache::hive::service::cli::thrift::TStatusCode;
+#include "common/names.h"
 
 namespace impala {
 
@@ -128,20 +128,6 @@ size_t ErrorCount(const ErrorLogMap& errors) {
   ErrorLogMap::const_iterator cit = errors.find(TErrorCode::GENERAL);
   if (cit == errors.end()) return errors.size();
   return errors.size() + cit->second.messages_size() - 1;
-}
-
-TErrorCode::type HS2TStatusCodeToTErrorCode(const TStatusCode::type& hs2Code) {
-  // There is no one-one mapping between HS2 error codes and TStatusCode types.
-  // So we return a "GENERAL" error type for ERROR_STATUS code. This lets the callers
-  // pick their own error message for substitution.
-  switch (hs2Code) {
-    case TStatusCode::ERROR_STATUS:
-      return TErrorCode::GENERAL;
-    default:
-      DCHECK(false) << "Unexpected hs2Code: " << hs2Code;
-  }
-  LOG(ERROR) << "Unexpected hs2Code encountered: " << hs2Code;
-  return TErrorCode::UNUSED;
 }
 
 }

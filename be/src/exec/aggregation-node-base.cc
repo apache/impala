@@ -21,6 +21,7 @@
 #include "exec/grouping-aggregator.h"
 #include "exec/non-grouping-aggregator.h"
 #include "exec/streaming-aggregation-node.h"
+#include "gen-cpp/ImpalaInternalService_types.h"
 #include "runtime/fragment-state.h"
 #include "runtime/runtime-state.h"
 #include "util/runtime-profile-counters.h"

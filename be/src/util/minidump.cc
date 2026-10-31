@@ -19,10 +19,6 @@
 
 #include <assert.h>
 #include <boost/filesystem.hpp>
-#include <client/linux/handler/exception_handler.h>
-#include <common/linux/linux_libc_support.h>
-#include <google_breakpad/common/minidump_format.h>
-#include <third_party/lss/linux_syscall_support.h>
 #include <ctime>
 #include <fstream>
 #include <glob.h>
@@ -37,6 +33,14 @@
 #include "util/debug-util.h"
 #include "util/filesystem-util.h"
 #include "util/time.h"
+
+// The breakpad headers must come after gen-cpp/TCLIService_types.h (included via the
+// headers above). They transitively include <sys/mman.h>, which defines the MAP_TYPE
+// macro, and that conflicts with the TTypeId::MAP_TYPE enum value in TCLIService_types.h.
+#include <client/linux/handler/exception_handler.h>
+#include <common/linux/linux_libc_support.h>
+#include <google_breakpad/common/minidump_format.h>
+#include <third_party/lss/linux_syscall_support.h>
 
 using namespace std;
 

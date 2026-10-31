@@ -23,6 +23,7 @@
 #include "codegen/impala-ir.h"
 #include "common/compiler-util.h"
 #include "exprs/scalar-expr.h"
+#include "gen-cpp/PlanNodes_types.h"
 #include "runtime/descriptors.h"
 #include "runtime/raw-value.h"
 #include "runtime/raw-value.inline.h"

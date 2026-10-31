@@ -17,6 +17,7 @@
 
 #include "scheduling/schedule-state.h"
 
+#include "gen-cpp/ImpalaInternalService_types.h"
 #include "runtime/bufferpool/reservation-util.h"
 #include "scheduling/scheduler.h"
 #include "util/mem-info.h"

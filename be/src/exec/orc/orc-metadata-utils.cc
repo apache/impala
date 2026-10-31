@@ -22,6 +22,7 @@
 #include <boost/algorithm/string.hpp>
 
 #include "exec/file-metadata-utils.h"
+#include "gen-cpp/Query_types.h"
 #include "util/debug-util.h"
 #include "common/names.h"
 

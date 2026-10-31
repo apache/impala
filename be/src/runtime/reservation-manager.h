@@ -19,6 +19,8 @@
 #define IMPALA_RUNTIME_RESERVATION_MANAGER_H
 
 #include "common/status.h"
+#include "gen-cpp/ImpalaInternalService_types.h"
+#include "gen-cpp/ResourceProfile_types.h"
 #include "runtime/bufferpool/buffer-pool.h"
 
 namespace impala {

@@ -23,14 +23,12 @@
 #include <vector>
 
 #include "common/logging.h"
-#include "gen-cpp/CatalogObjects_types.h"
-#include "gen-cpp/ErrorCodes_constants.h"
 #include "gen-cpp/ErrorCodes_types.h"
-#include "gen-cpp/ImpalaInternalService_types.h"
-#include "gen-cpp/TCLIService_types.h"
 #include "gutil/strings/substitute.h"
 
 namespace impala {
+
+class TTableName;
 
 /// Returns the error message for errno. We should not use strerror directly
 /// as that is not thread safe.
@@ -141,10 +139,6 @@ private:
   std::string message_;
   std::vector<std::string> details_;
 };
-
-/// Maps the HS2 TStatusCode types to the corresponding TErrorCode.
-TErrorCode::type HS2TStatusCodeToTErrorCode(
-    const apache::hive::service::cli::thrift::TStatusCode::type& hs2Code);
 }
 
 #endif

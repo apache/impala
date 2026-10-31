@@ -23,7 +23,9 @@
 #include <unordered_map>
 
 #include "common/status.h"
+#include "gen-cpp/ImpalaService_types.h"
 #include "gen-cpp/Query_types.h"  // for TQueryOptionsHash
+#include "gen-cpp/beeswax_types.h"
 
 /// Utility methods to process per-query options
 

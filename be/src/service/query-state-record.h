@@ -23,8 +23,13 @@
 #include <vector>
 
 #include "gen-cpp/ExecStats_types.h"
+#include "gen-cpp/Planner_types.h"
+#include "gen-cpp/Query_types.h"
+#include "gen-cpp/RuntimeProfile_types.h"
+#include "gen-cpp/TCLIService_types.h"
 #include "gen-cpp/Types_types.h"
 #include "gen-cpp/admission_control_service.pb.h"
+#include "gen-cpp/beeswax_types.h"
 #include "util/network-util.h"
 
 namespace impala {

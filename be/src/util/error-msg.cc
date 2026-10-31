@@ -20,6 +20,8 @@
 #include <algorithm>
 #include <sstream>
 
+#include "gen-cpp/ErrorCodes_constants.h"
+
 #include "common/names.h"
 
 namespace impala {
