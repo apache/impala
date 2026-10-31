@@ -49,12 +49,19 @@ under the License.
    the select list (i.e. not as a <q>*</q> expression) will be included in the result.
   </p>
 
-  <p><b>Type:</b>BOOLEAN</p>
-  <p><b>Default:</b>TRUE</p>
-  <p><b>Added in:</b>Impala 4.2</p>
+  <p conref="../shared/impala_common.xml#common/type_boolean"/>
+  <p conref="../shared/impala_common.xml#common/default_true_1"/>
+  <note>
+   The default value was changed to <codeph>true</codeph> starting from
+   <keyword keyref="impala50"/>. In earlier releases the default was <codeph>false</codeph>.
+   For the statements that this change affects, see
+   <xref href="impala_incompatible_changes.xml#incompatible_changes_500x"/>.
+  </note>
+  <p><b>Added in:</b> <keyword keyref="impala42"/></p>
   <p conref="../shared/impala_common.xml#common/related_info"/>
   <p>
    <xref href="impala_complex_types.xml"/>,
+   <xref href="impala_incompatible_changes.xml#incompatible_changes_500x"/>
   </p>
  </conbody>
 </concept>

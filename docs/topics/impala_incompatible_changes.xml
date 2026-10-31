@@ -59,13 +59,39 @@ under the License.
             changed from <codeph>FALSE</codeph> to <codeph>TRUE</codeph>.<p>As a result,
               <codeph>SELECT *</codeph> queries on tables that contain complex-typed
               (<codeph>ARRAY</codeph>, <codeph>MAP</codeph>, or <codeph>STRUCT</codeph>)
-              columns now return those columns by default, instead of skipping them.</p><p>If
-              a table has a complex column whose type is not supported in the select list
-              (for example a <codeph>STRUCT</codeph> nested inside a collection), a
-              <codeph>SELECT *</codeph> that previously succeeded by skipping the column now
-              fails with an analysis error.</p><p>To restore the previous behavior, set the
-                <codeph>EXPAND_COMPLEX_TYPES</codeph> query option to <codeph>false</codeph>.
-              See <xref href="impala_expand_complex_types.xml"/>.</p></li>
+              columns now return those columns by default, instead of skipping them. This
+              also applies to joins with collection columns, such as <codeph>SELECT * FROM
+              t, t.arr a</codeph>, which now return the complex columns of
+              <codeph>t</codeph> too, so clients that read result columns by position can
+              see a different set of columns.</p><p>The following statements, which
+              previously succeeded because <codeph>SELECT *</codeph> skipped the complex
+              columns, now fail with an analysis error:</p>
+            <ul>
+              <li><codeph>CREATE TABLE ... AS SELECT *</codeph> and <codeph>INSERT ...
+                SELECT *</codeph>, because Impala cannot write complex columns, or because
+                the target table has fewer columns than the query returns.</li>
+              <li><codeph>SELECT DISTINCT *</codeph>, because complex values cannot be
+                compared.</li>
+              <li><codeph>UNION</codeph>, <codeph>INTERSECT</codeph>, and
+                <codeph>EXCEPT</codeph> without <codeph>ALL</codeph>, because complex values
+                cannot be compared. <codeph>UNION ALL</codeph> also fails if a column is a
+                <codeph>STRUCT</codeph> or contains a <codeph>STRUCT</codeph>.</li>
+              <li><codeph>SELECT *</codeph> with <codeph>ORDER BY</codeph> if the table has
+                a <codeph>STRUCT</codeph> column that contains a collection, because Impala
+                cannot sort such values.</li>
+              <li><codeph>SELECT *</codeph> on tables or partitions in a file format that
+                can return only scalar columns, such as RCFile or SequenceFile, and on
+                Paimon tables with <codeph>STRUCT</codeph> (<codeph>ROW</codeph>)
+                columns.</li>
+              <li><codeph>SELECT *</codeph> with a join to a collection column that has no
+                table alias, such as <codeph>SELECT * FROM t, t.arr</codeph>, which fails
+                with a <codeph>Duplicate table alias</codeph> error. Give the collection an
+                alias, as in <codeph>SELECT * FROM t, t.arr a</codeph>.</li>
+            </ul>
+            <p>To restore the previous behavior, set the
+                <codeph>EXPAND_COMPLEX_TYPES</codeph> query option to <codeph>false</codeph>,
+              or list the columns explicitly instead of using <codeph>*</codeph>. See
+              <xref href="impala_expand_complex_types.xml"/>.</p></li>
           <li>STRING columns in Parquet are annotated as UTF-8 by default<p>Starting in
             <keyword keyref="impala50"/>, the
             <xref keyref="parquet_annotate_strings_utf8"/> defaults to
