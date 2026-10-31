@@ -1,0 +1,73 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+Licensed to the Apache Software Foundation (ASF) under one
+or more contributor license agreements.  See the NOTICE file
+distributed with this work for additional information
+regarding copyright ownership.  The ASF licenses this file
+to you under the Apache License, Version 2.0 (the
+"License"); you may not use this file except in compliance
+with the License.  You may obtain a copy of the License at
+
+  http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing,
+software distributed under the License is distributed on an
+"AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+KIND, either express or implied.  See the License for the
+specific language governing permissions and limitations
+under the License.
+-->
+<!DOCTYPE concept PUBLIC "-//OASIS//DTD DITA Concept//EN" "concept.dtd">
+<concept id="long_polling_time_ms">
+  <title>LONG_POLLING_TIME_MS Query Option</title>
+  <titlealts audience="PDF">
+    <navtitle>LONG POLLING TIME MS</navtitle>
+  </titlealts>
+  <prolog>
+    <metadata>
+      <data name="Category" value="Impala"/>
+      <data name="Category" value="Impala Query Options"/>
+      <data name="Category" value="Querying"/>
+      <data name="Category" value="Performance"/>
+      <data name="Category" value="Developers"/>
+      <data name="Category" value="Data Analysts"/>
+    </metadata>
+  </prolog>
+  <conbody>
+    <p>Use the <codeph>LONG_POLLING_TIME_MS</codeph> query option to control
+      how long, in milliseconds, Impala waits on the server side for a query
+      to complete when a client requests the status of the query.</p>
+    <p>After submitting a query, a client polls the query status until the
+      query reaches the 'FINISHED' state or fails. A query in the 'FINISHED'
+      state means that the rows are available to be fetched, or, for
+      statements that do not return rows, that the statement has completed.
+      When this query option is set to a value greater than <codeph>0</codeph>,
+      status requests (<codeph>GetOperationStatus</codeph> for HiveServer2
+      clients) wait until the query reaches the 'FINISHED' or the error
+      state, or until the specified time elapses, whichever comes first. The
+      request then returns the current state of the query, which is not
+      necessarily a final state.</p>
+    <p>Waiting on the server side lets the client learn that the query
+      finished as soon as it happens, instead of after the sleep between two
+      client-side polls. This reduces the latency of short queries.
+      <cmdname>impala-shell</cmdname> shortens its sleep between polls by the
+      time that the status request took.</p>
+    <p>When this query option is set to <codeph>0</codeph>, status requests
+      return the current state of the query immediately, without waiting.</p>
+    <p>The option only affects status requests. Requests that submit a query,
+      such as <codeph>ExecuteStatement</codeph>, do not wait for the query to
+      finish.</p>
+    <p conref="../shared/impala_common.xml#common/type_integer"/>
+    <p><b>Allowed values:</b> 0 or positive integers</p>
+    <p><b>Default:</b>
+      <codeph>250</codeph> (0.25 seconds)</p>
+    <note>The default value was changed to <codeph>250</codeph> starting from
+      <keyword keyref="impala50"/>. In earlier releases the default was
+      <codeph>0</codeph>, so status requests returned immediately. To restore
+      the previous behavior, set <codeph>LONG_POLLING_TIME_MS=0</codeph>.</note>
+    <p><b>Added in:</b>
+      <keyword keyref="impala45"/></p>
+    <p><b>Related information:</b>
+      <xref href="impala_fetch_rows_timeout_ms.xml#FETCH_ROWS_TIMEOUT_MS"/></p>
+  </conbody>
+</concept>

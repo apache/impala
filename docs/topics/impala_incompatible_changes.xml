@@ -116,6 +116,15 @@ under the License.
             write path. To store such data, use a <codeph>BINARY</codeph> column
             instead.</note>
           </li>
+          <li>The default value of the <codeph>LONG_POLLING_TIME_MS</codeph> query option
+            changed from <codeph>0</codeph> to <codeph>250</codeph>.<p>As a result, query
+              status requests (<codeph>GetOperationStatus</codeph> for HiveServer2 clients)
+              wait on the server for up to 250 milliseconds for the query to finish, instead
+              of returning immediately. A client with an RPC timeout shorter than 250
+              milliseconds can time out on these requests.</p>
+              <p>To restore the previous behavior, set the <codeph>LONG_POLLING_TIME_MS</codeph>
+              query option to <codeph>0</codeph>. See
+              <xref keyref="long_polling_time_ms"/>.</p></li>
           <li>The DataSketches sketch-producing functions
               (<codeph>ds_hll_sketch()</codeph>, <codeph>ds_cpc_sketch()</codeph>,
               <codeph>ds_theta_sketch()</codeph>, and <codeph>ds_kll_sketch()</codeph>) now

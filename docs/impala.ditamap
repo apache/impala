@@ -227,6 +227,7 @@ under the License.
         <topicref rev="4.4.0" href="topics/impala_large_agg_mem_threshold.xml"/>
         <topicref href="topics/impala_live_progress.xml"/>
         <topicref href="topics/impala_live_summary.xml"/>
+        <topicref rev="4.5.0" href="topics/impala_long_polling_time_ms.xml"/>
         <topicref href="topics/impala_max_errors.xml"/>
         <topicref href="topics/impala_max_fragment_instances_per_node.xml"/>
         <topicref href="topics/impala_max_fs_writers.xml"/>

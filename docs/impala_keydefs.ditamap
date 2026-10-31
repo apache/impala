@@ -10828,6 +10828,7 @@ under the License.
   <keydef href="topics/impala_hbase_caching.xml" keys="hbase_caching"/>
   <keydef href="topics/impala_live_progress.xml" keys="live_progress"/>
   <keydef href="topics/impala_live_summary.xml" keys="live_summary"/>
+  <keydef href="topics/impala_long_polling_time_ms.xml" keys="long_polling_time_ms"/>
   <keydef href="topics/impala_max_errors.xml" keys="max_errors"/>
   <keydef rev="2.10.0 IMPALA-3200" href="topics/impala_max_row_size.xml" keys="max_row_size"/>
   <keydef href="topics/impala_max_scan_range_length.xml" keys="max_scan_range_length"/>
