@@ -250,6 +250,8 @@ under the License.
         <topicref href="topics/impala_parquet_compression_codec.xml"/>
         <topicref rev="2.6.0 IMPALA-2069" href="topics/impala_parquet_annotate_strings_utf8.xml"/>
         <topicref rev="2.9.0 IMPALA-4725" href="topics/impala_parquet_array_resolution.xml"/>
+        <topicref rev="4.1.0 IMPALA-10642" href="topics/impala_parquet_bloom_filter_write.xml"/>
+        <topicref rev="4.1.0 IMPALA-10640" href="topics/impala_parquet_bloom_filtering.xml"/>
         <topicref href="topics/impala_parquet_dictionary_filtering.xml"/>
         <topicref rev="2.6.0 IMPALA-2835" href="topics/impala_parquet_fallback_schema_resolution.xml"/>
         <topicref href="topics/impala_parquet_file_size.xml"/>

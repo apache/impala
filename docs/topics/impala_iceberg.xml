@@ -1743,6 +1743,34 @@ ORDER BY made_current_at;
             If the table property is unset, the way Impala calculates dictionary
             page size will remain unchanged.
           </li>
+          <li rev="5.0.0 IMPALA-12700">
+            <codeph>write.parquet.bloom-filter-enabled.column.<varname>col</varname></codeph>:
+            if set to <codeph>true</codeph>, Impala writes a Parquet Bloom filter for the
+            column <varname>col</varname>. See
+            <xref href="impala_parquet.xml#parquet_bloom_filters"/>.
+          </li>
+          <li rev="5.0.0 IMPALA-12700">
+            <codeph>write.parquet.bloom-filter-max-bytes</codeph>: the maximum size of a
+            Parquet Bloom filter bitset in bytes. It must be a positive 32-bit integer.
+            The default value is 1048576 (1 MiB). Impala rounds the value up to a power of
+            two and limits it to the range of 64 bytes to 128 MiB.
+          </li>
+          <li rev="5.0.0 IMPALA-12700">
+            <codeph>write.parquet.bloom-filter-ndv.column.<varname>col</varname></codeph>:
+            the expected number of distinct values in the column <varname>col</varname>,
+            used to size its Bloom filter. It must be a positive integer. If the property
+            is not set, Impala uses the number of distinct values from the column
+            statistics, for example computed by <codeph>COMPUTE STATS</codeph>. If neither
+            is available, the size of the Bloom filter is
+            <codeph>write.parquet.bloom-filter-max-bytes</codeph>.
+          </li>
+          <li rev="5.0.0 IMPALA-12700">
+            <codeph>write.parquet.bloom-filter-fpp.column.<varname>col</varname></codeph>:
+            the false positive probability of the Bloom filter of the column
+            <varname>col</varname>, used to size the Bloom filter together with the number
+            of distinct values. It must be a number greater than 0 and less than 1. The
+            default value is 0.01.
+          </li>
         </ul>
       </p>
     </conbody>

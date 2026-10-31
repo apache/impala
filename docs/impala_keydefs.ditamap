@@ -10840,6 +10840,8 @@ under the License.
   <keydef href="topics/impala_parquet_compression_codec.xml" keys="parquet_compression_codec"/>
   <keydef href="topics/impala_parquet_annotate_strings_utf8.xml" keys="parquet_annotate_strings_utf8"/>
   <keydef href="topics/impala_parquet_array_resolution.xml" keys="parquet_array_resolution"/>
+  <keydef href="topics/impala_parquet_bloom_filter_write.xml" keys="parquet_bloom_filter_write"/>
+  <keydef href="topics/impala_parquet_bloom_filtering.xml" keys="parquet_bloom_filtering"/>
   <keydef href="topics/impala_parquet_fallback_schema_resolution.xml" keys="parquet_fallback_schema_resolution"/>
   <keydef href="topics/impala_parquet_file_size.xml" keys="parquet_file_size"/>
   <keydef href="topics/impala_prefetch_mode.xml" keys="prefetch_mode"/>
@@ -11036,6 +11038,7 @@ under the License.
   <keydef href="topics/impala_parquet.xml#parquet_etl" keys="parquet_etl"/>
   <keydef href="topics/impala_parquet.xml#parquet_performance" keys="parquet_performance"/>
   <keydef href="topics/impala_parquet.xml#parquet_partitioning" keys="parquet_partitioning"/>
+  <keydef href="topics/impala_parquet.xml#parquet_bloom_filters" keys="parquet_bloom_filters"/>
   <keydef href="topics/impala_parquet.xml#parquet_compression" keys="parquet_compression"/>
   <keydef href="topics/impala_parquet.xml#parquet_snappy" keys="parquet_snappy"/>
   <keydef href="topics/impala_parquet.xml#parquet_gzip" keys="parquet_gzip"/>

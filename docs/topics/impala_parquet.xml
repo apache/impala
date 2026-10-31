@@ -363,6 +363,12 @@ under the License.
         Parquet files, set the <codeph>PARQUET_WRITE_PAGE_INDEX</codeph> query
         option to <codeph>FALSE</codeph>.</p>
 
+      <p rev="4.1.0 IMPALA-10640">
+        For equality predicates on columns with many distinct values, Impala can also skip
+        row groups based on Parquet Bloom filters. See
+        <xref href="#parquet_bloom_filters"/> for details.
+      </p>
+
     </conbody>
 
     <concept id="parquet_partitioning">
@@ -430,6 +436,104 @@ under the License.
             accordingly.
           </li>
         </ul>
+
+      </conbody>
+
+    </concept>
+
+    <concept id="parquet_bloom_filters" rev="4.1.0 IMPALA-10640 IMPALA-10642">
+
+      <title>Parquet Bloom Filters</title>
+
+      <conbody>
+
+        <p>
+          A Parquet Bloom filter is a compact data structure that a Parquet file can store
+          for a column of a row group. A reader can use it to determine quickly that a
+          value does not occur in the row group. Bloom filters help with equality
+          predicates on columns that have many distinct values, such as IDs, where the
+          minimum and maximum values and the dictionary of the column cannot rule out row
+          groups.
+        </p>
+
+        <p>
+          In <keyword keyref="impala41"/> and higher, Impala uses Parquet Bloom filters to
+          skip row groups when it reads Parquet files, and it can write Parquet Bloom
+          filters when it creates Parquet files. The
+          <codeph>PARQUET_BLOOM_FILTERING</codeph> query option, which is enabled by
+          default, controls reading, see
+          <xref href="impala_parquet_bloom_filtering.xml#parquet_bloom_filtering"/>.
+        </p>
+
+        <p>
+          Impala writes Parquet Bloom filters only for the columns listed in the
+          <codeph>parquet.bloom.filter.columns</codeph> table property. The value of the
+          property is a comma-separated list of column names. Each column name can be
+          followed by a colon and the size of the Bloom filter bitset in bytes, for
+          example <codeph>'col1:1024,col2'</codeph>. Impala rounds the size up to a power
+          of two and limits it to the range of 64 bytes to 128 MiB. If the size is
+          omitted, Impala uses the maximum size, 128 MiB. The column names must be in
+          lower case. Impala does not check the value of this property in the
+          <codeph>CREATE TABLE</codeph> and <codeph>ALTER TABLE</codeph> statements. If
+          the value is malformed, Impala ignores the whole property and writes no Bloom
+          filters based on it.
+        </p>
+
+        <p>
+          The <codeph>PARQUET_BLOOM_FILTER_WRITE</codeph> query option controls when
+          Impala writes the requested Bloom filters. With the default value,
+          <codeph>IF_NO_DICT</codeph>, Impala writes the Bloom filter of a column only
+          into the row groups where the column is not fully dictionary encoded. See
+          <xref href="impala_parquet_bloom_filter_write.xml#parquet_bloom_filter_write"/>
+          for details.
+        </p>
+
+        <p>
+          Impala reads and writes Parquet Bloom filters only for columns of the following
+          types: <codeph>TINYINT</codeph>, <codeph>SMALLINT</codeph>,
+          <codeph>INT</codeph>, <codeph>BIGINT</codeph>, <codeph>FLOAT</codeph>,
+          <codeph>DOUBLE</codeph>, and <codeph>STRING</codeph>.
+        </p>
+
+        <p>
+          For a given number of distinct values in a row group, the size of the bitset
+          determines the false positive probability of the Bloom filter. A larger bitset
+          makes false positives less likely, but makes the data files larger. For example,
+          a false positive probability of 1% needs about 128 KiB for 100,000 distinct
+          values. Impala keeps the bitsets in memory while it writes a data file, so large
+          Bloom filters also increase the memory needed by <codeph>INSERT</codeph>
+          statements, especially when they write many partitions at the same time.
+        </p>
+
+        <p>
+          The following example creates a Parquet table with Bloom filters for the
+          <codeph>id</codeph> and <codeph>name</codeph> columns, and runs a query that can
+          use them:
+        </p>
+
+<codeblock>CREATE TABLE customers (id BIGINT, name STRING, city STRING)
+  STORED AS PARQUET
+  TBLPROPERTIES ('parquet.bloom.filter.columns'='id:131072,name:131072');
+
+INSERT INTO customers SELECT id, name, city FROM customers_staging;
+
+SELECT * FROM customers WHERE id = 12345;</codeblock>
+
+        <p>
+          To request Bloom filters for an existing table, set the property with the
+          <codeph>ALTER TABLE ... SET TBLPROPERTIES</codeph> statement. The property
+          affects only the data files that Impala writes afterwards.
+        </p>
+
+        <p>
+          The <codeph>parquet.bloom.filter.columns</codeph> property is specific to
+          Impala. It also applies to Iceberg tables. In addition, Impala honors the
+          Parquet Bloom filter table properties of Iceberg when it writes Iceberg tables,
+          see <xref href="impala_iceberg.xml#iceberg_table_properties"/>. If a column is
+          listed both in <codeph>parquet.bloom.filter.columns</codeph> and in the Iceberg
+          properties, the <codeph>parquet.bloom.filter.columns</codeph> property takes
+          precedence.
+        </p>
 
       </conbody>
 
