@@ -100,6 +100,10 @@ public class IcebergRestCatalogTest {
           Class<T> responseType,
           Consumer<ErrorResponse> errorHandler,
           Consumer<Map<String, String>> responseHeaders) {
+        // Tests check the requests in the log, e.g. that DROP TABLE ... PURGE sends
+        // purgeRequested=true. Not through SLF4J, which may have no binding.
+        System.err.printf("Request: %s %s %s%n", request.method(), request.path(),
+            request.queryParameters());
         Object body = roundTripSerialize(request.body(), "request");
         HTTPRequest req = ImmutableHTTPRequest.builder().from(request).body(body).build();
         T response = super.execute(req, responseType, errorHandler, responseHeaders);

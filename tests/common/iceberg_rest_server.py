@@ -44,12 +44,15 @@ class IcebergRestServer(object):
     self.process = None
     self.stdout = None
     self.stderr = None
+    # The server logs every request it handles here, see IcebergRestCatalogTest.
+    self.log_path = None
 
   def start_rest_server(self, timeout_s=60):
     start_time = time.strftime("%Y%m%d-%H%M%S")
     log_pattern = self.LOG_PATTERN % (IMPALA_CLUSTER_LOGS, self.port, start_time)
     self.stdout = open(log_pattern + '.stdout', 'w')
-    self.stderr = open(log_pattern + '.stderr', 'w')
+    self.log_path = log_pattern + '.stderr'
+    self.stderr = open(self.log_path, 'w')
     command = ['testdata/bin/run-iceberg-rest-server.sh', "--port",
         str(self.port), "--catalog-location", self.catalog_location]
     self.process = subprocess.Popen(

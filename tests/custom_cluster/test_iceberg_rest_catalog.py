@@ -53,6 +53,13 @@ MULTIPLE_REST_WITHOUT_CATALOGD_IMPALAD_ARGS = """--use_local_catalog=true
     --catalogd_deployed=false \
     --catalog_config_dir={}/testdata/configs/catalog_configs/multicatalog_rest_config"""\
         .format(IMPALA_HOME)
+# Two REST catalogs sharing a name: neither has a unique name, so DML and DDL are
+# disabled for both.
+DUPLICATE_NAME_REST_IMPALAD_ARGS = """--use_local_catalog=true
+    --catalog_config_dir={}/testdata/configs/catalog_configs/duplicate_name_rest_config"""\
+        .format(IMPALA_HOME)
+DUPLICATE_NAME_REST_WITHOUT_CATALOGD_IMPALAD_ARGS = \
+    "--catalogd_deployed=false " + DUPLICATE_NAME_REST_IMPALAD_ARGS
 MULTICATALOG_CATALOGD_ARGS = "--catalog_topic_mode=minimal"
 WRITE_TEST_TABLE = "impala_rest_dml_test.insert_test"
 PARTITIONED_WRITE_TEST_TABLE = "impala_rest_dml_test.partitioned_insert_test"
@@ -180,6 +187,25 @@ class IcebergRestCatalogTests(CustomClusterTestSuite):
     if response.status_code != 404:
       response.raise_for_status()
 
+  @staticmethod
+  def _drop_requests(server, table_name):
+    """The DELETE requests for 'table_name' that 'server' logged."""
+    namespace, table = table_name.split('.', 1)
+    path = "namespaces/{}/tables/{} ".format(namespace, table)
+    with open(server.log_path) as log:
+      return [line for line in log if "Request: DELETE" in line and path in line]
+
+  def _check_drop_request(self, server, table_name, stmt, purge):
+    """Runs 'stmt', which drops 'table_name', and checks that it sent one DELETE to
+    'server', with purgeRequested=true exactly if 'purge'. The test server deletes the
+    table directory either way, so only the request shows whether PURGE reached it."""
+    requests_before = len(self._drop_requests(server, table_name))
+    result = self.execute_query_expect_success(self.client, stmt)
+    assert result.data == ['Table has been dropped.']
+    new_requests = self._drop_requests(server, table_name)[requests_before:]
+    assert len(new_requests) == 1
+    assert ("purgeRequested=true" in new_requests[0]) == purge
+
   def _run_rest_drop_table_test(self, server, table_name):
     """DROP TABLE on a REST catalog table runs in the coordinator through the REST
     catalog: the table disappears from the REST server and from Impala. Names are
@@ -195,11 +221,9 @@ class IcebergRestCatalogTests(CustomClusterTestSuite):
     assert len(filesystem_client.ls(table_path + "/data")) == 1
 
     # The test server, backed by HadoopCatalog, deletes the table directory with or
-    # without PURGE, so this does not show that PURGE reached the server; the request
-    # is covered by IcebergDdlExecutorTest.
-    result = self.execute_query_expect_success(
-        self.client, "drop table {} purge".format(table_name.upper()))
-    assert result.data == ['Table has been dropped.']
+    # without PURGE; the request shows that PURGE reached the server.
+    self._check_drop_request(server, table_name,
+        "drop table {} purge".format(table_name.upper()), purge=True)
     assert requests.get(self._rest_table_url(server, table_name),
         timeout=30).status_code == 404
     assert not filesystem_client.exists(table_path)
@@ -226,9 +250,8 @@ class IcebergRestCatalogTests(CustomClusterTestSuite):
     result = self.execute_query_expect_success(
         self.client, "drop view if exists {}".format(table_name))
     assert result.data == ['Drop view is not allowed on a table.']
-    result = self.execute_query_expect_success(
-        self.client, "drop table if exists {}".format(table_name.upper()))
-    assert result.data == ['Table has been dropped.']
+    self._check_drop_request(server, table_name,
+        "drop table if exists {}".format(table_name.upper()), purge=False)
     assert requests.get(self._rest_table_url(server, table_name),
         timeout=30).status_code == 404
 
@@ -241,6 +264,34 @@ class IcebergRestCatalogTests(CustomClusterTestSuite):
         self.client, "drop table if exists {} purge".format(mixed_case_table))
     assert requests.get(self._rest_table_url(server, mixed_case_table),
         timeout=30).status_code == 200
+
+  def _check_drop_without_unique_name(self):
+    """Both REST catalogs are named 'rest', so neither can be addressed by name. Every
+    DROP TABLE on their tables must be rejected for that reason and must not be sent to
+    catalogd instead."""
+    server = self.servers[0]
+    expected = "REST catalog does not have a unique name"
+
+    error = self.execute_query_expect_failure(
+        self.client, "drop table {}".format(WRITE_TEST_TABLE))
+    assert expected in str(error)
+
+    self._create_rest_test_table(
+        server, UNLOADABLE_TEST_TABLE, definition=UNLOADABLE_TEST_DEFINITION)
+    self.rest_test_tables.append(
+        (server, UNLOADABLE_TEST_TABLE, UNLOADABLE_TEST_DEFINITION))
+    for stmt in ["drop table {}", "drop table if exists {}"]:
+      error = self.execute_query_expect_failure(
+          self.client, stmt.format(UNLOADABLE_TEST_TABLE))
+      assert expected in str(error)
+    assert requests.get(self._rest_table_url(server, UNLOADABLE_TEST_TABLE),
+        timeout=30).status_code == 200
+
+    # A table that analysis did not find is a no-op with IF EXISTS, as in catalogd.
+    db_name = WRITE_TEST_TABLE.split('.')[0]
+    result = self.execute_query_expect_success(
+        self.client, "drop table if exists {}.no_such_table".format(db_name))
+    assert result.data == ['Table does not exist.']
 
   @classmethod
   def _create_rest_test_table(cls, server, table_name, partitioned=False,
@@ -306,6 +357,66 @@ class TestIcebergRestCatalogWithHms(IcebergRestCatalogTests):
     result = self.execute_query_expect_success(
         self.client, "drop table if exists default.no_such_table")
     assert result.data == ['Table does not exist.']
+
+    # The coordinators cache nothing for REST tables: a drop through one coordinator is
+    # visible on another at once, and SYNC_DDL has nothing to wait for.
+    self._create_rest_test_table(self.servers[0], WRITE_TEST_TABLE)
+    other_client = self.create_client_for_nth_impalad(1)
+    try:
+      self.execute_query_expect_success(
+          other_client, "select * from {}".format(WRITE_TEST_TABLE))
+      self.execute_query_expect_success(
+          self.client, "drop table {}".format(WRITE_TEST_TABLE),
+          query_options={'sync_ddl': 1})
+      error = self.execute_query_expect_failure(
+          other_client, "select * from {}".format(WRITE_TEST_TABLE))
+      assert "Could not resolve table reference" in str(error)
+    finally:
+      other_client.close()
+
+  @RestServerProperties(
+      {'port': 9084, 'catalog_location': WRITE_TEST_CATALOG_LOCATION})
+  @CustomClusterTestSuite.with_args(
+     impalad_args=MULTICATALOG_IMPALAD_ARGS,
+     catalogd_args=MULTICATALOG_CATALOGD_ARGS)
+  @pytest.mark.execute_serially
+  def test_rest_catalog_drop_while_unreachable(self, unique_database):
+    """In a database that catalogd and a REST catalog both have, DROP TABLE cannot tell
+    which catalog holds a table while the REST server is unreachable. It fails then,
+    also for a table of catalogd, and works again once the server is back."""
+    server = self.servers[0]
+    hms_table = "{}.hms_tbl".format(unique_database)
+    rest_table = "{}.rest_tbl".format(unique_database)
+    self.execute_query_expect_success(
+        self.client, "create table {} (i int)".format(hms_table))
+    self._create_rest_test_table(server, rest_table)
+    self.rest_test_tables.append((server, rest_table, INSERT_TEST_TABLE))
+
+    server.stop_rest_server()
+    try:
+      error = self.execute_query_expect_failure(
+          self.client, "drop table {}".format(hms_table))
+      assert "failed to list the tables of {}".format(unique_database) in str(error)
+    finally:
+      server.start_rest_server(300)
+    self.execute_query_expect_success(self.client, "drop table {}".format(hms_table))
+    self.execute_query_expect_success(
+        self.client, "drop table {} purge".format(rest_table))
+    requests.delete("http://localhost:{}/v1/namespaces/{}".format(
+        server.port, unique_database), timeout=30).raise_for_status()
+
+  @RestServerProperties(
+      {'port': 9084, 'catalog_location': WRITE_TEST_CATALOG_LOCATION,
+       'test_table': WRITE_TEST_TABLE},
+      {'port': 9085, 'catalog_location': SECONDARY_WRITE_TEST_CATALOG_LOCATION})
+  @CustomClusterTestSuite.with_args(
+     impalad_args=DUPLICATE_NAME_REST_IMPALAD_ARGS,
+     catalogd_args=MULTICATALOG_CATALOGD_ARGS)
+  @pytest.mark.execute_serially
+  def test_rest_catalog_drop_without_unique_name(self):
+    """With catalogd deployed, DROP TABLE on a REST catalog without a unique name is
+    rejected, whether the table loads or fails to load."""
+    self._check_drop_without_unique_name()
 
   @RestServerProperties(
     {'port': 9084},
@@ -921,6 +1032,41 @@ class TestIcebergRestCatalogStandalone(IcebergRestCatalogTests):
     assert requests.get(self._rest_table_url(self.servers[0], WRITE_TEST_TABLE),
         timeout=30).status_code == 200
     self._check_drop_table_in_missing_db()
+
+  @RestServerProperties(
+      {'port': 9084, 'catalog_location': WRITE_TEST_CATALOG_LOCATION,
+       'test_table': WRITE_TEST_TABLE},
+      {'port': 9085, 'catalog_location': SECONDARY_WRITE_TEST_CATALOG_LOCATION})
+  @CustomClusterTestSuite.with_args(
+     impalad_args=DUPLICATE_NAME_REST_WITHOUT_CATALOGD_IMPALAD_ARGS,
+     start_args=NO_CATALOGD_STARTARGS,
+     cluster_size=1)
+  @pytest.mark.execute_serially
+  def test_rest_catalog_drop_without_unique_name(self):
+    """Without catalogd, DROP TABLE on a REST catalog without a unique name is
+    rejected, whether the table loads or fails to load."""
+    self._check_drop_without_unique_name()
+
+  @RestServerProperties(
+      {'port': 9084, 'catalog_location': WRITE_TEST_CATALOG_LOCATION,
+       'test_table': WRITE_TEST_TABLE},
+      {'port': 9085, 'catalog_location': SECONDARY_WRITE_TEST_CATALOG_LOCATION,
+       'test_table': WRITE_TEST_TABLE})
+  @CustomClusterTestSuite.with_args(
+     impalad_args=MULTIPLE_REST_WITHOUT_CATALOGD_IMPALAD_ARGS,
+     start_args=NO_CATALOGD_STARTARGS,
+     cluster_size=1)
+  @pytest.mark.execute_serially
+  def test_multiple_rest_catalogs_drop_ambiguous_table(self):
+    """A table that two REST catalogs both list is ambiguous: DROP TABLE is rejected,
+    also with IF EXISTS, and neither catalog drops it."""
+    for stmt in ["drop table {}", "drop table if exists {} purge"]:
+      error = self.execute_query_expect_failure(
+          self.client, stmt.format(WRITE_TEST_TABLE))
+      assert "Ambiguous table name" in str(error)
+    for server in self.servers:
+      assert requests.get(self._rest_table_url(server, WRITE_TEST_TABLE),
+          timeout=30).status_code == 200
 
   def _check_drop_table_in_missing_db(self):
     """Without catalogd, a database that no REST catalog serves belongs to the first
