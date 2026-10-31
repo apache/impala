@@ -33,21 +33,61 @@ under the License.
   <conbody>
 
     <p id="p_24">
-      This section describes the mandatory and recommended configuration settings for Impala. If Impala is
-      installed using cluster management software, some of these configurations might be completed automatically; you must still
-      configure short-circuit reads manually. If you want to customize your environment, consider making the changes described in this topic.
+      This section describes the mandatory and recommended configuration settings for Impala.
+      They depend on whether the Impala daemons run on the same hosts as the storage, that is,
+      the HDFS DataNodes or the Ozone Datanodes. If Impala is installed using cluster
+      management software, some of these configurations might be completed automatically. If
+      you want to customize your environment, consider making the changes described in this
+      topic.
+    </p>
+
+    <p>
+      <b>If Impala runs on the same hosts as the storage:</b>
     </p>
 
     <ul>
       <li>
         You must enable short-circuit reads, whether or not Impala was installed with cluster
-        management software. This setting goes in the Impala configuration settings, not the Hadoop-wide settings.
+        management software. This setting goes in the Impala configuration settings, not the
+        Hadoop-wide settings. See <xref href="#config_performance/section_fhq_wyv_ls">Mandatory:
+        Short-Circuit Reads</xref>.
       </li>
 
       <li>
-        You must enable block location tracking, and you can optionally enable native checksumming for optimal performance.
+        Keep block location tracking turned on, so that Impala reads the data locally. It is on
+        by default and needs no configuration. See
+        <xref href="#config_performance/block_location_tracking">Block Location Tracking</xref>.
       </li>
     </ul>
+
+    <p>
+      <b>If Impala does not run on the same hosts as the storage</b>, for example when Impala
+      runs in containers:
+    </p>
+
+    <ul>
+      <li>
+        We recommend turning off block location loading, which makes loading and refreshing
+        tables much faster. See <xref href="#config_performance/disable_block_locations">Turning
+        Off Block Location Loading</xref>.
+      </li>
+
+      <li>
+        Short-circuit reads do not apply, because Impala never reads the data from the local
+        host.
+      </li>
+
+      <li>
+        To reduce the cost of remote reads, enable the data cache. See
+        <xref href="impala_data_cache.xml#data_cache"/>.
+      </li>
+    </ul>
+
+    <p>
+      In both cases, you can optionally enable native checksumming for optimal performance.
+      See <xref href="#config_performance/native_checksumming">Optional: Native
+      Checksumming</xref>.
+    </p>
 
     <section id="section_fhq_wyv_ls">
       <title>Mandatory: Short-Circuit Reads</title>
@@ -74,7 +114,6 @@ under the License.
         <li>
           <indexterm audience="hidden">dfs.client.read.shortcircuit</indexterm>
           <indexterm audience="hidden">dfs.domain.socket.path</indexterm>
-          <indexterm audience="hidden">dfs.client.file-block-storage-locations.timeout.millis</indexterm>
           On all Impala nodes, configure the following properties in <!-- Exact timing is unclear, since we say farther down to copy /etc/hadoop/conf/hdfs-site.xml to /etc/impala/conf.
      Which wouldn't work if we already modified the Impala version of the file here. Also on a 'managed'
      cluster, these /etc files might not exist in those locations. -->
@@ -87,11 +126,6 @@ under the License.
 &lt;property&gt;
     &lt;name&gt;dfs.domain.socket.path&lt;/name&gt;
     &lt;value&gt;/var/run/hdfs-sockets/dn&lt;/value&gt;
-&lt;/property&gt;
-
-&lt;property&gt;
-    &lt;name&gt;dfs.client.file-block-storage-locations.timeout.millis&lt;/name&gt;
-    &lt;value&gt;10000&lt;/value&gt;
 &lt;/property&gt;</codeblock>
           <!-- Former socket.path value:    &lt;value&gt;/var/run/hadoop-hdfs/dn._PORT&lt;/value&gt; -->
           <!--
@@ -104,16 +138,6 @@ under the License.
         <li>
           <p> If <codeph>/var/run/hadoop-hdfs/</codeph> is group-writable, make
             sure its group is <codeph>root</codeph>. </p>
-          <note> If you are also going to enable block location tracking, you
-            can skip copying configuration files and restarting DataNodes and go
-            straight to <xref href="#config_performance/block_location_tracking"
-             >Optional: Block Location Tracking</xref>.
-            Configuring short-circuit reads and block location tracking require
-            the same process of copying files and restarting services, so you
-            can complete that process once when you have completed all
-            configuration changes. Whether you copy files and restart services
-            now or during configuring block location tracking, short-circuit
-            reads are not enabled until you complete those final steps. </note>
         </li>
         <li id="restart_all_datanodes"> After applying these changes, restart
           all DataNodes. </li>
@@ -122,30 +146,149 @@ under the License.
 
     <section id="block_location_tracking">
 
-      <title>Mandatory: Block Location Tracking</title>
+      <title>Block Location Tracking</title>
 
       <p>
-        Enabling block location metadata allows Impala to know which disk data blocks are located on, allowing
-        better utilization of the underlying disks. Impala will not start unless this setting is enabled.
+        For files on HDFS, Ozone, and Alluxio, Impala loads the block locations of each file,
+        that is, which hosts and disks store each block. The scheduler uses them to assign each
+        scan range to an Impala daemon running on a host that stores a replica, so the data is
+        read locally, for example with short-circuit reads, and the I/O is spread across the
+        disks of the host. Block locations are loaded by default and need no configuration.
       </p>
 
       <p>
-        <b>To enable block location tracking:</b>
+        Data locality only matters when the Impala daemons run on the same hosts as the HDFS
+        DataNodes or Ozone Datanodes. If they do not, we recommend turning off block location
+        loading, as described in <xref href="#config_performance/disable_block_locations">Turning
+        Off Block Location Loading</xref>. It makes loading and refreshing tables much faster,
+        and the table metadata takes less memory.
+      </p>
+    </section>
+
+    <section id="disable_block_locations" rev="5.0.0 IMPALA-14138">
+
+      <title>Turning Off Block Location Loading</title>
+
+      <p>
+        In <keyword keyref="impala50"/> and higher, you can turn off block location loading
+        through the Hadoop configuration. We recommend doing this when Impala does not run on
+        the same hosts as HDFS or Ozone, for example when Impala runs in containers. In that
+        case the block locations bring no benefit, but <cmdname>catalogd</cmdname> still
+        fetches them for every file when it loads or refreshes a table, which is expensive for
+        tables with many files.
       </p>
 
-      <ol>
+      <p>
+        Set the following properties in the <codeph>core-site.xml</codeph> file in the Impala
+        configuration directory. They are Hadoop configuration properties, not startup flags,
+        so they do not appear in the <codeph>--help</codeph> output or on the
+        <codeph>/varz</codeph> page; the <codeph>/hadoop-varz</codeph> page of the
+        <cmdname>impalad</cmdname> and <cmdname>catalogd</cmdname> web UI shows the values in
+        effect.
+      </p>
+
+      <ul>
         <li>
-          For each DataNode, adding the following to the <codeph>hdfs-site.xml</codeph> file:
-<codeblock>&lt;property&gt;
-  &lt;name&gt;dfs.datanode.hdfs-blocks-metadata.enabled&lt;/name&gt;
-  &lt;value&gt;true&lt;/value&gt;
-&lt;/property&gt; </codeblock>
+          <codeph>impala.preload-block-locations-for-scheduling</codeph>: applies to all
+          filesystems.
         </li>
 
-        <li conref="#config_performance/copy_config_files"/>
+        <li>
+          <codeph>impala.preload-block-locations-for-scheduling.scheme.<varname>scheme</varname></codeph>:
+          applies to the filesystems with the given URI scheme, such as <codeph>hdfs</codeph>
+          or <codeph>ofs</codeph>.
+        </li>
 
-        <li conref="#config_performance/restart_all_datanodes"/>
-      </ol>
+        <li>
+          <codeph>impala.preload-block-locations-for-scheduling.authority.<varname>authority</varname></codeph>:
+          applies to the filesystems with the given URI authority, such as
+          <codeph>mycluster</codeph> for <codeph>hdfs://mycluster/...</codeph> or
+          <codeph>nn-host:8020</codeph> for <codeph>hdfs://nn-host:8020/...</codeph>. Use it
+          when several storage clusters share the same scheme.
+        </li>
+      </ul>
+
+      <p>
+        All of them default to <codeph>true</codeph>. Setting any of them to
+        <codeph>false</codeph> turns off block location loading for the matching filesystems,
+        and a <codeph>true</codeph> value at another level cannot turn it back on. For example,
+        if the <codeph>hdfs</codeph> scheme is set to <codeph>false</codeph> and the
+        <codeph>mycluster</codeph> authority to <codeph>true</codeph>, Impala does not load
+        block locations for <codeph>hdfs://mycluster/</codeph>. Any value other than
+        <codeph>true</codeph> counts as <codeph>false</codeph>.
+      </p>
+
+      <p>
+        Only the <codeph>hdfs</codeph>, <codeph>ofs</codeph>, <codeph>o3fs</codeph>, and
+        <codeph>alluxio</codeph> schemes have block locations, so the properties only affect
+        those. Impala never loads block locations for other filesystems, such as S3, ADLS,
+        ABFS, or GCS.
+      </p>
+
+      <p>
+        For example, the following setting turns off block location loading for HDFS:
+      </p>
+
+<codeblock>&lt;property&gt;
+  &lt;name&gt;impala.preload-block-locations-for-scheduling.scheme.hdfs&lt;/name&gt;
+  &lt;value&gt;false&lt;/value&gt;
+&lt;/property&gt;</codeblock>
+
+      <p>
+        Each daemon reads these properties once at startup, so restart
+        <cmdname>catalogd</cmdname> and the <cmdname>impalad</cmdname> daemons after changing
+        them.
+      </p>
+
+      <note type="warning">
+        Use the same settings on <cmdname>catalogd</cmdname> and on every coordinator. If
+        <cmdname>catalogd</cmdname> does not load block locations but a coordinator expects
+        them, the coordinator skips the files that have no blocks, and queries silently return
+        too few rows. If <cmdname>catalogd</cmdname> loads block locations but a coordinator
+        does not expect them, queries on the affected tables fail with an
+        <codeph>IllegalStateException</codeph>.
+      </note>
+
+      <p>
+        When block location loading is turned off for a filesystem, Impala handles the tables
+        on it as if they were on an object store:
+      </p>
+
+      <ul>
+        <li>
+          The scheduler treats every scan range as a remote read. It no longer assigns scan
+          ranges to the hosts that store the data, so data locality and short-circuit reads no
+          longer help. To reduce the cost of remote reads, enable the
+          <xref href="impala_data_cache.xml#data_cache">data cache</xref>.
+        </li>
+
+        <li>
+          Scan ranges come from synthetic splits rather than from the actual blocks. Parquet
+          files are split by the
+          <xref href="impala_parquet_object_store_split_size.xml#parquet_object_store_split_size"
+            >PARQUET_OBJECT_STORE_SPLIT_SIZE</xref> query option, files in other formats by
+          the default block size of the filesystem.
+        </li>
+
+        <li>
+          Loading and refreshing large tables is much cheaper, and their file metadata takes
+          less memory. <cmdname>catalogd</cmdname> lists the files without their block
+          locations, using up to <codeph>--max_nonhdfs_partitions_parallel_load</codeph>
+          threads per table instead of <codeph>--max_hdfs_partitions_parallel_load</codeph>.
+          For Iceberg tables, the file list comes from the Iceberg metadata without accessing
+          the files.
+        </li>
+      </ul>
+
+      <p>
+        Because the files of Iceberg tables are not accessed during loading, Impala does not
+        know whether they are erasure-coded. For these files, <codeph>SHOW FILES</codeph>
+        shows <codeph>N/A</codeph> in the <codeph>EC Policy</codeph> column, and neither the
+        <xref href="impala_allow_erasure_coded_files.xml#allow_erasure_coded_files"
+          >ALLOW_ERASURE_CODED_FILES</xref> query option nor the erasure-coding counters in
+        <codeph>EXPLAIN</codeph> output and query profiles apply to them. Other tables still
+        get the erasure-coding information from the file listing.
+      </p>
     </section>
 
     <section id="native_checksumming">

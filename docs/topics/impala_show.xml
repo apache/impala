@@ -149,6 +149,19 @@ show files in sample_table partition (month like 'J%');
       </p>
 
       <p>
+        The <codeph>EC Policy</codeph> column shows the erasure coding policy of each file:
+        <codeph>NONE</codeph> if the file is not erasure-coded, otherwise the name of the policy,
+        such as <codeph>RS-6-3-1024k</codeph>. For Iceberg tables on HDFS or Ozone with block
+        location loading turned off, it shows <codeph>N/A</codeph> because the policy is not
+        known; see
+        <xref href="impala_config_performance.xml#config_performance/disable_block_locations">Turning
+        Off Block Location Loading</xref>. In the output of <codeph>SHOW PARTITIONS</codeph>
+        and <codeph>SHOW TABLE STATS</codeph>, the <codeph>EC Policy</codeph> column can also
+        show <codeph>MIXED</codeph>, for a partition whose files do not all share the same
+        policy.
+      </p>
+
+      <p>
         The information for partitioned tables complements the output of the <codeph>SHOW PARTITIONS</codeph>
         statement, which summarizes information about each partition. <codeph>SHOW PARTITIONS</codeph>
         produces some output for each partition, while <codeph>SHOW FILES</codeph> does not

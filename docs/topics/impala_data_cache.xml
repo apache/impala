@@ -35,6 +35,13 @@ under the License.
       working set read from remote filesystems, such as, remote HDFS data node, S3, ABFS, ADLS.
     </p>
 
+    <p rev="5.0.0 IMPALA-14138">
+      When block location loading is turned off for HDFS or Ozone, Impala schedules every scan
+      range on them as a remote read, so the data cache can serve all reads from them. See
+      <xref href="impala_config_performance.xml#config_performance/disable_block_locations">Turning
+      Off Block Location Loading</xref>.
+    </p>
+
     <p>
       To enable remote data cache, set the <codeph>--data_cache</codeph> Impala Daemon start-up
       flag as below:

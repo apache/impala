@@ -70,9 +70,11 @@ under the License.
         <li>
           Review the configured values.
           <p>
-            For example, to check that your system is configured to use block locality tracking information, you
-            would check that the value for <codeph>dfs.datanode.hdfs-blocks-metadata.enabled</codeph> is
-            <codeph>true</codeph>.
+            The <codeph>/varz</codeph> page shows the startup flags. The Hadoop configuration
+            properties, such as the ones set in <codeph>hdfs-site.xml</codeph>, are on the
+            <codeph>/hadoop-varz</codeph> page instead. For example, to check that short-circuit
+            reads are enabled, check that the value of <codeph>dfs.client.read.shortcircuit</codeph>
+            on the <codeph>/hadoop-varz</codeph> page is <codeph>true</codeph>.
           </p>
         </li>
       </ol>

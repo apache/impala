@@ -89,6 +89,14 @@ CREATE TABLE d1.t2 (a TINYINT, b BOOLEAN);
 
     <p conref="../shared/impala_common.xml#common/ozone_block_size_caveat"/>
 
+    <p rev="5.0.0 IMPALA-14138">
+      If Impala does not run on the same hosts as the Ozone Datanodes, we recommend turning off
+      block location loading for Ozone. The block locations bring no benefit in that case, and
+      turning off their loading makes loading and refreshing tables much faster. See
+      <xref href="impala_config_performance.xml#config_performance/disable_block_locations">Turning
+      Off Block Location Loading</xref>.
+    </p>
+
     <p>
       Impala's spill-to-disk feature may be configured to use Ozone storage by specifying a full
       URI (e.g. <codeph>ofs://host:port/volume/bucket/key</codeph>) for the spill location. See

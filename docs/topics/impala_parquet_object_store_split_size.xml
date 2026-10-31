@@ -38,6 +38,10 @@ under the License.
     <p>Use the <codeph>PARQUET_OBJECT_STORE_SPLIT_SIZE</codeph> query option to
       control the Parquet format specific split sizes on non-block based stores,
       e.g. S3, ADLS, etc.</p>
+    <p rev="5.0.0 IMPALA-14138">The option also applies to HDFS, Ozone, and
+      Alluxio when block location loading is turned off for them. See
+      <xref href="impala_config_performance.xml#config_performance/disable_block_locations">Turning
+      Off Block Location Loading</xref>.</p>
     <p>The value must be greater than or equal to 1 MB.</p>
     <p><b>Type:</b>
       <codeph>INT</codeph></p>
