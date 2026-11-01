@@ -1,0 +1,120 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+Licensed to the Apache Software Foundation (ASF) under one
+or more contributor license agreements.  See the NOTICE file
+distributed with this work for additional information
+regarding copyright ownership.  The ASF licenses this file
+to you under the Apache License, Version 2.0 (the
+"License"); you may not use this file except in compliance
+with the License.  You may obtain a copy of the License at
+
+  http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing,
+software distributed under the License is distributed on an
+"AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+KIND, either express or implied.  See the License for the
+specific language governing permissions and limitations
+under the License.
+-->
+<!DOCTYPE concept PUBLIC "-//OASIS//DTD DITA Concept//EN" "concept.dtd">
+<concept id="json_binary_format" rev="5.0.0 IMPALA-12927">
+
+  <title>JSON_BINARY_FORMAT Query Option (<keyword keyref="impala50"/> or higher only)</title>
+  <titlealts audience="PDF"><navtitle>JSON BINARY FORMAT</navtitle></titlealts>
+  <prolog>
+    <metadata>
+      <data name="Category" value="Impala"/>
+      <data name="Category" value="Impala Query Options"/>
+      <data name="Category" value="Developers"/>
+      <data name="Category" value="Data Analysts"/>
+    </metadata>
+  </prolog>
+
+  <conbody>
+
+    <p>
+      <indexterm audience="hidden">JSON_BINARY_FORMAT query option</indexterm>
+      Specifies how <codeph>BINARY</codeph> column values are encoded in the data files of
+      JSON tables, for tables that do not specify it with the
+      <codeph>json.binary.format</codeph> serde property.
+    </p>
+
+    <p conref="../shared/impala_common.xml#common/usage_notes_blurb"/>
+
+    <p>
+      Impala has to know whether the binary data in a JSON table is base64 encoded or
+      written as a raw string, otherwise it could return incorrect data. The format is
+      taken from the first of these that is set:
+    </p>
+
+    <ol>
+      <li>
+        The <codeph>json.binary.format</codeph> serde property of the table or partition.
+        The property takes precedence over the query option. If the property is set to a
+        value other than <codeph>base64</codeph> or <codeph>rawstring</codeph>, the query
+        fails with an error instead of falling back to the query option.
+      </li>
+      <li>
+        The <codeph>JSON_BINARY_FORMAT</codeph> query option.
+      </li>
+    </ol>
+
+    <p>
+      If neither the property nor the query option is set, a query that scans a <codeph>BINARY</codeph>
+      column of a JSON table fails with an error that names the table (and the partition,
+      if the table is partitioned). Queries that do not scan a <codeph>BINARY</codeph>
+      column of the table are not affected.
+    </p>
+
+    <p>
+      The valid values of the query option and of the serde property are:
+    </p>
+
+    <ul>
+      <li>
+        <codeph>BASE64</codeph>: the data is read as a base64 encoded string.
+      </li>
+      <li>
+        <codeph>RAWSTRING</codeph>: the data is read as a raw string.
+      </li>
+      <li>
+        <codeph>NONE</codeph> (the query option only): no format is set, which is the
+        default.
+      </li>
+    </ul>
+
+    <p>
+      Changes to the serde properties of a table take effect after a
+      <codeph>REFRESH</codeph> of the table. The option can be set for all queries with
+      the <codeph>default_query_options</codeph> startup flag of
+      <cmdname>impalad</cmdname>.
+    </p>
+
+    <p>
+      <b>Type:</b> string
+    </p>
+
+    <p>
+      <b>Default:</b> <codeph>NONE</codeph>
+    </p>
+
+    <p>
+      <b>Example:</b>
+    </p>
+
+<codeblock>ALTER TABLE json_tbl SET SERDEPROPERTIES ('json.binary.format'='base64');
+REFRESH json_tbl;
+
+-- For JSON tables without the serde property:
+SET JSON_BINARY_FORMAT=rawstring;
+SELECT id, CAST(binary_col AS STRING) FROM other_json_tbl;</codeblock>
+
+    <p conref="../shared/impala_common.xml#common/related_info"/>
+    <p>
+      <xref href="impala_binary.xml#binary"/>
+    </p>
+
+  </conbody>
+
+</concept>

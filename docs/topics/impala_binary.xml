@@ -1,0 +1,226 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+Licensed to the Apache Software Foundation (ASF) under one
+or more contributor license agreements.  See the NOTICE file
+distributed with this work for additional information
+regarding copyright ownership.  The ASF licenses this file
+to you under the Apache License, Version 2.0 (the
+"License"); you may not use this file except in compliance
+with the License.  You may obtain a copy of the License at
+
+  http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing,
+software distributed under the License is distributed on an
+"AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+KIND, either express or implied.  See the License for the
+specific language governing permissions and limitations
+under the License.
+-->
+<!DOCTYPE concept PUBLIC "-//OASIS//DTD DITA Concept//EN" "concept.dtd">
+<concept id="binary" rev="4.2.0 IMPALA-9482">
+
+  <title>BINARY Data Type (<keyword keyref="impala42"/> or higher only)</title>
+
+  <titlealts audience="PDF">
+
+    <navtitle>BINARY</navtitle>
+
+  </titlealts>
+
+  <prolog>
+    <metadata>
+      <data name="Category" value="Impala"/>
+      <data name="Category" value="Impala Data Types"/>
+      <data name="Category" value="SQL"/>
+      <data name="Category" value="Data Analysts"/>
+      <data name="Category" value="Developers"/>
+      <data name="Category" value="Schemas"/>
+    </metadata>
+  </prolog>
+
+  <conbody>
+
+    <p>
+      The <codeph>BINARY</codeph> data type stores a variable-length sequence of arbitrary
+      bytes. The difference from <codeph>STRING</codeph> is that a <codeph>STRING</codeph> is
+      meant to hold text, while a <codeph>BINARY</codeph> value can be any byte array,
+      including bytes that are not valid UTF-8.
+    </p>
+
+    <p>
+      <b>Syntax:</b>
+    </p>
+
+<codeblock><varname>column_name</varname> BINARY</codeblock>
+
+    <p>
+      <b>Range:</b>
+    </p>
+
+    <p>
+      A <codeph>BINARY</codeph> value has no declared length, the same as a
+      <codeph>STRING</codeph> value.
+    </p>
+
+    <p>
+      <b>Literals:</b>
+    </p>
+
+    <p>
+      There is no <codeph>BINARY</codeph> literal. Use <codeph>CAST(<varname>string</varname>
+      AS BINARY)</codeph>. To build a value from arbitrary bytes, convert a hexadecimal
+      string with <codeph>UNHEX()</codeph> and cast the result:
+    </p>
+
+<codeblock>CREATE TABLE bin_t (id INT, b BINARY) STORED AS PARQUET;
+
+INSERT INTO bin_t VALUES
+  (1, CAST('abc' AS BINARY)),
+  (2, CAST(UNHEX('00FF00FF') AS BINARY));</codeblock>
+
+    <p>
+      Unlike Hive, Impala requires the explicit <codeph>CAST</codeph> in
+      <codeph>INSERT ... VALUES</codeph>, because a <codeph>STRING</codeph> is not
+      implicitly converted to <codeph>BINARY</codeph>.
+    </p>
+
+    <p>
+      <b>Conversions:</b>
+    </p>
+
+    <p>
+      <codeph>BINARY</codeph> can only be cast to and from <codeph>STRING</codeph>. Casts
+      to or from any other type, including <codeph>CHAR</codeph> and
+      <codeph>VARCHAR</codeph>, are not allowed. Impala does not implicitly convert
+      between <codeph>BINARY</codeph> and any other type, so a function that expects a
+      <codeph>STRING</codeph> argument does not accept a <codeph>BINARY</codeph> value.
+      Cast the value to <codeph>STRING</codeph> first, e.g.
+      <codeph>HEX(CAST(b AS STRING))</codeph> to display the bytes in hexadecimal.
+    </p>
+
+    <p>
+      <b>Operators and functions:</b>
+    </p>
+
+    <ul>
+      <li>
+        The comparison operators (<codeph>=</codeph>, <codeph>!=</codeph>,
+        <codeph>&lt;</codeph>, <codeph>&gt;</codeph>, <codeph>&lt;=</codeph>,
+        <codeph>&gt;=</codeph>, <codeph>IS [NOT] DISTINCT FROM</codeph>) can be used on
+        <codeph>BINARY</codeph> values, as well as <codeph>ORDER BY</codeph>,
+        <codeph>DISTINCT</codeph>, <codeph>GROUP BY</codeph> and joins on
+        <codeph>BINARY</codeph> columns. The operands must both be
+        <codeph>BINARY</codeph>, for example
+        <codeph>WHERE b = CAST('abc' AS BINARY)</codeph>.
+      </li>
+      <li>
+        Only a small set of built-in functions accepts <codeph>BINARY</codeph> arguments:
+        <codeph>LENGTH()</codeph> and <codeph>BYTES()</codeph> (both return the size in
+        bytes), <codeph>CONCAT()</codeph>, <codeph>IF()</codeph>,
+        <codeph>COALESCE()</codeph>, <codeph>ISNULL()</codeph>, <codeph>IFNULL()</codeph>,
+        <codeph>NVL()</codeph>, <codeph>TYPEOF()</codeph> and
+        <codeph>MURMUR_HASH()</codeph>.
+        <codeph>LENGTH()</codeph> returns the number of bytes regardless of the
+        <codeph>UTF8_MODE</codeph> query option. Other string functions, and
+        <codeph>LIKE</codeph> and <codeph>REGEXP</codeph>, require a cast to
+        <codeph>STRING</codeph>.
+      </li>
+      <li>
+        <codeph>COUNT()</codeph>, <codeph>COUNT(DISTINCT)</codeph>, <codeph>MIN()</codeph>
+        and <codeph>MAX()</codeph> are supported. <codeph>NDV()</codeph> is not, so cast
+        the column to <codeph>STRING</codeph> to estimate the number of distinct values.
+      </li>
+      <li>
+        <codeph>COMPUTE STATS</codeph> does not calculate the number of distinct values
+        of <codeph>BINARY</codeph> columns. The other column statistics are computed.
+      </li>
+    </ul>
+
+<codeblock>SELECT id, HEX(CAST(b AS STRING)), LENGTH(b) FROM bin_t
+WHERE b = CAST(UNHEX('00FF00FF') AS BINARY);</codeblock>
+
+    <p>
+      <b>Partitioning:</b>
+    </p>
+
+    <p>
+      <codeph>BINARY</codeph> columns cannot be used as partition columns with the
+      <codeph>PARTITIONED BY (<varname>col</varname> BINARY)</codeph> syntax.
+    </p>
+
+    <p>
+      <b>File format considerations:</b>
+    </p>
+
+    <ul>
+      <li>
+        <b>Text:</b> <codeph>BINARY</codeph> values are base64 encoded in text data files.
+        Impala decodes them when reading and encodes them when writing. A value that is not
+        valid base64 is returned as <codeph>NULL</codeph> and reported as
+        <codeph>Error converting column: <varname>n</varname> to BINARY</codeph>.
+      </li>
+      <li>
+        <b>JSON:</b> Before HIVE-21240, Hive wrote binary data to JSON tables as escaped
+        strings, and since then it writes base64 encoded strings by default. Impala
+        therefore needs to know the format. Set the <codeph>json.binary.format</codeph> serde property of
+        the table to <codeph>base64</codeph> or <codeph>rawstring</codeph>, or set the
+        <codeph>JSON_BINARY_FORMAT</codeph> query option for tables where the property is
+        not set. See <xref href="impala_json_binary_format.xml#json_binary_format"/>.
+      </li>
+      <li>
+        <b>Other HDFS file formats such as Parquet and ORC:</b> <codeph>BINARY</codeph>
+        values are stored as the byte arrays of the format, with no base64 encoding.
+      </li>
+      <li>
+        <b>Kudu:</b> Since <keyword keyref="impala44"/>, <codeph>BINARY</codeph> columns
+        are supported in Kudu tables, and simple predicates on them can be pushed down to
+        Kudu.
+      </li>
+      <li>
+        <b>Hive Metastore:</b> The column type is stored as <codeph>binary</codeph>.
+      </li>
+    </ul>
+
+    <p>
+      <b>User-defined functions:</b>
+    </p>
+
+    <p>
+      Native UDFs and Java UDFs can use <codeph>BINARY</codeph> arguments and return
+      values. For backward compatibility, a Java UDF whose Java type is
+      <codeph>byte[]</codeph> or <codeph>BytesWritable</codeph> is treated as taking or
+      returning a <codeph>STRING</codeph>, unless the argument and return types are
+      specified explicitly as <codeph>BINARY</codeph> in the <codeph>CREATE FUNCTION</codeph>
+      statement.
+    </p>
+
+    <p>
+      <b>Complex types:</b>
+    </p>
+
+    <p>
+      Since <keyword keyref="impala45"/>, <codeph>BINARY</codeph> values can be members
+      of <codeph>STRUCT</codeph> types and items, keys or values of
+      <codeph>ARRAY</codeph> and <codeph>MAP</codeph> types. When a
+      complex-typed column is returned directly in the select list, it is displayed in JSON
+      format, and the <codeph>BINARY</codeph> values in it are shown base64 encoded, for
+      example <codeph>{"i":0,"b":"bWVtYmVy"}</codeph>. Referring to the
+      <codeph>BINARY</codeph> member, item, key or value itself returns the raw bytes. See
+      <xref href="impala_complex_types.xml#complex_types"/>.
+    </p>
+
+    <p>
+      <b>Added in:</b> <keyword keyref="impala42"/>
+    </p>
+
+    <p>
+      <b>Related information:</b>
+      <xref href="impala_datatypes.xml#datatypes"/>,
+      <xref href="impala_string.xml#string"/>,
+      <xref href="impala_json_binary_format.xml#json_binary_format"/>
+    </p>
+
+  </conbody>
+
+</concept>

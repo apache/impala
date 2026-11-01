@@ -100,6 +100,7 @@ under the License.
     <topicref href="topics/impala_datatypes.xml">
       <topicref href="topics/impala_array.xml"/>
       <topicref href="topics/impala_bigint.xml"/>
+      <topicref rev="4.2.0 IMPALA-9482" href="topics/impala_binary.xml"/>
       <topicref href="topics/impala_boolean.xml"/>
       <topicref href="topics/impala_char.xml"/>
       <topicref href="topics/impala_date.xml"/>
@@ -221,6 +222,7 @@ under the License.
         <topicref href="topics/impala_hbase_caching.xml"/>
         <topicref href="topics/impala_idle_session_timeout.xml"/>
         <topicref href="topics/impala_join_rows_produced_limit.xml"/>
+        <topicref rev="5.0.0 IMPALA-12927" href="topics/impala_json_binary_format.xml"/>
         <topicref href="topics/impala_kudu_read_mode.xml"/>
         <topicref rev="4.4.0" href="topics/impala_large_agg_mem_threshold.xml"/>
         <topicref href="topics/impala_live_progress.xml"/>
