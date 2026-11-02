@@ -186,6 +186,31 @@ Impala is divided into several components:
   For tests under `tests/custom_cluster`, check whether the file contains
   `@SkipIfExploration.is_not_exhaustive()` (e.g., `grep -q SkipIfExploration <file>`).
   If it does, add `--exploration_strategy=exhaustive` to the invocation.
+- Python tests under `tests` are either serial or parallel:
+  - Serial tests are marked with `execute_serially`, or inherit from
+    `CustomClusterTestSuite` (all tests under `tests/custom_cluster`).
+  - All other tests can safely run in parallel.
+  - `tests/run-tests.py` runs the serial tests in their own phase and the parallel
+    tests in a separate phase.
+  - When running end-to-end tests that are not serial (for example, under
+    `tests/query_test`), MUST run them in parallel with pytest-xdist (`-n`), then run
+    the serial ones in a second invocation without `-n`. Use the number of workers in
+    the `NUM_CONCURRENT_TESTS` environment variable if it is set, otherwise half the
+    number of CPUs. Example:
+    ```
+    N=${NUM_CONCURRENT_TESTS:-$(( $(nproc) / 2 ))}
+    ${IMPALA_HOME}/bin/impala-py.test <path_to_test> -m "not execute_serially" -n $N
+    ${IMPALA_HOME}/bin/impala-py.test <path_to_test> -m "execute_serially"
+    ```
+    Files are not mixed: a file whose test classes use `CustomClusterTestSuite` (all of
+    `tests/custom_cluster` and `tests/authorization`) is entirely serial. Run such a
+    file in a single invocation without `-n`. Never use `-n` for them.
+  - New tests that cannot safely run concurrently with other tests (for example,
+    tests that change global cluster state) MUST be marked `execute_serially`.
+  - New tests SHOULD be written to run in parallel whenever possible.
+  - New tests SHOULD be regular end-to-end tests. Use `CustomClusterTestSuite` only
+    if the test requires restarting the Impala cluster (for example, to change
+    startup flags). Regular end-to-end tests are preferred over custom cluster tests.
 
 ## Coding Standards
 
