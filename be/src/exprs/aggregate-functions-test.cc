@@ -23,6 +23,8 @@
 #include <boost/accumulators/statistics/variance.hpp>
 
 #include "exprs/aggregate-functions.h"
+#include "runtime/timestamp-value.h"
+#include "runtime/timestamp-value.inline.h"
 #include "testutil/gtest-util.h"
 #include "udf/udf.h"
 #include "udf/uda-test-harness.h"
@@ -179,6 +181,89 @@ TEST(DsThetaSketch, DataToSketch) {
 
   EXPECT_TRUE(test.Execute(input, BigIntVal(6)))
       << "DsThetaSketch: " << test.GetErrorMsg();
+}
+
+// Helper: build a TimestampVal from unix microseconds.
+static TimestampVal MakeTimestampVal(int64_t unix_micros) {
+  TimestampVal tv;
+  TimestampValue::UtcFromUnixTimeMicros(unix_micros).ToTimestampVal(&tv);
+  return tv;
+}
+
+// Helper: build a TimestampVal from unix nanoseconds, i.e. with sub-microsecond
+// precision that the sketch encoding has to floor away.
+static TimestampVal MakeTimestampValFromNanos(int64_t unix_nanos) {
+  TimestampVal tv;
+  TimestampValue::UtcFromUnixTimeLimitedRangeNanos(unix_nanos).ToTimestampVal(&tv);
+  return tv;
+}
+
+// DsThetaUpdateIceberg<TimestampVal> converts to microseconds before hashing, so two
+// TimestampVals representing the same instant must produce NDV=1 and two representing
+// different instants must produce NDV=2.
+TEST(DsThetaSketch, IcebergDataToSketchTimestamp) {
+  UdaTestHarness<BigIntVal, StringVal, TimestampVal> test(
+      AggregateFunctions::DsThetaInit,
+      AggregateFunctions::DsThetaUpdateIceberg<TimestampVal>,
+      AggregateFunctions::DsThetaMerge,
+      AggregateFunctions::DsThetaSerialize,
+      AggregateFunctions::DsThetaFinalize);
+
+  // Empty input → 0.
+  std::vector<TimestampVal> input;
+  EXPECT_TRUE(test.Execute(input, BigIntVal(0)))
+      << "DsThetaSketch<Timestamp> empty: " << test.GetErrorMsg();
+
+  // Three distinct timestamps (0 s, 1 s, 2 s since epoch).
+  input.push_back(MakeTimestampVal(0));
+  input.push_back(MakeTimestampVal(1000000));
+  input.push_back(MakeTimestampVal(2000000));
+  EXPECT_TRUE(test.Execute(input, BigIntVal(3)))
+      << "DsThetaSketch<Timestamp> distinct: " << test.GetErrorMsg();
+
+  // Repeated timestamp → 1.
+  input.clear();
+  input.push_back(MakeTimestampVal(42000000));
+  input.push_back(MakeTimestampVal(42000000));
+  input.push_back(MakeTimestampVal(42000000));
+  EXPECT_TRUE(test.Execute(input, BigIntVal(1)))
+      << "DsThetaSketch<Timestamp> duplicate: " << test.GetErrorMsg();
+
+  // Pre-epoch (negative micros) values exercise the signed encoding path; three
+  // distinct instants straddling the epoch → 3, and a repeat of a negative → still 3.
+  input.clear();
+  input.push_back(MakeTimestampVal(-2000000));
+  input.push_back(MakeTimestampVal(-1000000));
+  input.push_back(MakeTimestampVal(-2000000));
+  input.push_back(MakeTimestampVal(1000000));
+  EXPECT_TRUE(test.Execute(input, BigIntVal(3)))
+      << "DsThetaSketch<Timestamp> negative: " << test.GetErrorMsg();
+
+  // NULLs are skipped → 0.
+  input.clear();
+  input.push_back(TimestampVal::null());
+  input.push_back(TimestampVal::null());
+  EXPECT_TRUE(test.Execute(input, BigIntVal(0)))
+      << "DsThetaSketch<Timestamp> nulls: " << test.GetErrorMsg();
+
+  // Sub-microsecond precision is floored away, the only lossy part of the conversion:
+  // instants inside the same microsecond collapse into a single value.
+  input.clear();
+  input.push_back(MakeTimestampValFromNanos(1000000000));
+  input.push_back(MakeTimestampValFromNanos(1000000500));
+  input.push_back(MakeTimestampValFromNanos(1000000999));
+  EXPECT_TRUE(test.Execute(input, BigIntVal(1)))
+      << "DsThetaSketch<Timestamp> nanos floor positive: " << test.GetErrorMsg();
+
+  // Flooring is towards minus infinity, so before the epoch the exact microsecond and
+  // the instants just after it land in different buckets: -1000000000ns stays at
+  // -1000000us while both -1000000500ns and -1000000999ns floor to -1000001us.
+  input.clear();
+  input.push_back(MakeTimestampValFromNanos(-1000000000));
+  input.push_back(MakeTimestampValFromNanos(-1000000500));
+  input.push_back(MakeTimestampValFromNanos(-1000000999));
+  EXPECT_TRUE(test.Execute(input, BigIntVal(2)))
+      << "DsThetaSketch<Timestamp> nanos floor negative: " << test.GetErrorMsg();
 }
 
 IMPALA_TEST_MAIN();

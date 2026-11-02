@@ -2800,6 +2800,99 @@ void AggregateFunctions::DsThetaUpdate(
   sketch_ptr->update(reinterpret_cast<char*>(src.ptr), src.len);
 }
 
+// Feeds 'len' bytes at 'bytes' into the sketch held by 'dst'. Shared by the update
+// functions that encode the value themselves, rather than letting the DataSketches
+// typed update() overloads do it.
+static void DsThetaUpdateRaw(const void* bytes, size_t len, StringVal* dst) {
+  DCHECK(!dst->is_null);
+  DCHECK_EQ(dst->len, sizeof(agg_state));
+  auto agg_state_ptr = reinterpret_cast<agg_state*>(dst->ptr);
+  DCHECK_EQ(agg_state_ptr->first, agg_phase::UPDATE);
+  auto sketch_ptr =
+      reinterpret_cast<datasketches::update_theta_sketch*>(agg_state_ptr->second);
+  sketch_ptr->update(bytes, len);
+}
+
+// See AggregateFunctions::DsThetaUpdateIceberg in aggregate-functions.h for why these
+// types need their own encoding.
+
+template <>
+void AggregateFunctions::DsThetaUpdateIceberg(
+    FunctionContext* ctx, const BooleanVal& src, StringVal* dst) {
+  if (src.is_null) return;
+  uint8_t val = src.val ? 1 : 0;
+  DsThetaUpdateRaw(&val, sizeof(val), dst);
+}
+
+template <>
+void AggregateFunctions::DsThetaUpdateIceberg(
+    FunctionContext* ctx, const IntVal& src, StringVal* dst) {
+  if (src.is_null) return;
+  int32_t val = src.val;
+  DsThetaUpdateRaw(&val, sizeof(val), dst);
+}
+
+template <>
+void AggregateFunctions::DsThetaUpdateIceberg(
+    FunctionContext* ctx, const FloatVal& src, StringVal* dst) {
+  if (src.is_null) return;
+  float val = src.val;
+  DsThetaUpdateRaw(&val, sizeof(val), dst);
+}
+
+template <>
+void AggregateFunctions::DsThetaUpdateIceberg(
+    FunctionContext* ctx, const DoubleVal& src, StringVal* dst) {
+  if (src.is_null) return;
+  double val = src.val;
+  DsThetaUpdateRaw(&val, sizeof(val), dst);
+}
+
+template <>
+void AggregateFunctions::DsThetaUpdateIceberg(
+    FunctionContext* ctx, const DateVal& src, StringVal* dst) {
+  if (src.is_null) return;
+  int32_t val = src.val;
+  DsThetaUpdateRaw(&val, sizeof(val), dst);
+}
+
+template <>
+void AggregateFunctions::DsThetaUpdateIceberg(
+    FunctionContext* ctx, const TimestampVal& src, StringVal* dst) {
+  if (src.is_null) return;
+  int64_t micros;
+  if (UNLIKELY(
+      !TimestampValue::FromTimestampVal(src).FloorUtcToUnixTimeMicros(&micros))) {
+    return;
+  }
+  DsThetaUpdateRaw(&micros, sizeof(micros), dst);
+}
+
+template <>
+void AggregateFunctions::DsThetaUpdateIceberg(
+    FunctionContext* ctx, const DecimalVal& src, StringVal* dst) {
+  if (src.is_null) return;
+  auto update_sketch = [&](auto unscaled) {
+    auto be = BitUtil::ToBigEndian(unscaled);
+    int len;
+    const uint8_t* first = BitUtil::TrimSignExtension(be, &len);
+    DsThetaUpdateRaw(first, len, dst);
+  };
+  switch (ctx->impl()->GetConstFnAttr(FunctionContextImpl::ARG_TYPE_SIZE, 0)) {
+    case 4:
+      update_sketch(src.val4);
+      break;
+    case 8:
+      update_sketch(src.val8);
+      break;
+    case 16:
+      update_sketch(src.val16);
+      break;
+    default:
+      DCHECK(false);
+  }
+}
+
 StringVal AggregateFunctions::DsThetaSerialize(
     FunctionContext* ctx, const StringVal& src) {
   DCHECK(!src.is_null);
@@ -4155,6 +4248,8 @@ template void AggregateFunctions::DsThetaUpdate(
     FunctionContext*, const DoubleVal&, StringVal*);
 template void AggregateFunctions::DsThetaUpdate(
     FunctionContext*, const DateVal&, StringVal*);
+// DsThetaUpdateIceberg only has the explicit specialisations above; the other Iceberg
+// column types reuse DsThetaUpdate.
 
 template void AggregateFunctions::SampledNdvUpdate(
     FunctionContext*, const BooleanVal&, const DoubleVal&, StringVal*);

@@ -343,6 +343,26 @@ class AggregateFunctions {
   static void DsThetaInit(FunctionContext*, StringVal* slot);
   template <typename T>
   static void DsThetaUpdate(FunctionContext*, const T& src, StringVal* dst);
+  /// Update variant used by COMPUTE STATS on Iceberg tables: encodes each value with
+  /// Iceberg Appendix D single-value serialization instead of the DataSketches typed
+  /// overloads, so the sketches match those written by Trino/Spark. Specialized for:
+  /// - BOOLEAN: 1 byte (the typed overloads would widen it to 8 bytes).
+  /// - INT, DATE: 4-byte little endian (instead of a widened 8-byte value).
+  /// - FLOAT: 4-byte little endian (instead of a widened double).
+  /// - DOUBLE: the raw 8 bytes. The typed overload canonicalizes -0.0 to 0.0 and all NaNs
+  ///   to a single NaN before hashing, while Iceberg hashes the bytes as they are.
+  /// - TIMESTAMP: microseconds since the epoch as 8-byte little endian. Sub-microsecond
+  ///   precision is floored away; Iceberg timestamps only have microsecond precision.
+  ///   No time zone conversion is done, so the query should run with TIMEZONE=UTC.
+  /// - DECIMAL: the unscaled value as big-endian two's-complement, in the minimum number
+  ///   of bytes, regardless of the decimal4/8/16 backing type.
+  /// The other Iceberg column types (BIGINT, STRING, UUID) reuse
+  /// DsThetaUpdate<BigIntVal/StringVal>, which already produces the same bytes; UUID is
+  /// stored as its 16 big-endian bytes. TINYINT and SMALLINT have no overload of their
+  /// own, as Iceberg has no such column types - its narrowest integer is int; they are
+  /// implicitly cast to INT and get its encoding.
+  template <typename T>
+  static void DsThetaUpdateIceberg(FunctionContext*, const T& src, StringVal* dst);
   static StringVal DsThetaSerialize(FunctionContext*, const StringVal& src);
   static void DsThetaMerge(FunctionContext*, const StringVal& src, StringVal* dst);
   static BigIntVal DsThetaFinalize(FunctionContext*, const StringVal& src);

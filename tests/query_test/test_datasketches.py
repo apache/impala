@@ -15,6 +15,8 @@
 # specific language governing permissions and limitations
 # under the License.
 
+from copy import deepcopy
+
 from tests.common.file_utils import create_table_and_copy_files
 from tests.common.impala_test_suite import ImpalaTestSuite
 from tests.common.skip import SkipIfFS
@@ -72,7 +74,10 @@ class TestDatasketches(ImpalaTestSuite):
         self.client, unique_database, 'theta_sketches_from_hive', _SKETCH_COLS_9)
     _create_sketch_table(
         self.client, unique_database, 'theta_sketches_from_impala', _SKETCH_COLS_9)
-    self.run_test_case('QueryTest/datasketches-theta', vector, unique_database)
+    new_vector = deepcopy(vector)
+    # .test file sets disable_codegen_rows_threshold
+    del new_vector.get_value('exec_option')['disable_codegen_rows_threshold']
+    self.run_test_case('QueryTest/datasketches-theta', new_vector, unique_database)
 
   def test_kll(self, vector, unique_database):
     _create_sketch_table(

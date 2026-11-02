@@ -614,3 +614,228 @@ BIGINT
 ---- RESULTS
 5
 ====
+---- QUERY
+# ds_theta_sketch_iceberg() is an undocumented flavor of ds_theta_sketch() used by
+# COMPUTE STATS on Iceberg tables. It supports every Iceberg column type that Impala
+# computes NDV for.
+select
+    ds_theta_estimate(ds_theta_sketch_iceberg(bool_col)),
+    ds_theta_estimate(ds_theta_sketch_iceberg(int_col)),
+    ds_theta_estimate(ds_theta_sketch_iceberg(bigint_col)),
+    ds_theta_estimate(ds_theta_sketch_iceberg(float_col)),
+    ds_theta_estimate(ds_theta_sketch_iceberg(double_col)),
+    ds_theta_estimate(ds_theta_sketch_iceberg(string_col)),
+    ds_theta_estimate(ds_theta_sketch_iceberg(timestamp_col))
+from functional_parquet.alltypessmall;
+---- RESULTS
+2,10,10,10,10,10,100
+---- TYPES
+BIGINT,BIGINT,BIGINT,BIGINT,BIGINT,BIGINT,BIGINT
+====
+---- QUERY
+select ds_theta_estimate(ds_theta_sketch_iceberg(date_col))
+from functional_parquet.date_tbl;
+---- RESULTS
+17
+---- TYPES
+BIGINT
+====
+---- QUERY
+# The columns cover all three decimal backing representations: d1 is decimal4
+# (precision <= 9), d2/d5 are decimal8 (precision <= 18) and d3/d4 are decimal16. d4 has
+# the maximum precision and scale.
+select
+    ds_theta_estimate(ds_theta_sketch_iceberg(d1)),
+    ds_theta_estimate(ds_theta_sketch_iceberg(d2)),
+    ds_theta_estimate(ds_theta_sketch_iceberg(d3)),
+    ds_theta_estimate(ds_theta_sketch_iceberg(d4)),
+    ds_theta_estimate(ds_theta_sketch_iceberg(d5))
+from functional_parquet.decimal_tbl;
+---- RESULTS
+4,3,5,1,5
+---- TYPES
+BIGINT,BIGINT,BIGINT,BIGINT,BIGINT
+====
+---- QUERY
+# Check the exact bytes ds_theta_sketch_iceberg() hashes for each value against the
+# Iceberg Appendix D single-value serialization, given as hex. ds_theta_sketch() hashes
+# the raw bytes of a STRING, so the two sketches must contain exactly the same hashes:
+# the sum of A-not-B and B-not-A is 0. The third timestamp has sub-microsecond
+# precision and is floored to the same microsecond as the first one.
+# These checks read only a few rows, so they set disable_codegen_rows_threshold=0 to
+# test the codegen'd path that COMPUTE STATS runs too.
+set disable_codegen_rows_threshold=0;
+with v as (
+  select * from (values
+    (true b, '01' hb, cast(1 as int) i, '01000000' hi, cast(1.0 as float) f,
+     '0000803F' hf, date '1970-01-02' d, '01000000' hd,
+     cast('1970-01-01 00:00:00.000001' as timestamp) ts, '0100000000000000' hts),
+    (false, '00', cast(-1 as int), 'FFFFFFFF', cast(-2.5 as float), '000020C0',
+     date '1969-12-31', 'FFFFFFFF', cast('1969-12-31 23:59:59.999999' as timestamp),
+     'FFFFFFFFFFFFFFFF'),
+    (true, '01', cast(2147483647 as int), 'FFFFFF7F', cast(0.5 as float), '0000003F',
+     date '2000-01-01', 'CD2A0000',
+     cast('1970-01-01 00:00:00.000001999' as timestamp), '0100000000000000')) t),
+sketches as (
+  select
+      ds_theta_sketch_iceberg(b) i_b, ds_theta_sketch(unhex(hb)) r_b,
+      ds_theta_sketch_iceberg(i) i_i, ds_theta_sketch(unhex(hi)) r_i,
+      ds_theta_sketch_iceberg(f) i_f, ds_theta_sketch(unhex(hf)) r_f,
+      ds_theta_sketch_iceberg(d) i_d, ds_theta_sketch(unhex(hd)) r_d,
+      ds_theta_sketch_iceberg(ts) i_ts, ds_theta_sketch(unhex(hts)) r_ts
+  from v)
+select
+    ds_theta_estimate(i_b),
+    ds_theta_estimate(ds_theta_exclude(i_b, r_b))
+        + ds_theta_estimate(ds_theta_exclude(r_b, i_b)),
+    ds_theta_estimate(i_i),
+    ds_theta_estimate(ds_theta_exclude(i_i, r_i))
+        + ds_theta_estimate(ds_theta_exclude(r_i, i_i)),
+    ds_theta_estimate(i_f),
+    ds_theta_estimate(ds_theta_exclude(i_f, r_f))
+        + ds_theta_estimate(ds_theta_exclude(r_f, i_f)),
+    ds_theta_estimate(i_d),
+    ds_theta_estimate(ds_theta_exclude(i_d, r_d))
+        + ds_theta_estimate(ds_theta_exclude(r_d, i_d)),
+    ds_theta_estimate(i_ts),
+    ds_theta_estimate(ds_theta_exclude(i_ts, r_ts))
+        + ds_theta_estimate(ds_theta_exclude(r_ts, i_ts))
+from sketches;
+---- RESULTS
+2,0,3,0,3,0,3,0,2,0
+---- TYPES
+BIGINT,BIGINT,BIGINT,BIGINT,BIGINT,BIGINT,BIGINT,BIGINT,BIGINT,BIGINT
+====
+---- QUERY
+# Same check for DECIMAL: the unscaled value is encoded as big-endian two's-complement
+# in the minimum number of bytes, so the encoding does not depend on whether the value
+# is backed by a decimal4, decimal8 or decimal16.
+set disable_codegen_rows_threshold=0;
+with v as (
+  select * from (values
+    (cast(1 as decimal(9,0)) d, '01' h), (cast(-1 as decimal(9,0)), 'FF'),
+    (cast(127 as decimal(9,0)), '7F'), (cast(128 as decimal(9,0)), '0080'),
+    (cast(-128 as decimal(9,0)), '80'), (cast(-129 as decimal(9,0)), 'FF7F')) t),
+sketches as (
+  select
+      ds_theta_sketch(unhex(h)) r,
+      ds_theta_sketch_iceberg(d) i4,
+      ds_theta_sketch_iceberg(cast(d as decimal(18,0))) i8,
+      ds_theta_sketch_iceberg(cast(d as decimal(38,0))) i16
+  from v)
+select
+    ds_theta_estimate(r),
+    ds_theta_estimate(ds_theta_exclude(i4, r))
+        + ds_theta_estimate(ds_theta_exclude(r, i4)),
+    ds_theta_estimate(ds_theta_exclude(i8, r))
+        + ds_theta_estimate(ds_theta_exclude(r, i8)),
+    ds_theta_estimate(ds_theta_exclude(i16, r))
+        + ds_theta_estimate(ds_theta_exclude(r, i16))
+from sketches;
+---- RESULTS
+6,0,0,0
+---- TYPES
+BIGINT,BIGINT,BIGINT,BIGINT
+====
+---- QUERY
+# Same check for DOUBLE, whose 8 bytes are hashed as they are (so -0.0 differs from
+# 0.0), and for UUID, whose 16 bytes are stored and hashed in big-endian order.
+set disable_codegen_rows_threshold=0;
+with v as (
+  select * from (values
+    (cast(0 as double) d, '0000000000000000' hd,
+     cast('f79c3e09-677c-4d4f-a0a2-a2be1e4c6ec1' as uuid) u,
+     'F79C3E09677C4D4FA0A2A2BE1E4C6EC1' hu),
+    (cast('-0' as double), '0000000000000080',
+     cast('00000000-0000-0000-0000-000000000001' as uuid),
+     '00000000000000000000000000000001'),
+    (cast(1.5 as double), '000000000000F83F',
+     cast('f79c3e09-677c-4d4f-a0a2-a2be1e4c6ec1' as uuid),
+     'F79C3E09677C4D4FA0A2A2BE1E4C6EC1'),
+    (cast(-2.5 as double), '00000000000004C0',
+     cast('00000000-0000-0000-0000-000000000001' as uuid),
+     '00000000000000000000000000000001')) t),
+sketches as (
+  select
+      ds_theta_sketch_iceberg(d) i_d, ds_theta_sketch(unhex(hd)) r_d,
+      ds_theta_sketch_iceberg(u) i_u, ds_theta_sketch(unhex(hu)) r_u
+  from v)
+select
+    ds_theta_estimate(i_d),
+    ds_theta_estimate(ds_theta_exclude(i_d, r_d))
+        + ds_theta_estimate(ds_theta_exclude(r_d, i_d)),
+    ds_theta_estimate(i_u),
+    ds_theta_estimate(ds_theta_exclude(i_u, r_u))
+        + ds_theta_estimate(ds_theta_exclude(r_u, i_u))
+from sketches;
+---- RESULTS
+4,0,2,0
+---- TYPES
+BIGINT,BIGINT,BIGINT,BIGINT
+====
+---- QUERY
+# ds_theta_sketch() canonicalizes doubles before hashing (-0.0 becomes 0.0, every NaN
+# becomes the same NaN), while ds_theta_sketch_iceberg() hashes the raw bytes for both
+# FLOAT and DOUBLE, as Iceberg does. ndv() also distinguishes them.
+set disable_codegen_rows_threshold=0;
+with v as (
+  select * from (values
+    (cast('nan' as double) d), (cast('-nan' as double)), (cast('-0' as double)),
+    (cast('0' as double))) t),
+sketches as (
+  select
+      ndv(d) n, ds_theta_sketch(d) a, ds_theta_sketch_iceberg(d) b,
+      ds_theta_sketch_iceberg(cast(d as float)) f
+  from v)
+select n, ds_theta_estimate(a), ds_theta_estimate(b), ds_theta_estimate(f)
+from sketches;
+---- RESULTS
+4,2,4,4
+---- TYPES
+BIGINT,BIGINT,BIGINT,BIGINT
+====
+---- QUERY
+# ds_theta_sketch() hands values to the DataSketches typed update() overloads, which
+# widen INT to 8 bytes and FLOAT to a double, so it hashes them differently from
+# ds_theta_sketch_iceberg(). BIGINT and STRING are hashed identically, and so is DOUBLE
+# apart from -0.0 and NaN (see above). Here the two flavors sketch the same column, so
+# A-not-B is the full distinct count when the encodings differ and 0 when they agree.
+with sketches as (
+  select
+      ds_theta_sketch(int_col) d_int, ds_theta_sketch_iceberg(int_col) i_int,
+      ds_theta_sketch(float_col) d_float, ds_theta_sketch_iceberg(float_col) i_float,
+      ds_theta_sketch(bigint_col) d_bigint, ds_theta_sketch_iceberg(bigint_col) i_bigint,
+      ds_theta_sketch(double_col) d_double, ds_theta_sketch_iceberg(double_col) i_double,
+      ds_theta_sketch(string_col) d_string, ds_theta_sketch_iceberg(string_col) i_string
+  from functional_parquet.alltypestiny)
+select
+    ds_theta_estimate(ds_theta_exclude(d_int, i_int)),
+    ds_theta_estimate(ds_theta_exclude(d_float, i_float)),
+    ds_theta_estimate(ds_theta_exclude(d_bigint, i_bigint)),
+    ds_theta_estimate(ds_theta_exclude(d_double, i_double)),
+    ds_theta_estimate(ds_theta_exclude(d_string, i_string))
+from sketches;
+---- TYPES
+BIGINT,BIGINT,BIGINT,BIGINT,BIGINT
+---- RESULTS
+2,2,0,0,0
+====
+---- QUERY
+# Iceberg has no TINYINT or SMALLINT, so ds_theta_sketch_iceberg() is not registered for
+# them. Such values are implicitly cast to INT and get its encoding.
+with sketches as (
+  select
+      ds_theta_sketch_iceberg(tinyint_col) t, ds_theta_sketch_iceberg(smallint_col) s,
+      ds_theta_sketch_iceberg(int_col) i
+  from functional_parquet.alltypessmall)
+select
+    ds_theta_estimate(t), ds_theta_estimate(ds_theta_exclude(t, i)),
+    ds_theta_estimate(ds_theta_exclude(i, t)),
+    ds_theta_estimate(s), ds_theta_estimate(ds_theta_exclude(s, i)),
+    ds_theta_estimate(ds_theta_exclude(i, s))
+from sketches;
+---- RESULTS
+10,0,0,10,0,0
+---- TYPES
+BIGINT,BIGINT,BIGINT,BIGINT,BIGINT,BIGINT
+====

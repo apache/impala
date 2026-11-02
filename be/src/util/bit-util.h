@@ -258,6 +258,25 @@ class BitUtil {
   static inline uint16_t ToBigEndian(uint16_t val) { return val; }
 #endif
 
+  /// Strips the redundant sign-extension bytes from 'big_endian_value', which must be
+  /// the result of ToBigEndian(). Returns a pointer to the first significant byte (into
+  /// 'big_endian_value', so it must outlive the result) and sets '*len' to the number of
+  /// bytes left; at least one byte is always kept. This produces the minimal
+  /// two's-complement encoding that Iceberg's single-value serialization prescribes for
+  /// DECIMAL.
+  template <typename T>
+  static inline const uint8_t* TrimSignExtension(const T& big_endian_value, int* len) {
+    const uint8_t* first = reinterpret_cast<const uint8_t*>(&big_endian_value);
+    const uint8_t* last = first + sizeof(T) - 1;
+    if ((first[0] & 0x80) != 0) {
+      for (; first < last && first[0] == 0xFF && (first[1] & 0x80) != 0; ++first) {}
+    } else {
+      for (; first < last && first[0] == 0x00 && (first[1] & 0x80) == 0; ++first) {}
+    }
+    *len = last - first + 1;
+    return first;
+  }
+
 /// Converts from big endian format to the machine's native endian format.
 #if __BYTE_ORDER == __LITTLE_ENDIAN
   static inline __int128_t FromBigEndian(__int128_t value) {

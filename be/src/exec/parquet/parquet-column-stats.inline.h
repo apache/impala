@@ -334,16 +334,9 @@ template <>                                                                     
 inline void ColumnStats<DecimalValue>::SerializeIcebergSingleValue(                     \
     const DecimalValue& v, std::string* out) {                                          \
   const auto big_endian_val = BitUtil::ToBigEndian(v.value());                          \
-  const uint8_t* first = reinterpret_cast<const uint8_t*>(&big_endian_val);             \
-  const uint8_t* last = first + sizeof(big_endian_val) - 1;                             \
-  if ((first[0] & 0x80) != 0) {                                                         \
-    for (; first < last && first[0] == 0xFF && (first[1] & 0x80) != 0; ++first) {       \
-    }                                                                                   \
-  } else {                                                                              \
-    for (; first < last && first[0] == 0x00 && (first[1] & 0x80) == 0; ++first) {       \
-    }                                                                                   \
-  }                                                                                     \
-  out->assign(reinterpret_cast<const char*>(first), last - first + 1);                  \
+  int len;                                                                              \
+  const uint8_t* first = BitUtil::TrimSignExtension(big_endian_val, &len);              \
+  out->assign(reinterpret_cast<const char*>(first), len);                               \
 }
 
 SERIALIZE_ICEBERG_DECIMAL_SINGLE_VALUE(Decimal4Value)
