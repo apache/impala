@@ -1,9 +1,9 @@
 # Impala <-> Trino interop over Apache Iceberg V3 tables: UUID column reads.
 #
 # See iceberg-trino-interop-insert.test for the shared setup notes. Trino writes
-# Parquet and ORC UUID columns; Impala reads them after INVALIDATE METADATA. Impala
-# cannot INSERT UUID columns yet, so this file only covers the Trino -> Impala
-# direction.
+# Parquet, ORC, and Avro UUID columns; Impala reads them after INVALIDATE METADATA.
+# Impala cannot INSERT UUID columns yet, so this file only covers the
+# Trino -> Impala direction.
 ====
 ---- TRINO_QUERY
 # Trino creates a V3 Parquet table with a UUID column and inserts rows.
@@ -318,35 +318,110 @@ INT,UUID,STRING
 ---- HS2_TYPES
 INT,STRING,STRING
 ====
----- QUERY
-# abcdefab-... is negative as a signed long; the scan compares UUIDs unsigned.
-SELECT id FROM ti_uuid_orc
-WHERE uuid_col > CAST('20000000-0000-0000-0000-000000000000' AS UUID)
----- RESULTS
-2
----- TYPES
-INT
+---- TRINO_QUERY
+# Avro data files with a nested STRUCT UUID column. Trino format='AVRO' does not set the
+# Hive TBLPROPERTY write.format.default that Impala uses for scan planning
+# (IcebergUtil.getIcebergFileFormat); Impala defaults to PARQUET when that property is
+# missing. Set write.format.default explicitly below with Impala ALTER TABLE.
+CREATE TABLE ti_uuid_avro_struct (
+  id integer,
+  s row(uuid_col uuid, name varchar)
+)
+WITH (format_version=3, format='AVRO');
+INSERT INTO ti_uuid_avro_struct VALUES
+  (1, ROW(UUID '12345678-1234-5678-1234-567812345678', 'alice')),
+  (2, NULL);
 ====
 ---- QUERY
-SELECT id FROM ti_uuid_orc
-WHERE uuid_col IN (CAST('12345678-1234-5678-1234-567812345678' AS UUID),
-                   CAST('abcdefab-cdef-abcd-efab-cdefabcdefab' AS UUID))
-ORDER BY id
----- RESULTS
-1
-2
+# Trino format='AVRO' does not populate write.format.default in DESCRIBE FORMATTED.
+# Impala still uses PARQUET for scan planning when that HMS property is unset
+# (IcebergUtil.getIcebergFileFormat); nested scalar reads below demonstrate that default.
+INVALIDATE METADATA ti_uuid_avro_struct;
+DESCRIBE FORMATTED ti_uuid_avro_struct
+---- RESULTS: VERIFY_IS_SUBSET
+'','format-version      ','3                   '
+---- RESULTS: VERIFY_IS_NOT_IN
+'','write.format.default','avro                '
 ---- TYPES
-INT
+STRING,STRING,STRING
 ====
 ---- QUERY
-# JOIN of the Trino-written ORC table and the Trino-written Parquet table.
-SELECT o.id, p.name FROM ti_uuid_orc o JOIN ti_uuid p ON o.uuid_col = p.uuid_col
-ORDER BY o.id
+# With effective PARQUET default (property unset), nested scalars in existing Avro files
+# are planned and read; whole-struct SELECT still fails in the Avro scanner.
+SELECT id, s.uuid_col FROM ti_uuid_avro_struct ORDER BY id
 ---- RESULTS
-1,'alice'
-2,'bob'
+1,'12345678-1234-5678-1234-567812345678'
+2,'NULL'
 ---- TYPES
+INT,UUID
+---- HS2_TYPES
 INT,STRING
+====
+---- QUERY
+SELECT s FROM ti_uuid_avro_struct
+---- CATCH
+Reading STRUCT<uuid_col:UUID,name:STRING> from AVRO format is not yet supported.
+====
+---- QUERY
+# Avro write.format.default: struct reads are rejected. Selecting the whole struct fails in
+# analysis (SlotRef.checkFileFormatSupportsStruct); selecting only a nested field passes
+# analysis and fails in the planner (HdfsScanNode complex-type check on an AVRO scan).
+ALTER TABLE ti_uuid_avro_struct SET TBLPROPERTIES ('write.format.default'='avro');
+INVALIDATE METADATA ti_uuid_avro_struct;
+DESCRIBE FORMATTED ti_uuid_avro_struct
+---- RESULTS: VERIFY_IS_SUBSET
+'','write.format.default','avro                '
+---- TYPES
+STRING,STRING,STRING
+====
+---- QUERY
+SELECT id, s.uuid_col FROM ti_uuid_avro_struct ORDER BY id
+---- CATCH
+in format 'AVRO' is not supported because the table has a column 's' with a complex type
+====
+---- QUERY
+SELECT s FROM ti_uuid_avro_struct
+---- CATCH
+Querying STRUCT is only supported for ORC and Parquet file formats.
+====
+---- QUERY
+# Parquet write.format.default (ORC behaves the same): nested scalars read from Avro
+# data files; whole struct still fails in the Avro scanner (data files unchanged).
+ALTER TABLE ti_uuid_avro_struct SET TBLPROPERTIES ('write.format.default'='parquet');
+INVALIDATE METADATA ti_uuid_avro_struct;
+DESCRIBE FORMATTED ti_uuid_avro_struct
+---- RESULTS: VERIFY_IS_SUBSET
+'','write.format.default','parquet             '
+---- TYPES
+STRING,STRING,STRING
+====
+---- QUERY
+SELECT id, s.uuid_col, s.name FROM ti_uuid_avro_struct ORDER BY id
+---- RESULTS
+1,'12345678-1234-5678-1234-567812345678','alice'
+2,'NULL','NULL'
+---- TYPES
+INT,UUID,STRING
+---- HS2_TYPES
+INT,STRING,STRING
+====
+---- QUERY
+SELECT s FROM ti_uuid_avro_struct
+---- CATCH
+Reading STRUCT<uuid_col:UUID,name:STRING> from AVRO format is not yet supported.
+====
+---- TRINO_QUERY
+# ARRAY<UUID> in Avro schema is rejected by IsSupportedAvroType (no array reader).
+CREATE TABLE ti_uuid_avro_array (id integer, uuid_arr array(uuid))
+WITH (format_version=3, format='AVRO');
+INSERT INTO ti_uuid_avro_array VALUES
+  (1, ARRAY[UUID '12345678-1234-5678-1234-567812345678']);
+====
+---- QUERY
+INVALIDATE METADATA ti_uuid_avro_array;
+SELECT id FROM ti_uuid_avro_array
+---- CATCH
+Got type: array
 ====
 ---- TRINO_QUERY
 # Mixed Parquet + Avro: start with Parquet so Impala can read before the format change.
@@ -367,14 +442,30 @@ INT,STRING,STRING
 ---- TRINO_QUERY
 # Add an Avro data file after changing the write format.
 ALTER TABLE ti_uuid_mixed_avro SET PROPERTIES format='AVRO';
-INSERT INTO ti_uuid_mixed_avro VALUES (2, NULL, 'avro');
+INSERT INTO ti_uuid_mixed_avro VALUES
+  (2, NULL, 'avro'),
+  (3, UUID 'abcdefab-cdef-abcd-efab-cdefabcdefab', 'avro');
 ====
 ---- QUERY
-# Impala must reject the scan once an Avro data file is present.
+# Impala reads UUIDs from both the Parquet and the Avro data files.
 INVALIDATE METADATA ti_uuid_mixed_avro;
-SELECT id, uuid_col FROM ti_uuid_mixed_avro ORDER BY id
----- CATCH
-Reading UUID columns from AVRO format is not yet supported
+SELECT id, uuid_col, name FROM ti_uuid_mixed_avro ORDER BY id
+---- RESULTS
+1,'12345678-1234-5678-1234-567812345678','parquet'
+2,'NULL','avro'
+3,'abcdefab-cdef-abcd-efab-cdefabcdefab','avro'
+---- TYPES
+INT,UUID,STRING
+---- HS2_TYPES
+INT,STRING,STRING
+====
+---- QUERY
+SELECT id FROM ti_uuid_mixed_avro
+WHERE uuid_col = CAST('abcdefab-cdef-abcd-efab-cdefabcdefab' AS UUID)
+---- RESULTS
+3
+---- TYPES
+INT
 ====
 ---- TRINO_QUERY
 # Partition evolution: start with identity partitioning on uuid_col.

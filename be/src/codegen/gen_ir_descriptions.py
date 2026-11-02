@@ -160,6 +160,8 @@ ir_functions = [
    "_ZN6impala15HdfsAvroScanner12ReadAvroCharENS_13PrimitiveTypeEiPPhS2_bPvPNS_7MemPoolE"],
   ["READ_AVRO_DECIMAL",
    "_ZN6impala15HdfsAvroScanner15ReadAvroDecimalEiPPhS1_bPvPNS_7MemPoolE"],
+  ["READ_AVRO_UUID",
+   "_ZN6impala15HdfsAvroScanner12ReadAvroUuidENS_13PrimitiveTypeEPPhS2_bPvPNS_7MemPoolE"],
   ["HDFS_SCANNER_GET_CONJUNCT_EVALUATOR",
    "_ZNK6impala11HdfsScanner15GetConjunctEvalEi"],
   ["HDFS_SCANNER_INIT_TUPLE",

@@ -45,6 +45,7 @@ import org.apache.impala.catalog.FeFsTable;
 import org.apache.impala.catalog.FileDescriptor;
 import org.apache.impala.catalog.HdfsFileFormat;
 import org.apache.impala.catalog.HdfsStorageDescriptor;
+import org.apache.impala.catalog.HdfsTable;
 import org.apache.impala.catalog.PrunablePartition;
 import org.apache.impala.catalog.SqlConstraints;
 import org.apache.impala.catalog.local.MetaProvider.PartitionMetadata;
@@ -384,18 +385,16 @@ public class LocalFsTable extends LocalTable implements FeFsTable {
     return false;
   }
 
-  protected void setAvroSchema(Table msTbl) {
-    if (avroSchema_ == null) {
-      // No Avro schema was explicitly set in the table metadata, so infer the Avro
-      // schema from the column definitions.
-      Schema inferredSchema = AvroSchemaConverter.convertFieldSchemas(
-          msTbl.getSd().getCols(), msTbl.getDbName() + "." + msTbl.getTableName());
-      avroSchema_ = inferredSchema.toString();
-    }
-  }
-
   protected String getAvroSchema() {
     return avroSchema_;
+  }
+
+  /**
+   * Sets the Avro schema from Impala column types for Iceberg tables with Avro files.
+   * See {@link HdfsTable#setIcebergAvroScanSchema}.
+   */
+  protected void setAvroSchemaFromColumns(List<Column> columns, String fullName) {
+    avroSchema_ = HdfsTable.buildAvroSchemaFromColumns(columns, fullName);
   }
 
   public LocalFsPartition createPrototypePartition() {

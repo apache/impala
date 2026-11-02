@@ -165,8 +165,12 @@ public class LocalIcebergTable extends LocalTable implements FeIcebergTable {
     fileStore_ = cachedFiles.fileStore;
     getHostIndex().populate(cachedFiles.hostIndex.getList());
     partitionStats_ = cachedFiles.partitionStats;
-    if (fileStore_.hasAvro()) localFsTable_.setAvroSchema(msTable);
     icebergApiTable_ = icebergApiTable;
+    if (fileStore_.hasAvro()) {
+      Preconditions.checkNotNull(icebergApiTable_,
+          "icebergApiTable_ must be initialized before building the Avro scan schema");
+      localFsTable_.setAvroSchemaFromColumns(getColumnsInHiveOrder(), getFullName());
+    }
     catalogSnapshotId_ = tableInfo.getIceberg_table().getCatalog_snapshot_id();
     partitionSpecs_ = Utils.loadPartitionSpecByIceberg(this);
     defaultPartitionSpecId_ = tableInfo.getIceberg_table().getDefault_partition_spec_id();
@@ -190,6 +194,8 @@ public class LocalIcebergTable extends LocalTable implements FeIcebergTable {
 
   @Override
   public List<Column> getColumnsInHiveOrder() {
+    Preconditions.checkNotNull(icebergApiTable_,
+        "getColumnsInHiveOrder() requires a loaded Iceberg API table");
     if (getFormatVersion() < 3) {
       return super.getColumnsInHiveOrder();
     } else {

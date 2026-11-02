@@ -1879,6 +1879,26 @@ public class HdfsTable extends Table implements FeFsTable {
   }
 
   /**
+   * Builds an Avro reader schema from Impala column types.
+   */
+  public static String buildAvroSchemaFromColumns(List<Column> columns, String fullName) {
+    return AvroSchemaConverter.convertColumns(columns, fullName).toString();
+  }
+
+  /**
+   * Sets {@code avroSchema_} for an Iceberg table that contains Avro data files. Uses
+   * Impala column types because Iceberg HMS metadata is lossy (e.g. UUID is stored as
+   * string in {@code avro.schema}) and does not match on-disk Iceberg Avro files.
+   * Call only from Iceberg catalog loading; not for generic Avro/Hive tables.
+   */
+  protected void setIcebergAvroScanSchema(
+      List<Column> dataColumns, EventSequence catalogTimeline) {
+    Preconditions.checkNotNull(dataColumns);
+    avroSchema_ = buildAvroSchemaFromColumns(dataColumns, getFullName());
+    catalogTimeline.markEvent("Loaded avro schema");
+  }
+
+  /**
    * Sets avroSchema_. Additionally, this method also reconciles the schema if the column
    * definitions from the metastore differ from the Avro schema.
    */

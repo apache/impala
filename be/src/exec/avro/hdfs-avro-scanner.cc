@@ -20,6 +20,7 @@
 #include <avro/errors.h>
 #include <algorithm>    // std::min
 #include <avro/legacy.h>
+#include <avro/schema.h>
 #include <gutil/strings/substitute.h>
 
 #include "codegen/llvm-codegen.h"
@@ -33,6 +34,7 @@
 #include "util/decompress.h"
 #include "util/runtime-profile-counters.h"
 #include "util/test-info.h"
+#include "util/uuid-util.h"
 
 #include "common/names.h"
 
@@ -101,6 +103,7 @@ static bool SchemasMatchForCodegen(const AvroSchemaElement& table_schema,
     case AVRO_STRING:
     case AVRO_BYTES:
     case AVRO_DECIMAL:
+    case AVRO_FIXED:
       return true;
     case AVRO_RECORD: {
       if (table_schema.children.size() != file_schema.children.size()) return false;
@@ -317,10 +320,12 @@ Status HdfsAvroScanner::ResolveSchemas(const AvroSchemaElement& table_root,
         if (default_value == nullptr) {
           return Status(TErrorCode::AVRO_MISSING_DEFAULT, field_name);
         }
+        // The default covers the rest of the path, so write it to this slot and stop.
+        // Impala's schemas give a struct field a NULL default, which sets the slot to
+        // NULL. A non-NULL default for a struct field is a record datum, which
+        // WriteDefaultValue() rejects.
         RETURN_IF_ERROR(WriteDefaultValue(slot_desc, default_value, field_name));
-        DCHECK_EQ(i, path.size() - 1) <<
-            "WriteDefaultValue() doesn't support default records yet, should have failed";
-        continue;
+        break;
       }
 
       const AvroSchemaElement& table_field = table_record->children[table_field_idx];
@@ -493,6 +498,7 @@ bool HdfsAvroScanner::VerifyTypesMatch(
       if (reader_type.precision != writer_type.precision) return false;
       return true;
     case TYPE_STRING: return reader_type.IsStringType();
+    case TYPE_UUID: return reader_type.IsUuidType();
     case TYPE_INT:
     case TYPE_DATE:
       switch(reader_type.type) {
@@ -735,6 +741,11 @@ bool HdfsAvroScanner::MaterializeTuple(const AvroSchemaElement& record_schema,
           slot_byte_size = slot_desc->type().GetByteSize();
         }
         success = ReadAvroDecimal(slot_byte_size, data, data_end, write_slot, slot, pool);
+        break;
+      }
+      case AVRO_FIXED: {
+        DCHECK_EQ(avro_schema_fixed_size(element.schema), UUID_BYTE_LEN);
+        success = ReadAvroUuid(slot_type, data, data_end, write_slot, slot, pool);
         break;
       }
       case AVRO_RECORD:
@@ -1146,6 +1157,9 @@ Status HdfsAvroScanner::CodegenReadScalar(const AvroSchemaElement& element,
       break;
     case AVRO_DECIMAL:
       read_field_fn = codegen->GetFunction(IRFunction::READ_AVRO_DECIMAL, false);
+      break;
+    case AVRO_FIXED:
+      read_field_fn = codegen->GetFunction(IRFunction::READ_AVRO_UUID, false);
       break;
     default:
       return Status::Expected(Substitute(

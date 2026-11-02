@@ -456,6 +456,8 @@ public class IcebergTable extends Table implements FeIcebergTable {
 
   @Override
   public List<Column> getColumnsInHiveOrder() {
+    Preconditions.checkNotNull(getIcebergApiTable(),
+        "getColumnsInHiveOrder() requires a loaded Iceberg API table");
     if (getFormatVersion() < 3) {
       return super.getColumnsInHiveOrder();
     } else {
@@ -798,7 +800,7 @@ public class IcebergTable extends Table implements FeIcebergTable {
       org.apache.hadoop.hive.metastore.api.Table msTbl,
       IcebergContentFileStore fileStore, EventSequence catalogTimeline) throws Exception {
     if (fileStore.hasAvro()) {
-      hdfsTable_.setAvroSchemaInternal(msClient, msTbl, catalogTimeline);
+      hdfsTable_.setIcebergAvroScanSchema(getColumnsInHiveOrder(), catalogTimeline);
     }
   }
 

@@ -114,7 +114,7 @@ class TestIcebergTable(IcebergTestSuite):
     create_iceberg_table_from_directory(self.client, unique_database,
         "iceberg_uuid_test_orc", "orc", table_location=uuid_fixture_dir)
     create_iceberg_table_from_directory(self.client, unique_database,
-        "iceberg_uuid_test_avro", "avro", table_location=uuid_fixture_dir)
+        "iceberg_uuid_test_avro_struct", "avro", table_location=uuid_fixture_dir)
     create_iceberg_table_from_directory(self.client, unique_database,
         "iceberg_uuid_test_part", "parquet", table_location=uuid_fixture_dir)
     self.run_test_case('QueryTest/iceberg-uuid-type', vector, use_db=unique_database)

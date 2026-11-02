@@ -18,6 +18,8 @@
 #include "exec/avro/hdfs-avro-scanner.h"
 
 #include <algorithm>
+#include <avro/errors.h>
+#include <avro/schema.h>
 #include <limits.h>
 
 #include "exec/read-write-util.h"
@@ -26,6 +28,8 @@
 #include "runtime/runtime-state.h"
 #include "runtime/string-value.inline.h"
 #include "testutil/gtest-util.h"
+#include "util/avro-util.h"
+#include "util/uuid-util.h"
 
 #include "common/names.h"
 
@@ -185,6 +189,47 @@ class HdfsAvroScannerTest : public testing::Test {
         expected_val, expected_encoded_len, expected_error);
   }
 
+  // A UUID always occupies UUID_BYTE_LEN bytes, so a successful read must consume exactly
+  // that many. A failed read must leave the slot and the input position unchanged.
+  void TestReadAvroUuid(uint8_t* data, int64_t data_len, const uint8_t* expected_bytes,
+      TErrorCode::type expected_error = TErrorCode::OK) {
+    scanner_.parse_status_ = Status::OK();
+    uint8_t* new_data = data;
+    const uint8_t sentinel = 0xa5;
+    uint8_t slot[UUID_BYTE_LEN];
+    memset(slot, sentinel, sizeof(slot));
+    bool success = scanner_.ReadAvroUuid(TYPE_UUID, &new_data, data + data_len, true,
+        slot, NULL);
+    bool expect_success = expected_error == TErrorCode::OK;
+    EXPECT_EQ(success, expect_success);
+    if (success) {
+      EXPECT_TRUE(scanner_.parse_status_.ok());
+      EXPECT_EQ(0, memcmp(slot, expected_bytes, UUID_BYTE_LEN));
+      EXPECT_EQ(UUID_BYTE_LEN, new_data - data);
+    } else {
+      EXPECT_EQ(scanner_.parse_status_.code(), expected_error);
+      EXPECT_EQ(data, new_data);
+      for (int i = 0; i < UUID_BYTE_LEN; ++i) EXPECT_EQ(sentinel, slot[i]) << i;
+    }
+  }
+
+  // Resolves a file field with Avro schema 'file_json' against a table field with Avro
+  // schema 'table_json', as ResolveSchemas() does for every field.
+  Status ResolveField(const string& table_json, const string& file_json) {
+    ScopedAvroSchemaElement table_field;
+    ScopedAvroSchemaElement file_field;
+    RETURN_IF_ERROR(ParseAvroSchema(table_json, table_field.get()));
+    RETURN_IF_ERROR(ParseAvroSchema(file_json, file_field.get()));
+    return scanner_.VerifyTypesMatch(*table_field.get(), *file_field.get(), "c");
+  }
+
+  static Status ParseAvroSchema(const string& json, AvroSchemaElement* element) {
+    avro_schema_t schema;
+    if (avro_schema_from_json_length(json.c_str(), json.size(), &schema) != 0) {
+      return Status(avro_strerror());
+    }
+    return AvroSchemaElement::ConvertSchema(schema, element);
+  }
 
   template<typename T>
   void TestReadAvroDecimal(uint8_t* data, int64_t data_len, DecimalValue<T> expected_val,
@@ -434,6 +479,17 @@ TEST_F(HdfsAvroScannerTest, StringTest) {
   TestReadAvroString(data, 10, sv, 1);
 }
 
+TEST_F(HdfsAvroScannerTest, UuidTest) {
+  uint8_t data[100];
+  const uint8_t uuid_bytes[16] = {0x12, 0x34, 0x56, 0x78, 0x12, 0x34, 0x56, 0x78,
+      0x12, 0x34, 0x56, 0x78, 0x12, 0x34, 0x56, 0x78};
+  memcpy(data, uuid_bytes, sizeof(uuid_bytes));
+  TestReadAvroUuid(data, UUID_BYTE_LEN, uuid_bytes);
+  TestReadAvroUuid(data, UUID_BYTE_LEN + 1, uuid_bytes);
+  TestReadAvroUuid(data, UUID_BYTE_LEN - 1, uuid_bytes, TErrorCode::AVRO_TRUNCATED_BLOCK);
+  TestReadAvroUuid(data, 0, uuid_bytes, TErrorCode::AVRO_TRUNCATED_BLOCK);
+}
+
 TEST_F(HdfsAvroScannerTest, DecimalTest) {
   uint8_t data[100];
   Decimal4Value d4v(123);
@@ -547,5 +603,108 @@ TEST_F(HdfsAvroScannerTest, ParseAvroCodecMetadata) {
   Status status = HdfsAvroScanner::ParseAvroCodecMetadata("lz4", &compressed, &type);
   EXPECT_FALSE(status.ok());
   EXPECT_STR_CONTAINS(status.GetDetail(), "Unknown Avro compression codec: lz4");
+}
+
+TEST_F(HdfsAvroScannerTest, ConvertSchemaNamedTypeReference) {
+  // The second use of 'uuid_fixed' is parsed into an AVRO_LINK.
+  const string json = R"({"type": "record", "name": "r", "fields": [
+      {"name": "u1", "type": {"type": "fixed", "name": "uuid_fixed", "size": 16}},
+      {"name": "u2", "type": ["null", "uuid_fixed"]}]})";
+  avro_schema_t schema;
+  ASSERT_EQ(avro_schema_from_json_length(json.c_str(), json.size(), &schema), 0)
+      << avro_strerror();
+  ScopedAvroSchemaElement element;
+  ASSERT_OK(AvroSchemaElement::ConvertSchema(schema, element.get()));
+  ASSERT_EQ(element->children.size(), 2);
+  EXPECT_EQ(element->children[0].schema->type, AVRO_FIXED);
+  EXPECT_FALSE(element->children[0].nullable());
+  EXPECT_EQ(element->children[1].schema->type, AVRO_FIXED);
+  EXPECT_TRUE(element->children[1].nullable());
+}
+
+TEST_F(HdfsAvroScannerTest, ConvertSchemaRecursiveType) {
+  const string json = R"({"type": "record", "name": "node", "fields": [
+      {"name": "next", "type": ["null", "node"]}]})";
+  avro_schema_t schema;
+  ASSERT_EQ(avro_schema_from_json_length(json.c_str(), json.size(), &schema), 0)
+      << avro_strerror();
+  ScopedAvroSchemaElement element;
+  Status status = AvroSchemaElement::ConvertSchema(schema, element.get());
+  ASSERT_FALSE(status.ok());
+  EXPECT_STR_CONTAINS(status.GetDetail(), "Recursive Avro schemas are not supported");
+}
+
+TEST_F(HdfsAvroScannerTest, AvroSchemaToColumnTypeUuidFixed) {
+  const string json =
+      R"({"type": "fixed", "name": "u", "size": 16, "logicalType": "uuid"})";
+  avro_schema_t schema;
+  ASSERT_EQ(avro_schema_from_json_length(json.c_str(), json.size(), &schema), 0)
+      << avro_strerror();
+  ColumnType column_type;
+  ASSERT_OK(AvroSchemaToColumnType(schema, "u", &column_type));
+  EXPECT_TRUE(column_type.IsUuidType());
+}
+
+TEST_F(HdfsAvroScannerTest, ConvertSchemaRejectsAvroArray) {
+  const string json = R"({"type": "record", "name": "r", "fields": [
+      {"name": "items", "type": {"type": "array", "items": "long"}}]})";
+  avro_schema_t schema;
+  ASSERT_EQ(avro_schema_from_json_length(json.c_str(), json.size(), &schema), 0)
+      << avro_strerror();
+  ScopedAvroSchemaElement element;
+  Status status = AvroSchemaElement::ConvertSchema(schema, element.get());
+  ASSERT_FALSE(status.ok());
+  EXPECT_STR_CONTAINS(status.GetDetail(), "Got type: array");
+}
+
+TEST_F(HdfsAvroScannerTest, ConvertSchemaRejectsFixedOtherThan16Bytes) {
+  const string json = R"({"type": "record", "name": "r", "fields": [
+      {"name": "f", "type": {"type": "fixed", "name": "fixed8", "size": 8}}]})";
+  avro_schema_t schema;
+  ASSERT_EQ(avro_schema_from_json_length(json.c_str(), json.size(), &schema), 0)
+      << avro_strerror();
+  ScopedAvroSchemaElement element;
+  Status status = AvroSchemaElement::ConvertSchema(schema, element.get());
+  ASSERT_FALSE(status.ok());
+  EXPECT_STR_CONTAINS(status.GetDetail(), "Got type: fixed(8)");
+
+  ColumnType column_type;
+  status = AvroSchemaToColumnType(
+      avro_schema_record_field_get_by_index(schema, 0), "f", &column_type);
+  EXPECT_EQ(status.code(), TErrorCode::AVRO_UNSUPPORTED_TYPE);
+}
+
+// avro-c drops 'logicalType' from fixed schemas, so a fixed(16) file field is read as a
+// UUID. The next two tests check that a fixed(16) which is not a UUID cannot be read into
+// the non-UUID table column it belongs to.
+TEST_F(HdfsAvroScannerTest, Fixed16WithoutUuidLogicalTypeRejectedForNonUuidColumn) {
+  const string file_json = R"({"type": "fixed", "name": "fixed16", "size": 16})";
+  // Reader schemas of BINARY and STRING table columns.
+  EXPECT_EQ(ResolveField(R"({"type": "bytes"})", file_json).code(),
+      TErrorCode::AVRO_SCHEMA_RESOLUTION_ERROR);
+  EXPECT_EQ(ResolveField(R"({"type": "string"})", file_json).code(),
+      TErrorCode::AVRO_SCHEMA_RESOLUTION_ERROR);
+  // A UUID table column still accepts it, since the missing logicalType is not visible.
+  EXPECT_OK(ResolveField(R"({"type": "fixed", "name": "uuid_fixed", "size": 16,
+      "logicalType": "uuid"})", file_json));
+}
+
+TEST_F(HdfsAvroScannerTest, DecimalOnFixed16RejectedForDecimalColumn) {
+  // Iceberg writes DECIMAL(38, s) to Avro as a decimal on fixed(16).
+  const string file_json = R"({"type": "fixed", "name": "decimal16", "size": 16,
+      "logicalType": "decimal", "precision": 38, "scale": 2})";
+  // Impala's reader schema for a DECIMAL(38, 2) column is a decimal on bytes.
+  const string table_json = R"({"type": "bytes", "logicalType": "decimal",
+      "precision": 38, "scale": 2})";
+  EXPECT_EQ(ResolveField(table_json, file_json).code(),
+      TErrorCode::AVRO_SCHEMA_RESOLUTION_ERROR);
+}
+
+TEST_F(HdfsAvroScannerTest, StringFileFieldRejectedForUuidColumn) {
+  const string uuid_table = R"({"type": "fixed", "name": "uuid_fixed", "size": 16,
+      "logicalType": "uuid"})";
+  const string string_file = R"({"type": "string"})";
+  EXPECT_EQ(ResolveField(uuid_table, string_file).code(),
+      TErrorCode::AVRO_SCHEMA_RESOLUTION_ERROR);
 }
 }

@@ -1,6 +1,6 @@
 ====
 ---- QUERY
-# Iceberg UUID Parquet and ORC read-path tests.
+# Iceberg UUID Parquet, ORC and Avro read-path tests.
 DESCRIBE iceberg_uuid_test
 ---- RESULTS: VERIFY_IS_SUBSET
 'id','int','','true'
@@ -245,10 +245,132 @@ BIGINT
 aggregation(SUM, RowsRead): 0
 ====
 ---- QUERY
-# Avro format is not yet supported for UUID column reads.
-SELECT id, uuid_col FROM iceberg_uuid_test_avro
----- CATCH
-Reading UUID columns from AVRO format is not yet supported
+# The table has a struct column. Impala rejects any scan planned as Avro for such a
+# table, even when it reads only flat columns, so the scan is planned as Parquet.
+ALTER TABLE iceberg_uuid_test_avro_struct
+SET TBLPROPERTIES ('write.format.default'='parquet');
+SELECT id, uuid_col, name FROM iceberg_uuid_test_avro_struct ORDER BY id
+---- RESULTS
+1,'12345678-1234-5678-1234-567812345678','alice'
+2,'abcdefab-cdef-abcd-efab-cdefabcdefab','bob'
+3,'00000000-0000-0000-0000-000000000000','zeros'
+4,'NULL','null_uuid'
+5,'ffffffff-ffff-ffff-ffff-ffffffffffff','max'
+---- TYPES
+INT,UUID,STRING
+---- HS2_TYPES
+INT,STRING,STRING
+====
+---- QUERY
+# Avro UUID predicates (same cases as the flat Parquet/ORC sections).
+SELECT id FROM iceberg_uuid_test_avro_struct
+WHERE uuid_col = CAST('12345678-1234-5678-1234-567812345678' AS UUID)
+---- RESULTS
+1
+---- TYPES
+INT
+====
+---- QUERY
+SELECT id FROM iceberg_uuid_test_avro_struct
+WHERE uuid_col IN (CAST('abcdefab-cdef-abcd-efab-cdefabcdefab' AS UUID),
+                   CAST('ffffffff-ffff-ffff-ffff-ffffffffffff' AS UUID))
+ORDER BY id
+---- RESULTS
+2
+5
+---- TYPES
+INT
+====
+---- QUERY
+SELECT id FROM iceberg_uuid_test_avro_struct
+WHERE uuid_col > CAST('20000000-0000-0000-0000-000000000000' AS UUID)
+ORDER BY id
+---- RESULTS
+2
+5
+---- TYPES
+INT
+====
+---- QUERY
+SELECT id FROM iceberg_uuid_test_avro_struct WHERE uuid_col IS NULL
+---- RESULTS
+4
+---- TYPES
+INT
+====
+---- QUERY
+# Aggregates, sort order, and string cast on the Avro UUID column.
+SELECT COUNT(uuid_col), COUNT(DISTINCT uuid_col), MIN(uuid_col), MAX(uuid_col),
+  MAX(CASE WHEN id = 1 THEN CAST(uuid_col AS STRING) END)
+FROM iceberg_uuid_test_avro_struct
+---- RESULTS
+4,4,'00000000-0000-0000-0000-000000000000','ffffffff-ffff-ffff-ffff-ffffffffffff','12345678-1234-5678-1234-567812345678'
+---- TYPES
+BIGINT,BIGINT,UUID,UUID,STRING
+---- HS2_TYPES
+BIGINT,BIGINT,STRING,STRING,STRING
+====
+---- QUERY
+SELECT p.id, a.name FROM iceberg_uuid_test p
+JOIN iceberg_uuid_test_avro_struct a ON p.uuid_col = a.uuid_col
+ORDER BY p.id
+---- RESULTS
+1,'alice'
+2,'bob'
+3,'zeros'
+5,'max'
+---- TYPES
+INT,STRING
+====
+---- QUERY
+# The data file has 's' with fields a and u, but no 's.t' or 's2': those were added to the
+# schema after the file was written. The fields in the file are read, including a nested
+# UUID.
+SELECT id, s.a, s.u FROM iceberg_uuid_test_avro_struct ORDER BY id
+---- RESULTS
+1,10,'abcdefab-cdef-abcd-efab-cdefabcdefab'
+2,NULL,'NULL'
+3,NULL,'00000000-0000-0000-0000-000000000000'
+4,40,'NULL'
+5,50,'ffffffff-ffff-ffff-ffff-ffffffffffff'
+---- TYPES
+INT,INT,UUID
+---- HS2_TYPES
+INT,INT,STRING
+====
+---- QUERY
+# 's.t' and 's2' are not in the data file, so their fields are NULL in every row. This
+# covers a missing intermediate struct ('s.t') and a missing top-level struct ('s2').
+SELECT id, s.t.y, s.t.k, s.t.z, s2.x, s2.k
+FROM iceberg_uuid_test_avro_struct ORDER BY id
+---- RESULTS
+1,NULL,'NULL','NULL',NULL,'NULL'
+2,NULL,'NULL','NULL',NULL,'NULL'
+3,NULL,'NULL','NULL',NULL,'NULL'
+4,NULL,'NULL','NULL',NULL,'NULL'
+5,NULL,'NULL','NULL',NULL,'NULL'
+---- TYPES
+INT,INT,UUID,STRING,INT,UUID
+---- HS2_TYPES
+INT,INT,STRING,STRING,INT,STRING
+====
+---- QUERY
+# Predicate on a UUID nested in 's', which is read from the data file.
+SELECT id FROM iceberg_uuid_test_avro_struct
+WHERE s.u = CAST('abcdefab-cdef-abcd-efab-cdefabcdefab' AS UUID)
+---- RESULTS
+1
+---- TYPES
+INT
+====
+---- QUERY
+# Every row has NULL for the fields that are missing from the data file.
+SELECT count(*) FROM iceberg_uuid_test_avro_struct
+WHERE s.t.k IS NULL AND s.t.y IS NULL AND s2.k IS NULL
+---- RESULTS
+5
+---- TYPES
+BIGINT
 ====
 ---- QUERY
 # Equality predicate on two UUID-typed operands (via scalar subquery).

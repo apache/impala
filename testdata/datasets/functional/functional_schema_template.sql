@@ -3384,19 +3384,6 @@ hadoop fs -put -f ${IMPALA_HOME}/testdata/data/iceberg_test/iceberg_uuid/iceberg
 ---- DATASET
 functional
 ---- BASE_TABLE_NAME
-iceberg_uuid_test_avro
----- CREATE
-CREATE EXTERNAL TABLE IF NOT EXISTS {db_name}{db_suffix}.{table_name}
-STORED AS ICEBERG
-LOCATION '/test-warehouse/iceberg_uuid_test_avro'
-TBLPROPERTIES('write.format.default'='avro', 'iceberg.catalog'='hadoop.tables');
----- DEPENDENT_LOAD
-`hadoop fs -mkdir -p /test-warehouse && \
-hadoop fs -put -f ${IMPALA_HOME}/testdata/data/iceberg_test/iceberg_uuid/iceberg_uuid_test_avro /test-warehouse/
-====
----- DATASET
-functional
----- BASE_TABLE_NAME
 trino_variant
 ---- CREATE
 CREATE EXTERNAL TABLE IF NOT EXISTS {db_name}{db_suffix}.{table_name}

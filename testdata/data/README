@@ -1049,11 +1049,17 @@ write.orc.bloom.filter.columns=uuid_col. UUID values are stored as ORC BINARY wi
 the iceberg.binary-type=UUID attribute. ORC BINARY has no min/max statistics, so
 only null counts and the bloom filter can skip data.
 
-iceberg_test/iceberg_uuid/iceberg_uuid_test_avro:
-Same logical row data as iceberg_uuid_test, Avro format (format v2, unpartitioned).
-Generated using the Iceberg Java API.
-UUID values are stored as Avro fixed(16) with logicalType=uuid.
-Used to verify Avro UUID reads are rejected until a later patch.
+iceberg_test/iceberg_uuid/iceberg_uuid_test_avro_struct:
+Avro format table (format v2, unpartitioned) for the Avro UUID read tests and the
+missing-field path of the Avro scanner. Generated using the Iceberg Java API (version
+1.11.0). The rows match iceberg_uuid_test, plus a struct column s (a: int, u: uuid).
+The single data file has id, uuid_col, name and s. Afterwards, two metadata-only schema
+changes add s.t (y: int, k: uuid, z: string) and s2 (x: int, k: uuid), so the data file
+has neither. UUID values are stored as Avro fixed(16) with logicalType=uuid.
+Rows (id, s), with uuid values written as bob = abcdefab-..., zeros = 00000000-...,
+max = ffffffff-...:
+  1: {a: 10, u: bob}, 2: NULL, 3: {a: NULL, u: zeros}, 4: {a: 40, u: NULL},
+  5: {a: 50, u: max}
 
 iceberg_test/iceberg_uuid/iceberg_uuid_test_part:
 Iceberg V3 Parquet table for UUID partition transform tests.

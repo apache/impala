@@ -25,6 +25,7 @@
 #include "runtime/mem-tracker.h"
 #include "runtime/runtime-state.h"
 #include "runtime/string-value.inline.h"
+#include "util/uuid-util.h"
 
 using namespace impala;
 using namespace strings;
@@ -264,6 +265,20 @@ bool HdfsAvroScanner::ReadAvroString(PrimitiveType type, uint8_t** data,
     sv->Assign(reinterpret_cast<char*>(*data), len.val);
   }
   *data += len.val;
+  return true;
+}
+
+bool HdfsAvroScanner::ReadAvroUuid(PrimitiveType type, uint8_t** data, uint8_t* data_end,
+    bool write_slot, void* slot, MemPool* pool) {
+  if (UNLIKELY(data_end - *data < UUID_BYTE_LEN)) {
+    SetStatusCorruptData(TErrorCode::AVRO_TRUNCATED_BLOCK);
+    return false;
+  }
+  if (write_slot) {
+    DCHECK_EQ(type, TYPE_UUID);
+    memcpy(slot, *data, UUID_BYTE_LEN);
+  }
+  *data += UUID_BYTE_LEN;
   return true;
 }
 

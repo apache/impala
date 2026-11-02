@@ -55,7 +55,6 @@ import org.apache.impala.catalog.Column;
 import org.apache.impala.catalog.ColumnStats;
 import org.apache.impala.catalog.FeFsPartition;
 import org.apache.impala.catalog.FeFsTable;
-import org.apache.impala.catalog.FeIcebergTable;
 import org.apache.impala.catalog.FeTable;
 import org.apache.impala.catalog.FileBlock;
 import org.apache.impala.catalog.FileDescriptor;
@@ -501,8 +500,8 @@ public class HdfsScanNode extends ScanNode {
     conjuncts_ = orderConjunctsByCost(conjuncts_);
     checkSamplingAndCountStar(analyzer);
     checkForSupportedFileFormats();
-    checkUuidReadSupported();
     checkVariantReadSupported();
+    checkAvroComplexTypeReadSupported();
 
     assignCollectionConjuncts(analyzer);
 
@@ -691,26 +690,6 @@ public class HdfsScanNode extends ScanNode {
   }
 
   /**
-   * Validates that Iceberg tables with UUID columns can be read from the file formats
-   * present in this scan. TODO: Remove when Avro UUID read support is added.
-   */
-  private void checkUuidReadSupported() throws ImpalaException {
-    FeTable table = desc_.getTable();
-    if (!(table instanceof FeIcebergTable)) return;
-
-    boolean readsUuid = false;
-    for (SlotDescriptor slot : desc_.getSlots()) {
-      if (slot.isMaterialized() && slot.getType().containsUuid()) {
-        readsUuid = true;
-        break;
-      }
-    }
-    if (!readsUuid) return;
-
-    ((FeIcebergTable) table).validateUuidReadSupported(fileFormats_);
-  }
-
-  /**
    * Validates that the VARIANT columns read by this scan can be read from the file
    * formats present in this scan. Only Parquet is supported. For Iceberg tables
    * 'fileFormats_' contains the formats of the scanned data files, which can differ from
@@ -731,6 +710,24 @@ public class HdfsScanNode extends ScanNode {
       if (format == HdfsFileFormat.PARQUET || !fileFormats_.contains(format)) continue;
       throw new NotImplementedException(String.format(
           "Reading VARIANT columns from %s format is not yet supported.", format));
+    }
+  }
+
+  /**
+   * Validates that the complex-typed slots read by this scan can be read from Avro
+   * data files. Only checked when 'fileFormats_' contains AVRO, which for Iceberg tables
+   * means some data files are Avro even if the table's default format is not.
+   * Avro can read struct fields but not whole structs, arrays, or maps.
+   */
+  private void checkAvroComplexTypeReadSupported() throws NotImplementedException {
+    if (!fileFormats_.contains(HdfsFileFormat.AVRO)) return;
+    for (SlotDescriptor slot : desc_.getSlotsRecursively()) {
+      if (!slot.isMaterialized()) continue;
+      Type type = slot.getType();
+      if (type.isComplexType()) {
+        throw new NotImplementedException(String.format(
+            "Reading %s from AVRO format is not yet supported.", type.toSql()));
+      }
     }
   }
 

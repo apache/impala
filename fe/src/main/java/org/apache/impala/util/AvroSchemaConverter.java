@@ -30,6 +30,7 @@ import org.apache.impala.catalog.ScalarType;
 import org.apache.impala.catalog.StructField;
 import org.apache.impala.catalog.StructType;
 import org.apache.impala.catalog.Type;
+import org.apache.impala.catalog.VariantType;
 import com.google.common.collect.Lists;
 
 /**
@@ -57,6 +58,8 @@ public class AvroSchemaConverter {
   private static final String SCALE_PROP_NAME = "scale";
   private static final String AVRO_DECIMAL_TYPE = "decimal";
   private static final String AVRO_DATE_TYPE = "date";
+  private static final String AVRO_UUID_LOGICAL_TYPE = "uuid";
+  private static final int AVRO_UUID_FIXED_SIZE_BYTES = Type.UUID.getSlotSize();
 
   // Used to generate unique record names as required by Avro.
   private int recordCounter_ = 0;
@@ -82,8 +85,9 @@ public class AvroSchemaConverter {
   private Schema convertColumnsImpl(List<Column> columns, String schemaName) {
     List<Schema.Field> avroFields = Lists.newArrayList();
     for (Column column: columns) {
+      // The NULL default lets the scanner read files written before a column was added.
       final Schema.Field avroField = new Schema.Field(column.getName(),
-          createAvroSchema(column.getType()), column.getComment(), null);
+          createAvroSchema(column.getType()), column.getComment(), Schema.NULL_VALUE);
       avroFields.add(avroField);
     }
     return createAvroRecord(avroFields, schemaName);
@@ -132,7 +136,10 @@ public class AvroSchemaConverter {
     } else if (impalaType.isMapType()) {
       schema = createMapSchema((MapType) impalaType);
     } else if (impalaType.isStructType()) {
-      schema = createRecordSchema((StructType) impalaType);
+      schema = createRecordSchema(((StructType) impalaType).getFields());
+    } else if (impalaType.isVariantType()) {
+      // Same record{metadata, value} layout as the VARIANT struct stored in HMS.
+      schema = createRecordSchema(((VariantType) impalaType).getFields());
     } else {
       throw new UnsupportedOperationException(
           impalaType.toSql() + " cannot be converted to an Avro type");
@@ -158,6 +165,7 @@ public class AvroSchemaConverter {
       case TIMESTAMP: return Schema.create(Schema.Type.STRING);
       case DATE: return createDateSchema();
       case DECIMAL: return createDecimalSchema(impalaScalarType);
+      case UUID: return createUuidSchema();
       default:
         throw new UnsupportedOperationException(
             impalaScalarType.toSql() + " cannot be converted to an Avro type");
@@ -179,6 +187,14 @@ public class AvroSchemaConverter {
     return decimalSchema;
   }
 
+  private Schema createUuidSchema() {
+    Schema uuidSchema = Schema.createFixed(
+        RECORD_NAME_PREFIX + "uuid_" + recordCounter_++, null, null,
+        AVRO_UUID_FIXED_SIZE_BYTES);
+    uuidSchema.addProp(AVRO_LOGICAL_TYPE, AVRO_UUID_LOGICAL_TYPE);
+    return uuidSchema;
+  }
+
   private Schema createArraySchema(ArrayType impalaArrayType) {
     Schema elementSchema = createAvroSchema(impalaArrayType.getItemType());
     return Schema.createArray(elementSchema);
@@ -190,11 +206,14 @@ public class AvroSchemaConverter {
     return Schema.createMap(valueSchema);
   }
 
-  private Schema createRecordSchema(StructType impalaStructType) {
+  private Schema createRecordSchema(List<StructField> fields) {
     List<Schema.Field> schemaFields = Lists.newArrayList();
-    for (StructField structField : impalaStructType.getFields()) {
+    for (StructField structField : fields) {
+      // The NULL default lets the scanner read files written before a field was added
+      // to the struct, as for top-level columns.
       Schema.Field avroField = new Schema.Field(structField.getName(),
-          createAvroSchema(structField.getType()), structField.getComment(), null);
+          createAvroSchema(structField.getType()), structField.getComment(),
+          Schema.NULL_VALUE);
       schemaFields.add(avroField);
     }
     // All Avro records in a table must have the name property.

@@ -17,8 +17,13 @@
 
 #include "util/avro-util.h"
 
-#include <avro/schema.h>
+#include <algorithm>
 #include <sstream>
+
+#include <avro/schema.h>
+#include <boost/container/small_vector.hpp>
+
+#include "util/uuid-util.h"
 
 using namespace std;
 
@@ -40,13 +45,32 @@ bool IsSupportedAvroType(const avro_schema_t& schema) {
     case AVRO_RECORD:
     case AVRO_DECIMAL:
       return true;
+    case AVRO_FIXED:
+      return avro_schema_fixed_size(schema) == UUID_BYTE_LEN;
     default:
       return false;
   }
 }
 
-Status AvroSchemaElement::ConvertSchema(
-    const avro_schema_t& schema, AvroSchemaElement* element) {
+/// Records enclosing the schema node being converted; its size is the nesting depth.
+typedef boost::container::small_vector<avro_schema_t, 8> AvroEnclosingRecords;
+
+static Status ConvertSchemaRecursive(const avro_schema_t& schema,
+    AvroSchemaElement* element, AvroEnclosingRecords* enclosing_records) {
+  // A reference to an already defined named type is an AVRO_LINK. A link to an
+  // enclosing record is a recursive type, which Impala cannot represent.
+  if (schema->type == AVRO_LINK) {
+    avro_schema_t target = avro_schema_link_target(schema);
+    if (std::find(enclosing_records->begin(), enclosing_records->end(), target)
+        != enclosing_records->end()) {
+      stringstream ss;
+      ss << "Recursive Avro schemas are not supported. Got recursive reference to: "
+         << avro_schema_name(target);
+      return Status(ss.str());
+    }
+    return ConvertSchemaRecursive(target, element, enclosing_records);
+  }
+
   element->schema = schema;
 
   // Look for special case of [<supported type>, "null"] union
@@ -66,7 +90,8 @@ Status AvroSchemaElement::ConvertSchema(
       if (null_position != -1) {
         const avro_schema_t& non_null_child = null_position == 0 ? child1 : child0;
         AvroSchemaElement child;
-        RETURN_IF_ERROR(ConvertSchema(non_null_child, &child));
+        RETURN_IF_ERROR(
+            ConvertSchemaRecursive(non_null_child, &child, enclosing_records));
 
         // 'schema' is a [<child>, "null"] union. Treat this node as the same type as
         // child except with null_union_position set appropriately.
@@ -81,21 +106,34 @@ Status AvroSchemaElement::ConvertSchema(
 
   if (!IsSupportedAvroType(element->schema)) {
     stringstream ss;
-    ss << "Avro enum, array, map, union, and fixed types are not supported. "
-       << "Got type: " << avro_type_name(element->schema->type);
+    ss << "Avro enum, array, map, unions other than [<type>, \"null\"], and fixed types "
+       << "with a size other than " << UUID_BYTE_LEN << " are not supported. Got type: "
+       << avro_type_name(element->schema->type);
+    if (element->schema->type == AVRO_FIXED) {
+      ss << "(" << avro_schema_fixed_size(element->schema) << ")";
+    }
     return Status(ss.str());
   }
 
   if (element->schema->type == AVRO_RECORD) {
     int num_fields = avro_schema_record_size(element->schema);
     element->children.resize(num_fields);
+    enclosing_records->push_back(element->schema);
     for (int i = 0; i < num_fields; ++i) {
       avro_schema_t field =
           avro_schema_record_field_get_by_index(element->schema, i);
-      RETURN_IF_ERROR(ConvertSchema(field, &element->children[i]));
+      RETURN_IF_ERROR(
+          ConvertSchemaRecursive(field, &element->children[i], enclosing_records));
     }
+    enclosing_records->pop_back();
   }
   return Status::OK();
+}
+
+Status AvroSchemaElement::ConvertSchema(
+    const avro_schema_t& schema, AvroSchemaElement* element) {
+  AvroEnclosingRecords enclosing_records;
+  return ConvertSchemaRecursive(schema, element, &enclosing_records);
 }
 
 ScopedAvroSchemaElement::~ScopedAvroSchemaElement() {
@@ -137,6 +175,17 @@ Status AvroSchemaToColumnType(
       }
       *column_type = ColumnType::CreateDecimalType(precision, scale);
       return Status::OK();
+    }
+    case AVRO_FIXED: {
+      // avro-c drops 'logicalType' from fixed schemas, so a fixed(16) UUID cannot be
+      // told apart from a plain fixed(16) or a decimal stored as fixed(16). A file field
+      // of this type therefore only resolves against a UUID table column.
+      if (avro_schema_fixed_size(schema) == UUID_BYTE_LEN) {
+        *column_type = ColumnType::CreateUuidType();
+        return Status::OK();
+      }
+      return Status(TErrorCode::AVRO_UNSUPPORTED_TYPE, column_name,
+          avro_type_name(schema->type));
     }
     default:
       return Status(TErrorCode::AVRO_UNSUPPORTED_TYPE, column_name, avro_type_name(schema->type));

@@ -293,6 +293,8 @@ class HdfsAvroScanner : public BaseSequenceScanner {
       bool write_slot, void* slot, MemPool* pool);
   bool ReadAvroString(PrimitiveType type, uint8_t** data, uint8_t* data_end,
       bool write_slot, void* slot, MemPool* pool);
+  bool ReadAvroUuid(PrimitiveType type, uint8_t** data, uint8_t* data_end,
+      bool write_slot, void* slot, MemPool* pool);
 
   /// Helper function for some of the above. Returns the the length of certain varlen
   /// types and updates 'data'. If an error is encountered returns a non-ok result and
