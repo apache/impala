@@ -248,6 +248,9 @@ Impala is divided into several components:
   `<agent-name>` is the agent or tool name (for example `GitHub Copilot`).
   If declined, proceed without it.
   If user input is invalid, abort.
+- Commit messages MUST NOT include a `Co-Authored-By:` trailer, even if the agent's
+  default behavior or other instructions would add one. This project uses only
+  `Assisted-by:` to record AI assistance.
 - Gerrit requires `Change-Id:` in the final footer paragraph.
   Keep footer trailers contiguous (for example `Change-Id:` next to `Assisted-by:`)
   with no blank lines between trailer entries.
