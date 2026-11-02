@@ -42,6 +42,12 @@ though some of them might not be necessary. The exclusions are sorted alphabetic
       <groupId>org.apache.hadoop</groupId>
       <artifactId>hadoop-aws</artifactId>
     </dependency>
+    <!-- Ranger use a mix of AWS SDK v1 and v2. Ensure we include everything. -->
+    <dependency>
+      <groupId>org.apache.ranger</groupId>
+      <artifactId>ranger-audit-core</artifactId>
+      <version>${ranger.version}</version>
+    </dependency>
   </dependencies>
   <build>
     <plugins>
@@ -51,127 +57,817 @@ though some of them might not be necessary. The exclusions are sorted alphabetic
           <artifactSet>
             <includes>
               <include>com.amazonaws:aws-java-sdk-bundle</include>
+              <include>software.amazon.awssdk:bundle</include>
             </includes>
           </artifactSet>
           <filters>
             <filter>
               <artifact>com.amazonaws:aws-java-sdk-bundle</artifact>
               <excludes>
+                <exclude>com/amazonaws/services/accessanalyzer/**</exclude>
+                <exclude>com/amazonaws/services/account/**</exclude>
+                <exclude>com/amazonaws/services/acmpca/**</exclude>
                 <exclude>com/amazonaws/services/alexaforbusiness/**</exclude>
                 <exclude>com/amazonaws/services/amplify/**</exclude>
+                <exclude>com/amazonaws/services/amplifybackend/**</exclude>
+                <exclude>com/amazonaws/services/amplifyuibuilder/**</exclude>
                 <exclude>com/amazonaws/services/apigateway/**</exclude>
+                <exclude>com/amazonaws/services/apigatewaymanagementapi/**</exclude>
                 <exclude>com/amazonaws/services/apigatewayv2/**</exclude>
+                <exclude>com/amazonaws/services/appconfig/**</exclude>
+                <exclude>com/amazonaws/services/appconfigdata/**</exclude>
+                <exclude>com/amazonaws/services/appfabric/**</exclude>
+                <exclude>com/amazonaws/services/appflow/**</exclude>
+                <exclude>com/amazonaws/services/appintegrations/**</exclude>
                 <exclude>com/amazonaws/services/applicationautoscaling/**</exclude>
+                <exclude>com/amazonaws/services/applicationcostprofiler/**</exclude>
                 <exclude>com/amazonaws/services/applicationdiscovery/**</exclude>
+                <exclude>com/amazonaws/services/applicationinsights/**</exclude>
+                <exclude>com/amazonaws/services/applicationsignals/**</exclude>
                 <exclude>com/amazonaws/services/appmesh/**</exclude>
+                <exclude>com/amazonaws/services/appregistry/**</exclude>
+                <exclude>com/amazonaws/services/apprunner/**</exclude>
                 <exclude>com/amazonaws/services/appstream/**</exclude>
                 <exclude>com/amazonaws/services/appsync/**</exclude>
+                <exclude>com/amazonaws/services/apptest/**</exclude>
+                <exclude>com/amazonaws/services/arczonalshift/**</exclude>
+                <exclude>com/amazonaws/services/artifact/**</exclude>
                 <exclude>com/amazonaws/services/athena/**</exclude>
+                <exclude>com/amazonaws/services/auditmanager/**</exclude>
+                <exclude>com/amazonaws/services/augmentedairuntime/**</exclude>
                 <exclude>com/amazonaws/services/autoscaling/**</exclude>
                 <exclude>com/amazonaws/services/autoscalingplans/**</exclude>
+                <exclude>com/amazonaws/services/b2bi/**</exclude>
+                <exclude>com/amazonaws/services/backup/**</exclude>
+                <exclude>com/amazonaws/services/backupgateway/**</exclude>
                 <exclude>com/amazonaws/services/batch/**</exclude>
+                <exclude>com/amazonaws/services/bcmdataexports/**</exclude>
+                <exclude>com/amazonaws/services/bedrock/**</exclude>
+                <exclude>com/amazonaws/services/bedrockagent/**</exclude>
+                <exclude>com/amazonaws/services/bedrockagentruntime/**</exclude>
+                <exclude>com/amazonaws/services/bedrockruntime/**</exclude>
+                <exclude>com/amazonaws/services/billingconductor/**</exclude>
+                <exclude>com/amazonaws/services/braket/**</exclude>
+                <exclude>com/amazonaws/services/budgets/**</exclude>
+                <exclude>com/amazonaws/services/certificatemanager/**</exclude>
+                <exclude>com/amazonaws/services/chatbot/**</exclude>
                 <exclude>com/amazonaws/services/chime/**</exclude>
+                <exclude>com/amazonaws/services/chimesdkidentity/**</exclude>
+                <exclude>com/amazonaws/services/chimesdkmediapipelines/**</exclude>
+                <exclude>com/amazonaws/services/chimesdkmeetings/**</exclude>
+                <exclude>com/amazonaws/services/chimesdkmessaging/**</exclude>
+                <exclude>com/amazonaws/services/chimesdkvoice/**</exclude>
+                <exclude>com/amazonaws/services/cleanrooms/**</exclude>
+                <exclude>com/amazonaws/services/cleanroomsml/**</exclude>
                 <exclude>com/amazonaws/services/cloud9/**</exclude>
+                <exclude>com/amazonaws/services/cloudcontrolapi/**</exclude>
                 <exclude>com/amazonaws/services/clouddirectory/**</exclude>
                 <exclude>com/amazonaws/services/cloudformation/**</exclude>
                 <exclude>com/amazonaws/services/cloudfront/**</exclude>
+                <exclude>com/amazonaws/services/cloudhsm/**</exclude>
+                <exclude>com/amazonaws/services/cloudhsmv2/**</exclude>
+                <exclude>com/amazonaws/services/cloudsearchdomain/**</exclude>
                 <exclude>com/amazonaws/services/cloudsearchv2/**</exclude>
+                <exclude>com/amazonaws/services/cloudtrail/**</exclude>
+                <exclude>com/amazonaws/services/cloudtraildata/**</exclude>
                 <exclude>com/amazonaws/services/cloudwatch/**</exclude>
                 <exclude>com/amazonaws/services/cloudwatchevents/**</exclude>
+                <exclude>com/amazonaws/services/cloudwatchevidently/**</exclude>
+                <exclude>com/amazonaws/services/cloudwatchrum/**</exclude>
+                <exclude>com/amazonaws/services/codeartifact/**</exclude>
                 <exclude>com/amazonaws/services/codebuild/**</exclude>
                 <exclude>com/amazonaws/services/codecommit/**</exclude>
+                <exclude>com/amazonaws/services/codeconnections/**</exclude>
                 <exclude>com/amazonaws/services/codedeploy/**</exclude>
+                <exclude>com/amazonaws/services/codeguruprofiler/**</exclude>
+                <exclude>com/amazonaws/services/codegurureviewer/**</exclude>
+                <exclude>com/amazonaws/services/codegurusecurity/**</exclude>
                 <exclude>com/amazonaws/services/codepipeline/**</exclude>
                 <exclude>com/amazonaws/services/codestar/**</exclude>
+                <exclude>com/amazonaws/services/codestarconnections/**</exclude>
+                <exclude>com/amazonaws/services/codestarnotifications/**</exclude>
+                <exclude>com/amazonaws/services/cognitoidentity/**</exclude>
                 <exclude>com/amazonaws/services/cognitoidp/**</exclude>
                 <exclude>com/amazonaws/services/cognitosync/**</exclude>
                 <exclude>com/amazonaws/services/comprehend/**</exclude>
+                <exclude>com/amazonaws/services/comprehendmedical/**</exclude>
+                <exclude>com/amazonaws/services/computeoptimizer/**</exclude>
+                <exclude>com/amazonaws/services/config/**</exclude>
                 <exclude>com/amazonaws/services/connect/**</exclude>
+                <exclude>com/amazonaws/services/connectcampaign/**</exclude>
+                <exclude>com/amazonaws/services/connectcases/**</exclude>
+                <exclude>com/amazonaws/services/connectcontactlens/**</exclude>
+                <exclude>com/amazonaws/services/connectparticipant/**</exclude>
+                <exclude>com/amazonaws/services/connectwisdom/**</exclude>
+                <exclude>com/amazonaws/services/controlcatalog/**</exclude>
+                <exclude>com/amazonaws/services/controltower/**</exclude>
+                <exclude>com/amazonaws/services/costandusagereport/**</exclude>
+                <exclude>com/amazonaws/services/costexplorer/**</exclude>
+                <exclude>com/amazonaws/services/costoptimizationhub/**</exclude>
+                <exclude>com/amazonaws/services/customerprofiles/**</exclude>
                 <exclude>com/amazonaws/services/databasemigrationservice/**</exclude>
+                <exclude>com/amazonaws/services/dataexchange/**</exclude>
+                <exclude>com/amazonaws/services/datapipeline/**</exclude>
+                <exclude>com/amazonaws/services/datasync/**</exclude>
+                <exclude>com/amazonaws/services/datazone/**</exclude>
+                <exclude>com/amazonaws/services/dax/**</exclude>
+                <exclude>com/amazonaws/services/deadline/**</exclude>
+                <exclude>com/amazonaws/services/detective/**</exclude>
                 <exclude>com/amazonaws/services/devicefarm/**</exclude>
+                <exclude>com/amazonaws/services/devopsguru/**</exclude>
+                <exclude>com/amazonaws/services/directconnect/**</exclude>
                 <exclude>com/amazonaws/services/directory/**</exclude>
+                <exclude>com/amazonaws/services/dlm/**</exclude>
                 <exclude>com/amazonaws/services/docdb/**</exclude>
+                <exclude>com/amazonaws/services/docdbelastic/**</exclude>
+                <exclude>com/amazonaws/services/drs/**</exclude>
+                <exclude>com/amazonaws/services/dynamodbv2/**</exclude>
+                <exclude>com/amazonaws/services/ebs/**</exclude>
                 <exclude>com/amazonaws/services/ec2/**</exclude>
+                <exclude>com/amazonaws/services/ec2instanceconnect/**</exclude>
                 <exclude>com/amazonaws/services/ecr/**</exclude>
+                <exclude>com/amazonaws/services/ecrpublic/**</exclude>
                 <exclude>com/amazonaws/services/ecs/**</exclude>
                 <exclude>com/amazonaws/services/eks/**</exclude>
+                <exclude>com/amazonaws/services/eksauth/**</exclude>
                 <exclude>com/amazonaws/services/elasticache/**</exclude>
                 <exclude>com/amazonaws/services/elasticbeanstalk/**</exclude>
                 <exclude>com/amazonaws/services/elasticfilesystem/**</exclude>
+                <exclude>com/amazonaws/services/elasticinference/**</exclude>
                 <exclude>com/amazonaws/services/elasticloadbalancing/**</exclude>
                 <exclude>com/amazonaws/services/elasticloadbalancingv2/**</exclude>
                 <exclude>com/amazonaws/services/elasticmapreduce/**</exclude>
                 <exclude>com/amazonaws/services/elasticsearch/**</exclude>
                 <exclude>com/amazonaws/services/elastictranscoder/**</exclude>
+                <exclude>com/amazonaws/services/emrcontainers/**</exclude>
+                <exclude>com/amazonaws/services/emrserverless/**</exclude>
+                <exclude>com/amazonaws/services/entityresolution/**</exclude>
+                <exclude>com/amazonaws/services/eventbridge/**</exclude>
+                <exclude>com/amazonaws/services/finspace/**</exclude>
+                <exclude>com/amazonaws/services/finspacedata/**</exclude>
+                <exclude>com/amazonaws/services/fis/**</exclude>
                 <exclude>com/amazonaws/services/fms/**</exclude>
+                <exclude>com/amazonaws/services/forecast/**</exclude>
+                <exclude>com/amazonaws/services/forecastquery/**</exclude>
+                <exclude>com/amazonaws/services/frauddetector/**</exclude>
+                <exclude>com/amazonaws/services/freetier/**</exclude>
+                <exclude>com/amazonaws/services/fsx/**</exclude>
+                <exclude>com/amazonaws/services/gamelift/**</exclude>
+                <exclude>com/amazonaws/services/glacier/**</exclude>
                 <exclude>com/amazonaws/services/globalaccelerator/**</exclude>
                 <exclude>com/amazonaws/services/glue/**</exclude>
+                <exclude>com/amazonaws/services/gluedatabrew/**</exclude>
                 <exclude>com/amazonaws/services/greengrass/**</exclude>
+                <exclude>com/amazonaws/services/greengrassv2/**</exclude>
                 <exclude>com/amazonaws/services/groundstation/**</exclude>
                 <exclude>com/amazonaws/services/guardduty/**</exclude>
+                <exclude>com/amazonaws/services/health/**</exclude>
+                <exclude>com/amazonaws/services/healthlake/**</exclude>
+                <exclude>com/amazonaws/services/iamrolesanywhere/**</exclude>
+                <exclude>com/amazonaws/services/identitymanagement/**</exclude>
+                <exclude>com/amazonaws/services/identitystore/**</exclude>
+                <exclude>com/amazonaws/services/imagebuilder/**</exclude>
+                <exclude>com/amazonaws/services/importexport/**</exclude>
                 <exclude>com/amazonaws/services/inspector/**</exclude>
+                <exclude>com/amazonaws/services/inspector2/**</exclude>
+                <exclude>com/amazonaws/services/inspectorscan/**</exclude>
+                <exclude>com/amazonaws/services/internetmonitor/**</exclude>
                 <exclude>com/amazonaws/services/iot/**</exclude>
                 <exclude>com/amazonaws/services/iot1clickdevices/**</exclude>
                 <exclude>com/amazonaws/services/iot1clickprojects/**</exclude>
                 <exclude>com/amazonaws/services/iotanalytics/**</exclude>
+                <exclude>com/amazonaws/services/iotdata/**</exclude>
+                <exclude>com/amazonaws/services/iotdeviceadvisor/**</exclude>
                 <exclude>com/amazonaws/services/iotevents/**</exclude>
+                <exclude>com/amazonaws/services/ioteventsdata/**</exclude>
+                <exclude>com/amazonaws/services/iotfleethub/**</exclude>
+                <exclude>com/amazonaws/services/iotfleetwise/**</exclude>
+                <exclude>com/amazonaws/services/iotjobsdataplane/**</exclude>
+                <exclude>com/amazonaws/services/iotsecuretunneling/**</exclude>
+                <exclude>com/amazonaws/services/iotsitewise/**</exclude>
                 <exclude>com/amazonaws/services/iotthingsgraph/**</exclude>
+                <exclude>com/amazonaws/services/iottwinmaker/**</exclude>
+                <exclude>com/amazonaws/services/iotwireless/**</exclude>
+                <exclude>com/amazonaws/services/ivs/**</exclude>
+                <exclude>com/amazonaws/services/ivschat/**</exclude>
+                <exclude>com/amazonaws/services/ivsrealtime/**</exclude>
                 <exclude>com/amazonaws/services/kafka/**</exclude>
+                <exclude>com/amazonaws/services/kafkaconnect/**</exclude>
+                <exclude>com/amazonaws/services/kendra/**</exclude>
+                <exclude>com/amazonaws/services/kendraranking/**</exclude>
+                <exclude>com/amazonaws/services/keyspaces/**</exclude>
                 <exclude>com/amazonaws/services/kinesis/**</exclude>
                 <exclude>com/amazonaws/services/kinesisanalytics/**</exclude>
                 <exclude>com/amazonaws/services/kinesisanalyticsv2/**</exclude>
                 <exclude>com/amazonaws/services/kinesisfirehose/**</exclude>
                 <exclude>com/amazonaws/services/kinesisvideo/**</exclude>
+                <exclude>com/amazonaws/services/kinesisvideosignalingchannels/**</exclude>
+                <exclude>com/amazonaws/services/kinesisvideowebrtcstorage/**</exclude>
+                <exclude>com/amazonaws/services/lakeformation/**</exclude>
                 <exclude>com/amazonaws/services/lambda/**</exclude>
+                <exclude>com/amazonaws/services/launchwizard/**</exclude>
                 <exclude>com/amazonaws/services/lexmodelbuilding/**</exclude>
+                <exclude>com/amazonaws/services/lexmodelsv2/**</exclude>
+                <exclude>com/amazonaws/services/lexruntime/**</exclude>
+                <exclude>com/amazonaws/services/lexruntimev2/**</exclude>
                 <exclude>com/amazonaws/services/licensemanager/**</exclude>
+                <exclude>com/amazonaws/services/licensemanagerlinuxsubscriptions/**</exclude>
+                <exclude>com/amazonaws/services/licensemanagerusersubscriptions/**</exclude>
                 <exclude>com/amazonaws/services/lightsail/**</exclude>
+                <exclude>com/amazonaws/services/location/**</exclude>
+                <exclude>com/amazonaws/services/logs/**</exclude>
+                <exclude>com/amazonaws/services/lookoutequipment/**</exclude>
+                <exclude>com/amazonaws/services/lookoutforvision/**</exclude>
+                <exclude>com/amazonaws/services/lookoutmetrics/**</exclude>
                 <exclude>com/amazonaws/services/machinelearning/**</exclude>
+                <exclude>com/amazonaws/services/macie2/**</exclude>
+                <exclude>com/amazonaws/services/mailmanager/**</exclude>
+                <exclude>com/amazonaws/services/mainframemodernization/**</exclude>
                 <exclude>com/amazonaws/services/managedblockchain/**</exclude>
+                <exclude>com/amazonaws/services/managedblockchainquery/**</exclude>
+                <exclude>com/amazonaws/services/managedgrafana/**</exclude>
+                <exclude>com/amazonaws/services/marketplaceagreement/**</exclude>
+                <exclude>com/amazonaws/services/marketplacecatalog/**</exclude>
+                <exclude>com/amazonaws/services/marketplacecommerceanalytics/**</exclude>
+                <exclude>com/amazonaws/services/marketplacedeployment/**</exclude>
+                <exclude>com/amazonaws/services/marketplaceentitlement/**</exclude>
+                <exclude>com/amazonaws/services/marketplacemetering/**</exclude>
                 <exclude>com/amazonaws/services/mediaconnect/**</exclude>
                 <exclude>com/amazonaws/services/mediaconvert/**</exclude>
                 <exclude>com/amazonaws/services/medialive/**</exclude>
                 <exclude>com/amazonaws/services/mediapackage/**</exclude>
+                <exclude>com/amazonaws/services/mediapackagev2/**</exclude>
                 <exclude>com/amazonaws/services/mediapackagevod/**</exclude>
                 <exclude>com/amazonaws/services/mediastore/**</exclude>
+                <exclude>com/amazonaws/services/mediastoredata/**</exclude>
+                <exclude>com/amazonaws/services/mediatailor/**</exclude>
+                <exclude>com/amazonaws/services/medicalimaging/**</exclude>
+                <exclude>com/amazonaws/services/memorydb/**</exclude>
+                <exclude>com/amazonaws/services/mgn/**</exclude>
                 <exclude>com/amazonaws/services/migrationhub/**</exclude>
+                <exclude>com/amazonaws/services/migrationhubconfig/**</exclude>
+                <exclude>com/amazonaws/services/migrationhuborchestrator/**</exclude>
+                <exclude>com/amazonaws/services/migrationhubrefactorspaces/**</exclude>
+                <exclude>com/amazonaws/services/migrationhubstrategyrecommendations/**</exclude>
                 <exclude>com/amazonaws/services/mq/**</exclude>
                 <exclude>com/amazonaws/services/mturk/**</exclude>
+                <exclude>com/amazonaws/services/mwaa/**</exclude>
                 <exclude>com/amazonaws/services/neptune/**</exclude>
+                <exclude>com/amazonaws/services/neptunedata/**</exclude>
+                <exclude>com/amazonaws/services/networkfirewall/**</exclude>
+                <exclude>com/amazonaws/services/networkmanager/**</exclude>
+                <exclude>com/amazonaws/services/networkmonitor/**</exclude>
+                <exclude>com/amazonaws/services/nimblestudio/**</exclude>
+                <exclude>com/amazonaws/services/oam/**</exclude>
+                <exclude>com/amazonaws/services/omics/**</exclude>
+                <exclude>com/amazonaws/services/opensearch/**</exclude>
+                <exclude>com/amazonaws/services/opensearchserverless/**</exclude>
                 <exclude>com/amazonaws/services/opsworks/**</exclude>
+                <exclude>com/amazonaws/services/opsworkscm/**</exclude>
+                <exclude>com/amazonaws/services/organizations/**</exclude>
+                <exclude>com/amazonaws/services/osis/**</exclude>
+                <exclude>com/amazonaws/services/outposts/**</exclude>
+                <exclude>com/amazonaws/services/panorama/**</exclude>
+                <exclude>com/amazonaws/services/paymentcryptography/**</exclude>
+                <exclude>com/amazonaws/services/paymentcryptographydata/**</exclude>
+                <exclude>com/amazonaws/services/pcaconnectorad/**</exclude>
+                <exclude>com/amazonaws/services/pcaconnectorscep/**</exclude>
+                <exclude>com/amazonaws/services/personalize/**</exclude>
+                <exclude>com/amazonaws/services/personalizeevents/**</exclude>
+                <exclude>com/amazonaws/services/personalizeruntime/**</exclude>
+                <exclude>com/amazonaws/services/pi/**</exclude>
                 <exclude>com/amazonaws/services/pinpoint/**</exclude>
                 <exclude>com/amazonaws/services/pinpointemail/**</exclude>
                 <exclude>com/amazonaws/services/pinpointsmsvoice/**</exclude>
+                <exclude>com/amazonaws/services/pinpointsmsvoicev2/**</exclude>
+                <exclude>com/amazonaws/services/pipes/**</exclude>
                 <exclude>com/amazonaws/services/polly/**</exclude>
+                <exclude>com/amazonaws/services/pricing/**</exclude>
+                <exclude>com/amazonaws/services/private5g/**</exclude>
+                <exclude>com/amazonaws/services/prometheus/**</exclude>
+                <exclude>com/amazonaws/services/proton/**</exclude>
+                <exclude>com/amazonaws/services/qapps/**</exclude>
+                <exclude>com/amazonaws/services/qbusiness/**</exclude>
+                <exclude>com/amazonaws/services/qconnect/**</exclude>
+                <exclude>com/amazonaws/services/qldb/**</exclude>
+                <exclude>com/amazonaws/services/qldbsession/**</exclude>
                 <exclude>com/amazonaws/services/quicksight/**</exclude>
+                <exclude>com/amazonaws/services/ram/**</exclude>
                 <exclude>com/amazonaws/services/rds/**</exclude>
+                <exclude>com/amazonaws/services/rdsdata/**</exclude>
+                <exclude>com/amazonaws/services/recyclebin/**</exclude>
                 <exclude>com/amazonaws/services/redshift/**</exclude>
+                <exclude>com/amazonaws/services/redshiftdataapi/**</exclude>
+                <exclude>com/amazonaws/services/redshiftserverless/**</exclude>
                 <exclude>com/amazonaws/services/rekognition/**</exclude>
+                <exclude>com/amazonaws/services/repostspace/**</exclude>
+                <exclude>com/amazonaws/services/resiliencehub/**</exclude>
+                <exclude>com/amazonaws/services/resourceexplorer2/**</exclude>
+                <exclude>com/amazonaws/services/resourcegroups/**</exclude>
+                <exclude>com/amazonaws/services/resourcegroupstaggingapi/**</exclude>
                 <exclude>com/amazonaws/services/robomaker/**</exclude>
                 <exclude>com/amazonaws/services/route53/**</exclude>
                 <exclude>com/amazonaws/services/route53domains/**</exclude>
+                <exclude>com/amazonaws/services/route53profiles/**</exclude>
+                <exclude>com/amazonaws/services/route53recoverycluster/**</exclude>
+                <exclude>com/amazonaws/services/route53recoverycontrolconfig/**</exclude>
+                <exclude>com/amazonaws/services/route53recoveryreadiness/**</exclude>
                 <exclude>com/amazonaws/services/route53resolver/**</exclude>
+                <exclude>com/amazonaws/services/s3outposts/**</exclude>
                 <exclude>com/amazonaws/services/sagemaker/**</exclude>
+                <exclude>com/amazonaws/services/sagemakeredgemanager/**</exclude>
+                <exclude>com/amazonaws/services/sagemakerfeaturestoreruntime/**</exclude>
+                <exclude>com/amazonaws/services/sagemakergeospatial/**</exclude>
+                <exclude>com/amazonaws/services/sagemakermetrics/**</exclude>
+                <exclude>com/amazonaws/services/sagemakerruntime/**</exclude>
+                <exclude>com/amazonaws/services/savingsplans/**</exclude>
+                <exclude>com/amazonaws/services/scheduler/**</exclude>
+                <exclude>com/amazonaws/services/schemas/**</exclude>
+                <exclude>com/amazonaws/services/secretsmanager/**</exclude>
                 <exclude>com/amazonaws/services/securityhub/**</exclude>
+                <exclude>com/amazonaws/services/securitylake/**</exclude>
                 <exclude>com/amazonaws/services/serverlessapplicationrepository/**</exclude>
                 <exclude>com/amazonaws/services/servermigration/**</exclude>
                 <exclude>com/amazonaws/services/servicecatalog/**</exclude>
                 <exclude>com/amazonaws/services/servicediscovery/**</exclude>
+                <exclude>com/amazonaws/services/servicequotas/**</exclude>
                 <exclude>com/amazonaws/services/shield/**</exclude>
+                <exclude>com/amazonaws/services/signer/**</exclude>
                 <exclude>com/amazonaws/services/simpledb/**</exclude>
                 <exclude>com/amazonaws/services/simpleemail/**</exclude>
+                <exclude>com/amazonaws/services/simpleemailv2/**</exclude>
                 <exclude>com/amazonaws/services/simplesystemsmanagement/**</exclude>
                 <exclude>com/amazonaws/services/simpleworkflow/**</exclude>
+                <exclude>com/amazonaws/services/simspaceweaver/**</exclude>
+                <exclude>com/amazonaws/services/snowball/**</exclude>
+                <exclude>com/amazonaws/services/snowdevicemanagement/**</exclude>
+                <exclude>com/amazonaws/services/sns/**</exclude>
                 <exclude>com/amazonaws/services/sqs/**</exclude>
+                <exclude>com/amazonaws/services/ssmcontacts/**</exclude>
+                <exclude>com/amazonaws/services/ssmincidents/**</exclude>
+                <exclude>com/amazonaws/services/ssmsap/**</exclude>
+                <exclude>com/amazonaws/services/sso/**</exclude>
+                <exclude>com/amazonaws/services/ssoadmin/**</exclude>
+                <exclude>com/amazonaws/services/ssooidc/**</exclude>
                 <exclude>com/amazonaws/services/stepfunctions/**</exclude>
+                <exclude>com/amazonaws/services/storagegateway/**</exclude>
+                <exclude>com/amazonaws/services/supplychain/**</exclude>
                 <exclude>com/amazonaws/services/support/**</exclude>
+                <exclude>com/amazonaws/services/supportapp/**</exclude>
+                <exclude>com/amazonaws/services/synthetics/**</exclude>
+                <exclude>com/amazonaws/services/taxsettings/**</exclude>
                 <exclude>com/amazonaws/services/textract/**</exclude>
+                <exclude>com/amazonaws/services/timestreaminfluxdb/**</exclude>
+                <exclude>com/amazonaws/services/timestreamquery/**</exclude>
+                <exclude>com/amazonaws/services/timestreamwrite/**</exclude>
+                <exclude>com/amazonaws/services/tnb/**</exclude>
                 <exclude>com/amazonaws/services/transcribe/**</exclude>
+                <exclude>com/amazonaws/services/transfer/**</exclude>
+                <exclude>com/amazonaws/services/translate/**</exclude>
+                <exclude>com/amazonaws/services/trustedadvisor/**</exclude>
+                <exclude>com/amazonaws/services/verifiedpermissions/**</exclude>
+                <exclude>com/amazonaws/services/voiceid/**</exclude>
+                <exclude>com/amazonaws/services/vpclattice/**</exclude>
                 <exclude>com/amazonaws/services/waf/**</exclude>
+                <exclude>com/amazonaws/services/wafv2/**</exclude>
+                <exclude>com/amazonaws/services/wellarchitected/**</exclude>
                 <exclude>com/amazonaws/services/workdocs/**</exclude>
                 <exclude>com/amazonaws/services/worklink/**</exclude>
                 <exclude>com/amazonaws/services/workmail/**</exclude>
+                <exclude>com/amazonaws/services/workmailmessageflow/**</exclude>
                 <exclude>com/amazonaws/services/workspaces/**</exclude>
+                <exclude>com/amazonaws/services/workspacesthinclient/**</exclude>
+                <exclude>com/amazonaws/services/workspacesweb/**</exclude>
+                <exclude>com/amazonaws/services/xray/**</exclude>
+                <exclude>io/netty/**</exclude>
+                <exclude>META-INF/maven/io.netty/**</exclude>
+                <exclude>META-INF/io.netty.versions.properties</exclude>
+                <exclude>META-INF/native/*netty*</exclude>
+                <exclude>models/**</exclude>
+              </excludes>
+            </filter>
+            <filter>
+              <artifact>software.amazon.awssdk:bundle</artifact>
+              <excludes>
+                <exclude>software/amazon/awssdk/services/accessanalyzer/**</exclude>
+                <exclude>software/amazon/awssdk/services/account/**</exclude>
+                <exclude>software/amazon/awssdk/services/acm/**</exclude>
+                <exclude>software/amazon/awssdk/services/acmpca/**</exclude>
+                <exclude>software/amazon/awssdk/services/aiops/**</exclude>
+                <exclude>software/amazon/awssdk/services/amp/**</exclude>
+                <exclude>software/amazon/awssdk/services/amplify/**</exclude>
+                <exclude>software/amazon/awssdk/services/amplifybackend/**</exclude>
+                <exclude>software/amazon/awssdk/services/amplifyuibuilder/**</exclude>
+                <exclude>software/amazon/awssdk/services/apigateway/**</exclude>
+                <exclude>software/amazon/awssdk/services/apigatewaymanagementapi/**</exclude>
+                <exclude>software/amazon/awssdk/services/apigatewayv2/**</exclude>
+                <exclude>software/amazon/awssdk/services/appconfig/**</exclude>
+                <exclude>software/amazon/awssdk/services/appconfigdata/**</exclude>
+                <exclude>software/amazon/awssdk/services/appfabric/**</exclude>
+                <exclude>software/amazon/awssdk/services/appflow/**</exclude>
+                <exclude>software/amazon/awssdk/services/appintegrations/**</exclude>
+                <exclude>software/amazon/awssdk/services/applicationautoscaling/**</exclude>
+                <exclude>software/amazon/awssdk/services/applicationcostprofiler/**</exclude>
+                <exclude>software/amazon/awssdk/services/applicationdiscovery/**</exclude>
+                <exclude>software/amazon/awssdk/services/applicationinsights/**</exclude>
+                <exclude>software/amazon/awssdk/services/applicationsignals/**</exclude>
+                <exclude>software/amazon/awssdk/services/appmesh/**</exclude>
+                <exclude>software/amazon/awssdk/services/apprunner/**</exclude>
+                <exclude>software/amazon/awssdk/services/appstream/**</exclude>
+                <exclude>software/amazon/awssdk/services/appsync/**</exclude>
+                <exclude>software/amazon/awssdk/services/arcregionswitch/**</exclude>
+                <exclude>software/amazon/awssdk/services/arczonalshift/**</exclude>
+                <exclude>software/amazon/awssdk/services/artifact/**</exclude>
+                <exclude>software/amazon/awssdk/services/athena/**</exclude>
+                <exclude>software/amazon/awssdk/services/auditmanager/**</exclude>
+                <exclude>software/amazon/awssdk/services/autoscaling/**</exclude>
+                <exclude>software/amazon/awssdk/services/autoscalingplans/**</exclude>
+                <exclude>software/amazon/awssdk/services/b2bi/**</exclude>
+                <exclude>software/amazon/awssdk/services/backup/**</exclude>
+                <exclude>software/amazon/awssdk/services/backupgateway/**</exclude>
+                <exclude>software/amazon/awssdk/services/backupsearch/**</exclude>
+                <exclude>software/amazon/awssdk/services/batch/**</exclude>
+                <exclude>software/amazon/awssdk/services/bcmdashboards/**</exclude>
+                <exclude>software/amazon/awssdk/services/bcmdataexports/**</exclude>
+                <exclude>software/amazon/awssdk/services/bcmpricingcalculator/**</exclude>
+                <exclude>software/amazon/awssdk/services/bcmrecommendedactions/**</exclude>
+                <exclude>software/amazon/awssdk/services/bedrock/**</exclude>
+                <exclude>software/amazon/awssdk/services/bedrockagent/**</exclude>
+                <exclude>software/amazon/awssdk/services/bedrockagentcore/**</exclude>
+                <exclude>software/amazon/awssdk/services/bedrockagentcorecontrol/**</exclude>
+                <exclude>software/amazon/awssdk/services/bedrockagentruntime/**</exclude>
+                <exclude>software/amazon/awssdk/services/bedrockdataautomation/**</exclude>
+                <exclude>software/amazon/awssdk/services/bedrockdataautomationruntime/**</exclude>
+                <exclude>software/amazon/awssdk/services/bedrockruntime/**</exclude>
+                <exclude>software/amazon/awssdk/services/billing/**</exclude>
+                <exclude>software/amazon/awssdk/services/billingconductor/**</exclude>
+                <exclude>software/amazon/awssdk/services/braket/**</exclude>
+                <exclude>software/amazon/awssdk/services/budgets/**</exclude>
+                <exclude>software/amazon/awssdk/services/chatbot/**</exclude>
+                <exclude>software/amazon/awssdk/services/chime/**</exclude>
+                <exclude>software/amazon/awssdk/services/chimesdkidentity/**</exclude>
+                <exclude>software/amazon/awssdk/services/chimesdkmediapipelines/**</exclude>
+                <exclude>software/amazon/awssdk/services/chimesdkmeetings/**</exclude>
+                <exclude>software/amazon/awssdk/services/chimesdkmessaging/**</exclude>
+                <exclude>software/amazon/awssdk/services/chimesdkvoice/**</exclude>
+                <exclude>software/amazon/awssdk/services/cleanrooms/**</exclude>
+                <exclude>software/amazon/awssdk/services/cleanroomsml/**</exclude>
+                <exclude>software/amazon/awssdk/services/cloud9/**</exclude>
+                <exclude>software/amazon/awssdk/services/cloudcontrol/**</exclude>
+                <exclude>software/amazon/awssdk/services/clouddirectory/**</exclude>
+                <exclude>software/amazon/awssdk/services/cloudformation/**</exclude>
+                <exclude>software/amazon/awssdk/services/cloudfront/**</exclude>
+                <exclude>software/amazon/awssdk/services/cloudfrontkeyvaluestore/**</exclude>
+                <exclude>software/amazon/awssdk/services/cloudhsm/**</exclude>
+                <exclude>software/amazon/awssdk/services/cloudhsmv2/**</exclude>
+                <exclude>software/amazon/awssdk/services/cloudsearch/**</exclude>
+                <exclude>software/amazon/awssdk/services/cloudsearchdomain/**</exclude>
+                <exclude>software/amazon/awssdk/services/cloudtrail/**</exclude>
+                <exclude>software/amazon/awssdk/services/cloudtraildata/**</exclude>
+                <exclude>software/amazon/awssdk/services/cloudwatch/**</exclude>
+                <exclude>software/amazon/awssdk/services/cloudwatchevents/**</exclude>
+                <exclude>software/amazon/awssdk/services/cloudwatchlogs/**</exclude>
+                <exclude>software/amazon/awssdk/services/codeartifact/**</exclude>
+                <exclude>software/amazon/awssdk/services/codebuild/**</exclude>
+                <exclude>software/amazon/awssdk/services/codecatalyst/**</exclude>
+                <exclude>software/amazon/awssdk/services/codecommit/**</exclude>
+                <exclude>software/amazon/awssdk/services/codeconnections/**</exclude>
+                <exclude>software/amazon/awssdk/services/codedeploy/**</exclude>
+                <exclude>software/amazon/awssdk/services/codeguruprofiler/**</exclude>
+                <exclude>software/amazon/awssdk/services/codegurureviewer/**</exclude>
+                <exclude>software/amazon/awssdk/services/codegurusecurity/**</exclude>
+                <exclude>software/amazon/awssdk/services/codepipeline/**</exclude>
+                <exclude>software/amazon/awssdk/services/codestarconnections/**</exclude>
+                <exclude>software/amazon/awssdk/services/codestarnotifications/**</exclude>
+                <exclude>software/amazon/awssdk/services/cognitoidentity/**</exclude>
+                <exclude>software/amazon/awssdk/services/cognitoidentityprovider/**</exclude>
+                <exclude>software/amazon/awssdk/services/cognitosync/**</exclude>
+                <exclude>software/amazon/awssdk/services/comprehend/**</exclude>
+                <exclude>software/amazon/awssdk/services/comprehendmedical/**</exclude>
+                <exclude>software/amazon/awssdk/services/computeoptimizer/**</exclude>
+                <exclude>software/amazon/awssdk/services/computeoptimizerautomation/**</exclude>
+                <exclude>software/amazon/awssdk/services/config/**</exclude>
+                <exclude>software/amazon/awssdk/services/connect/**</exclude>
+                <exclude>software/amazon/awssdk/services/connectcampaigns/**</exclude>
+                <exclude>software/amazon/awssdk/services/connectcampaignsv2/**</exclude>
+                <exclude>software/amazon/awssdk/services/connectcases/**</exclude>
+                <exclude>software/amazon/awssdk/services/connectcontactlens/**</exclude>
+                <exclude>software/amazon/awssdk/services/connecthealth/**</exclude>
+                <exclude>software/amazon/awssdk/services/connectparticipant/**</exclude>
+                <exclude>software/amazon/awssdk/services/controlcatalog/**</exclude>
+                <exclude>software/amazon/awssdk/services/controltower/**</exclude>
+                <exclude>software/amazon/awssdk/services/costandusagereport/**</exclude>
+                <exclude>software/amazon/awssdk/services/costexplorer/**</exclude>
+                <exclude>software/amazon/awssdk/services/costoptimizationhub/**</exclude>
+                <exclude>software/amazon/awssdk/services/customerprofiles/**</exclude>
+                <exclude>software/amazon/awssdk/services/databasemigration/**</exclude>
+                <exclude>software/amazon/awssdk/services/databrew/**</exclude>
+                <exclude>software/amazon/awssdk/services/dataexchange/**</exclude>
+                <exclude>software/amazon/awssdk/services/datapipeline/**</exclude>
+                <exclude>software/amazon/awssdk/services/datasync/**</exclude>
+                <exclude>software/amazon/awssdk/services/datazone/**</exclude>
+                <exclude>software/amazon/awssdk/services/dax/**</exclude>
+                <exclude>software/amazon/awssdk/services/deadline/**</exclude>
+                <exclude>software/amazon/awssdk/services/detective/**</exclude>
+                <exclude>software/amazon/awssdk/services/devicefarm/**</exclude>
+                <exclude>software/amazon/awssdk/services/devopsagent/**</exclude>
+                <exclude>software/amazon/awssdk/services/devopsguru/**</exclude>
+                <exclude>software/amazon/awssdk/services/directconnect/**</exclude>
+                <exclude>software/amazon/awssdk/services/directory/**</exclude>
+                <exclude>software/amazon/awssdk/services/directoryservicedata/**</exclude>
+                <exclude>software/amazon/awssdk/services/dlm/**</exclude>
+                <exclude>software/amazon/awssdk/services/docdb/**</exclude>
+                <exclude>software/amazon/awssdk/services/docdbelastic/**</exclude>
+                <exclude>software/amazon/awssdk/services/drs/**</exclude>
+                <exclude>software/amazon/awssdk/services/dsql/**</exclude>
+                <exclude>software/amazon/awssdk/services/dynamodb/**</exclude>
+                <exclude>software/amazon/awssdk/services/ebs/**</exclude>
+                <exclude>software/amazon/awssdk/services/ec2/**</exclude>
+                <exclude>software/amazon/awssdk/services/ec2instanceconnect/**</exclude>
+                <exclude>software/amazon/awssdk/services/ecr/**</exclude>
+                <exclude>software/amazon/awssdk/services/ecrpublic/**</exclude>
+                <exclude>software/amazon/awssdk/services/ecs/**</exclude>
+                <exclude>software/amazon/awssdk/services/efs/**</exclude>
+                <exclude>software/amazon/awssdk/services/eks/**</exclude>
+                <exclude>software/amazon/awssdk/services/eksauth/**</exclude>
+                <exclude>software/amazon/awssdk/services/elasticache/**</exclude>
+                <exclude>software/amazon/awssdk/services/elasticbeanstalk/**</exclude>
+                <exclude>software/amazon/awssdk/services/elasticloadbalancing/**</exclude>
+                <exclude>software/amazon/awssdk/services/elasticloadbalancingv2/**</exclude>
+                <exclude>software/amazon/awssdk/services/elasticsearch/**</exclude>
+                <exclude>software/amazon/awssdk/services/elementalinference/**</exclude>
+                <exclude>software/amazon/awssdk/services/emr/**</exclude>
+                <exclude>software/amazon/awssdk/services/emrcontainers/**</exclude>
+                <exclude>software/amazon/awssdk/services/emrserverless/**</exclude>
+                <exclude>software/amazon/awssdk/services/entityresolution/**</exclude>
+                <exclude>software/amazon/awssdk/services/eventbridge/**</exclude>
+                <exclude>software/amazon/awssdk/services/evs/**</exclude>
+                <exclude>software/amazon/awssdk/services/finspace/**</exclude>
+                <exclude>software/amazon/awssdk/services/finspacedata/**</exclude>
+                <exclude>software/amazon/awssdk/services/firehose/**</exclude>
+                <exclude>software/amazon/awssdk/services/fis/**</exclude>
+                <exclude>software/amazon/awssdk/services/fms/**</exclude>
+                <exclude>software/amazon/awssdk/services/forecast/**</exclude>
+                <exclude>software/amazon/awssdk/services/forecastquery/**</exclude>
+                <exclude>software/amazon/awssdk/services/frauddetector/**</exclude>
+                <exclude>software/amazon/awssdk/services/freetier/**</exclude>
+                <exclude>software/amazon/awssdk/services/fsx/**</exclude>
+                <exclude>software/amazon/awssdk/services/gamelift/**</exclude>
+                <exclude>software/amazon/awssdk/services/gameliftstreams/**</exclude>
+                <exclude>software/amazon/awssdk/services/geomaps/**</exclude>
+                <exclude>software/amazon/awssdk/services/geoplaces/**</exclude>
+                <exclude>software/amazon/awssdk/services/georoutes/**</exclude>
+                <exclude>software/amazon/awssdk/services/glacier/**</exclude>
+                <exclude>software/amazon/awssdk/services/globalaccelerator/**</exclude>
+                <exclude>software/amazon/awssdk/services/glue/**</exclude>
+                <exclude>software/amazon/awssdk/services/grafana/**</exclude>
+                <exclude>software/amazon/awssdk/services/greengrass/**</exclude>
+                <exclude>software/amazon/awssdk/services/greengrassv2/**</exclude>
+                <exclude>software/amazon/awssdk/services/groundstation/**</exclude>
+                <exclude>software/amazon/awssdk/services/guardduty/**</exclude>
+                <exclude>software/amazon/awssdk/services/health/**</exclude>
+                <exclude>software/amazon/awssdk/services/healthlake/**</exclude>
+                <exclude>software/amazon/awssdk/services/iam/**</exclude>
+                <exclude>software/amazon/awssdk/services/identitystore/**</exclude>
+                <exclude>software/amazon/awssdk/services/imagebuilder/**</exclude>
+                <exclude>software/amazon/awssdk/services/inspector/**</exclude>
+                <exclude>software/amazon/awssdk/services/inspector2/**</exclude>
+                <exclude>software/amazon/awssdk/services/inspectorscan/**</exclude>
+                <exclude>software/amazon/awssdk/services/interconnect/**</exclude>
+                <exclude>software/amazon/awssdk/services/internetmonitor/**</exclude>
+                <exclude>software/amazon/awssdk/services/invoicing/**</exclude>
+                <exclude>software/amazon/awssdk/services/iot/**</exclude>
+                <exclude>software/amazon/awssdk/services/iotdataplane/**</exclude>
+                <exclude>software/amazon/awssdk/services/iotdeviceadvisor/**</exclude>
+                <exclude>software/amazon/awssdk/services/iotfleetwise/**</exclude>
+                <exclude>software/amazon/awssdk/services/iotjobsdataplane/**</exclude>
+                <exclude>software/amazon/awssdk/services/iotmanagedintegrations/**</exclude>
+                <exclude>software/amazon/awssdk/services/iotsecuretunneling/**</exclude>
+                <exclude>software/amazon/awssdk/services/iotsitewise/**</exclude>
+                <exclude>software/amazon/awssdk/services/iotthingsgraph/**</exclude>
+                <exclude>software/amazon/awssdk/services/iottwinmaker/**</exclude>
+                <exclude>software/amazon/awssdk/services/iotwireless/**</exclude>
+                <exclude>software/amazon/awssdk/services/ivs/**</exclude>
+                <exclude>software/amazon/awssdk/services/ivschat/**</exclude>
+                <exclude>software/amazon/awssdk/services/ivsrealtime/**</exclude>
+                <exclude>software/amazon/awssdk/services/kafka/**</exclude>
+                <exclude>software/amazon/awssdk/services/kafkaconnect/**</exclude>
+                <exclude>software/amazon/awssdk/services/kendra/**</exclude>
+                <exclude>software/amazon/awssdk/services/kendraranking/**</exclude>
+                <exclude>software/amazon/awssdk/services/keyspaces/**</exclude>
+                <exclude>software/amazon/awssdk/services/keyspacesstreams/**</exclude>
+                <exclude>software/amazon/awssdk/services/kinesis/**</exclude>
+                <exclude>software/amazon/awssdk/services/kinesisanalytics/**</exclude>
+                <exclude>software/amazon/awssdk/services/kinesisanalyticsv2/**</exclude>
+                <exclude>software/amazon/awssdk/services/kinesisvideo/**</exclude>
+                <exclude>software/amazon/awssdk/services/kinesisvideoarchivedmedia/**</exclude>
+                <exclude>software/amazon/awssdk/services/kinesisvideomedia/**</exclude>
+                <exclude>software/amazon/awssdk/services/kinesisvideosignaling/**</exclude>
+                <exclude>software/amazon/awssdk/services/kinesisvideowebrtcstorage/**</exclude>
+                <exclude>software/amazon/awssdk/services/lakeformation/**</exclude>
+                <exclude>software/amazon/awssdk/services/lambda/**</exclude>
+                <exclude>software/amazon/awssdk/services/lambdacore/**</exclude>
+                <exclude>software/amazon/awssdk/services/lambdamicrovms/**</exclude>
+                <exclude>software/amazon/awssdk/services/launchwizard/**</exclude>
+                <exclude>software/amazon/awssdk/services/lexmodelbuilding/**</exclude>
+                <exclude>software/amazon/awssdk/services/lexmodelsv2/**</exclude>
+                <exclude>software/amazon/awssdk/services/lexruntime/**</exclude>
+                <exclude>software/amazon/awssdk/services/lexruntimev2/**</exclude>
+                <exclude>software/amazon/awssdk/services/licensemanager/**</exclude>
+                <exclude>software/amazon/awssdk/services/licensemanagerlinuxsubscriptions/**</exclude>
+                <exclude>software/amazon/awssdk/services/licensemanagerusersubscriptions/**</exclude>
+                <exclude>software/amazon/awssdk/services/lightsail/**</exclude>
+                <exclude>software/amazon/awssdk/services/location/**</exclude>
+                <exclude>software/amazon/awssdk/services/lookoutequipment/**</exclude>
+                <exclude>software/amazon/awssdk/services/machinelearning/**</exclude>
+                <exclude>software/amazon/awssdk/services/macie2/**</exclude>
+                <exclude>software/amazon/awssdk/services/mailmanager/**</exclude>
+                <exclude>software/amazon/awssdk/services/managedblockchain/**</exclude>
+                <exclude>software/amazon/awssdk/services/managedblockchainquery/**</exclude>
+                <exclude>software/amazon/awssdk/services/marketplaceagreement/**</exclude>
+                <exclude>software/amazon/awssdk/services/marketplacecatalog/**</exclude>
+                <exclude>software/amazon/awssdk/services/marketplacecommerceanalytics/**</exclude>
+                <exclude>software/amazon/awssdk/services/marketplacedeployment/**</exclude>
+                <exclude>software/amazon/awssdk/services/marketplacediscovery/**</exclude>
+                <exclude>software/amazon/awssdk/services/marketplaceentitlement/**</exclude>
+                <exclude>software/amazon/awssdk/services/marketplacemetering/**</exclude>
+                <exclude>software/amazon/awssdk/services/marketplacereporting/**</exclude>
+                <exclude>software/amazon/awssdk/services/mediaconnect/**</exclude>
+                <exclude>software/amazon/awssdk/services/mediaconvert/**</exclude>
+                <exclude>software/amazon/awssdk/services/medialive/**</exclude>
+                <exclude>software/amazon/awssdk/services/mediapackage/**</exclude>
+                <exclude>software/amazon/awssdk/services/mediapackagev2/**</exclude>
+                <exclude>software/amazon/awssdk/services/mediapackagevod/**</exclude>
+                <exclude>software/amazon/awssdk/services/mediastore/**</exclude>
+                <exclude>software/amazon/awssdk/services/mediastoredata/**</exclude>
+                <exclude>software/amazon/awssdk/services/mediatailor/**</exclude>
+                <exclude>software/amazon/awssdk/services/medicalimaging/**</exclude>
+                <exclude>software/amazon/awssdk/services/memorydb/**</exclude>
+                <exclude>software/amazon/awssdk/services/mgn/**</exclude>
+                <exclude>software/amazon/awssdk/services/migrationhub/**</exclude>
+                <exclude>software/amazon/awssdk/services/migrationhubconfig/**</exclude>
+                <exclude>software/amazon/awssdk/services/migrationhuborchestrator/**</exclude>
+                <exclude>software/amazon/awssdk/services/migrationhubrefactorspaces/**</exclude>
+                <exclude>software/amazon/awssdk/services/migrationhubstrategy/**</exclude>
+                <exclude>software/amazon/awssdk/services/mpa/**</exclude>
+                <exclude>software/amazon/awssdk/services/mq/**</exclude>
+                <exclude>software/amazon/awssdk/services/mturk/**</exclude>
+                <exclude>software/amazon/awssdk/services/mwaa/**</exclude>
+                <exclude>software/amazon/awssdk/services/mwaaserverless/**</exclude>
+                <exclude>software/amazon/awssdk/services/neptune/**</exclude>
+                <exclude>software/amazon/awssdk/services/neptunedata/**</exclude>
+                <exclude>software/amazon/awssdk/services/neptunegraph/**</exclude>
+                <exclude>software/amazon/awssdk/services/networkfirewall/**</exclude>
+                <exclude>software/amazon/awssdk/services/networkflowmonitor/**</exclude>
+                <exclude>software/amazon/awssdk/services/networkmanager/**</exclude>
+                <exclude>software/amazon/awssdk/services/networkmonitor/**</exclude>
+                <exclude>software/amazon/awssdk/services/notifications/**</exclude>
+                <exclude>software/amazon/awssdk/services/notificationscontacts/**</exclude>
+                <exclude>software/amazon/awssdk/services/novaact/**</exclude>
+                <exclude>software/amazon/awssdk/services/oam/**</exclude>
+                <exclude>software/amazon/awssdk/services/observabilityadmin/**</exclude>
+                <exclude>software/amazon/awssdk/services/odb/**</exclude>
+                <exclude>software/amazon/awssdk/services/omics/**</exclude>
+                <exclude>software/amazon/awssdk/services/opensearch/**</exclude>
+                <exclude>software/amazon/awssdk/services/opensearchserverless/**</exclude>
+                <exclude>software/amazon/awssdk/services/organizations/**</exclude>
+                <exclude>software/amazon/awssdk/services/osis/**</exclude>
+                <exclude>software/amazon/awssdk/services/outposts/**</exclude>
+                <exclude>software/amazon/awssdk/services/partnercentralaccount/**</exclude>
+                <exclude>software/amazon/awssdk/services/partnercentralbenefits/**</exclude>
+                <exclude>software/amazon/awssdk/services/partnercentralchannel/**</exclude>
+                <exclude>software/amazon/awssdk/services/partnercentralrevenuemeasurement/**</exclude>
+                <exclude>software/amazon/awssdk/services/partnercentralselling/**</exclude>
+                <exclude>software/amazon/awssdk/services/paymentcryptography/**</exclude>
+                <exclude>software/amazon/awssdk/services/paymentcryptographydata/**</exclude>
+                <exclude>software/amazon/awssdk/services/pcaconnectorad/**</exclude>
+                <exclude>software/amazon/awssdk/services/pcaconnectorscep/**</exclude>
+                <exclude>software/amazon/awssdk/services/pcs/**</exclude>
+                <exclude>software/amazon/awssdk/services/personalize/**</exclude>
+                <exclude>software/amazon/awssdk/services/personalizeevents/**</exclude>
+                <exclude>software/amazon/awssdk/services/personalizeruntime/**</exclude>
+                <exclude>software/amazon/awssdk/services/pi/**</exclude>
+                <exclude>software/amazon/awssdk/services/pinpoint/**</exclude>
+                <exclude>software/amazon/awssdk/services/pinpointemail/**</exclude>
+                <exclude>software/amazon/awssdk/services/pinpointsmsvoice/**</exclude>
+                <exclude>software/amazon/awssdk/services/pinpointsmsvoicev2/**</exclude>
+                <exclude>software/amazon/awssdk/services/pipes/**</exclude>
+                <exclude>software/amazon/awssdk/services/polly/**</exclude>
+                <exclude>software/amazon/awssdk/services/pricing/**</exclude>
+                <exclude>software/amazon/awssdk/services/proton/**</exclude>
+                <exclude>software/amazon/awssdk/services/qapps/**</exclude>
+                <exclude>software/amazon/awssdk/services/qbusiness/**</exclude>
+                <exclude>software/amazon/awssdk/services/qconnect/**</exclude>
+                <exclude>software/amazon/awssdk/services/quicksight/**</exclude>
+                <exclude>software/amazon/awssdk/services/ram/**</exclude>
+                <exclude>software/amazon/awssdk/services/rbin/**</exclude>
+                <exclude>software/amazon/awssdk/services/rds/**</exclude>
+                <exclude>software/amazon/awssdk/services/rdsdata/**</exclude>
+                <exclude>software/amazon/awssdk/services/redshift/**</exclude>
+                <exclude>software/amazon/awssdk/services/redshiftdata/**</exclude>
+                <exclude>software/amazon/awssdk/services/redshiftserverless/**</exclude>
+                <exclude>software/amazon/awssdk/services/rekognition/**</exclude>
+                <exclude>software/amazon/awssdk/services/repostspace/**</exclude>
+                <exclude>software/amazon/awssdk/services/resiliencehub/**</exclude>
+                <exclude>software/amazon/awssdk/services/resiliencehubv2/**</exclude>
+                <exclude>software/amazon/awssdk/services/resourceexplorer2/**</exclude>
+                <exclude>software/amazon/awssdk/services/resourcegroups/**</exclude>
+                <exclude>software/amazon/awssdk/services/resourcegroupstaggingapi/**</exclude>
+                <exclude>software/amazon/awssdk/services/rolesanywhere/**</exclude>
+                <exclude>software/amazon/awssdk/services/route53/**</exclude>
+                <exclude>software/amazon/awssdk/services/route53domains/**</exclude>
+                <exclude>software/amazon/awssdk/services/route53globalresolver/**</exclude>
+                <exclude>software/amazon/awssdk/services/route53profiles/**</exclude>
+                <exclude>software/amazon/awssdk/services/route53recoverycluster/**</exclude>
+                <exclude>software/amazon/awssdk/services/route53recoverycontrolconfig/**</exclude>
+                <exclude>software/amazon/awssdk/services/route53recoveryreadiness/**</exclude>
+                <exclude>software/amazon/awssdk/services/route53resolver/**</exclude>
+                <exclude>software/amazon/awssdk/services/rtbfabric/**</exclude>
+                <exclude>software/amazon/awssdk/services/rum/**</exclude>
+                <exclude>software/amazon/awssdk/services/s3files/**</exclude>
+                <exclude>software/amazon/awssdk/services/s3outposts/**</exclude>
+                <exclude>software/amazon/awssdk/services/s3tables/**</exclude>
+                <exclude>software/amazon/awssdk/services/s3vectors/**</exclude>
+                <exclude>software/amazon/awssdk/services/sagemaker/**</exclude>
+                <exclude>software/amazon/awssdk/services/sagemakera2iruntime/**</exclude>
+                <exclude>software/amazon/awssdk/services/sagemakeredge/**</exclude>
+                <exclude>software/amazon/awssdk/services/sagemakerfeaturestoreruntime/**</exclude>
+                <exclude>software/amazon/awssdk/services/sagemakergeospatial/**</exclude>
+                <exclude>software/amazon/awssdk/services/sagemakerjobruntime/**</exclude>
+                <exclude>software/amazon/awssdk/services/sagemakermetrics/**</exclude>
+                <exclude>software/amazon/awssdk/services/sagemakerruntime/**</exclude>
+                <exclude>software/amazon/awssdk/services/sagemakerruntimehttp2/**</exclude>
+                <exclude>software/amazon/awssdk/services/savingsplans/**</exclude>
+                <exclude>software/amazon/awssdk/services/scheduler/**</exclude>
+                <exclude>software/amazon/awssdk/services/schemas/**</exclude>
+                <exclude>software/amazon/awssdk/services/secretsmanager/**</exclude>
+                <exclude>software/amazon/awssdk/services/securityagent/**</exclude>
+                <exclude>software/amazon/awssdk/services/securityhub/**</exclude>
+                <exclude>software/amazon/awssdk/services/securityir/**</exclude>
+                <exclude>software/amazon/awssdk/services/securitylake/**</exclude>
+                <exclude>software/amazon/awssdk/services/serverlessapplicationrepository/**</exclude>
+                <exclude>software/amazon/awssdk/services/servicecatalog/**</exclude>
+                <exclude>software/amazon/awssdk/services/servicecatalogappregistry/**</exclude>
+                <exclude>software/amazon/awssdk/services/servicediscovery/**</exclude>
+                <exclude>software/amazon/awssdk/services/servicequotas/**</exclude>
+                <exclude>software/amazon/awssdk/services/ses/**</exclude>
+                <exclude>software/amazon/awssdk/services/sesv2/**</exclude>
+                <exclude>software/amazon/awssdk/services/sfn/**</exclude>
+                <exclude>software/amazon/awssdk/services/shield/**</exclude>
+                <exclude>software/amazon/awssdk/services/signer/**</exclude>
+                <exclude>software/amazon/awssdk/services/signerdata/**</exclude>
+                <exclude>software/amazon/awssdk/services/signin/**</exclude>
+                <exclude>software/amazon/awssdk/services/simpledbv2/**</exclude>
+                <exclude>software/amazon/awssdk/services/snowball/**</exclude>
+                <exclude>software/amazon/awssdk/services/snowdevicemanagement/**</exclude>
+                <exclude>software/amazon/awssdk/services/sns/**</exclude>
+                <exclude>software/amazon/awssdk/services/socialmessaging/**</exclude>
+                <exclude>software/amazon/awssdk/services/sqs/**</exclude>
+                <exclude>software/amazon/awssdk/services/ssm/**</exclude>
+                <exclude>software/amazon/awssdk/services/ssmcontacts/**</exclude>
+                <exclude>software/amazon/awssdk/services/ssmguiconnect/**</exclude>
+                <exclude>software/amazon/awssdk/services/ssmincidents/**</exclude>
+                <exclude>software/amazon/awssdk/services/ssmquicksetup/**</exclude>
+                <exclude>software/amazon/awssdk/services/ssmsap/**</exclude>
+                <exclude>software/amazon/awssdk/services/sso/**</exclude>
+                <exclude>software/amazon/awssdk/services/ssoadmin/**</exclude>
+                <exclude>software/amazon/awssdk/services/ssooidc/**</exclude>
+                <exclude>software/amazon/awssdk/services/storagegateway/**</exclude>
+                <exclude>software/amazon/awssdk/services/supplychain/**</exclude>
+                <exclude>software/amazon/awssdk/services/support/**</exclude>
+                <exclude>software/amazon/awssdk/services/supportapp/**</exclude>
+                <exclude>software/amazon/awssdk/services/supportauthz/**</exclude>
+                <exclude>software/amazon/awssdk/services/sustainability/**</exclude>
+                <exclude>software/amazon/awssdk/services/swf/**</exclude>
+                <exclude>software/amazon/awssdk/services/synthetics/**</exclude>
+                <exclude>software/amazon/awssdk/services/taxsettings/**</exclude>
+                <exclude>software/amazon/awssdk/services/textract/**</exclude>
+                <exclude>software/amazon/awssdk/services/timestreaminfluxdb/**</exclude>
+                <exclude>software/amazon/awssdk/services/timestreamquery/**</exclude>
+                <exclude>software/amazon/awssdk/services/timestreamwrite/**</exclude>
+                <exclude>software/amazon/awssdk/services/tnb/**</exclude>
+                <exclude>software/amazon/awssdk/services/transcribe/**</exclude>
+                <exclude>software/amazon/awssdk/services/transcribestreaming/**</exclude>
+                <exclude>software/amazon/awssdk/services/transfer/**</exclude>
+                <exclude>software/amazon/awssdk/services/translate/**</exclude>
+                <exclude>software/amazon/awssdk/services/trustedadvisor/**</exclude>
+                <exclude>software/amazon/awssdk/services/uxc/**</exclude>
+                <exclude>software/amazon/awssdk/services/verifiedpermissions/**</exclude>
+                <exclude>software/amazon/awssdk/services/voiceid/**</exclude>
+                <exclude>software/amazon/awssdk/services/vpclattice/**</exclude>
+                <exclude>software/amazon/awssdk/services/waf/**</exclude>
+                <exclude>software/amazon/awssdk/services/wafv2/**</exclude>
+                <exclude>software/amazon/awssdk/services/wellarchitected/**</exclude>
+                <exclude>software/amazon/awssdk/services/wickr/**</exclude>
+                <exclude>software/amazon/awssdk/services/wisdom/**</exclude>
+                <exclude>software/amazon/awssdk/services/workdocs/**</exclude>
+                <exclude>software/amazon/awssdk/services/workmail/**</exclude>
+                <exclude>software/amazon/awssdk/services/workmailmessageflow/**</exclude>
+                <exclude>software/amazon/awssdk/services/workspaces/**</exclude>
+                <exclude>software/amazon/awssdk/services/workspacesinstances/**</exclude>
+                <exclude>software/amazon/awssdk/services/workspacesthinclient/**</exclude>
+                <exclude>software/amazon/awssdk/services/workspacesweb/**</exclude>
+                <exclude>software/amazon/awssdk/services/xray/**</exclude>
               </excludes>
             </filter>
           </filters>

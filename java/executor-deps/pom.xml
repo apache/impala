@@ -70,12 +70,18 @@ under the License.
       <groupId>org.apache.hadoop</groupId>
       <artifactId>hadoop-cloud-storage</artifactId>
       <version>${hadoop.version}</version>
-      <!-- Exclude the aws-java-sdk-bundle dependency because the Impala minimal
-           version of this dependency is used instead. -->
+      <!-- Exclude the aws-java-sdk-bundle dependency (for both v1 and v2 Amazon SDK)
+           because the Impala minimal version of this dependency is used instead. -->
       <exclusions>
+        <!-- V1 Amazon SDK -->
         <exclusion>
           <groupId>com.amazonaws</groupId>
           <artifactId>aws-java-sdk-bundle</artifactId>
+        </exclusion>
+        <!-- V2 Amazon SDK -->
+        <exclusion>
+          <groupId>software.amazon.awssdk</groupId>
+          <artifactId>bundle</artifactId>
         </exclusion>
         <exclusion>
           <groupId>com.cloudera</groupId>
