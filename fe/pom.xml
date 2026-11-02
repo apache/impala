@@ -398,7 +398,7 @@ under the License.
     <!-- https://mvnrepository.com/artifact/org.pac4j/pac4j-saml -->
     <dependency>
       <groupId>org.pac4j</groupId>
-      <artifactId>pac4j-saml-opensamlv3</artifactId>
+      <artifactId>pac4j-saml</artifactId>
       <version>${pac4j.version}</version>
       <exclusions>
         <exclusion>

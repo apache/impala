@@ -24,6 +24,7 @@ import java.util.Optional;
 import org.apache.http.HttpStatus;
 import org.apache.impala.common.InternalException;
 import org.apache.impala.service.BackendConfig;
+import org.pac4j.core.credentials.Credentials;
 import org.pac4j.core.credentials.TokenCredentials;
 import org.pac4j.core.credentials.extractor.BearerAuthExtractor;
 
@@ -144,8 +145,10 @@ public class ImpalaSamlClientHS2 extends ImpalaSamlClientBase {
   private String doSamlAuth(WrappedWebContext webContext)
       throws HttpSamlAuthenticationException {
     BearerAuthExtractor extractor = new BearerAuthExtractor();
-    Optional<TokenCredentials> tokenCredentials = extractor.extract(webContext);
-    String token = tokenCredentials.map(TokenCredentials::getToken).orElse(null);
+    Optional<Credentials> tokenCredentials = extractor.extract(webContext,
+        webContext.getSessionStore());
+    String token = tokenCredentials.map(c -> ((TokenCredentials) c).getToken())
+        .orElse(null);
     if (token == null) {
       throw new HttpSamlAuthenticationException("No token found");
     }

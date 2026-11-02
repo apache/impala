@@ -128,9 +128,15 @@ public class WrappedWebContext implements WebContext {
     return request.getServer_port();
   }
 
-  @Override
+  // pac4j 5.x removed WebContext.getSessionStore(); kept as a helper so callers
+  // (e.g. ImpalaSamlClient) can obtain the NullSessionStore to pass explicitly.
   public SessionStore getSessionStore() {
     return sessionStore;
+  }
+
+  @Override
+  public Optional<String> getResponseHeader(String name) {
+    return Optional.ofNullable(response.getHeaders().get(name));
   }
 
   @Override

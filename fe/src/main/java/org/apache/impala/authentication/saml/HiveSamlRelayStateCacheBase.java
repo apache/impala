@@ -25,6 +25,7 @@ import java.util.Random;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import org.pac4j.core.context.WebContext;
+import org.pac4j.core.context.session.SessionStore;
 import org.pac4j.core.util.generator.ValueGenerator;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -51,7 +52,7 @@ public abstract class HiveSamlRelayStateCacheBase<T extends HiveSamlRelayStateIn
   }
 
   @Override
-  public String generateValue(WebContext webContext) {
+  public String generateValue(WebContext webContext, SessionStore sessionStore) {
     String relayState = UUID.randomUUID().toString();
     T relayStateInfo = createRelayStateInfo(webContext);
     String clientIdentifier = getClientIdentifier(relayStateInfo);

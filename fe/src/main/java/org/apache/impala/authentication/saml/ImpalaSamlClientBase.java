@@ -23,11 +23,12 @@ import java.util.Optional;
 
 import org.apache.impala.service.BackendConfig;
 import org.opensaml.saml.common.xml.SAMLConstants;
+import org.pac4j.core.credentials.Credentials;
 import org.pac4j.core.exception.http.RedirectionAction;
 import org.pac4j.core.exception.http.WithLocationAction;
 import org.pac4j.saml.client.SAML2Client;
 import org.pac4j.saml.config.SAML2Configuration;
-import org.pac4j.core.exception.http.RedirectionActionHelper;
+import org.pac4j.core.util.HttpActionHelper;
 import org.pac4j.saml.credentials.SAML2Credentials;
 import org.pac4j.saml.credentials.extractor.SAML2CredentialsExtractor;
 import org.pac4j.saml.store.SAMLMessageStoreFactory;
@@ -52,7 +53,7 @@ public abstract class ImpalaSamlClientBase extends SAML2Client {
     super(getSamlConfig(idpMetadata));
     // setUseModernHttpCodes(false) is needed to return 302 instead of 303 for
     // redirect actions on POST requests.
-    RedirectionActionHelper.setUseModernHttpCodes(false);
+    HttpActionHelper.setUseModernHttpCodes(false);
     setName(clientName);
     setStateGenerator(stateGenerator);
     setCallbackUrl(callbackUrl);
@@ -100,7 +101,8 @@ public abstract class ImpalaSamlClientBase extends SAML2Client {
    */
   protected final void setRedirectCommon(WrappedWebContext webContext)
       throws InternalException {
-    Optional<RedirectionAction> redirect = getRedirectionAction(webContext);
+    Optional<RedirectionAction> redirect = getRedirectionAction(webContext,
+        webContext.getSessionStore());
     if (redirect == null || !redirect.isPresent()) {
       throw new InternalException("Could not get the redirect response");
     }
@@ -115,11 +117,12 @@ public abstract class ImpalaSamlClientBase extends SAML2Client {
    */
   protected final String validateAuthnResponseInner(WrappedWebContext webContext)
       throws HttpSamlAuthenticationException {
-    Optional<SAML2Credentials> credentials;
+    Optional<Credentials> credentials;
     try {
       SAML2CredentialsExtractor credentialsExtractor = new SAML2CredentialsExtractor(
           this);
-      credentials = credentialsExtractor.extract(webContext);
+      credentials = credentialsExtractor.extract(webContext,
+          webContext.getSessionStore());
     } catch (Exception ex) {
       throw new HttpSamlAuthenticationException("Could not validate the SAML response",
           ex);
@@ -128,8 +131,9 @@ public abstract class ImpalaSamlClientBase extends SAML2Client {
       throw new HttpSamlAuthenticationException("Credentials could not be extracted");
     }
 
-    String nameId = credentials.get().getNameId().getValue();
-    if (!groupNameFilter.apply(credentials.get().getAttributes())) {
+    SAML2Credentials samlCredentials = (SAML2Credentials) credentials.get();
+    String nameId = samlCredentials.getNameId().getValue();
+    if (!groupNameFilter.apply(samlCredentials.getAttributes())) {
       LOG.warn("Could not match any groups for the nameid {}", nameId);
       throw new HttpSamlNoGroupsMatchedException(
           "None of the configured groups match for the user");

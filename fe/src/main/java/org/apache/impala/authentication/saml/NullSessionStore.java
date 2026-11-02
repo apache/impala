@@ -28,9 +28,9 @@ import org.pac4j.core.context.session.SessionStore;
 public class NullSessionStore implements SessionStore {
 
   @Override
-  public String getOrCreateSessionId(WebContext context) {
+  public Optional<String> getSessionId(WebContext context, boolean createSession) {
    WrappedWebContext wrappedContext = (WrappedWebContext) context;
-    return wrappedContext.getRemoteAddr();
+    return Optional.ofNullable(wrappedContext.getRemoteAddr());
   }
 
   @Override

@@ -18,6 +18,7 @@
 package org.apache.impala.authentication.saml;
 
 import org.pac4j.core.context.WebContext;
+import org.pac4j.core.context.session.SessionStore;
 import org.pac4j.saml.store.SAMLMessageStore;
 import org.pac4j.saml.store.SAMLMessageStoreFactory;
 
@@ -33,7 +34,7 @@ public class ImpalaSAMLMessageStoreFactory implements SAMLMessageStoreFactory {
   private static final ImpalaSAMLMessageStore INSTANCE = new ImpalaSAMLMessageStore();
 
   @Override
-  public SAMLMessageStore getMessageStore(WebContext context) {
+  public SAMLMessageStore getMessageStore(WebContext context, SessionStore sessionStore) {
     // Return singleton instance since the cache is static and shared
     return INSTANCE;
   }
