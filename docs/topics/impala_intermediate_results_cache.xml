@@ -34,54 +34,202 @@ under the License.
       resources for other queries.
     </p>
 
-    <p>
-      The intermediate results cache is enabled via the following configurations:
-      <ul>
-        <li>
-          <codeph>--allow_tuple_caching</codeph> is a startup flag that gates
-          the intermediate results caching feature. It must be set to true on coordinators
-          and executors to allow the use of the intermediate results cache, but it does
-          not enable the cache by itself.
-        </li>
-        <li>
-          The <codeph>--tuple_cache</codeph> startup flag specifies the storage
-          directory and quota for the intermediate results cache on coordinators and
-          executors. The flag is set to a directory name followed by a <codeph>:</codeph>
-          and a capacity for that directory. For example:
-          <codeblock>--tuple_cache=/data/cache:20GB</codeblock>
-          This setting uses the <codeph>/data/cache</codeph> directory and allows the
-          cache to consume up to 20GB in that directory. The directory must exist in the
-          local filesystem of each Impala Daemon, or Impala will fail to start.
-        </li>
-        <li>
-          The <codeph>enable_tuple_caching</codeph> query option determines whether a
-          query uses the intermediate results cache. To use the feature, this must be
-          set to true via the session or <codeph>default_query_options</codeph>.
-        </li>
-      </ul>
-      All three of these settings must be specified to use the intermediate results cache.
-      The default value for all three configurations is for the feature to be disabled.
-    </p>
+    <section id="tuple_cache_basics">
 
-    <p>
-      The cache key incorporates information about all the settings that can impact the
-      query results, including information about the base tables and any query options.
-      When any of those settings change, it results in a new cache entry.
-      For example, if new data is ingested into a base table, the key will change. This
-      means that there is no need for an administrator to manually refresh or invalidate
-      the cache entries.
-    </p>
+      <title>Basic Configuration</title>
+      <p>
+        The intermediate results cache is enabled via the following configurations:
+        <ul>
+          <li>
+            <codeph>--allow_tuple_caching</codeph> is a startup flag that gates
+            the intermediate results caching feature. It must be set to true on
+            coordinators and executors to allow the use of the intermediate results cache,
+            but it does not enable the cache by itself.
+          </li>
+          <li>
+            The <codeph>--tuple_cache</codeph> startup flag specifies the storage
+            directory and quota for the intermediate results cache on coordinators and
+            executors. The flag is set to a directory name followed by a
+            <codeph>:</codeph> and a capacity for that directory. For example:
+            <codeblock>--tuple_cache=/data/cache:20GB</codeblock>
+            This setting uses the <codeph>/data/cache</codeph> directory and allows the
+            cache to consume up to 20GB in that directory. The directory must exist in the
+            local filesystem of each Impala Daemon, or Impala will fail to start.
+          </li>
+          <li>
+            The <codeph>enable_tuple_cache</codeph> query option determines whether a
+            query uses the intermediate results cache. To use the feature, this must be
+            set to true via the session or <codeph>default_query_options</codeph>.
+          </li>
+        </ul>
+        All three of these settings must be specified to use the intermediate results
+        cache. The default value for all three configurations is for the feature to be
+        disabled.
+      </p>
 
-    <p>
-      When the cache reaches the quota, cache entries are evicted to make space for new
-      entries. The cache eviction policy can be specified by the
-      <codeph>--tuple_cache_eviction_policy</codeph> startup flag. Currently, the cache
-      supports the following cache eviction policies:
-      <ul>
-        <li>LRU (Least Recently Used--the default)</li>
-        <li>LIRS (Least Inter-reference Recency Set)</li>
-      </ul>
-      LIRS is a scan-resistant, low performance-overhead policy.
-    </p>
+      <p>
+        The cache key incorporates information about all the settings that can impact the
+        query results, including information about the base tables and any query options.
+        When any of those settings change, it results in a new cache entry.
+        For example, if new data is ingested into a base table, the key will change. This
+        means that there is no need for an administrator to manually refresh or invalidate
+        the cache entries.
+      </p>
+
+      <p>
+        When the cache reaches the quota, cache entries are evicted to make space for new
+        entries. The cache eviction policy can be specified by the
+        <codeph>--tuple_cache_eviction_policy</codeph> startup flag. Currently, the cache
+        supports the following cache eviction policies:
+        <ul>
+          <li>LRU (Least Recently Used--the default)</li>
+          <li>LIRS (Least Inter-reference Recency Set)</li>
+        </ul>
+        LIRS is a scan-resistant, low performance-overhead policy.
+      </p>
+
+    </section>
+
+    <section id="tuple_cache_eligibility">
+
+      <title>Eligible Locations in the Plan</title>
+
+      <p>
+        The intermediate results cache stores the output of a node in the query plan, so
+        a cache lookup can replace the work of everything below that node, including work
+        in other fragments. A location in the plan is <term>eligible</term> for caching
+        only if its output is fully determined by its cache key. If Impala cannot
+        guarantee that, a cache hit could return stale or incorrect results, so the
+        location is not eligible.
+      </p>
+
+      <p>
+        A location is ineligible for one of two basic reasons:
+        <ul>
+          <li>
+            <b>Non-deterministic behavior:</b> The subtree can produce different results
+            for the same inputs. For example, it calls a non-deterministic function such
+            as <codeph>RAND()</codeph>, or it contains a <codeph>LIMIT</codeph>, which
+            may return a different set of rows on each run.
+          </li>
+          <li>
+            <b>Unsupported functionality:</b> The subtree uses a feature that the cache
+            does not yet support, such as full ACID tables or exchanges that merge or
+            repartition rows.
+          </li>
+        </ul>
+        Ineligibility propagates up the plan: if any child of a node is ineligible, the
+        node is also ineligible. Eligibility is only a prerequisite. Impala chooses which
+        of the eligible locations to actually cache as described in the next section.
+      </p>
+
+      <p>
+        To see why a location is ineligible, run <codeph>EXPLAIN</codeph> with the
+        <codeph>EXPLAIN_LEVEL</codeph> query option set to <codeph>VERBOSE</codeph> while
+        <codeph>enable_tuple_cache</codeph> is true. Each plan node reports either its
+        cost information or a "<codeph>tuple cache ineligibility reasons</codeph>" line.
+      </p>
+
+    </section>
+
+    <section id="tuple_cache_placement">
+
+      <title>Cost-Based Placement</title>
+
+      <p>
+        Impala does not cache at every eligible location. Caching has overhead when a
+        result is written, and a cache entry is only valuable if reading it is much
+        cheaper than recomputing it. Instead, Impala uses the estimated processing cost of
+        the plan to choose a subset of eligible locations in three steps:
+        <ol>
+          <li>
+            <b>Threshold:</b> Locations are discarded if the cost of reading the result
+            from the cache is not sufficiently lower than the cost of computing it.
+            The <codeph>tuple_cache_required_cost_reduction_factor</codeph> query option
+            sets the threshold. A location is considered only if the cost of computing
+            the result is at least this many times the cost of reading it from the
+            cache. The default is 3.0, meaning that reading from the cache must cost
+            less than 1/3 of computing the result. A higher value caches less
+            aggressively and lowers the overhead.
+          </li>
+          <li>
+            <b>Ranking:</b> The remaining locations are ranked by the cost reduction
+            per byte of cache space:
+            <codeblock>(cost of regular execution - cost of reading from the cache) / estimated serialized size</codeblock>
+            This favors locations with small results or a large reduction in cost.
+          </li>
+          <li>
+            <b>Budget:</b> Locations are picked in rank order until the budget for the
+            estimated serialized size per executor is used up. A location that does not
+            fit in the remaining budget is skipped, but smaller locations ranked below it
+            can still be picked. The
+            <codeph>tuple_cache_budget_bytes_per_executor</codeph> query option sets the
+            budget. It accepts a memory specification such as <codeph>200MB</codeph>, and
+            the default is <codeph>100MB</codeph>. A higher value caches more
+            aggressively, which can increase the overhead the first time a query runs.
+            A lower value limits the overhead at the expense of less caching. The budget
+            is per executor, so the total scales with the number of executors.
+          </li>
+        </ol>
+        For example:
+<codeblock>SET enable_tuple_cache=true;
+SET tuple_cache_required_cost_reduction_factor=5;
+SET tuple_cache_budget_bytes_per_executor=200MB;</codeblock>
+      </p>
+
+      <p>
+        Because the estimates depend on table and column statistics, run
+        <codeph>COMPUTE STATS</codeph> on the tables in queries that use the cache.
+      </p>
+
+      <p>
+        When <codeph>EXPLAIN_LEVEL</codeph> is <codeph>VERBOSE</codeph>, the explain plan
+        shows the estimated serialized size, the cumulative processing cost, and the
+        cache read and write processing costs for each eligible location. This can help
+        explain why a particular location was or was not picked.
+      </p>
+
+    </section>
+
+    <section id="tuple_cache_monitoring">
+
+      <title>Monitoring Cache Hits and Misses</title>
+
+      <p>
+        Each cached location in a query appears as a <codeph>TUPLE_CACHE_NODE</codeph> in
+        the query profile. The following counters on that node show what happened for each
+        fragment instance:
+        <ul>
+          <li>
+            <codeph>NumTupleCacheHits</codeph> is 1 if the result was read from the cache.
+            If it is 0, the result was a cache miss and was computed normally.
+          </li>
+          <li>
+            <codeph>NumTupleCacheSkipped</codeph> is 1 if there was a miss and the result
+            was not written to the cache. This happens if another fragment is already
+            writing the same entry, or if the entry was previously found to be too large.
+          </li>
+          <li>
+            <codeph>NumTupleCacheHalted</codeph> and
+            <codeph>NumTupleCacheBackpressureHalted</codeph> are 1 if writing the result
+            to the cache was abandoned, either because the entry exceeded the maximum
+            entry size or because too many cache writes were outstanding.
+          </li>
+        </ul>
+        The <codeph>Combined Key</codeph> info string on the node shows the cache key
+        for that fragment instance.
+      </p>
+
+      <p>
+        Each Impala daemon also keeps cumulative statistics for its cache in the
+        <codeph>impala.tuple-cache.*</codeph> metrics, such as
+        <codeph>impala.tuple-cache.hits</codeph>,
+        <codeph>impala.tuple-cache.misses</codeph>, and
+        <codeph>impala.tuple-cache.entries-evicted</codeph>. These metrics are on the
+        <b>Metrics</b> page of the Impala daemon debug web UI. See
+        <xref href="impala_webui.xml#webui"/> for details about the web UI.
+      </p>
+
+    </section>
   </conbody>
 </concept>
