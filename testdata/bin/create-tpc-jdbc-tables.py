@@ -23,7 +23,7 @@
 
 import logging
 import os
-import sqlparse
+from impala_shell.sqlparse_util import sqlparse
 
 LOG = logging.getLogger(os.path.splitext(os.path.basename(__file__))[0])
 

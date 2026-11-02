@@ -18,19 +18,23 @@
 # under the License.
 
 from contextlib import closing
+import csv
 import errno
 import getpass
 import os
 import re
 import signal
 import socket
-from subprocess import call, Popen
+from subprocess import call, check_output, Popen
+import sys
 import tempfile
 from time import sleep, time
 import pytest
 
 from impala_shell.impala_client import utf8_encode_if_needed
-from impala_shell.impala_shell import ImpalaShell as ImpalaShellClass
+from impala_shell.impala_shell import ImpalaShell as ImpalaShellClass, strip_comments
+from impala_shell.sqlparse_util import sqlparse
+from tests.common.base_test_suite import BaseTestSuite
 from tests.common.environ import ImpalaTestClusterProperties
 from tests.common.impala_service import ImpaladService
 from tests.common.impala_test_suite import IMPALAD_HS2_HOST_PORT, ImpalaTestSuite
@@ -73,6 +77,53 @@ def find_query_option(key, string, strip_brackets=True):
   values = re.findall(pattern, string, re.MULTILINE)
   assert len(values) == 1
   return values[0].strip("[]") if strip_brackets else values[0]
+
+
+class TestSqlParse(BaseTestSuite):
+  def test_large_sql_grouping_and_strip_comments(self):
+    columns = ",\n".join("c{0} INT".format(i) for i in range(2001))
+    query = "CREATE TABLE t (\n{0}\n)".format(columns)
+    assert sum(1 for _ in sqlparse.lexer.tokenize(query)) > 10000
+    assert [str(stmt) for stmt in sqlparse.parse(query)] == [query]
+    assert sqlparse.format(query + " -- trailing comment\n", strip_comments=True) == \
+        query + "\n"
+    assert strip_comments(query + " -- trailing comment\n") == query
+
+  def test_deep_sql_grouping(self):
+    query = "SELECT {0}1{1}".format("(" * 105, ")" * 105)
+    assert [str(stmt) for stmt in sqlparse.parse(query)] == [query]
+    assert sqlparse.format(query + " -- trailing comment\n", strip_comments=True) == \
+        query + "\n"
+
+  @pytest.mark.parametrize("quote", ["'", '"'])
+  def test_sqlparse_without_shell_import(self, quote):
+    query = r"select {q}\\{q}; select {q}\{q}{q};".format(q=quote)
+    code = (
+        "import sys\n"
+        "from impala_shell.sqlparse_util import sqlparse\n"
+        "assert 'impala_shell.impala_shell' not in sys.modules\n"
+        "assert sqlparse.engine.grouping.MAX_GROUPING_DEPTH is None\n"
+        "assert sqlparse.engine.grouping.MAX_GROUPING_TOKENS is None\n"
+        "assert len(sqlparse.split(sys.argv[1])) == 2\n")
+    check_output([sys.executable, "-c", code, query])
+
+  @pytest.mark.parametrize("quote", ["'", '"'])
+  @pytest.mark.parametrize("contents", [
+      r"\\", r"\\\\", r"before\\", r"\{quote}", "{quote}{quote}",
+      "line one\nline two", "\\\n", "semi;-- /* comment */",
+  ])
+  def test_sqlparse_quoted_literals(self, quote, contents):
+    literal = quote + contents.format(quote=quote) + quote
+    query = "SELECT {0}, {0}".format(literal)
+    assert [value for _, value in sqlparse.lexer.tokenize(query)] == [
+        "SELECT", " ", literal, ",", " ", literal]
+    assert [token.value for token in sqlparse.parse(query)[0].flatten()] == [
+        "SELECT", " ", literal, ",", " ", literal]
+    assert sqlparse.split(query + "; " + query + ";") == [query + ";", query + ";"]
+    assert sqlparse.format(query) == query
+    assert sqlparse.format(query + " -- trailing comment\n", strip_comments=True) == \
+        query + "\n"
+    assert strip_comments(query + " -- trailing comment\n") == query
 
 
 @pytest.fixture
@@ -161,10 +212,13 @@ class TestImpalaShell(ImpalaTestSuite):
     args = ['-q', queries, '-B']
     run_impala_shell_cmd(vector, args)
 
-  def test_multiple_queries_with_escaped_backslash(self, vector):
-    """Regression test for string containing an escaped backslash.
-    """
-    run_impala_shell_cmd(vector, ['-q', r'''select '\\'; select '\'';''', '-B'])
+  @pytest.mark.parametrize("quote", ["'", '"'])
+  def test_multiple_queries_with_escaped_backslash(self, vector, quote):
+    """Regression test for sqlparse issue 814: escaped backslashes hide semicolons."""
+    query = r"select {q}\\{q}; select {q}\{q}{q};".format(q=quote)
+    result = run_impala_shell_cmd(vector, ['-q', query, '-B'])
+    assert list(csv.reader(result.stdout.splitlines(), delimiter='\t')) == [
+        ["\\"], [quote]]
 
   def test_default_db(self, vector, empty_table):
     db_name, table_name = empty_table.split('.')

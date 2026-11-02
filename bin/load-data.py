@@ -25,13 +25,13 @@ import getpass
 import logging
 import os
 import re
-import sqlparse
 import subprocess
 import sys
 import time
 import traceback
 
 from optparse import OptionParser
+from impala_shell.sqlparse_util import sqlparse
 from tests.common.impala_connection import ImpylaHS2Connection
 from tests.common.test_vector import HS2
 from multiprocessing.pool import ThreadPool

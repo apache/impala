@@ -18,7 +18,7 @@
 from inspect import getmro
 from logging import getLogger
 from re import sub
-from sqlparse import format
+from impala_shell.sqlparse_util import sqlparse
 
 from tests.comparison.common import StructColumn, CollectionColumn
 from tests.comparison.db_types import (
@@ -157,7 +157,7 @@ class SqlWriter(object):
 
   def make_pretty_sql(self, sql):
     try:
-      sql = format(sql, reindent=True)
+      sql = sqlparse.format(sql, reindent=True)
     except Exception as e:
       LOG.warn('Unable to format sql: %s', e)
     return sql

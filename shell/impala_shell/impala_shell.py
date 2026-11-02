@@ -39,7 +39,6 @@ import json
 from six.moves import http_client
 
 import prettytable
-import sqlparse
 
 from impala_shell.compatibility import _xrange as xrange
 from impala_shell.impala_client import (
@@ -67,6 +66,7 @@ from impala_shell.shell_output import (
     PrettyOutputFormatter,
     VerticalOutputFormatter,
 )
+from impala_shell.sqlparse_util import sqlparse
 from impala_shell.value_converter import HS2ValueConverter
 
 VERSION_FORMAT = "Impala Shell v%(version)s (%(git_hash)s) built on %(build_date)s"
