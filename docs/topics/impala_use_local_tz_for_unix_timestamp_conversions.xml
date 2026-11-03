@@ -1,0 +1,109 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+Licensed to the Apache Software Foundation (ASF) under one
+or more contributor license agreements.  See the NOTICE file
+distributed with this work for additional information
+regarding copyright ownership.  The ASF licenses this file
+to you under the Apache License, Version 2.0 (the
+"License"); you may not use this file except in compliance
+with the License.  You may obtain a copy of the License at
+
+  http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing,
+software distributed under the License is distributed on an
+"AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+KIND, either express or implied.  See the License for the
+specific language governing permissions and limitations
+under the License.
+-->
+<!DOCTYPE concept PUBLIC "-//OASIS//DTD DITA Concept//EN" "concept.dtd">
+<concept id="use_local_tz_for_unix_timestamp_conversions" rev="4.0.0 IMPALA-10171">
+
+  <title>USE_LOCAL_TZ_FOR_UNIX_TIMESTAMP_CONVERSIONS Query Option</title>
+
+  <titlealts audience="PDF">
+    <navtitle>USE LOCAL TZ FOR UNIX TIMESTAMP CONVERSIONS</navtitle>
+  </titlealts>
+
+  <prolog>
+    <metadata>
+      <data name="Category" value="Impala"/>
+      <data name="Category" value="Impala Query Options"/>
+      <data name="Category" value="Dates and Times"/>
+      <data name="Category" value="Querying"/>
+      <data name="Category" value="Developers"/>
+      <data name="Category" value="Data Analysts"/>
+    </metadata>
+  </prolog>
+
+  <conbody>
+    <p>
+      <indexterm audience="hidden">
+        USE_LOCAL_TZ_FOR_UNIX_TIMESTAMP_CONVERSIONS query option
+      </indexterm>
+      The <codeph>USE_LOCAL_TZ_FOR_UNIX_TIMESTAMP_CONVERSIONS</codeph> query option
+      selects the time zone that Impala uses when converting between Unix time and
+      <codeph>TIMESTAMP</codeph> values. When it is <codeph>FALSE</codeph>, Impala
+      interprets <codeph>TIMESTAMP</codeph> values as UTC. When it is
+      <codeph>TRUE</codeph>, Impala interprets them in the local time zone.
+    </p>
+
+    <p>
+      The option affects the following functions and operations:
+    </p>
+    <ul>
+      <li>
+        The <codeph>FROM_UNIXTIME()</codeph>, <codeph>UNIX_TIMESTAMP()</codeph>, and
+        <codeph>TO_TIMESTAMP()</codeph> functions that take or return Unix time
+      </li>
+      <li>
+        <codeph>CAST()</codeph> from an integer, floating-point, or
+        <codeph>DECIMAL</codeph> value to <codeph>TIMESTAMP</codeph>
+      </li>
+      <li>
+        <codeph>CAST()</codeph> from a <codeph>TIMESTAMP</codeph> value to an integer
+        or floating-point type
+      </li>
+    </ul>
+
+    <p>
+      The <codeph>TIMEZONE</codeph> query option selects the local time zone; if unset,
+      Impala uses the coordinator's default time zone. The option does not affect
+      timestamps read from Parquet files; see
+      <xref href="impala_convert_legacy_hive_parquet_utc_timestamps.xml"/>.
+    </p>
+
+    <p>
+      This option replaces the
+      <codeph>--use_local_tz_for_unix_timestamp_conversions</codeph> startup flag, which
+      is removed in <keyword keyref="impala50"/>.
+    </p>
+
+    <p conref="../shared/impala_common.xml#common/type_boolean"/>
+    <p conref="../shared/impala_common.xml#common/default_false_0"/>
+    <p>
+      <b>Added in:</b> <keyword keyref="impala40"/>
+    </p>
+
+    <p>
+      <b>Example:</b> Interpret Unix time in the <codeph>America/Los_Angeles</codeph>
+      time zone:
+    </p>
+<codeblock>SET TIMEZONE='America/Los_Angeles';
+SET USE_LOCAL_TZ_FOR_UNIX_TIMESTAMP_CONVERSIONS=TRUE;
+-- Returns 2020-01-01 00:00:00 (Pacific time) instead of 2020-01-01 08:00:00.
+SELECT CAST(1577865600 AS TIMESTAMP);</codeblock>
+
+    <p conref="../shared/impala_common.xml#common/related_info"/>
+    <p>
+      <xref href="impala_timestamp.xml#timestamp"/>
+    </p>
+    <p>
+      <xref href="impala_datetime_functions.xml#datetime_functions"/>
+    </p>
+    <p>
+      <xref href="impala_timezone.xml#timezone"/>
+    </p>
+  </conbody>
+</concept>

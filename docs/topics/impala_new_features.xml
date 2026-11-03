@@ -62,6 +62,21 @@ under the License.
           <xref href="impala_udf.xml#udfs_args"/>.
         </p>
       </section>
+      <section id="hive_legacy_timestamp_conversion">
+        <title>Hive-Compatible Parquet Timestamp Conversion</title>
+        <p>
+          Impala uses Parquet writer metadata to select a Hive-compatible time zone
+          conversion method when reading timestamps from <codeph>parquet-mr</codeph>
+          files with <codeph>CONVERT_LEGACY_HIVE_PARQUET_UTC_TIMESTAMPS</codeph> enabled.
+        </p>
+        <p>
+          For files without conversion metadata, the new
+          <codeph>USE_LEGACY_HIVE_TIMESTAMP_CONVERSION</codeph> query option selects the
+          fallback method. See
+          <xref href="impala_use_legacy_hive_timestamp_conversion.xml"/>
+          for the default, metadata precedence, and performance considerations.
+        </p>
+      </section>
     </conbody>
   </concept>
   <concept rev="4.0.0" id="new_features_400">

@@ -199,6 +199,8 @@ under the License.
         <topicref href="topics/impala_compression_codec.xml"/>
         <topicref href="topics/impala_compute_stats_min_sample_size.xml"/>
         <topicref href="topics/impala_compute_processing_cost.xml"/>
+        <topicref rev="4.0.0 IMPALA-10171"
+          href="topics/impala_convert_legacy_hive_parquet_utc_timestamps.xml"/>
         <topicref href="topics/impala_debug_action.xml"/>
         <topicref rev="2.9.0" href="topics/impala_decimal_v2.xml"/>
         <topicref rev="3.2.0" href="topics/impala_default_file_format.xml"/>
@@ -288,6 +290,10 @@ under the License.
         <topicref href="topics/impala_timezone.xml"/>
         <topicref href="topics/impala_topn_bytes_limit.xml"/>
         <topicref rev="4.5.0" href="topics/impala_use_hbo_stats.xml"/>
+        <topicref rev="5.0.0"
+          href="topics/impala_use_legacy_hive_timestamp_conversion.xml"/>
+        <topicref rev="4.0.0 IMPALA-10171"
+          href="topics/impala_use_local_tz_for_unix_timestamp_conversions.xml"/>
         <topicref rev="4.5.0" href="topics/impala_use_null_slots_cache.xml"/>
         <topicref href="topics/impala_utf8_mode.xml"/>
       </topicref>

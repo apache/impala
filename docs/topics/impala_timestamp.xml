@@ -158,7 +158,8 @@ DATE_ADD (<varname>timestamp</varname>, INTERVAL <varname>interval</varname> <va
 
     <p>
       When you set the
-      <codeph>USE_LOCAL_TZ_FOR_UNIX_TIMESTAMP_CONVERSIONS</codeph> query option to
+      <xref href="impala_use_local_tz_for_unix_timestamp_conversions.xml">
+      <codeph>USE_LOCAL_TZ_FOR_UNIX_TIMESTAMP_CONVERSIONS</codeph></xref> query option to
       <codeph>TRUE</codeph>, Impala treats the <codeph>TIMESTAMP</codeph> values specified in
       the local time zone. The local time zone is determined in the following order with the
       <codeph>TIMEZONE</codeph> query option takes the highest precedence:
@@ -197,6 +198,12 @@ DATE_ADD (<varname>timestamp</varname>, INTERVAL <varname>interval</varname> <va
       <codeph>USE_LOCAL_TZ_FOR_UNIX_TIMESTAMP_CONVERSIONS</codeph> query option.
     </p>
 
+    <p rev="5.0.0">
+      The <codeph>--use_local_tz_for_unix_timestamp_conversions</codeph> startup flag is
+      removed and ignored in <keyword keyref="impala50"/>. Use the query option instead.
+      See <xref href="impala_incompatible_changes.xml#incompatible_changes_500x"/>.
+    </p>
+
     <p>
       <b>Time zone handling between Impala and Hive:</b>
     </p>
@@ -218,86 +225,53 @@ DATE_ADD (<varname>timestamp</varname>, INTERVAL <varname>interval</varname> <va
       <li>
         <i>Parquet</i>
         <note>
-          This section only applies to <codeph>INT96 TIMESTAMP</codeph>. See
+          This section primarily describes <codeph>INT96 TIMESTAMP</codeph> values.
+          For <codeph>INT64 TIMESTAMP</codeph> values, see the end of this section. See
           <xref href="impala_parquet.xml#parquet_data_types"/> for information about Parquet
           data types.
         </note>
         <p>
           When Hive writes to Parquet data files, the <codeph>TIMESTAMP</codeph> values are
-          normalized to UTC from the local time zone of the host where the data was written. On
-          the other hand, Impala does not make any time zone adjustment when it writes or reads
-          <codeph>INT96 TIMESTAMP</codeph> values to Parquet files. This difference in time zone
-          handling can cause potentially inconsistent results when Impala processes
-          <codeph>TIMESTAMP</codeph> values in the Parquet files written by Hive.
+          normalized to UTC from the local time zone of the host where the data was written.
+          By default, Impala does not make a time zone adjustment when it writes or reads
+          <codeph>INT96 TIMESTAMP</codeph> values in Parquet files. This difference can cause
+          inconsistent results when Impala reads Parquet files written by Hive.
+        </p>
+
+        <p rev="5.0.0">
+          To convert <codeph>INT96</codeph> timestamps from UTC to local time when reading
+          files written by Parquet Java (<codeph>parquet-mr</codeph>), including Hive
+          files, set the
+          <xref href="impala_convert_legacy_hive_parquet_utc_timestamps.xml">
+          <codeph>CONVERT_LEGACY_HIVE_PARQUET_UTC_TIMESTAMPS</codeph></xref>
+          query option to <codeph>TRUE</codeph>. It defaults to <codeph>FALSE</codeph>
+          and does not affect writes. Set <codeph>TIMEZONE</codeph> to the time zone Hive
+          used to write the file; otherwise, Impala uses the coordinator's default time
+          zone. The <codeph>USE_LOCAL_TZ_FOR_UNIX_TIMESTAMP_CONVERSIONS</codeph> query
+          option controls Unix time conversions, not this Parquet read conversion.
+        </p>
+
+        <p rev="5.0.0">
+          The <codeph>--convert_legacy_hive_parquet_utc_timestamps</codeph> startup flag
+          is deprecated but still sets the default for the query option. Use the query
+          option instead. See
+          <xref href="impala_incompatible_changes.xml#incompatible_changes_500x"/>.
         </p>
 
         <p>
-          To avoid incompatibility problems or having to code workarounds, you can set one
-          or both of these query options:
-          <ul>
-            <li>
-              <codeph>SET USE_LOCAL_TZ_FOR_UNIX_TIMESTAMP_CONVERSIONS=TRUE</codeph>
-            </li>
-
-            <li>
-              <codeph>&#8209;convert_legacy_hive_parquet_utc_timestamps=true</codeph>
-            </li>
-          </ul>
+          In <keyword keyref="impala30"/> and lower, this conversion had a severe impact
+          on multithreaded performance. <keyword keyref="impala31"/> improved the time
+          zone implementation and reduced this overhead.
         </p>
 
-        <p>
-          When the <codeph>&#8209;&#8209;convert_legacy_hive_parquet_utc_timestamps</codeph>
-          setting is enabled, Impala recognizes the Parquet data files written by Hive, and
-          applies the same UTC-to-local-timezone conversion logic during the query as Hive does.
-        </p>
-
-        <p>
-          In <keyword keyref="impala30"/> and lower, the
-          <codeph>‑‑convert_legacy_hive_parquet_utc_timestamps</codeph> setting had a severe
-          impact on multi-threaded performance. The new time zone implementation in
-          <keyword keyref="impala31"/> eliminated most of the performance overhead and made
-          Impala scale well to multiple threads. The
-          <codeph>‑‑convert_legacy_hive_parquet_utc_timestamps</codeph> setting is turned
-          off by default for a performance reason. To avoid unexpected incompatibility problems,
-          you should turn on the option when processing <codeph>TIMESTAMP</codeph> columns in
-          Parquet files written by Hive.
-        </p>
-
-        <p>
-          Hive versions prior to 3.1 wrote Parquet files in local time using Java's
-          SimpleDateFormat. That method has some cases that differ from both Impala's
-          method and the default method used in Hive 3.1.2+ that are based on the
-          <xref href="https://www.iana.org/time-zones" format="html" scope="external">
-          IANA Time Zone Database</xref>. Hive 4 added the
-          <codeph>writer.zone.conversion.legacy</codeph> Parquet file metadata property
-          to identify which method was used to write the file (controlled by
-          <codeph>hive.parquet.timestamp.write.legacy.conversion.enabled</codeph>). When
-          the Parquet file was written by Parquet Java (<codeph>parquet-mr</codeph>), Hive -
-          and Impala's behavior when
-          <codeph>convert_legacy_hive_parquet_utc_timestamps</codeph> is
-          <codeph>true</codeph> - are:
-          <ul>
-            <li>
-              If <codeph>writer.zone.conversion.legacy</codeph> is present, use the legacy
-              conversion method if true, use the newer method if false.
-            </li>
-            <li>
-              If <codeph>writer.zone.conversion.legacy</codeph> is not present but
-              <codeph>writer.time.zone</codeph> is, we can infer the file was written by
-              Hive 3.1.2+ using new APIs and use the newer method.
-            </li>
-            <li>
-              Otherwise assume it was written by an earlier Hive release. In that case
-              Hive will select conversion method based on
-              <codeph>hive.parquet.timestamp.legacy.conversion.enabled</codeph> (defaults
-              to <codeph>true</codeph>). <keyword keyref="impala45"/> adds the query
-              option <codeph>use_legacy_hive_timestamp_conversion</codeph> to select this
-              behavior. It defaults to <codeph>false</codeph> because conversion is ~50x
-              slower than Impala's default conversion method and they produce the same
-              results for modern time periods (post 1970, and in most instances before
-              that).
-            </li>
-          </ul>
+        <p rev="5.0.0">
+          Hive's legacy time zone conversion method can differ from the newer method for
+          historical timestamps. Impala uses Parquet writer metadata to select the method
+          when conversion is enabled. For files without that metadata, the
+          <codeph>USE_LEGACY_HIVE_TIMESTAMP_CONVERSION</codeph> query option selects the
+          fallback. See
+          <xref href="impala_use_legacy_hive_timestamp_conversion.xml"/>
+          for the metadata precedence, performance considerations, and an example.
         </p>
 
         <p>

@@ -61,11 +61,21 @@ under the License.
         </li>
 
         <li>
-          When reading Parquet timestamps written by Hive if the
-          <codeph>convert_legacy_hive_parquet_utc_timestamps</codeph> flag is
+          When reading <codeph>INT96</codeph> Parquet timestamps written by
+          <codeph>parquet-mr</codeph>, including Hive, if the
+          <codeph>CONVERT_LEGACY_HIVE_PARQUET_UTC_TIMESTAMPS</codeph> query option is
           <codeph>TRUE</codeph>
         </li>
+
+        <li>
+          When reading UTC-normalized <codeph>INT64</codeph> Parquet timestamps
+        </li>
       </ul>
+    </p>
+
+    <p>
+      For the method used to convert Hive-written Parquet timestamps, see
+      <xref href="impala_use_legacy_hive_timestamp_conversion.xml"/>.
     </p>
 
     <p>

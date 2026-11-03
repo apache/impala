@@ -55,6 +55,31 @@ under the License.
     <conbody>
       <p>
         <ul>
+          <li rev="5.0.0 IMPALA-13953">Time zone startup flag changes
+            <p>
+              The <codeph>--use_local_tz_for_unix_timestamp_conversions</codeph> startup
+              flag is removed. Impala logs a warning and ignores it. Use the
+              <xref href="impala_use_local_tz_for_unix_timestamp_conversions.xml">
+              <codeph>USE_LOCAL_TZ_FOR_UNIX_TIMESTAMP_CONVERSIONS</codeph></xref> query
+              option instead.
+            </p>
+            <p>
+              The <codeph>--convert_legacy_hive_parquet_utc_timestamps</codeph> startup
+              flag is deprecated. It still sets the default for the
+              <xref href="impala_convert_legacy_hive_parquet_utc_timestamps.xml">
+              <codeph>CONVERT_LEGACY_HIVE_PARQUET_UTC_TIMESTAMPS</codeph></xref> query
+              option. Use the query option instead.
+            </p>
+            <p>
+              To set a default for either query option, add it to the
+              <codeph>--default_query_options</codeph> startup flag on each coordinator.
+              See <xref href=
+                "impala_config_options.xml#config_options_noncm/default_query_options">
+                configuring default query options</xref> for details. For example:
+            </p>
+<codeblock>--default_query_options=USE_LOCAL_TZ_FOR_UNIX_TIMESTAMP_CONVERSIONS=true
+</codeblock>
+          </li>
           <li>The default value of the <codeph>EXPAND_COMPLEX_TYPES</codeph> query option
             changed from <codeph>FALSE</codeph> to <codeph>TRUE</codeph>.<p>As a result,
               <codeph>SELECT *</codeph> queries on tables that contain complex-typed
