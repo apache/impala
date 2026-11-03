@@ -45,6 +45,25 @@ under the License.
     <p outputclass="toc inpage"/>
 
   </conbody>
+  <concept rev="5.0.0" id="new_features_500">
+    <title>New Features in <keyword keyref="impala50"/></title>
+    <conbody>
+      <section id="new_features_500_udf">
+        <title>Native UDF Interface</title>
+        <p>
+          Native UDFs and UDAs can use
+          <codeph>FunctionContext::IsQueryCancelled()</codeph> to check for cancellation
+          and stop long-running work. See
+          <xref href="impala_udf.xml#udf_cancellation"/>.
+        </p>
+        <p>
+          The interface also adds <codeph>TYPE_UUID</codeph> for UUID type descriptors
+          and an output-stream operator for <codeph>StringVal</codeph>. See
+          <xref href="impala_udf.xml#udfs_args"/>.
+        </p>
+      </section>
+    </conbody>
+  </concept>
   <concept rev="4.0.0" id="new_features_400">
     <title>New Features in <keyword keyref="impala40"/></title>
     <conbody>

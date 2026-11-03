@@ -10937,6 +10937,7 @@ under the License.
   <keydef href="topics/impala_udf.xml#udf_malloc" keys="udf_malloc"/>
   <keydef href="topics/impala_udf.xml#udf_threads" keys="udf_threads"/>
   <keydef href="topics/impala_udf.xml#udf_error_handling" keys="udf_error_handling"/>
+  <keydef href="topics/impala_udf.xml#udf_cancellation" keys="udf_cancellation"/>
   <keydef href="topics/impala_udf.xml#udafs" keys="udafs"/>
   <keydef href="topics/impala_udf.xml#uda_functions" keys="uda_functions"/>
   <keydef href="topics/impala_udf.xml#udf_intermediate" keys="udf_intermediate"/>

@@ -644,6 +644,32 @@ IntVal AddUdf(FunctionContext* context, const IntVal&amp; arg1, const IntVal&amp
               takes a pointer to a <codeph>FunctionContext</codeph> struct and a length, that does allocate space
               for a new copy of the string data, for use in UDFs that return string values.
             </p>
+            <p>
+              Starting in <keyword keyref="impala50"/>, you can write a
+              <codeph>StringVal</codeph> to a C++ output stream with
+              <codeph>operator&lt;&lt;</codeph>. The operator writes exactly
+              <codeph>len</codeph> bytes, including embedded zero bytes, without requiring a
+              null terminator. For a null value, it writes the text <codeph>NULL</codeph>.
+            </p>
+          </li>
+
+          <li>
+            <p>
+              Starting in <keyword keyref="impala50"/>, a <codeph>UUID</codeph> value is
+              passed as a <codeph>StringVal</codeph>, not a separate UUID structure. A
+              non-null value contains 16 binary bytes, not a UUID formatted as text. The
+              corresponding <codeph>FunctionContext::TypeDesc</codeph> has type
+              <codeph>TYPE_UUID</codeph> and <codeph>len</codeph> 16. See
+              <xref href="impala_iceberg.xml#impala_iceberg"/> for Iceberg type support.
+            </p>
+          </li>
+
+          <li>
+            <p>
+              <codeph>DecimalVal</codeph> represents a <codeph>DECIMAL</codeph> value as an
+              unscaled integer. Use <codeph>val4</codeph>, <codeph>val8</codeph>, or
+              <codeph>val16</codeph> according to the decimal precision.
+            </p>
           </li>
 
           <li>
@@ -780,52 +806,174 @@ within UDAs, you can return without specifying a value.
       <conbody>
 
         <p>
-          By default, memory allocated within a UDF is deallocated when the function exits, which could be before
-          the query is finished. The input arguments remain allocated for the lifetime of the function, so you can
-          refer to them in the expressions for your return values. If you use temporary variables to construct
-          all-new string values, use the <codeph>StringVal()</codeph> constructor that takes an initial
-          <codeph>FunctionContext*</codeph> argument followed by a length, and copy the data into the newly
-          allocated memory buffer.
+          Automatic C++ local variables do not persist after a UDF call returns. To keep
+          state across calls, use storage with an appropriate lifetime and associate it
+          with the <codeph>FunctionContext</codeph>, as described in
+          <xref href="impala_udf.xml#udf_threads"/>. The input arguments remain allocated
+          for the lifetime of the function, so you can refer to them in the expressions
+          for your return values.
+        </p>
+        <p>
+          To return a newly allocated string, use the <codeph>StringVal()</codeph>
+          constructor that takes a <codeph>FunctionContext*</codeph> and a length, or use
+          <codeph>StringVal::CopyFrom()</codeph>. Impala manages the resulting string
+          storage.
         </p>
       </conbody>
     </concept>
 
     <concept rev="1.3.0" id="udf_threads">
 
-      <title>Thread-Safe Work Area for UDFs</title>
+      <title>Function State for UDFs</title>
 
       <conbody>
 
         <p>
-          One way to improve performance of UDFs is to specify the optional <codeph>PREPARE_FN</codeph> and
-          <codeph>CLOSE_FN</codeph> clauses on the <codeph>CREATE FUNCTION</codeph> statement. The <q>prepare</q>
-          function sets up a thread-safe data structure in memory that you can use as a work area. The <q>close</q>
-          function deallocates that memory. Each subsequent call to the UDF within the same thread can access that
-          same memory area. There might be several such memory areas allocated on the same host, as UDFs are
-          parallelized using multiple threads.
+          You can use <codeph>FunctionContext::SetFunctionState()</codeph> and
+          <codeph>FunctionContext::GetFunctionState()</codeph> to retain state across
+          calls to a native UDF. The methods have the following signatures:
+        </p>
+
+<codeblock>void SetFunctionState(FunctionStateScope scope, void* ptr);
+void* GetFunctionState(FunctionStateScope scope) const;</codeblock>
+
+        <p>
+          <codeph>SetFunctionState()</codeph> stores a pointer for the specified scope.
+          <codeph>GetFunctionState()</codeph> returns that pointer, or
+          <codeph>NULL</codeph> if no pointer is set. Cast the returned pointer to its
+          original type before using it. Each context has one pointer slot per scope; to
+          store multiple values in a scope, put them in one object. Impala stores only
+          the pointer and does not copy, own, or free the object. Setting a new pointer
+          replaces the previous pointer for that scope without freeing it; setting
+          <codeph>NULL</codeph> clears the pointer but does not free the object. Do not
+          retain pointers to local variables or input buffers that do not outlive the
+          calls using the state.
+        </p>
+
+        <p>Use a <codeph>FunctionContext::FunctionStateScope</codeph> value to select the
+          state:</p>
+        <ul>
+          <li>
+            <codeph>THREAD_LOCAL</codeph>: The state is local to a function context for
+            a thread. Use it for mutable scratch space or caches that do not need to be
+            shared between threads. Each context has its own pointer.
+          </li>
+          <li>
+            <codeph>FRAGMENT_LOCAL</codeph>: Contexts for the same UDF use within a
+            plan fragment can share the state. Multiple threads can access it
+            concurrently, so use read-only data or synchronize changes. Impala can
+            initialize different fragments concurrently on the same host.
+          </li>
+        </ul>
+
+        <p>
+          For a scalar UDF, initialize a fragment-local pointer in the
+          <codeph>FRAGMENT_LOCAL</codeph> prepare callback, before Impala clones the
+          context for other threads. Cloned contexts inherit that pointer; replacing it
+          later in one context does not update the other contexts. Neither scope provides
+          a single state shared across all UDF uses, hosts, or queries.
         </p>
 
         <p>
-          Within this work area, you can set up predefined lookup tables, or record the results of complex
-          operations on data types such as <codeph>STRING</codeph> or <codeph>TIMESTAMP</codeph>. Saving the
-          results of previous computations rather than repeating the computation each time is an optimization known
-          as <xref href="http://en.wikipedia.org/wiki/Memoization" scope="external" format="html"/>. For example,
-          if your UDF performs a regular expression match or date manipulation on a column that repeats the same
-          value over and over, you could store the last-computed value or a hash table of already-computed values,
-          and do a fast lookup to find the result for subsequent iterations of the UDF.
+          For a scalar C++ UDF, register optional <codeph>PREPARE_FN</codeph> and
+          <codeph>CLOSE_FN</codeph> callbacks with <codeph>CREATE FUNCTION</codeph>.
+          For each UDF use, prepare runs before the UDF: once with
+          <codeph>FRAGMENT_LOCAL</codeph> per fragment instance and once with
+          <codeph>THREAD_LOCAL</codeph> per function context. When
+          <codeph>MT_DOP</codeph> is greater than 1, a host can run up to
+          <codeph>MT_DOP</codeph> instances of a fragment, so the
+          <codeph>FRAGMENT_LOCAL</codeph> prepare can run up to <codeph>MT_DOP</codeph>
+          times per fragment on that host; see <xref href="impala_mt_dop.xml#mt_dop"/>.
+          Close runs for the corresponding scopes after the UDF calls. Both callbacks have
+          this signature:
+        </p>
+
+<codeblock>void FunctionName(impala_udf::FunctionContext* context,
+    impala_udf::FunctionContext::FunctionStateScope scope);</codeblock>
+
+        <p>
+          Check <codeph>scope</codeph> in each callback, initialize the state for that
+          scope in prepare, and release it in the matching close callback. Close can run
+          after initialization fails or without prepare, so handle an unset pointer.
+          Allocate persistent state with <codeph>FunctionContext::Allocate()</codeph>
+          where possible, and release it with <codeph>FunctionContext::Free()</codeph>.
+          If allocation fails, <codeph>Allocate()</codeph> returns <codeph>NULL</codeph>
+          and sets an error on the context.
         </p>
 
         <p>
-          Each such function must have the signature:
+          The following example caches the most recent square in thread-local state.
+          The prepare and close callbacks ignore the fragment-local scope.
         </p>
 
-<codeblock>void <varname>function_name</varname>(impala_udf::FunctionContext*, impala_udf::FunctionContext::FunctionScope)
-</codeblock>
+<codeblock>#include &lt;impala_udf/udf.h&gt;
+#include &lt;new&gt;
+
+using namespace impala_udf;
+
+struct SquareCache {
+  bool valid;
+  int32_t input;
+  int64_t result;
+  SquareCache() : valid(false), input(0), result(0) {}
+};
+
+IMPALA_UDF_EXPORT
+void CachedSquarePrepare(FunctionContext* context,
+    FunctionContext::FunctionStateScope scope) {
+  if (scope != FunctionContext::THREAD_LOCAL) return;
+  uint8_t* memory = context-&gt;Allocate(sizeof(SquareCache));
+  if (memory == NULL) return;
+  context-&gt;SetFunctionState(scope, new (memory) SquareCache());
+}
+
+IMPALA_UDF_EXPORT
+BigIntVal CachedSquare(FunctionContext* context, const IntVal&amp; input) {
+  if (input.is_null) return BigIntVal::null();
+  SquareCache* cache = static_cast&lt;SquareCache*&gt;(
+      context-&gt;GetFunctionState(FunctionContext::THREAD_LOCAL));
+  if (cache == NULL) {
+    context-&gt;SetError("CachedSquare state is not initialized");
+    return BigIntVal::null();
+  }
+  if (!cache-&gt;valid || cache-&gt;input != input.val) {
+    cache-&gt;input = input.val;
+    cache-&gt;result = static_cast&lt;int64_t&gt;(input.val) * input.val;
+    cache-&gt;valid = true;
+  }
+  return BigIntVal(cache-&gt;result);
+}
+
+IMPALA_UDF_EXPORT
+void CachedSquareClose(FunctionContext* context,
+    FunctionContext::FunctionStateScope scope) {
+  if (scope != FunctionContext::THREAD_LOCAL) return;
+  SquareCache* cache = static_cast&lt;SquareCache*&gt;(
+      context-&gt;GetFunctionState(scope));
+  if (cache == NULL) return;
+  cache-&gt;~SquareCache();
+  context-&gt;Free(reinterpret_cast&lt;uint8_t*&gt;(cache));
+  context-&gt;SetFunctionState(scope, NULL);
+}</codeblock>
 
         <p>
-          Currently, only <codeph>THREAD_SCOPE</codeph> is implemented, not <codeph>FRAGMENT_SCOPE</codeph>. See
-          <filepath>udf.h</filepath> for details about the scope values.
+          After building and deploying the shared library, register the scalar UDF and
+          both callbacks:
         </p>
+
+<codeblock>CREATE FUNCTION cached_square(INT) RETURNS BIGINT
+  LOCATION '/user/hive/udfs/libcached_square.so'
+  SYMBOL='CachedSquare'
+  PREPARE_FN='CachedSquarePrepare'
+  CLOSE_FN='CachedSquareClose';</codeblock>
+
+        <note>
+          UDA callbacks also receive a <codeph>FunctionContext</codeph>, but
+          <codeph>PREPARE_FN</codeph> and <codeph>CLOSE_FN</codeph> apply only to scalar
+          UDFs. A function-state slot is not per-group aggregate state. Use the UDA
+          intermediate value and its callbacks for per-group state; see
+          <xref href="impala_udf.xml#uda_functions"/>.
+        </note>
       </conbody>
     </concept>
 
@@ -859,6 +1007,64 @@ within UDAs, you can return without specifying a value.
         </p>
 
 <codeblock>void SetError(const char* error_msg);</codeblock>
+      </conbody>
+    </concept>
+
+    <concept rev="5.0.0" id="udf_cancellation">
+      <title>Responding to Query Cancellation</title>
+      <conbody>
+        <p>
+          Starting in <keyword keyref="impala50"/>, a native UDF or UDA can check the
+          cancellation state through the <codeph>FunctionContext</codeph> passed to it:
+        </p>
+
+<codeblock>bool IsQueryCancelled() const;</codeblock>
+
+        <p>
+          The method returns <codeph>true</codeph> when Impala marks the local query
+          runtime state as canceled, and <codeph>false</codeph> otherwise. A
+          <codeph>false</codeph> result does not prevent the query from being canceled
+          later.
+        </p>
+        <p>
+          For long-running work, check the state periodically. When it is
+          <codeph>true</codeph>, stop the work, release any resources that your function
+          owns, and return an appropriate value or, for a <codeph>void</codeph> UDA
+          callback, return without a value. The check does not cancel the query or
+          interrupt blocking I/O. Use bounded operations or timeouts so that your function
+          can check again.
+        </p>
+        <p>
+          For example, this UDF checks for cancellation while counting nonzero bytes:
+        </p>
+
+<codeblock>#include &lt;impala_udf/udf.h&gt;
+
+using namespace impala_udf;
+
+IMPALA_UDF_EXPORT
+IntVal CountNonZero(FunctionContext* context, const StringVal&amp; value) {
+  if (value.is_null) return IntVal::null();
+  int count = 0;
+  for (int i = 0; i &lt; value.len; ++i) {
+    if (i % 4096 == 0 &amp;&amp; context-&gt;IsQueryCancelled()) {
+      return IntVal::null();
+    }
+    if (value.ptr[i] != 0) ++count;
+  }
+  return IntVal(count);
+}</codeblock>
+
+        <p>
+          Returning a null value exits the UDF; it does not initiate cancellation.
+        </p>
+        <note>
+          Do not call <codeph>IsQueryCancelled()</codeph> under the standalone UDF test
+          harness. The harness does not provide query runtime state, so the call aborts
+          the test. For example, testing <codeph>CountNonZero()</codeph> with a
+          non-empty value aborts. Test cancellation against a running Impala query
+          instead.
+        </note>
       </conbody>
     </concept>
   </concept>
