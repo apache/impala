@@ -3223,8 +3223,7 @@ flight_num:           INT32 SNAPPY DO:83456393 FPO:83488603 SZ:10216514/11474301
 
         <p>
           If you created compressed Parquet files through some tool other than Impala, make sure
-          that any compression codecs are supported in Parquet by Impala. For example, Impala
-          does not currently support LZO compression in Parquet files. Also doublecheck that you
+          that any compression codecs are supported in Parquet by Impala. Also doublecheck that you
           used any recommended compatibility settings in the other tool, such as
           <codeph>spark.sql.parquet.binaryAsString</codeph> when writing Parquet files through
           Spark.

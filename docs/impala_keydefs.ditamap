@@ -160,7 +160,6 @@ under the License.
   <keydef href="http://stat-computing.org/dataexpo/2009/" scope="external" format="html" keys="dataexpo-2009"/>
   <keydef href="http://stat-computing.org/dataexpo/2009/the-data.html" scope="external" format="html" keys="dataexpo-2009-the-data"/>
 
-  <keydef href="http://www.lzop.org/" scope="external" format="html" keys="lzop.org"/>
 
 <!-- Links to Wikipedia pages for background on industry terminology. -->
   <keydef href="https://en.wikipedia.org/wiki/Base64" scope="external" format="html" keys="base64">
@@ -328,7 +327,6 @@ under the License.
   <keydef href="https://cwiki.apache.org/confluence/display/Hive/AvroSerDe" scope="external" format="html" keys="AvroSerDe"/>
   <keydef href="https://cwiki.apache.org/confluence/display/Hive/HBaseIntegration" scope="external" format="html" keys="HBaseIntegration"/>
   <keydef href="https://cwiki.apache.org/confluence/display/Hive/LanguageManual+DDL#LanguageManualDDL-Keywords,Non-reservedKeywordsandReservedKeywords" scope="external" format="html" keys="hive_reserved_words"/>
-  <keydef href="https://cwiki.apache.org/confluence/display/Hive/LanguageManual+LZO" scope="external" format="html" keys="hive_lzo"/>
   <keydef href="https://cwiki.apache.org/confluence/display/Hive/LanguageManual+UDF" scope="external" format="html" keys="hive_udf"/>
   <keydef href="https://cwiki.apache.org/confluence/display/Hive/StatsDev" scope="external" format="html" keys="StatsDev"/>
 
@@ -11030,7 +11028,6 @@ under the License.
   <keydef href="topics/impala_txtfile.xml#text_ddl" keys="text_ddl"/>
   <keydef href="topics/impala_txtfile.xml#text_data_files" keys="text_data_files"/>
   <keydef href="topics/impala_txtfile.xml#text_etl" keys="text_etl"/>
-  <keydef href="topics/impala_txtfile.xml#lzo" keys="lzo"/>
   <keydef href="topics/impala_txtfile.xml#gzip" keys="gzip"/>
   <keydef audience="hidden" href="topics/impala_txtfile.xml#txtfile_data_types" keys="txtfile_data_types"/>
 

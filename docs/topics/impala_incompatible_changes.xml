@@ -1344,8 +1344,6 @@ ALTER TABLE <varname>table_name</varname> SET FILEFORMAT
 </codeblock>
       <p> Impala 1.1.1 and higher can reuse Parquet data files created by Hive,
         without any action required. </p>
-      <p> As usual, make sure to upgrade the Impala LZO package to the latest
-        level at the same time as you upgrade the Impala server. </p>
     </conbody>
   </concept>
   <concept id="incompatible_changes_11">
@@ -1371,16 +1369,6 @@ ALTER TABLE <varname>table_name</varname> SET FILEFORMAT
               href="impala_invalidate_metadata.xml#invalidate_metadata"/> for
             the latest details about these statements. </p>
         </li>
-      </ul>
-    </conbody>
-  </concept>
-  <concept id="incompatible_changes_10">
-    <title>Incompatible Changes Introduced in Impala 1.0</title>
-    <conbody>
-      <ul>
-        <li> If you use LZO-compressed text files, when you upgrade Impala to
-          version 1.0, also update the Impala LZO package to the latest level.
-          See <xref href="impala_txtfile.xml#lzo"/> for details. </li>
       </ul>
     </conbody>
   </concept>

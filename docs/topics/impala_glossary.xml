@@ -237,15 +237,6 @@ under the License.
       <p></p>
     </section>
 
-    <section id="glos_lzo">
-
-      <title>LZO</title>
-
-      <p>
-        A compression codec.
-      </p>
-    </section>
-
     <section id="glos_gzip">
 
       <title>gzip</title>

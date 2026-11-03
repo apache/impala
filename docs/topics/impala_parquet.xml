@@ -923,8 +923,7 @@ The filesystem under path '/user/impala/warehouse/parquet_compression.db/parquet
           and dictionary encoding, based on analysis of the actual data values. Once the data
           values are encoded in a compact form, the encoded data can optionally be further
           compressed using a compression algorithm. Parquet data files created by Impala can use
-          Snappy, GZip, or no compression; the Parquet spec also allows LZO compression, but
-          currently Impala does not support LZO-compressed Parquet files.
+          Snappy, GZip, zstd, LZ4, or no compression.
         </p>
 
         <p>

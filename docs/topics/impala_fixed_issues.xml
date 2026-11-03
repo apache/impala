@@ -5695,33 +5695,6 @@ hive&gt; NULL</codeblock>
       </conbody>
     </concept>
 
-    <concept id="IMPALA-234">
-
-      <title>Add some library version validation logic to impalad when loading impala-lzo shared library</title>
-
-      <conbody>
-
-        <p>
-          No validation was done to check that the <codeph>impala-lzo</codeph> shared library was compatible with
-          the version of Impala, possibly leading to a crash when using LZO-compressed text files.
-        </p>
-
-        <p>
-          <b>Bug:</b>
-          <xref keyref="IMPALA-234">IMPALA-234</xref>
-        </p>
-
-        <p>
-          <b>Resolution:</b> Fixed
-        </p>
-
-        <p>
-          <b>Workaround:</b> Always upgrade the <codeph>impala-lzo</codeph> library at the same time as you upgrade
-          Impala itself.
-        </p>
-      </conbody>
-    </concept>
-
     <concept id="IMPALA-238">
 
       <title>Problems inserting into tables with TIMESTAMP partition columns leading table metadata loading failures and failed dchecks</title>

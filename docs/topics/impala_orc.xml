@@ -160,10 +160,9 @@ Fetched 3 row(s) in 0.11s</codeblock>
 
       <p>
         <indexterm audience="hidden">compression</indexterm>
-        ORC tables are in zlib (Deflate in Impala) compression in default. You may want
-        to use Snappy or LZO compression on existing tables for different balance between
-        compression ratio and decompression speed. In Hive-1.1.0, the supported
-        compressions for ORC tables are NONE, ZLIB, SNAPPY and LZO.
+        ORC tables are in zlib (Deflate in Impala) compression by default. You may want
+        to use Snappy compression on existing tables for a different balance between
+        compression ratio and decompression speed.
         For example, to enable Snappy compression, you would specify
         the following additional settings when loading data through the Hive shell:
       </p>
@@ -214,7 +213,8 @@ hive&gt; INSERT OVERWRITE TABLE tbl_orc PARTITION(year) SELECT * FROM tbl;</code
         </p>
 <codeblock>SET orc.compress=SNAPPY;</codeblock>
         <p>
-          You could elect to specify alternative codecs such as <codeph>NONE, GZIP, LZO</codeph> here.
+          You could elect to specify alternative codecs such as <codeph>NONE</codeph>,
+          <codeph>ZLIB</codeph>, <codeph>LZ4</codeph>, or <codeph>ZSTD</codeph> here.
         </p>
       </note>
     </conbody>

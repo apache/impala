@@ -123,7 +123,7 @@ under the License.
               Structured
             </entry>
             <entry>
-              gzip, Snappy, LZO, LZ4; currently gzip by default
+              gzip, Snappy, LZ4, zstd; currently gzip by default
             </entry>
             <entry> Yes, in Impala 2.12.0 and higher. <p>By default, ORC reads are enabled in Impala
               3.4.0 and higher. </p>
@@ -141,16 +141,14 @@ under the License.
             <entry>
               Unstructured
             </entry>
-            <entry rev="2.0.0">bzip2, deflate, gzip, LZO, Snappy, zstd</entry>
+            <entry rev="2.0.0">bzip2, deflate, gzip, Snappy, zstd</entry>
             <entry>
               Yes. For <codeph>CREATE TABLE</codeph> with no <codeph>STORED AS</codeph> clause,
               the default file format is uncompressed text, with values separated by ASCII
               <codeph>0x01</codeph> characters (typically represented as Ctrl-A).
             </entry>
-            <entry> Yes if uncompressed.<p>No if compressed.</p><p>If LZO
-                compression is used, you must create the table and load data in
-                Hive.</p><p>If other kinds of compression are used, you must
-                load data through <codeph>LOAD DATA</codeph>, Hive, or manually
+            <entry> Yes if uncompressed.<p>No if compressed.</p><p>If
+                compression is used, you must load data through <codeph>LOAD DATA</codeph>, Hive, or manually
                 in HDFS. </p></entry>
           </row>
           <row id="avro_support">
@@ -297,21 +295,6 @@ under the License.
 
       </dlentry>
 
-      <dlentry rev="2.0.0">
-
-        <dt>
-          LZO
-        </dt>
-
-        <dd>
-          <p>
-            For text files only. Impala can query LZO-compressed text tables, but currently
-            cannot create them or insert data into them. You need to perform these operations in
-            Hive.
-          </p>
-        </dd>
-
-      </dlentry>
       <dlentry>
         <dt>Zstd</dt>
         <dd>For Parquet and text files only.</dd>

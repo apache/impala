@@ -81,8 +81,7 @@ under the License.
         In the interest of speed, only limited error checking is done. If the loaded files have the wrong file
         format, different columns than the destination table, or other kind of mismatch, Impala does not raise any
         error for the <codeph>LOAD DATA</codeph> statement. Querying the table afterward could produce a runtime
-        error or unexpected results. Currently, the only checking the <codeph>LOAD DATA</codeph> statement does is
-        to avoid mixing together uncompressed and LZO-compressed text files in the same table.
+        error or unexpected results.
       </li>
 
       <li>
