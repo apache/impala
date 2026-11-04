@@ -88,7 +88,7 @@ class PlanNode {
   static Status CreateTree(FragmentState* state, const TPlan& plan, PlanNode** root);
 
   /// Recursively calls Codegen() on all children.
-  /// Expected to be overriden in subclass to generate LLVM IR functions and register
+  /// Expected to be overridden in subclass to generate LLVM IR functions and register
   /// them with the LlvmCodeGen object. The function pointers of the compiled IR functions
   /// will be set up when the LlvmCodeGen object is finalized. If overridden in subclass,
   /// must also call superclass's Codegen() before or after the code generation for this
