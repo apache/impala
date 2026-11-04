@@ -105,7 +105,8 @@ public:
 
 int main(int argc, char ** argv) {
   google::ParseCommandLineFlags(&argc, &argv, true);
-  impala::InitCommonRuntime(argc, argv, true, impala::TestInfo::BE_TEST);
+  auto common_runtime_ctx =
+      impala::InitCommonRuntime(argc, argv, true, impala::TestInfo::BE_TEST);
   impala::HashRingDistributionCheck::TestDistribution(FLAGS_num_hosts,
       FLAGS_num_replicas);
   return 0;

@@ -367,7 +367,7 @@ using namespace impala;
 
 int main(int argc, char **argv) {
   ::testing::InitGoogleTest(&argc, argv);
-  InitCommonRuntime(argc, argv, true, TestInfo::BE_TEST);
+  auto common_runtime_ctx = InitCommonRuntime(argc, argv, true, TestInfo::BE_TEST);
   InitFeSupport();
   ABORT_IF_ERROR(LlvmCodeGen::InitializeLlvm());
 

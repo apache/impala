@@ -1004,7 +1004,8 @@ TEST_P(DataCacheTest, ChangeConfBeforeLoad) {
 
 int main(int argc, char **argv) {
   ::testing::InitGoogleTest(&argc, argv);
-  impala::InitCommonRuntime(argc, argv, true, impala::TestInfo::BE_TEST);
+  auto common_runtime_ctx =
+      impala::InitCommonRuntime(argc, argv, true, impala::TestInfo::BE_TEST);
   impala::InitFeSupport();
   int rand_seed = time(NULL);
   LOG(INFO) << "rand_seed: " << rand_seed;

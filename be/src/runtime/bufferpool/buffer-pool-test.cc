@@ -2506,7 +2506,8 @@ TEST_F(BufferPoolTest, ShortDebugString) {
 
 int main(int argc, char** argv) {
   ::testing::InitGoogleTest(&argc, argv);
-  impala::InitCommonRuntime(argc, argv, true, impala::TestInfo::BE_TEST);
+  auto common_runtime_ctx =
+      impala::InitCommonRuntime(argc, argv, true, impala::TestInfo::BE_TEST);
   impala::InitFeSupport();
   ABORT_IF_ERROR(impala::LlvmCodeGen::InitializeLlvm());
   int result = 0;

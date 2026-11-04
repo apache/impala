@@ -416,9 +416,12 @@ class RowBatchSerializeBenchmark {
 } // namespace impala
 
 int main(int argc, char** argv) {
-  impala::InitCommonRuntime(argc, argv, true, impala::TestInfo::BE_TEST);
+  auto common_runtime_ctx =
+      impala::InitCommonRuntime(argc, argv, true, impala::TestInfo::BE_TEST);
   InitFeSupport();
   fe.reset(new Frontend());
   RowBatchSerializeBenchmark::Run();
+  // Destroy the Frontend before 'common_runtime_ctx' shuts down the JVM.
+  fe.reset();
   return 0;
 }

@@ -92,7 +92,12 @@ class TAcceptQueueServer::Task : public Runnable {
       // detect "MaxMessageSize" and print it along with advice on how to address it.
       bool hit_max_message_size =
           std::string(ttx.what()).find("MaxMessageSize") != std::string::npos;
-      if (ttx.getType() != TTransportException::END_OF_FILE || hit_max_message_size) {
+      bool interrupted_by_stop = ttx.getType() == TTransportException::INTERRUPTED
+          && server_.stop_;
+      if (interrupted_by_stop) {
+        // The server is shutting down, so this is expected.
+      } else if (ttx.getType() != TTransportException::END_OF_FILE
+          || hit_max_message_size) {
         string errStr = string("TAcceptQueueServer client died: ") + ttx.what();
         TOutput::instance()(errStr.c_str());
         if (hit_max_message_size) {

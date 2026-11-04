@@ -16,6 +16,9 @@
 // under the License.
 
 
+#include <optional>
+
+#include "common/init.h"
 #include "service/fe-support.h"
 #include "testutil/gtest-util.h"
 #include "common/names.h"
@@ -38,8 +41,10 @@ int main(int argc, char** argv) {
     }
   }
   ::testing::InitGoogleTest(&argc, argv);
+  std::optional<impala::CommonRuntimeCtx> common_runtime_ctx;
   if (!list_tests_only) {
-    impala::InitCommonRuntime(argc, argv, true, impala::TestInfo::BE_TEST);
+    common_runtime_ctx.emplace(
+        impala::InitCommonRuntime(argc, argv, true, impala::TestInfo::BE_TEST));
     impala::InitFeSupport();
     uint32_t seed = time(NULL);
     cout << "seed = " << seed << endl;

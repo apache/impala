@@ -42,6 +42,7 @@
 #include "util/openssl-util.h"
 #include "util/collection-metrics.h"
 #include "util/scope-exit-trigger.h"
+#include "util/test-info.h"
 #include "util/time.h"
 
 #include "common/names.h"
@@ -303,6 +304,11 @@ bool StatestoreSubscriber::IsInPostRecoveryGracePeriod() {
 bool StatestoreSubscriber::IsRegistered() {
   StatestoreStub* active_statestore = GetActiveStatestore();
   return (active_statestore != nullptr) ? active_statestore->IsRegistered() : false;
+}
+
+void StatestoreSubscriber::ShutdownForTesting() {
+  CHECK(TestInfo::is_be_test()) << "Only valid to call in backend tests.";
+  if (heartbeat_server_ != nullptr) heartbeat_server_->StopForTesting();
 }
 
 Status StatestoreSubscriber::Start() {

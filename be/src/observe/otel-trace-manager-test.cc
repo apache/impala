@@ -116,6 +116,11 @@ TEST(OtelTraceManagerTest, TraceQueryNotCalled) {
 
   shutdown_otel_tracer();
 
+  // Stop the Thrift and KRPC threads, which can be attached to the JVM and would
+  // otherwise prevent the JVM from shutting down at exit.
+  statestore->ShutdownForTesting();
+  impala_server_->ShutdownForTesting();
+
   EXPECT_FALSE(filesystem::exists(trace_file));
 } // test OtelTraceManagerTest.TraceQueryNotCalled
 

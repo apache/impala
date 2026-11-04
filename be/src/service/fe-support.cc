@@ -80,7 +80,8 @@ Java_org_apache_impala_service_FeSupport_NativeFeInit(
   // Init the JVM to load the classes in JniUtil that are needed for returning
   // exceptions to the FE.
   InitCommonRuntime(1, &name, true,
-      external_fe ? TestInfo::NON_TEST : TestInfo::FE_TEST, external_fe);
+      external_fe ? TestInfo::NON_TEST : TestInfo::FE_TEST, external_fe)
+      .Release();
   THROW_IF_ERROR(
       LlvmCodeGen::InitializeLlvm(name, true), env, JniUtil::internal_exc_class());
   ExecEnv* exec_env = new ExecEnv(external_fe); // This also caches it from the process.

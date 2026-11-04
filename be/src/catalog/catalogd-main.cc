@@ -69,7 +69,7 @@ int CatalogdMain(int argc, char** argv) {
     FLAGS_state_store_subscriber_port = 23020;
   }
 
-  InitCommonRuntime(argc, argv, true);
+  InitCommonRuntime(argc, argv, true).Release();
   InitFeSupport();
 
   DaemonEnv daemon_env("catalog");

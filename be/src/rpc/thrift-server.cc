@@ -450,7 +450,9 @@ void ThriftServer::StopForTesting() {
   DCHECK(server_thread_ != NULL);
   DCHECK(server_);
   server_->stop();
-  if (started_) Join();
+  // Always join the server thread, even if Supervise() has already exited. 'started_' is
+  // written by Supervise() under a lock that is not held here, so it must not be read.
+  server_thread_->Join();
 }
 
 void ThriftServer::GetConnectionContextList(ConnectionContextList* connection_contexts) {

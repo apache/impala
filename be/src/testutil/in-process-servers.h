@@ -60,6 +60,10 @@ class InProcessImpalaServer {
   /// servers.
   Status StartWithClientServers(int beeswax_port, int hs2_port, int hs2_http_port);
 
+  /// Stops the statestore subscriber's Thrift server and the KRPC services. Only used
+  /// for testing.
+  void ShutdownForTesting();
+
   /// Blocks until the backend server exits. Returns Status::OK unless
   /// there was an error joining.
   Status Join();

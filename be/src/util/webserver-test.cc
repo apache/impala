@@ -850,7 +850,7 @@ TEST(Webserver, Options) {
 
 int main(int argc, char **argv) {
   ::testing::InitGoogleTest(&argc, argv);
-  InitCommonRuntime(argc, argv, false, TestInfo::BE_TEST);
+  auto common_runtime_ctx = InitCommonRuntime(argc, argv, false, TestInfo::BE_TEST);
   FLAGS_webserver_port = 27890;
   return RUN_ALL_TESTS();
 }

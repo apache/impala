@@ -60,7 +60,7 @@ DECLARE_int32(external_fe_port);
 DECLARE_bool(is_coordinator);
 
 int ImpaladMain(int argc, char** argv) {
-  InitCommonRuntime(argc, argv, true);
+  InitCommonRuntime(argc, argv, true).Release();
 
   ABORT_IF_ERROR(LlvmCodeGen::InitializeLlvm(argv[0]));
   JniUtil::InitLibhdfs();

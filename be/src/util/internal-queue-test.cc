@@ -304,6 +304,7 @@ int main(int argc, char **argv) {
   return 0;
 #endif
   ::testing::InitGoogleTest(&argc, argv);
-  impala::InitCommonRuntime(argc, argv, false, impala::TestInfo::BE_TEST);
+  auto common_runtime_ctx =
+      impala::InitCommonRuntime(argc, argv, false, impala::TestInfo::BE_TEST);
   return RUN_ALL_TESTS();
 }

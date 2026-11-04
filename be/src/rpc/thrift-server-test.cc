@@ -782,7 +782,8 @@ TEST(NoPasswordPemFile, BadServerCertificate) {
 
 int main(int argc, char** argv) {
   ::testing::InitGoogleTest(&argc, argv);
-  impala::InitCommonRuntime(argc, argv, false, impala::TestInfo::BE_TEST);
+  auto common_runtime_ctx =
+      impala::InitCommonRuntime(argc, argv, false, impala::TestInfo::BE_TEST);
   FLAGS_thrift_external_rpc_max_message_size = 128 * 1024;
 
   int port = impala::FindUnusedEphemeralPort();

@@ -163,7 +163,8 @@ void RunNumBlocksBenchmark(TReplicaPreference::type replica_preference) {
 }
 
 int main(int argc, char** argv) {
-  impala::InitCommonRuntime(argc, argv, true, impala::TestInfo::BE_TEST);
+  auto common_runtime_ctx =
+      impala::InitCommonRuntime(argc, argv, true, impala::TestInfo::BE_TEST);
   impala::InitFeSupport();
   ABORT_IF_ERROR(LlvmCodeGen::InitializeLlvm());
 

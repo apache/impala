@@ -21,6 +21,7 @@
 #include <stdlib.h>
 
 #include "statestore/statestore.h"
+#include "rpc/rpc-mgr.h"
 #include "rpc/thrift-util.h"
 #include "rpc/thrift-server.h"
 #include "util/network-util.h"
@@ -99,6 +100,12 @@ Status InProcessImpalaServer::StartWithClientServers(
   // Wait for up to 1s for the backend server to start
   RETURN_IF_ERROR(WaitForServer(FLAGS_hostname, krpc_port_, 10, 100));
   return Status::OK();
+}
+
+void InProcessImpalaServer::ShutdownForTesting() {
+  exec_env_->subscriber()->ShutdownForTesting();
+  // Stops the KRPC service threads, which can be attached to the JVM.
+  exec_env_->rpc_mgr()->Shutdown();
 }
 
 Status InProcessImpalaServer::Join() {

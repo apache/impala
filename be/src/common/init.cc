@@ -18,6 +18,8 @@
 #include "common/init.h"
 
 #include <csignal>
+#include <cstdlib>
+#include <cstring>
 #include <regex>
 #include <string_view>
 #include <boost/filesystem.hpp>
@@ -433,7 +435,14 @@ static Status JavaSetProcessName(const string& name) {
   return Status::OK();
 }
 
-void impala::InitCommonRuntime(int argc, char** argv, bool init_jvm,
+impala::CommonRuntimeCtx::~CommonRuntimeCtx() {
+  if (!owns_jvm_) return;
+  const char* skip = getenv("IMPALA_BETEST_SKIP_JVM_SHUTDOWN");
+  if (skip != nullptr && skip[0] != '\0' && strcmp(skip, "0") != 0) return;
+  JniUtil::ShutdownJvm();
+}
+
+impala::CommonRuntimeCtx impala::InitCommonRuntime(int argc, char** argv, bool init_jvm,
     TestInfo::Mode test_mode, bool external_fe) {
   srand(time(NULL));
   BlockImpalaShutdownSignal();
@@ -690,6 +699,9 @@ void impala::InitCommonRuntime(int argc, char** argv, bool init_jvm,
     // Impala daemons load it through ImpaladMain
     ABORT_IF_ERROR(TimezoneDatabase::Initialize());
   }
+
+  return CommonRuntimeCtx(init_jvm && !external_fe
+      && (test_mode == TestInfo::BE_TEST || test_mode == TestInfo::BE_CLUSTER_TEST));
 }
 
 Status impala::StartMemoryMaintenanceThread() {

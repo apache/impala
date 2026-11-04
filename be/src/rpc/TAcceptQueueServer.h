@@ -22,6 +22,8 @@
 #ifndef IMPALA_RPC_TACCEPTQUEUESERVER_H
 #define IMPALA_RPC_TACCEPTQUEUESERVER_H
 
+#include <atomic>
+
 #include <thrift/concurrency/Monitor.h>
 #include <thrift/concurrency/ThreadFactory.h>
 #include <thrift/server/TServer.h>
@@ -73,6 +75,9 @@ class TAcceptQueueServer : public TServer {
   void stop() override {
     stop_ = true;
     serverTransport_->interrupt();
+    // Wake up connection threads blocked waiting for requests on accepted sockets so
+    // that serve() does not wait for clients to disconnect before it returns.
+    serverTransport_->interruptChildren();
   }
 
   // New - Adds a metric for the size of the queue of connections waiting to be setup to
@@ -93,7 +98,7 @@ class TAcceptQueueServer : public TServer {
       const std::shared_ptr<TTransport>& client);
 
   std::shared_ptr<ThreadFactory> threadFactory_;
-  volatile bool stop_ = false;
+  std::atomic<bool> stop_{false};
 
   /// Name of the thrift server.
   const std::string name_;

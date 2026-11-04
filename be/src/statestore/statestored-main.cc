@@ -53,7 +53,7 @@ int StatestoredMain(int argc, char** argv) {
   if (google::GetCommandLineFlagInfoOrDie("webserver_port").is_default) {
     FLAGS_webserver_port = 25010;
   }
-  InitCommonRuntime(argc, argv, false);
+  InitCommonRuntime(argc, argv, false).Release();
 
   DaemonEnv daemon_env("statestore");
   ABORT_IF_ERROR(daemon_env.Init(/* init_jvm */ false));

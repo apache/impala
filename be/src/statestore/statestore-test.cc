@@ -124,7 +124,8 @@ TEST(StatestoreSslTest, InvalidCertSmokeTest) {
 
 int main(int argc, char** argv) {
   ::testing::InitGoogleTest(&argc, argv);
-  impala::InitCommonRuntime(argc, argv, false, impala::TestInfo::BE_TEST);
+  auto common_runtime_ctx =
+      impala::InitCommonRuntime(argc, argv, false, impala::TestInfo::BE_TEST);
   perm_objects = new ObjectPool;
   IGNORE_LEAKING_OBJECT(perm_objects);
   return RUN_ALL_TESTS();

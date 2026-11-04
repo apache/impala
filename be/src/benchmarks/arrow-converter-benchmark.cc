@@ -149,7 +149,8 @@ void TestArrowToArrowCopy(int batch_size, void* d) {
 }
 
 int main(int argc, char** argv) {
-  impala::InitCommonRuntime(argc, argv, true, impala::TestInfo::BE_TEST);
+  auto common_runtime_ctx =
+      impala::InitCommonRuntime(argc, argv, true, impala::TestInfo::BE_TEST);
   cout << Benchmark::GetMachineInfo() << endl;
   impala::InitFeSupport();
 

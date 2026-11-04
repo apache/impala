@@ -224,7 +224,8 @@ TEST_F(SystemAllocatorTest, LargeAllocFailure) {
 
 int main(int argc, char** argv) {
   ::testing::InitGoogleTest(&argc, argv);
-  impala::InitCommonRuntime(argc, argv, true, impala::TestInfo::BE_TEST);
+  auto common_runtime_ctx =
+      impala::InitCommonRuntime(argc, argv, true, impala::TestInfo::BE_TEST);
   impala::InitFeSupport();
   int result = 0;
   for (bool mmap : {false, true}) {

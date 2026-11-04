@@ -290,6 +290,10 @@ class JniUtil {
   /// Call this prior to any libhdfs calls.
   static void InitLibhdfs();
 
+  /// Destroys the JVM. Must be called from the main thread (which blocks until all
+  /// non-daemon Java threads exit). No JNI calls may be made after this returns.
+  static void ShutdownJvm();
+
   /// Returns the JNIEnv attached to the current thread, attaching it
   /// if necessary. Always returns a valid non-NULL value.
   static JNIEnv* GetJNIEnv() {

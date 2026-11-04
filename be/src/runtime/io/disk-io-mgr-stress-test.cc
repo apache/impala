@@ -44,7 +44,8 @@ DEFINE_int64(duration_sec, DEFAULT_DURATION_SEC,
     "Disk I/O Manager stress test duration in seconds. 0 means run indefinitely.");
 
 int main(int argc, char** argv) {
-  impala::InitCommonRuntime(argc, argv, true, impala::TestInfo::BE_TEST);
+  auto common_runtime_ctx =
+      impala::InitCommonRuntime(argc, argv, true, impala::TestInfo::BE_TEST);
   impala::InitFeSupport();
 
   if (FLAGS_duration_sec != 0) {

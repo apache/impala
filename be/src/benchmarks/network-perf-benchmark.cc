@@ -204,7 +204,8 @@ bool ProcessCommand(const vector<string>& tokens) {
 
 int main(int argc, char** argv) {
   google::ParseCommandLineFlags(&argc, &argv, true);
-  impala::InitCommonRuntime(argc, argv, false, impala::TestInfo::BE_TEST);
+  auto common_runtime_ctx =
+      impala::InitCommonRuntime(argc, argv, false, impala::TestInfo::BE_TEST);
 
   if (argc != 1) {
     // Just run client from command line args

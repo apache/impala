@@ -127,14 +127,18 @@ TEST(SessionTest, TestExpiry) {
   // work). Sleep to allow the threads closing the session to complete before tearing down
   // the server.
   SleepForMs(1000);
+  // Stop the Thrift and KRPC threads, which can be attached to the JVM and would
+  // otherwise prevent the JVM from shutting down at exit.
   statestore->ShutdownForTesting();
+  impala->ShutdownForTesting();
 }
 
 } // namespace impala
 
 int main(int argc, char** argv) {
   ::testing::InitGoogleTest(&argc, argv);
-  impala::InitCommonRuntime(argc, argv, true, impala::TestInfo::BE_TEST);
+  auto common_runtime_ctx =
+      impala::InitCommonRuntime(argc, argv, true, impala::TestInfo::BE_TEST);
   InitFeSupport();
   perm_objects = new ObjectPool;
   IGNORE_LEAKING_OBJECT(perm_objects);

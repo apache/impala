@@ -742,7 +742,8 @@ TEST_F(DecompressorTest, LZ4Blocked) {
 
 int main(int argc, char **argv) {
   ::testing::InitGoogleTest(&argc, argv);
-  impala::InitCommonRuntime(argc, argv, false, impala::TestInfo::BE_TEST);
+  auto common_runtime_ctx =
+      impala::InitCommonRuntime(argc, argv, false, impala::TestInfo::BE_TEST);
   int rand_seed = time(NULL);
   LOG(INFO) << "rand_seed: " << rand_seed;
   srand(rand_seed);

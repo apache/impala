@@ -169,7 +169,7 @@ Status ValidateFlags() {
 }
 
 int main(int argc, char **argv) {
-  InitCommonRuntime(argc, argv, false);
+  auto common_runtime_ctx = InitCommonRuntime(argc, argv, false);
 
   Status status = ValidateFlags();
   if (!status.ok()) CLEAN_EXIT_WITH_ERROR(status.GetDetail());

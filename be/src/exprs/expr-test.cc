@@ -106,6 +106,7 @@ const char* TEST_TZ_WITHOUT_DST = "America/Anguilla";
 scoped_ptr<ImpaladQueryExecutor> executor_;
 MetricGroup* statestore_metrics;
 Statestore* statestore;
+InProcessImpalaServer* in_process_server;
 
 template <typename ORIGINAL_TYPE, typename VAL_TYPE>
 string LiteralToString(VAL_TYPE val) {
@@ -246,6 +247,7 @@ class ExprTest : public testing::TestWithParam<std::tuple<bool, bool>> {
     ABORT_IF_ERROR(InProcessImpalaServer::StartWithEphemeralPorts(
         FLAGS_hostname, statestore->port(), &impala_server));
     IGNORE_LEAKING_OBJECT(impala_server);
+    in_process_server = impala_server;
 
     executor_.reset(
         new ImpaladQueryExecutor(FLAGS_hostname, impala_server->GetBeeswaxPort()));
@@ -256,6 +258,11 @@ class ExprTest : public testing::TestWithParam<std::tuple<bool, bool>> {
     // Teardown before global destructors to avoid a race where JvmMetricCache is
     // destroyed before the last query is closed.
     executor_.reset();
+    // Stop the servers' Thrift connection threads, which can be attached to the JVM
+    // and would otherwise prevent the JVM from shutting down at exit. The statestore
+    // goes first so no more updates reach the subscriber.
+    statestore->ShutdownForTesting();
+    in_process_server->ShutdownForTesting();
   }
 
  protected:

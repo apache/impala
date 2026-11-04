@@ -79,7 +79,8 @@ TEST(CollectionValueBuilderTest, MaxBufferSize) {
 
 int main(int argc, char** argv) {
   ::testing::InitGoogleTest(&argc, argv);
-  InitCommonRuntime(argc, argv, true, impala::TestInfo::BE_TEST);
+  auto common_runtime_ctx =
+      InitCommonRuntime(argc, argv, true, impala::TestInfo::BE_TEST);
   InitFeSupport();
   fe.reset(new Frontend());
   return RUN_ALL_TESTS();

@@ -145,7 +145,8 @@ void CreateQueryIds(int num_queries) {
 int main(int argc, char **argv) {
   // Though we don't use the JVM or require FeSupport, the TestEnv class requires it,
   // so we start them up.
-  impala::InitCommonRuntime(argc, argv, true, impala::TestInfo::BE_TEST);
+  auto common_runtime_ctx =
+      impala::InitCommonRuntime(argc, argv, true, impala::TestInfo::BE_TEST);
   impala::InitFeSupport();
 
   const int MAX_QUERIES = 1000;
@@ -171,5 +172,8 @@ int main(int argc, char **argv) {
 
   // TODO: Benchmark lock of ClientRequestStates too.
 
+  // Destroy the TestEnv before 'common_runtime_ctx' shuts down the JVM. Otherwise it
+  // would be destroyed at process exit and call into the JVM after it is gone.
+  test_env_.reset();
   return 0;
 }

@@ -595,7 +595,8 @@ int main(int argc, char** argv) {
   ThreadDebugInfo debugInfo;
 
   testing::InitGoogleTest(&argc, argv);
-  InitCommonRuntime(argc, argv, true, TestInfo::BE_CLUSTER_TEST);
+  auto common_runtime_ctx =
+      InitCommonRuntime(argc, argv, true, TestInfo::BE_CLUSTER_TEST);
   ABORT_IF_ERROR(LlvmCodeGen::InitializeLlvm(argv[0]));
   JniUtil::InitLibhdfs();
   ABORT_IF_ERROR(JniCatalogCacheUpdateIterator::InitJNI());

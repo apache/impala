@@ -413,7 +413,8 @@ void RunBenchmarks() {
 }
 
 int main(int argc, char **argv) {
-  impala::InitCommonRuntime(argc, argv, true, impala::TestInfo::BE_TEST);
+  auto common_runtime_ctx =
+      impala::InitCommonRuntime(argc, argv, true, impala::TestInfo::BE_TEST);
   impala::InitFeSupport();
   TestEnv test_env;
   int64_t min_page_size = 8;

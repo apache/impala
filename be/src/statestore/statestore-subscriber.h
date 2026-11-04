@@ -79,6 +79,10 @@ class StatestoreSubscriber {
 
   virtual ~StatestoreSubscriber() {}
 
+  /// Stops the heartbeat Thrift server, including its open connections. Only used for
+  /// testing. This is not a complete shutdown: the object cannot be destroyed.
+  void ShutdownForTesting();
+
   /// A TopicDeltaMap is passed to each callback. See UpdateCallback for more details.
   typedef std::map<Statestore::TopicId, TTopicDelta> TopicDeltaMap;
 

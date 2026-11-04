@@ -314,7 +314,8 @@ int64_t GetMemoryBytesConsumed(HashTable* ht) {
 }
 
 int main(int argc, char** argv) {
-  impala::InitCommonRuntime(argc, argv, true, impala::TestInfo::BE_TEST);
+  auto common_runtime_ctx =
+      impala::InitCommonRuntime(argc, argv, true, impala::TestInfo::BE_TEST);
   impala::InitFeSupport();
   /// Runtime Benchmark
   std::cout << Benchmark::GetMachineInfo() << std::endl;

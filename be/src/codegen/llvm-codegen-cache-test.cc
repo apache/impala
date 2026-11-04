@@ -689,7 +689,8 @@ TEST_F(LlvmCodeGenCacheTest, ConcurrentStore) {
 
 int main(int argc, char** argv) {
   ::testing::InitGoogleTest(&argc, argv);
-  impala::InitCommonRuntime(argc, argv, true, impala::TestInfo::BE_TEST);
+  auto common_runtime_ctx =
+      impala::InitCommonRuntime(argc, argv, true, impala::TestInfo::BE_TEST);
   impala::InitFeSupport(false);
   ABORT_IF_ERROR(impala::LlvmCodeGen::InitializeLlvm());
   return RUN_ALL_TESTS();

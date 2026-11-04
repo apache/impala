@@ -1809,6 +1809,9 @@ void Statestore::MainLoop() {
   subscriber_topic_update_threadpool_.Join();
   subscriber_priority_topic_update_threadpool_.Join();
   subscriber_heartbeat_threadpool_.Join();
+  // Stop accepting connections and wake up the connection threads of the clients that
+  // are still connected (e.g. the subscribers' cached statestore client).
+  if (thrift_server_ != nullptr) thrift_server_->StopForTesting();
 }
 
 void Statestore::ShutdownForTesting() {

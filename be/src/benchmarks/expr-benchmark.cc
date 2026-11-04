@@ -984,7 +984,8 @@ Benchmark* BenchmarkTimestampFunctions(bool codegen) {
 typedef Benchmark* (*SingleBenchmark)(bool);
 
 int main(int argc, char** argv) {
-  impala::InitCommonRuntime(argc, argv, true, impala::TestInfo::BE_TEST);
+  auto common_runtime_ctx =
+      impala::InitCommonRuntime(argc, argv, true, impala::TestInfo::BE_TEST);
   impala::InitFeSupport(false);
   ABORT_IF_ERROR(impala::LlvmCodeGen::InitializeLlvm());
   ThreadDebugInfo debugInfo;

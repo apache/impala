@@ -289,6 +289,13 @@ JNIEnv* JniUtil::GetJNIEnvSlowPath() {
   return CHECK_NOTNULL(tls_env_);
 }
 
+void JniUtil::ShutdownJvm() {
+  GoogleOnceInit(&g_vm_once, &FindJavaVMOrDie);
+  tls_env_ = nullptr;
+  int rc = g_vm->DestroyJavaVM();
+  if (rc != JNI_OK) LOG(WARNING) << "DestroyJavaVM() failed with error code " << rc;
+}
+
 Status JniUtil::InitJvmPauseMonitor() {
   JNIEnv* env = JniUtil::GetJNIEnv();
   if (!env) return Status("Failed to get/create JVM.");

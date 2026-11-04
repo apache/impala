@@ -38,7 +38,7 @@ int AdmissiondMain(int argc, char** argv) {
   // Override default for webserver port
   FLAGS_webserver_port = 25030;
   FLAGS_state_store_subscriber_port = 23030;
-  InitCommonRuntime(argc, argv, /* init_jvm */ true);
+  InitCommonRuntime(argc, argv, /* init_jvm */ true).Release();
 
   DaemonEnv daemon_env("admissiond");
   ABORT_IF_ERROR(daemon_env.Init(/* init_jvm */ true));

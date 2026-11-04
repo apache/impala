@@ -425,7 +425,8 @@ INSTANTIATE_TEST_SUITE_P(UdsOnAndOff, RpcMgrTest, ::testing::Values(true, false)
 
 int main(int argc, char** argv) {
   ::testing::InitGoogleTest(&argc, argv);
-  impala::InitCommonRuntime(argc, argv, true, impala::TestInfo::BE_TEST);
+  auto common_runtime_ctx =
+      impala::InitCommonRuntime(argc, argv, true, impala::TestInfo::BE_TEST);
   impala::InitFeSupport();
 
   // Fill in the path of the current binary for use by the tests.

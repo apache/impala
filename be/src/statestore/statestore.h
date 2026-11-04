@@ -212,9 +212,9 @@ class Statestore : public CacheLineAligned {
   /// The main processing loop. Runs infinitely.
   void MainLoop();
 
-  /// Shut down some background threads. Only used for testing. Note that this is not
-  /// a clean shutdown because we can't correctly tear down 'thrift_server_', so
-  /// not all background threads are stopped and this object cannot be destroyed.
+  /// Shut down some background threads and the Thrift server. Only used for testing.
+  /// Note that this is not a complete shutdown: not all background threads are stopped
+  /// and this object cannot be destroyed.
   void ShutdownForTesting();
 
   /// Returns the Thrift API interface that proxies requests onto the local Statestore.

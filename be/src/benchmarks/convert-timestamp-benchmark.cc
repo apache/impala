@@ -708,7 +708,8 @@ TimestampVal cctz_to_utc(const TimestampVal& ts_val) {
 
 
 int main(int argc, char* argv[]) {
-  impala::InitCommonRuntime(argc, argv, true, impala::TestInfo::BE_TEST);
+  auto common_runtime_ctx =
+      impala::InitCommonRuntime(argc, argv, true, impala::TestInfo::BE_TEST);
   impala::InitFeSupport();
   TestEnv test_env;
   CHECK(test_env.Init().ok());
