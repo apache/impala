@@ -76,6 +76,7 @@ under the License.
     <guava.version>${env.IMPALA_GUAVA_VERSION}</guava.version>
     <derby.version>${env.IMPALA_DERBY_VERSION}</derby.version>
     <jackson.version>${env.IMPALA_JACKSON_VERSION}</jackson.version>
+    <jackson-annotations.version>${env.IMPALA_JACKSON_ANNOTATIONS_VERSION}</jackson-annotations.version>
     <jackson-databind.version>${env.IMPALA_JACKSON_DATABIND_VERSION}</jackson-databind.version>
     <iceberg.version>${env.IMPALA_ICEBERG_VERSION}</iceberg.version>
     <pac4j.version>${env.IMPALA_PAC4J_VERSION}</pac4j.version>
@@ -418,7 +419,7 @@ under the License.
       <dependency>
         <groupId>com.fasterxml.jackson.core</groupId>
         <artifactId>jackson-annotations</artifactId>
-        <version>${jackson.version}</version>
+        <version>${jackson-annotations.version}</version>
       </dependency>
 
       <dependency>
