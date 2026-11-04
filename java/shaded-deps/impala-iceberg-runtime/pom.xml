@@ -100,12 +100,12 @@ under the License.
     <dependency>
       <groupId>org.apache.httpcomponents.client5</groupId>
       <artifactId>httpclient5</artifactId>
-      <version>5.5</version>
+      <version>${httpclient5.version}</version>
     </dependency>
     <dependency>
       <groupId>org.apache.httpcomponents.core5</groupId>
       <artifactId>httpcore5</artifactId>
-      <version>5.4</version>
+      <version>${httpcore5.version}</version>
     </dependency>
   </dependencies>
 
