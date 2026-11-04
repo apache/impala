@@ -21,6 +21,7 @@
 #include "exec/partitioned-hash-join-node.h"
 
 #include "runtime/buffered-tuple-stream.inline.h"
+#include "runtime/runtime-state.h"
 
 namespace impala {
 
@@ -46,6 +47,19 @@ inline void IR_NO_INLINE PartitionedHashJoinNode::ClearExprResultsPool(
       UNLIKELY(expr_results_pool_->total_allocated_bytes() > expr_results_mem_limit_)) {
     expr_results_pool_->Clear();
   }
+}
+
+// Always inlined: called for every build row in the probe loops.
+inline bool IR_ALWAYS_INLINE PartitionedHashJoinNode::CheckCancelledInProbeLoop(
+    Status* status) {
+  if (LIKELY((++probe_loop_iterations_ & (PROBE_CANCEL_CHECK_INTERVAL - 1)) != 0)) {
+    return false;
+  }
+  if (UNLIKELY(runtime_state_->is_cancelled())) {
+    *status = Status::CANCELLED;
+    return true;
+  }
+  return false;
 }
 
 }

@@ -313,10 +313,12 @@ class PartitionedHashJoinNode : public BlockingJoinNode {
   /// the output batch. It's updated as rows are added to the output batch.
   /// Using a separate variable is probably faster than calling
   /// 'out_batch_iterator->parent()->AtCapacity()' as it avoids unnecessary memory load.
+  /// 'status' is set to CANCELLED if the query is cancelled while probing.
   bool inline ProcessProbeRowInnerJoin(
       ScalarExprEvaluator* const* other_join_conjunct_evals, int num_other_join_conjuncts,
       ScalarExprEvaluator* const* conjunct_evals, int num_conjuncts,
-      RowBatch::Iterator* out_batch_iterator, int* remaining_capacity) WARN_UNUSED_RESULT;
+      RowBatch::Iterator* out_batch_iterator, int* remaining_capacity,
+      Status* status) WARN_UNUSED_RESULT;
 
   /// Probes and updates the hash table for the current probe row for either
   /// RIGHT_SEMI_JOIN or RIGHT_ANTI_JOIN. For RIGHT_SEMI_JOIN, all matching build
@@ -330,11 +332,13 @@ class PartitionedHashJoinNode : public BlockingJoinNode {
   /// the output batch. It's updated as rows are added to the output batch.
   /// Using a separate variable is probably faster than calling
   /// 'out_batch_iterator->parent()->AtCapacity()' as it avoids unnecessary memory load.
+  /// 'status' is set to CANCELLED if the query is cancelled while probing.
   template <int const JoinOp>
   bool inline ProcessProbeRowRightSemiJoins(
       ScalarExprEvaluator* const* other_join_conjunct_evals, int num_other_join_conjuncts,
       ScalarExprEvaluator* const* conjunct_evals, int num_conjuncts,
-      RowBatch::Iterator* out_batch_iterator, int* remaining_capacity) WARN_UNUSED_RESULT;
+      RowBatch::Iterator* out_batch_iterator, int* remaining_capacity,
+      Status* status) WARN_UNUSED_RESULT;
 
   /// Probes the hash table for the current probe row for LEFT_SEMI_JOIN,
   /// LEFT_ANTI_JOIN or NULL_AWARE_LEFT_ANTI_JOIN. The probe row will be appended
@@ -370,7 +374,8 @@ class PartitionedHashJoinNode : public BlockingJoinNode {
   bool inline ProcessProbeRowOuterJoins(
       ScalarExprEvaluator* const* other_join_conjunct_evals, int num_other_join_conjuncts,
       ScalarExprEvaluator* const* conjunct_evals, int num_conjuncts,
-      RowBatch::Iterator* out_batch_iterator, int* remaining_capacity) WARN_UNUSED_RESULT;
+      RowBatch::Iterator* out_batch_iterator, int* remaining_capacity,
+      Status* status) WARN_UNUSED_RESULT;
 
   /// Probes 'current_probe_row_' against the the hash tables and append outputs
   /// to output batch. Wrapper around the join-type specific probe row functions
@@ -551,6 +556,14 @@ class PartitionedHashJoinNode : public BlockingJoinNode {
   inline void ClearExprResultsPool(const int num_conjuncts,
       const int num_other_join_conjuncts);
 
+  /// Checks whether the query has been cancelled once every
+  /// PROBE_CANCEL_CHECK_INTERVAL calls. Called for every build row visited by the
+  /// ProcessProbeRow* loops, because those loops only return to GetNext() when the
+  /// output batch is full and can otherwise run for a very long time without noticing
+  /// cancellation (e.g. many-to-many joins whose other join conjuncts are mostly false).
+  /// Sets 'status' to CANCELLED and returns true if the query was cancelled.
+  inline bool CheckCancelledInProbeLoop(Status* status) WARN_UNUSED_RESULT;
+
   RuntimeState* runtime_state_;
 
   /// Our equi-join predicates "<lhs> = <rhs>" are separated into
@@ -570,6 +583,12 @@ class PartitionedHashJoinNode : public BlockingJoinNode {
   /// Memory limit for the conjunct expression results pool used during building probe
   /// batches.
   const int64_t expr_results_mem_limit_;
+
+  /// Number of build rows visited by the ProcessProbeRow* loops. Used by
+  /// CheckCancelledInProbeLoop() to check for cancellation periodically. Only the
+  /// value modulo PROBE_CANCEL_CHECK_INTERVAL matters, so it is not reset in Reset().
+  uint32_t probe_loop_iterations_ = 0;
+  static constexpr uint32_t PROBE_CANCEL_CHECK_INTERVAL = 1024;
 
   /// Used for hash-related functionality, such as evaluating rows and calculating hashes.
   /// This owns the evaluators for the build and probe expressions used during insertion
