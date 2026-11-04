@@ -1059,11 +1059,10 @@ IntVal CountNonZero(FunctionContext* context, const StringVal&amp; value) {
           Returning a null value exits the UDF; it does not initiate cancellation.
         </p>
         <note>
-          Do not call <codeph>IsQueryCancelled()</codeph> under the standalone UDF test
-          harness. The harness does not provide query runtime state, so the call aborts
-          the test. For example, testing <codeph>CountNonZero()</codeph> with a
-          non-empty value aborts. Test cancellation against a running Impala query
-          instead.
+          Under the standalone UDF test harness, <codeph>IsQueryCancelled()</codeph> is
+          safe to call but always returns <codeph>false</codeph>, because the harness
+          does not provide query runtime state. Test cancellation against a running
+          Impala query instead.
         </note>
       </conbody>
     </concept>

@@ -479,4 +479,13 @@ TEST(UdfTest, TestStringValStreamOperator) {
   EXPECT_EQ("hello", DebugString(hello_val));
 }
 
+BooleanVal IsCancelledUdf(FunctionContext* context) {
+    return BooleanVal(context->IsQueryCancelled());
+}
+
+TEST(UdfTest, TestIsQueryCancelled) {
+  EXPECT_TRUE(UdfTestHarness::ValidateUdf<BooleanVal>(
+      IsCancelledUdf, BooleanVal(false)));
+}
+
 IMPALA_TEST_MAIN();

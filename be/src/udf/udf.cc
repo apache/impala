@@ -329,6 +329,8 @@ FunctionContext::UniqueId FunctionContext::query_id() const {
 }
 
 bool FunctionContext::IsQueryCancelled() const {
+  // state_ is nullptr in the standalone UDF test harness.
+  if (impl_->state_ == nullptr) return false;
   return impl_->state_->is_cancelled();
 }
 

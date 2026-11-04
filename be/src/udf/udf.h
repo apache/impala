@@ -168,7 +168,8 @@ class FunctionContext {
   /// Returns the query_id for the current query.
   UniqueId query_id() const;
 
-  /// Returns whether the query is cancelled.
+  /// Returns whether the query is cancelled. Always returns false in the standalone
+  /// UDF test harness.
   bool IsQueryCancelled() const;
 
   /// Sets an error for this UDF. The error message is copied and the copy is owned by
