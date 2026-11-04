@@ -111,7 +111,13 @@ TBLPROPERTIES (
                         dir="ltr">Example: “jdbc:impala://10.96.132.138:21050/sample_db”.</p></li>
                 <li dir="ltr"><codeph>jdbc.driver</codeph>: Class name of the JDBC driver</li>
                 <li dir="ltr"><codeph>driver.url</codeph>: URL to download the JAR file package that
-                    is used to access the external database</li>
+                    is used to access the external database. The JAR file must be inside
+                    one of the directories listed in the
+                    <codeph>--trusted_jar_paths</codeph>
+                    <cmdname>impalad</cmdname> startup flag, for example
+                    <codeph>--trusted_jar_paths=hdfs://nn/trusted/jars/</codeph>. The
+                    flag is empty by default, which prevents Impala from loading any JDBC
+                    driver JAR file.</li>
                 <li><codeph>table</codeph>: Name of the table in the remote database that you want
                     to map in Impala</li>
             </ul>

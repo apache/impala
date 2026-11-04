@@ -142,6 +142,43 @@ under the License.
               <codeph>BINARY</codeph>; the on-disk bytes are unchanged. Alternatively, store
               sketches in <codeph>BINARY</codeph> columns, or wrap the column with
               <codeph>CAST(sketch_col AS BINARY)</codeph> at the call site.</p></li>
+          <li rev="IMPALA-15218">Impala no longer loads JAR files for JDBC tables or
+            external data sources from arbitrary locations.
+            <p>Impala loads a JAR file from the <codeph>driver.url</codeph> table property
+              of a JDBC table, or from the <codeph>LOCATION</codeph> of an external data
+              source, only if the path is inside one of the directories listed in the
+              <codeph>--trusted_jar_paths</codeph> startup flag. The flag is empty by
+              default, so queries on JDBC tables and external data source tables that load
+              a JAR file fail with an error that the path is not permitted by
+              <codeph>--trusted_jar_paths</codeph>.</p>
+            <p>To restore the previous behavior for known locations, start each
+              <cmdname>impalad</cmdname> with <codeph>--trusted_jar_paths</codeph> set to
+              a comma-separated list of the directories that contain your JDBC driver and
+              data source JAR files, for example
+              <codeph>--trusted_jar_paths=hdfs://nn/jars/,s3a://b/jars/</codeph>. See
+              <xref href="impala_jdbc_external_table.xml"/>.</p>
+          </li>
+          <li rev="IMPALA-15217">Impala restricts where the
+            <codeph>avro.schema.url</codeph> table property can read an Avro schema
+            from.<ul>
+              <li><codeph>CREATE TABLE</codeph>, <codeph>ALTER TABLE ... SET
+                TBLPROPERTIES</codeph>, and <codeph>ALTER TABLE ... SET FILEFORMAT
+                AVRO</codeph> statements that use <codeph>avro.schema.url</codeph> require
+                the <codeph>ALL</codeph> privilege on the schema URI when authorization is
+                enabled. For a URI that is not HTTP or HTTPS, the file must exist.</li>
+              <li>Impala does not read schemas from HTTP or HTTPS URLs by default. To
+                allow them, set
+                <codeph>--avro_schema_url_remote_http_enabled=true</codeph> and
+                list the permitted hosts in
+                <codeph>--avro_schema_url_http_allowed_hosts</codeph>. Impala does not
+                follow HTTP redirects.</li>
+              <li>Impala reads schemas only from the filesystem URI schemes listed in
+                <codeph>--avro_schema_url_allowed_schemes</codeph>. The default is
+                <codeph>hdfs,s3a,abfs,abfss,gs,o3fs,ofs</codeph>, so schemes such as
+                <codeph>file</codeph> are rejected unless you add them.</li>
+            </ul><p>These restrictions also apply when Impala loads the metadata of
+              existing Avro tables. See
+              <xref href="impala_avro.xml#avro_json"/>.</p></li>
         </ul>
       </p>
     </conbody>

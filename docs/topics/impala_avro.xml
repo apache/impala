@@ -316,6 +316,40 @@ hive> CREATE TABLE hive_avro_table
       </p>
 
 <codeblock>tblproperties ('avro.schema.url'='hdfs//your-name-node:port/path/to/schema.json');</codeblock>
+
+      <p rev="IMPALA-15217">
+        When authorization is enabled, you must have the <codeph>ALL</codeph> privilege on
+        the schema URI to use <codeph>avro.schema.url</codeph> in a <codeph>CREATE
+        TABLE</codeph>, <codeph>ALTER TABLE ... SET TBLPROPERTIES</codeph>, or
+        <codeph>ALTER TABLE ... SET FILEFORMAT AVRO</codeph> statement. For a URI that is
+        not HTTP or HTTPS, the schema file must exist when you run the statement.
+      </p>
+
+      <p rev="IMPALA-15217">
+        The following startup flags control where Impala can read a schema from:
+      </p>
+
+      <ul rev="IMPALA-15217">
+        <li>
+          <codeph>--avro_schema_url_allowed_schemes</codeph>: Comma-separated list of
+          filesystem URI schemes that <codeph>avro.schema.url</codeph> can use. The
+          default is <codeph>hdfs,s3a,abfs,abfss,gs,o3fs,ofs</codeph>. A URI without a
+          scheme resolves against the default filesystem. This flag does not enable HTTP
+          or HTTPS.
+        </li>
+
+        <li>
+          <codeph>--avro_schema_url_remote_http_enabled</codeph>: Set to
+          <codeph>true</codeph> to allow HTTP and HTTPS schema URLs. The default is
+          <codeph>false</codeph>.
+        </li>
+
+        <li>
+          <codeph>--avro_schema_url_http_allowed_hosts</codeph>: Comma-separated list of
+          hosts that HTTP and HTTPS schema URLs can use. If the list is empty, Impala
+          rejects all HTTP and HTTPS schema URLs. Impala does not follow HTTP redirects.
+        </li>
+      </ul>
     </conbody>
   </concept>
 
