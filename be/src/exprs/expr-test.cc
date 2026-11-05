@@ -19,6 +19,7 @@
 #include <time.h>
 #include <limits>
 #include <map>
+#include <optional>
 #include <string>
 
 #include <boost/algorithm/string.hpp>
@@ -159,19 +160,21 @@ string StringToOctalLiteral(const string& s) {
 class ScopedTimeZoneOverride {
  public:
   ScopedTimeZoneOverride(const char* tz_name)
-      : original_tz_name_(getenv("TZ")),
-        new_tz_name_(tz_name),
+      : new_tz_name_(tz_name),
         new_tz_(TimezoneDatabase::FindTimezone(new_tz_name_)) {
     EXPECT_NE(nullptr, new_tz_) << "Could not find " << new_tz_name_ << " time zone.";
+    // Copy the original value, since setenv() may invalidate getenv()'s pointer.
+    const char* original_tz_name = getenv("TZ");
+    if (original_tz_name != nullptr) original_tz_name_ = original_tz_name;
     setenv("TZ", new_tz_name_, true);
     tzset();
   }
 
   ~ScopedTimeZoneOverride() {
-    if (original_tz_name_ == nullptr) {
-      unsetenv("TZ");
+    if (original_tz_name_.has_value()) {
+      setenv("TZ", original_tz_name_->c_str(), true);
     } else {
-      setenv("TZ", original_tz_name_, true);
+      unsetenv("TZ");
     }
     tzset();
   }
@@ -179,7 +182,7 @@ class ScopedTimeZoneOverride {
   const Timezone& GetTimezone() const { return *new_tz_; }
 
  private:
-  const char* const original_tz_name_;
+  std::optional<std::string> original_tz_name_;
   const char* const new_tz_name_;
   const Timezone* new_tz_;
 };

@@ -39,7 +39,6 @@ Checks: "-*,clang*,\
 -clang-analyzer-optin.core.EnumCastOutOfRange,\
 -clang-analyzer-optin.cplusplus.VirtualCall,\
 -clang-analyzer-optin.performance.Padding,\
--clang-analyzer-security.cert.env.InvalidPtr,\
 -clang-analyzer-unix.Malloc,\
 -clang-analyzer-unix.MallocSizeof,\
 -clang-diagnostic-deprecated-copy-with-user-provided-copy,\
