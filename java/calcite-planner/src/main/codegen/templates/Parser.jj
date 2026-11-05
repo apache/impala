@@ -7769,6 +7769,7 @@ SqlIdentifier ReservedFunctionName() :
     }
 }
 
+// Impala added code. Omit USER so USER.col parses as a qualified identifier.
 SqlIdentifier ContextVariable() :
 {
 }
@@ -7786,7 +7787,6 @@ SqlIdentifier ContextVariable() :
     |   <LOCALTIMESTAMP>
     |   <SESSION_USER>
     |   <SYSTEM_USER>
-    |   <USER>
     )
     {
         return new SqlIdentifier(unquotedIdentifier(), getPos());

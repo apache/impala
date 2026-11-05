@@ -393,6 +393,10 @@ parser: {
   # List of non-reserved keywords to add;
   # items in this list become non-reserved.
   nonReservedKeywordsToAdd: [
+    "RESULT"
+    "RETURN"
+    "TIME"
+    "USER"
   ]
 
   # List of non-reserved keywords to remove;

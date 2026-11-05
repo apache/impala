@@ -1557,3 +1557,94 @@ SMALLINT, TINYINT
 ---- RUNTIME_PROFILE
 row_regex: PlannerType: CalcitePlanner
 ====
+---- QUERY
+# IMPALA-15535: TIME is an unquoted identifier in the Calcite planner.
+select 1 as time
+---- RESULTS
+1
+---- TYPES
+tinyint
+---- LABELS
+time
+====
+---- QUERY
+select coalesce(time, 0), coalesce(t.time, 0)
+from (select 1 as time) t
+---- RESULTS
+1,1
+---- TYPES
+tinyint, tinyint
+====
+---- QUERY
+select coalesce(`time`, 0), coalesce(t.`time`, 0)
+from (select 1 as `time`) t
+---- RESULTS
+1,1
+---- TYPES
+tinyint, tinyint
+====
+---- QUERY
+select coalesce(time, 0), coalesce(t.time, 0)
+from (select cast(null as int) as time) t
+---- RESULTS
+0,0
+---- TYPES
+int, int
+====
+---- QUERY
+# RESULT, RETURN and USER are valid unquoted identifiers in the Calcite planner.
+select cast(1 as int) as result, cast(2 as int) as return, cast(3 as int) as user
+---- RESULTS
+1,2,3
+---- TYPES
+INT,INT,INT
+====
+---- QUERY
+select result, return, user from
+  (select cast(1 as int) as `result`, cast(2 as int) as `return`,
+          cast(3 as int) as `user`) t
+---- RESULTS
+1,2,3
+---- TYPES
+INT,INT,INT
+====
+---- QUERY
+select t.result, t.return, t.user from
+  (select cast(1 as int) as `result`, cast(2 as int) as `return`,
+          cast(3 as int) as `user`) t
+---- RESULTS
+1,2,3
+---- TYPES
+INT,INT,INT
+====
+---- QUERY
+# Quoted identifiers and the USER() function retain their existing meaning.
+select `result`, `return`, `user`, user() is not null from
+  (select cast(1 as int) as `result`, cast(2 as int) as `return`,
+          cast(3 as int) as `user`) t
+---- RESULTS
+1,2,3,true
+---- TYPES
+INT,INT,INT,BOOLEAN
+====
+---- QUERY
+select user.a from (select 1 as a) user
+---- RESULTS
+1
+---- TYPES
+TINYINT
+====
+---- QUERY
+select user.a from (select 1 as a) user group by user.a
+---- RESULTS
+1
+---- TYPES
+TINYINT
+====
+---- QUERY
+with user as (select 1 as a) select user.a from user
+---- RESULTS
+1
+---- TYPES
+TINYINT
+====
