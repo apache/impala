@@ -52,7 +52,7 @@ public class BlacklistingMetaProviderTest {
 
   @AfterClass
   public static void teardown() {
-    BackendConfig.create(origFlags);
+    CatalogBlacklistUtilsTest.restoreBackendConfig(origFlags, true);
   }
 
   @Test

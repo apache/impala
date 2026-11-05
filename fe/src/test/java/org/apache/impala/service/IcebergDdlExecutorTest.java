@@ -48,8 +48,6 @@ import org.junit.Before;
 import org.junit.BeforeClass;
 import org.junit.Test;
 
-import com.google.common.base.Strings;
-
 /**
  * Unit tests for executing DDL on the coordinator through an Iceberg REST catalog,
  * without a live catalog. Routing is covered by MultiMetaProviderTest.
@@ -74,11 +72,7 @@ public class IcebergDdlExecutorTest {
 
   @AfterClass
   public static void tearDownClass() {
-    CatalogBlacklistUtilsTest.setBlacklist(
-        Strings.nullToEmpty(origFlags_.getBlacklisted_dbs()),
-        Strings.nullToEmpty(origFlags_.getBlacklisted_tables()),
-        origFlags_.isEnable_workload_mgmt());
-    BackendConfig.create(origFlags_, false);
+    CatalogBlacklistUtilsTest.restoreBackendConfig(origFlags_, false);
   }
 
   @Before

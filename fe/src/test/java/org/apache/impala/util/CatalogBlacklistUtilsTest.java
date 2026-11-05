@@ -40,6 +40,8 @@ import org.junit.AfterClass;
 import org.junit.BeforeClass;
 import org.junit.Test;
 
+import com.google.common.base.Strings;
+
 public class CatalogBlacklistUtilsTest {
 
   private static TBackendGflags origFlags;
@@ -56,7 +58,7 @@ public class CatalogBlacklistUtilsTest {
 
   @AfterClass
   public static void teardown() {
-    BackendConfig.create(origFlags);
+    restoreBackendConfig(origFlags, true);
   }
 
   @Test
@@ -110,6 +112,7 @@ public class CatalogBlacklistUtilsTest {
 
   @Test
   public void testParsingBlacklistedDbsNone() {
+    setBlacklist("", "");
     assertThat(getBlacklistedDbsCount(), equalTo(0));
   }
 
@@ -227,6 +230,21 @@ public class CatalogBlacklistUtilsTest {
 
   public static void setBlacklist(String blacklistedDbs, String blacklistedTables) {
     setBlacklist(blacklistedDbs, blacklistedTables, false);
+  }
+
+  /**
+   * Restores 'flags' as the BackendConfig and reloads the cached blacklists from it, so
+   * tests that mutate the blacklists do not leak them into later tests in the same JVM.
+   */
+  public static void restoreBackendConfig(TBackendGflags flags, boolean initialize) {
+    // reload() requires non-null blacklist configs, which a default-constructed
+    // TBackendGflags does not have, so build the cache from a sanitized copy.
+    TBackendGflags reloadFlags = flags.deepCopy();
+    reloadFlags.setBlacklisted_dbs(Strings.nullToEmpty(flags.getBlacklisted_dbs()));
+    reloadFlags.setBlacklisted_tables(Strings.nullToEmpty(flags.getBlacklisted_tables()));
+    BackendConfig.create(reloadFlags, false);
+    reload();
+    BackendConfig.create(flags, initialize);
   }
 
 }
