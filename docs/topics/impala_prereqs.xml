@@ -63,8 +63,30 @@ under the License.
     <conbody>
 
       <p>
-        Apache Impala runs on Linux systems only. See the <filepath>README.md</filepath> file
-        for more information.
+        Apache Impala runs on Linux systems only, on the x86-64 and ARM64 (AArch64)
+        processor architectures. See <xref href="impala_prereqs.xml#prereqs_cpu"/> for the
+        CPU requirements. Impala supports the following Linux distributions:
+      </p>
+
+      <ul>
+        <li>
+          Ubuntu 22.04 and 24.04
+        </li>
+
+        <li>
+          Rocky Linux and Red Hat Enterprise Linux (RHEL) 8 and 9
+        </li>
+      </ul>
+
+      <p rev="5.0.0 IMPALA-14147">
+        Starting in <keyword keyref="impala50"/>, Impala does not support CentOS 7,
+        RHEL 7, SLES 12, Ubuntu 16.04, Ubuntu 18.04, and Ubuntu 20.04.
+      </p>
+
+      <p rev="5.0.0 IMPALA-14508">
+        Impala uses the OpenSSL library of the operating system. Starting in
+        <keyword keyref="impala50"/>, Impala requires OpenSSL 1.1.1 or higher.
+        <keyword keyref="impala45"/> required OpenSSL 1.0.2 or higher.
       </p>
 
     </conbody>
@@ -171,16 +193,14 @@ under the License.
     <conbody>
 
       <p>
-        Although Impala is primarily written in C++, it does use Java to communicate with
-        various Hadoop components:
+        Although Impala is primarily written in C++, it uses Java for query planning, in
+        the catalog service, and to communicate with various Hadoop components:
       </p>
 
       <ul>
-        <li>
-          The officially supported JVM for Impala is the Oracle JVM. Other JVMs might cause
-          issues, typically resulting in a failure at <cmdname>impalad</cmdname> startup. In
-          particular, the JamVM used by default on certain levels of Ubuntu systems can cause
-          <cmdname>impalad</cmdname> to fail to start.
+        <li rev="5.0.0 IMPALA-13919">
+          Impala requires Java 17. Impala is tested with OpenJDK 17. Starting in
+          <keyword keyref="impala50"/>, Impala does not support Java 8 and Java 11.
         </li>
 
         <li>
@@ -188,12 +208,6 @@ under the License.
           <codeph>JAVA_HOME</codeph> environment variable to locate the system Java libraries.
           Make sure the <cmdname>impalad</cmdname> service is not run from an environment with
           an incorrect setting for this variable.
-        </li>
-
-        <li>
-          All Java dependencies are packaged in the <codeph>impala-dependencies.jar</codeph>
-          file, which is located at <codeph>/usr/lib/impala/lib/</codeph>. These map to
-          everything that is built under <codeph>fe/target/dependency</codeph>.
         </li>
       </ul>
 

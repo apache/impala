@@ -55,6 +55,18 @@ under the License.
     <conbody>
       <p>
         <ul>
+          <li rev="5.0.0 IMPALA-13919">Impala requires Java 17<p><keyword
+              keyref="impala50"/> requires Java 17. <keyword keyref="impala45"/> also
+              supported Java 8 and Java 11. Before you upgrade, install Java 17 on all
+              Impala hosts and set the <codeph>JAVA_HOME</codeph> environment variable of
+              the Impala daemons to it. See
+              <xref href="impala_prereqs.xml#prereqs_java"/>.</p></li>
+          <li rev="5.0.0 IMPALA-14147 IMPALA-14508">Removed operating systems and new
+            OpenSSL minimum<p><keyword keyref="impala50"/> does not support CentOS 7,
+              RHEL 7, SLES 12, Ubuntu 16.04, Ubuntu 18.04, and Ubuntu 20.04. Impala
+              requires OpenSSL 1.1.1 or higher from the operating system.
+              <keyword keyref="impala45"/> required OpenSSL 1.0.2 or higher. See
+              <xref href="impala_prereqs.xml#prereqs_os"/>.</p></li>
           <li rev="5.0.0 IMPALA-13953">Time zone startup flag changes
             <p>
               The <codeph>--use_local_tz_for_unix_timestamp_conversions</codeph> startup
