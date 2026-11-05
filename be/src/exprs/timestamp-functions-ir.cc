@@ -483,8 +483,9 @@ inline void AddInterval<Years>(FunctionContext* context, int64_t interval,
 
 string TimestampFunctions::ShortDayName(FunctionContext* context,
     const TimestampVal& ts) {
-  if (ts.is_null) return NULL;
+  if (ts.is_null) return string();
   IntVal dow = DayOfWeek(context, ts);
+  if (dow.is_null) return string();
   DCHECK_GT(dow.val, 0);
   DCHECK_LT(dow.val, 8);
   return SHORT_DAY_NAMES[CAPITALIZED][dow.val - 1];
@@ -494,6 +495,7 @@ StringVal TimestampFunctions::LongDayName(FunctionContext* context,
     const TimestampVal& ts) {
   if (ts.is_null) return StringVal::null();
   IntVal dow = DayOfWeek(context, ts);
+  if (dow.is_null) return StringVal::null();
   DCHECK_GT(dow.val, 0);
   DCHECK_LT(dow.val, 8);
   const string& day_name = DAY_NAMES[CAPITALIZED][dow.val - 1];
@@ -503,8 +505,9 @@ StringVal TimestampFunctions::LongDayName(FunctionContext* context,
 
 string TimestampFunctions::ShortMonthName(FunctionContext* context,
     const TimestampVal& ts) {
-  if (ts.is_null) return NULL;
+  if (ts.is_null) return string();
   IntVal mth = Month(context, ts);
+  if (mth.is_null) return string();
   DCHECK_GT(mth.val, 0);
   DCHECK_LT(mth.val, 13);
   return SHORT_MONTH_NAMES[CAPITALIZED][mth.val - 1];
@@ -514,6 +517,7 @@ StringVal TimestampFunctions::LongMonthName(FunctionContext* context,
     const TimestampVal& ts) {
   if (ts.is_null) return StringVal::null();
   IntVal mth = Month(context, ts);
+  if (mth.is_null) return StringVal::null();
   DCHECK_GT(mth.val, 0);
   DCHECK_LT(mth.val, 13);
   const string& mn = MONTH_NAMES[CAPITALIZED][mth.val - 1];
@@ -616,7 +620,9 @@ TimestampVal TimestampFunctions::NextDay(FunctionContext* context,
   DCHECK_GE(it->second, 0);
   DCHECK_LE(it->second, 6);
 
-  int delta_days = it->second + 1 - DayOfWeek(context, date).val;
+  IntVal day_of_week = DayOfWeek(context, date);
+  if (day_of_week.is_null) return TimestampVal::null();
+  int delta_days = it->second + 1 - day_of_week.val;
   delta_days = delta_days <= 0 ? delta_days + 7 : delta_days;
   DCHECK_GE(delta_days, 1);
   DCHECK_LE(delta_days, 7);

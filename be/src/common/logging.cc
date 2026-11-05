@@ -367,14 +367,16 @@ static const uint32_t ONE_BILLION = 1000000000;
 // Print the value in base 10 by converting v into parts that are base
 // 1 billion (large multiple of 10 that's easy to work with).
 ostream& impala::operator<<(ostream& os, const __int128_t& val) {
-  __int128_t v = val;
-  if (v == 0) {
+  if (val == 0) {
     os << "0";
     return os;
   }
 
-  if (v < 0) {
-    v = -v;
+  // Compute the magnitude as unsigned: unsigned subtraction wraps modulo 2^128, so
+  // 0 - v yields |val| even for the minimum value, where signed negation overflows.
+  __uint128_t v = static_cast<__uint128_t>(val);
+  if (val < 0) {
+    v = 0 - v;
     os << "-";
   }
 
@@ -382,10 +384,10 @@ ostream& impala::operator<<(ostream& os, const __int128_t& val) {
   // parts[0] is the least significant place.
   uint32_t parts[5];
   int index = 0;
-  while (v > 0) {
+  do {
     parts[index++] = v % ONE_BILLION;
     v /= ONE_BILLION;
-  }
+  } while (v > 0);
   --index;
 
   // Accumulate into a temporary stringstream so format options on 'os' do

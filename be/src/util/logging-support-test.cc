@@ -17,7 +17,10 @@
 
 #include <boost/filesystem.hpp>
 #include <ctime>
+#include <limits>
+#include <sstream>
 
+#include "common/logging.h"
 #include "testutil/gtest-util.h"
 #include "util/filesystem-util.h"
 #include "util/logging-support.h"
@@ -92,3 +95,29 @@ TEST(LoggingSupport, DeleteOldLogs) {
   filesystem::remove_all(dir);
 }
 
+static string Int128ToString(__int128_t val) {
+  std::stringstream ss;
+  ss << val;
+  return ss.str();
+}
+
+TEST(LoggingSupport, PrintInt128) {
+  const __int128_t int128_max =
+      static_cast<__int128_t>(~static_cast<__uint128_t>(0) >> 1);
+  const __int128_t int128_min = -int128_max - 1;
+  const __int128_t one_billion = 1000000000;
+
+  EXPECT_EQ("0", Int128ToString(0));
+  EXPECT_EQ("1", Int128ToString(1));
+  EXPECT_EQ("-1", Int128ToString(-1));
+  EXPECT_EQ("999999999", Int128ToString(one_billion - 1));
+  EXPECT_EQ("1000000000", Int128ToString(one_billion));
+  EXPECT_EQ("-1000000000", Int128ToString(-one_billion));
+  // Inner base-1-billion parts must be zero-padded.
+  EXPECT_EQ("1000000000000000001", Int128ToString(one_billion * one_billion + 1));
+  EXPECT_EQ("-9223372036854775808", Int128ToString(std::numeric_limits<int64_t>::min()));
+  EXPECT_EQ("170141183460469231731687303715884105727", Int128ToString(int128_max));
+  EXPECT_EQ("-170141183460469231731687303715884105727", Int128ToString(-int128_max));
+  // Negating the minimum value as a signed __int128_t would overflow.
+  EXPECT_EQ("-170141183460469231731687303715884105728", Int128ToString(int128_min));
+}
