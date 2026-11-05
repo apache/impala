@@ -100,6 +100,8 @@ typedef int SOCKET;
 #define CGI_ENVIRONMENT_SIZE 4096
 #define MAX_CGI_ENVIR_VARS 64
 #define SQ_BUF_LEN 8192
+// Maximum sscanf() field width for buffers of size SQ_BUF_LEN.
+#define SQ_BUF_SCANF_WIDTH "8191"
 #define MAX_REQUEST_SIZE 16384
 #define WORKER_THREAD_TIMEOUT_SECS 3
 #define ARRAY_SIZE(array) (sizeof(array) / sizeof(array[0]))
@@ -1758,7 +1760,7 @@ static int authorize(struct sq_connection *conn, struct file *filep) {
   // Loop over passwords file
   p = (char *) filep->membuf;
   while (sq_fgets(line, sizeof(line), filep, &p) != NULL) {
-    if (sscanf(line, "%[^:]:%[^:]:%s", f_user, f_domain, ha1) != 3) {
+    if (sscanf(line, "%255[^:]:%255[^:]:%255s", f_user, f_domain, ha1) != 3) {
       continue;
     }
 
@@ -1858,7 +1860,7 @@ int sq_modify_passwords_file(const char *fname, const char *domain,
 
   // Copy the stuff to temporary file
   while (fgets(line, sizeof(line), fp) != NULL) {
-    if (sscanf(line, "%[^:]:%[^:]:%*s", u, d) != 2) {
+    if (sscanf(line, "%511[^:]:%511[^:]:%*s", u, d) != 2) {
       continue;
     }
 
@@ -2925,18 +2927,16 @@ static void do_ssi_include(struct sq_connection *conn, const char *ssi,
   char file_name[SQ_BUF_LEN], path[PATH_MAX], *p;
   struct file file = STRUCT_FILE_INITIALIZER;
 
-  // sscanf() is safe here, since send_ssi_file() also uses buffer
-  // of size SQ_BUF_LEN to get the tag. So strlen(tag) is always < SQ_BUF_LEN.
-  if (sscanf(tag, " virtual=\"%[^\"]\"", file_name) == 1) {
+  if (sscanf(tag, " virtual=\"%" SQ_BUF_SCANF_WIDTH "[^\"]\"", file_name) == 1) {
     // File name is relative to the webserver root
     (void) sq_snprintf(conn, path, sizeof(path), "%s%c%s",
         conn->ctx->config[DOCUMENT_ROOT], '/', file_name);
-  } else if (sscanf(tag, " abspath=\"%[^\"]\"", file_name) == 1) {
+  } else if (sscanf(tag, " abspath=\"%" SQ_BUF_SCANF_WIDTH "[^\"]\"", file_name) == 1) {
     // File name is relative to the webserver working directory
     // or it is absolute system path
     (void) sq_snprintf(conn, path, sizeof(path), "%s", file_name);
-  } else if (sscanf(tag, " file=\"%[^\"]\"", file_name) == 1 ||
-             sscanf(tag, " \"%[^\"]\"", file_name) == 1) {
+  } else if (sscanf(tag, " file=\"%" SQ_BUF_SCANF_WIDTH "[^\"]\"", file_name) == 1 ||
+             sscanf(tag, " \"%" SQ_BUF_SCANF_WIDTH "[^\"]\"", file_name) == 1) {
     // File name is relative to the currect document
     (void) sq_snprintf(conn, path, sizeof(path), "%s", ssi);
     if ((p = strrchr(path, '/')) != NULL) {
@@ -2969,7 +2969,7 @@ static void do_ssi_exec(struct sq_connection *conn, char *tag) {
   char cmd[SQ_BUF_LEN];
   struct file file = STRUCT_FILE_INITIALIZER;
 
-  if (sscanf(tag, " \"%[^\"]\"", cmd) != 1) {
+  if (sscanf(tag, " \"%" SQ_BUF_SCANF_WIDTH "[^\"]\"", cmd) != 1) {
     cry(conn, "Bad SSI #exec: [%s]", tag);
   } else if ((file.fp = popen(cmd, "r")) == NULL) {
     cry(conn, "Cannot SSI #exec: [%s]: %s", cmd, strerror(ERRNO));

@@ -213,9 +213,7 @@ endif()
 
 # Squeasel requires C99 compatibility to build.
 SET_SOURCE_FILES_PROPERTIES(${SQUEASEL_SRC_DIR}/squeasel.c
-  PROPERTIES COMPILE_FLAGS -std=c99)
-SET_SOURCE_FILES_PROPERTIES(${SQUEASEL_SRC_DIR}/squeasel.c
-  PROPERTIES COMPILE_FLAGS -DUSE_IPV6)
+  PROPERTIES COMPILE_FLAGS "-std=c99 -DUSE_IPV6")
 
 add_executable(parquet-reader parquet-reader.cc)
 add_executable(impala-profile-tool impala-profile-tool.cc)
