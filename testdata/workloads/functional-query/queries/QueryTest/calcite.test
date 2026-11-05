@@ -1655,3 +1655,33 @@ select 1e-40, 1e3, 1e37, 1e38, 1e-38, 1e-39
 ---- TYPES
 DOUBLE,SMALLINT,DECIMAL,DOUBLE,DECIMAL,DOUBLE
 ====
+---- QUERY
+# IMPALA-15404: unary minus on a non-literal is typed like -1 * x, as in the
+# original planner, so FLOAT is promoted to DOUBLE and INT to BIGINT.
+select -cast(1.0 as float), -cast(1 as int), -cast(1 as tinyint),
+       -cast(1 as smallint), -cast(1 as bigint), -cast(1.0 as double)
+---- RESULTS
+-1,-1,-1,-1,-1,-1
+---- TYPES
+DOUBLE,BIGINT,SMALLINT,INT,BIGINT,DOUBLE
+---- RUNTIME_PROFILE
+row_regex: PlannerType: CalcitePlanner
+====
+---- QUERY
+# IMPALA-15404: unary minus on columns.
+select -tinyint_col, -smallint_col, -int_col, -bigint_col, -double_col
+from functional.alltypestiny where id = 1
+---- RESULTS
+-1,-1,-1,-10,-10.1
+---- TYPES
+SMALLINT,INT,BIGINT,BIGINT,DOUBLE
+====
+---- QUERY
+# IMPALA-15404: numeric and interval literals are not rewritten. The sign stays
+# folded into the literal, and INTERVAL -1 DAYS still works.
+select -1, -1.5, cast('2024-01-02' as timestamp) + interval -1 days
+---- RESULTS
+-1,-1.5,2024-01-01 00:00:00
+---- TYPES
+TINYINT,DECIMAL,TIMESTAMP
+====

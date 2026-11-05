@@ -45,6 +45,8 @@ import org.apache.calcite.sql.SqlFunction;
 import org.apache.calcite.sql.SqlIdentifier;
 import org.apache.calcite.sql.SqlJoin;
 import org.apache.calcite.sql.SqlKind;
+import org.apache.calcite.sql.SqlIntervalLiteral;
+import org.apache.calcite.sql.SqlLiteral;
 import org.apache.calcite.sql.SqlNode;
 import org.apache.calcite.sql.SqlNodeList;
 import org.apache.calcite.sql.SqlNumericLiteral;
@@ -52,6 +54,8 @@ import org.apache.calcite.sql.SqlOperator;
 import org.apache.calcite.sql.SqlSelect;
 import org.apache.calcite.sql.SqlWithItem;
 import org.apache.calcite.util.Util;
+import org.apache.calcite.sql.fun.SqlStdOperatorTable;
+import org.apache.calcite.sql.parser.SqlParserPos;
 import org.apache.impala.analysis.Analyzer;
 import org.apache.impala.authorization.Privilege;
 import org.apache.impala.calcite.schema.CalciteTable;
@@ -138,6 +142,27 @@ public class ImpalaSqlValidatorImpl extends SqlValidatorImpl {
       return type;
     }
     return super.deriveType(scope, operand);
+  }
+
+  /**
+   * Rewrites unary minus on a non-literal operand into a multiplication by -1,
+   * matching the original Impala parser (see "SUBTRACT expr" in sql-parser.cup).
+   * The multiplication goes through Impala's arithmetic type promotion, so e.g.
+   * -cast(1.0 as float) is a DOUBLE and -int_col is a BIGINT, rather than keeping
+   * the operand type. Signs on numeric literals are already folded into the literal
+   * by the Calcite parser, except for the INTERVAL rule, so literals are skipped here.
+   */
+  @Override
+  protected SqlNode performUnconditionalRewrites(SqlNode node, boolean underFrom) {
+    SqlNode result = super.performUnconditionalRewrites(node, underFrom);
+    if (result == null || result.getKind() != SqlKind.MINUS_PREFIX) return result;
+    SqlNode operand = ((SqlCall) result).operand(0);
+    if (operand instanceof SqlNumericLiteral || operand instanceof SqlIntervalLiteral) {
+      return result;
+    }
+    SqlParserPos pos = result.getParserPosition();
+    return SqlStdOperatorTable.MULTIPLY.createCall(pos,
+        SqlLiteral.createExactNumeric("-1", pos), operand);
   }
 
   @Override public void validateIdentifier(SqlIdentifier id, SqlValidatorScope scope) {
