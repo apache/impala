@@ -797,9 +797,11 @@ class AdmissionController {
     void ReleaseMem(int64_t mem_to_release);
     /// Updates the pool stats when the request represented by 'state' is queued.
     void Queue();
-    /// Increment per-user stats for a user.
+    /// Increment per-user stats for a user, including the parent's
+    /// root_agg_user_loads_. Must hold admission_ctrl_lock_.
     void IncrementPerUser(const std::string& user);
-    /// Decrement per-user stats for a user.
+    /// Decrement per-user stats for a user, including the parent's
+    /// root_agg_user_loads_. Must hold admission_ctrl_lock_.
     void DecrementPerUser(const std::string& user);
     /// Updates the pool stats when the request represented by 'state is dequeued.
     void Dequeue(bool timed_out);
@@ -957,6 +959,7 @@ class AdmissionController {
     FRIEND_TEST(AdmissionControllerTest, PoolStats);
     FRIEND_TEST(AdmissionControllerTest, QueryRejection);
     FRIEND_TEST(AdmissionControllerTest, QuotaExamples);
+    FRIEND_TEST(AdmissionControllerTest, RootQuotaWithLocalAdmissions);
     FRIEND_TEST(AdmissionControllerTest, Simple);
     FRIEND_TEST(AdmissionControllerTest, TopNQueryCheck);
     FRIEND_TEST(AdmissionControllerTest, EraseHostStats);
@@ -984,7 +987,8 @@ class AdmissionController {
   typedef boost::unordered_map<std::string, PoolStats> PoolStatsMap;
   PoolStatsMap pool_stats_;
 
-  /// User loads aggregated across all pools. Updated by UpdateClusterAggregates().
+  /// User loads aggregated across all pools. Updated by UpdateClusterAggregates(), and
+  /// kept up to date by PoolStats::IncrementPerUser() and PoolStats::DecrementPerUser().
   /// Protected by admission_ctrl_lock_.
   AggregatedUserLoads root_agg_user_loads_;
 
@@ -1545,6 +1549,7 @@ class AdmissionController {
   FRIEND_TEST(AdmissionControllerTest, PoolStats);
   FRIEND_TEST(AdmissionControllerTest, QueryRejection);
   FRIEND_TEST(AdmissionControllerTest, QuotaExamples);
+  FRIEND_TEST(AdmissionControllerTest, RootQuotaWithLocalAdmissions);
   FRIEND_TEST(AdmissionControllerTest, Simple);
   FRIEND_TEST(AdmissionControllerTest, TopNQueryCheck);
   FRIEND_TEST(AdmissionControllerTest, UserAndGroupQuotas);

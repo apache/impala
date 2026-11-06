@@ -930,6 +930,7 @@ void AdmissionController::PoolStats::Queue() {
 
 void AdmissionController::PoolStats::IncrementPerUser(const std::string& user) {
   agg_user_loads_.increment(user);
+  parent_->root_agg_user_loads_.increment(user);
   metrics_.agg_current_users->Add(user);
   metrics_.local_current_users->Add(user);
   IncrementCount(local_stats_.user_loads, user);
@@ -937,6 +938,7 @@ void AdmissionController::PoolStats::IncrementPerUser(const std::string& user) {
 
 void AdmissionController::PoolStats::DecrementPerUser(const string& user) {
   int64_t agg_count_after_decrement = agg_user_loads_.decrement(user);
+  parent_->root_agg_user_loads_.decrement(user);
   if (agg_count_after_decrement == 0) {
     metrics_.agg_current_users->Remove(user);
   }
@@ -2329,6 +2331,19 @@ void AdmissionController::PoolStats::UpdateAggregates(HostMemMap* host_mem_reser
 }
 
 void AdmissionController::UpdateClusterAggregates(const set<string>& removed_nodes) {
+#ifndef NDEBUG
+  // Between statestore updates root_agg_user_loads_ is maintained incrementally by
+  // PoolStats::IncrementPerUser() and PoolStats::DecrementPerUser(), so it must still
+  // equal the sum of the per-pool aggregates before they are recomputed below.
+  AggregatedUserLoads expected_root_loads;
+  for (auto& entry : pool_stats_) {
+    expected_root_loads.add_loads(
+        entry.second.get_aggregated_user_loads().get_user_loads());
+  }
+  DCHECK(expected_root_loads.get_user_loads() == root_agg_user_loads_.get_user_loads())
+      << "expected: " << expected_root_loads.DebugString()
+      << " actual: " << root_agg_user_loads_.DebugString();
+#endif
   // Recompute mem_reserved for all hosts.
   PoolStats::HostMemMap updated_mem_reserved;
   for (auto& entry : pool_stats_) {

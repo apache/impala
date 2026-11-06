@@ -1131,6 +1131,69 @@ TEST_F(AdmissionControllerTest, QuotaExamples) {
       not_admitted_reason);
 }
 
+/// Test that root level user quotas are enforced against queries admitted or queued
+/// locally before the next statestore update recomputes the cluster aggregates.
+TEST_F(AdmissionControllerTest, RootQuotaWithLocalAdmissions) {
+  FLAGS_fair_scheduler_allocation_path = GetResourceFile("fair-scheduler-test3.xml");
+  FLAGS_llama_site_path = GetResourceFile("llama-site-test2.xml");
+  const string USER = "howard";
+  AdmissionController* admission_controller = MakeAdmissionController();
+  RequestPoolService* request_pool_service = admission_controller->request_pool_service_;
+
+  // Howard has a limit of 4 at root level that overrides the root wildcard limit of 8,
+  // and a limit of 100 in the small pool.
+  TPoolConfig config_root;
+  ASSERT_OK(request_pool_service->GetPoolConfig(QUEUE_ROOT, &config_root));
+  TPoolConfig config_small;
+  ASSERT_OK(request_pool_service->GetPoolConfig(QUEUE_SMALL, &config_small));
+  AdmissionController::PoolStats* small_stats =
+      admission_controller->GetPoolStats(QUEUE_SMALL);
+  AdmissionController::PoolStats* large_stats =
+      admission_controller->GetPoolStats(QUEUE_LARGE);
+  ScheduleState* schedule_state = MakeScheduleState(QUEUE_SMALL, config_small, 1,
+      30L * MEGABYTE, ImpalaServer::DEFAULT_EXECUTOR_GROUP_NAME, USER);
+
+  // Simulate queries being admitted or queued locally with no statestore update in
+  // between. Every one of them must count against the root limit.
+  string not_admitted_reason;
+  for (int i = 0; i < 4; ++i) {
+    ASSERT_TRUE(admission_controller->CanAdmitQuota(
+        *schedule_state, config_small, config_root, &not_admitted_reason))
+        << "load " << i << ": " << not_admitted_reason;
+    small_stats->IncrementPerUser(USER);
+    ASSERT_EQ(i + 1, admission_controller->root_agg_user_loads_.get(USER));
+  }
+  ASSERT_FALSE(admission_controller->CanAdmitQuota(
+      *schedule_state, config_small, config_root, &not_admitted_reason));
+  ASSERT_EQ("current per-user load 4 for user 'howard' is at or above the user limit 4 "
+            "in pool '" + QUEUE_ROOT + "'",
+      not_admitted_reason);
+
+  // Load from other pools also counts against the root limit.
+  small_stats->DecrementPerUser(USER);
+  ASSERT_EQ(3, admission_controller->root_agg_user_loads_.get(USER));
+  ASSERT_TRUE(admission_controller->CanAdmitQuota(
+      *schedule_state, config_small, config_root, &not_admitted_reason));
+  large_stats->IncrementPerUser(USER);
+  ASSERT_EQ(4, admission_controller->root_agg_user_loads_.get(USER));
+  ASSERT_FALSE(admission_controller->CanAdmitQuota(
+      *schedule_state, config_small, config_root, &not_admitted_reason));
+
+  // A statestore update recomputes the same aggregates.
+  set<string> pool_stats_removed_hosts;
+  admission_controller->UpdateClusterAggregates(pool_stats_removed_hosts);
+  ASSERT_EQ(4, admission_controller->root_agg_user_loads_.get(USER));
+
+  // Releasing queries frees up root level quota.
+  large_stats->DecrementPerUser(USER);
+  ASSERT_EQ(3, admission_controller->root_agg_user_loads_.get(USER));
+  ASSERT_TRUE(admission_controller->CanAdmitQuota(
+      *schedule_state, config_small, config_root, &not_admitted_reason));
+  for (int i = 0; i < 3; ++i) small_stats->DecrementPerUser(USER);
+  ASSERT_EQ(0, admission_controller->root_agg_user_loads_.get(USER));
+  ASSERT_EQ(0, admission_controller->root_agg_user_loads_.size());
+}
+
 /// Test CanAdmitRequest() using the slots mechanism that is enabled with non-default
 /// executor groups.
 TEST_F(AdmissionControllerTest, CanAdmitRequestSlots) {
