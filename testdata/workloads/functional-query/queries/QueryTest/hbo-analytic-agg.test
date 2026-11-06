@@ -17,20 +17,20 @@ PLAN-ROOT SINK
 |  functions: rank()
 |  order by: id ASC
 |  window: RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
-|  row-size=29B cardinality=620
+|  row-size=25B cardinality=620
 |
 04:MERGING-EXCHANGE [UNPARTITIONED]
 |  order by: id ASC
 |
 01:SORT
 |  order by: id ASC
-|  row-size=21B cardinality=620
+|  row-size=17B cardinality=620
 |
 00:SCAN HDFS [functional.alltypes]
    partition predicates: `month` = 1
    HDFS partitions=2/24 files=2 size=40.32KB
    predicates: string_col != 'test_agg_over_analytic'
-   row-size=21B cardinality=620 (from HBO)
+   row-size=17B cardinality=620 (from HBO)
 ====
 ---- QUERY
 EXPLAIN select count(*), rnk % 10 from
@@ -50,18 +50,18 @@ PLAN-ROOT SINK
 |  functions: rank()
 |  order by: id ASC
 |  window: RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
-|  row-size=29B cardinality=620
+|  row-size=25B cardinality=620
 |
 04:MERGING-EXCHANGE [UNPARTITIONED]
 |  order by: id ASC
 |
 01:SORT
 |  order by: id ASC
-|  row-size=21B cardinality=620
+|  row-size=17B cardinality=620
 |
 00:SCAN HDFS [functional.alltypes]
    partition predicates: `month` = 2
    HDFS partitions=2/24 files=2 size=36.51KB
    predicates: string_col != 'test_agg_over_analytic'
-   row-size=21B cardinality=620 (from HBO, key ignores partition constants)
+   row-size=17B cardinality=620 (from HBO, key ignores partition constants)
 ====

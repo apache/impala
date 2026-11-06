@@ -39,6 +39,7 @@ import org.apache.impala.authorization.Privilege;
 import org.apache.impala.catalog.ArrayType;
 import org.apache.impala.catalog.Column;
 import org.apache.impala.catalog.DatabaseNotFoundException;
+import org.apache.impala.catalog.FeFsTable;
 import org.apache.impala.catalog.FeIcebergTable;
 import org.apache.impala.catalog.FeIcebergTable.Utils;
 import org.apache.impala.catalog.FeKuduTable;
@@ -54,6 +55,7 @@ import org.apache.impala.common.ColumnAliasGenerator;
 import org.apache.impala.common.Pair;
 import org.apache.impala.common.TableAliasGenerator;
 import org.apache.impala.common.TreeNode;
+import org.apache.impala.planner.HdfsPartitionPruner;
 import org.apache.impala.rewrite.ExprRewriter;
 import org.apache.impala.service.BackendConfig;
 import org.slf4j.Logger;
@@ -1450,11 +1452,12 @@ public class SelectStmt extends QueryStmt {
       List<TupleId> tids = new ArrayList<>();
       getMaterializedTupleIds(tids); // includes the analytic tuple
       List<Expr> conjuncts = analyzer.getUnassignedConjuncts(tids, false);
-      // The predicates that can be bounded to KuduScanNode don't need to materialize
-      // here. Because we don't need to materialize the predicates that can be evaluated
-      // by Kudu.
       for (TupleId tid : tids) {
-        if (analyzer.getTupleDesc(tid).getTable() instanceof FeKuduTable) {
+        TupleDescriptor tupleDesc = analyzer.getTupleDesc(tid);
+        FeTable table = tupleDesc.getTable();
+        if (table instanceof FeKuduTable) {
+          // Single-tuple conjuncts on a Kudu tuple are assigned to the KuduScanNode,
+          // which materializes the slots of any conjuncts it cannot push to Kudu.
           Iterator<Expr> iterator = conjuncts.iterator();
           while (iterator.hasNext()) {
             Expr e = iterator.next();
@@ -1464,6 +1467,14 @@ public class SelectStmt extends QueryStmt {
               iterator.remove();
             }
           }
+        } else if (table instanceof FeFsTable) {
+          // Conjuncts bound only to partition columns are consumed by partition pruning
+          // in SingleNodePlanner.createHdfsScanPlan() and are never evaluated per row.
+          // They must not pin a partition-column slot as materialized here.
+          // Use evalAllFuncs=false to skip non-deterministic functions.
+          List<SlotId> partitionSlots = tupleDesc.getPartitionSlots();
+          conjuncts.removeIf(e -> HdfsPartitionPruner.isPartitionPrunedFilterConjunct(
+              partitionSlots, e, /*evalAllFuncs*/ false));
         }
       }
       materializeSlots(analyzer, conjuncts);

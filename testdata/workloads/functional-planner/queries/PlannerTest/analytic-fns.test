@@ -3206,6 +3206,105 @@ PLAN-ROOT SINK
    HDFS partitions=24/24 files=24 size=478.45KB
    row-size=4B cardinality=7.30K
 ====
+# IMPALA-15751: Query with analytic functions doesn't need to materialize an HDFS
+# partition column that only appears in a partition-pruning predicate.
+SELECT MIN(id) OVER (PARTITION BY int_col)
+FROM functional.alltypes t1
+WHERE t1.month = 1
+---- PLAN
+PLAN-ROOT SINK
+|
+02:ANALYTIC
+|  functions: min(id)
+|  partition by: int_col
+|  row-size=12B cardinality=620
+|
+01:SORT
+|  order by: int_col ASC NULLS LAST
+|  row-size=8B cardinality=620
+|
+00:SCAN HDFS [functional.alltypes t1]
+   partition predicates: t1.`month` = 1
+   HDFS partitions=2/24 files=2 size=40.32KB
+   row-size=8B cardinality=620
+====
+# IMPALA-15751: Join variant that the partition-pruning predicate on t1 does not
+# materialize t1.month.
+SELECT MIN(t1.id) OVER (PARTITION BY t1.int_col)
+FROM functional.alltypes t1
+    JOIN functional.alltypestiny t2 ON t1.id = t2.id
+WHERE t1.month = 1
+---- PLAN
+PLAN-ROOT SINK
+|
+04:ANALYTIC
+|  functions: min(id)
+|  partition by: t1.int_col
+|  row-size=16B cardinality=1
+|
+03:SORT
+|  order by: int_col ASC NULLS LAST
+|  row-size=12B cardinality=1
+|
+02:HASH JOIN [INNER JOIN]
+|  hash predicates: t1.id = t2.id
+|  runtime filters: RF000 <- t2.id
+|  row-size=12B cardinality=1
+|
+|--01:SCAN HDFS [functional.alltypestiny t2]
+|     HDFS partitions=4/4 files=4 size=460B
+|     row-size=4B cardinality=8
+|
+00:SCAN HDFS [functional.alltypes t1]
+   partition predicates: t1.`month` = 1
+   HDFS partitions=2/24 files=2 size=40.32KB
+   runtime filters: RF000 -> t1.id
+   row-size=8B cardinality=620
+====
+# IMPALA-15751: Negative case that the partition column 'month' is projected, so it is
+# still materialized even though it is constant due to the partition predicate.
+SELECT month, MIN(id) OVER (PARTITION BY int_col)
+FROM functional.alltypes t1
+WHERE t1.month = 1
+---- PLAN
+PLAN-ROOT SINK
+|
+02:ANALYTIC
+|  functions: min(id)
+|  partition by: int_col
+|  row-size=16B cardinality=620
+|
+01:SORT
+|  order by: int_col ASC NULLS LAST
+|  row-size=12B cardinality=620
+|
+00:SCAN HDFS [functional.alltypes t1]
+   partition predicates: t1.`month` = 1
+   HDFS partitions=2/24 files=2 size=40.32KB
+   row-size=12B cardinality=620
+====
+# IMPALA-15751: Non-partition predicate still materializes the slot
+SELECT MIN(id) OVER (PARTITION BY int_col)
+FROM functional.alltypes
+WHERE month = 1 AND string_col = '1'
+---- PLAN
+PLAN-ROOT SINK
+|
+02:ANALYTIC
+|  functions: min(id)
+|  partition by: int_col
+|  row-size=25B cardinality=62
+|
+01:SORT
+|  order by: int_col ASC NULLS LAST
+|  row-size=21B cardinality=62
+|
+00:SCAN HDFS [functional.alltypes]
+   partition predicates: `month` = 1
+   HDFS partitions=2/24 files=2 size=40.32KB
+   predicates: string_col = '1'
+   row-size=21B cardinality=62
+====
 # IMPALA-10473: AnalyticEvalNodes with constant Partition-by and Order-by exprs should be
 # computed in single unpartitioned fragments. In this case, it's placed in the coordinator
 # fragment which contains PlanRootSink.
