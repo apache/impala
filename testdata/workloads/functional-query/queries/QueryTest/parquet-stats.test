@@ -792,6 +792,8 @@ explain select id, p from non_ascii_pk where p < 'a';
 STRING
 ---- RESULTS: VERIFY_IS_SUBSET
 '00:SCAN $FILESYSTEM_NAME [$DATABASE.non_ascii_pk]'
-'   partition predicates: p < 'a''
+# Original planner has string 'p < 'a'
+# Calcite planner has string '$DATABASE.non_ascii_pk.p < 'a'
+row_regex:.*partition predicates:.*\bp\b \< ''a''.*
 '   partitions=0/1 files=0 size=0B'
 ====
