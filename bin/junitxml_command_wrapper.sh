@@ -39,12 +39,18 @@ COMMAND=("$@")
 # quotes.
 STDOUT_TMP_FILE=$(mktemp)
 STDERR_TMP_FILE=$(mktemp)
-# The command's stdout and stderr need to remain separate, and we tee them to separate
-# files. Some CMake build steps have a command like "command1 | command2"
-# and command2 should not see stderr. That also means that this script must not produce
-# its own output when the command runs successfully.
-"${COMMAND[@]}" > >(tee "${STDOUT_TMP_FILE}") 2> >(tee "${STDERR_TMP_FILE}" >&2)
-COMMAND_RET_CODE=${PIPESTATUS[0]}
+# The command's stdout and stderr need to remain separate. Some CMake build steps have a
+# command like "command1 | command2" and command2 should not see stderr. That also means
+# that this script must not produce its own output when the command runs successfully.
+# The output is captured in the temporary files and replayed after the command finishes.
+# Piping it through process substitutions like >(tee ...) is not safe: bash does not wait
+# for them, so this script could exit before the tee has written all of stdout. For a
+# step like "command > file" the next step could then see an empty or partial file
+# (IMPALA-15747).
+"${COMMAND[@]}" > "${STDOUT_TMP_FILE}" 2> "${STDERR_TMP_FILE}"
+COMMAND_RET_CODE=$?
+cat "${STDOUT_TMP_FILE}"
+cat "${STDERR_TMP_FILE}" >&2
 if [[ ${COMMAND_RET_CODE} -ne 0 ]]; then
   # Use a hash of the command to make sure multiple build failures generate distinct
   # symptoms
