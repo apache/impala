@@ -1353,20 +1353,10 @@ public class HdfsScanNode extends ScanNode {
     Preconditions.checkState((sampleParams_ == null) == (sampledPartitions_ == null));
     // Assume all table files are in parquet format and all in columnar format
     // until proven otherwise.
-    boolean allParquet = true;
-    boolean allColumnarFormat = true;
-
-    if (this instanceof IcebergScanNode && this.fileFormats_.isEmpty()) {
-      // Iceberg tables always have one partition, even if the scan node contains zero
-      // file descriptors. TODO: IMPALA-13267
-      allParquet = false;
-      allColumnarFormat = false;
-    } else {
-      // If table has no partition, then it is not all parquet, nor it is all columnar.
-      int partitionsSize = getSampledOrRawPartitions().size();
-      allParquet = partitionsSize > 0;
-      allColumnarFormat = partitionsSize > 0;
-    }
+    // If table has no partition, then it is not all parquet, nor it is all columnar.
+    int partitionsSize = getSampledOrRawPartitions().size();
+    boolean allParquet = partitionsSize > 0;
+    boolean allColumnarFormat = partitionsSize > 0;
     long simpleLimitNumRows = 0; // only used for the simple limit case
     boolean isSimpleLimit = sampleParams_ == null &&
         (analyzer.getQueryCtx().client_request.getQuery_options()
@@ -1503,8 +1493,7 @@ public class HdfsScanNode extends ScanNode {
         break;
       }
     }
-    allParquet_ = allParquet;
-    allColumnarFormat_ = allColumnarFormat;
+    setAllFormatFlags(allParquet, allColumnarFormat);
     if (totalFilesPerFs_.isEmpty() || sumValues(totalFilesPerFs_) == 0) {
       maxScanRangeNumRows_ = 0;
     } else {
@@ -1520,6 +1509,16 @@ public class HdfsScanNode extends ScanNode {
             estimateAcidDeleteDeltaNumRows(largestScanRangeBytes_, 1));
       }
     }
+  }
+
+  /**
+   * Set the format flags after scan ranges have been computed. Subclasses can
+   * override this when the partition format does not identify the formats of
+   * the files being scanned.
+   */
+  protected void setAllFormatFlags(boolean allParquet, boolean allColumnarFormat) {
+    allParquet_ = allParquet;
+    allColumnarFormat_ = allColumnarFormat;
   }
 
   protected List<FileDescriptor> getFileDescriptorsWithLimit(

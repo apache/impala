@@ -317,6 +317,18 @@ public class IcebergScanNode extends HdfsScanNode {
   }
 
   @Override
+  protected void setAllFormatFlags(boolean allParquet, boolean allColumnarFormat) {
+    // Iceberg scans can contain files with formats different from the table's default
+    // write format. Derive the flags from the formats of the files selected for this
+    // scan rather than from the synthetic partition format.
+    boolean allParquetFromFiles = fileFormats_.size() == 1
+        && fileFormats_.contains(HdfsFileFormat.PARQUET);
+    boolean allColumnarFromFiles = !fileFormats_.isEmpty()
+        && VALID_COLUMNAR_FORMATS.containsAll(fileFormats_);
+    super.setAllFormatFlags(allParquetFromFiles, allColumnarFromFiles);
+  }
+
+  @Override
   protected void populateFileFormats() throws ImpalaRuntimeException {
     //TODO IMPALA-11577: optimize file format counting
     boolean hasParquet = false;

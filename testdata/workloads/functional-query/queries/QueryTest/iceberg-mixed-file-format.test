@@ -8,3 +8,45 @@ select * from functional_parquet.iceberg_mixed_file_format;
 ---- TYPES
 INT, STRING, DOUBLE, BOOLEAN
 ====
+---- QUERY
+select m.string_col
+from functional_parquet.iceberg_mixed_file_format_part m
+join functional.alltypestiny a on m.double_col = a.double_col
+where m.int_col = 1;
+---- RESULTS
+---- TYPES
+STRING
+====
+---- QUERY
+set ORC_READ_STATISTICS=false;
+select m.string_col
+from functional_parquet.iceberg_mixed_file_format_part m
+join functional.alltypestiny a on m.double_col = a.double_col
+where m.int_col = 2;
+---- RESULTS
+---- TYPES
+STRING
+====
+---- QUERY
+set MINMAX_FILTER_THRESHOLD=0.5;
+select m.string_col
+from functional_parquet.iceberg_mixed_file_format_part m
+join functional_parquet.iceberg_non_partitioned s on m.int_col = s.id
+where m.int_col = 1 and s.user = 'Alex';
+---- RESULTS
+'avro'
+---- TYPES
+STRING
+====
+---- QUERY
+set MINMAX_FILTER_THRESHOLD=0.5;
+set ORC_READ_STATISTICS=false;
+select m.string_col
+from functional_parquet.iceberg_mixed_file_format_part m
+join functional_parquet.iceberg_non_partitioned s on m.int_col = s.id
+where m.int_col = 2 and s.user = 'Lisa';
+---- RESULTS
+'orc'
+---- TYPES
+STRING
+====
