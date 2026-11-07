@@ -107,6 +107,15 @@ public class CalciteValuesLiteralTest extends FrontendTestBase {
     assertEquals("[3, 4]", constantRow("values ((1+2),4)"));
   }
 
+  /**
+   * A function call in the first column is still one row. The comma inside
+   * concat() separates arguments, not columns.
+   */
+  @Test
+  public void valuesRowStartingWithAFunctionCallPlans() throws ImpalaException {
+    assertEquals("['ab', 1]", constantRow("values (concat('a', 'b'), 1)"));
+  }
+
   /** Per-row aliases in Impala multi-row form, e.g. values((1 x), (2), (3)). */
   @Test
   public void aliasedRowsInImpalaDoubleParenValuesPlans() throws ImpalaException {

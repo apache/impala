@@ -303,8 +303,17 @@ public class ${parser.class} extends SqlAbstractParserImpl
      * - an identifier (quoted or not) directly before the closing paren
      * - any other word (e.g. the keyword YEAR) that directly follows a complete
      *   operand, e.g. "(1 year)". See isOperandEnd().
+     * A double-paren row always starts with "((". If the second token is not
+     * "(", this is a single-paren row, including a function call such as
+     * "values (concat("a", "b"), 1)". The comma there separates arguments.
      */
     private boolean isSingleParenRowForValues() {
+        // getToken(1) is the "(" after VALUES. A non-"(" after that cannot be
+        // the double-paren form, so do not treat a comma inside the first
+        // expression as a column separator.
+        if (getToken(2).kind != LPAREN) {
+          return true;
+        }
         int depth = 0;
         boolean hasTokenAtDepth2 = false;
         boolean possibleAliasTokenFound = false;
