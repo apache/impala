@@ -402,6 +402,7 @@ parser: {
   # List of non-reserved keywords to add;
   # items in this list become non-reserved.
   nonReservedKeywordsToAdd: [
+    "ABS"
     "RESULT"
     "RETURN"
     "TIME"

@@ -49,7 +49,7 @@ public class CalciteKeywordIdentifierTest {
 
   @Test
   public void testKeywordColumns() throws ImpalaException {
-    for (String word : new String[] {"RESULT", "RETURN", "TIME", "USER"}) {
+    for (String word : new String[] {"RESULT", "RETURN", "TIME", "USER", "ABS"}) {
       assertColumn(word, false);
       assertColumn(word, true);
       assertAlias(word);
