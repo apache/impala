@@ -4704,7 +4704,10 @@ final String p;
     <APPROX_NUMERIC_LITERAL> {
         BigDecimal bd = new BigDecimal(token.image);
         ScalarType t = (ScalarType) TypesUtil.computeDecimalType(bd);
-        return new ImpalaSqlNumericLiteral(bd, t, getPos());
+        // type will be null if it is out of the range of a decimal, e.g. 1e39
+        return t != null
+            ? new ImpalaSqlNumericLiteral(bd, t, getPos())
+            : SqlLiteral.createApproxNumeric(token.image, getPos());
     }
 }
 
