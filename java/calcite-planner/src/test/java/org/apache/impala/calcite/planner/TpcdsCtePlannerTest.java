@@ -74,9 +74,6 @@ public class TpcdsCtePlannerTest extends PlannerTestBase {
           .setMem_estimate_scale_for_spilling_operator(1.0)
           .setPlanner_testcase_mode(true)
           .setCte_threshold(1)
-          // Required so that output doesn't vary by whether scanned tables have stats &
-          // numRows property or not.
-          .setDisable_hdfs_num_rows_estimate(true)
           .setPlanner(TPlannerType.CALCITE)
           .setFallback_planner(TPlannerType.CALCITE)
           .setEnable_explain_calcite(true);
