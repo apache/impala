@@ -23,6 +23,15 @@
 #include <glog/logging.h>
 #include <tcmalloc/malloc_extension.h>
 
+// tcmalloc uses Abseil, and it leaks these definitions. These conflict with equivalent
+// definitions in gutils (which comes in via util/metrics.h below). IMPALA-15728
+// tracks the full fix for these conflicts.
+#undef ANNOTATE_IGNORE_READS_BEGIN
+#undef ANNOTATE_IGNORE_READS_END
+#undef ANNOTATE_IGNORE_READS_AND_WRITES_BEGIN
+#undef ANNOTATE_IGNORE_READS_AND_WRITES_END
+#undef ANNOTATE_UNPROTECTED_READ
+
 #include "util/malloc-util.h"
 #include "util/metrics.h"
 #include "util/thread.h"
