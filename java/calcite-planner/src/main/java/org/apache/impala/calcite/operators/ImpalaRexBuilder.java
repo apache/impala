@@ -24,6 +24,8 @@ import org.apache.calcite.rex.RexNode;
 import org.apache.calcite.sql.parser.SqlParserPos;
 import org.apache.calcite.sql.type.SqlTypeName;
 import org.apache.calcite.sql.type.SqlTypeUtil;
+import org.apache.calcite.util.NlsString;
+import org.apache.impala.analysis.StringLiteral;
 import org.apache.impala.catalog.Type;
 import org.apache.impala.calcite.type.ImpalaTypeConverter;
 
@@ -74,11 +76,30 @@ public class ImpalaRexBuilder extends RexBuilder {
         BigDecimal bd0 = (BigDecimal) o;
         type = ImpalaTypeConverter.getLiteralDataType(bd0, type);
       } else if (SqlTypeUtil.inCharFamily(typeName)) {
-        // Calcite creates string literals as char type, so this needs to be overridden.
-        type = ImpalaTypeConverter.getRelDataType(Type.STRING, false);
+        // The last parameter is for unescaping. We only want to unescape on the
+        // conversion from AST literals to Rex literals, right before we move
+        // on to the post analysis phase.
+        return makeStringLiteral(o, typeName, !postAnalysis_);
       }
     }
 
+    return super.makeLiteral(o, type, typeName);
+  }
+
+  public RexLiteral makeStringLiteral(Comparable o, SqlTypeName typeName,
+      boolean unescape) {
+    RelDataType type = ImpalaTypeConverter.getRelDataType(Type.STRING, false);
+    if (unescape) {
+      if (o instanceof NlsString) {
+        NlsString nlsString = (NlsString) o;
+        // Same decoding StringLiteral applies when it sends the literal to
+        // the backend. '\061' and '1' are then the same value.
+        String unescaped = new StringLiteral(nlsString.getValue(), Type.STRING,
+            true).unescapeIfNeeded();
+        o = new NlsString(unescaped, nlsString.getCharsetName(),
+            nlsString.getCollation());
+      }
+    }
     return super.makeLiteral(o, type, typeName);
   }
 

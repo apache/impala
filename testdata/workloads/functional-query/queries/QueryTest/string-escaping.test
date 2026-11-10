@@ -60,3 +60,14 @@ where s in ('\\"', 'foo"bar')
 ---- TYPES
 STRING
 ====
+---- QUERY
+# IMPALA-15774: chr(92) is a backslash, so this predicate is the four
+# characters \061, not '1'. Folding produces that value already decoded.
+# Kudu must not unescape it again. HDFS returned 0; Kudu used to return 4.
+select count(*) from functional_kudu.alltypestiny
+where string_col = concat(chr(92), '061');
+---- TYPES
+BIGINT
+---- RESULTS
+0
+====

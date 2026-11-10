@@ -251,7 +251,7 @@ public class HBaseScanNode extends ScanNode {
         // as a key. That is, we'll produce wrong query results.
         if (val instanceof StringLiteral) {
           StringLiteral litVal = (StringLiteral) val;
-          startKey_ = convertToBytes(litVal.getUnescapedValue(),
+          startKey_ = convertToBytes(litVal.unescapeIfNeeded(),
               !rowRange.getLowerBoundInclusive());
         } else {
           // lower bound is null.
@@ -267,7 +267,7 @@ public class HBaseScanNode extends ScanNode {
             analyzer.getQueryCtx(), StringLiteral.MAX_STRING_LEN);
         if (val instanceof StringLiteral) {
           StringLiteral litVal = (StringLiteral) val;
-          stopKey_ = convertToBytes(litVal.getUnescapedValue(),
+          stopKey_ = convertToBytes(litVal.unescapeIfNeeded(),
               rowRange.getUpperBoundInclusive());
         } else {
           // lower bound is null.
@@ -420,7 +420,7 @@ public class HBaseScanNode extends ScanNode {
         // null value. Constructors in Thrift do not set optional fields, so the qualifier
         // must be set separately.
         THBaseFilter thbf = new THBaseFilter(col.getColumnFamily(),
-            (byte) hbaseOp.ordinal(), literal.getUnescapedValue());
+            (byte) hbaseOp.ordinal(), literal.unescapeIfNeeded());
         thbf.setQualifier(col.getColumnQualifier());
         filters_.add(thbf);
         analyzer.materializeSlots(Lists.newArrayList(e));

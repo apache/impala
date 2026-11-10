@@ -24,6 +24,7 @@ import org.apache.calcite.rex.RexBuilder;
 import org.apache.calcite.rex.RexCall;
 import org.apache.calcite.rex.RexNode;
 import org.apache.calcite.sql.SqlCall;
+import org.apache.calcite.sql.SqlCharStringLiteral;
 import org.apache.calcite.sql.SqlNode;
 import org.apache.calcite.sql.SqlOperator;
 import org.apache.calcite.sql.fun.SqlStdOperatorTable;
@@ -148,7 +149,7 @@ public class ImpalaConvertletTable extends ReflectiveConvertletTable {
           SqlTypeUtil.inCharFamily(returnType));
       SqlNode formatExpr = call.operand(2);
       operands = Lists.newArrayList(cx.convertExpression(expr),
-          cx.convertExpression(formatExpr));
+          convertCastFormat(cx.getRexBuilder(), formatExpr));
     } else if (call.operandCount() == 2) {
       operands = Lists.newArrayList(cx.convertExpression(expr));
     } else {
@@ -156,6 +157,22 @@ public class ImpalaConvertletTable extends ReflectiveConvertletTable {
     }
 
     return rexBuilder.makeCall(returnType, ImpalaCastFunction.INSTANCE, operands);
+  }
+
+  /**
+   * The datetime format parser reads SQL escapes such as \" itself. Decoding
+   * this literal the way other strings are decoded removes those escapes.
+   */
+  private static RexNode convertCastFormat(RexBuilder rexBuilder, SqlNode formatExpr) {
+    Preconditions.checkState(formatExpr instanceof SqlCharStringLiteral);
+    Preconditions.checkState(rexBuilder instanceof ImpalaRexBuilder);
+    SqlCharStringLiteral formatLiteral = (SqlCharStringLiteral) formatExpr;
+    ImpalaRexBuilder impalaRexBuilder = (ImpalaRexBuilder) rexBuilder;
+    // Call makeStringLiteral rather than makeLiteral. This convertlet is called before
+    // postAnalysis. Normally, the rexBuilder "unescapes" strings when converting to a
+    // RexLiteral, but date format strings need to retain their escape characters.
+    return impalaRexBuilder.makeStringLiteral(formatLiteral.getNlsString(),
+        SqlTypeName.CHAR, false);
   }
 
   /**

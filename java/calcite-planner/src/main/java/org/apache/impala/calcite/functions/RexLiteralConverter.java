@@ -104,8 +104,9 @@ public class RexLiteralConverter {
         return numericExpr;
       case CHAR:
       case VARCHAR:
+        // ImpalaRexBuilder already decoded SQL escapes into this value.
         return new StringLiteral(rexLiteral.getValueAs(String.class),
-            ImpalaTypeConverter.createImpalaType(rexLiteral.getType()), true);
+            ImpalaTypeConverter.createImpalaType(rexLiteral.getType()), false);
       case BINARY:
         // Calcite keeps a binary literal as a ByteString, and Impala's StringLiteral
         // takes the bytes: it holds them as bytes when they are not valid UTF-8, which

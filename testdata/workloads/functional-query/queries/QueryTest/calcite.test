@@ -1726,3 +1726,56 @@ NULL,NULL,1,8
 ---- TYPES
 INT,TINYINT,BIGINT,TINYINT
 ====
+---- QUERY
+# IMPALA-15774: Escaped and plain spellings of the same string compare equal.
+select 'a\q' = 'aq', '\061' = '1', "it's" = 'it\'s', 'a\q' < 'aq',
+  'a\q' in ('aq', 'x');
+---- TYPES
+BOOLEAN, BOOLEAN, BOOLEAN, BOOLEAN, BOOLEAN
+---- RESULTS
+true,true,true,false,true
+====
+---- QUERY
+# IMPALA-15774: A filter must not treat '\061' as different from '1'.
+select count(*) from functional.alltypestiny
+where string_col = '1' and string_col = '\061';
+---- TYPES
+BIGINT
+---- RESULTS
+4
+====
+---- QUERY
+# IMPALA-15774: The complementary filter must not keep those rows.
+select count(*) from functional.alltypestiny
+where string_col = '1' and string_col != '\061';
+---- TYPES
+BIGINT
+---- RESULTS
+0
+====
+---- QUERY
+# IMPALA-15774: Join keys written with different escapes are the same value.
+select count(*) from functional.alltypestiny a join functional.alltypestiny b
+  on a.string_col = b.string_col
+where a.string_col = '\061' and b.string_col = '1';
+---- TYPES
+BIGINT
+---- RESULTS
+16
+====
+---- QUERY
+# IMPALA-15753: Test LIKE with an escaped wildcard.
+select count(*) from functional.alltypestiny
+where concat('a%', string_col) like 'a\\%_'
+---- TYPES
+BIGINT
+---- RESULTS
+8
+====
+---- QUERY
+# IMPALA-15753: Test LIKE with an escaped wildcard in a WHERE clause.
+select 1 from functional.alltypestiny where 'a\\' like 'a\\%%' limit 1;
+---- TYPES
+TINYINT
+---- RESULTS
+====

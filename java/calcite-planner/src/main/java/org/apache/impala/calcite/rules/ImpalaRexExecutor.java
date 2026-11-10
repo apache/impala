@@ -231,7 +231,6 @@ public class ImpalaRexExecutor implements RexExecutor {
       if (newString == null) {
         return constExp;
       }
-      newString = newString.replace("\\", "\\\\");
       return builder.makeLiteral(newString, returnType, true);
     }
     Preconditions.checkState(!colVal.isSetTimestamp_val(),
