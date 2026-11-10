@@ -21,15 +21,12 @@ import com.google.common.base.Preconditions;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
-import java.util.stream.Collectors;
-import org.apache.iceberg.DeleteFile;
 import org.apache.iceberg.FileScanTask;
 import org.apache.impala.authorization.Privilege;
 import org.apache.impala.catalog.FeIcebergTable;
 import org.apache.impala.catalog.FeKuduTable;
 import org.apache.impala.catalog.FeTable;
 import org.apache.impala.common.AnalysisException;
-import org.apache.impala.common.ImpalaRuntimeException;
 import org.apache.impala.thrift.TAlterTableDropPartitionParams;
 import org.apache.impala.thrift.TAlterTableParams;
 import org.apache.impala.thrift.TAlterTableType;
@@ -47,15 +44,12 @@ public class AlterTableDropPartitionStmt extends AlterTableStmt {
   // deleted. For example, for HDFS tables it skips the trash mechanism
   private final boolean purgePartition_;
 
-  // File paths selected by Iceberg's partition filtering
+  // Data file paths selected by Iceberg's partition filtering. The scan tasks return
+  // each data file once, so the paths are unique.
   private List<String> icebergFilePaths_;
 
   // Statistics for selected Iceberg partitions
   private long numberOfIcebergPartitions_;
-
-  // If every partition is selected by Iceberg's partition filtering, this flag signals
-  // that a truncate should be executed instead of deleting every file from the metadata.
-  private boolean isIcebergTruncate_ = false;
 
   public AlterTableDropPartitionStmt(TableName tableName,
       PartitionSet partitionSet, boolean ifExists, boolean purgePartition) {
@@ -97,12 +91,7 @@ public class AlterTableDropPartitionStmt extends AlterTableStmt {
     params.setDrop_partition_params(dropPartParams);
     if (table_ instanceof FeIcebergTable) {
       TIcebergDropPartitionRequest request = new TIcebergDropPartitionRequest();
-      request.setIs_truncate(isIcebergTruncate_);
-      if (isIcebergTruncate_) {
-        request.setPaths(Collections.emptyList());
-      } else {
-        request.setPaths(icebergFilePaths_);
-      }
+      request.setPaths(icebergFilePaths_);
       request.num_partitions = numberOfIcebergPartitions_;
       dropPartParams.setIceberg_drop_partition_request(request);
       dropPartParams.setPartition_set(Collections.emptyList());
@@ -139,23 +128,13 @@ public class AlterTableDropPartitionStmt extends AlterTableStmt {
     IcebergUtil.PartitionFilesResult result = IcebergUtil.planPartitionFiles(
         table, partitionSet_.getPartitionExprs(), analyzer);
     numberOfIcebergPartitions_ = result.numPartitions;
+    // Only the data files are dropped, also if every partition is selected: truncating
+    // the table instead would also drop the files written since the analysis. Iceberg's
+    // DeleteFiles drops data files only, and it would fail to find delete files when it
+    // validates that the files to drop still exist.
     icebergFilePaths_ = new ArrayList<>();
     for (FileScanTask fileScanTask : result.fileScanTasks) {
-      List<DeleteFile> deleteFiles = fileScanTask.deletes();
-      if (!deleteFiles.isEmpty()) {
-        icebergFilePaths_.addAll(deleteFiles.stream()
-            .map(DeleteFile::location).collect(Collectors.toSet()));
-      }
       icebergFilePaths_.add(fileScanTask.file().location());
-    }
-    try {
-      if (icebergFilePaths_.size() == FeIcebergTable.Utils.getTotalNumberOfFiles(table,
-          null)) {
-        isIcebergTruncate_ = true;
-        icebergFilePaths_ = Collections.emptyList();
-      }
-    } catch (ImpalaRuntimeException e) {
-      throw new AnalysisException("Error loading metadata for Iceberg table", e);
     }
     if (numberOfIcebergPartitions_ == 0 && !ifExists_) {
       throw new AnalysisException(

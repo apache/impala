@@ -1438,27 +1438,5 @@ public interface FeIcebergTable extends FeFsTable {
       return new FileStatus(contentFile.fileSizeInBytes(), false, 0, 0,
           DEFAULT_MODIFICATION_TIME, path);
     }
-
-    public static long getTotalNumberOfFiles(FeIcebergTable icebergTable,
-        TimeTravelSpec travelSpec)
-        throws ImpalaRuntimeException {
-      Map<String, String> snapshotSummary = getSnapshotSummary(
-          icebergTable.getIcebergApiTable(),
-          travelSpec);
-      if (snapshotSummary == null) {
-        throw new ImpalaRuntimeException("Invalid Iceberg snapshot summary");
-      }
-      try {
-        String totalDataFilesProp = snapshotSummary.get(
-            SnapshotSummary.TOTAL_DATA_FILES_PROP);
-        String totalDeleteFilesProp = snapshotSummary.getOrDefault(
-            SnapshotSummary.TOTAL_DELETE_FILES_PROP, "0");
-        long totalDataFiles = Long.parseLong(totalDataFilesProp);
-        long totalDeleteFiles = Long.parseLong(totalDeleteFilesProp);
-        return totalDataFiles + totalDeleteFiles;
-      } catch (NumberFormatException e) {
-        throw new ImpalaRuntimeException("Invalid Iceberg snapshot summary value");
-      }
-    }
   }
 }

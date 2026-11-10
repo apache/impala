@@ -332,17 +332,17 @@ public class IcebergCatalogOpExecutor {
   }
 
   /**
-   * Deletes files related to specific set of partitions
+   * Deletes the data files of the dropped partitions. The commit fails if one of these
+   * data files was removed since the analysis, e.g. rewritten by a concurrent OPTIMIZE.
+   * Only data file paths are sent: DeleteFiles.deleteFile() matches data files, so the
+   * delete files of the dropped partitions are left behind (IMPALA-15483), and passing
+   * their paths would make validateFilesExist() fail.
    */
   public static long alterTableDropPartition(
       Transaction iceTxn, TAlterTableDropPartitionParams params) {
-    DeleteFiles deleteFiles = iceTxn.newDelete();
-    if (params.iceberg_drop_partition_request.is_truncate) {
-      deleteFiles.deleteFromRowFilter(Expressions.alwaysTrue());
-    } else {
-      for (String path : params.iceberg_drop_partition_request.paths) {
-        deleteFiles.deleteFile(path);
-      }
+    DeleteFiles deleteFiles = iceTxn.newDelete().validateFilesExist();
+    for (String path : params.iceberg_drop_partition_request.paths) {
+      deleteFiles.deleteFile(path);
     }
     deleteFiles.commit();
     return params.iceberg_drop_partition_request.num_partitions;

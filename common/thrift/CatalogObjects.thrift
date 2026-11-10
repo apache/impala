@@ -692,11 +692,8 @@ struct TIcebergContentFileStore {
 
 // Represents a drop partition request for Iceberg tables
 struct TIcebergDropPartitionRequest {
-  // List of affected file paths (could be empty if the drop partition
-  // request can be exchanged with a truncate command)
+  // Paths of the data files of the dropped partitions
   1: required list<string> paths
-  // Indicates whether the request could be exchanged with a truncate command
-  2: required bool is_truncate
   // Number of affected partitions that will be dropped
   3: required i64 num_partitions
 }

@@ -556,3 +556,111 @@ ALTER TABLE $DATABASE.iceberg_drop_partition_like_truncate DROP PARTITION (s LIK
 ---- CATCH
 AnalysisException: Predicate 's LIKE 'd%d'' can only be partially converted to Iceberg expression
 ====
+---- QUERY
+# A position delete file that applies to several data files of the dropped partition must
+# not make the drop remove the other partitions too:
+# 2 data files and 1 delete file in p=1, 1 data file in p=2.
+CREATE TABLE $DATABASE.iceberg_drop_partition_shared_deletes (id INT, p INT)
+PARTITIONED BY SPEC (p) STORED AS ICEBERG TBLPROPERTIES ('format-version'='2');
+INSERT INTO $DATABASE.iceberg_drop_partition_shared_deletes VALUES (1, 1), (11, 1);
+INSERT INTO $DATABASE.iceberg_drop_partition_shared_deletes VALUES (2, 1), (12, 1);
+INSERT INTO $DATABASE.iceberg_drop_partition_shared_deletes VALUES (3, 2);
+DELETE FROM $DATABASE.iceberg_drop_partition_shared_deletes WHERE id IN (1, 2);
+ALTER TABLE $DATABASE.iceberg_drop_partition_shared_deletes DROP PARTITION (p = 1);
+---- RESULTS
+'Dropped 1 partition(s)'
+====
+---- QUERY
+SELECT id, p FROM $DATABASE.iceberg_drop_partition_shared_deletes;
+---- RESULTS
+3,2
+---- TYPES
+INT,INT
+====
+---- QUERY
+# The same for a table upgraded to format version 3 that still has the position delete
+# file of format version 2.
+CREATE TABLE $DATABASE.iceberg_drop_partition_shared_deletes_v3 (id INT, p INT)
+PARTITIONED BY SPEC (p) STORED AS ICEBERG TBLPROPERTIES ('format-version'='2');
+INSERT INTO $DATABASE.iceberg_drop_partition_shared_deletes_v3 VALUES (1, 1), (11, 1);
+INSERT INTO $DATABASE.iceberg_drop_partition_shared_deletes_v3 VALUES (2, 1), (12, 1);
+INSERT INTO $DATABASE.iceberg_drop_partition_shared_deletes_v3 VALUES (3, 2);
+DELETE FROM $DATABASE.iceberg_drop_partition_shared_deletes_v3 WHERE id IN (1, 2);
+ALTER TABLE $DATABASE.iceberg_drop_partition_shared_deletes_v3
+SET TBLPROPERTIES ('format-version'='3');
+ALTER TABLE $DATABASE.iceberg_drop_partition_shared_deletes_v3 DROP PARTITION (p = 1);
+---- RESULTS
+'Dropped 1 partition(s)'
+====
+---- QUERY
+SELECT id, p FROM $DATABASE.iceberg_drop_partition_shared_deletes_v3;
+---- RESULTS
+3,2
+---- TYPES
+INT,INT
+====
+---- QUERY
+# A deletion vector of format version 3 applies to one data file, and it is dropped with
+# it: 2 data files with a deletion vector each in p=1, 1 data file with a deletion vector
+# in p=2. A table upgraded to format version 3 can't get deletion vectors while it has
+# position delete files of format version 2, so this table is created as version 3.
+CREATE TABLE $DATABASE.iceberg_drop_partition_dvs (id INT, p INT)
+PARTITIONED BY SPEC (p) STORED AS ICEBERG TBLPROPERTIES ('format-version'='3');
+INSERT INTO $DATABASE.iceberg_drop_partition_dvs VALUES (1, 1), (11, 1);
+INSERT INTO $DATABASE.iceberg_drop_partition_dvs VALUES (2, 1), (12, 1);
+INSERT INTO $DATABASE.iceberg_drop_partition_dvs VALUES (3, 2), (13, 2);
+DELETE FROM $DATABASE.iceberg_drop_partition_dvs WHERE id IN (1, 2, 3);
+ALTER TABLE $DATABASE.iceberg_drop_partition_dvs DROP PARTITION (p = 1);
+---- RESULTS
+'Dropped 1 partition(s)'
+====
+---- QUERY
+SELECT id, p FROM $DATABASE.iceberg_drop_partition_dvs;
+---- RESULTS
+13,2
+---- TYPES
+INT,INT
+====
+---- QUERY
+SELECT `partition`.p, file_format FROM $DATABASE.iceberg_drop_partition_dvs.delete_files;
+---- RESULTS
+2,'PUFFIN'
+---- TYPES
+INT,STRING
+====
+---- QUERY
+# Dropping the last partition drops the remaining rows.
+ALTER TABLE $DATABASE.iceberg_drop_partition_shared_deletes DROP PARTITION (p = 2);
+SELECT count(*) FROM $DATABASE.iceberg_drop_partition_shared_deletes;
+---- RESULTS
+0
+---- TYPES
+BIGINT
+====
+---- QUERY
+# Dropping every partition at once, which truncated the table before, drops every data
+# file of a table with shared delete files: 2 data files and 1 delete file that applies
+# to both of them in each of p=1 and p=2.
+CREATE TABLE $DATABASE.iceberg_drop_partition_all (id INT, p INT)
+PARTITIONED BY SPEC (p) STORED AS ICEBERG TBLPROPERTIES ('format-version'='2');
+INSERT INTO $DATABASE.iceberg_drop_partition_all VALUES (1, 1), (11, 1), (3, 2), (13, 2);
+INSERT INTO $DATABASE.iceberg_drop_partition_all VALUES (2, 1), (12, 1), (4, 2), (14, 2);
+DELETE FROM $DATABASE.iceberg_drop_partition_all WHERE id IN (1, 2, 3, 4);
+ALTER TABLE $DATABASE.iceberg_drop_partition_all DROP PARTITION (p IN (1, 2));
+---- RESULTS
+'Dropped 2 partition(s)'
+====
+---- QUERY
+SELECT count(*) FROM $DATABASE.iceberg_drop_partition_all;
+---- RESULTS
+0
+---- TYPES
+BIGINT
+====
+---- QUERY
+SELECT count(*) FROM $DATABASE.iceberg_drop_partition_all.data_files;
+---- RESULTS
+0
+---- TYPES
+BIGINT
+====
