@@ -24,7 +24,7 @@ github:
     issues: false
     projects: false
     # Use http://gerrit.cloudera.org/ for pullrequests
-    pullrequests: false
+    # pullrequests: false
   autolink_jira:
     - IMPALA
     - KUDU
