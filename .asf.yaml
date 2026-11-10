@@ -18,6 +18,13 @@
 # https://github.com/apache/infrastructure-asfyaml/blob/main/README.md
 ---
 github:
+  features:
+    wiki: false
+    # Use https://issues.apache.org/jira for issues
+    issues: false
+    projects: false
+    # Use http://gerrit.cloudera.org/ for pullrequests
+    pullrequests: false
   autolink_jira:
     - IMPALA
     - KUDU
