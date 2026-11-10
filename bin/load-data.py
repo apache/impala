@@ -374,9 +374,9 @@ def main():
     #       They take the form:
     #       load-${workload_exploration}-impala-generated-${file_format_suffix}.sql
     #
-    #    F. Invalidation script runs through Impala to invalidate/refresh metadata
-    #       for tables. It takes the form:
-    #       invalidate-${workload_exploration}-impala-generated.sql
+    #    F. Invalidation scripts run through Impala to invalidate/refresh metadata
+    #       for tables, one per file format. They take the form:
+    #       invalidate-${workload_exploration}-impala-generated-${file_format_suffix}.sql
     generate_schema_statements(workload)
 
     # Determine the directory from #1
@@ -447,6 +447,9 @@ def main():
       list(map(LOG.debug, list(map(os.path.basename, file_list))))
       LOG.debug("\n")
 
+    # Kudu table creation is the longest file, so don't queue it behind other formats.
+    impala_create_files.sort(key=lambda filename: ('-kudu-' not in filename, filename))
+
     log_file_list("Impala Create Files:", impala_create_files)
     log_file_list("Hive Load Text Files:", hive_load_text_files)
     log_file_list("Hive Load Orc Files:", hive_load_orc_files)
@@ -490,7 +493,6 @@ def main():
 
     # Invalidate so that Impala sees the loads done by Hive before loading Parquet/Kudu
     # Note: This only invalidates tables for this workload.
-    assert(len(invalidate_files) <= 1)
     if impala_load_files:
       impala_exec_query_files_parallel(thread_pool, invalidate_files,
           "Impala Invalidate 1")

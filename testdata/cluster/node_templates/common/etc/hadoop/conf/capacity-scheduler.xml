@@ -12,7 +12,7 @@
   limitations under the License. See accompanying LICENSE file.
 
   NOTE: this is the default capacity-scheduler.xml that ships with
-  YARN. No Impala-specific modifications have been made.
+  YARN, with an increased application-master budget for parallel test data loading.
 -->
 <configuration>
 
@@ -26,7 +26,7 @@
 
   <property>
     <name>yarn.scheduler.capacity.maximum-am-resource-percent</name>
-    <value>0.1</value>
+    <value>0.3</value>
     <description>
       Maximum percent of resources in the cluster which can be used to run 
       application masters i.e. controls number of concurrent running

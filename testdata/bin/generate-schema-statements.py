@@ -66,14 +66,13 @@
 #       HBase tables. (Only generated if loading HBase table.) It takes the form:
 #       post-load-${workload_exploration}-hbase-generated.sql
 #
-#    E. Impala load scripts run in Impala to load data. Only Parquet and Kudu
-#       are loaded through Impala. There is one for each of those formats loaded.
-#       They take the form:
+#    E. Impala load scripts run in Impala to load data. There is one for each file
+#       format Impala supports. They take the form:
 #       load-${workload_exploration}-impala-generated-${file_format_suffix}.sql
 #
-#    F. Invalidation script runs through Impala to invalidate/refresh metadata
-#       for tables. It takes the form:
-#       invalidate-${workload_exploration}-impala-generated.sql
+#    F. Invalidation scripts run through Impala to invalidate/refresh metadata
+#       for tables, one per file format. They take the form:
+#       invalidate-${workload_exploration}-impala-generated-${file_format_suffix}.sql
 #
 # In summary, table "CREATE" statements are mostly done by Impala. Any "CREATE"
 # statements that Impala does not support are done through Hive. Loading data
@@ -859,13 +858,12 @@ def generate_statements(output_name, test_vectors, sections,
 
   hbase_output = Statements()
   hbase_post_load = Statements()
-  impala_invalidate = Statements()
-
   existing_tables = get_hdfs_subdirs_with_data(options.hive_warehouse_dir)
   for row in test_vectors:
     impala_create = Statements()
     hive_output = Statements()
     impala_load = Statements()
+    impala_invalidate = Statements()
     file_format, data_set, codec, compression_type =\
         [row.file_format, row.dataset, row.compression_codec, row.compression_type]
     table_format = '%s/%s/%s' % (file_format, codec, compression_type)
@@ -1082,12 +1080,13 @@ def generate_statements(output_name, test_vectors, sections,
         (output_name, file_format, codec, compression_type))
     impala_load.write_to_file("load-%s-impala-generated-%s-%s-%s.sql" %
         (output_name, file_format, codec, compression_type))
+    impala_invalidate.write_to_file("invalidate-%s-impala-generated-%s-%s-%s.sql" %
+        (output_name, file_format, codec, compression_type))
 
   if hbase_output:
     hbase_output.write_to_file('load-' + output_name + '-hbase-generated.create')
   if hbase_post_load:
     hbase_post_load.write_to_file('post-load-' + output_name + '-hbase-generated.sql')
-  impala_invalidate.write_to_file("invalidate-" + output_name + "-impala-generated.sql")
 
 
 def is_transactional(table_properties):

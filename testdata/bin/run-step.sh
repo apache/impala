@@ -39,7 +39,8 @@ function run-step {
 
   echo "${MSG} (logging to ${LOG})... "
   echo "Log for command '$@'" > ${LOG}
-  START_TIME=$SECONDS
+  local START_TIME=$SECONDS
+  local ELAPSED_TIME
   if ! "$@" >> ${LOG} 2>&1 ; then
     ELAPSED_TIME=$(($SECONDS - $START_TIME))
     echo "    FAILED (Took: $(($ELAPSED_TIME/60)) min $(($ELAPSED_TIME%60)) sec)"
