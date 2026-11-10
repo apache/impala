@@ -22,7 +22,7 @@ insert into kudu_tbl_01 values (1, 'one', 1.0, 1), (2, 'two', 2.0, 2);
 ---- QUERY
 # Kudu takes time to commit the rows and update its live row count.
 show table stats kudu_tbl_01;
----- RESULTS: RETRY=10@1000
+---- RESULTS: RETRY=20@1000
 2,3,regex:.*,'KUDU',regex:.*
 ---- TYPES
 BIGINT,BIGINT,STRING,STRING,STRING
