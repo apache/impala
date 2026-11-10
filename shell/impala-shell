@@ -29,25 +29,52 @@ SHELL_HOME=${IMPALA_SHELL_HOME:-${SCRIPT_DIR}}
 # Set the envrionment's locale settings to allow for utf-8 compatibility
 export LC_CTYPE=${LC_CTYPE:-en_US.UTF-8}
 
-# Select python version; prefer 2, use 3 if 2's absent. Allow override with envvar
-PYTHON_EXE="${IMPALA_PYTHON_EXECUTABLE:-python}"
-if ! command -v "${PYTHON_EXE}" > /dev/null; then
-  PYTHON_EXE=python3
+# Prints the "major.minor" version of the given python interpreter.
+python_version() {
+  "${1}" -c 'import sys; \
+    print("{}.{}".format(sys.version_info.major, sys.version_info.minor))' 2> /dev/null
+}
+
+# Dependencies in install_py${PYTHON_VERSION} are built for a specific python version
+# (some are compiled extensions), so the interpreter must match one of the bundled
+# versions exactly. Prefer the host's default interpreter, but fall back to any bundled
+# version whose interpreter is installed, e.g. python3.11 on a host whose default
+# "python" is a version this package was not built for. Allow override with envvar.
+if [ -n "${IMPALA_PYTHON_EXECUTABLE}" ]; then
+  candidates="${IMPALA_PYTHON_EXECUTABLE}"
+else
+  candidates="python python3 python2"
+  for install_dir in "${SHELL_HOME}"/install_py*; do
+    [ -d "${install_dir}" ] || continue
+    # install_py3.11 -> python3.11
+    candidates="${candidates} python${install_dir##*/install_py}"
+  done
 fi
 
-# impala-shell is installed in /install_py${PYTHON_VERSION}
-PYTHON_VERSION=$("${PYTHON_EXE}" -c 'import sys; \
-  print("{}.{}".format(sys.version_info.major, sys.version_info.minor))')
-if [ ! -d "${SHELL_HOME}/install_py${PYTHON_VERSION}" ]; then
+PYTHON_EXE=""
+PYTHON_VERSION=""
+for candidate in ${candidates}; do
+  command -v "${candidate}" > /dev/null || continue
+  version=$(python_version "${candidate}")
+  [ -n "${version}" ] || continue
+  if [ -d "${SHELL_HOME}/install_py${version}" ]; then
+    PYTHON_EXE="${candidate}"
+    PYTHON_VERSION="${version}"
+    break
+  fi
+done
+
+if [ -z "${PYTHON_EXE}" ]; then
   # List all install_py* dirs, remove install_py prefix, and join into a comma-separated
   # string.
-  dirs=( $(cd ${SHELL_HOME} && echo install_py*) )
+  dirs=( $(cd "${SHELL_HOME}" && echo install_py*) )
   vers="${dirs[@]#install_py}"
   pretty="$(printf "%s, " ${vers[@]})"
-  echo "This impala-shell package was not built to support Python ${PYTHON_VERSION}." \
-       "Supported Python versions are: ${pretty%, }."
+  echo "This impala-shell package was not built to support any Python interpreter" \
+       "available on this host. Supported Python versions are: ${pretty%, }." \
+       "Install one of them, or set IMPALA_PYTHON_EXECUTABLE to a matching interpreter."
   exit 1
 fi
 
 PYTHONIOENCODING='utf-8' PYTHONPATH="${SHELL_HOME}/install_py${PYTHON_VERSION}" \
-  exec ${PYTHON_EXE} -m "impala_shell.impala_shell" "$@"
+  exec "${PYTHON_EXE}" -m "impala_shell.impala_shell" "$@"
