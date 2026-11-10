@@ -22,6 +22,16 @@
 All documentation contributors MUST follow these standards to ensure consistency,
 clarity, and accessibility across Impala documentation.
 
+## Content
+
+- MUST document new features, behavioral changes.
+- SHOULD keep it short and clear.
+- MUST explain the requirements for the desired outcome. SHOULD elaborate on error paths
+  only if the behavior is unexpected e.g. fallback, silent ignore.
+- MUST avoid redundancy. Give examples only for the syntax or if the description needs
+  more clarity.
+- MAY recommend configurations for performance.
+
 ## Voice and Tone Standards
 
 - MUST use second person ("you") and present tense.

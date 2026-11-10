@@ -62,7 +62,8 @@ This file is optimized for AI agents. Follow these terms exactly:
 3. Build only the touched component(s).
 4. Run the narrowest relevant tests.
 5. Expand validation only if needed.
-6. Summarize exact commands run, outputs, and follow-up actions.
+6. Document the behavioral changes.
+7. Summarize exact commands run, outputs, and follow-up actions.
 
 ## Environment Configuration
 
@@ -122,6 +123,7 @@ Impala is divided into several components:
 - `common`: Thrift, Flatbuffers, and Protobuf serialization definitions.
 - `docker`: Container image build resources. Not used during normal development or
   build of Impala itself.
+- `docs`: Documentation (DITA). Writing standards are in `docs/AGENTS.md`.
 - `fe`: Frontend Java codebase for query planning. Maven is used for dependencies
   and build workflows. Parent POM is in `java/pom.xml`. Java 17 is required.
 - `java`: Additional Java sub-projects used for development, testing, and runtime.
