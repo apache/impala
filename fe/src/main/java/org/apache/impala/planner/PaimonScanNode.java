@@ -19,9 +19,9 @@ package org.apache.impala.planner;
 
 import com.google.common.base.MoreObjects;
 import com.google.common.base.Preconditions;
-import com.google.common.collect.Iterables;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
+
 import org.apache.commons.lang3.SerializationUtils;
 import org.apache.impala.analysis.Analyzer;
 import org.apache.impala.analysis.Expr;
@@ -30,11 +30,14 @@ import org.apache.impala.analysis.SlotDescriptor;
 import org.apache.impala.analysis.TupleDescriptor;
 import org.apache.impala.catalog.paimon.FePaimonTable;
 import org.apache.impala.catalog.paimon.PaimonColumn;
+import org.apache.impala.catalog.paimon.PaimonUtil;
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.common.ImpalaException;
 import org.apache.impala.common.ImpalaRuntimeException;
 import org.apache.impala.common.ThriftSerializationCtx;
+import org.apache.impala.planner.paimon.PaimonJniReadFilter;
 import org.apache.impala.planner.paimon.PaimonSplit;
+import org.apache.impala.planner.paimon.PredicateExtractor;
 import org.apache.impala.thrift.TExplainLevel;
 import org.apache.impala.thrift.TNetworkAddress;
 import org.apache.impala.thrift.TPaimonScanNode;
@@ -67,10 +70,10 @@ import java.util.Set;
 public class PaimonScanNode extends ScanNode {
   private final static Logger LOG = LoggerFactory.getLogger(PaimonScanNode.class);
   private final static long PAIMON_ROW_AVG_SIZE_OVERHEAD = 4L;
-  // FeTable object
+  // FeTable object.
   private final FePaimonTable table_;
 
-  // paimon table object
+  // paimon table object.
   private final Table paimonApiTable_;
 
   // Indexes for the set of hosts that will be used for the query.
@@ -79,9 +82,12 @@ public class PaimonScanNode extends ScanNode {
   // Array of top level field ids used for top level column scan pruning.
   private int[] projection_;
   // top level field id map
-  private Set<Integer> fieldIdMap_ = Sets.newHashSet();
+  private final Set<Integer> fieldIdMap_ = Sets.newHashSet();
   // Splits generated for paimon scanning during planning stage.
   private List<Split> splits_;
+  // ExtractedPredicates object used to hold expressions that
+  // can be pushed down to paimon table.
+  private PredicateExtractor.ExtractedPredicates extractedPredicates_;
 
   public PaimonScanNode(PlanNodeId id, TupleDescriptor desc, List<Expr> conjuncts,
       MultiAggregateInfo aggInfo, FePaimonTable table) {
@@ -95,15 +101,32 @@ public class PaimonScanNode extends ScanNode {
   @Override
   public void init(Analyzer analyzer) throws ImpalaException {
     super.init(analyzer);
+    extractedPredicates_ = new PredicateExtractor.ExtractedPredicates();
     conjuncts_ = orderConjunctsByCost(conjuncts_);
-    // TODO: implement predicate push down later here.
-
-    // materialize slots in remaining conjuncts_
-    analyzer.materializeSlots(conjuncts_);
+    applyPaimonPredicatePushDownIfAvailable(analyzer);
+    // Materialize slots for post-scan conjuncts and for columns referenced only by
+    // pushed Paimon predicates (so JNI read schema includes filter fields).
+    List<Expr> exprsToMaterialize = Lists.newArrayList(conjuncts_);
+    exprsToMaterialize.addAll(extractedPredicates_.getPushedExprs());
+    analyzer.materializeSlots(exprsToMaterialize);
     collectProjectionId();
     computeMemLayout(analyzer);
     computeScanRangeLocations(analyzer);
     computePaimonStats(analyzer);
+  }
+
+  // check if push down can be applied to given table.
+  protected boolean canApplyPaimonPredicatePushdown() {
+    return PaimonUtil.canApplyPredicatePushDown(paimonApiTable_);
+  }
+
+  // apply predicate pushdown if available. the expressions that can be pushed down is
+  // stored in predicateExtractor.
+  protected void applyPaimonPredicatePushDownIfAvailable(Analyzer analyzer) {
+    if (!canApplyPaimonPredicatePushdown()) return;
+    extractedPredicates_ =
+        PredicateExtractor.extractPaimonPredicates(paimonApiTable_, conjuncts_, analyzer);
+    conjuncts_ = orderConjunctsByCost(extractedPredicates_.getPostScanExprs());
   }
 
   public void computePaimonStats(Analyzer analyzer) {
@@ -149,10 +172,11 @@ public class PaimonScanNode extends ScanNode {
   }
 
   protected long estimateTableRowCount() {
-    return splits_.stream()
-        .map(this ::estimateSplitRowCount)
-        .reduce(Long::sum)
-        .orElse(-1L);
+    // fix corner case when no splits
+    // is available after predicate pushdown
+    // is applied.
+    return splits_.stream().map(this::estimateSplitRowCount).reduce(Long::sum)
+        .orElse(0L);
   }
 
   protected long estimateAvgRowSize() {
@@ -164,13 +188,18 @@ public class PaimonScanNode extends ScanNode {
         + PAIMON_ROW_AVG_SIZE_OVERHEAD;
   }
   /**
-   * Compute the scan range locations for the given table using the scan tokens.
+   * Filters used to plan splits. Dynamic runtime filters are applied later on the scan
+   * tuple; their values are not known while splits are planned.
    */
+  private PaimonJniReadFilter getEffectiveReadFilters() {
+    return extractedPredicates_.getReadFilters();
+  }
+
   private void computeScanRangeLocations(Analyzer analyzer)
       throws ImpalaRuntimeException {
     scanRangeSpecs_ = new TScanRangeSpec();
     ReadBuilder readBuilder = paimonApiTable_.newReadBuilder();
-
+    getEffectiveReadFilters().applyTo(paimonApiTable_, readBuilder);
     // 2. Plan splits in 'Coordinator'.
     splits_ = readBuilder.newScan().plan().splits();
 
@@ -194,10 +223,9 @@ public class PaimonScanNode extends ScanNode {
       }
 
       TScanRange scanRange = new TScanRange();
-      // TODO: apply predicate push down later.
-      PaimonSplit paimonSplit = new PaimonSplit(split, null);
+      PaimonSplit paimonSplit = new PaimonSplit(split);
       byte[] split_data_serialized = SerializationUtils.serialize(paimonSplit);
-      scanRange.setFile_metadata(split_data_serialized);
+      scanRange.setPaimon_split(split_data_serialized);
       TScanRangeLocationList locs = new TScanRangeLocationList();
       locs.setScan_range(scanRange);
       locs.setLocations(locations);
@@ -206,9 +234,9 @@ public class PaimonScanNode extends ScanNode {
   }
 
   @Override
-  protected double computeSelectivity() {
-    List<Expr> allConjuncts = Lists.newArrayList(Iterables.concat(conjuncts_));
-    return computeCombinedSelectivity(allConjuncts);
+  public boolean hasStorageLayerConjuncts() {
+    return !extractedPredicates_.getReadFilters().getPartitionPredicates().isEmpty()
+        || !extractedPredicates_.getReadFilters().getDataFilters().isEmpty();
   }
 
   /**
@@ -256,9 +284,14 @@ public class PaimonScanNode extends ScanNode {
   @Override
   protected void toThrift(TPlanNode node) {
     node.node_type = TPlanNodeType.PAIMON_SCAN_NODE;
+    byte[] readFiltersBytes = PaimonJniReadFilter.serialize(getEffectiveReadFilters());
     node.paimon_table_scan_node = new TPaimonScanNode(desc_.getId().asInt(),
         ByteBuffer.wrap(SerializationUtils.serialize(paimonApiTable_)),
         table_.getFullName());
+    if (readFiltersBytes != null) {
+      node.paimon_table_scan_node.setPaimon_read_filters(
+          ByteBuffer.wrap(readFiltersBytes));
+    }
   }
 
   @Override
@@ -276,7 +309,9 @@ public class PaimonScanNode extends ScanNode {
         table_.getFullName(), aliasStr));
 
     switch (detailLevel) {
-      case MINIMAL: break;
+      case MINIMAL: {
+        break;
+      }
       case STANDARD: // Fallthrough intended.
       case EXTENDED: // Fallthrough intended.
       case VERBOSE: {
@@ -284,10 +319,18 @@ public class PaimonScanNode extends ScanNode {
           result.append(detailPrefix
               + "predicates: " + Expr.getExplainString(conjuncts_, detailLevel) + "\n");
         }
-        if (!runtimeFilters_.isEmpty()) {
-          result.append(detailPrefix + "runtime filters: ");
-          result.append(getRuntimeFilterExplainString(false, detailLevel));
+        if (!extractedPredicates_.getPushedPredicates().isEmpty()) {
+          result.append(detailPrefix + "paimon predicates: "
+              + Expr.getExplainString(extractedPredicates_.getPushedExprs(), detailLevel)
+              + "\n");
         }
+        if (!extractedPredicates_.getPartitionPredicates().isEmpty()) {
+          result.append(detailPrefix + "paimon partition predicates: "
+              + Expr.getExplainString(
+                  extractedPredicates_.getPartitionExprs(), detailLevel)
+              + "\n");
+        }
+        break;
       }
     }
     return result.toString();

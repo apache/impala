@@ -18,12 +18,9 @@
 
 package org.apache.impala.planner.paimon;
 
-import org.apache.paimon.predicate.Predicate;
 import org.apache.paimon.table.source.Split;
 
 import java.io.Serializable;
-import java.util.ArrayList;
-import java.util.List;
 
 /**
  * Paimon split entity used by paimon jni scanner.
@@ -31,15 +28,10 @@ import java.util.List;
 public class PaimonSplit implements Serializable {
   // Paimon split instance to perform scan.
   private final Split split_;
-  // predicates that can be pushed to paimon source.
-  private final ArrayList<Predicate> predicates_;
 
-  public PaimonSplit(Split split, ArrayList<Predicate> predicates) {
+  public PaimonSplit(Split split) {
     split_ = split;
-    predicates_ = predicates;
   }
 
   public Split getSplit() { return split_; }
-
-  public List<Predicate> getPredicates() { return predicates_; }
 }

@@ -309,6 +309,7 @@ struct TScanRange {
   5: optional bool is_system_scan
   6: optional binary iceberg_deletion_vector
   7: optional bool is_data_source_scan
+  8: optional binary paimon_split;
 }
 
 // Specification of an overlap predicate desc.
@@ -458,12 +459,16 @@ struct TPaimonJniScanParam {
   5: optional i32 batch_size
   // fragment id
   6: Types.TUniqueId fragment_id;
+  // Serialized PaimonJniReadFilter (partition + data), once per scan fragment.
+  7: optional binary paimon_read_filters;
 }
 
 struct TPaimonScanNode {
   1: required Types.TTupleId tuple_id
   2: required binary paimon_table_obj
   3: required string table_name;
+  // Serialized paimon read filters for JNI scan (see PaimonJniReadFilter).
+  4: optional binary paimon_read_filters;
 }
 
 struct TUnpivotNode {

@@ -1,0 +1,211 @@
+====
+---- QUERY
+# Test profile with paimon predicate push down.
+select * from functional_parquet.paimon_partitioned where userid=1 and movieid<3
+---- RUNTIME_PROFILE
+aggregation(SUM, RowsRead): 53
+====
+---- QUERY
+# LIKE with prefix is pushed down as startsWith.
+select int_value, varchar_value from functional_parquet.paimon_primitive_alltypes
+where varchar_value like 'var%' order by int_value
+---- RESULTS
+11,'varchar1'
+12,'varchar2'
+13,'varchar3'
+14,'varchar4'
+20,'varchar0'
+2147483647,'varchar'
+---- TYPES
+INT, VARCHAR
+====
+---- QUERY
+# LIKE with suffix is pushed down as endsWith.
+select int_value, varchar_value from functional_parquet.paimon_primitive_alltypes
+where varchar_value like '%3' order by int_value
+---- RESULTS
+13,'varchar3'
+---- TYPES
+INT, VARCHAR
+====
+---- QUERY
+# LIKE with prefix and suffix is pushed down as startsWith and endsWith.
+select int_value, varchar_value from functional_parquet.paimon_primitive_alltypes
+where varchar_value like 'var%3' order by int_value
+---- RESULTS
+13,'varchar3'
+---- TYPES
+INT, VARCHAR
+====
+---- QUERY
+# Wildcards in the middle are not pushed down, the full LIKE is still evaluated.
+select int_value, varchar_value from functional_parquet.paimon_primitive_alltypes
+where varchar_value like 'v%r%3' order by int_value
+---- RESULTS
+13,'varchar3'
+---- TYPES
+INT, VARCHAR
+====
+---- QUERY
+# '_' matches exactly one character, the full LIKE is still evaluated.
+select int_value, varchar_value from functional_parquet.paimon_primitive_alltypes
+where varchar_value like 'v_rchar_' order by int_value
+---- RESULTS
+11,'varchar1'
+12,'varchar2'
+13,'varchar3'
+14,'varchar4'
+20,'varchar0'
+---- TYPES
+INT, VARCHAR
+====
+---- QUERY
+select int_value, varchar_value from functional_parquet.paimon_primitive_alltypes
+where varchar_value like 'v_r%h_r%3' order by int_value
+---- RESULTS
+13,'varchar3'
+---- TYPES
+INT, VARCHAR
+====
+---- QUERY
+# LIKE without wildcards is pushed down as equal.
+select int_value, varchar_value from functional_parquet.paimon_primitive_alltypes
+where varchar_value like 'varchar' order by int_value
+---- RESULTS
+2147483647,'varchar'
+---- TYPES
+INT, VARCHAR
+====
+---- QUERY
+# Escaped wildcard matches the literal 'var%'.
+select int_value, varchar_value from functional_parquet.paimon_primitive_alltypes
+where varchar_value like 'var\\%' order by int_value
+---- RESULTS
+---- TYPES
+INT, VARCHAR
+====
+---- QUERY
+select int_value, varchar_value from functional_parquet.paimon_primitive_alltypes
+where varchar_value rlike '^var.*' order by int_value
+---- RESULTS
+11,'varchar1'
+12,'varchar2'
+13,'varchar3'
+14,'varchar4'
+20,'varchar0'
+2147483647,'varchar'
+---- TYPES
+INT, VARCHAR
+====
+---- QUERY
+select int_value, varchar_value from functional_parquet.paimon_primitive_alltypes
+where varchar_value rlike '.*3$' order by int_value
+---- RESULTS
+13,'varchar3'
+---- TYPES
+INT, VARCHAR
+====
+---- QUERY
+select int_value, varchar_value from functional_parquet.paimon_primitive_alltypes
+where varchar_value regexp '^varchar3$' order by int_value
+---- RESULTS
+13,'varchar3'
+---- TYPES
+INT, VARCHAR
+====
+---- QUERY
+select int_value, varchar_value from functional_parquet.paimon_primitive_alltypes
+where varchar_value regexp '^v.*3$' order by int_value
+---- RESULTS
+13,'varchar3'
+---- TYPES
+INT, VARCHAR
+====
+---- QUERY
+# Not pushed down.
+select int_value, varchar_value from functional_parquet.paimon_primitive_alltypes
+where varchar_value rlike '^a*b' order by int_value
+---- RESULTS
+---- TYPES
+INT, VARCHAR
+====
+---- QUERY
+# LIKE on CHAR column is not pushed down since the values are space-padded by Impala.
+select int_value, char_value from functional_parquet.paimon_primitive_alltypes
+where char_value like 'char%' order by int_value
+---- RESULTS
+11,'char1     '
+12,'char2     '
+13,'char3     '
+14,'char4     '
+20,'char0     '
+2147483647,'char      '
+---- TYPES
+INT, CHAR
+====
+---- QUERY
+# LIKE stays in Impala and sees the space-padded CHAR. 'char' is padded to the
+# column width, so it matches 'char %'.
+select int_value, char_value from functional_parquet.paimon_primitive_alltypes
+where char_value like 'char %' order by int_value
+---- RESULTS
+2147483647,'char      '
+---- TYPES
+INT, CHAR
+====
+---- QUERY
+# NOT LIKE with '_' must not be pushed as NOT startsWith. 'varchar' starts with 'v'
+# but does not match 'v_rchar_', so it must still be returned.
+select int_value, varchar_value from functional_parquet.paimon_primitive_alltypes
+where not (varchar_value like 'v_rchar_') order by int_value
+---- RESULTS
+2147483647,'varchar'
+---- TYPES
+INT, VARCHAR
+====
+---- QUERY
+# int_value is logical field 3. Selecting tiny_value first puts int_value at
+# projected index 1, which is tiny_value's logical index. A filter remapped into
+# that projected index would keep only tiny_value = 11.
+select tiny_value, int_value from functional_parquet.paimon_primitive_alltypes
+where int_value = 11
+---- RESULTS
+1,11
+---- TYPES
+TINYINT, INT
+====
+---- QUERY
+# Microsecond timestamp predicate pushes to Paimon.
+select int_value from functional_parquet.paimon_primitive_alltypes
+where ts_value = cast('2009-01-02 00:13:00.48' as timestamp)
+---- RESULTS
+13
+---- TYPES
+INT
+====
+---- QUERY
+# Double equality pushed to Paimon.
+select int_value from functional_parquet.paimon_primitive_alltypes
+where double_value > cast(30.0 as double) and int_value = 13
+---- RESULTS
+13
+---- TYPES
+INT
+====
+---- QUERY
+# Float comparison pushed to Paimon.
+select int_value from functional_parquet.paimon_primitive_alltypes
+where float_value > cast(3.2 as float) and int_value = 13
+---- RESULTS
+13
+---- TYPES
+INT
+====
+---- QUERY
+# Sub-microsecond timestamp is not pushed; Impala evaluates it with no matches.
+select int_value from functional_parquet.paimon_primitive_alltypes
+where ts_value = cast('2009-01-02 00:13:00.480000123' as timestamp)
+---- RESULTS
+---- TYPES
+INT
+====

@@ -1834,4 +1834,12 @@ public class PlannerTest extends PlannerTestBase {
 
     Assert.assertEquals(expectedMethodNumber, publicMethods);
   }
+  /**
+   * Checks predicate pushdown for paimon table.
+   */
+  @Test
+  public void testPaimonPredicates() {
+    runPlannerTestFile("paimon-predicates", "functional_parquet",
+        ImmutableSet.of(PlannerTestOption.VALIDATE_CARDINALITY));
+  }
 }

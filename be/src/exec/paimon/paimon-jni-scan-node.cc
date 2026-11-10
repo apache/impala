@@ -74,10 +74,14 @@ Status PaimonJniScanNode::Prepare(RuntimeState* state) {
       arrow_batch_mem_tracker_->GetLowestLimit(MemLimit::HARD));
   paimon_jni_scan_param_.__set_batch_size(state->batch_size());
   paimon_jni_scan_param_.__set_fragment_id(state->fragment_instance_id());
+  if (plan_node_.tnode_->paimon_table_scan_node.__isset.paimon_read_filters) {
+    paimon_jni_scan_param_.__set_paimon_read_filters(
+        plan_node_.tnode_->paimon_table_scan_node.paimon_read_filters);
+  }
   std::vector<std::string> scan_range_vector;
   for (const ScanRangeParamsPB& params : *scan_range_params_) {
-    DCHECK(params.scan_range().has_file_metadata());
-    const std::string& split = params.scan_range().file_metadata();
+    DCHECK(params.scan_range().has_paimon_split());
+    const std::string& split = params.scan_range().paimon_split();
     scan_range_vector.push_back(split);
   }
   paimon_jni_scan_param_.__set_splits(scan_range_vector);

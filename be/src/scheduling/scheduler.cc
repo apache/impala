@@ -1963,6 +1963,9 @@ void TScanRangeToScanRangePB(const TScanRange& tscan_range, ScanRangePB* scan_ra
   if (tscan_range.__isset.iceberg_deletion_vector) {
     scan_range_pb->set_iceberg_deletion_vector(tscan_range.iceberg_deletion_vector);
   }
+  if (tscan_range.__isset.paimon_split) {
+    scan_range_pb->set_paimon_split(tscan_range.paimon_split);
+  }
 }
 
 void Scheduler::AssignmentCtx::RecordScanRangeAssignment(

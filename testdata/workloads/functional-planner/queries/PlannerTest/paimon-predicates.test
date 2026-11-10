@@ -1,0 +1,142 @@
+select * from functional_parquet.paimon_partitioned where userid=1 and movieid=3;
+---- PLAN
+PLAN-ROOT SINK
+|
+00:SCAN PAIMON [functional_parquet.paimon_partitioned]
+   predicates: movieid = 3
+   paimon predicates: movieid = 3, userid = 1
+   paimon partition predicates: userid = 1
+   row-size=20B cardinality=1
+====
+select * from functional_parquet.paimon_partitioned where userid<3 and movieid=3;
+---- PLAN
+PLAN-ROOT SINK
+|
+00:SCAN PAIMON [functional_parquet.paimon_partitioned]
+    predicates: movieid = 3
+    paimon predicates: movieid = 3, userid < 3
+    paimon partition predicates: userid < 3
+    row-size=20B cardinality=1
+====
+select * from functional_parquet.paimon_partitioned where userid=1 and rating>3;
+---- PLAN
+PLAN-ROOT SINK
+|
+00:SCAN PAIMON [functional_parquet.paimon_partitioned]
+    predicates: rating > 3
+    paimon predicates: rating > 3, userid = 1
+    paimon partition predicates: userid = 1
+    row-size=20B cardinality=5
+====
+select * from functional_parquet.paimon_partitioned where userid=1;
+---- PLAN
+PLAN-ROOT SINK
+|
+00:SCAN PAIMON [functional_parquet.paimon_partitioned]
+   paimon predicates: userid = 1
+   paimon partition predicates: userid = 1
+   row-size=20B cardinality=53
+====
+select * from functional_parquet.paimon_partitioned where userid in (1, 2, 3) and movieid=5;
+---- PLAN
+PLAN-ROOT SINK
+|
+00:SCAN PAIMON [functional_parquet.paimon_partitioned]
+    predicates: movieid = 5
+    paimon predicates: movieid = 5, userid IN (1, 2, 3)
+    paimon partition predicates: userid IN (1, 2, 3)
+    row-size=20B cardinality=1
+====
+select * from functional_parquet.paimon_partitioned where userid between 1 and 3 and rating>=4;
+---- PLAN
+PLAN-ROOT SINK
+|
+00:SCAN PAIMON [functional_parquet.paimon_partitioned]
+    predicates: rating >= 4
+    paimon predicates: rating >= 4, userid <= 3, userid >= 1
+    paimon partition predicates: userid <= 3, userid >= 1
+    row-size=20B cardinality=23
+====
+select * from functional_parquet.paimon_partitioned where (userid=1 and movieid=2) or (userid=3 and movieid=4);
+---- PLAN
+PLAN-ROOT SINK
+|
+00:SCAN PAIMON [functional_parquet.paimon_partitioned]
+   predicates: (userid = 1 AND movieid = 2) OR (userid = 3 AND movieid = 4)
+   paimon predicates: (userid = 1 AND movieid = 2) OR (userid = 3 AND movieid = 4)
+   row-size=20B cardinality=1
+====
+select * from functional_parquet.paimon_partitioned where userid is null;
+---- PLAN
+PLAN-ROOT SINK
+|
+00:SCAN PAIMON [functional_parquet.paimon_partitioned]
+   paimon predicates: userid IS NULL
+   paimon partition predicates: userid IS NULL
+   row-size=20B cardinality=0
+====
+# LIKE is pushed down as startsWith('var') and endsWith('3'), the full LIKE is still
+# evaluated by the scanner.
+select int_value, varchar_value from functional_parquet.paimon_primitive_alltypes
+where varchar_value like 'var%ch%3';
+---- PLAN
+PLAN-ROOT SINK
+|
+00:SCAN PAIMON [functional_parquet.paimon_primitive_alltypes]
+   predicates: varchar_value LIKE 'var%ch%3'
+   paimon predicates: varchar_value LIKE 'var%ch%3'
+   row-size=16B cardinality=1
+====
+# LIKE on CHAR column is not pushed down.
+select int_value, char_value from functional_parquet.paimon_primitive_alltypes
+where char_value like 'char%';
+---- PLAN
+PLAN-ROOT SINK
+|
+00:SCAN PAIMON [functional_parquet.paimon_primitive_alltypes]
+   predicates: char_value LIKE 'char%'
+   row-size=14B cardinality=1
+====
+# Double data filter pushes to Paimon.
+select int_value from functional_parquet.paimon_primitive_alltypes
+where double_value > 30;
+---- PLAN
+PLAN-ROOT SINK
+|
+00:SCAN PAIMON [functional_parquet.paimon_primitive_alltypes]
+   predicates: double_value > 30
+   paimon predicates: double_value > 30
+   row-size=12B cardinality=1
+====
+# Float data filter pushes to Paimon.
+select int_value from functional_parquet.paimon_primitive_alltypes
+where float_value > cast(3.2 as float) and int_value = 13;
+---- PLAN
+PLAN-ROOT SINK
+|
+00:SCAN PAIMON [functional_parquet.paimon_primitive_alltypes]
+   predicates: float_value > 3.2000000476837158203125, int_value = 13
+   paimon predicates: float_value > 3.2000000476837158203125, int_value = 13
+   row-size=8B cardinality=1
+====
+# Microsecond timestamp equality pushes to Paimon.
+select int_value from functional_parquet.paimon_primitive_alltypes
+where ts_value = cast('2009-01-02 00:13:00.48' as timestamp);
+---- PLAN
+PLAN-ROOT SINK
+|
+00:SCAN PAIMON [functional_parquet.paimon_primitive_alltypes]
+   predicates: ts_value = TIMESTAMP '2009-01-02 00:13:00.480000000'
+   paimon predicates: ts_value = TIMESTAMP '2009-01-02 00:13:00.480000000'
+   row-size=20B cardinality=1
+====
+# Sub-microsecond timestamp literal is not pushed; Impala evaluates the filter.
+select int_value from functional_parquet.paimon_primitive_alltypes
+where ts_value = cast('2009-01-02 00:13:00.480000123' as timestamp);
+---- PLAN
+PLAN-ROOT SINK
+|
+00:SCAN PAIMON [functional_parquet.paimon_primitive_alltypes]
+   predicates: ts_value = TIMESTAMP '2009-01-02 00:13:00.480000123'
+   row-size=20B cardinality=1
+====

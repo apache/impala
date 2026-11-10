@@ -23,11 +23,11 @@ import org.apache.commons.lang3.SerializationUtils;
 import org.apache.impala.catalog.paimon.PaimonUtil;
 import org.apache.impala.common.ImpalaException;
 import org.apache.impala.common.JniUtil;
+import org.apache.impala.planner.paimon.PaimonJniReadFilter;
 import org.apache.impala.planner.paimon.PaimonSplit;
 import org.apache.impala.thrift.TPaimonJniScanParam;
 import org.apache.paimon.arrow.vector.ArrowCStruct;
 import org.apache.paimon.data.InternalRow;
-import org.apache.paimon.predicate.Predicate;
 import org.apache.paimon.reader.RecordReader;
 import org.apache.paimon.reader.RecordReaderIterator;
 import org.apache.paimon.table.Table;
@@ -60,6 +60,8 @@ public class PaimonJniScanner implements AutoCloseable {
   private Table table_ = null;
   // Paimon splits assigned to the scanner.
   private List<PaimonSplit> splits_ = null;
+  // Read filters sent once per scan fragment.
+  private PaimonJniReadFilter readFilters_;
   // Paimon schema after projection.
   private RowType projectedSchema_;
   // Paimon data record iterator.
@@ -104,6 +106,12 @@ public class PaimonJniScanner implements AutoCloseable {
             .mapToObj(fieldId -> table_.rowType().getField(fieldId))
             .toArray(DataField[] ::new);
     projectedSchema_ = RowType.of(projectedFields);
+    if (paimonJniScanParam.isSetPaimon_read_filters()) {
+      readFilters_ = PaimonJniReadFilter.deserialize(
+          paimonJniScanParam.getPaimon_read_filters());
+    } else {
+      readFilters_ = PaimonJniReadFilter.empty();
+    }
     // get batch size
     batchSize_ = paimonJniScanParam.getBatch_size();
     if (batchSize_ <= 0) { batchSize_ = DEFAULT_ROWBATCH_SIZE; }
@@ -135,7 +143,8 @@ public class PaimonJniScanner implements AutoCloseable {
     JniUtil.setContextClassLoaderForThisThread(this.getClass().getClassLoader());
     writer_ = new PaimonArrowFormatNativeWriter(
         projectedSchema_, batchSize_, false, bufferAllocator_);
-    // Create and scan the metadata table
+    // Create and scan the metadata table. A failure must surface to the backend;
+    // a null iterator would fail later as a generic NPE.
     initReader();
   }
 
@@ -170,16 +179,12 @@ public class PaimonJniScanner implements AutoCloseable {
     }
   }
 
-  protected boolean initReader() {
+  protected void initReader() {
     try {
       ReadBuilder readBuilder = table_.newReadBuilder().withReadType(projectedSchema_);
-      // Apply push down predicates if present.
-      // Currently predicates are always null/empty,
-      // All conjuncts are evaluated by the C++ scanner.
-      List<Predicate> predicates = splits_.get(0).getPredicates();
-      if (predicates != null && !predicates.isEmpty()) {
-        readBuilder.withFilter(predicates);
-      }
+      // Data filters stay in logical-row index space. Paimon projects them onto
+      // the read schema. Remapping them here filters the wrong column.
+      readFilters_.applyTo(table_, readBuilder);
       // Create Iterator for given splits.
       List<Split> splits =
           splits_.stream().map(PaimonSplit::getSplit).collect(Collectors.toList());
@@ -187,10 +192,9 @@ public class PaimonJniScanner implements AutoCloseable {
       iterator_ = new RecordReaderIterator<>(reader);
       LOG.info(
           String.format("Reading %d splits for %s", splits.size(), table_.fullName()));
-      return true;
     } catch (Exception ex) {
-      LOG.error("failed to init reader for " + table_.fullName(), ex);
-      return false;
+      throw new RuntimeException(
+          "failed to init reader for " + table_.fullName(), ex);
     }
   }
 
