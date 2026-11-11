@@ -1597,7 +1597,8 @@ ORDER BY made_current_at;
       will be used. For HMS stats we use the 'impala.computeStatsSnapshotId' table
       property which stores, for each column, the snapshot for which HMS stats were
       calculated. We compare this with the snapshot of the Puffin stats to decide which
-      is more recent.
+      is more recent. If both were calculated for the same snapshot, the HMS stats are
+      used.
       </p>
       <p>
       Reading Puffin stats is enabled by default. Set the "--enable_reading_puffin_stats"

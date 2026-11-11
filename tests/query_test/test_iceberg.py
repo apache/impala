@@ -3213,20 +3213,26 @@ class TestIcebergTableWithPuffinStats(IcebergTestSuite):
 
     self._change_metadata_json_file(tbl_info, "not_all_blobs_current.metadata.json")
 
-    prev_snapshot_id = self._get_snapshot_ids(tbl_info.full_tbl_name)[1]
+    snapshot_ids = self._get_snapshot_ids(tbl_info.full_tbl_name)
+    current_snapshot_id = snapshot_ids[0]
+    prev_snapshot_id = snapshot_ids[1]
 
-    # Set HMS stats for the first and third column, for the previous snapshot.
+    # Set HMS stats for the first and third column for the previous snapshot, and for the
+    # second column for the current snapshot.
     # There are Puffin stats from the latest snapshot for the first two columns, and older
-    # Puffin stats for the next two columns - the HMS stats are more recent than these
-    # older Puffin stats.
+    # Puffin stats for the next two columns - the HMS stats for the third column are more
+    # recent than these older Puffin stats. The HMS and Puffin stats of the second column
+    # belong to the same snapshot, in which case HMS stats win.
     stmts = [
         "alter table {} set column stats int_col1('numDVs'='100')".format(
+            tbl_info.full_tbl_name),
+        "alter table {} set column stats int_col2('numDVs'='200')".format(
             tbl_info.full_tbl_name),
         "alter table {} set column stats bigint_col('numDVs'='300')".format(
             tbl_info.full_tbl_name),
         "alter table {} set tblproperties('impala.computeStatsSnapshotIds'= \
-            '1:{prev_snapshot_id},3:{prev_snapshot_id}')".format(tbl_info.full_tbl_name,
-                prev_snapshot_id=prev_snapshot_id)
+            '1:{prev},2:{cur},3:{prev}')".format(tbl_info.full_tbl_name,
+                prev=prev_snapshot_id, cur=current_snapshot_id)
     ]
     for stmt in stmts:
       self.execute_query(stmt)
@@ -3234,7 +3240,7 @@ class TestIcebergTableWithPuffinStats(IcebergTestSuite):
     # Note: '4' is a value that comes from Puffin stats for an older snapshot for which
     # there is no HMS stat.
     self._assert_ndv_stats(tbl_info,
-        [1, 2, 300, 4, -1, -1, -1, -1, 2000, -1])
+        [1, 200, 300, 4, -1, -1, -1, -1, 2000, -1])
 
   def test_puffin_stats_disabled_by_tbl_prop(self, vector, unique_database):
     tbl_info = self._setup_table(vector, unique_database)

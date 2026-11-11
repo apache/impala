@@ -191,10 +191,12 @@ public class PuffinStatsLoader {
   }
 
   // Returns true if there are HMS stats for the column referenced by 'fieldId' that are
-  // at least as recent as the snapshot referenced by 'snapshotId'
+  // at least as recent as the snapshot referenced by 'snapshotId'. If both refer to the
+  // same snapshot, HMS stats win.
   private boolean hmsHasMoreRecentStats(int fieldId, long snapshotId) {
     Long hmsSnapshot = fieldIdsWithHmsStats_.get(fieldId);
     if (hmsSnapshot == null) return false;
+    if (hmsSnapshot == snapshotId) return true;
     return isMoreRecentSnapshot(hmsSnapshot, snapshotId);
   }
 
