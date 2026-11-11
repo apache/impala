@@ -43,6 +43,7 @@ import org.apache.thrift.TDeserializer;
 import org.apache.thrift.TException;
 import org.apache.thrift.protocol.TBinaryProtocol;
 import org.apache.thrift.protocol.TProtocolFactory;
+import org.apache.thrift.transport.TEndpointTransport;
 
 import com.google.common.base.Joiner;
 
@@ -150,13 +151,33 @@ public class JniUtil {
   public static <T extends TBase<?, ?>, F extends TProtocolFactory>
   void deserializeThrift(F protocolFactory, T result, byte[] thriftData)
       throws ImpalaException {
-    // TODO: avoid creating deserializer for each query?
     try {
-      TDeserializer deserializer = new TDeserializer(protocolFactory);
-      deserializer.deserialize(result, thriftData);
+      deserializeThriftRaw(protocolFactory, result, thriftData);
     } catch (TException e) {
       throw new InternalException(e.getMessage());
     }
+  }
+
+  /** Decode a JNI message without converting the original Thrift exception. */
+  public static <T extends TBase<?, ?>>
+  void deserializeThriftRaw(T result, byte[] thriftData) throws TException {
+    deserializeThriftRaw(protocolFactory_, result, thriftData);
+  }
+
+  private static <T extends TBase<?, ?>, F extends TProtocolFactory>
+  void deserializeThriftRaw(F protocolFactory, T result, byte[] thriftData)
+      throws TException {
+    // TODO: avoid creating deserializer for each query?
+    // JNI already owns the complete message. Use its size as the transport budget.
+    TDeserializer deserializer = new TDeserializer(transport -> {
+      // Thrift 0.11's memory transport has no message-size limit or configuration.
+      if (transport instanceof TEndpointTransport) {
+        ((TEndpointTransport) transport).getConfiguration()
+            .setMaxMessageSize(thriftData.length);
+      }
+      return protocolFactory.getProtocol(transport);
+    });
+    deserializer.deserialize(result, thriftData);
   }
 
   public static class OperationLog {

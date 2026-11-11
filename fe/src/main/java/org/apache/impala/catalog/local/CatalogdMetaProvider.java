@@ -78,6 +78,7 @@ import org.apache.impala.catalog.SqlConstraints;
 import org.apache.impala.catalog.VirtualColumn;
 import org.apache.impala.catalog.local.LocalIcebergTable.TableParams;
 import org.apache.impala.common.InternalException;
+import org.apache.impala.common.JniUtil;
 import org.apache.impala.common.Pair;
 import org.apache.impala.common.PrintUtils;
 import org.apache.impala.service.BackendConfig;
@@ -466,6 +467,14 @@ public class CatalogdMetaProvider implements MetaProvider {
     authzChecker_ = authzChecker;
   }
 
+  /** Decode the complete in-memory response with its actual JNI message budget. */
+  static TGetPartialCatalogObjectResponse deserializeResponse(byte[] data)
+      throws TException {
+    TGetPartialCatalogObjectResponse response = new TGetPartialCatalogObjectResponse();
+    JniUtil.deserializeThriftRaw(response, data);
+    return response;
+  }
+
   /**
    * Send a GetPartialCatalogObject request to catalogd. This handles converting
    * non-OK status responses back to exceptions, performing various generic sanity
@@ -490,8 +499,7 @@ public class CatalogdMetaProvider implements MetaProvider {
         profile.addToCounter(RPC_TIME, TUnit.TIME_MS, sw.elapsed(TimeUnit.MILLISECONDS));
       }
     }
-    resp = new TGetPartialCatalogObjectResponse();
-    new TDeserializer().deserialize(resp, ret);
+    resp = deserializeResponse(ret);
     if (resp.isSetStatus() && resp.status.status_code != TErrorCode.OK) {
       String errorMsg = String.join("\n", resp.status.error_msgs);
       if (resp.status.status_code == TErrorCode.CATALOG_IN_STANDBY_MODE) {
