@@ -77,6 +77,22 @@ public interface FeCatalog {
     return CatalogRef.CATALOGD;
   }
 
+  /**
+   * Returns the catalog that database 'dbName' belongs to. The database need not exist:
+   * for a missing database, this is the catalog that answers for it. Throws a
+   * RuntimeException when the catalog cannot be decided, e.g. because several catalogs
+   * list the database.
+   */
+  default CatalogRef getCatalogRef(String dbName) {
+    return CatalogRef.CATALOGD;
+  }
+
+  /**
+   * Whether databases are merged from several catalogs, e.g. CatalogD and Iceberg REST
+   * catalogs. A new database could then belong to any of them.
+   */
+  default boolean isMultiCatalog() { return false; }
+
   /** @see Catalog#getHdfsPartition(String, String, List) */
   FeFsPartition getHdfsPartition(String db, String tbl,
       List<TPartitionKeyValue> partitionSpec) throws CatalogException;

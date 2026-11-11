@@ -96,6 +96,24 @@ public class IcebergRESTCatalog implements IcebergCatalog {
     return restCatalog_.listTables(Namespace.of(namespace));
   }
 
+  /**
+   * Drops the empty namespace 'dbName' through the REST catalog. Returns false if it did
+   * not exist. A namespace that still holds tables or views is rejected by the server
+   * with HTTP 409, which this Iceberg client reports as AlreadyExistsException and newer
+   * clients as NamespaceNotEmptyException.
+   */
+  public boolean dropNamespace(String dbName) {
+    return restCatalog_.dropNamespace(Namespace.of(dbName));
+  }
+
+  /**
+   * Creates the namespace 'dbName' with 'properties' through the REST catalog. Throws
+   * AlreadyExistsException if it exists.
+   */
+  public void createNamespace(String dbName, Map<String, String> properties) {
+    restCatalog_.createNamespace(Namespace.of(dbName), properties);
+  }
+
   @Override
   public Table loadTable(FeIcebergTable feTable) throws TableLoadingException {
     TableIdentifier tableId = IcebergUtil.getIcebergTableIdentifier(feTable);

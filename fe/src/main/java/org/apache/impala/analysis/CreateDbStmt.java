@@ -20,6 +20,7 @@ package org.apache.impala.analysis;
 import java.util.Map;
 
 import com.google.common.base.Preconditions;
+import com.google.common.collect.ImmutableMap;
 import org.apache.hadoop.fs.permission.FsAction;
 import org.apache.impala.authorization.Privilege;
 import org.apache.impala.catalog.FeDb;
@@ -73,6 +74,10 @@ public class CreateDbStmt extends StatementBase {
   public String getParsedDb() { return dbName_; }
   public String getDb() { return dbName_; }
   public boolean getIfNotExists() { return ifNotExists_; }
+  public boolean hasManagedLocation() { return managedLocation_ != null; }
+  public Map<String, String> getDbProperties() {
+    return dbProperties_ == null ? ImmutableMap.of() : dbProperties_;
+  }
 
   @Override
   public String toSql(ToSqlOptions options) {
@@ -108,6 +113,10 @@ public class CreateDbStmt extends StatementBase {
       throw new AnalysisException("Invalid database name: " + dbName_);
     }
     CatalogBlacklistUtils.verifyDbName(dbName_);
+    if (analyzer.getCatalog().isMultiCatalog()) {
+      throw new AnalysisException("CREATE DATABASE is not supported with multiple " +
+          "catalogs, as the catalog to create it in is ambiguous: " + dbName_);
+    }
 
     // Note: It is possible that a database with the same name was created external to
     // this Impala instance. If that happens, the caller will not get an

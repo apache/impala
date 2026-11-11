@@ -19,6 +19,7 @@ package org.apache.impala.util;
 
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Maps;
 import com.google.common.primitives.Doubles;
 import com.google.common.primitives.Ints;
@@ -39,12 +40,15 @@ import java.util.function.IntFunction;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Base64;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
+
+import javax.annotation.Nullable;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.iceberg.CatalogProperties;
@@ -165,6 +169,25 @@ public class IcebergUtil {
   public static final String ICEBERG_REST_USER_SECRET = "iceberg_rest_user_secret";
   public static final String ICEBERG_REST_WAREHOUSE_LOCATION =
       "iceberg_rest_warehouse_location";
+
+  // Lower case. Namespace properties that users cannot set on Iceberg REST catalogs:
+  // the owner comes from the session (IMPALA-15508), and the location is authorized
+  // only as a LOCATION clause.
+  public static final Set<String> REST_RESERVED_DB_PROPERTIES =
+      ImmutableSet.of("owner", "ownertype", "location");
+
+  /**
+   * Returns the first of 'keys' that is in 'reserved', compared case-insensitively, or
+   * null. 'reserved' holds lower-case keys.
+   */
+  @Nullable
+  public static String findReservedProperty(Collection<String> keys,
+      Set<String> reserved) {
+    for (String key : keys) {
+      if (reserved.contains(key.toLowerCase())) return key;
+    }
+    return null;
+  }
 
   /**
    * For BINARY type, we use ISO-8859-1 to preserve the byte values.

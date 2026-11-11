@@ -66,7 +66,7 @@ public class MetaProviderDecoratorTest {
 
   // Expected number of public methods in MetaProvider interface
   // Update this constant when adding new methods to MetaProvider
-  private static final int EXPECTED_METHOD_COUNT = 25;
+  private static final int EXPECTED_METHOD_COUNT = 26;
 
   @Test
   public void testMetaProviderMethodCount() {
@@ -194,6 +194,11 @@ public class MetaProviderDecoratorTest {
     assertThat(fixture.getCatalogRef("testDb", "testTable"),
         sameInstance(expectedCatalogRef));
     verify(mockDecorated).getCatalogRef(eq("testDb"), eq("testTable"));
+
+    // Test getCatalogRef(String)
+    when(mockDecorated.getCatalogRef(anyString())).thenReturn(expectedCatalogRef);
+    assertThat(fixture.getCatalogRef("testDb"), sameInstance(expectedCatalogRef));
+    verify(mockDecorated).getCatalogRef(eq("testDb"));
 
     // Test loadTableList(String)
     ImmutableCollection<TBriefTableMeta> actualTableList =

@@ -293,6 +293,64 @@ class IcebergRestCatalogTests(CustomClusterTestSuite):
         self.client, "drop table if exists {}.no_such_table".format(db_name))
     assert result.data == ['Table does not exist.']
 
+    # A namespace of only one of them is not ambiguous, but still not addressable.
+    namespace = "impala_rest_not_unique_db_test"
+    namespace_url = self._rest_namespace_url(server, namespace)
+    requests.post("http://localhost:{}/v1/namespaces".format(server.port),
+        json={'namespace': [namespace], 'properties': {}}, timeout=30)
+    try:
+      error = self.execute_query_expect_failure(
+          self.client, "drop database {}".format(namespace))
+      assert expected in str(error)
+      assert requests.get(namespace_url, timeout=30).status_code == 200
+    finally:
+      requests.delete(namespace_url, timeout=30)
+
+  @staticmethod
+  def _rest_namespace_url(server, namespace):
+    return "http://localhost:{}/v1/namespaces/{}".format(
+        server.port, quote(namespace, safe=''))
+
+  def _run_rest_drop_database_test(self, server):
+    """DROP DATABASE on a namespace of a REST catalog runs in the coordinator through
+    the REST catalog. REST catalogs drop empty namespaces only, so CASCADE and a
+    namespace that still holds a table are rejected."""
+    namespace = "impala_rest_drop_db_test"
+    table_name = "{}.tbl".format(namespace)
+    namespace_url = self._rest_namespace_url(server, namespace)
+    self._create_rest_test_table(server, table_name)
+    self.rest_test_tables.append((server, table_name, INSERT_TEST_TABLE))
+    try:
+      error = self.execute_query_expect_failure(
+          self.client, "drop database {}".format(namespace))
+      assert "Cannot drop non-empty database: {}".format(namespace) in str(error)
+      error = self.execute_query_expect_failure(
+          self.client, "drop database {} restrict".format(namespace))
+      assert "Cannot drop non-empty database: {}".format(namespace) in str(error)
+      error = self.execute_query_expect_failure(
+          self.client, "drop database if exists {} cascade".format(namespace))
+      assert "DROP DATABASE CASCADE is not supported" in str(error)
+      assert requests.get(namespace_url, timeout=30).status_code == 200
+
+      self.execute_query_expect_success(
+          self.client, "drop table {}".format(table_name))
+      result = self.execute_query_expect_success(
+          self.client, "drop database {} restrict".format(namespace.upper()))
+      assert result.data == ['Database has been dropped.']
+      assert requests.get(namespace_url, timeout=30).status_code == 404
+      result = self.execute_query_expect_success(self.client, "show databases")
+      assert namespace not in [row.split('\t')[0] for row in result.data]
+
+      # A missing database is a no-op with IF EXISTS, and an error without it.
+      result = self.execute_query_expect_success(
+          self.client, "drop database if exists {}".format(namespace))
+      assert result.data == ['Database does not exist.']
+      error = self.execute_query_expect_failure(
+          self.client, "drop database {}".format(namespace))
+      assert "Database does not exist: {}".format(namespace) in str(error)
+    finally:
+      requests.delete(namespace_url, timeout=30)
+
   @classmethod
   def _create_rest_test_table(cls, server, table_name, partitioned=False,
       definition=None):
@@ -380,13 +438,15 @@ class TestIcebergRestCatalogWithHms(IcebergRestCatalogTests):
      impalad_args=MULTICATALOG_IMPALAD_ARGS,
      catalogd_args=MULTICATALOG_CATALOGD_ARGS)
   @pytest.mark.execute_serially
-  def test_rest_catalog_drop_while_unreachable(self, unique_database):
+  def test_rest_catalog_drop_while_unreachable(self):
     """In a database that catalogd and a REST catalog both have, DROP TABLE cannot tell
     which catalog holds a table while the REST server is unreachable. It fails then,
     also for a table of catalogd, and works again once the server is back."""
     server = self.servers[0]
-    hms_table = "{}.hms_tbl".format(unique_database)
-    rest_table = "{}.rest_tbl".format(unique_database)
+    db_name = "impala_rest_unreachable_test"
+    self._create_hms_database(db_name)
+    hms_table = "{}.hms_tbl".format(db_name)
+    rest_table = "{}.rest_tbl".format(db_name)
     self.execute_query_expect_success(
         self.client, "create table {} (i int)".format(hms_table))
     self._create_rest_test_table(server, rest_table)
@@ -396,14 +456,21 @@ class TestIcebergRestCatalogWithHms(IcebergRestCatalogTests):
     try:
       error = self.execute_query_expect_failure(
           self.client, "drop table {}".format(hms_table))
-      assert "failed to list the tables of {}".format(unique_database) in str(error)
+      assert "failed to list the tables of {}".format(db_name) in str(error)
     finally:
       server.start_rest_server(300)
     self.execute_query_expect_success(self.client, "drop table {}".format(hms_table))
     self.execute_query_expect_success(
         self.client, "drop table {} purge".format(rest_table))
-    requests.delete("http://localhost:{}/v1/namespaces/{}".format(
-        server.port, unique_database), timeout=30).raise_for_status()
+    requests.delete(self._rest_namespace_url(server, db_name),
+        timeout=30).raise_for_status()
+    self.execute_query_expect_success(self.client, "drop database {}".format(db_name))
+
+  def _create_hms_database(self, db_name):
+    """Creates 'db_name' in HMS. Impala cannot create a database with several
+    catalogs."""
+    self.run_stmt_in_hive("create database if not exists {}".format(db_name))
+    self.execute_query_expect_success(self.client, "invalidate metadata")
 
   @RestServerProperties(
       {'port': 9084, 'catalog_location': WRITE_TEST_CATALOG_LOCATION,
@@ -417,6 +484,42 @@ class TestIcebergRestCatalogWithHms(IcebergRestCatalogTests):
     """With catalogd deployed, DROP TABLE on a REST catalog without a unique name is
     rejected, whether the table loads or fails to load."""
     self._check_drop_without_unique_name()
+
+  @RestServerProperties(
+      {'port': 9084, 'catalog_location': WRITE_TEST_CATALOG_LOCATION})
+  @CustomClusterTestSuite.with_args(
+     impalad_args=MULTICATALOG_IMPALAD_ARGS,
+     catalogd_args=MULTICATALOG_CATALOGD_ARGS)
+  @pytest.mark.execute_serially
+  def test_rest_catalog_drop_database(self):
+    """With catalogd deployed, DROP DATABASE on a REST namespace runs in the
+    coordinator, and on a database of catalogd in catalogd. A database that both have
+    is ambiguous. CREATE DATABASE is rejected, as any catalog could create it."""
+    server = self.servers[0]
+    self._run_rest_drop_database_test(server)
+    result = self.execute_query_expect_success(
+        self.client, "drop database if exists no_such_db")
+    assert result.data == ['Database does not exist.']
+
+    db_name = "impala_rest_hms_drop_db_test"
+    for stmt in ["create database {}", "create database if not exists {}"]:
+      error = self.execute_query_expect_failure(self.client, stmt.format(db_name))
+      assert "CREATE DATABASE is not supported with multiple catalogs" in str(error)
+    namespace_url = self._rest_namespace_url(server, db_name)
+    self._create_hms_database(db_name)
+    requests.post("http://localhost:{}/v1/namespaces".format(server.port),
+        json={'namespace': [db_name], 'properties': {}}, timeout=30)
+    try:
+      error = self.execute_query_expect_failure(
+          self.client, "drop database {}".format(db_name))
+      assert "Ambiguous database name: {}".format(db_name) in str(error)
+      assert requests.get(namespace_url, timeout=30).status_code == 200
+    finally:
+      requests.delete(namespace_url, timeout=30)
+    # Without the namespace, the database is catalogd's again.
+    result = self.execute_query_expect_success(
+        self.client, "drop database {}".format(db_name))
+    assert result.data == ['Database has been dropped.']
 
   @RestServerProperties(
     {'port': 9084},
@@ -849,6 +952,85 @@ class TestIcebergRestCatalogStandalone(IcebergRestCatalogTests):
     self._check_drop_table_in_missing_db()
 
   @RestServerProperties(
+      {'port': 9084, 'catalog_location': WRITE_TEST_CATALOG_LOCATION})
+  @CustomClusterTestSuite.with_args(
+     impalad_args=REST_STANDALONE_IMPALAD_ARGS,
+     start_args=NO_CATALOGD_STARTARGS,
+     cluster_size=1)
+  @pytest.mark.execute_serially
+  def test_rest_catalog_drop_database(self):
+    self._run_rest_drop_database_test(self.servers[0])
+
+  @RestServerProperties(
+      {'port': 9084, 'catalog_location': WRITE_TEST_CATALOG_LOCATION})
+  @CustomClusterTestSuite.with_args(
+     impalad_args=REST_STANDALONE_IMPALAD_ARGS,
+     start_args=NO_CATALOGD_STARTARGS,
+     cluster_size=1)
+  @pytest.mark.execute_serially
+  def test_rest_catalog_create_database(self):
+    """With a single REST catalog, CREATE DATABASE creates a namespace in it through
+    the coordinator."""
+    server = self.servers[0]
+    namespace = "impala_rest_create_db_test"
+    namespace_url = self._rest_namespace_url(server, namespace)
+    schema_namespace = "impala_rest_create_schema_test"
+    schema_url = self._rest_namespace_url(server, schema_namespace)
+    try:
+      result = self.execute_query_expect_success(
+          self.client, "create database {}".format(namespace.upper()))
+      assert result.data == ['Database has been created.']
+      assert requests.get(namespace_url, timeout=30).status_code == 200
+      result = self.execute_query_expect_success(self.client, "show databases")
+      assert namespace in [row.split('\t')[0] for row in result.data]
+
+      result = self.execute_query_expect_success(
+          self.client, "create database if not exists {}".format(namespace))
+      assert result.data == ['Database already exists.']
+      result = self.execute_query_expect_success(self.client,
+          "create database if not exists {} with dbproperties ('k'='v')".format(
+              namespace))
+      assert result.data == ['Database already exists.']
+      assert 'k' not in requests.get(namespace_url, timeout=30).json()['properties']
+      error = self.execute_query_expect_failure(
+          self.client, "create database {}".format(namespace))
+      assert "Database already exists: {}".format(namespace) in str(error)
+      error = self.execute_query_expect_failure(self.client,
+          "create database {}_2 managedlocation '/tmp/x'".format(namespace))
+      assert "MANAGEDLOCATION is not supported on Iceberg REST catalogs" in str(error)
+      for prop in ["owner", "OWNER", "ownerType", "location"]:
+        error = self.execute_query_expect_failure(self.client,
+            "create database {}_2 with dbproperties ('{}'='x')".format(namespace, prop))
+        assert "Database property '{}' cannot be set on Iceberg REST catalogs".format(
+            prop) in str(error)
+      assert requests.get(self._rest_namespace_url(server, namespace + "_2"),
+          timeout=30).status_code == 404
+
+      self._create_rest_test_table(server, "{}.tbl".format(namespace))
+      self.rest_test_tables.append(
+          (server, "{}.tbl".format(namespace), INSERT_TEST_TABLE))
+      self.execute_query_expect_success(
+          self.client, "insert into {}.tbl values (1)".format(namespace))
+      self.execute_query_expect_success(
+          self.client, "drop table {}.tbl".format(namespace))
+      result = self.execute_query_expect_success(
+          self.client, "drop database {}".format(namespace))
+      assert result.data == ['Database has been dropped.']
+
+      # SCHEMA is a synonym of DATABASE.
+      result = self.execute_query_expect_success(
+          self.client, "create schema {}".format(schema_namespace))
+      assert result.data == ['Database has been created.']
+      assert requests.get(schema_url, timeout=30).status_code == 200
+      result = self.execute_query_expect_success(
+          self.client, "drop schema {}".format(schema_namespace))
+      assert result.data == ['Database has been dropped.']
+      assert requests.get(schema_url, timeout=30).status_code == 404
+    finally:
+      requests.delete(namespace_url, timeout=30)
+      requests.delete(schema_url, timeout=30)
+
+  @RestServerProperties(
       {'port': 9084, 'catalog_location': WRITE_TEST_CATALOG_LOCATION,
        'test_table': WRITE_TEST_TABLE})
   @CustomClusterTestSuite.with_args(
@@ -1067,6 +1249,11 @@ class TestIcebergRestCatalogStandalone(IcebergRestCatalogTests):
     for server in self.servers:
       assert requests.get(self._rest_table_url(server, WRITE_TEST_TABLE),
           timeout=30).status_code == 200
+
+    # With multiple REST catalogs, any of them could create a new database.
+    error = self.execute_query_expect_failure(
+        self.client, "create database impala_rest_ambiguous_create_test")
+    assert "CREATE DATABASE is not supported with multiple catalogs" in str(error)
 
   def _check_drop_table_in_missing_db(self):
     """Without catalogd, a database that no REST catalog serves belongs to the first

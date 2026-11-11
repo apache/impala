@@ -227,6 +227,20 @@ public class LocalCatalog implements FeCatalog {
     }
   }
 
+  @Override
+  public CatalogRef getCatalogRef(String dbName) {
+    try {
+      return metaProvider_.getCatalogRef(dbName.toLowerCase());
+    } catch (TException e) {
+      throw new LocalCatalogException(String.format(
+          "Could not resolve the catalog of database %s: %s", dbName, e.getMessage()),
+          e);
+    }
+  }
+
+  @Override
+  public boolean isMultiCatalog() { return metaProvider_ instanceof MultiMetaProvider; }
+
   private FeDb getDbOrThrow(String dbName) throws DatabaseNotFoundException {
     Preconditions.checkNotNull(dbName);
     FeDb db = getDb(dbName);

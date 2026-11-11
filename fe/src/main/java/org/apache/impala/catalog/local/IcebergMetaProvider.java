@@ -188,6 +188,11 @@ public class IcebergMetaProvider implements MetaProvider {
   }
 
   @Override
+  public CatalogRef getCatalogRef(String dbName) {
+    return catalogRef_;
+  }
+
+  @Override
   public ImmutableCollection<TBriefTableMeta> loadTableList(String dbName)
       throws TException {
     ImmutableList.Builder<TBriefTableMeta> ret = ImmutableList.builder();
@@ -335,10 +340,10 @@ public class IcebergMetaProvider implements MetaProvider {
     return ret;
   }
 
+  /** REST catalogs hold no Impala functions. */
   @Override
   public List<String> loadFunctionNames(String dbName) throws TException {
-    throw new UnsupportedOperationException(
-        "Functions not supported by IcebergMetaProvider");
+    return ImmutableList.of();
   }
 
 

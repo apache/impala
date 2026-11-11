@@ -154,6 +154,35 @@ public class MultiMetaProvider implements MetaProvider {
     return tableProvider.getCatalogRef(dbName, tableName);
   }
 
+  /**
+   * Returns the catalog that serves database 'dbName'. Every provider lists its databases
+   * afresh. The database is served by the provider that lists it, and a missing database
+   * by the primary provider. The database is rejected when several providers list it,
+   * as a DDL on it in one catalog would leave it in the others, and when a provider
+   * fails to list its databases, as that provider may hold it.
+   */
+  @Override
+  public CatalogRef getCatalogRef(String dbName) throws TException {
+    MetaProvider dbProvider = null;
+    for (MetaProvider provider : getAllProviders()) {
+      ImmutableList<String> dbNames;
+      try {
+        dbNames = provider.loadDbList();
+      } catch (Exception e) {
+        throw new TException(String.format(
+            "Cannot decide which catalog serves database %s: %s failed to list its " +
+            "databases: %s. Retry once it is reachable.",
+            dbName, provider.getURI(), e.getMessage()), e);
+      }
+      if (dbNames.stream().noneMatch(dbName::equalsIgnoreCase)) continue;
+      if (dbProvider != null) {
+        throw new TException("Ambiguous database name: " + dbName);
+      }
+      dbProvider = provider;
+    }
+    return (dbProvider != null ? dbProvider : primaryProvider_).getCatalogRef(dbName);
+  }
+
   /** Whether 'e' tells that a provider does not have the database it was asked for. */
   private static boolean isDbNotFound(Throwable e) {
     for (Throwable t = e; t != null; t = t.getCause()) {

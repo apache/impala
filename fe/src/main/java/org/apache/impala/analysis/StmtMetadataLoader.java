@@ -103,10 +103,11 @@ public class StmtMetadataLoader {
 
   /**
    * Contains all statement-relevant tables and database names as well as the latest
-   * ImpaladCatalog. An entry in the tables map is guaranteed to point to a loaded
-   * table. This could mean the table was loaded successfully or a load was attempted
-   * but failed. The absence of a table or database name indicates that object was not
-   * in the Catalog at the time this StmtTableCache was generated.
+   * FeCatalog (ImpaladCatalog, or LocalCatalog in local catalog mode). An entry in the
+   * tables map is guaranteed to point to a loaded table. This could mean the table was
+   * loaded successfully or a load was attempted but failed. The absence of a table or
+   * database name indicates that object was not in the Catalog at the time this
+   * StmtTableCache was generated.
    */
   public static final class StmtTableCache {
     public final FeCatalog catalog;
@@ -174,7 +175,8 @@ public class StmtMetadataLoader {
    * loaded, the set of table/views still to be loaded is expanded based on the view
    * definitions. For tables/views missing metadata this function issues a loading
    * request to the catalog server and then waits for the metadata to arrive through
-   * a statestore topic update.
+   * a statestore topic update. In local catalog mode, tables are loaded on demand
+   * while they are collected (see MetaProvider), so no loading request is issued.
    * This function succeeds even across catalog restarts for the following reasons:
    * - The loading process is strictly additive, i.e., a new loaded table may be added
    *   to the 'loadedOrFailedTbls_' map, but an existing entry is never removed, even if

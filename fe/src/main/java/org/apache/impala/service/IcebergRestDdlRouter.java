@@ -25,6 +25,8 @@ import javax.annotation.Nullable;
 
 import org.apache.impala.analysis.AnalysisContext.AnalysisResult;
 import org.apache.impala.analysis.Analyzer;
+import org.apache.impala.analysis.CreateDbStmt;
+import org.apache.impala.analysis.DropDbStmt;
 import org.apache.impala.analysis.DropTableOrViewStmt;
 import org.apache.impala.catalog.CatalogRef;
 import org.apache.impala.catalog.FeIcebergTable;
@@ -34,6 +36,7 @@ import org.apache.impala.catalog.local.LocalCatalogException;
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.thrift.TDdlType;
 import org.apache.impala.util.CatalogBlacklistUtils;
+import org.apache.impala.util.IcebergUtil;
 
 import com.google.common.base.Preconditions;
 
@@ -87,9 +90,17 @@ final class IcebergRestDdlRouter {
 
   /** Returns how the DDL in 'analysis' is executed. */
   static Route route(AnalysisResult analysis) throws AnalysisException {
-    if (!analysis.isDropTableOrViewStmt()) return Route.CATALOGD;
-    return routeDropTableOrView(analysis.getAnalyzer(),
-        analysis.getDropTableOrViewStmt());
+    if (analysis.isDropTableOrViewStmt()) {
+      return routeDropTableOrView(analysis.getAnalyzer(),
+          analysis.getDropTableOrViewStmt());
+    }
+    if (analysis.isDropDbStmt()) {
+      return routeDropDb(analysis.getAnalyzer(), analysis.getDropDbStmt());
+    }
+    if (analysis.isCreateDbStmt()) {
+      return routeCreateDb(analysis.getAnalyzer(), analysis.getCreateDbStmt());
+    }
+    return Route.CATALOGD;
   }
 
   /**
@@ -150,6 +161,77 @@ final class IcebergRestDdlRouter {
     if (table != null && !stmt.isDropTable()) {
       Preconditions.checkState(stmt.isIfExists());
       return Route.noOp("Drop view is not allowed on a table.");
+    }
+    return Route.restCatalog(catalogRef.getRestCatalogName());
+  }
+
+  /**
+   * Routes DROP DATABASE [IF EXISTS] to the catalog that serves the database now. The
+   * statement is rejected when that catalog cannot be decided, e.g. because several
+   * catalogs list the database. Unlike a table, a database carries no catalog from
+   * analysis to check against: it is authorized by name. On a database served by a
+   * REST catalog:
+   * - an existing database is dropped through the REST catalog, which needs a unique
+   *   name. CASCADE is rejected: REST catalogs drop empty namespaces only.
+   * - a missing database, which analysis lets through with IF EXISTS only, is a no-op,
+   *   as for a missing table.
+   * The summary of a no-op is the one CatalogD gives.
+   */
+  private static Route routeDropDb(Analyzer analyzer, DropDbStmt stmt)
+      throws AnalysisException {
+    String dbName = stmt.getDb().toLowerCase();
+    CatalogRef catalogRef;
+    try {
+      catalogRef = analyzer.getCatalog().getCatalogRef(dbName);
+    } catch (LocalCatalogException e) {
+      throw new AnalysisException(e.getMessage(), e);
+    }
+    if (!catalogRef.isRest()) return Route.CATALOGD;
+    if (!analyzer.dbExists(dbName)) {
+      Preconditions.checkState(stmt.getIfExists());
+      if (CatalogBlacklistUtils.isDbBlacklisted(dbName)) {
+        return Route.noOp("Can't drop blacklisted database: " + dbName);
+      }
+      return Route.noOp("Database does not exist.");
+    }
+    if (catalogRef.getRestCatalogName() == null) {
+      throw Analyzer.restCatalogNotUnique(TDdlType.DROP_DATABASE, dbName);
+    }
+    if (stmt.getCascade()) {
+      throw new AnalysisException(
+          "DROP DATABASE CASCADE is not supported on Iceberg REST catalogs: " + dbName);
+    }
+    return Route.restCatalog(catalogRef.getRestCatalogName());
+  }
+
+  /**
+   * Routes CREATE DATABASE [IF NOT EXISTS]. Analysis rejects it with multiple catalogs,
+   * so the one catalog creates it: a REST catalog creates a namespace, which needs a
+   * unique name. IF NOT EXISTS on an existing database is a no-op, with the summary that
+   * CatalogD gives.
+   */
+  private static Route routeCreateDb(Analyzer analyzer, CreateDbStmt stmt)
+      throws AnalysisException {
+    String dbName = stmt.getDb().toLowerCase();
+    Preconditions.checkState(!analyzer.getCatalog().isMultiCatalog());
+    CatalogRef catalogRef = analyzer.getCatalog().getCatalogRef(dbName);
+    if (!catalogRef.isRest()) return Route.CATALOGD;
+    if (analyzer.dbExists(dbName)) {
+      Preconditions.checkState(stmt.getIfNotExists());
+      return Route.noOp("Database already exists.");
+    }
+    if (catalogRef.getRestCatalogName() == null) {
+      throw Analyzer.restCatalogNotUnique(TDdlType.CREATE_DATABASE, dbName);
+    }
+    if (stmt.hasManagedLocation()) {
+      throw new AnalysisException(
+          "MANAGEDLOCATION is not supported on Iceberg REST catalogs: " + dbName);
+    }
+    String reserved = IcebergUtil.findReservedProperty(
+        stmt.getDbProperties().keySet(), IcebergUtil.REST_RESERVED_DB_PROPERTIES);
+    if (reserved != null) {
+      throw new AnalysisException(IcebergDdlExecutor.reservedDbPropertyError(
+          reserved, dbName));
     }
     return Route.restCatalog(catalogRef.getRestCatalogName());
   }

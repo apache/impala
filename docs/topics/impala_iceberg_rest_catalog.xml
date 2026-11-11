@@ -251,6 +251,14 @@ iceberg.rest-catalog.uri=http://rest-catalog-server:9084</codeblock>
             for example because its server is unreachable, the statement fails, also for
             tables in the Hive Metastore. Retry it once the catalog is reachable.
           </p>
+          <p>
+            Likewise, <codeph>DROP DATABASE</codeph> looks up which catalog holds the
+            database. If more than one catalog lists the database, or a catalog cannot list
+            its databases, the statement fails, also for databases in the Hive Metastore.
+            <codeph>CREATE DATABASE</codeph> is not supported when more than one catalog
+            is configured, also for databases in the Hive Metastore, as any of them could
+            create the database.
+          </p>
         </section>
       </conbody>
     </concept>
@@ -289,16 +297,24 @@ iceberg.rest-catalog.uri=http://rest-catalog-server:9084</codeblock>
               unpartitioned. TRUNCATE is not supported.
             </li>
             <li>
-              <b>DDL Operations:</b> Only DROP TABLE is supported, and only for a catalog
-              configured with a unique <codeph>iceberg.rest-catalog.name</codeph>. The
-              coordinator drops the table through the REST catalog; the Impala Catalog
-              Server is not involved. <codeph>DROP TABLE ... PURGE</codeph> asks the
+              <b>DDL Operations:</b> Only DROP TABLE, CREATE DATABASE and DROP DATABASE are
+              supported, and only for a catalog configured with a unique
+              <codeph>iceberg.rest-catalog.name</codeph>. The coordinator creates or drops
+              the namespace, or drops the table, through the REST catalog; the Impala
+              Catalog Server is not involved. <codeph>DROP TABLE ... PURGE</codeph> asks the
               REST catalog to delete the data files of the table as well; without
               PURGE, whether they are deleted is up to the REST catalog server. This
               differs from Iceberg tables in the Hive Metastore, where tables created by
               Impala have <codeph>external.table.purge=true</codeph>, so a plain DROP
-              TABLE deletes their data files too. Other DDL operations (CREATE,
-              ALTER,...) are not supported.
+              TABLE deletes their data files too. <codeph>DROP DATABASE</codeph> drops
+              empty namespaces only: <codeph>CASCADE</codeph> is not supported, and a
+              namespace that still holds tables is not dropped. <codeph>CREATE
+              DATABASE</codeph> is supported with a single REST catalog only; its comment,
+              location and properties become namespace properties, and
+              <codeph>MANAGEDLOCATION</codeph> is not supported. The database properties
+              <codeph>owner</codeph>, <codeph>ownerType</codeph> and
+              <codeph>location</codeph> cannot be set. Other DDL operations
+              (CREATE TABLE, ALTER,...) are not supported.
             </li>
             <li>
               <b>Views:</b> Iceberg views are not supported through the REST Catalog.

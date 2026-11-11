@@ -18,15 +18,19 @@
 package org.apache.impala.service;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
-import static org.junit.Assert.fail;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import org.apache.iceberg.exceptions.AlreadyExistsException;
+import org.apache.iceberg.exceptions.NamespaceNotEmptyException;
 import org.apache.iceberg.exceptions.NoSuchNamespaceException;
 import org.apache.impala.catalog.DatabaseNotFoundException;
 import org.apache.impala.catalog.TableNotFoundException;
@@ -34,10 +38,12 @@ import org.apache.impala.catalog.iceberg.IcebergRESTCatalog;
 import org.apache.impala.common.ImpalaRuntimeException;
 import org.apache.impala.service.catalogmanager.FeCatalogManager;
 import org.apache.impala.thrift.TBackendGflags;
+import org.apache.impala.thrift.TCreateDbParams;
 import org.apache.impala.thrift.TDdlExecRequest;
 import org.apache.impala.thrift.TDdlExecResponse;
 import org.apache.impala.thrift.TDdlQueryOptions;
 import org.apache.impala.thrift.TDdlType;
+import org.apache.impala.thrift.TDropDbParams;
 import org.apache.impala.thrift.TDropTableOrViewParams;
 import org.apache.impala.thrift.TErrorCode;
 import org.apache.impala.thrift.TIcebergDdlExecRequest;
@@ -47,6 +53,8 @@ import org.junit.AfterClass;
 import org.junit.Before;
 import org.junit.BeforeClass;
 import org.junit.Test;
+
+import com.google.common.collect.ImmutableMap;
 
 /**
  * Unit tests for executing DDL on the coordinator through an Iceberg REST catalog,
@@ -131,13 +139,10 @@ public class IcebergDdlExecutorTest {
         catalogManager_, dropTableRequest(/*ifExists=*/true, /*purge=*/false));
     assertEquals("Table does not exist.", summary(response));
 
-    try {
-      IcebergDdlExecutor.execDdl(
-          catalogManager_, dropTableRequest(/*ifExists=*/false, /*purge=*/false));
-      fail("Expected a missing table to be rejected without IF EXISTS");
-    } catch (TableNotFoundException e) {
-      assertTrue(e.getMessage().contains("Table does not exist"));
-    }
+    TableNotFoundException e = assertThrows(TableNotFoundException.class,
+        () -> IcebergDdlExecutor.execDdl(
+            catalogManager_, dropTableRequest(/*ifExists=*/false, /*purge=*/false)));
+    assertTrue(e.getMessage(), e.getMessage().contains("Table does not exist"));
   }
 
   @Test
@@ -149,13 +154,10 @@ public class IcebergDdlExecutorTest {
         catalogManager_, dropTableRequest(/*ifExists=*/true, /*purge=*/false));
     assertEquals("Database does not exist: " + DB_NAME, summary(response));
 
-    try {
-      IcebergDdlExecutor.execDdl(
-          catalogManager_, dropTableRequest(/*ifExists=*/false, /*purge=*/false));
-      fail("Expected a missing database to be rejected without IF EXISTS");
-    } catch (DatabaseNotFoundException e) {
-      assertTrue(e.getMessage().contains("Database does not exist"));
-    }
+    DatabaseNotFoundException e = assertThrows(DatabaseNotFoundException.class,
+        () -> IcebergDdlExecutor.execDdl(
+            catalogManager_, dropTableRequest(/*ifExists=*/false, /*purge=*/false)));
+    assertTrue(e.getMessage(), e.getMessage().contains("Database does not exist"));
   }
 
   @Test
@@ -168,12 +170,9 @@ public class IcebergDdlExecutorTest {
     assertEquals("View does not exist.", summary(response));
 
     request.getDdl_params().getDrop_table_or_view_params().setIf_exists(false);
-    try {
-      IcebergDdlExecutor.execDdl(catalogManager_, request);
-      fail("Expected DROP VIEW to be rejected without IF EXISTS");
-    } catch (TableNotFoundException e) {
-      assertTrue(e.getMessage().contains("View does not exist"));
-    }
+    TableNotFoundException e = assertThrows(TableNotFoundException.class,
+        () -> IcebergDdlExecutor.execDdl(catalogManager_, request));
+    assertTrue(e.getMessage(), e.getMessage().contains("View does not exist"));
     verify(restCatalog_, never()).dropTable(anyString(), anyString(), anyBoolean());
   }
 
@@ -208,38 +207,143 @@ public class IcebergDdlExecutorTest {
     assertEquals("Can't drop blacklisted table: db.tbl", summary(response));
 
     params.setIf_exists(false);
-    try {
-      IcebergDdlExecutor.execDdl(catalogManager_, request);
-      fail("Expected a blacklisted table to be rejected without IF EXISTS");
-    } catch (ImpalaRuntimeException e) {
-      assertTrue(e.getMessage().contains("Can't drop blacklisted table: db.tbl"));
-    }
+    ImpalaRuntimeException e = assertThrows(ImpalaRuntimeException.class,
+        () -> IcebergDdlExecutor.execDdl(catalogManager_, request));
+    assertTrue(e.getMessage(),
+        e.getMessage().contains("Can't drop blacklisted table: db.tbl"));
     verify(restCatalog_, never()).dropTable(anyString(), anyString(), anyBoolean());
+  }
+
+  @Test
+  public void testDropDatabase() throws Exception {
+    when(restCatalog_.dropNamespace(DB_NAME)).thenReturn(true);
+
+    TDdlExecResponse response = IcebergDdlExecutor.execDdl(
+        catalogManager_, dropDbRequest("DB", /*ifExists=*/false, /*cascade=*/false));
+
+    verify(restCatalog_).dropNamespace(DB_NAME);
+    assertEquals("Database has been dropped.", summary(response));
+    assertEquals(0, response.getResult().getVersion());
+  }
+
+  @Test
+  public void testDropMissingDatabase() throws Exception {
+    when(restCatalog_.dropNamespace(DB_NAME)).thenReturn(false);
+
+    TDdlExecResponse response = IcebergDdlExecutor.execDdl(
+        catalogManager_, dropDbRequest(DB_NAME, /*ifExists=*/true, /*cascade=*/false));
+    assertEquals("Database does not exist.", summary(response));
+
+    DatabaseNotFoundException e = assertThrows(DatabaseNotFoundException.class,
+        () -> IcebergDdlExecutor.execDdl(catalogManager_,
+            dropDbRequest(DB_NAME, /*ifExists=*/false, /*cascade=*/false)));
+    assertTrue(e.getMessage(),
+        e.getMessage().contains("Database does not exist: " + DB_NAME));
+  }
+
+  @Test
+  public void testDropNonEmptyDatabase() throws Exception {
+    // The server answers HTTP 409, which Iceberg clients report as either exception.
+    for (RuntimeException notEmpty : new RuntimeException[] {
+        new NamespaceNotEmptyException("Namespace not empty: %s", DB_NAME),
+        new AlreadyExistsException("Namespace not empty: %s", DB_NAME)}) {
+      doThrow(notEmpty).when(restCatalog_).dropNamespace(DB_NAME);
+      ImpalaRuntimeException e = assertThrows(ImpalaRuntimeException.class,
+          () -> IcebergDdlExecutor.execDdl(catalogManager_,
+              dropDbRequest(DB_NAME, /*ifExists=*/true, /*cascade=*/false)));
+      assertTrue(e.getMessage(),
+          e.getMessage().contains("Cannot drop non-empty database: " + DB_NAME));
+    }
+  }
+
+  @Test
+  public void testDropDatabaseCascade() throws Exception {
+    ImpalaRuntimeException e = assertThrows(ImpalaRuntimeException.class,
+        () -> IcebergDdlExecutor.execDdl(catalogManager_,
+            dropDbRequest(DB_NAME, /*ifExists=*/true, /*cascade=*/true)));
+    assertTrue(e.getMessage(),
+        e.getMessage().contains("DROP DATABASE CASCADE is not supported"));
+    verify(restCatalog_, never()).dropNamespace(anyString());
+  }
+
+  @Test
+  public void testDropBlacklistedDatabase() throws Exception {
+    CatalogBlacklistUtilsTest.setBlacklist(DB_NAME, "");
+    TDdlExecResponse response = IcebergDdlExecutor.execDdl(
+        catalogManager_, dropDbRequest("DB", /*ifExists=*/true, /*cascade=*/false));
+    assertEquals("Can't drop blacklisted database: " + DB_NAME, summary(response));
+    ImpalaRuntimeException e = assertThrows(ImpalaRuntimeException.class,
+        () -> IcebergDdlExecutor.execDdl(catalogManager_,
+            dropDbRequest(DB_NAME, /*ifExists=*/false, /*cascade=*/false)));
+    assertTrue(e.getMessage(),
+        e.getMessage().contains("Can't drop blacklisted database"));
+    verify(restCatalog_, never()).dropNamespace(anyString());
+  }
+
+  @Test
+  public void testCreateDatabase() throws Exception {
+    TIcebergDdlExecRequest request = createDbRequest("DB", /*ifNotExists=*/false);
+    TCreateDbParams params = request.getDdl_params().getCreate_db_params();
+    params.setComment("c");
+    params.setLocation("/loc");
+    params.setProperties(ImmutableMap.of("k", "v"));
+
+    TDdlExecResponse response = IcebergDdlExecutor.execDdl(catalogManager_, request);
+
+    verify(restCatalog_).createNamespace(DB_NAME,
+        ImmutableMap.of("k", "v", "comment", "c", "location", "/loc"));
+    assertEquals("Database has been created.", summary(response));
+    assertEquals(0, response.getResult().getVersion());
+  }
+
+  @Test
+  public void testCreateDatabaseWithReservedProperty() throws Exception {
+    // Analysis rejects these; this guards against a request that bypassed it.
+    for (String property : new String[] {"owner", "OWNER", "ownerType", "Location"}) {
+      TIcebergDdlExecRequest request = createDbRequest(DB_NAME, /*ifNotExists=*/false);
+      request.getDdl_params().getCreate_db_params().setProperties(
+          ImmutableMap.of(property, "x"));
+      ImpalaRuntimeException e = assertThrows(ImpalaRuntimeException.class,
+          () -> IcebergDdlExecutor.execDdl(catalogManager_, request));
+      assertTrue(e.getMessage(), e.getMessage().contains(
+          "Database property '" + property + "' cannot be set"));
+    }
+    verify(restCatalog_, never()).createNamespace(anyString(), any());
+  }
+
+  @Test
+  public void testCreateExistingDatabase() throws Exception {
+    doThrow(new AlreadyExistsException("Namespace already exists: %s", DB_NAME))
+        .when(restCatalog_).createNamespace(DB_NAME, ImmutableMap.of());
+
+    TDdlExecResponse response = IcebergDdlExecutor.execDdl(
+        catalogManager_, createDbRequest(DB_NAME, /*ifNotExists=*/true));
+    assertEquals("Database already exists.", summary(response));
+
+    ImpalaRuntimeException e = assertThrows(ImpalaRuntimeException.class,
+        () -> IcebergDdlExecutor.execDdl(
+            catalogManager_, createDbRequest(DB_NAME, /*ifNotExists=*/false)));
+    assertTrue(e.getMessage(),
+        e.getMessage().contains("Database already exists: " + DB_NAME));
   }
 
   @Test
   public void testUnknownCatalog() throws Exception {
     when(catalogManager_.getIcebergCatalog(CATALOG_NAME))
         .thenThrow(new ImpalaRuntimeException("Unknown Iceberg REST catalog: rest-1"));
-    try {
-      IcebergDdlExecutor.execDdl(
-          catalogManager_, dropTableRequest(/*ifExists=*/true, /*purge=*/false));
-      fail("Expected an unknown catalog to be rejected");
-    } catch (ImpalaRuntimeException e) {
-      assertTrue(e.getMessage().contains("Unknown Iceberg REST catalog"));
-    }
+    ImpalaRuntimeException e = assertThrows(ImpalaRuntimeException.class,
+        () -> IcebergDdlExecutor.execDdl(
+            catalogManager_, dropTableRequest(/*ifExists=*/true, /*purge=*/false)));
+    assertTrue(e.getMessage(), e.getMessage().contains("Unknown Iceberg REST catalog"));
   }
 
   @Test
   public void testUnsupportedDdlType() throws Exception {
     TIcebergDdlExecRequest request = dropTableRequest(false, false);
     request.getDdl_params().setDdl_type(TDdlType.ALTER_TABLE);
-    try {
-      IcebergDdlExecutor.execDdl(catalogManager_, request);
-      fail("Expected ALTER TABLE to be rejected");
-    } catch (ImpalaRuntimeException e) {
-      assertTrue(e.getMessage().contains("ALTER_TABLE is not supported"));
-    }
+    ImpalaRuntimeException e = assertThrows(ImpalaRuntimeException.class,
+        () -> IcebergDdlExecutor.execDdl(catalogManager_, request));
+    assertTrue(e.getMessage(), e.getMessage().contains("ALTER_TABLE is not supported"));
   }
 
   private static TIcebergDdlExecRequest dropTableRequest(boolean ifExists,
@@ -252,6 +356,37 @@ public class IcebergDdlExecutorTest {
     TDdlExecRequest ddl = new TDdlExecRequest();
     ddl.setDdl_type(TDdlType.DROP_TABLE);
     ddl.setDrop_table_or_view_params(params);
+    ddl.setQuery_options(new TDdlQueryOptions(false));
+    TIcebergDdlExecRequest request = new TIcebergDdlExecRequest();
+    request.setRest_catalog_name(CATALOG_NAME);
+    request.setDdl_params(ddl);
+    return request;
+  }
+
+  private static TIcebergDdlExecRequest createDbRequest(String dbName,
+      boolean ifNotExists) {
+    TCreateDbParams params = new TCreateDbParams();
+    params.setDb(dbName);
+    params.setIf_not_exists(ifNotExists);
+    TDdlExecRequest ddl = new TDdlExecRequest();
+    ddl.setDdl_type(TDdlType.CREATE_DATABASE);
+    ddl.setCreate_db_params(params);
+    ddl.setQuery_options(new TDdlQueryOptions(false));
+    TIcebergDdlExecRequest request = new TIcebergDdlExecRequest();
+    request.setRest_catalog_name(CATALOG_NAME);
+    request.setDdl_params(ddl);
+    return request;
+  }
+
+  private static TIcebergDdlExecRequest dropDbRequest(String dbName, boolean ifExists,
+      boolean cascade) {
+    TDropDbParams params = new TDropDbParams();
+    params.setDb(dbName);
+    params.setIf_exists(ifExists);
+    params.setCascade(cascade);
+    TDdlExecRequest ddl = new TDdlExecRequest();
+    ddl.setDdl_type(TDdlType.DROP_DATABASE);
+    ddl.setDrop_db_params(params);
     ddl.setQuery_options(new TDdlQueryOptions(false));
     TIcebergDdlExecRequest request = new TIcebergDdlExecRequest();
     request.setRest_catalog_name(CATALOG_NAME);

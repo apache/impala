@@ -101,6 +101,16 @@ public interface MetaProvider {
     return CatalogRef.CATALOGD;
   }
 
+  /**
+   * Returns the catalog that serves database 'dbName'. The database need not exist: for
+   * a missing database, this is the catalog that answers for it. Providers that are not
+   * backed by an Iceberg REST catalog are served by CatalogD. Throws when the catalog
+   * cannot be decided.
+   */
+  default CatalogRef getCatalogRef(String dbName) throws TException {
+    return CatalogRef.CATALOGD;
+  }
+
   ImmutableCollection<TBriefTableMeta> loadTableList(String dbName)
       throws MetaException, UnknownDBException, TException;
 

@@ -17,6 +17,7 @@
 
 package org.apache.impala.catalog.local;
 
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertSame;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
@@ -149,6 +150,77 @@ public class MultiMetaProviderTest {
     // Without MultiMetaProvider, every table belongs to the one catalog.
     assertSame(REST_1,
         new LocalCatalog(first).getCatalogRef("no_such_db", "no_such_table"));
+  }
+
+  @Test
+  public void testDbIsServedByProviderThatListsIt() throws Exception {
+    MetaProvider catalogd = dbProvider(CatalogRef.CATALOGD, "hms_db");
+    MetaProvider first = dbProvider(REST_1, "other_db");
+    MetaProvider second = dbProvider(REST_2, DB_NAME);
+    MultiMetaProvider provider =
+        new MultiMetaProvider(catalogd, Arrays.asList(first, second));
+    assertSame(REST_2, provider.getCatalogRef(DB_NAME));
+    assertSame(REST_2, provider.getCatalogRef(DB_NAME.toUpperCase()));
+    assertSame(REST_1, provider.getCatalogRef("other_db"));
+    assertSame(CatalogRef.CATALOGD, provider.getCatalogRef("hms_db"));
+    // A missing database is served by the primary provider.
+    assertSame(CatalogRef.CATALOGD, provider.getCatalogRef("no_such_db"));
+    // Every call lists the databases afresh.
+    for (MetaProvider p : Arrays.asList(catalogd, first, second)) {
+      verify(p, times(5)).loadDbList();
+    }
+    LocalCatalog catalog = new LocalCatalog(provider);
+    assertSame(REST_2, catalog.getCatalogRef(DB_NAME.toUpperCase()));
+    assertTrue(catalog.isMultiCatalog());
+    // Without MultiMetaProvider, every database belongs to the one catalog.
+    assertSame(REST_1, new LocalCatalog(first).getCatalogRef("no_such_db"));
+    assertFalse(new LocalCatalog(first).isMultiCatalog());
+  }
+
+  @Test
+  public void testDbListedBySeveralProvidersIsAmbiguous() throws Exception {
+    MetaProvider catalogd = dbProvider(CatalogRef.CATALOGD, DB_NAME);
+    MetaProvider rest = dbProvider(REST_1, DB_NAME.toUpperCase(), "other_db");
+    MultiMetaProvider provider = new MultiMetaProvider(catalogd, Arrays.asList(rest));
+    try {
+      provider.getCatalogRef(DB_NAME);
+      fail("Expected the database to be ambiguous");
+    } catch (TException e) {
+      assertTrue(e.getMessage().contains("Ambiguous database name: " + DB_NAME));
+    }
+    assertSame(REST_1, provider.getCatalogRef("other_db"));
+  }
+
+  @Test
+  public void testFailingProviderMakesEveryDbUndecidable() throws Exception {
+    MetaProvider catalogd = dbProvider(CatalogRef.CATALOGD, "hms_db");
+    MetaProvider failing = dbProvider(REST_1);
+    when(failing.loadDbList()).thenThrow(new TException("unreachable"));
+    MultiMetaProvider provider =
+        new MultiMetaProvider(catalogd, Arrays.asList(failing));
+    for (String dbName : Arrays.asList(DB_NAME, "hms_db")) {
+      try {
+        provider.getCatalogRef(dbName);
+        fail("Expected the catalog of the database to be undecidable");
+      } catch (TException e) {
+        assertTrue(e.getMessage(), e.getMessage().startsWith(
+            "Cannot decide which catalog serves database " + dbName + ": "));
+        assertTrue(e.getMessage(), e.getMessage().contains("unreachable"));
+      }
+    }
+  }
+
+  /**
+   * Returns a provider of catalog 'catalogRef' that lists the databases 'dbNames' and
+   * answers its own catalog for every database.
+   */
+  private static MetaProvider dbProvider(CatalogRef catalogRef, String... dbNames)
+      throws TException {
+    MetaProvider provider = mock(MetaProvider.class);
+    when(provider.getURI()).thenReturn(catalogRef.toString());
+    when(provider.getCatalogRef(anyString())).thenReturn(catalogRef);
+    when(provider.loadDbList()).thenReturn(ImmutableList.copyOf(dbNames));
+    return provider;
   }
 
   private static void assertAmbiguous(MultiMetaProvider provider, String tblName) {
