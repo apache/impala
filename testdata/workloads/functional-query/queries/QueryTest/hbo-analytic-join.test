@@ -55,6 +55,61 @@ PLAN-ROOT SINK
    HDFS partitions=2/24 files=2 size=40.32KB
    predicates: string_col != 'test_join_over_analytic'
    row-size=21B cardinality=620 (from HBO)
+---- CALCITE_PLANNER_PLAN
+# Calcite generates extra SelectNodes with IS NOT NULL predicates
+PLAN-ROOT SINK
+|
+08:HASH JOIN [INNER JOIN, BROADCAST]
+|  hash predicates: int_col = int_col, rank() = rank()
+|  row-size=58B cardinality=62
+|
+|--11:EXCHANGE [UNPARTITIONED]
+|  |
+|  07:SELECT
+|  |  predicates: int_col IS NOT NULL
+|  |  row-size=29B cardinality=1
+|  |
+|  06:ANALYTIC
+|  |  functions: rank()
+|  |  order by: id DESC
+|  |  window: RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+|  |  row-size=29B cardinality=2
+|  |
+|  10:MERGING-EXCHANGE [UNPARTITIONED]
+|  |  order by: id DESC NULLS FIRST
+|  |
+|  05:SORT
+|  |  order by: id DESC NULLS FIRST
+|  |  row-size=21B cardinality=2
+|  |
+|  04:SCAN HDFS [functional.alltypestiny]
+|     partition predicates: functional.alltypestiny.month = 1
+|     HDFS partitions=1/4 files=1 size=115B
+|     predicates: functional.alltypestiny.string_col != 'test_join_over_analytic'
+|     row-size=21B cardinality=2 (from HBO)
+|
+03:SELECT
+|  predicates: int_col IS NOT NULL
+|  row-size=29B cardinality=62
+|
+02:ANALYTIC
+|  functions: rank()
+|  order by: id ASC
+|  window: RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+|  row-size=29B cardinality=620
+|
+09:MERGING-EXCHANGE [UNPARTITIONED]
+|  order by: id ASC NULLS LAST
+|
+01:SORT
+|  order by: id ASC NULLS LAST
+|  row-size=21B cardinality=620
+|
+00:SCAN HDFS [functional.alltypes]
+   partition predicates: functional.alltypes.month = 1
+   HDFS partitions=2/24 files=2 size=40.32KB
+   predicates: functional.alltypes.string_col != 'test_join_over_analytic'
+   row-size=21B cardinality=620 (from HBO)
 ====
 ---- QUERY
 # Change the JOIN order
@@ -111,6 +166,61 @@ PLAN-ROOT SINK
    partition predicates: `month` = 1
    HDFS partitions=1/4 files=1 size=115B
    predicates: string_col != 'test_join_over_analytic'
+   row-size=21B cardinality=2 (from HBO)
+---- CALCITE_PLANNER_PLAN
+# Calcite generates extra SelectNodes with IS NOT NULL predicates
+PLAN-ROOT SINK
+|
+08:HASH JOIN [INNER JOIN, BROADCAST]
+|  hash predicates: int_col = int_col, rank() = rank()
+|  row-size=58B cardinality=62
+|
+|--11:EXCHANGE [UNPARTITIONED]
+|  |
+|  07:SELECT
+|  |  predicates: int_col IS NOT NULL
+|  |  row-size=29B cardinality=62
+|  |
+|  06:ANALYTIC
+|  |  functions: rank()
+|  |  order by: id ASC
+|  |  window: RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+|  |  row-size=29B cardinality=620
+|  |
+|  10:MERGING-EXCHANGE [UNPARTITIONED]
+|  |  order by: id ASC NULLS LAST
+|  |
+|  05:SORT
+|  |  order by: id ASC NULLS LAST
+|  |  row-size=21B cardinality=620
+|  |
+|  04:SCAN HDFS [functional.alltypes]
+|     partition predicates: functional.alltypes.month = 1
+|     HDFS partitions=2/24 files=2 size=40.32KB
+|     predicates: functional.alltypes.string_col != 'test_join_over_analytic'
+|     row-size=21B cardinality=620 (from HBO)
+|
+03:SELECT
+|  predicates: int_col IS NOT NULL
+|  row-size=29B cardinality=1
+|
+02:ANALYTIC
+|  functions: rank()
+|  order by: id DESC
+|  window: RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+|  row-size=29B cardinality=2
+|
+09:MERGING-EXCHANGE [UNPARTITIONED]
+|  order by: id DESC NULLS FIRST
+|
+01:SORT
+|  order by: id DESC NULLS FIRST
+|  row-size=21B cardinality=2
+|
+00:SCAN HDFS [functional.alltypestiny]
+   partition predicates: functional.alltypestiny.month = 1
+   HDFS partitions=1/4 files=1 size=115B
+   predicates: functional.alltypestiny.string_col != 'test_join_over_analytic'
    row-size=21B cardinality=2 (from HBO)
 ====
 ---- QUERY
@@ -169,6 +279,61 @@ PLAN-ROOT SINK
    HDFS partitions=2/24 files=2 size=40.32KB
    predicates: string_col != 'test_join_over_analytic'
    row-size=29B cardinality=620 (from HBO)
+---- CALCITE_PLANNER_PLAN
+# Calcite generates extra SelectNodes with IS NOT NULL predicates
+PLAN-ROOT SINK
+|
+08:HASH JOIN [INNER JOIN, BROADCAST]
+|  hash predicates: int_col = int_col, rank() = rank()
+|  row-size=74B cardinality=62
+|
+|--11:EXCHANGE [UNPARTITIONED]
+|  |
+|  07:SELECT
+|  |  predicates: int_col IS NOT NULL
+|  |  row-size=37B cardinality=1
+|  |
+|  06:ANALYTIC
+|  |  functions: rank()
+|  |  order by: bigint_col ASC, id DESC
+|  |  window: RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+|  |  row-size=37B cardinality=2
+|  |
+|  10:MERGING-EXCHANGE [UNPARTITIONED]
+|  |  order by: bigint_col ASC NULLS LAST, id DESC NULLS FIRST
+|  |
+|  05:SORT
+|  |  order by: bigint_col ASC NULLS LAST, id DESC NULLS FIRST
+|  |  row-size=29B cardinality=2
+|  |
+|  04:SCAN HDFS [functional.alltypestiny]
+|     partition predicates: functional.alltypestiny.month = 1
+|     HDFS partitions=1/4 files=1 size=115B
+|     predicates: functional.alltypestiny.string_col != 'test_join_over_analytic'
+|     row-size=29B cardinality=2 (from HBO)
+|
+03:SELECT
+|  predicates: int_col IS NOT NULL
+|  row-size=37B cardinality=62
+|
+02:ANALYTIC
+|  functions: rank()
+|  order by: bigint_col ASC, id ASC
+|  window: RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+|  row-size=37B cardinality=620
+|
+09:MERGING-EXCHANGE [UNPARTITIONED]
+|  order by: bigint_col ASC NULLS LAST, id ASC NULLS LAST
+|
+01:SORT
+|  order by: bigint_col ASC NULLS LAST, id ASC NULLS LAST
+|  row-size=29B cardinality=620
+|
+00:SCAN HDFS [functional.alltypes]
+   partition predicates: functional.alltypes.month = 1
+   HDFS partitions=2/24 files=2 size=40.32KB
+   predicates: functional.alltypes.string_col != 'test_join_over_analytic'
+   row-size=29B cardinality=620 (from HBO)
 ====
 ---- QUERY
 # Change the partition predicate to month=2
@@ -225,5 +390,60 @@ PLAN-ROOT SINK
    partition predicates: `month` = 2
    HDFS partitions=2/24 files=2 size=36.51KB
    predicates: string_col != 'test_join_over_analytic'
+   row-size=21B cardinality=620 (from HBO, key ignores partition constants)
+---- CALCITE_PLANNER_PLAN
+# Calcite generates extra SelectNodes with IS NOT NULL predicates
+PLAN-ROOT SINK
+|
+08:HASH JOIN [INNER JOIN, BROADCAST]
+|  hash predicates: int_col = int_col, rank() = rank()
+|  row-size=58B cardinality=62
+|
+|--11:EXCHANGE [UNPARTITIONED]
+|  |
+|  07:SELECT
+|  |  predicates: int_col IS NOT NULL
+|  |  row-size=29B cardinality=1
+|  |
+|  06:ANALYTIC
+|  |  functions: rank()
+|  |  order by: id DESC
+|  |  window: RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+|  |  row-size=29B cardinality=2
+|  |
+|  10:MERGING-EXCHANGE [UNPARTITIONED]
+|  |  order by: id DESC NULLS FIRST
+|  |
+|  05:SORT
+|  |  order by: id DESC NULLS FIRST
+|  |  row-size=21B cardinality=2
+|  |
+|  04:SCAN HDFS [functional.alltypestiny]
+|     partition predicates: functional.alltypestiny.month = 2
+|     HDFS partitions=1/4 files=1 size=115B
+|     predicates: functional.alltypestiny.string_col != 'test_join_over_analytic'
+|     row-size=21B cardinality=2 (from HBO, key ignores partition constants)
+|
+03:SELECT
+|  predicates: int_col IS NOT NULL
+|  row-size=29B cardinality=62
+|
+02:ANALYTIC
+|  functions: rank()
+|  order by: id ASC
+|  window: RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+|  row-size=29B cardinality=620
+|
+09:MERGING-EXCHANGE [UNPARTITIONED]
+|  order by: id ASC NULLS LAST
+|
+01:SORT
+|  order by: id ASC NULLS LAST
+|  row-size=21B cardinality=620
+|
+00:SCAN HDFS [functional.alltypes]
+   partition predicates: functional.alltypes.month = 2
+   HDFS partitions=2/24 files=2 size=36.51KB
+   predicates: functional.alltypes.string_col != 'test_join_over_analytic'
    row-size=21B cardinality=620 (from HBO, key ignores partition constants)
 ====
