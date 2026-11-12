@@ -217,9 +217,19 @@ public class ImpalaTypeSystemImpl extends RelDataTypeSystemImpl {
         return type2;
       }
 
-      Type retType = op == ArithmeticExpr.Operator.INT_DIVIDE
+      // DIV and the bitwise operators return the assignment compatible type of the
+      // operands, like ArithmeticExpr does in the original planner.
+      boolean isIntegerOp = op == ArithmeticExpr.Operator.INT_DIVIDE ||
+          op == ArithmeticExpr.Operator.BITAND ||
+          op == ArithmeticExpr.Operator.BITOR ||
+          op == ArithmeticExpr.Operator.BITXOR;
+      Type retType = isIntegerOp
           ? Type.getAssignmentCompatibleType(t1, t2, TypeCompatibility.DEFAULT)
           : TypesUtil.getArithmeticResultType(t1, t2, op, true);
+      // If both operands are NULL, default to INT for DIV and the bitwise operators
+      // and to DOUBLE otherwise, like ArithmeticExpr does in the original planner.
+      // This prevents the BE from seeing NULL_TYPE.
+      if (retType.isNull()) retType = isIntegerOp ? Type.INT : Type.DOUBLE;
       SqlTypeName sqlTypeName =
           ImpalaTypeConverter.getRelDataType(retType).getSqlTypeName();
       RelDataType preNullableType =

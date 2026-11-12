@@ -8137,7 +8137,7 @@ SqlBinaryOperator BinaryRowOperator() :
 |   <CONCAT> { return ImpalaCustomOperatorTable.CONCAT_OR; }
 |   <AND> { return SqlStdOperatorTable.AND; }
 |   <AMPERSAND_AND> { return SqlStdOperatorTable.AND; }
-|   <BITAND_OPERATOR> { return SqlStdOperatorTable.BITAND_OPERATOR; }
+|   <BITAND_OPERATOR> { return ImpalaCustomOperatorTable.BITAND; }
 |   <OR> { return SqlStdOperatorTable.OR; }
 |   LOOKAHEAD(2) <IS> <DISTINCT> <FROM> { return SqlStdOperatorTable.IS_DISTINCT_FROM; }
 |   <IS> <NOT> <DISTINCT> <FROM> { return SqlStdOperatorTable.IS_NOT_DISTINCT_FROM; }

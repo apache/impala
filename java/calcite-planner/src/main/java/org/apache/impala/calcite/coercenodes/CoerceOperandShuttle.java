@@ -115,6 +115,19 @@ public class CoerceOperandShuttle extends RexShuttle {
     // in the Filter constructor.
     castedOperandsCall = (RexCall) RexUtil.flatten(rexBuilder, castedOperandsCall);
 
+    // AND and OR (with CAST) are the only operators that skip the operand casting
+    // below (see NO_CAST_OPERATORS). For every other operator, getCastedArgTypes
+    // casts NULL operands to the resolved signature types. But Calcite
+    // simplifications (RexUtil.pullFactors and RexUtil.toCnf in CoerceNodes) can
+    // collapse an AND or OR into one of its operands. A NULL typed operand would
+    // then change the type of the expression to NULL. This happens with
+    // "FALSE || NULL", since the || operator does not infer operand types like the
+    // OR operator does.
+    if (castedOperandsCall.getKind() == SqlKind.AND ||
+        castedOperandsCall.getKind() == SqlKind.OR) {
+      castedOperandsCall = castNullOperands(castedOperandsCall);
+    }
+
     // Certain operators will never need casting for their operands.
     if (!isCastingNeeded(castedOperandsCall)) {
       return castedOperandsCall;
@@ -388,6 +401,22 @@ public class CoerceOperandShuttle extends RexShuttle {
       default:
         return true;
     }
+  }
+
+  /**
+   * Casts the NULL typed operands of the call to the return type of the call.
+   * Returns the original call if there are no NULL typed operands.
+   */
+  private RexCall castNullOperands(RexCall call) {
+    List<RexNode> newOperands = new ArrayList<>();
+    for (RexNode operand : call.getOperands()) {
+      newOperands.add(SqlTypeUtil.isNull(operand.getType())
+          ? rexBuilder.makeCast(call.getType(), operand)
+          : operand);
+    }
+    return newOperands.equals(call.getOperands())
+        ? call
+        : (RexCall) rexBuilder.makeCall(call.getType(), call.getOperator(), newOperands);
   }
 
   private static boolean isCaseFunction(Function fn) {

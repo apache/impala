@@ -1708,3 +1708,21 @@ TINYINT
 ---- RUNTIME_PROFILE
 row_regex: PlannerType: CalcitePlanner
 ====
+---- QUERY
+# IMPALA-15399: arithmetic on NULL operands returns DOUBLE (INT for DIV), and ||
+# between BOOLEAN or NULL operands returns BOOLEAN.
+select NULL * NULL, NULL + NULL, NULL / NULL, NULL % NULL, NULL DIV NULL,
+       FALSE || NULL, NULL || NULL
+---- RESULTS
+NULL,NULL,NULL,NULL,NULL,NULL,NULL
+---- TYPES
+DOUBLE,DOUBLE,DOUBLE,DOUBLE,INT,BOOLEAN,BOOLEAN
+====
+---- QUERY
+# IMPALA-15399: & on NULL operands returns INT, like the original planner.
+select NULL & NULL, NULL & 1, cast(1 as bigint) & 1, 12 & 10
+---- RESULTS
+NULL,NULL,1,8
+---- TYPES
+INT,TINYINT,BIGINT,TINYINT
+====

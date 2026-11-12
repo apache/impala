@@ -32,6 +32,7 @@ import org.apache.calcite.sql.fun.ImpalaSqlDatetimePlusOperator;
 import org.apache.calcite.sql.fun.SqlCountAggFunction;
 import org.apache.calcite.sql.fun.SqlLibraryOperators;
 import org.apache.calcite.sql.fun.SqlMonotonicBinaryOperator;
+import org.apache.calcite.sql.fun.SqlStdOperatorTable;
 import org.apache.calcite.sql.type.InferTypes;
 import org.apache.calcite.sql.type.OperandTypes;
 import org.apache.calcite.sql.type.ReturnTypes;
@@ -127,6 +128,13 @@ public class ImpalaCustomOperatorTable extends ReflectiveSqlOperatorTable {
   public static final SqlReturnTypeInference INT_DIV_ADJUSTED_RETURN_TYPE_NULLABLE =
       INT_DIV_ADJUSTED_RETURN_TYPE.andThen(SqlTypeTransforms.TO_NULLABLE);
 
+  public static final SqlReturnTypeInference BITAND_ADJUSTED_RETURN_TYPE = opBinding -> {
+    return inferReturnTypeForArithmeticOps(opBinding, ArithmeticExpr.Operator.BITAND);
+  };
+
+  public static final SqlReturnTypeInference BITAND_ADJUSTED_RETURN_TYPE_NULLABLE =
+      BITAND_ADJUSTED_RETURN_TYPE.andThen(SqlTypeTransforms.TO_NULLABLE);
+
 
   public static final SqlReturnTypeInference MOD_ADJUSTED_RETURN_TYPE_NULLABLE =
       MOD_ADJUSTED_RETURN_TYPE.andThen(SqlTypeTransforms.TO_NULLABLE);
@@ -188,6 +196,18 @@ public class ImpalaCustomOperatorTable extends ReflectiveSqlOperatorTable {
           INT_DIV_ADJUSTED_RETURN_TYPE_NULLABLE,
           InferTypes.FIRST_KNOWN,
           OperandTypes.DIVISION_OPERATOR);
+
+  // Same as Calcite's BITAND_OPERATOR, but with Impala's return type, which is INT
+  // when both operands are NULL.
+  public static final SqlBinaryOperator BITAND =
+      new SqlBinaryOperator(
+          "&",
+          SqlKind.BITAND,
+          50,
+          true,
+          BITAND_ADJUSTED_RETURN_TYPE_NULLABLE,
+          InferTypes.FIRST_KNOWN,
+          SqlStdOperatorTable.BITAND_OPERATOR.getOperandTypeChecker());
 
   public static final SqlPostfixOperator FACTORIAL =
       new SqlPostfixOperator(
