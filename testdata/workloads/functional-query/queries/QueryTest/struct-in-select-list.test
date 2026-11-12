@@ -619,3 +619,42 @@ order by 3
 ---- CATCH
 AnalysisException: ORDER BY: ordinal exceeds the number of items in the SELECT list: 3
 ====
+---- QUERY
+# A predicate on a struct member that is evaluated in an outer join node on rows where
+# the whole tuple that contains the struct is NULL. The hash predicate never matches, so
+# all build rows are returned as unmatched build rows with a NULL probe tuple. Codegen
+# used to dereference the NULL tuple for struct members. The struct has to be in the
+# select list too, otherwise its members are not placed in a separate struct tuple.
+select b.id, p.small_struct
+from complextypes_structs p
+right outer join complextypes_structs b on p.id + 100 = b.id
+where b.id = 2 or p.small_struct.s like '%abc%';
+---- RESULTS: VERIFY_IS_EQUAL_SORTED
+2,'NULL'
+---- TYPES
+INT,STRING
+====
+---- QUERY
+# Same as above, but with a mix of matched and unmatched build rows.
+select b.id, p.small_struct
+from complextypes_structs p
+right outer join complextypes_structs b on p.id = b.id + 1
+where b.id = 6 or p.small_struct.s like 'small%'
+---- RESULTS: VERIFY_IS_EQUAL_SORTED
+1,'{"i":19191,"s":"small_struct_str"}'
+6,'NULL'
+---- TYPES
+INT,STRING
+====
+---- QUERY
+# Same as the first query above, but the predicate is on a member with a simple type
+# (INT), which takes a different codegen path than the STRING member above.
+select b.id, p.small_struct
+from complextypes_structs p
+right outer join complextypes_structs b on p.id + 100 = b.id
+where b.id = 4 or p.small_struct.i > 0;
+---- RESULTS: VERIFY_IS_EQUAL_SORTED
+4,'NULL'
+---- TYPES
+INT,STRING
+====

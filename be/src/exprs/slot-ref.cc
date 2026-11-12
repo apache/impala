@@ -110,8 +110,9 @@ Status SlotRef::Init(
       return Status(error);
     }
     DCHECK(tuple_idx_ != RowDescriptor::INVALID_IDX);
-    tuple_is_nullable_ = slot_desc_->parent()->isTupleOfStructSlot() ?
-        false : row_desc.TupleIsNullable(tuple_idx_);
+    // For struct children 'tuple_idx_' refers to the master tuple, which can be NULL
+    // (e.g. the nullable side of an outer join), so it must be checked as well.
+    tuple_is_nullable_ = row_desc.TupleIsNullable(tuple_idx_);
     slot_offset_ = slot_desc_->tuple_offset();
     null_indicator_offset_ = slot_desc_->null_indicator_offset();
   }
