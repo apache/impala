@@ -24,7 +24,7 @@ import subprocess
 
 from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
 from tests.common.environ import build_flavor_timeout
-from tests.common.skip import SkipIfApacheHive
+from tests.common.skip import SkipIfApacheHive, SkipIfFS
 from tests.common.test_dimensions import create_exec_option_dimension
 from tests.util.filesystem_utils import FILESYSTEM_PREFIX
 from time import sleep
@@ -429,6 +429,7 @@ class TestHivePostgresJdbcTables(CustomClusterTestSuite):
   def setup_class(cls):
     super(TestHivePostgresJdbcTables, cls).setup_class()
 
+  @SkipIfFS.hive
   @pytest.mark.execute_serially
   def test_postgres_hive_jdbc_tables(self, vector, unique_database):
     """Run tests for external hive jdbc tables."""
@@ -592,6 +593,7 @@ class TestHivePostgresJdbcTables(CustomClusterTestSuite):
     self.run_test_case('QueryTest/hive-jdbc-postgres-tables', vector,
                        use_db=unique_database)
 
+  @SkipIfFS.hive
   def test_invalid_postgres_hive_jdbc_table(self, unique_database):
     """Negative tests for hive jdbc tables with postgres"""
 
@@ -701,6 +703,7 @@ class TestMySqlExtJdbcTables(CustomClusterTestSuite):
     """Run tests for external jdbc tables on MySQL"""
     self.run_test_case('QueryTest/mysql-ext-jdbc-tables', vector, use_db=unique_database)
 
+  @SkipIfFS.hive
   @pytest.mark.execute_serially
   def test_mysql_hive_jdbc_tables(self, vector, unique_database):
     """ Run tests for external hive jdbc tables on mysql"""
@@ -864,6 +867,7 @@ class TestMySqlExtJdbcTables(CustomClusterTestSuite):
     self.run_test_case('QueryTest/hive-jdbc-mysql-tables', vector,
                        use_db=unique_database)
 
+  @SkipIfFS.hive
   @pytest.mark.execute_serially
   def test_invalid_mysql_hive_jdbc_table_properties(self, unique_database):
     """Negative tests for hive jdbc tables with hive"""
