@@ -178,7 +178,10 @@ under the License.
               <codeph>ALTER TABLE ... CHANGE COLUMN</codeph> from <codeph>STRING</codeph> to
               <codeph>BINARY</codeph>; the on-disk bytes are unchanged. Alternatively, store
               sketches in <codeph>BINARY</codeph> columns, or wrap the column with
-              <codeph>CAST(sketch_col AS BINARY)</codeph> at the call site.</p></li>
+              <codeph>CAST(sketch_col AS BINARY)</codeph> at the call site.</p>
+            <p>See
+              <xref href="impala_datasketches_functions.xml#datasketches_functions"/>.
+            </p></li>
           <li rev="IMPALA-15218">Impala no longer loads JAR files for JDBC tables or
             external data sources from arbitrary locations.
             <p>Impala loads a JAR file from the <codeph>driver.url</codeph> table property

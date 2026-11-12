@@ -10901,6 +10901,7 @@ under the License.
   <keydef href="topics/impala_variance.xml" keys="variance"/>
 
   <keydef href="topics/impala_analytic_functions.xml" keys="analytic_functions"/>
+  <keydef href="topics/impala_datasketches_functions.xml" keys="datasketches_functions"/>
   <keydef href="topics/impala_analytic_functions.xml#over" keys="over"/>
   <keydef href="topics/impala_analytic_functions.xml#window_clause" keys="window_clause"/>
   <keydef href="topics/impala_analytic_functions.xml#avg_analytic" keys="avg_analytic"/>

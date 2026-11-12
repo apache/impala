@@ -1,0 +1,870 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+Licensed to the Apache Software Foundation (ASF) under one
+or more contributor license agreements.  See the NOTICE file
+distributed with this work for additional information
+regarding copyright ownership.  The ASF licenses this file
+to you under the Apache License, Version 2.0 (the
+"License"); you may not use this file except in compliance
+with the License.  You may obtain a copy of the License at
+
+  http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing,
+software distributed under the License is distributed on an
+"AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+KIND, either express or implied.  See the License for the
+specific language governing permissions and limitations
+under the License.
+-->
+<!DOCTYPE concept PUBLIC "-//OASIS//DTD DITA Concept//EN" "concept.dtd">
+<concept id="datasketches_functions">
+
+  <title>Impala DataSketches Functions</title>
+
+  <titlealts audience="PDF">
+
+    <navtitle>DataSketches Functions</navtitle>
+
+  </titlealts>
+
+  <prolog>
+    <metadata>
+      <data name="Category" value="Impala"/>
+      <data name="Category" value="Impala Functions"/>
+      <data name="Category" value="SQL"/>
+      <data name="Category" value="Aggregate Functions"/>
+      <data name="Category" value="Data Analysts"/>
+      <data name="Category" value="Developers"/>
+      <data name="Category" value="Querying"/>
+    </metadata>
+  </prolog>
+
+  <conbody>
+
+    <p>
+      <indexterm audience="hidden">DataSketches functions</indexterm> The DataSketches
+      functions estimate distinct counts and quantiles from sketches, which are compact
+      summaries of the data. For example, you can store one sketch for each day in a
+      table and merge the sketches later to estimate the distinct values of a month. The
+      functions use the
+      <xref href="https://datasketches.apache.org/" scope="external" format="html">Apache
+      DataSketches</xref> library.
+    </p>
+
+    <p>
+      A sketch is a <codeph>BINARY</codeph> value. The functions return and accept
+      sketches as <codeph>BINARY</codeph>, and you store them in <codeph>BINARY</codeph>
+      columns. See <xref href="impala_binary.xml#binary"/>.
+    </p>
+
+    <p>
+      The following table lists the supported sketch types.
+    </p>
+
+    <table id="ds_sketch_types">
+      <tgroup cols="3">
+        <colspec colname="1" colwidth="1*"/>
+        <colspec colname="2" colwidth="1*"/>
+        <colspec colname="3" colwidth="4*"/>
+        <thead>
+          <row>
+            <entry>Sketch type</entry>
+            <entry>Function prefix</entry>
+            <entry>Purpose</entry>
+          </row>
+        </thead>
+        <tbody>
+          <row>
+            <entry>HLL</entry>
+            <entry><codeph>ds_hll_</codeph></entry>
+            <entry>Distinct count.</entry>
+          </row>
+          <row>
+            <entry>CPC</entry>
+            <entry><codeph>ds_cpc_</codeph></entry>
+            <entry>Distinct count. Smaller than an HLL sketch of the same
+              accuracy.</entry>
+          </row>
+          <row>
+            <entry>Theta</entry>
+            <entry><codeph>ds_theta_</codeph></entry>
+            <entry>Distinct count with set operations: union, intersection, and
+              difference.</entry>
+          </row>
+          <row>
+            <entry>KLL</entry>
+            <entry><codeph>ds_kll_</codeph></entry>
+            <entry>Quantiles, ranks, and distribution of <codeph>FLOAT</codeph>
+              values.</entry>
+          </row>
+        </tbody>
+      </tgroup>
+    </table>
+
+    <p conref="../shared/impala_common.xml#common/usage_notes_blurb"/>
+
+    <p rev="5.0.0 IMPALA-9821">
+      Before <keyword keyref="impala50"/>, sketches were <codeph>STRING</codeph> values.
+      A query that passes a <codeph>STRING</codeph> sketch fails with a
+      <codeph>No matching function</codeph> error. To migrate, see
+      <xref href="impala_incompatible_changes.xml#incompatible_changes_500x"/>.
+    </p>
+
+    <p>
+      You can read the <codeph>BINARY</codeph> sketches that Hive writes and merge them
+      with the sketches that Impala creates. The exception is HLL and CPC sketches of
+      <codeph>STRING</codeph> values. Impala and Hive hash these strings differently, so
+      a merged sketch counts the same string twice. For a compatible sketch, use
+      <codeph>CAST(<varname>col</varname> AS BINARY)</codeph> in Hive.
+    </p>
+
+    <p conref="../shared/impala_common.xml#common/example_blurb"/>
+
+<codeblock>-- Store one HLL sketch of the visitors for each day.
+CREATE TABLE visitor_sketches (visit_date DATE, visitors BINARY)
+  STORED AS PARQUET;
+INSERT INTO visitor_sketches
+  SELECT visit_date, ds_hll_sketch(user_id) FROM visits GROUP BY visit_date;
+
+-- Estimate the distinct visitors for each day.
+SELECT visit_date, ds_hll_estimate(visitors) FROM visitor_sketches;
+
+-- Merge the sketches to estimate the distinct visitors for all days.
+SELECT ds_hll_estimate(ds_hll_union(visitors)) FROM visitor_sketches;
+
+-- Estimate the median of a column.
+SELECT ds_kll_quantile(ds_kll_sketch(CAST(price AS FLOAT)), 0.5) FROM sales;
+</codeblock>
+
+    <section id="ds_aggregate_functions">
+
+      <title>Aggregate Functions</title>
+
+      <p>
+        The aggregate functions create a sketch or an estimate from the values of a
+        group, or merge the sketches of a group. They ignore <codeph>NULL</codeph>
+        values, and the HLL, CPC, and Theta functions also ignore empty strings. Unless
+        stated otherwise, a function returns <codeph>NULL</codeph> for a group without
+        other values.
+      </p>
+
+      <p>
+        Impala supports the following DataSketches aggregate functions:
+      </p>
+
+      <ul>
+        <li>
+          <xref href="#datasketches_functions/ds_cpc_sketch">DS_CPC_SKETCH</xref>
+        </li>
+
+        <li>
+          <xref href="#datasketches_functions/ds_cpc_sketch_and_estimate"
+            >DS_CPC_SKETCH_AND_ESTIMATE</xref>
+        </li>
+
+        <li>
+          <xref href="#datasketches_functions/ds_cpc_union">DS_CPC_UNION</xref>
+        </li>
+
+        <li>
+          <xref href="#datasketches_functions/ds_hll_sketch">DS_HLL_SKETCH</xref>
+        </li>
+
+        <li>
+          <xref href="#datasketches_functions/ds_hll_sketch_and_estimate"
+            >DS_HLL_SKETCH_AND_ESTIMATE</xref>
+        </li>
+
+        <li>
+          <xref href="#datasketches_functions/ds_hll_union">DS_HLL_UNION</xref>
+        </li>
+
+        <li>
+          <xref href="#datasketches_functions/ds_kll_sketch">DS_KLL_SKETCH</xref>
+        </li>
+
+        <li>
+          <xref href="#datasketches_functions/ds_kll_union">DS_KLL_UNION</xref>
+        </li>
+
+        <li>
+          <xref href="#datasketches_functions/ds_theta_intersect"
+            >DS_THETA_INTERSECT</xref>
+        </li>
+
+        <li>
+          <xref href="#datasketches_functions/ds_theta_sketch">DS_THETA_SKETCH</xref>
+        </li>
+
+        <li>
+          <xref href="#datasketches_functions/ds_theta_sketch_and_estimate"
+            >DS_THETA_SKETCH_AND_ESTIMATE</xref>
+        </li>
+
+        <li>
+          <xref href="#datasketches_functions/ds_theta_union">DS_THETA_UNION</xref>
+        </li>
+      </ul>
+
+      <dl>
+        <dlentry id="ds_cpc_sketch">
+
+          <dt>
+            DS_CPC_SKETCH(type a)
+          </dt>
+
+          <dd>
+            <b>Purpose:</b> Creates a CPC sketch of the values of
+            <codeph><varname>a</varname></codeph>.
+            <p id="ds_sketch_argument_types">
+              <b>Argument type:</b> <codeph>TINYINT</codeph>, <codeph>INT</codeph>,
+              <codeph>BIGINT</codeph>, <codeph>FLOAT</codeph>, <codeph>DOUBLE</codeph>, or
+              <codeph>STRING</codeph>. You must cast other types, for example
+              <codeph>SMALLINT</codeph>, <codeph>DECIMAL</codeph>, or
+              <codeph>DATE</codeph>, to one of these types.
+            </p>
+
+            <p>
+              <b>Return type:</b> <codeph>BINARY</codeph>
+            </p>
+          </dd>
+
+        </dlentry>
+
+        <dlentry id="ds_cpc_sketch_and_estimate">
+
+          <dt>
+            DS_CPC_SKETCH_AND_ESTIMATE(type a)
+          </dt>
+
+          <dd>
+            <b>Purpose:</b> Returns the distinct count estimate of the values of
+            <codeph><varname>a</varname></codeph>, computed with a CPC sketch.
+            <p conref="#datasketches_functions/ds_sketch_argument_types"/>
+
+            <p>
+              <b>Return type:</b> <codeph>BIGINT</codeph>
+            </p>
+          </dd>
+
+        </dlentry>
+
+        <dlentry id="ds_cpc_union">
+
+          <dt>
+            DS_CPC_UNION(BINARY sketch)
+          </dt>
+
+          <dd>
+            <b>Purpose:</b> Merges the CPC sketches of the group into one sketch.
+            <p>
+              <b>Return type:</b> <codeph>BINARY</codeph>
+            </p>
+          </dd>
+
+        </dlentry>
+
+        <dlentry id="ds_hll_sketch">
+
+          <dt>
+            DS_HLL_SKETCH(type a)
+          </dt>
+
+          <dd>
+            <b>Purpose:</b> Creates an HLL sketch of the values of
+            <codeph><varname>a</varname></codeph>.
+            <p conref="#datasketches_functions/ds_sketch_argument_types"/>
+
+            <p>
+              <b>Return type:</b> <codeph>BINARY</codeph>
+            </p>
+          </dd>
+
+        </dlentry>
+
+        <dlentry id="ds_hll_sketch_and_estimate">
+
+          <dt>
+            DS_HLL_SKETCH_AND_ESTIMATE(type a)
+          </dt>
+
+          <dd>
+            <b>Purpose:</b> Returns the distinct count estimate of the values of
+            <codeph><varname>a</varname></codeph>, computed with an HLL sketch.
+            <p conref="#datasketches_functions/ds_sketch_argument_types"/>
+
+            <p>
+              <b>Return type:</b> <codeph>BIGINT</codeph>
+            </p>
+          </dd>
+
+        </dlentry>
+
+        <dlentry id="ds_hll_union">
+
+          <dt>
+            DS_HLL_UNION(BINARY sketch)
+          </dt>
+
+          <dd>
+            <b>Purpose:</b> Merges the HLL sketches of the group into one sketch.
+            <p>
+              <b>Return type:</b> <codeph>BINARY</codeph>
+            </p>
+          </dd>
+
+        </dlentry>
+
+        <dlentry id="ds_kll_sketch">
+
+          <dt>
+            DS_KLL_SKETCH(FLOAT a)
+          </dt>
+
+          <dd>
+            <b>Purpose:</b> Creates a KLL sketch of the values of
+            <codeph><varname>a</varname></codeph>.
+            <p>
+              <b>Return type:</b> <codeph>BINARY</codeph>
+            </p>
+
+            <p>
+              <b>Usage notes:</b> The function also accepts integer types. You must cast
+              <codeph>DOUBLE</codeph> values to <codeph>FLOAT</codeph>.
+            </p>
+          </dd>
+
+        </dlentry>
+
+        <dlentry id="ds_kll_union">
+
+          <dt>
+            DS_KLL_UNION(BINARY sketch)
+          </dt>
+
+          <dd>
+            <b>Purpose:</b> Merges the KLL sketches of the group into one sketch.
+            <p>
+              <b>Return type:</b> <codeph>BINARY</codeph>
+            </p>
+          </dd>
+
+        </dlentry>
+
+        <dlentry id="ds_theta_intersect">
+
+          <dt>
+            DS_THETA_INTERSECT(BINARY sketch)
+          </dt>
+
+          <dd>
+            <b>Purpose:</b> Returns a Theta sketch of the values that are in every sketch
+            of the group.
+            <p>
+              <b>Return type:</b> <codeph>BINARY</codeph>
+            </p>
+          </dd>
+
+        </dlentry>
+
+        <dlentry id="ds_theta_sketch">
+
+          <dt>
+            DS_THETA_SKETCH(type a)
+          </dt>
+
+          <dd>
+            <b>Purpose:</b> Creates a Theta sketch of the values of
+            <codeph><varname>a</varname></codeph>.
+            <p conref="#datasketches_functions/ds_sketch_argument_types"/>
+
+            <p>
+              <b>Return type:</b> <codeph>BINARY</codeph>
+            </p>
+
+            <p>
+              <b>Usage notes:</b> Returns an empty sketch, not <codeph>NULL</codeph>, for
+              a group without values.
+            </p>
+          </dd>
+
+        </dlentry>
+
+        <dlentry id="ds_theta_sketch_and_estimate">
+
+          <dt>
+            DS_THETA_SKETCH_AND_ESTIMATE(type a)
+          </dt>
+
+          <dd>
+            <b>Purpose:</b> Returns the distinct count estimate of the values of
+            <codeph><varname>a</varname></codeph>, computed with a Theta sketch.
+            <p conref="#datasketches_functions/ds_sketch_argument_types"/>
+
+            <p>
+              <b>Return type:</b> <codeph>BIGINT</codeph>
+            </p>
+
+            <p>
+              <b>Usage notes:</b> Returns 0, not <codeph>NULL</codeph>, for a group
+              without values.
+            </p>
+          </dd>
+
+        </dlentry>
+
+        <dlentry id="ds_theta_union">
+
+          <dt>
+            DS_THETA_UNION(BINARY sketch)
+          </dt>
+
+          <dd>
+            <b>Purpose:</b> Merges the Theta sketches of the group into one sketch.
+            <p>
+              <b>Return type:</b> <codeph>BINARY</codeph>
+            </p>
+          </dd>
+
+        </dlentry>
+
+      </dl>
+
+    </section>
+
+    <section id="ds_scalar_functions">
+
+      <title>Scalar Functions</title>
+
+      <p>
+        The scalar functions read and combine sketches. Unless stated otherwise, a
+        function that takes one sketch returns <codeph>NULL</codeph> for a
+        <codeph>NULL</codeph> sketch. The query fails if a value is not a sketch of the
+        expected type.
+      </p>
+
+      <p>
+        Impala supports the following DataSketches scalar functions:
+      </p>
+
+      <ul>
+        <li>
+          <xref href="#datasketches_functions/ds_cpc_estimate">DS_CPC_ESTIMATE</xref>
+        </li>
+
+        <li>
+          <xref href="#datasketches_functions/ds_cpc_stringify">DS_CPC_STRINGIFY</xref>
+        </li>
+
+        <li>
+          <xref href="#datasketches_functions/ds_cpc_union_f">DS_CPC_UNION_F</xref>
+        </li>
+
+        <li>
+          <xref href="#datasketches_functions/ds_hll_estimate">DS_HLL_ESTIMATE</xref>
+        </li>
+
+        <li>
+          <xref href="#datasketches_functions/ds_hll_estimate_bounds_as_string"
+            >DS_HLL_ESTIMATE_BOUNDS_AS_STRING</xref>
+        </li>
+
+        <li>
+          <xref href="#datasketches_functions/ds_hll_stringify">DS_HLL_STRINGIFY</xref>
+        </li>
+
+        <li>
+          <xref href="#datasketches_functions/ds_hll_union_f">DS_HLL_UNION_F</xref>
+        </li>
+
+        <li>
+          <xref href="#datasketches_functions/ds_kll_cdf_as_string"
+            >DS_KLL_CDF_AS_STRING</xref>
+        </li>
+
+        <li>
+          <xref href="#datasketches_functions/ds_kll_n">DS_KLL_N</xref>
+        </li>
+
+        <li>
+          <xref href="#datasketches_functions/ds_kll_pmf_as_string"
+            >DS_KLL_PMF_AS_STRING</xref>
+        </li>
+
+        <li>
+          <xref href="#datasketches_functions/ds_kll_quantile">DS_KLL_QUANTILE</xref>
+        </li>
+
+        <li>
+          <xref href="#datasketches_functions/ds_kll_quantiles_as_string"
+            >DS_KLL_QUANTILES_AS_STRING</xref>
+        </li>
+
+        <li>
+          <xref href="#datasketches_functions/ds_kll_rank">DS_KLL_RANK</xref>
+        </li>
+
+        <li>
+          <xref href="#datasketches_functions/ds_kll_stringify">DS_KLL_STRINGIFY</xref>
+        </li>
+
+        <li>
+          <xref href="#datasketches_functions/ds_theta_estimate">DS_THETA_ESTIMATE</xref>
+        </li>
+
+        <li>
+          <xref href="#datasketches_functions/ds_theta_exclude">DS_THETA_EXCLUDE</xref>
+        </li>
+
+        <li>
+          <xref href="#datasketches_functions/ds_theta_intersect_f"
+            >DS_THETA_INTERSECT_F</xref>
+        </li>
+
+        <li>
+          <xref href="#datasketches_functions/ds_theta_union_f">DS_THETA_UNION_F</xref>
+        </li>
+      </ul>
+
+      <dl>
+        <dlentry id="ds_cpc_estimate">
+
+          <dt>
+            DS_CPC_ESTIMATE(BINARY sketch)
+          </dt>
+
+          <dd>
+            <b>Purpose:</b> Returns the distinct count estimate of a CPC sketch.
+            <p>
+              <b>Return type:</b> <codeph>BIGINT</codeph>
+            </p>
+          </dd>
+
+        </dlentry>
+
+        <dlentry id="ds_cpc_stringify">
+
+          <dt>
+            DS_CPC_STRINGIFY(BINARY sketch)
+          </dt>
+
+          <dd>
+            <b>Purpose:</b> Returns a readable summary of a CPC sketch.
+            <p>
+              <b>Return type:</b> <codeph>STRING</codeph>
+            </p>
+          </dd>
+
+        </dlentry>
+
+        <dlentry id="ds_cpc_union_f">
+
+          <dt>
+            DS_CPC_UNION_F(BINARY sketch1, BINARY sketch2)
+          </dt>
+
+          <dd>
+            <b>Purpose:</b> Merges two CPC sketches into one sketch.
+            <p>
+              <b>Return type:</b> <codeph>BINARY</codeph>
+            </p>
+
+            <p>
+              <b>Usage notes:</b> Ignores a <codeph>NULL</codeph> argument. Returns an
+              empty sketch if both arguments are <codeph>NULL</codeph>.
+            </p>
+          </dd>
+
+        </dlentry>
+
+        <dlentry id="ds_hll_estimate">
+
+          <dt>
+            DS_HLL_ESTIMATE(BINARY sketch)
+          </dt>
+
+          <dd>
+            <b>Purpose:</b> Returns the distinct count estimate of an HLL sketch.
+            <p>
+              <b>Return type:</b> <codeph>BIGINT</codeph>
+            </p>
+          </dd>
+
+        </dlentry>
+
+        <dlentry id="ds_hll_estimate_bounds_as_string">
+
+          <dt>
+            DS_HLL_ESTIMATE_BOUNDS_AS_STRING(BINARY sketch [, INT kappa])
+          </dt>
+
+          <dd>
+            <b>Purpose:</b> Returns the distinct count estimate of an HLL sketch with its
+            lower and upper bounds, as a comma-separated string.
+            <codeph><varname>kappa</varname></codeph> is the number of standard deviations
+            of the bounds: <codeph>1</codeph>, <codeph>2</codeph> (default), or
+            <codeph>3</codeph>.
+            <p>
+              <b>Return type:</b> <codeph>STRING</codeph>
+            </p>
+          </dd>
+
+        </dlentry>
+
+        <dlentry id="ds_hll_stringify">
+
+          <dt>
+            DS_HLL_STRINGIFY(BINARY sketch)
+          </dt>
+
+          <dd>
+            <b>Purpose:</b> Returns a readable summary of an HLL sketch.
+            <p>
+              <b>Return type:</b> <codeph>STRING</codeph>
+            </p>
+          </dd>
+
+        </dlentry>
+
+        <dlentry id="ds_hll_union_f">
+
+          <dt>
+            DS_HLL_UNION_F(BINARY sketch1, BINARY sketch2)
+          </dt>
+
+          <dd>
+            <b>Purpose:</b> Merges two HLL sketches into one sketch.
+            <p>
+              <b>Return type:</b> <codeph>BINARY</codeph>
+            </p>
+
+            <p>
+              <b>Usage notes:</b> Ignores a <codeph>NULL</codeph> argument. Returns an
+              empty sketch if both arguments are <codeph>NULL</codeph>.
+            </p>
+          </dd>
+
+        </dlentry>
+
+        <dlentry id="ds_kll_cdf_as_string">
+
+          <dt>
+            DS_KLL_CDF_AS_STRING(BINARY sketch, FLOAT split_point
+            [, FLOAT split_point ...])
+          </dt>
+
+          <dd>
+            <b>Purpose:</b> Returns the fraction of the values in a KLL sketch that are
+            below each split point, as a comma-separated string. The last element is the
+            fraction of all the values, which is 1.
+            <p>
+              <b>Return type:</b> <codeph>STRING</codeph>
+            </p>
+
+            <p>
+              <b>Usage notes:</b> You must specify unique split points in increasing
+              order.
+            </p>
+          </dd>
+
+        </dlentry>
+
+        <dlentry id="ds_kll_n">
+
+          <dt>
+            DS_KLL_N(BINARY sketch)
+          </dt>
+
+          <dd>
+            <b>Purpose:</b> Returns the number of values that a KLL sketch was created
+            from.
+            <p>
+              <b>Return type:</b> <codeph>BIGINT</codeph>
+            </p>
+          </dd>
+
+        </dlentry>
+
+        <dlentry id="ds_kll_pmf_as_string">
+
+          <dt>
+            DS_KLL_PMF_AS_STRING(BINARY sketch, FLOAT split_point
+            [, FLOAT split_point ...])
+          </dt>
+
+          <dd>
+            <b>Purpose:</b> Divides the values of a KLL sketch into ranges at the split
+            points and returns the fraction of the values in each range, as a
+            comma-separated string. For example, the split points <codeph>1.0</codeph> and
+            <codeph>3.5</codeph> create the ranges below 1.0, from 1.0 to 3.5, and from
+            3.5.
+            <p>
+              <b>Return type:</b> <codeph>STRING</codeph>
+            </p>
+
+            <p>
+              <b>Usage notes:</b> You must specify unique split points in increasing
+              order.
+            </p>
+          </dd>
+
+        </dlentry>
+
+        <dlentry id="ds_kll_quantile">
+
+          <dt>
+            DS_KLL_QUANTILE(BINARY sketch, DOUBLE rank)
+          </dt>
+
+          <dd>
+            <b>Purpose:</b> Returns the value at <codeph><varname>rank</varname></codeph>
+            in a KLL sketch. <codeph><varname>rank</varname></codeph> is between 0 and 1.
+            For example, <codeph>0.5</codeph> returns the median.
+            <p>
+              <b>Return type:</b> <codeph>FLOAT</codeph>
+            </p>
+          </dd>
+
+        </dlentry>
+
+        <dlentry id="ds_kll_quantiles_as_string">
+
+          <dt>
+            DS_KLL_QUANTILES_AS_STRING(BINARY sketch, DOUBLE rank [, DOUBLE rank ...])
+          </dt>
+
+          <dd>
+            <b>Purpose:</b> Returns the values at the given ranks in a KLL sketch, as a
+            comma-separated string.
+            <p>
+              <b>Return type:</b> <codeph>STRING</codeph>
+            </p>
+          </dd>
+
+        </dlentry>
+
+        <dlentry id="ds_kll_rank">
+
+          <dt>
+            DS_KLL_RANK(BINARY sketch, FLOAT value)
+          </dt>
+
+          <dd>
+            <b>Purpose:</b> Returns the fraction of the values in a KLL sketch that are
+            less than <codeph><varname>value</varname></codeph>, as a number between 0 and
+            1.
+            <p>
+              <b>Return type:</b> <codeph>DOUBLE</codeph>
+            </p>
+          </dd>
+
+        </dlentry>
+
+        <dlentry id="ds_kll_stringify">
+
+          <dt>
+            DS_KLL_STRINGIFY(BINARY sketch)
+          </dt>
+
+          <dd>
+            <b>Purpose:</b> Returns a readable summary of a KLL sketch.
+            <p>
+              <b>Return type:</b> <codeph>STRING</codeph>
+            </p>
+          </dd>
+
+        </dlentry>
+
+        <dlentry id="ds_theta_estimate">
+
+          <dt>
+            DS_THETA_ESTIMATE(BINARY sketch)
+          </dt>
+
+          <dd>
+            <b>Purpose:</b> Returns the distinct count estimate of a Theta sketch.
+            <p>
+              <b>Return type:</b> <codeph>BIGINT</codeph>
+            </p>
+
+            <p>
+              <b>Usage notes:</b> Returns 0, not <codeph>NULL</codeph>, for a
+              <codeph>NULL</codeph> sketch.
+            </p>
+          </dd>
+
+        </dlentry>
+
+        <dlentry id="ds_theta_exclude">
+
+          <dt>
+            DS_THETA_EXCLUDE(BINARY sketch1, BINARY sketch2)
+          </dt>
+
+          <dd>
+            <b>Purpose:</b> Returns a Theta sketch of the values that are in
+            <codeph><varname>sketch1</varname></codeph> but not in
+            <codeph><varname>sketch2</varname></codeph>.
+            <p>
+              <b>Return type:</b> <codeph>BINARY</codeph>
+            </p>
+
+            <p>
+              <b>Usage notes:</b> Returns <codeph>NULL</codeph> if
+              <codeph><varname>sketch1</varname></codeph> is <codeph>NULL</codeph>, and
+              <codeph><varname>sketch1</varname></codeph> if
+              <codeph><varname>sketch2</varname></codeph> is <codeph>NULL</codeph>.
+            </p>
+          </dd>
+
+        </dlentry>
+
+        <dlentry id="ds_theta_intersect_f">
+
+          <dt>
+            DS_THETA_INTERSECT_F(BINARY sketch1, BINARY sketch2)
+          </dt>
+
+          <dd>
+            <b>Purpose:</b> Returns a Theta sketch of the values that are in both
+            sketches.
+            <p>
+              <b>Return type:</b> <codeph>BINARY</codeph>
+            </p>
+
+            <p>
+              <b>Usage notes:</b> Returns <codeph>NULL</codeph> if either argument is
+              <codeph>NULL</codeph>.
+            </p>
+          </dd>
+
+        </dlentry>
+
+        <dlentry id="ds_theta_union_f">
+
+          <dt>
+            DS_THETA_UNION_F(BINARY sketch1, BINARY sketch2)
+          </dt>
+
+          <dd>
+            <b>Purpose:</b> Merges two Theta sketches into one sketch.
+            <p>
+              <b>Return type:</b> <codeph>BINARY</codeph>
+            </p>
+
+            <p>
+              <b>Usage notes:</b> Ignores a <codeph>NULL</codeph> argument. Returns an
+              empty sketch if both arguments are <codeph>NULL</codeph>.
+            </p>
+          </dd>
+
+        </dlentry>
+
+      </dl>
+
+    </section>
+
+  </conbody>
+
+</concept>
