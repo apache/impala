@@ -707,6 +707,7 @@ public class IcebergCatalogOpExecutor {
     Map<Integer, Long> columnSizes = new HashMap<>();
     Map<Integer, Long> valueCounts = new HashMap<>();
     Map<Integer, Long> nullValueCounts = new HashMap<>();
+    Map<Integer, Long> nanValueCounts = new HashMap<>();
     Map<Integer, ByteBuffer> lowerBounds = new HashMap<>();
     Map<Integer, ByteBuffer> upperBounds = new HashMap<>();
     for (int i = 0; i < dataFile.perColumnStatsLength(); ++i) {
@@ -717,6 +718,8 @@ public class IcebergCatalogOpExecutor {
           columnSizes.put(fieldId, stats.totalCompressedByteSize());
           valueCounts.put(fieldId, stats.valueCount());
           nullValueCounts.put(fieldId, stats.nullCount());
+          // Only set for floating point columns.
+          if (stats.nanCount() >= 0) nanValueCounts.put(fieldId, stats.nanCount());
           if (stats.lowerBoundLength() > 0) {
             lowerBounds.put(fieldId, stats.lowerBoundAsByteBuffer());
           }
@@ -727,7 +730,8 @@ public class IcebergCatalogOpExecutor {
       }
     }
     return new Metrics(dataFile.recordCount(), columnSizes, valueCounts,
-        nullValueCounts, null, lowerBounds, upperBounds);
+        nullValueCounts, nanValueCounts.isEmpty() ? null : nanValueCounts, lowerBounds,
+        upperBounds);
   }
 
   private static void optimizeTable(FeIcebergTable feIcebergTable, Transaction txn,

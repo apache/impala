@@ -12,12 +12,12 @@ PLAN-ROOT SINK
 01:UNPIVOT
 |  source-exprs=functional_parquet.alltypestiny.id
 |  unpivot-data-exprs=functional_parquet.alltypestiny.year
-|  row-size=20B cardinality=190
+|  row-size=20B cardinality=191
 |
 00:SCAN HDFS [functional_parquet.alltypestiny]
    partition predicates: functional_parquet.alltypestiny.month = 1
-   HDFS partitions=1/4 files=1 size=2.99KB
-   row-size=12B cardinality=190
+   HDFS partitions=1/4 files=1 size=3.00KB
+   row-size=12B cardinality=191
 ====
 # The child node of the UNPIVOT node is a SCAN node.
 # The predicate should be evaluated in the UNPIVOT node.
@@ -34,11 +34,11 @@ PLAN-ROOT SINK
 |  source-exprs=functional_parquet.alltypestiny.id
 |  unpivot-data-exprs=functional_parquet.alltypestiny.month, functional_parquet.alltypestiny.year
 |  predicates: c = 1
-|  row-size=20B cardinality=1.52K
+|  row-size=20B cardinality=1.53K
 |
 00:SCAN HDFS [functional_parquet.alltypestiny]
-   HDFS partitions=4/4 files=4 size=11.96KB
-   row-size=12B cardinality=761
+   HDFS partitions=4/4 files=4 size=12.00KB
+   row-size=12B cardinality=763
 ====
 # The child node of the UNPIVOT node is a JOIN node.
 select t1.id, b, c, t2.id from functional_parquet.alltypestiny unpivot (
@@ -52,20 +52,20 @@ PLAN-ROOT SINK
 |
 03:HASH JOIN [INNER JOIN, BROADCAST]
 |  hash predicates: t1.c = t2.`month`
-|  row-size=28B cardinality=1.52K
+|  row-size=28B cardinality=1.53K
 |
 |--04:EXCHANGE [BROADCAST]
 |  |
 |  02:SCAN HDFS [functional_parquet.alltypestiny t2]
-|     HDFS partitions=4/4 files=4 size=11.96KB
-|     row-size=8B cardinality=761
+|     HDFS partitions=4/4 files=4 size=12.00KB
+|     row-size=8B cardinality=763
 |
 01:UNPIVOT
 |  source-exprs=functional_parquet.alltypestiny.id
 |  unpivot-data-exprs=functional_parquet.alltypestiny.month, functional_parquet.alltypestiny.year
-|  row-size=20B cardinality=1.52K
+|  row-size=20B cardinality=1.53K
 |
 00:SCAN HDFS [functional_parquet.alltypestiny]
-   HDFS partitions=4/4 files=4 size=11.96KB
-   row-size=12B cardinality=761
+   HDFS partitions=4/4 files=4 size=12.00KB
+   row-size=12B cardinality=763
 ====

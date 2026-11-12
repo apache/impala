@@ -272,7 +272,10 @@ class HdfsParquetTableWriter::BaseColumnWriter {
   }
 
   Status AddPageStatsToColumnIndex() {
-    if (!write_page_index_) return Status::OK();
+    // Invalid column indexes are not written. Pages that only have NaN and null values
+    // have no min and max values, but they are not null pages. They don't get here,
+    // because NaNs make the column index invalid (IMPALA-8498).
+    if (!write_page_index_ || !valid_column_index_) return Status::OK();
     parquet::Statistics page_stats;
     page_stats_base_->EncodeToThrift(&page_stats);
     // If pages_stats contains min_value and max_value, then append them to min_values_

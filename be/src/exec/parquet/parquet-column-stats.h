@@ -76,11 +76,19 @@ class ColumnStatsBase {
     }
   };
 
-  /// min and max functions for floating point types
+  /// min and max functions for floating point types. NaNs are ignored unless both
+  /// values are NaN. When -0.0 and 0.0 tie, the minimum is -0.0 and the maximum is 0.0,
+  /// so the bounds also follow Iceberg's total order.
   template <typename T>
   struct MinMaxTrait<T, std::enable_if_t<std::is_floating_point<T>::value>> {
-    static decltype(auto) MinValue(const T& a, const T& b) { return std::fmin(a, b); }
-    static decltype(auto) MaxValue(const T& a, const T& b) { return std::fmax(a, b); }
+    static T MinValue(const T& a, const T& b) {
+      if (a == b) return std::signbit(a) ? a : b;
+      return std::fmin(a, b);
+    }
+    static T MaxValue(const T& a, const T& b) {
+      if (a == b) return std::signbit(a) ? b : a;
+      return std::fmax(a, b);
+    }
     static int Compare(const T& a, const T& b) {
       //TODO: Should be aligned with PARQUET-1222, once resolved
       if (a == b) return 0;
@@ -90,7 +98,7 @@ class ColumnStatsBase {
     }
   };
 
-  ColumnStatsBase() : has_min_max_values_(false), null_count_(0) {}
+  ColumnStatsBase() : has_min_max_values_(false), null_count_(0), nan_count_(0) {}
   virtual ~ColumnStatsBase() {}
 
   /// Merges this statistics object with values from 'other'. If other has not been
@@ -110,11 +118,16 @@ class ColumnStatsBase {
   /// parquet::Statistics object.
   virtual int64_t BytesNeeded() const = 0;
 
-  /// Encodes the current values into a Statistics thrift message.
+  /// Encodes the current values into a Statistics thrift message. For floating point
+  /// types, it also sets nan_count, and leaves out the min and max values if all
+  /// non-null values are NaN. Zero min values are written as -0.0 and zero max values
+  /// as +0.0.
   virtual void EncodeToThrift(parquet::Statistics* out) const = 0;
 
   /// Writes the current values into IcebergColumnStats struct.
-  /// Min and max stats are Single-value serialized.
+  /// Min and max stats are Single-value serialized. For floating point types, it also
+  /// sets nan_count, and leaves out the min and max values if all non-null values are
+  /// NaN. For other types, nan_count is -1.
   virtual void GetIcebergStats(int64_t column_size, int64_t value_count,
                                IcebergColumnStats* out) const = 0;
 
@@ -149,6 +162,10 @@ class ColumnStatsBase {
 
   // Number of null values since the last call to Reset().
   int64_t null_count_;
+
+  // Number of NaN values since the last call to Reset(). Only counted for floating point
+  // types.
+  int64_t nan_count_;
 
   // If true, min/max values are ascending.
   // We assume the values are ascending, so start with true and only make it false when
@@ -200,8 +217,13 @@ class ColumnStats : public ColumnStatsBase {
   /// MaterializeStringValuesToInternalBuffers() gets called.
   void Update(const T& min_value, const T& max_value);
 
-  /// Wrapper to call the Update function which takes in the min_value and max_value.
-  void Update(const T& v) { Update(v, v); }
+  /// Updates the statistics with value 'v'. NaN values are also counted.
+  void Update(const T& v) {
+    if constexpr (std::is_floating_point<T>::value) {
+      if (UNLIKELY(std::isnan(v))) ++nan_count_;
+    }
+    Update(v, v);
+  }
 
   virtual void Merge(const ColumnStatsBase& other) override;
   virtual Status MaterializeStringValuesToInternalBuffers() override {
@@ -235,6 +257,11 @@ class ColumnStats : public ColumnStatsBase {
 
   /// Returns the number of bytes needed to encode value 'v'.
   int64_t BytesNeeded(const T& v) const;
+
+  /// Returns true if there are min and max values that can be written into Parquet
+  /// statistics and Iceberg metrics. Neither of them allows NaN min and max values, which
+  /// are only computed if all non-null values are NaN.
+  bool HasMinMaxValuesToWrite() const;
 
   // Size of each encoded value in plain encoding, -1 if the type is variable-length.
   int plain_encoded_value_size_;

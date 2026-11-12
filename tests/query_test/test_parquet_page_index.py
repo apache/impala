@@ -18,6 +18,7 @@
 # Targeted Impala insert tests
 
 from collections import namedtuple
+import math
 import os
 import random
 import string
@@ -507,6 +508,8 @@ class TestHdfsParquetTableIndexWriter(ImpalaTestSuite):
     """ IMPALA-7304: Impala doesn't write column index for floating-point columns
     until PARQUET-1222 is resolved. This is modified by:
     IMPALA-8498: Write column index for floating types when NaN is not present.
+    IMPALA-15794: The column statistics have NaN counts, and no min and max values if
+    all values are NaN.
     """
     for col_type in ["float", "double"]:
       nan_val = "(CAST('NaN' as " + col_type + "))"
@@ -519,6 +522,8 @@ class TestHdfsParquetTableIndexWriter(ImpalaTestSuite):
           tmpdir.join(no_nan_tbl))
       column = row_group_indexes[0][0]
       assert column.column_index is not None
+      assert column.stats.nan_count == 0
+      assert column.stats.min_value is not None
 
       # Table contains NaN as first value.
       first_nan_tbl = "first_nan_tbl_" + col_type
@@ -529,6 +534,8 @@ class TestHdfsParquetTableIndexWriter(ImpalaTestSuite):
           tmpdir.join(first_nan_tbl))
       column = row_group_indexes[0][0]
       assert column.column_index is None
+      assert column.stats.nan_count == 1
+      assert column.stats.min_value is not None
 
       # Table contains NaN as last value.
       last_nan_tbl = "last_nan_tbl_" + col_type
@@ -539,6 +546,8 @@ class TestHdfsParquetTableIndexWriter(ImpalaTestSuite):
           tmpdir.join(last_nan_tbl))
       column = row_group_indexes[0][0]
       assert column.column_index is None
+      assert column.stats.nan_count == 1
+      assert column.stats.min_value is not None
 
       # Table contains NaN value in the middle.
       mid_nan_tbl = "mid_nan_tbl_" + col_type
@@ -549,6 +558,8 @@ class TestHdfsParquetTableIndexWriter(ImpalaTestSuite):
           tmpdir.join(mid_nan_tbl))
       column = row_group_indexes[0][0]
       assert column.column_index is None
+      assert column.stats.nan_count == 1
+      assert column.stats.min_value is not None
 
       # Table contains only NaN values.
       only_nan_tbl = "only_nan_tbl_" + col_type
@@ -558,3 +569,32 @@ class TestHdfsParquetTableIndexWriter(ImpalaTestSuite):
           tmpdir.join(only_nan_tbl))
       column = row_group_indexes[0][0]
       assert column.column_index is None
+      assert column.stats.nan_count == 4
+      assert column.stats.min_value is None
+      assert column.stats.max_value is None
+
+  def test_signed_zeros_for_floating_types(self, vector, unique_database, tmpdir):
+    """IMPALA-15794: Any zero minimum is written as -0.0 and any zero maximum as 0.0,
+    both in the column index and in the column statistics."""
+    def assert_signed_zero(value, sign):
+      assert value == 0 and math.copysign(1, value) == sign
+
+    for col_type in ["float", "double"]:
+      neg_zero = "(CAST('-0' as " + col_type + "))"
+      for i, values in enumerate(
+          ["(0), " + neg_zero, neg_zero + ", (0)", "(0)", neg_zero]):
+        tbl = "signed_zeros_tbl_{0}_{1}".format(col_type, i)
+        hdfs_path = self._create_table_with_values_of_type(col_type, vector,
+            unique_database, tbl, values)
+        row_group_indexes = self._get_row_groups_from_hdfs_folder(hdfs_path,
+            tmpdir.join(tbl))
+        column = row_group_indexes[0][0]
+        column_index = column.column_index
+        assert column_index is not None
+        assert column_index.null_pages == [False]
+        assert column.stats.nan_count == 0
+        for min_value, max_value in [
+            (column_index.min_values[0], column_index.max_values[0]),
+            (column.stats.min_value, column.stats.max_value)]:
+          assert_signed_zero(decode_stats_value(column.schema, min_value), -1)
+          assert_signed_zero(decode_stats_value(column.schema, max_value), 1)

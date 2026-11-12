@@ -45,6 +45,8 @@ struct IcebergColumnStats {
   std::string max_binary;
   int64_t value_count;
   int64_t null_count;
+  // Number of NaN values for floating point columns, -1 for other columns.
+  int64_t nan_count;
   int64_t column_size;
 };
 

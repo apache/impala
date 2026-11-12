@@ -67,7 +67,8 @@ add_dependencies(ExecParquetTests gen-deps)
 
 ADD_UNIFIED_BE_LSAN_TEST(parquet-bool-decoder-test ParquetBoolDecoder.*)
 ADD_UNIFIED_BE_LSAN_TEST(parquet-byte-stream-split-test "ParquetByteStreamSplitDecoderTest.*:ParquetByteStreamSplitEncoderTest.*:ParquetByteStreamSplitCoderTest.*")
-ADD_UNIFIED_BE_LSAN_TEST(parquet-column-stats-test ParquetColumnStatsReaderTest.*)
+ADD_UNIFIED_BE_LSAN_TEST(parquet-column-stats-test
+  "ParquetColumnStatsReaderTest.*:ParquetColumnStatsTest.*")
 ADD_UNIFIED_BE_LSAN_TEST(parquet-common-test ParquetCommon.*)
 ADD_UNIFIED_BE_LSAN_TEST(parquet-delta-coder-test "ParquetDeltaEncoder.*:ParquetDeltaDecoder.*:ParquetDeltaCoder.*")
 ADD_UNIFIED_BE_LSAN_TEST(parquet-delta-length-byte-array-decoder-test "ParquetDeltaLengthByteArrayDecoderTest.*")

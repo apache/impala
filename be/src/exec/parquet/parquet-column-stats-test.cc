@@ -23,6 +23,8 @@
 #include "gen-cpp/parquet_types.h"
 #include "gutil/strings/substitute.h"
 #include "runtime/decimal-value.inline.h"
+#include "runtime/mem-pool.h"
+#include "runtime/mem-tracker.h"
 #include "runtime/types.h"
 #include "testutil/gtest-util.h"
 
@@ -226,6 +228,153 @@ TEST(ParquetColumnStatsReaderTest, WidenedIntAndFloat) {
       1024.125, 1.0e300};
   TestReadStats(PlainElement(parquet::Type::DOUBLE), ColumnType(TYPE_DOUBLE),
       EncodeStats(double_values), double_values);
+}
+
+/// Decodes 'binary', which is the plain encoding or the Iceberg single-value
+/// serialization of a value of type T. They are the same for the tested types.
+template <typename T>
+T DecodeValue(const string& binary) {
+  T value{};
+  EXPECT_EQ(sizeof(T), binary.size());
+  if (binary.size() == sizeof(T)) memcpy(&value, binary.data(), sizeof(T));
+  return value;
+}
+
+/// Returns the Iceberg stats of 'values', updating page stats with each value and merging
+/// them into the row group stats after every 'page_size' values, like the Parquet writer.
+/// Also returns the Parquet statistics in 'parquet_stats' if it is not null, and checks
+/// that they have the same NaN count and the same bounds, apart from the sign of zeros.
+template <typename T>
+IcebergColumnStats ComputeIcebergStats(const vector<T>& values, int page_size,
+    parquet::Statistics* parquet_stats = nullptr) {
+  MemTracker tracker;
+  MemPool pool(&tracker);
+  ColumnStats<T> page_stats(&pool, sizeof(T));
+  ColumnStats<T> row_group_stats(&pool, sizeof(T));
+  for (size_t i = 0; i < values.size(); ++i) {
+    page_stats.Update(values[i]);
+    if ((i + 1) % page_size == 0 || i + 1 == values.size()) {
+      row_group_stats.Merge(page_stats);
+      page_stats.Reset();
+    }
+  }
+  IcebergColumnStats result;
+  row_group_stats.GetIcebergStats(0, values.size(), &result);
+  parquet::Statistics local_parquet_stats;
+  if (parquet_stats == nullptr) parquet_stats = &local_parquet_stats;
+  *parquet_stats = parquet::Statistics();
+  row_group_stats.EncodeToThrift(parquet_stats);
+  EXPECT_EQ(result.has_min_max_values, parquet_stats->__isset.min_value);
+  EXPECT_EQ(result.has_min_max_values, parquet_stats->__isset.max_value);
+  if (result.has_min_max_values) {
+    EXPECT_EQ(
+        DecodeValue<T>(result.min_binary), DecodeValue<T>(parquet_stats->min_value));
+    EXPECT_EQ(
+        DecodeValue<T>(result.max_binary), DecodeValue<T>(parquet_stats->max_value));
+  }
+  EXPECT_EQ(std::is_floating_point<T>::value, parquet_stats->__isset.nan_count);
+  if (parquet_stats->__isset.nan_count) {
+    EXPECT_EQ(result.nan_count, parquet_stats->nan_count);
+  }
+  pool.FreeAll();
+  return result;
+}
+
+/// Checks that 'min_binary' and 'max_binary' are 'lower' and 'upper', including the sign
+/// of zeros.
+template <typename T>
+void ExpectBounds(const string& min_binary, const string& max_binary, T lower, T upper) {
+  T actual_lower = DecodeValue<T>(min_binary);
+  T actual_upper = DecodeValue<T>(max_binary);
+  EXPECT_EQ(lower, actual_lower);
+  EXPECT_EQ(std::signbit(lower), std::signbit(actual_lower));
+  EXPECT_EQ(upper, actual_upper);
+  EXPECT_EQ(std::signbit(upper), std::signbit(actual_upper));
+}
+
+/// Checks the Iceberg bounds in 'stats'.
+template <typename T>
+void ExpectBounds(const IcebergColumnStats& stats, T lower, T upper) {
+  ASSERT_TRUE(stats.has_min_max_values);
+  ExpectBounds<T>(stats.min_binary, stats.max_binary, lower, upper);
+}
+
+/// Checks the min and max values of the Parquet statistics 'stats'.
+template <typename T>
+void ExpectBounds(const parquet::Statistics& stats, T lower, T upper) {
+  ASSERT_TRUE(stats.__isset.min_value);
+  ASSERT_TRUE(stats.__isset.max_value);
+  ExpectBounds<T>(stats.min_value, stats.max_value, lower, upper);
+}
+
+/// IMPALA-15794: Iceberg requires NaN counts, no NaNs in the bounds, and bounds that
+/// order -0.0 before 0.0. Parquet statistics also have NaN counts and no NaN bounds, and
+/// they write any zero minimum as -0.0 and any zero maximum as +0.0.
+template <typename T>
+void TestIcebergStatsOfFloatingPoint() {
+  const T nan = std::numeric_limits<T>::quiet_NaN();
+  for (int page_size : {1, 2, 100}) {
+    SCOPED_TRACE(Substitute("page_size: $0", page_size));
+    parquet::Statistics parquet_stats;
+    IcebergColumnStats stats = ComputeIcebergStats<T>({1, nan}, page_size);
+    EXPECT_EQ(1, stats.nan_count);
+    ExpectBounds<T>(stats, 1, 1);
+
+    stats = ComputeIcebergStats<T>({nan, 5, nan, -2, nan}, page_size);
+    EXPECT_EQ(3, stats.nan_count);
+    ExpectBounds<T>(stats, -2, 5);
+
+    stats = ComputeIcebergStats<T>({-3, 0, -0.0}, page_size, &parquet_stats);
+    EXPECT_EQ(0, stats.nan_count);
+    ExpectBounds<T>(stats, -3, 0);
+    ExpectBounds<T>(parquet_stats, -3, 0);
+
+    stats = ComputeIcebergStats<T>({3, -0.0, 0}, page_size, &parquet_stats);
+    ExpectBounds<T>(stats, -0.0, 3);
+    ExpectBounds<T>(parquet_stats, -0.0, 3);
+
+    stats = ComputeIcebergStats<T>({0, -0.0}, page_size, &parquet_stats);
+    ExpectBounds<T>(stats, -0.0, 0);
+    ExpectBounds<T>(parquet_stats, -0.0, 0);
+
+    stats = ComputeIcebergStats<T>({-0.0, 0}, page_size, &parquet_stats);
+    ExpectBounds<T>(stats, -0.0, 0);
+    ExpectBounds<T>(parquet_stats, -0.0, 0);
+
+    // The Iceberg bounds keep the sign of zeros, the Parquet statistics don't.
+    stats = ComputeIcebergStats<T>({-1, -0.0}, page_size, &parquet_stats);
+    ExpectBounds<T>(stats, -1, -0.0);
+    ExpectBounds<T>(parquet_stats, -1, 0);
+
+    stats = ComputeIcebergStats<T>({2, 0}, page_size, &parquet_stats);
+    ExpectBounds<T>(stats, 0, 2);
+    ExpectBounds<T>(parquet_stats, -0.0, 2);
+
+    stats = ComputeIcebergStats<T>({-0.0, -0.0}, page_size, &parquet_stats);
+    ExpectBounds<T>(stats, -0.0, -0.0);
+    ExpectBounds<T>(parquet_stats, -0.0, 0);
+
+    stats = ComputeIcebergStats<T>({0, 0}, page_size, &parquet_stats);
+    ExpectBounds<T>(stats, 0, 0);
+    ExpectBounds<T>(parquet_stats, -0.0, 0);
+
+    // No bounds if all values are NaN, neither in Iceberg nor in Parquet.
+    stats = ComputeIcebergStats<T>({nan, nan}, page_size);
+    EXPECT_EQ(2, stats.nan_count);
+    EXPECT_FALSE(stats.has_min_max_values);
+  }
+}
+
+TEST(ParquetColumnStatsTest, IcebergStatsOfFloatingPoint) {
+  TestIcebergStatsOfFloatingPoint<float>();
+  TestIcebergStatsOfFloatingPoint<double>();
+}
+
+/// NaNs are only counted for floating point types.
+TEST(ParquetColumnStatsTest, IcebergStatsOfNonFloatingPoint) {
+  IcebergColumnStats stats = ComputeIcebergStats<int32_t>({3, -1}, 1);
+  EXPECT_EQ(-1, stats.nan_count);
+  ExpectBounds<int32_t>(stats, -1, 3);
 }
 
 } // namespace impala

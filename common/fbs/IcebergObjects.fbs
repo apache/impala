@@ -75,6 +75,8 @@ table FbIcebergColumnStats {
   null_count: long;
   lower_bound: [ubyte];
   upper_bound: [ubyte];
+  // Number of NaN values for floating point columns, -1 for other columns.
+  nan_count: long = -1;
 }
 
 table FbIcebergPartitionField {

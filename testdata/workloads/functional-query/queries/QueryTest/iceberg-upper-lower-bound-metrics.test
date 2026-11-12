@@ -501,3 +501,48 @@ where d3 = 3412345678901234567.89 and p >= 0;
 aggregation(SUM, NumRowGroups): 2
 aggregation(SUM, RowsRead): 6
 ====
+---- QUERY
+# IMPALA-15794: FLOAT and DOUBLE columns get NaN value counts, NaNs are not in the bounds,
+# and the bounds of zeros follow the order of Iceberg, where -0.0 is less than 0.0.
+create table ice_float_metrics (p INT, f FLOAT, d DOUBLE)
+partitioned by spec (p)
+stored as iceberg;
+---- RESULTS
+'Table has been created.'
+====
+---- QUERY
+insert into ice_float_metrics values
+    (1, 1, 1), (1, cast('nan' as float), cast('nan' as double)),
+    (2, -3, -3), (2, 0, 0), (2, cast('-0' as float), cast('-0' as double)),
+    (3, 0, 0), (3, cast('-0' as float), cast('-0' as double)),
+    (4, cast('nan' as float), cast('nan' as double)),
+    (4, cast('nan' as float), cast('nan' as double)),
+    (5, NULL, NULL);
+# Casting to STRING shows the sign of zeros.
+select readable_metrics.p.lower_bound,
+    readable_metrics.f.nan_value_count,
+    cast(readable_metrics.f.lower_bound as string),
+    cast(readable_metrics.f.upper_bound as string),
+    readable_metrics.d.nan_value_count,
+    cast(readable_metrics.d.lower_bound as string),
+    cast(readable_metrics.d.upper_bound as string)
+from $DATABASE.ice_float_metrics.`files`;
+---- RESULTS
+1,1,'1','1',1,'1','1'
+2,0,'-3','0',0,'-3','0'
+3,0,'-0','0',0,'-0','0'
+4,2,'NULL','NULL',2,'NULL','NULL'
+5,0,'NULL','NULL',0,'NULL','NULL'
+---- TYPES
+INT,BIGINT,STRING,STRING,BIGINT,STRING,STRING
+====
+---- QUERY
+# Only FLOAT and DOUBLE columns get NaN value counts.
+select distinct readable_metrics.f.nan_value_count, readable_metrics.db.nan_value_count,
+    readable_metrics.i.nan_value_count, readable_metrics.s.nan_value_count
+from $DATABASE.ice_types1.`files`;
+---- RESULTS
+0,0,NULL,NULL
+---- TYPES
+BIGINT,BIGINT,BIGINT,BIGINT
+====

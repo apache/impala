@@ -29,6 +29,7 @@ namespace impala {
 inline void ColumnStatsBase::Reset() {
   has_min_max_values_ = false;
   null_count_ = 0;
+  nan_count_ = 0;
   ascending_boundary_order_ = true;
   descending_boundary_order_ = true;
 }
@@ -69,25 +70,48 @@ inline void ColumnStats<T>::Merge(const ColumnStatsBase& other) {
     prev_page_max_value_ = cs->max_value_;
   }
   IncrementNullCount(cs->null_count_);
+  nan_count_ += cs->nan_count_;
 }
 
 template <typename T>
 inline int64_t ColumnStats<T>::BytesNeeded() const {
-  return BytesNeeded(min_value_) + BytesNeeded(max_value_)
+  int64_t bytes_needed = BytesNeeded(min_value_) + BytesNeeded(max_value_)
       + ParquetPlainEncoder::ByteSize(null_count_);
+  if constexpr (std::is_floating_point<T>::value) {
+    bytes_needed += ParquetPlainEncoder::ByteSize(nan_count_);
+  }
+  return bytes_needed;
+}
+
+template <typename T>
+inline bool ColumnStats<T>::HasMinMaxValuesToWrite() const {
+  if (!has_min_max_values_) return false;
+  if constexpr (std::is_floating_point<T>::value) {
+    return !std::isnan(min_value_) && !std::isnan(max_value_);
+  }
+  return true;
 }
 
 template <typename T>
 inline void ColumnStats<T>::EncodeToThrift(parquet::Statistics* out) const {
-  if (has_min_max_values_) {
+  if (HasMinMaxValuesToWrite()) {
+    T min_value = min_value_;
+    T max_value = max_value_;
+    if constexpr (std::is_floating_point<T>::value) {
+      // The Parquet spec says that any zero minimum should be written as -0.0 and any
+      // zero maximum as +0.0, because readers may order -0.0 before +0.0.
+      if (min_value == 0) min_value = -0.0;
+      if (max_value == 0) max_value = 0.0;
+    }
     std::string min_str;
-    EncodePlainValue(min_value_, BytesNeeded(min_value_), &min_str);
+    EncodePlainValue(min_value, BytesNeeded(min_value), &min_str);
     out->__set_min_value(std::move(min_str));
     std::string max_str;
-    EncodePlainValue(max_value_, BytesNeeded(max_value_), &max_str);
+    EncodePlainValue(max_value, BytesNeeded(max_value), &max_str);
     out->__set_max_value(std::move(max_str));
   }
   out->__set_null_count(null_count_);
+  if constexpr (std::is_floating_point<T>::value) out->__set_nan_count(nan_count_);
 }
 
 template <typename T>
@@ -282,7 +306,9 @@ template <typename T>
 inline void ColumnStats<T>::GetIcebergStats(
     int64_t column_size, int64_t value_count, IcebergColumnStats* out) const {
   DCHECK(out != nullptr);
-  out->has_min_max_values = has_min_max_values_;
+  out->has_min_max_values = HasMinMaxValuesToWrite();
+  out->nan_count = -1;
+  if constexpr (std::is_floating_point<T>::value) out->nan_count = nan_count_;
   if (out->has_min_max_values) {
     SerializeIcebergSingleValue(min_value_, &out->min_binary);
     SerializeIcebergSingleValue(max_value_, &out->max_binary);

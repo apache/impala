@@ -569,6 +569,7 @@ createIcebergColumnStats(
   stats_builder.add_total_compressed_byte_size(col_stats.column_size);
   stats_builder.add_value_count(col_stats.value_count);
   stats_builder.add_null_count(col_stats.null_count);
+  stats_builder.add_nan_count(col_stats.nan_count);
 
   if (col_stats.has_min_max_values) {
     stats_builder.add_lower_bound(lower_bound);

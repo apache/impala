@@ -680,8 +680,8 @@ public class IcebergPredicateConverter {
   protected double getIcebergDoubleValue(Operation op, NumericLiteral literal)
       throws ImpalaRuntimeException {
     // Iceberg assumes that a file without NaN value counts has no NaNs, so it skips files
-    // where the lower and upper bounds equal the literal. Impala doesn't write NaN value
-    // counts and leaves NaNs out of the bounds.
+    // where the lower and upper bounds equal the literal. Data files written by Impala
+    // before IMPALA-15794 have no NaN value counts, but leave NaNs out of the bounds.
     if (op == Operation.NOT_EQ || op == Operation.NOT_IN) {
       throw new ImpalaRuntimeException(
           "!= and NOT IN can't be converted to Iceberg expressions for floating-point " +

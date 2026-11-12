@@ -1,10 +1,25 @@
 ====
 ---- QUERY
-# Impala doesn't write NaN value counts, and leaves NaNs out of the bounds, so Iceberg
-# can't skip files for !=, NOT IN and NOT on floating-point columns.
-create table nan_tbl (d double, f float) stored as iceberg
-tblproperties ('impala.iceberg.push_down_hint'='d,f');
+# Impala doesn't push down !=, NOT IN and NOT on floating-point columns (IMPALA-15635),
+# because data files written before IMPALA-15794 have no NaN value counts. The data files
+# of migrated tables, like this one, have no NaN value counts either. Setting
+# 'write.data.path' to the table location makes them part of the data location, so other
+# predicates are pushed down for this table (IMPALA-15639).
+create table nan_tbl (d double, f float) stored as parquet;
 insert into nan_tbl values (1, 1), (cast('nan' as double), cast('nan' as float));
+alter table nan_tbl convert to iceberg;
+alter table nan_tbl set tblproperties ('impala.iceberg.push_down_hint'='d,f',
+    'write.data.path'='$NAMENODE/test-warehouse/$DATABASE.db/nan_tbl');
+invalidate metadata nan_tbl;
+select readable_metrics.d.nan_value_count, readable_metrics.d.lower_bound,
+    readable_metrics.d.upper_bound, readable_metrics.f.nan_value_count
+from $DATABASE.nan_tbl.`files`;
+---- TYPES
+BIGINT,DOUBLE,DOUBLE,BIGINT
+---- RESULTS
+NULL,1,1,NULL
+====
+---- QUERY
 select count(*) from nan_tbl where d != 1;
 ---- TYPES
 BIGINT
