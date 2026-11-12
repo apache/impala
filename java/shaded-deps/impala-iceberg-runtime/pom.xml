@@ -34,6 +34,10 @@ under the License.
 
   <properties>
     <iceberg.parquet.version>1.16.0</iceberg.parquet.version>
+    <!-- Keep these runtime versions in sync with iceberg-core's POM when updating
+         APACHE_ICEBERG_VERSION in bin/impala-config.sh. -->
+    <iceberg.caffeine.version>2.9.3</iceberg.caffeine.version>
+    <iceberg.roaringbitmap.version>1.6.14</iceberg.roaringbitmap.version>
   </properties>
 
   <dependencies>
@@ -96,6 +100,25 @@ under the License.
       <artifactId>avro</artifactId>
       <version>1.12.1</version>
       <optional>true</optional>
+    </dependency>
+    <!-- Runtime requirements of the bundled Iceberg classes. Keep these visible
+         without exporting the bundled modules' optional provider dependencies. -->
+    <dependency>
+      <groupId>com.github.ben-manes.caffeine</groupId>
+      <artifactId>caffeine</artifactId>
+      <version>${iceberg.caffeine.version}</version>
+      <scope>runtime</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.roaringbitmap</groupId>
+      <artifactId>RoaringBitmap</artifactId>
+      <version>${iceberg.roaringbitmap.version}</version>
+      <scope>runtime</scope>
+    </dependency>
+    <dependency>
+      <groupId>io.airlift</groupId>
+      <artifactId>aircompressor</artifactId>
+      <scope>runtime</scope>
     </dependency>
     <dependency>
       <groupId>org.apache.httpcomponents.client5</groupId>

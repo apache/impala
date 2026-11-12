@@ -267,6 +267,8 @@ export APACHE_MIRROR
 export APACHE_AVRO_JAVA_VERSION=1.11.1
 export APACHE_HADOOP_VERSION=3.4.1
 export APACHE_HBASE_VERSION=2.6.0
+# When updating Iceberg, also check the runtime dependency versions in
+# java/shaded-deps/impala-iceberg-runtime/pom.xml against iceberg-core's POM.
 export APACHE_ICEBERG_VERSION=1.11.0
 export APACHE_KNOX_VERSION=2.0.0
 export APACHE_ORC_JAVA_VERSION=1.8.3
