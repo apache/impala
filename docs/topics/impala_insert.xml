@@ -91,6 +91,25 @@ hint_with_brackets ::= [SHUFFLE] | [NOSHUFFLE]
       mechanism.
     </p>
 
+    <p rev="5.0.0 IMPALA-14223">
+      By default, Impala treats the data files in the subdirectories of a table or
+      partition directory as part of the table. Starting in <keyword keyref="impala50"/>,
+      <codeph>INSERT OVERWRITE</codeph> into an unpartitioned table deletes the
+      subdirectories of the table directory, with their contents, in addition to the data
+      files. The statement deletes the subdirectories even if the
+      <codeph>impala.disable.recursive.listing</codeph> table property is
+      <codeph>true</codeph>. It keeps the files and subdirectories whose names start with a
+      dot (<codeph>.</codeph>) or an underscore (<codeph>_</codeph>), and the
+      subdirectories whose names start with one of the prefixes listed in the
+      <codeph>--ignored_dir_prefix_list</codeph> startup flag of <cmdname>impalad</cmdname>.
+      The default value of the flag is
+      <codeph>.,_tmp.,-tmp.,_spark_metadata,_impala_insert_staging</codeph>. Earlier
+      releases deleted only the data files directly in the table directory. For a
+      partitioned table, <codeph>INSERT OVERWRITE</codeph> replaces the whole directory of
+      each partition that it writes, as in earlier releases. Transactional and Iceberg
+      tables are not affected.
+    </p>
+
     <p conref="../shared/impala_common.xml#common/complex_types_blurb"/>
 
     <p rev="2.3.0">

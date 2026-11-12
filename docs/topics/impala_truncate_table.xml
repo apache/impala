@@ -54,6 +54,33 @@ under the License.
       including all partitions of a partitioned table. </p>
     <p> Any statistics produced by the <codeph>COMPUTE STATS</codeph> statement
       are reset when the data is removed. </p>
+    <p rev="5.0.0 IMPALA-14224">
+      Starting in <keyword keyref="impala50"/>, <codeph>TRUNCATE TABLE</codeph> on a table
+      that is not transactional and not an Iceberg table removes the data through the Hive
+      Metastore. The Hive Metastore deletes all the files and subdirectories in the table
+      and partition directories, including the data files in subdirectories, which Impala
+      reads as part of the table. The statement always deletes the table and column
+      statistics. The Hive Metastore generates an <codeph>ALTER_TABLE</codeph> event for an
+      unpartitioned table, and an <codeph>ALTER_PARTITION</codeph> event for each partition
+      of a partitioned table, or one <codeph>ALTER_PARTITIONS</codeph> event for all the
+      partitions if the <codeph>metastore.alterPartitions.notification.v2.enabled</codeph>
+      Hive Metastore property is <codeph>true</codeph>.
+      The Hive Metastore moves the deleted files to the HDFS trash unless the
+      <codeph>auto.purge</codeph> table property is <codeph>true</codeph>. Earlier releases
+      deleted only the data files directly in the table and partition directories, and
+      they deleted the files immediately, without the HDFS trash.
+    </p>
+    <p rev="5.0.0 IMPALA-14224">
+      The <codeph>--truncate_external_tables_with_hms</codeph> startup flag of
+      <cmdname>catalogd</cmdname> controls this behavior. Its default value is
+      <codeph>true</codeph>. Despite its name, the flag applies to all tables that are not
+      transactional and not Iceberg tables, not only to external tables. To delete only
+      the data files directly in the table and partition directories, as in earlier
+      releases, set the flag to <codeph>false</codeph>. With the default value, the
+      <codeph>DELETE_STATS_IN_TRUNCATE</codeph> query option cannot be set to
+      <codeph>false</codeph> for these tables, see
+      <xref href="impala_delete_stats_in_truncate.xml#delete_stats_in_truncate"/>.
+    </p>
     <p> Make sure that you are in the correct database before truncating a
       table, either by issuing a <codeph>USE</codeph> statement first or by
       using a fully qualified name
@@ -74,9 +101,17 @@ under the License.
       details about working with S3 tables. </p>
     <p conref="../shared/impala_common.xml#common/cancel_blurb_no"/>
     <p conref="../shared/impala_common.xml#common/permissions_blurb"/>
-    <p rev=""> The user ID that the <cmdname>impalad</cmdname> daemon runs
+    <p rev=""> The user ID that the <cmdname>catalogd</cmdname> daemon runs
       under, typically the <codeph>impala</codeph> user, must have write
       permission for all the files and directories that make up the table. </p>
+    <p rev="5.0.0 IMPALA-14224">
+      When the Hive Metastore removes the data, as described above, it deletes the files on
+      behalf of the <cmdname>catalogd</cmdname> user if it impersonates its clients. It does
+      so in clusters secured with Kerberos, and in other clusters if the
+      <codeph>metastore.execute.setugi</codeph> Hive Metastore property is
+      <codeph>true</codeph>, which is the default. Otherwise, the user that the Hive
+      Metastore runs under must have the write permission.
+    </p>
     <p conref="../shared/impala_common.xml#common/kudu_blurb"/>
     <p conref="../shared/impala_common.xml#common/kudu_no_truncate_table"/>
     <p conref="../shared/impala_common.xml#common/example_blurb"/>

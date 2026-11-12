@@ -32,7 +32,7 @@ under the License.
    <data name="Category" value="Data Analysts"/>
   </metadata>
  </prolog>
- 
+
  <conbody>
 
   <p>
@@ -49,17 +49,26 @@ under the License.
    or 0. When set to false, a truncate operation will not delete the table and column statistics for
    the table.
   </p>
-  
+
+  <p rev="5.0.0 IMPALA-14224">
+   Starting in <keyword keyref="impala50"/>, setting this option to <codeph>false</codeph>
+   is supported for tables that are not transactional and not Iceberg tables only if
+   <cmdname>catalogd</cmdname> runs with
+   <codeph>--truncate_external_tables_with_hms=false</codeph>. With the default value of
+   that flag, <codeph>TRUNCATE TABLE</codeph> on these tables always deletes the
+   statistics, and it fails if this option is <codeph>false</codeph>. See
+   <xref href="impala_truncate_table.xml#truncate_table"/>.
+  </p>
   <p>
    <b>Type:</b><codeph>BOOLEAN</codeph>; recognized values are 1 and 0, or true and false;
   </p>
-  
+
   <p>
    <b>Default:</b><codeph>TRUE</codeph> (shown as 1 in output of SET statement).
   </p>
-  
+
   <p><b>Added in:</b>
    <keyword keyref="impala40"/></p>
-  
+
  </conbody>
 </concept>

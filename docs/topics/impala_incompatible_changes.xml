@@ -251,6 +251,26 @@ under the License.
               <codeph>'abc%x' LIKE 'abc\%%'</codeph> is now true, and <codeph>s LIKE
               'C:\\dir_%'</codeph> matches <codeph>C:\dir1</codeph> instead of
               <codeph>C:dir1</codeph>.</p></li>
+          <li rev="5.0.0 IMPALA-14223">INSERT OVERWRITE deletes subdirectories<p>
+              <codeph>INSERT OVERWRITE</codeph> into an unpartitioned table now also
+              deletes the subdirectories of the table directory, with their contents.
+              Earlier releases deleted only the data files directly in the table
+              directory. Subdirectories whose names start with a dot or an underscore, or
+              with a prefix listed in the <codeph>--ignored_dir_prefix_list</codeph>
+              startup flag, are kept. See
+              <xref href="impala_insert.xml#insert"/>.</p></li>
+          <li rev="5.0.0 IMPALA-14224">TRUNCATE TABLE uses the Hive Metastore<p>
+              <codeph>TRUNCATE TABLE</codeph> on a table that is not transactional and not
+              an Iceberg table now removes the data through the Hive Metastore. This
+              deletes all the files and subdirectories in the table and partition
+              directories, moves the files to the HDFS trash unless the
+              <codeph>auto.purge</codeph> table property is <codeph>true</codeph>, and
+              always deletes the statistics. Setting the
+              <codeph>DELETE_STATS_IN_TRUNCATE</codeph> query option to
+              <codeph>false</codeph> makes these statements fail. To restore the previous
+              behavior, start <cmdname>catalogd</cmdname> with
+              <codeph>--truncate_external_tables_with_hms=false</codeph>. See
+              <xref href="impala_truncate_table.xml#truncate_table"/>.</p></li>
         </ul>
       </p>
     </conbody>
