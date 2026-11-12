@@ -3082,7 +3082,7 @@ class TestIcebergV3Table(IcebergTestSuite):
     size of the file on the filesystem, and that the DV blob extent (content_offset +
     content_size_in_bytes) fits within that file. This guards against off-by-N bugs in
     current_offset_ tracking inside PuffinWriter (e.g. the leading footer magic not being
-    accounted for)."""
+    accounted for). Also checks that the footer follows the Puffin spec."""
     table = "ice_puffin_size"
     fqn = "%s.%s" % (unique_database, table)
 
@@ -3093,9 +3093,18 @@ class TestIcebergV3Table(IcebergTestSuite):
     """.format(fqn=fqn))
     self.client.execute(
         "INSERT INTO {fqn} VALUES (1, 'a'), (2, 'b'), (3, 'c')".format(fqn=fqn))
-    self.client.execute(
-        "DELETE FROM {fqn} WHERE id = 2".format(fqn=fqn))
+    data_file = self.client.execute(
+        "SELECT file_path FROM {fqn}.`files` WHERE content = 0".format(fqn=fqn)).data
+    assert len(data_file) == 1, data_file
+    # The second DELETE merges the existing deletion vector with the new delete.
+    for deleted_id, cardinality in ((2, '1'), (3, '2')):
+      self.client.execute(
+          "DELETE FROM {fqn} WHERE id = {id}".format(fqn=fqn, id=deleted_id))
+      self._check_puffin_file(fqn, data_file[0], cardinality)
 
+  def _check_puffin_file(self, fqn, data_file, cardinality):
+    """Checks the only Puffin file of 'fqn', which has the deletion vector of 'data_file'
+    with 'cardinality' deleted rows."""
     # Retrieve the Puffin file path, manifest-reported size, and DV blob extent.
     result = self.client.execute("""
         SELECT file_path, file_size_in_bytes, content_offset, content_size_in_bytes
@@ -3116,6 +3125,30 @@ class TestIcebergV3Table(IcebergTestSuite):
       check_call(['hadoop', 'fs', '-copyToLocal', hdfs_path, local_file])
       self._assert_puffin_file_layout(local_file, reported_size,
                                       content_offset, content_size)
+      footer = self._read_puffin_footer(local_file)
+
+    # IMPALA-15797: The footer follows the Puffin spec for deletion vectors.
+    assert footer['properties']['created-by'].startswith('impala version '), footer
+    assert len(footer['blobs']) == 1, footer
+    blob = footer['blobs'][0]
+    assert 'compression-codec' not in blob, blob
+    assert blob == {
+        'type': 'deletion-vector-v1',
+        # The field id of the row position, Integer.MAX_VALUE - 2.
+        'fields': [2147483645],
+        'snapshot-id': -1,
+        'sequence-number': -1,
+        'offset': content_offset,
+        'length': content_size,
+        'properties': {'referenced-data-file': data_file, 'cardinality': cardinality}}
+
+  def _read_puffin_footer(self, local_file):
+    """Returns the footer payload of the Puffin file 'local_file' as a dict."""
+    with open(local_file, 'rb') as f:
+      f.seek(-12, 2)
+      footer_json_len = struct.unpack('<I', f.read(4))[0]
+      f.seek(-12 - footer_json_len, 2)
+      return json.loads(f.read(footer_json_len).decode('utf-8'))
 
   def test_v3_merge(self, vector, unique_database):
     """MERGE INTO a table that was created as V2 then upgraded to V3."""

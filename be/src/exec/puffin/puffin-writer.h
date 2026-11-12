@@ -77,10 +77,8 @@ class PuffinWriter : public HdfsTableWriter {
   /// Creates a DeleteVector blob from the bitmap and adds it to the file.
   /// 'data_file_path' identifies which data file this DV applies to.
   /// 'bitmap' contains the deleted row positions.
-  /// 'snapshot_id' and 'sequence_number' are Iceberg metadata.
   Status AddDeletionVector(const std::string& data_file_path,
-      RoaringBitmap64& bitmap, int64_t snapshot_id = 0,
-      int64_t sequence_number = 0) WARN_UNUSED_RESULT;
+      RoaringBitmap64& bitmap) WARN_UNUSED_RESULT;
 
   /// Load an existing deletion vector from a Puffin file and merge it with
   /// in-memory deletion vectors for the same data file.
@@ -162,6 +160,10 @@ class PuffinWriter : public HdfsTableWriter {
 
   /// Magic bytes for blob serialization
   static constexpr uint32_t BLOB_MAGIC = 0xD1D33964;
+
+  /// Field id of the row position metadata column (_pos) of Iceberg, which deletion
+  /// vectors are computed for.
+  static constexpr int32_t ROW_POSITION_FIELD_ID = INT32_MAX - 2;
 
   /// Size of magic bytes
   static const int MAGIC_SIZE = 4;

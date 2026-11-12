@@ -28,6 +28,7 @@
 #include "common/logging.h"
 #include "common/object-pool.h"
 #include "common/status.h"
+#include "common/version.h"
 #include "exec/blob-reader.h"
 #include "exec/hdfs-table-writer.h"
 #include "exec/output-partition.h"
@@ -116,6 +117,8 @@ void PuffinWriter::Close() {
 }
 
 Status PuffinWriter::InitNewFile() {
+  file_.GetFileMetadata()["created-by"] = strings::Substitute(
+      "impala version $0 (build $1)", GetDaemonBuildVersion(), GetDaemonBuildHash());
   current_offset_ = MAGIC_SIZE;
   uint32_t magic_be = htonl(PUFFIN_MAGIC);
   RETURN_IF_ERROR(Write(magic_be));
@@ -219,9 +222,7 @@ Status PuffinWriter::Finalize() {
     RoaringBitmap64& bitmap = entry.second;
 
     // Add deletion vector blob for this data file
-    // Using default snapshot_id=0 and sequence_number=0
-    // These should be set appropriately by the caller if needed
-    RETURN_IF_ERROR(AddDeletionVector(data_file_path, bitmap, 0, 0));
+    RETURN_IF_ERROR(AddDeletionVector(data_file_path, bitmap));
   }
 
   // Write all buffered blobs to the file
@@ -255,7 +256,7 @@ Status PuffinWriter::AddBlob(puffin::Blob& blob) {
 }
 
 Status PuffinWriter::AddDeletionVector(const std::string& data_file_path,
-    RoaringBitmap64& bitmap, int64_t snapshot_id, int64_t sequence_number) {
+    RoaringBitmap64& bitmap) {
   // Get the serialized size of the bitmap
   bitmap.Optimize(); // Optimize the bitmap before serialization for better compression
   size_t bitmap_serialized_size = bitmap.BitmapSizeInBytes();
@@ -307,13 +308,16 @@ Status PuffinWriter::AddDeletionVector(const std::string& data_file_path,
   // Create blob data wrapper
   puffin::BlobData blob_data = {data, total_blob_size};
 
-  // Create blob metadata
+  // Create blob metadata as the Puffin spec requires for deletion vectors: the snapshot
+  // id and the sequence number are not known yet, so they are -1, and the properties
+  // are the path of the data file and the number of deleted rows. Like Iceberg's
+  // BaseDVFileWriter, the blob is computed for the row position field.
   puffin::BlobMetadata metadata(puffin::BlobType::DELETION_VECTOR_V1, total_blob_size);
-  metadata.snapshot_id = snapshot_id;
-  metadata.sequence_number = sequence_number;
-
-  // Store the data file path in properties
+  metadata.fields.push_back(ROW_POSITION_FIELD_ID);
+  metadata.snapshot_id = -1;
+  metadata.sequence_number = -1;
   metadata.properties["referenced-data-file"] = data_file_path;
+  metadata.properties["cardinality"] = std::to_string(bitmap.Cardinality());
 
   // Create the deletion vector object to track the newly written blob
   TIcebergDeletionVector new_dv;
@@ -379,11 +383,14 @@ std::string PuffinWriter::SerializeFooterToJson() {
     blob_obj.AddMember("offset", blob.metadata.offset, allocator);
     blob_obj.AddMember("length", static_cast<int64_t>(blob.metadata.length), allocator);
 
-    Value codec_val;
-    codec_val.SetString(
-        puffin::CompressionCodecToString(blob.metadata.compression_codec).c_str(),
-        allocator);
-    blob_obj.AddMember("compression-codec", codec_val, allocator);
+    // An omitted codec means that the blob is not compressed, "none" is not a codec.
+    if (blob.metadata.compression_codec != puffin::CompressionCodec::NONE) {
+      Value codec_val;
+      codec_val.SetString(
+          puffin::CompressionCodecToString(blob.metadata.compression_codec).c_str(),
+          allocator);
+      blob_obj.AddMember("compression-codec", codec_val, allocator);
+    }
 
     Value props_obj(kObjectType);
     for (const auto& prop : blob.metadata.properties) {
