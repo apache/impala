@@ -51,31 +51,31 @@ INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name} partition (year, month)
 SELECT id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month
 FROM {db_name}.{table_name};
 ---- LOAD
-LOAD DATA LOCAL INPATH '{impala_home}/testdata/target/AllTypes/090101.txt' OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name} PARTITION(year=2009, month=1);
-LOAD DATA LOCAL INPATH '{impala_home}/testdata/target/AllTypes/090201.txt' OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name} PARTITION(year=2009, month=2);
-LOAD DATA LOCAL INPATH '{impala_home}/testdata/target/AllTypes/090301.txt' OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name} PARTITION(year=2009, month=3);
-LOAD DATA LOCAL INPATH '{impala_home}/testdata/target/AllTypes/090401.txt' OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name} PARTITION(year=2009, month=4);
-LOAD DATA LOCAL INPATH '{impala_home}/testdata/target/AllTypes/090501.txt' OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name} PARTITION(year=2009, month=5);
-LOAD DATA LOCAL INPATH '{impala_home}/testdata/target/AllTypes/090601.txt' OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name} PARTITION(year=2009, month=6);
-LOAD DATA LOCAL INPATH '{impala_home}/testdata/target/AllTypes/090701.txt' OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name} PARTITION(year=2009, month=7);
-LOAD DATA LOCAL INPATH '{impala_home}/testdata/target/AllTypes/090801.txt' OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name} PARTITION(year=2009, month=8);
-LOAD DATA LOCAL INPATH '{impala_home}/testdata/target/AllTypes/090901.txt' OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name} PARTITION(year=2009, month=9);
-LOAD DATA LOCAL INPATH '{impala_home}/testdata/target/AllTypes/091001.txt' OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name} PARTITION(year=2009, month=10);
-LOAD DATA LOCAL INPATH '{impala_home}/testdata/target/AllTypes/091101.txt' OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name} PARTITION(year=2009, month=11);
-LOAD DATA LOCAL INPATH '{impala_home}/testdata/target/AllTypes/091201.txt' OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name} PARTITION(year=2009, month=12);
+LOAD DATA INPATH '{staging_dir}/testdata/target/AllTypes/090101.txt' OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name} PARTITION(year=2009, month=1);
+LOAD DATA INPATH '{staging_dir}/testdata/target/AllTypes/090201.txt' OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name} PARTITION(year=2009, month=2);
+LOAD DATA INPATH '{staging_dir}/testdata/target/AllTypes/090301.txt' OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name} PARTITION(year=2009, month=3);
+LOAD DATA INPATH '{staging_dir}/testdata/target/AllTypes/090401.txt' OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name} PARTITION(year=2009, month=4);
+LOAD DATA INPATH '{staging_dir}/testdata/target/AllTypes/090501.txt' OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name} PARTITION(year=2009, month=5);
+LOAD DATA INPATH '{staging_dir}/testdata/target/AllTypes/090601.txt' OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name} PARTITION(year=2009, month=6);
+LOAD DATA INPATH '{staging_dir}/testdata/target/AllTypes/090701.txt' OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name} PARTITION(year=2009, month=7);
+LOAD DATA INPATH '{staging_dir}/testdata/target/AllTypes/090801.txt' OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name} PARTITION(year=2009, month=8);
+LOAD DATA INPATH '{staging_dir}/testdata/target/AllTypes/090901.txt' OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name} PARTITION(year=2009, month=9);
+LOAD DATA INPATH '{staging_dir}/testdata/target/AllTypes/091001.txt' OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name} PARTITION(year=2009, month=10);
+LOAD DATA INPATH '{staging_dir}/testdata/target/AllTypes/091101.txt' OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name} PARTITION(year=2009, month=11);
+LOAD DATA INPATH '{staging_dir}/testdata/target/AllTypes/091201.txt' OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name} PARTITION(year=2009, month=12);
 
-LOAD DATA LOCAL INPATH '{impala_home}/testdata/target/AllTypes/100101.txt' OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name} PARTITION(year=2010, month=1);
-LOAD DATA LOCAL INPATH '{impala_home}/testdata/target/AllTypes/100201.txt' OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name} PARTITION(year=2010, month=2);
-LOAD DATA LOCAL INPATH '{impala_home}/testdata/target/AllTypes/100301.txt' OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name} PARTITION(year=2010, month=3);
-LOAD DATA LOCAL INPATH '{impala_home}/testdata/target/AllTypes/100401.txt' OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name} PARTITION(year=2010, month=4);
-LOAD DATA LOCAL INPATH '{impala_home}/testdata/target/AllTypes/100501.txt' OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name} PARTITION(year=2010, month=5);
-LOAD DATA LOCAL INPATH '{impala_home}/testdata/target/AllTypes/100601.txt' OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name} PARTITION(year=2010, month=6);
-LOAD DATA LOCAL INPATH '{impala_home}/testdata/target/AllTypes/100701.txt' OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name} PARTITION(year=2010, month=7);
-LOAD DATA LOCAL INPATH '{impala_home}/testdata/target/AllTypes/100801.txt' OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name} PARTITION(year=2010, month=8);
-LOAD DATA LOCAL INPATH '{impala_home}/testdata/target/AllTypes/100901.txt' OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name} PARTITION(year=2010, month=9);
-LOAD DATA LOCAL INPATH '{impala_home}/testdata/target/AllTypes/101001.txt' OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name} PARTITION(year=2010, month=10);
-LOAD DATA LOCAL INPATH '{impala_home}/testdata/target/AllTypes/101101.txt' OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name} PARTITION(year=2010, month=11);
-LOAD DATA LOCAL INPATH '{impala_home}/testdata/target/AllTypes/101201.txt' OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name} PARTITION(year=2010, month=12);
+LOAD DATA INPATH '{staging_dir}/testdata/target/AllTypes/100101.txt' OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name} PARTITION(year=2010, month=1);
+LOAD DATA INPATH '{staging_dir}/testdata/target/AllTypes/100201.txt' OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name} PARTITION(year=2010, month=2);
+LOAD DATA INPATH '{staging_dir}/testdata/target/AllTypes/100301.txt' OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name} PARTITION(year=2010, month=3);
+LOAD DATA INPATH '{staging_dir}/testdata/target/AllTypes/100401.txt' OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name} PARTITION(year=2010, month=4);
+LOAD DATA INPATH '{staging_dir}/testdata/target/AllTypes/100501.txt' OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name} PARTITION(year=2010, month=5);
+LOAD DATA INPATH '{staging_dir}/testdata/target/AllTypes/100601.txt' OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name} PARTITION(year=2010, month=6);
+LOAD DATA INPATH '{staging_dir}/testdata/target/AllTypes/100701.txt' OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name} PARTITION(year=2010, month=7);
+LOAD DATA INPATH '{staging_dir}/testdata/target/AllTypes/100801.txt' OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name} PARTITION(year=2010, month=8);
+LOAD DATA INPATH '{staging_dir}/testdata/target/AllTypes/100901.txt' OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name} PARTITION(year=2010, month=9);
+LOAD DATA INPATH '{staging_dir}/testdata/target/AllTypes/101001.txt' OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name} PARTITION(year=2010, month=10);
+LOAD DATA INPATH '{staging_dir}/testdata/target/AllTypes/101101.txt' OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name} PARTITION(year=2010, month=11);
+LOAD DATA INPATH '{staging_dir}/testdata/target/AllTypes/101201.txt' OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name} PARTITION(year=2010, month=12);
 ---- CREATE_KUDU
 DROP TABLE IF EXISTS {db_name}{db_suffix}.{table_name};
 CREATE TABLE {db_name}{db_suffix}.{table_name} (
@@ -139,7 +139,7 @@ year int
 month int
 ---- ROW_FORMAT
 delimited fields terminated by ','  escaped by '\\'
----- LOAD
+---- LOAD_HIVE
 INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name}
 SELECT * FROM {db_name}{db_suffix}.alltypes;
 ---- DEPENDENT_LOAD
@@ -179,10 +179,10 @@ INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name} partition (year, month)
 SELECT id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month
 FROM {db_name}.{table_name};
 ---- LOAD
-LOAD DATA LOCAL INPATH '{impala_home}/testdata/target/AllTypesSmall/090101.txt' OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name} PARTITION(year=2009, month=1);
-LOAD DATA LOCAL INPATH '{impala_home}/testdata/target/AllTypesSmall/090201.txt' OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name} PARTITION(year=2009, month=2);
-LOAD DATA LOCAL INPATH '{impala_home}/testdata/target/AllTypesSmall/090301.txt' OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name} PARTITION(year=2009, month=3);
-LOAD DATA LOCAL INPATH '{impala_home}/testdata/target/AllTypesSmall/090401.txt' OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name} PARTITION(year=2009, month=4);
+LOAD DATA INPATH '{staging_dir}/testdata/target/AllTypesSmall/090101.txt' OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name} PARTITION(year=2009, month=1);
+LOAD DATA INPATH '{staging_dir}/testdata/target/AllTypesSmall/090201.txt' OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name} PARTITION(year=2009, month=2);
+LOAD DATA INPATH '{staging_dir}/testdata/target/AllTypesSmall/090301.txt' OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name} PARTITION(year=2009, month=3);
+LOAD DATA INPATH '{staging_dir}/testdata/target/AllTypesSmall/090401.txt' OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name} PARTITION(year=2009, month=4);
 ---- CREATE_KUDU
 DROP TABLE IF EXISTS {db_name}{db_suffix}.{table_name};
 CREATE TABLE {db_name}{db_suffix}.{table_name} (
@@ -269,10 +269,10 @@ INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name} partition (year, month)
 SELECT id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month
 FROM {db_name}.{table_name};
 ---- LOAD
-LOAD DATA LOCAL INPATH '{impala_home}/testdata/target/AllTypesTiny/090101.txt' OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name} PARTITION(year=2009, month=1);
-LOAD DATA LOCAL INPATH '{impala_home}/testdata/target/AllTypesTiny/090201.txt' OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name} PARTITION(year=2009, month=2);
-LOAD DATA LOCAL INPATH '{impala_home}/testdata/target/AllTypesTiny/090301.txt' OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name} PARTITION(year=2009, month=3);
-LOAD DATA LOCAL INPATH '{impala_home}/testdata/target/AllTypesTiny/090401.txt' OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name} PARTITION(year=2009, month=4);
+LOAD DATA INPATH '{staging_dir}/testdata/target/AllTypesTiny/090101.txt' OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name} PARTITION(year=2009, month=1);
+LOAD DATA INPATH '{staging_dir}/testdata/target/AllTypesTiny/090201.txt' OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name} PARTITION(year=2009, month=2);
+LOAD DATA INPATH '{staging_dir}/testdata/target/AllTypesTiny/090301.txt' OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name} PARTITION(year=2009, month=3);
+LOAD DATA INPATH '{staging_dir}/testdata/target/AllTypesTiny/090401.txt' OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name} PARTITION(year=2009, month=4);
 ---- CREATE_KUDU
 DROP TABLE IF EXISTS {db_name}{db_suffix}.{table_name};
 CREATE TABLE {db_name}{db_suffix}.{table_name} (
@@ -416,9 +416,9 @@ SELECT * FROM {db_name}.{table_name}_tmp;
 -- Cleanup the temp table
 DROP TABLE IF EXISTS {db_name}{db_suffix}.{table_name}_tmp;
 ---- LOAD
-LOAD DATA LOCAL INPATH '{impala_home}/testdata/data/AllTypesError/0901.txt' OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name} PARTITION(year=2009, month=1);
-LOAD DATA LOCAL INPATH '{impala_home}/testdata/data/AllTypesError/0902.txt' OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name} PARTITION(year=2009, month=2);
-LOAD DATA LOCAL INPATH '{impala_home}/testdata/data/AllTypesError/0903.txt' OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name} PARTITION(year=2009, month=3);
+LOAD DATA INPATH '{staging_dir}/testdata/data/AllTypesError/0901.txt' OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name} PARTITION(year=2009, month=1);
+LOAD DATA INPATH '{staging_dir}/testdata/data/AllTypesError/0902.txt' OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name} PARTITION(year=2009, month=2);
+LOAD DATA INPATH '{staging_dir}/testdata/data/AllTypesError/0903.txt' OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name} PARTITION(year=2009, month=3);
 ====
 ---- DATASET
 functional
@@ -569,9 +569,9 @@ SELECT * FROM {db_name}.{table_name}_tmp;
 -- Cleanup the temp table
 DROP TABLE IF EXISTS {db_name}{db_suffix}.{table_name}_tmp;
 ---- LOAD
-LOAD DATA LOCAL INPATH '{impala_home}/testdata/data/AllTypesErrorNoNulls/0901.txt' OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name} PARTITION(year=2009, month=1);
-LOAD DATA LOCAL INPATH '{impala_home}/testdata/data/AllTypesErrorNoNulls/0902.txt' OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name} PARTITION(year=2009, month=2);
-LOAD DATA LOCAL INPATH '{impala_home}/testdata/data/AllTypesErrorNoNulls/0903.txt' OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name} PARTITION(year=2009, month=3);
+LOAD DATA INPATH '{staging_dir}/testdata/data/AllTypesErrorNoNulls/0901.txt' OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name} PARTITION(year=2009, month=1);
+LOAD DATA INPATH '{staging_dir}/testdata/data/AllTypesErrorNoNulls/0902.txt' OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name} PARTITION(year=2009, month=2);
+LOAD DATA INPATH '{staging_dir}/testdata/data/AllTypesErrorNoNulls/0903.txt' OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name} PARTITION(year=2009, month=3);
 ====
 ---- DATASET
 functional
@@ -662,19 +662,19 @@ ALTER TABLE {table_name} ADD IF NOT EXISTS PARTITION(year=2010, month=1, day=NUL
 INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name} partition (year, month, day)
 SELECT id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month, day
 FROM {db_name}.{table_name};
----- LOAD
+---- LOAD_HIVE
 SET hive.exec.dynamic.partition.mode=nonstrict;
 SET hive.exec.dynamic.partition=true;
-LOAD DATA LOCAL INPATH '{impala_home}/testdata/target/AllTypesAgg/100101.txt' OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name} PARTITION(year=2010, month=1, day=1);
-LOAD DATA LOCAL INPATH '{impala_home}/testdata/target/AllTypesAgg/100102.txt' OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name} PARTITION(year=2010, month=1, day=2);
-LOAD DATA LOCAL INPATH '{impala_home}/testdata/target/AllTypesAgg/100103.txt' OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name} PARTITION(year=2010, month=1, day=3);
-LOAD DATA LOCAL INPATH '{impala_home}/testdata/target/AllTypesAgg/100104.txt' OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name} PARTITION(year=2010, month=1, day=4);
-LOAD DATA LOCAL INPATH '{impala_home}/testdata/target/AllTypesAgg/100105.txt' OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name} PARTITION(year=2010, month=1, day=5);
-LOAD DATA LOCAL INPATH '{impala_home}/testdata/target/AllTypesAgg/100106.txt' OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name} PARTITION(year=2010, month=1, day=6);
-LOAD DATA LOCAL INPATH '{impala_home}/testdata/target/AllTypesAgg/100107.txt' OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name} PARTITION(year=2010, month=1, day=7);
-LOAD DATA LOCAL INPATH '{impala_home}/testdata/target/AllTypesAgg/100108.txt' OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name} PARTITION(year=2010, month=1, day=8);
-LOAD DATA LOCAL INPATH '{impala_home}/testdata/target/AllTypesAgg/100109.txt' OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name} PARTITION(year=2010, month=1, day=9);
-LOAD DATA LOCAL INPATH '{impala_home}/testdata/target/AllTypesAgg/100110.txt' OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name} PARTITION(year=2010, month=1, day=10);
+LOAD DATA INPATH '{staging_dir}/testdata/target/AllTypesAgg/100101.txt' OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name} PARTITION(year=2010, month=1, day=1);
+LOAD DATA INPATH '{staging_dir}/testdata/target/AllTypesAgg/100102.txt' OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name} PARTITION(year=2010, month=1, day=2);
+LOAD DATA INPATH '{staging_dir}/testdata/target/AllTypesAgg/100103.txt' OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name} PARTITION(year=2010, month=1, day=3);
+LOAD DATA INPATH '{staging_dir}/testdata/target/AllTypesAgg/100104.txt' OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name} PARTITION(year=2010, month=1, day=4);
+LOAD DATA INPATH '{staging_dir}/testdata/target/AllTypesAgg/100105.txt' OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name} PARTITION(year=2010, month=1, day=5);
+LOAD DATA INPATH '{staging_dir}/testdata/target/AllTypesAgg/100106.txt' OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name} PARTITION(year=2010, month=1, day=6);
+LOAD DATA INPATH '{staging_dir}/testdata/target/AllTypesAgg/100107.txt' OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name} PARTITION(year=2010, month=1, day=7);
+LOAD DATA INPATH '{staging_dir}/testdata/target/AllTypesAgg/100108.txt' OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name} PARTITION(year=2010, month=1, day=8);
+LOAD DATA INPATH '{staging_dir}/testdata/target/AllTypesAgg/100109.txt' OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name} PARTITION(year=2010, month=1, day=9);
+LOAD DATA INPATH '{staging_dir}/testdata/target/AllTypesAgg/100110.txt' OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name} PARTITION(year=2010, month=1, day=10);
 INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name} partition (year, month, day) SELECT id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month, tinyint_col as day FROM {db_name}.{table_name} WHERE year=2010 and month=1 and day IS NOT NULL and tinyint_col IS NULL order by id;
 ---- CREATE_KUDU
 DROP VIEW IF EXISTS {db_name}{db_suffix}.{table_name};
@@ -748,16 +748,16 @@ INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name} partition (year, month,
 SELECT id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month, day
 FROM {db_name}.{table_name};
 ---- LOAD
-LOAD DATA LOCAL INPATH '{impala_home}/testdata/target/AllTypesAggNoNulls/100101.txt' OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name} PARTITION(year=2010, month=1, day=1);
-LOAD DATA LOCAL INPATH '{impala_home}/testdata/target/AllTypesAggNoNulls/100102.txt' OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name} PARTITION(year=2010, month=1, day=2);
-LOAD DATA LOCAL INPATH '{impala_home}/testdata/target/AllTypesAggNoNulls/100103.txt' OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name} PARTITION(year=2010, month=1, day=3);
-LOAD DATA LOCAL INPATH '{impala_home}/testdata/target/AllTypesAggNoNulls/100104.txt' OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name} PARTITION(year=2010, month=1, day=4);
-LOAD DATA LOCAL INPATH '{impala_home}/testdata/target/AllTypesAggNoNulls/100105.txt' OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name} PARTITION(year=2010, month=1, day=5);
-LOAD DATA LOCAL INPATH '{impala_home}/testdata/target/AllTypesAggNoNulls/100106.txt' OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name} PARTITION(year=2010, month=1, day=6);
-LOAD DATA LOCAL INPATH '{impala_home}/testdata/target/AllTypesAggNoNulls/100107.txt' OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name} PARTITION(year=2010, month=1, day=7);
-LOAD DATA LOCAL INPATH '{impala_home}/testdata/target/AllTypesAggNoNulls/100108.txt' OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name} PARTITION(year=2010, month=1, day=8);
-LOAD DATA LOCAL INPATH '{impala_home}/testdata/target/AllTypesAggNoNulls/100109.txt' OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name} PARTITION(year=2010, month=1, day=9);
-LOAD DATA LOCAL INPATH '{impala_home}/testdata/target/AllTypesAggNoNulls/100110.txt' OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name} PARTITION(year=2010, month=1, day=10);
+LOAD DATA INPATH '{staging_dir}/testdata/target/AllTypesAggNoNulls/100101.txt' OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name} PARTITION(year=2010, month=1, day=1);
+LOAD DATA INPATH '{staging_dir}/testdata/target/AllTypesAggNoNulls/100102.txt' OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name} PARTITION(year=2010, month=1, day=2);
+LOAD DATA INPATH '{staging_dir}/testdata/target/AllTypesAggNoNulls/100103.txt' OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name} PARTITION(year=2010, month=1, day=3);
+LOAD DATA INPATH '{staging_dir}/testdata/target/AllTypesAggNoNulls/100104.txt' OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name} PARTITION(year=2010, month=1, day=4);
+LOAD DATA INPATH '{staging_dir}/testdata/target/AllTypesAggNoNulls/100105.txt' OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name} PARTITION(year=2010, month=1, day=5);
+LOAD DATA INPATH '{staging_dir}/testdata/target/AllTypesAggNoNulls/100106.txt' OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name} PARTITION(year=2010, month=1, day=6);
+LOAD DATA INPATH '{staging_dir}/testdata/target/AllTypesAggNoNulls/100107.txt' OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name} PARTITION(year=2010, month=1, day=7);
+LOAD DATA INPATH '{staging_dir}/testdata/target/AllTypesAggNoNulls/100108.txt' OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name} PARTITION(year=2010, month=1, day=8);
+LOAD DATA INPATH '{staging_dir}/testdata/target/AllTypesAggNoNulls/100109.txt' OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name} PARTITION(year=2010, month=1, day=9);
+LOAD DATA INPATH '{staging_dir}/testdata/target/AllTypesAggNoNulls/100110.txt' OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name} PARTITION(year=2010, month=1, day=10);
 ---- CREATE_KUDU
 DROP TABLE IF EXISTS {db_name}{db_suffix}.{table_name};
 CREATE TABLE {db_name}{db_suffix}.{table_name} (
@@ -876,7 +876,7 @@ small_struct struct<i:int, s:string>
 hadoop fs -put -f ${IMPALA_HOME}/testdata/data/ComplexTypesTbl/structs.parq \
 /test-warehouse/complextypes_structs_parquet/
 ---- DEPENDENT_LOAD_ACID
-LOAD DATA LOCAL INPATH '{impala_home}/testdata/data/ComplexTypesTbl/structs.orc' OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name};
+LOAD DATA INPATH '{staging_dir}/testdata/data/ComplexTypesTbl/structs.orc' OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name};
 ---- LOAD
 ====
 ---- DATASET
@@ -891,7 +891,7 @@ outer_struct struct<str:string,inner_struct1:struct<str:string,de:decimal(8,2)>,
 hadoop fs -put -f ${IMPALA_HOME}/testdata/data/ComplexTypesTbl/structs_nested.parq \
 /test-warehouse/complextypes_nested_structs_parquet/
 ---- DEPENDENT_LOAD_ACID
-LOAD DATA LOCAL INPATH '{impala_home}/testdata/data/ComplexTypesTbl/structs_nested.orc' OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name};
+LOAD DATA INPATH '{staging_dir}/testdata/data/ComplexTypesTbl/structs_nested.orc' OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name};
 ---- LOAD
 ====
 ---- DATASET
@@ -907,7 +907,7 @@ arr2 array<string>
 hadoop fs -put -f ${IMPALA_HOME}/testdata/data/ComplexTypesTbl/arrays.parq \
 /test-warehouse/complextypes_arrays_parquet/
 ---- DEPENDENT_LOAD_ACID
-LOAD DATA LOCAL INPATH '{impala_home}/testdata/data/ComplexTypesTbl/arrays.orc' OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name};
+LOAD DATA INPATH '{staging_dir}/testdata/data/ComplexTypesTbl/arrays.orc' OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name};
 ---- LOAD
 ====
 ---- DATASET
@@ -1004,7 +1004,7 @@ INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name} SELECT c.* FROM functio
 functional
 ---- BASE_TABLE_NAME
 multipartformat
----- CREATE_HIVE
+---- CREATE
 -- Used to test dynamic and static insert into partitioned tables which contains
 -- supported and unsupported file formats.
 CREATE TABLE IF NOT EXISTS {db_name}{db_suffix}.{table_name} (id int)
@@ -1031,7 +1031,7 @@ CREATE TABLE IF NOT EXISTS {db_name}{db_suffix}.{table_name} (
   a array<int>,
   m map<string,bigint>)
 STORED AS {file_format};
----- LOAD
+---- LOAD_HIVE
 INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name} SELECT id, named_struct("f1",string_col,"f2",int_col), array(1, 2, 3), map("k", cast(0 as bigint)) FROM functional.alltypestiny;
 ---- DEPENDENT_LOAD_HIVE
 -- This INSERT must run in Hive, because Impala doesn't support inserting into tables
@@ -1053,7 +1053,7 @@ CREATE TABLE IF NOT EXISTS {db_name}{db_suffix}.{table_name} (
   m map<string,bigint>)
 PARTITIONED BY (p int)
 STORED AS {file_format};
----- LOAD
+---- LOAD_HIVE
 INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name} PARTITION(p=1) SELECT id, named_struct("f1",string_col,"f2",int_col), array(1, 2, 3), map("k", cast(0 as bigint)) FROM functional.alltypestiny;
 INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name} PARTITION(p=2) SELECT id, named_struct("f1",string_col,"f2",int_col), array(1, 2, 3), map("k", cast(0 as bigint)) FROM functional.alltypestiny;
 INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name} PARTITION(p=3) SELECT id, named_struct("f1",string_col,"f2",int_col), array(1, 2, 3), map("k", cast(0 as bigint)) FROM functional.alltypestiny;
@@ -1102,7 +1102,7 @@ delimited fields terminated by ','  escaped by '\\'
 ---- DEPENDENT_LOAD
 INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name} SELECT * FROM {db_name}.{table_name};
 ---- LOAD
-LOAD DATA LOCAL INPATH '{impala_home}/testdata/data/DimTbl/data.csv' OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name};
+LOAD DATA INPATH '{staging_dir}/testdata/data/DimTbl/data.csv' OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name};
 ---- CREATE_KUDU
 DROP TABLE IF EXISTS {db_name}{db_suffix}.{table_name};
 create table {db_name}{db_suffix}.{table_name} (
@@ -1127,7 +1127,7 @@ delimited fields terminated by ','  escaped by '\\'
 ---- DEPENDENT_LOAD
 INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name} SELECT * FROM {db_name}.{table_name};
 ---- LOAD
-LOAD DATA LOCAL INPATH '{impala_home}/testdata/data/JoinTbl/data.csv' OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name};
+LOAD DATA INPATH '{staging_dir}/testdata/data/JoinTbl/data.csv' OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name};
 ---- CREATE_KUDU
 DROP TABLE IF EXISTS {db_name}{db_suffix}.{table_name};
 create table {db_name}{db_suffix}.{table_name} (
@@ -1158,7 +1158,7 @@ delimited fields terminated by ','  escaped by '\\'
 ---- DEPENDENT_LOAD
 INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name} SELECT * FROM {db_name}.{table_name};
 ---- LOAD
-LOAD DATA LOCAL INPATH '{impala_home}/testdata/data/LikeTbl/data.csv' OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name};
+LOAD DATA INPATH '{staging_dir}/testdata/data/LikeTbl/data.csv' OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name};
 ====
 ---- DATASET
 functional
@@ -1359,7 +1359,7 @@ col4 int
 ---- ROW_FORMAT
 delimited fields terminated by ',' escaped by '\\' lines terminated by '\n'
 ---- LOAD
-LOAD DATA LOCAL INPATH '{impala_home}/testdata/data/text-comma-backslash-newline.txt' OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name};
+LOAD DATA INPATH '{staging_dir}/testdata/data/text-comma-backslash-newline.txt' OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name};
 ====
 ---- DATASET
 functional
@@ -1373,7 +1373,7 @@ col4 int
 ---- ROW_FORMAT
 delimited fields terminated by '$' escaped by '#' lines terminated by '|'
 ---- LOAD
-LOAD DATA LOCAL INPATH '{impala_home}/testdata/data/text-dollar-hash-pipe.txt' OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name};
+LOAD DATA INPATH '{staging_dir}/testdata/data/text-dollar-hash-pipe.txt' OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name};
 ====
 ---- DATASET
 functional
@@ -1392,7 +1392,7 @@ delimited fields terminated by '-2' escaped by '-22' lines terminated by '\n'
 -- TERMINATED BY are specified at the same time and set to extended ASCII characters.
 -- To work around this, the data file is loaded into a temp table with the same location.
 CREATE EXTERNAL TABLE IF NOT EXISTS {db_name}{db_suffix}.{table_name}_tmp(i int) LOCATION '/test-warehouse/{table_name}';
-LOAD DATA LOCAL INPATH '{impala_home}/testdata/data/text-thorn-ecirc-newline.txt' OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name}_tmp;
+LOAD DATA INPATH '{staging_dir}/testdata/data/text-thorn-ecirc-newline.txt' OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name}_tmp;
 DROP TABLE {db_name}{db_suffix}.{table_name}_tmp;
 ====
 ---- DATASET
@@ -1412,7 +1412,7 @@ decimal2_col DECIMAL(38,38)
 ---- ROW_FORMAT
 delimited fields terminated by ','  escaped by '\\'
 ---- LOAD
-LOAD DATA LOCAL INPATH '{impala_home}/testdata/data/overflow.txt' OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name};
+LOAD DATA INPATH '{staging_dir}/testdata/data/overflow.txt' OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name};
 ====
 ---- DATASET
 functional
@@ -1426,7 +1426,7 @@ child string
 ---- ROW_FORMAT
 delimited fields terminated by ','  escaped by '\\'
 ---- LOAD
-LOAD DATA LOCAL INPATH '{impala_home}/testdata/data/json_test/complex.json' OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name};
+LOAD DATA INPATH '{staging_dir}/testdata/data/json_test/complex.json' OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name};
 ====
 ---- DATASET
 functional
@@ -1439,7 +1439,7 @@ value string
 ---- ROW_FORMAT
 delimited fields terminated by ','  escaped by '\\'
 ---- LOAD
-LOAD DATA LOCAL INPATH '{impala_home}/testdata/data/json_test/multiline.json' OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name};
+LOAD DATA INPATH '{staging_dir}/testdata/data/json_test/multiline.json' OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name};
 ====
 ---- DATASET
 functional
@@ -1453,7 +1453,7 @@ string_col string
 ---- ROW_FORMAT
 delimited fields terminated by ','  escaped by '\\'
 ---- LOAD
-LOAD DATA LOCAL INPATH '{impala_home}/testdata/data/json_test/malformed.json' OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name};
+LOAD DATA INPATH '{staging_dir}/testdata/data/json_test/malformed.json' OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name};
 ====
 ---- DATASET
 functional
@@ -1472,7 +1472,7 @@ decimal2_col DECIMAL(38,38)
 ---- ROW_FORMAT
 delimited fields terminated by ','  escaped by '\\'
 ---- LOAD
-LOAD DATA LOCAL INPATH '{impala_home}/testdata/data/json_test/overflow.json' OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name};
+LOAD DATA INPATH '{staging_dir}/testdata/data/json_test/overflow.json' OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name};
 ====
 ---- DATASET
 functional
@@ -1485,7 +1485,7 @@ delimited fields terminated by ','  escaped by '\\'
 ---- DEPENDENT_LOAD
 INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name} SELECT * FROM {db_name}.{table_name};
 ---- LOAD
-LOAD DATA LOCAL INPATH '{impala_home}/testdata/data/widerow.txt' OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name};
+LOAD DATA INPATH '{staging_dir}/testdata/data/widerow.txt' OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name};
 ====
 ---- DATASET
 functional
@@ -1496,7 +1496,7 @@ field string
 ---- DEPENDENT_LOAD
 INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name} SELECT * FROM {db_name}.{table_name};
 ---- LOAD
-LOAD DATA LOCAL INPATH '{impala_home}/testdata/data/hive_benchmark/grepTiny/part-00000' OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name};
+LOAD DATA INPATH '{staging_dir}/testdata/data/hive_benchmark/grepTiny/part-00000' OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name};
 ====
 ---- DATASET
 functional
@@ -1511,7 +1511,7 @@ delimited fields terminated by '|'
 ---- DEPENDENT_LOAD
 INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name} SELECT * FROM {db_name}.{table_name};
 ---- LOAD
-LOAD DATA LOCAL INPATH '{impala_home}/testdata/data/hive_benchmark/htmlTiny/Rankings.dat' OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name};
+LOAD DATA INPATH '{staging_dir}/testdata/data/hive_benchmark/htmlTiny/Rankings.dat' OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name};
 ====
 ---- DATASET
 functional
@@ -1532,7 +1532,7 @@ delimited fields terminated by '|'
 ---- DEPENDENT_LOAD
 INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name} SELECT * FROM {db_name}.{table_name};
 ---- LOAD
-LOAD DATA LOCAL INPATH '{impala_home}/testdata/data/hive_benchmark/htmlTiny/UserVisits.dat' OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name};
+LOAD DATA INPATH '{staging_dir}/testdata/data/hive_benchmark/htmlTiny/UserVisits.dat' OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name};
 ====
 ---- DATASET
 functional
@@ -1587,7 +1587,7 @@ insert overwrite table {db_name}{db_suffix}.{table_name} partition (year, month,
 insert into table {db_name}{db_suffix}.{table_name} partition (year, month, day) SELECT id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month, day FROM {db_name}.{table_name} where id % 4 = 1;
 insert into table {db_name}{db_suffix}.{table_name} partition (year, month, day) SELECT id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month, day FROM {db_name}.{table_name} where id % 4 = 2;
 insert into table {db_name}{db_suffix}.{table_name} partition (year, month, day) SELECT  id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month, day FROM {db_name}.{table_name} where id % 4 = 3;
----- LOAD
+---- LOAD_HIVE
 SET hive.exec.dynamic.partition.mode=nonstrict;
 SET hive.exec.dynamic.partition=true;
 insert overwrite table {db_name}{db_suffix}.{table_name} partition (year, month, day) SELECT id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month, day FROM functional.alltypesagg where id % 4 = 0;
@@ -1616,7 +1616,7 @@ insert into table {db_name}{db_suffix}.{table_name} SELECT id, bool_col, tinyint
 insert into table {db_name}{db_suffix}.{table_name} SELECT id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col FROM {db_name}.{table_name} where id % 4 = 1;
 insert into table {db_name}{db_suffix}.{table_name} SELECT id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col FROM {db_name}.{table_name} where id % 4 = 2;
 insert into table {db_name}{db_suffix}.{table_name} SELECT id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col FROM {db_name}.{table_name} where id % 4 = 3;
----- LOAD
+---- LOAD_HIVE
 SET hive.exec.dynamic.partition.mode=nonstrict;
 SET hive.exec.dynamic.partition=true;
 SET hive.input.format=org.apache.hadoop.hive.ql.io.HiveInputFormat;
@@ -1637,10 +1637,8 @@ id int
 ALTER TABLE {table_name} ADD IF NOT EXISTS PARTITION (string_col = "partition1");
 ALTER TABLE {table_name} ADD IF NOT EXISTS PARTITION (string_col = "2009-01-01 00:00:00");
 ---- LOAD
-SET hive.exec.dynamic.partition.mode=nonstrict;
-SET hive.exec.dynamic.partition=true;
 INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name} PARTITION(string_col)
-SELECT id, timestamp_col as string_col from functional.alltypestiny
+SELECT id, cast(timestamp_col as string) as string_col from functional.alltypestiny
 WHERE timestamp_col = "2009-01-01 00:00:00";
 ====
 ---- DATASET
@@ -1655,7 +1653,7 @@ delimited fields terminated by ','
 ---- DEPENDENT_LOAD
 INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name} SELECT * FROM {db_name}.{table_name};
 ---- LOAD
-LOAD DATA LOCAL INPATH '{impala_home}/testdata/data/TinyTable/data.csv' OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name};
+LOAD DATA INPATH '{staging_dir}/testdata/data/TinyTable/data.csv' OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name};
 ---- CREATE_KUDU
 DROP TABLE IF EXISTS {db_name}{db_suffix}.{table_name};
 create table {db_name}{db_suffix}.{table_name} (
@@ -1676,7 +1674,7 @@ delimited fields terminated by ','
 ---- DEPENDENT_LOAD
 INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name} SELECT * FROM {db_name}.{table_name};
 ---- LOAD
-LOAD DATA LOCAL INPATH '{impala_home}/testdata/data/TinyIntTable/data.csv' OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name};
+LOAD DATA INPATH '{staging_dir}/testdata/data/TinyIntTable/data.csv' OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name};
 ---- CREATE_KUDU
 DROP TABLE IF EXISTS {db_name}{db_suffix}.{table_name};
 create table {db_name}{db_suffix}.{table_name} (
@@ -1703,7 +1701,7 @@ delimited fields terminated by ','
 ---- DEPENDENT_LOAD
 INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name} select * from functional.nulltable;
 ---- LOAD
-LOAD DATA LOCAL INPATH '{impala_home}/testdata/data/NullTable/data.csv'
+LOAD DATA INPATH '{staging_dir}/testdata/data/NullTable/data.csv'
 OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name};
 ---- CREATE_KUDU
 DROP TABLE IF EXISTS {db_name}{db_suffix}.{table_name};
@@ -1734,7 +1732,7 @@ delimited fields terminated by ','
 ---- DEPENDENT_LOAD
 INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name} select * from functional.nullrows;
 ---- LOAD
-LOAD DATA LOCAL INPATH '{impala_home}/testdata/data/NullRows/data.csv'
+LOAD DATA INPATH '{staging_dir}/testdata/data/NullRows/data.csv'
 OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name};
 ====
 ---- DATASET
@@ -1754,8 +1752,7 @@ delimited fields terminated by ',' escaped by '\\'
 ---- DEPENDENT_LOAD
 INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name} select * from functional.nulltable;
 ---- LOAD
-LOAD DATA LOCAL INPATH '{impala_home}/testdata/data/NullTable/data.csv'
-OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name};
+INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name} select * from functional.nulltable;
 ---- CREATE_KUDU
 DROP TABLE IF EXISTS {db_name}{db_suffix}.{table_name};
 create table {db_name}{db_suffix}.{table_name} (
@@ -1790,7 +1787,7 @@ delimited fields terminated by ','  escaped by '\\'
 ---- DEPENDENT_LOAD
 INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name} SELECT * FROM {db_name}.{table_name};
 ---- LOAD
-LOAD DATA LOCAL INPATH '{impala_home}/testdata/data/TblWithRaggedColumns/data.csv' OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name};
+LOAD DATA INPATH '{staging_dir}/testdata/data/TblWithRaggedColumns/data.csv' OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name};
 ====
 ---- DATASET
 functional
@@ -1807,7 +1804,7 @@ DELIMITED FIELDS TERMINATED BY ','
 ---- DEPENDENT_LOAD
 INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name} SELECT * FROM {db_name}.{table_name};
 ---- LOAD
-LOAD DATA LOCAL INPATH '{impala_home}/testdata/data/ImpalaDemoDataset/DEC_00_SF3_P077_with_ann_noheader.csv' OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name};
+LOAD DATA INPATH '{staging_dir}/testdata/data/ImpalaDemoDataset/DEC_00_SF3_P077_with_ann_noheader.csv' OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name};
 ---- CREATE_KUDU
 DROP TABLE IF EXISTS {db_name}{db_suffix}.{table_name};
 create table {db_name}{db_suffix}.{table_name} (
@@ -1835,7 +1832,7 @@ DELIMITED FIELDS TERMINATED BY ','
 ---- DEPENDENT_LOAD
 INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name} SELECT * FROM {db_name}.{table_name};
 ---- LOAD
-LOAD DATA LOCAL INPATH '{impala_home}/testdata/data/zipcodes_timezones.csv' OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name};
+LOAD DATA INPATH '{staging_dir}/testdata/data/zipcodes_timezones.csv' OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name};
 ====
 ---- DATASET
 functional
@@ -1865,7 +1862,7 @@ old_rcfile_table
 key INT
 value STRING
 ---- DEPENDENT_LOAD_HIVE
-LOAD DATA LOCAL INPATH '{impala_home}/testdata/data/oldrcfile.rc'
+LOAD DATA INPATH '{staging_dir}/testdata/data/oldrcfile.rc'
 OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name};
 ====
 ---- DATASET
@@ -1876,7 +1873,7 @@ bad_text_gzip
 s STRING
 i INT
 ---- DEPENDENT_LOAD_HIVE
-LOAD DATA LOCAL INPATH '{impala_home}/testdata/data/bad_text_gzip/file_not_finished.gz'
+LOAD DATA INPATH '{staging_dir}/testdata/data/bad_text_gzip/file_not_finished.gz'
 OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name};
 ====
 ---- DATASET
@@ -1887,7 +1884,7 @@ bad_seq_snap
 field STRING
 ---- DEPENDENT_LOAD_HIVE
 -- This data file contains format errors and is accessed by the unit test: sequence-file-recover-test.
-LOAD DATA LOCAL INPATH '{impala_home}/testdata/data/bad_seq_snap/bad_file'
+LOAD DATA INPATH '{staging_dir}/testdata/data/bad_seq_snap/bad_file'
 OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name};
 ====
 ---- DATASET
@@ -1897,11 +1894,11 @@ bad_avro_snap_strings
 ---- COLUMNS
 s STRING
 ---- DEPENDENT_LOAD_HIVE
-LOAD DATA LOCAL INPATH '{impala_home}/testdata/data/bad_avro_snap/negative_string_len.avro'
+LOAD DATA INPATH '{staging_dir}/testdata/data/bad_avro_snap/negative_string_len.avro'
 OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name};
-LOAD DATA LOCAL INPATH '{impala_home}/testdata/data/bad_avro_snap/invalid_union.avro'
+LOAD DATA INPATH '{staging_dir}/testdata/data/bad_avro_snap/invalid_union.avro'
 INTO TABLE {db_name}{db_suffix}.{table_name};
-LOAD DATA LOCAL INPATH '{impala_home}/testdata/data/bad_avro_snap/truncated_string.avro'
+LOAD DATA INPATH '{staging_dir}/testdata/data/bad_avro_snap/truncated_string.avro'
 INTO TABLE {db_name}{db_suffix}.{table_name};
 ====
 ---- DATASET
@@ -1911,7 +1908,7 @@ bad_avro_snap_floats
 ---- COLUMNS
 c1 FLOAT
 ---- DEPENDENT_LOAD_HIVE
-LOAD DATA LOCAL INPATH '{impala_home}/testdata/data/bad_avro_snap/truncated_float.avro'
+LOAD DATA INPATH '{staging_dir}/testdata/data/bad_avro_snap/truncated_float.avro'
 OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name};
 ====
 ---- DATASET
@@ -1922,7 +1919,7 @@ bad_avro_decimal_schema
 name STRING
 value DECIMAL(5,2)
 ---- DEPENDENT_LOAD_HIVE
-LOAD DATA LOCAL INPATH '{impala_home}/testdata/data/bad_avro_snap/invalid_decimal_schema.avro'
+LOAD DATA INPATH '{staging_dir}/testdata/data/bad_avro_snap/invalid_decimal_schema.avro'
 OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name};
 ====
 ---- DATASET
@@ -1932,7 +1929,7 @@ bad_avro_date_out_of_range
 ---- COLUMNS
 d DATE
 ---- DEPENDENT_LOAD_HIVE
-LOAD DATA LOCAL INPATH '{impala_home}/testdata/data/bad_avro_snap/out_of_range_date.avro'
+LOAD DATA INPATH '{staging_dir}/testdata/data/bad_avro_snap/out_of_range_date.avro'
 OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name};
 ====
 ---- DATASET
@@ -1942,7 +1939,7 @@ hive2_bad_avro_date_pre_gregorian
 ---- COLUMNS
 d DATE
 ---- DEPENDENT_LOAD_HIVE
-LOAD DATA LOCAL INPATH '{impala_home}/testdata/data/bad_avro_snap/hive2_pre_gregorian_date.avro'
+LOAD DATA INPATH '{staging_dir}/testdata/data/bad_avro_snap/hive2_pre_gregorian_date.avro'
 OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name};
 ====
 ---- DATASET
@@ -1952,7 +1949,7 @@ hive3_avro_date_pre_gregorian
 ---- COLUMNS
 d DATE
 ---- DEPENDENT_LOAD_HIVE
-LOAD DATA LOCAL INPATH '{impala_home}/testdata/data/bad_avro_snap/hive3_pre_gregorian_date.avro'
+LOAD DATA INPATH '{staging_dir}/testdata/data/bad_avro_snap/hive3_pre_gregorian_date.avro'
 OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name};
 ====
 ---- DATASET
@@ -1964,17 +1961,17 @@ bad_parquet
 field STRING
 ---- DEPENDENT_LOAD_HIVE
 -- IMPALA-694: data file produced by parquet-mr version 1.2.5-cdh4.5.0
-LOAD DATA LOCAL INPATH '{impala_home}/testdata/data/bad_parquet_data.parquet'
+LOAD DATA INPATH '{staging_dir}/testdata/data/bad_parquet_data.parquet'
 OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name};
 -- Data file produced by parquet-mr with repeated values (produces 0 bit width dictionary)
-LOAD DATA LOCAL INPATH '{impala_home}/testdata/data/repeated_values.parquet'
+LOAD DATA INPATH '{staging_dir}/testdata/data/repeated_values.parquet'
 INTO TABLE {db_name}{db_suffix}.{table_name};
 -- IMPALA-720: data file produced by parquet-mr with multiple row groups
-LOAD DATA LOCAL INPATH '{impala_home}/testdata/data/multiple_rowgroups.parquet'
+LOAD DATA INPATH '{staging_dir}/testdata/data/multiple_rowgroups.parquet'
 INTO TABLE {db_name}{db_suffix}.{table_name};
 -- IMPALA-1401: data file produced by Hive 13 containing page statistics with long min/max
 -- string values
-LOAD DATA LOCAL INPATH '{impala_home}/testdata/data/long_page_header.parquet'
+LOAD DATA INPATH '{staging_dir}/testdata/data/long_page_header.parquet'
 INTO TABLE {db_name}{db_suffix}.{table_name};
 ====
 ---- DATASET
@@ -1985,11 +1982,11 @@ bad_parquet_strings_negative_len
 s STRING
 ---- DEPENDENT_LOAD_HIVE
 -- IMPALA-3732: parquet files with corrupt strings
-LOAD DATA LOCAL INPATH
-'{impala_home}/testdata/data/bad_parquet_data/dict-encoded-negative-len.parq'
+LOAD DATA INPATH
+'{staging_dir}/testdata/data/bad_parquet_data//dict-encoded-negative-len.parq'
 OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name};
-LOAD DATA LOCAL INPATH
-'{impala_home}/testdata/data/bad_parquet_data/plain-encoded-negative-len.parq'
+LOAD DATA INPATH
+'{staging_dir}/testdata/data/bad_parquet_data//plain-encoded-negative-len.parq'
 INTO TABLE {db_name}{db_suffix}.{table_name};
 ====
 ---- DATASET
@@ -2000,11 +1997,11 @@ bad_parquet_strings_out_of_bounds
 s STRING
 ---- DEPENDENT_LOAD_HIVE
 -- IMPALA-3732: parquet files with corrupt strings
-LOAD DATA LOCAL INPATH
-'{impala_home}/testdata/data/bad_parquet_data/dict-encoded-out-of-bounds.parq'
+LOAD DATA INPATH
+'{staging_dir}/testdata/data/bad_parquet_data//dict-encoded-out-of-bounds.parq'
 OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name};
-LOAD DATA LOCAL INPATH
-'{impala_home}/testdata/data/bad_parquet_data/plain-encoded-out-of-bounds.parq'
+LOAD DATA INPATH
+'{staging_dir}/testdata/data/bad_parquet_data//plain-encoded-out-of-bounds.parq'
 INTO TABLE {db_name}{db_suffix}.{table_name};
 ====
 ---- DATASET
@@ -2022,8 +2019,8 @@ d7 DECIMAL(4, 2)
 d8 DECIMAL(4, 2)
 ---- DEPENDENT_LOAD_HIVE
 -- IMPALA-10808: parquet files with illegal decimal schemas
-LOAD DATA LOCAL INPATH
-'{impala_home}/testdata/data/bad_parquet_data/illegal_decimals.parq'
+LOAD DATA INPATH
+'{staging_dir}/testdata/data/bad_parquet_data//illegal_decimals.parq'
 OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name};
 ====
 ---- DATASET
@@ -2034,7 +2031,7 @@ bad_magic_number
 ---- COLUMNS
 field STRING
 ---- DEPENDENT_LOAD_HIVE
-LOAD DATA LOCAL INPATH '{impala_home}/testdata/data/bad_magic_number.parquet'
+LOAD DATA INPATH '{staging_dir}/testdata/data/bad_magic_number.parquet'
 OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name};
 ====
 ---- DATASET
@@ -2058,7 +2055,7 @@ year int
 month int
 day int
 ---- DEPENDENT_LOAD_HIVE
-LOAD DATA LOCAL INPATH '{impala_home}/testdata/data/alltypesagg_hive_13_1.parquet'
+LOAD DATA INPATH '{staging_dir}/testdata/data/alltypesagg_hive_13_1.parquet'
 OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name};
 ====
 ---- DATASET
@@ -2069,7 +2066,7 @@ bad_metadata_len
 ---- COLUMNS
 field TINYINT
 ---- DEPENDENT_LOAD_HIVE
-LOAD DATA LOCAL INPATH '{impala_home}/testdata/data/bad_metadata_len.parquet'
+LOAD DATA INPATH '{staging_dir}/testdata/data/bad_metadata_len.parquet'
 OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name};
 ====
 ---- DATASET
@@ -2080,7 +2077,7 @@ bad_dict_page_offset
 ---- COLUMNS
 field TINYINT
 ---- DEPENDENT_LOAD_HIVE
-LOAD DATA LOCAL INPATH '{impala_home}/testdata/data/bad_dict_page_offset.parquet'
+LOAD DATA INPATH '{staging_dir}/testdata/data/bad_dict_page_offset.parquet'
 OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name};
 ====
 ---- DATASET
@@ -2091,7 +2088,7 @@ bad_compressed_size
 ---- COLUMNS
 field TINYINT
 ---- DEPENDENT_LOAD_HIVE
-LOAD DATA LOCAL INPATH '{impala_home}/testdata/data/bad_compressed_size.parquet'
+LOAD DATA INPATH '{staging_dir}/testdata/data/bad_compressed_size.parquet'
 OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name};
 ====
 ---- DATASET
@@ -2112,7 +2109,7 @@ opt_int_3 bigint
 req_int_2 bigint
 req_int_3 bigint
 ---- DEPENDENT_LOAD_HIVE
-LOAD DATA LOCAL INPATH '{impala_home}/testdata/data/kite_required_fields.parquet'
+LOAD DATA INPATH '{staging_dir}/testdata/data/kite_required_fields.parquet'
 OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name};
 ====
 ---- DATASET
@@ -2124,7 +2121,7 @@ bad_column_metadata
 id bigint
 int_array array<int>
 ---- DEPENDENT_LOAD_HIVE
-LOAD DATA LOCAL INPATH '{impala_home}/testdata/data/bad_column_metadata.parquet'
+LOAD DATA INPATH '{staging_dir}/testdata/data/bad_column_metadata.parquet'
 OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name};
 ====
 ---- DATASET
@@ -2167,7 +2164,7 @@ ALTER TABLE {table_name} ADD IF NOT EXISTS PARTITION(d6=1);
 ---- ROW_FORMAT
 delimited fields terminated by ','
 ---- LOAD
-LOAD DATA LOCAL INPATH '{impala_home}/testdata/data/decimal_tbl.txt'
+LOAD DATA INPATH '{staging_dir}/testdata/data/decimal_tbl.txt'
 OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name} PARTITION(d6=1);
 ---- DEPENDENT_LOAD
 INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name} partition(d6)
@@ -2228,7 +2225,7 @@ ALTER TABLE {table_name} ADD IF NOT EXISTS PARTITION(dpc=1);
 ---- ROW_FORMAT
 delimited fields terminated by ','
 ---- LOAD
-LOAD DATA LOCAL INPATH '{impala_home}/testdata/data/decimal_rtf_tbl.txt'
+LOAD DATA INPATH '{staging_dir}/testdata/data/decimal_rtf_tbl.txt'
 OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name} PARTITION(dpc=1);
 ---- DEPENDENT_LOAD
 INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name} partition(dpc)
@@ -2307,7 +2304,7 @@ ALTER TABLE {table_name} ADD IF NOT EXISTS PARTITION(dpc=1);
 ---- ROW_FORMAT
 delimited fields terminated by ','
 ---- LOAD
-LOAD DATA LOCAL INPATH '{impala_home}/testdata/data/decimal_rtf_tiny_tbl.txt'
+LOAD DATA INPATH '{staging_dir}/testdata/data/decimal_rtf_tiny_tbl.txt'
 OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name} PARTITION(dpc=1);
 ---- DEPENDENT_LOAD
 INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name} partition(dpc)
@@ -2359,7 +2356,7 @@ c3 DECIMAL(1,1)
 ---- ROW_FORMAT
 delimited fields terminated by ','
 ---- LOAD
-LOAD DATA LOCAL INPATH '{impala_home}/testdata/data/decimal-tiny.txt'
+LOAD DATA INPATH '{staging_dir}/testdata/data/decimal-tiny.txt'
 OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name};
 ---- DEPENDENT_LOAD
 INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name}
@@ -2392,7 +2389,7 @@ LOCATION '/test-warehouse/{table_name}';
 ---- ROW_FORMAT
 delimited fields terminated by '',''
 ---- LOAD
-LOAD DATA LOCAL INPATH '{impala_home}/testdata/data/parent_table.txt'
+LOAD DATA INPATH '{staging_dir}/testdata/data/parent_table.txt'
 OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name};
 ====
 ---- DATASET
@@ -2408,7 +2405,7 @@ LOCATION '/test-warehouse/{table_name}';
 ---- ROW_FORMAT
 delimited fields terminated by ','
 ---- LOAD
-LOAD DATA LOCAL INPATH '{impala_home}/testdata/data/parent_table_2.txt'
+LOAD DATA INPATH '{staging_dir}/testdata/data/parent_table_2.txt'
 OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name};
 ====
 ---- DATASET
@@ -2427,7 +2424,7 @@ LOCATION '/test-warehouse/{table_name}';
 ---- ROW_FORMAT
 delimited fields terminated by ','
 ---- LOAD
-LOAD DATA LOCAL INPATH '{impala_home}/testdata/data/child_table.txt'
+LOAD DATA INPATH '{staging_dir}/testdata/data/child_table.txt'
 OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name};
 ====
 ---- DATASET
@@ -2441,7 +2438,7 @@ vc VARCHAR(32)
 ---- ROW_FORMAT
 delimited fields terminated by ','
 ---- LOAD
-LOAD DATA LOCAL INPATH '{impala_home}/testdata/data/chars-tiny.txt'
+LOAD DATA INPATH '{staging_dir}/testdata/data/chars-tiny.txt'
 OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name};
 ---- DEPENDENT_LOAD
 INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name}
@@ -2459,7 +2456,7 @@ delimited fields terminated by ','  escaped by '\\'
 INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name}
 select * from functional.{table_name};
 ---- LOAD
-`${IMPALA_HOME}/testdata/common/widetable.py --create_data -n 250 -o /tmp/widetable_data.csv
+`${IMPALA_HOME}/testdata/common/widetable.py --create_data -n 250 -o /tmp/widetable_data_250.csv
 ====
 ---- DATASET
 functional
@@ -2473,7 +2470,7 @@ delimited fields terminated by ','  escaped by '\\'
 INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name}
 select * from functional.{table_name};
 ---- LOAD
-`${IMPALA_HOME}/testdata/common/widetable.py --create_data -n 500 -o /tmp/widetable_data.csv
+`${IMPALA_HOME}/testdata/common/widetable.py --create_data -n 500 -o /tmp/widetable_data_500.csv
 ====
 ---- DATASET
 functional
@@ -2487,7 +2484,7 @@ delimited fields terminated by ','  escaped by '\\'
 INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name}
 select * from functional.{table_name};
 ---- LOAD
-`${IMPALA_HOME}/testdata/common/widetable.py --create_data -n 1000 -o /tmp/widetable_data.csv
+`${IMPALA_HOME}/testdata/common/widetable.py --create_data -n 1000 -o /tmp/widetable_data_1000.csv
 ====
 ---- DATASET
 functional
@@ -2508,7 +2505,7 @@ avro_decimal_tbl
 name STRING
 value DECIMAL(5,2)
 ---- DEPENDENT_LOAD_HIVE
-LOAD DATA LOCAL INPATH '{impala_home}/testdata/data/avro_decimal_tbl.avro'
+LOAD DATA INPATH '{staging_dir}/testdata/data/avro_decimal_tbl.avro'
 OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name};
 ====
 ---- DATASET
@@ -2550,7 +2547,7 @@ row format delimited fields terminated by ','
 STORED AS TEXTFILE
 LOCATION '/test-warehouse/{table_name}';
 ---- LOAD
-LOAD DATA LOCAL INPATH '{impala_home}/testdata/data/table_no_newline.csv'
+LOAD DATA INPATH '{staging_dir}/testdata/data/table_no_newline.csv'
 OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name};
 ====
 ---- DATASET
@@ -2567,9 +2564,9 @@ LOCATION '/test-warehouse/{table_name}';
 ALTER TABLE {db_name}{db_suffix}.{table_name} ADD IF NOT EXISTS PARTITION (year=2015, month=3);
 ALTER TABLE {db_name}{db_suffix}.{table_name} ADD IF NOT EXISTS PARTITION (year=2010, month=3);
 ---- LOAD
-LOAD DATA LOCAL INPATH '{impala_home}/testdata/data/table_no_newline.csv'
+LOAD DATA INPATH '{staging_dir}/testdata/data/table_no_newline_part/table_no_newline.csv'
 OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name} PARTITION(year=2010, month=3);
-LOAD DATA LOCAL INPATH '{impala_home}/testdata/data/table_missing_columns.csv'
+LOAD DATA INPATH '{staging_dir}/testdata/data/table_missing_columns.csv'
 OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name} PARTITION(year=2015, month=3);
 ====
 ---- DATASET
@@ -2635,7 +2632,7 @@ CREATE TABLE IF NOT EXISTS {db_name}{db_suffix}.{table_name} (
   col1 int, col2 int)
 CLUSTERED BY (col1) INTO 5 BUCKETS
 STORED AS {file_format};
----- LOAD
+---- LOAD_HIVE
 INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name}
 SELECT id, int_col from functional.alltypes;
 ---- DEPENDENT_LOAD_HIVE
@@ -2770,7 +2767,7 @@ row format delimited fields terminated by ','
 STORED AS TEXTFILE
 LOCATION '/test-warehouse/{table_name}';
 ---- LOAD
-LOAD DATA LOCAL INPATH '{impala_home}/testdata/data/timezoneverification.csv'
+LOAD DATA INPATH '{staging_dir}/testdata/data/timezoneverification.csv'
 OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name};
 ====
 ---- DATASET
@@ -2780,7 +2777,7 @@ avro_unicode_nulls
 ---- CREATE_HIVE
 create external table if not exists {db_name}{db_suffix}.{table_name} like {db_name}{db_suffix}.liketbl stored as avro LOCATION '{hdfs_location}';
 ---- DEPENDENT_LOAD_HIVE
-LOAD DATA LOCAL INPATH '{impala_home}/testdata/data/avro_null_char/000000_0'
+LOAD DATA INPATH '{staging_dir}/testdata/data/avro_null_char/000000_0'
 OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name};
 ====
 ---- DATASET
@@ -2890,7 +2887,7 @@ C_MKTSEGMENT STRING
 C_COMMENT STRING
 C_ORDERS ARRAY<STRUCT<O_ORDERKEY: BIGINT, O_ORDERSTATUS: STRING, O_TOTALPRICE: DECIMAL(12, 2), O_ORDERDATE: STRING, O_ORDERPRIORITY: STRING, O_CLERK: STRING, O_SHIPPRIORITY: INT, O_COMMENT: STRING, O_LINEITEMS: ARRAY<STRUCT<L_PARTKEY: BIGINT, L_SUPPKEY: BIGINT, L_LINENUMBER: INT, L_QUANTITY: DECIMAL(12, 2), L_EXTENDEDPRICE: DECIMAL(12, 2), L_DISCOUNT: DECIMAL(12, 2), L_TAX: DECIMAL(12, 2), L_RETURNFLAG: STRING, L_LINESTATUS: STRING, L_SHIPDATE: STRING, L_COMMITDATE: STRING, L_RECEIPTDATE: STRING, L_SHIPINSTRUCT: STRING, L_SHIPMODE: STRING, L_COMMENT: STRING>>>>
 ---- DEPENDENT_LOAD_HIVE
-LOAD DATA LOCAL INPATH '{impala_home}/testdata/data/CustomerMultiBlock/customer_multiblock.parquet'
+LOAD DATA INPATH '{staging_dir}/testdata/data/CustomerMultiBlock/customer_multiblock.parquet'
 OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name};
 ====
 ---- DATASET
@@ -2909,7 +2906,7 @@ C_MKTSEGMENT STRING
 C_COMMENT STRING
 C_ORDERS ARRAY<STRUCT<O_ORDERKEY: BIGINT, O_ORDERSTATUS: STRING, O_TOTALPRICE: DECIMAL(12, 2), O_ORDERDATE: STRING, O_ORDERPRIORITY: STRING, O_CLERK: STRING, O_SHIPPRIORITY: INT, O_COMMENT: STRING, O_LINEITEMS: ARRAY<STRUCT<L_PARTKEY: BIGINT, L_SUPPKEY: BIGINT, L_LINENUMBER: INT, L_QUANTITY: DECIMAL(12, 2), L_EXTENDEDPRICE: DECIMAL(12, 2), L_DISCOUNT: DECIMAL(12, 2), L_TAX: DECIMAL(12, 2), L_RETURNFLAG: STRING, L_LINESTATUS: STRING, L_SHIPDATE: STRING, L_COMMITDATE: STRING, L_RECEIPTDATE: STRING, L_SHIPINSTRUCT: STRING, L_SHIPMODE: STRING, L_COMMENT: STRING>>>>
 ---- DEPENDENT_LOAD_HIVE
-LOAD DATA LOCAL INPATH '{impala_home}/testdata/data/customer_nested_multiblock_multipage.parquet'
+LOAD DATA INPATH '{staging_dir}/testdata/data/customer_nested_multiblock_multipage.parquet'
 OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name};
 ====
 ---- DATASET
@@ -2919,7 +2916,7 @@ bzip2_tbl
 ---- COLUMNS
 col string
 ---- DEPENDENT_LOAD_HIVE
-LOAD DATA LOCAL INPATH '{impala_home}/testdata/data/data-bzip2.bz2'
+LOAD DATA INPATH '{staging_dir}/testdata/data/data-bzip2.bz2'
 OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name};
 ====
 ---- DATASET
@@ -2929,7 +2926,7 @@ large_bzip2_tbl
 ---- COLUMNS
 col string
 ---- DEPENDENT_LOAD_HIVE
-LOAD DATA LOCAL INPATH '{impala_home}/testdata/data/large_bzip2.bz2'
+LOAD DATA INPATH '{staging_dir}/testdata/data/large_bzip2.bz2'
 OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name};
 ====
 ---- DATASET
@@ -2939,7 +2936,7 @@ multistream_bzip2_tbl
 ---- COLUMNS
 col string
 ---- DEPENDENT_LOAD_HIVE
-LOAD DATA LOCAL INPATH '{impala_home}/testdata/data/data-pbzip2.bz2'
+LOAD DATA INPATH '{staging_dir}/testdata/data/data-pbzip2.bz2'
 OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name};
 ====
 ---- DATASET
@@ -2949,7 +2946,7 @@ large_multistream_bzip2_tbl
 ---- COLUMNS
 col string
 ---- DEPENDENT_LOAD_HIVE
-LOAD DATA LOCAL INPATH '{impala_home}/testdata/data/large_pbzip2.bz2'
+LOAD DATA INPATH '{staging_dir}/testdata/data/large_pbzip2.bz2'
 OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name};
 ====
 ---- DATASET
@@ -2964,10 +2961,10 @@ delimited fields terminated by ','  escaped by '\\'
 ---- ALTER
 ALTER TABLE {table_name} SET TBLPROPERTIES('skip.header.line.count'='1');
 ---- LOAD
-LOAD DATA LOCAL INPATH '{impala_home}/testdata/data/table_with_header.csv'
+LOAD DATA INPATH '{staging_dir}/testdata/data/table_with_header.csv'
 OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name};
----- DEPENDENT_LOAD_HIVE
-LOAD DATA LOCAL INPATH '{impala_home}/testdata/data/table_with_header.gz'
+---- DEPENDENT_LOAD
+LOAD DATA INPATH '{staging_dir}/testdata/data/table_with_header.gz'
 OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name};
 ====
 ---- DATASET
@@ -2982,10 +2979,10 @@ delimited fields terminated by ','  escaped by '\\'
 ---- ALTER
 ALTER TABLE {table_name} SET TBLPROPERTIES('skip.header.line.count'='2');
 ---- LOAD
-LOAD DATA LOCAL INPATH '{impala_home}/testdata/data/table_with_header_2.csv'
+LOAD DATA INPATH '{staging_dir}/testdata/data/table_with_header_2.csv'
 OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name};
----- DEPENDENT_LOAD_HIVE
-LOAD DATA LOCAL INPATH '{impala_home}/testdata/data/table_with_header_2.gz'
+---- DEPENDENT_LOAD
+LOAD DATA INPATH '{staging_dir}/testdata/data/table_with_header_2.gz'
 OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name};
 ====
 ---- DATASET
@@ -3007,7 +3004,7 @@ i int
 ---- ROW_FORMAT
 delimited fields terminated by ','  escaped by '\\'
 ---- LOAD
-LOAD DATA LOCAL INPATH '{impala_home}/testdata/data/strings_with_quotes.csv'
+LOAD DATA INPATH '{staging_dir}/testdata/data/strings_with_quotes.csv'
 OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name};
 ---- DEPENDENT_LOAD
 INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name}
@@ -3071,7 +3068,7 @@ INSERT into TABLE {db_name}{db_suffix}.{table_name}_idx
 SELECT row_number() over (order by id),
        id, nullcol
 FROM {db_name}.{table_name};
----- LOAD
+---- LOAD_HIVE
 INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name}
 SELECT id, if((id div 500) % 2 = 0, NULL, id) as nullcol
 FROM functional.alltypesagg;
@@ -3104,7 +3101,7 @@ INSERT into TABLE {db_name}{db_suffix}.{table_name}
 SELECT row_number() over (order by id),
        id, nullcol
 FROM {db_name}.{table_name};
----- LOAD
+---- LOAD_HIVE
 INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name}
 SELECT id, if((id div 500) % 2 = 0, NULL, id) as nullcol
 FROM functional.alltypesagg;
@@ -3137,7 +3134,7 @@ INSERT into TABLE {db_name}{db_suffix}.{table_name}
 SELECT row_number() over (order by id),
        id, nullcol
 FROM {db_name}.{table_name};
----- LOAD
+---- LOAD_HIVE
 INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name}
 SELECT id, if((id div 500) % 2 = 0, NULL, id) as nullcol
 FROM functional.alltypesagg where id < 5000;
@@ -3156,9 +3153,12 @@ varchar_col varchar(3)
 insert overwrite table {db_name}{db_suffix}.{table_name}
 select id, date_char_col, char_col, date_varchar_col, varchar_col
 from {db_name}.{table_name};
----- LOAD
+---- LOAD_HIVE
 insert overwrite table {db_name}{db_suffix}.{table_name}
-select id, date_string_col, case when id % 3 in (0, 1) then string_col end, date_string_col, case when id % 3 = 0 then string_col end
+select id, cast(date_string_col as char(8)),
+case when id % 3 in (0, 1) then cast(string_col as char(3)) end,
+cast(date_string_col as varchar(8)),
+case when id % 3 = 0 then cast(string_col as varchar(3)) end
 from functional.alltypesagg;
 ====
 ---- DATASET
@@ -3180,10 +3180,10 @@ delimited fields terminated by ','
 ---- HBASE_REGION_SPLITS
 '1','3','5','7','9'
 ---- LOAD
-LOAD DATA LOCAL INPATH '{impala_home}/testdata/data/date_tbl/0000.txt' OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name} PARTITION(date_part='0001-01-01');
-LOAD DATA LOCAL INPATH '{impala_home}/testdata/data/date_tbl/0001.txt' OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name} PARTITION(date_part='1399-06-27');
-LOAD DATA LOCAL INPATH '{impala_home}/testdata/data/date_tbl/0002.txt' OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name} PARTITION(date_part='2017-11-27');
-LOAD DATA LOCAL INPATH '{impala_home}/testdata/data/date_tbl/0003.txt' OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name} PARTITION(date_part='9999-12-31');
+LOAD DATA INPATH '{staging_dir}/testdata/data/date_tbl/0000.txt' OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name} PARTITION(date_part='0001-01-01');
+LOAD DATA INPATH '{staging_dir}/testdata/data/date_tbl/0001.txt' OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name} PARTITION(date_part='1399-06-27');
+LOAD DATA INPATH '{staging_dir}/testdata/data/date_tbl/0002.txt' OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name} PARTITION(date_part='2017-11-27');
+LOAD DATA INPATH '{staging_dir}/testdata/data/date_tbl/0003.txt' OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name} PARTITION(date_part='9999-12-31');
 ---- DEPENDENT_LOAD
 insert overwrite table {db_name}{db_suffix}.{table_name} partition(date_part)
 select id_col, date_col, date_part from functional.{table_name};
@@ -3245,10 +3245,10 @@ SELECT * FROM {db_name}.{table_name}_tmp;
 -- Cleanup the temp table
 DROP TABLE IF EXISTS {db_name}{db_suffix}.{table_name}_tmp;
 ---- LOAD
-LOAD DATA LOCAL INPATH '{impala_home}/testdata/data/date_tbl_error/0000.txt' OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name} PARTITION(date_part='0001-01-01');
-LOAD DATA LOCAL INPATH '{impala_home}/testdata/data/date_tbl_error/0001.txt' OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name} PARTITION(date_part='1399-06-27');
-LOAD DATA LOCAL INPATH '{impala_home}/testdata/data/date_tbl_error/0002.txt' OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name} PARTITION(date_part='2017-11-27');
-LOAD DATA LOCAL INPATH '{impala_home}/testdata/data/date_tbl_error/0003.txt' OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name} PARTITION(date_part='9999-12-31');
+LOAD DATA INPATH '{staging_dir}/testdata/data/date_tbl_error/0000.txt' OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name} PARTITION(date_part='0001-01-01');
+LOAD DATA INPATH '{staging_dir}/testdata/data/date_tbl_error/0001.txt' OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name} PARTITION(date_part='1399-06-27');
+LOAD DATA INPATH '{staging_dir}/testdata/data/date_tbl_error/0002.txt' OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name} PARTITION(date_part='2017-11-27');
+LOAD DATA INPATH '{staging_dir}/testdata/data/date_tbl_error/0003.txt' OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name} PARTITION(date_part='9999-12-31');
 ====
 ---- DATASET
 functional
@@ -3320,8 +3320,6 @@ case when id % 2 = 0 then cast(timestamp_col as date)
 else cast(cast(timestamp_col as date) + interval 5 days as date) end date_col
 FROM {db_name}{db_suffix}.alltypes where id < 500;
 ---- LOAD
-SET hive.exec.dynamic.partition.mode=nonstrict;
-SET hive.exec.dynamic.partition=true;
 INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name} PARTITION (date_col)
 SELECT id, bool_col, tinyint_col, smallint_col, int_col, bigint_col,
 float_col, double_col, string_col, timestamp_col,
@@ -3681,8 +3679,6 @@ float_col, double_col, string_col, timestamp_col,
 cast(timestamp_col as date) date_col
 FROM {db_name}{db_suffix}.alltypes where id < 500;
 ---- LOAD
-SET hive.exec.dynamic.partition.mode=nonstrict;
-SET hive.exec.dynamic.partition=true;
 INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name} PARTITION (date_col)
 SELECT id, bool_col, tinyint_col, smallint_col, int_col, bigint_col,
 float_col, double_col, string_col, timestamp_col,
@@ -3720,7 +3716,7 @@ utf8_str_tiny
 ---- COLUMNS
 id int
 name string
----- DEPENDENT_LOAD_HIVE
+---- DEPENDENT_LOAD
 INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name}
 SELECT id, name FROM {db_name}.{table_name};
 ---- LOAD
@@ -4679,7 +4675,7 @@ binary_col BINARY
 ---- ROW_FORMAT
 delimited fields terminated by ','
 ---- LOAD
-LOAD DATA LOCAL INPATH '{impala_home}/testdata/data/binary_tbl/000000_0.txt' OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name};
+LOAD DATA INPATH '{staging_dir}/testdata/data/binary_tbl/000000_0.txt' OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name};
 ---- DEPENDENT_LOAD
 insert overwrite table {db_name}{db_suffix}.{table_name}
 select id, string_col, binary_col from functional.{table_name};
@@ -4716,8 +4712,6 @@ int_col INT
 binary_col BINARY
 binary_col_with_nulls BINARY
 ---- LOAD
-SET hive.exec.dynamic.partition.mode=nonstrict;
-SET hive.exec.dynamic.partition=true;
 insert overwrite table {db_name}{db_suffix}.{table_name} partition(year, month)
 select id, int_col, cast(string_col as binary),
        cast(case when id % 2 = 0 then date_string_col else NULL end as binary),
@@ -4902,7 +4896,7 @@ id bigint
 ---- ROW_FORMAT
 delimited
 ---- LOAD
-LOAD DATA LOCAL INPATH '{impala_home}/testdata/data/empty_parquet_page_source_impala10186/data.csv' OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name};
+LOAD DATA INPATH '{staging_dir}/testdata/data/empty_parquet_page_source_impala10186/data.csv' OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name};
 ====
 ---- DATASET
 functional
@@ -4914,7 +4908,7 @@ s2 struct<id:int>
 ---- TABLE_PROPERTIES
 transactional=false
 ---- DEPENDENT_LOAD
-LOAD DATA LOCAL INPATH '{impala_home}/testdata/data/empty_present_stream.orc' OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name};
+LOAD DATA INPATH '{staging_dir}/testdata/data/empty_present_stream.orc' OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name};
 ====
 ---- DATASET
 functional
@@ -4930,7 +4924,7 @@ delimited fields terminated by ','  escaped by '\\'
 INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name}
 SELECT * FROM {db_name}.{table_name};
 ---- LOAD
-LOAD DATA LOCAL INPATH '{impala_home}/testdata/data/timestamp_at_dst_changes.txt'
+LOAD DATA INPATH '{staging_dir}/testdata/data/timestamp_at_dst_changes.txt'
 OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name};
 ---- CREATE_KUDU
 DROP TABLE IF EXISTS {db_name}{db_suffix}.{table_name};
@@ -5104,7 +5098,7 @@ multipolygon2 STRING
 ---- ROW_FORMAT
 delimited fields terminated by '\t'
 ---- LOAD
-LOAD DATA LOCAL INPATH '{impala_home}/testdata/data/geom_relations_wkt/data.csv' OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name};
+LOAD DATA INPATH '{staging_dir}/testdata/data/geom_relations_wkt/data.csv' OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name};
 ---- DEPENDENT_LOAD
 INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name} SELECT * FROM functional.{table_name};
 ====

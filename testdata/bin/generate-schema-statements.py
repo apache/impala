@@ -117,6 +117,9 @@ parser.add_option("-e", "--exploration_strategy", dest="exploration_strategy",
 parser.add_option("--hive_warehouse_dir", dest="hive_warehouse_dir",
                   default="/test-warehouse",
                   help="The HDFS path to the base Hive test warehouse directory")
+parser.add_option("--staging_dir", dest="staging_dir",
+                  default=os.getenv("REMOTE_LOAD", "/tmp"),
+                  help="The HDFS path to use for staging data loads")
 parser.add_option("-w", "--workload", dest="workload",
                   help="The workload to generate schema for: tpch, tpcds, ...")
 parser.add_option("-s", "--scale_factor", dest="scale_factor", default="",
@@ -242,7 +245,7 @@ VAR_DB_NAME = "db_name"
 VAR_DB_SUFFIX = "db_suffix"
 VAR_TABLE_NAME = "table_name"
 VAR_HDFS_LOCATION = "hdfs_location"
-VAR_IMPALA_HOME = "impala_home"
+VAR_STAGING_DIR = "staging_dir"
 VAR_HINT = "hint"
 VAR_PART_PREDICATE = "part_predicate"
 VAR_FILE_FORMAT = "file_format"
@@ -250,8 +253,8 @@ VAR_SCALE_FACTOR = "scale_factor"
 
 
 def build_replacement_params(
-    db_name, db_suffix, table_name, hdfs_location=None, impala_home=None,
-    hint=None, part_predicate=None, file_format=None, scale_factor=None):
+    db_name, db_suffix, table_name, hdfs_location=None, staging_dir=options.staging_dir,
+    hint=None, part_predicate=None, file_format=None, scale_factor=options.scale_factor):
   """Create a variable:value map for SQL replacement based on given parameters.
   db_name, db_suffix, and table_name is mandatory. Others are optional."""
   params = {
@@ -261,8 +264,8 @@ def build_replacement_params(
   }
   if hdfs_location is not None:
     params[VAR_HDFS_LOCATION] = hdfs_location
-  if impala_home is not None:
-    params[VAR_IMPALA_HOME] = impala_home
+  if staging_dir is not None:
+    params[VAR_STAGING_DIR] = staging_dir
   if hint is not None:
     params[VAR_HINT] = hint
   if part_predicate is not None:
@@ -275,8 +278,7 @@ def build_replacement_params(
 
 
 def build_create_statement(table_template, table_name, db_name, db_suffix,
-                           file_format, hdfs_location, force_reload, is_hive_stmt,
-                           scale_factor=""):
+                           file_format, hdfs_location, force_reload, is_hive_stmt):
   create_stmt = ''
   if (force_reload):
     tbl_type = 'TABLE'
@@ -296,8 +298,7 @@ def build_create_statement(table_template, table_name, db_name, db_suffix,
     db_suffix,
     table_name,
     file_format=FILE_FORMAT_TO_STORED_AS_MAP[file_format],
-    hdfs_location=hdfs_location,
-    scale_factor=scale_factor)
+    hdfs_location=hdfs_location)
   stmt = table_template.format(**params)
   # Apache Hive 3.1 doesn't support "STORED BY ICEBERG STORED AS AVRO" and
   # "STORED AS JSONFILE" (HIVE-25162, HIVE-19899)
@@ -581,17 +582,15 @@ def build_partitioned_load(insert, re_match, can_hint, params):
 
 
 def build_insert_into_statement(insert, db_name, db_suffix, table_name, file_format,
-                                hdfs_path, for_impala=False, scale_factor=""):
+                                hdfs_path, for_impala=False):
   can_hint = for_impala and (file_format == 'parquet' or is_iceberg_table(file_format))
   params = build_replacement_params(
     db_name,
     db_suffix,
     table_name,
     hdfs_location=hdfs_path,
-    impala_home=IMPALA_HOME,
     hint="",
-    part_predicate="",
-    scale_factor=scale_factor)
+    part_predicate="")
 
   m = PARTITIONED_INSERT_RE.search(insert)
   if m:
@@ -638,7 +637,7 @@ def build_hbase_insert(db_name, db_suffix, table_name):
 
 def build_insert(insert, db_name, db_suffix, file_format,
                  codec, compression_type, table_name, hdfs_path, create_hive=False,
-                 for_impala=False, scale_factor=""):
+                 for_impala=False):
   # HBASE inserts don't need the hive options to be set, and don't require and HDFS
   # file location, so they're handled separately.
   if file_format == 'hbase' and not create_hive:
@@ -654,25 +653,22 @@ def build_insert(insert, db_name, db_suffix, file_format,
     output += build_impala_parquet_codec_statement(codec) + "\n"
   output += build_insert_into_statement(insert, db_name, db_suffix,
                                         table_name, file_format, hdfs_path,
-                                        for_impala, scale_factor) + "\n"
+                                        for_impala) + "\n"
   return output
 
 
-def build_load_statement(load_template, db_name, db_suffix, table_name, scale_factor=""):
+def build_load_statement(load_template, db_name, db_suffix, table_name):
   # hbase does not need the hdfs path.
   if table_name.startswith('hbase'):
     params = build_replacement_params(db_name, db_suffix, table_name)
     load_template = load_template.format(**params)
   else:
-    base_load_dir = os.getenv("REMOTE_LOAD", IMPALA_HOME)
     params = build_replacement_params(
       db_name,
       db_suffix,
       table_name,
-      impala_home=base_load_dir,
       hint="",
-      part_predicate="",
-      scale_factor=scale_factor)
+      part_predicate="")
 
     m = PARTITIONED_INSERT_RE.search(load_template)
     if m:
@@ -798,10 +794,14 @@ def eval_sections(test_vectors, sections, fails_only_constraint,
     assert not (section['CREATE'] and section['CREATE_HIVE']), \
         "Can't set both CREATE and CREATE_HIVE"
 
+    assert not (section['LOAD'] and section['LOAD_HIVE']), \
+        "Can't set both LOAD and LOAD_HIVE"
+
     assert not (section['DEPENDENT_LOAD'] and section['DEPENDENT_LOAD_HIVE']), \
         "Can't set both DEPENDENT_LOAD and DEPENDENT_LOAD_HIVE"
 
     section['LOAD'] = eval_section(pool, section['LOAD'])
+    section['LOAD_HIVE'] = eval_section(pool, section['LOAD_HIVE'])
 
     section['DEPENDENT_LOAD'] = eval_section(pool, section['DEPENDENT_LOAD'])
     section['DEPENDENT_LOAD_HIVE'] = eval_section(pool, section['DEPENDENT_LOAD_HIVE'])
@@ -895,6 +895,7 @@ def generate_statements(output_name, test_vectors, sections,
       insert = section['DEPENDENT_LOAD']
       insert_hive = section['DEPENDENT_LOAD_HIVE']
       load = section['LOAD']
+      load_hive = section['LOAD_HIVE']
 
       if file_format == 'kudu':
         create_kudu = section["CREATE_KUDU"]
@@ -933,7 +934,7 @@ def generate_statements(output_name, test_vectors, sections,
       # HBASE we need to create these tables with a supported insert format.
       create_file_format = file_format
       create_codec = codec
-      if not (section['LOAD'] or section['DEPENDENT_LOAD']
+      if not (section['LOAD'] or section['LOAD_HIVE'] or section['DEPENDENT_LOAD']
               or section['DEPENDENT_LOAD_HIVE'] or section['DEPENDENT_LOAD_ACID']):
         create_codec = 'none'
         create_file_format = file_format
@@ -1009,8 +1010,7 @@ def generate_statements(output_name, test_vectors, sections,
 
       if table_template:
         output.create.append(build_create_statement(table_template, table_name, db_name,
-            db_suffix, create_file_format, data_path, force_reload, create_hive,
-            options.scale_factor))
+            db_suffix, create_file_format, data_path, force_reload, create_hive))
       # HBASE create table
       if file_format == 'hbase':
         # If the HBASE_COLUMN_FAMILIES section does not exist, default to 'd'
@@ -1047,21 +1047,23 @@ def generate_statements(output_name, test_vectors, sections,
         print('HDFS path:', data_path, 'does not exist or is empty. Data will be loaded.')
         load_from_json_file = file_format == 'json' and table_name.endswith('_json')
         if not db_suffix or load_from_json_file:
-          if load:
+          if load_hive:
             hive_output.load_base.append(
-                build_load_statement(load, db_name, db_suffix, table_name,
-                                     options.scale_factor))
+                build_load_statement(load_hive, db_name, db_suffix, table_name))
+          elif load:
+            impala_load.load_base.append(
+                build_load_statement(load, db_name, db_suffix, table_name))
           else:
             print('Empty base table load for %s. Skipping load generation' % table_name)
         elif file_format in ['kudu', 'parquet', 'iceberg']:
           if insert_hive:
             hive_output.load.append(build_insert(insert_hive, db_name, db_suffix,
                 file_format, codec, compression_type, table_name, data_path,
-                for_impala=False, scale_factor=options.scale_factor))
+                for_impala=False))
           elif insert:
             impala_load.load.append(build_insert(insert, db_name, db_suffix,
                 file_format, codec, compression_type, table_name, data_path,
-                for_impala=True, scale_factor=options.scale_factor))
+                for_impala=True))
           else:
             print('Empty parquet/kudu load for table %s. Skipping insert generation'
               % table_name)
@@ -1102,7 +1104,7 @@ def parse_schema_template_file(file_name):
                          'ROW_FORMAT', 'CREATE', 'CREATE_HIVE', 'CREATE_KUDU', 'COMMENT',
                          'DEPENDENT_LOAD', 'DEPENDENT_LOAD_KUDU', 'DEPENDENT_LOAD_HIVE',
                          'DEPENDENT_LOAD_ACID', 'DEPENDENT_LOAD_JSON', 'LOAD', 'ALTER',
-                         'HBASE_COLUMN_FAMILIES', 'TABLE_PROPERTIES',
+                         'HBASE_COLUMN_FAMILIES', 'TABLE_PROPERTIES', 'LOAD_HIVE',
                          'HBASE_REGION_SPLITS', 'HIVE_MAJOR_VERSION']
   return parse_test_file(file_name, VALID_SECTION_NAMES, skip_unknown_sections=False)
 

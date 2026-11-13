@@ -26,6 +26,7 @@ from shutil import rmtree
 from optparse import OptionParser
 from itertools import product
 import os
+import subprocess
 
 parser = OptionParser()
 parser.add_option("--table_dir", dest="table_dir", default=None)
@@ -51,6 +52,9 @@ def generate_testescape_files(table_location, only_newline, file_len):
     with open(os.path.join(table_location, str(count)), 'w') as f:
       f.write(content)
 
+  hdfs_dest = os.path.dirname(table_location)
+  subprocess.run(['hadoop', 'fs', '-put', '-f', table_location, hdfs_dest], check=True)
+
 if __name__ == "__main__":
   (options, args) = parser.parse_args()
   if not options.table_dir:
@@ -59,6 +63,6 @@ if __name__ == "__main__":
   # Generate data locally, and output the SQL load command for use in dataload
   generate_testescape_files(options.table_dir, options.only_newline, options.file_len)
 
-  print ("LOAD DATA LOCAL INPATH '%s' "
-         "OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name};"
-         % options.table_dir)
+  print("LOAD DATA INPATH '%s' "
+        "OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name};"
+        % options.table_dir)

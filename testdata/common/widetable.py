@@ -24,6 +24,8 @@
 
 import itertools
 import optparse
+import os
+import subprocess
 
 parser = optparse.OptionParser()
 parser.add_option("--get_columns", dest="get_columns", default=False, action="store_true")
@@ -130,6 +132,10 @@ if __name__ == "__main__":
         f.write(row)
         f.write('\n')
 
-    print ("LOAD DATA LOCAL INPATH '%s' "
-           "OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name};"
-           % options.output_file)
+    hdfs_dest = os.path.dirname(options.output_file)
+    subprocess.run(['hadoop', 'fs', '-put', '-f', options.output_file, hdfs_dest],
+                   check=True)
+
+    print("LOAD DATA INPATH '%s' "
+          "OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name};"
+          % options.output_file)

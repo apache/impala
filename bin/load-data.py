@@ -46,6 +46,9 @@ parser.add_option("-e", "--exploration_strategy", dest="exploration_strategy",
 parser.add_option("--hive_warehouse_dir", dest="hive_warehouse_dir",
                   default="/test-warehouse",
                   help="The HDFS path to the base Hive test warehouse directory")
+parser.add_option("--staging_dir", dest="staging_dir",
+                  default=os.getenv("REMOTE_LOAD", "/tmp"),
+                  help="The HDFS path to use for staging data loads")
 parser.add_option("-w", "--workloads", dest="workloads",
                   help="Comma-separated list of workloads to load data for. If 'all' is "\
                        "specified then data for all workloads is loaded.")
@@ -85,7 +88,8 @@ options, args = parser.parse_args()
 SQL_OUTPUT_DIR = os.environ['IMPALA_DATA_LOADING_SQL_DIR']
 WORKLOAD_DIR = options.workload_dir
 DATASET_DIR = options.dataset_dir
-TESTDATA_BIN_DIR = os.path.join(os.environ['IMPALA_HOME'], 'testdata/bin')
+TESTDATA_DIR = os.path.join(os.environ['IMPALA_HOME'], 'testdata')
+TESTDATA_BIN_DIR = os.path.join(TESTDATA_DIR, 'bin')
 AVRO_SCHEMA_DIR = "avro_schemas"
 
 GENERATE_SCHEMA_CMD = "generate-schema-statements.py --exploration_strategy=%s "\
@@ -235,6 +239,7 @@ def generate_schema_statements(workload):
     generate_cmd += " --table_formats=%s" % options.table_formats
   if options.hive_warehouse_dir is not None:
     generate_cmd += " --hive_warehouse_dir=%s" % options.hive_warehouse_dir
+  generate_cmd += " --staging_dir=%s" % options.staging_dir
   if options.hdfs_namenode is not None:
     generate_cmd += " --hdfs_namenode=%s" % options.hdfs_namenode
   generate_cmd += " --backend=%s" % HS2_HOST_PORT
@@ -256,6 +261,29 @@ def get_dataset_for_workload(workload):
     else:
       LOG.error('Dimension file does not contain dataset for workload \'%s\'' % (workload))
       sys.exit(1)
+
+
+def copy_workload_data_to_hdfs(workload):
+  """Copy dataset files for the specified workload to HDFS. No-op for purely derivative
+  workloads."""
+  # TPC data is generated per scale factor and loaded from the matching {db_name} dir.
+  workload_subdirs = {
+    'tpch': [f'impala-data/tpch{options.scale_factor}'],
+    'tpcds': [f'impala-data/tpcds{options.scale_factor}'],
+    'functional-query': ['data', 'target']
+  }.get(workload, [])
+  for workload_subdir in workload_subdirs:
+    local_dir = os.path.join(TESTDATA_DIR, workload_subdir)
+    if not os.path.isdir(local_dir):
+      LOG.error(f"Data directory for workload '{workload}' not found: {local_dir}")
+      sys.exit(1)
+    staging_dir = f"{options.staging_dir}/testdata/{workload_subdir}"
+    # -put nests the source inside staging_dir if it already exists, so remove leftovers
+    # from a previous load to have -put create staging_dir with local_dir's contents.
+    exec_hadoop_fs_cmd(f"-rm -r -f -skipTrash {staging_dir}")
+    exec_hadoop_fs_cmd(f"-mkdir -p {os.path.dirname(staging_dir)}")
+    exec_hadoop_fs_cmd(f"-put -t {options.num_processes} {local_dir} {staging_dir}")
+
 
 def copy_avro_schemas_to_hdfs(schemas_dir):
   """Recursively copies all of schemas_dir to the test warehouse."""
@@ -369,9 +397,8 @@ def main():
     #       HBase tables. (Only generated if loading HBase table.) It takes the form:
     #       post-load-${workload_exploration}-hbase-generated.sql
     #
-    #    E. Impala load scripts run in Impala to load data. Only Parquet and Kudu
-    #       are loaded through Impala. There is one for each of those formats loaded.
-    #       They take the form:
+    #    E. Impala load scripts run in Impala to load data. There is one for each file
+    #       format Impala supports. They take the form:
     #       load-${workload_exploration}-impala-generated-${file_format_suffix}.sql
     #
     #    F. Invalidation scripts run through Impala to invalidate/refresh metadata
@@ -384,6 +411,8 @@ def main():
     assert os.path.isdir(sql_dir),\
       ("Could not find the generated SQL files for loading dataset '%s'.\
         \nExpected to find the SQL files in: %s" % (dataset, sql_dir))
+
+    copy_workload_data_to_hdfs(workload)
 
     # Copy the avro schemas (see #2) into HDFS
     avro_schemas_path = os.path.join(sql_dir, AVRO_SCHEMA_DIR)
@@ -417,7 +446,8 @@ def main():
     hive_load_nontext_files = []
     hbase_create_files = []
     hbase_postload_files = []
-    impala_load_files = []
+    impala_load_text_files = []
+    impala_load_nontext_files = []
     invalidate_files = []
     for filename in dataset_dir_contents:
       if impala_create_match in filename:
@@ -434,7 +464,10 @@ def main():
       elif hbase_postload_match in filename:
         hbase_postload_files.append(filename)
       elif impala_load_match in filename:
-        impala_load_files.append(filename)
+        if 'text-none-none' in filename:
+          impala_load_text_files.append(filename)
+        else:
+          impala_load_nontext_files.append(filename)
       elif invalidate_match in filename:
         invalidate_files.append(filename)
       else:
@@ -456,31 +489,33 @@ def main():
     log_file_list("Hive Load Non-Text Files:", hive_load_nontext_files)
     log_file_list("HBase Create Files:", hbase_create_files)
     log_file_list("HBase Post-Load Files:", hbase_postload_files)
-    log_file_list("Impala Load Files:", impala_load_files)
+    log_file_list("Impala Load Text Files:", impala_load_text_files)
+    log_file_list("Impala Load Non-Text Files:", impala_load_nontext_files)
     log_file_list("Impala Invalidate Files:", invalidate_files)
 
     # Execute the data loading scripts.
-    # Creating tables in Impala has no dependencies, so we execute them first.
-    # HBase table inserts are done via hive, so the hbase tables need to be created before
-    # running the hive scripts. Some of the Impala inserts depend on hive tables,
-    # so they're done at the end. Finally, the Hbase Tables that have been filled with data
-    # need to be flushed.
-
-    impala_exec_query_files_parallel(thread_pool, impala_create_files, "Impala Create")
+    # HBase table inserts are done via hive, and hbase setup has minimal concurrency, so
+    # create the hbase tables first to co-exist better with TPC data loading.
+    # Then create Impala tables and load text data, since they have no dependencies.
+    # Next load Hive data and flush the HBase tables that have been filled.
+    # Some of the Impala inserts depend on hive tables, so they're done at the end.
 
     # There should be at most one hbase creation script
     assert(len(hbase_create_files) <= 1)
     for hbase_create in hbase_create_files:
       exec_hbase_query_from_file(hbase_create, "HBase Create")
 
+    impala_exec_query_files_parallel(thread_pool, impala_create_files, "Impala Create")
+    impala_exec_query_files_parallel(thread_pool, impala_load_text_files,
+                                     "Impala Load Text")
+
     # If this is loading text tables plus multiple other formats, the text tables
     # need to be loaded first
-    assert(len(hive_load_text_files) <= 1)
     hive_exec_query_files_parallel(thread_pool, hive_load_text_files, "Hive Load Text")
+
     # IMPALA-9923: Run ORC serially separately from other non-text formats. This hacks
     # around flakiness seen when loading this in parallel (see IMPALA-12630 comments for
     # broken tests). This should be removed as soon as possible.
-    assert(len(hive_load_orc_files) <= 1)
     hive_exec_query_files_parallel(thread_pool, hive_load_orc_files, "Hive Load ORC")
 
     # Load all non-text formats (goes parallel)
@@ -493,10 +528,11 @@ def main():
 
     # Invalidate so that Impala sees the loads done by Hive before loading Parquet/Kudu
     # Note: This only invalidates tables for this workload.
-    if impala_load_files:
+    if impala_load_nontext_files:
       impala_exec_query_files_parallel(thread_pool, invalidate_files,
           "Impala Invalidate 1")
-      impala_exec_query_files_parallel(thread_pool, impala_load_files, "Impala Load")
+      impala_exec_query_files_parallel(thread_pool, impala_load_nontext_files,
+                                       "Impala Load Non-Text")
     # Final invalidate for this workload
     impala_exec_query_files_parallel(thread_pool, invalidate_files, "Impala Invalidate 2")
     loading_time_map[workload] = time.time() - start_time
