@@ -402,7 +402,8 @@ hive> CREATE TABLE hive_avro_table
         <indexterm audience="hidden">compression</indexterm>
         To enable compression for Avro tables, specify settings in the Hive shell to enable compression and to
         specify a codec, then issue a <codeph>CREATE TABLE</codeph> statement as in the preceding examples. Impala
-        supports the <codeph>snappy</codeph> and <codeph>deflate</codeph> codecs for Avro tables.
+        supports the <codeph>snappy</codeph>, <codeph>deflate</codeph>, and
+        <codeph>zstandard</codeph> codecs for Avro tables.
       </p>
 
       <p>

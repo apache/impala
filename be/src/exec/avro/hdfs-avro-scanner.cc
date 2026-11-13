@@ -50,6 +50,7 @@ const string HdfsAvroScanner::AVRO_CODEC_KEY("avro.codec");
 const string HdfsAvroScanner::AVRO_NULL_CODEC("null");
 const string HdfsAvroScanner::AVRO_SNAPPY_CODEC("snappy");
 const string HdfsAvroScanner::AVRO_DEFLATE_CODEC("deflate");
+const string HdfsAvroScanner::AVRO_ZSTANDARD_CODEC("zstandard");
 
 const string AVRO_MEM_LIMIT_EXCEEDED = "HdfsAvroScanner::$0() failed to allocate "
     "$1 bytes for $2.";
@@ -127,6 +128,28 @@ Status HdfsAvroScanner::Codegen(HdfsScanPlanNode* node,
   DCHECK(state->codegen() != nullptr);
   RETURN_IF_ERROR(CodegenDecodeAvroData(node, state, decode_avro_data_fn));
   DCHECK(*decode_avro_data_fn != nullptr);
+  return Status::OK();
+}
+
+Status HdfsAvroScanner::ParseAvroCodecMetadata(const string& avro_codec,
+    bool* is_compressed, THdfsCompression::type* compression_type) {
+  DCHECK(is_compressed != nullptr);
+  DCHECK(compression_type != nullptr);
+  if (avro_codec == AVRO_NULL_CODEC) {
+    *is_compressed = false;
+    *compression_type = THdfsCompression::NONE;
+    return Status::OK();
+  }
+  *is_compressed = true;
+  if (avro_codec == AVRO_SNAPPY_CODEC) {
+    *compression_type = THdfsCompression::SNAPPY;
+  } else if (avro_codec == AVRO_DEFLATE_CODEC) {
+    *compression_type = THdfsCompression::DEFLATE;
+  } else if (avro_codec == AVRO_ZSTANDARD_CODEC) {
+    *compression_type = THdfsCompression::ZSTD;
+  } else {
+    return Status("Unknown Avro compression codec: " + avro_codec);
+  }
   return Status::OK();
 }
 
@@ -223,19 +246,10 @@ Status HdfsAvroScanner::ParseMetadata() {
 
       } else if (key == AVRO_CODEC_KEY) {
         string avro_codec(reinterpret_cast<char*>(value), value_len);
-        if (avro_codec != AVRO_NULL_CODEC) {
-          header_->is_compressed = true;
-          // This scanner doesn't use header_->codec (Avro doesn't use the
-          // Hadoop codec strings), but fill it in for logging
-          header_->codec = avro_codec;
-          if (avro_codec == AVRO_SNAPPY_CODEC) {
-            header_->compression_type = THdfsCompression::SNAPPY;
-          } else if (avro_codec == AVRO_DEFLATE_CODEC) {
-            header_->compression_type = THdfsCompression::DEFLATE;
-          } else {
-            return Status("Unknown Avro compression codec: " + avro_codec);
-          }
-        }
+        // Avro doesn't use Hadoop codec strings; header_->codec is for logging only.
+        header_->codec = avro_codec;
+        RETURN_IF_ERROR(ParseAvroCodecMetadata(
+            avro_codec, &header_->is_compressed, &header_->compression_type));
       } else {
         VLOG_ROW << "Skipping metadata entry: " << key;
       }

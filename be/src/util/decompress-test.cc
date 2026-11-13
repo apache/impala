@@ -521,6 +521,130 @@ TEST_F(DecompressorTest, ZSTD) {
   RunTestStreaming(THdfsCompression::ZSTD, clevel_p);
 }
 
+TEST_F(DecompressorTest, ZSTDNoOutputPreallocated) {
+  scoped_ptr<Codec> decompressor;
+  EXPECT_OK(
+      Codec::CreateDecompressor(&mem_pool_, true, THdfsCompression::ZSTD, &decompressor));
+  // Streaming compressors, e.g. the one used by Java Avro, omit the
+  // content size from the frame header.
+  for (int content_size_flag : {1, 0}) {
+    ZSTD_CCtx* cctx = ZSTD_createCCtx();
+    ASSERT_TRUE(cctx != nullptr);
+    ASSERT_FALSE(ZSTD_isError(
+        ZSTD_CCtx_setParameter(cctx, ZSTD_c_contentSizeFlag, content_size_flag)));
+    const size_t max_compressed_len = ZSTD_compressBound(sizeof(input_));
+    uint8_t* compressed = mem_pool_.Allocate(max_compressed_len);
+    const size_t compressed_len =
+        ZSTD_compress2(cctx, compressed, max_compressed_len, input_, sizeof(input_));
+    ZSTD_freeCCtx(cctx);
+    ASSERT_FALSE(ZSTD_isError(compressed_len));
+    EXPECT_EQ(ZSTD_getFrameContentSize(compressed, compressed_len),
+        content_size_flag ? sizeof(input_) : ZSTD_CONTENTSIZE_UNKNOWN);
+
+    uint8_t* output = nullptr;
+    int64_t output_len = 0;
+    EXPECT_OK(decompressor->ProcessBlock(
+        false, compressed_len, compressed, &output_len, &output));
+    ASSERT_EQ(output_len, static_cast<int64_t>(sizeof(input_)));
+    EXPECT_EQ(Ubsan::MemCmp(input_, output, output_len), 0);
+  }
+  decompressor->Close();
+}
+
+// A frame without a content size only gives an upper bound of 128 KB of output per block,
+// which a tiny frame of RLE blocks can drive arbitrarily high. The decompressor must
+// reject it instead of allocating the bound.
+TEST_F(DecompressorTest, ZSTDOutputBoundTooLarge) {
+  scoped_ptr<Codec> decompressor;
+  EXPECT_OK(
+      Codec::CreateDecompressor(&mem_pool_, true, THdfsCompression::ZSTD, &decompressor));
+
+  // Frame header: magic number, a descriptor byte without content size, checksum or
+  // dictionary, and a window descriptor for a 128 KB window.
+  vector<uint8_t> frame = {0x28, 0xb5, 0x2f, 0xfd, 0x00, 0x38};
+  const int num_blocks = 5000;
+  for (int i = 0; i < num_blocks; ++i) {
+    // RLE block header (3 bytes, little endian): regenerated size 128 KB, block type 1
+    // and the last block flag, followed by the 1 byte that is repeated.
+    const bool last_block = i == num_blocks - 1;
+    frame.insert(
+        frame.end(), {static_cast<uint8_t>(last_block ? 0x03 : 0x02), 0x00, 0x10, 0xab});
+  }
+  EXPECT_EQ(
+      ZSTD_getFrameContentSize(frame.data(), frame.size()), ZSTD_CONTENTSIZE_UNKNOWN);
+  EXPECT_GT(decompressor->MaxOutputLen(frame.size(), frame.data()), 512LL * 1024 * 1024);
+
+  uint8_t* output = nullptr;
+  int64_t output_len = 0;
+  Status status =
+      decompressor->ProcessBlock(false, frame.size(), frame.data(), &output_len, &output);
+  ASSERT_FALSE(status.ok());
+  EXPECT_EQ(status.code(), TErrorCode::ZSTD_ERROR);
+  EXPECT_STR_CONTAINS(status.GetDetail(), "exceeds the limit");
+  EXPECT_EQ(output_len, 0);
+  decompressor->Close();
+}
+
+TEST_F(DecompressorTest, ZSTDEmptyInput) {
+  scoped_ptr<Codec> decompressor;
+  EXPECT_OK(
+      Codec::CreateDecompressor(&mem_pool_, true, THdfsCompression::ZSTD, &decompressor));
+  uint8_t* output = nullptr;
+  int64_t output_len = 0;
+  // Empty input is an empty block: it decompresses to zero bytes rather than failing.
+  EXPECT_OK(decompressor->ProcessBlock(false, 0, nullptr, &output_len, &output));
+  EXPECT_EQ(0, output_len);
+  decompressor->Close();
+}
+
+TEST_F(DecompressorTest, ZSTDInvalidFrameHeader) {
+  scoped_ptr<Codec> decompressor;
+  EXPECT_OK(
+      Codec::CreateDecompressor(&mem_pool_, true, THdfsCompression::ZSTD, &decompressor));
+  const uint8_t garbage[] = {0x00, 0x01, 0x02, 0x03};
+  uint8_t* output = nullptr;
+  int64_t output_len = 0;
+  Status status =
+      decompressor->ProcessBlock(false, sizeof(garbage), garbage, &output_len, &output);
+  ASSERT_FALSE(status.ok());
+  EXPECT_EQ(status.code(), TErrorCode::ZSTD_ERROR);
+  decompressor->Close();
+}
+
+// Two concatenated frames without content size, as some streaming writers emit. They are
+// passed to ProcessBlock() as one input, and both must be decompressed.
+TEST_F(DecompressorTest, ZSTDConcatenatedFramesNoContentSize) {
+  scoped_ptr<Codec> decompressor;
+  EXPECT_OK(
+      Codec::CreateDecompressor(&mem_pool_, true, THdfsCompression::ZSTD, &decompressor));
+  const vector<uint8_t> payload(256, 0xab);
+  vector<uint8_t> input;
+  for (int frame = 0; frame < 2; ++frame) {
+    ZSTD_CCtx* cctx = ZSTD_createCCtx();
+    ASSERT_TRUE(cctx != nullptr);
+    ASSERT_FALSE(ZSTD_isError(ZSTD_CCtx_setParameter(cctx, ZSTD_c_contentSizeFlag, 0)));
+    const size_t bound = ZSTD_compressBound(payload.size());
+    vector<uint8_t> compressed(bound);
+    const size_t len =
+        ZSTD_compress2(cctx, compressed.data(), bound, payload.data(), payload.size());
+    ZSTD_freeCCtx(cctx);
+    ASSERT_FALSE(ZSTD_isError(len));
+    compressed.resize(len);
+    input.insert(input.end(), compressed.begin(), compressed.end());
+  }
+  ASSERT_EQ(
+      ZSTD_getFrameContentSize(input.data(), input.size()), ZSTD_CONTENTSIZE_UNKNOWN);
+
+  uint8_t* output = nullptr;
+  int64_t output_len = 0;
+  EXPECT_OK(decompressor->ProcessBlock(
+      false, input.size(), input.data(), &output_len, &output));
+  ASSERT_EQ(output_len, static_cast<int64_t>(2 * payload.size()));
+  EXPECT_EQ(Ubsan::MemCmp(payload.data(), output, payload.size()), 0);
+  EXPECT_EQ(Ubsan::MemCmp(payload.data(), output + payload.size(), payload.size()), 0);
+  decompressor->Close();
+}
+
 TEST_F(DecompressorTest, ZSTDHuge) {
   // As output buffer size is about 8M, we want to use an input buffer larger than that
   // to test continuous stream reading

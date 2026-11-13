@@ -1392,6 +1392,14 @@ v is 42, "hello", {"age":30,"name":"Alice"}, a variant null and a SQL NULL.
 Generated with a custom Java program (written by Claude Opus 5.5) using the Iceberg
 1.11 Java library.
 
+testdata/data/iceberg_test/iceberg_avro_trino_zstd
+Iceberg V2 table with a single Avro data file written by Trino 482 (format 'AVRO', with
+the default Iceberg compression codec ZSTD). The data file's avro.codec is 'zstandard';
+the manifests use deflate. Used to test reading 'zstandard' Avro blocks in core tests,
+since the Trino interop tests only run in exhaustive. Schema: id INT, name STRING,
+score DOUBLE.
+Five rows; row 3 has NULL name and score.
+
 testdata/data/iceberg_test/iceberg_v3/iceberg_v3_spark_variant
 Iceberg V3 table with an (unshredded) VARIANT column, written by Spark 4.1.3 and Iceberg
 1.11.0 (IMPALA-15460). Spark stores object values in document order (parse_json) or in

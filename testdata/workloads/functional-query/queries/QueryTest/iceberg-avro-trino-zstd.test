@@ -1,0 +1,29 @@
+# Iceberg Avro data files written by Trino.
+# The Avro object file header of these files has avro.codec 'zstandard', which
+# the Avro scanner maps to the ZSTD decompressor.
+====
+---- QUERY
+SELECT id, name, score FROM iceberg_avro_trino_zstd ORDER BY id
+---- RESULTS
+1,'alice',1.5
+2,'bob',2.25
+3,'NULL',NULL
+4,'dave',-4
+5,'eve',0
+---- TYPES
+INT,STRING,DOUBLE
+====
+---- QUERY
+SELECT count(*), count(name), sum(score) FROM iceberg_avro_trino_zstd
+---- RESULTS
+5,4,-0.25
+---- TYPES
+BIGINT,BIGINT,DOUBLE
+====
+---- QUERY
+SELECT id FROM iceberg_avro_trino_zstd WHERE name IS NULL
+---- RESULTS
+3
+---- TYPES
+INT
+====

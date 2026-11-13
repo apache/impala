@@ -119,6 +119,24 @@ class TestIcebergTable(IcebergTestSuite):
         "iceberg_uuid_test_part", "parquet", table_location=uuid_fixture_dir)
     self.run_test_case('QueryTest/iceberg-uuid-type', vector, use_db=unique_database)
 
+  def test_iceberg_avro_trino_zstd(self, vector, unique_database):
+    """Avro data files written by Trino use the 'zstandard' codec by default,
+    which is read via the ZSTD decompressor."""
+    trino_zstd_fixture_dir = "${IMPALA_HOME}/testdata/data/iceberg_test/"
+    # This test only covers the ZSTD path while the data file's Avro header
+    # says 'zstandard'. Reading the header does not decode any blocks.
+    data_dir = os.path.expandvars(
+        os.path.join(trino_zstd_fixture_dir, "iceberg_avro_trino_zstd", "data"))
+    data_files = glob.glob(os.path.join(data_dir, "*.avro"))
+    assert len(data_files) == 1, data_files
+    with open(data_files[0], "rb") as f:
+      with DataFileReader(f, DatumReader()) as reader:
+        assert reader.codec == "zstandard", reader.codec
+    create_iceberg_table_from_directory(self.client, unique_database,
+        "iceberg_avro_trino_zstd", "avro", table_location=trino_zstd_fixture_dir)
+    self.run_test_case('QueryTest/iceberg-avro-trino-zstd', vector,
+        use_db=unique_database)
+
   def test_utf8_string_validation(self, unique_database):
     """IMPALA-12675: Iceberg always annotates STRING as UTF-8, so writing non-UTF-8 bytes
     to a STRING column always fails; a BINARY column stores them instead."""

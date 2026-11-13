@@ -15,10 +15,17 @@
 // specific language governing permissions and limitations
 // under the License.
 
+// ZSTD_decompressBound() is in zstd's static-only API (Impala links zstd statically).
+// zstd.h exposes that section when ZSTD_STATIC_LINKING_ONLY is defined at the point it
+// is included. This file includes zstd.h indirectly through util/decompress.h, so the
+// define must come before that include.
+#define ZSTD_STATIC_LINKING_ONLY
+
 #include "util/decompress.h"
 
 #include <strings.h>
 
+#include <limits>
 #include <sstream>
 
 // Codec libraries
@@ -26,7 +33,6 @@
 #include <bzlib.h>
 #include <lz4.h>
 #include <snappy.h>
-#include <zstd.h>
 #include <zstd_errors.h>
 
 #include "common/logging.h"
@@ -622,13 +628,55 @@ ZstandardDecompressor::~ZstandardDecompressor() {
   }
 }
 
+// Largest output buffer allocated for a zstd block whose output size is not provided by
+// the caller. For a frame without a content size in its header, ZSTD_decompressBound()
+// can only add up the maximum size of each block (128 KB), so a small, highly
+// compressible (e.g. RLE) frame in a corrupt or malicious file could otherwise make us
+// allocate gigabytes. Avro blocks default to 16 KB–64 MB and are far smaller than this.
+static const int64_t ZSTD_MAX_UNKNOWN_OUTPUT_LEN = 512LL * 1024 * 1024;
+
 int64_t ZstandardDecompressor::MaxOutputLen(int64_t input_len, const uint8_t* input) {
-  return -1;
+  if (input_len == 0) return 0;
+  // Exact when the frame header records the content size. Otherwise an upper bound
+  // derived from the block headers, e.g. streaming compressors used by Java Avro
+  // omit the content size from the frame header.
+  unsigned long long bound = ZSTD_decompressBound(input, input_len);
+  if (bound == ZSTD_CONTENTSIZE_ERROR
+      || bound > static_cast<unsigned long long>(std::numeric_limits<int64_t>::max())) {
+    return -1;
+  }
+  return bound;
 }
 
 Status ZstandardDecompressor::ProcessBlock(bool output_preallocated, int64_t input_length,
     const uint8_t* input, int64_t* output_length, uint8_t** output) {
-  DCHECK(output_preallocated) << "Output was not allocated for Zstd Codec";
+  if (!output_preallocated) {
+    int64_t max_output_len = MaxOutputLen(input_length, input);
+    if (max_output_len < 0) {
+      *output_length = 0;
+      return Status(TErrorCode::ZSTD_ERROR, "ZSTD_decompressBound", "invalid zstd frame");
+    }
+    if (max_output_len > ZSTD_MAX_UNKNOWN_OUTPUT_LEN) {
+      *output_length = 0;
+      return Status(TErrorCode::ZSTD_ERROR, "ZSTD_decompressBound",
+          Substitute("decompressed size of at most $0 bytes exceeds the limit of $1 "
+                     "bytes",
+              max_output_len, ZSTD_MAX_UNKNOWN_OUTPUT_LEN));
+    }
+    if (!reuse_buffer_ || out_buffer_ == nullptr || buffer_length_ < max_output_len) {
+      buffer_length_ = max_output_len;
+      out_buffer_ = memory_pool_->TryAllocate(buffer_length_);
+      if (UNLIKELY(out_buffer_ == nullptr)) {
+        *output_length = 0;
+        string details =
+            Substitute(DECOMPRESSOR_MEM_LIMIT_EXCEEDED, "Zstd", buffer_length_);
+        return memory_pool_->mem_tracker()->MemLimitExceeded(
+            nullptr, details, buffer_length_);
+      }
+    }
+    *output = out_buffer_;
+    *output_length = max_output_len;
+  }
   if (*output_length == 0) return Status::OK();
   if (stream_ == NULL) {
     stream_ = ZSTD_createDCtx();

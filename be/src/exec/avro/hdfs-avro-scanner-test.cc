@@ -526,4 +526,26 @@ TEST_F(HdfsAvroScannerTest, DecimalTest) {
   TestReadAvroDecimal(data, 16, d16v, -1, TErrorCode::AVRO_TRUNCATED_BLOCK);
 }
 
+TEST_F(HdfsAvroScannerTest, ParseAvroCodecMetadata) {
+  bool compressed = true;
+  THdfsCompression::type type = THdfsCompression::NONE;
+  EXPECT_OK(HdfsAvroScanner::ParseAvroCodecMetadata("null", &compressed, &type));
+  EXPECT_FALSE(compressed);
+  EXPECT_EQ(THdfsCompression::NONE, type);
+
+  EXPECT_OK(HdfsAvroScanner::ParseAvroCodecMetadata("snappy", &compressed, &type));
+  EXPECT_TRUE(compressed);
+  EXPECT_EQ(THdfsCompression::SNAPPY, type);
+
+  EXPECT_OK(HdfsAvroScanner::ParseAvroCodecMetadata("deflate", &compressed, &type));
+  EXPECT_EQ(THdfsCompression::DEFLATE, type);
+
+  // Java Avro / Trino use "zstandard" in object file metadata, not "zstd".
+  EXPECT_OK(HdfsAvroScanner::ParseAvroCodecMetadata("zstandard", &compressed, &type));
+  EXPECT_EQ(THdfsCompression::ZSTD, type);
+
+  Status status = HdfsAvroScanner::ParseAvroCodecMetadata("lz4", &compressed, &type);
+  EXPECT_FALSE(status.ok());
+  EXPECT_STR_CONTAINS(status.GetDetail(), "Unknown Avro compression codec: lz4");
+}
 }

@@ -98,6 +98,11 @@ class HdfsAvroScanner : public BaseSequenceScanner {
   static Status Codegen(
       HdfsScanPlanNode* node, FragmentState* state, llvm::Function** decode_avro_data_fn);
 
+  /// Maps an Avro object file avro.codec metadata value to THdfsCompression
+  /// for block decompression. The "null" codec leaves *is_compressed false.
+  static Status ParseAvroCodecMetadata(const std::string& avro_codec, bool* is_compressed,
+      THdfsCompression::type* compression_type);
+
   static const char* LLVM_CLASS_NAME;
 
  protected:
@@ -150,6 +155,7 @@ class HdfsAvroScanner : public BaseSequenceScanner {
   static const std::string AVRO_NULL_CODEC;
   static const std::string AVRO_SNAPPY_CODEC;
   static const std::string AVRO_DEFLATE_CODEC;
+  static const std::string AVRO_ZSTANDARD_CODEC;
 
   typedef int (*DecodeAvroDataFn)(HdfsAvroScanner*, int, MemPool*, uint8_t**, uint8_t*,
                                   Tuple*, TupleRow*);

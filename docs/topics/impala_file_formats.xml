@@ -159,7 +159,7 @@ under the License.
               Structured
             </entry>
             <entry>
-              Snappy, gzip, deflate
+              Snappy, deflate, zstandard
             </entry>
             <entry rev="1.4.0">
               Yes, in Impala 1.4.0 and higher. In lower versions, create the table using Hive.
