@@ -139,8 +139,8 @@ fe/src/test/resources/hbase-jaas-server.conf.template
 fe/src/test/resources/users.ldif
 java/.mvn/maven.config
 java/toolchains.xml.tmpl
-testdata/AllTypesError/*.txt
-testdata/AllTypesErrorNoNulls/*.txt
+testdata/data/AllTypesError/*.txt
+testdata/data/AllTypesErrorNoNulls/*.txt
 *.avsc
 *.parq
 *.parquet
@@ -208,7 +208,7 @@ testdata/impala-profiles/impala_profile_log_tpcds_compute_stats_v2.expected.summ
 testdata/impala-profiles/impala_profile_log_tpcds_compute_stats_v2_default.expected.txt
 testdata/impala-profiles/impala_profile_log_tpcds_compute_stats_v2_extended.expected.txt
 testdata/impala-profiles/impala_profile_log_tpcds_compute_stats_v2_extended.expected.pretty.json
-testdata/hive_benchmark/grepTiny/part-00000
+testdata/data/hive_benchmark/grepTiny/part-00000
 testdata/jceks/.gitkeep
 testdata/jwt/*.json
 testdata/jwt/jwt_expired

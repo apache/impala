@@ -23,5 +23,7 @@
 HADOOP_HOME=
 
 # load the HBase data
-yes exit | $HBASE_HOME/bin/hbase shell $IMPALA_HOME/testdata/HBaseAllTypesError/functional_hbase.hbasealltypeserror.hbase
-yes exit | $HBASE_HOME/bin/hbase shell $IMPALA_HOME/testdata/HBaseAllTypesErrorNoNulls/functional_hbase.hbasealltypeserrornonulls.hbase
+yes exit | $HBASE_HOME/bin/hbase shell $IMPALA_HOME/testdata/data/\
+HBaseAllTypesError/functional_hbase.hbasealltypeserror.hbase
+yes exit | $HBASE_HOME/bin/hbase shell $IMPALA_HOME/testdata/data/\
+HBaseAllTypesErrorNoNulls/functional_hbase.hbasealltypeserrornonulls.hbase
