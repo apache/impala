@@ -1075,6 +1075,19 @@ partition. Its uuid_identity summary, built with Iceberg's signed UUID comparato
 spans the sign bit: lower ffffffff-ffff-ffff-ffff-ffffffffffff, upper
 12345678-1234-5678-1234-567812345678.
 
+iceberg_test/iceberg_avro_null_struct:
+Iceberg table with an Avro data file that contains NULL structs, read by
+QueryTest/iceberg-avro-struct.test. Generated using the Iceberg Java API (version
+1.11.0). The table is created with write.format.default=avro, the single data file is
+written, and then the default is switched to parquet.
+Columns: id (int), s (struct<a: int, b: string>),
+s2 (struct<x: int, t: struct<y: int, z: string>>).
+Rows (id, s, s2):
+  1: {a: 10, b: 'x1'}, {x: 1, t: {y: 100, z: 'z1'}}
+  2: NULL struct, NULL struct
+  3: {a: NULL, b: 'x3'}, {x: 3, t: NULL}
+  4: {a: 40, b: NULL}, {x: 4, t: {y: NULL, z: 'z4'}}
+
 iceberg_v2_positional_delete_all_rows:
 iceberg_v2_positional_delete_all_rows_orc:
 Created similarly to iceberg_v2_no_deletes.

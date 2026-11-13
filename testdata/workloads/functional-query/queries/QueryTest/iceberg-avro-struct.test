@@ -1,0 +1,70 @@
+====
+---- QUERY
+# IMPALA-15470: Avro data files in a Parquet-default table. The fields of a NULL struct
+# must be NULL.
+select id, s.a, s.b, s.a is null, s.b is null
+from $DATABASE.iceberg_avro_null_struct order by id;
+---- RESULTS
+1,10,'x1',false,false
+2,NULL,'NULL',true,true
+3,NULL,'x3',true,false
+4,40,'NULL',false,true
+---- TYPES
+INT,INT,STRING,BOOLEAN,BOOLEAN
+====
+---- QUERY
+select count(s.a), count(s.b) from $DATABASE.iceberg_avro_null_struct;
+---- RESULTS
+2,2
+---- TYPES
+BIGINT,BIGINT
+====
+---- QUERY
+select id from $DATABASE.iceberg_avro_null_struct where s.b is null order by id;
+---- RESULTS
+2
+4
+---- TYPES
+INT
+====
+---- QUERY
+# IMPALA-15470: NULL fields of a nested struct must be NULL too. s2 is NULL in row 2,
+# s2.t is NULL in row 3, and s2.t.y is NULL in row 4.
+select id, s2.x, s2.t.y, s2.t.z from $DATABASE.iceberg_avro_null_struct order by id;
+---- RESULTS
+1,1,100,'z1'
+2,NULL,NULL,'NULL'
+3,3,NULL,'NULL'
+4,4,NULL,'z4'
+---- TYPES
+INT,INT,INT,STRING
+====
+---- QUERY
+select count(s2.x), count(s2.t.y), count(s2.t.z) from $DATABASE.iceberg_avro_null_struct;
+---- RESULTS
+3,1,2
+---- TYPES
+BIGINT,BIGINT,BIGINT
+====
+---- QUERY
+select id from $DATABASE.iceberg_avro_null_struct where s2.t.y is null order by id;
+---- RESULTS
+2
+3
+4
+---- TYPES
+INT
+====
+---- QUERY
+# IMPALA-4061: codegen crashed on a nested record in an Avro scan. Selecting only 'id'
+# leaves the struct's fields without slots, so the decoder must still skip the struct's
+# bytes.
+select id from $DATABASE.iceberg_avro_null_struct order by id;
+---- RESULTS
+1
+2
+3
+4
+---- TYPES
+INT
+====

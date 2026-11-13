@@ -644,6 +644,19 @@ WHERE variant_get(v, '$.name', 'string') = 'Alice';
 Reading VARIANT columns from AVRO format is not yet supported.
 ====
 ---- QUERY
+# IMPALA-4061: codegen crashed on a nested record in an Avro scan. Selecting only the
+# non-VARIANT columns of the table must succeed.
+SELECT id, p FROM iceberg_v3_variant_avro ORDER BY id;
+---- RESULTS
+1,1
+2,1
+3,1
+4,1
+5,1
+---- TYPES
+INT,INT
+====
+---- QUERY
 SELECT id, v FROM iceberg_v3_variant_orc;
 ---- CATCH
 Reading VARIANT columns from ORC format is not yet supported.

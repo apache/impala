@@ -79,6 +79,47 @@ Status HdfsAvroScanner::Open(ScannerContext* context) {
   return Status::OK();
 }
 
+// Returns true if the codegen'd decoder, generated for 'table_schema', decodes data
+// written with 'file_schema' the same way. Record names are ignored: they do not affect
+// how values are encoded, and the writer picks them independently of the reader's
+// schema. Everything else must match: types, field names and their order, and
+// nullability, including the position of "null" in a union.
+static bool SchemasMatchForCodegen(const AvroSchemaElement& table_schema,
+    const AvroSchemaElement& file_schema) {
+  if (table_schema.schema->type != file_schema.schema->type) return false;
+  if (table_schema.null_union_position != file_schema.null_union_position) return false;
+  switch (table_schema.schema->type) {
+    // For these types the codegen'd and the interpreted decoders read the same encoding.
+    // Both pick the reader from the slot type, which comes from the table.
+    case AVRO_BOOLEAN:
+    case AVRO_DATE:
+    case AVRO_INT32:
+    case AVRO_INT64:
+    case AVRO_FLOAT:
+    case AVRO_DOUBLE:
+    case AVRO_STRING:
+    case AVRO_BYTES:
+    case AVRO_DECIMAL:
+      return true;
+    case AVRO_RECORD: {
+      if (table_schema.children.size() != file_schema.children.size()) return false;
+      for (int i = 0; i < table_schema.children.size(); ++i) {
+        const char* table_field = avro_schema_record_field_name(table_schema.schema, i);
+        const char* file_field = avro_schema_record_field_name(file_schema.schema, i);
+        if (strcmp(table_field, file_field) != 0) return false;
+        if (!SchemasMatchForCodegen(table_schema.children[i], file_schema.children[i])) {
+          return false;
+        }
+      }
+      return true;
+    }
+    default:
+      // CodegenReadScalar() cannot read other types. Those files use the
+      // interpreted path.
+      return false;
+  }
+}
+
 Status HdfsAvroScanner::Codegen(HdfsScanPlanNode* node,
    FragmentState* state, llvm::Function** decode_avro_data_fn) {
   *decode_avro_data_fn = nullptr;
@@ -174,11 +215,11 @@ Status HdfsAvroScanner::ParseMetadata() {
 
         RETURN_IF_ERROR(ResolveSchemas(scan_node_->avro_schema(), file_schema));
 
-        // We currently codegen a function only for the table schema. If this file's
-        // schema is different from the table schema, don't use the codegen'd function and
-        // use the interpreted path instead.
-        avro_header_->use_codegend_decode_avro_data = avro_schema_equal(
-            scan_node_->avro_schema().schema, file_schema->schema);
+        // The codegen'd decoder is generated for the table schema. Use it only if this
+        // file's schema decodes the same way (see SchemasMatchForCodegen()). Otherwise
+        // use the interpreted path.
+        avro_header_->use_codegend_decode_avro_data = SchemasMatchForCodegen(
+            scan_node_->avro_schema(), *file_schema);
 
       } else if (key == AVRO_CODEC_KEY) {
         string avro_codec(reinterpret_cast<char*>(value), value_len);
@@ -599,6 +640,16 @@ Status HdfsAvroScanner::ProcessRange(RowBatch* row_batch) {
   return Status::OK();
 }
 
+// Sets every materialized slot nested under 'record' to NULL.
+static void SetNestedSlotsNull(const AvroSchemaElement& record, Tuple* tuple) {
+  for (const AvroSchemaElement& child : record.children) {
+    if (child.slot_desc != nullptr) {
+      tuple->SetNull(child.slot_desc->null_indicator_offset());
+    }
+    if (child.schema->type == AVRO_RECORD) SetNestedSlotsNull(child, tuple);
+  }
+}
+
 bool HdfsAvroScanner::MaterializeTuple(const AvroSchemaElement& record_schema,
     MemPool* pool, uint8_t** data, uint8_t* data_end, Tuple* tuple) {
   DCHECK_EQ(record_schema.schema->type, AVRO_RECORD);
@@ -628,6 +679,7 @@ bool HdfsAvroScanner::MaterializeTuple(const AvroSchemaElement& record_schema,
     switch (type) {
       case AVRO_NULL:
         if (slot_desc != nullptr) tuple->SetNull(slot_desc->null_indicator_offset());
+        if (element.schema->type == AVRO_RECORD) SetNestedSlotsNull(element, tuple);
         success = true;
         break;
       case AVRO_BOOLEAN:
@@ -911,6 +963,25 @@ Status HdfsAvroScanner::CodegenMaterializeTuple(const HdfsScanPlanNode* node,
   return Status::OK();
 }
 
+// Codegen counterpart of SetNestedSlotsNull(). 'path' is the column path of 'record'.
+static void CodegenSetNestedSlotsNull(const SchemaPath& path,
+    const AvroSchemaElement& record, const HdfsScanPlanNode* node, LlvmCodeGen* codegen,
+    LlvmBuilder* builder, llvm::Value* tuple_val) {
+  for (int i = 0; i < record.children.size(); ++i) {
+    const AvroSchemaElement& child = record.children[i];
+    SchemaPath child_path = path;
+    child_path.push_back(i);
+    int slot_idx = node->GetMaterializedSlotIdx(child_path);
+    if (slot_idx != HdfsScanNodeBase::SKIP_COLUMN) {
+      node->materialized_slots_[slot_idx]->CodegenSetNullIndicator(
+          codegen, builder, tuple_val, codegen->true_value());
+    }
+    if (child.schema->type == AVRO_RECORD) {
+      CodegenSetNestedSlotsNull(child_path, child, node, codegen, builder, tuple_val);
+    }
+  }
+}
+
 Status HdfsAvroScanner::CodegenReadRecord(const SchemaPath& path,
     const AvroSchemaElement& record, int child_start, int child_end,
     const HdfsScanPlanNode* node, LlvmCodeGen* codegen, void* void_builder,
@@ -982,6 +1053,9 @@ Status HdfsAvroScanner::CodegenReadRecord(const SchemaPath& path,
         slot_desc->CodegenSetNullIndicator(
             codegen, builder, tuple_val, codegen->true_value());
       }
+      if (field.schema->type == AVRO_RECORD) {
+        CodegenSetNestedSlotsNull(new_path, field, node, codegen, builder, tuple_val);
+      }
       // LLVM requires all basic blocks to end with a terminating instruction
       builder->CreateBr(end_field_block);
     } else {
@@ -991,18 +1065,20 @@ Status HdfsAvroScanner::CodegenReadRecord(const SchemaPath& path,
 
     // Write read_field_block IR
     builder->SetInsertPoint(read_field_block);
-    llvm::Value* ret_val = nullptr;
     if (field.schema->type == AVRO_RECORD) {
       llvm::BasicBlock* insert_before_block =
           (null_block != nullptr) ? null_block : end_field_block;
       RETURN_IF_ERROR(CodegenReadRecord(new_path, field, 0, field.children.size(),
           node, codegen, builder, fn, insert_before_block, bail_out, tuple_type, this_val,
           pool_val, tuple_val, data_val, data_end_val));
+      // Nested record decoding reports failures via bail_out; on success continue.
+      builder->CreateBr(end_field_block);
     } else {
+      llvm::Value* ret_val = nullptr;
       RETURN_IF_ERROR(CodegenReadScalar(field, slot_desc, codegen, builder, tuple_type,
           this_val, pool_val, tuple_val, data_val, data_end_val, &ret_val));
+      builder->CreateCondBr(ret_val, end_field_block, bail_out);
     }
-    builder->CreateCondBr(ret_val, end_field_block, bail_out);
 
     // Set insertion point for next field.
     builder->SetInsertPoint(end_field_block);

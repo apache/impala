@@ -187,7 +187,7 @@ class SlotDescriptor {
 
   /// Generate LLVM code at the insert position of 'builder' to set this slot's
   /// NULL bit in the given 'tuple' to the value 'is_null'. 'tuple' is a pointer
-  /// to the tuple, and 'is_null' is an boolean value represented as a LLVM i1.
+  /// to the tuple, and 'is_null' is a boolean value represented as an LLVM i1.
   void CodegenSetNullIndicator(LlvmCodeGen* codegen, LlvmBuilder* builder,
       llvm::Value* tuple, llvm::Value* is_null) const;
 

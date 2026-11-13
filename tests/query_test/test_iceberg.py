@@ -3155,6 +3155,34 @@ class TestIcebergV3Table(IcebergTestSuite):
     self.run_test_case('QueryTest/iceberg-v3-merge', vector, unique_database)
 
 
+class TestIcebergAvroStruct(IcebergTestSuite):
+  """Iceberg Avro data files with NULL structs, read with the interpreted and with the
+  codegen'd Avro decoder."""
+
+  @classmethod
+  def add_test_dimensions(cls):
+    super(TestIcebergAvroStruct, cls).add_test_dimensions()
+    # Run both decoders in every exploration strategy.
+    cls.ImpalaTestMatrix.add_dimension(create_exec_option_dimension(
+        disable_codegen_options=[False, True]))
+    cls.ImpalaTestMatrix.add_constraint(
+        lambda v: v.get_value('table_format').file_format == 'parquet')
+
+  def test_avro_struct(self, vector, unique_database):
+    create_iceberg_table_from_directory(self.client, unique_database,
+        "iceberg_avro_null_struct", "parquet")
+    self.run_test_case('QueryTest/iceberg-avro-struct', vector,
+        use_db=unique_database)
+    # Check the scan profile to confirm which decoder ran: a codegen run that falls
+    # back to the interpreted decoder would otherwise still pass.
+    disable_codegen = vector.get_value('exec_option')['disable_codegen']
+    query = "select id, s.a, s2.t.z from {0}.iceberg_avro_null_struct".format(
+        unique_database)
+    result = self.execute_query(query, vector.get_value('exec_option'))
+    expected = "Codegen enabled: {0} out of 1".format(0 if disable_codegen else 1)
+    assert expected in result.runtime_profile, result.runtime_profile
+
+
 class TestIcebergUuidAggregates(IcebergTestSuite):
   """Iceberg UUID aggregate tests."""
 
