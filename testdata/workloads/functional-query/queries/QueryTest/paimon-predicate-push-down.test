@@ -77,6 +77,47 @@ where varchar_value like 'varchar' order by int_value
 INT, VARCHAR
 ====
 ---- QUERY
+# NOT LIKE with prefix is pushed down as NotStartsWith (Paimon 2.1+).
+# 'varchar1%' drops a real row; 'a%' would match nothing in this table.
+select int_value, varchar_value from functional_parquet.paimon_primitive_alltypes
+where varchar_value not like 'varchar1%' order by int_value
+---- RESULTS
+12,'varchar2'
+13,'varchar3'
+14,'varchar4'
+20,'varchar0'
+2147483647,'varchar'
+---- TYPES
+INT, VARCHAR
+====
+---- QUERY
+# NOT LIKE with suffix is pushed down as NotEndsWith (Paimon 2.1+).
+select int_value, varchar_value from functional_parquet.paimon_primitive_alltypes
+where varchar_value not like '%3' order by int_value
+---- RESULTS
+11,'varchar1'
+12,'varchar2'
+14,'varchar4'
+20,'varchar0'
+2147483647,'varchar'
+---- TYPES
+INT, VARCHAR
+====
+---- QUERY
+# NULL varchar must not be mis-handled by pushed NOT LIKE; include via IS NULL.
+select int_value, varchar_value from functional_parquet.paimon_primitive_alltypes
+where varchar_value not like 'varchar1%' or varchar_value is null order by int_value
+---- RESULTS
+12,'varchar2'
+13,'varchar3'
+14,'varchar4'
+20,'varchar0'
+2147483647,'varchar'
+NULL,'NULL'
+---- TYPES
+INT, VARCHAR
+====
+---- QUERY
 # Escaped wildcard matches the literal 'var%'.
 select int_value, varchar_value from functional_parquet.paimon_primitive_alltypes
 where varchar_value like 'var\\%' order by int_value

@@ -472,25 +472,12 @@ under the License.
       <scope>test</scope>
     </dependency>
     <dependency>
-      <groupId>org.apache.paimon</groupId>
-      <artifactId>paimon-hive-connector-3.1</artifactId>
-      <version>${paimon.version}</version>
-      <exclusions>
-        <exclusion>
-          <artifactId>lz4-java</artifactId>
-          <groupId>org.lz4</groupId>
-        </exclusion>
-        <exclusion>
-          <artifactId>caffeine</artifactId>
-          <groupId>com.github.ben-manes.caffeine</groupId>
-        </exclusion>
-      </exclusions>
+      <groupId>org.apache.impala</groupId>
+      <artifactId>impala-paimon-runtime</artifactId>
+      <version>${project.version}</version>
     </dependency>
-    <dependency>
-      <groupId>org.apache.paimon</groupId>
-      <artifactId>paimon-arrow</artifactId>
-      <version>${paimon.version}</version>
-    </dependency>
+    <!-- Paimon modules (including paimon-arrow) are shaded into impala-paimon-runtime;
+         avoid duplicate org.apache.paimon classes. -->
       <dependency>
           <groupId>org.apache.arrow</groupId>
           <artifactId>arrow-vector</artifactId>

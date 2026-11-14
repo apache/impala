@@ -1,0 +1,196 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+Licensed to the Apache Software Foundation (ASF) under one
+or more contributor license agreements.  See the NOTICE file
+distributed with this work for additional information
+regarding copyright ownership.  The ASF licenses this file
+to you under the Apache License, Version 2.0 (the
+"License"); you may not use this file except in compliance
+with the License.  You may obtain a copy of the License at
+
+  http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing,
+software distributed under the License is distributed on an
+"AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+KIND, either express or implied.  See the License for the
+specific language governing permissions and limitations
+under the License.
+-->
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <parent>
+    <groupId>org.apache.impala</groupId>
+    <artifactId>impala-parent</artifactId>
+    <version>5.0.0-SNAPSHOT</version>
+    <relativePath>../../pom.xml</relativePath>
+  </parent>
+  <modelVersion>4.0.0</modelVersion>
+
+  <artifactId>impala-paimon-runtime</artifactId>
+  <packaging>jar</packaging>
+
+  <name>Impala Paimon Runtime ${paimon.version}</name>
+
+  <dependencies>
+    <!-- Listed before the Paimon jars so shade keeps these classes on
+         duplicates. CVE-2025-33042 is in avro-compiler's SpecificCompiler,
+         which this runtime jar does not package. 1.11.5 is the same class
+         set as the 1.11.4 copy Paimon vendors, plus the SpecificDatumReader
+         fixes. Do not use Impala's Avro 1.12: Paimon calls RawBlockReader,
+         which upstream Avro does not ship. Those eight RawBlock* classes
+         stay from the Paimon jar. -->
+    <dependency>
+      <groupId>org.apache.avro</groupId>
+      <artifactId>avro</artifactId>
+      <version>1.11.5</version>
+      <optional>true</optional>
+    </dependency>
+    <!-- paimon-hive-connector-common shades paimon-hive-common and paimon-bundle. -->
+    <dependency>
+      <groupId>org.apache.paimon</groupId>
+      <artifactId>paimon-hive-connector-common</artifactId>
+      <version>${paimon.version}</version>
+      <optional>true</optional>
+      <exclusions>
+        <exclusion>
+          <groupId>*</groupId>
+          <artifactId>*</artifactId>
+        </exclusion>
+      </exclusions>
+    </dependency>
+    <!-- JNI Arrow scan/write; not part of paimon-bundle inside connector-common. -->
+    <dependency>
+      <groupId>org.apache.paimon</groupId>
+      <artifactId>paimon-arrow</artifactId>
+      <version>${paimon.version}</version>
+      <optional>true</optional>
+      <exclusions>
+        <exclusion>
+          <groupId>*</groupId>
+          <artifactId>*</artifactId>
+        </exclusion>
+      </exclusions>
+    </dependency>
+
+    <dependency>
+      <groupId>org.apache.hive</groupId>
+      <artifactId>hive-exec</artifactId>
+      <scope>provided</scope>
+    </dependency>
+  </dependencies>
+
+  <build>
+    <plugins>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-shade-plugin</artifactId>
+        <configuration>
+          <artifactSet>
+            <includes>
+              <include>org.apache.avro:avro</include>
+              <include>org.apache.paimon:*</include>
+            </includes>
+          </artifactSet>
+          <!-- Upstream Paimon module jars bundle dependencies, many
+               relocated under org.apache.paimon.shade. Drop embedded copies only for
+               libraries Impala pins in impala-config.sh and relocates onto the Impala
+               classpath. Caffeine, antlr4, threeten-extra, commons-io, and
+               commons-compress stay embedded under org.apache.paimon.shade. Parquet, ORC
+               and hive-storage-api stay relocated. Avro is overlaid with 1.11.5
+               (see the avro dependency). Paimon's RawBlock* classes are kept. -->
+          <filters>
+            <filter>
+              <artifact>*:*</artifact>
+              <excludes>
+                <exclude>org/apache/paimon/shade/jackson2/com/**</exclude>
+                <exclude>org/apache/paimon/shade/com/fasterxml/jackson/**</exclude>
+                <exclude>org/apache/paimon/shade/io/airlift/compress/**</exclude>
+                <exclude>org/apache/paimon/shade/guava30/**</exclude>
+                <exclude>org/apache/paimon/shade/hc/**</exclude>
+                <exclude>org/apache/paimon/shade/com/google/protobuf/**</exclude>
+                <exclude>org/apache/paimon/shade/org/apache/commons/lang3/**</exclude>
+                <exclude>org/apache/paimon/shade/org/apache/datasketches/**</exclude>
+                <exclude>META-INF/versions/*/org/apache/datasketches/**</exclude>
+                <exclude>org/apache/paimon/shade/net/openhft/hashing/**</exclude>
+                <exclude>META-INF/maven/com.fasterxml.jackson.core/**</exclude>
+                <exclude>META-INF/maven/io.airlift/**</exclude>
+                <exclude>META-INF/maven/com.google.guava/**</exclude>
+                <exclude>META-INF/maven/org.apache.httpcomponents.client5/**</exclude>
+                <exclude>META-INF/maven/org.apache.httpcomponents.core5/**</exclude>
+                <exclude>META-INF/maven/com.google.protobuf/**</exclude>
+                <exclude>META-INF/maven/org.apache.commons/commons-lang3/**</exclude>
+                <exclude>META-INF/maven/org.apache.datasketches/**</exclude>
+                <exclude>META-INF/maven/net.openhft/**</exclude>
+                <!-- zstd-jni is bundled without relocation; use ours. -->
+                <exclude>com/github/luben/zstd/**</exclude>
+                <exclude>*/*/libzstd-jni-*</exclude>
+                <exclude>META-INF/licenses/LICENSE.zstd-jni</exclude>
+                <exclude>META-INF/maven/com.github.luben/**</exclude>
+                <!-- Only used by jackson-dataformat-yaml, which is excluded. -->
+                <exclude>org/apache/paimon/shade/jackson2/org/yaml/**</exclude>
+                <!-- Service files naming excluded classes. Our own jars provide them. -->
+                <exclude>META-INF/services/org.apache.paimon.shade.jackson2.*</exclude>
+                <exclude>META-INF/services/org.apache.paimon.shade.com.*</exclude>
+              </excludes>
+            </filter>
+            <!-- Drop Paimon's Avro 1.11.4 metadata. The 1.11.5 pom.properties
+                 from org.apache.avro:avro is kept. -->
+            <filter>
+              <artifact>org.apache.paimon:*</artifact>
+              <excludes>
+                <exclude>META-INF/maven/org.apache.avro/**</exclude>
+              </excludes>
+            </filter>
+          </filters>
+          <relocations>
+            <relocation>
+              <pattern>org.apache.avro</pattern>
+              <shadedPattern>org.apache.paimon.shade.org.apache.avro</shadedPattern>
+            </relocation>
+            <relocation>
+              <pattern>org.apache.paimon.shade.jackson2.com</pattern>
+              <shadedPattern>com</shadedPattern>
+            </relocation>
+            <relocation>
+              <pattern>org.apache.paimon.shade.com.fasterxml.jackson</pattern>
+              <shadedPattern>com.fasterxml.jackson</shadedPattern>
+            </relocation>
+            <relocation>
+              <pattern>org.apache.paimon.shade.io.airlift.compress</pattern>
+              <shadedPattern>io.airlift.compress</shadedPattern>
+            </relocation>
+            <relocation>
+              <pattern>org.apache.paimon.shade.guava30.com</pattern>
+              <shadedPattern>com</shadedPattern>
+            </relocation>
+            <relocation>
+              <pattern>org.apache.paimon.shade.hc</pattern>
+              <shadedPattern>org.apache.hc</shadedPattern>
+            </relocation>
+            <relocation>
+              <pattern>org.apache.paimon.shade.com.google.protobuf</pattern>
+              <shadedPattern>com.google.protobuf</shadedPattern>
+            </relocation>
+            <relocation>
+              <pattern>org.apache.paimon.shade.org.apache.commons.lang3</pattern>
+              <shadedPattern>org.apache.commons.lang3</shadedPattern>
+            </relocation>
+            <relocation>
+              <pattern>org.apache.paimon.shade.org.apache.datasketches</pattern>
+              <shadedPattern>org.apache.datasketches</shadedPattern>
+            </relocation>
+            <relocation>
+              <pattern>org.apache.paimon.shade.net.openhft.hashing</pattern>
+              <shadedPattern>net.openhft.hashing</shadedPattern>
+            </relocation>
+          </relocations>
+          <transformers>
+            <transformer implementation="org.apache.maven.plugins.shade.resource.ServicesResourceTransformer"/>
+          </transformers>
+        </configuration>
+      </plugin>
+    </plugins>
+  </build>
+</project>

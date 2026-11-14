@@ -312,7 +312,7 @@ export IMPALA_DBCP2_VERSION=2.14.0
 export IMPALA_DROPWIZARD_METRICS_VERSION=4.2.40
 export IMPALA_AIRCOMPRESSOR_VERSION=2.0.3
 export IMPALA_DATASKETCHES_VERSION=6.0.0
-export IMPALA_PAIMON_VERSION=1.3.1
+export IMPALA_PAIMON_VERSION=2.1.0
 export IMPALA_ESRI_GEOMETRY_API_VERSION=2.2.4
 
 # Docker image used for the Valkey (Redis-compatible) server that backs the distributed

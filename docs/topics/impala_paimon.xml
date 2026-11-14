@@ -40,6 +40,7 @@ under the License.
       Impala adds experimental support for Apache Paimon tables registered in
       the Hive Metastore. You can create and drop those tables, and query the
       latest snapshot. Impala supports the Hive catalog and the Hadoop catalog.
+      Impala bundles the Apache Paimon 2.1.0 reader.
     </p>
 
     <p>
@@ -377,10 +378,12 @@ DROP TABLE test_create_managed_bucket_paimon_table;
 
       <p>
         You can get information about the Paimon data types in
-        <xref href="https://paimon.apache.org/docs/1.3/concepts/data-types/" scope="external" format="html">
+        <xref href="https://paimon.apache.org/docs/2.1/concepts/data-types/" scope="external" format="html">
           the Paimon spec</xref>.
         Impala can create and query the primitive types in the table below.
-        <codeph>CREATE TABLE</codeph> rejects every other type.
+        <codeph>CREATE TABLE</codeph> rejects every other type. The Paimon 2.x
+        types <codeph>BLOB</codeph>, <codeph>VECTOR</codeph> and
+        <codeph>VARIANT</codeph> are not supported.
       </p>
 
       <p>
@@ -478,6 +481,18 @@ DROP TABLE test_create_managed_bucket_paimon_table;
               </row>
               <row>
                 <entry>ROW</entry>
+                <entry>Not supported</entry>
+              </row>
+              <row>
+                <entry>VARIANT</entry>
+                <entry>Not supported</entry>
+              </row>
+              <row>
+                <entry>BLOB</entry>
+                <entry>Not supported</entry>
+              </row>
+              <row>
+                <entry>VECTOR</entry>
                 <entry>Not supported</entry>
               </row>
             </tbody>

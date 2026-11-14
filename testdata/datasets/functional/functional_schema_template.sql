@@ -5030,6 +5030,18 @@ hadoop fs -put -f ${IMPALA_HOME}/testdata/data/paimon_test/paimon_catalog/wareho
 ---- DATASET
 functional
 ---- BASE_TABLE_NAME
+paimon_aggregation_pk
+---- CREATE
+CREATE EXTERNAL TABLE IF NOT EXISTS {db_name}{db_suffix}.{table_name}
+STORED AS PAIMON
+LOCATION '/test-warehouse/paimon_test/paimon_catalog/warehouse/functional.db/paimon_aggregation_pk';
+---- DEPENDENT_LOAD
+`hadoop fs -mkdir -p /test-warehouse/paimon_test/paimon_catalog/warehouse/functional.db && \
+hadoop fs -put -f ${IMPALA_HOME}/testdata/data/paimon_test/paimon_catalog/warehouse/functional.db/paimon_aggregation_pk /test-warehouse/paimon_test/paimon_catalog/warehouse/functional.db
+====
+---- DATASET
+functional
+---- BASE_TABLE_NAME
 paimon_decimal_tbl
 ---- CREATE
 CREATE EXTERNAL TABLE IF NOT EXISTS {db_name}{db_suffix}.{table_name}

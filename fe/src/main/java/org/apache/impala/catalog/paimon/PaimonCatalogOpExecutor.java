@@ -34,6 +34,7 @@ import org.apache.paimon.catalog.Identifier;
 import org.apache.paimon.fs.FileIO;
 import org.apache.paimon.fs.Path;
 import org.apache.paimon.schema.Schema;
+import org.apache.paimon.schema.FileSystemSchemaManager;
 import org.apache.paimon.schema.SchemaManager;
 import org.apache.paimon.schema.TableSchema;
 import org.apache.paimon.table.Table;
@@ -122,7 +123,7 @@ public class PaimonCatalogOpExecutor {
         throw new ImpalaRuntimeException("Failed to get file IO for paimon table", e);
       }
 
-      SchemaManager schemaManager = new SchemaManager(fileIO, path);
+      SchemaManager schemaManager = new FileSystemSchemaManager(fileIO, path);
       Optional<TableSchema> tableSchema = schemaManager.latest();
       if (!tableSchema.isPresent()) {
         Schema schema = PaimonUtil.genPaimonSchema(

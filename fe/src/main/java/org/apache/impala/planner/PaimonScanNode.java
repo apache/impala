@@ -166,7 +166,7 @@ public class PaimonScanNode extends ScanNode {
   protected long estimateSplitRowCount(Split s) {
     if (s instanceof DataSplit) {
       DataSplit dataSplit = (DataSplit) s;
-      if (dataSplit.mergedRowCountAvailable()) { return dataSplit.mergedRowCount(); }
+      return dataSplit.mergedRowCount().orElseGet(dataSplit::rowCount);
     }
     return s.rowCount();
   }

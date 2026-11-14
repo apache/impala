@@ -32,10 +32,10 @@ import org.apache.impala.common.ImpalaRuntimeException;
 import org.apache.impala.common.FrontendTestBase;
 import org.apache.paimon.table.Table;
 import org.apache.paimon.predicate.And;
+import org.apache.paimon.predicate.Between;
 import org.apache.paimon.predicate.CompoundPredicate;
 import org.apache.paimon.predicate.EndsWith;
 import org.apache.paimon.predicate.Equal;
-import org.apache.paimon.predicate.GreaterOrEqual;
 import org.apache.paimon.predicate.GreaterThan;
 import org.apache.paimon.predicate.In;
 import org.apache.paimon.predicate.LessOrEqual;
@@ -43,8 +43,10 @@ import org.apache.paimon.predicate.LessThan;
 import org.apache.paimon.predicate.IsNotNull;
 import org.apache.paimon.predicate.IsNull;
 import org.apache.paimon.predicate.LeafPredicate;
+import org.apache.paimon.predicate.NotEndsWith;
 import org.apache.paimon.predicate.NotEqual;
 import org.apache.paimon.predicate.NotIn;
+import org.apache.paimon.predicate.NotStartsWith;
 import org.apache.paimon.predicate.Or;
 import org.apache.paimon.predicate.Predicate;
 import org.apache.paimon.predicate.StartsWith;
@@ -573,11 +575,15 @@ public class PaimonImpalaExprConverterTest extends FrontendTestBase {
     ImpalaExprConverter.ConverterResult gt = convertSql(String.format(
         "select * from %s where double_value > cast(10.1 as double)", TBL));
     Assert.assertTrue(gt.isFullyConverted());
-    CompoundPredicate and = (CompoundPredicate) gt.getPredicate();
-    Assert.assertTrue(and.function() instanceof And);
-    LeafPredicate comparison = (LeafPredicate) and.children().get(0);
-    Assert.assertTrue(comparison.function() instanceof GreaterThan);
-    Assert.assertEquals(10.1d, ((Number) comparison.literals().get(0)).doubleValue(), 0);
+    boolean foundGt = false;
+    for (LeafPredicate leaf : collectLeaves(gt.getPredicate())) {
+      if (leaf.function() instanceof GreaterThan) {
+        Assert.assertEquals(
+            10.1d, ((Number) leaf.literals().get(0)).doubleValue(), 0);
+        foundGt = true;
+      }
+    }
+    Assert.assertTrue(foundGt);
   }
 
   /*
@@ -608,14 +614,15 @@ public class PaimonImpalaExprConverterTest extends FrontendTestBase {
     checkUnAcceptableExpr(String.format(
         "select * from %s where float_value = cast(1.1 as double)", TBL));
 
-    // d >= 0 becomes d >= -0.0 AND d <= +Infinity.
-    assertGreaterBound(String.format(
-        "select * from %s where double_value >= cast(0 as double)", TBL), true);
-    // d > x and d >= x for a non-zero x keep the literal and exclude NaN.
-    assertGreaterBound(String.format(
-        "select * from %s where double_value > cast(1 as double)", TBL), false);
-    assertGreaterBound(String.format(
-        "select * from %s where double_value >= cast(1 as double)", TBL), false);
+    // d >= 0 becomes BETWEEN (-0.0, +Infinity).
+    assertBetweenInclusive(String.format(
+        "select * from %s where double_value >= cast(0 as double)", TBL),
+        0.0d, true);
+    // d > x is GT x AND d <= +Infinity; d >= x (non-zero) is BETWEEN (x, +Infinity).
+    assertGreaterThanWithMaxFinite(String.format(
+        "select * from %s where double_value > cast(1 as double)", TBL), 1.0d);
+    assertBetweenInclusive(String.format(
+        "select * from %s where double_value >= cast(1 as double)", TBL), 1.0d, false);
 
     // d < 0 becomes d < -0.0. NaN is already above every finite literal.
     ImpalaExprConverter.ConverterResult ltZero = convertSql(String.format(
@@ -695,25 +702,59 @@ public class PaimonImpalaExprConverterTest extends FrontendTestBase {
     Assert.assertTrue(extracted.getPostScanExprs().isEmpty());
   }
 
-  private void assertGreaterBound(String sql, boolean zeroBound)
+  private void assertBetweenInclusive(String sql, double lower, boolean negativeZeroLower)
       throws AnalysisException {
     ImpalaExprConverter.ConverterResult result = convertSql(sql);
     Assert.assertTrue(result.isFullyConverted());
     Assert.assertFalse(result.isPartitionOnly());
-    CompoundPredicate and = (CompoundPredicate) result.getPredicate();
-    Assert.assertTrue(and.function() instanceof And);
-    LeafPredicate comparison = (LeafPredicate) and.children().get(0);
-    LeafPredicate notNan = (LeafPredicate) and.children().get(1);
-    if (zeroBound) {
-      Assert.assertTrue(comparison.function() instanceof GreaterOrEqual);
-      Assert.assertTrue(isNegativeZero(comparison.literals().get(0)));
+    Assert.assertTrue(result.getPredicate() instanceof LeafPredicate);
+    LeafPredicate leaf = (LeafPredicate) result.getPredicate();
+    Assert.assertTrue(leaf.function() instanceof Between);
+    if (negativeZeroLower) {
+      Assert.assertTrue(isNegativeZero(leaf.literals().get(0)));
     } else {
-      Assert.assertTrue(comparison.function() instanceof GreaterThan
-          || comparison.function() instanceof GreaterOrEqual);
-      Assert.assertEquals(1.0d, ((Number) comparison.literals().get(0)).doubleValue(), 0);
+      Assert.assertEquals(
+          lower, ((Number) leaf.literals().get(0)).doubleValue(), 0);
     }
-    Assert.assertTrue(notNan.function() instanceof LessOrEqual);
-    Assert.assertTrue(isPositiveInfinity(notNan.literals().get(0)));
+    Assert.assertTrue(isPositiveInfinity(leaf.literals().get(1)));
+  }
+
+  private void assertGreaterThanWithMaxFinite(String sql, double lower)
+      throws AnalysisException {
+    ImpalaExprConverter.ConverterResult result = convertSql(sql);
+    Assert.assertTrue(result.isFullyConverted());
+    Assert.assertFalse(result.isPartitionOnly());
+    Predicate predicate = result.getPredicate();
+    Assert.assertTrue(predicate instanceof CompoundPredicate);
+    Assert.assertTrue(((CompoundPredicate) predicate).function() instanceof And);
+    List<LeafPredicate> leaves = collectLeaves(predicate);
+    Assert.assertEquals(2, leaves.size());
+    boolean foundGt = false;
+    boolean foundLeInf = false;
+    for (LeafPredicate leaf : leaves) {
+      if (leaf.function() instanceof GreaterThan) {
+        Assert.assertEquals(
+            lower, ((Number) leaf.literals().get(0)).doubleValue(), 0);
+        foundGt = true;
+      } else if (leaf.function() instanceof LessOrEqual) {
+        Assert.assertTrue(isPositiveInfinity(leaf.literals().get(0)));
+        foundLeInf = true;
+      }
+    }
+    Assert.assertTrue(foundGt);
+    Assert.assertTrue(foundLeInf);
+  }
+
+  private static List<LeafPredicate> collectLeaves(Predicate predicate) {
+    List<LeafPredicate> out = new ArrayList<>();
+    if (predicate instanceof LeafPredicate) {
+      out.add((LeafPredicate) predicate);
+    } else if (predicate instanceof CompoundPredicate) {
+      for (Predicate child : ((CompoundPredicate) predicate).children()) {
+        out.addAll(collectLeaves(child));
+      }
+    }
+    return out;
   }
 
   private static void assertHasPositiveAndNegativeZero(Predicate predicate) {
@@ -1177,9 +1218,16 @@ public class PaimonImpalaExprConverterTest extends FrontendTestBase {
         String.format("select * from %s where not (%s like 'a_b')", TBL, col));
     checkUnAcceptableExpr(
         String.format("select * from %s where not (%s rlike '^ab.*bc$')", TBL, col));
-    // startsWith cannot be negated by Paimon, so NOT LIKE 'a%' stays in Impala.
-    checkUnAcceptableExpr(
+    ImpalaExprConverter.ConverterResult notPrefix = convertSql(
         String.format("select * from %s where not (%s like 'a%%')", TBL, col));
+    Assert.assertTrue(notPrefix.isFullyConverted());
+    Assert.assertTrue(((LeafPredicate) notPrefix.getPredicate()).function()
+        instanceof NotStartsWith);
+    ImpalaExprConverter.ConverterResult notSuffix = convertSql(
+        String.format("select * from %s where not (%s like '%%a')", TBL, col));
+    Assert.assertTrue(notSuffix.isFullyConverted());
+    Assert.assertTrue(((LeafPredicate) notSuffix.getPredicate()).function()
+        instanceof NotEndsWith);
     // LIKE without a wildcard is equality, and equality can be negated.
     ImpalaExprConverter.ConverterResult notExact = convertSql(
         String.format("select * from %s where not (%s like 'exact')", TBL, col));

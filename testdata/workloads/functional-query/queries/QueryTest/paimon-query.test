@@ -203,6 +203,15 @@ BIGINT
 aggregation(SUM, RowsRead): 7300
 ====
 ---- QUERY
+# Primary-key table with merge-engine=aggregation (merged sum on read).
+select id, amount from functional_parquet.paimon_aggregation_pk order by id
+---- RESULTS
+1,30
+2,5
+---- TYPES
+INT, BIGINT
+====
+---- QUERY
 set debug_action="0:GETNEXT:FAIL";
 select * from functional_parquet.alltypes_paimon
 ---- CATCH

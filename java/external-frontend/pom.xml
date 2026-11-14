@@ -42,6 +42,10 @@ under the License.
           <groupId>org.apache.impala</groupId>
           <artifactId>impala-iceberg-runtime</artifactId>
         </exclusion>
+        <exclusion>
+          <groupId>org.apache.impala</groupId>
+          <artifactId>impala-paimon-runtime</artifactId>
+        </exclusion>
       </exclusions>
     </dependency>
   </dependencies>

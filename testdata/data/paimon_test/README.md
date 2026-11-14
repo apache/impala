@@ -43,6 +43,17 @@ schema is:
 | ts_ltz_value  | timestamp     |         |
 | ts_value      | timestamp     |         |
 +---------------+---------------+---------+
+## paimon_aggregation_pk
+Primary-key table with `merge-engine=aggregation` and `sum` on `amount`.
+schema is:
++--------+--------+---------+
+| name   | type   | comment |
++--------+--------+---------+
+| id     | int    | PK      |
+| amount | bigint | sum agg |
++--------+--------+---------+
+Written in two commits so merge-on-read sums key `id=1`: commit 1 `(1, 10)`,
+commit 2 `(1, 20)` and `(2, 5)`. Latest snapshot rows: `(1, 30)`, `(2, 5)`.
 ## paimon_decimal_tbl
 The table is used to support decimal related test,with various precision and scale.
 the schema is:
