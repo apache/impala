@@ -11799,6 +11799,49 @@ TEST_P(ExprTest, AiFunctionsTest) {
       AiFunctions::AiGenerateTextParseOpenAiResponse(bad_type_response);
   EXPECT_EQ(bad_type_parsed, AiFunctions::AI_GENERATE_TXT_JSON_PARSE_ERROR);
 
+  // Some models (e.g. Claude) return text content together with tool_calls. The
+  // tool_calls must be preserved so the caller can execute them.
+  string content_with_tool_calls_response = R"({
+    "choices": [
+      {
+        "message": {
+          "role": "assistant",
+          "content": "I'll start with the timeline.",
+          "tool_calls": [
+            {
+              "id": "call_1",
+              "type": "function",
+              "function": {"name": "get_timeline", "arguments": "{}"}
+            }
+          ]
+        }
+      }
+    ]
+  })";
+  string content_with_tool_calls_parsed =
+      AiFunctions::AiGenerateTextParseOpenAiResponse(content_with_tool_calls_response);
+  EXPECT_NE(content_with_tool_calls_parsed.find("\"tool_calls\""), string::npos);
+  EXPECT_NE(content_with_tool_calls_parsed.find("\"call_1\""), string::npos);
+  EXPECT_NE(content_with_tool_calls_parsed.find("I'll start with the timeline."),
+      string::npos);
+
+  // A final answer may carry an empty tool_calls array alongside the text content.
+  // Only the text content should be returned in that case.
+  string content_with_empty_tool_calls_response = R"({
+    "choices": [
+      {
+        "message": {
+          "role": "assistant",
+          "content": "Final analysis.",
+          "tool_calls": []
+        }
+      }
+    ]
+  })";
+  EXPECT_EQ(AiFunctions::AiGenerateTextParseOpenAiResponse(
+          content_with_empty_tool_calls_response),
+      "Final analysis.");
+
   // resource cleanup
   pool.FreeAll();
   UdfTestHarness::CloseContext(ctx);

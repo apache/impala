@@ -253,19 +253,22 @@ string AiFunctions::AiGenerateTextParseOpenAiResponse(const string_view& respons
 
   // Access the "content" field within "message"
   const rapidjson::Value& message = firstChoice[OPEN_AI_RESPONSE_FIELD_MESSAGE];
-  if (message.HasMember(OPEN_AI_RESPONSE_FIELD_CONTENT)
-      && message[OPEN_AI_RESPONSE_FIELD_CONTENT].IsString()) {
-    return message[OPEN_AI_RESPONSE_FIELD_CONTENT].GetString();
-  }
-
-  // Native tool-calling responses can set content=null and provide tool_calls.
-  if (message.HasMember(OPEN_AI_RESPONSE_FIELD_TOOL_CALLS)
-      && message[OPEN_AI_RESPONSE_FIELD_TOOL_CALLS].IsArray()) {
+  const auto content = message.FindMember(OPEN_AI_RESPONSE_FIELD_CONTENT);
+  const auto tool_calls = message.FindMember(OPEN_AI_RESPONSE_FIELD_TOOL_CALLS);
+  const bool has_text_content =
+    content != message.MemberEnd() && content->value.IsString();
+  const bool has_tool_calls =
+      tool_calls != message.MemberEnd() && tool_calls->value.IsArray();
+  // Return the whole message when there are tool_calls for the caller to execute, or
+  // when there is no usable text content. Some models (e.g. Claude) return a text
+  // preamble alongside tool_calls, so tool_calls must win over content.
+  if (has_tool_calls && (!tool_calls->value.Empty() || !has_text_content)) {
     rapidjson::StringBuffer buffer;
-    rapidjson::Writer<rapidjson::StringBuffer> writer(buffer);
+    rapidjson::Writer writer(buffer);
     message.Accept(writer);
     return string(buffer.GetString(), buffer.GetSize());
   }
+  if (has_text_content) return content->value.GetString();
 
   LOG(WARNING) << AI_GENERATE_TXT_JSON_PARSE_ERROR << ": " << response;
   return AI_GENERATE_TXT_JSON_PARSE_ERROR;
