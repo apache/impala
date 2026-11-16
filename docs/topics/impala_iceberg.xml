@@ -702,6 +702,37 @@ ALTER TABLE non_iceberg_table CONVERT TO ICEBERG TBLPROPERTIES('format-version'=
         statement does nothing and returns the message 'Table has already been
         migrated.'.
       </p>
+      <p rev="IMPALA-12667">
+        <b>Interoperability of converted tables:</b> The Iceberg specification requires
+        <codeph>STRING</codeph> columns in Parquet data files to carry the UTF-8
+        annotation. Because <codeph>CONVERT TO ICEBERG</codeph> does not rewrite the data
+        files, the converted table keeps any Parquet files that Impala wrote without this
+        annotation. Impala writes such files in releases before
+        <keyword keyref="impala50"/>, and in later releases when you set the
+        <xref keyref="parquet_annotate_strings_utf8"/> to <codeph>false</codeph>. Without
+        the annotation, Impala does not validate the values, so these
+        <codeph>STRING</codeph> columns can also contain bytes that are not valid UTF-8,
+        for example binary data. Impala reads these files without problems, but other
+        engines that read the converted table might reject <codeph>STRING</codeph> columns
+        that lack the UTF-8 annotation or that contain values that are not valid UTF-8.
+      </p>
+      <p rev="IMPALA-12667">
+        If engines other than Impala must read the table, use a
+        <codeph>CREATE TABLE AS SELECT</codeph> statement instead of
+        <codeph>CONVERT TO ICEBERG</codeph>. The statement rewrites the data, and Impala
+        always writes the UTF-8 annotation for <codeph>STRING</codeph> columns of Iceberg
+        tables, for example:
+        <codeblock>
+CREATE TABLE ice_tbl STORED AS ICEBERG AS SELECT * FROM legacy_tbl;
+        </codeblock>
+        Impala validates the <codeph>STRING</codeph> values that it writes to Iceberg
+        tables, so the statement fails if the legacy table contains values that are not
+        valid UTF-8. To find such rows, use the
+        <xref href="impala_string_functions.xml#string_functions/is_valid_utf8"
+          >IS_VALID_UTF8()</xref>
+        function. To keep non-UTF-8 data, cast the affected columns to
+        <codeph>BINARY</codeph> in the <codeph>SELECT</codeph> list.
+      </p>
     </conbody>
   </concept>
 
