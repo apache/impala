@@ -429,9 +429,15 @@ SELECT DISTINCT expression 'variant_get(v, '$.context')' with type 'VARIANT' is 
 ====
 ---- QUERY
 # Unsupported target type tag in the 3-arg form.
-SELECT variant_get(v, '$.age', 'decimal') FROM trino_variant;
+SELECT variant_get(v, '$.age', 'timestamp') FROM trino_variant;
 ---- CATCH
-unsupported target type 'decimal'
+unsupported target type 'timestamp'
+====
+---- QUERY
+# A decimal type tag with an invalid precision.
+SELECT variant_get(v, '$.age', 'decimal(39,2)') FROM trino_variant;
+---- CATCH
+invalid target type 'decimal(39,2)': Decimal precision must be <= 38: 39
 ====
 ---- QUERY
 # Constant path must be '$'-rooted.
@@ -556,6 +562,72 @@ INT, BIGINT, SMALLINT
 SELECT variant_get(v, '$', 'int') FROM trino_variant WHERE id = 53;
 ---- CATCH
 out of range
+====
+---- QUERY
+# IMPALA-15811: with a decimal type, decimals convert like CAST(decimal AS DECIMAL(p,s)).
+# DECIMAL(28,9) holds every digit of the values. A smaller scale rounds half away from
+# zero, and try_variant_get() returns NULL if the value does not fit the precision.
+SELECT id, variant_get(v, '$', 'decimal(28,9)'), variant_get(v, '$', 'DECIMAL(20, 2)'),
+  try_variant_get(v, '$', 'decimal(8,2)')
+FROM trino_variant WHERE id BETWEEN 50 AND 53;
+---- RESULTS
+50,3.140000000,3.14,3.14
+51,123456.789000000,123456.79,123456.79
+52,-123456789.987654321,-123456789.99,NULL
+53,9876543210.123456789,9876543210.12,NULL
+---- TYPES
+INT, DECIMAL, DECIMAL, DECIMAL
+====
+---- QUERY
+# The result is exact, so it can be aggregated without losing digits.
+SELECT sum(variant_get(v, '$', 'decimal(28,9)')) FROM trino_variant
+WHERE id BETWEEN 50 AND 53 AND variant_get(v, '$', 'decimal(28,9)') != 3.14;
+---- RESULTS
+9753209876.924802468
+---- TYPES
+DECIMAL
+====
+---- QUERY
+# Integers and floating-point values convert to decimals too. 'decimal' without a
+# precision is DECIMAL(9,0), which the int64 of id 12 does not fit.
+SELECT id, variant_get(v, '$', 'decimal(12,1)'), try_variant_get(v, '$', 'decimal')
+FROM trino_variant WHERE id IN (6, 12, 13, 14);
+---- RESULTS
+6,-34.0,-34
+12,10000000000.0,NULL
+13,14.3,14
+14,-14.3,-14
+---- TYPES
+INT, DECIMAL, DECIMAL
+====
+---- QUERY
+# A decimal from a field of an object. id 33 has no such field.
+SELECT id, variant_get(v, '$.age', 'decimal(5,1)') FROM trino_variant
+WHERE id IN (31, 33);
+---- RESULTS
+31,30.0
+33,NULL
+---- TYPES
+INT, DECIMAL
+====
+---- QUERY
+# A value that does not fit the precision is an error.
+SELECT variant_get(v, '$', 'decimal(8,2)') FROM trino_variant WHERE id = 52;
+---- CATCH
+out of range
+====
+---- QUERY
+# A string that is not a number is not convertible to a decimal.
+SELECT variant_get(v, '$', 'decimal(10,2)') FROM trino_variant WHERE id = 15;
+---- CATCH
+not convertible to DECIMAL
+====
+---- QUERY
+SELECT try_variant_get(v, '$', 'decimal(10,2)') FROM trino_variant WHERE id = 15;
+---- RESULTS
+NULL
+---- TYPES
+DECIMAL
 ====
 ---- QUERY
 # Strict narrowing overflow: 100000 does not fit TINYINT.

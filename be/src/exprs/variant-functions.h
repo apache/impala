@@ -30,6 +30,7 @@ using impala_udf::IntVal;
 using impala_udf::BigIntVal;
 using impala_udf::FloatVal;
 using impala_udf::DoubleVal;
+using impala_udf::DecimalVal;
 using impala_udf::StringVal;
 using impala_udf::DateVal;
 using impala_udf::VariantVal;
@@ -44,9 +45,11 @@ using impala_udf::VariantVal;
 ///
 /// variant_get(VARIANT v, STRING path, STRING type) -> <type>
 ///   Extracts the sub-value at 'path' and coerces it to the named scalar 'type'
-///   (BOOLEAN/TINYINT/SMALLINT/INT/BIGINT/FLOAT/DOUBLE/STRING/DATE). A STRING result is
-///   the raw text of a string value, else its JSON rendering; TIME/TIMESTAMPTZ/UUID fail
-///   to coerce, since the serializer cannot render them yet.
+///   (BOOLEAN/TINYINT/SMALLINT/INT/BIGINT/FLOAT/DOUBLE/DECIMAL(p,s)/STRING/DATE). A
+///   STRING result is the raw text of a string value, else its JSON rendering;
+///   TIME/TIMESTAMPTZ/UUID fail to coerce, since the serializer cannot render them yet.
+///   For DECIMAL(p,s) the frontend parses the precision and scale from 'type' and sets
+///   them in the return type.
 ///
 /// try_variant_get() are the non-strict variants: instead of raising an error on a
 /// corrupt metadata blob or a 3-arg type mismatch/overflow, they return SQL NULL.
@@ -85,6 +88,8 @@ class VariantFunctions {
       const StringVal& path, const StringVal& type);
   static DoubleVal VariantGetDouble(FunctionContext* ctx, const VariantVal& v,
       const StringVal& path, const StringVal& type);
+  static DecimalVal VariantGetDecimal(FunctionContext* ctx, const VariantVal& v,
+      const StringVal& path, const StringVal& type);
   static StringVal VariantGetString(FunctionContext* ctx, const VariantVal& v,
       const StringVal& path, const StringVal& type);
   static DateVal VariantGetDate(FunctionContext* ctx, const VariantVal& v,
@@ -103,6 +108,8 @@ class VariantFunctions {
   static FloatVal TryVariantGetFloat(FunctionContext* ctx, const VariantVal& v,
       const StringVal& path, const StringVal& type);
   static DoubleVal TryVariantGetDouble(FunctionContext* ctx, const VariantVal& v,
+      const StringVal& path, const StringVal& type);
+  static DecimalVal TryVariantGetDecimal(FunctionContext* ctx, const VariantVal& v,
       const StringVal& path, const StringVal& type);
   static StringVal TryVariantGetString(FunctionContext* ctx, const VariantVal& v,
       const StringVal& path, const StringVal& type);

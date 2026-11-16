@@ -158,10 +158,11 @@ under the License.
         The third argument of the typed form must be a string literal, one of
         <codeph>boolean</codeph>, <codeph>tinyint</codeph>, <codeph>smallint</codeph>,
         <codeph>int</codeph>, <codeph>bigint</codeph>, <codeph>float</codeph>,
-        <codeph>double</codeph>, <codeph>string</codeph> and <codeph>date</codeph>. The
-        names are not case-sensitive. Other types, such as <codeph>decimal</codeph> and
-        <codeph>timestamp</codeph>, are not supported. The function converts the value at
-        the path as follows:
+        <codeph>double</codeph>,
+        <codeph>decimal(<varname>p</varname>,<varname>s</varname>)</codeph>,
+        <codeph>string</codeph> and <codeph>date</codeph>. The names are not
+        case-sensitive. Other types, such as <codeph>timestamp</codeph>, are not
+        supported. The function converts the value at the path as follows:
       </p>
       <ul>
         <li>
@@ -170,14 +171,27 @@ under the License.
         </li>
         <li>
           <codeph>tinyint</codeph>, <codeph>smallint</codeph>, <codeph>int</codeph>,
-          <codeph>bigint</codeph>: an integer of any width, or a string that Impala can
-          parse as an integer. The value must fit in the requested type. Impala does not
-          convert floating-point values to integers.
+          <codeph>bigint</codeph>: an integer of any width, a decimal, or a string that
+          Impala can parse as an integer. A decimal is rounded to the nearest integer,
+          half away from zero, also if <codeph>DECIMAL_V2</codeph> is
+          <codeph>false</codeph>. The value must fit in the requested type. Impala does
+          not convert floating-point values to integers.
         </li>
         <li>
           <codeph>float</codeph>, <codeph>double</codeph>: a floating-point value, an
-          integer, or a string that Impala can parse as a number. The value must be in the
-          range of <codeph>float</codeph> for the <codeph>float</codeph> type.
+          integer, a decimal, or a string that Impala can parse as a number. The value
+          must be in the range of <codeph>float</codeph> for the <codeph>float</codeph>
+          type. A decimal can have more digits than these types can hold.
+        </li>
+        <li>
+          <codeph>decimal(<varname>p</varname>,<varname>s</varname>)</codeph>: a decimal,
+          an integer, a floating-point value, or a string that Impala can parse as a
+          number. The result has the given precision and scale, so a decimal keeps every
+          digit if the precision and the scale are large enough. Digits beyond the scale
+          are rounded half away from zero, also if <codeph>DECIMAL_V2</codeph> is
+          <codeph>false</codeph>. The value must fit in the precision. The scale is 0 for
+          <codeph>decimal(<varname>p</varname>)</codeph>, and
+          <codeph>decimal</codeph> is <codeph>DECIMAL(9,0)</codeph>.
         </li>
         <li>
           <codeph>date</codeph>: a variant date, or a string in the
@@ -210,6 +224,8 @@ WHERE variant_get(v, '$.age', 'int') > 18;
 SELECT variant_get(variant_get(v, '$.context'), '$.page') FROM events;
 
 SELECT try_variant_get(v, '$.items[0].quantity', 'int') FROM events;
+
+SELECT sum(variant_get(v, '$.items[0].price', 'decimal(12,2)')) FROM events;
 
 SELECT variant_to_json(variant_get(v, '$.items')) FROM events;</codeblock>
     </section>

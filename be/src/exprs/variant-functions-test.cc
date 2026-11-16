@@ -19,12 +19,15 @@
 
 #include <algorithm>
 #include <cstring>
+#include <limits>
 #include <sstream>
 #include <vector>
 
 #include "gutil/strings/substitute.h"
+#include "runtime/decimal-value.inline.h"
 #include "runtime/mem-pool.h"
 #include "runtime/mem-tracker.h"
+#include "runtime/types.h"
 #include "runtime/variant-value.h"
 #include "testutil/gtest-util.h"
 #include "udf/udf-internal.h"
@@ -278,6 +281,55 @@ class VariantFunctionsTest : public ::testing::Test {
         nullptr, pool_.get(), pool_.get(), td, args, 0, true);
     owned_ctxs_.push_back(c);
     return c;
+  }
+
+  // Creates a context with DECIMAL(precision, scale) as the return type, which is how
+  // the frontend passes the 'decimal(p,s)' type argument of variant_get().
+  FunctionContext* MakeDecimalCtx(int precision, int scale) {
+    FunctionContext::TypeDesc arg;
+    arg.type = FunctionContext::TYPE_STRING;
+    FunctionContext::TypeDesc ret;
+    ret.type = FunctionContext::TYPE_DECIMAL;
+    ret.precision = precision;
+    ret.scale = scale;
+    FunctionContext* c = FunctionContextImpl::CreateContext(
+        nullptr, pool_.get(), pool_.get(), ret, {arg, arg, arg}, 0, true);
+    owned_ctxs_.push_back(c);
+    return c;
+  }
+
+  // Returns variant_get(v, path, 'decimal(precision,scale)') as a string, "NULL" for a
+  // SQL NULL. Expects that the function does not fail.
+  string GetDecimal(const VariantVal& v, const char* path, int precision, int scale) {
+    FunctionContext* c = MakeDecimalCtx(precision, scale);
+    DecimalVal d = VariantFunctions::VariantGetDecimal(
+        c, v, StringVal(path), StringVal("decimal"));
+    EXPECT_FALSE(c->has_error()) << path << ": " << c->error_msg();
+    if (d.is_null) return "NULL";
+    // Read the bytes that a DECIMAL of this precision occupies.
+    __int128_t unscaled;
+    switch (ColumnType::GetDecimalByteSize(precision)) {
+      case 4: unscaled = d.val4; break;
+      case 8: unscaled = d.val8; break;
+      default: unscaled = d.val16; break;
+    }
+    return Decimal16Value(unscaled).ToString(precision, scale);
+  }
+
+  // Expects that variant_get(v, path, 'decimal(precision,scale)') fails with an error
+  // that contains 'error', and that try_variant_get() returns NULL without an error.
+  void ExpectDecimalFails(const VariantVal& v, const char* path, int precision,
+      int scale, const string& error) {
+    FunctionContext* c = MakeDecimalCtx(precision, scale);
+    EXPECT_TRUE(VariantFunctions::VariantGetDecimal(
+        c, v, StringVal(path), StringVal("decimal")).is_null) << path;
+    ASSERT_TRUE(c->has_error()) << path;
+    EXPECT_NE(string::npos, string(c->error_msg()).find(error))
+        << path << ": " << c->error_msg();
+    FunctionContext* try_ctx = MakeDecimalCtx(precision, scale);
+    EXPECT_TRUE(VariantFunctions::TryVariantGetDecimal(
+        try_ctx, v, StringVal(path), StringVal("decimal")).is_null) << path;
+    EXPECT_FALSE(try_ctx->has_error()) << path;
   }
 
   MemTracker tracker_;
@@ -607,6 +659,110 @@ TEST_F(VariantFunctionsTest, ThreeArgMalformedDecimal) {
     EXPECT_TRUE(c->has_error()) << path;
   }
   EXPECT_FALSE(ctx_->has_error());
+}
+
+// A variant decimal converts to the DECIMAL(p,s) of the type argument like
+// CAST(decimal AS DECIMAL(p,s)): digits beyond the scale round half away from zero, and
+// a value that does not fit the precision is out of range.
+TEST_F(VariantFunctionsTest, ThreeArgDecimalFromDecimal) {
+  vector<uint8_t> meta = BuildMetadata({"d16", "d4", "d8", "half", "neg_half"});
+  vector<uint8_t> obj = BuildObject({0, 1, 2, 3, 4},
+      {BuildDecimal16(9, Pow10(9) * 9876543210LL + 123456789), BuildDecimal4(2, 1234),
+          BuildDecimal8(9, -123456789987654321LL), BuildDecimal4(1, 995),
+          BuildDecimal4(1, -995)});
+  VariantVal v = MakeVariant(meta, obj);
+  // The same scale, in each width of the result.
+  EXPECT_EQ("12.34", GetDecimal(v, "$.d4", 4, 2));
+  EXPECT_EQ("12.34", GetDecimal(v, "$.d4", 18, 2));
+  EXPECT_EQ("9876543210.123456789", GetDecimal(v, "$.d16", 38, 9));
+  // A larger scale.
+  EXPECT_EQ("12.34000", GetDecimal(v, "$.d4", 9, 5));
+  EXPECT_EQ("9876543210.1234567890000000000000000000", GetDecimal(v, "$.d16", 38, 28));
+  // A smaller scale rounds.
+  EXPECT_EQ("-123456789.987654", GetDecimal(v, "$.d8", 20, 6));
+  EXPECT_EQ("-123456790", GetDecimal(v, "$.d8", 9, 0));
+  EXPECT_EQ("100", GetDecimal(v, "$.half", 3, 0));
+  EXPECT_EQ("-100", GetDecimal(v, "$.neg_half", 3, 0));
+  // 12.34 has two integer digits, 99.5 rounds to 100, and 9876543210.123456789 with
+  // scale 29 needs 10 + 29 = 39 digits.
+  ExpectDecimalFails(v, "$.d4", 3, 2, "out of range");
+  ExpectDecimalFails(v, "$.half", 2, 0, "out of range");
+  ExpectDecimalFails(v, "$.d16", 38, 29, "out of range");
+}
+
+// Integers and floating-point values convert like CAST(... AS DECIMAL(p,s)).
+TEST_F(VariantFunctionsTest, ThreeArgDecimalFromNumber) {
+  vector<uint8_t> meta = BuildMetadata(
+      {"d", "f", "i64", "i64_max", "i64_min", "i8", "inf", "nan"});
+  vector<uint8_t> obj = BuildObject({0, 1, 2, 3, 4, 5, 6, 7},
+      {BuildDouble(14.3), BuildFloat(-2.5f), BuildInt64(10000000000LL),
+          BuildInt64(std::numeric_limits<int64_t>::max()),
+          BuildInt64(std::numeric_limits<int64_t>::min()), BuildInt8(-34),
+          BuildDouble(std::numeric_limits<double>::infinity()),
+          BuildDouble(std::numeric_limits<double>::quiet_NaN())});
+  VariantVal v = MakeVariant(meta, obj);
+  // The int64 boundaries have 19 digits.
+  EXPECT_EQ("9223372036854775807", GetDecimal(v, "$.i64_max", 19, 0));
+  EXPECT_EQ("-9223372036854775808", GetDecimal(v, "$.i64_min", 19, 0));
+  EXPECT_EQ("9223372036854775807.0000000000000000000",
+      GetDecimal(v, "$.i64_max", 38, 19));
+  ExpectDecimalFails(v, "$.i64_max", 18, 0, "out of range");
+  ExpectDecimalFails(v, "$.i64_min", 38, 20, "out of range");
+  EXPECT_EQ("-34.00", GetDecimal(v, "$.i8", 4, 2));
+  EXPECT_EQ("10000000000.000", GetDecimal(v, "$.i64", 14, 3));
+  EXPECT_EQ("14.30", GetDecimal(v, "$.d", 10, 2));
+  EXPECT_EQ("14", GetDecimal(v, "$.d", 5, 0));
+  EXPECT_EQ("-2.5", GetDecimal(v, "$.f", 4, 1));
+  EXPECT_EQ("-3", GetDecimal(v, "$.f", 3, 0));
+  ExpectDecimalFails(v, "$.i8", 3, 2, "out of range");
+  ExpectDecimalFails(v, "$.i64", 13, 3, "out of range");
+  ExpectDecimalFails(v, "$.d", 2, 1, "out of range");
+  ExpectDecimalFails(v, "$.inf", 38, 0, "out of range");
+  ExpectDecimalFails(v, "$.nan", 38, 0, "out of range");
+}
+
+// A string is parsed like in CAST(string AS DECIMAL(p,s)).
+TEST_F(VariantFunctionsTest, ThreeArgDecimalFromString) {
+  vector<uint8_t> meta = BuildMetadata({"bad", "big", "carry", "exp", "huge_exp", "max",
+      "min", "num", "tiny_exp", "ws"});
+  vector<uint8_t> obj = BuildObject({0, 1, 2, 3, 4, 5, 6, 7, 8, 9},
+      {BuildShortString("abc"), BuildShortString("123456"), BuildShortString("9.995"),
+          BuildShortString("1.5e2"), BuildShortString("1e200"),
+          BuildShortString("99999999.99"), BuildShortString("-99999999.99"),
+          BuildShortString("12.345"), BuildShortString("1e-200"),
+          BuildShortString(" -1.5 ")});
+  VariantVal v = MakeVariant(meta, obj);
+  EXPECT_EQ("12.34500", GetDecimal(v, "$.num", 10, 5));
+  EXPECT_EQ("12.35", GetDecimal(v, "$.num", 10, 2));
+  EXPECT_EQ("-1.50", GetDecimal(v, "$.ws", 10, 2));
+  EXPECT_EQ("150.00", GetDecimal(v, "$.exp", 10, 2));
+  // Rounding carries into a new integer digit.
+  EXPECT_EQ("10.00", GetDecimal(v, "$.carry", 10, 2));
+  // An exponent that is too negative to parse gives 0.
+  EXPECT_EQ("0.00", GetDecimal(v, "$.tiny_exp", 10, 2));
+  // The largest and smallest values of DECIMAL(10,2).
+  EXPECT_EQ("99999999.99", GetDecimal(v, "$.max", 10, 2));
+  EXPECT_EQ("-99999999.99", GetDecimal(v, "$.min", 10, 2));
+  ExpectDecimalFails(v, "$.big", 4, 2, "out of range");
+  // 9.995 rounds to 10.00, which does not fit DECIMAL(3,2).
+  ExpectDecimalFails(v, "$.carry", 3, 2, "out of range");
+  ExpectDecimalFails(v, "$.max", 10, 3, "out of range");
+  ExpectDecimalFails(v, "$.huge_exp", 38, 0, "out of range");
+  ExpectDecimalFails(v, "$.bad", 10, 2, "not convertible to DECIMAL");
+}
+
+// Other values and malformed decimals are not convertible to a decimal. A missing path
+// and a variant null are a SQL NULL.
+TEST_F(VariantFunctionsTest, ThreeArgDecimalNotConvertible) {
+  vector<uint8_t> meta = BuildMetadata({"b", "dt", "malformed", "null"});
+  vector<uint8_t> obj = BuildObject({0, 1, 2, 3},
+      {BuildBoolean(true), BuildDate(0), BuildDecimal4(10, 5), BuildNull()});
+  VariantVal v = MakeVariant(meta, obj);
+  for (const char* path : {"$.b", "$.dt", "$.malformed", "$"}) {
+    ExpectDecimalFails(v, path, 10, 2, "not convertible to DECIMAL");
+  }
+  EXPECT_EQ("NULL", GetDecimal(v, "$.null", 10, 2));
+  EXPECT_EQ("NULL", GetDecimal(v, "$.missing", 10, 2));
 }
 
 // DATE extraction from the DATE physical type and from a date string; a bare INT32 is

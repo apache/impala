@@ -314,6 +314,60 @@ Coerce ToDouble(const VariantValue& sub, double* out) {
   return Coerce::MISMATCH;
 }
 
+// Extracts 'sub' as a decimal with the given precision and scale, like
+// CAST(... AS DECIMAL(precision, scale)) does with DECIMAL_V2: integers and decimals are
+// rescaled, floating-point values are converted, strings are parsed, and digits beyond
+// 'scale' round half away from zero. Everything else is a type mismatch. On OK the
+// unscaled value in 'out' fits 'precision'.
+Coerce ToDecimal(const VariantValue& sub, int precision, int scale, Decimal16Value* out) {
+  bool overflow = false;
+  if (sub.GetBasicType() == VariantBasicType::PRIMITIVE) {
+    switch (sub.GetPhysicalType()) {
+      case VariantPhysicalType::INT8:
+      case VariantPhysicalType::INT16:
+      case VariantPhysicalType::INT32:
+      case VariantPhysicalType::INT64: {
+        // An integer is a decimal with scale 0.
+        int64_t t;
+        if (ToInt64(sub, &t) != Coerce::OK) return Coerce::MISMATCH;
+        *out = Decimal16Value(t).ScaleTo(0, scale, precision, /*round=*/true, &overflow);
+        return overflow ? Coerce::OVERFLOW : Coerce::OK;
+      }
+      case VariantPhysicalType::DECIMAL4:
+      case VariantPhysicalType::DECIMAL8:
+      case VariantPhysicalType::DECIMAL16: {
+        Decimal16Value dv;
+        int src_scale;
+        if (!GetDecimal(sub, &dv, &src_scale)) return Coerce::MISMATCH;
+        *out = dv.ScaleTo(src_scale, scale, precision, /*round=*/true, &overflow);
+        return overflow ? Coerce::OVERFLOW : Coerce::OK;
+      }
+      case VariantPhysicalType::FLOAT:
+      case VariantPhysicalType::DOUBLE: {
+        double d;
+        if (ToDouble(sub, &d) != Coerce::OK) return Coerce::MISMATCH;
+        // NaN and the infinities overflow.
+        *out = Decimal16Value::FromDouble(precision, scale, d, /*round=*/true, &overflow);
+        return overflow ? Coerce::OVERFLOW : Coerce::OK;
+      }
+      default: break;
+    }
+  }
+  if (IsStringLike(sub)) {
+    StringValue sv;
+    if (!sub.GetString(&sv)) return Coerce::MISMATCH;
+    StringParser::ParseResult pr;
+    *out = StringParser::StringToDecimal<__int128_t>(
+        sv.Ptr(), sv.Len(), precision, scale, /*round=*/true, &pr);
+    if (pr == StringParser::PARSE_FAILURE) return Coerce::MISMATCH;
+    if (pr == StringParser::PARSE_OVERFLOW) return Coerce::OVERFLOW;
+    // PARSE_UNDERFLOW means that digits beyond 'scale' were rounded, or that the
+    // exponent was too negative to parse, e.g. "1e-200", which gives 0.
+    return Coerce::OK;
+  }
+  return Coerce::MISMATCH;
+}
+
 // ------------------------------- 2-arg core --------------------------------
 
 VariantVal DoVariantGet(
@@ -414,6 +468,33 @@ FloatVal DoGetFloat(
     return FloatVal::null();
   }
   return FloatVal(f);
+}
+
+DecimalVal DoGetDecimal(
+    FunctionContext* ctx, const VariantVal& v, const StringVal& path, bool is_try) {
+  VariantMetadata meta;
+  VariantValue sub;
+  if (NavAndReport(ctx, v, path, is_try, &meta, &sub) != NavStatus::OK) {
+    return DecimalVal::null();
+  }
+  // The frontend sets the return type to the DECIMAL(p,s) named by the type argument.
+  const FunctionContext::TypeDesc& type = ctx->GetReturnType();
+  DCHECK_EQ(type.type, FunctionContext::TYPE_DECIMAL);
+  Decimal16Value dv;
+  switch (ToDecimal(sub, type.precision, type.scale, &dv)) {
+    case Coerce::OK:
+      // Sets every width of the DecimalVal: the value fits the precision.
+      return DecimalVal(dv.value());
+    case Coerce::OVERFLOW:
+      FailCoercion(ctx, is_try, "variant_get: value at path is out of range for the "
+          "requested type");
+      break;
+    case Coerce::MISMATCH:
+      FailCoercion(ctx, is_try,
+          "variant_get: value at path is not convertible to DECIMAL");
+      break;
+  }
+  return DecimalVal::null();
 }
 
 DateVal DoGetDate(
@@ -543,6 +624,7 @@ VARIANT_GET_INT(VariantGetBigInt, BigIntVal, int64_t)
 VARIANT_GET_SIMPLE(VariantGetBoolean, BooleanVal, DoGetBoolean)
 VARIANT_GET_SIMPLE(VariantGetFloat, FloatVal, DoGetFloat)
 VARIANT_GET_SIMPLE(VariantGetDouble, DoubleVal, DoGetDouble)
+VARIANT_GET_SIMPLE(VariantGetDecimal, DecimalVal, DoGetDecimal)
 VARIANT_GET_SIMPLE(VariantGetString, StringVal, DoGetString)
 VARIANT_GET_SIMPLE(VariantGetDate, DateVal, DoGetDate)
 #undef VARIANT_GET_SIMPLE

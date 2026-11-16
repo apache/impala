@@ -23,6 +23,8 @@ import java.util.HashSet;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import org.apache.impala.authorization.Privilege;
 import org.apache.impala.catalog.AggregateFunction;
@@ -65,6 +67,11 @@ public class FunctionCallExpr extends Expr {
   // Builtin aggregate functions whose intermediate value is a ReservoirSampleState.
   private static final Set<String> RESERVOIR_SAMPLE_AGG_FNS =
       ImmutableSet.of("appx_median", "histogram", "sample");
+  // The decimal type tags of the typed variant_get(): 'decimal', 'decimal(p)' and
+  // 'decimal(p,s)'. Type.parseColumnType() is not used: it parses a CREATE TABLE column,
+  // so it accepts text after the type, and it wraps numbers that do not fit an int.
+  private static final Pattern VARIANT_GET_DECIMAL_TAG = Pattern.compile(
+      "decimal\\s*(?:\\(\\s*(\\d+)\\s*(?:,\\s*(\\d+)\\s*)?\\))?");
   // cache prior shouldConvertToCNF checks to avoid repeat tree walking
   // omitted from clone in case cloner plans to mutate the expr
   protected Optional<Boolean> shouldConvertToCNF_ = Optional.empty();
@@ -956,27 +963,74 @@ public class FunctionCallExpr extends Expr {
     // getStringValue() returns null for a non-UTF8 binary literal; treat as unsupported.
     String rawTag = typeLiteral.getStringValue();
     String typeTag = rawTag == null ? "" : rawTag.toLowerCase();
-    switch (typeTag) {
-      case "boolean": case "tinyint": case "smallint": case "int": case "bigint":
-      case "float": case "double": case "string": case "date":
-        break;
-      default:
-        throw new AnalysisException(fnName_.getFunction()
-            + "() unsupported target type '" + typeTag + "'. Supported types: boolean, "
-            + "tinyint, smallint, int, bigint, float, double, string, date.");
+    // Every decimal type shares one builtin, which gets the precision and scale from its
+    // return type.
+    ScalarType decimalType = parseVariantGetDecimalType(typeTag, analyzer);
+    if (decimalType == null) {
+      switch (typeTag) {
+        case "boolean": case "tinyint": case "smallint": case "int": case "bigint":
+        case "float": case "double": case "string": case "date":
+          break;
+        default:
+          throw new AnalysisException(fnName_.getFunction()
+              + "() unsupported target type '" + typeTag + "'. Supported types: "
+              + "boolean, tinyint, smallint, int, bigint, float, double, decimal(p,s), "
+              + "string, date.");
+      }
     }
     // variant_get is a scalar function; reject the aggregate-only param decorations that
     // the shared tail in analyzeImpl() would validate (this path returns early).
     if (params_.isIgnoreNulls()) throw ignoreNullsNotAccepted();
     validateScalarFnParams(params_);
-    String internalName = vgFn + "_" + typeTag; // e.g. variant_get_bigint
+    // E.g. variant_get_bigint.
+    String internalName = vgFn + "_" + (decimalType == null ? typeTag : "decimal");
     Type[] vgArgTypes = collectChildReturnTypes();
     Function vgSearchDesc = new Function(
         new FunctionName(db.getName(), internalName), vgArgTypes, Type.INVALID, false);
     fn_ = db.getFunction(vgSearchDesc, Function.CompareMode.IS_NONSTRICT_SUPERTYPE_OF);
     if (fn_ == null) throw new AnalysisException(getFunctionNotFoundError(vgArgTypes));
     castForFunctionCall(false, analyzer.getRegularCompatibilityLevel());
-    type_ = fn_.getReturnType();
+    type_ = decimalType == null ? fn_.getReturnType() : decimalType;
+  }
+
+  /**
+   * Returns the type named by a decimal type tag of the typed variant_get(): 'decimal',
+   * 'decimal(p)' or 'decimal(p,s)', with the defaults of the DECIMAL column type. Returns
+   * null if 'typeTag' is not a decimal type tag. Throws if the precision or the scale is
+   * not valid for a DECIMAL.
+   */
+  private ScalarType parseVariantGetDecimalType(String typeTag, Analyzer analyzer)
+      throws AnalysisException {
+    Matcher m = VARIANT_GET_DECIMAL_TAG.matcher(typeTag);
+    if (!m.matches()) return null;
+    int precision = m.group(1) == null ? ScalarType.DEFAULT_PRECISION
+        : parseDecimalTagNumber(typeTag, m.group(1), "precision",
+            ScalarType.MAX_PRECISION);
+    int scale = m.group(2) == null ? ScalarType.DEFAULT_SCALE
+        : parseDecimalTagNumber(typeTag, m.group(2), "scale", ScalarType.MAX_SCALE);
+    ScalarType type = ScalarType.createDecimalType(precision, scale);
+    try {
+      new TypeDef(type).analyze(analyzer);
+    } catch (AnalysisException e) {
+      throw new AnalysisException(fnName_.getFunction() + "() invalid target type '"
+          + typeTag + "': " + e.getMessage(), e);
+    }
+    return type;
+  }
+
+  /**
+   * Parses the precision or the scale of a decimal type tag of the typed variant_get().
+   * A number that does not fit an int is rejected here. TypeDef rejects the other
+   * invalid precisions and scales.
+   */
+  private int parseDecimalTagNumber(String typeTag, String digits, String what,
+      int maxValue) throws AnalysisException {
+    try {
+      return Integer.parseInt(digits);
+    } catch (NumberFormatException e) {
+      throw new AnalysisException(fnName_.getFunction() + "() invalid target type '"
+          + typeTag + "': Decimal " + what + " must be <= " + maxValue + ": " + digits);
+    }
   }
 
   /**

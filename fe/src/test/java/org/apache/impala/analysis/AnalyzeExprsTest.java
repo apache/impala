@@ -3583,8 +3583,46 @@ public class AnalyzeExprsTest extends AnalyzerTest {
         "variant_get() first argument must be VARIANT");
 
     // An unsupported target type tag in the 3-arg form is rejected.
-    AnalysisError("select variant_get(v, '$', 'decimal')" + tbl,
-        "variant_get() unsupported target type 'decimal'");
+    AnalysisError("select variant_get(v, '$', 'timestamp')" + tbl,
+        "variant_get() unsupported target type 'timestamp'");
+
+    // A decimal type tag sets the precision and scale of the result. The defaults are
+    // those of the DECIMAL column type.
+    checkReturnType("select variant_get(v, '$', 'decimal(10,2)')" + tbl,
+        ScalarType.createDecimalType(10, 2));
+    checkReturnType("select try_variant_get(v, '$', 'DECIMAL (38, 38)')" + tbl,
+        ScalarType.createDecimalType(38, 38));
+    checkReturnType("select variant_get(v, '$', 'decimal(5)')" + tbl,
+        ScalarType.createDecimalType(5, 0));
+    checkReturnType("select variant_get(v, '$', 'decimal')" + tbl,
+        ScalarType.createDecimalType(9, 0));
+    AnalysisError("select variant_get(v, '$', 'decimal(39,2)')" + tbl,
+        "variant_get() invalid target type 'decimal(39,2)': "
+            + "Decimal precision must be <= 38: 39");
+    AnalysisError("select variant_get(v, '$', 'decimal(0)')" + tbl,
+        "variant_get() invalid target type 'decimal(0)': "
+            + "Decimal precision must be > 0: 0");
+    AnalysisError("select try_variant_get(v, '$', 'decimal(5,6)')" + tbl,
+        "try_variant_get() invalid target type 'decimal(5,6)': "
+            + "Decimal scale (6) must be <= precision (5)");
+    // Numbers that do not fit an int are invalid too.
+    AnalysisError("select variant_get(v, '$', 'decimal(12345678901)')" + tbl,
+        "variant_get() invalid target type 'decimal(12345678901)': "
+            + "Decimal precision must be <= 38: 12345678901");
+    AnalysisError("select variant_get(v, '$', 'decimal(10,12345678901)')" + tbl,
+        "variant_get() invalid target type 'decimal(10,12345678901)': "
+            + "Decimal scale must be <= 38: 12345678901");
+    // The SQL parser keeps only the low 32 bits of this number, giving DECIMAL(10,2).
+    AnalysisError("select variant_get(v, '$', 'decimal(4294967306,2)')" + tbl,
+        "variant_get() invalid target type 'decimal(4294967306,2)': "
+            + "Decimal precision must be <= 38: 4294967306");
+    // Malformed tags and text after the type. Type.parseColumnType() accepts the last 3.
+    for (String type : new String[] {"decimal()", "decimal(10,)", "decimal(10,2",
+        "decimal(-1)", "decimal(1.5)", "decimal(p,s)", "decimal(10,2,1)", "decimal10",
+        "decimal(10,2), x int", "decimal(10,2) not null", "int primary key"}) {
+      AnalysisError("select variant_get(v, '$', '" + type + "')" + tbl,
+          "variant_get() unsupported target type '" + type + "'");
+    }
   }
 
   private void RunCastFormatTestOnType(String type) {
