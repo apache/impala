@@ -340,9 +340,9 @@ export IMPALA_CUSTOM_DOCKER_BASE=${IMPALA_CUSTOM_DOCKER_BASE:-"cgr.dev/chainguar
 export USE_CUSTOM_IMPALA_BASE_IMAGE=${USE_CUSTOM_IMPALA_BASE_IMAGE:-false}
 
 # Selects the version of Java to use when start-impala-cluster.py starts with container
-# images (created via e.g. 'make docker_debug_java11_images'). The Java version used in
+# images (created via e.g. 'make docker_debug_java21_images'). The Java version used in
 # these images is independent of the Java version used to compile Impala.
-# Accepts 8, 11, 17.
+# Accepts 17, 21.
 export IMPALA_DOCKER_JAVA=${IMPALA_DOCKER_JAVA:-"17"}
 
 # There are multiple compatible implementations of zlib. Cloudflare Zlib is an

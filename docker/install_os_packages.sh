@@ -110,13 +110,6 @@ elif [[ -f /etc/lsb-release ]]; then
   if [[ $DISTRIB_ID == Ubuntu ]]; then
     echo "Identified Ubuntu system."
     DISTRIBUTION=Ubuntu
-
-    # Ubuntu 16.04 does not have Java 11 in its package repository,
-    # so exit with an error.
-    if [[ $DISTRIB_RELEASE == 16.04 ]] && [[ $JAVA_VERSION == 11 ]] ; then
-      echo "ERROR: Java 11 is not supported on Ubuntu 16.04"
-      exit 1
-    fi
   fi
 # Check /etc/os-release last: it exists on Red Hat and Ubuntu systems as well
 elif [[ -f /etc/os-release ]]; then
@@ -163,9 +156,6 @@ if [[ $DISTRIBUTION == Ubuntu ]]; then
         vim
   fi
 elif [[ $DISTRIBUTION == Redhat ]]; then
-  if [[ $JAVA_VERSION == 8 ]]; then
-    JAVA_VERSION=1.8.0
-  fi
   wrap yum install -y --disableplugin=subscription-manager \
       cyrus-sasl-gssapi \
       cyrus-sasl-plain \

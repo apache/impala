@@ -82,13 +82,14 @@ time -p ./buildall.sh -format -testdata -notests < /dev/null
 # non-test build.
 IMAGE_TYPE=docker_debug
 case ${IMPALA_DOCKER_JAVA:-17} in
-  8)
-    IMAGE_TYPE=${IMAGE_TYPE}_java8
+  17)
     ;;
-  11)
-    IMAGE_TYPE=${IMAGE_TYPE}_java11
+  21)
+    IMAGE_TYPE=${IMAGE_TYPE}_java21
     ;;
   *)
+    echo "ERROR: IMPALA_DOCKER_JAVA must be 17 or 21."
+    exit 1
     ;;
 esac
 ${IMPALA_MAKE_CMD} -j ${IMPALA_BUILD_THREADS-} \
