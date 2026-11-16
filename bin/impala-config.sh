@@ -233,7 +233,8 @@ export IMPALA_SYSTEM_PYTHON3="${IMPALA_SYSTEM_PYTHON3_OVERRIDE-$(command -v pyth
 
 # Additional Python versions to use when building the impala-shell prebuilt tarball
 # via make_shell_tarball.sh. That tarball includes precompiled packages, so it can be
-# used without additional system dependencies needed for pip install.
+# used without additional system dependencies needed for pip install. Each entry must
+# have a unique basename that differs from the basename of IMPALA_SYSTEM_PYTHON3.
 # export IMPALA_EXTRA_PACKAGE_PYTHONS=python3.6;python3.10
 
 if [[ $OSTYPE == "darwin"* ]]; then

@@ -41,14 +41,11 @@ shift
 SHELL_HOME=${IMPALA_HOME}/shell
 BUILD_DIR=${SHELL_HOME}/build
 TARBALL_ROOT=${BUILD_DIR}/impala-shell-${IMPALA_VERSION}
-IMPALA_SYSTEM_PYTHON3_VERSION=$(${IMPALA_SYSTEM_PYTHON3} -c 'import sys; \
-    print("{}.{}".format(sys.version_info.major, sys.version_info.minor))')
 
 for PYTHON_EXE in $*; do
   PYTHON_NAME=$(basename ${PYTHON_EXE})
   PYTHON_VERSION=$(${PYTHON_EXE} -c 'import sys; \
     print("{}.{}".format(sys.version_info.major, sys.version_info.minor))')
-  PYTHON_MAJOR_VERSION=$(${PYTHON_EXE} -c 'import sys; print(sys.version_info.major)')
   # pip install the wheel into the external dependencies directory
   PIP_CACHE="~/.cache/impala_pip/${PYTHON_NAME}"
   BUILD_TMP_DIR="$(mktemp -d)"
@@ -57,11 +54,7 @@ for PYTHON_EXE in $*; do
   rm -rf ${TARBALL_ROOT}/install_py${PYTHON_VERSION} 2>&1 > /dev/null
   echo "Installing for python ${PYTHON_VERSION}"
   # Use pip from a matching python version
-  if [[ $IMPALA_SYSTEM_PYTHON3_VERSION == $PYTHON_VERSION ]]; then
-    source ${IMPALA_HOME}/shell/build/python3_venv/bin/activate
-  else
-    source ${IMPALA_HOME}/shell/build/python${PYTHON_VERSION}_venv/bin/activate
-  fi
+  source ${IMPALA_HOME}/shell/build/${PYTHON_NAME}_venv/bin/activate
 
   mkdir -p ${TARBALL_ROOT}/install_py${PYTHON_VERSION}
   pip install --cache ${PIP_CACHE} \

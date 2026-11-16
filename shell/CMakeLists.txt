@@ -22,15 +22,33 @@ set(IMPALA_PYTHON_BUILD_VENVS "")
 set(VENV_LOC "${CMAKE_SOURCE_DIR}/shell/build")
 set(PIP_LOC "~/.cache/impala_pip")
 
-# Tests depend on installing system pythons to specific locations, so we error if they
-# won't match what's expected in this config and make_shell_tarball.sh.
-set(PYTHON_EXES $ENV{IMPALA_EXTRA_PACKAGE_PYTHONS})
-if (NOT $ENV{IMPALA_SYSTEM_PYTHON3} STREQUAL "")
-  get_filename_component(PYTHON_NAME $ENV{IMPALA_SYSTEM_PYTHON3} NAME)
-  if (NOT ${PYTHON_NAME} STREQUAL "python3")
-    message(FATAL_ERROR "IMPALA_SYSTEM_PYTHON3 must be a binary named python3")
+# Each python gets a virtualenv named after its basename (also used by
+# make_shell_tarball.sh and tests), so basenames must be unique.
+set(PYTHON_EXES "")
+set(PYTHON_NAMES "")
+if (NOT "$ENV{IMPALA_SYSTEM_PYTHON3}" STREQUAL "")
+  get_filename_component(SYSTEM_PYTHON_NAME "$ENV{IMPALA_SYSTEM_PYTHON3}" NAME)
+endif()
+set(EXTRA_PYTHONS "$ENV{IMPALA_EXTRA_PACKAGE_PYTHONS}")
+foreach(PYTHON_EXE IN LISTS EXTRA_PYTHONS)
+  get_filename_component(PYTHON_NAME "${PYTHON_EXE}" NAME)
+  if (DEFINED SYSTEM_PYTHON_NAME AND PYTHON_NAME STREQUAL SYSTEM_PYTHON_NAME)
+    message(FATAL_ERROR "IMPALA_EXTRA_PACKAGE_PYTHONS entry ${PYTHON_EXE} has the "
+      "same basename as IMPALA_SYSTEM_PYTHON3=$ENV{IMPALA_SYSTEM_PYTHON3}")
   endif()
-  list(APPEND PYTHON_EXES $ENV{IMPALA_SYSTEM_PYTHON3})
+  if (PYTHON_NAME IN_LIST PYTHON_NAMES)
+    message(FATAL_ERROR "IMPALA_EXTRA_PACKAGE_PYTHONS entries must have unique "
+      "basenames, found ${PYTHON_NAME} more than once")
+  endif()
+  list(APPEND PYTHON_NAMES "${PYTHON_NAME}")
+  list(APPEND PYTHON_EXES "${PYTHON_EXE}")
+endforeach()
+if (DEFINED SYSTEM_PYTHON_NAME)
+  list(APPEND PYTHON_EXES "$ENV{IMPALA_SYSTEM_PYTHON3}")
+endif()
+if (NOT PYTHON_EXES)
+  message(FATAL_ERROR "At least one of IMPALA_SYSTEM_PYTHON3 or "
+    "IMPALA_EXTRA_PACKAGE_PYTHONS must be set to build the impala-shell tarball")
 endif()
 message(STATUS "Packaging for ${PYTHON_EXES}")
 
@@ -87,10 +105,13 @@ add_custom_target(shell_pypi_test_package
     "${CMAKE_SOURCE_DIR}/shell/packaging/make_python_package.sh"
 )
 
-set(PYTHON3_VENV "${VENV_LOC}/python3_venv")
-add_custom_target(shell_python3_install DEPENDS python3_venv shell_pypi_test_package
-  COMMAND "${PYTHON3_VENV}/bin/pip" install --cache-dir "${PIP_LOC}/python3" "${SHELL_TEST_PKG}"
-)
+if (DEFINED SYSTEM_PYTHON_NAME)
+  add_custom_target(shell_install
+    DEPENDS ${SYSTEM_PYTHON_NAME}_venv shell_pypi_test_package
+    COMMAND "${VENV_LOC}/${SYSTEM_PYTHON_NAME}_venv/bin/pip" install --cache-dir
+      "${PIP_LOC}/${SYSTEM_PYTHON_NAME}" "${SHELL_TEST_PKG}"
+  )
+endif()
 
 add_custom_target(shell_tarball DEPENDS gen-deps shell_pypi_test_package "${IMPALA_PYTHON_BUILD_VENVS}"
   COMMAND "${CMAKE_SOURCE_DIR}/shell/packaging/make_shell_tarball.sh" "${SHELL_TEST_PKG}" ${PYTHON_EXES}

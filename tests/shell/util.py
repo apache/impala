@@ -389,10 +389,16 @@ def get_impala_shell_executable(vector):
   # impala-shell is invoked some places where adding a test vector may not make sense;
   # use 'dev3' as the default.
   impala_shell_executable, _ = get_dev_impala_shell_executable()
+  # The shell tarball and venv are built for IMPALA_SYSTEM_PYTHON3, and the venv is
+  # named after its basename (see shell/CMakeLists.txt).
+  system_python3 = os.getenv("IMPALA_SYSTEM_PYTHON3")
+  assert system_python3, "Must set env var IMPALA_SYSTEM_PYTHON3!"
+  python3_venv = os.path.basename(system_python3) + "_venv"
   executable_map = {
-    'dev3': ['env', 'IMPALA_PYTHON_EXECUTABLE=python3',
+    'dev3': ['env', 'IMPALA_PYTHON_EXECUTABLE=' + system_python3,
              'IMPALA_SHELL_PYTHON_FALLBACK=false', impala_shell_executable],
-    'python3': [os.path.join(IMPALA_HOME, 'shell/build/python3_venv/bin/impala-shell')]
+    'python3': [os.path.join(IMPALA_HOME, 'shell/build', python3_venv,
+                             'bin/impala-shell')]
   }
   return executable_map[vector.get_value_with_default('impala_shell', 'dev3')]
 

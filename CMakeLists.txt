@@ -539,8 +539,8 @@ add_custom_target(impala_python3 ALL
 )
 
 set(IMPALA_PYTHON_INSTALLS "")
-if (NOT $ENV{IMPALA_SYSTEM_PYTHON3} EQUAL "")
-  list(APPEND IMPALA_PYTHON_INSTALLS shell_python3_install)
+if (NOT "$ENV{IMPALA_SYSTEM_PYTHON3}" STREQUAL "")
+  list(APPEND IMPALA_PYTHON_INSTALLS shell_install)
 endif()
 add_custom_target(impala_shell_pypi ALL DEPENDS ${IMPALA_PYTHON_INSTALLS})
 
