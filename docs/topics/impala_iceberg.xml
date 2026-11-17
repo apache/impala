@@ -1288,7 +1288,9 @@ MERGE INTO ice_t USING source ON ice_t.a = source.id
         This causes read performance to degrade over time.
         The following statement can be used to compact the table and optimize it for reading.
         <codeblock>
-OPTIMIZE TABLE [<varname>db_name</varname>.]<varname>table_name</varname> [(FILE_SIZE_THRESHOLD_MB=<varname>value</varname>)];
+OPTIMIZE TABLE [<varname>db_name</varname>.]<varname>table_name</varname>
+  [PARTITION (<varname>partition_filter</varname>)]
+  [(FILE_SIZE_THRESHOLD_MB=<varname>value</varname>)];
         </codeblock>
       </p>
 
@@ -1299,8 +1301,8 @@ OPTIMIZE TABLE [<varname>db_name</varname>.]<varname>table_name</varname> [(FILE
           <li>Merges delete files with the corresponding data files.</li>
           <li>Compacts data files that are smaller than the specified file size threshold in megabytes.</li>
         </ul>
-        If no <codeph>FILE_SIZE_THRESHOLD_MB</codeph> was specified, the command compacts
-        ALL files and also
+        If you specify neither <codeph>PARTITION</codeph> nor
+        <codeph>FILE_SIZE_THRESHOLD_MB</codeph>, the command compacts ALL files and also
         <ul>
           <li>Converts data files to the latest table schema.</li>
           <li>Rewrites all partitions according to the latest partition spec.</li>
@@ -1325,8 +1327,8 @@ OPTIMIZE TABLE [<varname>db_name</varname>.]<varname>table_name</varname> [(FILE
         to remove the old files from the file system.
       </p>
       <p>
-        Note that <codeph>OPTIMIZE TABLE</codeph> without a specified <codeph>FILE_SIZE_THRESHOLD_MB</codeph>
-        rewrites the entire table, therefore the operation can take a long time to complete
+        Note that <codeph>OPTIMIZE TABLE</codeph> without a <codeph>PARTITION</codeph> clause
+        or <codeph>FILE_SIZE_THRESHOLD_MB</codeph> rewrites the entire table, therefore the operation can take a long time to complete
         depending on the size of the table.
         It is recommended to specify a file size threshold for recurring table maintenance
         jobs to save resources.
@@ -1339,6 +1341,43 @@ OPTIMIZE TABLE [<varname>db_name</varname>.]<varname>table_name</varname> [(FILE
         smaller than the threshold.
       </p>
     </conbody>
+
+    <concept id="iceberg_optimize_partition">
+      <title>Optimizing selected partitions</title>
+      <conbody>
+        <p>
+          Starting in <keyword keyref="impala50"/>, you can compact only some partitions of
+          a partitioned table by adding a <codeph>PARTITION</codeph> clause. The statement
+          does not change the other partitions. For example:
+          <codeblock>
+OPTIMIZE TABLE ice_t PARTITION (i IN (1, 2));
+OPTIMIZE TABLE ice_t PARTITION (month(date_col) = '2024-01');
+OPTIMIZE TABLE ice_t PARTITION (i BETWEEN 3 AND 4) (FILE_SIZE_THRESHOLD_MB=100);
+          </codeblock>
+        </p>
+        <p>
+          The partition filter follows the same rules as in
+          <codeph>ALTER TABLE DROP PARTITION</codeph>, see
+          <xref href="#iceberg_drop_partition"/>. In the selected partitions, the statement
+          merges all delete files with their data files and compacts the data files that
+          are smaller than <codeph>FILE_SIZE_THRESHOLD_MB</codeph>, or all data files if you
+          do not specify a threshold.
+        </p>
+        <p>
+          Limitations:
+          <ul>
+            <li>The filter must target the latest partition spec. If a data file was written
+              with an older spec, the statement selects it only if the filter can also be
+              evaluated on that spec's partition values. Otherwise the statement skips the
+              file, even if its rows match the filter. To rewrite all files with the latest
+              spec, run <codeph>OPTIMIZE TABLE</codeph> on the whole table.</li>
+            <li>If the selected partitions have equality delete files written with an
+              unpartitioned spec, you must run <codeph>OPTIMIZE TABLE</codeph> on the whole
+              table, because such files apply to every partition.</li>
+          </ul>
+        </p>
+      </conbody>
+    </concept>
   </concept>
 
   <concept id="iceberg_time_travel">
