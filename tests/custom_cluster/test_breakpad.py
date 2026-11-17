@@ -19,7 +19,9 @@ import glob
 import os
 import psutil
 import pytest
+import re
 import shutil
+import subprocess
 import tempfile
 import time
 from resource import setrlimit, RLIMIT_CORE, RLIM_INFINITY
@@ -173,6 +175,85 @@ class TestBreakpadCore(TestBreakpadBase):
     # the state of the cluster is not in flux.
     self.wait_for_num_processes('impalad', 0)
     assert self.count_minidumps('impalad') > 0
+
+  @pytest.mark.execute_serially
+  def test_minidump_symbol_resolution(self):
+    """Check that a minidump from impalad can be resolved with symbols for the impalad
+    binary. This exercises both ways that bin/jenkins/finalize.sh resolves minidumps:
+    dump_breakpad_symbols.py + minidump_stackwalk, and resolve_minidumps.py. This guards
+    against regressions where Breakpad cannot match the symbols to the binary (e.g.
+    IMPALA-15764, where binaries linked with mold on aarch64 showed up as multiple
+    modules in the minidump).
+    """
+    assert self.count_all_minidumps() == 0
+    self.start_cluster()
+    self.cluster.refresh()
+    assert self.get_num_processes('impalad') > 0
+    # Make one impalad write a minidump and kill the rest of the cluster.
+    self.kill_processes(self.cluster.impalads[:1], SIGSEGV)
+    self.kill_cluster(SIGKILL)
+    minidumps = glob.glob(os.path.join(self.tmp_dir, 'impalad', '*.dmp'))
+    assert len(minidumps) == 1
+    minidump = minidumps[0]
+
+    impala_home = os.environ['IMPALA_HOME']
+    impalad_binary = os.path.join(impala_home, 'be/build/latest/service/impalad')
+    breakpad_bin_dir = os.path.join(os.environ['IMPALA_TOOLCHAIN_PACKAGES_HOME'],
+        'breakpad-{0}'.format(os.environ['IMPALA_BREAKPAD_VERSION']), 'bin')
+
+    # Approach 1: dump_breakpad_symbols.py followed by minidump_stackwalk
+    symbol_dir = os.path.join(self.tmp_dir, 'symbols')
+    subprocess.check_call([os.path.join(impala_home, 'bin/dump_breakpad_symbols.py'),
+        '-d', symbol_dir, '-f', impalad_binary])
+    stackwalk_output = subprocess.check_output(
+        [os.path.join(breakpad_bin_dir, 'minidump_stackwalk'), minidump, symbol_dir],
+        stderr=subprocess.DEVNULL, universal_newlines=True)
+    self.assert_impalad_symbols_resolved(stackwalk_output)
+
+    # Approach 2: resolve_minidumps.py
+    resolved_file = os.path.join(self.tmp_dir, 'resolved_minidump.txt')
+    subprocess.check_call([os.path.join(impala_home, 'bin/resolve_minidumps.py'),
+        '--minidump_file', minidump, '--output_file', resolved_file])
+    with open(resolved_file, 'r') as f:
+      self.assert_impalad_symbols_resolved(f.read())
+
+  def assert_impalad_symbols_resolved(self, stackwalk_output):
+    """Verify that the minidump_stackwalk output in 'stackwalk_output' resolves frames
+    from the impalad binary to the correct functions. Failure modes this detects:
+     - Missing symbols: minidump_stackwalk annotates the module in the 'Loaded modules:'
+       section with '(WARNING: No symbols, ...)' and prints frames from impalad as
+       'impalad + 0x...'.
+     - The minidump splits impalad into multiple modules (IMPALA-15764). The symbols
+       are loaded for each module, but they are only correct for the first one, so
+       frames resolve to the wrong functions.
+    """
+    lines = stackwalk_output.splitlines()
+    assert 'Loaded modules:' in lines, \
+        "Missing 'Loaded modules:' section:\n{0}".format("\n".join(lines[:100]))
+    modules_start = lines.index('Loaded modules:') + 1
+    modules_end = modules_start
+    while modules_end < len(lines) and lines[modules_end].strip():
+      modules_end += 1
+    module_lines = lines[modules_start:modules_end]
+    # Include the module list in assertion messages, because the temporary directory
+    # with the output is removed during teardown.
+    module_context = "Loaded modules:\n{0}".format("\n".join(module_lines))
+    # Module lines have the form: '<start> - <end>  <name>  <version>  [annotations]'
+    impalad_modules = [line for line in module_lines
+                       if len(line.split()) > 3 and line.split()[3] == 'impalad']
+    assert len(impalad_modules) == 1, \
+        "Expected exactly one impalad module\n{0}".format(module_context)
+    impalad_module = impalad_modules[0]
+    assert '(main)' in impalad_module, module_context
+    assert 'No symbols' not in impalad_module, module_context
+    assert 'Corrupt symbols' not in impalad_module, module_context
+    # Every Impala thread starts in Thread::SuperviseThread(), so it should show up in
+    # the stacks. This would not be found if addresses in impalad were resolved with the
+    # wrong base address. The main thread is not a good candidate, because the stack
+    # walk can stop in libc before reaching main() (e.g. on aarch64).
+    frame_regex = r'impalad!impala::Thread::SuperviseThread\(.*\) \[thread\.cc'
+    assert re.search(frame_regex, stackwalk_output), \
+        "No frame matching '{0}'\n{1}".format(frame_regex, module_context)
 
 
 class TestBreakpadExhaustive(TestBreakpadBase):
