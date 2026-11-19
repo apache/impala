@@ -508,7 +508,7 @@ void KrpcDataStreamRecvr::SenderQueue::AddBatch(const TransmitDataRequestPB* req
     // responded to if we reach here.
     DCHECK_GT(num_remaining_senders_, 0);
     if (UNLIKELY(is_cancelled_)) {
-      lock_.unlock();
+      l.unlock();
       Status cancel_status = Status::Expected(TErrorCode::DATASTREAM_RECVR_CLOSED,
           PrintId(recvr_->fragment_instance_id()), recvr_->dest_node_id());
       TRACE_TO(rpc_context->trace(), "Receiver was cancelled");
