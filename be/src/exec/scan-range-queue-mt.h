@@ -31,7 +31,8 @@ namespace impala {
 /// to the fragment instances using this queue. The scan ranges in this queue are
 /// ordered from largest to smallest, i.e. implementing a Longest-Processing Time
 /// scheduling. Exceptions are scan ranges that use HDFS caching, they are prioritized
-/// earlier.
+/// earlier. The size of a scan range is the amount of work it stands for, see
+/// RangeWeight().
 /// It's also possible to add high prio scan ranges, they are scheduled before
 /// the non-high prio scan ranges.
 class ScanRangeQueueMt {
@@ -44,7 +45,7 @@ class ScanRangeQueueMt {
     std::lock_guard<std::mutex> lock(scan_range_queue_lock_);
     if (LIKELY(!high_prio)) {
       for (io::ScanRange* scan_range : ranges) {
-        scan_range_queue_.Push(scan_range);
+        scan_range_queue_.Push({scan_range, RangeWeight(scan_range)});
       }
     } else {
       for (io::ScanRange* scan_range : ranges) {
@@ -61,7 +62,7 @@ class ScanRangeQueueMt {
       ret = high_prio_scan_ranges_.front();
       high_prio_scan_ranges_.pop();
     } else if (!scan_range_queue_.Empty()) {
-      ret = scan_range_queue_.Pop();
+      ret = scan_range_queue_.Pop().range;
     }
     return ret;
   }
@@ -79,25 +80,37 @@ class ScanRangeQueueMt {
     scan_range_queue_.Reserve(capacity);
   }
 
+  /// Returns the number of bytes that the instance that processes 'range' will read.
+  /// This is the length of the range, except for the footer ranges of Parquet and ORC
+  /// files: such a footer range stands for the split it was issued for, so the length of
+  /// that split is returned. Defined in hdfs-scan-node-base.cc because it needs
+  /// ScanRangeMetadata.
+  static int64_t RangeWeight(const io::ScanRange* range);
+
  private:
   DISALLOW_COPY_AND_ASSIGN(ScanRangeQueueMt);
 
+  struct Entry {
+    io::ScanRange* range;
+    /// RangeWeight() of 'range', computed once when the range is enqueued.
+    int64_t weight;
+  };
+
   struct ScanRangeComparator {
   public:
-    bool Less(const io::ScanRange* lhs, const io::ScanRange* rhs) const {
-      DCHECK(lhs != nullptr);
-      DCHECK(rhs != nullptr);
-      if (!lhs->UseHdfsCache() && rhs->UseHdfsCache()) return true;
-      if (lhs->UseHdfsCache() && !rhs->UseHdfsCache()) return false;
-      return lhs->bytes_to_read() < rhs->bytes_to_read();
+    bool Less(const Entry& lhs, const Entry& rhs) const {
+      DCHECK(lhs.range != nullptr);
+      DCHECK(rhs.range != nullptr);
+      if (!lhs.range->UseHdfsCache() && rhs.range->UseHdfsCache()) return true;
+      if (lhs.range->UseHdfsCache() && !rhs.range->UseHdfsCache()) return false;
+      return lhs.weight < rhs.weight;
     }
   };
 
   std::mutex scan_range_queue_lock_;
   std::queue<io::ScanRange*> high_prio_scan_ranges_;
   ScanRangeComparator scan_range_compare_;
-  PriorityQueue<io::ScanRange*, ScanRangeComparator> scan_range_queue_{
-      scan_range_compare_};
+  PriorityQueue<Entry, ScanRangeComparator> scan_range_queue_{scan_range_compare_};
 };
 
 }

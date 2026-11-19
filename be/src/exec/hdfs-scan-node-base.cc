@@ -1365,6 +1365,19 @@ void ScanRangeSharedState::UpdateRemainingScanRangeSubmissions(int32_t delta) {
   range_submission_cv_.NotifyAll();
 }
 
+int64_t ScanRangeQueueMt::RangeWeight(const ScanRange* range) {
+  // Footer ranges of Parquet and ORC files are small and have about the same length,
+  // but the instance that processes one reads the row groups / stripes of the whole
+  // 'original_split' (see HdfsScanner::IssueFooterRanges()). Of the ranges that are
+  // enqueued, only footer ranges set 'original_split'.
+  const ScanRangeMetadata* metadata =
+      static_cast<const ScanRangeMetadata*>(range->meta_data());
+  if (metadata != nullptr && metadata->original_split != nullptr) {
+    return metadata->original_split->len();
+  }
+  return range->bytes_to_read();
+}
+
 void ScanRangeSharedState::EnqueueScanRange(
     const vector<ScanRange*>& ranges, bool at_front) {
   DCHECK(use_mt_scan_node_) << "Should only be called by MT scan nodes";
