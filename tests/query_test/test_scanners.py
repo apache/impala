@@ -392,6 +392,11 @@ class TestHdfsScannerSkew(ImpalaTestSuite):
   def add_test_dimensions(cls):
     super(TestHdfsScannerSkew, cls).add_test_dimensions()
     add_mandatory_exec_option(cls, 'mt_dop', 2)
+    # IMPALA-11572: BytesRead also counts data cache hits, which are much cheaper than
+    # remote reads. The dockerised tests run with a data cache. When it is partially
+    # warm, the two instances on a node finish together but read very different
+    # numbers of bytes.
+    add_mandatory_exec_option(cls, 'disable_data_cache', True)
     cls.ImpalaTestMatrix.add_constraint(lambda v:
         v.get_value('table_format').file_format in ('text')
         and v.get_value('table_format').compression_codec == 'none')
@@ -408,6 +413,11 @@ class TestHdfsScannerSkew(ImpalaTestSuite):
        we are doing Longest-Processing Time (LPT) scheduling."""
     def count_intra_node_skew(profile):
       SKEW_THRESHOLD = 0.80
+      cache_hit_lines = [line.strip() for line in profile.splitlines()
+                         if "- DataCacheHitBytes: " in line]
+      assert cache_hit_lines
+      assert all(line == "- DataCacheHitBytes: 0" for line in cache_hit_lines), \
+          cache_hit_lines
       lines = [line.strip() for line in profile.splitlines() if "- BytesRead: " in line]
       assert len(lines) == 7  # Averaged fragment + 6 fragment
       bytes_read_array = []
