@@ -167,7 +167,7 @@ RUN echo "y" | sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohm
     && git reflog expire --expire=30.days.ago --all \
     && git gc --aggressive --prune=now \
     && for remote in $(git remote); do git remote rm "${remote}"; done \
-    && git remote add upstream "${GIT_REPO_PREFIX}{GIT_REPO}" \
+    && git remote add upstream "${GIT_REPO_PREFIX}${GIT_REPO}" \
     && rm -f "${USER_HOME}/.gitconfig" \
     && echo "[STATUS] - prepopulating Impala shell virtual environment" \
     && ./bin/impala-shell.sh --version \
