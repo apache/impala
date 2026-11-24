@@ -156,6 +156,18 @@ for jar in $TEZ_HOME/lib/* ; do
   esac
 done
 
+# Hive's lib/ jars are added in unsorted 'find' order, and patched-iceberg-core has an
+# incompatible org.apache.iceberg.BaseFile (serialVersionUID) from the one in
+# hive-iceberg-handler that Tez tasks use to serialize commit files. Put the handler
+# first via TEZ_CONF_DIR, the only entry bin/hive places ahead of lib/. The "/./" keeps
+# Hadoop's classpath de-duplication from dropping it in favor of the later lib/ entry.
+for jar in "${HIVE_HOME}"/lib/hive-iceberg-handler-*.jar; do
+  if [[ -f "$jar" ]]; then
+    export TEZ_CONF_DIR="${TEZ_CONF_DIR:-/etc/tez/conf}:"\
+"${HIVE_HOME}/lib/./$(basename "$jar")"
+  fi
+done
+
 # Add kudu-hive.jar to the Hive Metastore classpath, so that Kudu's HMS
 # plugin can be loaded.
 for file in ${IMPALA_KUDU_JAVA_HOME}/*kudu-hive*jar; do
