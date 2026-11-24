@@ -44,36 +44,60 @@ if [[ -n "${IMPALA_PYTHON_EXECUTABLE}" ]]; then
   fi
 fi
 
-# If IMPALA_PYTHON_EXECUTABLE isn't specified or doesn't exist, try the regular
-# "python3" and "python" executables. Since Python 2 is deprecated, prefer "python3"
-# to "python" (though "python" may actually point to Python 3).
-if [[ -z "${PYTHON_EXE}" ]]; then
-  if command -v python3 > /dev/null; then
+# Lists the Python versions this package was built for, from newest to oldest.
+supported_versions() {
+  (cd "${SHELL_HOME}" && ls -d install_py* 2> /dev/null) \
+    | sed 's/^install_py//' | sort -t. -k1,1nr -k2,2nr
+}
+
+get_python_version() {
+  "$1" -c 'import sys; \
+    print("{}.{}".format(sys.version_info.major, sys.version_info.minor))'
+}
+
+# If IMPALA_PYTHON_EXECUTABLE isn't specified or doesn't exist, use "python3" if this
+# package was built for its version. PYTHON_VERSION is kept even when it doesn't match,
+# so it can be reported if no other supported Python is found.
+PYTHON_VERSION=""
+if [[ -n "${PYTHON_EXE}" ]]; then
+  PYTHON_VERSION=$(get_python_version "${PYTHON_EXE}")
+elif command -v python3 > /dev/null; then
+  PYTHON_VERSION=$(get_python_version python3)
+  if [[ -d "${SHELL_HOME}/install_py${PYTHON_VERSION}" ]]; then
     PYTHON_EXE=python3
-  elif command -v python > /dev/null; then
-    PYTHON_EXE=python
-  else
-    if [[ -n "${IMPALA_PYTHON_EXECUTABLE}" ]]; then
-      echo "Couldn't find IMPALA_PYTHON_EXECUTABLE=${IMPALA_PYTHON_EXECUTABLE}."
-    fi
-    echo "Couldn't find python3 or python on the PATH"
-    exit 1
   fi
 fi
 
-# impala-shell is installed in /install_py${PYTHON_VERSION}
-PYTHON_VERSION=$("${PYTHON_EXE}" -c 'import sys; \
-  print("{}.{}".format(sys.version_info.major, sys.version_info.minor))')
-if [ ! -d "${SHELL_HOME}/install_py${PYTHON_VERSION}" ]; then
-  # List all install_py* dirs, remove install_py prefix, and join into a comma-separated
-  # string.
-  dirs=( $(cd ${SHELL_HOME} && echo install_py*) )
-  vers="${dirs[@]#install_py}"
-  pretty="$(printf "%s, " ${vers[@]})"
+# Otherwise, look for a versioned executable (e.g. python3.12) matching one of the
+# bundled install_py* directories, searching from newest to oldest version.
+if [[ -z "${PYTHON_EXE}" ]]; then
+  for ver in $(supported_versions); do
+    if command -v "python${ver}" > /dev/null; then
+      PYTHON_EXE="python${ver}"
+      PYTHON_VERSION="${ver}"
+      break
+    fi
+  done
+fi
+
+# No Python was found at all.
+if [[ -z "${PYTHON_VERSION}" ]]; then
+  if [[ -n "${IMPALA_PYTHON_EXECUTABLE}" ]]; then
+    echo "Couldn't find IMPALA_PYTHON_EXECUTABLE=${IMPALA_PYTHON_EXECUTABLE}."
+  fi
+  echo "Couldn't find python3 or a supported python3.x on the PATH."
+  exit 1
+fi
+
+# impala-shell is installed in /install_py${PYTHON_VERSION}. This only fails when
+# IMPALA_PYTHON_EXECUTABLE is an unsupported version, or python3 is and no python3.x
+# matched.
+if [[ ! -d "${SHELL_HOME}/install_py${PYTHON_VERSION}" ]]; then
+  pretty="$(supported_versions | paste -sd, - | sed 's/,/, /g')"
   echo "This impala-shell package was not built to support Python ${PYTHON_VERSION}." \
-       "Supported Python versions are: ${pretty%, }."
+       "Supported Python versions are: ${pretty}."
   exit 1
 fi
 
 PYTHONIOENCODING='utf-8' PYTHONPATH="${SHELL_HOME}/install_py${PYTHON_VERSION}" \
-  exec ${PYTHON_EXE} -m "impala_shell.impala_shell" "$@"
+  exec "${PYTHON_EXE}" -m "impala_shell.impala_shell" "$@"
