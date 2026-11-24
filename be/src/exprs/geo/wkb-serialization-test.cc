@@ -18,6 +18,7 @@
 #include "exprs/geo/wkb-serialization.h"
 
 #include <cstring>
+#include <limits>
 #include <memory>
 #include <vector>
 
@@ -41,6 +42,13 @@ static std::vector<uint8_t> MakeWkb(uint32_t type, const std::vector<uint8_t>& b
 static std::vector<uint8_t> U32(uint32_t val) {
   std::vector<uint8_t> v(4);
   memcpy(v.data(), &val, 4);
+  return v;
+}
+
+// Helper to encode a double in LE.
+static std::vector<uint8_t> F64(double val) {
+  std::vector<uint8_t> v(8);
+  memcpy(v.data(), &val, 8);
   return v;
 }
 
@@ -224,6 +232,75 @@ TEST_F(WkbMalformedTest, BBoxNoCountField) {
   linestring2d ls;
   EXPECT_FALSE(ReadWkbLineString(buf.data(), buf.size(), ls));
   EXPECT_INVALID(ComputeWkbBBox(buf.data(), buf.size(), ST_LINESTRING));
+}
+
+// --- ComputeWkbBBox status ---
+
+// A value that cannot be parsed must be reported as MALFORMED, distinctly from an empty
+// geometry: the extent of the former is unknown, while the latter has none.
+TEST_F(WkbMalformedTest, BBoxStatusMalformed) {
+  BBoxStatus status;
+
+  auto pt = MakeWkb(WKB_POINT, {});  // needs 16 bytes of coords, has none
+  ComputeWkbBBox(pt.data(), pt.size(), ST_POINT, false, &status);
+  EXPECT_EQ(status, BBoxStatus::MALFORMED);
+
+  auto no_count = MakeWkb(WKB_LINESTRING, {});  // header only, no count field
+  ComputeWkbBBox(no_count.data(), no_count.size(), ST_LINESTRING, false, &status);
+  EXPECT_EQ(status, BBoxStatus::MALFORMED);
+
+  auto ls = MakeWkb(WKB_LINESTRING, U32(100));  // count without point data
+  ComputeWkbBBox(ls.data(), ls.size(), ST_LINESTRING, false, &status);
+  EXPECT_EQ(status, BBoxStatus::MALFORMED);
+
+  // One ring that claims 500 points, but no point data follows.
+  auto poly = MakeWkb(WKB_POLYGON, Cat({U32(1), U32(500)}));
+  ComputeWkbBBox(poly.data(), poly.size(), ST_POLYGON, false, &status);
+  EXPECT_EQ(status, BBoxStatus::MALFORMED);
+
+  // Claims 5 polygons, but none follow.
+  auto mpoly = MakeWkb(WKB_MULTIPOLYGON, U32(5));
+  ComputeWkbBBox(mpoly.data(), mpoly.size(), ST_MULTIPOLYGON, false, &status);
+  EXPECT_EQ(status, BBoxStatus::MALFORMED);
+}
+
+// An empty geometry parses cleanly but has no extent. It must be EMPTY, not MALFORMED,
+// as it is not a parse failure.
+TEST_F(WkbMalformedTest, BBoxStatusEmpty) {
+  BBoxStatus status;
+  const double nan = std::numeric_limits<double>::quiet_NaN();
+
+  // An empty point is a well-formed WKB point whose coordinates are NaN.
+  auto pt = MakeWkb(WKB_POINT, Cat({F64(nan), F64(nan)}));
+  box2d bbox = ComputeWkbBBox(pt.data(), pt.size(), ST_POINT, false, &status);
+  EXPECT_EQ(status, BBoxStatus::EMPTY);
+  EXPECT_INVALID(bbox);
+
+  // Zero points / rings / sub-geometries are all empty rather than truncated.
+  auto ls = MakeWkb(WKB_LINESTRING, U32(0));
+  ComputeWkbBBox(ls.data(), ls.size(), ST_LINESTRING, false, &status);
+  EXPECT_EQ(status, BBoxStatus::EMPTY);
+
+  auto poly = MakeWkb(WKB_POLYGON, U32(0));
+  ComputeWkbBBox(poly.data(), poly.size(), ST_POLYGON, false, &status);
+  EXPECT_EQ(status, BBoxStatus::EMPTY);
+
+  auto mp = MakeWkb(WKB_MULTIPOINT, U32(0));
+  ComputeWkbBBox(mp.data(), mp.size(), ST_MULTIPOINT, false, &status);
+  EXPECT_EQ(status, BBoxStatus::EMPTY);
+
+  auto mls = MakeWkb(WKB_MULTILINESTRING, U32(0));
+  ComputeWkbBBox(mls.data(), mls.size(), ST_MULTILINESTRING, false, &status);
+  EXPECT_EQ(status, BBoxStatus::EMPTY);
+}
+
+// A geometry with real coordinates reports OK.
+TEST_F(WkbMalformedTest, BBoxStatusOk) {
+  BBoxStatus status;
+  auto pt = MakeWkb(WKB_POINT, Cat({F64(3.0), F64(4.0)}));
+  box2d bbox = ComputeWkbBBox(pt.data(), pt.size(), ST_POINT, false, &status);
+  EXPECT_EQ(status, BBoxStatus::OK);
+  EXPECT_BBOX(bbox, 3.0, 4.0, 3.0, 4.0);
 }
 
 // --- OgcTypeToWkbType ---

@@ -323,14 +323,21 @@ static bool skipWKBHeader(const uint8_t*& ptr, const uint8_t* end) {
 }
 
 template <bool SWAP>
-static box2d ComputeWkbBBoxInner(const uint8_t* data, int len, OGCType ogc_type) {
+static box2d ComputeWkbBBoxInner(const uint8_t* data, int len, OGCType ogc_type,
+    BBoxStatus* status) {
   box2d result = invalidBox();
+  // Every early return below is a parse failure; the success paths overwrite this.
+  if (status != nullptr) *status = BBoxStatus::MALFORMED;
 
   const uint8_t* ptr = data + WKB_HEADER_SIZE;
   const uint8_t* end = data + len;
 
   if (ogc_type == ST_POINT) {
     if (UNLIKELY(!updateBBox<SWAP>(ptr, end, result))) return invalidBox();
+    // An empty point is encoded with NaN coordinates, which update nothing.
+    if (status != nullptr) {
+      *status = IsBboxInvalid(result) ? BBoxStatus::EMPTY : BBoxStatus::OK;
+    }
     return result;
   }
 
@@ -380,15 +387,21 @@ static box2d ComputeWkbBBoxInner(const uint8_t* data, int len, OGCType ogc_type)
     }
     default:
       DCHECK(false) << "ComputeWkbBBox called with unrecognized OGCType: " << ogc_type;
-      break;
+      return invalidBox();
+  }
+  // A geometry with no coordinates at all (zero points, rings or sub-geometries) is
+  // empty: it has no extent, but it parsed cleanly.
+  if (status != nullptr) {
+    *status = IsBboxInvalid(result) ? BBoxStatus::EMPTY : BBoxStatus::OK;
   }
   return result;
 }
 
-box2d ComputeWkbBBox(const uint8_t* data, int len, OGCType ogc_type, bool big_endian) {
+box2d ComputeWkbBBox(const uint8_t* data, int len, OGCType ogc_type, bool big_endian,
+    BBoxStatus* status) {
   return big_endian
-      ? ComputeWkbBBoxInner<true>(data, len, ogc_type)
-      : ComputeWkbBBoxInner<false>(data, len, ogc_type);
+      ? ComputeWkbBBoxInner<true>(data, len, ogc_type, status)
+      : ComputeWkbBBoxInner<false>(data, len, ogc_type, status);
 }
 
 } // namespace impala::geo

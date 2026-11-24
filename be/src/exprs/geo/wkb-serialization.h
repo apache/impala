@@ -46,13 +46,24 @@ StringVal WriteWkbMultiLineString(FunctionContext* ctx, const multi_linestring2d
 StringVal WriteWkbMultiPolygon(FunctionContext* ctx, const multi_polygon2d& mpoly);
 StringVal WriteWkbBox(FunctionContext* ctx, const box2d& box);
 
+// Outcome of a bounding box computation. Callers that accumulate boxes over many values
+// must tell EMPTY and MALFORMED apart: an empty geometry legitimately has no extent and
+// can be skipped, while a value that could not be parsed has an unknown extent, so an
+// accumulated box may not cover it.
+enum class BBoxStatus {
+  OK,         // the returned box holds the geometry's extent
+  EMPTY,      // the geometry has no extent (e.g. POINT EMPTY); box is the sentinel
+  MALFORMED,  // the WKB could not be parsed; box is the sentinel
+};
+
 // Compute bounding box from WKB without full geometry construction.
 // 'data' includes the 5-byte WKB header. Returns an invalid sentinel box
-// (IsBboxInvalid() == true) if the geometry is malformed or too short.
+// (IsBboxInvalid() == true) if the geometry is malformed, too short or empty; when
+// 'status' is given it tells these cases apart.
 // Note: do NOT use bg::is_valid() to check the result — it uses strict <
 // and therefore rejects degenerate point bboxes where min == max.
 box2d ComputeWkbBBox(const uint8_t* data, int len, OGCType ogc_type,
-    bool big_endian = false);
+    bool big_endian = false, BBoxStatus* status = nullptr);
 
 // Returns true if bbox is the sentinel value returned by ComputeWkbBBox on error.
 // Uses > (not >=) so degenerate point bboxes (min == max) are accepted as valid.
