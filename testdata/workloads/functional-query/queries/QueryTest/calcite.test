@@ -1684,6 +1684,25 @@ from functional.alltypestiny where id = 1
 SMALLINT,INT,BIGINT,BIGINT,DOUBLE
 ====
 ---- QUERY
+# IMPALA-15877: Use Impala operators for stddev and var functions
+# Calcite creates return type as Decimal, but Impala creates return
+# type as double.
+select
+round(variance(c1), 4),
+round(variance_pop(c1), 4),
+round(variance_samp(c1), 4),
+round(var_pop(c1), 4),
+round(var_samp(c1), 4),
+round(stddev(c1), 4),
+round(stddev_pop(c1), 4),
+round(stddev_samp(c1), 4)
+from functional.decimal_tiny
+---- RESULTS
+10.3889,10.285,10.3889,10.285,10.3889,3.2232,3.207,3.2232
+---- TYPES
+DOUBLE,DOUBLE,DOUBLE,DOUBLE,DOUBLE,DOUBLE,DOUBLE,DOUBLE
+====
+---- QUERY
 # IMPALA-15404: numeric and interval literals are not rewritten. The sign stays
 # folded into the literal, and INTERVAL -1 DAYS still works.
 select -1, -1.5, cast('2024-01-02' as timestamp) + interval -1 days

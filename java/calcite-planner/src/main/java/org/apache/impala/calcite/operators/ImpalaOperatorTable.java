@@ -100,6 +100,14 @@ public class ImpalaOperatorTable extends ReflectiveSqlOperatorTable {
       .add("first_value")
       .add("last_value")
       .add("typeof")
+       // IMPALA-15877: these functions return DECIMAL in Calcite, so we need to use
+       // the Impala version to avoid a crash.
+      .add("variance")
+      .add("var_samp")
+      .add("var_pop")
+      .add("stddev")
+      .add("stddev_samp")
+      .add("stddev_pop")
       .build();
 
   private static ImpalaOperatorTable INSTANCE;
