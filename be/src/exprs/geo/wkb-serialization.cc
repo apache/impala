@@ -273,11 +273,11 @@ StringVal WriteWkbBox(FunctionContext* ctx, const box2d& box) {
 
   polygon2d poly;
   poly.outer().reserve(5);
-  // CW order: matches polygon2d convention (bg::model::polygon<…, ClockWise=true>).
+  // CCW order: matches polygon2d convention (bg::model::polygon<…, ClockWise=false>).
   poly.outer().emplace_back(xmin, ymin);
-  poly.outer().emplace_back(xmin, ymax);
-  poly.outer().emplace_back(xmax, ymax);
   poly.outer().emplace_back(xmax, ymin);
+  poly.outer().emplace_back(xmax, ymax);
+  poly.outer().emplace_back(xmin, ymax);
   poly.outer().emplace_back(xmin, ymin);
   DCHECK(bg::is_valid(poly));
   return WriteWkbPolygon(ctx, poly);

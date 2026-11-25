@@ -441,7 +441,7 @@ TEST_F(WkbRoundTripTest, WriteWkbBox) {
   polygon2d poly;
   ASSERT_TRUE(ReadWkbPolygon(wkb.ptr, wkb.len, poly));
   EXPECT_EQ(poly.outer().size(), 5u);  // closed 5-point rectangle
-  EXPECT_TRUE(bg::is_valid(poly));     // outer ring must be CW (polygon2d convention)
+  EXPECT_TRUE(bg::is_valid(poly));     // outer ring must be CCW (polygon2d convention)
   box2d result = ComputeWkbBBox(wkb.ptr, wkb.len, ST_POLYGON);
   EXPECT_BBOX(result, 1.0, 2.0, 3.0, 4.0);
 }

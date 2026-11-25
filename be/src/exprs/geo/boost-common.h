@@ -28,7 +28,8 @@ namespace bg = boost::geometry;
 using point2d = bg::model::d2::point_xy<double>;
 using box2d = bg::model::box<point2d>;
 using linestring2d = bg::model::linestring<point2d>;
-using polygon2d = bg::model::polygon<point2d, true>;
+// Counter-clockwise exterior rings (holes clockwise): the OGC/GeoJSON right-hand rule.
+using polygon2d = bg::model::polygon<point2d, false>;
 using multipoint2d = bg::model::multi_point<point2d>;
 using multi_linestring2d = bg::model::multi_linestring<linestring2d>;
 using multi_polygon2d = bg::model::multi_polygon<polygon2d>;
